@@ -452,3 +452,130 @@ TEST_CASE("ASCI") {
   MACIS_MPI_CODE(MPI_Barrier(MPI_COMM_WORLD);)
   spdlog::drop_all();
 }
+
+TEST_CASE("ASCI Exponential Backoff", "[asci][backoff]") {
+  using macis::NumElectron;
+  using macis::NumInactive;
+  using macis::NumVirtual;
+
+  // Read Water FCIDUMP
+  const size_t norb = macis::read_fcidump_norb(water_ccpvdz_fcidump);
+  const size_t norb2 = norb * norb;
+  const size_t norb4 = norb2 * norb2;
+
+  std::vector<double> T(norb2), V(norb4);
+  auto E_core = macis::read_fcidump_core(water_ccpvdz_fcidump);
+  macis::read_fcidump_1body(water_ccpvdz_fcidump, T.data(), norb);
+  macis::read_fcidump_2body(water_ccpvdz_fcidump, V.data(), norb);
+
+  // Hamiltonian Generator
+  using wfn_type = macis::wfn_t<64>;
+  using wfn_traits = macis::wavefunction_traits<wfn_type>;
+  using generator_t = macis::DoubleLoopHamiltonianGenerator<wfn_type>;
+  generator_t ham_gen(
+      macis::matrix_span<double>(T.data(), norb, norb),
+      macis::rank4_span<double>(V.data(), norb, norb, norb, norb));
+
+  uint32_t nalpha(5), nbeta(5);
+
+  macis::ASCISettings asci_settings;
+  macis::MCSCFSettings mcscf_settings;
+
+  // HF guess
+  std::vector<wfn_type> dets = {
+      wfn_traits::canonical_hf_determinant(nalpha, nbeta)};
+  std::vector<double> C = {1.0};
+  double E0 = ham_gen.matrix_element(dets[0], dets[0]);
+
+  SECTION("Fractional grow_factor") {
+    // Test that fractional grow_factor works
+    asci_settings.grow_factor = 2.5;
+    asci_settings.ntdets_max = 100;
+    asci_settings.ntdets_min = 10;
+
+    std::tie(E0, dets, C) = macis::asci_grow(
+        asci_settings, mcscf_settings, E0, std::move(dets), std::move(C),
+        ham_gen, norb MACIS_MPI_CODE(, MPI_COMM_WORLD));
+
+    // Should reach target size or close to it
+    REQUIRE(dets.size() >= 50);  // Should grow with factor 2.5
+    REQUIRE(dets.size() <= 100);
+    REQUIRE(C.size() == dets.size());
+    REQUIRE_THAT(std::inner_product(C.begin(), C.end(), C.begin(), 0.0),
+                 Catch::Matchers::WithinAbs(1.0, 1e-10));
+  }
+
+  SECTION("Small grow_factor with backoff") {
+    // Test that small grow_factor triggers backoff and continues
+    asci_settings.grow_factor = 1.1;  // Small growth
+    asci_settings.ntdets_max = 500;
+    asci_settings.ntdets_min = 5;
+    asci_settings.ncdets_max = 20;  // Limit to trigger backoff
+
+    // Reset to HF
+    dets = {wfn_traits::canonical_hf_determinant(nalpha, nbeta)};
+    C = {1.0};
+    const auto E0_hf = ham_gen.matrix_element(dets[0], dets[0]);
+    E0 = E0_hf;
+
+    std::tie(E0, dets, C) = macis::asci_grow(
+        asci_settings, mcscf_settings, E0, std::move(dets), std::move(C),
+        ham_gen, norb MACIS_MPI_CODE(, MPI_COMM_WORLD));
+
+    // Should complete without throwing, even if growth is limited
+    REQUIRE(dets.size() > 1);  // Should grow beyond HF
+    REQUIRE(C.size() == dets.size());
+    REQUIRE_THAT(std::inner_product(C.begin(), C.end(), C.begin(), 0.0),
+                 Catch::Matchers::WithinAbs(1.0, 1e-10));
+    // Energy should be reasonable (better than HF)
+    REQUIRE(E0 < E0_hf);
+  }
+
+  SECTION("Minimum grow_factor behavior") {
+    // Test that grow_factor doesn't go below minimum (1.01)
+    asci_settings.grow_factor = 10.0;  // Start high
+    asci_settings.ntdets_max = 1000;
+    asci_settings.ntdets_min = 5;
+    asci_settings.ncdets_max = 5;  // Very limited to force many backoffs
+
+    // Reset to HF
+    dets = {wfn_traits::canonical_hf_determinant(nalpha, nbeta)};
+    C = {1.0};
+    E0 = ham_gen.matrix_element(dets[0], dets[0]);
+
+    std::tie(E0, dets, C) = macis::asci_grow(
+        asci_settings, mcscf_settings, E0, std::move(dets), std::move(C),
+        ham_gen, norb MACIS_MPI_CODE(, MPI_COMM_WORLD));
+
+    // Should stop gracefully when can't grow anymore
+    REQUIRE(dets.size() > 1);
+    REQUIRE(C.size() == dets.size());
+    REQUIRE_THAT(std::inner_product(C.begin(), C.end(), C.begin(), 0.0),
+                 Catch::Matchers::WithinAbs(1.0, 1e-10));
+  }
+
+  SECTION("Normal growth without backoff") {
+    // Test that normal settings don't trigger backoff
+    asci_settings.grow_factor = 8.0;  // Default
+    asci_settings.ntdets_max = 1000;
+    asci_settings.ntdets_min = 100;
+    asci_settings.ncdets_max = 1000;  // Plenty of room
+
+    // Reset to HF
+    dets = {wfn_traits::canonical_hf_determinant(nalpha, nbeta)};
+    C = {1.0};
+    E0 = ham_gen.matrix_element(dets[0], dets[0]);
+
+    std::tie(E0, dets, C) = macis::asci_grow(
+        asci_settings, mcscf_settings, E0, std::move(dets), std::move(C),
+        ham_gen, norb MACIS_MPI_CODE(, MPI_COMM_WORLD));
+
+    // Should reach target size
+    REQUIRE(dets.size() == 1000);
+    REQUIRE(C.size() == 1000);
+    REQUIRE_THAT(std::inner_product(C.begin(), C.end(), C.begin(), 0.0),
+                 Catch::Matchers::WithinAbs(1.0, 1e-10));
+  }
+
+  spdlog::drop_all();
+}
