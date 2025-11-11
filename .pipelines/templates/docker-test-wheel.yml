@@ -1,0 +1,24 @@
+parameters:
+- name: agentBuildDirectory
+  type: string
+  default: $(Agent.BuildDirectory)
+- name: dockerImage
+  type: string
+  default: ubuntu:22.04
+- name: imageTag
+  type: string
+  default: linux/amd64
+- name: pythonVersion
+  type: string
+  default: 3.11
+
+steps:
+- script: |
+    echo "Running wheel tests in Docker container..."
+    docker run --rm \
+      --platform ${{ parameters.imageTag }} \
+      -v ${{ parameters.agentBuildDirectory }}:/workspace \
+      -w /workspace/qdk-chemistry/python \
+      ${{ parameters.dockerImage }} \
+      bash ../.pipelines/pip-scripts/test-pip-wheels.sh ${{ parameters.pythonVersion }}
+  displayName: Test Wheel in Docker Container
