@@ -1,8 +1,3 @@
-parameters:
-- name: artifactFeed
-  displayName: Azure Artifacts Feed Path 
-  type: string
-
 jobs:
 - job: precommit
   pool:
@@ -19,7 +14,7 @@ jobs:
   - task: PipAuthenticate@1
     displayName: Pip Authenticate
     inputs:
-      artifactFeeds: ${{ parameters.artifactFeed }}
+      artifactFeeds: ""
 
   - script: pip install pre-commit
     displayName: Install pre-commit
