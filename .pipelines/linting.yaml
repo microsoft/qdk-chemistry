@@ -1,6 +1,6 @@
 parameters:
 - name: artifactFeed
-  displayName: Azure Artifacts Feed Path (format: Organization/FeedName)
+  displayName: Azure Artifacts Feed Path 
   type: string
 
 jobs:
