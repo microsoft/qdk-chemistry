@@ -27,22 +27,6 @@ parameters:
   - x86-64-v3
   - native
 
-- name: cpuPool
-  displayName: The pool to use for CPU only jobs
-  type: string
-- name: gpuPool
-  displayName: The pool to use for GPU jobs
-  type: string
-- name: artifactOrganization
-  displayName: Azure DevOps Organization URL
-  type: string
-- name: artifactProject
-  displayName: Azure DevOps Project ID
-  type: string
-- name: artifactFeed
-  displayName: Azure Artifacts Feed Name
-  type: string
-
 resources:
   repositories:
   - repository: self
@@ -54,6 +38,12 @@ variables:
     march: x86-64
   ${{ else }}:
     march: ${{ parameters.march }}
+  # ADO Pipeline Variables - Set these in your Azure DevOps pipeline configuration
+  cpuPool: 'YOUR_CPU_POOL_NAME'  # The pool to use for CPU only jobs
+  gpuPool: 'YOUR_GPU_POOL_NAME'  # The pool to use for GPU jobs
+  artifactOrganization: 'https://dev.azure.com/YOUR_ORGANIZATION/'  # Azure DevOps Organization URL
+  artifactProject: 'YOUR_PROJECT_ID'  # Azure DevOps Project ID
+  artifactFeed: 'YOUR_FEED_NAME'  # Azure Artifacts Feed Name
 
 stages:
 - stage: Coverage
@@ -61,7 +51,7 @@ stages:
   jobs:
   - job: Coverage
     displayName: Coverage
-    pool: ${{ parameters.cpuPool }}
+    pool: $(cpuPool)
     timeoutInMinutes: 240
     variables:
       LD_LIBRARY_PATH: $LD_LIBRARY_PATH:/usr/local/lib
@@ -79,8 +69,8 @@ stages:
         buildTesting: ON
         agentBuildDirectory: $(Agent.BuildDirectory)
         systemDefaultWorkingDirectory: $(System.DefaultWorkingDirectory)
-        artifactProject: ${{ parameters.artifactProject }}
-        artifactFeed: ${{ parameters.artifactFeed }}
+        artifactProject: $(artifactProject)
+        artifactFeed: $(artifactFeed)
 
     # C++ Tests with Coverage
     - script: |
