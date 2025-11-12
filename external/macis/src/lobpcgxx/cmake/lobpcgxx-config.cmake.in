@@ -1,0 +1,18 @@
+cmake_minimum_required( VERSION 3.13 FATAL_ERROR )
+
+get_filename_component( lobpcgxx_CMAKE_DIR "${CMAKE_CURRENT_LIST_FILE}" PATH )
+
+#list( APPEND CMAKE_MODULE_PATH ${lobpcgxx_CMAKE_DIR} )
+include( CMakeFindDependencyMacro )
+find_dependency( OpenMP )
+find_dependency( blaspp )
+find_dependency( lapackpp )
+
+
+#list(REMOVE_AT CMAKE_MODULE_PATH -1)
+
+if(NOT TARGET lobpcgxx::lobpcgxx)
+    include("${lobpcgxx_CMAKE_DIR}/lobpcgxx-targets.cmake")
+endif()
+
+set(lobpcgxx_LIBRARIES lobpcgxx::lobpcgxx)

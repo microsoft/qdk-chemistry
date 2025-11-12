@@ -1,0 +1,12 @@
+[CI]
+NALPHA = 4
+NBETA  = 4
+REF_DATA_FORMAT = FCIDUMP
+REF_DATA_FILE   = ../../../data/electronic/8e8o_h8_chain/h8_chain_8e8o.fcidump
+JOB = CI
+EXPANSION = CAS
+
+[PRINT]
+CI = TRUE
+DAVIDSON = TRUE
+DETERMINANTS = TRUE

@@ -1,0 +1,25 @@
+#pragma once
+#include <filesystem>
+
+#cmakedefine QDK_CHEMISTRY_ENABLE_MPI
+#cmakedefine QDK_CHEMISTRY_ENABLE_GPU
+#cmakedefine QDK_CHEMISTRY_ENABLE_HGP
+#cmakedefine QDK_CHEMISTRY_ENABLE_RYS
+#cmakedefine QDK_CHEMISTRY_ENABLE_LIBINTX
+#cmakedefine QDK_CHEMISTRY_ENABLE_QMMM
+#cmakedefine QDK_CHEMISTRY_ENABLE_PCM
+#cmakedefine QDK_CHEMISTRY_ENABLE_DFTD3
+
+namespace qdk::chemistry::scf {
+
+class QDKChemistryConfig {
+ private:
+  QDKChemistryConfig() = default;  // Singleton Pattern for the config
+  static std::filesystem::path resources_dir_;
+
+ public:
+  static std::filesystem::path get_resources_dir();
+  static void set_resources_dir(const std::filesystem::path& path);
+};
+
+}  // namespace qdk::chemistry::scf

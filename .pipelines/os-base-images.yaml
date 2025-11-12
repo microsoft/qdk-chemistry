@@ -19,31 +19,10 @@ pr:
   drafts: true
 
 parameters:
-- name: amd64CpuPool
-  displayName: The pool to use for AMD64 CPU builds
-  type: string
-- name: arm64CpuPool
-  displayName: The pool to use for ARM64 CPU builds
-  type: string
-- name: amd64GpuPool
-  displayName: The pool to use for AMD64 GPU builds
-  type: string
 - name: forcePublishing
   displayName: Force the publishing of resulting artifacts
   default: false
   type: boolean
-- name: publishingRegistryServiceConnection
-  displayName: Registry Service Connection
-  type: string
-- name: publishingRegistry
-  displayName: Registry URL
-  type: string
-- name: developmentRegistryServiceConnection
-  displayName: Development Registry Service Connection
-  type: string
-- name: developmentRegistry
-  displayName: Development Registry URL
-  type: string
 - name: cudaVersion
   displayName: CUDA Version for GPU images
   default: 12.1.0
@@ -58,8 +37,11 @@ resources:
   - repository: self
 
 variables:
-  date: $[format('{0:yyyy}.{0:MM}.{0:dd}', pipeline.startTime)]
-  baseImageName: azurelinux-base
+- group: QdkChemistry
+- name: date
+  value: $[format('{0:yyyy}.{0:MM}.{0:dd}', pipeline.startTime)]
+- name: baseImageName
+  value: azurelinux-base
 
 stages:
 
@@ -77,7 +59,7 @@ stages:
         cpu_amd64_py310:
           architecture: amd64
           platform: linux/amd64
-          pool: ${{ parameters.amd64CpuPool }}
+          pool: $(CPU_POOL_X86)
           pythonVersion: '3.10'
           imageType: cpu
           cudaArch: none
@@ -85,7 +67,7 @@ stages:
         cpu_amd64_py311:
           architecture: amd64
           platform: linux/amd64
-          pool: ${{ parameters.amd64CpuPool }}
+          pool: $(CPU_POOL_X86)
           pythonVersion: '3.11'
           imageType: cpu
           cudaArch: none
@@ -93,7 +75,7 @@ stages:
         cpu_amd64_py312:
           architecture: amd64
           platform: linux/amd64
-          pool: ${{ parameters.amd64CpuPool }}
+          pool: $(CPU_POOL_X86)
           pythonVersion: '3.12'
           imageType: cpu
           cudaArch: none
@@ -101,7 +83,7 @@ stages:
         cpu_amd64_py313:
           architecture: amd64
           platform: linux/amd64
-          pool: ${{ parameters.amd64CpuPool }}
+          pool: $(CPU_POOL_X86)
           pythonVersion: '3.13'
           imageType: cpu
           cudaArch: none
@@ -110,7 +92,7 @@ stages:
         cpu_arm64_py310:
           architecture: arm64
           platform: linux/arm64
-          pool: ${{ parameters.arm64CpuPool }}
+          pool: $(CPU_POOL_ARM)
           pythonVersion: '3.10'
           imageType: cpu
           cudaArch: none
@@ -118,7 +100,7 @@ stages:
         cpu_arm64_py311:
           architecture: arm64
           platform: linux/arm64
-          pool: ${{ parameters.arm64CpuPool }}
+          pool: $(CPU_POOL_ARM)
           pythonVersion: '3.11'
           imageType: cpu
           cudaArch: none
@@ -126,7 +108,7 @@ stages:
         cpu_arm64_py312:
           architecture: arm64
           platform: linux/arm64
-          pool: ${{ parameters.arm64CpuPool }}
+          pool: $(CPU_POOL_ARM)
           pythonVersion: '3.12'
           imageType: cpu
           cudaArch: none
@@ -134,7 +116,7 @@ stages:
         cpu_arm64_py313:
           architecture: arm64
           platform: linux/arm64
-          pool: ${{ parameters.arm64CpuPool }}
+          pool: $(CPU_POOL_ARM)
           pythonVersion: '3.13'
           imageType: cpu
           cudaArch: none
@@ -144,7 +126,7 @@ stages:
         sm90_amd64_py310:
           architecture: amd64
           platform: linux/amd64
-          pool: ${{ parameters.amd64GpuPool }}
+          pool: $(GPU_POOL_X86_SM80)
           pythonVersion: '3.10'
           imageType: gpu
           cudaArch: '90'
@@ -153,7 +135,7 @@ stages:
         sm90_amd64_py311:
           architecture: amd64
           platform: linux/amd64
-          pool: ${{ parameters.amd64GpuPool }}
+          pool: $(GPU_POOL_X86_SM80)
           pythonVersion: '3.11'
           imageType: gpu
           cudaArch: '90'
@@ -162,7 +144,7 @@ stages:
         sm90_amd64_py312:
           architecture: amd64
           platform: linux/amd64
-          pool: ${{ parameters.amd64GpuPool }}
+          pool: $(GPU_POOL_X86_SM80)
           pythonVersion: '3.12'
           imageType: gpu
           cudaArch: '90'
@@ -171,7 +153,7 @@ stages:
         sm90_amd64_py313:
           architecture: amd64
           platform: linux/amd64
-          pool: ${{ parameters.amd64GpuPool }}
+          pool: $(GPU_POOL_X86_SM80)
           pythonVersion: '3.13'
           imageType: gpu
           cudaArch: '90'
@@ -181,7 +163,7 @@ stages:
         sm80_amd64_py310:
           architecture: amd64
           platform: linux/amd64
-          pool: ${{ parameters.amd64GpuPool }}
+          pool: $(GPU_POOL_X86_SM80)
           pythonVersion: '3.10'
           imageType: gpu
           cudaArch: '80'
@@ -190,7 +172,7 @@ stages:
         sm80_amd64_py311:
           architecture: amd64
           platform: linux/amd64
-          pool: ${{ parameters.amd64GpuPool }}
+          pool: $(GPU_POOL_X86_SM80)
           pythonVersion: '3.11'
           imageType: gpu
           cudaArch: '80'
@@ -199,7 +181,7 @@ stages:
         sm80_amd64_py312:
           architecture: amd64
           platform: linux/amd64
-          pool: ${{ parameters.amd64GpuPool }}
+          pool: $(GPU_POOL_X86_SM80)
           pythonVersion: '3.12'
           imageType: gpu
           cudaArch: '80'
@@ -208,7 +190,7 @@ stages:
         sm80_amd64_py313:
           architecture: amd64
           platform: linux/amd64
-          pool: ${{ parameters.amd64GpuPool }}
+          pool: $(GPU_POOL_X86_SM80)
           pythonVersion: '3.13'
           imageType: gpu
           cudaArch: '80'
@@ -231,7 +213,7 @@ stages:
       displayName: Container repo login
       inputs:
         command: login
-        containerRegistry: ${{ parameters.developmentRegistryServiceConnection }}
+        containerRegistry: $(DEV_ACR_SC)
 
     # Build Docker image using buildx for multi-platform support
     - script: |
@@ -247,7 +229,7 @@ stages:
         dockerfile: $(Agent.BuildDirectory)/qatk/.pipelines/bases/azurelinux/Dockerfile
         buildContext: $(Agent.BuildDirectory)/qatk/.pipelines/bases/azurelinux
         repository: $(baseImageName)-$(imageSuffix)
-        containerRegistry: ${{ parameters.developmentRegistryServiceConnection }}
+        containerRegistry: $(DEV_ACR_SC)
         arguments: |
           --platform $(platform)
           --build-arg PYTHON_VERSION=$(pythonVersion)
@@ -265,14 +247,14 @@ stages:
       inputs:
         command: push
         repository: $(baseImageName)-$(imageSuffix)
-        containerRegistry: ${{ parameters.developmentRegistryServiceConnection }}
+        containerRegistry: $(DEV_ACR_SC)
         tags: |
           $(gitHash)
 
     # Test the built image
     - script: |
         echo "Testing the built QDK Azure Linux Base image..."
-        docker run --rm --platform $(platform) ${{ parameters.developmentRegistry }}/$(baseImageName)-$(imageSuffix):$(gitHash) /bin/bash -c "
+        docker run --rm --platform $(platform) $(DEV_ACR)/$(baseImageName)-$(imageSuffix):$(gitHash) /bin/bash -c "
           echo 'Testing Python $(pythonVersion) installation...' &&
           python3 --version &&
           python3 -c 'import sys; print(\"Python version:\", sys.version)' &&
@@ -294,7 +276,7 @@ stages:
     # Test GPU-specific components for GPU images
     - script: |
         echo "Testing GPU components in the image..."
-        docker run --rm --platform $(platform) ${{ parameters.developmentRegistry }}/$(baseImageName)-$(imageSuffix):$(gitHash) /bin/bash -c "
+        docker run --rm --platform $(platform) $(DEV_ACR)/$(baseImageName)-$(imageSuffix):$(gitHash) /bin/bash -c "
           echo 'Testing CUDA installation...' &&
           nvidia-smi --version || echo 'NVIDIA SMI not available (expected in container)' &&
           nvcc --version || echo 'NVCC not available' &&
@@ -308,10 +290,10 @@ stages:
     # Output image information
     - script: |
         echo "QDK Azure Linux Base Docker image built successfully!"
-        echo "Registry: ${{ parameters.developmentRegistry }}"
+        echo "Registry: $(DEV_ACR)"
         echo "Image: $(baseImageName)-$(imageSuffix)"
         echo "Hash Tag: $(gitHash)"
-        echo "Full image name: ${{ parameters.developmentRegistry }}/$(baseImageName)-$(imageSuffix):$(gitHash)"
+        echo "Full image name: $(DEV_ACR)/$(baseImageName)-$(imageSuffix):$(gitHash)"
         echo "Platform: $(platform)"
         echo "Python Version: $(pythonVersion)"
         echo "Image Type: $(imageType)"
@@ -322,10 +304,10 @@ stages:
         fi
         echo ""
         echo "To use this image locally:"
-        echo "docker pull ${{ parameters.developmentRegistry }}/$(baseImageName)-$(imageSuffix):$(gitHash)"
+        echo "docker pull $(DEV_ACR)/$(baseImageName)-$(imageSuffix):$(gitHash)"
         echo ""
         echo "To run the container:"
-        echo "docker run -it --rm ${{ parameters.developmentRegistry }}/$(baseImageName)-$(imageSuffix):$(gitHash)"
+        echo "docker run -it --rm $(DEV_ACR)/$(baseImageName)-$(imageSuffix):$(gitHash)"
       displayName: Output Image Information
 
 - stage: PublishLatest
@@ -391,7 +373,7 @@ stages:
           platform: linux/amd64
       maxParallel: 6
     displayName: Publish Latest Tag
-    pool: ${{ parameters.amd64CpuPool }}
+    pool: $(CPU_POOL_X86)
     timeoutInMinutes: 60
     variables:
       gitHash: $[stageDependencies.Hash.GenerateTagHashs.outputs['hashingStep.gitHash']]
@@ -402,43 +384,43 @@ stages:
       displayName: Container repo login (development)
       inputs:
         command: login
-        containerRegistry: ${{ parameters.developmentRegistryServiceConnection }}
+        containerRegistry: $(DEV_ACR_SC)
 
     - task: Docker@2
       displayName: Container repo login (publishing)
       inputs:
         command: login
-        containerRegistry: ${{ parameters.publishingRegistryServiceConnection }}
+        containerRegistry: $(PUB_ACR_SC)
 
     # Pull the hash-tagged image
     - script: |
-        docker pull ${{ parameters.developmentRegistry }}/$(baseImageName)-$(imageSuffix):$(gitHash)
+        docker pull $(DEV_ACR)/$(baseImageName)-$(imageSuffix):$(gitHash)
       displayName: Pull Hash-Tagged Image
 
     # Tag and push as latest to development registry
     - script: |
-        docker tag ${{ parameters.developmentRegistry }}/$(baseImageName)-$(imageSuffix):$(gitHash) ${{ parameters.developmentRegistry }}/$(baseImageName)-$(imageSuffix):latest
-        docker push ${{ parameters.developmentRegistry }}/$(baseImageName)-$(imageSuffix):latest
+        docker tag $(DEV_ACR)/$(baseImageName)-$(imageSuffix):$(gitHash) $(DEV_ACR)/$(baseImageName)-$(imageSuffix):latest
+        docker push $(DEV_ACR)/$(baseImageName)-$(imageSuffix):latest
       displayName: Push Latest Tag to Development Registry
 
     # Tag and push to publishing registry if different
     - script: |
-        if [ "${{ parameters.developmentRegistry }}" != "${{ parameters.publishingRegistry }}" ]; then
-          echo "Publishing to external registry: ${{ parameters.publishingRegistry }}"
-          docker tag ${{ parameters.developmentRegistry }}/$(baseImageName)-$(imageSuffix):$(gitHash) ${{ parameters.publishingRegistry }}/$(baseImageName)-$(imageSuffix):$(gitHash)
-          docker tag ${{ parameters.developmentRegistry }}/$(baseImageName)-$(imageSuffix):$(gitHash) ${{ parameters.publishingRegistry }}/$(baseImageName)-$(imageSuffix):latest
-          docker push ${{ parameters.publishingRegistry }}/$(baseImageName)-$(imageSuffix):$(gitHash)
-          docker push ${{ parameters.publishingRegistry }}/$(baseImageName)-$(imageSuffix):latest
+        if [ "$(DEV_ACR)" != "$(PUB_ACR)" ]; then
+          echo "Publishing to external registry: $(PUB_ACR)"
+          docker tag $(DEV_ACR)/$(baseImageName)-$(imageSuffix):$(gitHash) $(PUB_ACR)/$(baseImageName)-$(imageSuffix):$(gitHash)
+          docker tag $(DEV_ACR)/$(baseImageName)-$(imageSuffix):$(gitHash) $(PUB_ACR)/$(baseImageName)-$(imageSuffix):latest
+          docker push $(PUB_ACR)/$(baseImageName)-$(imageSuffix):$(gitHash)
+          docker push $(PUB_ACR)/$(baseImageName)-$(imageSuffix):latest
         else
           echo "Development and publishing registries are the same, skipping duplicate push"
         fi
       displayName: Push to Publishing Registry
-      condition: ne('${{ parameters.publishingRegistry }}', '')
+      condition: ne('$(PUB_ACR)', '')
 
     - script: |
         echo "Latest tag published successfully!"
-        echo "Development Registry: ${{ parameters.developmentRegistry }}/$(baseImageName)-$(imageSuffix):latest"
-        if [ "${{ parameters.developmentRegistry }}" != "${{ parameters.publishingRegistry }}" ]; then
-          echo "Publishing Registry: ${{ parameters.publishingRegistry }}/$(baseImageName)-$(imageSuffix):latest"
+        echo "Development Registry: $(DEV_ACR)/$(baseImageName)-$(imageSuffix):latest"
+        if [ "$(DEV_ACR)" != "$(PUB_ACR)" ]; then
+          echo "Publishing Registry: $(PUB_ACR)/$(baseImageName)-$(imageSuffix):latest"
         fi
       displayName: Output Publishing Information

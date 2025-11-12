@@ -27,12 +27,6 @@ parameters:
     arch: aarch64
     march: armv8-a
     imageName: qd-azurelinux3-pt-arm
-- name: cpuPoolX86
-  displayName: The pool to use for x86_64 CPU builds
-  type: string
-- name: cpuPoolArm
-  displayName: The pool to use for ARM64 CPU builds
-  type: string
 - name: pcmsolverRef
   displayName: pcmsolver Reference
   default: msft_develop
@@ -49,12 +43,6 @@ parameters:
   displayName: Force Artifact Upload
   type: boolean
   default: false
-- name: artifactProject
-  displayName: Azure DevOps Project ID
-  type: string
-- name: artifactFeed
-  displayName: Azure Artifacts Feed Name
-  type: string
 
 resources:
   repositories:
@@ -73,6 +61,9 @@ resources:
     name: AzureQuantum/GauXC
     ref: ${{ parameters.gauXCRef }}
 
+variables:
+- group: QdkChemistry
+
 stages:
 - stage: Build
   displayName: Build C++ Deps and Python Wheels
@@ -81,14 +72,14 @@ stages:
     - job: Build_${{ target.name }}
       ${{ if eq(target.arch, 'aarch64') }}:
         pool:
-          name: ${{ parameters.cpuPoolArm }}
+          name: $(CPU_POOL_ARM)
           demands:
           - ImageOverride -equals ${{ target.imageName }}
           os: ${{ target.os }}
           hostArchitecture: Arm64
       ${{ if eq(target.arch, 'x86_64') }}:
         pool:
-          name: ${{ parameters.cpuPoolX86 }}
+          name: $(CPU_POOL_X86)
           demands:
           - ImageOverride -equals ${{ target.imageName }}
           os: ${{ target.os }}
@@ -161,13 +152,13 @@ stages:
       - task: TwineAuthenticate@1
         displayName: Twine Authenticate for wheel upload
         inputs:
-          artifactFeed: ${{ parameters.artifactProject }}/${{ parameters.artifactFeed }}
+          $(DEPENDENCIES_ARTIFACT_FEED): $(DEPENDENCIES_ARTIFACT_PROJECT)/$(DEPENDENCIES_ARTIFACT_FEED)
         condition: and(succeeded(), eq(variables['Build.SourceBranch'], 'refs/heads/main'), ne(variables['Build.Reason'], 'PullRequest'))
 
       - script: |
           cd $(Agent.BuildDirectory)/qdk-chemistry/python
           pip install --user twine
-          python3 -m twine upload -r ${{ parameters.artifactFeed }} repaired_wheelhouse/*.whl --config-file $(PYPIRC_PATH)
+          python3 -m twine upload -r $(DEPENDENCIES_ARTIFACT_FEED) repaired_wheelhouse/*.whl --config-file $(PYPIRC_PATH)
         displayName: Upload wheel with twine
         condition: and(succeeded(), eq(variables['Build.SourceBranch'], 'refs/heads/main'), ne(variables['Build.Reason'], 'PullRequest'))
 
@@ -175,13 +166,13 @@ stages:
       - task: TwineAuthenticate@1
         displayName: Twine Authenticate for wheel upload
         inputs:
-          artifactFeed: ${{ parameters.artifactProject }}/${{ parameters.artifactFeed }}
+          $(DEPENDENCIES_ARTIFACT_FEED): $(DEPENDENCIES_ARTIFACT_PROJECT)/$(DEPENDENCIES_ARTIFACT_FEED)
         condition: and(succeeded(), eq(${{ parameters.forceArtifactUpload }}, true))
 
       - script: |
           echo "WARNING: Forcing artifact upload. This is intended for debugging purposes only."
           cd $(Agent.BuildDirectory)/qdk-chemistry/python
           pip install --user twine
-          python3 -m twine upload -r ${{ parameters.artifactFeed }} repaired_wheelhouse/*.whl --config-file $(PYPIRC_PATH)
+          python3 -m twine upload -r $(DEPENDENCIES_ARTIFACT_FEED) repaired_wheelhouse/*.whl --config-file $(PYPIRC_PATH)
         displayName: Upload wheel with twine
         condition: and(succeeded(), eq(${{ parameters.forceArtifactUpload }}, true))

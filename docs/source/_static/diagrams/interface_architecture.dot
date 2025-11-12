@@ -1,0 +1,17 @@
+digraph InterfaceArchitecture {
+    rankdir=TB;
+    bgcolor="#FAFAFA";
+    node [shape=box, style="rounded,filled", fontname="Arial", margin=0.3];
+    edge [color="#1976D2", penwidth=2];
+
+    UserCode [label="User Code", fillcolor="#E8EAF6", color="#5C6BC0", penwidth=2, fontcolor="#3949AB"];
+    API [label="QDK/Chemistry Algorithm API", fillcolor="#E3F2FD", color="#42A5F5", penwidth=2, fontcolor="#1976D2"];
+    Native [label="Native Implementation", fillcolor="#E0F2F1", color="#26A69A", penwidth=2, fontcolor="#00796B"];
+    ThirdParty [label="Third-Party Interface", fillcolor="#E0F2F1", color="#26A69A", penwidth=2, fontcolor="#00796B"];
+    External [label="External Package", fillcolor="#F3E5F5", color="#AB47BC", penwidth=2, fontcolor="#7B1FA2"];
+
+    UserCode -> API;
+    API -> Native;
+    API -> ThirdParty;
+    ThirdParty -> External;
+}

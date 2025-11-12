@@ -6,7 +6,7 @@
 trigger:
   branches:
     include:
-    - main
+    - '*'
 
 # Trigger this pipeline on PRs targeting any branch
 pr:
@@ -33,17 +33,14 @@ resources:
     path: qdk-chemistry
 
 variables:
-  date: $[format('{0:yyyy}.{0:MM}.{0:dd}', pipeline.startTime)]
-  ${{ if eq(parameters.march, 'x86-64-v3') }}:  # -march=x86-64-v3 flag not supported by GCC < 12
-    march: x86-64
+- group: QdkChemistry
+- name: date
+  value: $[format('{0:yyyy}.{0:MM}.{0:dd}', pipeline.startTime)]
+- name: march
+  ${{ if eq(parameters.march, 'x86-64-v3') }}:
+    value: x86-64
   ${{ else }}:
-    march: ${{ parameters.march }}
-  # ADO Pipeline Variables - Set these in your Azure DevOps pipeline configuration
-  cpuPool: 'YOUR_CPU_POOL_NAME'  # The pool to use for CPU only jobs
-  gpuPool: 'YOUR_GPU_POOL_NAME'  # The pool to use for GPU jobs
-  artifactOrganization: 'https://dev.azure.com/YOUR_ORGANIZATION/'  # Azure DevOps Organization URL
-  artifactProject: 'YOUR_PROJECT_ID'  # Azure DevOps Project ID
-  artifactFeed: 'YOUR_FEED_NAME'  # Azure Artifacts Feed Name
+    value: ${{ parameters.march }}
 
 stages:
 - stage: Coverage
@@ -51,7 +48,7 @@ stages:
   jobs:
   - job: Coverage
     displayName: Coverage
-    pool: $(cpuPool)
+    pool: $(CPU_POOL_X86)
     timeoutInMinutes: 240
     variables:
       LD_LIBRARY_PATH: $LD_LIBRARY_PATH:/usr/local/lib
@@ -69,8 +66,8 @@ stages:
         buildTesting: ON
         agentBuildDirectory: $(Agent.BuildDirectory)
         systemDefaultWorkingDirectory: $(System.DefaultWorkingDirectory)
-        artifactProject: $(artifactProject)
-        artifactFeed: $(artifactFeed)
+        artifactProject: $(DEPENDENCIES_ARTIFACT_PROJECT)
+        artifactFeed: $(DEPENDENCIES_ARTIFACT_FEED)
 
     # C++ Tests with Coverage
     - script: |

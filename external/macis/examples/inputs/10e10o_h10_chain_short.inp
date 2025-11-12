@@ -1,0 +1,15 @@
+[CI]
+NALPHA = 5
+NBETA  = 5
+REF_DATA_FORMAT = FCIDUMP
+REF_DATA_FILE   = ../../../data/electronic/10e10o_h10_chain_short/h10_chain_short_10e10o.fcidump
+JOB = CI
+EXPANSION = CAS
+
+[PRINT]
+CI = TRUE
+DAVIDSON = TRUE
+DETERMINANTS = TRUE
+
+[SOLVER]
+CI_MAX_SUB = 100

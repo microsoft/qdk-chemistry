@@ -1,0 +1,3 @@
+{
+ "UKS-DFJ/PBE/sto-3g/def2-universal-jfit/pure": {"mol": "bf", "charge": 0, "multiplicity": 1, "basis": "sto-3g", "aux_basis": "def2-universal-jfit", "cart": false, "functional": "PBE", "method": "UKS", "dfj": true, "energy": -122.732943463018, "gradient": [0.0, 0.0, -0.0187560935, 0.0, 0.0, 0.0187556146],"polarizability": [6.971666216739, -0.000000000000, -0.000000000001, -0.000000000000, 6.971666216739, -0.000000000000, -0.000000000000, 0.000000000004, 6.715528675197]}
+}

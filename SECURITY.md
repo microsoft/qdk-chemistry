@@ -1,6 +1,6 @@
 <!-- BEGIN MICROSOFT SECURITY.MD V1.0.0 BLOCK -->
 
-## Security
+# Security
 
 Microsoft takes the security of our software products and services seriously, which
 includes all source code repositories in our GitHub organizations.

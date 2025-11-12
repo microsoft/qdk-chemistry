@@ -1,0 +1,32 @@
+{
+"def2-svp/pipek-mezey" : {
+  "mol": "benzene",
+  "charge": 0,
+  "multiplicity" : 1,
+  "basis": "def2-svp",
+  "cart" : false,
+  "functional": "HF",
+  "method": "RHF",
+  "energy": -230.535764726136,
+  "localization_method": "PipekMezey",
+  "localization_metric_occupied": 1.349643e+01,
+  "localization_metric_virtual": 3.521506e+02,
+  "localize_occupied": true,
+  "localize_virtual": true
+},
+"def2-svp/foster-boys" : {
+  "mol": "benzene",
+  "charge": 0,
+  "multiplicity" : 1,
+  "basis": "def2-svp",
+  "cart" : false,
+  "functional": "HF",
+  "method": "RHF",
+  "energy": -230.535764726136,
+  "localization_method": "FosterBoys",
+  "localization_metric_occupied": 1.824004e+02,
+  "localization_metric_virtual": 1.347891e+03,
+  "localize_occupied": true,
+  "localize_virtual": true
+}
+}

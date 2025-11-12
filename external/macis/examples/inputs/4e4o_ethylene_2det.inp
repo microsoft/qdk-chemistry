@@ -1,0 +1,12 @@
+[CI]
+NALPHA = 2
+NBETA  = 2
+REF_DATA_FORMAT = FCIDUMP
+REF_DATA_FILE   = ../../../data/electronic/4e4o_ethylene_2det/4e4o_ethylene_2det.fcidump
+JOB = CI
+EXPANSION = CAS
+
+[PRINT]
+CI = TRUE
+DAVIDSON = TRUE
+DETERMINANTS = TRUE

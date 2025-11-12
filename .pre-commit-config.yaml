@@ -1,0 +1,126 @@
+default_stages: [pre-commit, pre-push]
+
+# Define the list of directories to lint
+# You can extend this list to include more directories over time
+files: &linted_files .*
+exclude: \.(xyz|fcidump|wfn|qasm)$
+
+repos:
+- repo: https://github.com/pre-commit/pre-commit-hooks
+  rev: v5.0.0
+  hooks:
+  - id: check-added-large-files
+    files: *linted_files
+    args: [--maxkb=500000]
+  - id: check-merge-conflict
+    files: ^(?!(qatk/.*\.rst$)).*$
+  - id: check-yaml
+    files: *linted_files
+  - id: check-json
+  - id: check-ast
+    files: *linted_files
+  - id: mixed-line-ending
+    args: [--fix=lf]
+    files: *linted_files
+  - id: trailing-whitespace
+    files: *linted_files
+  - id: end-of-file-fixer
+    files: *linted_files
+  - id: debug-statements
+    files: *linted_files
+  - id: check-case-conflict
+  - id: check-docstring-first
+    files: *linted_files
+  - id: detect-private-key
+
+
+- repo: https://github.com/gitleaks/gitleaks
+  rev: v8.24.2
+  hooks:
+  - id: gitleaks
+
+- repo: https://github.com/econchick/interrogate
+  rev: 1.7.0
+  hooks:
+  - id: interrogate
+    args: [--fail-under=80, --verbose, --ignore-init-method]
+    files: *linted_files
+    exclude: docs/
+
+- repo: https://github.com/pre-commit/mirrors-clang-format
+  rev: v20.1.7
+  hooks:
+  - id: clang-format
+    files: &all_cpp >
+      (?x)^(
+        .*\.(cpp|h|hpp|cxx|cc)$|
+      )$
+
+- repo: https://github.com/macisamuele/language-formatters-pre-commit-hooks
+  rev: v2.15.0
+  hooks:
+  - id: pretty-format-yaml
+    args: [--autofix]
+    files: &all_yaml >
+      (?x)^(
+        .*\.yaml$|
+      )$
+
+- repo: https://github.com/astral-sh/ruff-pre-commit
+  rev: v0.12.2
+  hooks:
+  - id: ruff-format
+    files: &all_py >
+      (?x)^(
+        .*\.py$|
+      )$
+  - id: ruff
+    args: [--fix, --output-format=concise]
+    files: *all_py
+
+- repo: https://github.com/igorshubovych/markdownlint-cli
+  rev: v0.45.0
+  hooks:
+  - id: markdownlint
+    args: [--fix, --disable=line-length, --disable=MD024, --disable=MD029, --disable=MD033]
+    files: &all_md >
+      (?x)^(
+        .*\.md$|
+      )$
+
+- repo: https://github.com/pre-commit/mirrors-mypy
+  rev: v1.16.1
+  hooks:
+  - id: mypy
+    args: [--ignore-missing-imports, --explicit-package-bases, --check-untyped-defs]
+    files: *all_py
+
+- repo: local
+  hooks:
+  - id: check-license-headers
+    name: Check License Headers
+    description: Verify all source files have the correct Microsoft license header
+    entry: python3 .github/scripts/check_license_headers.py
+    language: system
+    pass_filenames: true
+    require_serial: true
+    files: &all_source_files >
+      (?x)^(
+        .*\.(cpp|h|hpp|cxx|cc|c|py)$
+      )$
+    exclude: ^(external/|.*build/)
+
+  - id: check-version-alignment
+    name: Check Version Alignment
+    description: Verify all version strings in the codebase are aligned
+    entry: python3 .github/scripts/check_version_alignment.py
+    language: system
+    pass_filenames: false
+    require_serial: true
+    files: >
+      (?x)^(
+        python/src/qdk/chemistry/__init__\.py|
+        python/CMakeLists\.txt|
+        cpp/CMakeLists\.txt|
+        docs/source/conf\.py
+      )$

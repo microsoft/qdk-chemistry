@@ -1,0 +1,12 @@
+[CI]
+NALPHA = 1
+NBETA  = 1
+REF_DATA_FORMAT = FCIDUMP
+REF_DATA_FILE   = ../../../data/electronic/2e2o_fe-pnnp/2e2o_fe-pnnp.fcidump
+JOB = CI
+EXPANSION = CAS
+
+[PRINT]
+CI = TRUE
+DAVIDSON = TRUE
+DETERMINANTS = TRUE

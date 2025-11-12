@@ -1,0 +1,50 @@
+if(DEFINED ENV{CUTENSOR_ROOT} AND NOT DEFINED CUTENSOR_ROOT)
+  set(CUTENSOR_ROOT "$ENV{CUTENSOR_ROOT}")
+endif()
+
+
+
+# Find Library
+set(CUTENSOR_LIBRARY_NAME "libcutensor.so")
+
+find_package(CUDAToolkit REQUIRED QUIET)
+if("${CUDAToolkit_VERSION_MAJOR}.${CUDAToolkit_VERSION_MINOR}" VERSION_GREATER_EQUAL "11.1")
+  set(CUTENSOR_LIBRARY_PATH "lib/${CUDAToolkit_VERSION_MAJOR}")
+else()
+  set(CUTENSOR_LIBRARY_PATH "lib/${CUDAToolkit_VERSION_MAJOR}.${CUDAToolkit_VERSION_MINOR}")
+endif()
+
+find_library(
+  CUTENSOR_LIBRARIES
+  "${CUTENSOR_LIBRARY_NAME}"
+  HINTS "${CUTENSOR_ROOT}"
+  PATH_SUFFIXES "${CUTENSOR_LIBRARY_PATH}"
+)
+
+if(NOT CUTENSOR_LIBRARIES)
+  message(FATAL_ERROR "cuTensor NOT FOUND")
+else()
+  message(STATUS "cuTensor Library Found at: ${CUTENSOR_LIBRARIES}")
+endif()
+
+
+# Find Headers
+set(CUTENSOR_HEADER_NAME "cutensor.h")
+find_path(
+  CUTENSOR_INCLUDE_DIRECTORY
+  "${CUTENSOR_HEADER_NAME}"
+  HINTS "${CUTENSOR_ROOT}"
+  PATH_SUFFIXES "include"
+)
+
+if(NOT CUTENSOR_INCLUDE_DIRECTORY)
+  message(FATAL_ERROR "cuTensor Headers NOT FOUND")
+else()
+  message(STATUS "cuTensor Headers Found at: ${CUTENSOR_INCLUDE_DIRECTORY}")
+endif()
+
+add_library(cutensor SHARED IMPORTED)
+set_target_properties(cutensor PROPERTIES
+  IMPORTED_LOCATION "${CUTENSOR_LIBRARIES}"
+  INTERFACE_INCLUDE_DIRECTORIES "${CUTENSOR_INCLUDE_DIRECTORY}"
+)

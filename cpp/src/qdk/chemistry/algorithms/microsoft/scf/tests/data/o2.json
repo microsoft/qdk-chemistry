@@ -1,0 +1,3 @@
+{
+ "UHF-DFJ/HF/def2-svp/def2-universal-jfit/pure": {"mol": "o2", "charge": 0, "multiplicity": 3, "basis": "def2-svp", "aux_basis": "def2-universal-jfit", "cart": false, "functional": "HF", "method": "UHF", "dfj": true, "energy":  -149.489993170463, "gradient": [0.0, 0.0, -0.1112764668, 0.0, 0.0, 0.1112764668],"polarizability": [3.520117769292, 0.000000000000, -0.000000000001, 0.000000000000, 3.520117769292, 0.000000000000, -0.000000000000, 0.00000000000, 16.016987398338]}
+}

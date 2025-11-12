@@ -14,7 +14,7 @@ jobs:
   - task: PipAuthenticate@1
     displayName: Pip Authenticate
     inputs:
-      artifactFeeds: ""
+      artifactFeeds: ''
 
   - script: pip install pre-commit
     displayName: Install pre-commit

@@ -1,0 +1,94 @@
+{
+    "RHF/HF/def2-svp/c2h4/water": {
+        "mol": "c2h4",
+        "ddx": true,
+        "ddx_lmax": 5,
+        "ddx_solvent": "water",
+        "basis": "def2-svp",
+        "functional": "HF",
+        "method": "RHF",
+        "energy": -77.984281219058
+    },
+    "RHF/HF/6-31g*/c2h4/water": {
+        "mol": "c2h4",
+        "ddx": true,
+        "ddx_lmax": 5,
+        "ddx_solvent": "water",
+        "basis": "6-31g*",
+        "functional": "HF",
+        "method": "RHF",
+        "energy": -78.032102474886
+    },
+    "UHF/HF/def2-svp/c2h4/water": {
+        "mol": "c2h4",
+        "ddx": true,
+        "ddx_lmax": 5,
+        "ddx_solvent": "water",
+        "basis": "def2-svp",
+        "functional": "HF",
+        "method": "UHF",
+        "energy": -77.984281219058
+    },
+    "RKS/pbe/def2-svp/c2h4/water": {
+        "mol": "c2h4",
+        "ddx": true,
+        "ddx_lmax": 5,
+        "solvent": "water",
+        "basis": "def2-svp",
+        "functional": "pbe",
+        "method": "RKS",
+        "energy": -78.415160158794379
+    },
+    "UKS/pbe/def2-svp/c2h4/water": {
+        "mol": "c2h4",
+        "ddx": true,
+        "ddx_lmax": 5,
+        "solvent": "water",
+        "basis": "def2-svp",
+        "functional": "pbe",
+        "method": "UKS",
+        "energy": -78.415160158794379
+    },
+    "RKS/pbe/6-31g*/benzene/ethanol": {
+        "mol": "benzene",
+        "ddx": true,
+        "ddx_lmax": 5,
+        "solvent": "ethanol",
+        "basis": "6-31g*",
+        "functional": "pbe",
+        "method": "RKS",
+        "energy":  -231.93715366740139
+    },
+    "RKS/pbe/6-31g*/acetylene/acetone": {
+        "mol": "acetylene",
+        "ddx": true,
+        "ddx_lmax": 5,
+        "solvent": "acetone",
+        "basis": "6-31g*",
+        "functional": "pbe",
+        "method": "RKS",
+        "energy": -77.217345083093036
+    },
+    "Cosmo/RHF/HF/def2-svp/c2h4/water": {
+        "mol": "c2h4",
+        "ddx": true,
+        "ddx_lmax": 5,
+        "ddx_solvent": "water",
+        "ddx_model": 1,
+        "basis": "def2-svp",
+        "functional": "HF",
+        "method": "RHF",
+        "energy": -77.984343048599
+    },
+    "Cosmo/UHF/HF/def2-svp/c2h4/water": {
+        "mol": "c2h4",
+        "ddx": true,
+        "ddx_lmax": 5,
+        "ddx_solvent": "water",
+        "ddx_model": 1,
+        "basis": "def2-svp",
+        "functional": "HF",
+        "method": "UHF",
+        "energy": -77.984343048614
+    }
+}
