@@ -1,0 +1,18 @@
+qdk.chemistry.data package
+==========================
+
+.. automodule:: qdk.chemistry.data
+   :members:
+   :private-members:
+   :show-inheritance:
+   :undoc-members:
+
+Submodules
+----------
+
+.. toctree::
+   :maxdepth: 4
+
+   qdk.chemistry.data.estimator_data
+   qdk.chemistry.data.qpe_result
+   qdk.chemistry.data.qubit_hamiltonian

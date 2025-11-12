@@ -1,0 +1,8 @@
+qdk.chemistry.interop.qiskit.noise\_model module
+================================================
+
+.. automodule:: qdk.chemistry.interop.qiskit.noise_model
+   :members:
+   :private-members:
+   :show-inheritance:
+   :undoc-members:

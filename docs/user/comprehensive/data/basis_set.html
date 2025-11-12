@@ -1,0 +1,585 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../../../">
+<head>
+  <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Basis Set &mdash; QDK/Chemistry 0.0.1 documentation</title>
+      <link rel="stylesheet" type="text/css" href="../../../_static/pygments.css?v=b86133f3" />
+      <link rel="stylesheet" type="text/css" href="../../../_static/css/theme.css?v=e59714d7" />
+      <link rel="stylesheet" type="text/css" href="../../../_static/tabs.css?v=4c969af8" />
+      <link rel="stylesheet" type="text/css" href="../../../_static/graphviz.css?v=4ae1632d" />
+      <link rel="stylesheet" type="text/css" href="../../../_static/copybutton.css?v=76b2166b" />
+
+  
+      <script src="../../../_static/jquery.js?v=5d32c60e"></script>
+      <script src="../../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="../../../_static/documentation_options.js?v=d45e8c67"></script>
+      <script src="../../../_static/doctools.js?v=9bcbadda"></script>
+      <script src="../../../_static/sphinx_highlight.js?v=dc90522c"></script>
+      <script src="../../../_static/tabs.js?v=3ee01567"></script>
+      <script src="../../../_static/clipboard.min.js?v=a7894cd8"></script>
+      <script src="../../../_static/copybutton.js?v=f281be69"></script>
+    <script src="../../../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../../../genindex.html" />
+    <link rel="search" title="Search" href="../../../search.html" />
+    <link rel="next" title="Algorithms" href="../algorithms.html" />
+    <link rel="prev" title="Wavefunction" href="wavefunction.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="../../../index.html" class="icon icon-home">
+            QDK/Chemistry
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../../../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">User Documentation</span></p>
+<ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="../../Quickstart.html">Quickstart</a></li>
+<li class="toctree-l1 current"><a class="reference internal" href="../index.html">In-Depth Guide</a><ul class="current">
+<li class="toctree-l2"><a class="reference internal" href="../design.html">Design and Architecture</a></li>
+<li class="toctree-l2 current"><a class="reference internal" href="../data.html">Data Classes</a><ul class="current">
+<li class="toctree-l3"><a class="reference internal" href="structure.html">Structure</a></li>
+<li class="toctree-l3"><a class="reference internal" href="orbitals.html">Orbitals</a></li>
+<li class="toctree-l3"><a class="reference internal" href="hamiltonian.html">Hamiltonian</a></li>
+<li class="toctree-l3"><a class="reference internal" href="wavefunction.html">Wavefunction</a></li>
+<li class="toctree-l3 current"><a class="current reference internal" href="#">Basis Set</a><ul>
+<li class="toctree-l4"><a class="reference internal" href="#overview">Overview</a></li>
+<li class="toctree-l4"><a class="reference internal" href="#usage">Usage</a></li>
+<li class="toctree-l4"><a class="reference internal" href="#core-concepts">Core Concepts</a></li>
+<li class="toctree-l4"><a class="reference internal" href="#creating-a-basis-set">Creating a Basis Set</a></li>
+<li class="toctree-l4"><a class="reference internal" href="#accessing-basis-set-data">Accessing Basis Set Data</a></li>
+<li class="toctree-l4"><a class="reference internal" href="#working-with-shells">Working with Shells</a></li>
+<li class="toctree-l4"><a class="reference internal" href="#serialization">Serialization</a></li>
+<li class="toctree-l4"><a class="reference internal" href="#utility-functions">Utility Functions</a></li>
+<li class="toctree-l4"><a class="reference internal" href="#predefined-basis-sets">Predefined Basis Sets</a></li>
+<li class="toctree-l4"><a class="reference internal" href="#related-classes">Related Classes</a></li>
+<li class="toctree-l4"><a class="reference internal" href="#related-topics">Related Topics</a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="../algorithms.html">Algorithms</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../keywords.html">Functionals and Basis Sets</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../plugins.html">Plugins</a></li>
+</ul>
+</li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">API Reference</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../api/python_api.html">Python API</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../api/cpp_api.html">C++ API</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Supporting Information</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../glossary.html">Glossary</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../references.html">References</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../../../index.html">QDK/Chemistry</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../../../index.html" class="icon icon-home" aria-label="Home"></a></li>
+          <li class="breadcrumb-item"><a href="../index.html">In-Depth Guide</a></li>
+          <li class="breadcrumb-item"><a href="../data.html">Data Classes</a></li>
+      <li class="breadcrumb-item active">Basis Set</li>
+      <li class="wy-breadcrumbs-aside">
+            <a href="../../../_sources/user/comprehensive/data/basis_set.rst.txt" rel="nofollow"> View page source</a>
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <section id="basis-set">
+<h1>Basis Set<a class="headerlink" href="#basis-set" title="Link to this heading"></a></h1>
+<p>The <code class="docutils literal notranslate"><span class="pre">BasisSet</span></code> class in QDK/Chemistry represents a collection of atomic orbital basis functions used to describe the electronic
+structure of molecules. It organizes basis functions into shells and provides methods for managing, querying, and
+serializing basis set data.</p>
+<section id="overview">
+<h2>Overview<a class="headerlink" href="#overview" title="Link to this heading"></a></h2>
+<p>In quantum chemistry, a basis set is a collection of mathematical functions used to represent molecular orbitals. The
+<code class="docutils literal notranslate"><span class="pre">BasisSet</span></code> class in QDK/Chemistry uses a shell-based organization, where each shell contains basis functions with the same atom,
+angular momentum, and primitive Gaussian functions.</p>
+<p>Key features of the <code class="docutils literal notranslate"><span class="pre">BasisSet</span></code> class include:</p>
+<ul class="simple">
+<li><p>Shell-based storage for memory efficiency</p></li>
+<li><p>Support for both spherical and Cartesian basis functions</p></li>
+<li><p>Mapping between shells/basis functions and atoms</p></li>
+<li><p>Mapping between shells/basis functions and orbital types</p></li>
+<li><p>Basis set metadata (name, parameters)</p></li>
+<li><p>Integration with molecular structure information</p></li>
+<li><p>On-demand expansion of shells to individual basis functions</p></li>
+</ul>
+</section>
+<section id="usage">
+<h2>Usage<a class="headerlink" href="#usage" title="Link to this heading"></a></h2>
+<p>The <code class="docutils literal notranslate"><span class="pre">BasisSet</span></code> class is a fundamental component in quantum chemistry calculations, providing the mathematical foundation
+for representing molecular orbitals. It’s typically used as input for SCF calculations and is usually created
+automatically when selecting a <span class="xref std std-doc">predefined basis set</span> for a calculation.</p>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>QDK/Chemistry provides a collection of predefined basis sets that can be accessed through the appropriate factory
+functions. For common calculations, you typically won’t need to construct basis sets manually.</p>
+</div>
+</section>
+<section id="core-concepts">
+<h2>Core Concepts<a class="headerlink" href="#core-concepts" title="Link to this heading"></a></h2>
+<section id="shells-and-primitives">
+<h3>Shells and Primitives<a class="headerlink" href="#shells-and-primitives" title="Link to this heading"></a></h3>
+<p>A shell represents a group of basis functions that share the same atom, angular momentum, and primitive functions, but
+differ in magnetic quantum numbers. For example, a p-shell contains px, py, pz functions.</p>
+<p>Shells contain primitives, which are Gaussian functions defined by:</p>
+<ul class="simple">
+<li><p>Exponent: Controls how diffuse or tight the function is</p></li>
+<li><p>Coefficient: Controls the weight of the primitive in the contracted function</p></li>
+</ul>
+</section>
+<section id="orbital-types">
+<h3>Orbital Types<a class="headerlink" href="#orbital-types" title="Link to this heading"></a></h3>
+<p>The <code class="docutils literal notranslate"><span class="pre">BasisSet</span></code> class supports various orbital types with different angular momentum:</p>
+<ul class="simple">
+<li><p>S orbital (angular momentum l=0): 1 function per shell (spherical or Cartesian)</p></li>
+<li><p>P orbital (angular momentum l=1): 3 functions per shell (spherical or Cartesian)</p></li>
+<li><p>D orbital (angular momentum l=2): 5 functions (spherical) or 6 functions (Cartesian) per shell</p></li>
+<li><p>F orbital (angular momentum l=3): 7 functions (spherical) or 10 functions (Cartesian) per shell</p></li>
+<li><p>G, H, I orbitals: Higher angular momentum orbitals</p></li>
+</ul>
+</section>
+<section id="basis-types">
+<h3>Basis Types<a class="headerlink" href="#basis-types" title="Link to this heading"></a></h3>
+<p>The <code class="docutils literal notranslate"><span class="pre">BasisSet</span></code> class supports two types of basis functions:</p>
+<ul class="simple">
+<li><p><strong>Spherical</strong>: Uses spherical harmonics with 2l+1 functions per shell</p></li>
+<li><p><strong>Cartesian</strong>: Uses Cartesian coordinates with (l+1)(l+2)/2 functions per shell</p></li>
+</ul>
+</section>
+</section>
+<section id="creating-a-basis-set">
+<h2>Creating a Basis Set<a class="headerlink" href="#creating-a-basis-set" title="Link to this heading"></a></h2>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>In most cases, you should use the built-in basis set library rather than creating basis sets manually.
+Manual creation is primarily for advanced use cases or when working with custom basis sets not available in the
+library.</p>
+</div>
+<div class="admonition-todo admonition" id="id1">
+<p class="admonition-title">Todo</p>
+<p>TODO (NAB):  check BasisSet code after API change.
+<a class="reference external" href="https://dev.azure.com/ms-azurequantum/AzureQuantum/_workitems/edit/41366">https://dev.azure.com/ms-azurequantum/AzureQuantum/_workitems/edit/41366</a></p>
+</div>
+<div class="tab-set docutils container">
+<input checked="True" class="tab-input" id="tab-set--0-input--1" name="tab-set--0" type="radio"><label class="tab-label" for="tab-set--0-input--1">C++ API</label><div class="tab-content docutils container">
+<div class="highlight-cpp notranslate"><div class="highlight"><pre><span></span><span class="c1">// Create an empty basis set with a name</span>
+<span class="n">BasisSet</span><span class="w"> </span><span class="n">basis_set</span><span class="p">(</span><span class="s">&quot;6-31G&quot;</span><span class="p">,</span><span class="w"> </span><span class="n">BasisType</span><span class="o">::</span><span class="n">Spherical</span><span class="p">);</span>
+
+<span class="c1">// Add a shell with multiple primitives</span>
+<span class="kt">size_t</span><span class="w"> </span><span class="n">atom_index</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">0</span><span class="p">;</span><span class="w">  </span><span class="c1">// First atom</span>
+<span class="n">OrbitalType</span><span class="w"> </span><span class="n">orbital_type</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">OrbitalType</span><span class="o">::</span><span class="n">P</span><span class="p">;</span><span class="w">  </span><span class="c1">// p orbital</span>
+<span class="n">Eigen</span><span class="o">::</span><span class="n">VectorXd</span><span class="w"> </span><span class="nf">exponents</span><span class="p">(</span><span class="mi">2</span><span class="p">);</span>
+<span class="n">exponents</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="mf">0.16871439</span><span class="p">,</span><span class="w"> </span><span class="mf">0.62391373</span><span class="p">;</span>
+<span class="n">Eigen</span><span class="o">::</span><span class="n">VectorXd</span><span class="w"> </span><span class="nf">coefficients</span><span class="p">(</span><span class="mi">2</span><span class="p">);</span>
+<span class="n">coefficients</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="mf">0.43394573</span><span class="p">,</span><span class="w"> </span><span class="mf">0.56604777</span><span class="p">;</span>
+<span class="n">basis_set</span><span class="p">.</span><span class="n">add_shell</span><span class="p">(</span><span class="n">atom_index</span><span class="p">,</span><span class="w"> </span><span class="n">orbital_type</span><span class="p">,</span><span class="w"> </span><span class="n">exponents</span><span class="p">,</span><span class="w"> </span><span class="n">coefficients</span><span class="p">);</span>
+
+<span class="c1">// Add a shell with a single primitive</span>
+<span class="n">basis_set</span><span class="p">.</span><span class="n">add_shell</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span><span class="w"> </span><span class="n">OrbitalType</span><span class="o">::</span><span class="n">S</span><span class="p">,</span><span class="w"> </span><span class="mf">0.5</span><span class="p">,</span><span class="w"> </span><span class="mf">1.0</span><span class="p">);</span>
+
+<span class="c1">// Set molecular structure</span>
+<span class="n">basis_set</span><span class="p">.</span><span class="n">set_structure</span><span class="p">(</span><span class="n">structure</span><span class="p">);</span>
+</pre></div>
+</div>
+</div>
+<input class="tab-input" id="tab-set--0-input--2" name="tab-set--0" type="radio"><label class="tab-label" for="tab-set--0-input--2">Python API</label><div class="tab-content docutils container">
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="c1"># Create an empty basis set with a name</span>
+<span class="n">basis_set</span> <span class="o">=</span> <span class="n">BasisSet</span><span class="p">(</span><span class="s2">&quot;6-31G&quot;</span><span class="p">,</span> <span class="n">BasisType</span><span class="o">.</span><span class="n">SPHERICAL</span><span class="p">)</span>
+
+<span class="c1"># Add a shell with multiple primitives</span>
+<span class="n">atom_index</span> <span class="o">=</span> <span class="mi">0</span>  <span class="c1"># First atom</span>
+<span class="n">orbital_type</span> <span class="o">=</span> <span class="n">OrbitalType</span><span class="o">.</span><span class="n">P</span>  <span class="c1"># p orbital</span>
+<span class="n">exponents</span> <span class="o">=</span> <span class="p">[</span><span class="mf">0.16871439</span><span class="p">,</span> <span class="mf">0.62391373</span><span class="p">]</span>
+<span class="n">coefficients</span> <span class="o">=</span> <span class="p">[</span><span class="mf">0.43394573</span><span class="p">,</span> <span class="mf">0.56604777</span><span class="p">]</span>
+<span class="n">basis_set</span><span class="o">.</span><span class="n">add_shell</span><span class="p">(</span><span class="n">atom_index</span><span class="p">,</span> <span class="n">orbital_type</span><span class="p">,</span> <span class="n">exponents</span><span class="p">,</span> <span class="n">coefficients</span><span class="p">)</span>
+
+<span class="c1"># Add a shell with a single primitive</span>
+<span class="n">basis_set</span><span class="o">.</span><span class="n">add_shell</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="n">OrbitalType</span><span class="o">.</span><span class="n">S</span><span class="p">,</span> <span class="mf">0.5</span><span class="p">,</span> <span class="mf">1.0</span><span class="p">)</span>
+
+<span class="c1"># Set molecular structure</span>
+<span class="n">basis_set</span><span class="o">.</span><span class="n">set_structure</span><span class="p">(</span><span class="n">structure</span><span class="p">)</span>
+</pre></div>
+</div>
+</div>
+</div>
+</section>
+<section id="accessing-basis-set-data">
+<h2>Accessing Basis Set Data<a class="headerlink" href="#accessing-basis-set-data" title="Link to this heading"></a></h2>
+<p>Following the <a class="reference internal" href="../advanced/design_principles.html"><span class="doc">immutable design principle</span></a> used throughout QDK/Chemistry, all getter methods
+return const references or copies of the data. This ensures that the basis set data remains consistent and prevents
+accidental modifications that could lead to inconsistent states.</p>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>If you need to modify a basis set after creation, you should create a new BasisSet object with the desired
+changes rather than trying to modify an existing one.</p>
+</div>
+<div class="tab-set docutils container">
+<input checked="True" class="tab-input" id="tab-set--1-input--1" name="tab-set--1" type="radio"><label class="tab-label" for="tab-set--1-input--1">C++ API</label><div class="tab-content docutils container">
+<div class="highlight-cpp notranslate"><div class="highlight"><pre><span></span><span class="c1">// Get basis set type and name (returns BasisType)</span>
+<span class="k">auto</span><span class="w"> </span><span class="n">basis_type</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">basis_set</span><span class="p">.</span><span class="n">get_basis_type</span><span class="p">();</span>
+<span class="c1">// Get basis set name (returns std::string)</span>
+<span class="k">auto</span><span class="w"> </span><span class="n">name</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">basis_set</span><span class="p">.</span><span class="n">get_name</span><span class="p">();</span>
+
+<span class="c1">// Get all shells (returns const std::vector&lt;Shell&gt;&amp;)</span>
+<span class="k">auto</span><span class="w"> </span><span class="n">all_shells</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">basis_set</span><span class="p">.</span><span class="n">get_shells</span><span class="p">();</span>
+<span class="c1">// Get shells for specific atom (returns const std::vector&lt;const Shell&gt;&amp;)</span>
+<span class="k">auto</span><span class="w"> </span><span class="n">shells_for_atom</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">basis_set</span><span class="p">.</span><span class="n">get_shells_for_atom</span><span class="p">(</span><span class="mi">0</span><span class="p">);</span>
+<span class="c1">// Get specific shell by index (returns const Shell&amp;)</span>
+<span class="k">const</span><span class="w"> </span><span class="n">Shell</span><span class="o">&amp;</span><span class="w"> </span><span class="n">specific_shell</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">basis_set</span><span class="p">.</span><span class="n">get_shell</span><span class="p">(</span><span class="mi">3</span><span class="p">);</span>
+
+<span class="c1">// Get counts</span>
+<span class="kt">size_t</span><span class="w"> </span><span class="n">num_shells</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">basis_set</span><span class="p">.</span><span class="n">get_num_shells</span><span class="p">();</span>
+<span class="kt">size_t</span><span class="w"> </span><span class="n">num_basis_functions</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">basis_set</span><span class="p">.</span><span class="n">get_num_basis_functions</span><span class="p">();</span>
+<span class="kt">size_t</span><span class="w"> </span><span class="n">num_atoms</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">basis_set</span><span class="p">.</span><span class="n">get_num_atoms</span><span class="p">();</span>
+
+<span class="c1">// Get basis function information (returns std::pair&lt;size_t, int&gt;)</span>
+<span class="k">auto</span><span class="w"> </span><span class="p">[</span><span class="n">shell_index</span><span class="p">,</span><span class="w"> </span><span class="n">m_quantum_number</span><span class="p">]</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">basis_set</span><span class="p">.</span><span class="n">get_basis_function_info</span><span class="p">(</span><span class="mi">5</span><span class="p">);</span>
+<span class="kt">size_t</span><span class="w"> </span><span class="n">atom_index</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">basis_set</span><span class="p">.</span><span class="n">get_atom_index_for_basis_function</span><span class="p">(</span><span class="mi">5</span><span class="p">);</span>
+
+<span class="c1">// Get indices for specific atoms or orbital types</span>
+<span class="c1">// Returns std::vector&lt;size_t&gt;</span>
+<span class="k">auto</span><span class="w"> </span><span class="n">basis_indices</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">basis_set</span><span class="p">.</span><span class="n">get_basis_fuction_indices_for_atom</span><span class="p">(</span><span class="mi">1</span><span class="p">);</span>
+<span class="c1">// Returns std::vector&lt;size_t&gt;</span>
+<span class="k">auto</span><span class="w"> </span><span class="n">shell_indices</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">basis_set</span><span class="p">.</span><span class="n">get_shell_indices_for_orbital_type</span><span class="p">(</span><span class="n">OrbitalType</span><span class="o">::</span><span class="n">P</span><span class="p">);</span>
+<span class="c1">// Returns std::vector&lt;size_t&gt;</span>
+<span class="k">auto</span><span class="w"> </span><span class="n">shell_indices_specific</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">basis_set</span><span class="p">.</span><span class="n">get_shell_indices_for_atom_and_orbital_type</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span><span class="w"> </span><span class="n">OrbitalType</span><span class="o">::</span><span class="n">D</span><span class="p">);</span>
+
+<span class="c1">// Validation</span>
+<span class="kt">bool</span><span class="w"> </span><span class="n">is_valid</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">basis_set</span><span class="p">.</span><span class="n">is_valid</span><span class="p">();</span>
+<span class="kt">bool</span><span class="w"> </span><span class="n">is_consistent</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">basis_set</span><span class="p">.</span><span class="n">is_consistent_with_structure</span><span class="p">();</span>
+</pre></div>
+</div>
+</div>
+<input class="tab-input" id="tab-set--1-input--2" name="tab-set--1" type="radio"><label class="tab-label" for="tab-set--1-input--2">Python API</label><div class="tab-content docutils container">
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="c1"># Get basis set type and name</span>
+<span class="n">basis_type</span> <span class="o">=</span> <span class="n">basis_set</span><span class="o">.</span><span class="n">get_basis_type</span><span class="p">()</span>
+<span class="n">name</span> <span class="o">=</span> <span class="n">basis_set</span><span class="o">.</span><span class="n">get_name</span><span class="p">()</span>
+
+<span class="c1"># Get shells</span>
+<span class="n">all_shells</span> <span class="o">=</span> <span class="n">basis_set</span><span class="o">.</span><span class="n">get_shells</span><span class="p">()</span>
+<span class="n">shells_for_atom</span> <span class="o">=</span> <span class="n">basis_set</span><span class="o">.</span><span class="n">get_shells_for_atom</span><span class="p">(</span><span class="mi">0</span><span class="p">)</span>
+<span class="n">specific_shell</span> <span class="o">=</span> <span class="n">basis_set</span><span class="o">.</span><span class="n">get_shell</span><span class="p">(</span><span class="mi">3</span><span class="p">)</span>
+
+<span class="c1"># Get counts</span>
+<span class="n">num_shells</span> <span class="o">=</span> <span class="n">basis_set</span><span class="o">.</span><span class="n">get_num_shells</span><span class="p">()</span>
+<span class="n">num_basis_functions</span> <span class="o">=</span> <span class="n">basis_set</span><span class="o">.</span><span class="n">get_num_basis_functions</span><span class="p">()</span>
+<span class="n">num_atoms</span> <span class="o">=</span> <span class="n">basis_set</span><span class="o">.</span><span class="n">get_num_atoms</span><span class="p">()</span>
+
+<span class="c1"># Get basis function information</span>
+<span class="n">shell_index</span><span class="p">,</span> <span class="n">m_quantum_number</span> <span class="o">=</span> <span class="n">basis_set</span><span class="o">.</span><span class="n">get_basis_function_info</span><span class="p">(</span><span class="mi">5</span><span class="p">)</span>
+<span class="n">atom_index</span> <span class="o">=</span> <span class="n">basis_set</span><span class="o">.</span><span class="n">get_atom_index_for_basis_function</span><span class="p">(</span><span class="mi">5</span><span class="p">)</span>
+
+<span class="c1"># Get indices for specific atoms or orbital types</span>
+<span class="n">basis_indices</span> <span class="o">=</span> <span class="n">basis_set</span><span class="o">.</span><span class="n">get_basis_fuction_indices_for_atom</span><span class="p">(</span><span class="mi">1</span><span class="p">)</span>
+<span class="n">shell_indices</span> <span class="o">=</span> <span class="n">basis_set</span><span class="o">.</span><span class="n">get_shell_indices_for_orbital_type</span><span class="p">(</span><span class="n">OrbitalType</span><span class="o">.</span><span class="n">P</span><span class="p">)</span>
+<span class="n">shell_indices_specific</span> <span class="o">=</span> <span class="n">basis_set</span><span class="o">.</span><span class="n">get_shell_indices_for_atom_and_orbital_type</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="n">OrbitalType</span><span class="o">.</span><span class="n">D</span><span class="p">)</span>
+
+<span class="c1"># Validation</span>
+<span class="n">is_valid</span> <span class="o">=</span> <span class="n">basis_set</span><span class="o">.</span><span class="n">is_valid</span><span class="p">()</span>
+<span class="n">is_consistent</span> <span class="o">=</span> <span class="n">basis_set</span><span class="o">.</span><span class="n">is_consistent_with_structure</span><span class="p">()</span>
+</pre></div>
+</div>
+</div>
+</div>
+</section>
+<section id="working-with-shells">
+<h2>Working with Shells<a class="headerlink" href="#working-with-shells" title="Link to this heading"></a></h2>
+<p>The <code class="docutils literal notranslate"><span class="pre">Shell</span></code> structure contains information about a group of basis functions:</p>
+<div class="tab-set docutils container">
+<input checked="True" class="tab-input" id="tab-set--2-input--1" name="tab-set--2" type="radio"><label class="tab-label" for="tab-set--2-input--1">C++ API</label><div class="tab-content docutils container">
+<div class="highlight-cpp notranslate"><div class="highlight"><pre><span></span><span class="c1">// Get shell by index (returns const Shell&amp;)</span>
+<span class="k">const</span><span class="w"> </span><span class="n">Shell</span><span class="o">&amp;</span><span class="w"> </span><span class="n">shell</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">basis_set</span><span class="p">.</span><span class="n">get_shell</span><span class="p">(</span><span class="mi">0</span><span class="p">);</span>
+<span class="kt">size_t</span><span class="w"> </span><span class="n">atom_idx</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">shell</span><span class="p">.</span><span class="n">atom_index</span><span class="p">;</span>
+<span class="n">OrbitalType</span><span class="w"> </span><span class="n">orb_type</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">shell</span><span class="p">.</span><span class="n">orbital_type</span><span class="p">;</span>
+<span class="c1">// Get exponents (returns const Eigen::VectorXd&amp;)</span>
+<span class="k">const</span><span class="w"> </span><span class="n">Eigen</span><span class="o">::</span><span class="n">VectorXd</span><span class="o">&amp;</span><span class="w"> </span><span class="n">exps</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">shell</span><span class="p">.</span><span class="n">exponents</span><span class="p">;</span>
+<span class="c1">// Get coefficients (returns const Eigen::VectorXd&amp;)</span>
+<span class="k">const</span><span class="w"> </span><span class="n">Eigen</span><span class="o">::</span><span class="n">VectorXd</span><span class="o">&amp;</span><span class="w"> </span><span class="n">coeffs</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">shell</span><span class="p">.</span><span class="n">coefficients</span><span class="p">;</span>
+
+<span class="c1">// Get information from shell</span>
+<span class="kt">size_t</span><span class="w"> </span><span class="n">num_primitives</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">shell</span><span class="p">.</span><span class="n">get_num_primitives</span><span class="p">();</span>
+<span class="kt">size_t</span><span class="w"> </span><span class="n">num_basis_funcs</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">shell</span><span class="p">.</span><span class="n">get_num_basis_functions</span><span class="p">(</span><span class="n">BasisType</span><span class="o">::</span><span class="n">Spherical</span><span class="p">);</span>
+<span class="kt">int</span><span class="w"> </span><span class="n">angular_momentum</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">shell</span><span class="p">.</span><span class="n">get_angular_momentum</span><span class="p">();</span>
+</pre></div>
+</div>
+</div>
+<input class="tab-input" id="tab-set--2-input--2" name="tab-set--2" type="radio"><label class="tab-label" for="tab-set--2-input--2">Python API</label><div class="tab-content docutils container">
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="c1"># Python API</span>
+<span class="n">shell</span> <span class="o">=</span> <span class="n">basis_set</span><span class="o">.</span><span class="n">get_shell</span><span class="p">(</span><span class="mi">0</span><span class="p">)</span>
+<span class="n">atom_idx</span> <span class="o">=</span> <span class="n">shell</span><span class="o">.</span><span class="n">atom_index</span>
+<span class="n">orb_type</span> <span class="o">=</span> <span class="n">shell</span><span class="o">.</span><span class="n">orbital_type</span>
+<span class="n">exps</span> <span class="o">=</span> <span class="n">shell</span><span class="o">.</span><span class="n">exponents</span>
+<span class="n">coeffs</span> <span class="o">=</span> <span class="n">shell</span><span class="o">.</span><span class="n">coefficients</span>
+
+<span class="c1"># Get information from shell</span>
+<span class="n">num_primitives</span> <span class="o">=</span> <span class="n">shell</span><span class="o">.</span><span class="n">get_num_primitives</span><span class="p">()</span>
+<span class="n">num_basis_funcs</span> <span class="o">=</span> <span class="n">shell</span><span class="o">.</span><span class="n">get_num_basis_functions</span><span class="p">(</span><span class="n">BasisType</span><span class="o">.</span><span class="n">SPHERICAL</span><span class="p">)</span>
+<span class="n">angular_momentum</span> <span class="o">=</span> <span class="n">shell</span><span class="o">.</span><span class="n">get_angular_momentum</span><span class="p">()</span>
+</pre></div>
+</div>
+</div>
+</div>
+</section>
+<section id="serialization">
+<h2>Serialization<a class="headerlink" href="#serialization" title="Link to this heading"></a></h2>
+<p>The <code class="docutils literal notranslate"><span class="pre">BasisSet</span></code> class supports serialization to and from JSON and HDF5 formats. For detailed information about
+serialization in QDK/Chemistry, see the <a class="reference internal" href="../advanced/serialization.html"><span class="doc">Serialization</span></a> documentation.</p>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>All basis set-related files require the <code class="docutils literal notranslate"><span class="pre">.basis_set</span></code> suffix before the file type extension, for example
+<code class="docutils literal notranslate"><span class="pre">molecule.basis_set.json</span></code> and <code class="docutils literal notranslate"><span class="pre">h2.basis_set.h5</span></code> for JSON and HDF5 files respectively. This naming convention is
+enforced to maintain consistency across the QDK/Chemistry ecosystem.</p>
+</div>
+<section id="file-formats">
+<h3>File Formats<a class="headerlink" href="#file-formats" title="Link to this heading"></a></h3>
+<p>QDK/Chemistry supports multiple serialization formats for basis set data:</p>
+<section id="json-format">
+<h4>JSON Format<a class="headerlink" href="#json-format" title="Link to this heading"></a></h4>
+<p>JSON representation of a <code class="docutils literal notranslate"><span class="pre">BasisSet</span></code> has the following structure (showing simplified content):</p>
+<div class="highlight-json notranslate"><div class="highlight"><pre><span></span><span class="p">{</span>
+<span class="w">  </span><span class="nt">&quot;atoms&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">[</span>
+<span class="w">    </span><span class="p">{</span>
+<span class="w">      </span><span class="nt">&quot;atom_index&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">0</span><span class="p">,</span>
+<span class="w">      </span><span class="nt">&quot;shells&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">[</span>
+<span class="w">        </span><span class="p">{</span>
+<span class="w">          </span><span class="nt">&quot;coefficients&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">[</span><span class="mf">0.1543289673</span><span class="p">,</span><span class="w"> </span><span class="mf">0.5353281423</span><span class="p">,</span><span class="w"> </span><span class="mf">0.4446345422</span><span class="p">],</span>
+<span class="w">          </span><span class="nt">&quot;exponents&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">[</span><span class="mf">3.425250914</span><span class="p">,</span><span class="w"> </span><span class="mf">0.6239137298</span><span class="p">,</span><span class="w"> </span><span class="mf">0.168855404</span><span class="p">],</span>
+<span class="w">          </span><span class="nt">&quot;orbital_type&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;s&quot;</span>
+<span class="w">        </span><span class="p">},</span>
+<span class="w">        </span><span class="p">{</span>
+<span class="w">          </span><span class="nt">&quot;coefficients&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">[</span><span class="mf">0.1559162750</span><span class="p">,</span><span class="w"> </span><span class="mf">0.6076837186</span><span class="p">],</span>
+<span class="w">          </span><span class="nt">&quot;exponents&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">[</span><span class="mf">0.7868272350</span><span class="p">,</span><span class="w"> </span><span class="mf">0.1881288540</span><span class="p">],</span>
+<span class="w">          </span><span class="nt">&quot;orbital_type&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;p&quot;</span>
+<span class="w">        </span><span class="p">}</span>
+<span class="w">      </span><span class="p">]</span>
+<span class="w">    </span><span class="p">},</span>
+<span class="w">    </span><span class="p">{</span>
+<span class="w">      </span><span class="nt">&quot;atom_index&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">1</span><span class="p">,</span>
+<span class="w">      </span><span class="nt">&quot;shells&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">[</span><span class="s2">&quot;...&quot;</span><span class="p">]</span>
+<span class="w">    </span><span class="p">}</span>
+<span class="w">  </span><span class="p">],</span>
+<span class="w">  </span><span class="nt">&quot;basis_type&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;spherical&quot;</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;name&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;6-31G&quot;</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;num_atoms&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">2</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;num_basis_functions&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">9</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;num_shells&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">3</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+</section>
+<section id="hdf5-format">
+<h4>HDF5 Format<a class="headerlink" href="#hdf5-format" title="Link to this heading"></a></h4>
+<p>HDF5 representation of a <code class="docutils literal notranslate"><span class="pre">BasisSet</span></code> has the following structure (showing groups and datasets):</p>
+<div class="highlight-text notranslate"><div class="highlight"><pre><span></span>/
+├── shells/             # Group
+│   ├── atom_indices    # Dataset: uint32, 1D Array of atom indices
+│   ├── coefficients    # Dataset: float64, 1D Array of orbital coefficients
+│   ├── exponents       # Dataset: float64, 1D Array of orbital exponents
+│   ├── num_primitives  # Dataset: uint32, 1D Array of number of primitives per orbital
+│   └── orbital_types   # Dataset: int32, 1D Array of orbital type per orbital
+└── metadata/           # Group
+    └── name            # Attribute: string value of the basis set name
+</pre></div>
+</div>
+<div class="tab-set docutils container">
+<input checked="True" class="tab-input" id="tab-set--3-input--1" name="tab-set--3" type="radio"><label class="tab-label" for="tab-set--3-input--1">C++ API</label><div class="tab-content docutils container">
+<div class="highlight-cpp notranslate"><div class="highlight"><pre><span></span><span class="c1">// Generic serialization with format specification</span>
+<span class="n">basis_set</span><span class="p">.</span><span class="n">to_file</span><span class="p">(</span><span class="s">&quot;molecule.basis.json&quot;</span><span class="p">,</span><span class="w"> </span><span class="s">&quot;json&quot;</span><span class="p">);</span>
+<span class="n">basis_set</span><span class="p">.</span><span class="n">from_file</span><span class="p">(</span><span class="s">&quot;molecule.basis.json&quot;</span><span class="p">,</span><span class="w"> </span><span class="s">&quot;json&quot;</span><span class="p">);</span>
+
+<span class="c1">// JSON serialization</span>
+<span class="n">basis_set</span><span class="p">.</span><span class="n">to_json_file</span><span class="p">(</span><span class="s">&quot;molecule.basis.json&quot;</span><span class="p">);</span>
+<span class="n">basis_set</span><span class="p">.</span><span class="n">from_json_file</span><span class="p">(</span><span class="s">&quot;molecule.basis.json&quot;</span><span class="p">);</span>
+
+<span class="c1">// Direct JSON conversion</span>
+<span class="n">nlohmann</span><span class="o">::</span><span class="n">json</span><span class="w"> </span><span class="n">j</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">basis_set</span><span class="p">.</span><span class="n">to_json</span><span class="p">();</span>
+<span class="n">basis_set</span><span class="p">.</span><span class="n">from_json</span><span class="p">(</span><span class="n">j</span><span class="p">);</span>
+
+<span class="c1">// HDF5 serialization</span>
+<span class="n">basis_set</span><span class="p">.</span><span class="n">to_hdf5_file</span><span class="p">(</span><span class="s">&quot;molecule.basis.h5&quot;</span><span class="p">);</span>
+<span class="n">basis_set</span><span class="p">.</span><span class="n">from_hdf5_file</span><span class="p">(</span><span class="s">&quot;molecule.basis.h5&quot;</span><span class="p">);</span>
+</pre></div>
+</div>
+</div>
+<input class="tab-input" id="tab-set--3-input--2" name="tab-set--3" type="radio"><label class="tab-label" for="tab-set--3-input--2">Python API</label><div class="tab-content docutils container">
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="c1"># Generic serialization with format specification</span>
+<span class="n">basis_set</span><span class="o">.</span><span class="n">to_file</span><span class="p">(</span><span class="s2">&quot;molecule.basis.json&quot;</span><span class="p">,</span> <span class="s2">&quot;json&quot;</span><span class="p">)</span>
+<span class="n">basis_set</span><span class="o">.</span><span class="n">from_file</span><span class="p">(</span><span class="s2">&quot;molecule.basis.json&quot;</span><span class="p">,</span> <span class="s2">&quot;json&quot;</span><span class="p">)</span>
+
+<span class="c1"># JSON serialization</span>
+<span class="n">basis_set</span><span class="o">.</span><span class="n">to_json_file</span><span class="p">(</span><span class="s2">&quot;molecule.basis.json&quot;</span><span class="p">)</span>
+<span class="n">basis_set</span><span class="o">.</span><span class="n">from_json_file</span><span class="p">(</span><span class="s2">&quot;molecule.basis.json&quot;</span><span class="p">)</span>
+
+<span class="c1"># Direct JSON conversion</span>
+<span class="n">j</span> <span class="o">=</span> <span class="n">basis_set</span><span class="o">.</span><span class="n">to_json</span><span class="p">()</span>
+<span class="n">basis_set</span><span class="o">.</span><span class="n">from_json</span><span class="p">(</span><span class="n">j</span><span class="p">)</span>
+
+<span class="c1"># HDF5 serialization</span>
+<span class="n">basis_set</span><span class="o">.</span><span class="n">to_hdf5_file</span><span class="p">(</span><span class="s2">&quot;molecule.basis.h5&quot;</span><span class="p">)</span>
+<span class="n">basis_set</span><span class="o">.</span><span class="n">from_hdf5_file</span><span class="p">(</span><span class="s2">&quot;molecule.basis.h5&quot;</span><span class="p">)</span>
+</pre></div>
+</div>
+</div>
+</div>
+</section>
+</section>
+</section>
+<section id="utility-functions">
+<h2>Utility Functions<a class="headerlink" href="#utility-functions" title="Link to this heading"></a></h2>
+<p>The <code class="docutils literal notranslate"><span class="pre">BasisSet</span></code> class provides several static utility functions:</p>
+<div class="tab-set docutils container">
+<input checked="True" class="tab-input" id="tab-set--4-input--1" name="tab-set--4" type="radio"><label class="tab-label" for="tab-set--4-input--1">C++ API</label><div class="tab-content docutils container">
+<div class="highlight-cpp notranslate"><div class="highlight"><pre><span></span><span class="c1">// Convert orbital type to string (returns std::string)</span>
+<span class="n">std</span><span class="o">::</span><span class="n">string</span><span class="w"> </span><span class="n">orbital_str</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">BasisSet</span><span class="o">::</span><span class="n">orbital_type_to_string</span><span class="p">(</span><span class="n">OrbitalType</span><span class="o">::</span><span class="n">D</span><span class="p">);</span><span class="w">  </span><span class="c1">// &quot;d&quot;</span>
+<span class="c1">// Convert string to orbital type (returns OrbitalType)</span>
+<span class="n">OrbitalType</span><span class="w"> </span><span class="n">orbital_type</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">BasisSet</span><span class="o">::</span><span class="n">string_to_orbital_type</span><span class="p">(</span><span class="s">&quot;f&quot;</span><span class="p">);</span><span class="w">  </span><span class="c1">// OrbitalType::F</span>
+
+<span class="c1">// Get angular momentum (returns int)</span>
+<span class="kt">int</span><span class="w"> </span><span class="n">l_value</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">BasisSet</span><span class="o">::</span><span class="n">get_angular_momentum</span><span class="p">(</span><span class="n">OrbitalType</span><span class="o">::</span><span class="n">P</span><span class="p">);</span><span class="w">  </span><span class="c1">// 1</span>
+<span class="c1">// Get number of orbitals for angular momentum (returns int)</span>
+<span class="kt">int</span><span class="w"> </span><span class="n">num_orbitals</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">BasisSet</span><span class="o">::</span><span class="n">get_num_orbitals_for_l</span><span class="p">(</span><span class="mi">2</span><span class="p">,</span><span class="w"> </span><span class="n">BasisType</span><span class="o">::</span><span class="n">Spherical</span><span class="p">);</span><span class="w">  </span><span class="c1">// 5</span>
+
+<span class="c1">// Convert basis type to string (returns std::string)</span>
+<span class="n">std</span><span class="o">::</span><span class="n">string</span><span class="w"> </span><span class="n">basis_str</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">BasisSet</span><span class="o">::</span><span class="n">basis_type_to_string</span><span class="p">(</span><span class="n">BasisType</span><span class="o">::</span><span class="n">Cartesian</span><span class="p">);</span><span class="w">  </span><span class="c1">// &quot;cartesian&quot;</span>
+<span class="c1">// Convert string to basis type (returns BasisType)</span>
+<span class="n">BasisType</span><span class="w"> </span><span class="n">basis_type</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">BasisSet</span><span class="o">::</span><span class="n">string_to_basis_type</span><span class="p">(</span><span class="s">&quot;spherical&quot;</span><span class="p">);</span><span class="w">  </span><span class="c1">// BasisType::Spherical</span>
+</pre></div>
+</div>
+</div>
+<input class="tab-input" id="tab-set--4-input--2" name="tab-set--4" type="radio"><label class="tab-label" for="tab-set--4-input--2">Python API</label><div class="tab-content docutils container">
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="c1"># Python API</span>
+<span class="n">orbital_str</span> <span class="o">=</span> <span class="n">BasisSet</span><span class="o">.</span><span class="n">orbital_type_to_string</span><span class="p">(</span><span class="n">OrbitalType</span><span class="o">.</span><span class="n">D</span><span class="p">)</span>  <span class="c1"># &quot;d&quot;</span>
+<span class="n">orbital_type</span> <span class="o">=</span> <span class="n">BasisSet</span><span class="o">.</span><span class="n">string_to_orbital_type</span><span class="p">(</span><span class="s2">&quot;f&quot;</span><span class="p">)</span>  <span class="c1"># OrbitalType.F</span>
+
+<span class="n">l_value</span> <span class="o">=</span> <span class="n">BasisSet</span><span class="o">.</span><span class="n">get_angular_momentum</span><span class="p">(</span><span class="n">OrbitalType</span><span class="o">.</span><span class="n">P</span><span class="p">)</span>  <span class="c1"># 1</span>
+<span class="n">num_orbitals</span> <span class="o">=</span> <span class="n">BasisSet</span><span class="o">.</span><span class="n">get_num_orbitals_for_l</span><span class="p">(</span><span class="mi">2</span><span class="p">,</span> <span class="n">BasisType</span><span class="o">.</span><span class="n">SPHERICAL</span><span class="p">)</span>  <span class="c1"># 5</span>
+
+<span class="n">basis_str</span> <span class="o">=</span> <span class="n">BasisSet</span><span class="o">.</span><span class="n">basis_type_to_string</span><span class="p">(</span><span class="n">BasisType</span><span class="o">.</span><span class="n">CARTESIAN</span><span class="p">)</span>  <span class="c1"># &quot;cartesian&quot;</span>
+<span class="n">basis_type</span> <span class="o">=</span> <span class="n">BasisSet</span><span class="o">.</span><span class="n">string_to_basis_type</span><span class="p">(</span><span class="s2">&quot;spherical&quot;</span><span class="p">)</span>  <span class="c1"># BasisType.SPHERICAL</span>
+</pre></div>
+</div>
+</div>
+</div>
+</section>
+<section id="predefined-basis-sets">
+<h2>Predefined Basis Sets<a class="headerlink" href="#predefined-basis-sets" title="Link to this heading"></a></h2>
+<p>QDK/Chemistry provides access to a library of standard basis sets commonly used in quantum chemistry calculations. These
+predefined basis sets can be easily loaded without having to manually specify the basis functions. For a complete list
+of available basis sets and their specifications, see the <span class="xref std std-doc">Supported Basis Sets</span> documentation.</p>
+<div class="tab-set docutils container">
+<input checked="True" class="tab-input" id="tab-set--5-input--1" name="tab-set--5" type="radio"><label class="tab-label" for="tab-set--5-input--1">C++ API</label><div class="tab-content docutils container">
+<div class="highlight-cpp notranslate"><div class="highlight"><pre><span></span><span class="c1">// Create a basis set from a predefined library (returns std::unique_ptr&lt;BasisSet&gt;)</span>
+<span class="k">auto</span><span class="w"> </span><span class="n">basis_set</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">BasisSet</span><span class="o">::</span><span class="n">create</span><span class="p">(</span><span class="s">&quot;6-31G&quot;</span><span class="p">);</span>
+
+<span class="c1">// List all available basis sets (returns std::vector&lt;std::string&gt;)</span>
+<span class="k">auto</span><span class="w"> </span><span class="n">available_basis_sets</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">BasisSet</span><span class="o">::</span><span class="n">get_available_basis_sets</span><span class="p">();</span>
+
+<span class="c1">// Check if a basis set exists in the library (returns bool)</span>
+<span class="kt">bool</span><span class="w"> </span><span class="n">has_basis</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">BasisSet</span><span class="o">::</span><span class="n">has_basis_set</span><span class="p">(</span><span class="s">&quot;cc-pvdz&quot;</span><span class="p">);</span>
+</pre></div>
+</div>
+</div>
+<input class="tab-input" id="tab-set--5-input--2" name="tab-set--5" type="radio"><label class="tab-label" for="tab-set--5-input--2">Python API</label><div class="tab-content docutils container">
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="c1"># Create a basis set from a predefined library</span>
+<span class="n">basis_set</span> <span class="o">=</span> <span class="n">BasisSet</span><span class="o">.</span><span class="n">create</span><span class="p">(</span><span class="s2">&quot;6-31G&quot;</span><span class="p">)</span>
+
+<span class="c1"># List all available basis sets</span>
+<span class="n">available_basis_sets</span> <span class="o">=</span> <span class="n">BasisSet</span><span class="o">.</span><span class="n">get_available_basis_sets</span><span class="p">()</span>
+
+<span class="c1"># Check if a basis set exists in the library</span>
+<span class="n">has_basis</span> <span class="o">=</span> <span class="n">BasisSet</span><span class="o">.</span><span class="n">has_basis_set</span><span class="p">(</span><span class="s2">&quot;cc-pvdz&quot;</span><span class="p">)</span>
+</pre></div>
+</div>
+</div>
+</div>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>The basis set library includes popular basis sets such as STO-nG, Pople basis sets (3-21G, 6-31G, etc.), correlation-consistent basis sets (cc-pVDZ, cc-pVTZ, etc.), and more.
+For detailed specifications and a complete list, see the <span class="xref std std-doc">Supported Basis Sets</span> documentation.
+The availability may depend on your QDK/Chemistry installation.</p>
+</div>
+</section>
+<section id="related-classes">
+<h2>Related Classes<a class="headerlink" href="#related-classes" title="Link to this heading"></a></h2>
+<ul class="simple">
+<li><p><a class="reference internal" href="structure.html"><span class="doc">Structure</span></a>: Molecular structure representation</p></li>
+<li><p><a class="reference internal" href="orbitals.html"><span class="doc">Orbitals</span></a>: Molecular orbitals constructed using the basis set</p></li>
+<li><p><a class="reference internal" href="../algorithms/scf_solver.html"><span class="doc">ScfSolver</span></a>: Algorithm that uses basis sets to produce orbitals</p></li>
+</ul>
+</section>
+<section id="related-topics">
+<h2>Related Topics<a class="headerlink" href="#related-topics" title="Link to this heading"></a></h2>
+<ul class="simple">
+<li><p><a class="reference internal" href="../advanced/serialization.html"><span class="doc">Serialization</span></a>: Data serialization and deserialization</p></li>
+<li><p><a class="reference internal" href="../advanced/settings.html"><span class="doc">Settings</span></a>: Configuration settings for algorithms</p></li>
+<li><p><span class="xref std std-doc">Supported Basis Sets</span>: List of pre-defined basis sets available in QDK/Chemistry</p></li>
+</ul>
+</section>
+</section>
+
+
+           </div>
+          </div>
+          <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
+        <a href="wavefunction.html" class="btn btn-neutral float-left" title="Wavefunction" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+        <a href="../algorithms.html" class="btn btn-neutral float-right" title="Algorithms" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright Copyright (c) Microsoft Corporation. All rights reserved. Licensed under the MIT License..</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

@@ -1,0 +1,599 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../../../">
+<head>
+  <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Settings &mdash; QDK/Chemistry 0.0.1 documentation</title>
+      <link rel="stylesheet" type="text/css" href="../../../_static/pygments.css?v=b86133f3" />
+      <link rel="stylesheet" type="text/css" href="../../../_static/css/theme.css?v=e59714d7" />
+      <link rel="stylesheet" type="text/css" href="../../../_static/tabs.css?v=4c969af8" />
+      <link rel="stylesheet" type="text/css" href="../../../_static/graphviz.css?v=4ae1632d" />
+      <link rel="stylesheet" type="text/css" href="../../../_static/copybutton.css?v=76b2166b" />
+
+  
+      <script src="../../../_static/jquery.js?v=5d32c60e"></script>
+      <script src="../../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="../../../_static/documentation_options.js?v=d45e8c67"></script>
+      <script src="../../../_static/doctools.js?v=9bcbadda"></script>
+      <script src="../../../_static/sphinx_highlight.js?v=dc90522c"></script>
+      <script src="../../../_static/tabs.js?v=3ee01567"></script>
+      <script src="../../../_static/clipboard.min.js?v=a7894cd8"></script>
+      <script src="../../../_static/copybutton.js?v=f281be69"></script>
+    <script src="../../../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../../../genindex.html" />
+    <link rel="search" title="Search" href="../../../search.html" />
+    <link rel="next" title="Data Classes" href="../data.html" />
+    <link rel="prev" title="Interface System in QDK/Chemistry" href="interfaces.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="../../../index.html" class="icon icon-home">
+            QDK/Chemistry
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../../../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">User Documentation</span></p>
+<ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="../../Quickstart.html">Quickstart</a></li>
+<li class="toctree-l1 current"><a class="reference internal" href="../index.html">In-Depth Guide</a><ul class="current">
+<li class="toctree-l2 current"><a class="reference internal" href="../design.html">Design and Architecture</a><ul class="current">
+<li class="toctree-l3"><a class="reference internal" href="design_principles.html">Design Principles of QDK/Chemistry</a></li>
+<li class="toctree-l3"><a class="reference internal" href="factory_pattern.html">Factory Pattern in QDK/Chemistry</a></li>
+<li class="toctree-l3"><a class="reference internal" href="serialization.html">Serialization in QDK/Chemistry</a></li>
+<li class="toctree-l3"><a class="reference internal" href="interfaces.html">Interface System in QDK/Chemistry</a></li>
+<li class="toctree-l3 current"><a class="current reference internal" href="#">Settings</a><ul>
+<li class="toctree-l4"><a class="reference internal" href="#overview">Overview</a></li>
+<li class="toctree-l4"><a class="reference internal" href="#accessing-settings">Accessing Settings</a></li>
+<li class="toctree-l4"><a class="reference internal" href="#common-settings-operations">Common Settings Operations</a></li>
+<li class="toctree-l4"><a class="reference internal" href="#serialization">Serialization</a></li>
+<li class="toctree-l4"><a class="reference internal" href="#extending-settings">Extending Settings</a></li>
+<li class="toctree-l4"><a class="reference internal" href="#supported-types">Supported Types</a></li>
+<li class="toctree-l4"><a class="reference internal" href="#error-handling">Error Handling</a></li>
+<li class="toctree-l4"><a class="reference internal" href="#related-topics">Related Topics</a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="../data.html">Data Classes</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../algorithms.html">Algorithms</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../keywords.html">Functionals and Basis Sets</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../plugins.html">Plugins</a></li>
+</ul>
+</li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">API Reference</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../api/python_api.html">Python API</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../api/cpp_api.html">C++ API</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Supporting Information</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../glossary.html">Glossary</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../references.html">References</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../../../index.html">QDK/Chemistry</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../../../index.html" class="icon icon-home" aria-label="Home"></a></li>
+          <li class="breadcrumb-item"><a href="../index.html">In-Depth Guide</a></li>
+          <li class="breadcrumb-item"><a href="../design.html">Design and Architecture</a></li>
+      <li class="breadcrumb-item active">Settings</li>
+      <li class="wy-breadcrumbs-aside">
+            <a href="../../../_sources/user/comprehensive/advanced/settings.rst.txt" rel="nofollow"> View page source</a>
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <section id="settings">
+<h1>Settings<a class="headerlink" href="#settings" title="Link to this heading"></a></h1>
+<p>The <code class="docutils literal notranslate"><span class="pre">Settings</span></code> class in QDK/Chemistry provides a flexible configuration mechanism for all algorithms and data structures in the quantum chemistry toolkit.
+It allows users to customize the behavior of algorithms by setting various parameters with type safety and extensibility.
+This unified settings system ensures consistency across the toolkit and makes it easy to save, load, and share configurations between different parts of your application.</p>
+<section id="overview">
+<h2>Overview<a class="headerlink" href="#overview" title="Link to this heading"></a></h2>
+<p>The <code class="docutils literal notranslate"><span class="pre">Settings</span></code> class is a type-safe key-value store that provides a unified interface for configuring algorithms and data structures.
+Each algorithm type (such as <code class="docutils literal notranslate"><span class="pre">ScfSolver</span></code>, <code class="docutils literal notranslate"><span class="pre">Localizer</span></code>, etc.) extends the base <code class="docutils literal notranslate"><span class="pre">Settings</span></code> class to
+create its own specialized settings with appropriate default values.
+The class follows a design philosophy where default settings are established during class initialization.
+This approach aligns with QDK/Chemistry’s broader <a class="reference internal" href="design_principles.html"><span class="doc">design principles</span></a> of type safety and flexibility.</p>
+<p>The class supports:</p>
+<ul class="simple">
+<li><p><strong>Type-safe storage</strong>: Stores different value types (bool, int, long, size_t, float, double, string, and vectors) in a
+type-safe variant system</p></li>
+<li><p><strong>Convenient accessor methods</strong>: Get values with or without default fallbacks, check existence, and validate types</p></li>
+<li><p><strong>Multiple serialization formats</strong>: Save and load from JSON and HDF5 files for interoperability (see
+<a class="reference internal" href="serialization.html"><span class="doc">Serialization</span></a> for more details)</p></li>
+<li><p><strong>Default settings protection</strong>: Default settings are defined during initialization through the protected
+<code class="docutils literal notranslate"><span class="pre">set_default</span></code> method, values can be alterd before algorithm execution but are locked afterwasrds to ensure consistency</p></li>
+</ul>
+</section>
+<section id="accessing-settings">
+<h2>Accessing Settings<a class="headerlink" href="#accessing-settings" title="Link to this heading"></a></h2>
+<p>All QDK/Chemistry algorithm classes that use configurable parameters provide access to their settings through the <code class="docutils literal notranslate"><span class="pre">settings()</span></code> method, which returns a reference to their internal <code class="docutils literal notranslate"><span class="pre">Settings</span></code> object.
+This consistent interface makes it easy to configure any algorithm in the toolkit using the same pattern.</p>
+<p>The settings object acts as a bridge between the user interface and the internal algorithm implementation, allowing you
+to modify algorithm behavior without changing its code. Most algorithms validate their settings only at execution time,
+so you can adjust parameters anytime before running the algorithm.</p>
+<div class="admonition-todo admonition" id="id1">
+<p class="admonition-title">Todo</p>
+<p>TODO (NAB):  Check Settings code examples after finalizing API.
+<a class="reference external" href="https://dev.azure.com/ms-azurequantum/AzureQuantum/_workitems/edit/41366">https://dev.azure.com/ms-azurequantum/AzureQuantum/_workitems/edit/41366</a></p>
+</div>
+<div class="tab-set docutils container">
+<input checked="True" class="tab-input" id="tab-set--0-input--1" name="tab-set--0" type="radio"><label class="tab-label" for="tab-set--0-input--1">C++ API</label><div class="tab-content docutils container">
+<div class="highlight-cpp notranslate"><div class="highlight"><pre><span></span><span class="c1">// Get the settings object</span>
+<span class="k">auto</span><span class="o">&amp;</span><span class="w"> </span><span class="n">settings</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">algorithm</span><span class="o">-&gt;</span><span class="n">settings</span><span class="p">();</span>
+
+<span class="c1">// Set a parameter</span>
+<span class="n">settings</span><span class="p">.</span><span class="n">set</span><span class="p">(</span><span class="s">&quot;parameter_name&quot;</span><span class="p">,</span><span class="w"> </span><span class="n">value</span><span class="p">);</span>
+
+<span class="c1">// Get a parameter</span>
+<span class="k">auto</span><span class="w"> </span><span class="n">value</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">settings</span><span class="p">.</span><span class="n">get</span><span class="o">&lt;</span><span class="n">ValueType</span><span class="o">&gt;</span><span class="p">(</span><span class="s">&quot;parameter_name&quot;</span><span class="p">);</span>
+</pre></div>
+</div>
+</div>
+<input class="tab-input" id="tab-set--0-input--2" name="tab-set--0" type="radio"><label class="tab-label" for="tab-set--0-input--2">Python API</label><div class="tab-content docutils container">
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="c1"># Get the settings object</span>
+<span class="n">settings</span> <span class="o">=</span> <span class="n">algorithm</span><span class="o">.</span><span class="n">settings</span><span class="p">()</span>
+
+<span class="c1"># Set a parameter</span>
+<span class="n">settings</span><span class="o">.</span><span class="n">set</span><span class="p">(</span><span class="s2">&quot;parameter_name&quot;</span><span class="p">,</span> <span class="n">value</span><span class="p">)</span>
+
+<span class="c1"># Get a parameter</span>
+<span class="n">value</span> <span class="o">=</span> <span class="n">settings</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;parameter_name&quot;</span><span class="p">)</span>
+</pre></div>
+</div>
+</div>
+</div>
+</section>
+<section id="common-settings-operations">
+<h2>Common Settings Operations<a class="headerlink" href="#common-settings-operations" title="Link to this heading"></a></h2>
+<p>The <code class="docutils literal notranslate"><span class="pre">Settings</span></code> class provides a rich set of methods for manipulating and accessing configuration parameters. Each method
+is designed to be intuitive while providing robust error handling and type safety.</p>
+<section id="setting-values">
+<h3>Setting Values<a class="headerlink" href="#setting-values" title="Link to this heading"></a></h3>
+<p>Values can be set for any key in the settings map. If the key already exists, the value will be updated. If the key
+doesn’t exist, it will be created. The <code class="docutils literal notranslate"><span class="pre">set</span></code> method is overloaded to handle various types including C-style strings,
+which are automatically converted to <code class="docutils literal notranslate"><span class="pre">std::string</span></code>.</p>
+<div class="tab-set docutils container">
+<input checked="True" class="tab-input" id="tab-set--1-input--1" name="tab-set--1" type="radio"><label class="tab-label" for="tab-set--1-input--1">C++ API</label><div class="tab-content docutils container">
+<div class="highlight-cpp notranslate"><div class="highlight"><pre><span></span><span class="c1">// Set a string value</span>
+<span class="n">settings</span><span class="p">.</span><span class="n">set</span><span class="p">(</span><span class="s">&quot;basis_set&quot;</span><span class="p">,</span><span class="w"> </span><span class="s">&quot;def2-tzvp&quot;</span><span class="p">);</span>
+
+<span class="c1">// Set a numeric value</span>
+<span class="n">settings</span><span class="p">.</span><span class="n">set</span><span class="p">(</span><span class="s">&quot;convergence_threshold&quot;</span><span class="p">,</span><span class="w"> </span><span class="mf">1.0e-8</span><span class="p">);</span>
+
+<span class="c1">// Set a boolean value</span>
+<span class="n">settings</span><span class="p">.</span><span class="n">set</span><span class="p">(</span><span class="s">&quot;density_fitting&quot;</span><span class="p">,</span><span class="w"> </span><span class="nb">true</span><span class="p">);</span>
+
+<span class="c1">// Set an array value</span>
+<span class="n">settings</span><span class="p">.</span><span class="n">set</span><span class="p">(</span><span class="s">&quot;active_orbitals&quot;</span><span class="p">,</span><span class="w"> </span><span class="n">std</span><span class="o">::</span><span class="n">vector</span><span class="o">&lt;</span><span class="kt">int</span><span class="o">&gt;</span><span class="p">{</span><span class="mi">4</span><span class="p">,</span><span class="w"> </span><span class="mi">5</span><span class="p">,</span><span class="w"> </span><span class="mi">6</span><span class="p">,</span><span class="w"> </span><span class="mi">7</span><span class="p">});</span>
+</pre></div>
+</div>
+</div>
+<input class="tab-input" id="tab-set--1-input--2" name="tab-set--1" type="radio"><label class="tab-label" for="tab-set--1-input--2">Python API</label><div class="tab-content docutils container">
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="c1"># Set a string value</span>
+<span class="n">settings</span><span class="o">.</span><span class="n">set</span><span class="p">(</span><span class="s2">&quot;basis_set&quot;</span><span class="p">,</span> <span class="s2">&quot;def2-tzvp&quot;</span><span class="p">)</span>
+
+<span class="c1"># Set a numeric value</span>
+<span class="n">settings</span><span class="o">.</span><span class="n">set</span><span class="p">(</span><span class="s2">&quot;convergence_threshold&quot;</span><span class="p">,</span> <span class="mf">1.0e-8</span><span class="p">)</span>
+
+<span class="c1"># Set a boolean value</span>
+<span class="n">settings</span><span class="o">.</span><span class="n">set</span><span class="p">(</span><span class="s2">&quot;density_fitting&quot;</span><span class="p">,</span> <span class="kc">True</span><span class="p">)</span>
+
+<span class="c1"># Set an array value</span>
+<span class="n">settings</span><span class="o">.</span><span class="n">set</span><span class="p">(</span><span class="s2">&quot;active_orbitals&quot;</span><span class="p">,</span> <span class="p">[</span><span class="mi">4</span><span class="p">,</span> <span class="mi">5</span><span class="p">,</span> <span class="mi">6</span><span class="p">,</span> <span class="mi">7</span><span class="p">])</span>
+</pre></div>
+</div>
+</div>
+</div>
+</section>
+<section id="getting-values">
+<h3>Getting Values<a class="headerlink" href="#getting-values" title="Link to this heading"></a></h3>
+<p>Values can be retrieved with type checking to ensure the correct data type is returned. The templated <code class="docutils literal notranslate"><span class="pre">get</span></code> method
+throws exceptions if the key doesn’t exist or if the requested type doesn’t match the stored type. For cases where you
+want to provide a fallback value if the key doesn’t exist, use the <code class="docutils literal notranslate"><span class="pre">get_or_default</span></code> method.</p>
+<div class="tab-set docutils container">
+<input checked="True" class="tab-input" id="tab-set--2-input--1" name="tab-set--2" type="radio"><label class="tab-label" for="tab-set--2-input--1">C++ API</label><div class="tab-content docutils container">
+<div class="highlight-cpp notranslate"><div class="highlight"><pre><span></span><span class="c1">// Get a string value</span>
+<span class="n">std</span><span class="o">::</span><span class="n">string</span><span class="w"> </span><span class="n">basis</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">settings</span><span class="p">.</span><span class="n">get</span><span class="o">&lt;</span><span class="n">std</span><span class="o">::</span><span class="n">string</span><span class="o">&gt;</span><span class="p">(</span><span class="s">&quot;basis_set&quot;</span><span class="p">);</span>
+
+<span class="c1">// Get a numeric value</span>
+<span class="kt">double</span><span class="w"> </span><span class="n">threshold</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">settings</span><span class="p">.</span><span class="n">get</span><span class="o">&lt;</span><span class="kt">double</span><span class="o">&gt;</span><span class="p">(</span><span class="s">&quot;convergence_threshold&quot;</span><span class="p">);</span>
+
+<span class="c1">// Get a boolean value</span>
+<span class="kt">bool</span><span class="w"> </span><span class="n">use_df</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">settings</span><span class="p">.</span><span class="n">get</span><span class="o">&lt;</span><span class="kt">bool</span><span class="o">&gt;</span><span class="p">(</span><span class="s">&quot;density_fitting&quot;</span><span class="p">);</span>
+
+<span class="c1">// Get an array value</span>
+<span class="k">auto</span><span class="w"> </span><span class="n">active_orbitals</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">settings</span><span class="p">.</span><span class="n">get</span><span class="o">&lt;</span><span class="n">std</span><span class="o">::</span><span class="n">vector</span><span class="o">&lt;</span><span class="kt">int</span><span class="o">&gt;&gt;</span><span class="p">(</span><span class="s">&quot;active_orbitals&quot;</span><span class="p">);</span>
+
+<span class="c1">// Get a value with default fallback</span>
+<span class="k">auto</span><span class="w"> </span><span class="n">max_iter</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">settings</span><span class="p">.</span><span class="n">get_or_default</span><span class="o">&lt;</span><span class="kt">int</span><span class="o">&gt;</span><span class="p">(</span><span class="s">&quot;max_iterations&quot;</span><span class="p">,</span><span class="w"> </span><span class="mi">100</span><span class="p">);</span>
+</pre></div>
+</div>
+</div>
+<input class="tab-input" id="tab-set--2-input--2" name="tab-set--2" type="radio"><label class="tab-label" for="tab-set--2-input--2">Python API</label><div class="tab-content docutils container">
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="c1"># Get a string value</span>
+<span class="n">basis</span> <span class="o">=</span> <span class="n">settings</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;basis_set&quot;</span><span class="p">)</span>
+
+<span class="c1"># Get a numeric value</span>
+<span class="n">threshold</span> <span class="o">=</span> <span class="n">settings</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;convergence_threshold&quot;</span><span class="p">)</span>
+
+<span class="c1"># Get a boolean value</span>
+<span class="n">use_df</span> <span class="o">=</span> <span class="n">settings</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;density_fitting&quot;</span><span class="p">)</span>
+
+<span class="c1"># Get an array value</span>
+<span class="n">active_orbitals</span> <span class="o">=</span> <span class="n">settings</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;active_orbitals&quot;</span><span class="p">)</span>
+
+<span class="c1"># Get a value with default fallback</span>
+<span class="n">max_iter</span> <span class="o">=</span> <span class="n">settings</span><span class="o">.</span><span class="n">get_or_default</span><span class="p">(</span><span class="s2">&quot;max_iterations&quot;</span><span class="p">,</span> <span class="mi">100</span><span class="p">)</span>
+</pre></div>
+</div>
+</div>
+</div>
+</section>
+<section id="checking-for-settings">
+<h3>Checking for Settings<a class="headerlink" href="#checking-for-settings" title="Link to this heading"></a></h3>
+<p>Before accessing a setting, you might want to check if it exists or if it has the expected type. The <code class="docutils literal notranslate"><span class="pre">Settings</span></code> class
+provides methods for both checks. Additionally, the <code class="docutils literal notranslate"><span class="pre">try_get</span></code> method returns an <code class="docutils literal notranslate"><span class="pre">std::optional</span></code> that contains the value
+if it exists and has the correct type, or is empty otherwise.</p>
+<div class="tab-set docutils container">
+<input checked="True" class="tab-input" id="tab-set--3-input--1" name="tab-set--3" type="radio"><label class="tab-label" for="tab-set--3-input--1">C++ API</label><div class="tab-content docutils container">
+<div class="highlight-cpp notranslate"><div class="highlight"><pre><span></span><span class="c1">// Check if a setting exists</span>
+<span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="n">settings</span><span class="p">.</span><span class="n">has</span><span class="p">(</span><span class="s">&quot;basis_set&quot;</span><span class="p">))</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="c1">// Use the setting</span>
+<span class="p">}</span>
+
+<span class="c1">// Check if a setting exists with the expected type</span>
+<span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="n">settings</span><span class="p">.</span><span class="n">has_type</span><span class="o">&lt;</span><span class="kt">double</span><span class="o">&gt;</span><span class="p">(</span><span class="s">&quot;convergence_threshold&quot;</span><span class="p">))</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="c1">// Use the setting</span>
+<span class="p">}</span>
+
+<span class="c1">// Try to get a value (returns std::optional)</span>
+<span class="k">auto</span><span class="w"> </span><span class="n">maybe_value</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">settings</span><span class="p">.</span><span class="n">try_get</span><span class="o">&lt;</span><span class="kt">double</span><span class="o">&gt;</span><span class="p">(</span><span class="s">&quot;convergence_threshold&quot;</span><span class="p">);</span>
+<span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="n">maybe_value</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="kt">double</span><span class="w"> </span><span class="n">value</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="o">*</span><span class="n">maybe_value</span><span class="p">;</span>
+<span class="w">    </span><span class="c1">// Use the value</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+</div>
+<input class="tab-input" id="tab-set--3-input--2" name="tab-set--3" type="radio"><label class="tab-label" for="tab-set--3-input--2">Python API</label><div class="tab-content docutils container">
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="c1"># Check if a setting exists</span>
+<span class="k">if</span> <span class="n">settings</span><span class="o">.</span><span class="n">has</span><span class="p">(</span><span class="s2">&quot;basis_set&quot;</span><span class="p">):</span>
+    <span class="c1"># Use the setting</span>
+    <span class="k">pass</span>
+</pre></div>
+</div>
+</div>
+</div>
+</section>
+<section id="other-operations">
+<h3>Other Operations<a class="headerlink" href="#other-operations" title="Link to this heading"></a></h3>
+<p>The <code class="docutils literal notranslate"><span class="pre">Settings</span></code> class provides numerous utility methods for working with the settings collection as a whole. These
+include methods for introspection (examining what settings exist), validation (checking that required settings are
+present), manipulation (merging with other settings objects), and more.</p>
+<div class="tab-set docutils container">
+<input checked="True" class="tab-input" id="tab-set--4-input--1" name="tab-set--4" type="radio"><label class="tab-label" for="tab-set--4-input--1">C++ API</label><div class="tab-content docutils container">
+<div class="highlight-cpp notranslate"><div class="highlight"><pre><span></span><span class="c1">// Get all setting keys</span>
+<span class="k">auto</span><span class="w"> </span><span class="n">keys</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">settings</span><span class="p">.</span><span class="n">keys</span><span class="p">();</span>
+
+<span class="c1">// Get the number of settings</span>
+<span class="kt">size_t</span><span class="w"> </span><span class="n">count</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">settings</span><span class="p">.</span><span class="n">size</span><span class="p">();</span>
+
+<span class="c1">// Check if settings are empty</span>
+<span class="kt">bool</span><span class="w"> </span><span class="n">is_empty</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">settings</span><span class="p">.</span><span class="n">empty</span><span class="p">();</span>
+
+<span class="c1">// Clear all settings</span>
+<span class="n">settings</span><span class="p">.</span><span class="n">clear</span><span class="p">();</span>
+
+<span class="c1">// Validate that required settings exist</span>
+<span class="n">settings</span><span class="p">.</span><span class="n">validate_required</span><span class="p">({</span><span class="s">&quot;basis_set&quot;</span><span class="p">,</span><span class="w"> </span><span class="s">&quot;convergence_threshold&quot;</span><span class="p">});</span>
+
+<span class="c1">// Get a setting as a string representation</span>
+<span class="n">std</span><span class="o">::</span><span class="n">string</span><span class="w"> </span><span class="n">value_str</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">settings</span><span class="p">.</span><span class="n">get_as_string</span><span class="p">(</span><span class="s">&quot;convergence_threshold&quot;</span><span class="p">);</span>
+
+<span class="c1">// Merge settings from another settings object</span>
+<span class="n">Settings</span><span class="w"> </span><span class="n">other_settings</span><span class="p">;</span>
+<span class="n">settings</span><span class="p">.</span><span class="n">merge</span><span class="p">(</span><span class="n">other_settings</span><span class="p">,</span><span class="w"> </span><span class="nb">true</span><span class="p">);</span><span class="w"> </span><span class="c1">// true to overwrite existing</span>
+
+<span class="c1">// Update an existing setting (throws if key doesn&#39;t exist)</span>
+<span class="n">settings</span><span class="p">.</span><span class="n">update</span><span class="p">(</span><span class="s">&quot;convergence_threshold&quot;</span><span class="p">,</span><span class="w"> </span><span class="mf">1.0e-9</span><span class="p">);</span>
+
+<span class="c1">// Get the type name of a setting</span>
+<span class="n">std</span><span class="o">::</span><span class="n">string</span><span class="w"> </span><span class="n">type</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">settings</span><span class="p">.</span><span class="n">get_type_name</span><span class="p">(</span><span class="s">&quot;convergence_threshold&quot;</span><span class="p">);</span>
+</pre></div>
+</div>
+</div>
+<input class="tab-input" id="tab-set--4-input--2" name="tab-set--4" type="radio"><label class="tab-label" for="tab-set--4-input--2">Python API</label><div class="tab-content docutils container">
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="c1"># Get all setting keys</span>
+<span class="n">keys</span> <span class="o">=</span> <span class="n">settings</span><span class="o">.</span><span class="n">keys</span><span class="p">()</span>
+
+<span class="c1"># Get the number of settings</span>
+<span class="n">count</span> <span class="o">=</span> <span class="n">settings</span><span class="o">.</span><span class="n">size</span><span class="p">()</span>
+
+<span class="c1"># Check if settings are empty</span>
+<span class="n">is_empty</span> <span class="o">=</span> <span class="n">settings</span><span class="o">.</span><span class="n">empty</span><span class="p">()</span>
+
+<span class="c1"># Clear all settings</span>
+<span class="n">settings</span><span class="o">.</span><span class="n">clear</span><span class="p">()</span>
+
+<span class="c1"># Validate that required settings exist</span>
+<span class="n">settings</span><span class="o">.</span><span class="n">validate_required</span><span class="p">([</span><span class="s2">&quot;basis_set&quot;</span><span class="p">,</span> <span class="s2">&quot;convergence_threshold&quot;</span><span class="p">])</span>
+
+<span class="c1"># Get a setting as a string representation</span>
+<span class="n">value_str</span> <span class="o">=</span> <span class="n">settings</span><span class="o">.</span><span class="n">get_as_string</span><span class="p">(</span><span class="s2">&quot;convergence_threshold&quot;</span><span class="p">)</span>
+
+<span class="c1"># Merge settings from another settings object</span>
+<span class="n">other_settings</span> <span class="o">=</span> <span class="n">qdk</span><span class="o">.</span><span class="n">chemistry</span><span class="o">.</span><span class="n">Settings</span><span class="p">()</span>
+<span class="n">settings</span><span class="o">.</span><span class="n">merge</span><span class="p">(</span><span class="n">other_settings</span><span class="p">,</span> <span class="kc">True</span><span class="p">)</span>  <span class="c1"># True to overwrite existing</span>
+
+<span class="c1"># Update an existing setting (throws if key doesn&#39;t exist)</span>
+<span class="n">settings</span><span class="o">.</span><span class="n">update</span><span class="p">(</span><span class="s2">&quot;convergence_threshold&quot;</span><span class="p">,</span> <span class="mf">1.0e-9</span><span class="p">)</span>
+
+<span class="c1"># Get the type name of a setting</span>
+<span class="n">type_name</span> <span class="o">=</span> <span class="n">settings</span><span class="o">.</span><span class="n">get_type_name</span><span class="p">(</span><span class="s2">&quot;convergence_threshold&quot;</span><span class="p">)</span>
+</pre></div>
+</div>
+</div>
+</div>
+</section>
+</section>
+<section id="serialization">
+<h2>Serialization<a class="headerlink" href="#serialization" title="Link to this heading"></a></h2>
+<p>Configuration persistence is important for reproducibility in scientific computing. The <code class="docutils literal notranslate"><span class="pre">Settings</span></code> class provides
+methods to serialize and deserialize settings to both JSON and HDF5 formats. This allows you to save algorithm
+configurations, share them with colleagues, or use them in future runs to ensure consistent results.</p>
+<p>JSON is a human-readable format ideal for manual editing and inspection, while HDF5 offers better performance and type preservation for large datasets.
+For more information on serialization throughout QDK/Chemistry, see the <a class="reference internal" href="serialization.html"><span class="doc">Serialization</span></a> documentation:</p>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p><strong>TODO</strong>: Note that the HDF5 serialization function is named <code class="docutils literal notranslate"><span class="pre">to_hdf5()</span></code> while other classes use <code class="docutils literal notranslate"><span class="pre">to_hdf5_file()</span></code>.
+This naming inconsistency should be addressed for API uniformity by renaming the function to match other classes in
+the toolkit.</p>
+</div>
+<div class="tab-set docutils container">
+<input checked="True" class="tab-input" id="tab-set--5-input--1" name="tab-set--5" type="radio"><label class="tab-label" for="tab-set--5-input--1">C++ API</label><div class="tab-content docutils container">
+<div class="highlight-cpp notranslate"><div class="highlight"><pre><span></span><span class="c1">// Save settings to JSON file</span>
+<span class="n">settings</span><span class="p">.</span><span class="n">to_json_file</span><span class="p">(</span><span class="s">&quot;configuration.settings.json&quot;</span><span class="p">);</span>
+
+<span class="c1">// Load settings from JSON file</span>
+<span class="k">auto</span><span class="w"> </span><span class="n">settings_from_json_file</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">Settings</span><span class="o">::</span><span class="n">from_json_file</span><span class="p">(</span><span class="s">&quot;configuration.settings.json&quot;</span><span class="p">);</span>
+
+<span class="c1">// Save settings to HDF5 file</span>
+<span class="n">settings</span><span class="p">.</span><span class="n">to_hdf5</span><span class="p">(</span><span class="s">&quot;configuration.settings.h5&quot;</span><span class="p">);</span>
+
+<span class="c1">// Load settings from HDF5 file</span>
+<span class="k">auto</span><span class="w"> </span><span class="n">settings_from_hdf5</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">Settings</span><span class="o">::</span><span class="n">from_hdf5</span><span class="p">(</span><span class="s">&quot;configuration.settings.h5&quot;</span><span class="p">);</span>
+
+<span class="c1">// Generic file I/O with specified format</span>
+<span class="n">settings</span><span class="p">.</span><span class="n">to_file</span><span class="p">(</span><span class="s">&quot;configuration&quot;</span><span class="p">,</span><span class="w"> </span><span class="s">&quot;json&quot;</span><span class="p">);</span>
+<span class="k">auto</span><span class="w"> </span><span class="n">settings_from_file</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">Settings</span><span class="o">::</span><span class="n">from_file</span><span class="p">(</span><span class="s">&quot;configuration&quot;</span><span class="p">,</span><span class="w"> </span><span class="s">&quot;hdf5&quot;</span><span class="p">);</span>
+
+<span class="c1">// Convert to JSON object</span>
+<span class="k">auto</span><span class="w"> </span><span class="n">json_data</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">settings</span><span class="p">.</span><span class="n">to_json</span><span class="p">();</span>
+
+<span class="c1">// Load from JSON object</span>
+<span class="k">auto</span><span class="w"> </span><span class="n">settings_from_json</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">Settings</span><span class="o">::</span><span class="n">from_json</span><span class="p">(</span><span class="n">json_data</span><span class="p">);</span>
+</pre></div>
+</div>
+</div>
+<input class="tab-input" id="tab-set--5-input--2" name="tab-set--5" type="radio"><label class="tab-label" for="tab-set--5-input--2">Python API</label><div class="tab-content docutils container">
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="c1"># Save settings to JSON file</span>
+<span class="n">settings</span><span class="o">.</span><span class="n">to_json_file</span><span class="p">(</span><span class="s2">&quot;configuration.settings.json&quot;</span><span class="p">)</span>
+
+<span class="c1"># Load settings from JSON file</span>
+<span class="n">settings_from_json_file</span> <span class="o">=</span> <span class="n">Settings</span><span class="o">.</span><span class="n">from_json_file</span><span class="p">(</span><span class="s2">&quot;configuration.settings.json&quot;</span><span class="p">)</span>
+
+<span class="c1"># Save settings to HDF5 file</span>
+<span class="n">settings</span><span class="o">.</span><span class="n">to_hdf5</span><span class="p">(</span><span class="s2">&quot;configuration.settings.h5&quot;</span><span class="p">)</span>
+
+<span class="c1"># Load settings from HDF5 file</span>
+<span class="n">settings_from_hdf5</span> <span class="o">=</span> <span class="n">Settings</span><span class="o">.</span><span class="n">from_hdf5</span><span class="p">(</span><span class="s2">&quot;configuration.settings.h5&quot;</span><span class="p">)</span>
+
+<span class="c1"># Convert to JSON object</span>
+<span class="n">json_data</span> <span class="o">=</span> <span class="n">settings</span><span class="o">.</span><span class="n">to_json</span><span class="p">()</span>
+
+<span class="c1"># Load from JSON object</span>
+<span class="n">settings_from_json</span> <span class="o">=</span> <span class="n">Settings</span><span class="o">.</span><span class="n">from_json</span><span class="p">(</span><span class="n">json_data</span><span class="p">)</span>
+</pre></div>
+</div>
+</div>
+</div>
+<section id="serialization-format">
+<h3>Serialization Format<a class="headerlink" href="#serialization-format" title="Link to this heading"></a></h3>
+<p>When settings are serialized, the format preserves both the keys and the associated values with their types. Here are
+examples of how settings are serialized in both JSON and HDF5 formats, using an SCF solver configuration as an example.</p>
+<section id="json-format">
+<h4>JSON Format<a class="headerlink" href="#json-format" title="Link to this heading"></a></h4>
+<div class="highlight-json notranslate"><div class="highlight"><pre><span></span><span class="p">{</span>
+<span class="w">  </span><span class="nt">&quot;basis_set&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;sto-3g&quot;</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;convergence_threshold&quot;</span><span class="p">:</span><span class="w"> </span><span class="mf">1e-08</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;max_iterations&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">200</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;method&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;hf&quot;</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+</section>
+<section id="hdf5-format">
+<h4>HDF5 Format<a class="headerlink" href="#hdf5-format" title="Link to this heading"></a></h4>
+<div class="highlight-text notranslate"><div class="highlight"><pre><span></span>/settings  # HDF5 group for SCF solver settings
+  ├── basis_set              # String dataset, the basis set
+  ├── convergence_threshold  # Double dataset, the energy convergence threshold
+  ├── max_iterations         # Integer dataset, the maximum number of iterations
+  └── method                 # String dataset, the method, e.g. hf
+</pre></div>
+</div>
+</section>
+</section>
+</section>
+<section id="extending-settings">
+<h2>Extending Settings<a class="headerlink" href="#extending-settings" title="Link to this heading"></a></h2>
+<p>The <code class="docutils literal notranslate"><span class="pre">Settings</span></code> class is designed with inheritance in mind, allowing algorithm developers to create specialized settings
+classes with predefined parameters and defaults. This design pattern ensures that algorithm settings are well-defined
+and discoverable.</p>
+<p>The key aspect of this design is that default values are established during construction using the protected
+<code class="docutils literal notranslate"><span class="pre">set_default</span></code> method, which ensures baseline functionality. While new settings can be added at runtime through the
+public <code class="docutils literal notranslate"><span class="pre">set</span></code> method, defining defaults during construction helps with documentation and discoverability.</p>
+<p>This extensibility model is part of QDK/Chemistry’s broader <a class="reference internal" href="factory_pattern.html"><span class="doc">Factory Pattern</span></a> design, which allows for flexible algorithm implementations while maintaining a consistent API.
+The pattern is used throughout QDK/Chemistry, such as in the <a class="reference internal" href="interfaces.html"><span class="doc">Interface System</span></a> for integrating third-party packages.</p>
+<p>Here’s how to extend the <code class="docutils literal notranslate"><span class="pre">Settings</span></code> class for a custom algorithm:</p>
+<div class="tab-set docutils container">
+<input checked="True" class="tab-input" id="tab-set--6-input--1" name="tab-set--6" type="radio"><label class="tab-label" for="tab-set--6-input--1">C++ API</label><div class="tab-content docutils container">
+<div class="highlight-cpp notranslate"><div class="highlight"><pre><span></span><span class="k">class</span><span class="w"> </span><span class="nc">MySettings</span><span class="w"> </span><span class="o">:</span><span class="w"> </span><span class="k">public</span><span class="w"> </span><span class="n">Settings</span><span class="w"> </span><span class="p">{</span>
+<span class="k">public</span><span class="o">:</span>
+<span class="w">    </span><span class="n">MySettings</span><span class="p">()</span><span class="w"> </span><span class="p">{</span>
+<span class="w">        </span><span class="c1">// Can only call set_default during construction</span>
+<span class="w">        </span><span class="n">set_default</span><span class="p">(</span><span class="s">&quot;max_iterations&quot;</span><span class="p">,</span><span class="w"> </span><span class="mi">100</span><span class="p">);</span>
+<span class="w">        </span><span class="n">set_default</span><span class="p">(</span><span class="s">&quot;tolerance&quot;</span><span class="p">,</span><span class="w"> </span><span class="mf">1e-6</span><span class="p">);</span>
+<span class="w">        </span><span class="n">set_default</span><span class="p">(</span><span class="s">&quot;method&quot;</span><span class="p">,</span><span class="w"> </span><span class="n">std</span><span class="o">::</span><span class="n">string</span><span class="p">(</span><span class="s">&quot;default&quot;</span><span class="p">));</span>
+<span class="w">    </span><span class="p">}</span>
+<span class="p">};</span>
+</pre></div>
+</div>
+</div>
+<input class="tab-input" id="tab-set--6-input--2" name="tab-set--6" type="radio"><label class="tab-label" for="tab-set--6-input--2">Python API</label><div class="tab-content docutils container">
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="k">class</span><span class="w"> </span><span class="nc">MySettings</span><span class="p">(</span><span class="n">qdk</span><span class="o">.</span><span class="n">chemistry</span><span class="o">.</span><span class="n">Settings</span><span class="p">):</span>
+    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">()</span>
+        <span class="c1"># Set default values during initialization</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">set_default</span><span class="p">(</span><span class="s2">&quot;max_iterations&quot;</span><span class="p">,</span> <span class="mi">100</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">set_default</span><span class="p">(</span><span class="s2">&quot;tolerance&quot;</span><span class="p">,</span> <span class="mf">1e-6</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">set_default</span><span class="p">(</span><span class="s2">&quot;method&quot;</span><span class="p">,</span> <span class="s2">&quot;default&quot;</span><span class="p">)</span>
+</pre></div>
+</div>
+</div>
+</div>
+</section>
+<section id="supported-types">
+<h2>Supported Types<a class="headerlink" href="#supported-types" title="Link to this heading"></a></h2>
+<p>The <code class="docutils literal notranslate"><span class="pre">Settings</span></code> class uses a variant-based type system to store different types of values in a type-safe manner. This
+system balances flexibility with strong typing, allowing settings to hold various types of data while still providing
+compile-time type checking when accessed.</p>
+<p>Currently, the following value types are supported:</p>
+<ul class="simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">bool</span></code> - For binary settings (true/false flags)</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">int</span></code> - For integer settings with moderate range</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">long</span></code> - For integer settings with larger range</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">size_t</span></code> - For non-negative counts and indices</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">float</span></code> - For single-precision floating-point values</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">double</span></code> - For double-precision floating-point values (recommended for most numerical parameters)</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">std::string</span></code> - For text, identifiers, file paths, and other string data</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">std::vector&lt;int&gt;</span></code> - For collections of integers (e.g., orbital indices)</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">std::vector&lt;double&gt;</span></code> - For numerical arrays (e.g., coordinates, coefficients)</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">std::vector&lt;std::string&gt;</span></code> - For collections of strings (e.g., atom labels)</p></li>
+</ul>
+<p>This type system can be extended in the future to support additional types as needed. The implementation ensures type
+safety through C++ templates and variant handling.</p>
+</section>
+<section id="error-handling">
+<h2>Error Handling<a class="headerlink" href="#error-handling" title="Link to this heading"></a></h2>
+<p>The <code class="docutils literal notranslate"><span class="pre">Settings</span></code> class uses exceptions to provide clear error messages when operations fail. This exception-based approach
+makes errors explicit and helps catch configuration issues early in development. The class defines two specific
+exception types:</p>
+<ul class="simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">SettingNotFound</span></code>: Thrown when attempting to access a setting that doesn’t exist in the map. The exception message
+includes the key that was requested to help with debugging.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">SettingTypeMismatch</span></code>: Thrown when attempting to access a setting with the wrong type. For example, trying to get an
+<code class="docutils literal notranslate"><span class="pre">int</span></code> when the setting actually holds a <code class="docutils literal notranslate"><span class="pre">string</span></code>. The exception message includes both the key and the expected type.</p></li>
+</ul>
+<p>These exceptions can be caught and handled to provide graceful error recovery:</p>
+<div class="tab-set docutils container">
+<input checked="True" class="tab-input" id="tab-set--7-input--1" name="tab-set--7" type="radio"><label class="tab-label" for="tab-set--7-input--1">C++ API</label><div class="tab-content docutils container">
+<div class="highlight-cpp notranslate"><div class="highlight"><pre><span></span><span class="k">try</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="k">auto</span><span class="w"> </span><span class="n">value</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">settings</span><span class="p">.</span><span class="n">get</span><span class="o">&lt;</span><span class="kt">double</span><span class="o">&gt;</span><span class="p">(</span><span class="s">&quot;non_existent_setting&quot;</span><span class="p">);</span>
+<span class="p">}</span><span class="w"> </span><span class="k">catch</span><span class="w"> </span><span class="p">(</span><span class="k">const</span><span class="w"> </span><span class="n">qdk</span><span class="o">::</span><span class="n">chemistry</span><span class="o">::</span><span class="n">data</span><span class="o">::</span><span class="n">SettingNotFound</span><span class="o">&amp;</span><span class="w"> </span><span class="n">e</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="n">std</span><span class="o">::</span><span class="n">cerr</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="n">e</span><span class="p">.</span><span class="n">what</span><span class="p">()</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="n">std</span><span class="o">::</span><span class="n">endl</span><span class="p">;</span><span class="w"> </span><span class="c1">// &quot;Setting not found: non_existent_setting&quot;</span>
+<span class="p">}</span>
+
+<span class="k">try</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="k">auto</span><span class="w"> </span><span class="n">value</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">settings</span><span class="p">.</span><span class="n">get</span><span class="o">&lt;</span><span class="kt">int</span><span class="o">&gt;</span><span class="p">(</span><span class="s">&quot;string_setting&quot;</span><span class="p">);</span><span class="w"> </span><span class="c1">// where string_setting is a string</span>
+<span class="p">}</span><span class="w"> </span><span class="k">catch</span><span class="w"> </span><span class="p">(</span><span class="k">const</span><span class="w"> </span><span class="n">qdk</span><span class="o">::</span><span class="n">chemistry</span><span class="o">::</span><span class="n">data</span><span class="o">::</span><span class="n">SettingTypeMismatch</span><span class="o">&amp;</span><span class="w"> </span><span class="n">e</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="n">std</span><span class="o">::</span><span class="n">cerr</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="n">e</span><span class="p">.</span><span class="n">what</span><span class="p">()</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="n">std</span><span class="o">::</span><span class="n">endl</span><span class="p">;</span><span class="w"> </span><span class="c1">// &quot;Type mismatch for setting &#39;string_setting&#39;. Expected: int&quot;</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+</div>
+<input class="tab-input" id="tab-set--7-input--2" name="tab-set--7" type="radio"><label class="tab-label" for="tab-set--7-input--2">Python API</label><div class="tab-content docutils container">
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="k">try</span><span class="p">:</span>
+    <span class="n">value</span> <span class="o">=</span> <span class="n">settings</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;non_existent_setting&quot;</span><span class="p">)</span>
+<span class="k">except</span> <span class="n">qdk</span><span class="o">.</span><span class="n">chemistry</span><span class="o">.</span><span class="n">SettingNotFound</span> <span class="k">as</span> <span class="n">e</span><span class="p">:</span>
+    <span class="nb">print</span><span class="p">(</span><span class="n">e</span><span class="p">)</span>  <span class="c1"># &quot;Setting not found: non_existent_setting&quot;</span>
+</pre></div>
+</div>
+</div>
+</div>
+</section>
+<section id="related-topics">
+<h2>Related Topics<a class="headerlink" href="#related-topics" title="Link to this heading"></a></h2>
+<ul class="simple">
+<li><p><a class="reference internal" href="design_principles.html"><span class="doc">Design Principles</span></a>: Core architectural principles of QDK/Chemistry</p></li>
+<li><p><a class="reference internal" href="factory_pattern.html"><span class="doc">Factory Pattern</span></a>: Understanding the factory pattern and extending QDK/Chemistry</p></li>
+<li><p><a class="reference internal" href="interfaces.html"><span class="doc">Interfaces</span></a>: QDK/Chemistry’s interface system to external packages</p></li>
+<li><p><a class="reference internal" href="serialization.html"><span class="doc">Serialization</span></a>: Data persistence in QDK/Chemistry</p></li>
+</ul>
+</section>
+</section>
+
+
+           </div>
+          </div>
+          <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
+        <a href="interfaces.html" class="btn btn-neutral float-left" title="Interface System in QDK/Chemistry" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+        <a href="../data.html" class="btn btn-neutral float-right" title="Data Classes" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright Copyright (c) Microsoft Corporation. All rights reserved. Licensed under the MIT License..</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

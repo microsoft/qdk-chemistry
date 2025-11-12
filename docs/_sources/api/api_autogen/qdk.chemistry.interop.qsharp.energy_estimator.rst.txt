@@ -1,0 +1,8 @@
+qdk.chemistry.interop.qsharp.energy\_estimator module
+=====================================================
+
+.. automodule:: qdk.chemistry.interop.qsharp.energy_estimator
+   :members:
+   :private-members:
+   :show-inheritance:
+   :undoc-members:

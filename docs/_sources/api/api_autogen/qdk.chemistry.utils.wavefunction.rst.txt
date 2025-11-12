@@ -1,0 +1,8 @@
+qdk.chemistry.utils.wavefunction module
+=======================================
+
+.. automodule:: qdk.chemistry.utils.wavefunction
+   :members:
+   :private-members:
+   :show-inheritance:
+   :undoc-members:

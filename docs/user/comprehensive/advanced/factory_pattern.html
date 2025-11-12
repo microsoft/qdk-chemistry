@@ -1,0 +1,431 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../../../">
+<head>
+  <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Factory Pattern in QDK/Chemistry &mdash; QDK/Chemistry 0.0.1 documentation</title>
+      <link rel="stylesheet" type="text/css" href="../../../_static/pygments.css?v=b86133f3" />
+      <link rel="stylesheet" type="text/css" href="../../../_static/css/theme.css?v=e59714d7" />
+      <link rel="stylesheet" type="text/css" href="../../../_static/tabs.css?v=4c969af8" />
+      <link rel="stylesheet" type="text/css" href="../../../_static/graphviz.css?v=4ae1632d" />
+      <link rel="stylesheet" type="text/css" href="../../../_static/copybutton.css?v=76b2166b" />
+
+  
+      <script src="../../../_static/jquery.js?v=5d32c60e"></script>
+      <script src="../../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="../../../_static/documentation_options.js?v=d45e8c67"></script>
+      <script src="../../../_static/doctools.js?v=9bcbadda"></script>
+      <script src="../../../_static/sphinx_highlight.js?v=dc90522c"></script>
+      <script src="../../../_static/tabs.js?v=3ee01567"></script>
+      <script src="../../../_static/clipboard.min.js?v=a7894cd8"></script>
+      <script src="../../../_static/copybutton.js?v=f281be69"></script>
+    <script src="../../../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../../../genindex.html" />
+    <link rel="search" title="Search" href="../../../search.html" />
+    <link rel="next" title="Serialization in QDK/Chemistry" href="serialization.html" />
+    <link rel="prev" title="Design Principles of QDK/Chemistry" href="design_principles.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="../../../index.html" class="icon icon-home">
+            QDK/Chemistry
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../../../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">User Documentation</span></p>
+<ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="../../Quickstart.html">Quickstart</a></li>
+<li class="toctree-l1 current"><a class="reference internal" href="../index.html">In-Depth Guide</a><ul class="current">
+<li class="toctree-l2 current"><a class="reference internal" href="../design.html">Design and Architecture</a><ul class="current">
+<li class="toctree-l3"><a class="reference internal" href="design_principles.html">Design Principles of QDK/Chemistry</a></li>
+<li class="toctree-l3 current"><a class="current reference internal" href="#">Factory Pattern in QDK/Chemistry</a><ul>
+<li class="toctree-l4"><a class="reference internal" href="#overview-of-the-factory-pattern">Overview of the Factory Pattern</a></li>
+<li class="toctree-l4"><a class="reference internal" href="#id1">Factory Pattern in QDK/Chemistry</a></li>
+<li class="toctree-l4"><a class="reference internal" href="#factory-classes-in-qdk-chemistry">Factory Classes in QDK/Chemistry</a></li>
+<li class="toctree-l4"><a class="reference internal" href="#using-factories">Using Factories</a></li>
+<li class="toctree-l4"><a class="reference internal" href="#extending-qdk-chemistry">Extending QDK/Chemistry</a></li>
+<li class="toctree-l4"><a class="reference internal" href="#connection-to-interface-system">Connection to Interface System</a></li>
+<li class="toctree-l4"><a class="reference internal" href="#related-topics">Related Topics</a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="serialization.html">Serialization in QDK/Chemistry</a></li>
+<li class="toctree-l3"><a class="reference internal" href="interfaces.html">Interface System in QDK/Chemistry</a></li>
+<li class="toctree-l3"><a class="reference internal" href="settings.html">Settings</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="../data.html">Data Classes</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../algorithms.html">Algorithms</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../keywords.html">Functionals and Basis Sets</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../plugins.html">Plugins</a></li>
+</ul>
+</li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">API Reference</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../api/python_api.html">Python API</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../api/cpp_api.html">C++ API</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Supporting Information</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../glossary.html">Glossary</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../references.html">References</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../../../index.html">QDK/Chemistry</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../../../index.html" class="icon icon-home" aria-label="Home"></a></li>
+          <li class="breadcrumb-item"><a href="../index.html">In-Depth Guide</a></li>
+          <li class="breadcrumb-item"><a href="../design.html">Design and Architecture</a></li>
+      <li class="breadcrumb-item active">Factory Pattern in QDK/Chemistry</li>
+      <li class="wy-breadcrumbs-aside">
+            <a href="../../../_sources/user/comprehensive/advanced/factory_pattern.rst.txt" rel="nofollow"> View page source</a>
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <section id="factory-pattern-in-qdk-chemistry">
+<h1>Factory Pattern in QDK/Chemistry<a class="headerlink" href="#factory-pattern-in-qdk-chemistry" title="Link to this heading"></a></h1>
+<p>QDK/Chemistry extensively uses the Factory Pattern, a creational design pattern that provides an interface for creating
+objects without specifying their concrete classes. This document explains how and why QDK/Chemistry uses this pattern for
+algorithm instantiation.</p>
+<section id="overview-of-the-factory-pattern">
+<h2>Overview of the Factory Pattern<a class="headerlink" href="#overview-of-the-factory-pattern" title="Link to this heading"></a></h2>
+<p>The Factory Pattern is a design pattern that encapsulates object creation logic. Instead of directly instantiating
+objects using constructors, clients request objects from a factory, typically by specifying a type identifier. This
+approach has several advantages:</p>
+<ol class="arabic simple">
+<li><p><strong>Abstraction</strong>: Clients work with abstract interfaces rather than concrete implementations</p></li>
+<li><p><strong>Flexibility</strong>: The concrete implementation can be changed without affecting client code</p></li>
+<li><p><strong>Configuration</strong>: Objects can be configured based on runtime parameters</p></li>
+<li><p><strong>Extension</strong>: New implementations can be added without modifying existing code</p></li>
+</ol>
+</section>
+<section id="id1">
+<h2>Factory Pattern in QDK/Chemistry<a class="headerlink" href="#id1" title="Link to this heading"></a></h2>
+<p>In QDK/Chemistry, algorithm classes like <code class="docutils literal notranslate"><span class="pre">ScfSolver</span></code>, <code class="docutils literal notranslate"><span class="pre">Localizer</span></code>, and <code class="docutils literal notranslate"><span class="pre">MCCalculator</span></code> are instantiated through factory classes rather than direct constructors.
+This design allows QDK/Chemistry to:</p>
+<ul class="simple">
+<li><p>Support multiple implementations of the same algorithm interface</p></li>
+<li><p>Configure algorithm instances based on settings</p></li>
+<li><p>Load algorithm implementations dynamically at runtime</p></li>
+<li><p>Isolate algorithm implementation details from client code</p></li>
+</ul>
+</section>
+<section id="factory-classes-in-qdk-chemistry">
+<h2>Factory Classes in QDK/Chemistry<a class="headerlink" href="#factory-classes-in-qdk-chemistry" title="Link to this heading"></a></h2>
+<p>QDK/Chemistry provides factory classes for each algorithm type:</p>
+<table class="docutils align-default" id="id4">
+<caption><span class="caption-text">QDK/Chemistry Algorithm Factories</span><a class="headerlink" href="#id4" title="Link to this table"></a></caption>
+<thead>
+<tr class="row-odd"><th class="head"><p>Algorithm</p></th>
+<th class="head"><p>Factory Class</p></th>
+<th class="head"><p>Creation Function (Python)</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p><a class="reference internal" href="../algorithms/scf_solver.html"><span class="doc">ScfSolver</span></a></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">ScfSolverFactory</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">create_scf_solver()</span></code></p></td>
+</tr>
+<tr class="row-odd"><td><p><a class="reference internal" href="../algorithms/localizer.html"><span class="doc">Localizer</span></a></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">LocalizerFactory</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">create_localizer()</span></code></p></td>
+</tr>
+<tr class="row-even"><td><p><a class="reference internal" href="../algorithms/active_space.html"><span class="doc">ActiveSpaceSelector</span></a></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">ActiveSpaceSelectorFactory</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">create_active_space_selector()</span></code></p></td>
+</tr>
+<tr class="row-odd"><td><p><a class="reference internal" href="../algorithms/hamiltonian_constructor.html"><span class="doc">HamiltonianConstructor</span></a></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">HamiltonianConstructorFactory</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">create_hamiltonian_constructor()</span></code></p></td>
+</tr>
+<tr class="row-even"><td><p><a class="reference internal" href="../algorithms/mc_calculator.html"><span class="doc">MCCalculator</span></a></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">MCCalculatorFactory</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">create_mc_calculator()</span></code></p></td>
+</tr>
+<tr class="row-odd"><td><p><a class="reference internal" href="../algorithms/dynamical_correlation.html"><span class="doc">DynamicalCorrelation</span></a></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">DynamicalCorrelationFactory</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">create_dynamical_correlation()</span></code></p></td>
+</tr>
+</tbody>
+</table>
+</section>
+<section id="using-factories">
+<h2>Using Factories<a class="headerlink" href="#using-factories" title="Link to this heading"></a></h2>
+<p>QDK/Chemistry provides factory methods to create algorithm instances in both C++ and Python.
+These factory methods allow users to create default implementations or specific implementations by name.</p>
+<div class="admonition-todo admonition" id="id2">
+<p class="admonition-title">Todo</p>
+<p>TODO (NAB):  David needs to check these Factory pattern code examples.
+<a class="reference external" href="https://dev.azure.com/ms-azurequantum/AzureQuantum/_workitems/edit/41366">https://dev.azure.com/ms-azurequantum/AzureQuantum/_workitems/edit/41366</a></p>
+</div>
+<div class="tab-set docutils container">
+<input checked="True" class="tab-input" id="tab-set--0-input--1" name="tab-set--0" type="radio"><label class="tab-label" for="tab-set--0-input--1">C++ API</label><div class="tab-content docutils container">
+<div class="highlight-cpp notranslate"><div class="highlight"><pre><span></span><span class="cp">#include</span><span class="w"> </span><span class="cpf">&lt;qdk/chemistry.hpp&gt;</span>
+
+<span class="k">using</span><span class="w"> </span><span class="k">namespace</span><span class="w"> </span><span class="nn">qdk</span><span class="o">::</span><span class="nn">chemistry</span><span class="o">::</span><span class="nn">algorithms</span><span class="p">;</span>
+
+<span class="c1">// Create default implementation</span>
+<span class="k">auto</span><span class="w"> </span><span class="n">scf_solver</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">ScfSolverFactory</span><span class="o">::</span><span class="n">create</span><span class="p">();</span>
+
+<span class="c1">// Create specific implementation by name</span>
+<span class="k">auto</span><span class="w"> </span><span class="n">localizer</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">LocalizerFactory</span><span class="o">::</span><span class="n">create</span><span class="p">(</span><span class="s">&quot;pipek-mezey&quot;</span><span class="p">);</span>
+
+<span class="c1">// Configure and use the instance</span>
+<span class="n">scf_solver</span><span class="o">-&gt;</span><span class="n">settings</span><span class="p">().</span><span class="n">set</span><span class="p">(</span><span class="s">&quot;basis_set&quot;</span><span class="p">,</span><span class="w"> </span><span class="s">&quot;def2-tzvp&quot;</span><span class="p">);</span>
+<span class="k">auto</span><span class="w"> </span><span class="p">[</span><span class="n">E_scf</span><span class="p">,</span><span class="w"> </span><span class="n">orbitals</span><span class="p">]</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">scf_solver</span><span class="o">-&gt;</span><span class="n">solve</span><span class="p">(</span><span class="n">structure</span><span class="p">);</span>
+</pre></div>
+</div>
+</div>
+<input class="tab-input" id="tab-set--0-input--2" name="tab-set--0" type="radio"><label class="tab-label" for="tab-set--0-input--2">Python API</label><div class="tab-content docutils container">
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">from</span><span class="w"> </span><span class="nn">qdk.chemistry.algorithms</span><span class="w"> </span><span class="kn">import</span> <span class="n">create_scf_solver</span><span class="p">,</span> <span class="n">create_localizer</span>
+
+<span class="c1"># Create default implementation</span>
+<span class="n">scf_solver</span> <span class="o">=</span> <span class="n">create_scf_solver</span><span class="p">()</span>
+
+<span class="c1"># Create specific implementation by name</span>
+<span class="n">localizer</span> <span class="o">=</span> <span class="n">create_localizer</span><span class="p">(</span><span class="s2">&quot;pipek-mezey&quot;</span><span class="p">)</span>
+
+<span class="c1"># Configure and use the instance</span>
+<span class="n">scf_solver</span><span class="o">.</span><span class="n">settings</span><span class="p">()</span><span class="o">.</span><span class="n">set</span><span class="p">(</span><span class="s2">&quot;basis_set&quot;</span><span class="p">,</span> <span class="s2">&quot;def2-tzvp&quot;</span><span class="p">)</span>
+<span class="n">E_scf</span><span class="p">,</span> <span class="n">orbitals</span> <span class="o">=</span> <span class="n">scf_solver</span><span class="o">.</span><span class="n">solve</span><span class="p">(</span><span class="n">structure</span><span class="p">)</span>
+</pre></div>
+</div>
+</div>
+</div>
+</section>
+<section id="extending-qdk-chemistry">
+<h2>Extending QDK/Chemistry<a class="headerlink" href="#extending-qdk-chemistry" title="Link to this heading"></a></h2>
+<p>QDK/Chemistry is designed with extensibility in mind, allowing developers to add new algorithms, data formats, and functionality.
+The factory pattern is the primary mechanism for extending QDK/Chemistry with custom implementations, especially for interfacing with external quantum chemistry programs.</p>
+<section id="interface-implementation-patterns">
+<h3>Interface Implementation Patterns<a class="headerlink" href="#interface-implementation-patterns" title="Link to this heading"></a></h3>
+<p>QDK/Chemistry can be extended in several ways:</p>
+<ol class="arabic simple">
+<li><p><strong>External Program Interfaces</strong>: Create implementations that connect QDK/Chemistry to external quantum chemistry packages</p></li>
+<li><p><strong>Custom Algorithm Implementations</strong>: Develop your own implementations of QDK/Chemistry’s algorithm interfaces</p></li>
+<li><p><strong>Data Format Bridges</strong>: Create bridges between QDK/Chemistry’s data structures and external formats</p></li>
+</ol>
+</section>
+<section id="implementing-program-interfaces-in-c">
+<h3>Implementing Program Interfaces in C++<a class="headerlink" href="#implementing-program-interfaces-in-c" title="Link to this heading"></a></h3>
+<p>To create a new interface to an external program in C++:</p>
+<ol class="arabic simple">
+<li><p><strong>Inherit from the algorithm base class</strong>:</p></li>
+</ol>
+<div class="admonition-todo admonition" id="id3">
+<p class="admonition-title">Todo</p>
+<p>TODO (NAB):  David to check these code examples.
+<a class="reference external" href="https://dev.azure.com/ms-azurequantum/AzureQuantum/_workitems/edit/41366">https://dev.azure.com/ms-azurequantum/AzureQuantum/_workitems/edit/41366</a></p>
+</div>
+<div class="tab-set docutils container">
+<input checked="True" class="tab-input" id="tab-set--1-input--1" name="tab-set--1" type="radio"><label class="tab-label" for="tab-set--1-input--1">C++ API</label><div class="tab-content docutils container">
+<div class="highlight-cpp notranslate"><div class="highlight"><pre><span></span><span class="cp">#include</span><span class="w"> </span><span class="cpf">&lt;qdk/chemistry/algorithms/scf_solver.hpp&gt;</span>
+<span class="cp">#include</span><span class="w"> </span><span class="cpf">&lt;external_program/api.h&gt;</span><span class="c1">  // Your external program&#39;s API</span>
+
+<span class="k">namespace</span><span class="w"> </span><span class="nn">my_namespace</span><span class="w"> </span><span class="p">{</span>
+
+<span class="k">class</span><span class="w"> </span><span class="nc">ExternalProgramScfSolver</span><span class="w"> </span><span class="o">:</span><span class="w"> </span><span class="k">public</span><span class="w"> </span><span class="n">qdk</span><span class="o">::</span><span class="n">chemistry</span><span class="o">::</span><span class="n">algorithms</span><span class="o">::</span><span class="n">ScfSolver</span><span class="w"> </span><span class="p">{</span>
+<span class="k">public</span><span class="o">:</span>
+<span class="w">    </span><span class="n">ExternalProgramScfSolver</span><span class="p">()</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="k">default</span><span class="p">;</span>
+<span class="w">    </span><span class="o">~</span><span class="n">ExternalProgramScfSolver</span><span class="p">()</span><span class="w"> </span><span class="k">override</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="k">default</span><span class="p">;</span>
+
+<span class="w">    </span><span class="c1">// Implement the interface method that connects to your external program</span>
+<span class="w">    </span><span class="n">std</span><span class="o">::</span><span class="n">tuple</span><span class="o">&lt;</span><span class="kt">double</span><span class="p">,</span><span class="w"> </span><span class="n">qdk</span><span class="o">::</span><span class="n">chemistry</span><span class="o">::</span><span class="n">data</span><span class="o">::</span><span class="n">Orbitals</span><span class="o">&gt;</span><span class="w"> </span><span class="n">solve</span><span class="p">(</span><span class="k">const</span><span class="w"> </span><span class="n">qdk</span><span class="o">::</span><span class="n">chemistry</span><span class="o">::</span><span class="n">data</span><span class="o">::</span><span class="n">Structure</span><span class="o">&amp;</span><span class="w"> </span><span class="n">structure</span><span class="p">)</span><span class="w"> </span><span class="k">override</span><span class="w"> </span><span class="p">{</span>
+<span class="w">        </span><span class="c1">// Convert QDK/Chemistry structure to external program format</span>
+<span class="w">        </span><span class="k">auto</span><span class="w"> </span><span class="n">ext_molecule</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">convert_to_external_format</span><span class="p">(</span><span class="n">structure</span><span class="p">);</span>
+
+<span class="w">        </span><span class="c1">// Run calculation using external program&#39;s API</span>
+<span class="w">        </span><span class="k">auto</span><span class="w"> </span><span class="n">ext_results</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">external_program</span><span class="o">::</span><span class="n">run_scf</span><span class="p">(</span><span class="n">ext_molecule</span><span class="p">,</span><span class="w"> </span><span class="n">settings</span><span class="p">().</span><span class="n">get_all</span><span class="p">());</span>
+
+<span class="w">        </span><span class="c1">// Convert results back to QDK/Chemistry format</span>
+<span class="w">        </span><span class="kt">double</span><span class="w"> </span><span class="n">energy</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">ext_results</span><span class="p">.</span><span class="n">energy</span><span class="p">;</span>
+<span class="w">        </span><span class="n">qdk</span><span class="o">::</span><span class="n">chemistry</span><span class="o">::</span><span class="n">data</span><span class="o">::</span><span class="n">Orbitals</span><span class="w"> </span><span class="n">orbitals</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">convert_from_external_format</span><span class="p">(</span><span class="n">ext_results</span><span class="p">.</span><span class="n">orbitals</span><span class="p">);</span>
+
+<span class="w">        </span><span class="k">return</span><span class="w"> </span><span class="p">{</span><span class="n">energy</span><span class="p">,</span><span class="w"> </span><span class="n">orbitals</span><span class="p">};</span>
+<span class="w">    </span><span class="p">}</span>
+
+<span class="k">private</span><span class="o">:</span>
+<span class="w">    </span><span class="c1">// Helper functions for format conversion</span>
+<span class="w">    </span><span class="n">external_program</span><span class="o">::</span><span class="n">Molecule</span><span class="w"> </span><span class="n">convert_to_external_format</span><span class="p">(</span><span class="k">const</span><span class="w"> </span><span class="n">qdk</span><span class="o">::</span><span class="n">chemistry</span><span class="o">::</span><span class="n">data</span><span class="o">::</span><span class="n">Structure</span><span class="o">&amp;</span><span class="w"> </span><span class="n">structure</span><span class="p">);</span>
+<span class="w">    </span><span class="n">qdk</span><span class="o">::</span><span class="n">chemistry</span><span class="o">::</span><span class="n">data</span><span class="o">::</span><span class="n">Orbitals</span><span class="w"> </span><span class="nf">convert_from_external_format</span><span class="p">(</span><span class="k">const</span><span class="w"> </span><span class="n">external_program</span><span class="o">::</span><span class="n">Orbitals</span><span class="o">&amp;</span><span class="w"> </span><span class="n">ext_orbitals</span><span class="p">);</span>
+<span class="p">};</span>
+
+<span class="p">}</span><span class="w"> </span><span class="c1">// namespace my_namespace</span>
+</pre></div>
+</div>
+</div>
+</div>
+<ol class="arabic simple" start="2">
+<li><p><strong>Register with the factory</strong>:</p></li>
+</ol>
+<div class="highlight-cpp notranslate"><div class="highlight"><pre><span></span><span class="cp">#include</span><span class="w"> </span><span class="cpf">&lt;qdk/chemistry/algorithms/scf_solver_factory.hpp&gt;</span>
+
+<span class="c1">// Register the implementation</span>
+<span class="kt">bool</span><span class="w"> </span><span class="n">registered</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">qdk</span><span class="o">::</span><span class="n">chemistry</span><span class="o">::</span><span class="n">algorithms</span><span class="o">::</span><span class="n">ScfSolverFactory</span><span class="o">::</span><span class="n">register_implementation</span><span class="p">(</span>
+<span class="w">    </span><span class="s">&quot;external-program&quot;</span><span class="p">,</span><span class="w">  </span><span class="c1">// Name for this implementation</span>
+<span class="w">    </span><span class="p">[]()</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="k">return</span><span class="w"> </span><span class="n">std</span><span class="o">::</span><span class="n">make_unique</span><span class="o">&lt;</span><span class="n">my_namespace</span><span class="o">::</span><span class="n">ExternalProgramScfSolver</span><span class="o">&gt;</span><span class="p">();</span><span class="w"> </span><span class="p">}</span>
+<span class="p">);</span>
+</pre></div>
+</div>
+<ol class="arabic simple" start="3">
+<li><p><strong>Use your implementation</strong>:</p></li>
+</ol>
+<div class="highlight-cpp notranslate"><div class="highlight"><pre><span></span><span class="k">auto</span><span class="w"> </span><span class="n">solver</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">qdk</span><span class="o">::</span><span class="n">chemistry</span><span class="o">::</span><span class="n">algorithms</span><span class="o">::</span><span class="n">ScfSolverFactory</span><span class="o">::</span><span class="n">create</span><span class="p">(</span><span class="s">&quot;external-program&quot;</span><span class="p">);</span>
+</pre></div>
+</div>
+</section>
+<section id="implementing-program-interfaces-in-python">
+<h3>Implementing Program Interfaces in Python<a class="headerlink" href="#implementing-program-interfaces-in-python" title="Link to this heading"></a></h3>
+<p>To create a new interface to an external program in Python:</p>
+<ol class="arabic simple">
+<li><p><strong>Inherit from the algorithm base class</strong>:</p></li>
+</ol>
+<div class="tab-set docutils container">
+<input checked="True" class="tab-input" id="tab-set--2-input--1" name="tab-set--2" type="radio"><label class="tab-label" for="tab-set--2-input--1">Python API</label><div class="tab-content docutils container">
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">from</span><span class="w"> </span><span class="nn">qdk.chemistry.algorithms</span><span class="w"> </span><span class="kn">import</span> <span class="n">ScfSolver</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">qdk.chemistry.data</span><span class="w"> </span><span class="kn">import</span> <span class="n">Structure</span><span class="p">,</span> <span class="n">Orbitals</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">external_program</span>  <span class="c1"># Your external program&#39;s Python package</span>
+
+<span class="k">class</span><span class="w"> </span><span class="nc">ExternalProgramScfSolver</span><span class="p">(</span><span class="n">ScfSolver</span><span class="p">):</span>
+    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">()</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">solve</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">structure</span><span class="p">):</span>
+        <span class="c1"># Convert QDK/Chemistry structure to external program format</span>
+        <span class="n">ext_molecule</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_convert_to_external_format</span><span class="p">(</span><span class="n">structure</span><span class="p">)</span>
+
+        <span class="c1"># Set up calculation with external program</span>
+        <span class="n">ext_calc</span> <span class="o">=</span> <span class="n">external_program</span><span class="o">.</span><span class="n">SCF</span><span class="p">(</span><span class="n">ext_molecule</span><span class="p">)</span>
+
+        <span class="c1"># Apply settings</span>
+        <span class="k">for</span> <span class="n">key</span><span class="p">,</span> <span class="n">value</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">settings</span><span class="p">()</span><span class="o">.</span><span class="n">get_all</span><span class="p">()</span><span class="o">.</span><span class="n">items</span><span class="p">():</span>
+            <span class="k">if</span> <span class="n">key</span><span class="o">.</span><span class="n">startswith</span><span class="p">(</span><span class="s2">&quot;external_program.&quot;</span><span class="p">):</span>
+                <span class="n">option_name</span> <span class="o">=</span> <span class="n">key</span><span class="o">.</span><span class="n">split</span><span class="p">(</span><span class="s2">&quot;.&quot;</span><span class="p">,</span> <span class="mi">1</span><span class="p">)[</span><span class="mi">1</span><span class="p">]</span>
+                <span class="n">ext_calc</span><span class="o">.</span><span class="n">set_option</span><span class="p">(</span><span class="n">option_name</span><span class="p">,</span> <span class="n">value</span><span class="p">)</span>
+
+        <span class="c1"># Run calculation</span>
+        <span class="n">ext_results</span> <span class="o">=</span> <span class="n">ext_calc</span><span class="o">.</span><span class="n">run</span><span class="p">()</span>
+
+        <span class="c1"># Convert results back to QDK/Chemistry format</span>
+        <span class="n">energy</span> <span class="o">=</span> <span class="n">ext_results</span><span class="o">.</span><span class="n">energy</span>
+        <span class="n">orbitals</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_convert_from_external_format</span><span class="p">(</span><span class="n">ext_results</span><span class="o">.</span><span class="n">orbitals</span><span class="p">)</span>
+
+        <span class="k">return</span> <span class="n">energy</span><span class="p">,</span> <span class="n">orbitals</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">_convert_to_external_format</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">structure</span><span class="p">):</span>
+        <span class="c1"># Implementation of conversion from QDK/Chemistry to external format</span>
+        <span class="c1"># ...</span>
+        <span class="k">return</span> <span class="n">ext_molecule</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">_convert_from_external_format</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">ext_orbitals</span><span class="p">):</span>
+        <span class="c1"># Implementation of conversion from external format to QDK/Chemistry</span>
+        <span class="c1"># ...</span>
+        <span class="k">return</span> <span class="n">orbitals</span>
+</pre></div>
+</div>
+</div>
+</div>
+<ol class="arabic simple" start="2">
+<li><p><strong>Register with the factory</strong>:</p></li>
+</ol>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">from</span><span class="w"> </span><span class="nn">qdk.chemistry.algorithms</span><span class="w"> </span><span class="kn">import</span> <span class="n">register_scf_solver</span>
+
+<span class="c1"># Register the implementation</span>
+<span class="n">register_scf_solver</span><span class="p">(</span><span class="s2">&quot;external-program&quot;</span><span class="p">,</span> <span class="n">ExternalProgramScfSolver</span><span class="p">)</span>
+</pre></div>
+</div>
+<ol class="arabic simple" start="3">
+<li><p><strong>Use your implementation</strong>:</p></li>
+</ol>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">from</span><span class="w"> </span><span class="nn">qdk.chemistry.algorithms</span><span class="w"> </span><span class="kn">import</span> <span class="n">create_scf_solver</span>
+<span class="n">solver</span> <span class="o">=</span> <span class="n">create_scf_solver</span><span class="p">(</span><span class="s2">&quot;external-program&quot;</span><span class="p">)</span>
+</pre></div>
+</div>
+</section>
+</section>
+<section id="connection-to-interface-system">
+<h2>Connection to Interface System<a class="headerlink" href="#connection-to-interface-system" title="Link to this heading"></a></h2>
+<p>The factory pattern serves as the foundation for QDK/Chemistry’s <a class="reference internal" href="interfaces.html"><span class="doc">Interface System</span></a>.
+In QDK/Chemistry, factories enable the registration and instantiation of interface implementations that connect to external quantum chemistry programs.</p>
+<p>Internally, QDK/Chemistry’s factories maintain a registry of creator functions mapped to implementation names.
+When a client requests an implementation by name, the factory looks up the appropriate creator function and instantiates the object with the necessary setup.</p>
+<p>This design enables several key capabilities:</p>
+<ul class="simple">
+<li><p>Seamless integration with external quantum chemistry packages</p></li>
+<li><p>Runtime selection of specific implementations</p></li>
+<li><p>Decoupling of interface usage from implementation details</p></li>
+</ul>
+<p>For detailed information about implementing interfaces to external programs, including data conversion, error handling, resource management, and settings translation, see the <a class="reference internal" href="interfaces.html"><span class="doc">Interfaces</span></a> documentation.</p>
+</section>
+<section id="related-topics">
+<h2>Related Topics<a class="headerlink" href="#related-topics" title="Link to this heading"></a></h2>
+<ul class="simple">
+<li><p><a class="reference internal" href="settings.html"><span class="doc">Settings</span></a>: Configuration of algorithm instances</p></li>
+<li><p><a class="reference internal" href="interfaces.html"><span class="doc">Interfaces</span></a>: QDK/Chemistry’s interface system to external packages</p></li>
+</ul>
+</section>
+</section>
+
+
+           </div>
+          </div>
+          <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
+        <a href="design_principles.html" class="btn btn-neutral float-left" title="Design Principles of QDK/Chemistry" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+        <a href="serialization.html" class="btn btn-neutral float-right" title="Serialization in QDK/Chemistry" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright Copyright (c) Microsoft Corporation. All rights reserved. Licensed under the MIT License..</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

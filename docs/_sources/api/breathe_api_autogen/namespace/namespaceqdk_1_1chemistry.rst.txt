@@ -1,0 +1,6 @@
+Namespace qdk::chemistry
+========================
+
+.. doxygennamespace:: qdk::chemistry
+   :project: QDK/Chemistry
+   :members:

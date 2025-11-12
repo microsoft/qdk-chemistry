@@ -1,0 +1,256 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../">
+<head>
+  <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>C++ API &mdash; QDK/Chemistry 0.0.1 documentation</title>
+      <link rel="stylesheet" type="text/css" href="../_static/pygments.css?v=b86133f3" />
+      <link rel="stylesheet" type="text/css" href="../_static/css/theme.css?v=e59714d7" />
+      <link rel="stylesheet" type="text/css" href="../_static/tabs.css?v=4c969af8" />
+      <link rel="stylesheet" type="text/css" href="../_static/graphviz.css?v=4ae1632d" />
+      <link rel="stylesheet" type="text/css" href="../_static/copybutton.css?v=76b2166b" />
+
+  
+      <script src="../_static/jquery.js?v=5d32c60e"></script>
+      <script src="../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="../_static/documentation_options.js?v=d45e8c67"></script>
+      <script src="../_static/doctools.js?v=9bcbadda"></script>
+      <script src="../_static/sphinx_highlight.js?v=dc90522c"></script>
+      <script src="../_static/tabs.js?v=3ee01567"></script>
+      <script src="../_static/clipboard.min.js?v=a7894cd8"></script>
+      <script src="../_static/copybutton.js?v=f281be69"></script>
+    <script src="../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" />
+    <link rel="next" title="Namespace qdk::chemistry::data" href="breathe_api_autogen/namespace/namespaceqdk_1_1chemistry_1_1data.html" />
+    <link rel="prev" title="qdk.chemistry.constants module" href="api_autogen/qdk.chemistry.constants.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="../index.html" class="icon icon-home">
+            QDK/Chemistry
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">User Documentation</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../user/Quickstart.html">Quickstart</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../user/comprehensive/index.html">In-Depth Guide</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">API Reference</span></p>
+<ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="python_api.html">Python API</a></li>
+<li class="toctree-l1 current"><a class="current reference internal" href="#">C++ API</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="#data-classes">Data Classes</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="breathe_api_autogen/namespace/namespaceqdk_1_1chemistry_1_1data.html">Namespace qdk::chemistry::data</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="#algorithms">Algorithms</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="breathe_api_autogen/namespace/namespaceqdk_1_1chemistry_1_1algorithms.html">Namespace qdk::chemistry::algorithms</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="#utilities">Utilities</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="breathe_api_autogen/namespace/namespaceqdk_1_1chemistry_1_1utils.html">Namespace qdk::chemistry::utils</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="#constants">Constants</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="breathe_api_autogen/namespace/namespaceqdk_1_1chemistry_1_1constants.html">Namespace qdk::chemistry::constants</a></li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Supporting Information</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../glossary.html">Glossary</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../references.html">References</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../index.html">QDK/Chemistry</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../index.html" class="icon icon-home" aria-label="Home"></a></li>
+      <li class="breadcrumb-item active">C++ API</li>
+      <li class="wy-breadcrumbs-aside">
+            <a href="../_sources/api/cpp_api.rst.txt" rel="nofollow"> View page source</a>
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <section id="c-api">
+<h1>C++ API<a class="headerlink" href="#c-api" title="Link to this heading"></a></h1>
+<p>This section provides complete documentation for the QDK/Chemistry C++ API.</p>
+<p>QDK/Chemistry provides a comprehensive C++ library for quantum chemistry calculations.
+The library is designed for high-performance computing with modern C++ features and efficient memory management.
+The C++ implementation forms the core computational engine of QDK/Chemistry, offering maximum performance and fine-grained control for demanding quantum chemistry applications.</p>
+<section id="data-classes">
+<h2>Data Classes<a class="headerlink" href="#data-classes" title="Link to this heading"></a></h2>
+<p>The data classes in the C++ API provide efficient data structures for representing and manipulating quantum chemistry concepts such as molecular geometries, wavefunctions, and electronic states.
+These classes are designed with performance in mind, employing optimized memory layouts and computational kernels for high-performance quantum chemistry calculations.</p>
+<p>For detailed information, see <a class="reference internal" href="breathe_api_autogen/namespace/namespaceqdk_1_1chemistry_1_1data.html"><span class="doc">Namespace qdk::chemistry::data</span></a>.</p>
+<div class="toctree-wrapper compound">
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="breathe_api_autogen/namespace/namespaceqdk_1_1chemistry_1_1data.html">Namespace qdk::chemistry::data</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="breathe_api_autogen/namespace/namespaceqdk_1_1chemistry_1_1data.html#_CPPv4N3qdk9chemistry4dataE"><code class="docutils literal notranslate"><span class="pre">qdk::chemistry::data</span></code></a></li>
+</ul>
+</li>
+</ul>
+</div>
+</section>
+<section id="algorithms">
+<h2>Algorithms<a class="headerlink" href="#algorithms" title="Link to this heading"></a></h2>
+<p>The algorithms namespace contains highly optimized implementations of various quantum chemistry methods.
+This includes self-consistent field procedures, electron correlation methods, and specialized numerical techniques for solving quantum mechanical equations.
+The C++ implementations take advantage of modern hardware features and parallelization to achieve maximum computational efficiency.</p>
+<p>For detailed information, see <a class="reference internal" href="breathe_api_autogen/namespace/namespaceqdk_1_1chemistry_1_1algorithms.html"><span class="doc">Namespace qdk::chemistry::algorithms</span></a>.</p>
+<div class="toctree-wrapper compound">
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="breathe_api_autogen/namespace/namespaceqdk_1_1chemistry_1_1algorithms.html">Namespace qdk::chemistry::algorithms</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="breathe_api_autogen/namespace/namespaceqdk_1_1chemistry_1_1algorithms.html#_CPPv4N3qdk9chemistry10algorithmsE"><code class="docutils literal notranslate"><span class="pre">qdk::chemistry::algorithms</span></code></a><ul>
+<li class="toctree-l3"><a class="reference internal" href="breathe_api_autogen/namespace/namespaceqdk_1_1chemistry_1_1algorithms.html#_CPPv4N3qdk9chemistry10algorithms34make_autocas_active_space_selectorEv"><code class="docutils literal notranslate"><span class="pre">make_autocas_active_space_selector()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="breathe_api_autogen/namespace/namespaceqdk_1_1chemistry_1_1algorithms.html#_CPPv4N3qdk9chemistry10algorithms38make_autocas_eos_active_space_selectorEv"><code class="docutils literal notranslate"><span class="pre">make_autocas_eos_active_space_selector()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="breathe_api_autogen/namespace/namespaceqdk_1_1chemistry_1_1algorithms.html#_CPPv4N3qdk9chemistry10algorithms18make_macis_asci_mcEv"><code class="docutils literal notranslate"><span class="pre">make_macis_asci_mc()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="breathe_api_autogen/namespace/namespaceqdk_1_1chemistry_1_1algorithms.html#_CPPv4N3qdk9chemistry10algorithms17make_macis_cas_mcEv"><code class="docutils literal notranslate"><span class="pre">make_macis_cas_mc()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="breathe_api_autogen/namespace/namespaceqdk_1_1chemistry_1_1algorithms.html#_CPPv4N3qdk9chemistry10algorithms14make_macis_pmcEv"><code class="docutils literal notranslate"><span class="pre">make_macis_pmc()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="breathe_api_autogen/namespace/namespaceqdk_1_1chemistry_1_1algorithms.html#_CPPv4N3qdk9chemistry10algorithms26make_microsoft_hamiltonianEv"><code class="docutils literal notranslate"><span class="pre">make_microsoft_hamiltonian()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="breathe_api_autogen/namespace/namespaceqdk_1_1chemistry_1_1algorithms.html#_CPPv4N3qdk9chemistry10algorithms25make_microsoft_scf_solverEv"><code class="docutils literal notranslate"><span class="pre">make_microsoft_scf_solver()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="breathe_api_autogen/namespace/namespaceqdk_1_1chemistry_1_1algorithms.html#_CPPv4N3qdk9chemistry10algorithms34make_mp2_natural_orbital_localizerEv"><code class="docutils literal notranslate"><span class="pre">make_mp2_natural_orbital_localizer()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="breathe_api_autogen/namespace/namespaceqdk_1_1chemistry_1_1algorithms.html#_CPPv4N3qdk9chemistry10algorithms37make_occupation_active_space_selectorEv"><code class="docutils literal notranslate"><span class="pre">make_occupation_active_space_selector()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="breathe_api_autogen/namespace/namespaceqdk_1_1chemistry_1_1algorithms.html#_CPPv4N3qdk9chemistry10algorithms26make_pipek_mezey_localizerEv"><code class="docutils literal notranslate"><span class="pre">make_pipek_mezey_localizer()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="breathe_api_autogen/namespace/namespaceqdk_1_1chemistry_1_1algorithms.html#_CPPv4N3qdk9chemistry10algorithms34make_valence_active_space_selectorEv"><code class="docutils literal notranslate"><span class="pre">make_valence_active_space_selector()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="breathe_api_autogen/namespace/namespaceqdk_1_1chemistry_1_1algorithms.html#_CPPv4N3qdk9chemistry10algorithms19make_vvhv_localizerEv"><code class="docutils literal notranslate"><span class="pre">make_vvhv_localizer()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="breathe_api_autogen/namespace/namespaceqdk_1_1chemistry_1_1algorithms.html#_CPPv4N3qdk9chemistry10algorithms22cc_calculator_registryE"><code class="docutils literal notranslate"><span class="pre">cc_calculator_registry</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="breathe_api_autogen/namespace/namespaceqdk_1_1chemistry_1_1algorithms.html#_CPPv4N3qdk9chemistry10algorithms14mcscf_registryE"><code class="docutils literal notranslate"><span class="pre">mcscf_registry</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="breathe_api_autogen/namespace/namespaceqdk_1_1chemistry_1_1algorithms.html#_CPPv4N3qdk9chemistry10algorithms19ActiveSpaceSelectorE"><code class="docutils literal notranslate"><span class="pre">qdk::chemistry::algorithms::ActiveSpaceSelector</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="breathe_api_autogen/namespace/namespaceqdk_1_1chemistry_1_1algorithms.html#_CPPv4N3qdk9chemistry10algorithms26ActiveSpaceSelectorFactoryE"><code class="docutils literal notranslate"><span class="pre">qdk::chemistry::algorithms::ActiveSpaceSelectorFactory</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="breathe_api_autogen/namespace/namespaceqdk_1_1chemistry_1_1algorithms.html#_CPPv4I00DpEN3qdk9chemistry10algorithms9AlgorithmE"><code class="docutils literal notranslate"><span class="pre">qdk::chemistry::algorithms::Algorithm</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="breathe_api_autogen/namespace/namespaceqdk_1_1chemistry_1_1algorithms.html#_CPPv4I00EN3qdk9chemistry10algorithms16AlgorithmFactoryE"><code class="docutils literal notranslate"><span class="pre">qdk::chemistry::algorithms::AlgorithmFactory</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="breathe_api_autogen/namespace/namespaceqdk_1_1chemistry_1_1algorithms.html#_CPPv4N3qdk9chemistry10algorithms24CoupledClusterCalculatorE"><code class="docutils literal notranslate"><span class="pre">qdk::chemistry::algorithms::CoupledClusterCalculator</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="breathe_api_autogen/namespace/namespaceqdk_1_1chemistry_1_1algorithms.html#_CPPv4N3qdk9chemistry10algorithms31CoupledClusterCalculatorFactoryE"><code class="docutils literal notranslate"><span class="pre">qdk::chemistry::algorithms::CoupledClusterCalculatorFactory</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="breathe_api_autogen/namespace/namespaceqdk_1_1chemistry_1_1algorithms.html#_CPPv4N3qdk9chemistry10algorithms27ElectronicStructureSettingsE"><code class="docutils literal notranslate"><span class="pre">qdk::chemistry::algorithms::ElectronicStructureSettings</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="breathe_api_autogen/namespace/namespaceqdk_1_1chemistry_1_1algorithms.html#_CPPv4N3qdk9chemistry10algorithms22HamiltonianConstructorE"><code class="docutils literal notranslate"><span class="pre">qdk::chemistry::algorithms::HamiltonianConstructor</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="breathe_api_autogen/namespace/namespaceqdk_1_1chemistry_1_1algorithms.html#_CPPv4N3qdk9chemistry10algorithms29HamiltonianConstructorFactoryE"><code class="docutils literal notranslate"><span class="pre">qdk::chemistry::algorithms::HamiltonianConstructorFactory</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="breathe_api_autogen/namespace/namespaceqdk_1_1chemistry_1_1algorithms.html#_CPPv4N3qdk9chemistry10algorithms9LocalizerE"><code class="docutils literal notranslate"><span class="pre">qdk::chemistry::algorithms::Localizer</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="breathe_api_autogen/namespace/namespaceqdk_1_1chemistry_1_1algorithms.html#_CPPv4N3qdk9chemistry10algorithms16LocalizerFactoryE"><code class="docutils literal notranslate"><span class="pre">qdk::chemistry::algorithms::LocalizerFactory</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="breathe_api_autogen/namespace/namespaceqdk_1_1chemistry_1_1algorithms.html#_CPPv4N3qdk9chemistry10algorithms28MultiConfigurationCalculatorE"><code class="docutils literal notranslate"><span class="pre">qdk::chemistry::algorithms::MultiConfigurationCalculator</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="breathe_api_autogen/namespace/namespaceqdk_1_1chemistry_1_1algorithms.html#_CPPv4N3qdk9chemistry10algorithms35MultiConfigurationCalculatorFactoryE"><code class="docutils literal notranslate"><span class="pre">qdk::chemistry::algorithms::MultiConfigurationCalculatorFactory</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="breathe_api_autogen/namespace/namespaceqdk_1_1chemistry_1_1algorithms.html#_CPPv4N3qdk9chemistry10algorithms21MultiConfigurationScfE"><code class="docutils literal notranslate"><span class="pre">qdk::chemistry::algorithms::MultiConfigurationScf</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="breathe_api_autogen/namespace/namespaceqdk_1_1chemistry_1_1algorithms.html#_CPPv4N3qdk9chemistry10algorithms28MultiConfigurationScfFactoryE"><code class="docutils literal notranslate"><span class="pre">qdk::chemistry::algorithms::MultiConfigurationScfFactory</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="breathe_api_autogen/namespace/namespaceqdk_1_1chemistry_1_1algorithms.html#_CPPv4N3qdk9chemistry10algorithms26MultiConfigurationSettingsE"><code class="docutils literal notranslate"><span class="pre">qdk::chemistry::algorithms::MultiConfigurationSettings</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="breathe_api_autogen/namespace/namespaceqdk_1_1chemistry_1_1algorithms.html#_CPPv4N3qdk9chemistry10algorithms37ProjectedMultiConfigurationCalculatorE"><code class="docutils literal notranslate"><span class="pre">qdk::chemistry::algorithms::ProjectedMultiConfigurationCalculator</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="breathe_api_autogen/namespace/namespaceqdk_1_1chemistry_1_1algorithms.html#_CPPv4N3qdk9chemistry10algorithms44ProjectedMultiConfigurationCalculatorFactoryE"><code class="docutils literal notranslate"><span class="pre">qdk::chemistry::algorithms::ProjectedMultiConfigurationCalculatorFactory</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="breathe_api_autogen/namespace/namespaceqdk_1_1chemistry_1_1algorithms.html#_CPPv4N3qdk9chemistry10algorithms35ProjectedMultiConfigurationSettingsE"><code class="docutils literal notranslate"><span class="pre">qdk::chemistry::algorithms::ProjectedMultiConfigurationSettings</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="breathe_api_autogen/namespace/namespaceqdk_1_1chemistry_1_1algorithms.html#_CPPv4N3qdk9chemistry10algorithms9ScfSolverE"><code class="docutils literal notranslate"><span class="pre">qdk::chemistry::algorithms::ScfSolver</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="breathe_api_autogen/namespace/namespaceqdk_1_1chemistry_1_1algorithms.html#_CPPv4N3qdk9chemistry10algorithms16ScfSolverFactoryE"><code class="docutils literal notranslate"><span class="pre">qdk::chemistry::algorithms::ScfSolverFactory</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="breathe_api_autogen/namespace/namespaceqdk_1_1chemistry_1_1algorithms.html#_CPPv4N3qdk9chemistry10algorithms16StabilityCheckerE"><code class="docutils literal notranslate"><span class="pre">qdk::chemistry::algorithms::StabilityChecker</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="breathe_api_autogen/namespace/namespaceqdk_1_1chemistry_1_1algorithms.html#_CPPv4N3qdk9chemistry10algorithms23StabilityCheckerFactoryE"><code class="docutils literal notranslate"><span class="pre">qdk::chemistry::algorithms::StabilityCheckerFactory</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="breathe_api_autogen/namespace/namespaceqdk_1_1chemistry_1_1algorithms.html#_CPPv4N3qdk9chemistry10algorithms6detailE"><code class="docutils literal notranslate"><span class="pre">qdk::chemistry::algorithms::detail</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="breathe_api_autogen/namespace/namespaceqdk_1_1chemistry_1_1algorithms.html#_CPPv4N3qdk9chemistry10algorithms9microsoftE"><code class="docutils literal notranslate"><span class="pre">qdk::chemistry::algorithms::microsoft</span></code></a></li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</div>
+</section>
+<section id="utilities">
+<h2>Utilities<a class="headerlink" href="#utilities" title="Link to this heading"></a></h2>
+<p>The utils module provides various utility functions and helper routines that support the core functionality of QDK/Chemistry.
+These utilities facilitate common tasks such as data manipulation, file I/O, and other ancillary operations.</p>
+<p>For detailed information, see <a class="reference internal" href="breathe_api_autogen/namespace/namespaceqdk_1_1chemistry_1_1utils.html"><span class="doc">Namespace qdk::chemistry::utils</span></a>.</p>
+<div class="toctree-wrapper compound">
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="breathe_api_autogen/namespace/namespaceqdk_1_1chemistry_1_1utils.html">Namespace qdk::chemistry::utils</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="breathe_api_autogen/namespace/namespaceqdk_1_1chemistry_1_1utils.html#_CPPv4N3qdk9chemistry5utilsE"><code class="docutils literal notranslate"><span class="pre">qdk::chemistry::utils</span></code></a><ul>
+<li class="toctree-l3"><a class="reference internal" href="breathe_api_autogen/namespace/namespaceqdk_1_1chemistry_1_1utils.html#_CPPv4N3qdk9chemistry5utils9microsoftE"><code class="docutils literal notranslate"><span class="pre">qdk::chemistry::utils::microsoft</span></code></a></li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</div>
+</section>
+<section id="constants">
+<h2>Constants<a class="headerlink" href="#constants" title="Link to this heading"></a></h2>
+<p>The constants namespace provides access to fundamental physical constants, conversion factors, and reference values required for quantum chemistry calculations.
+These constants are defined with high precision and are consistent with the latest CODATA recommendations, ensuring accurate and reproducible computational results across different hardware and software environments.</p>
+<p>For detailed information, see <a class="reference internal" href="breathe_api_autogen/namespace/namespaceqdk_1_1chemistry_1_1constants.html"><span class="doc">Namespace qdk::chemistry::constants</span></a>.</p>
+<div class="toctree-wrapper compound">
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="breathe_api_autogen/namespace/namespaceqdk_1_1chemistry_1_1constants.html">Namespace qdk::chemistry::constants</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="breathe_api_autogen/namespace/namespaceqdk_1_1chemistry_1_1constants.html#_CPPv4N3qdk9chemistry9constantsE"><code class="docutils literal notranslate"><span class="pre">qdk::chemistry::constants</span></code></a><ul>
+<li class="toctree-l3"><a class="reference internal" href="breathe_api_autogen/namespace/namespaceqdk_1_1chemistry_1_1constants.html#_CPPv4N3qdk9chemistry9constants18get_constants_infoEv"><code class="docutils literal notranslate"><span class="pre">get_constants_info()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="breathe_api_autogen/namespace/namespaceqdk_1_1chemistry_1_1constants.html#_CPPv4N3qdk9chemistry9constants26get_current_codata_versionEv"><code class="docutils literal notranslate"><span class="pre">get_current_codata_version()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="breathe_api_autogen/namespace/namespaceqdk_1_1chemistry_1_1constants.html#_CPPv4N3qdk9chemistry9constants12ConstantInfoE"><code class="docutils literal notranslate"><span class="pre">qdk::chemistry::constants::ConstantInfo</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="breathe_api_autogen/namespace/namespaceqdk_1_1chemistry_1_1constants.html#_CPPv4N3qdk9chemistry9constants11codata_2014E"><code class="docutils literal notranslate"><span class="pre">qdk::chemistry::constants::codata_2014</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="breathe_api_autogen/namespace/namespaceqdk_1_1chemistry_1_1constants.html#_CPPv4N3qdk9chemistry9constants11codata_2018E"><code class="docutils literal notranslate"><span class="pre">qdk::chemistry::constants::codata_2018</span></code></a></li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</div>
+</section>
+</section>
+
+
+           </div>
+          </div>
+          <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
+        <a href="api_autogen/qdk.chemistry.constants.html" class="btn btn-neutral float-left" title="qdk.chemistry.constants module" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+        <a href="breathe_api_autogen/namespace/namespaceqdk_1_1chemistry_1_1data.html" class="btn btn-neutral float-right" title="Namespace qdk::chemistry::data" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright Copyright (c) Microsoft Corporation. All rights reserved. Licensed under the MIT License..</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

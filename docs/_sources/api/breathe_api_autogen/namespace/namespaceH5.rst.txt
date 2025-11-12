@@ -1,0 +1,6 @@
+Namespace H5
+============
+
+.. doxygennamespace:: H5
+   :project: QDK/Chemistry
+   :members:

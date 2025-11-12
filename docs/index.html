@@ -1,0 +1,518 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="./">
+<head>
+  <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>QDK/Chemistry: A Quantum Applications Toolkit &mdash; QDK/Chemistry 0.0.1 documentation</title>
+      <link rel="stylesheet" type="text/css" href="_static/pygments.css?v=b86133f3" />
+      <link rel="stylesheet" type="text/css" href="_static/css/theme.css?v=e59714d7" />
+      <link rel="stylesheet" type="text/css" href="_static/tabs.css?v=4c969af8" />
+      <link rel="stylesheet" type="text/css" href="_static/graphviz.css?v=4ae1632d" />
+      <link rel="stylesheet" type="text/css" href="_static/copybutton.css?v=76b2166b" />
+
+  
+      <script src="_static/jquery.js?v=5d32c60e"></script>
+      <script src="_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="_static/documentation_options.js?v=d45e8c67"></script>
+      <script src="_static/doctools.js?v=9bcbadda"></script>
+      <script src="_static/sphinx_highlight.js?v=dc90522c"></script>
+      <script src="_static/tabs.js?v=3ee01567"></script>
+      <script src="_static/clipboard.min.js?v=a7894cd8"></script>
+      <script src="_static/copybutton.js?v=f281be69"></script>
+    <script src="_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="genindex.html" />
+    <link rel="search" title="Search" href="search.html" />
+    <link rel="next" title="Quickstart" href="user/Quickstart.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="#" class="icon icon-home">
+            QDK/Chemistry
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">User Documentation</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="user/Quickstart.html">Quickstart</a></li>
+<li class="toctree-l1"><a class="reference internal" href="user/comprehensive/index.html">In-Depth Guide</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">API Reference</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="api/python_api.html">Python API</a></li>
+<li class="toctree-l1"><a class="reference internal" href="api/cpp_api.html">C++ API</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Supporting Information</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="glossary.html">Glossary</a></li>
+<li class="toctree-l1"><a class="reference internal" href="references.html">References</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="#">QDK/Chemistry</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="#" class="icon icon-home" aria-label="Home"></a></li>
+      <li class="breadcrumb-item active">QDK/Chemistry:  A Quantum Applications Toolkit</li>
+      <li class="wy-breadcrumbs-aside">
+            <a href="_sources/index.rst.txt" rel="nofollow"> View page source</a>
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <section id="qdk-chemistry-a-quantum-applications-toolkit">
+<h1>QDK/Chemistry:  A Quantum Applications Toolkit<a class="headerlink" href="#qdk-chemistry-a-quantum-applications-toolkit" title="Link to this heading"></a></h1>
+<section id="welcome-to-qdk-chemistry-documentation">
+<h2>Welcome to QDK/Chemistry Documentation<a class="headerlink" href="#welcome-to-qdk-chemistry-documentation" title="Link to this heading"></a></h2>
+<p><strong>QDK/Chemistry</strong> (Quantum Applications Toolkit) provides a comprehensive set of tools and libraries for quantum chemistry calculations and simulations.
+It features a unified interface for vast community of quantum chemistry packages.</p>
+</section>
+<section id="key-features">
+<h2>Key Features<a class="headerlink" href="#key-features" title="Link to this heading"></a></h2>
+<ul class="simple">
+<li><p><strong>Unified Interface</strong> - Consistent API across quantum chemistry methods and packages</p></li>
+<li><p><strong>Molecular Structure Support</strong> - Work with molecular coordinates, electronic structures, and quantum states</p></li>
+<li><p><strong>Advanced Algorithms</strong> - Implementations of state-of-the-art quantum chemistry methods</p></li>
+<li><p><strong>Plugin System</strong> - Extendable architecture for integrating with other quantum chemistry packages</p></li>
+</ul>
+<div class="toctree-wrapper compound">
+<p class="caption" role="heading"><span class="caption-text">User Documentation</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="user/Quickstart.html">Quickstart</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="user/Quickstart.html#the-qdk-chemistry-workflow">The QDK/Chemistry Workflow</a></li>
+<li class="toctree-l2"><a class="reference internal" href="user/Quickstart.html#creating-a-structure-object">Creating a <code class="docutils literal notranslate"><span class="pre">Structure</span></code> Object</a></li>
+<li class="toctree-l2"><a class="reference internal" href="user/Quickstart.html#running-an-scf-calculation">Running an SCF Calculation</a></li>
+<li class="toctree-l2"><a class="reference internal" href="user/Quickstart.html#manipulate-the-orbitals">Manipulate the <code class="docutils literal notranslate"><span class="pre">Orbitals</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="user/Quickstart.html#select-the-active-space">Select the Active Space</a></li>
+<li class="toctree-l2"><a class="reference internal" href="user/Quickstart.html#calculate-the-hamiltonian">Calculate the Hamiltonian</a></li>
+<li class="toctree-l2"><a class="reference internal" href="user/Quickstart.html#compute-a-cas-energy">Compute a CAS Energy</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="user/comprehensive/index.html">In-Depth Guide</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="user/comprehensive/design.html">Design and Architecture</a></li>
+<li class="toctree-l2"><a class="reference internal" href="user/comprehensive/data.html">Data Classes</a></li>
+<li class="toctree-l2"><a class="reference internal" href="user/comprehensive/algorithms.html">Algorithms</a></li>
+<li class="toctree-l2"><a class="reference internal" href="user/comprehensive/keywords.html">Functionals and Basis Sets</a></li>
+<li class="toctree-l2"><a class="reference internal" href="user/comprehensive/plugins.html">Plugins</a></li>
+</ul>
+</li>
+</ul>
+</div>
+<div class="toctree-wrapper compound">
+<p class="caption" role="heading"><span class="caption-text">API Reference</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="api/python_api.html">Python API</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="api/python_api.html#data-classes">Data Classes</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="api/api_autogen/qdk.chemistry.data.html">qdk.chemistry.data package</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="api/python_api.html#algorithms">Algorithms</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="api/api_autogen/qdk.chemistry.algorithms.html">qdk.chemistry.algorithms package</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="api/python_api.html#plugins">Plugins</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="api/api_autogen/qdk.chemistry.plugins.html">qdk.chemistry.plugins package</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="api/python_api.html#utilities">Utilities</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="api/api_autogen/qdk.chemistry.utils.html">qdk.chemistry.utils package</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="api/python_api.html#constants">Constants</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="api/api_autogen/qdk.chemistry.constants.html">qdk.chemistry.constants module</a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="api/cpp_api.html">C++ API</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="api/cpp_api.html#data-classes">Data Classes</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="api/breathe_api_autogen/namespace/namespaceqdk_1_1chemistry_1_1data.html">Namespace qdk::chemistry::data</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="api/cpp_api.html#algorithms">Algorithms</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="api/breathe_api_autogen/namespace/namespaceqdk_1_1chemistry_1_1algorithms.html">Namespace qdk::chemistry::algorithms</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="api/cpp_api.html#utilities">Utilities</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="api/breathe_api_autogen/namespace/namespaceqdk_1_1chemistry_1_1utils.html">Namespace qdk::chemistry::utils</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="api/cpp_api.html#constants">Constants</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="api/breathe_api_autogen/namespace/namespaceqdk_1_1chemistry_1_1constants.html">Namespace qdk::chemistry::constants</a></li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</div>
+<div class="toctree-wrapper compound">
+<p class="caption" role="heading"><span class="caption-text">Supporting Information</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="glossary.html">Glossary</a></li>
+<li class="toctree-l1"><a class="reference internal" href="references.html">References</a></li>
+</ul>
+</div>
+<div class="admonition-todo admonition">
+<p class="admonition-title">Todo</p>
+<ul class="simple">
+<li><p>TODO (NAB): convert <cite>print</cite> statements throughout this module to use logging.
+Decide whether the functions should return strings instead of printing/logging directly.
+<a class="reference external" href="https://dev.azure.com/ms-azurequantum/AzureQuantum/_workitems/edit/41417">https://dev.azure.com/ms-azurequantum/AzureQuantum/_workitems/edit/41417</a></p></li>
+<li><p>TODO (NAB):  add typing information for the functions in this module
+<a class="reference external" href="https://dev.azure.com/ms-azurequantum/AzureQuantum/_workitems/edit/41419">https://dev.azure.com/ms-azurequantum/AzureQuantum/_workitems/edit/41419</a></p></li>
+</ul>
+</div>
+<p class="todo-source"><a class="reference internal" href="api/api_autogen/qdk.chemistry.constants.html#id1"><em>original entry</em></a></p>
+<div class="admonition-todo admonition">
+<p class="admonition-title">Todo</p>
+<p>TODO (NAB):  Consider adding additional explanatory text to the docstring.
+What is a plugin?  What are they for?
+<a class="reference external" href="https://dev.azure.com/ms-azurequantum/AzureQuantum/_workitems/edit/41409">https://dev.azure.com/ms-azurequantum/AzureQuantum/_workitems/edit/41409</a></p>
+</div>
+<p class="todo-source"><a class="reference internal" href="api/api_autogen/qdk.chemistry.plugins.html#id1"><em>original entry</em></a></p>
+<div class="admonition-todo admonition">
+<p class="admonition-title">Todo</p>
+<p>TODO (NAB):  we need tutorials and examples for in RST files to describe
+how to use this module.</p>
+</div>
+<p class="todo-source"><a class="reference internal" href="api/api_autogen/qdk.chemistry.state_preparation.html#id1"><em>original entry</em></a></p>
+<div class="admonition-todo admonition">
+<p class="admonition-title">Todo</p>
+<p>Finish the glossary and link terms throughout the documentation.</p>
+</div>
+<p class="todo-source"><a class="reference internal" href="glossary.html#id1"><em>original entry</em></a></p>
+<div class="admonition-todo admonition">
+<p class="admonition-title">Todo</p>
+<dl class="simple">
+<dt>TODO (NAB):  finish documentation</dt><dd><p><a class="reference external" href="https://dev.azure.com/ms-azurequantum/AzureQuantum/_workitems/edit/41390">https://dev.azure.com/ms-azurequantum/AzureQuantum/_workitems/edit/41390</a></p>
+</dd>
+</dl>
+</div>
+<p class="todo-source"><a class="reference internal" href="user/Quickstart.html#id1"><em>original entry</em></a></p>
+<div class="admonition-todo admonition">
+<p class="admonition-title">Todo</p>
+<p>🔧 TODO: It seems that we actually <em>don’t</em> store charge and multiplicity here…</p>
+</div>
+<p class="todo-source"><a class="reference internal" href="user/Quickstart.html#id2"><em>original entry</em></a></p>
+<div class="admonition-todo admonition">
+<p class="admonition-title">Todo</p>
+<p>TODO (NAB):  finish documentation
+<a class="reference external" href="https://dev.azure.com/ms-azurequantum/AzureQuantum/_workitems/edit/41390">https://dev.azure.com/ms-azurequantum/AzureQuantum/_workitems/edit/41390</a></p>
+</div>
+<p class="todo-source"><a class="reference internal" href="user/Quickstart.html#id3"><em>original entry</em></a></p>
+<div class="admonition-todo admonition">
+<p class="admonition-title">Todo</p>
+<p><strong>TODO</strong> describe describe quirks for input units after Bohr PR</p>
+</div>
+<p class="todo-source"><a class="reference internal" href="user/Quickstart.html#id4"><em>original entry</em></a></p>
+<div class="admonition-todo admonition">
+<p class="admonition-title">Todo</p>
+<p>TODO (NAB):  finish documentation
+<a class="reference external" href="https://dev.azure.com/ms-azurequantum/AzureQuantum/_workitems/edit/41390">https://dev.azure.com/ms-azurequantum/AzureQuantum/_workitems/edit/41390</a></p>
+</div>
+<p class="todo-source"><a class="reference internal" href="user/Quickstart.html#id5"><em>original entry</em></a></p>
+<div class="admonition-todo admonition">
+<p class="admonition-title">Todo</p>
+<p>TODO (NAB):  check code after API changes
+<a class="reference external" href="https://dev.azure.com/ms-azurequantum/AzureQuantum/_workitems/edit/41366">https://dev.azure.com/ms-azurequantum/AzureQuantum/_workitems/edit/41366</a></p>
+</div>
+<p class="todo-source"><a class="reference internal" href="user/Quickstart.html#id6"><em>original entry</em></a></p>
+<div class="admonition-todo admonition">
+<p class="admonition-title">Todo</p>
+<p>🔧 TODO: Expand this section to explain that active space selectors are also Orbital constructors (like localization, active space selectors),
+i.e., they take orbitals as input and return Orbitals (which carry an active space) as output.
+Add this relationship to the Localization section.</p>
+</div>
+<p class="todo-source"><a class="reference internal" href="user/Quickstart.html#id7"><em>original entry</em></a></p>
+<div class="admonition-todo admonition">
+<p class="admonition-title">Todo</p>
+<p>TODO (NAB):  finish documentation
+<a class="reference external" href="https://dev.azure.com/ms-azurequantum/AzureQuantum/_workitems/edit/41390">https://dev.azure.com/ms-azurequantum/AzureQuantum/_workitems/edit/41390</a></p>
+</div>
+<p class="todo-source"><a class="reference internal" href="user/Quickstart.html#id8"><em>original entry</em></a></p>
+<div class="admonition-todo admonition">
+<p class="admonition-title">Todo</p>
+<p>TODO (NAB):  Need overview of sample scripts, sample problems, etc. – including
+QPE and examples showing interoperability with other languages/tools.
+<a class="reference external" href="https://dev.azure.com/ms-azurequantum/AzureQuantum/_workitems/edit/41390">https://dev.azure.com/ms-azurequantum/AzureQuantum/_workitems/edit/41390</a></p>
+</div>
+<p class="todo-source"><a class="reference internal" href="user/Quickstart.html#id9"><em>original entry</em></a></p>
+<div class="admonition-todo admonition">
+<p class="admonition-title">Todo</p>
+<p>TODO (NAB):  David needs to check if these code examples are still correct
+<a class="reference external" href="https://dev.azure.com/ms-azurequantum/AzureQuantum/_workitems/edit/41366">https://dev.azure.com/ms-azurequantum/AzureQuantum/_workitems/edit/41366</a></p>
+</div>
+<p class="todo-source"><a class="reference internal" href="user/comprehensive/advanced/design_principles.html#id1"><em>original entry</em></a></p>
+<div class="admonition-todo admonition">
+<p class="admonition-title">Todo</p>
+<p>TODO (NAB):  David needs to check these Factory pattern code examples.
+<a class="reference external" href="https://dev.azure.com/ms-azurequantum/AzureQuantum/_workitems/edit/41366">https://dev.azure.com/ms-azurequantum/AzureQuantum/_workitems/edit/41366</a></p>
+</div>
+<p class="todo-source"><a class="reference internal" href="user/comprehensive/advanced/factory_pattern.html#id2"><em>original entry</em></a></p>
+<div class="admonition-todo admonition">
+<p class="admonition-title">Todo</p>
+<p>TODO (NAB):  David to check these code examples.
+<a class="reference external" href="https://dev.azure.com/ms-azurequantum/AzureQuantum/_workitems/edit/41366">https://dev.azure.com/ms-azurequantum/AzureQuantum/_workitems/edit/41366</a></p>
+</div>
+<p class="todo-source"><a class="reference internal" href="user/comprehensive/advanced/factory_pattern.html#id3"><em>original entry</em></a></p>
+<div class="admonition-todo admonition">
+<p class="admonition-title">Todo</p>
+<p>TODO (NAB):  check Interfaces code examples
+<a class="reference external" href="https://dev.azure.com/ms-azurequantum/AzureQuantum/_workitems/edit/41366">https://dev.azure.com/ms-azurequantum/AzureQuantum/_workitems/edit/41366</a></p>
+</div>
+<p class="todo-source"><a class="reference internal" href="user/comprehensive/advanced/interfaces.html#id1"><em>original entry</em></a></p>
+<div class="admonition-todo admonition">
+<p class="admonition-title">Todo</p>
+<p>TODO (NAB):  Check Serialization code examples after finalizing API.
+<a class="reference external" href="https://dev.azure.com/ms-azurequantum/AzureQuantum/_workitems/edit/41366">https://dev.azure.com/ms-azurequantum/AzureQuantum/_workitems/edit/41366</a></p>
+</div>
+<p class="todo-source"><a class="reference internal" href="user/comprehensive/advanced/serialization.html#id1"><em>original entry</em></a></p>
+<div class="admonition-todo admonition">
+<p class="admonition-title">Todo</p>
+<p>TODO (NAB):  Check Settings code examples after finalizing API.
+<a class="reference external" href="https://dev.azure.com/ms-azurequantum/AzureQuantum/_workitems/edit/41366">https://dev.azure.com/ms-azurequantum/AzureQuantum/_workitems/edit/41366</a></p>
+</div>
+<p class="todo-source"><a class="reference internal" href="user/comprehensive/advanced/settings.html#id1"><em>original entry</em></a></p>
+<div class="admonition-todo admonition">
+<p class="admonition-title">Todo</p>
+<p>TODO (NAB):  update HamiltonianConstructor documentation for restricted orbitals
+<a class="reference external" href="https://dev.azure.com/ms-azurequantum/AzureQuantum/_workitems/edit/41379">https://dev.azure.com/ms-azurequantum/AzureQuantum/_workitems/edit/41379</a></p>
+</div>
+<p class="todo-source"><a class="reference internal" href="user/comprehensive/algorithms/hamiltonian_constructor.html#id1"><em>original entry</em></a></p>
+<div class="admonition-todo admonition">
+<p class="admonition-title">Todo</p>
+<p>TODO (NAB):  Check HamiltonianConstructorcode examples after finalizing API.
+<a class="reference external" href="https://dev.azure.com/ms-azurequantum/AzureQuantum/_workitems/edit/41366">https://dev.azure.com/ms-azurequantum/AzureQuantum/_workitems/edit/41366</a></p>
+</div>
+<p class="todo-source"><a class="reference internal" href="user/comprehensive/algorithms/hamiltonian_constructor.html#id2"><em>original entry</em></a></p>
+<div class="admonition-todo admonition">
+<p class="admonition-title">Todo</p>
+<p>TODO (NAB):  add names for invoking localizer methods to list (e.g., “mp2_natural_orbitals”)</p>
+</div>
+<p class="todo-source"><a class="reference internal" href="user/comprehensive/algorithms/localizer.html#id1"><em>original entry</em></a></p>
+<div class="admonition-todo admonition">
+<p class="admonition-title">Todo</p>
+<p>TODO (NAB):  Check Localizer code examples after finalizing API.
+<a class="reference external" href="https://dev.azure.com/ms-azurequantum/AzureQuantum/_workitems/edit/41366">https://dev.azure.com/ms-azurequantum/AzureQuantum/_workitems/edit/41366</a></p>
+</div>
+<p class="todo-source"><a class="reference internal" href="user/comprehensive/algorithms/localizer.html#id2"><em>original entry</em></a></p>
+<div class="admonition-todo admonition">
+<p class="admonition-title">Todo</p>
+<p>TODO (NAB):  finish Localizer documentation
+<a class="reference external" href="https://dev.azure.com/ms-azurequantum/AzureQuantum/_workitems/edit/41380">https://dev.azure.com/ms-azurequantum/AzureQuantum/_workitems/edit/41380</a></p>
+</div>
+<p class="todo-source"><a class="reference internal" href="user/comprehensive/algorithms/localizer.html#id3"><em>original entry</em></a></p>
+<div class="admonition-todo admonition">
+<p class="admonition-title">Todo</p>
+<p>🔧 <strong>TODO</strong>: Add detailed descriptions of each localization method with theory and practical considerations</p>
+<p>TODO (NAB):  finish Localizer documentation
+<a class="reference external" href="https://dev.azure.com/ms-azurequantum/AzureQuantum/_workitems/edit/41380">https://dev.azure.com/ms-azurequantum/AzureQuantum/_workitems/edit/41380</a></p>
+</div>
+<p class="todo-source"><a class="reference internal" href="user/comprehensive/algorithms/localizer.html#id4"><em>original entry</em></a></p>
+<div class="admonition-todo admonition">
+<p class="admonition-title">Todo</p>
+<p>🔧 <strong>TODO</strong>: Verify and complete the settings tables with accurate parameters and descriptions</p>
+<p>TODO (NAB):  finish Localizer documentation
+<a class="reference external" href="https://dev.azure.com/ms-azurequantum/AzureQuantum/_workitems/edit/41380">https://dev.azure.com/ms-azurequantum/AzureQuantum/_workitems/edit/41380</a></p>
+</div>
+<p class="todo-source"><a class="reference internal" href="user/comprehensive/algorithms/localizer.html#id5"><em>original entry</em></a></p>
+<div class="admonition-todo admonition">
+<p class="admonition-title">Todo</p>
+<p>🔧 <strong>TODO</strong>: Add computational scaling for all localization methods</p>
+</div>
+<p class="todo-source"><a class="reference internal" href="user/comprehensive/algorithms/localizer.html#id6"><em>original entry</em></a></p>
+<div class="admonition-todo admonition">
+<p class="admonition-title">Todo</p>
+<p>TODO (NAB):  correct Localizer documentation if needed and remove TODO
+<a class="reference external" href="https://dev.azure.com/ms-azurequantum/AzureQuantum/_workitems/edit/41380">https://dev.azure.com/ms-azurequantum/AzureQuantum/_workitems/edit/41380</a></p>
+</div>
+<p class="todo-source"><a class="reference internal" href="user/comprehensive/algorithms/localizer.html#id7"><em>original entry</em></a></p>
+<div class="admonition-todo admonition">
+<p class="admonition-title">Todo</p>
+<p>TODO (NAB):  Check MCCalculator code examples after finalizing API.
+<a class="reference external" href="https://dev.azure.com/ms-azurequantum/AzureQuantum/_workitems/edit/41366">https://dev.azure.com/ms-azurequantum/AzureQuantum/_workitems/edit/41366</a></p>
+</div>
+<p class="todo-source"><a class="reference internal" href="user/comprehensive/algorithms/mc_calculator.html#id1"><em>original entry</em></a></p>
+<div class="admonition-todo admonition">
+<p class="admonition-title">Todo</p>
+<p>🔧 <strong>TODO</strong>: Add specialized settings for each calculator type with accurate parameter names and default values</p>
+<p>TODO (NAB):  finish documentation
+<a class="reference external" href="https://dev.azure.com/ms-azurequantum/AzureQuantum/_workitems/edit/41381">https://dev.azure.com/ms-azurequantum/AzureQuantum/_workitems/edit/41381</a></p>
+</div>
+<p class="todo-source"><a class="reference internal" href="user/comprehensive/algorithms/mc_calculator.html#id2"><em>original entry</em></a></p>
+<div class="admonition-todo admonition">
+<p class="admonition-title">Todo</p>
+<p>TODO (NAB):  finish SCF Solver documentation
+<a class="reference external" href="https://dev.azure.com/ms-azurequantum/AzureQuantum/_workitems/edit/41382">https://dev.azure.com/ms-azurequantum/AzureQuantum/_workitems/edit/41382</a></p>
+</div>
+<p class="todo-source"><a class="reference internal" href="user/comprehensive/algorithms/scf_solver.html#id1"><em>original entry</em></a></p>
+<div class="admonition-todo admonition">
+<p class="admonition-title">Todo</p>
+<p>TODO (NAB):  finish SCF Solver documentation
+<a class="reference external" href="https://dev.azure.com/ms-azurequantum/AzureQuantum/_workitems/edit/41382">https://dev.azure.com/ms-azurequantum/AzureQuantum/_workitems/edit/41382</a></p>
+</div>
+<p class="todo-source"><a class="reference internal" href="user/comprehensive/algorithms/scf_solver.html#id2"><em>original entry</em></a></p>
+<div class="admonition-todo admonition">
+<p class="admonition-title">Todo</p>
+<p>TODO (NAB):  finish SCF Solver documentation
+<a class="reference external" href="https://dev.azure.com/ms-azurequantum/AzureQuantum/_workitems/edit/41382">https://dev.azure.com/ms-azurequantum/AzureQuantum/_workitems/edit/41382</a></p>
+</div>
+<p class="todo-source"><a class="reference internal" href="user/comprehensive/algorithms/scf_solver.html#id3"><em>original entry</em></a></p>
+<div class="admonition-todo admonition">
+<p class="admonition-title">Todo</p>
+<p>🔧 <strong>TODO:</strong> Add comprehensive list of all actual base settings used by ScfSolver implementations</p>
+<p>TODO (NAB):  finish SCF Solver documentation
+<a class="reference external" href="https://dev.azure.com/ms-azurequantum/AzureQuantum/_workitems/edit/41382">https://dev.azure.com/ms-azurequantum/AzureQuantum/_workitems/edit/41382</a></p>
+</div>
+<p class="todo-source"><a class="reference internal" href="user/comprehensive/algorithms/scf_solver.html#id4"><em>original entry</em></a></p>
+<div class="admonition-todo admonition">
+<p class="admonition-title">Todo</p>
+<p>TODO (NAB):  finish SCF Solver documentation below
+<a class="reference external" href="https://dev.azure.com/ms-azurequantum/AzureQuantum/_workitems/edit/41382">https://dev.azure.com/ms-azurequantum/AzureQuantum/_workitems/edit/41382</a></p>
+</div>
+<p class="todo-source"><a class="reference internal" href="user/comprehensive/algorithms/scf_solver.html#id5"><em>original entry</em></a></p>
+<div class="admonition-todo admonition">
+<p class="admonition-title">Todo</p>
+<p>🔧 <strong>TODO:</strong> Add comprehensive list of all actual specialized settings used by ScfSolver implementations</p>
+<p>TODO (NAB):  finish SCF Solver documentation above and below
+<a class="reference external" href="https://dev.azure.com/ms-azurequantum/AzureQuantum/_workitems/edit/41382">https://dev.azure.com/ms-azurequantum/AzureQuantum/_workitems/edit/41382</a></p>
+</div>
+<p class="todo-source"><a class="reference internal" href="user/comprehensive/algorithms/scf_solver.html#id6"><em>original entry</em></a></p>
+<div class="admonition-todo admonition">
+<p class="admonition-title">Todo</p>
+<p>TODO (NAB):  check BasisSet code after API change.
+<a class="reference external" href="https://dev.azure.com/ms-azurequantum/AzureQuantum/_workitems/edit/41366">https://dev.azure.com/ms-azurequantum/AzureQuantum/_workitems/edit/41366</a></p>
+</div>
+<p class="todo-source"><a class="reference internal" href="user/comprehensive/data/basis_set.html#id1"><em>original entry</em></a></p>
+<div class="admonition-todo admonition">
+<p class="admonition-title">Todo</p>
+<p>TODO (NAB):  finish documentation above with suggested move
+<a class="reference external" href="https://dev.azure.com/ms-azurequantum/AzureQuantum/_workitems/edit/41385">https://dev.azure.com/ms-azurequantum/AzureQuantum/_workitems/edit/41385</a></p>
+</div>
+<p class="todo-source"><a class="reference internal" href="user/comprehensive/data/hamiltonian.html#id1"><em>original entry</em></a></p>
+<div class="admonition-todo admonition">
+<p class="admonition-title">Todo</p>
+<p>TODO (NAB):  check code after API change.
+<a class="reference external" href="https://dev.azure.com/ms-azurequantum/AzureQuantum/_workitems/edit/41366">https://dev.azure.com/ms-azurequantum/AzureQuantum/_workitems/edit/41366</a></p>
+</div>
+<p class="todo-source"><a class="reference internal" href="user/comprehensive/data/hamiltonian.html#id2"><em>original entry</em></a></p>
+<div class="admonition-todo admonition">
+<p class="admonition-title">Todo</p>
+<p>TODO (NAB):  finish documentation above
+<a class="reference external" href="https://dev.azure.com/ms-azurequantum/AzureQuantum/_workitems/edit/41386">https://dev.azure.com/ms-azurequantum/AzureQuantum/_workitems/edit/41386</a></p>
+</div>
+<p class="todo-source"><a class="reference internal" href="user/comprehensive/data/orbitals.html#id1"><em>original entry</em></a></p>
+<div class="admonition-todo admonition">
+<p class="admonition-title">Todo</p>
+<p>TODO (NAB):  finish documentation above and below
+<a class="reference external" href="https://dev.azure.com/ms-azurequantum/AzureQuantum/_workitems/edit/41386">https://dev.azure.com/ms-azurequantum/AzureQuantum/_workitems/edit/41386</a></p>
+</div>
+<p class="todo-source"><a class="reference internal" href="user/comprehensive/data/orbitals.html#id2"><em>original entry</em></a></p>
+<div class="admonition-todo admonition">
+<p class="admonition-title">Todo</p>
+<p>🔧 <strong>TODO</strong>: Verify if this HDF5 serialization structure is complete and accurate. Are basis set details properly
+included?</p>
+</div>
+<p class="todo-source"><a class="reference internal" href="user/comprehensive/data/orbitals.html#id3"><em>original entry</em></a></p>
+<div class="admonition-todo admonition">
+<p class="admonition-title">Todo</p>
+<p>TODO (NAB):  check code after API changes
+<a class="reference external" href="https://dev.azure.com/ms-azurequantum/AzureQuantum/_workitems/edit/41366">https://dev.azure.com/ms-azurequantum/AzureQuantum/_workitems/edit/41366</a></p>
+</div>
+<p class="todo-source"><a class="reference internal" href="user/comprehensive/data/orbitals.html#id4"><em>original entry</em></a></p>
+<div class="admonition-todo admonition">
+<p class="admonition-title">Todo</p>
+<p>TODO (NAB):  finish documentation throughout the Structure file
+<a class="reference external" href="https://dev.azure.com/ms-azurequantum/AzureQuantum/_workitems/edit/41387">https://dev.azure.com/ms-azurequantum/AzureQuantum/_workitems/edit/41387</a></p>
+</div>
+<p class="todo-source"><a class="reference internal" href="user/comprehensive/data/structure.html#id1"><em>original entry</em></a></p>
+<div class="admonition-todo admonition">
+<p class="admonition-title">Todo</p>
+<p>TODO (NAB):  check Structure code after API changes
+<a class="reference external" href="https://dev.azure.com/ms-azurequantum/AzureQuantum/_workitems/edit/41366">https://dev.azure.com/ms-azurequantum/AzureQuantum/_workitems/edit/41366</a></p>
+</div>
+<p class="todo-source"><a class="reference internal" href="user/comprehensive/data/structure.html#id2"><em>original entry</em></a></p>
+<div class="admonition-todo admonition">
+<p class="admonition-title">Todo</p>
+<p>Why is there a TODO in the XYZ code block below?</p>
+</div>
+<p class="todo-source"><a class="reference internal" href="user/comprehensive/data/structure.html#id3"><em>original entry</em></a></p>
+<div class="admonition-todo admonition">
+<p class="admonition-title">Todo</p>
+<p>🔧 <strong>TODO</strong> Add functions to get coordinates in Bohr units, such as <code class="docutils literal notranslate"><span class="pre">get_coordinates_bohr()</span></code> and
+<code class="docutils literal notranslate"><span class="pre">get_atom_coordinates_bohr(index)</span></code>, for cases where atomic units are needed for calculations.</p>
+</div>
+<p class="todo-source"><a class="reference internal" href="user/comprehensive/data/structure.html#id4"><em>original entry</em></a></p>
+<div class="admonition-todo admonition">
+<p class="admonition-title">Todo</p>
+<p>TODO (NAB):  finish Structure documentation
+<a class="reference external" href="https://dev.azure.com/ms-azurequantum/AzureQuantum/_workitems/edit/41387">https://dev.azure.com/ms-azurequantum/AzureQuantum/_workitems/edit/41387</a></p>
+</div>
+<p class="todo-source"><a class="reference internal" href="user/comprehensive/data/structure.html#id5"><em>original entry</em></a></p>
+<div class="admonition-todo admonition">
+<p class="admonition-title">Todo</p>
+<p>TODO (NAB):  finish Wavefunction documentation
+<a class="reference external" href="https://dev.azure.com/ms-azurequantum/AzureQuantum/_workitems/edit/41388">https://dev.azure.com/ms-azurequantum/AzureQuantum/_workitems/edit/41388</a></p>
+</div>
+<p class="todo-source"><a class="reference internal" href="user/comprehensive/data/wavefunction.html#id1"><em>original entry</em></a></p>
+</section>
+</section>
+
+
+           </div>
+          </div>
+          <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
+        <a href="user/Quickstart.html" class="btn btn-neutral float-right" title="Quickstart" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright Copyright (c) Microsoft Corporation. All rights reserved. Licensed under the MIT License..</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

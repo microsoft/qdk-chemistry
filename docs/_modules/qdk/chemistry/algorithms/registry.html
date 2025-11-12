@@ -1,0 +1,531 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../../../../">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>qdk.chemistry.algorithms.registry &mdash; QDK/Chemistry 0.0.1 documentation</title>
+      <link rel="stylesheet" type="text/css" href="../../../../_static/pygments.css?v=b86133f3" />
+      <link rel="stylesheet" type="text/css" href="../../../../_static/css/theme.css?v=e59714d7" />
+      <link rel="stylesheet" type="text/css" href="../../../../_static/tabs.css?v=4c969af8" />
+      <link rel="stylesheet" type="text/css" href="../../../../_static/graphviz.css?v=4ae1632d" />
+      <link rel="stylesheet" type="text/css" href="../../../../_static/copybutton.css?v=76b2166b" />
+
+  
+      <script src="../../../../_static/jquery.js?v=5d32c60e"></script>
+      <script src="../../../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="../../../../_static/documentation_options.js?v=d45e8c67"></script>
+      <script src="../../../../_static/doctools.js?v=9bcbadda"></script>
+      <script src="../../../../_static/sphinx_highlight.js?v=dc90522c"></script>
+      <script src="../../../../_static/tabs.js?v=3ee01567"></script>
+      <script src="../../../../_static/clipboard.min.js?v=a7894cd8"></script>
+      <script src="../../../../_static/copybutton.js?v=f281be69"></script>
+    <script src="../../../../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../../../../genindex.html" />
+    <link rel="search" title="Search" href="../../../../search.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="../../../../index.html" class="icon icon-home">
+            QDK/Chemistry
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../../../../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">User Documentation</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../../user/Quickstart.html">Quickstart</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../../user/comprehensive/index.html">In-Depth Guide</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">API Reference</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../../api/python_api.html">Python API</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../../api/cpp_api.html">C++ API</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Supporting Information</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../../glossary.html">Glossary</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../../references.html">References</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../../../../index.html">QDK/Chemistry</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../../../../index.html" class="icon icon-home" aria-label="Home"></a></li>
+          <li class="breadcrumb-item"><a href="../../../index.html">Module code</a></li>
+      <li class="breadcrumb-item active">qdk.chemistry.algorithms.registry</li>
+      <li class="wy-breadcrumbs-aside">
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <h1>Source code for qdk.chemistry.algorithms.registry</h1><div class="highlight"><pre>
+<span></span><span class="sd">&quot;&quot;&quot;QDK/Chemistry-algorithms registry.</span>
+
+<span class="sd">This module contains a registration mechanism for Hamiltonian constructor, SCF solver, localizer,</span>
+<span class="sd">active space selector, coupled cluster calculator, (projected) multi configuration calculator,</span>
+<span class="sd">and MultiConfigurationScf. The user should be able to use the registration mechanism to easily</span>
+<span class="sd">add and remove custom algorithms at runtime.</span>
+
+<span class="sd">Algorithm Lifecycle Management</span>
+<span class="sd">-----------------------------</span>
+<span class="sd">The registry system handles the lifecycle of algorithm instances to prevent memory issues. When</span>
+<span class="sd">Python-implemented algorithms are registered, they need special handling during Python interpreter</span>
+<span class="sd">shutdown to avoid &quot;double-free&quot; errors that can occur when C++ static deinitialization runs after</span>
+<span class="sd">Python&#39;s garbage collection.</span>
+
+<span class="sd">This module automatically registers cleanup handlers (via `atexit`) that unregister all custom</span>
+<span class="sd">algorithms before Python shuts down. Users should never need to call the cleanup functions directly.</span>
+
+<span class="sd">Important Notes:</span>
+<span class="sd">- All registration functions in this module provide automatic cleanup</span>
+<span class="sd">- Custom Python algorithms are automatically unregistered during interpreter shutdown</span>
+<span class="sd">- The cleanup functions are NOT intended to be called by users</span>
+<span class="sd">&quot;&quot;&quot;</span>
+
+<span class="kn">import</span><span class="w"> </span><span class="nn">atexit</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">collections.abc</span><span class="w"> </span><span class="kn">import</span> <span class="n">Callable</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">typing</span><span class="w"> </span><span class="kn">import</span> <span class="n">Any</span>
+
+<span class="kn">from</span><span class="w"> </span><span class="nn">qdk.chemistry._core._algorithms</span><span class="w"> </span><span class="kn">import</span> <span class="p">(</span>
+    <span class="n">ActiveSpaceSelectorFactory</span><span class="p">,</span>
+    <span class="n">CoupledClusterCalculatorFactory</span><span class="p">,</span>
+    <span class="n">HamiltonianConstructorFactory</span><span class="p">,</span>
+    <span class="n">LocalizerFactory</span><span class="p">,</span>
+    <span class="n">MultiConfigurationCalculatorFactory</span><span class="p">,</span>
+    <span class="n">MultiConfigurationScfFactory</span><span class="p">,</span>
+    <span class="n">ProjectedMultiConfigurationCalculatorFactory</span><span class="p">,</span>
+    <span class="n">ScfSolverFactory</span><span class="p">,</span>
+    <span class="n">StabilityCheckerFactory</span><span class="p">,</span>
+<span class="p">)</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">qdk.chemistry.algorithms.energy_estimator</span><span class="w"> </span><span class="kn">import</span> <span class="n">EnergyEstimatorFactory</span><span class="p">,</span> <span class="n">QDKEnergyEstimator</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">qdk.chemistry.algorithms.qubit_mapper</span><span class="w"> </span><span class="kn">import</span> <span class="n">QubitMapperFactory</span>
+
+<span class="kn">from</span><span class="w"> </span><span class="nn">.base</span><span class="w"> </span><span class="kn">import</span> <span class="n">Algorithm</span><span class="p">,</span> <span class="n">AlgorithmFactory</span>
+
+<span class="c1"># Universal cleanup solution for all algorithms</span>
+<span class="n">__cleanup_registered</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span>
+
+<span class="n">__factories</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="n">AlgorithmFactory</span><span class="p">]</span> <span class="o">=</span> <span class="p">[]</span>
+
+
+<div class="viewcode-block" id="create">
+<a class="viewcode-back" href="../../../../api/api_autogen/qdk.chemistry.algorithms.registry.html#qdk.chemistry.algorithms.registry.create">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">create</span><span class="p">(</span><span class="n">algorithm_type</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">algorithm_name</span><span class="p">:</span> <span class="nb">str</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Algorithm</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Create an algorithm instance by type and name.</span>
+
+<span class="sd">    This function creates an algorithm instance from the registry using the specified</span>
+<span class="sd">    algorithm type and name. If no name is provided, the default algorithm for that</span>
+<span class="sd">    type is created.</span>
+
+<span class="sd">    Available algorithm types and algorithms are dependent on the QDK/Chemistry installation</span>
+<span class="sd">    but importantly also the loaded plugins and registered custom algorithms. If an</span>
+<span class="sd">    expected algorithm is not found, ensure that the corresponding plugin is loaded</span>
+<span class="sd">    or that the custom algorithm is registered.</span>
+
+<span class="sd">    The currently loaded algorithms can be queried using the `available()` function.</span>
+<span class="sd">    Which lists the available algorithms by type for all currently loaded plugins and</span>
+<span class="sd">    registered custom algorithms.</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">        algorithm_type (str): The type of algorithm to create (e.g., &quot;scf_solver&quot;,</span>
+<span class="sd">            &quot;active_space_selector&quot;, &quot;coupled_cluster_calculator&quot;).</span>
+<span class="sd">        algorithm_name (Optional[str]): The specific name of the algorithm implementation</span>
+<span class="sd">            to create. If None or empty string, creates the default algorithm for that type.</span>
+<span class="sd">        **kwargs: Optional keyword arguments to configure the algorithm&#39;s settings.</span>
+<span class="sd">            These are passed directly to the algorithm&#39;s settings via `settings().update()`.</span>
+<span class="sd">            Available settings depend on the specific algorithm type and implementation</span>
+<span class="sd">            and can be looked up with show_settings() method in .</span>
+
+<span class="sd">    Returns:</span>
+<span class="sd">        Algorithm: The created algorithm instance.</span>
+
+<span class="sd">    Raises:</span>
+<span class="sd">        KeyError: If the specified algorithm type is not registered in the system.</span>
+
+<span class="sd">    Examples:</span>
+<span class="sd">        &gt;&gt;&gt; from qdk.chemistry.algorithms import registry</span>
+<span class="sd">        &gt;&gt;&gt; # Create the default SCF solver</span>
+<span class="sd">        &gt;&gt;&gt; scf = registry.create(&quot;scf_solver&quot;)</span>
+<span class="sd">        &gt;&gt;&gt; # Create a specific SCF solver by name</span>
+<span class="sd">        &gt;&gt;&gt; pyscf_solver = registry.create(&quot;scf_solver&quot;, &quot;pyscf&quot;)</span>
+<span class="sd">        &gt;&gt;&gt; # Create an SCF solver with custom settings</span>
+<span class="sd">        &gt;&gt;&gt; scf = registry.create(&quot;scf_solver&quot;, &quot;pyscf&quot;, max_iterations=100, convergence_threshold=1e-8)</span>
+
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="k">if</span> <span class="n">algorithm_name</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="n">algorithm_name</span> <span class="o">=</span> <span class="s2">&quot;&quot;</span>
+    <span class="k">for</span> <span class="n">factory</span> <span class="ow">in</span> <span class="n">__factories</span><span class="p">:</span>
+        <span class="k">if</span> <span class="n">factory</span><span class="o">.</span><span class="n">algorithm_type_name</span><span class="p">()</span> <span class="o">==</span> <span class="n">algorithm_type</span><span class="p">:</span>
+            <span class="k">try</span><span class="p">:</span>
+                <span class="n">instance</span> <span class="o">=</span> <span class="n">factory</span><span class="o">.</span><span class="n">create</span><span class="p">(</span><span class="n">algorithm_name</span><span class="p">)</span>
+                <span class="n">instance</span><span class="o">.</span><span class="n">settings</span><span class="p">()</span><span class="o">.</span><span class="n">update</span><span class="p">(</span><span class="n">kwargs</span> <span class="ow">or</span> <span class="p">{})</span>
+                <span class="k">return</span> <span class="n">instance</span>
+            <span class="k">except</span> <span class="p">(</span><span class="ne">KeyError</span><span class="p">,</span> <span class="ne">RuntimeError</span><span class="p">,</span> <span class="ne">ValueError</span><span class="p">)</span> <span class="k">as</span> <span class="n">e</span><span class="p">:</span>
+                <span class="n">available_algorithms</span> <span class="o">=</span> <span class="n">factory</span><span class="o">.</span><span class="n">available</span><span class="p">()</span>
+                <span class="k">if</span> <span class="ow">not</span> <span class="n">available_algorithms</span><span class="p">:</span>
+                    <span class="k">raise</span> <span class="ne">KeyError</span><span class="p">(</span>
+                        <span class="sa">f</span><span class="s2">&quot;No algorithms available for type &#39;</span><span class="si">{</span><span class="n">algorithm_type</span><span class="si">}</span><span class="s2">&#39;. &quot;</span>
+                        <span class="s2">&quot;This may indicate that no plugins providing this algorithm type are loaded or registered.&quot;</span>
+                    <span class="p">)</span> <span class="kn">from</span><span class="w"> </span><span class="nn">e</span>
+                <span class="k">raise</span> <span class="ne">KeyError</span><span class="p">(</span>
+                    <span class="sa">f</span><span class="s2">&quot;Algorithm &#39;</span><span class="si">{</span><span class="n">algorithm_name</span><span class="si">}</span><span class="s2">&#39; not found for type &#39;</span><span class="si">{</span><span class="n">algorithm_type</span><span class="si">}</span><span class="s2">&#39;. &quot;</span>
+                    <span class="sa">f</span><span class="s2">&quot;Available algorithms for this type: </span><span class="si">{</span><span class="s1">&#39;, &#39;</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">available_algorithms</span><span class="p">)</span><span class="si">}</span><span class="s2">. &quot;</span>
+                    <span class="s2">&quot;Available algorithms are influenced by loaded plugins and registered custom algorithms. &quot;</span>
+                    <span class="s2">&quot;Please ensure the relevant plugins are loaded or custom algorithms are registered &quot;</span>
+                    <span class="s2">&quot;ahead of calling create().&quot;</span>
+                <span class="p">)</span> <span class="kn">from</span><span class="w"> </span><span class="nn">e</span>
+    <span class="n">available_types</span> <span class="o">=</span> <span class="p">[</span><span class="n">factory</span><span class="o">.</span><span class="n">algorithm_type_name</span><span class="p">()</span> <span class="k">for</span> <span class="n">factory</span> <span class="ow">in</span> <span class="n">__factories</span><span class="p">]</span>
+    <span class="k">raise</span> <span class="ne">KeyError</span><span class="p">(</span>
+        <span class="sa">f</span><span class="s2">&quot;Algorithm type &#39;</span><span class="si">{</span><span class="n">algorithm_type</span><span class="si">}</span><span class="s2">&#39; is not registered. Available algorithm types: </span><span class="si">{</span><span class="s1">&#39;, &#39;</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">available_types</span><span class="p">)</span><span class="si">}</span><span class="s2">.&quot;</span>
+        <span class="s2">&quot;Available algorithm types are influenced by loaded plugins and registered custom algorithms. &quot;</span>
+        <span class="s2">&quot;Please ensure the relevant plugins are loaded or custom algorithms are registered ahead of calling create().&quot;</span>
+    <span class="p">)</span></div>
+
+
+
+<div class="viewcode-block" id="show_settings">
+<a class="viewcode-back" href="../../../../api/api_autogen/qdk.chemistry.algorithms.registry.html#qdk.chemistry.algorithms.registry.show_settings">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">show_settings</span><span class="p">(</span><span class="n">algorithm_type</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">algorithm_name</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">list</span><span class="p">[</span><span class="nb">tuple</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]]:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Show the settings schema for a specific algorithm.</span>
+
+<span class="sd">    This function retrieves the settings schema for a given algorithm type and name.</span>
+<span class="sd">    The settings schema provides information about configurable parameters for the</span>
+<span class="sd">    algorithm, including their names, expected Python types, and default values.</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">        algorithm_type (str): The type of algorithm (e.g., &quot;scf_solver&quot;,</span>
+<span class="sd">            &quot;active_space_selector&quot;, &quot;coupled_cluster_calculator&quot;).</span>
+<span class="sd">        algorithm_name (str): The specific name of the algorithm implementation.</span>
+
+<span class="sd">    Returns:</span>
+<span class="sd">        list[tuple[str, str, Any]]: A list of tuples where each tuple contains:</span>
+<span class="sd">            - Setting name (str): The name/key of the setting</span>
+<span class="sd">            - Expected Python type (str): The Python type expected for this setting</span>
+<span class="sd">              (e.g., int, float, str, bool, list[int], list[float])</span>
+<span class="sd">            - Default value (Any): The default value for this setting</span>
+
+<span class="sd">    Raises:</span>
+<span class="sd">        KeyError: If the specified algorithm type is not registered in the system.</span>
+
+<span class="sd">    Examples:</span>
+<span class="sd">        &gt;&gt;&gt; from qdk.chemistry.algorithms import registry</span>
+<span class="sd">        &gt;&gt;&gt; # Show settings for the PySCF SCF solver</span>
+<span class="sd">        &gt;&gt;&gt; settings_info = registry.show_settings(&quot;scf_solver&quot;, &quot;pyscf&quot;)</span>
+<span class="sd">        &gt;&gt;&gt; for name, python_type, default in settings_info:</span>
+<span class="sd">        ...     print(f&quot;{name}: {python_type} = {default}&quot;)</span>
+<span class="sd">        method: str = hf</span>
+<span class="sd">        basis_set: str = def2-svp</span>
+<span class="sd">        charge: int = 0</span>
+<span class="sd">        spin_multiplicity: int = 1</span>
+<span class="sd">        tolerance: float = 1e-06</span>
+<span class="sd">        max_iterations: int = 50</span>
+<span class="sd">        force_restricted: bool = False</span>
+
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="k">for</span> <span class="n">factory</span> <span class="ow">in</span> <span class="n">__factories</span><span class="p">:</span>
+        <span class="k">if</span> <span class="n">factory</span><span class="o">.</span><span class="n">algorithm_type_name</span><span class="p">()</span> <span class="o">==</span> <span class="n">algorithm_type</span><span class="p">:</span>
+            <span class="n">instance</span> <span class="o">=</span> <span class="n">factory</span><span class="o">.</span><span class="n">create</span><span class="p">(</span><span class="n">algorithm_name</span><span class="p">)</span>
+            <span class="n">settings</span> <span class="o">=</span> <span class="n">instance</span><span class="o">.</span><span class="n">settings</span><span class="p">()</span><span class="o">.</span><span class="n">get_all_settings</span><span class="p">()</span>
+            <span class="k">return</span> <span class="p">[</span>
+                <span class="p">(</span><span class="n">name</span><span class="p">,</span> <span class="n">instance</span><span class="o">.</span><span class="n">settings</span><span class="p">()</span><span class="o">.</span><span class="n">get_expected_python_type</span><span class="p">(</span><span class="n">name</span><span class="p">),</span> <span class="n">default</span><span class="p">)</span>
+                <span class="k">for</span> <span class="n">name</span><span class="p">,</span> <span class="n">default</span> <span class="ow">in</span> <span class="n">settings</span><span class="o">.</span><span class="n">items</span><span class="p">()</span>
+            <span class="p">]</span>
+    <span class="n">available_types</span> <span class="o">=</span> <span class="p">[</span><span class="n">factory</span><span class="o">.</span><span class="n">algorithm_type_name</span><span class="p">()</span> <span class="k">for</span> <span class="n">factory</span> <span class="ow">in</span> <span class="n">__factories</span><span class="p">]</span>
+    <span class="k">raise</span> <span class="ne">KeyError</span><span class="p">(</span>
+        <span class="sa">f</span><span class="s2">&quot;Algorithm type &#39;</span><span class="si">{</span><span class="n">algorithm_type</span><span class="si">}</span><span class="s2">&#39; is not registered. Available algorithm types: </span><span class="si">{</span><span class="s1">&#39;, &#39;</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">available_types</span><span class="p">)</span><span class="si">}</span><span class="s2">&quot;</span>
+        <span class="s2">&quot;Available algorithm types are influenced by loaded plugins and registered custom algorithms. &quot;</span>
+        <span class="s2">&quot;Please ensure the relevant plugins are loaded or custom algorithms are registered ahead of calling create().&quot;</span>
+    <span class="p">)</span></div>
+
+
+
+<div class="viewcode-block" id="register">
+<a class="viewcode-back" href="../../../../api/api_autogen/qdk.chemistry.algorithms.registry.html#qdk.chemistry.algorithms.registry.register">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">register</span><span class="p">(</span><span class="n">generator</span><span class="p">:</span> <span class="n">Callable</span><span class="p">[[],</span> <span class="n">Algorithm</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Register a custom algorithm implementation.</span>
+
+<span class="sd">    This function registers a custom algorithm implementation (typically written in Python)</span>
+<span class="sd">    into the registry system. The generator function should return a new instance of the</span>
+<span class="sd">    algorithm each time it&#39;s called. The algorithm&#39;s type is automatically detected from</span>
+<span class="sd">    the returned instance.</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">        generator (Callable[[], Algorithm]): A callable that returns a new instance of</span>
+<span class="sd">            the custom algorithm. This will be called each time the algorithm is created</span>
+<span class="sd">            from the factory.</span>
+
+<span class="sd">    Raises:</span>
+<span class="sd">        KeyError: If the algorithm&#39;s type is not a recognized algorithm type in the system.</span>
+
+<span class="sd">    Examples:</span>
+<span class="sd">        &gt;&gt;&gt; from qdk.chemistry.algorithms import registry</span>
+<span class="sd">        &gt;&gt;&gt; from qdk.chemistry.algorithms import ScfSolver</span>
+<span class="sd">        &gt;&gt;&gt; class MyCustomScf(ScfSolver):</span>
+<span class="sd">        ...     def name(self):</span>
+<span class="sd">        ...         return &quot;my_custom_scf&quot;</span>
+<span class="sd">        ...     def _run_impl(self, structure, charge, spin_multiplicity):</span>
+<span class="sd">        ...         # Custom implementation</span>
+<span class="sd">        ...         pass</span>
+<span class="sd">        &gt;&gt;&gt; # Register the custom algorithm</span>
+<span class="sd">        &gt;&gt;&gt; registry.register(lambda: MyCustomScf())</span>
+<span class="sd">        &gt;&gt;&gt; # Now it can be created from the registry</span>
+<span class="sd">        &gt;&gt;&gt; scf = registry.create(&quot;scf_solver&quot;, &quot;my_custom_scf&quot;)</span>
+
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">_ensure_cleanup_registered</span><span class="p">()</span>
+    <span class="n">tmp</span> <span class="o">=</span> <span class="n">generator</span><span class="p">()</span>
+    <span class="n">algorithm_type</span> <span class="o">=</span> <span class="n">tmp</span><span class="o">.</span><span class="n">type_name</span><span class="p">()</span>
+    <span class="k">for</span> <span class="n">factory</span> <span class="ow">in</span> <span class="n">__factories</span><span class="p">:</span>
+        <span class="k">if</span> <span class="n">factory</span><span class="o">.</span><span class="n">algorithm_type_name</span><span class="p">()</span> <span class="o">==</span> <span class="n">algorithm_type</span><span class="p">:</span>
+            <span class="n">factory</span><span class="o">.</span><span class="n">register_instance</span><span class="p">(</span><span class="n">generator</span><span class="p">)</span>
+            <span class="k">return</span>
+    <span class="n">available_types</span> <span class="o">=</span> <span class="p">[</span><span class="n">factory</span><span class="o">.</span><span class="n">algorithm_type_name</span><span class="p">()</span> <span class="k">for</span> <span class="n">factory</span> <span class="ow">in</span> <span class="n">__factories</span><span class="p">]</span>
+    <span class="k">raise</span> <span class="ne">KeyError</span><span class="p">(</span>
+        <span class="sa">f</span><span class="s2">&quot;Algorithm type &#39;</span><span class="si">{</span><span class="n">algorithm_type</span><span class="si">}</span><span class="s2">&#39; is not registered. Available algorithm types: </span><span class="si">{</span><span class="s1">&#39;, &#39;</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">available_types</span><span class="p">)</span><span class="si">}</span><span class="s2">&quot;</span>
+    <span class="p">)</span></div>
+
+
+
+<div class="viewcode-block" id="available">
+<a class="viewcode-back" href="../../../../api/api_autogen/qdk.chemistry.algorithms.registry.html#qdk.chemistry.algorithms.registry.available">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">available</span><span class="p">(</span><span class="n">algorithm_type</span><span class="p">:</span> <span class="nb">str</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="nb">list</span><span class="p">[</span><span class="nb">str</span><span class="p">]]</span> <span class="o">|</span> <span class="nb">list</span><span class="p">[</span><span class="nb">str</span><span class="p">]:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;List all available algorithms by type.</span>
+
+<span class="sd">    This function returns information about available algorithms in the registry.</span>
+<span class="sd">    When called without arguments, it returns a dictionary mapping all algorithm</span>
+<span class="sd">    types to their available implementations. When called with a specific algorithm</span>
+<span class="sd">    type, it returns only the list of available algorithms for that type.</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">        algorithm_type (Optional[str]): If provided, only list algorithms of this type.</span>
+<span class="sd">            If None, list all algorithms across all types.</span>
+
+<span class="sd">    Returns:</span>
+<span class="sd">        dict[str, list[str]] | list[str]: When algorithm_type is None, returns a dictionary</span>
+<span class="sd">            where keys are algorithm type names and values are lists of available algorithm</span>
+<span class="sd">            names for that type. When algorithm_type is specified, returns a list of available</span>
+<span class="sd">            algorithm names for that specific type (empty list if type not found or no</span>
+<span class="sd">            algorithms are available).</span>
+
+<span class="sd">    Examples:</span>
+<span class="sd">        &gt;&gt;&gt; from qdk.chemistry.algorithms import registry</span>
+<span class="sd">        &gt;&gt;&gt; # List all available algorithms across all types</span>
+<span class="sd">        &gt;&gt;&gt; all_algorithms = registry.available()</span>
+<span class="sd">        &gt;&gt;&gt; print(all_algorithms)</span>
+<span class="sd">        {&#39;scf_solver&#39;: [&#39;pyscf&#39;, &#39;qdk&#39;], &#39;active_space_selector&#39;: [&#39;occupation&#39;, &#39;avas&#39;], ...}</span>
+<span class="sd">        &gt;&gt;&gt; # List only SCF solvers</span>
+<span class="sd">        &gt;&gt;&gt; scf_solvers = registry.available(&quot;scf_solver&quot;)</span>
+<span class="sd">        &gt;&gt;&gt; print(scf_solvers)</span>
+<span class="sd">        [&#39;pyscf&#39;, &#39;qdk&#39;]</span>
+<span class="sd">        &gt;&gt;&gt; # Check what active space selectors are available</span>
+<span class="sd">        &gt;&gt;&gt; selectors = registry.available(&quot;active_space_selector&quot;)</span>
+<span class="sd">        &gt;&gt;&gt; print(selectors)</span>
+<span class="sd">        [&#39;occupation&#39;, &#39;avas&#39;, &#39;valence&#39;]</span>
+
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="k">if</span> <span class="n">algorithm_type</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="n">result</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="nb">list</span><span class="p">[</span><span class="nb">str</span><span class="p">]]</span> <span class="o">=</span> <span class="p">{}</span>
+        <span class="k">for</span> <span class="n">factory</span> <span class="ow">in</span> <span class="n">__factories</span><span class="p">:</span>
+            <span class="n">result</span><span class="p">[</span><span class="n">factory</span><span class="o">.</span><span class="n">algorithm_type_name</span><span class="p">()]</span> <span class="o">=</span> <span class="n">factory</span><span class="o">.</span><span class="n">available</span><span class="p">()</span>
+        <span class="k">return</span> <span class="n">result</span>
+    <span class="k">for</span> <span class="n">factory</span> <span class="ow">in</span> <span class="n">__factories</span><span class="p">:</span>
+        <span class="k">if</span> <span class="n">factory</span><span class="o">.</span><span class="n">algorithm_type_name</span><span class="p">()</span> <span class="o">==</span> <span class="n">algorithm_type</span><span class="p">:</span>
+            <span class="k">return</span> <span class="n">factory</span><span class="o">.</span><span class="n">available</span><span class="p">()</span>
+    <span class="k">return</span> <span class="p">[]</span></div>
+
+
+
+<div class="viewcode-block" id="unregister">
+<a class="viewcode-back" href="../../../../api/api_autogen/qdk.chemistry.algorithms.registry.html#qdk.chemistry.algorithms.registry.unregister">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">unregister</span><span class="p">(</span><span class="n">algorithm_type</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">algorithm_name</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Unregister a custom algorithm implementation.</span>
+
+<span class="sd">    This function removes a previously registered algorithm from the registry.</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">        algorithm_type (str): The type of algorithm to unregister</span>
+<span class="sd">            (e.g., &quot;scf_solver&quot;, &quot;active_space_selector&quot;).</span>
+<span class="sd">        algorithm_name (str): The name of the specific algorithm implementation</span>
+<span class="sd">            to unregister.</span>
+
+<span class="sd">    Raises:</span>
+<span class="sd">        KeyError: If the specified algorithm type is not registered in the system.</span>
+
+<span class="sd">    Examples:</span>
+<span class="sd">        &gt;&gt;&gt; from qdk.chemistry.algorithms import registry</span>
+<span class="sd">        &gt;&gt;&gt; # Assuming you previously registered a custom algorithm</span>
+<span class="sd">        &gt;&gt;&gt; registry.unregister(&quot;scf_solver&quot;, &quot;my_custom_scf&quot;)</span>
+
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="k">for</span> <span class="n">factory</span> <span class="ow">in</span> <span class="n">__factories</span><span class="p">:</span>
+        <span class="k">if</span> <span class="n">factory</span><span class="o">.</span><span class="n">algorithm_type_name</span><span class="p">()</span> <span class="o">==</span> <span class="n">algorithm_type</span><span class="p">:</span>
+            <span class="n">factory</span><span class="o">.</span><span class="n">unregister_instance</span><span class="p">(</span><span class="n">algorithm_name</span><span class="p">)</span>
+            <span class="k">return</span>
+    <span class="n">available_types</span> <span class="o">=</span> <span class="p">[</span><span class="n">factory</span><span class="o">.</span><span class="n">algorithm_type_name</span><span class="p">()</span> <span class="k">for</span> <span class="n">factory</span> <span class="ow">in</span> <span class="n">__factories</span><span class="p">]</span>
+    <span class="k">raise</span> <span class="ne">KeyError</span><span class="p">(</span>
+        <span class="sa">f</span><span class="s2">&quot;Algorithm type &#39;</span><span class="si">{</span><span class="n">algorithm_type</span><span class="si">}</span><span class="s2">&#39; is not registered. Available types: </span><span class="si">{</span><span class="s1">&#39;, &#39;</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">available_types</span><span class="p">)</span><span class="si">}</span><span class="s2">&quot;</span>
+    <span class="p">)</span></div>
+
+
+
+<div class="viewcode-block" id="register_factory">
+<a class="viewcode-back" href="../../../../api/api_autogen/qdk.chemistry.algorithms.registry.html#qdk.chemistry.algorithms.registry.register_factory">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">register_factory</span><span class="p">(</span><span class="n">factory</span><span class="p">:</span> <span class="n">AlgorithmFactory</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Register a new algorithm factory.</span>
+
+<span class="sd">    This function allows adding new algorithm factories to the registry,</span>
+<span class="sd">    thus adding entire algorithm types.</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">        factory (AlgorithmFactory): The factory instance to register.</span>
+
+<span class="sd">    Raises:</span>
+<span class="sd">        ValueError: If a factory with the same algorithm type name is already registered.</span>
+
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">algorithm_type</span> <span class="o">=</span> <span class="n">factory</span><span class="o">.</span><span class="n">algorithm_type_name</span><span class="p">()</span>
+    <span class="k">for</span> <span class="n">existing_factory</span> <span class="ow">in</span> <span class="n">__factories</span><span class="p">:</span>
+        <span class="k">if</span> <span class="n">existing_factory</span><span class="o">.</span><span class="n">algorithm_type_name</span><span class="p">()</span> <span class="o">==</span> <span class="n">algorithm_type</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Factory for algorithm type &#39;</span><span class="si">{</span><span class="n">algorithm_type</span><span class="si">}</span><span class="s2">&#39; is already registered.&quot;</span><span class="p">)</span>
+    <span class="n">__factories</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">factory</span><span class="p">)</span></div>
+
+
+
+<div class="viewcode-block" id="unregister_factory">
+<a class="viewcode-back" href="../../../../api/api_autogen/qdk.chemistry.algorithms.registry.html#qdk.chemistry.algorithms.registry.unregister_factory">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">unregister_factory</span><span class="p">(</span><span class="n">algorithm_type</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Unregister an existing algorithm factory.</span>
+
+<span class="sd">    This function allows removing algorithm factories from the registry,</span>
+<span class="sd">    thus removing entire algorithm types.</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">        algorithm_type (str): The type name of the factory to unregister.</span>
+
+<span class="sd">    Raises:</span>
+<span class="sd">        KeyError: If no factory with the specified algorithm type name is found.</span>
+
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="k">for</span> <span class="n">existing_factory</span> <span class="ow">in</span> <span class="n">__factories</span><span class="p">:</span>
+        <span class="k">if</span> <span class="n">existing_factory</span><span class="o">.</span><span class="n">algorithm_type_name</span><span class="p">()</span> <span class="o">==</span> <span class="n">algorithm_type</span><span class="p">:</span>
+            <span class="n">__factories</span><span class="o">.</span><span class="n">remove</span><span class="p">(</span><span class="n">existing_factory</span><span class="p">)</span>
+            <span class="k">return</span>
+    <span class="k">raise</span> <span class="ne">KeyError</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Factory for algorithm type &#39;</span><span class="si">{</span><span class="n">algorithm_type</span><span class="si">}</span><span class="s2">&#39; is not registered.&quot;</span><span class="p">)</span></div>
+
+
+
+<span class="k">def</span><span class="w"> </span><span class="nf">_register_cpp_factories</span><span class="p">():</span>
+    <span class="n">register_factory</span><span class="p">(</span><span class="n">ActiveSpaceSelectorFactory</span><span class="p">)</span>
+    <span class="n">register_factory</span><span class="p">(</span><span class="n">CoupledClusterCalculatorFactory</span><span class="p">)</span>
+    <span class="n">register_factory</span><span class="p">(</span><span class="n">HamiltonianConstructorFactory</span><span class="p">)</span>
+    <span class="n">register_factory</span><span class="p">(</span><span class="n">LocalizerFactory</span><span class="p">)</span>
+    <span class="n">register_factory</span><span class="p">(</span><span class="n">MultiConfigurationCalculatorFactory</span><span class="p">)</span>
+    <span class="n">register_factory</span><span class="p">(</span><span class="n">MultiConfigurationScfFactory</span><span class="p">)</span>
+    <span class="n">register_factory</span><span class="p">(</span><span class="n">ProjectedMultiConfigurationCalculatorFactory</span><span class="p">)</span>
+    <span class="n">register_factory</span><span class="p">(</span><span class="n">ScfSolverFactory</span><span class="p">)</span>
+    <span class="n">register_factory</span><span class="p">(</span><span class="n">StabilityCheckerFactory</span><span class="p">)</span>
+
+
+<span class="k">def</span><span class="w"> </span><span class="nf">_register_python_factories</span><span class="p">():</span>
+    <span class="n">register_factory</span><span class="p">(</span><span class="n">EnergyEstimatorFactory</span><span class="p">())</span>
+    <span class="n">register_factory</span><span class="p">(</span><span class="n">QubitMapperFactory</span><span class="p">())</span>
+
+
+<span class="n">_</span> <span class="o">=</span> <span class="n">_register_cpp_factories</span><span class="p">()</span>
+<span class="n">_</span> <span class="o">=</span> <span class="n">_register_python_factories</span><span class="p">()</span>
+
+
+<span class="k">def</span><span class="w"> </span><span class="nf">_ensure_cleanup_registered</span><span class="p">():</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Ensure cleanup is registered exactly once per module import.</span>
+
+<span class="sd">    This internal function makes sure that the atexit handler for cleaning up</span>
+<span class="sd">    algorithm registrations is set up exactly once. This prevents redundant</span>
+<span class="sd">    registrations of the cleanup function when multiple registration functions</span>
+<span class="sd">    are called.</span>
+
+<span class="sd">    The atexit handler is critical for preventing memory issues that can occur when</span>
+<span class="sd">    C++ static deinitialization happens after Python garbage collection. Without this</span>
+<span class="sd">    automatic cleanup, Python-implemented algorithms could cause double-free errors</span>
+<span class="sd">    during interpreter shutdown.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="k">global</span> <span class="n">__cleanup_registered</span>  <span class="c1"># noqa: PLW0603</span>
+    <span class="k">if</span> <span class="ow">not</span> <span class="n">__cleanup_registered</span><span class="p">:</span>
+        <span class="n">atexit</span><span class="o">.</span><span class="n">register</span><span class="p">(</span><span class="n">_cleanup_algorithms</span><span class="p">)</span>
+        <span class="n">__cleanup_registered</span> <span class="o">=</span> <span class="kc">True</span>
+
+
+<span class="k">def</span><span class="w"> </span><span class="nf">_cleanup_algorithms</span><span class="p">():</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Clean up all registered algorithms to prevent segfaults.</span>
+
+<span class="sd">    This function is automatically called during Python interpreter shutdown</span>
+<span class="sd">    through the atexit module. It ensures that all algorithm instances registered</span>
+<span class="sd">    from Python are properly unregistered before Python garbage collection occurs.</span>
+
+<span class="sd">    This prevents double-free errors that can happen when C++ static deinitialization</span>
+<span class="sd">    runs after Python has already garbage-collected the Python objects. Users should</span>
+<span class="sd">    never need to call this function directly as it&#39;s handled automatically by the</span>
+<span class="sd">    registry system.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="k">for</span> <span class="n">factory</span> <span class="ow">in</span> <span class="n">__factories</span><span class="p">:</span>
+        <span class="n">factory</span><span class="o">.</span><span class="n">clear</span><span class="p">()</span>
+
+
+<span class="c1"># Register built-in Python energy estimators</span>
+<span class="n">register</span><span class="p">(</span><span class="k">lambda</span><span class="p">:</span> <span class="n">QDKEnergyEstimator</span><span class="p">())</span>
+</pre></div>
+
+           </div>
+          </div>
+          <footer>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright Copyright (c) Microsoft Corporation. All rights reserved. Licensed under the MIT License..</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

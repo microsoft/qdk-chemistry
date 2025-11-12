@@ -1,0 +1,53 @@
+In-Depth Guide
+==============
+
+
+Welcome to the comprehensive documentation for the Quantum Development Kit (QDK) Chemistry library.
+This documentation provides detailed information about QDK/Chemistry's structure, components, and usage patterns.
+
+
+.. toctree::
+   :maxdepth: 3
+   :caption: Overview
+
+   design
+   data
+   algorithms
+   keywords
+   plugins
+
+
+The QDK Chemistry library is designed to facilitate quantum chemistry calculations and simulations. It
+provides a set of tools and libraries for working with molecular structures, performing electronic structure
+calculations, and analyzing quantum many-body systems.
+
+QDK/Chemistry features a unified interface for communitry quantum chemistry software packages,
+allowing seamless interoperability with established software while maintaining a consistent API. This enables users to
+leverage specialized capabilities across different packages without changing their workflow.
+
+This comprehensive documentation is organized into the following sections:
+
+
+- **Data Classes**: Documentation of the core data structures used in QDK/Chemistry
+
+  - :doc:`Structure <data/structure>`: Molecular structure representation
+  - :doc:`Orbitals <data/orbitals>`: Molecular orbital information
+  - :doc:`Hamiltonian <data/hamiltonian>`: Electronic Hamiltonian representation
+  - :doc:`Wavefunction <data/wavefunction>`: Wavefunction representation
+
+- **Algorithms**: Documentation of the computational algorithms in QDK/Chemistry
+
+  - :doc:`ScfSolver <algorithms/scf_solver>`: Self-Consistent Field calculations
+  - :doc:`Localizer <algorithms/localizer>`: Orbital localization methods
+  - :doc:`ActiveSpaceSelector <algorithms/active_space>`: Active space selection methods
+  - :doc:`HamiltonianConstructor <algorithms/hamiltonian_constructor>`: Hamiltonian construction
+  - :doc:`MCCalculator <algorithms/mc_calculator>`: Multi-Configurational calculations
+  - :doc:`DynamicalCorrelation <algorithms/dynamical_correlation>`: Dynamical correlation methods
+
+- **Advanced Topics**: Deeper insights into QDK/Chemistry's design and usage
+
+  - :doc:`Design Principles <advanced/design_principles>`: Core architectural principles of QDK/Chemistry
+  - :doc:`Factory Pattern <advanced/factory_pattern>`: Understanding the factory pattern and extending QDK/Chemistry
+  - :doc:`Serialization <advanced/serialization>`: Data serialization and deserialization
+  - :doc:`Interfaces <advanced/interfaces>`: QDK/Chemistry's interface system to external packages
+  - :doc:`Settings <advanced/settings>`: Configuration system for algorithms

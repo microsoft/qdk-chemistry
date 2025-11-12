@@ -1,0 +1,8 @@
+qdk.chemistry.utils.time\_evolution module
+==========================================
+
+.. automodule:: qdk.chemistry.utils.time_evolution
+   :members:
+   :private-members:
+   :show-inheritance:
+   :undoc-members:

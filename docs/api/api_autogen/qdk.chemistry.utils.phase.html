@@ -1,0 +1,269 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../../">
+<head>
+  <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>qdk.chemistry.utils.phase module &mdash; QDK/Chemistry 0.0.1 documentation</title>
+      <link rel="stylesheet" type="text/css" href="../../_static/pygments.css?v=b86133f3" />
+      <link rel="stylesheet" type="text/css" href="../../_static/css/theme.css?v=e59714d7" />
+      <link rel="stylesheet" type="text/css" href="../../_static/tabs.css?v=4c969af8" />
+      <link rel="stylesheet" type="text/css" href="../../_static/graphviz.css?v=4ae1632d" />
+      <link rel="stylesheet" type="text/css" href="../../_static/copybutton.css?v=76b2166b" />
+
+  
+      <script src="../../_static/jquery.js?v=5d32c60e"></script>
+      <script src="../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="../../_static/documentation_options.js?v=d45e8c67"></script>
+      <script src="../../_static/doctools.js?v=9bcbadda"></script>
+      <script src="../../_static/sphinx_highlight.js?v=dc90522c"></script>
+      <script src="../../_static/tabs.js?v=3ee01567"></script>
+      <script src="../../_static/clipboard.min.js?v=a7894cd8"></script>
+      <script src="../../_static/copybutton.js?v=f281be69"></script>
+    <script src="../../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../../genindex.html" />
+    <link rel="search" title="Search" href="../../search.html" />
+    <link rel="next" title="qdk.chemistry.utils.statevector module" href="qdk.chemistry.utils.statevector.html" />
+    <link rel="prev" title="qdk.chemistry.utils.bitstring module" href="qdk.chemistry.utils.bitstring.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="../../index.html" class="icon icon-home">
+            QDK/Chemistry
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">User Documentation</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../user/Quickstart.html">Quickstart</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../user/comprehensive/index.html">In-Depth Guide</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">API Reference</span></p>
+<ul class="current">
+<li class="toctree-l1 current"><a class="reference internal" href="../python_api.html">Python API</a><ul class="current">
+<li class="toctree-l2"><a class="reference internal" href="../python_api.html#data-classes">Data Classes</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../python_api.html#algorithms">Algorithms</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../python_api.html#plugins">Plugins</a></li>
+<li class="toctree-l2 current"><a class="reference internal" href="../python_api.html#utilities">Utilities</a><ul class="current">
+<li class="toctree-l3 current"><a class="reference internal" href="qdk.chemistry.utils.html">qdk.chemistry.utils package</a><ul class="current">
+<li class="toctree-l4"><a class="reference internal" href="qdk.chemistry.utils.html#qdk.chemistry.utils.compute_valence_space"><code class="docutils literal notranslate"><span class="pre">compute_valence_space()</span></code></a></li>
+<li class="toctree-l4 current"><a class="reference internal" href="qdk.chemistry.utils.html#submodules">Submodules</a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="../python_api.html#constants">Constants</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="../cpp_api.html">C++ API</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Supporting Information</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../glossary.html">Glossary</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../references.html">References</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../../index.html">QDK/Chemistry</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../../index.html" class="icon icon-home" aria-label="Home"></a></li>
+          <li class="breadcrumb-item"><a href="../python_api.html">Python API</a></li>
+          <li class="breadcrumb-item"><a href="qdk.chemistry.utils.html">qdk.chemistry.utils package</a></li>
+      <li class="breadcrumb-item active">qdk.chemistry.utils.phase module</li>
+      <li class="wy-breadcrumbs-aside">
+            <a href="../../_sources/api/api_autogen/qdk.chemistry.utils.phase.rst.txt" rel="nofollow"> View page source</a>
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <section id="module-qdk.chemistry.utils.phase">
+<span id="qdk-chemistry-utils-phase-module"></span><h1>qdk.chemistry.utils.phase module<a class="headerlink" href="#module-qdk.chemistry.utils.phase" title="Link to this heading"></a></h1>
+<p>Utility functions for manipulating phases produced by QPE.</p>
+<dl class="py function">
+<dt class="sig sig-object py" id="qdk.chemistry.utils.phase.energy_from_phase">
+<span class="sig-name descname"><span class="pre">energy_from_phase</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">phase_fraction</span></span></em>, <em class="sig-param"><span class="keyword-only-separator o"><abbr title="Keyword-only parameters separator (PEP 3102)"><span class="pre">*</span></abbr></span></em>, <em class="sig-param"><span class="n"><span class="pre">evolution_time</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../../_modules/qdk/chemistry/utils/phase.html#energy_from_phase"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#qdk.chemistry.utils.phase.energy_from_phase" title="Link to this definition"></a></dt>
+<dd><p>Convert a measured phase fraction to energy using <code class="docutils literal notranslate"><span class="pre">E</span> <span class="pre">=</span> <span class="pre">angle</span> <span class="pre">/</span> <span class="pre">t</span></code>.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p><span class="sphinx_autodoc_typehints-type"><a class="reference external" href="https://docs.python.org/3/library/functions.html#float" title="(in Python v3.14)"><code class="xref py py-class docutils literal notranslate"><span class="pre">float</span></code></a></span></p>
+</dd>
+<dt class="field-even">Parameters<span class="colon">:</span></dt>
+<dd class="field-even"><ul class="simple">
+<li><p><strong>phase_fraction</strong> (<a class="reference external" href="https://docs.python.org/3/library/functions.html#float" title="(in Python v3.14)"><em>float</em></a>) – Fractional phase obtained from the phase register.</p></li>
+<li><p><strong>evolution_time</strong> (<a class="reference external" href="https://docs.python.org/3/library/functions.html#float" title="(in Python v3.14)"><em>float</em></a>) – Evolution time <code class="docutils literal notranslate"><span class="pre">t</span></code> used in <code class="docutils literal notranslate"><span class="pre">U</span> <span class="pre">=</span> <span class="pre">exp(-i</span> <span class="pre">H</span> <span class="pre">t)</span></code>.</p></li>
+</ul>
+</dd>
+<dt class="field-odd">Returns<span class="colon">:</span></dt>
+<dd class="field-odd"><p>Energy estimate corresponding to <code class="docutils literal notranslate"><span class="pre">phase_fraction</span></code>.</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="qdk.chemistry.utils.phase.energy_alias_candidates">
+<span class="sig-name descname"><span class="pre">energy_alias_candidates</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">raw_energy</span></span></em>, <em class="sig-param"><span class="keyword-only-separator o"><abbr title="Keyword-only parameters separator (PEP 3102)"><span class="pre">*</span></abbr></span></em>, <em class="sig-param"><span class="n"><span class="pre">evolution_time</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">shift_range</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">range(-2,</span> <span class="pre">3)</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../../_modules/qdk/chemistry/utils/phase.html#energy_alias_candidates"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#qdk.chemistry.utils.phase.energy_alias_candidates" title="Link to this definition"></a></dt>
+<dd><p>Enumerate alias energies compatible with <code class="docutils literal notranslate"><span class="pre">raw_energy</span></code>.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p><span class="sphinx_autodoc_typehints-type"><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#list" title="(in Python v3.14)"><code class="xref py py-class docutils literal notranslate"><span class="pre">list</span></code></a>[<a class="reference external" href="https://docs.python.org/3/library/functions.html#float" title="(in Python v3.14)"><code class="xref py py-class docutils literal notranslate"><span class="pre">float</span></code></a>]</span></p>
+</dd>
+<dt class="field-even">Parameters<span class="colon">:</span></dt>
+<dd class="field-even"><ul class="simple">
+<li><p><strong>raw_energy</strong> (<a class="reference external" href="https://docs.python.org/3/library/functions.html#float" title="(in Python v3.14)"><em>float</em></a>) – Energy derived from the measured phase.</p></li>
+<li><p><strong>evolution_time</strong> (<a class="reference external" href="https://docs.python.org/3/library/functions.html#float" title="(in Python v3.14)"><em>float</em></a>) – Evolution time <code class="docutils literal notranslate"><span class="pre">t</span></code> used by the unitary.</p></li>
+<li><p><strong>shift_range</strong> (<a class="reference external" href="https://docs.python.org/3/library/collections.abc.html#collections.abc.Iterable" title="(in Python v3.14)"><em>Iterable</em></a><em>[</em><a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(in Python v3.14)"><em>int</em></a><em>]</em>) – Integer shifts (in multiples of <code class="docutils literal notranslate"><span class="pre">2π</span> <span class="pre">/</span> <span class="pre">t</span></code>) to explore. The
+default <code class="docutils literal notranslate"><span class="pre">range(-2,</span> <span class="pre">3)</span></code> checks <code class="docutils literal notranslate"><span class="pre">k</span> <span class="pre">=</span> <span class="pre">-2,</span> <span class="pre">-1,</span> <span class="pre">0,</span> <span class="pre">1,</span> <span class="pre">2</span></code>—a pragmatic
+window that typically covers chemical-energy estimates because they
+rarely deviate by more than one or two <code class="docutils literal notranslate"><span class="pre">2π</span> <span class="pre">/</span> <span class="pre">t</span></code> periods from the
+raw measurement.</p></li>
+</ul>
+</dd>
+<dt class="field-odd">Returns<span class="colon">:</span></dt>
+<dd class="field-odd"><p>Sorted list of alias energy values covering positive and negative branches.</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="qdk.chemistry.utils.phase.resolve_energy_aliases">
+<span class="sig-name descname"><span class="pre">resolve_energy_aliases</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">raw_energy</span></span></em>, <em class="sig-param"><span class="keyword-only-separator o"><abbr title="Keyword-only parameters separator (PEP 3102)"><span class="pre">*</span></abbr></span></em>, <em class="sig-param"><span class="n"><span class="pre">evolution_time</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">reference_energy</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">shift_range</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">range(-2,</span> <span class="pre">3)</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../../_modules/qdk/chemistry/utils/phase.html#resolve_energy_aliases"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#qdk.chemistry.utils.phase.resolve_energy_aliases" title="Link to this definition"></a></dt>
+<dd><p>Select the alias energy closest to a known reference value.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p><span class="sphinx_autodoc_typehints-type"><a class="reference external" href="https://docs.python.org/3/library/functions.html#float" title="(in Python v3.14)"><code class="xref py py-class docutils literal notranslate"><span class="pre">float</span></code></a></span></p>
+</dd>
+<dt class="field-even">Parameters<span class="colon">:</span></dt>
+<dd class="field-even"><ul class="simple">
+<li><p><strong>raw_energy</strong> (<a class="reference external" href="https://docs.python.org/3/library/functions.html#float" title="(in Python v3.14)"><em>float</em></a>) – Energy derived from the measured phase.</p></li>
+<li><p><strong>evolution_time</strong> (<a class="reference external" href="https://docs.python.org/3/library/functions.html#float" title="(in Python v3.14)"><em>float</em></a>) – Evolution time <code class="docutils literal notranslate"><span class="pre">t</span></code> used by the unitary.</p></li>
+<li><p><strong>reference_energy</strong> (<a class="reference external" href="https://docs.python.org/3/library/functions.html#float" title="(in Python v3.14)"><em>float</em></a>) – External reference guiding alias selection.</p></li>
+<li><p><strong>shift_range</strong> (<a class="reference external" href="https://docs.python.org/3/library/collections.abc.html#collections.abc.Iterable" title="(in Python v3.14)"><em>Iterable</em></a><em>[</em><a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(in Python v3.14)"><em>int</em></a><em>]</em>) – Integer shifts (in multiples of <code class="docutils literal notranslate"><span class="pre">2π</span> <span class="pre">/</span> <span class="pre">t</span></code>) to explore. Use
+a wider window when the true value may sit multiple periods away
+from the raw estimate.</p></li>
+</ul>
+</dd>
+<dt class="field-odd">Returns<span class="colon">:</span></dt>
+<dd class="field-odd"><p>Alias energy closest to <code class="docutils literal notranslate"><span class="pre">reference_energy</span></code>.</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="qdk.chemistry.utils.phase.iterative_phase_feedback_update">
+<span class="sig-name descname"><span class="pre">iterative_phase_feedback_update</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">current_phase</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">measured_bit</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../../_modules/qdk/chemistry/utils/phase.html#iterative_phase_feedback_update"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#qdk.chemistry.utils.phase.iterative_phase_feedback_update" title="Link to this definition"></a></dt>
+<dd><p>Update the feedback phase according to Kitaev’s recursion.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p><span class="sphinx_autodoc_typehints-type"><a class="reference external" href="https://docs.python.org/3/library/functions.html#float" title="(in Python v3.14)"><code class="xref py py-class docutils literal notranslate"><span class="pre">float</span></code></a></span></p>
+</dd>
+<dt class="field-even">Parameters<span class="colon">:</span></dt>
+<dd class="field-even"><ul class="simple">
+<li><p><strong>current_phase</strong> (<a class="reference external" href="https://docs.python.org/3/library/functions.html#float" title="(in Python v3.14)"><em>float</em></a>) – Phase <code class="docutils literal notranslate"><span class="pre">Φ(k+1)</span></code> from the previous iteration.</p></li>
+<li><p><strong>measured_bit</strong> (<a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(in Python v3.14)"><em>int</em></a>) – Measured classical bit <code class="docutils literal notranslate"><span class="pre">j_k</span></code> (0 or 1).</p></li>
+</ul>
+</dd>
+<dt class="field-odd">Returns<span class="colon">:</span></dt>
+<dd class="field-odd"><p>Updated feedback phase <code class="docutils literal notranslate"><span class="pre">Φ(k)</span></code> for the next iteration.</p>
+</dd>
+<dt class="field-even">Raises<span class="colon">:</span></dt>
+<dd class="field-even"><p><a class="reference external" href="https://docs.python.org/3/library/exceptions.html#ValueError" title="(in Python v3.14)"><strong>ValueError</strong></a> – If <code class="docutils literal notranslate"><span class="pre">measured_bit</span></code> is not 0 or 1.</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="qdk.chemistry.utils.phase.phase_fraction_from_feedback">
+<span class="sig-name descname"><span class="pre">phase_fraction_from_feedback</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">phase_feedback</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../../_modules/qdk/chemistry/utils/phase.html#phase_fraction_from_feedback"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#qdk.chemistry.utils.phase.phase_fraction_from_feedback" title="Link to this definition"></a></dt>
+<dd><p>Convert the final feedback phase <code class="docutils literal notranslate"><span class="pre">Φ(1)</span></code> into the phase fraction <code class="docutils literal notranslate"><span class="pre">φ</span></code>.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p><span class="sphinx_autodoc_typehints-type"><a class="reference external" href="https://docs.python.org/3/library/functions.html#float" title="(in Python v3.14)"><code class="xref py py-class docutils literal notranslate"><span class="pre">float</span></code></a></span></p>
+</dd>
+<dt class="field-even">Parameters<span class="colon">:</span></dt>
+<dd class="field-even"><p><strong>phase_feedback</strong> (<a class="reference external" href="https://docs.python.org/3/library/functions.html#float" title="(in Python v3.14)"><em>float</em></a>) – Final feedback phase angle returned by IQPE.</p>
+</dd>
+<dt class="field-odd">Returns<span class="colon">:</span></dt>
+<dd class="field-odd"><p>Phase fraction corresponding to <code class="docutils literal notranslate"><span class="pre">phase_feedback</span></code>.</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="qdk.chemistry.utils.phase.accumulated_phase_from_bits">
+<span class="sig-name descname"><span class="pre">accumulated_phase_from_bits</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">bits_msb_first</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../../_modules/qdk/chemistry/utils/phase.html#accumulated_phase_from_bits"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#qdk.chemistry.utils.phase.accumulated_phase_from_bits" title="Link to this definition"></a></dt>
+<dd><p>Compute <code class="docutils literal notranslate"><span class="pre">Φ(1)</span></code> directly from a measured bit string (MSB to LSB).</p>
+<dl class="field-list simple">
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p><span class="sphinx_autodoc_typehints-type"><a class="reference external" href="https://docs.python.org/3/library/functions.html#float" title="(in Python v3.14)"><code class="xref py py-class docutils literal notranslate"><span class="pre">float</span></code></a></span></p>
+</dd>
+<dt class="field-even">Parameters<span class="colon">:</span></dt>
+<dd class="field-even"><p><strong>bits_msb_first</strong> (<a class="reference external" href="https://docs.python.org/3/library/collections.abc.html#collections.abc.Sequence" title="(in Python v3.14)"><em>Sequence</em></a><em>[</em><a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(in Python v3.14)"><em>int</em></a><em>]</em>) – Sequence of measured bits ordered from MSB to LSB.</p>
+</dd>
+<dt class="field-odd">Returns<span class="colon">:</span></dt>
+<dd class="field-odd"><p>Accumulated phase angle <code class="docutils literal notranslate"><span class="pre">Φ(1)</span></code>.</p>
+</dd>
+</dl>
+</dd></dl>
+
+</section>
+
+
+           </div>
+          </div>
+          <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
+        <a href="qdk.chemistry.utils.bitstring.html" class="btn btn-neutral float-left" title="qdk.chemistry.utils.bitstring module" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+        <a href="qdk.chemistry.utils.statevector.html" class="btn btn-neutral float-right" title="qdk.chemistry.utils.statevector module" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright Copyright (c) Microsoft Corporation. All rights reserved. Licensed under the MIT License..</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

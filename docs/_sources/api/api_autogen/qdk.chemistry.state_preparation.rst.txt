@@ -1,0 +1,18 @@
+qdk.chemistry.state\_preparation package
+========================================
+
+.. automodule:: qdk.chemistry.state_preparation
+   :members:
+   :private-members:
+   :show-inheritance:
+   :undoc-members:
+
+Submodules
+----------
+
+.. toctree::
+   :maxdepth: 4
+
+   qdk.chemistry.state_preparation.base
+   qdk.chemistry.state_preparation.regular_isometry
+   qdk.chemistry.state_preparation.sparse_isometry

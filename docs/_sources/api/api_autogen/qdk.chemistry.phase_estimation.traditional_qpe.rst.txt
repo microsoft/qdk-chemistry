@@ -1,0 +1,8 @@
+qdk.chemistry.phase\_estimation.traditional\_qpe module
+=======================================================
+
+.. automodule:: qdk.chemistry.phase_estimation.traditional_qpe
+   :members:
+   :private-members:
+   :show-inheritance:
+   :undoc-members:

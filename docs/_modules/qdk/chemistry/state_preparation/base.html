@@ -1,0 +1,374 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../../../../">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>qdk.chemistry.state_preparation.base &mdash; QDK/Chemistry 0.0.1 documentation</title>
+      <link rel="stylesheet" type="text/css" href="../../../../_static/pygments.css?v=b86133f3" />
+      <link rel="stylesheet" type="text/css" href="../../../../_static/css/theme.css?v=e59714d7" />
+      <link rel="stylesheet" type="text/css" href="../../../../_static/tabs.css?v=4c969af8" />
+      <link rel="stylesheet" type="text/css" href="../../../../_static/graphviz.css?v=4ae1632d" />
+      <link rel="stylesheet" type="text/css" href="../../../../_static/copybutton.css?v=76b2166b" />
+
+  
+      <script src="../../../../_static/jquery.js?v=5d32c60e"></script>
+      <script src="../../../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="../../../../_static/documentation_options.js?v=d45e8c67"></script>
+      <script src="../../../../_static/doctools.js?v=9bcbadda"></script>
+      <script src="../../../../_static/sphinx_highlight.js?v=dc90522c"></script>
+      <script src="../../../../_static/tabs.js?v=3ee01567"></script>
+      <script src="../../../../_static/clipboard.min.js?v=a7894cd8"></script>
+      <script src="../../../../_static/copybutton.js?v=f281be69"></script>
+    <script src="../../../../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../../../../genindex.html" />
+    <link rel="search" title="Search" href="../../../../search.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="../../../../index.html" class="icon icon-home">
+            QDK/Chemistry
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../../../../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">User Documentation</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../../user/Quickstart.html">Quickstart</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../../user/comprehensive/index.html">In-Depth Guide</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">API Reference</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../../api/python_api.html">Python API</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../../api/cpp_api.html">C++ API</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Supporting Information</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../../glossary.html">Glossary</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../../references.html">References</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../../../../index.html">QDK/Chemistry</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../../../../index.html" class="icon icon-home" aria-label="Home"></a></li>
+          <li class="breadcrumb-item"><a href="../../../index.html">Module code</a></li>
+      <li class="breadcrumb-item active">qdk.chemistry.state_preparation.base</li>
+      <li class="wy-breadcrumbs-aside">
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <h1>Source code for qdk.chemistry.state_preparation.base</h1><div class="highlight"><pre>
+<span></span><span class="sd">&quot;&quot;&quot;Base class for state preparation in qdk.chemistry.</span>
+
+<span class="sd">This module provides classes that wrap different state preparation algorithms</span>
+<span class="sd">with a common interface. Each class can be initialized with a problem-specific</span>
+<span class="sd">wavefunction and other parameters, then used to create quantum circuits.</span>
+<span class="sd">&quot;&quot;&quot;</span>
+
+<span class="kn">import</span><span class="w"> </span><span class="nn">logging</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">abc</span><span class="w"> </span><span class="kn">import</span> <span class="n">ABC</span><span class="p">,</span> <span class="n">abstractmethod</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">enum</span><span class="w"> </span><span class="kn">import</span> <span class="n">StrEnum</span>
+
+<span class="kn">import</span><span class="w"> </span><span class="nn">numpy</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">np</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">qiskit</span><span class="w"> </span><span class="kn">import</span> <span class="n">QuantumCircuit</span>
+
+<span class="kn">from</span><span class="w"> </span><span class="nn">qdk.chemistry.data</span><span class="w"> </span><span class="kn">import</span> <span class="n">Wavefunction</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">qdk.chemistry.utils.bitstring</span><span class="w"> </span><span class="kn">import</span> <span class="n">separate_alpha_beta_to_binary_string</span>
+
+<span class="n">_LOGGER</span> <span class="o">=</span> <span class="n">logging</span><span class="o">.</span><span class="n">getLogger</span><span class="p">(</span><span class="vm">__name__</span><span class="p">)</span>
+
+
+<div class="viewcode-block" id="StatePrepAlgorithm">
+<a class="viewcode-back" href="../../../../api/api_autogen/qdk.chemistry.state_preparation.base.html#qdk.chemistry.state_preparation.base.StatePrepAlgorithm">[docs]</a>
+<span class="k">class</span><span class="w"> </span><span class="nc">StatePrepAlgorithm</span><span class="p">(</span><span class="n">StrEnum</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Enumeration for state preparation algorithm types.&quot;&quot;&quot;</span>
+
+    <span class="n">REGULAR_ISOMETRY</span> <span class="o">=</span> <span class="s2">&quot;regular_isometry&quot;</span>
+    <span class="n">SPARSE_ISOMETRY_GF2X</span> <span class="o">=</span> <span class="s2">&quot;sparse_isometry_gf2x&quot;</span></div>
+
+
+
+<div class="viewcode-block" id="StatePrep">
+<a class="viewcode-back" href="../../../../api/api_autogen/qdk.chemistry.state_preparation.base.html#qdk.chemistry.state_preparation.base.StatePrep">[docs]</a>
+<span class="k">class</span><span class="w"> </span><span class="nc">StatePrep</span><span class="p">(</span><span class="n">ABC</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Base class for state preparation algorithms.</span>
+
+<span class="sd">    This abstract class defines the common interface for all state preparation implementations.</span>
+<span class="sd">    Subclasses must implement the create_circuit_qasm method.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="n">algorithm</span><span class="p">:</span> <span class="n">StatePrepAlgorithm</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span>  <span class="c1"># To be overridden by subclasses</span>
+
+<div class="viewcode-block" id="StatePrep.__init__">
+<a class="viewcode-back" href="../../../../api/api_autogen/qdk.chemistry.state_preparation.base.html#qdk.chemistry.state_preparation.base.StatePrep.__init__">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">wavefunction</span><span class="p">:</span> <span class="n">Wavefunction</span><span class="p">,</span> <span class="n">max_dets</span><span class="p">:</span> <span class="nb">int</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span> <span class="n">amplitude_threshold</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="mf">0.0</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Initialize the state preparation class with a wavefunction instance.</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            wavefunction: Wavefunction to prepare state from</span>
+<span class="sd">            max_dets: Maximum number of determinants to include in the isometry (default: include all)</span>
+<span class="sd">            amplitude_threshold: Amplitude threshold on absolute value of coefficients for including</span>
+<span class="sd">            determinants (default: 0.0)</span>
+
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">wavefunction</span> <span class="o">=</span> <span class="n">wavefunction</span>
+        <span class="n">orbitals</span> <span class="o">=</span> <span class="n">wavefunction</span><span class="o">.</span><span class="n">get_orbitals</span><span class="p">()</span>
+        <span class="n">alpha_active_orbital_indices</span><span class="p">,</span> <span class="n">beta_active_orbital_indices</span> <span class="o">=</span> <span class="n">orbitals</span><span class="o">.</span><span class="n">get_active_space_indices</span><span class="p">()</span>
+        <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">alpha_active_orbital_indices</span><span class="p">)</span> <span class="o">!=</span> <span class="nb">len</span><span class="p">(</span><span class="n">beta_active_orbital_indices</span><span class="p">):</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
+                <span class="sa">f</span><span class="s2">&quot;Active space contains </span><span class="si">{</span><span class="nb">len</span><span class="p">(</span><span class="n">alpha_active_orbital_indices</span><span class="p">)</span><span class="si">}</span><span class="s2"> alpha orbitals and &quot;</span>
+                <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="nb">len</span><span class="p">(</span><span class="n">beta_active_orbital_indices</span><span class="p">)</span><span class="si">}</span><span class="s2"> beta orbitals. Asymmetric active spaces for alpha and beta &quot;</span>
+                <span class="s2">&quot;orbitals are not supported for state preparation.&quot;</span>
+            <span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">num_orbitals</span> <span class="o">=</span> <span class="nb">len</span><span class="p">(</span><span class="n">alpha_active_orbital_indices</span><span class="p">)</span>
+        <span class="n">bitstrings</span> <span class="o">=</span> <span class="p">[]</span>
+        <span class="n">coeffs</span> <span class="o">=</span> <span class="p">[]</span>
+        <span class="k">for</span> <span class="n">det</span> <span class="ow">in</span> <span class="n">wavefunction</span><span class="o">.</span><span class="n">get_active_determinants</span><span class="p">():</span>
+            <span class="n">coeffs</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">wavefunction</span><span class="o">.</span><span class="n">get_coefficient</span><span class="p">(</span><span class="n">det</span><span class="p">))</span>
+            <span class="n">alpha_str</span><span class="p">,</span> <span class="n">beta_str</span> <span class="o">=</span> <span class="n">separate_alpha_beta_to_binary_string</span><span class="p">(</span><span class="n">det</span><span class="o">.</span><span class="n">to_string</span><span class="p">()[:</span> <span class="bp">self</span><span class="o">.</span><span class="n">num_orbitals</span><span class="p">])</span>
+            <span class="n">bitstring</span> <span class="o">=</span> <span class="n">beta_str</span><span class="p">[::</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span> <span class="o">+</span> <span class="n">alpha_str</span><span class="p">[::</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span>  <span class="c1"># Convert to little-endian format to match qiskit convention</span>
+            <span class="n">bitstrings</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">bitstring</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_bitstrings</span> <span class="o">=</span> <span class="n">bitstrings</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_coefficients</span> <span class="o">=</span> <span class="n">coeffs</span>
+
+        <span class="k">if</span> <span class="n">max_dets</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="ow">and</span> <span class="n">max_dets</span> <span class="o">&gt;</span> <span class="nb">len</span><span class="p">(</span><span class="n">wavefunction</span><span class="o">.</span><span class="n">get_active_determinants</span><span class="p">()):</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
+                <span class="sa">f</span><span class="s2">&quot;max_dets (</span><span class="si">{</span><span class="n">max_dets</span><span class="si">}</span><span class="s2">) cannot be greater than the &quot;</span>
+                <span class="sa">f</span><span class="s2">&quot;number of determinants (</span><span class="si">{</span><span class="nb">len</span><span class="p">(</span><span class="n">wavefunction</span><span class="o">.</span><span class="n">get_active_determinants</span><span class="p">())</span><span class="si">}</span><span class="s2">)&quot;</span>
+            <span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">max_dets</span> <span class="o">=</span> <span class="n">max_dets</span> <span class="ow">or</span> <span class="nb">len</span><span class="p">(</span><span class="n">wavefunction</span><span class="o">.</span><span class="n">get_active_determinants</span><span class="p">())</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">amplitude_threshold</span> <span class="o">=</span> <span class="n">amplitude_threshold</span>
+        <span class="c1"># Cached filtered terms</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_is_filtered</span> <span class="o">=</span> <span class="kc">False</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_filtered_coeffs</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_filtered_bitstrings</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span></div>
+
+
+<div class="viewcode-block" id="StatePrep.from_algorithm">
+<a class="viewcode-back" href="../../../../api/api_autogen/qdk.chemistry.state_preparation.base.html#qdk.chemistry.state_preparation.base.StatePrep.from_algorithm">[docs]</a>
+    <span class="nd">@classmethod</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">from_algorithm</span><span class="p">(</span>
+        <span class="bp">cls</span><span class="p">,</span>
+        <span class="n">state_prep_algorithm</span><span class="p">:</span> <span class="n">StatePrepAlgorithm</span><span class="p">,</span>
+        <span class="n">wavefunction</span><span class="p">:</span> <span class="n">Wavefunction</span><span class="p">,</span>
+        <span class="n">max_dets</span><span class="p">:</span> <span class="nb">int</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+        <span class="n">amplitude_threshold</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="mf">0.0</span><span class="p">,</span>
+        <span class="o">**</span><span class="n">kwargs</span><span class="p">,</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="s2">&quot;StatePrep&quot;</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Factory method to create a StatePrep object from the specified algorithm.</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            state_prep_algorithm: Algorithm used for state preparation</span>
+<span class="sd">            wavefunction: Wavefunction to prepare state for</span>
+<span class="sd">            max_dets: Maximum number of determinants to include (default: include all)</span>
+<span class="sd">            amplitude_threshold: Amplitude threshold for including determinants</span>
+<span class="sd">                (default: 0.0)</span>
+<span class="sd">            **kwargs: Additional parameters to pass to the state preparation constructor.</span>
+
+<span class="sd">        Additional kwargs supported by specific algorithms:</span>
+
+<span class="sd">        * ``SparseIsometryGF2XStatePrep`` : accepts optional arguments controlling output saving for</span>
+<span class="sd">            GF2+X elimination summaries and intermediate matrices:</span>
+
+<span class="sd">            * ``save_outputs``: whether to save output files (default: False),</span>
+<span class="sd">            * ``summary_filename``: filename for GF2+X elimination summary</span>
+<span class="sd">                                    (default: &quot;sparse_isometry_gf2x_summary.txt&quot;),</span>
+<span class="sd">            * ``output_dir``: directory for output files (default: &quot;sparse_isometry_gf2x_output&quot;),</span>
+
+<span class="sd">        * ``RegularIsometryStatePrep``: does not accept any additional arguments.</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            An instance of a ``StatePrep`` subclass.</span>
+
+<span class="sd">        Raises:</span>
+<span class="sd">            ValueError: If the prep_algorithm is not implemented</span>
+
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">for</span> <span class="n">subclass</span> <span class="ow">in</span> <span class="bp">cls</span><span class="o">.</span><span class="n">__subclasses__</span><span class="p">():</span>
+            <span class="k">if</span> <span class="n">subclass</span><span class="o">.</span><span class="n">algorithm</span> <span class="o">==</span> <span class="n">state_prep_algorithm</span><span class="p">:</span>
+                <span class="k">return</span> <span class="n">subclass</span><span class="p">(</span>
+                    <span class="n">wavefunction</span><span class="o">=</span><span class="n">wavefunction</span><span class="p">,</span>
+                    <span class="n">max_dets</span><span class="o">=</span><span class="n">max_dets</span><span class="p">,</span>
+                    <span class="n">amplitude_threshold</span><span class="o">=</span><span class="n">amplitude_threshold</span><span class="p">,</span>
+                    <span class="o">**</span><span class="n">kwargs</span><span class="p">,</span>
+                <span class="p">)</span>
+
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;State preparation algorithm </span><span class="si">{</span><span class="n">state_prep_algorithm</span><span class="si">}</span><span class="s2"> not implemented&quot;</span><span class="p">)</span></div>
+
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">_filter_terms</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">renormalize</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">True</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">tuple</span><span class="p">[</span><span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">,</span> <span class="nb">list</span><span class="p">[</span><span class="nb">str</span><span class="p">]]:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Filter coefficients and bitstrings based on threshold and max_dets.</span>
+
+<span class="sd">        This is a common filtering method used by all state preparation algorithms</span>
+<span class="sd">        to reduce the number of determinants based on amplitude threshold and/or</span>
+<span class="sd">        maximum determinant count.</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            renormalize: Whether to renormalize the filtered coefficients (default: True)</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            Tuple of ``(filtered_coeffs, filtered_bitstrings)``</span>
+
+<span class="sd">        Raises:</span>
+<span class="sd">            ValueError: If no determinants remain after filtering or max_dets is invalid</span>
+
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="c1"># Create a list of (abs_coeff, coeff, bitstring) tuples for sorting by absolute value in descending order</span>
+        <span class="n">dets</span> <span class="o">=</span> <span class="p">[</span>
+            <span class="p">(</span><span class="nb">abs</span><span class="p">(</span><span class="n">coeff</span><span class="p">),</span> <span class="n">coeff</span><span class="p">,</span> <span class="n">bitstring</span><span class="p">)</span>
+            <span class="k">for</span> <span class="n">coeff</span><span class="p">,</span> <span class="n">bitstring</span> <span class="ow">in</span> <span class="nb">zip</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_coefficients</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">_bitstrings</span><span class="p">,</span> <span class="n">strict</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
+        <span class="p">]</span>
+        <span class="n">dets</span><span class="o">.</span><span class="n">sort</span><span class="p">(</span><span class="n">key</span><span class="o">=</span><span class="k">lambda</span> <span class="n">x</span><span class="p">:</span> <span class="n">x</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span> <span class="n">reverse</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+
+        <span class="c1"># Filter by amplitude threshold</span>
+        <span class="n">dets</span> <span class="o">=</span> <span class="p">[</span>
+            <span class="p">(</span><span class="n">abs_coeff</span><span class="p">,</span> <span class="n">coeff</span><span class="p">,</span> <span class="n">bitstring</span><span class="p">)</span>
+            <span class="k">for</span> <span class="n">abs_coeff</span><span class="p">,</span> <span class="n">coeff</span><span class="p">,</span> <span class="n">bitstring</span> <span class="ow">in</span> <span class="n">dets</span>
+            <span class="k">if</span> <span class="n">abs_coeff</span> <span class="o">&gt;=</span> <span class="bp">self</span><span class="o">.</span><span class="n">amplitude_threshold</span>
+        <span class="p">]</span>
+
+        <span class="c1"># Apply max_dets limit</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">max_dets</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="k">if</span> <span class="ow">not</span> <span class="nb">isinstance</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">max_dets</span><span class="p">,</span> <span class="nb">int</span><span class="p">)</span> <span class="ow">or</span> <span class="bp">self</span><span class="o">.</span><span class="n">max_dets</span> <span class="o">&lt;=</span> <span class="mi">0</span><span class="p">:</span>
+                <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;max_dets must be a positive integer or None&quot;</span><span class="p">)</span>
+            <span class="n">original_count</span> <span class="o">=</span> <span class="nb">len</span><span class="p">(</span><span class="n">dets</span><span class="p">)</span>
+            <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">dets</span><span class="p">)</span> <span class="o">&gt;</span> <span class="bp">self</span><span class="o">.</span><span class="n">max_dets</span><span class="p">:</span>
+                <span class="n">dets</span> <span class="o">=</span> <span class="n">dets</span><span class="p">[:</span> <span class="bp">self</span><span class="o">.</span><span class="n">max_dets</span><span class="p">]</span>
+                <span class="n">_LOGGER</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Limiting determinants from </span><span class="si">{</span><span class="n">original_count</span><span class="si">}</span><span class="s2"> to </span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">max_dets</span><span class="si">}</span><span class="s2"> (max_dets applied)&quot;</span><span class="p">)</span>
+
+        <span class="c1"># Check if any determinants remain</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">dets</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;No determinants remain after filtering&quot;</span><span class="p">)</span>
+
+        <span class="c1"># Extract coefficients and bitstrings</span>
+        <span class="n">_</span><span class="p">,</span> <span class="n">filtered_coeffs</span><span class="p">,</span> <span class="n">filtered_bitstrings</span> <span class="o">=</span> <span class="nb">zip</span><span class="p">(</span><span class="o">*</span><span class="n">dets</span><span class="p">,</span> <span class="n">strict</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
+
+        <span class="c1"># Convert to numpy array for coefficients</span>
+        <span class="n">filtered_coeffs</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">(</span><span class="n">filtered_coeffs</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="nb">complex</span><span class="p">)</span>
+
+        <span class="c1"># Renormalize if requested</span>
+        <span class="k">if</span> <span class="n">renormalize</span><span class="p">:</span>
+            <span class="n">norm</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">linalg</span><span class="o">.</span><span class="n">norm</span><span class="p">(</span><span class="n">filtered_coeffs</span><span class="p">)</span>
+            <span class="k">if</span> <span class="n">norm</span> <span class="o">&gt;</span> <span class="mi">0</span><span class="p">:</span>
+                <span class="n">filtered_coeffs</span> <span class="o">/=</span> <span class="n">norm</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">_filtered_coeffs</span> <span class="o">=</span> <span class="n">filtered_coeffs</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_filtered_bitstrings</span> <span class="o">=</span> <span class="nb">list</span><span class="p">(</span><span class="n">filtered_bitstrings</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_is_filtered</span> <span class="o">=</span> <span class="kc">True</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_filtered_coeffs</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">_filtered_bitstrings</span>
+
+<div class="viewcode-block" id="StatePrep.create_circuit_qasm">
+<a class="viewcode-back" href="../../../../api/api_autogen/qdk.chemistry.state_preparation.base.html#qdk.chemistry.state_preparation.base.StatePrep.create_circuit_qasm">[docs]</a>
+    <span class="nd">@abstractmethod</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">create_circuit_qasm</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Create a quantum circuit that implements the state preparation.</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            A quantum circuit in QASM string format.</span>
+
+<span class="sd">        &quot;&quot;&quot;</span></div>
+</div>
+
+
+
+<div class="viewcode-block" id="prepare_single_reference_state">
+<a class="viewcode-back" href="../../../../api/api_autogen/qdk.chemistry.state_preparation.base.html#qdk.chemistry.state_preparation.base.prepare_single_reference_state">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">prepare_single_reference_state</span><span class="p">(</span><span class="n">bitstring</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">QuantumCircuit</span><span class="p">:</span>
+<span class="w">    </span><span class="sa">r</span><span class="sd">&quot;&quot;&quot;Prepare a single reference state on a quantum circuit based on a bitstring.</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">        bitstring: Binary string representing the occupation of qubits.</span>
+<span class="sd">                  &#39;1&#39; means apply X gate, &#39;0&#39; means leave in |0⟩ state.</span>
+
+<span class="sd">    Returns:</span>
+<span class="sd">        ``QuantumCircuit`` with the prepared single reference state</span>
+
+<span class="sd">    Example:</span>
+<span class="sd">        bitstring = &quot;1010&quot; creates a circuit with X gates on qubits 1 and 3:</span>
+
+<span class="sd">        * :math:`\left| 0 \right\rangle \rightarrow I \rightarrow \left| 0 \right\rangle`</span>
+<span class="sd">          (qubit 0, corresponds to rightmost bit &#39;0&#39;)</span>
+<span class="sd">        * :math:`\left| 0 \right\rangle \rightarrow X \rightarrow \left| 1 \right\rangle`</span>
+<span class="sd">          (qubit 1, corresponds to bit &#39;1&#39;)</span>
+<span class="sd">        * :math:`\left| 0 \right\rangle \rightarrow I \rightarrow \left| 0 \right\rangle`</span>
+<span class="sd">          (qubit 2, corresponds to bit &#39;0&#39;)</span>
+<span class="sd">        * :math:`\left| 0 \right\rangle \rightarrow X \rightarrow \left| 1 \right\rangle`</span>
+<span class="sd">          (qubit 3, corresponds to leftmost bit &#39;1&#39;)</span>
+
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="c1"># Input validation</span>
+    <span class="k">if</span> <span class="ow">not</span> <span class="n">bitstring</span><span class="p">:</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;Bitstring cannot be empty&quot;</span><span class="p">)</span>
+
+    <span class="k">if</span> <span class="ow">not</span> <span class="nb">all</span><span class="p">(</span><span class="n">bit</span> <span class="ow">in</span> <span class="s2">&quot;01&quot;</span> <span class="k">for</span> <span class="n">bit</span> <span class="ow">in</span> <span class="n">bitstring</span><span class="p">):</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;Bitstring must contain only &#39;0&#39; and &#39;1&#39; characters&quot;</span><span class="p">)</span>
+
+    <span class="n">num_qubits</span> <span class="o">=</span> <span class="nb">len</span><span class="p">(</span><span class="n">bitstring</span><span class="p">)</span>
+    <span class="n">circuit</span> <span class="o">=</span> <span class="n">QuantumCircuit</span><span class="p">(</span><span class="n">num_qubits</span><span class="p">,</span> <span class="n">name</span><span class="o">=</span><span class="sa">f</span><span class="s2">&quot;SingleRef_</span><span class="si">{</span><span class="n">bitstring</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+
+    <span class="c1"># Apply X gates for positions with &#39;1&#39;</span>
+    <span class="c1"># Note: bitstring is in little-endian format (rightmost bit = qubit 0)</span>
+    <span class="k">for</span> <span class="n">i</span><span class="p">,</span> <span class="n">bit</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="nb">reversed</span><span class="p">(</span><span class="n">bitstring</span><span class="p">)):</span>
+        <span class="k">if</span> <span class="n">bit</span> <span class="o">==</span> <span class="s2">&quot;1&quot;</span><span class="p">:</span>
+            <span class="n">circuit</span><span class="o">.</span><span class="n">x</span><span class="p">(</span><span class="n">i</span><span class="p">)</span>
+
+    <span class="k">return</span> <span class="n">circuit</span></div>
+
+</pre></div>
+
+           </div>
+          </div>
+          <footer>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright Copyright (c) Microsoft Corporation. All rights reserved. Licensed under the MIT License..</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

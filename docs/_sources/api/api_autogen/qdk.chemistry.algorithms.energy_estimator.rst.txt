@@ -1,0 +1,8 @@
+qdk.chemistry.algorithms.energy\_estimator module
+=================================================
+
+.. automodule:: qdk.chemistry.algorithms.energy_estimator
+   :members:
+   :private-members:
+   :show-inheritance:
+   :undoc-members:

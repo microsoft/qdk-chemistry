@@ -1,0 +1,8 @@
+qdk.chemistry.data.qubit\_hamiltonian module
+============================================
+
+.. automodule:: qdk.chemistry.data.qubit_hamiltonian
+   :members:
+   :private-members:
+   :show-inheritance:
+   :undoc-members:

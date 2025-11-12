@@ -1,0 +1,276 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../../">
+<head>
+  <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>qdk.chemistry.constants module &mdash; QDK/Chemistry 0.0.1 documentation</title>
+      <link rel="stylesheet" type="text/css" href="../../_static/pygments.css?v=b86133f3" />
+      <link rel="stylesheet" type="text/css" href="../../_static/css/theme.css?v=e59714d7" />
+      <link rel="stylesheet" type="text/css" href="../../_static/tabs.css?v=4c969af8" />
+      <link rel="stylesheet" type="text/css" href="../../_static/graphviz.css?v=4ae1632d" />
+      <link rel="stylesheet" type="text/css" href="../../_static/copybutton.css?v=76b2166b" />
+
+  
+      <script src="../../_static/jquery.js?v=5d32c60e"></script>
+      <script src="../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="../../_static/documentation_options.js?v=d45e8c67"></script>
+      <script src="../../_static/doctools.js?v=9bcbadda"></script>
+      <script src="../../_static/sphinx_highlight.js?v=dc90522c"></script>
+      <script src="../../_static/tabs.js?v=3ee01567"></script>
+      <script src="../../_static/clipboard.min.js?v=a7894cd8"></script>
+      <script src="../../_static/copybutton.js?v=f281be69"></script>
+    <script src="../../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../../genindex.html" />
+    <link rel="search" title="Search" href="../../search.html" />
+    <link rel="next" title="C++ API" href="../cpp_api.html" />
+    <link rel="prev" title="qdk.chemistry.utils.wavefunction module" href="qdk.chemistry.utils.wavefunction.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="../../index.html" class="icon icon-home">
+            QDK/Chemistry
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">User Documentation</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../user/Quickstart.html">Quickstart</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../user/comprehensive/index.html">In-Depth Guide</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">API Reference</span></p>
+<ul class="current">
+<li class="toctree-l1 current"><a class="reference internal" href="../python_api.html">Python API</a><ul class="current">
+<li class="toctree-l2"><a class="reference internal" href="../python_api.html#data-classes">Data Classes</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../python_api.html#algorithms">Algorithms</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../python_api.html#plugins">Plugins</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../python_api.html#utilities">Utilities</a></li>
+<li class="toctree-l2 current"><a class="reference internal" href="../python_api.html#constants">Constants</a><ul class="current">
+<li class="toctree-l3 current"><a class="current reference internal" href="#">qdk.chemistry.constants module</a><ul>
+<li class="toctree-l4"><a class="reference internal" href="#data-source">Data Source</a></li>
+<li class="toctree-l4"><a class="reference internal" href="#constants-documentation">Constants Documentation</a></li>
+<li class="toctree-l4"><a class="reference internal" href="#qdk.chemistry.constants.find_constant"><code class="docutils literal notranslate"><span class="pre">find_constant()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#qdk.chemistry.constants.get_constant_info"><code class="docutils literal notranslate"><span class="pre">get_constant_info()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#qdk.chemistry.constants.get_constants_info"><code class="docutils literal notranslate"><span class="pre">get_constants_info()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#qdk.chemistry.constants.list_constants"><code class="docutils literal notranslate"><span class="pre">list_constants()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#qdk.chemistry.constants.show_constant_details"><code class="docutils literal notranslate"><span class="pre">show_constant_details()</span></code></a></li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="../cpp_api.html">C++ API</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Supporting Information</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../glossary.html">Glossary</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../references.html">References</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../../index.html">QDK/Chemistry</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../../index.html" class="icon icon-home" aria-label="Home"></a></li>
+          <li class="breadcrumb-item"><a href="../python_api.html">Python API</a></li>
+      <li class="breadcrumb-item active">qdk.chemistry.constants module</li>
+      <li class="wy-breadcrumbs-aside">
+            <a href="../../_sources/api/api_autogen/qdk.chemistry.constants.rst.txt" rel="nofollow"> View page source</a>
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <section id="module-qdk.chemistry.constants">
+<span id="qdk-chemistry-constants-module"></span><h1>qdk.chemistry.constants module<a class="headerlink" href="#module-qdk.chemistry.constants" title="Link to this heading"></a></h1>
+<p>QDK/Chemistry Physical Constants Module.</p>
+<p>This module provides access to physical constants from CODATA standards.
+The constants are sourced from the most recent CODATA recommendations
+(currently CODATA 2018), but the underlying C++ implementation supports
+multiple CODATA versions for compatibility and comparison purposes.</p>
+<p>All constants are provided in their original units as specified by CODATA,
+with conversion factors available for different unit systems.</p>
+<p>The constants include fundamental physical constants, particle masses,
+and energy conversion factors commonly used in computational chemistry
+and quantum mechanics.</p>
+<section id="data-source">
+<h2>Data Source<a class="headerlink" href="#data-source" title="Link to this heading"></a></h2>
+<p>CODATA recommended values of the fundamental physical constants
+Currently using: CODATA 2018 (default)
+Also available: CODATA 2014 (via C++ preprocessor directives)
+<a class="reference external" href="https://physics.nist.gov/cuu/Constants/">https://physics.nist.gov/cuu/Constants/</a></p>
+</section>
+<section id="constants-documentation">
+<h2>Constants Documentation<a class="headerlink" href="#constants-documentation" title="Link to this heading"></a></h2>
+<p>Each constant includes detailed documentation about its physical meaning,
+units, mathematical symbol, and provenance. The documentation automatically
+reflects the CODATA version currently in use. You can access this information
+using the <code class="docutils literal notranslate"><span class="pre">get_constant_info()</span></code> function or by examining the <code class="docutils literal notranslate"><span class="pre">__doc__</span></code> attribute
+of individual constants.</p>
+<p class="rubric">Examples</p>
+<div class="doctest highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="kn">from</span><span class="w"> </span><span class="nn">qdk.chemistry.constants</span><span class="w"> </span><span class="kn">import</span> <span class="n">ANGSTROM_TO_BOHR</span><span class="p">,</span> <span class="n">HARTREE_TO_EV</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">length_angstrom</span> <span class="o">=</span> <span class="mf">1.5</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">length_bohr</span> <span class="o">=</span> <span class="n">length_angstrom</span> <span class="o">*</span> <span class="n">ANGSTROM_TO_BOHR</span>
+</pre></div>
+</div>
+<div class="doctest highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="c1"># Access detailed documentation (reflects current CODATA version)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="kn">from</span><span class="w"> </span><span class="nn">qdk.chemistry.constants</span><span class="w"> </span><span class="kn">import</span> <span class="n">get_constant_info</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">info</span> <span class="o">=</span> <span class="n">get_constant_info</span><span class="p">(</span><span class="s1">&#39;bohr_to_angstrom&#39;</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">info</span><span class="o">.</span><span class="n">description</span><span class="si">}</span><span class="s2"> (</span><span class="si">{</span><span class="n">info</span><span class="o">.</span><span class="n">symbol</span><span class="si">}</span><span class="s2">): </span><span class="si">{</span><span class="n">info</span><span class="o">.</span><span class="n">value</span><span class="si">}</span><span class="s2"> </span><span class="si">{</span><span class="n">info</span><span class="o">.</span><span class="n">units</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Source: </span><span class="si">{</span><span class="n">info</span><span class="o">.</span><span class="n">source</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+</pre></div>
+</div>
+<div class="doctest highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="c1"># Or use the docstring</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">help</span><span class="p">(</span><span class="n">angstrom_to_bohr</span><span class="p">)</span>
+</pre></div>
+</div>
+<div class="doctest highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="c1"># List all available constants with their documentation</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="kn">from</span><span class="w"> </span><span class="nn">qdk.chemistry.constants</span><span class="w"> </span><span class="kn">import</span> <span class="n">list_constants</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">list_constants</span><span class="p">()</span>
+</pre></div>
+</div>
+<div class="admonition-todo admonition" id="id1">
+<p class="admonition-title">Todo</p>
+<ul class="simple">
+<li><p>TODO (NAB): convert <cite>print</cite> statements throughout this module to use logging.
+Decide whether the functions should return strings instead of printing/logging directly.
+<a class="reference external" href="https://dev.azure.com/ms-azurequantum/AzureQuantum/_workitems/edit/41417">https://dev.azure.com/ms-azurequantum/AzureQuantum/_workitems/edit/41417</a></p></li>
+<li><p>TODO (NAB):  add typing information for the functions in this module
+<a class="reference external" href="https://dev.azure.com/ms-azurequantum/AzureQuantum/_workitems/edit/41419">https://dev.azure.com/ms-azurequantum/AzureQuantum/_workitems/edit/41419</a></p></li>
+</ul>
+</div>
+</section>
+<dl class="py function">
+<dt class="sig sig-object py" id="qdk.chemistry.constants.find_constant">
+<span class="sig-name descname"><span class="pre">find_constant</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">search_term</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../../_modules/qdk/chemistry/constants.html#find_constant"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#qdk.chemistry.constants.find_constant" title="Link to this definition"></a></dt>
+<dd><p>Find constants matching a search term.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p><span class="sphinx_autodoc_typehints-type"><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#dict" title="(in Python v3.14)"><code class="xref py py-class docutils literal notranslate"><span class="pre">dict</span></code></a></span></p>
+</dd>
+<dt class="field-even">Parameters<span class="colon">:</span></dt>
+<dd class="field-even"><p><strong>search_term</strong> (<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)"><em>str</em></a>) – Term to search for in constant names or descriptions</p>
+</dd>
+<dt class="field-odd">Returns<span class="colon">:</span></dt>
+<dd class="field-odd"><p>Dictionary of matching constants and their info</p>
+</dd>
+</dl>
+<p class="rubric">Examples</p>
+<div class="doctest highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="n">find_constant</span><span class="p">(</span><span class="s2">&quot;bohr&quot;</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">find_constant</span><span class="p">(</span><span class="s2">&quot;mass&quot;</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">find_constant</span><span class="p">(</span><span class="s2">&quot;energy&quot;</span><span class="p">)</span>
+</pre></div>
+</div>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="qdk.chemistry.constants.get_constant_info">
+<span class="sig-name descname"><span class="pre">get_constant_info</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">name</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)"><span class="pre">str</span></a></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">qdk.chemistry._core.constants.ConstantInfo</span></span></span><a class="headerlink" href="#qdk.chemistry.constants.get_constant_info" title="Link to this definition"></a></dt>
+<dd><p>Get documentation information for a specific constant</p>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="qdk.chemistry.constants.get_constants_info">
+<span class="sig-name descname"><span class="pre">get_constants_info</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#dict" title="(in Python v3.14)"><span class="pre">dict</span></a><span class="p"><span class="pre">[</span></span><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)"><span class="pre">str</span></a><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">qdk.chemistry._core.constants.ConstantInfo</span><span class="p"><span class="pre">]</span></span></span></span><a class="headerlink" href="#qdk.chemistry.constants.get_constants_info" title="Link to this definition"></a></dt>
+<dd><p>Get documentation information for all available constants</p>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="qdk.chemistry.constants.list_constants">
+<span class="sig-name descname"><span class="pre">list_constants</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">show_values</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">True</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">show_units</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">True</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../../_modules/qdk/chemistry/constants.html#list_constants"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#qdk.chemistry.constants.list_constants" title="Link to this definition"></a></dt>
+<dd><p>List all available constants with their documentation.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>show_values</strong> (<a class="reference external" href="https://docs.python.org/3/library/functions.html#bool" title="(in Python v3.14)"><em>bool</em></a>) – Whether to display the numerical values, default True</p></li>
+<li><p><strong>show_units</strong> (<a class="reference external" href="https://docs.python.org/3/library/functions.html#bool" title="(in Python v3.14)"><em>bool</em></a>) – Whether to display the units, default True</p></li>
+</ul>
+</dd>
+</dl>
+<p class="rubric">Examples</p>
+<div class="doctest highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="n">list_constants</span><span class="p">()</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">list_constants</span><span class="p">(</span><span class="n">show_values</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>  <span class="c1"># Just names and descriptions</span>
+</pre></div>
+</div>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="qdk.chemistry.constants.show_constant_details">
+<span class="sig-name descname"><span class="pre">show_constant_details</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">name</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../../_modules/qdk/chemistry/constants.html#show_constant_details"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#qdk.chemistry.constants.show_constant_details" title="Link to this definition"></a></dt>
+<dd><p>Print detailed information about a specific constant.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p><span class="sphinx_autodoc_typehints-type"><a class="reference external" href="https://docs.python.org/3/library/constants.html#None" title="(in Python v3.14)"><code class="xref py py-obj docutils literal notranslate"><span class="pre">None</span></code></a></span></p>
+</dd>
+<dt class="field-even">Parameters<span class="colon">:</span></dt>
+<dd class="field-even"><p><strong>name</strong> (<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)"><em>str</em></a>) – Name of the constant</p>
+</dd>
+</dl>
+<p class="rubric">Examples</p>
+<div class="doctest highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="n">show_constant_details</span><span class="p">(</span><span class="s1">&#39;bohr_to_angstrom&#39;</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">show_constant_details</span><span class="p">(</span><span class="s1">&#39;fine_structure_constant&#39;</span><span class="p">)</span>
+</pre></div>
+</div>
+</dd></dl>
+
+</section>
+
+
+           </div>
+          </div>
+          <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
+        <a href="qdk.chemistry.utils.wavefunction.html" class="btn btn-neutral float-left" title="qdk.chemistry.utils.wavefunction module" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+        <a href="../cpp_api.html" class="btn btn-neutral float-right" title="C++ API" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright Copyright (c) Microsoft Corporation. All rights reserved. Licensed under the MIT License..</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

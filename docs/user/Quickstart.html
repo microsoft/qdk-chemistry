@@ -1,0 +1,652 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../">
+<head>
+  <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Quickstart &mdash; QDK/Chemistry 0.0.1 documentation</title>
+      <link rel="stylesheet" type="text/css" href="../_static/pygments.css?v=b86133f3" />
+      <link rel="stylesheet" type="text/css" href="../_static/css/theme.css?v=e59714d7" />
+      <link rel="stylesheet" type="text/css" href="../_static/tabs.css?v=4c969af8" />
+      <link rel="stylesheet" type="text/css" href="../_static/graphviz.css?v=4ae1632d" />
+      <link rel="stylesheet" type="text/css" href="../_static/copybutton.css?v=76b2166b" />
+
+  
+      <script src="../_static/jquery.js?v=5d32c60e"></script>
+      <script src="../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="../_static/documentation_options.js?v=d45e8c67"></script>
+      <script src="../_static/doctools.js?v=9bcbadda"></script>
+      <script src="../_static/sphinx_highlight.js?v=dc90522c"></script>
+      <script src="../_static/tabs.js?v=3ee01567"></script>
+      <script src="../_static/clipboard.min.js?v=a7894cd8"></script>
+      <script src="../_static/copybutton.js?v=f281be69"></script>
+    <script src="../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" />
+    <link rel="next" title="In-Depth Guide" href="comprehensive/index.html" />
+    <link rel="prev" title="QDK/Chemistry: A Quantum Applications Toolkit" href="../index.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="../index.html" class="icon icon-home">
+            QDK/Chemistry
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">User Documentation</span></p>
+<ul class="current">
+<li class="toctree-l1 current"><a class="current reference internal" href="#">Quickstart</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="#the-qdk-chemistry-workflow">The QDK/Chemistry Workflow</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#creating-a-structure-object">Creating a <code class="docutils literal notranslate"><span class="pre">Structure</span></code> Object</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#running-an-scf-calculation">Running an SCF Calculation</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#manipulate-the-orbitals">Manipulate the <code class="docutils literal notranslate"><span class="pre">Orbitals</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="#select-the-active-space">Select the Active Space</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#calculate-the-hamiltonian">Calculate the Hamiltonian</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#compute-a-cas-energy">Compute a CAS Energy</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="comprehensive/index.html">In-Depth Guide</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">API Reference</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../api/python_api.html">Python API</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../api/cpp_api.html">C++ API</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Supporting Information</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../glossary.html">Glossary</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../references.html">References</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../index.html">QDK/Chemistry</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../index.html" class="icon icon-home" aria-label="Home"></a></li>
+      <li class="breadcrumb-item active">Quickstart</li>
+      <li class="wy-breadcrumbs-aside">
+            <a href="../_sources/user/Quickstart.rst.txt" rel="nofollow"> View page source</a>
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <section id="quickstart">
+<h1>Quickstart<a class="headerlink" href="#quickstart" title="Link to this heading"></a></h1>
+<p>This document is intended to provide a brief introduction to the QDK/Chemistry library in a variety of common use cases.
+The focus is primarily on high-level concepts and common coding patterns.
+A more comprehensive documentation can be found at <a class="reference internal" href="comprehensive/index.html"><span class="doc">In-Depth Guide</span></a>.</p>
+<section id="the-qdk-chemistry-workflow">
+<h2>The QDK/Chemistry Workflow<a class="headerlink" href="#the-qdk-chemistry-workflow" title="Link to this heading"></a></h2>
+<div class="graphviz"><img src="../_images/graphviz-00f3944a28071a8b497022f05cd7bff5a32ea8ef.png" alt="digraph QuantumWorkflow {
+    // Graph settings for vertical layout
+    rankdir=TB;
+    ranksep=1.8;
+    nodesep=1.0;
+    newrank=true;
+    compound=true;
+    overlap=false;
+    sep=&quot;+0.5&quot;;
+    bgcolor=&quot;#FAFAFA&quot;;
+
+    // Default node style
+    node [shape=box, style=&quot;rounded,filled&quot;, fontname=&quot;Arial&quot;, width=3.2, height=1.0, fixedsize=true, margin=0.2];
+
+    // Input subgraph
+    subgraph cluster_0 {
+        label=&quot;Input chemical structure&quot;;
+        style=&quot;filled,rounded&quot;;
+        fillcolor=&quot;#E8EAF6&quot;;
+        color=&quot;#5C6BC0&quot;;
+        penwidth=2.5;
+        fontsize=14;
+        fontname=&quot;Arial Bold&quot;;
+        fontcolor=&quot;#3949AB&quot;;
+
+        Start [label=&lt;&lt;B&gt;Input Structure&lt;/B&gt;&lt;BR/&gt;&lt;BR/&gt;&lt;FONT POINT-SIZE=&quot;10&quot; COLOR=&quot;#666666&quot;&gt;2D, 3D (xyz format)&lt;/FONT&gt;&gt;, fillcolor=&quot;#FFFFFF&quot;, color=&quot;#5C6BC0&quot;, penwidth=2.5, group=g1];
+    }
+
+    // Classical Data Preparation subgraph
+    subgraph cluster_1 {
+        label=&quot;Classical Data Preparation&quot;;
+        style=&quot;filled,rounded&quot;;
+        fillcolor=&quot;#E3F2FD&quot;;
+        color=&quot;#42A5F5&quot;;
+        penwidth=2.5;
+        fontsize=14;
+        fontname=&quot;Arial Bold&quot;;
+        fontcolor=&quot;#1976D2&quot;;
+        rank=same;
+
+        GeomOpt [label=&lt;&lt;B&gt;Geometry Optimization&lt;/B&gt;&lt;BR/&gt;&lt;BR/&gt;&lt;FONT POINT-SIZE=&quot;10&quot; COLOR=&quot;#E3F2FD&quot;&gt;Energy optimized input structure&lt;/FONT&gt;&gt;, fillcolor=&quot;#1976D2&quot;, fontcolor=white, color=&quot;#0D47A1&quot;, penwidth=2.5, group=g1];
+        SCF [label=&lt;&lt;B&gt;SCF&lt;/B&gt;&lt;BR/&gt;&lt;BR/&gt;&lt;FONT POINT-SIZE=&quot;10&quot; COLOR=&quot;#E3F2FD&quot;&gt;Initial guess for the electronic structure&lt;/FONT&gt;&gt;, fillcolor=&quot;#1976D2&quot;, fontcolor=white, color=&quot;#0D47A1&quot;, penwidth=2.5];
+        ActiveSpace [label=&lt;&lt;B&gt;Active Space Engineering&lt;/B&gt;&lt;BR/&gt;&lt;BR/&gt;&lt;FONT POINT-SIZE=&quot;10&quot; COLOR=&quot;#E3F2FD&quot;&gt;Select orbitals and electrons&lt;/FONT&gt;&gt;, fillcolor=&quot;#1976D2&quot;, fontcolor=white, color=&quot;#0D47A1&quot;, penwidth=2.5];
+        Hamilton [label=&lt;&lt;B&gt;Hamiltonian Formation&lt;/B&gt;&lt;BR/&gt;&lt;BR/&gt;&lt;FONT POINT-SIZE=&quot;10&quot; COLOR=&quot;#E3F2FD&quot;&gt;Chemistry to math&lt;/FONT&gt;&gt;, fillcolor=&quot;#1976D2&quot;, fontcolor=white, color=&quot;#0D47A1&quot;, penwidth=2.5];
+        ApproxCI [label=&lt;&lt;B&gt;Approximate CI Wavefunction&lt;/B&gt;&lt;BR/&gt;&lt;BR/&gt;&lt;FONT POINT-SIZE=&quot;10&quot; COLOR=&quot;#E3F2FD&quot;&gt;Description of the electronic configuration&lt;/FONT&gt;&gt;, fillcolor=&quot;#1976D2&quot;, fontcolor=white, color=&quot;#0D47A1&quot;, penwidth=2.5];
+
+        GeomOpt -&gt; SCF -&gt; ActiveSpace -&gt; Hamilton -&gt; ApproxCI;
+    }
+
+    // Building Quantum Circuit subgraph
+    subgraph cluster_2 {
+        label=&quot;Building Quantum Circuit&quot;;
+        style=&quot;filled,rounded&quot;;
+        fillcolor=&quot;#E0F2F1&quot;;
+        color=&quot;#26A69A&quot;;
+        penwidth=2.5;
+        fontsize=14;
+        fontname=&quot;Arial Bold&quot;;
+        fontcolor=&quot;#00796B&quot;;
+        rank=same;
+
+        HamEncode [label=&lt;&lt;B&gt;Hamiltonian Encoding&lt;/B&gt;&lt;BR/&gt;&lt;BR/&gt;&lt;FONT POINT-SIZE=&quot;10&quot; COLOR=&quot;#E0F2F1&quot;&gt;Map fermionic operators to qubit operators&lt;/FONT&gt;&gt;, fillcolor=&quot;#00796B&quot;, fontcolor=white, color=&quot;#004D40&quot;, penwidth=2.5, group=g1];
+        PauliOpt [label=&lt;&lt;B&gt;Pauli Operators Optimization&lt;/B&gt;&lt;BR/&gt;&lt;BR/&gt;&lt;FONT POINT-SIZE=&quot;10&quot; COLOR=&quot;#E0F2F1&quot;&gt;Reduce measurement circuit complexity&lt;/FONT&gt;&gt;, fillcolor=&quot;#00796B&quot;, fontcolor=white, color=&quot;#004D40&quot;, penwidth=2.5];
+        StatePrep [label=&lt;&lt;B&gt;State Prep&lt;/B&gt;&lt;BR/&gt;&lt;BR/&gt;&lt;FONT POINT-SIZE=&quot;10&quot; COLOR=&quot;#E0F2F1&quot;&gt;Loading of chemically relevant states to QC&lt;/FONT&gt;&gt;, fillcolor=&quot;#00796B&quot;, fontcolor=white, color=&quot;#004D40&quot;, penwidth=2.5];
+        Transpilation [label=&lt;&lt;B&gt;Transpilation&lt;/B&gt;&lt;BR/&gt;&lt;BR/&gt;&lt;FONT POINT-SIZE=&quot;10&quot; COLOR=&quot;#E0F2F1&quot;&gt;Convert abstract circuit into native gates&lt;/FONT&gt;&gt;, fillcolor=&quot;#00796B&quot;, fontcolor=white, color=&quot;#004D40&quot;, penwidth=2.5];
+
+        HamEncode -&gt; PauliOpt -&gt; StatePrep -&gt; Transpilation;
+    }
+
+    // Simulation and Execution subgraph
+    subgraph cluster_3 {
+        label=&quot;Simulation and Execution&quot;;
+        style=&quot;filled,rounded&quot;;
+        fillcolor=&quot;#F3E5F5&quot;;
+        color=&quot;#AB47BC&quot;;
+        penwidth=2.5;
+        fontsize=14;
+        fontname=&quot;Arial Bold&quot;;
+        fontcolor=&quot;#7B1FA2&quot;;
+        rank=same;
+
+        Debug [label=&lt;&lt;B&gt;Debugging in QDK&lt;/B&gt;&lt;BR/&gt;&lt;BR/&gt;&lt;FONT POINT-SIZE=&quot;10&quot; COLOR=&quot;#F3E5F5&quot;&gt;Test and validate circuit logic&lt;/FONT&gt;&gt;, fillcolor=&quot;#7B1FA2&quot;, fontcolor=white, color=&quot;#4A148C&quot;, penwidth=2.5, group=g1];
+        Simulator [label=&lt;&lt;B&gt;Simulator in QDK&lt;/B&gt;&lt;BR/&gt;&lt;BR/&gt;&lt;FONT POINT-SIZE=&quot;10&quot; COLOR=&quot;#F3E5F5&quot;&gt;With noise models&lt;/FONT&gt;&gt;, fillcolor=&quot;#7B1FA2&quot;, fontcolor=white, color=&quot;#4A148C&quot;, penwidth=2.5];
+        Execute [label=&lt;&lt;B&gt;Execution on Quantum Hardware&lt;/B&gt;&lt;BR/&gt;&lt;BR/&gt;&lt;FONT POINT-SIZE=&quot;10&quot; COLOR=&quot;#F3E5F5&quot;&gt;Run on physical quantum processors&lt;/FONT&gt;&gt;, fillcolor=&quot;#7B1FA2&quot;, fontcolor=white, color=&quot;#4A148C&quot;, penwidth=2.5];
+
+        Debug -&gt; Simulator -&gt; Execute;
+    }
+
+    // Workflow connections between subgraphs
+    Start:s -&gt; GeomOpt:n [color=&quot;#1976D2&quot;, penwidth=2.5, weight=0, arrowsize=1.2];
+    ApproxCI:s -&gt; HamEncode:n [color=&quot;#00796B&quot;, penwidth=2.5, weight=0, arrowsize=1.2];
+    Transpilation:s -&gt; Debug:n [color=&quot;#7B1FA2&quot;, penwidth=2.5, weight=0, arrowsize=1.2];
+}" class="graphviz" /></div>
+<div class="admonition-todo admonition" id="id1">
+<p class="admonition-title">Todo</p>
+<dl class="simple">
+<dt>TODO (NAB):  finish documentation</dt><dd><p><a class="reference external" href="https://dev.azure.com/ms-azurequantum/AzureQuantum/_workitems/edit/41390">https://dev.azure.com/ms-azurequantum/AzureQuantum/_workitems/edit/41390</a></p>
+</dd>
+</dl>
+</div>
+</section>
+<section id="creating-a-structure-object">
+<h2>Creating a <code class="docutils literal notranslate"><span class="pre">Structure</span></code> Object<a class="headerlink" href="#creating-a-structure-object" title="Link to this heading"></a></h2>
+<p>The <code class="docutils literal notranslate"><span class="pre">Structure</span></code> class represents the state of a molecular structure, i.e. the coordinates, charge, and spin multiplicity representing a system of interest.</p>
+<div class="admonition-todo admonition" id="id2">
+<p class="admonition-title">Todo</p>
+<p>🔧 TODO: It seems that we actually <em>don’t</em> store charge and multiplicity here…</p>
+</div>
+<div class="admonition-todo admonition" id="id3">
+<p class="admonition-title">Todo</p>
+<p>TODO (NAB):  finish documentation
+<a class="reference external" href="https://dev.azure.com/ms-azurequantum/AzureQuantum/_workitems/edit/41390">https://dev.azure.com/ms-azurequantum/AzureQuantum/_workitems/edit/41390</a></p>
+</div>
+<p><code class="docutils literal notranslate"><span class="pre">Structure</span></code> objects can be constructed manually, or via deserialization from a file.
+QDK/Chemistry supports multiple serialization formats for <code class="docutils literal notranslate"><span class="pre">Structure</span></code> objects, including the standard <a class="reference external" href="https://en.wikipedia.org/wiki/XYZ_file_format">XYZ file format</a>, as well as QDK/Chemistry-specific JSON and HDF5 serialization schemes (see documentation).
+See below for language specific examples of creating and serializing <code class="docutils literal notranslate"><span class="pre">Structure</span></code> objects.</p>
+<div class="admonition-todo admonition" id="id4">
+<p class="admonition-title">Todo</p>
+<p><strong>TODO</strong> describe describe quirks for input units after Bohr PR</p>
+</div>
+<div class="admonition-todo admonition" id="id5">
+<p class="admonition-title">Todo</p>
+<p>TODO (NAB):  finish documentation
+<a class="reference external" href="https://dev.azure.com/ms-azurequantum/AzureQuantum/_workitems/edit/41390">https://dev.azure.com/ms-azurequantum/AzureQuantum/_workitems/edit/41390</a></p>
+</div>
+<div class="admonition-todo admonition" id="id6">
+<p class="admonition-title">Todo</p>
+<p>TODO (NAB):  check code after API changes
+<a class="reference external" href="https://dev.azure.com/ms-azurequantum/AzureQuantum/_workitems/edit/41366">https://dev.azure.com/ms-azurequantum/AzureQuantum/_workitems/edit/41366</a></p>
+</div>
+<div class="tab-set docutils container">
+<input checked="True" class="tab-input" id="tab-set--0-input--1" name="tab-set--0" type="radio"><label class="tab-label" for="tab-set--0-input--1">C++ API</label><div class="tab-content docutils container">
+<div class="highlight-cpp notranslate"><div class="highlight"><pre><span></span><span class="cp">#include</span><span class="w"> </span><span class="cpf">&lt;qdk/chemistry.hpp&gt;</span>
+
+<span class="k">using</span><span class="w"> </span><span class="k">namespace</span><span class="w"> </span><span class="nn">qdk</span><span class="o">::</span><span class="nn">chemistry</span><span class="o">::</span><span class="nn">data</span><span class="p">;</span>
+
+<span class="kt">int</span><span class="w"> </span><span class="nf">main</span><span class="p">()</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="c1">// Create the Structure manually</span>
+<span class="w">    </span><span class="n">Structure</span><span class="w"> </span><span class="n">structure</span><span class="p">;</span>
+<span class="w">    </span><span class="n">structure</span><span class="p">.</span><span class="n">add_atom</span><span class="p">(</span><span class="n">Eigen</span><span class="o">::</span><span class="n">Vector3d</span><span class="p">(</span><span class="mf">0.0</span><span class="p">,</span><span class="w"> </span><span class="mf">0.0</span><span class="p">,</span><span class="w"> </span><span class="mf">0.0</span><span class="p">),</span><span class="w"> </span><span class="s">&quot;H&quot;</span><span class="p">);</span>
+<span class="w">    </span><span class="n">structure</span><span class="p">.</span><span class="n">add_atom</span><span class="p">(</span><span class="n">Eigen</span><span class="o">::</span><span class="n">Vector3d</span><span class="p">(</span><span class="mf">0.0</span><span class="p">,</span><span class="w"> </span><span class="mf">0.0</span><span class="p">,</span><span class="w"> </span><span class="mf">1.0</span><span class="p">),</span><span class="w"> </span><span class="s">&quot;H&quot;</span><span class="p">);</span>
+
+<span class="w">    </span><span class="c1">// Read from an XYZ file</span>
+<span class="w">    </span><span class="k">auto</span><span class="w"> </span><span class="n">structure_from_xyz</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">Structure</span><span class="o">::</span><span class="n">from_xyz_file</span><span class="p">(</span><span class="s">&quot;h2.structure.xyz&quot;</span><span class="p">);</span><span class="w"> </span><span class="c1">// Required .structure.xyz suffix</span>
+
+<span class="w">    </span><span class="c1">// Deserialize from JSON file</span>
+<span class="w">    </span><span class="k">auto</span><span class="w"> </span><span class="n">structure_from_json_file</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">Structure</span><span class="o">::</span><span class="n">from_json_file</span><span class="p">(</span><span class="s">&quot;h2.structure.json&quot;</span><span class="p">);</span><span class="w"> </span><span class="c1">// Required .structure.json suffix</span>
+
+<span class="w">    </span><span class="c1">// Serialize to in-memory JSON object</span>
+<span class="w">    </span><span class="k">auto</span><span class="w"> </span><span class="n">json_data</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">structure</span><span class="p">.</span><span class="n">to_json</span><span class="p">();</span>
+
+<span class="w">    </span><span class="c1">// Deserialize from JSON object</span>
+<span class="w">    </span><span class="k">auto</span><span class="w"> </span><span class="n">structure_from_json</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">Structure</span><span class="o">::</span><span class="n">from_json</span><span class="p">(</span><span class="n">json_data</span><span class="p">);</span>
+
+<span class="w">    </span><span class="c1">// Serialize to JSON file</span>
+<span class="w">    </span><span class="n">structure</span><span class="p">.</span><span class="n">to_json_file</span><span class="p">(</span><span class="s">&quot;h2.new.structure.json&quot;</span><span class="p">);</span><span class="w"> </span><span class="c1">// Required .structure.json suffix</span>
+
+<span class="w">    </span><span class="k">return</span><span class="w"> </span><span class="mi">0</span><span class="p">;</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+</div>
+<input class="tab-input" id="tab-set--0-input--2" name="tab-set--0" type="radio"><label class="tab-label" for="tab-set--0-input--2">Python API</label><div class="tab-content docutils container">
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">from</span><span class="w"> </span><span class="nn">qdk.chemistry.data</span><span class="w"> </span><span class="kn">import</span> <span class="n">Structure</span>
+
+<span class="k">if</span> <span class="vm">__name__</span> <span class="o">==</span> <span class="s1">&#39;__main__&#39;</span><span class="p">:</span>
+    <span class="c1"># Create the Structure manually</span>
+    <span class="n">structure</span> <span class="o">=</span> <span class="n">Structure</span><span class="p">()</span>
+    <span class="n">structure</span><span class="o">.</span><span class="n">add_atom</span><span class="p">([</span><span class="mf">0.0</span><span class="p">,</span> <span class="mf">0.0</span><span class="p">,</span> <span class="mf">0.0</span><span class="p">],</span> <span class="s1">&#39;H&#39;</span><span class="p">)</span>
+    <span class="n">structure</span><span class="o">.</span><span class="n">add_atom</span><span class="p">([</span><span class="mf">0.0</span><span class="p">,</span> <span class="mf">0.0</span><span class="p">,</span> <span class="mf">1.0</span><span class="p">],</span> <span class="s1">&#39;H&#39;</span><span class="p">)</span>
+
+    <span class="c1"># Read from an XYZ file</span>
+    <span class="n">structure_from_xyz</span> <span class="o">=</span> <span class="n">Structure</span><span class="o">.</span><span class="n">from_xyz_file</span><span class="p">(</span><span class="s2">&quot;h2.structure.xyz&quot;</span><span class="p">)</span> <span class="c1"># Required .structure.xyz suffix</span>
+
+    <span class="c1"># Deserialize from JSON file</span>
+    <span class="n">structure_from_json_file</span> <span class="o">=</span> <span class="n">Structure</span><span class="o">.</span><span class="n">from_json_file</span><span class="p">(</span><span class="s2">&quot;h2.structure.json&quot;</span><span class="p">)</span> <span class="c1"># Requires .structure.json suffix</span>
+
+    <span class="c1"># Serialize to JSON object</span>
+    <span class="n">json_data</span> <span class="o">=</span> <span class="n">structure</span><span class="o">.</span><span class="n">to_json</span><span class="p">()</span>
+
+    <span class="c1"># Deserialize from JSON object</span>
+    <span class="n">structure_from_json</span> <span class="o">=</span> <span class="n">Structure</span><span class="o">.</span><span class="n">from_json</span><span class="p">(</span><span class="n">json_data</span><span class="p">)</span>
+
+    <span class="c1"># Serialize to JSON file</span>
+    <span class="n">structure</span><span class="o">.</span><span class="n">to_json_file</span><span class="p">(</span><span class="s2">&quot;h2.new.structure.json&quot;</span><span class="p">)</span> <span class="c1"># Requires .structure.json suffix</span>
+</pre></div>
+</div>
+</div>
+</div>
+</section>
+<section id="running-an-scf-calculation">
+<h2>Running an SCF Calculation<a class="headerlink" href="#running-an-scf-calculation" title="Link to this heading"></a></h2>
+<p>Once a <code class="docutils literal notranslate"><span class="pre">Structure</span></code> is created, an SCF calculation can be performed to produce an initial set of <code class="docutils literal notranslate"><span class="pre">Orbitals</span></code> as well as an SCF energy.
+QDK/Chemistry performs SCF calculations via instantiations of the <code class="docutils literal notranslate"><span class="pre">ScfSolver</span></code> algorithm.
+Instantiations of the <code class="docutils literal notranslate"><span class="pre">ScfSolver</span></code> algorithm (and all other <code class="docutils literal notranslate"><span class="pre">Algorithm</span></code> classes for that matter) are managed by a factory.
+See the <a class="reference internal" href="comprehensive/advanced/factory_pattern.html"><span class="doc">Factory Pattern in QDK/Chemistry</span></a> documentation for more information on how it is used in the QDK/Chemistry.
+The basis for the SCF calculation can be set via a <code class="docutils literal notranslate"><span class="pre">Settings</span></code> instance. See below for language-specific examples.</p>
+<div class="tab-set docutils container">
+<input checked="True" class="tab-input" id="tab-set--1-input--1" name="tab-set--1" type="radio"><label class="tab-label" for="tab-set--1-input--1">C++ API</label><div class="tab-content docutils container">
+<div class="highlight-cpp notranslate"><div class="highlight"><pre><span></span><span class="cp">#include</span><span class="w"> </span><span class="cpf">&lt;qdk/chemistry.hpp&gt;</span>
+
+<span class="k">using</span><span class="w"> </span><span class="k">namespace</span><span class="w"> </span><span class="nn">qdk</span><span class="o">::</span><span class="nn">chemistry</span><span class="o">::</span><span class="nn">data</span><span class="p">;</span>
+<span class="k">using</span><span class="w"> </span><span class="k">namespace</span><span class="w"> </span><span class="nn">qdk</span><span class="o">::</span><span class="nn">chemistry</span><span class="o">::</span><span class="nn">algorithms</span><span class="p">;</span>
+
+<span class="kt">int</span><span class="w"> </span><span class="nf">main</span><span class="p">()</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="c1">// Obtain a valid Structure object</span>
+<span class="w">    </span><span class="n">Structure</span><span class="w"> </span><span class="n">structure</span><span class="p">;</span>
+<span class="w">    </span><span class="cm">/* structure = ... */</span>
+
+<span class="w">    </span><span class="c1">// Create the default ScfSolver instance</span>
+<span class="w">    </span><span class="k">auto</span><span class="w"> </span><span class="n">scf_solver</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">ScfSolverFactory</span><span class="o">::</span><span class="n">create</span><span class="p">();</span>
+
+<span class="w">    </span><span class="c1">// Print all settings available and their current values</span>
+<span class="w">    </span><span class="n">scf_solver</span><span class="o">-&gt;</span><span class="n">settings</span><span class="p">().</span><span class="n">to_json</span><span class="p">().</span><span class="n">dump</span><span class="p">(</span><span class="mi">4</span><span class="p">);</span>
+
+<span class="w">    </span><span class="c1">// Set the basis set</span>
+<span class="w">    </span><span class="n">scf_solver</span><span class="o">-&gt;</span><span class="n">settings</span><span class="p">().</span><span class="n">set</span><span class="p">(</span><span class="s">&quot;basis_set&quot;</span><span class="p">,</span><span class="w"> </span><span class="s">&quot;def2-tzvpp&quot;</span><span class="p">);</span>
+
+<span class="w">    </span><span class="c1">// Run the SCF calculation</span>
+<span class="w">    </span><span class="k">auto</span><span class="w"> </span><span class="p">[</span><span class="n">E_scf</span><span class="p">,</span><span class="w"> </span><span class="n">scf_orbitals</span><span class="p">]</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">scf_solver</span><span class="o">-&gt;</span><span class="n">solve</span><span class="p">(</span><span class="n">structure</span><span class="p">);</span>
+
+<span class="w">    </span><span class="k">return</span><span class="w"> </span><span class="mi">0</span><span class="p">;</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+</div>
+<input class="tab-input" id="tab-set--1-input--2" name="tab-set--1" type="radio"><label class="tab-label" for="tab-set--1-input--2">Python API</label><div class="tab-content docutils container">
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">from</span><span class="w"> </span><span class="nn">qdk.chemistry.data</span><span class="w"> </span><span class="kn">import</span> <span class="n">Structure</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">qdk.chemistry.algorithms</span><span class="w"> </span><span class="kn">import</span> <span class="n">create_scf_solver</span>
+
+<span class="k">if</span> <span class="vm">__name__</span> <span class="o">==</span> <span class="s1">&#39;__main__&#39;</span><span class="p">:</span>
+    <span class="c1"># Create a valid Structure object</span>
+    <span class="n">structure</span> <span class="o">=</span> <span class="n">Structure</span><span class="p">()</span>
+    <span class="c1"># structure = ...</span>
+
+    <span class="c1"># Create the default ScfSolver instance</span>
+    <span class="n">scf_solver</span> <span class="o">=</span> <span class="n">create_scf_solver</span><span class="p">()</span>
+
+    <span class="c1"># Print all settings available and their current values</span>
+    <span class="nb">print</span><span class="p">(</span><span class="n">scf_solver</span><span class="o">.</span><span class="n">settings</span><span class="p">())</span>
+
+    <span class="c1"># Set the basis set</span>
+    <span class="n">scf_solver</span><span class="o">.</span><span class="n">settings</span><span class="p">()</span><span class="o">.</span><span class="n">set</span><span class="p">(</span><span class="s2">&quot;basis_set&quot;</span><span class="p">,</span> <span class="s2">&quot;def2-tzvpp&quot;</span><span class="p">)</span>
+
+    <span class="c1"># Run the SCF calculation</span>
+    <span class="n">E_scf</span><span class="p">,</span> <span class="n">scf_orbitals</span> <span class="o">=</span> <span class="n">scf_solver</span><span class="o">.</span><span class="n">solve</span><span class="p">(</span><span class="n">structure</span><span class="p">)</span>
+</pre></div>
+</div>
+</div>
+</div>
+</section>
+<section id="manipulate-the-orbitals">
+<h2>Manipulate the <code class="docutils literal notranslate"><span class="pre">Orbitals</span></code><a class="headerlink" href="#manipulate-the-orbitals" title="Link to this heading"></a></h2>
+<p>While SCF orbitals are useful for many applications, they are often not the optimal set for the selection of active spaces and other post-SCF calculations.
+QDK/Chemistry generally characterizes the notion of orbital manipulation as “localization”, even if the operation does not actually perform a spatial localization (e.g. natural orbitals).
+As such, orbital manipulation is handled by instantiations of the <code class="docutils literal notranslate"><span class="pre">Localizer</span></code> algorithm.
+See below for language specific examples of how to obtain MP2 natural orbitals.</p>
+<div class="tab-set docutils container">
+<input checked="True" class="tab-input" id="tab-set--2-input--1" name="tab-set--2" type="radio"><label class="tab-label" for="tab-set--2-input--1">C++ API</label><div class="tab-content docutils container">
+<div class="highlight-cpp notranslate"><div class="highlight"><pre><span></span><span class="cp">#include</span><span class="w"> </span><span class="cpf">&lt;qdk/chemistry.hpp&gt;</span>
+
+<span class="k">using</span><span class="w"> </span><span class="k">namespace</span><span class="w"> </span><span class="nn">qdk</span><span class="o">::</span><span class="nn">chemistry</span><span class="o">::</span><span class="nn">data</span><span class="p">;</span>
+<span class="k">using</span><span class="w"> </span><span class="k">namespace</span><span class="w"> </span><span class="nn">qdk</span><span class="o">::</span><span class="nn">chemistry</span><span class="o">::</span><span class="nn">algorithms</span><span class="p">;</span>
+
+<span class="kt">int</span><span class="w"> </span><span class="nf">main</span><span class="p">()</span><span class="w"> </span><span class="p">{</span>
+<span class="w">  </span><span class="c1">// Obtain a valid Orbitals instance</span>
+<span class="w">  </span><span class="n">Orbitals</span><span class="w"> </span><span class="n">orbitals</span><span class="p">;</span>
+<span class="w">  </span><span class="cm">/* orbitals = ... */</span>
+
+<span class="w">  </span><span class="c1">// Create an instance of the MP2 natural orbital localizer</span>
+<span class="w">  </span><span class="k">auto</span><span class="w"> </span><span class="n">localizer</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">LocalizerFactory</span><span class="o">::</span><span class="n">create</span><span class="p">(</span><span class="s">&quot;mp2_natural_orbitals&quot;</span><span class="p">);</span>
+
+<span class="w">  </span><span class="c1">// Configure electron counts in settings</span>
+<span class="w">  </span><span class="n">localizer</span><span class="o">-&gt;</span><span class="n">settings</span><span class="p">().</span><span class="n">set</span><span class="p">(</span><span class="s">&quot;n_alpha_electrons&quot;</span><span class="p">,</span><span class="w"> </span><span class="n">n_alpha</span><span class="p">);</span>
+<span class="w">  </span><span class="n">localizer</span><span class="o">-&gt;</span><span class="n">settings</span><span class="p">().</span><span class="n">set</span><span class="p">(</span><span class="s">&quot;n_beta_electrons&quot;</span><span class="p">,</span><span class="w"> </span><span class="n">n_beta</span><span class="p">);</span>
+
+<span class="w">   </span><span class="c1">// Create indices for orbitals to localize</span>
+<span class="w">   </span><span class="n">std</span><span class="o">::</span><span class="n">vector</span><span class="o">&lt;</span><span class="kt">size_t</span><span class="o">&gt;</span><span class="w"> </span><span class="n">loc_indices_a</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span><span class="mi">0</span><span class="p">,</span><span class="w"> </span><span class="mi">1</span><span class="p">,</span><span class="w"> </span><span class="mi">2</span><span class="p">,</span><span class="w"> </span><span class="mi">3</span><span class="p">};</span><span class="w"> </span><span class="c1">// Alpha orbital indices</span>
+<span class="w">   </span><span class="n">std</span><span class="o">::</span><span class="n">vector</span><span class="o">&lt;</span><span class="kt">size_t</span><span class="o">&gt;</span><span class="w"> </span><span class="n">loc_indices_b</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span><span class="mi">0</span><span class="p">,</span><span class="w"> </span><span class="mi">1</span><span class="p">,</span><span class="w"> </span><span class="mi">2</span><span class="p">,</span><span class="w"> </span><span class="mi">3</span><span class="p">};</span><span class="w"> </span><span class="c1">// Beta orbital indices</span>
+
+
+<span class="w">  </span><span class="c1">// Localize the input orbitals</span>
+<span class="w">  </span><span class="c1">// N.B. MP2 natural orbitals requires the input to be canonical</span>
+<span class="w">  </span><span class="k">auto</span><span class="w"> </span><span class="n">localized_orbitals</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">localizer</span><span class="o">-&gt;</span><span class="n">run</span><span class="p">(</span><span class="n">orbitals</span><span class="p">,</span><span class="w"> </span><span class="n">loc_indices_a</span><span class="p">,</span><span class="w"> </span><span class="n">loc_indices_b</span><span class="p">);</span>
+
+<span class="w">  </span><span class="k">return</span><span class="w"> </span><span class="mi">0</span><span class="p">;</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+</div>
+<input class="tab-input" id="tab-set--2-input--2" name="tab-set--2" type="radio"><label class="tab-label" for="tab-set--2-input--2">Python API</label><div class="tab-content docutils container">
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">from</span><span class="w"> </span><span class="nn">qdk.chemistry.data</span><span class="w"> </span><span class="kn">import</span> <span class="n">Orbitals</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">qdk.chemistry.algorithms</span><span class="w"> </span><span class="kn">import</span> <span class="n">create_localizer</span>
+
+<span class="k">if</span> <span class="vm">__name__</span> <span class="o">==</span> <span class="s2">&quot;__main__&quot;</span><span class="p">:</span>
+   <span class="c1"># Obtain a valid Orbitals instance</span>
+   <span class="n">orbitals</span> <span class="o">=</span> <span class="n">Orbitals</span><span class="p">()</span>
+   <span class="c1"># orbitals = ...</span>
+
+   <span class="c1"># Create an instance of the MP2 natural orbital localizer</span>
+   <span class="n">localizer</span> <span class="o">=</span> <span class="n">create</span><span class="p">(</span><span class="s2">&quot;localizer&quot;</span><span class="p">,</span> <span class="s2">&quot;mp2_natural_orbitals&quot;</span><span class="p">)</span>
+
+   <span class="c1"># Configure electron counts in settings</span>
+   <span class="n">localizer</span><span class="o">.</span><span class="n">settings</span><span class="p">()</span><span class="o">.</span><span class="n">set</span><span class="p">(</span><span class="s2">&quot;n_alpha_electrons&quot;</span><span class="p">,</span> <span class="n">n_alpha</span><span class="p">)</span>
+   <span class="n">localizer</span><span class="o">.</span><span class="n">settings</span><span class="p">()</span><span class="o">.</span><span class="n">set</span><span class="p">(</span><span class="s2">&quot;n_beta_electrons&quot;</span><span class="p">,</span> <span class="n">n_beta</span><span class="p">)</span>
+
+   <span class="c1"># Create indices for orbitals to localize</span>
+   <span class="n">loc_indices_a</span> <span class="o">=</span> <span class="p">[</span><span class="mi">0</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="mi">2</span><span class="p">,</span> <span class="mi">3</span><span class="p">]</span>  <span class="c1"># Alpha orbital indices</span>
+   <span class="n">loc_indices_b</span> <span class="o">=</span> <span class="p">[</span><span class="mi">0</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="mi">2</span><span class="p">,</span> <span class="mi">3</span><span class="p">]</span>  <span class="c1"># Beta orbital indices</span>
+
+   <span class="c1"># Localize the input orbitals</span>
+   <span class="c1"># N.B. MP2 natural orbitals requires the input to be canonical</span>
+   <span class="n">localized_orbitals</span> <span class="o">=</span> <span class="n">localizer</span><span class="o">.</span><span class="n">run</span><span class="p">(</span><span class="n">orbitals</span><span class="p">,</span> <span class="n">loc_indices_a</span><span class="p">,</span> <span class="n">loc_indices_b</span><span class="p">)</span>
+</pre></div>
+</div>
+</div>
+</div>
+</section>
+<section id="select-the-active-space">
+<h2>Select the Active Space<a class="headerlink" href="#select-the-active-space" title="Link to this heading"></a></h2>
+<p>QDK/Chemistry offers many methods for the selection of active-spaces to accurately treat the quantum many-body problem while avoiding the prohibitive computational scaling of full configuration interaction.
+See the <a class="reference internal" href="comprehensive/algorithms/active_space.html"><span class="doc">ActiveSpaceSelector</span></a> documentation for a list of supported methods, along with their associated <code class="docutils literal notranslate"><span class="pre">Settings</span></code>, which accompany the standard QDK/Chemistry distribution.
+The following are language specific examples of how to select a so-called “valence” active space containing only those orbitals surrounding the Fermi-level.</p>
+<div class="admonition-todo admonition" id="id7">
+<p class="admonition-title">Todo</p>
+<p>🔧 TODO: Expand this section to explain that active space selectors are also Orbital constructors (like localization, active space selectors),
+i.e., they take orbitals as input and return Orbitals (which carry an active space) as output.
+Add this relationship to the Localization section.</p>
+</div>
+<div class="admonition-todo admonition" id="id8">
+<p class="admonition-title">Todo</p>
+<p>TODO (NAB):  finish documentation
+<a class="reference external" href="https://dev.azure.com/ms-azurequantum/AzureQuantum/_workitems/edit/41390">https://dev.azure.com/ms-azurequantum/AzureQuantum/_workitems/edit/41390</a></p>
+</div>
+<div class="tab-set docutils container">
+<input checked="True" class="tab-input" id="tab-set--3-input--1" name="tab-set--3" type="radio"><label class="tab-label" for="tab-set--3-input--1">C++ API</label><div class="tab-content docutils container">
+<div class="highlight-cpp notranslate"><div class="highlight"><pre><span></span><span class="cp">#include</span><span class="w"> </span><span class="cpf">&lt;qdk/chemistry.hpp&gt;</span>
+
+<span class="k">using</span><span class="w"> </span><span class="k">namespace</span><span class="w"> </span><span class="nn">qdk</span><span class="o">::</span><span class="nn">chemistry</span><span class="o">::</span><span class="nn">data</span><span class="p">;</span>
+<span class="k">using</span><span class="w"> </span><span class="k">namespace</span><span class="w"> </span><span class="nn">qdk</span><span class="o">::</span><span class="nn">chemistry</span><span class="o">::</span><span class="nn">algorithms</span><span class="p">;</span>
+
+<span class="kt">int</span><span class="w"> </span><span class="nf">main</span><span class="p">()</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="c1">// Obtain a valid Orbitals instance</span>
+<span class="w">    </span><span class="n">Orbitals</span><span class="w"> </span><span class="n">orbitals</span><span class="p">;</span>
+<span class="w">    </span><span class="cm">/* orbitals = ... */</span>
+
+<span class="w">    </span><span class="c1">// Create an active space selector</span>
+<span class="w">    </span><span class="k">auto</span><span class="w"> </span><span class="n">active_space_selector</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">ActiveSpaceSelectorFactory</span><span class="o">::</span><span class="n">create</span><span class="p">(</span><span class="s">&quot;valence&quot;</span><span class="p">);</span>
+
+<span class="w">    </span><span class="c1">// Configure the active space selection parameters</span>
+<span class="w">    </span><span class="n">active_space_selector</span><span class="o">-&gt;</span><span class="n">settings</span><span class="p">().</span><span class="n">set</span><span class="p">(</span><span class="s">&quot;num_active_electrons&quot;</span><span class="p">,</span><span class="w"> </span><span class="mi">10</span><span class="p">);</span>
+<span class="w">    </span><span class="n">active_space_selector</span><span class="o">-&gt;</span><span class="n">settings</span><span class="p">().</span><span class="n">set</span><span class="p">(</span><span class="s">&quot;num_active_orbitals&quot;</span><span class="p">,</span><span class="w"> </span><span class="mi">10</span><span class="p">);</span>
+
+<span class="w">    </span><span class="c1">// Select the active space indices</span>
+<span class="w">    </span><span class="k">auto</span><span class="w"> </span><span class="n">active_space_indices</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">active_space_selector</span><span class="o">-&gt;</span><span class="n">run</span><span class="p">(</span><span class="n">orbitals</span><span class="p">);</span>
+
+<span class="w">    </span><span class="k">return</span><span class="w"> </span><span class="mi">0</span><span class="p">;</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+</div>
+<input class="tab-input" id="tab-set--3-input--2" name="tab-set--3" type="radio"><label class="tab-label" for="tab-set--3-input--2">Python API</label><div class="tab-content docutils container">
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">from</span><span class="w"> </span><span class="nn">qdk.chemistry.data</span><span class="w"> </span><span class="kn">import</span> <span class="n">Orbitals</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">qdk.chemistry.algorithms</span><span class="w"> </span><span class="kn">import</span> <span class="n">create_active_space_selector</span>
+
+<span class="k">if</span> <span class="vm">__name__</span> <span class="o">==</span> <span class="s2">&quot;__main__&quot;</span><span class="p">:</span>
+    <span class="c1"># Obtain a valid Orbitals instance</span>
+    <span class="n">orbitals</span> <span class="o">=</span> <span class="n">Orbitals</span><span class="p">()</span>
+    <span class="c1"># orbitals = ...</span>
+
+    <span class="c1"># Create an active space selector</span>
+    <span class="n">active_space_selector</span> <span class="o">=</span> <span class="n">create_active_space_selector</span><span class="p">(</span><span class="s2">&quot;valence&quot;</span><span class="p">)</span>
+
+    <span class="c1"># Configure the active space selection parameters</span>
+    <span class="n">active_space_selector</span><span class="o">.</span><span class="n">settings</span><span class="p">()</span><span class="o">.</span><span class="n">set</span><span class="p">(</span><span class="s2">&quot;num_active_electrons&quot;</span><span class="p">,</span> <span class="mi">10</span><span class="p">)</span>
+    <span class="n">active_space_selector</span><span class="o">.</span><span class="n">settings</span><span class="p">()</span><span class="o">.</span><span class="n">set</span><span class="p">(</span><span class="s2">&quot;num_active_orbitals&quot;</span><span class="p">,</span> <span class="mi">10</span><span class="p">)</span>
+
+    <span class="c1"># Select the active space indices</span>
+    <span class="n">active_space_indices</span> <span class="o">=</span> <span class="n">active_space_selector</span><span class="o">.</span><span class="n">run</span><span class="p">(</span><span class="n">orbitals</span><span class="p">)</span>
+</pre></div>
+</div>
+</div>
+</div>
+</section>
+<section id="calculate-the-hamiltonian">
+<h2>Calculate the Hamiltonian<a class="headerlink" href="#calculate-the-hamiltonian" title="Link to this heading"></a></h2>
+<p>Once an active space has been selected, the electronic Hamiltonian can be computed within that active space.
+QDK/Chemistry provides flexible Hamiltonian construction capabilities through the <code class="docutils literal notranslate"><span class="pre">HamiltonianConstructor</span></code> algorithm.
+The Hamiltonian constructor can generate the one- and two-electron integrals needed for subsequent quantum many-body calculations.
+See below for language specific examples.</p>
+<div class="tab-set docutils container">
+<input checked="True" class="tab-input" id="tab-set--4-input--1" name="tab-set--4" type="radio"><label class="tab-label" for="tab-set--4-input--1">C++ API</label><div class="tab-content docutils container">
+<div class="highlight-cpp notranslate"><div class="highlight"><pre><span></span><span class="cp">#include</span><span class="w"> </span><span class="cpf">&lt;qdk/chemistry.hpp&gt;</span>
+
+<span class="k">using</span><span class="w"> </span><span class="k">namespace</span><span class="w"> </span><span class="nn">qdk</span><span class="o">::</span><span class="nn">chemistry</span><span class="o">::</span><span class="nn">data</span><span class="p">;</span>
+<span class="k">using</span><span class="w"> </span><span class="k">namespace</span><span class="w"> </span><span class="nn">qdk</span><span class="o">::</span><span class="nn">chemistry</span><span class="o">::</span><span class="nn">algorithms</span><span class="p">;</span>
+
+<span class="kt">int</span><span class="w"> </span><span class="nf">main</span><span class="p">()</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="c1">// Obtain a valid Orbitals instance</span>
+<span class="w">    </span><span class="n">Orbitals</span><span class="w"> </span><span class="n">orbitals</span><span class="p">;</span>
+<span class="w">    </span><span class="cm">/* orbitals = ... */</span>
+
+<span class="w">    </span><span class="c1">// Create a Hamiltonian constructor</span>
+<span class="w">    </span><span class="k">auto</span><span class="w"> </span><span class="n">hamiltonian_constructor</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">HamiltonianConstructorFactory</span><span class="o">::</span><span class="n">create</span><span class="p">();</span>
+
+<span class="w">    </span><span class="c1">// Set the active orbitals (if doing active space calculation)</span>
+<span class="w">    </span><span class="n">std</span><span class="o">::</span><span class="n">vector</span><span class="o">&lt;</span><span class="kt">int</span><span class="o">&gt;</span><span class="w"> </span><span class="n">active_orbitals</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span><span class="mi">4</span><span class="p">,</span><span class="w"> </span><span class="mi">5</span><span class="p">,</span><span class="w"> </span><span class="mi">6</span><span class="p">,</span><span class="w"> </span><span class="mi">7</span><span class="p">};</span><span class="w"> </span><span class="c1">// Example indices</span>
+<span class="w">    </span><span class="n">hamiltonian_constructor</span><span class="o">-&gt;</span><span class="n">settings</span><span class="p">().</span><span class="n">set</span><span class="p">(</span><span class="s">&quot;active_orbitals&quot;</span><span class="p">,</span><span class="w"> </span><span class="n">active_orbitals</span><span class="p">);</span>
+
+<span class="w">    </span><span class="c1">// Construct the Hamiltonian</span>
+<span class="w">    </span><span class="k">auto</span><span class="w"> </span><span class="n">hamiltonian</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">hamiltonian_constructor</span><span class="o">-&gt;</span><span class="n">run</span><span class="p">(</span><span class="n">orbitals</span><span class="p">);</span>
+
+<span class="w">    </span><span class="c1">// Access one- and two-electron integrals</span>
+<span class="w">    </span><span class="k">auto</span><span class="w"> </span><span class="n">h1</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">hamiltonian</span><span class="p">.</span><span class="n">get_one_body_integrals</span><span class="p">();</span>
+<span class="w">    </span><span class="k">auto</span><span class="w"> </span><span class="n">h2</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">hamiltonian</span><span class="p">.</span><span class="n">get_two_body_integrals</span><span class="p">();</span>
+
+<span class="w">    </span><span class="k">return</span><span class="w"> </span><span class="mi">0</span><span class="p">;</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+</div>
+<input class="tab-input" id="tab-set--4-input--2" name="tab-set--4" type="radio"><label class="tab-label" for="tab-set--4-input--2">Python API</label><div class="tab-content docutils container">
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">from</span><span class="w"> </span><span class="nn">qdk.chemistry.data</span><span class="w"> </span><span class="kn">import</span> <span class="n">Orbitals</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">qdk.chemistry.algorithms</span><span class="w"> </span><span class="kn">import</span> <span class="n">create_hamiltonian_constructor</span>
+
+<span class="k">if</span> <span class="vm">__name__</span> <span class="o">==</span> <span class="s2">&quot;__main__&quot;</span><span class="p">:</span>
+    <span class="c1"># Obtain a valid Orbitals instance</span>
+    <span class="n">orbitals</span> <span class="o">=</span> <span class="n">Orbitals</span><span class="p">()</span>
+    <span class="c1"># orbitals = ...</span>
+
+    <span class="c1"># Create a Hamiltonian constructor</span>
+    <span class="n">hamiltonian_constructor</span> <span class="o">=</span> <span class="n">create_hamiltonian_constructor</span><span class="p">()</span>
+
+    <span class="c1"># Set the active orbitals (if doing active space calculation)</span>
+    <span class="n">active_orbitals</span> <span class="o">=</span> <span class="p">[</span><span class="mi">4</span><span class="p">,</span> <span class="mi">5</span><span class="p">,</span> <span class="mi">6</span><span class="p">,</span> <span class="mi">7</span><span class="p">]</span>  <span class="c1"># Example indices</span>
+    <span class="n">hamiltonian_constructor</span><span class="o">.</span><span class="n">settings</span><span class="p">()</span><span class="o">.</span><span class="n">set</span><span class="p">(</span><span class="s2">&quot;active_orbitals&quot;</span><span class="p">,</span> <span class="n">active_orbitals</span><span class="p">)</span>
+
+    <span class="c1"># Construct the Hamiltonian</span>
+    <span class="n">hamiltonian</span> <span class="o">=</span> <span class="n">hamiltonian_constructor</span><span class="o">.</span><span class="n">run</span><span class="p">(</span><span class="n">orbitals</span><span class="p">)</span>
+
+    <span class="c1"># Access one- and two-electron integrals</span>
+    <span class="n">h1</span> <span class="o">=</span> <span class="n">hamiltonian</span><span class="o">.</span><span class="n">get_one_body_integrals</span><span class="p">()</span>
+    <span class="n">h2</span> <span class="o">=</span> <span class="n">hamiltonian</span><span class="o">.</span><span class="n">get_two_body_integrals</span><span class="p">()</span>
+</pre></div>
+</div>
+</div>
+</div>
+</section>
+<section id="compute-a-cas-energy">
+<h2>Compute a CAS Energy<a class="headerlink" href="#compute-a-cas-energy" title="Link to this heading"></a></h2>
+<p>With the active space Hamiltonian constructed, quantum many-body calculations can be performed to obtain accurate electronic energies and wavefunctions.
+QDK/Chemistry supports various Multi Configuration (MC) methods including full Configuration Interaction (CI) and selected CI approaches.
+MC calculations are performed via instantiations of the <code class="docutils literal notranslate"><span class="pre">MCCalculator</span></code> algorithm.
+See below for language specific examples of performing a full CI calculation.</p>
+<div class="tab-set docutils container">
+<input checked="True" class="tab-input" id="tab-set--5-input--1" name="tab-set--5" type="radio"><label class="tab-label" for="tab-set--5-input--1">C++ API</label><div class="tab-content docutils container">
+<div class="highlight-cpp notranslate"><div class="highlight"><pre><span></span><span class="cp">#include</span><span class="w"> </span><span class="cpf">&lt;qdk/chemistry.hpp&gt;</span>
+
+<span class="k">using</span><span class="w"> </span><span class="k">namespace</span><span class="w"> </span><span class="nn">qdk</span><span class="o">::</span><span class="nn">chemistry</span><span class="o">::</span><span class="nn">data</span><span class="p">;</span>
+<span class="k">using</span><span class="w"> </span><span class="k">namespace</span><span class="w"> </span><span class="nn">qdk</span><span class="o">::</span><span class="nn">chemistry</span><span class="o">::</span><span class="nn">algorithms</span><span class="p">;</span>
+
+<span class="kt">int</span><span class="w"> </span><span class="nf">main</span><span class="p">()</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="c1">// Obtain a valid Hamiltonian</span>
+<span class="w">    </span><span class="n">Hamiltonian</span><span class="w"> </span><span class="n">hamiltonian</span><span class="p">;</span>
+<span class="w">    </span><span class="cm">/* hamiltonian = ... */</span>
+
+<span class="w">    </span><span class="c1">// Create a multiconfigurational calculator (MACIS implementation)</span>
+<span class="w">    </span><span class="k">auto</span><span class="w"> </span><span class="n">mc_calculator</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">MCCalculatorFactory</span><span class="o">::</span><span class="n">create</span><span class="p">();</span>
+
+<span class="w">    </span><span class="c1">// Solve for the ground state</span>
+<span class="w">    </span><span class="k">auto</span><span class="w"> </span><span class="p">[</span><span class="n">E_ci</span><span class="p">,</span><span class="w"> </span><span class="n">ci_wavefunction</span><span class="p">]</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">mc_calculator</span><span class="o">-&gt;</span><span class="n">calculate</span><span class="p">(</span><span class="n">hamiltonian</span><span class="p">);</span>
+
+<span class="w">    </span><span class="c1">// Print the CI energy</span>
+<span class="w">    </span><span class="n">std</span><span class="o">::</span><span class="n">cout</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="s">&quot;CI Energy: &quot;</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="n">E_ci</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="n">std</span><span class="o">::</span><span class="n">endl</span><span class="p">;</span>
+
+<span class="w">    </span><span class="k">return</span><span class="w"> </span><span class="mi">0</span><span class="p">;</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+</div>
+<input class="tab-input" id="tab-set--5-input--2" name="tab-set--5" type="radio"><label class="tab-label" for="tab-set--5-input--2">Python API</label><div class="tab-content docutils container">
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">from</span><span class="w"> </span><span class="nn">qdk.chemistry.data</span><span class="w"> </span><span class="kn">import</span> <span class="n">Hamiltonian</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">qdk.chemistry.algorithms</span><span class="w"> </span><span class="kn">import</span> <span class="n">create_mc_calculator</span>
+
+<span class="k">if</span> <span class="vm">__name__</span> <span class="o">==</span> <span class="s2">&quot;__main__&quot;</span><span class="p">:</span>
+    <span class="c1"># Obtain a valid Hamiltonian</span>
+    <span class="n">hamiltonian</span> <span class="o">=</span> <span class="n">Hamiltonian</span><span class="p">()</span>
+    <span class="c1"># hamiltonian = ...</span>
+
+    <span class="c1"># Create a multiconfigurational calculator (MACIS implementation)</span>
+    <span class="n">mc_calculator</span> <span class="o">=</span> <span class="n">create_mc_calculator</span><span class="p">()</span>
+
+    <span class="c1"># The MACIS implementation automatically determines electron numbers</span>
+    <span class="c1"># from the orbital occupations in the Hamiltonian</span>
+    <span class="c1"># No additional configuration needed for basic FCI</span>
+
+    <span class="c1"># Solve for the ground state</span>
+    <span class="n">E_ci</span><span class="p">,</span> <span class="n">ci_wavefunction</span> <span class="o">=</span> <span class="n">mc_calculator</span><span class="o">.</span><span class="n">calculate</span><span class="p">(</span><span class="n">hamiltonian</span><span class="p">)</span>
+
+    <span class="c1"># Print the CI energy</span>
+    <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;CI Energy: </span><span class="si">{</span><span class="n">E_ci</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+</pre></div>
+</div>
+</div>
+</div>
+<div class="admonition-todo admonition" id="id9">
+<p class="admonition-title">Todo</p>
+<p>TODO (NAB):  Need overview of sample scripts, sample problems, etc. – including
+QPE and examples showing interoperability with other languages/tools.
+<a class="reference external" href="https://dev.azure.com/ms-azurequantum/AzureQuantum/_workitems/edit/41390">https://dev.azure.com/ms-azurequantum/AzureQuantum/_workitems/edit/41390</a></p>
+</div>
+</section>
+</section>
+
+
+           </div>
+          </div>
+          <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
+        <a href="../index.html" class="btn btn-neutral float-left" title="QDK/Chemistry: A Quantum Applications Toolkit" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+        <a href="comprehensive/index.html" class="btn btn-neutral float-right" title="In-Depth Guide" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright Copyright (c) Microsoft Corporation. All rights reserved. Licensed under the MIT License..</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

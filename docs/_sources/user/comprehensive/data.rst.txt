@@ -1,0 +1,12 @@
+Data Classes
+============
+
+.. toctree::
+   :maxdepth: 1
+   :caption: Data Classes
+
+   data/structure
+   data/orbitals
+   data/hamiltonian
+   data/wavefunction
+   data/basis_set

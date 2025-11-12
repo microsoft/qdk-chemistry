@@ -1,0 +1,8 @@
+qdk.chemistry.algorithms.registry module
+========================================
+
+.. automodule:: qdk.chemistry.algorithms.registry
+   :members:
+   :private-members:
+   :show-inheritance:
+   :undoc-members:

@@ -1,0 +1,8 @@
+qdk.chemistry.plugins.pyscf.stability module
+============================================
+
+.. automodule:: qdk.chemistry.plugins.pyscf.stability
+   :members:
+   :private-members:
+   :show-inheritance:
+   :undoc-members:

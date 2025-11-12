@@ -1,0 +1,8 @@
+qdk.chemistry.utils.bitstring module
+====================================
+
+.. automodule:: qdk.chemistry.utils.bitstring
+   :members:
+   :private-members:
+   :show-inheritance:
+   :undoc-members:

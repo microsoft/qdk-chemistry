@@ -1,0 +1,415 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../../../">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>qdk.chemistry.noise_models &mdash; QDK/Chemistry 0.0.1 documentation</title>
+      <link rel="stylesheet" type="text/css" href="../../../_static/pygments.css?v=b86133f3" />
+      <link rel="stylesheet" type="text/css" href="../../../_static/css/theme.css?v=e59714d7" />
+      <link rel="stylesheet" type="text/css" href="../../../_static/tabs.css?v=4c969af8" />
+      <link rel="stylesheet" type="text/css" href="../../../_static/graphviz.css?v=4ae1632d" />
+      <link rel="stylesheet" type="text/css" href="../../../_static/copybutton.css?v=76b2166b" />
+
+  
+      <script src="../../../_static/jquery.js?v=5d32c60e"></script>
+      <script src="../../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="../../../_static/documentation_options.js?v=d45e8c67"></script>
+      <script src="../../../_static/doctools.js?v=9bcbadda"></script>
+      <script src="../../../_static/sphinx_highlight.js?v=dc90522c"></script>
+      <script src="../../../_static/tabs.js?v=3ee01567"></script>
+      <script src="../../../_static/clipboard.min.js?v=a7894cd8"></script>
+      <script src="../../../_static/copybutton.js?v=f281be69"></script>
+    <script src="../../../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../../../genindex.html" />
+    <link rel="search" title="Search" href="../../../search.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="../../../index.html" class="icon icon-home">
+            QDK/Chemistry
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../../../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">User Documentation</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../user/Quickstart.html">Quickstart</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../user/comprehensive/index.html">In-Depth Guide</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">API Reference</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../api/python_api.html">Python API</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../api/cpp_api.html">C++ API</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Supporting Information</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../glossary.html">Glossary</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../references.html">References</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../../../index.html">QDK/Chemistry</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../../../index.html" class="icon icon-home" aria-label="Home"></a></li>
+          <li class="breadcrumb-item"><a href="../../index.html">Module code</a></li>
+      <li class="breadcrumb-item active">qdk.chemistry.noise_models</li>
+      <li class="wy-breadcrumbs-aside">
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <h1>Source code for qdk.chemistry.noise_models</h1><div class="highlight"><pre>
+<span></span><span class="sd">&quot;&quot;&quot;QDK/Chemistry noise model module for simulating noise in quantum circuits.&quot;&quot;&quot;</span>
+
+<span class="kn">from</span><span class="w"> </span><span class="nn">dataclasses</span><span class="w"> </span><span class="kn">import</span> <span class="n">dataclass</span><span class="p">,</span> <span class="n">field</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">enum</span><span class="w"> </span><span class="kn">import</span> <span class="n">StrEnum</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">pathlib</span><span class="w"> </span><span class="kn">import</span> <span class="n">Path</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">typing</span><span class="w"> </span><span class="kn">import</span> <span class="n">Any</span><span class="p">,</span> <span class="n">ClassVar</span><span class="p">,</span> <span class="n">TypedDict</span>
+
+<span class="kn">from</span><span class="w"> </span><span class="nn">ruamel.yaml</span><span class="w"> </span><span class="kn">import</span> <span class="n">YAML</span>
+
+
+<div class="viewcode-block" id="CaseInsensitiveStrEnum">
+<a class="viewcode-back" href="../../../api/api_autogen/qdk.chemistry.noise_models.html#qdk.chemistry.noise_models.CaseInsensitiveStrEnum">[docs]</a>
+<span class="k">class</span><span class="w"> </span><span class="nc">CaseInsensitiveStrEnum</span><span class="p">(</span><span class="n">StrEnum</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;StrEnum that allows case-insensitive lookup of values.&quot;&quot;&quot;</span>
+
+    <span class="nd">@classmethod</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">_missing_</span><span class="p">(</span><span class="bp">cls</span><span class="p">,</span> <span class="n">value</span><span class="p">):</span>  <span class="c1"># make input case-insensitive</span>
+        <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">value</span><span class="p">,</span> <span class="nb">str</span><span class="p">):</span>
+            <span class="k">for</span> <span class="n">member</span> <span class="ow">in</span> <span class="bp">cls</span><span class="p">:</span>
+                <span class="k">if</span> <span class="n">member</span><span class="o">.</span><span class="n">value</span><span class="o">.</span><span class="n">upper</span><span class="p">()</span> <span class="o">==</span> <span class="n">value</span><span class="o">.</span><span class="n">upper</span><span class="p">():</span>
+                    <span class="k">return</span> <span class="n">member</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">value</span><span class="si">}</span><span class="s2"> is not a valid </span><span class="si">{</span><span class="bp">cls</span><span class="o">.</span><span class="vm">__name__</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span></div>
+
+
+
+<div class="viewcode-block" id="SupportedGate">
+<a class="viewcode-back" href="../../../api/api_autogen/qdk.chemistry.noise_models.html#qdk.chemistry.noise_models.SupportedGate">[docs]</a>
+<span class="k">class</span><span class="w"> </span><span class="nc">SupportedGate</span><span class="p">(</span><span class="n">CaseInsensitiveStrEnum</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;An enumeration of quantum gate types.</span>
+
+<span class="sd">    Gathered from qiskit</span>
+<span class="sd">    https://github.com/Qiskit/qiskit/blob/a88ed60615eeb988f404f9afaf142775478aceb9/qiskit/circuit/quantumcircuit.py#L673C1-L731C1</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="n">BARRIER</span> <span class="o">=</span> <span class="s2">&quot;barrier&quot;</span>
+    <span class="n">CCX</span> <span class="o">=</span> <span class="s2">&quot;ccx&quot;</span>
+    <span class="n">CCZ</span> <span class="o">=</span> <span class="s2">&quot;ccz&quot;</span>
+    <span class="n">CH</span> <span class="o">=</span> <span class="s2">&quot;ch&quot;</span>
+    <span class="n">CP</span> <span class="o">=</span> <span class="s2">&quot;cp&quot;</span>
+    <span class="n">CRX</span> <span class="o">=</span> <span class="s2">&quot;crx&quot;</span>
+    <span class="n">CRY</span> <span class="o">=</span> <span class="s2">&quot;cry&quot;</span>
+    <span class="n">CRZ</span> <span class="o">=</span> <span class="s2">&quot;crz&quot;</span>
+    <span class="n">CS</span> <span class="o">=</span> <span class="s2">&quot;cs&quot;</span>
+    <span class="n">CSDG</span> <span class="o">=</span> <span class="s2">&quot;csdg&quot;</span>
+    <span class="n">CSWAP</span> <span class="o">=</span> <span class="s2">&quot;cswap&quot;</span>
+    <span class="n">CSX</span> <span class="o">=</span> <span class="s2">&quot;csx&quot;</span>
+    <span class="n">CU</span> <span class="o">=</span> <span class="s2">&quot;cu&quot;</span>
+    <span class="n">CX</span> <span class="o">=</span> <span class="s2">&quot;cx&quot;</span>
+    <span class="n">CY</span> <span class="o">=</span> <span class="s2">&quot;cy&quot;</span>
+    <span class="n">CZ</span> <span class="o">=</span> <span class="s2">&quot;cz&quot;</span>
+    <span class="n">DCX</span> <span class="o">=</span> <span class="s2">&quot;dcx&quot;</span>
+    <span class="n">DELAY</span> <span class="o">=</span> <span class="s2">&quot;delay&quot;</span>
+    <span class="n">ECR</span> <span class="o">=</span> <span class="s2">&quot;ecr&quot;</span>
+    <span class="n">H</span> <span class="o">=</span> <span class="s2">&quot;h&quot;</span>
+    <span class="n">ID</span> <span class="o">=</span> <span class="s2">&quot;id&quot;</span>
+    <span class="n">INITIALIZE</span> <span class="o">=</span> <span class="s2">&quot;initialize&quot;</span>
+    <span class="n">ISWAP</span> <span class="o">=</span> <span class="s2">&quot;iswap&quot;</span>
+    <span class="n">MCP</span> <span class="o">=</span> <span class="s2">&quot;mcp&quot;</span>
+    <span class="n">MCRX</span> <span class="o">=</span> <span class="s2">&quot;mcrx&quot;</span>
+    <span class="n">MCRY</span> <span class="o">=</span> <span class="s2">&quot;mcry&quot;</span>
+    <span class="n">MCRZ</span> <span class="o">=</span> <span class="s2">&quot;mcrz&quot;</span>
+    <span class="n">MCX</span> <span class="o">=</span> <span class="s2">&quot;mcx&quot;</span>
+    <span class="n">MEASURE</span> <span class="o">=</span> <span class="s2">&quot;measure&quot;</span>
+    <span class="n">MS</span> <span class="o">=</span> <span class="s2">&quot;ms&quot;</span>
+    <span class="n">P</span> <span class="o">=</span> <span class="s2">&quot;p&quot;</span>
+    <span class="n">PAULI</span> <span class="o">=</span> <span class="s2">&quot;pauli&quot;</span>
+    <span class="n">R</span> <span class="o">=</span> <span class="s2">&quot;r&quot;</span>
+    <span class="n">RCCCX</span> <span class="o">=</span> <span class="s2">&quot;rcccx&quot;</span>
+    <span class="n">RCCX</span> <span class="o">=</span> <span class="s2">&quot;rccx&quot;</span>
+    <span class="n">RESET</span> <span class="o">=</span> <span class="s2">&quot;reset&quot;</span>
+    <span class="n">RV</span> <span class="o">=</span> <span class="s2">&quot;rv&quot;</span>
+    <span class="n">RX</span> <span class="o">=</span> <span class="s2">&quot;rx&quot;</span>
+    <span class="n">RXX</span> <span class="o">=</span> <span class="s2">&quot;rxx&quot;</span>
+    <span class="n">RY</span> <span class="o">=</span> <span class="s2">&quot;ry&quot;</span>
+    <span class="n">RYY</span> <span class="o">=</span> <span class="s2">&quot;ryy&quot;</span>
+    <span class="n">RZ</span> <span class="o">=</span> <span class="s2">&quot;rz&quot;</span>
+    <span class="n">RZX</span> <span class="o">=</span> <span class="s2">&quot;rzx&quot;</span>
+    <span class="n">RZZ</span> <span class="o">=</span> <span class="s2">&quot;rzz&quot;</span>
+    <span class="n">S</span> <span class="o">=</span> <span class="s2">&quot;s&quot;</span>
+    <span class="n">SDG</span> <span class="o">=</span> <span class="s2">&quot;sdg&quot;</span>
+    <span class="n">SWAP</span> <span class="o">=</span> <span class="s2">&quot;swap&quot;</span>
+    <span class="n">SX</span> <span class="o">=</span> <span class="s2">&quot;sx&quot;</span>
+    <span class="n">SXDG</span> <span class="o">=</span> <span class="s2">&quot;sxdg&quot;</span>
+    <span class="n">T</span> <span class="o">=</span> <span class="s2">&quot;t&quot;</span>
+    <span class="n">TDG</span> <span class="o">=</span> <span class="s2">&quot;tdg&quot;</span>
+    <span class="n">U</span> <span class="o">=</span> <span class="s2">&quot;u&quot;</span>
+    <span class="n">UNITARY</span> <span class="o">=</span> <span class="s2">&quot;unitary&quot;</span>
+    <span class="n">X</span> <span class="o">=</span> <span class="s2">&quot;x&quot;</span>
+    <span class="n">Y</span> <span class="o">=</span> <span class="s2">&quot;y&quot;</span>
+    <span class="n">Z</span> <span class="o">=</span> <span class="s2">&quot;z&quot;</span>
+
+<div class="viewcode-block" id="SupportedGate.from_string">
+<a class="viewcode-back" href="../../../api/api_autogen/qdk.chemistry.noise_models.html#qdk.chemistry.noise_models.SupportedGate.from_string">[docs]</a>
+    <span class="nd">@classmethod</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">from_string</span><span class="p">(</span><span class="bp">cls</span><span class="p">,</span> <span class="n">gate_str</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="s2">&quot;SupportedGate&quot;</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Get a Gate enum value from its string representation.</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            gate_str: String representation of the gate (case-insensitive)</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            The corresponding SupportedGate enum value</span>
+
+<span class="sd">        Raises:</span>
+<span class="sd">            ValueError: If no matching gate is found</span>
+
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">try</span><span class="p">:</span>
+            <span class="c1"># Leverage internal _missing_ method for case-insensitive lookup</span>
+            <span class="k">return</span> <span class="bp">cls</span><span class="p">(</span><span class="n">gate_str</span><span class="p">)</span>
+        <span class="k">except</span> <span class="ne">ValueError</span><span class="p">:</span>
+            <span class="c1"># If the gate_str does not match any enum value, raise an error</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Unknown gate type: </span><span class="si">{</span><span class="n">gate_str</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span> <span class="kn">from</span><span class="w"> </span><span class="kc">None</span></div>
+</div>
+
+
+
+<div class="viewcode-block" id="SupportedErrorTypes">
+<a class="viewcode-back" href="../../../api/api_autogen/qdk.chemistry.noise_models.html#qdk.chemistry.noise_models.SupportedErrorTypes">[docs]</a>
+<span class="k">class</span><span class="w"> </span><span class="nc">SupportedErrorTypes</span><span class="p">(</span><span class="n">CaseInsensitiveStrEnum</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Supported error types for quantum gates.&quot;&quot;&quot;</span>
+
+    <span class="n">DEPOLARIZING_ERROR</span> <span class="o">=</span> <span class="s2">&quot;depolarizing_error&quot;</span></div>
+
+
+
+<div class="viewcode-block" id="GateErrorDef">
+<a class="viewcode-back" href="../../../api/api_autogen/qdk.chemistry.noise_models.html#qdk.chemistry.noise_models.GateErrorDef">[docs]</a>
+<span class="k">class</span><span class="w"> </span><span class="nc">GateErrorDef</span><span class="p">(</span><span class="n">TypedDict</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Typed dictionary for error definitions.&quot;&quot;&quot;</span>
+
+    <span class="nb">type</span><span class="p">:</span> <span class="n">SupportedErrorTypes</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Error type.&quot;&quot;&quot;</span>
+
+    <span class="n">rate</span><span class="p">:</span> <span class="nb">float</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Error rate.&quot;&quot;&quot;</span>
+
+    <span class="n">num_qubits</span><span class="p">:</span> <span class="nb">int</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Number of qubits the gate acts on.&quot;&quot;&quot;</span></div>
+
+
+
+<span class="c1">#: Gates to exclude from basis gates in noise model.</span>
+<span class="n">BASIS_GATES_EXCLUSION</span> <span class="o">=</span> <span class="p">{</span><span class="s2">&quot;reset&quot;</span><span class="p">,</span> <span class="s2">&quot;barrier&quot;</span><span class="p">,</span> <span class="s2">&quot;measure&quot;</span><span class="p">}</span>
+
+
+<div class="viewcode-block" id="QuantumErrorProfile">
+<a class="viewcode-back" href="../../../api/api_autogen/qdk.chemistry.noise_models.html#qdk.chemistry.noise_models.QuantumErrorProfile">[docs]</a>
+<span class="nd">@dataclass</span>
+<span class="k">class</span><span class="w"> </span><span class="nc">QuantumErrorProfile</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;A class representing a quantum error profile containing information about quantum gates and error properties.</span>
+
+<span class="sd">    This class provides functionalities to define, load, and save quantum error profiles</span>
+<span class="sd">    from YAML files, and convert them to Qiskit noise models for simulations.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="n">name</span><span class="p">:</span> <span class="nb">str</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Name of the quantum error profile.&quot;&quot;&quot;</span>
+
+    <span class="n">description</span><span class="p">:</span> <span class="nb">str</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Description of what the error profile represents.&quot;&quot;&quot;</span>
+
+    <span class="n">errors</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="n">SupportedGate</span><span class="p">,</span> <span class="n">GateErrorDef</span><span class="p">]</span> <span class="o">=</span> <span class="n">field</span><span class="p">(</span><span class="n">default_factory</span><span class="o">=</span><span class="nb">dict</span><span class="p">)</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Dictionary mapping gate names to their error properties.&quot;&quot;&quot;</span>
+
+    <span class="n">one_qubit_gates</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="n">field</span><span class="p">(</span><span class="n">default_factory</span><span class="o">=</span><span class="nb">list</span><span class="p">)</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Set of gate names that operate on a single qubit.&quot;&quot;&quot;</span>
+
+    <span class="n">two_qubit_gates</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="n">field</span><span class="p">(</span><span class="n">default_factory</span><span class="o">=</span><span class="nb">list</span><span class="p">)</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Set of gate names that operate on two qubits.&quot;&quot;&quot;</span>
+
+    <span class="n">supported_yaml_keys</span><span class="p">:</span> <span class="n">ClassVar</span><span class="p">[</span><span class="nb">set</span><span class="p">[</span><span class="nb">str</span><span class="p">]]</span> <span class="o">=</span> <span class="p">{</span>
+        <span class="s2">&quot;name&quot;</span><span class="p">,</span>
+        <span class="s2">&quot;description&quot;</span><span class="p">,</span>
+        <span class="s2">&quot;errors&quot;</span><span class="p">,</span>
+    <span class="p">}</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;YAML keys supported in the quantum error profile.&quot;&quot;&quot;</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">__post_init__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Initialize one_qubit_gates and two_qubit_gates based on errors.&quot;&quot;&quot;</span>
+        <span class="c1"># Clear existing sets to avoid duplication when loading from YAML</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">one_qubit_gates</span><span class="o">.</span><span class="n">clear</span><span class="p">()</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">two_qubit_gates</span><span class="o">.</span><span class="n">clear</span><span class="p">()</span>
+
+        <span class="k">for</span> <span class="n">gate</span><span class="p">,</span> <span class="n">error_dict</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">errors</span><span class="o">.</span><span class="n">items</span><span class="p">():</span>
+            <span class="k">if</span> <span class="n">error_dict</span><span class="p">[</span><span class="s2">&quot;num_qubits&quot;</span><span class="p">]</span> <span class="o">==</span> <span class="mi">1</span><span class="p">:</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">one_qubit_gates</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="nb">str</span><span class="p">(</span><span class="n">gate</span><span class="p">))</span>
+            <span class="k">elif</span> <span class="n">error_dict</span><span class="p">[</span><span class="s2">&quot;num_qubits&quot;</span><span class="p">]</span> <span class="o">==</span> <span class="mi">2</span><span class="p">:</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">two_qubit_gates</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="nb">str</span><span class="p">(</span><span class="n">gate</span><span class="p">))</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Unsupported number of qubits: </span><span class="si">{</span><span class="n">error_dict</span><span class="p">[</span><span class="s1">&#39;num_qubits&#39;</span><span class="p">]</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">one_qubit_gates</span> <span class="o">=</span> <span class="nb">sorted</span><span class="p">(</span><span class="nb">set</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">one_qubit_gates</span><span class="p">))</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">two_qubit_gates</span> <span class="o">=</span> <span class="nb">sorted</span><span class="p">(</span><span class="nb">set</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">two_qubit_gates</span><span class="p">))</span>
+
+<div class="viewcode-block" id="QuantumErrorProfile.to_dict">
+<a class="viewcode-back" href="../../../api/api_autogen/qdk.chemistry.noise_models.html#qdk.chemistry.noise_models.QuantumErrorProfile.to_dict">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">to_dict</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Convert to a dictionary suitable for YAML serialization.&quot;&quot;&quot;</span>
+        <span class="n">result</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]</span> <span class="o">=</span> <span class="p">{</span>
+            <span class="s2">&quot;name&quot;</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">name</span><span class="p">,</span>
+            <span class="s2">&quot;description&quot;</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">description</span><span class="p">,</span>
+            <span class="s2">&quot;errors&quot;</span><span class="p">:</span> <span class="p">{},</span>
+        <span class="p">}</span>
+
+        <span class="c1"># Convert enum keys and values to strings in the errors dictionary</span>
+        <span class="k">for</span> <span class="n">gate</span><span class="p">,</span> <span class="n">error_def</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">errors</span><span class="o">.</span><span class="n">items</span><span class="p">():</span>
+            <span class="n">gate_str</span> <span class="o">=</span> <span class="nb">str</span><span class="p">(</span><span class="n">gate</span><span class="p">)</span>
+            <span class="n">error_dict</span> <span class="o">=</span> <span class="nb">dict</span><span class="p">(</span><span class="n">error_def</span><span class="p">)</span>
+            <span class="n">error_dict</span><span class="p">[</span><span class="s2">&quot;type&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="nb">str</span><span class="p">(</span><span class="n">error_dict</span><span class="p">[</span><span class="s2">&quot;type&quot;</span><span class="p">])</span>
+            <span class="n">result</span><span class="p">[</span><span class="s2">&quot;errors&quot;</span><span class="p">][</span><span class="n">gate_str</span><span class="p">]</span> <span class="o">=</span> <span class="n">error_dict</span>
+
+        <span class="k">return</span> <span class="n">result</span></div>
+
+
+<div class="viewcode-block" id="QuantumErrorProfile.from_yaml">
+<a class="viewcode-back" href="../../../api/api_autogen/qdk.chemistry.noise_models.html#qdk.chemistry.noise_models.QuantumErrorProfile.from_yaml">[docs]</a>
+    <span class="nd">@classmethod</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">from_yaml</span><span class="p">(</span><span class="bp">cls</span><span class="p">,</span> <span class="n">yaml_file</span><span class="p">:</span> <span class="nb">str</span> <span class="o">|</span> <span class="n">Path</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="s2">&quot;QuantumErrorProfile&quot;</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Load quantum error profile from YAML file.</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            yaml_file: Path to YAML file</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            Loaded profile</span>
+
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">yaml</span> <span class="o">=</span> <span class="n">YAML</span><span class="p">(</span><span class="n">typ</span><span class="o">=</span><span class="s2">&quot;safe&quot;</span><span class="p">)</span>  <span class="c1"># type: ignore</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">Path</span><span class="p">(</span><span class="n">yaml_file</span><span class="p">)</span><span class="o">.</span><span class="n">exists</span><span class="p">():</span>
+            <span class="k">raise</span> <span class="ne">FileNotFoundError</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;File </span><span class="si">{</span><span class="n">yaml_file</span><span class="si">}</span><span class="s2"> not found&quot;</span><span class="p">)</span>
+
+        <span class="k">with</span> <span class="n">Path</span><span class="p">(</span><span class="n">yaml_file</span><span class="p">)</span><span class="o">.</span><span class="n">open</span><span class="p">(</span><span class="s2">&quot;r&quot;</span><span class="p">)</span> <span class="k">as</span> <span class="n">f</span><span class="p">:</span>
+            <span class="n">data</span> <span class="o">=</span> <span class="n">yaml</span><span class="o">.</span><span class="n">load</span><span class="p">(</span><span class="n">f</span><span class="p">)</span>
+
+        <span class="k">if</span> <span class="n">data</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;YAML file </span><span class="si">{</span><span class="n">yaml_file</span><span class="si">}</span><span class="s2"> is empty or invalid.&quot;</span><span class="p">)</span>
+
+        <span class="n">data_keys</span> <span class="o">=</span> <span class="n">data</span><span class="o">.</span><span class="n">keys</span><span class="p">()</span>
+
+        <span class="n">invalid_keys</span> <span class="o">=</span> <span class="nb">set</span><span class="p">(</span><span class="n">data_keys</span><span class="p">)</span> <span class="o">-</span> <span class="bp">cls</span><span class="o">.</span><span class="n">supported_yaml_keys</span>
+        <span class="k">if</span> <span class="n">invalid_keys</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Invalid keys in YAML file: </span><span class="si">{</span><span class="n">invalid_keys</span><span class="si">}</span><span class="s2">.Only </span><span class="si">{</span><span class="bp">cls</span><span class="o">.</span><span class="n">supported_yaml_keys</span><span class="si">}</span><span class="s2"> are allowed.&quot;</span><span class="p">)</span>
+
+        <span class="n">name</span> <span class="o">=</span> <span class="n">data</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;name&quot;</span><span class="p">,</span> <span class="s2">&quot;default&quot;</span><span class="p">)</span>
+        <span class="n">description</span> <span class="o">=</span> <span class="n">data</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;description&quot;</span><span class="p">,</span> <span class="s2">&quot;No description provided&quot;</span><span class="p">)</span>
+        <span class="n">errors_raw</span> <span class="o">=</span> <span class="n">data</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;errors&quot;</span><span class="p">,</span> <span class="p">{})</span>
+
+        <span class="c1"># Convert string keys back to Enum and ensure error types are Enums</span>
+        <span class="n">errors</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="n">SupportedGate</span><span class="p">,</span> <span class="n">GateErrorDef</span><span class="p">]</span> <span class="o">=</span> <span class="p">{}</span>
+        <span class="k">for</span> <span class="n">gate_str</span><span class="p">,</span> <span class="n">error_dict</span> <span class="ow">in</span> <span class="n">errors_raw</span><span class="o">.</span><span class="n">items</span><span class="p">():</span>
+            <span class="n">gate</span> <span class="o">=</span> <span class="n">SupportedGate</span><span class="p">(</span><span class="n">gate_str</span><span class="p">)</span>
+            <span class="n">errors</span><span class="p">[</span><span class="n">gate</span><span class="p">]</span> <span class="o">=</span> <span class="n">GateErrorDef</span><span class="p">(</span>
+                <span class="nb">type</span><span class="o">=</span><span class="n">SupportedErrorTypes</span><span class="p">(</span><span class="n">error_dict</span><span class="p">[</span><span class="s2">&quot;type&quot;</span><span class="p">]),</span>
+                <span class="n">rate</span><span class="o">=</span><span class="n">error_dict</span><span class="p">[</span><span class="s2">&quot;rate&quot;</span><span class="p">],</span>
+                <span class="n">num_qubits</span><span class="o">=</span><span class="n">error_dict</span><span class="p">[</span><span class="s2">&quot;num_qubits&quot;</span><span class="p">],</span>
+            <span class="p">)</span>
+
+        <span class="k">return</span> <span class="bp">cls</span><span class="p">(</span>
+            <span class="n">name</span><span class="o">=</span><span class="n">name</span><span class="p">,</span>
+            <span class="n">description</span><span class="o">=</span><span class="n">description</span><span class="p">,</span>
+            <span class="n">errors</span><span class="o">=</span><span class="n">errors</span><span class="p">,</span>
+        <span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="QuantumErrorProfile.to_yaml">
+<a class="viewcode-back" href="../../../api/api_autogen/qdk.chemistry.noise_models.html#qdk.chemistry.noise_models.QuantumErrorProfile.to_yaml">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">to_yaml</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">yaml_file</span><span class="p">:</span> <span class="nb">str</span> <span class="o">|</span> <span class="n">Path</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Save quantum error profile to YAML file.</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            yaml_file: Path to save YAML file</span>
+
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">yaml</span> <span class="o">=</span> <span class="n">YAML</span><span class="p">()</span>
+        <span class="n">yaml</span><span class="o">.</span><span class="n">default_flow_style</span> <span class="o">=</span> <span class="kc">False</span>
+        <span class="n">yaml</span><span class="o">.</span><span class="n">indent</span><span class="p">(</span><span class="n">mapping</span><span class="o">=</span><span class="mi">2</span><span class="p">,</span> <span class="n">sequence</span><span class="o">=</span><span class="mi">4</span><span class="p">,</span> <span class="n">offset</span><span class="o">=</span><span class="mi">2</span><span class="p">)</span>
+
+        <span class="c1"># Convert to serializable dict</span>
+        <span class="n">data</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">to_dict</span><span class="p">()</span>
+
+        <span class="k">with</span> <span class="n">Path</span><span class="p">(</span><span class="n">yaml_file</span><span class="p">)</span><span class="o">.</span><span class="n">open</span><span class="p">(</span><span class="s2">&quot;w&quot;</span><span class="p">)</span> <span class="k">as</span> <span class="n">f</span><span class="p">:</span>
+            <span class="n">yaml</span><span class="o">.</span><span class="n">dump</span><span class="p">(</span><span class="n">data</span><span class="p">,</span> <span class="n">f</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="QuantumErrorProfile.basis_gates">
+<a class="viewcode-back" href="../../../api/api_autogen/qdk.chemistry.noise_models.html#qdk.chemistry.noise_models.QuantumErrorProfile.basis_gates">[docs]</a>
+    <span class="nd">@property</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">basis_gates</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">list</span><span class="p">[</span><span class="nb">str</span><span class="p">]:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Get basis gates from profile.&quot;&quot;&quot;</span>
+        <span class="n">gates</span> <span class="o">=</span> <span class="p">[]</span>
+        <span class="k">for</span> <span class="n">gate</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">one_qubit_gates</span> <span class="o">+</span> <span class="bp">self</span><span class="o">.</span><span class="n">two_qubit_gates</span><span class="p">:</span>
+            <span class="k">if</span> <span class="n">gate</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">BASIS_GATES_EXCLUSION</span><span class="p">:</span>
+                <span class="n">gates</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">gate</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">gates</span></div>
+</div>
+
+</pre></div>
+
+           </div>
+          </div>
+          <footer>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright Copyright (c) Microsoft Corporation. All rights reserved. Licensed under the MIT License..</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

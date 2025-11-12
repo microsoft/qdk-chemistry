@@ -1,0 +1,12 @@
+Design and Architecture
+=======================
+
+.. toctree::
+   :maxdepth: 1
+   :caption: Design and Architecture
+
+   advanced/design_principles
+   advanced/factory_pattern
+   advanced/serialization
+   advanced/interfaces
+   advanced/settings

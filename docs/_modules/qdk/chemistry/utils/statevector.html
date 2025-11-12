@@ -1,0 +1,207 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../../../../">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>qdk.chemistry.utils.statevector &mdash; QDK/Chemistry 0.0.1 documentation</title>
+      <link rel="stylesheet" type="text/css" href="../../../../_static/pygments.css?v=b86133f3" />
+      <link rel="stylesheet" type="text/css" href="../../../../_static/css/theme.css?v=e59714d7" />
+      <link rel="stylesheet" type="text/css" href="../../../../_static/tabs.css?v=4c969af8" />
+      <link rel="stylesheet" type="text/css" href="../../../../_static/graphviz.css?v=4ae1632d" />
+      <link rel="stylesheet" type="text/css" href="../../../../_static/copybutton.css?v=76b2166b" />
+
+  
+      <script src="../../../../_static/jquery.js?v=5d32c60e"></script>
+      <script src="../../../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="../../../../_static/documentation_options.js?v=d45e8c67"></script>
+      <script src="../../../../_static/doctools.js?v=9bcbadda"></script>
+      <script src="../../../../_static/sphinx_highlight.js?v=dc90522c"></script>
+      <script src="../../../../_static/tabs.js?v=3ee01567"></script>
+      <script src="../../../../_static/clipboard.min.js?v=a7894cd8"></script>
+      <script src="../../../../_static/copybutton.js?v=f281be69"></script>
+    <script src="../../../../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../../../../genindex.html" />
+    <link rel="search" title="Search" href="../../../../search.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="../../../../index.html" class="icon icon-home">
+            QDK/Chemistry
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../../../../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">User Documentation</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../../user/Quickstart.html">Quickstart</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../../user/comprehensive/index.html">In-Depth Guide</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">API Reference</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../../api/python_api.html">Python API</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../../api/cpp_api.html">C++ API</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Supporting Information</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../../glossary.html">Glossary</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../../references.html">References</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../../../../index.html">QDK/Chemistry</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../../../../index.html" class="icon icon-home" aria-label="Home"></a></li>
+          <li class="breadcrumb-item"><a href="../../../index.html">Module code</a></li>
+      <li class="breadcrumb-item active">qdk.chemistry.utils.statevector</li>
+      <li class="wy-breadcrumbs-aside">
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <h1>Source code for qdk.chemistry.utils.statevector</h1><div class="highlight"><pre>
+<span></span><span class="sd">&quot;&quot;&quot;Statevector utilities in qdk.chemistry.&quot;&quot;&quot;</span>
+
+<span class="kn">import</span><span class="w"> </span><span class="nn">numpy</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">np</span>
+
+<span class="kn">from</span><span class="w"> </span><span class="nn">qdk.chemistry.data</span><span class="w"> </span><span class="kn">import</span> <span class="n">Wavefunction</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">qdk.chemistry.utils.bitstring</span><span class="w"> </span><span class="kn">import</span> <span class="n">binary_to_decimal</span><span class="p">,</span> <span class="n">separate_alpha_beta_to_binary_string</span>
+
+
+<div class="viewcode-block" id="create_statevector_from_coeffs_and_dets_string">
+<a class="viewcode-back" href="../../../../api/api_autogen/qdk.chemistry.utils.statevector.html#qdk.chemistry.utils.statevector.create_statevector_from_coeffs_and_dets_string">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">create_statevector_from_coeffs_and_dets_string</span><span class="p">(</span>
+    <span class="n">coeffs</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="nb">complex</span> <span class="o">|</span> <span class="nb">float</span><span class="p">]</span> <span class="o">|</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">,</span>
+    <span class="n">dets_string</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="nb">str</span><span class="p">],</span>
+    <span class="n">num_qubits</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span>
+    <span class="n">normalize</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">True</span><span class="p">,</span>
+<span class="p">)</span> <span class="o">-&gt;</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Convert coefficients and determinants into a column vector format.</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">        coeffs: List of coefficients for each determinant.</span>
+<span class="sd">        dets_string: List of binary determinants as strings or lists.</span>
+<span class="sd">        num_qubits: Number of qubits in the system.</span>
+<span class="sd">        normalize: Whether to normalize the statevector.</span>
+
+<span class="sd">    Returns:</span>
+<span class="sd">        A complex numpy array to represent the statevector.</span>
+
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">coeffs</span><span class="p">)</span> <span class="o">!=</span> <span class="nb">len</span><span class="p">(</span><span class="n">dets_string</span><span class="p">):</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;Number of coefficients must match number of bitstrings.&quot;</span><span class="p">)</span>
+    <span class="n">statevector</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">zeros</span><span class="p">(</span><span class="mi">2</span><span class="o">**</span><span class="n">num_qubits</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="nb">complex</span><span class="p">)</span>
+    <span class="k">for</span> <span class="n">coeff</span><span class="p">,</span> <span class="n">det</span> <span class="ow">in</span> <span class="nb">zip</span><span class="p">(</span><span class="n">coeffs</span><span class="p">,</span> <span class="n">dets_string</span><span class="p">,</span> <span class="n">strict</span><span class="o">=</span><span class="kc">False</span><span class="p">):</span>
+        <span class="n">det_num</span> <span class="o">=</span> <span class="n">binary_to_decimal</span><span class="p">(</span><span class="n">det</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">det_num</span> <span class="o">&gt;=</span> <span class="nb">len</span><span class="p">(</span><span class="n">statevector</span><span class="p">):</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Determinant </span><span class="si">{</span><span class="n">det</span><span class="si">}</span><span class="s2"> exceeds the size of 2**</span><span class="si">{</span><span class="n">num_qubits</span><span class="si">}</span><span class="s2">.&quot;</span><span class="p">)</span>
+        <span class="n">statevector</span><span class="p">[</span><span class="n">det_num</span><span class="p">]</span> <span class="o">=</span> <span class="n">coeff</span>
+    <span class="c1"># Normalize the statevector if requested</span>
+    <span class="k">if</span> <span class="n">normalize</span> <span class="ow">is</span> <span class="kc">True</span><span class="p">:</span>
+        <span class="n">norm</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">linalg</span><span class="o">.</span><span class="n">norm</span><span class="p">(</span><span class="n">statevector</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">norm</span> <span class="o">==</span> <span class="mi">0</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;Zero statevector norm; cannot normalize.&quot;</span><span class="p">)</span>
+        <span class="n">statevector</span> <span class="o">=</span> <span class="n">statevector</span> <span class="o">/</span> <span class="n">norm</span>
+    <span class="k">return</span> <span class="n">statevector</span></div>
+
+
+
+<div class="viewcode-block" id="create_statevector_from_wavefunction">
+<a class="viewcode-back" href="../../../../api/api_autogen/qdk.chemistry.utils.statevector.html#qdk.chemistry.utils.statevector.create_statevector_from_wavefunction">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">create_statevector_from_wavefunction</span><span class="p">(</span>
+    <span class="n">wavefunction</span><span class="p">:</span> <span class="n">Wavefunction</span><span class="p">,</span>
+    <span class="n">max_dets</span><span class="p">:</span> <span class="nb">int</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+    <span class="n">renormalize</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">True</span><span class="p">,</span>
+<span class="p">)</span> <span class="o">-&gt;</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Convert a wavefunction (in the form of a coefficient array) into a statevector.</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">        wavefunction (Wavefunction): The Wavefunction.</span>
+<span class="sd">        max_dets: Max number of determinants to include.</span>
+<span class="sd">        renormalize: Whether to renormalize the statevector after filtering max number of determinants.</span>
+
+<span class="sd">    Returns:</span>
+<span class="sd">        A complex numpy array to represent the statevector.</span>
+
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">orbitals</span> <span class="o">=</span> <span class="n">wavefunction</span><span class="o">.</span><span class="n">get_orbitals</span><span class="p">()</span>
+    <span class="n">active_orbital_indices</span><span class="p">,</span> <span class="n">_</span> <span class="o">=</span> <span class="n">orbitals</span><span class="o">.</span><span class="n">get_active_space_indices</span><span class="p">()</span>
+    <span class="n">num_orbs</span> <span class="o">=</span> <span class="nb">len</span><span class="p">(</span><span class="n">active_orbital_indices</span><span class="p">)</span>
+    <span class="n">det_strings</span> <span class="o">=</span> <span class="p">[]</span>
+    <span class="n">coeffs</span> <span class="o">=</span> <span class="p">[]</span>
+    <span class="k">for</span> <span class="n">det</span> <span class="ow">in</span> <span class="n">wavefunction</span><span class="o">.</span><span class="n">get_active_determinants</span><span class="p">():</span>
+        <span class="n">coeffs</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">wavefunction</span><span class="o">.</span><span class="n">get_coefficient</span><span class="p">(</span><span class="n">det</span><span class="p">))</span>
+        <span class="n">alpha_str</span><span class="p">,</span> <span class="n">beta_str</span> <span class="o">=</span> <span class="n">separate_alpha_beta_to_binary_string</span><span class="p">(</span><span class="n">det</span><span class="o">.</span><span class="n">to_string</span><span class="p">()[:</span><span class="n">num_orbs</span><span class="p">])</span>
+        <span class="n">bitstring</span> <span class="o">=</span> <span class="n">beta_str</span><span class="p">[::</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span> <span class="o">+</span> <span class="n">alpha_str</span><span class="p">[::</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span>  <span class="c1"># Convert to little-endian format to match qiskit convention</span>
+        <span class="n">det_strings</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">bitstring</span><span class="p">)</span>
+
+    <span class="n">indices</span> <span class="o">=</span> <span class="nb">range</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">det_strings</span><span class="p">))</span>
+    <span class="n">sorted_indices</span> <span class="o">=</span> <span class="nb">sorted</span><span class="p">(</span><span class="n">indices</span><span class="p">,</span> <span class="n">key</span><span class="o">=</span><span class="k">lambda</span> <span class="n">i</span><span class="p">:</span> <span class="o">-</span><span class="n">np</span><span class="o">.</span><span class="n">abs</span><span class="p">(</span><span class="n">coeffs</span><span class="p">[</span><span class="n">i</span><span class="p">]))</span>
+    <span class="n">sorted_det_strings</span> <span class="o">=</span> <span class="p">[</span><span class="n">det_strings</span><span class="p">[</span><span class="n">i</span><span class="p">]</span> <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="n">sorted_indices</span><span class="p">]</span>
+    <span class="n">sorted_coeffs</span> <span class="o">=</span> <span class="p">[</span><span class="n">coeffs</span><span class="p">[</span><span class="n">i</span><span class="p">]</span> <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="n">sorted_indices</span><span class="p">]</span>
+
+    <span class="n">num_dets</span> <span class="o">=</span> <span class="nb">len</span><span class="p">(</span><span class="n">det_strings</span><span class="p">)</span>
+    <span class="k">if</span> <span class="n">max_dets</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="ow">and</span> <span class="n">max_dets</span> <span class="o">&lt;</span> <span class="n">num_dets</span><span class="p">:</span>
+        <span class="n">sorted_det_strings</span> <span class="o">=</span> <span class="n">sorted_det_strings</span><span class="p">[:</span><span class="n">max_dets</span><span class="p">]</span>
+        <span class="n">sorted_coeffs</span> <span class="o">=</span> <span class="n">sorted_coeffs</span><span class="p">[:</span><span class="n">max_dets</span><span class="p">]</span>
+
+    <span class="k">return</span> <span class="n">create_statevector_from_coeffs_and_dets_string</span><span class="p">(</span>
+        <span class="n">sorted_coeffs</span><span class="p">,</span> <span class="n">sorted_det_strings</span><span class="p">,</span> <span class="n">num_orbs</span> <span class="o">*</span> <span class="mi">2</span><span class="p">,</span> <span class="n">normalize</span><span class="o">=</span><span class="n">renormalize</span>
+    <span class="p">)</span></div>
+
+</pre></div>
+
+           </div>
+          </div>
+          <footer>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright Copyright (c) Microsoft Corporation. All rights reserved. Licensed under the MIT License..</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

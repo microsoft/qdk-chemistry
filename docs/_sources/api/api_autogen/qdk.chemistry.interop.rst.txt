@@ -1,0 +1,17 @@
+qdk.chemistry.interop package
+=============================
+
+.. automodule:: qdk.chemistry.interop
+   :members:
+   :private-members:
+   :show-inheritance:
+   :undoc-members:
+
+Subpackages
+-----------
+
+.. toctree::
+   :maxdepth: 4
+
+   qdk.chemistry.interop.qiskit
+   qdk.chemistry.interop.qsharp

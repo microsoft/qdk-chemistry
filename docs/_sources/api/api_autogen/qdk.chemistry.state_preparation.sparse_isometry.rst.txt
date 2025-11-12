@@ -1,0 +1,8 @@
+qdk.chemistry.state\_preparation.sparse\_isometry module
+========================================================
+
+.. automodule:: qdk.chemistry.state_preparation.sparse_isometry
+   :members:
+   :private-members:
+   :show-inheritance:
+   :undoc-members:

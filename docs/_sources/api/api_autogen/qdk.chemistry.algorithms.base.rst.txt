@@ -1,0 +1,8 @@
+qdk.chemistry.algorithms.base module
+====================================
+
+.. automodule:: qdk.chemistry.algorithms.base
+   :members:
+   :private-members:
+   :show-inheritance:
+   :undoc-members:

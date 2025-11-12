@@ -1,0 +1,502 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../../../">
+<head>
+  <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>ScfSolver &mdash; QDK/Chemistry 0.0.1 documentation</title>
+      <link rel="stylesheet" type="text/css" href="../../../_static/pygments.css?v=b86133f3" />
+      <link rel="stylesheet" type="text/css" href="../../../_static/css/theme.css?v=e59714d7" />
+      <link rel="stylesheet" type="text/css" href="../../../_static/tabs.css?v=4c969af8" />
+      <link rel="stylesheet" type="text/css" href="../../../_static/graphviz.css?v=4ae1632d" />
+      <link rel="stylesheet" type="text/css" href="../../../_static/copybutton.css?v=76b2166b" />
+
+  
+      <script src="../../../_static/jquery.js?v=5d32c60e"></script>
+      <script src="../../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="../../../_static/documentation_options.js?v=d45e8c67"></script>
+      <script src="../../../_static/doctools.js?v=9bcbadda"></script>
+      <script src="../../../_static/sphinx_highlight.js?v=dc90522c"></script>
+      <script src="../../../_static/tabs.js?v=3ee01567"></script>
+      <script src="../../../_static/clipboard.min.js?v=a7894cd8"></script>
+      <script src="../../../_static/copybutton.js?v=f281be69"></script>
+    <script src="../../../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../../../genindex.html" />
+    <link rel="search" title="Search" href="../../../search.html" />
+    <link rel="next" title="Localizer" href="localizer.html" />
+    <link rel="prev" title="Algorithms" href="../algorithms.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="../../../index.html" class="icon icon-home">
+            QDK/Chemistry
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../../../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">User Documentation</span></p>
+<ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="../../Quickstart.html">Quickstart</a></li>
+<li class="toctree-l1 current"><a class="reference internal" href="../index.html">In-Depth Guide</a><ul class="current">
+<li class="toctree-l2"><a class="reference internal" href="../design.html">Design and Architecture</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../data.html">Data Classes</a></li>
+<li class="toctree-l2 current"><a class="reference internal" href="../algorithms.html">Algorithms</a><ul class="current">
+<li class="toctree-l3 current"><a class="current reference internal" href="#">ScfSolver</a><ul>
+<li class="toctree-l4"><a class="reference internal" href="#overview">Overview</a></li>
+<li class="toctree-l4"><a class="reference internal" href="#capabilities">Capabilities</a></li>
+<li class="toctree-l4"><a class="reference internal" href="#creating-an-scf-solver">Creating an SCF Solver</a></li>
+<li class="toctree-l4"><a class="reference internal" href="#configuring-the-scf-calculation">Configuring the SCF Calculation</a></li>
+<li class="toctree-l4"><a class="reference internal" href="#running-an-scf-calculation">Running an SCF Calculation</a></li>
+<li class="toctree-l4"><a class="reference internal" href="#available-settings">Available Settings</a></li>
+<li class="toctree-l4"><a class="reference internal" href="#implemented-interface">Implemented Interface</a></li>
+<li class="toctree-l4"><a class="reference internal" href="#related-classes">Related Classes</a></li>
+<li class="toctree-l4"><a class="reference internal" href="#related-topics">Related Topics</a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="localizer.html">Localizer</a></li>
+<li class="toctree-l3"><a class="reference internal" href="active_space.html">ActiveSpaceSelector</a></li>
+<li class="toctree-l3"><a class="reference internal" href="hamiltonian_constructor.html">HamiltonianConstructor</a></li>
+<li class="toctree-l3"><a class="reference internal" href="mc_calculator.html">MCCalculator</a></li>
+<li class="toctree-l3"><a class="reference internal" href="dynamical_correlation.html">DynamicalCorrelation</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="../keywords.html">Functionals and Basis Sets</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../plugins.html">Plugins</a></li>
+</ul>
+</li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">API Reference</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../api/python_api.html">Python API</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../api/cpp_api.html">C++ API</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Supporting Information</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../glossary.html">Glossary</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../references.html">References</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../../../index.html">QDK/Chemistry</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../../../index.html" class="icon icon-home" aria-label="Home"></a></li>
+          <li class="breadcrumb-item"><a href="../index.html">In-Depth Guide</a></li>
+          <li class="breadcrumb-item"><a href="../algorithms.html">Algorithms</a></li>
+      <li class="breadcrumb-item active">ScfSolver</li>
+      <li class="wy-breadcrumbs-aside">
+            <a href="../../../_sources/user/comprehensive/algorithms/scf_solver.rst.txt" rel="nofollow"> View page source</a>
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <section id="scfsolver">
+<h1>ScfSolver<a class="headerlink" href="#scfsolver" title="Link to this heading"></a></h1>
+<p>The <code class="docutils literal notranslate"><span class="pre">ScfSolver</span></code> algorithm in QDK/Chemistry performs Self-Consistent Field (SCF) calculations to optimize molecular orbitals for a
+given molecular structure. Following QDK/Chemistry’s <a class="reference internal" href="../advanced/design_principles.html"><span class="doc">algorithm design principles</span></a>, it takes a
+<a class="reference internal" href="../data/structure.html"><span class="doc">Structure</span></a> instance as input and produces an <a class="reference internal" href="../data/orbitals.html"><span class="doc">Orbitals</span></a> instance as
+output. Its primary purpose is to find the best single-particle orbitals within a mean-field approximation. For
+Hartree-Fock (HF) theory, it yields the mean field energy, which misses electron correlation and typically requires
+post-HF methods for accurate energetics. For Density Functional Theory (DFT), some correlation effects are included
+through the exchange-correlation functional.</p>
+<section id="overview">
+<h2>Overview<a class="headerlink" href="#overview" title="Link to this heading"></a></h2>
+<p>Self-Consistent Field theory encompasses both Hartree-Fock (HF) and Density Functional Theory (DFT) methods in quantum
+chemistry. Both methods rely on a single Slater determinant representation of the many-electron wavefunction, using
+molecular orbitals that are optimized to minimize the electronic energy. This single-determinant approach is a key
+simplification that makes these methods computationally efficient but limits their ability to capture certain
+correlation effects. The SCF procedure iteratively refines these orbitals until self-consistency is achieved.</p>
+<p>At its core, an SCF calculation:</p>
+<ol class="arabic simple">
+<li><p><strong>Initializes a starting guess</strong> for the molecular orbitals, typically using a superposition of atomic orbitals</p></li>
+<li><p><strong>Constructs the Fock matrix</strong> which represents the effective one-electron Hamiltonian</p></li>
+<li><p><strong>Diagonalizes the matrix</strong> to obtain a new set of molecular orbitals and their energies</p></li>
+<li><p><strong>Computes the electron density</strong> from the occupied molecular orbitals</p></li>
+<li><p><strong>Checks for convergence</strong> by comparing the new density with that from the previous iteration</p></li>
+<li><p><strong>Repeats steps 2-5</strong> until the density and energy no longer change significantly between iterations</p></li>
+</ol>
+<p>This iterative process is called “self-consistent” because the orbitals used to construct the Fock/Kohn-Sham operator
+must be consistent with the orbitals obtained by solving the resulting eigenvalue equation. The final result provides:</p>
+<ul class="simple">
+<li><p>Optimized molecular orbitals and their energies</p></li>
+<li><p>Mean-field energy (for HF), which excludes electron correlation</p></li>
+<li><p>Approximated ground state energy (for DFT), with correlation treated through the functional</p></li>
+<li><p>Electron density distribution</p></li>
+<li><p>Various electronic properties derived from the wavefunction/density</p></li>
+</ul>
+<p>SCF methods provide an excellent starting point, but they miss important electronic correlation effects:</p>
+<ul class="simple">
+<li><p><strong>Static correlation</strong>: Essential for systems with near-degenerate states or bond-breaking processes. See
+<a class="reference internal" href="mc_calculator.html"><span class="doc">MCCalculator</span></a> documentation.</p></li>
+<li><p><strong>Dynamic correlation</strong>: Required for all molecular systems to account for instantaneous electron-electron
+interactions. See <a class="reference internal" href="dynamical_correlation.html"><span class="doc">Dynamic Correlation</span></a> documentation.</p></li>
+</ul>
+<p>The orbitals from SCF calculations typically serve as input for post-SCF methods that capture these correlation effects.</p>
+<p>SCF methods thus serve as the foundation for more advanced electronic structure calculations and provide essential
+insights into molecular properties, reactivity, and spectroscopic characteristics.</p>
+</section>
+<section id="capabilities">
+<h2>Capabilities<a class="headerlink" href="#capabilities" title="Link to this heading"></a></h2>
+<p>The <code class="docutils literal notranslate"><span class="pre">ScfSolver</span></code> in QDK/Chemistry provides the following calculation types for both Hartree-Fock and Density Functional Theory
+methods:</p>
+<ul class="simple">
+<li><p><strong>Restricted calculations</strong>: For closed-shell systems with paired electrons</p>
+<ul>
+<li><p>Restricted Hartree-Fock (RHF)</p></li>
+<li><p>Restricted Kohn-Sham DFT (RKS)</p></li>
+</ul>
+</li>
+<li><p><strong>Unrestricted calculations</strong>: For open-shell systems with unpaired electrons (TODO: Implementation details)</p>
+<ul>
+<li><p>Unrestricted Hartree-Fock (UHF)</p></li>
+<li><p>Unrestricted Kohn-Sham DFT (UKS)</p></li>
+</ul>
+</li>
+</ul>
+<div class="admonition-todo admonition" id="id1">
+<p class="admonition-title">Todo</p>
+<p>TODO (NAB):  finish SCF Solver documentation
+<a class="reference external" href="https://dev.azure.com/ms-azurequantum/AzureQuantum/_workitems/edit/41382">https://dev.azure.com/ms-azurequantum/AzureQuantum/_workitems/edit/41382</a></p>
+</div>
+<ul class="simple">
+<li><p><strong>Restricted Open-shell calculations</strong>: For open-shell systems with restricted orbitals (TODO: Implementation details)</p>
+<ul>
+<li><p>Restricted Open-shell Hartree-Fock (ROHF)</p></li>
+<li><p>Restricted Open-shell Kohn-Sham DFT (ROKS)</p></li>
+</ul>
+</li>
+</ul>
+<div class="admonition-todo admonition" id="id2">
+<p class="admonition-title">Todo</p>
+<p>TODO (NAB):  finish SCF Solver documentation
+<a class="reference external" href="https://dev.azure.com/ms-azurequantum/AzureQuantum/_workitems/edit/41382">https://dev.azure.com/ms-azurequantum/AzureQuantum/_workitems/edit/41382</a></p>
+</div>
+<ul class="simple">
+<li><p><strong>DFT-specific features</strong>:</p>
+<ul>
+<li><p>Support for various <span class="xref std std-doc">exchange-correlation functionals</span> including LDA, GGA, meta-GGA, hybrid,
+and range-separated functionals</p></li>
+</ul>
+</li>
+<li><p><strong>Basis set support</strong>:</p>
+<ul>
+<li><p>Extensive library of standard quantum chemistry <span class="xref std std-doc">basis sets</span> including Pople (STO-nG, 3-21G,
+6-31G, etc.), Dunning (cc-pVDZ, cc-pVTZ, etc.), and Karlsruhe (def2-SVP, def2-TZVP, etc.) families</p></li>
+<li><p>Support for custom basis sets and effective core potentials (ECPs) (TODO)</p></li>
+</ul>
+</li>
+</ul>
+<div class="admonition-todo admonition" id="id3">
+<p class="admonition-title">Todo</p>
+<p>TODO (NAB):  finish SCF Solver documentation
+<a class="reference external" href="https://dev.azure.com/ms-azurequantum/AzureQuantum/_workitems/edit/41382">https://dev.azure.com/ms-azurequantum/AzureQuantum/_workitems/edit/41382</a></p>
+</div>
+</section>
+<section id="creating-an-scf-solver">
+<h2>Creating an SCF Solver<a class="headerlink" href="#creating-an-scf-solver" title="Link to this heading"></a></h2>
+<p>As an algorithm class in QDK/Chemistry, the <code class="docutils literal notranslate"><span class="pre">ScfSolver</span></code> follows the
+<a class="reference internal" href="../advanced/design_principles.html"><span class="doc">factory pattern design principle</span></a> and is created using its corresponding factory:</p>
+<section id="available-solvers">
+<h3>Available Solvers<a class="headerlink" href="#available-solvers" title="Link to this heading"></a></h3>
+<p>QDK/Chemistry currently provides the following registered solvers:</p>
+<div class="tab-set docutils container">
+<input checked="True" class="tab-input" id="tab-set--0-input--1" name="tab-set--0" type="radio"><label class="tab-label" for="tab-set--0-input--1">C++ API</label><div class="tab-content docutils container">
+<div class="highlight-cpp notranslate"><div class="highlight"><pre><span></span><span class="cp">#include</span><span class="w"> </span><span class="cpf">&lt;qdk/chemistry.hpp&gt;</span>
+<span class="k">using</span><span class="w"> </span><span class="k">namespace</span><span class="w"> </span><span class="nn">qdk</span><span class="o">::</span><span class="nn">chemistry</span><span class="o">::</span><span class="nn">algorithms</span><span class="p">;</span>
+
+<span class="c1">// Create the default ScfSolver instance</span>
+<span class="k">auto</span><span class="w"> </span><span class="n">scf_solver</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">ScfSolverFactory</span><span class="o">::</span><span class="n">create</span><span class="p">();</span>
+
+<span class="c1">// Or specify a particular solver implementation</span>
+<span class="k">auto</span><span class="w"> </span><span class="n">pyscf_solver</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">ScfSolverFactory</span><span class="o">::</span><span class="n">create</span><span class="p">(</span><span class="s">&quot;pyscf&quot;</span><span class="p">);</span>
+</pre></div>
+</div>
+</div>
+<input class="tab-input" id="tab-set--0-input--2" name="tab-set--0" type="radio"><label class="tab-label" for="tab-set--0-input--2">Python API</label><div class="tab-content docutils container">
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">from</span><span class="w"> </span><span class="nn">qdk.chemistry.algorithms</span><span class="w"> </span><span class="kn">import</span> <span class="n">create_scf_solver</span>
+
+<span class="c1"># Create the default ScfSolver instance</span>
+<span class="n">scf_solver</span> <span class="o">=</span> <span class="n">create_scf_solver</span><span class="p">()</span>
+
+<span class="c1"># Or specify a particular solver implementation</span>
+<span class="n">pyscf_solver</span> <span class="o">=</span> <span class="n">create_scf_solver</span><span class="p">(</span><span class="n">implementation</span><span class="o">=</span><span class="s2">&quot;pyscf&quot;</span><span class="p">)</span>
+</pre></div>
+</div>
+</div>
+</div>
+</section>
+</section>
+<section id="configuring-the-scf-calculation">
+<h2>Configuring the SCF Calculation<a class="headerlink" href="#configuring-the-scf-calculation" title="Link to this heading"></a></h2>
+<p>The <code class="docutils literal notranslate"><span class="pre">ScfSolver</span></code> can be configured using the <code class="docutils literal notranslate"><span class="pre">Settings</span></code> object.
+QDK/Chemistry provides standard SCF settings that apply to all solver implementations, as well as specialized settings for specific solvers or algorithms.</p>
+<p>QDK/Chemistry provides both standard settings that work across all SCF solver implementations and specialized settings for specific algorithms or implementations.
+See the <a class="reference internal" href="#available-settings">Available Settings</a> section below for a complete list of configuration options.</p>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>For a complete list of available basis sets and their specifications, see the
+<span class="xref std std-doc">Supported Basis Sets</span> documentation. This reference provides detailed information about all
+pre-defined basis sets you can use with the <code class="docutils literal notranslate"><span class="pre">basis_set</span></code> setting.</p>
+</div>
+<div class="tab-set docutils container">
+<input checked="True" class="tab-input" id="tab-set--1-input--1" name="tab-set--1" type="radio"><label class="tab-label" for="tab-set--1-input--1">C++ API</label><div class="tab-content docutils container">
+<div class="highlight-cpp notranslate"><div class="highlight"><pre><span></span><span class="c1">// Standard settings that work with all solvers</span>
+<span class="c1">// Set the method</span>
+<span class="n">scf_solver</span><span class="p">.</span><span class="n">settings</span><span class="p">().</span><span class="n">set</span><span class="p">(</span><span class="s">&quot;method&quot;</span><span class="p">,</span><span class="w"> </span><span class="s">&quot;dft&quot;</span><span class="p">)</span>
+<span class="c1">// Set the basis set</span>
+<span class="n">scf_solver</span><span class="o">-&gt;</span><span class="n">settings</span><span class="p">().</span><span class="n">set</span><span class="p">(</span><span class="s">&quot;basis_set&quot;</span><span class="p">,</span><span class="w"> </span><span class="s">&quot;def2-tzvpp&quot;</span><span class="p">);</span>
+
+<span class="c1">// For DFT calculations, set the exchange-correlation functional</span>
+<span class="n">scf_solver</span><span class="o">-&gt;</span><span class="n">settings</span><span class="p">().</span><span class="n">set</span><span class="p">(</span><span class="s">&quot;functional&quot;</span><span class="p">,</span><span class="w"> </span><span class="s">&quot;B3LYP&quot;</span><span class="p">);</span>
+</pre></div>
+</div>
+</div>
+<input class="tab-input" id="tab-set--1-input--2" name="tab-set--1" type="radio"><label class="tab-label" for="tab-set--1-input--2">Python API</label><div class="tab-content docutils container">
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="c1"># Standard settings that work with all solvers</span>
+<span class="c1"># Set the method</span>
+<span class="n">scf_solver</span><span class="o">.</span><span class="n">settings</span><span class="p">()</span><span class="o">.</span><span class="n">set</span><span class="p">(</span><span class="s2">&quot;method&quot;</span><span class="p">,</span> <span class="s2">&quot;dft&quot;</span><span class="p">)</span>
+<span class="c1"># Set the basis set</span>
+<span class="n">scf_solver</span><span class="o">.</span><span class="n">settings</span><span class="p">()</span><span class="o">.</span><span class="n">set</span><span class="p">(</span><span class="s2">&quot;basis_set&quot;</span><span class="p">,</span> <span class="s2">&quot;def2-tzvpp&quot;</span><span class="p">)</span>
+
+<span class="c1"># For DFT calculations, set the exchange-correlation functional</span>
+<span class="n">scf_solver</span><span class="o">.</span><span class="n">settings</span><span class="p">()</span><span class="o">.</span><span class="n">set</span><span class="p">(</span><span class="s2">&quot;functional&quot;</span><span class="p">,</span> <span class="s2">&quot;B3LYP&quot;</span><span class="p">)</span>
+</pre></div>
+</div>
+</div>
+</div>
+</section>
+<section id="running-an-scf-calculation">
+<h2>Running an SCF Calculation<a class="headerlink" href="#running-an-scf-calculation" title="Link to this heading"></a></h2>
+<p>Once configured, the SCF calculation can be executed on a molecular structure. The <code class="docutils literal notranslate"><span class="pre">solve</span></code> method returns two values:</p>
+<ol class="arabic simple">
+<li><p>A scalar <code class="docutils literal notranslate"><span class="pre">double</span></code> value representing the converged SCF energy</p></li>
+<li><p>An <a class="reference internal" href="../data/orbitals.html"><span class="doc">Orbitals</span></a> object containing the optimized molecular orbitals</p></li>
+</ol>
+<div class="tab-set docutils container">
+<input checked="True" class="tab-input" id="tab-set--2-input--1" name="tab-set--2" type="radio"><label class="tab-label" for="tab-set--2-input--1">C++ API</label><div class="tab-content docutils container">
+<div class="highlight-cpp notranslate"><div class="highlight"><pre><span></span><span class="c1">// Create a structure (or load from a file)</span>
+<span class="n">Structure</span><span class="w"> </span><span class="n">structure</span><span class="p">;</span>
+<span class="c1">// configuring structure ...</span>
+
+<span class="c1">// Run the SCF calculation</span>
+<span class="c1">// Return types are: std::tuple&lt;double, Orbitals&gt;</span>
+<span class="k">auto</span><span class="w"> </span><span class="p">[</span><span class="n">E_scf</span><span class="p">,</span><span class="w"> </span><span class="n">scf_orbitals</span><span class="p">]</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">scf_solver</span><span class="o">-&gt;</span><span class="n">solve</span><span class="p">(</span><span class="n">structure</span><span class="p">);</span>
+<span class="n">std</span><span class="o">::</span><span class="n">cout</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="s">&quot;SCF Energy: &quot;</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="n">E_scf</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="s">&quot; Hartree&quot;</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="n">std</span><span class="o">::</span><span class="n">endl</span><span class="p">;</span>
+</pre></div>
+</div>
+</div>
+<input class="tab-input" id="tab-set--2-input--2" name="tab-set--2" type="radio"><label class="tab-label" for="tab-set--2-input--2">Python API</label><div class="tab-content docutils container">
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="c1"># Create a structure (or load from a file)</span>
+<span class="n">structure</span> <span class="o">=</span> <span class="n">Structure</span><span class="p">()</span>
+<span class="c1"># configuring structure ...</span>
+
+<span class="c1"># Run the SCF calculation</span>
+<span class="c1"># Returns: (float, Orbitals)</span>
+<span class="n">E_scf</span><span class="p">,</span> <span class="n">scf_orbitals</span> <span class="o">=</span> <span class="n">scf_solver</span><span class="o">.</span><span class="n">solve</span><span class="p">(</span><span class="n">structure</span><span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;SCF Energy: </span><span class="si">{</span><span class="n">E_scf</span><span class="si">}</span><span class="s2"> Hartree&quot;</span><span class="p">)</span>
+</pre></div>
+</div>
+</div>
+</div>
+</section>
+<section id="available-settings">
+<h2>Available Settings<a class="headerlink" href="#available-settings" title="Link to this heading"></a></h2>
+<p>The <code class="docutils literal notranslate"><span class="pre">ScfSolver</span></code> accepts a range of settings to control its behavior. These settings are divided into base settings
+(common to all SCF calculations) and specialized settings (specific to certain SCF variants).</p>
+<section id="base-settings">
+<h3>Base Settings<a class="headerlink" href="#base-settings" title="Link to this heading"></a></h3>
+<div class="admonition-todo admonition" id="id4">
+<p class="admonition-title">Todo</p>
+<p>🔧 <strong>TODO:</strong> Add comprehensive list of all actual base settings used by ScfSolver implementations</p>
+<p>TODO (NAB):  finish SCF Solver documentation
+<a class="reference external" href="https://dev.azure.com/ms-azurequantum/AzureQuantum/_workitems/edit/41382">https://dev.azure.com/ms-azurequantum/AzureQuantum/_workitems/edit/41382</a></p>
+</div>
+<p>These settings apply to all SCF calculations:</p>
+<div class="admonition-todo admonition" id="id5">
+<p class="admonition-title">Todo</p>
+<p>TODO (NAB):  finish SCF Solver documentation below
+<a class="reference external" href="https://dev.azure.com/ms-azurequantum/AzureQuantum/_workitems/edit/41382">https://dev.azure.com/ms-azurequantum/AzureQuantum/_workitems/edit/41382</a></p>
+</div>
+<table class="docutils align-default">
+<colgroup>
+<col style="width: 25.0%" />
+<col style="width: 15.0%" />
+<col style="width: 15.0%" />
+<col style="width: 45.0%" />
+</colgroup>
+<thead>
+<tr class="row-odd"><th class="head"><p>Setting</p></th>
+<th class="head"><p>Type</p></th>
+<th class="head"><p>Default</p></th>
+<th class="head"><p>Description</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">method</span></code></p></td>
+<td><p>string</p></td>
+<td><p>TODO</p></td>
+<td><p>The method to use for the calculation</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">basis_set</span></code></p></td>
+<td><p>string</p></td>
+<td><p>TODO</p></td>
+<td><p>The basis set to use for the calculation</p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">convergence_threshold</span></code></p></td>
+<td><p>float</p></td>
+<td><p>TODO</p></td>
+<td><p>Energy convergence criterion for SCF iterations</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">max_iterations</span></code></p></td>
+<td><p>int</p></td>
+<td><p>TODO</p></td>
+<td><p>Maximum number of SCF iterations</p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">multiplicity</span></code></p></td>
+<td><p>int</p></td>
+<td><p>1</p></td>
+<td><p>Spin multiplicity of the system (TODO: move this to structure)</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">charge</span></code></p></td>
+<td><p>int</p></td>
+<td><p>0</p></td>
+<td><p>Total charge of the system (TODO: move this to structure)</p></td>
+</tr>
+</tbody>
+</table>
+</section>
+<section id="specialized-settings">
+<h3>Specialized Settings<a class="headerlink" href="#specialized-settings" title="Link to this heading"></a></h3>
+<div class="admonition-todo admonition" id="id6">
+<p class="admonition-title">Todo</p>
+<p>🔧 <strong>TODO:</strong> Add comprehensive list of all actual specialized settings used by ScfSolver implementations</p>
+<p>TODO (NAB):  finish SCF Solver documentation above and below
+<a class="reference external" href="https://dev.azure.com/ms-azurequantum/AzureQuantum/_workitems/edit/41382">https://dev.azure.com/ms-azurequantum/AzureQuantum/_workitems/edit/41382</a></p>
+</div>
+<p>These settings apply only to specific variants of SCF calculations:</p>
+<table class="docutils align-default">
+<colgroup>
+<col style="width: 20.0%" />
+<col style="width: 15.0%" />
+<col style="width: 15.0%" />
+<col style="width: 30.0%" />
+<col style="width: 20.0%" />
+</colgroup>
+<thead>
+<tr class="row-odd"><th class="head"><p>Setting</p></th>
+<th class="head"><p>Type</p></th>
+<th class="head"><p>Default</p></th>
+<th class="head"><p>Description</p></th>
+<th class="head"><p>Applicable To</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">functional</span></code></p></td>
+<td><p>string</p></td>
+<td><p>TODO</p></td>
+<td><p>Exchange-correlation functional for DFT (empty for HF); see <span class="xref std std-doc">functionals documentation</span></p></td>
+<td><p>DFT only</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">level_shift</span></code></p></td>
+<td><p>float</p></td>
+<td><p>0.0</p></td>
+<td><p>Energy level shifting for virtual orbitals to aid convergence</p></td>
+<td><p>All SCF types</p></td>
+</tr>
+</tbody>
+</table>
+</section>
+</section>
+<section id="implemented-interface">
+<h2>Implemented Interface<a class="headerlink" href="#implemented-interface" title="Link to this heading"></a></h2>
+<p>QDK/Chemistry’s <code class="docutils literal notranslate"><span class="pre">ScfSolver</span></code> provides a unified interface to SCF calculations across various quantum chemistry packages:</p>
+<section id="qdk-chemistry-implementations">
+<h3>QDK/Chemistry Implementations<a class="headerlink" href="#qdk-chemistry-implementations" title="Link to this heading"></a></h3>
+<ul class="simple">
+<li><p><strong>qdk</strong>: Native implementation with support for RHF, UHF, RKS and UKS</p></li>
+</ul>
+</section>
+<section id="third-party-interfaces">
+<h3>Third-Party Interfaces<a class="headerlink" href="#third-party-interfaces" title="Link to this heading"></a></h3>
+<ul class="simple">
+<li><p><strong>pyscf</strong>: Comprehensive Python-based quantum chemistry package with extensive DFT capabilities</p></li>
+</ul>
+<p>The factory pattern allows seamless selection between these implementations, with the most appropriate option chosen
+based on the calculation requirements and available packages.</p>
+<p>For more details on how QDK/Chemistry interfaces with external packages, see the <a class="reference internal" href="../advanced/interfaces.html"><span class="doc">Interfaces</span></a> documentation.</p>
+</section>
+</section>
+<section id="related-classes">
+<h2>Related Classes<a class="headerlink" href="#related-classes" title="Link to this heading"></a></h2>
+<ul class="simple">
+<li><p><a class="reference internal" href="../data/structure.html"><span class="doc">Structure</span></a>: Input molecular structure</p></li>
+<li><p><a class="reference internal" href="../data/orbitals.html"><span class="doc">Orbitals</span></a>: Output optimized molecular orbitals</p></li>
+</ul>
+</section>
+<section id="related-topics">
+<h2>Related Topics<a class="headerlink" href="#related-topics" title="Link to this heading"></a></h2>
+<ul class="simple">
+<li><p><a class="reference internal" href="../advanced/settings.html"><span class="doc">Settings</span></a>: Configuration settings for algorithms</p></li>
+<li><p><a class="reference internal" href="../advanced/factory_pattern.html"><span class="doc">Factory Pattern</span></a>: Understanding algorithm creation</p></li>
+</ul>
+</section>
+</section>
+
+
+           </div>
+          </div>
+          <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
+        <a href="../algorithms.html" class="btn btn-neutral float-left" title="Algorithms" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+        <a href="localizer.html" class="btn btn-neutral float-right" title="Localizer" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright Copyright (c) Microsoft Corporation. All rights reserved. Licensed under the MIT License..</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

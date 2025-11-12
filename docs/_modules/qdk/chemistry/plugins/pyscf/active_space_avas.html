@@ -1,0 +1,341 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../../../../../">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>qdk.chemistry.plugins.pyscf.active_space_avas &mdash; QDK/Chemistry 0.0.1 documentation</title>
+      <link rel="stylesheet" type="text/css" href="../../../../../_static/pygments.css?v=b86133f3" />
+      <link rel="stylesheet" type="text/css" href="../../../../../_static/css/theme.css?v=e59714d7" />
+      <link rel="stylesheet" type="text/css" href="../../../../../_static/tabs.css?v=4c969af8" />
+      <link rel="stylesheet" type="text/css" href="../../../../../_static/graphviz.css?v=4ae1632d" />
+      <link rel="stylesheet" type="text/css" href="../../../../../_static/copybutton.css?v=76b2166b" />
+
+  
+      <script src="../../../../../_static/jquery.js?v=5d32c60e"></script>
+      <script src="../../../../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="../../../../../_static/documentation_options.js?v=d45e8c67"></script>
+      <script src="../../../../../_static/doctools.js?v=9bcbadda"></script>
+      <script src="../../../../../_static/sphinx_highlight.js?v=dc90522c"></script>
+      <script src="../../../../../_static/tabs.js?v=3ee01567"></script>
+      <script src="../../../../../_static/clipboard.min.js?v=a7894cd8"></script>
+      <script src="../../../../../_static/copybutton.js?v=f281be69"></script>
+    <script src="../../../../../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../../../../../genindex.html" />
+    <link rel="search" title="Search" href="../../../../../search.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="../../../../../index.html" class="icon icon-home">
+            QDK/Chemistry
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../../../../../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">User Documentation</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../../../user/Quickstart.html">Quickstart</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../../../user/comprehensive/index.html">In-Depth Guide</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">API Reference</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../../../api/python_api.html">Python API</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../../../api/cpp_api.html">C++ API</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Supporting Information</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../../../glossary.html">Glossary</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../../../references.html">References</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../../../../../index.html">QDK/Chemistry</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../../../../../index.html" class="icon icon-home" aria-label="Home"></a></li>
+          <li class="breadcrumb-item"><a href="../../../../index.html">Module code</a></li>
+      <li class="breadcrumb-item active">qdk.chemistry.plugins.pyscf.active_space_avas</li>
+      <li class="wy-breadcrumbs-aside">
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <h1>Source code for qdk.chemistry.plugins.pyscf.active_space_avas</h1><div class="highlight"><pre>
+<span></span><span class="sd">&quot;&quot;&quot;PySCF AVAS active space selector implementation for qdk.chemistry.</span>
+
+<span class="sd">This module provides an interface to the PySCF Automated Valence Active Space (AVAS)</span>
+<span class="sd">method for selecting active spaces in quantum chemistry calculations. The AVAS method</span>
+<span class="sd">automatically constructs molecular active spaces from atomic valence orbitals.</span>
+
+<span class="sd">The module contains:</span>
+
+<span class="sd">* :class:`PyscfAVASSettings`: Configuration class for AVAS parameters</span>
+<span class="sd">* :class:`PyscfAVAS`: Main active space selector implementing the AVAS algorithm</span>
+<span class="sd">* Registration functions to integrate with the QDK/Chemistry framework</span>
+
+<span class="sd">References</span>
+<span class="sd">----------</span>
+<span class="sd">&gt;&gt;&gt; from qdk.chemistry.plugins.pyscf.active_space import PyscfAVAS</span>
+<span class="sd">&gt;&gt;&gt; avas_selector = PyscfAVAS()</span>
+<span class="sd">&gt;&gt;&gt; avas_selector.settings().set(&quot;ao_labels&quot;, [&quot;Fe 3d&quot;, &quot;Fe 4d&quot;])</span>
+<span class="sd">&gt;&gt;&gt; active_orbitals = avas_selector.run(molecular_orbitals)</span>
+
+<span class="sd">&quot;&quot;&quot;</span>
+
+<span class="kn">import</span><span class="w"> </span><span class="nn">re</span>
+
+<span class="kn">import</span><span class="w"> </span><span class="nn">numpy</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">np</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">pyscf.mcscf</span><span class="w"> </span><span class="kn">import</span> <span class="n">avas</span>
+
+<span class="kn">from</span><span class="w"> </span><span class="nn">qdk.chemistry.algorithms</span><span class="w"> </span><span class="kn">import</span> <span class="n">ActiveSpaceSelector</span><span class="p">,</span> <span class="n">register</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">qdk.chemistry.data</span><span class="w"> </span><span class="kn">import</span> <span class="n">Configuration</span><span class="p">,</span> <span class="n">Orbitals</span><span class="p">,</span> <span class="n">Settings</span><span class="p">,</span> <span class="n">SlaterDeterminantContainer</span><span class="p">,</span> <span class="n">Wavefunction</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">qdk.chemistry.plugins.pyscf.utils</span><span class="w"> </span><span class="kn">import</span> <span class="n">orbitals_to_scf</span>
+
+
+<div class="viewcode-block" id="PyscfAVASSettings">
+<a class="viewcode-back" href="../../../../../api/api_autogen/qdk.chemistry.plugins.pyscf.active_space_avas.html#qdk.chemistry.plugins.pyscf.active_space_avas.PyscfAVASSettings">[docs]</a>
+<span class="k">class</span><span class="w"> </span><span class="nc">PyscfAVASSettings</span><span class="p">(</span><span class="n">Settings</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Settings for the PySCF AVAS Active Space Selector.</span>
+
+<span class="sd">    This class manages the configuration parameters for the PySCF AVAS, providing a convenient</span>
+<span class="sd">    interface for setting and getting options.</span>
+
+<span class="sd">    Attributes:</span>
+<span class="sd">        ao_labels (list of str, default = None): The atomic orbital labels to be included in the active space.</span>
+<span class="sd">        canonicalize (bool, default = False): Whether to canonicalize the active space orbitals after selection.</span>
+<span class="sd">        openshell_option (int, default = 2): How to handle singly-occupied orbitals in the active space.</span>
+<span class="sd">            The singly-occupied orbitals are projected as part of alpha orbitals if ``openshell_option=2``, or</span>
+<span class="sd">            completely kept in active space if ``openshell_option=3``.</span>
+
+<span class="sd">    Examples:</span>
+<span class="sd">        &gt;&gt;&gt; settings = PyscfAVASSettings()</span>
+<span class="sd">        &gt;&gt;&gt; settings.get(&quot;ao_labels&quot;)</span>
+<span class="sd">        []</span>
+<span class="sd">        &gt;&gt;&gt; settings.set(&quot;ao_labels&quot;, [&quot;1s&quot;, &quot;2s&quot;, &quot;2p&quot;])</span>
+<span class="sd">        &gt;&gt;&gt; settings.get(&quot;ao_labels&quot;)</span>
+<span class="sd">        [&#39;1s&#39;, &#39;2s&#39;, &#39;2p&#39;]</span>
+
+<span class="sd">    &quot;&quot;&quot;</span>
+
+<div class="viewcode-block" id="PyscfAVASSettings.__init__">
+<a class="viewcode-back" href="../../../../../api/api_autogen/qdk.chemistry.plugins.pyscf.active_space_avas.html#qdk.chemistry.plugins.pyscf.active_space_avas.PyscfAVASSettings.__init__">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Initialize the settings with default values.&quot;&quot;&quot;</span>
+        <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">()</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_set_default</span><span class="p">(</span><span class="s2">&quot;ao_labels&quot;</span><span class="p">,</span> <span class="s2">&quot;vector&lt;string&gt;&quot;</span><span class="p">,</span> <span class="p">[])</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_set_default</span><span class="p">(</span><span class="s2">&quot;canonicalize&quot;</span><span class="p">,</span> <span class="s2">&quot;bool&quot;</span><span class="p">,</span> <span class="kc">False</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_set_default</span><span class="p">(</span><span class="s2">&quot;openshell_option&quot;</span><span class="p">,</span> <span class="s2">&quot;int&quot;</span><span class="p">,</span> <span class="mi">2</span><span class="p">)</span></div>
+</div>
+
+
+
+<div class="viewcode-block" id="PyscfAVAS">
+<a class="viewcode-back" href="../../../../../api/api_autogen/qdk.chemistry.plugins.pyscf.active_space_avas.html#qdk.chemistry.plugins.pyscf.active_space_avas.PyscfAVAS">[docs]</a>
+<span class="k">class</span><span class="w"> </span><span class="nc">PyscfAVAS</span><span class="p">(</span><span class="n">ActiveSpaceSelector</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;PySCF-based Active Space Selector for quantum chemistry calculations.</span>
+
+<span class="sd">    This class exposes AVAS active space selection using the PySCF library.</span>
+
+<span class="sd">    The details of the AVAS method can be found in the following publication:</span>
+
+<span class="sd">        Sayfutyarova, E.R.; Sun, Q.; Chan, G.K.-L.; Knizia, G.;</span>
+<span class="sd">        &quot;Automated construction of molecular active spaces from atomic valence orbitals&quot;</span>
+<span class="sd">        J. Chem. Theory Comput. 2017, 13, 9, 4063-4078</span>
+<span class="sd">        doi: `10.1021/acs.jctc.7b00128 &lt;https://doi.org/10.1021/acs.jctc.7b00128&gt;`_</span>
+<span class="sd">        arXiv: `1701.07862 &lt;https://arxiv.org/abs/1701.07862&gt;`_</span>
+
+<span class="sd">    Example:</span>
+<span class="sd">        &gt;&gt;&gt; avas = PyscfAVAS()</span>
+<span class="sd">        &gt;&gt;&gt; avas.settings().set(&quot;ao_labels&quot;, [&quot;Fe 3d&quot;, &quot;Fe 4d&quot;])</span>
+<span class="sd">        &gt;&gt;&gt; active_orbitals = avas.run(wavefunction)</span>
+
+<span class="sd">    Notes:</span>
+<span class="sd">        The selection criteria can be customized through the settings object.</span>
+
+<span class="sd">    &quot;&quot;&quot;</span>
+
+<div class="viewcode-block" id="PyscfAVAS.__init__">
+<a class="viewcode-back" href="../../../../../api/api_autogen/qdk.chemistry.plugins.pyscf.active_space_avas.html#qdk.chemistry.plugins.pyscf.active_space_avas.PyscfAVAS.__init__">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Initialize the PySCF AVAS with default settings.&quot;&quot;&quot;</span>
+        <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">()</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_settings</span> <span class="o">=</span> <span class="n">PyscfAVASSettings</span><span class="p">()</span></div>
+
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">_run_impl</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">wavefunction</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Orbitals</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Select the active space from the provided wavefunction.</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            wavefunction: The wavefunction object containing orbital information.</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            Orbitals with the active space identified and populated. AVAS may</span>
+<span class="sd">            rotate/canonicalize molecular orbitals and recompute occupations,</span>
+<span class="sd">            so the returned coefficients/occupations can differ from the</span>
+<span class="sd">            input. The input orbitals are not modified.</span>
+
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="c1"># Convert QDK/Chemistry -&gt; PySCF SCF object</span>
+        <span class="n">orbitals</span> <span class="o">=</span> <span class="n">wavefunction</span><span class="o">.</span><span class="n">get_orbitals</span><span class="p">()</span>
+        <span class="n">alpha_occs</span><span class="p">,</span> <span class="n">beta_occs</span> <span class="o">=</span> <span class="n">wavefunction</span><span class="o">.</span><span class="n">get_total_orbital_occupations</span><span class="p">()</span>
+        <span class="n">open_shell</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">any</span><span class="p">(</span><span class="n">alpha_occs</span> <span class="o">!=</span> <span class="n">beta_occs</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">orbitals</span><span class="o">.</span><span class="n">is_restricted</span><span class="p">():</span>
+            <span class="n">mf</span> <span class="o">=</span> <span class="n">orbitals_to_scf</span><span class="p">(</span><span class="n">orbitals</span><span class="p">,</span> <span class="n">alpha_occs</span><span class="p">,</span> <span class="n">beta_occs</span><span class="p">)</span>
+            <span class="n">mol</span> <span class="o">=</span> <span class="n">mf</span><span class="o">.</span><span class="n">mol</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;PySCF-QDK/Chemistry AVAS Plugin only supports restricted orbitals.&quot;</span><span class="p">)</span>
+
+        <span class="n">ao_labels</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_settings</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;ao_labels&quot;</span><span class="p">)</span>
+        <span class="n">canonicalize</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_settings</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;canonicalize&quot;</span><span class="p">)</span>
+        <span class="n">openshell_option</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_settings</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;openshell_option&quot;</span><span class="p">)</span>
+
+        <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">ao_labels</span><span class="p">)</span> <span class="o">==</span> <span class="mi">0</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;No atomic orbital labels provided for AVAS selection.&quot;</span><span class="p">)</span>
+
+        <span class="c1"># Sanitize the AO labels</span>
+        <span class="n">_atom_symbols</span> <span class="o">=</span> <span class="p">[</span><span class="n">s</span><span class="o">.</span><span class="n">split</span><span class="p">()[</span><span class="mi">1</span><span class="p">]</span><span class="o">.</span><span class="n">strip</span><span class="p">()</span> <span class="k">for</span> <span class="n">s</span> <span class="ow">in</span> <span class="n">mol</span><span class="o">.</span><span class="n">ao_labels</span><span class="p">()]</span>
+        <span class="n">atom_symbols</span> <span class="o">=</span> <span class="nb">set</span><span class="p">(</span><span class="n">_atom_symbols</span><span class="p">)</span>
+        <span class="n">atom_symbols_no_idx</span> <span class="o">=</span> <span class="p">[</span><span class="nb">str</span><span class="p">(</span><span class="n">re</span><span class="o">.</span><span class="n">sub</span><span class="p">(</span><span class="sa">r</span><span class="s2">&quot;\d+&quot;</span><span class="p">,</span> <span class="s2">&quot;&quot;</span><span class="p">,</span> <span class="n">s</span><span class="p">))</span> <span class="k">for</span> <span class="n">s</span> <span class="ow">in</span> <span class="n">atom_symbols</span><span class="p">]</span>
+        <span class="n">ao_labels_clean</span> <span class="o">=</span> <span class="p">[]</span>
+        <span class="k">for</span> <span class="n">label</span> <span class="ow">in</span> <span class="n">ao_labels</span><span class="p">:</span>
+            <span class="n">atom_symb</span><span class="p">,</span> <span class="n">orb_type</span> <span class="o">=</span> <span class="n">label</span><span class="o">.</span><span class="n">split</span><span class="p">()</span>
+
+            <span class="k">if</span> <span class="n">atom_symb</span> <span class="ow">in</span> <span class="n">atom_symbols</span><span class="p">:</span>
+                <span class="c1"># If there is an exact match, don&#39;t override</span>
+                <span class="n">ao_labels_clean</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">label</span><span class="p">)</span>
+            <span class="k">elif</span> <span class="s2">&quot;*&quot;</span> <span class="ow">in</span> <span class="n">atom_symb</span><span class="p">:</span>
+                <span class="c1"># If the atom symbol is a wildcard, keep it</span>
+                <span class="n">ao_labels_clean</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">label</span><span class="p">)</span>
+            <span class="k">elif</span> <span class="n">atom_symb</span> <span class="ow">in</span> <span class="n">atom_symbols_no_idx</span><span class="p">:</span>
+                <span class="c1"># If the atom symbol refers to an atom that is indexed but not unique, append a wildcard</span>
+                <span class="n">count</span> <span class="o">=</span> <span class="n">atom_symbols_no_idx</span><span class="o">.</span><span class="n">count</span><span class="p">(</span><span class="n">atom_symb</span><span class="p">)</span>
+                <span class="k">if</span> <span class="n">count</span> <span class="o">&gt;</span> <span class="mi">1</span><span class="p">:</span>
+                    <span class="n">ao_labels_clean</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">atom_symb</span> <span class="o">+</span> <span class="s2">&quot;* &quot;</span> <span class="o">+</span> <span class="n">orb_type</span><span class="p">)</span>
+                <span class="k">else</span><span class="p">:</span>
+                    <span class="n">ao_labels_clean</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">label</span><span class="p">)</span>
+            <span class="c1"># TODO (NAB):  is this if/elif block missing an else?</span>
+            <span class="c1"># https://dev.azure.com/ms-azurequantum/AzureQuantum/_workitems/edit/41403</span>
+
+        <span class="n">avas_obj</span> <span class="o">=</span> <span class="n">avas</span><span class="o">.</span><span class="n">AVAS</span><span class="p">(</span><span class="n">mf</span><span class="p">,</span> <span class="n">ao_labels_clean</span><span class="p">,</span> <span class="n">canonicalize</span><span class="o">=</span><span class="n">canonicalize</span><span class="p">,</span> <span class="n">openshell_option</span><span class="o">=</span><span class="n">openshell_option</span><span class="p">)</span>
+        <span class="n">norb_act</span><span class="p">,</span> <span class="n">_</span><span class="p">,</span> <span class="n">mo_coeff</span> <span class="o">=</span> <span class="n">avas_obj</span><span class="o">.</span><span class="n">kernel</span><span class="p">()</span>
+
+        <span class="c1"># Extract active indices</span>
+        <span class="n">inactive_range</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="n">mol</span><span class="o">.</span><span class="n">nelectron</span> <span class="o">/</span> <span class="mi">2</span><span class="p">)</span> <span class="o">-</span> <span class="n">norb_act</span>
+        <span class="n">active_indices</span> <span class="o">=</span> <span class="p">[</span><span class="n">inactive_range</span> <span class="o">+</span> <span class="n">i</span> <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">norb_act</span><span class="p">)]</span>
+        <span class="n">inactive_indices</span> <span class="o">=</span> <span class="nb">range</span><span class="p">(</span><span class="n">inactive_range</span><span class="p">)</span>
+
+        <span class="k">if</span> <span class="n">open_shell</span><span class="p">:</span>
+            <span class="c1"># Create active orbitals</span>
+            <span class="n">active_orbitals</span> <span class="o">=</span> <span class="n">Orbitals</span><span class="p">(</span>
+                <span class="n">mo_coeff</span><span class="p">,</span>
+                <span class="n">mo_coeff</span><span class="p">,</span>  <span class="c1"># AVAS returns same coefficients for alpha/beta</span>
+                <span class="kc">None</span><span class="p">,</span>
+                <span class="kc">None</span><span class="p">,</span>
+                <span class="n">orbitals</span><span class="o">.</span><span class="n">get_overlap_matrix</span><span class="p">()</span> <span class="k">if</span> <span class="n">orbitals</span><span class="o">.</span><span class="n">has_overlap_matrix</span><span class="p">()</span> <span class="k">else</span> <span class="kc">None</span><span class="p">,</span>
+                <span class="n">orbitals</span><span class="o">.</span><span class="n">get_basis_set</span><span class="p">(),</span>
+                <span class="p">[</span><span class="n">active_indices</span><span class="p">,</span> <span class="n">active_indices</span><span class="p">,</span> <span class="n">inactive_indices</span><span class="p">,</span> <span class="n">inactive_indices</span><span class="p">],</span>
+            <span class="p">)</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="c1"># Create active orbitals</span>
+            <span class="n">active_orbitals</span> <span class="o">=</span> <span class="n">Orbitals</span><span class="p">(</span>
+                <span class="n">mo_coeff</span><span class="p">,</span>
+                <span class="kc">None</span><span class="p">,</span>
+                <span class="n">orbitals</span><span class="o">.</span><span class="n">get_overlap_matrix</span><span class="p">()</span> <span class="k">if</span> <span class="n">orbitals</span><span class="o">.</span><span class="n">has_overlap_matrix</span><span class="p">()</span> <span class="k">else</span> <span class="kc">None</span><span class="p">,</span>
+                <span class="n">orbitals</span><span class="o">.</span><span class="n">get_basis_set</span><span class="p">(),</span>
+                <span class="p">[</span><span class="n">active_indices</span><span class="p">,</span> <span class="n">inactive_indices</span><span class="p">],</span>
+            <span class="p">)</span>
+        <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">wavefunction</span><span class="o">.</span><span class="n">get_active_determinants</span><span class="p">())</span> <span class="o">==</span> <span class="mi">1</span><span class="p">:</span>
+            <span class="c1"># Single determinant case - return new wavefunction with localized orbitals</span>
+            <span class="n">old_config</span> <span class="o">=</span> <span class="n">wavefunction</span><span class="o">.</span><span class="n">get_active_determinants</span><span class="p">()[</span><span class="mi">0</span><span class="p">]</span>
+
+            <span class="c1"># Get old and new active space indices</span>
+            <span class="n">old_orbitals</span> <span class="o">=</span> <span class="n">wavefunction</span><span class="o">.</span><span class="n">get_orbitals</span><span class="p">()</span>
+            <span class="n">old_active_indices</span> <span class="o">=</span> <span class="n">old_orbitals</span><span class="o">.</span><span class="n">get_active_space_indices</span><span class="p">()[</span><span class="mi">0</span><span class="p">]</span>
+            <span class="n">new_active_indices</span> <span class="o">=</span> <span class="n">active_orbitals</span><span class="o">.</span><span class="n">get_active_space_indices</span><span class="p">()[</span><span class="mi">0</span><span class="p">]</span>
+
+            <span class="c1"># Map from old active space to new active space</span>
+            <span class="c1"># The old determinant is already shortened to the old active space</span>
+            <span class="n">old_config_str</span> <span class="o">=</span> <span class="n">old_config</span><span class="o">.</span><span class="n">to_string</span><span class="p">()</span>
+            <span class="n">new_config_chars</span> <span class="o">=</span> <span class="p">[]</span>
+
+            <span class="k">for</span> <span class="n">new_idx</span> <span class="ow">in</span> <span class="n">new_active_indices</span><span class="p">:</span>
+                <span class="c1"># Find position of this orbital in the old active space</span>
+                <span class="k">try</span><span class="p">:</span>
+                    <span class="n">old_pos</span> <span class="o">=</span> <span class="n">old_active_indices</span><span class="o">.</span><span class="n">index</span><span class="p">(</span><span class="n">new_idx</span><span class="p">)</span>
+                    <span class="c1"># Get the occupation from the old determinant</span>
+                    <span class="n">new_config_chars</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">old_config_str</span><span class="p">[</span><span class="n">old_pos</span><span class="p">])</span>
+                <span class="k">except</span> <span class="ne">ValueError</span><span class="p">:</span>
+                    <span class="c1"># This orbital wasn&#39;t in the old active space, so it&#39;s unoccupied</span>
+                    <span class="n">new_config_chars</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="s2">&quot;0&quot;</span><span class="p">)</span>
+
+            <span class="n">active_config</span> <span class="o">=</span> <span class="n">Configuration</span><span class="p">(</span><span class="s2">&quot;&quot;</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">new_config_chars</span><span class="p">))</span>
+            <span class="k">return</span> <span class="n">Wavefunction</span><span class="p">(</span><span class="n">SlaterDeterminantContainer</span><span class="p">(</span><span class="n">active_config</span><span class="p">,</span> <span class="n">active_orbitals</span><span class="p">))</span>
+        <span class="k">raise</span> <span class="ne">NotImplementedError</span><span class="p">(</span>
+            <span class="s2">&quot;PySCF AVAS active space selector currently only supports single-determinant wavefunctions.&quot;</span>
+        <span class="p">)</span>
+
+<div class="viewcode-block" id="PyscfAVAS.name">
+<a class="viewcode-back" href="../../../../../api/api_autogen/qdk.chemistry.plugins.pyscf.active_space_avas.html#qdk.chemistry.plugins.pyscf.active_space_avas.PyscfAVAS.name">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">name</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Return the name of the active space selector.&quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="s2">&quot;pyscf_avas&quot;</span></div>
+</div>
+
+
+
+<span class="n">register</span><span class="p">(</span><span class="k">lambda</span><span class="p">:</span> <span class="n">PyscfAVAS</span><span class="p">())</span>
+</pre></div>
+
+           </div>
+          </div>
+          <footer>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright Copyright (c) Microsoft Corporation. All rights reserved. Licensed under the MIT License..</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

@@ -1,0 +1,6 @@
+Namespace qdk::chemistry::algorithms::detail
+============================================
+
+.. doxygennamespace:: qdk::chemistry::algorithms::detail
+   :project: QDK/Chemistry
+   :members:

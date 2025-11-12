@@ -1,0 +1,13 @@
+Algorithms
+==========
+
+.. toctree::
+   :maxdepth: 1
+   :caption: Algorithms
+
+   algorithms/scf_solver
+   algorithms/localizer
+   algorithms/active_space
+   algorithms/hamiltonian_constructor
+   algorithms/mc_calculator
+   algorithms/dynamical_correlation
