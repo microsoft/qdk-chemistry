@@ -35,8 +35,7 @@ qdk-chemistry/
 ├── python/             # Python bindings
 │   ├── src/            # pybind11 wrapper and python code
 │   └── tests/          # Python unit tests
-├── external/           # External libraries and scripts
-└── vscode/             # VS Code extension
+└── external/           # External libraries and scripts
 ```
 
 ## Installing
