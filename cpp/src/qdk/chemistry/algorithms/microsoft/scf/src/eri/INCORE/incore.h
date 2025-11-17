@@ -13,7 +13,7 @@
 
 namespace qdk::chemistry::scf {
 
-// Forward declarations of implementation clases
+// Forward declarations of implementation classes
 namespace incore {
 class ERI;
 class ERI_DF;
@@ -75,7 +75,7 @@ class ERIINCORE : public ERI {
   /**
    * @brief Compute nuclear gradients of density-fitted J and K matrices
    * @see ERI::get_gradients for API details
-   * @note This implemenation *does not* support exchange (K) matrix
+   * @note This implementation *does not* support exchange (K) matrix
    * construction. Function parameters are kept for interface compatibility.
    */
   void get_gradients(const double* P, double* dJ, double* dK, double alpha,
@@ -146,7 +146,7 @@ class ERIINCORE_DF : public ERI {
    * Constructs the Coulomb matrix efficiently using the density-fitted
    * approximation: J[μν] ≈ Σ_QP (μν|Q) (Q|P)⁻¹ (P|λσ) P[λσ]
    * @see ERI::build_JK for API details
-   * @note This implemenation *does not* support exchange (K) matrix
+   * @note This implementation *does not* support exchange (K) matrix
    * construction. Function parameters are kept for interface compatibility.
    */
   void build_JK_impl_(const double* P, double* J, double* K, double alpha,
@@ -155,7 +155,7 @@ class ERIINCORE_DF : public ERI {
   /**
    * @brief Compute nuclear gradients of density-fitted J and K matrices
    * @see ERI::get_gradients for API details
-   * @note This implemenation *does not* support exchange (K) matrix
+   * @note This implementation *does not* support exchange (K) matrix
    * construction. Function parameters are kept for interface compatibility.
    */
   void get_gradients(const double* P, double* dJ, double* dK, double alpha,

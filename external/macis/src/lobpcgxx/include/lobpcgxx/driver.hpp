@@ -84,7 +84,7 @@ void lobpcg(const lobpcg_settings& settings, int64_t N, int64_t K, int64_t NR,
     throw std::runtime_error("LWORK < LWORK_MIN");
   }
 
-  // Check for stupid options
+  // Check for invalid options
   if (settings.maxiter < 0) throw std::runtime_error("MAXITER < 0");
 
   if (settings.conv_tol < 0.0) throw std::runtime_error("CONV_TOL < 0");

@@ -10,7 +10,7 @@ from unittest.mock import patch
 import pytest
 from qiskit import QuantumCircuit
 
-from qdk.chemistry.plugins.qiskit._interop.circuit import (
+from qdk_chemistry.plugins.qiskit._interop.circuit import (
     CircuitInfo,
     analyze_qubit_status,
     plot_circuit_diagram,
@@ -287,8 +287,8 @@ def test_circuit_memory_error():
     circuit = QuantumCircuit(1)
     circuit.h(0)
     with (
-        patch("qdk.chemistry.plugins.qiskit._interop.circuit.circuit_drawer", side_effect=MemoryError()),
-        patch("qdk.chemistry.plugins.qiskit._interop.circuit._LOGGER") as mock_logger,
+        patch("qdk_chemistry.plugins.qiskit._interop.circuit.circuit_drawer", side_effect=MemoryError()),
+        patch("qdk_chemistry.plugins.qiskit._interop.circuit._LOGGER") as mock_logger,
     ):
         plot_circuit_diagram(circuit, output_file="test.png")
         mock_logger.warning.assert_called_once()

@@ -8,7 +8,7 @@
 import numpy as np
 import pytest
 
-from qdk.chemistry import algorithms, data
+from qdk_chemistry import algorithms, data
 
 
 class TestWavefunctionBasedActiveSpaceSelector:

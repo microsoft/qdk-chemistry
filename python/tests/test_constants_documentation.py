@@ -15,7 +15,7 @@ import pytest
 from .reference_tolerances import float_comparison_absolute_tolerance, float_comparison_relative_tolerance
 
 try:
-    from qdk.chemistry.constants import (
+    from qdk_chemistry.constants import (
         # Basic constants
         ANGSTROM_TO_BOHR,
         BOHR_TO_ANGSTROM,

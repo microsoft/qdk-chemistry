@@ -26,13 +26,13 @@ auto pipek_mezey_metric(const qdk::chemistry::data::Orbitals& orbitals,
   const auto& S = orbitals.get_overlap_matrix();
   Eigen::MatrixXd SC = S * C;
 
-  const size_t nbf = orbitals.get_num_aos();
-  const size_t nmo = orbitals.get_num_mos();
+  const size_t num_basis_funcs = orbitals.get_num_atomic_orbitals();
+  const size_t num_molecular_orbitals = orbitals.get_num_molecular_orbitals();
   const size_t natom = structure->get_num_atoms();
 
-  Eigen::MatrixXd Xi = Eigen::MatrixXd::Zero(natom, nmo);
-  for (size_t p = 0; p < nmo; ++p) {
-    for (size_t mu = 0; mu < nbf; ++mu) {
+  Eigen::MatrixXd Xi = Eigen::MatrixXd::Zero(natom, num_molecular_orbitals);
+  for (size_t p = 0; p < num_molecular_orbitals; ++p) {
+    for (size_t mu = 0; mu < num_basis_funcs; ++mu) {
       const auto iA = basis_set->get_atom_index_for_basis_function(mu);
       Xi(iA, p) += C(mu, p) * SC(mu, p);
     }
@@ -63,19 +63,27 @@ auto norm_diff_from_unitary(const Eigen::MatrixXd& U) {
  * virtual-occupied (VO) blocks of a transformation matrix.
  *
  * This function extracts two specific blocks from the transformation matrix U:
- * - The OV block: rows [0, nocc) and columns [nocc, nocc+nvir)
- * - The VO block: rows [nocc, nocc+nvir) and columns [0, nocc)
+ * - The OV block: rows [0, num_occupied_orbitals) and columns
+ * [num_occupied_orbitals, num_occupied_orbitals+num_virtual_orbitals)
+ * - The VO block: rows [num_occupied_orbitals,
+ * num_occupied_orbitals+num_virtual_orbitals) and columns [0,
+ * num_occupied_orbitals)
  *
- * @param nocc Number of occupied orbitals
- * @param nvir Number of virtual orbitals
- * @param U The transformation matrix of size (nocc+nvir) x (nocc+nvir)
+ * @param num_occupied_orbitals Number of occupied orbitals
+ * @param num_virtual_orbitals Number of virtual orbitals
+ * @param U The transformation matrix of size
+ * (num_occupied_orbitals+num_virtual_orbitals) x
+ * (num_occupied_orbitals+num_virtual_orbitals)
  * @return std::pair<double, double> A pair containing:
  *         - first: Frobenius norm of the occupied-virtual (OV) block
  *         - second: Frobenius norm of the virtual-occupied (VO) block
  */
-auto ov_block_norms(size_t nocc, size_t nvir, const Eigen::MatrixXd& U) {
-  const auto U_ov = U.block(0, nocc, nocc, nvir);
-  const auto U_vo = U.block(nocc, 0, nvir, nocc);
+auto ov_block_norms(size_t num_occupied_orbitals, size_t num_virtual_orbitals,
+                    const Eigen::MatrixXd& U) {
+  const auto U_ov = U.block(0, num_occupied_orbitals, num_occupied_orbitals,
+                            num_virtual_orbitals);
+  const auto U_vo = U.block(num_occupied_orbitals, 0, num_virtual_orbitals,
+                            num_occupied_orbitals);
   return std::make_pair(U_ov.norm(), U_vo.norm());
 }
 

@@ -215,3 +215,7 @@ __marimo__/
 
 # Streamlit
 .streamlit/secrets.toml
+
+# PYIs
+python/src/qdk_chemistry/_core/*.pyi
+python/src/qdk_chemistry/algorithms/registry.pyi

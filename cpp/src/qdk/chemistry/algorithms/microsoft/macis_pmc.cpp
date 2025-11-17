@@ -41,9 +41,7 @@ struct pmc_helper {
 
     auto orbitals = hamiltonian.get_orbitals();
     std::vector<size_t> active_indices = detail::get_active_indices(*orbitals);
-    // TODO (NAB):  Could a more descriptive variable name be used than `nmo`?
-    // https://dev.azure.com/ms-azurequantum/AzureQuantum/_workitems/edit/41319
-    const size_t nmo = active_indices.size();
+    const size_t num_molecular_orbitals = active_indices.size();
 
     const auto& T = hamiltonian.get_one_body_integrals();
     const auto& V = hamiltonian.get_two_body_integrals();
@@ -52,7 +50,7 @@ struct pmc_helper {
     if (!configurations.empty()) {
       // Get the orbital count from the configuration's string representation
       size_t config_num_orbitals = configurations[0].get_orbital_capacity();
-      if (config_num_orbitals < nmo) {
+      if (config_num_orbitals < num_molecular_orbitals) {
         throw std::runtime_error(
             "Configuration orbital capacity does not match Hamiltonian active "
             "space.");
@@ -71,10 +69,13 @@ struct pmc_helper {
     }
 
     // Create Hamiltonian Generator
-    generator_t ham_gen(
-        macis::matrix_span<double>(const_cast<double*>(T.data()), nmo, nmo),
-        macis::rank4_span<double>(const_cast<double*>(V.data()), nmo, nmo, nmo,
-                                  nmo));
+    generator_t ham_gen(macis::matrix_span<double>(
+                            const_cast<double*>(T.data()),
+                            num_molecular_orbitals, num_molecular_orbitals),
+                        macis::rank4_span<double>(
+                            const_cast<double*>(V.data()),
+                            num_molecular_orbitals, num_molecular_orbitals,
+                            num_molecular_orbitals, num_molecular_orbitals));
 
     // Perform projected CI diagonalization
     std::vector<double> C_pmc;
@@ -110,7 +111,7 @@ struct pmc_helper {
     std::vector<data::Configuration> dets_configs;
     for (auto det : dets) {
       // Convert macis::wfn_t to data::Configuration
-      dets_configs.emplace_back(det, nmo);
+      dets_configs.emplace_back(det, num_molecular_orbitals);
     }
     std::copy(C_pmc.begin(), C_pmc.end(), C_vector.data());
 
@@ -118,20 +119,31 @@ struct pmc_helper {
       if (settings_.get<bool>("calculate_one_rdm") ||
           settings_.get<bool>("calculate_two_rdm")) {
         // Calculate RDMs from CI coefficients
-        std::vector<double> active_ordm(nmo * nmo, 0.0);
-        std::vector<double> active_trdm(nmo * nmo * nmo * nmo, 0.0);
+        std::vector<double> active_ordm(
+            num_molecular_orbitals * num_molecular_orbitals, 0.0);
+        std::vector<double> active_trdm(
+            num_molecular_orbitals * num_molecular_orbitals *
+                num_molecular_orbitals * num_molecular_orbitals,
+            0.0);
 
         // Calculate RDMs using the Hamiltonian generator
-        ham_gen.form_rdms(
-            dets.begin(), dets.end(), dets.begin(), dets.end(), C_pmc.data(),
-            macis::matrix_span<double>(active_ordm.data(), nmo, nmo),
-            macis::rank4_span<double>(active_trdm.data(), nmo, nmo, nmo, nmo));
+        ham_gen.form_rdms(dets.begin(), dets.end(), dets.begin(), dets.end(),
+                          C_pmc.data(),
+                          macis::matrix_span<double>(active_ordm.data(),
+                                                     num_molecular_orbitals,
+                                                     num_molecular_orbitals),
+                          macis::rank4_span<double>(
+                              active_trdm.data(), num_molecular_orbitals,
+                              num_molecular_orbitals, num_molecular_orbitals,
+                              num_molecular_orbitals));
 
         // Convert to Eigen format
-        Eigen::MatrixXd one_rdm =
-            Eigen::Map<Eigen::MatrixXd>(active_ordm.data(), nmo, nmo);
+        Eigen::MatrixXd one_rdm = Eigen::Map<Eigen::MatrixXd>(
+            active_ordm.data(), num_molecular_orbitals, num_molecular_orbitals);
         Eigen::VectorXd two_rdm = Eigen::Map<Eigen::VectorXd>(
-            active_trdm.data(), nmo * nmo * nmo * nmo);
+            active_trdm.data(),
+            num_molecular_orbitals * num_molecular_orbitals *
+                num_molecular_orbitals * num_molecular_orbitals);
 
         // Create wavefunction with RDMs
         return data::Wavefunction(

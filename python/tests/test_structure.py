@@ -18,9 +18,9 @@ from .reference_tolerances import (
 )
 
 try:
-    from qdk.chemistry.data import Structure
+    from qdk_chemistry.data import Structure
 except ImportError:
-    pytest.skip("qdk.chemistry.data.Structure not available", allow_module_level=True)
+    pytest.skip("qdk_chemistry.data.Structure not available", allow_module_level=True)
 
 
 class TestStructure:

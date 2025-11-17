@@ -24,8 +24,8 @@ std::vector<size_t> get_active_indices(const data::Orbitals& orbitals) {
 
   // If no active indices are provided, use all orbitals
   if (active_indices.empty()) {
-    const size_t nmo = orbitals.get_num_mos();
-    active_indices.resize(nmo);
+    const size_t num_molecular_orbitals = orbitals.get_num_molecular_orbitals();
+    active_indices.resize(num_molecular_orbitals);
     std::iota(active_indices.begin(), active_indices.end(), 0);
   }
 

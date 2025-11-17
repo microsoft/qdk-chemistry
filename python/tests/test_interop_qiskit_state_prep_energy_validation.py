@@ -13,8 +13,8 @@ from qiskit import QuantumCircuit, qasm3, transpile
 from qiskit_aer import AerSimulator
 from qiskit_aer.primitives import Estimator as AerEstimator
 
-from qdk.chemistry.state_preparation import RegularIsometryStatePrep, SparseIsometryGF2XStatePrep
-from qdk.chemistry.state_preparation.base import prepare_single_reference_state
+from qdk_chemistry.algorithms import create
+from qdk_chemistry.algorithms.state_preparation.sparse_isometry import _prepare_single_reference_state
 
 from .reference_tolerances import float_comparison_absolute_tolerance, float_comparison_relative_tolerance
 
@@ -25,18 +25,16 @@ def test_energy_agreement_between_state_prep_methods(wavefunction_4e4o, hamilton
     Test whether sparse and regular isometry methods yield the same energy values.
     """
     # Create both state preparation instances
-    sparse_prep_gf2x = SparseIsometryGF2XStatePrep(wavefunction=wavefunction_4e4o, save_outputs=False)
-    regular_prep = RegularIsometryStatePrep(wavefunction=wavefunction_4e4o, max_dets=2, amplitude_threshold=0.01)
-
-    sparse_gf2x_circuit_untranspiled = qasm3.loads(sparse_prep_gf2x.create_circuit_qasm())
-    regular_circuit_untranspiled = qasm3.loads(regular_prep.create_circuit_qasm())
-
-    sparse_gf2x_circuit = transpile(
-        sparse_gf2x_circuit_untranspiled, basis_gates=["cx", "rz", "ry", "rx", "h", "x", "z"], optimization_level=1
+    basis_gates = ["cx", "rz", "ry", "rx", "h", "x", "z"]
+    sparse_prep_gf2x = create(
+        "state_prep", algorithm_name="sparse_isometry_gf2x", transpile_optimization_level=1, basis_gates=basis_gates
     )
-    regular_circuit = transpile(
-        regular_circuit_untranspiled, basis_gates=["cx", "rz", "ry", "rx", "h", "x", "z"], optimization_level=1
+    regular_prep = create(
+        "state_prep", algorithm_name="regular_isometry", transpile_optimization_level=1, basis_gates=basis_gates
     )
+
+    sparse_gf2x_circuit = qasm3.loads(sparse_prep_gf2x.run(wavefunction_4e4o))
+    regular_circuit = qasm3.loads(regular_prep.run(wavefunction_4e4o))
 
     # Create estimator and calculate energy for both circuits
     estimator = AerEstimator(approximation=True)
@@ -58,13 +56,17 @@ def test_energy_agreement_between_state_prep_methods(wavefunction_4e4o, hamilton
 
 
 def test_sparse_isometry_gf2x_energy_validation(wavefunction_10e6o, hamiltonian_10e6o, ref_energy_10e6o):
-    """Test SparseIsometryGF2XStatePrep energy validation for 10e6o F2."""
-    # Create SparseIsometryGF2XStatePrep instance for F2 test
-    sparse_prep = SparseIsometryGF2XStatePrep(wavefunction=wavefunction_10e6o, save_outputs=False)
+    """Test SparseIsometryGF2XStatePreparation energy validation for 10e6o F2."""
+    # Create SparseIsometryGF2XStatePreparation instance for F2 test
+    sparse_prep = create(
+        "state_prep",
+        algorithm_name="sparse_isometry_gf2x",
+        basis_gates=["cx", "rz", "ry", "rx", "h", "x", "z"],
+        transpile_optimization_level=1,
+    )
 
     # Create circuit qasm and convert to QuantumCircuit
-    original_circuit = qasm3.loads(sparse_prep.create_circuit_qasm())
-    circuit = transpile(original_circuit, basis_gates=["cx", "rz", "ry", "rx", "h", "x", "z"], optimization_level=1)
+    circuit = qasm3.loads(sparse_prep.run(wavefunction_10e6o))
 
     # Calculate circuit energy using the estimator
     estimator = AerEstimator(approximation=True)
@@ -88,17 +90,17 @@ def test_sparse_isometry_gf2x_circuit_efficiency(wavefunction_4e4o):
     than regular isometry.
     """
     # Create both state preparation instances
-    sparse_prep = SparseIsometryGF2XStatePrep(wavefunction=wavefunction_4e4o, save_outputs=False)
-    regular_prep = RegularIsometryStatePrep(wavefunction=wavefunction_4e4o, max_dets=2, amplitude_threshold=0.01)
+    basis_gates = ["cx", "rz", "ry", "rx", "h", "x", "z"]
+    sparse_prep = create(
+        "state_prep", algorithm_name="sparse_isometry_gf2x", transpile_optimization_level=1, basis_gates=basis_gates
+    )
+    regular_prep = create(
+        "state_prep", algorithm_name="regular_isometry", transpile_optimization_level=1, basis_gates=basis_gates
+    )
 
     # Create circuits using both methods
-    sparse_circuit = qasm3.loads(sparse_prep.create_circuit_qasm())
-    regular_circuit = qasm3.loads(regular_prep.create_circuit_qasm())
-
-    # Transpile to basic gate set for fair comparison
-    basis_gates = ["cx", "rz", "ry", "rx", "h", "x", "z"]
-    transpiled_sparse_circuit = transpile(sparse_circuit, basis_gates=basis_gates, optimization_level=1)
-    transpiled_regular_circuit = transpile(regular_circuit, basis_gates=basis_gates, optimization_level=1)
+    transpiled_sparse_circuit = qasm3.loads(sparse_prep.run(wavefunction_4e4o))
+    transpiled_regular_circuit = qasm3.loads(regular_prep.run(wavefunction_4e4o))
 
     # Compare circuit metrics
     sparse_depth = transpiled_sparse_circuit.depth()
@@ -137,7 +139,7 @@ def get_bitstring(circuit: QuantumCircuit) -> str:
 
     """
     # Add measurements
-    meas_circuit = circuit.copy()
+    meas_circuit = qasm3.loads(circuit)
     meas_circuit.measure_all()
 
     # Simulate
@@ -156,7 +158,6 @@ def get_bitstring(circuit: QuantumCircuit) -> str:
 @pytest.mark.parametrize("bitstring", ["1010", "0000", "1111", "101001", "1", "0"])
 def test_single_reference_state_basic(bitstring):
     """Test basic single reference state preparation with various bitstrings."""
-    circuit = prepare_single_reference_state(bitstring)
+    circuit = _prepare_single_reference_state(bitstring)
     result_bitstring = get_bitstring(circuit)
     assert result_bitstring == bitstring, f"Expected {bitstring}, got {result_bitstring}"
-    assert circuit.name == f"SingleRef_{bitstring}"

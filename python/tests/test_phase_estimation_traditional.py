@@ -15,8 +15,8 @@ from qiskit import QuantumCircuit, transpile
 from qiskit.quantum_info import SparsePauliOp
 from qiskit_aer import AerSimulator
 
-from qdk.chemistry.algorithms import TraditionalPhaseEstimation, energy_from_phase
-from qdk.chemistry.data import QubitHamiltonian
+from qdk_chemistry.algorithms import TraditionalPhaseEstimation, energy_from_phase
+from qdk_chemistry.data import QubitHamiltonian
 
 from .reference_tolerances import qpe_energy_tolerance, qpe_phase_fraction_tolerance
 

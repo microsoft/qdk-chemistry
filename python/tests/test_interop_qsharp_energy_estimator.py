@@ -9,9 +9,8 @@ import numpy as np
 import pytest
 from qsharp import BitFlipNoise, DepolarizingNoise, PauliNoise
 
-from qdk.chemistry.algorithms.energy_estimator import QDKEnergyEstimator
-from qdk.chemistry.data.qubit_hamiltonian import QubitHamiltonian, filter_and_group_pauli_ops_from_statevector
-from qdk.chemistry.utils.statevector import create_statevector_from_wavefunction
+from qdk_chemistry.algorithms.energy_estimator import QDKEnergyEstimator
+from qdk_chemistry.data.qubit_hamiltonian import QubitHamiltonian, filter_and_group_pauli_ops_from_wavefunction
 
 from .reference_tolerances import (
     estimator_energy_tolerance,
@@ -47,9 +46,8 @@ class TestQSharpEnergyEstimator:
 
         4e4o ethylene problem.
         """
-        state_vector = create_statevector_from_wavefunction(wavefunction_4e4o)
-        filtered_hamiltonian, classical_coeffs = filter_and_group_pauli_ops_from_statevector(
-            hamiltonian_4e4o, state_vector
+        filtered_hamiltonian, classical_coeffs = filter_and_group_pauli_ops_from_wavefunction(
+            hamiltonian_4e4o, wavefunction_4e4o
         )
 
         estimator = QDKEnergyEstimator()

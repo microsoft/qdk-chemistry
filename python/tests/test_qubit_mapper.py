@@ -8,8 +8,8 @@
 import numpy as np
 import pytest
 
-from qdk.chemistry.algorithms import QubitMapper, available, create
-from qdk.chemistry.data import Hamiltonian, QubitHamiltonian
+from qdk_chemistry.algorithms import QubitMapper, available, create
+from qdk_chemistry.data import Hamiltonian, QubitHamiltonian
 
 from .reference_tolerances import (
     float_comparison_absolute_tolerance,

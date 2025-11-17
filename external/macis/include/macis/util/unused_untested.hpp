@@ -61,11 +61,11 @@ void bitset_to_occ_vir_as(size_t norb, std::bitset<N> state,
   occ.clear();
   for(const auto i : as_orbs)
     if(state[i]) occ.emplace_back(i);
-  const auto nocc = occ.size();
-  assert(nocc <= norb);
+  const auto num_occupied_orbitals = occ.size();
+  assert(num_occupied_orbitals <= norb);
 
-  const auto nvir = as_orbs.size() - nocc;
-  vir.resize(nvir);
+  const auto num_virtual_orbitals = as_orbs.size() - num_occupied_orbitals;
+  vir.resize(num_virtual_orbitals);
   auto it = vir.begin();
   for(const auto i : as_orbs)
     if(!state[i]) *(it++) = i;

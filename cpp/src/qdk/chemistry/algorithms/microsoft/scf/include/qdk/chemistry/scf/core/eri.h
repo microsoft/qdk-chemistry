@@ -49,9 +49,12 @@ class ERI {
    * Accepts null outputs, in which case the calculation of that term is
    * skipped.
    *
-   * @param P Density matrix (input, size: ndm × NAO × NAO)
-   * @param J Output Coulomb matrix (size: ndm × NAO × NAO)
-   * @param K Output exchange matrix (size: ndm × NAO × NAO)
+   * @param P Density matrix (input, size: num_density_matrices ×
+   * num_atomic_orbitals × num_atomic_orbitals)
+   * @param J Output Coulomb matrix (size: num_density_matrices ×
+   * num_atomic_orbitals × num_atomic_orbitals)
+   * @param K Output exchange matrix (size: num_density_matrices ×
+   * num_atomic_orbitals × num_atomic_orbitals)
    * @param alpha Scaling coefficient for K (un-attenuated)
    * @param beta Scaling coefficient for K (long range)
    * @param omega Range-separation parameter ω for long-range corrected
@@ -69,7 +72,8 @@ class ERI {
    * Calculates Tr[∂J/∂R * P] and Tr[∂K/∂R * P] for analytical gradient
    * calculations.
    *
-   * @param P Density matrix (input, size: ndm × NAO × NAO)
+   * @param P Density matrix (input, size: num_density_matrices ×
+   * num_atomic_orbitals × num_atomic_orbitals)
    * @param dJ Output Coulomb gradient (size: 3 × natoms)
    * @param dK Output Exchange gradient (size: 3 × natoms)
    * @param alpha Scaling coefficient for dK (un-attenuated)

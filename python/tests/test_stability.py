@@ -11,13 +11,12 @@ import tempfile
 import numpy as np
 import pytest
 
-import qdk.chemistry.data
-from qdk.chemistry import algorithms
-from qdk.chemistry.data import Structure
+from qdk_chemistry import algorithms
+from qdk_chemistry.data import StabilityResult, Structure
 
 try:
-    import qdk.chemistry.plugins.pyscf
-    from qdk.chemistry.constants import ANGSTROM_TO_BOHR
+    import qdk_chemistry.plugins.pyscf  # noqa: F401
+    from qdk_chemistry.constants import ANGSTROM_TO_BOHR
 
     PYSCF_AVAILABLE = True
 except ImportError:
@@ -39,7 +38,7 @@ class TestStabilityResultIO:
 
         external_eigenvectors = np.array([[0.7, 0.714], [-0.714, 0.7]])
 
-        return qdk.chemistry.data.StabilityResult(
+        return StabilityResult(
             True,  # internal_stable
             False,  # external_stable
             internal_eigenvalues,
@@ -54,7 +53,7 @@ class TestStabilityResultIO:
 
         # Test direct JSON conversion
         json_data = result_out.to_json()
-        result_in = qdk.chemistry.data.StabilityResult.from_json(json_data)
+        result_in = StabilityResult.from_json(json_data)
 
         # Verify basic properties
         assert result_in.is_internal_stable() == result_out.is_internal_stable()
@@ -75,7 +74,7 @@ class TestStabilityResultIO:
             filename = tmp.name
             result_out.to_json_file(filename)
 
-            result_file = qdk.chemistry.data.StabilityResult.from_json_file(filename)
+            result_file = StabilityResult.from_json_file(filename)
 
             # Verify data is preserved
             assert result_file.internal_size() == result_out.internal_size()
@@ -92,7 +91,7 @@ class TestStabilityResultIO:
                 filename = tmp.name
                 result_out.to_hdf5_file(filename)
 
-                result_in = qdk.chemistry.data.StabilityResult.from_hdf5_file(filename)
+                result_in = StabilityResult.from_hdf5_file(filename)
 
                 # Verify data preservation
                 assert result_in.is_internal_stable() == result_out.is_internal_stable()
@@ -116,7 +115,7 @@ class TestStabilityResultIO:
             result.to_file(json_filename, "json")
 
             # Load using generic method (static)
-            result2 = qdk.chemistry.data.StabilityResult.from_file(json_filename, "json")
+            result2 = StabilityResult.from_file(json_filename, "json")
 
             # Check equality
             assert result2.internal_size() == result.internal_size()
@@ -134,7 +133,7 @@ class TestStabilityResultIO:
             result.to_file(hdf5_filename, "hdf5")
 
             # Load using generic method (static)
-            result3 = qdk.chemistry.data.StabilityResult.from_file(hdf5_filename, "hdf5")
+            result3 = StabilityResult.from_file(hdf5_filename, "hdf5")
 
             # Check equality
             assert result3.internal_size() == result.internal_size()
@@ -149,7 +148,7 @@ class TestStabilityResultIO:
             result.to_file("test.stability_result.xyz", "xyz")
 
         with pytest.raises(ValueError, match="Unsupported file type"):
-            qdk.chemistry.data.StabilityResult.from_file("test.stability_result.xyz", "xyz")
+            StabilityResult.from_file("test.stability_result.xyz", "xyz")
 
     def test_stability_result_file_io_validation(self):
         """Test filename validation for StabilityResult file I/O."""
@@ -160,31 +159,31 @@ class TestStabilityResultIO:
             result.to_json_file("test.json")
 
         with pytest.raises(ValueError, match=r"'.stability_result.' before the file extension"):
-            qdk.chemistry.data.StabilityResult.from_json_file("test.json")
+            StabilityResult.from_json_file("test.json")
 
         # Test filename validation for HDF5 files
         with pytest.raises(ValueError, match=r"'.stability_result.' before the file extension"):
             result.to_hdf5_file("test.h5")
 
         with pytest.raises(ValueError, match=r"'.stability_result.' before the file extension"):
-            qdk.chemistry.data.StabilityResult.from_hdf5_file("test.h5")
+            StabilityResult.from_hdf5_file("test.h5")
 
         # Test non-existent file
         with pytest.raises(RuntimeError, match="Failed to open file for reading"):
-            qdk.chemistry.data.StabilityResult.from_json_file("nonexistent.stability_result.json")
+            StabilityResult.from_json_file("nonexistent.stability_result.json")
 
         with pytest.raises(RuntimeError):
-            qdk.chemistry.data.StabilityResult.from_hdf5_file("nonexistent.stability_result.h5")
+            StabilityResult.from_hdf5_file("nonexistent.stability_result.h5")
 
     def test_stability_result_empty_data_io(self):
         """Test I/O with empty StabilityResult (no eigenvalues/eigenvectors)."""
-        empty_result = qdk.chemistry.data.StabilityResult()
+        empty_result = StabilityResult()
         assert empty_result.is_stable()  # Default should be stable
         assert empty_result.empty()  # Method call, not property
 
         # Test JSON I/O with empty data
         json_data = empty_result.to_json()
-        from_json = qdk.chemistry.data.StabilityResult.from_json(json_data)
+        from_json = StabilityResult.from_json(json_data)
         assert from_json.is_stable() == empty_result.is_stable()
         assert from_json.internal_size() == empty_result.internal_size()
         assert from_json.external_size() == empty_result.external_size()
@@ -193,7 +192,7 @@ class TestStabilityResultIO:
         with tempfile.NamedTemporaryFile(suffix=".stability_result.json") as tmp:
             filename = tmp.name
             empty_result.to_json_file(filename)
-            empty_from_file = qdk.chemistry.data.StabilityResult.from_json_file(filename)
+            empty_from_file = StabilityResult.from_json_file(filename)
             assert empty_from_file.is_stable()
             assert empty_from_file.empty()  # Method call, not property
 
@@ -381,7 +380,7 @@ class TestPyscfStabilityChecker:
 
         # Check results
         assert result is not None
-        assert isinstance(result, qdk.chemistry.data.StabilityResult)
+        assert isinstance(result, StabilityResult)
         assert isinstance(is_stable, bool)
         assert result.is_stable() is True  # Water RHF should be stable
 
@@ -465,7 +464,7 @@ class TestPyscfStabilityChecker:
 
         # Check results
         assert result is not None
-        assert isinstance(result, qdk.chemistry.data.StabilityResult)
+        assert isinstance(result, StabilityResult)
 
         # For UHF, we should have internal results but no external results
         internal_eigenvalues = result.get_internal_eigenvalues()
@@ -520,7 +519,7 @@ class TestPyscfStabilityChecker:
 
         # Check results
         assert result is not None
-        assert isinstance(result, qdk.chemistry.data.StabilityResult)
+        assert isinstance(result, StabilityResult)
 
         # For ROHF, we should have internal results but no external results (external gives warning)
         internal_eigenvalues = result.get_internal_eigenvalues()
@@ -584,7 +583,7 @@ class TestPyscfStabilityChecker:
 
         # Check results - should be internally stable but externally unstable
         assert result is not None
-        assert isinstance(result, qdk.chemistry.data.StabilityResult)
+        assert isinstance(result, StabilityResult)
         assert is_stable is False  # Overall unstable due to external instability
         assert result.is_internal_stable() is True  # No internal instability
         assert result.is_external_stable() is False  # One external instability
@@ -630,7 +629,7 @@ class TestPyscfStabilityChecker:
 
         # Check results - should have internal instability
         assert result is not None
-        assert isinstance(result, qdk.chemistry.data.StabilityResult)
+        assert isinstance(result, StabilityResult)
         assert is_stable is False  # Overall unstable due to internal instability
         assert result.is_internal_stable() is False  # One internal instability
 
@@ -672,7 +671,7 @@ class TestPyscfStabilityChecker:
 
         # Check results
         assert result is not None
-        assert isinstance(result, qdk.chemistry.data.StabilityResult)
+        assert isinstance(result, StabilityResult)
 
         # For UHF, we should have internal results but no external results
         internal_eigenvalues = result.get_internal_eigenvalues()
@@ -721,7 +720,7 @@ class TestPyscfStabilityChecker:
 
         # Check results
         assert result is not None
-        assert isinstance(result, qdk.chemistry.data.StabilityResult)
+        assert isinstance(result, StabilityResult)
 
         # For ROHF, we should have internal results but no external results
         internal_eigenvalues = result.get_internal_eigenvalues()

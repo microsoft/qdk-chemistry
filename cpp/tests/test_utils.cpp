@@ -43,8 +43,8 @@ class ValenceActiveParametersTest : public ::testing::Test {
 
     Configuration config_truncated(
         "22222");  // the orbitals of this config needs to be built specifically
-    Eigen::MatrixXd coeffs =
-        Eigen::MatrixXd::Identity(water_orbitals->get_num_mos(), 5);
+    Eigen::MatrixXd coeffs = Eigen::MatrixXd::Identity(
+        water_orbitals->get_num_molecular_orbitals(), 5);
     Orbitals water_orbitals_truncated(coeffs, std::nullopt, std::nullopt,
                                       basis_set, std::nullopt);
     std::shared_ptr<Orbitals> water_orbitals_truncated_ptr =

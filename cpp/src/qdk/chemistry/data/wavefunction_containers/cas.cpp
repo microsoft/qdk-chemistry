@@ -507,7 +507,8 @@ CasWavefunctionContainer::get_total_orbital_occupations() const {
   }
 
   // Get the total number of orbitals from the orbital basis set
-  const int num_orbitals = static_cast<int>(get_orbitals()->get_num_mos());
+  const int num_orbitals =
+      static_cast<int>(get_orbitals()->get_num_molecular_orbitals());
 
   Eigen::VectorXd alpha_occupations = Eigen::VectorXd::Zero(num_orbitals);
   Eigen::VectorXd beta_occupations = Eigen::VectorXd::Zero(num_orbitals);

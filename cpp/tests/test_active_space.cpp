@@ -429,7 +429,7 @@ class MockWavefunctionContainer : public WavefunctionContainer {
         orbitals_(orbitals),
         entropies_(entropies) {
     // Create a single determinant with the correct length
-    size_t num_orbitals = orbitals->get_num_mos();
+    size_t num_orbitals = orbitals->get_num_molecular_orbitals();
     std::string det_string(num_orbitals, '0');
     // Set first few orbitals to doubly occupied (matching the 4 electrons: 2
     // alpha + 2 beta)

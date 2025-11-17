@@ -154,7 +154,7 @@ struct SCFConfig {
 #endif
   ERIConfig eri;  ///< Configuration for electron repulsion integrals (ERI). By
                   ///< default this controls both J/K builds, but can be
-                  ///< overriden for K with `k_eri`
+                  ///< overridden for K with `k_eri`
   ERIConfig
       k_eri;  ///< Configuration for exchange (K) integrals (can differ from J)
   ERIConfig grad_eri;  ///< Configuration for gradient integrals
@@ -245,7 +245,7 @@ struct SCFContext {
   std::shared_ptr<BasisSet>
       basis_set_raw;  ///< Basis set in RAW normalization (for output)
 
-  int64_t n_mo = -1;  ///< Number of molecular orbitals
+  int64_t num_molecular_orbitals = -1;  ///< Number of molecular orbitals
 
   SCFResult result;  ///< Results from the SCF calculation
 };

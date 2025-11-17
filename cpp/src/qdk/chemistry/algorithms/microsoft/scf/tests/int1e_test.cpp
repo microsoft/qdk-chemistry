@@ -46,8 +46,9 @@ void test_integral(std::string name, double tol = 1e-9) {
   auto& bs = *bs_ptr;
   auto int1e = OneBodyIntegral(&bs, &mol, ParallelConfig{1, 0, 1, 0});
 
-  auto ref = read_mat(json, name, bs.n_bf, bs.n_bf);
-  RowMajorMatrix res = RowMajorMatrix::Zero(bs.n_bf, bs.n_bf);
+  auto ref = read_mat(json, name, bs.num_basis_funcs, bs.num_basis_funcs);
+  RowMajorMatrix res =
+      RowMajorMatrix::Zero(bs.num_basis_funcs, bs.num_basis_funcs);
   if (name == "kinetic_integral") {
     int1e.kinetic_integral(res.data());
   } else if (name == "nuclear_integral") {
@@ -72,7 +73,7 @@ void test_gradient(std::string name, double tol = 1e-9) {
   auto& bs = *bs_ptr;
   auto int1e = OneBodyIntegral(&bs, &mol, ParallelConfig{1, 0, 1, 0});
 
-  auto dm = read_mat(json, "dm", bs.n_bf, bs.n_bf);
+  auto dm = read_mat(json, "dm", bs.num_basis_funcs, bs.num_basis_funcs);
   auto ref = read_mat(json, name, mol.n_atoms, 3);
   RowMajorMatrix res = RowMajorMatrix::Zero(3, mol.n_atoms);
   if (name == "kinetic_gradient") {

@@ -37,7 +37,7 @@ std::shared_ptr<data::Wavefunction> PipekMezeyLocalizer::_run_impl(
   }
 
   // Early validation: Check orbital indices are valid
-  const size_t num_molecular_orbitals = orbitals->get_num_mos();
+  const size_t num_molecular_orbitals = orbitals->get_num_molecular_orbitals();
   if (!loc_indices_a.empty() &&
       loc_indices_a.back() >= num_molecular_orbitals) {
     throw std::invalid_argument(

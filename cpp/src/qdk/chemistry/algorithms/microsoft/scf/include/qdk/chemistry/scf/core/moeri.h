@@ -14,7 +14,7 @@
 namespace qdk::chemistry::scf {
 /**
  *  @brief A class to handle the evaluation of MO integrals given an
- *  AO ERI implmentation.
+ *  AO ERI implementation.
  *
  *  (pn|lk) = C(p,m) * (mn|lk) [first quarter - customization point]
  *  (pq|lk) = C(q,n) * (pn|lk) [second quarter]

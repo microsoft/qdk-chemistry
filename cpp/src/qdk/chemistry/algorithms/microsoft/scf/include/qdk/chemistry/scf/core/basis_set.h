@@ -66,8 +66,8 @@ class BasisSet {
   std::string name;           ///< Basis set name (e.g., "6-31G", "def2-TZVP")
   BasisMode mode;             ///< Normalization convention (PSI4 or RAW)
   std::vector<Shell> shells;  ///< All orbital basis function shells
-  bool pure;      ///< Whether to use pure spherical harmonics or Cartesian
-  uint64_t n_bf;  ///< Total number of basis functions
+  bool pure;  ///< Whether to use pure spherical harmonics or Cartesian
+  uint64_t num_basis_funcs;  ///< Total number of basis functions
 
   std::vector<Shell> ecp_shells;  ///< Effective core potential shells
   std::unordered_map<int, int>
@@ -187,9 +187,9 @@ class BasisSet {
   explicit BasisSet();
 
   std::vector<std::pair<int, int>>
-      shell_pairs_;  ///< Significant shell pairs for screening
-  std::vector<uint8_t>
-      atom2bf_;  ///< Atom-to-basis-function mapping matrix (n_atoms × n_bf)
+      shell_pairs_;               ///< Significant shell pairs for screening
+  std::vector<uint8_t> atom2bf_;  ///< Atom-to-basis-function mapping matrix
+                                  ///< (n_atoms × num_basis_funcs)
 
   /**
    * @brief Calculate atom-to-basis-function mapping

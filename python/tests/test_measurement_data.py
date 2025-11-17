@@ -11,8 +11,8 @@ from pathlib import Path
 
 import numpy as np
 
-from qdk.chemistry.data.estimator_data import MeasurementData
-from qdk.chemistry.data.qubit_hamiltonian import QubitHamiltonian
+from qdk_chemistry.data.estimator_data import MeasurementData
+from qdk_chemistry.data.qubit_hamiltonian import QubitHamiltonian
 
 
 def test_measurement_data_creation():

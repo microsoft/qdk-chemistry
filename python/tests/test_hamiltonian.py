@@ -17,7 +17,7 @@ from .reference_tolerances import float_comparison_absolute_tolerance, float_com
 from .test_helpers import create_test_basis_set, create_test_hamiltonian, create_test_orbitals
 
 try:
-    from qdk.chemistry.data import Hamiltonian, Orbitals
+    from qdk_chemistry.data import Hamiltonian, Orbitals
 
     HAMILTONIAN_AVAILABLE = True
 except ImportError:
@@ -36,7 +36,7 @@ class TestHamiltonian:
     def test_size_and_electron_counts(self):
         h = create_test_hamiltonian(3)
         assert isinstance(h, Hamiltonian)
-        assert h.get_orbitals().get_num_mos() == 3
+        assert h.get_orbitals().get_num_molecular_orbitals() == 3
 
     def test_full_constructor(self):
         one_body = np.array([[1.0, 0.5], [0.5, 2.0]])
@@ -49,7 +49,7 @@ class TestHamiltonian:
         assert h.has_one_body_integrals()
         assert h.has_two_body_integrals()
         assert h.has_orbitals()
-        assert h.get_orbitals().get_num_mos() == 2
+        assert h.get_orbitals().get_num_molecular_orbitals() == 2
         assert h.get_core_energy() == 1.5
         np.testing.assert_array_equal(h.get_one_body_integrals(), one_body)
         np.testing.assert_array_equal(h.get_two_body_integrals(), two_body)
@@ -99,7 +99,7 @@ class TestHamiltonian:
         assert data["has_orbitals"] is True
 
         h2 = Hamiltonian.from_json(json.dumps(data))
-        assert h2.get_orbitals().get_num_mos() == 2
+        assert h2.get_orbitals().get_num_molecular_orbitals() == 2
         assert h2.get_core_energy() == 1.5
         assert h2.has_one_body_integrals()
         assert h2.has_two_body_integrals()
@@ -131,7 +131,7 @@ class TestHamiltonian:
             h.to_json_file(filename)
             assert Path(filename).exists()
             h2 = Hamiltonian.from_json_file(filename)
-            assert h2.get_orbitals().get_num_mos() == 2
+            assert h2.get_orbitals().get_num_molecular_orbitals() == 2
             assert h2.get_core_energy() == 1.5
             assert h2.has_one_body_integrals()
             assert h2.has_two_body_integrals()
@@ -165,7 +165,7 @@ class TestHamiltonian:
             h.to_hdf5_file(filename)
             assert Path(filename).exists()
             h2 = Hamiltonian.from_hdf5_file(filename)
-            assert h2.get_orbitals().get_num_mos() == 2
+            assert h2.get_orbitals().get_num_molecular_orbitals() == 2
             assert h2.get_core_energy() == 1.5
             assert h2.has_one_body_integrals()
             assert h2.has_two_body_integrals()
@@ -199,7 +199,7 @@ class TestHamiltonian:
             h.to_file(json_filename, "json")
             assert Path(json_filename).exists()
             h2 = Hamiltonian.from_file(json_filename, "json")
-            assert h2.get_orbitals().get_num_mos() == 2
+            assert h2.get_orbitals().get_num_molecular_orbitals() == 2
             assert np.allclose(
                 h.get_one_body_integrals(),
                 h2.get_one_body_integrals(),
@@ -215,7 +215,7 @@ class TestHamiltonian:
             h.to_file(hdf5_filename, "hdf5")
             assert Path(hdf5_filename).exists()
             h3 = Hamiltonian.from_file(hdf5_filename, "hdf5")
-            assert h3.get_orbitals().get_num_mos() == 2
+            assert h3.get_orbitals().get_num_molecular_orbitals() == 2
             assert np.allclose(
                 h.get_one_body_integrals(),
                 h3.get_one_body_integrals(),
@@ -244,7 +244,7 @@ class TestHamiltonian:
         assert data["has_two_body_integrals"] is True
         assert data["has_orbitals"] is True
         h2 = Hamiltonian.from_json(json.dumps(data))
-        assert h2.get_orbitals().get_num_mos() == 1
+        assert h2.get_orbitals().get_num_molecular_orbitals() == 1
         assert h2.get_core_energy() == 0.0
         assert h2.has_one_body_integrals()
         assert h2.has_two_body_integrals()
@@ -308,5 +308,5 @@ class TestHamiltonian:
         if h.has_orbitals():
             orig_orbs = h.get_orbitals()
             restored_orbs = h_restored.get_orbitals()
-            assert orig_orbs.get_num_mos() == restored_orbs.get_num_mos()
+            assert orig_orbs.get_num_molecular_orbitals() == restored_orbs.get_num_molecular_orbitals()
             np.testing.assert_array_equal(orig_orbs.get_coefficients(), restored_orbs.get_coefficients())

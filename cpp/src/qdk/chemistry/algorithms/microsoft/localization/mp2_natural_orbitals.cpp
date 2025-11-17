@@ -80,7 +80,7 @@ std::shared_ptr<data::Wavefunction> MP2NaturalOrbitalLocalizer::_run_impl(
   }
 
   // the biggest loc_indice should be less than num_molecular_orbitals
-  const size_t num_molecular_orbitals = orbitals->get_num_mos();
+  const size_t num_molecular_orbitals = orbitals->get_num_molecular_orbitals();
   if (!loc_indices_a.empty() &&
       loc_indices_a.back() >= num_molecular_orbitals) {
     throw std::invalid_argument(

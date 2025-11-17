@@ -30,14 +30,14 @@ inline void approx_diag_hessian(NumInactive ni, NumActive na, NumVirtual nv,
 
 template <typename... Args>
 void approx_diag_hessian(NumOrbital norb, NumInactive ninact, NumActive nact,
-                         NumVirtual nvirt, const double* T, size_t LDT,
-                         const double* V, size_t LDV, const double* A1RDM,
-                         size_t LDD1, const double* A2RDM, size_t LDD2,
-                         Args&&... args) {
+                         NumVirtual num_virtual_orbitals, const double* T,
+                         size_t LDT, const double* V, size_t LDV,
+                         const double* A1RDM, size_t LDD1, const double* A2RDM,
+                         size_t LDD2, Args&&... args) {
   const size_t no = norb.get();
   const size_t ni = ninact.get();
   const size_t na = nact.get();
-  const size_t nv = nvirt.get();
+  const size_t nv = num_virtual_orbitals.get();
 
   // Compute inactive Fock
   std::vector<double> Fi(no * no);
@@ -57,14 +57,15 @@ void approx_diag_hessian(NumOrbital norb, NumInactive ninact, NumActive nact,
                           A1RDM, LDD1, Q.data(), na, F.data(), no);
 
   // Compute approximate diagonal hessian
-  approx_diag_hessian(ninact, nact, nvirt, Fi.data(), no, Fa.data(), no, A1RDM,
-                      LDD1, F.data(), no, std::forward<Args>(args)...);
+  approx_diag_hessian(ninact, nact, num_virtual_orbitals, Fi.data(), no,
+                      Fa.data(), no, A1RDM, LDD1, F.data(), no,
+                      std::forward<Args>(args)...);
 }
 
 void orb_orb_hessian_contract(NumOrbital norb, NumInactive ninact,
-                              NumActive nact, NumVirtual nvirt, const double* T,
-                              size_t LDT, const double* V, size_t LDV,
-                              const double* A1RDM, size_t LDD1,
+                              NumActive nact, NumVirtual num_virtual_orbitals,
+                              const double* T, size_t LDT, const double* V,
+                              size_t LDV, const double* A1RDM, size_t LDD1,
                               const double* A2RDM, size_t LDD2,
                               const double* OG, const double* K_lin,
                               double* HK_lin);

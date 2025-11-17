@@ -3707,8 +3707,8 @@
       ]
     },
     "is_restricted": true,
-    "num_aos": 28,
-    "num_mos": 28,
+    "num_atomic_orbitals": 28,
+    "num_molecular_orbitals": 28,
     "type": "Orbitals",
     "version": "0.1.0"
   },

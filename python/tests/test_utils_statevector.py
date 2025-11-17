@@ -10,8 +10,8 @@ import re
 import numpy as np
 import pytest
 
-from qdk.chemistry.utils.statevector import (
-    create_statevector_from_coeffs_and_dets_string,
+from qdk_chemistry.utils.statevector import (
+    _create_statevector_from_coeffs_and_dets_string,
     create_statevector_from_wavefunction,
 )
 
@@ -28,7 +28,7 @@ def test_create_statevector():
     expected_statevector[1] = 1 + 1j
     expected_statevector[2] = 0.5 - 0.5j
 
-    result = create_statevector_from_coeffs_and_dets_string(coeffs, dets, num_qubits, normalize=False)
+    result = _create_statevector_from_coeffs_and_dets_string(coeffs, dets, num_qubits, normalize=False)
     assert np.allclose(
         result, expected_statevector, rtol=float_comparison_relative_tolerance, atol=float_comparison_absolute_tolerance
     )
@@ -39,7 +39,7 @@ def test_create_statevector():
     num_qubits = 4
     expected_statevector = np.zeros(2**num_qubits, dtype=complex)
 
-    result = create_statevector_from_coeffs_and_dets_string(coeffs, dets, num_qubits, normalize=False)
+    result = _create_statevector_from_coeffs_and_dets_string(coeffs, dets, num_qubits, normalize=False)
     assert np.allclose(
         result, expected_statevector, rtol=float_comparison_relative_tolerance, atol=float_comparison_absolute_tolerance
     )
@@ -53,7 +53,7 @@ def test_create_statevector_mismatched_lengths():
     num_qubits = 2
 
     with pytest.raises(ValueError, match="Number of coefficients must match number of bitstrings"):
-        create_statevector_from_coeffs_and_dets_string(coeffs, dets, num_qubits)
+        _create_statevector_from_coeffs_and_dets_string(coeffs, dets, num_qubits)
 
 
 def test_create_statevector_determinant_exceeds_size():
@@ -65,7 +65,7 @@ def test_create_statevector_determinant_exceeds_size():
     match_string = f"Determinant .* exceeds the size of 2\\*\\*{num_qubits}"
 
     with pytest.raises(ValueError, match=match_string):
-        create_statevector_from_coeffs_and_dets_string(coeffs, dets, num_qubits)
+        _create_statevector_from_coeffs_and_dets_string(coeffs, dets, num_qubits)
 
 
 def test_create_statevector_edge_cases():
@@ -75,7 +75,7 @@ def test_create_statevector_edge_cases():
     dets = ["00", "01"]
     num_qubits = 2
 
-    result = create_statevector_from_coeffs_and_dets_string(coeffs, dets, num_qubits)
+    result = _create_statevector_from_coeffs_and_dets_string(coeffs, dets, num_qubits)
     expected = np.array([0.0, 1.0, 0.0, 0.0], dtype=complex)
     np.testing.assert_array_equal(result, expected)
 
@@ -84,7 +84,7 @@ def test_create_statevector_edge_cases():
     dets = ["00", "11"]
     num_qubits = 2
 
-    result = create_statevector_from_coeffs_and_dets_string(coeffs, dets, num_qubits, normalize=False)
+    result = _create_statevector_from_coeffs_and_dets_string(coeffs, dets, num_qubits, normalize=False)
     expected = np.array([1 + 1j, 0.0, 0.0, 0.5 - 0.5j], dtype=complex)
     np.testing.assert_array_equal(result, expected)
 
@@ -93,7 +93,7 @@ def test_create_statevector_edge_cases():
     dets = ["10", "01"]
     num_qubits = 2
 
-    result = create_statevector_from_coeffs_and_dets_string(coeffs, dets, num_qubits, normalize=False)
+    result = _create_statevector_from_coeffs_and_dets_string(coeffs, dets, num_qubits, normalize=False)
     expected = np.array([0.0, 0.3, 0.7, 0.0], dtype=complex)
     np.testing.assert_array_equal(result, expected)
 
@@ -105,14 +105,14 @@ def test_create_statevector_normalization():
     num_qubits = 4
 
     # Create unnormalized statevector
-    statevector = create_statevector_from_coeffs_and_dets_string(coeffs, dets, num_qubits, normalize=False)
+    statevector = _create_statevector_from_coeffs_and_dets_string(coeffs, dets, num_qubits, normalize=False)
 
     # Normalize manually
     norm = np.linalg.norm(statevector)
     normalized_statevector = statevector / norm
 
     # Create normalized statevector using the function
-    result = create_statevector_from_coeffs_and_dets_string(coeffs, dets, num_qubits, normalize=True)
+    result = _create_statevector_from_coeffs_and_dets_string(coeffs, dets, num_qubits, normalize=True)
 
     assert np.allclose(
         result,
@@ -123,7 +123,7 @@ def test_create_statevector_normalization():
 
     coeffs_zero = [0.0 + 0j, 0.0 + 0j]
     with pytest.raises(ValueError, match=re.escape("Zero statevector norm; cannot normalize.")):
-        create_statevector_from_coeffs_and_dets_string(coeffs_zero, dets, num_qubits, normalize=True)
+        _create_statevector_from_coeffs_and_dets_string(coeffs_zero, dets, num_qubits, normalize=True)
 
 
 def test_create_statevector_from_wavefunction(wavefunction_10e6o):

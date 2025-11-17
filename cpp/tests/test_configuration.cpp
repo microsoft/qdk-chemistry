@@ -221,7 +221,7 @@ class ConfigurationSetTest : public ::testing::Test {
   void SetUp() override {
     // Create orbitals with active space defined
     // Total: 10 orbitals (3 inactive, 4 active, 3 virtual)
-    size_t num_mos = 10;
+    size_t num_molecular_orbitals = 10;
 
     // Define active space: orbitals 3, 4, 5, 6 (0-indexed)
     std::vector<size_t> active_indices = {3, 4, 5, 6};
@@ -230,14 +230,14 @@ class ConfigurationSetTest : public ::testing::Test {
     std::vector<size_t> inactive_indices = {0, 1, 2};
 
     // Create base orbitals and then add active space
-    auto base_orbitals_with_active =
-        testing::create_test_orbitals(num_mos, num_mos, true);
+    auto base_orbitals_with_active = testing::create_test_orbitals(
+        num_molecular_orbitals, num_molecular_orbitals, true);
     orbitals_with_active = testing::with_active_space(
         base_orbitals_with_active, active_indices, inactive_indices);
 
     // Create orbitals without active space
-    orbitals_without_active =
-        testing::create_test_orbitals(num_mos, num_mos, true);
+    orbitals_without_active = testing::create_test_orbitals(
+        num_molecular_orbitals, num_molecular_orbitals, true);
   }
 
   std::shared_ptr<Orbitals> orbitals_with_active;

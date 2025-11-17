@@ -44,7 +44,8 @@ std::shared_ptr<data::Wavefunction> ValenceActiveSpaceSelector::_run_impl(
         "Number of active orbitals must be set and positive. ");
   }
 
-  if (num_active_orbitals > static_cast<int>(orbitals->get_num_mos())) {
+  if (num_active_orbitals >
+      static_cast<int>(orbitals->get_num_molecular_orbitals())) {
     throw std::runtime_error(
         "Number of active orbitals exceeds total number of orbitals.");
   }
@@ -54,7 +55,7 @@ std::shared_ptr<data::Wavefunction> ValenceActiveSpaceSelector::_run_impl(
   if (orbitals->has_active_space()) {
     candidate_indices = orbitals->get_active_space_indices().first;
   } else {
-    candidate_indices.resize(orbitals->get_num_mos());
+    candidate_indices.resize(orbitals->get_num_molecular_orbitals());
     std::iota(candidate_indices.begin(), candidate_indices.end(), 0);
   }
 
@@ -103,7 +104,7 @@ std::shared_ptr<data::Wavefunction> ValenceActiveSpaceSelector::_run_impl(
   }
 
   if (active_space_indices.size() + inactive_indices.size() >
-      static_cast<size_t>(orbitals->get_num_mos())) {
+      static_cast<size_t>(orbitals->get_num_molecular_orbitals())) {
     throw std::runtime_error(
         "Sum of inactive and active orbitals exceeds available orbitals.");
   }

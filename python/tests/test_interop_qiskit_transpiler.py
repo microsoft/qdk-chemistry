@@ -12,7 +12,7 @@ from qiskit.circuit import Parameter
 from qiskit.circuit.library import IGate, SdgGate, SGate, ZGate
 from qiskit.transpiler import PassManager
 
-from qdk.chemistry.plugins.qiskit._interop.transpiler import (
+from qdk_chemistry.plugins.qiskit._interop.transpiler import (
     MergeZBasisRotations,
     RemoveZBasisOnZeroState,
     SubstituteCliffordRz,

@@ -139,14 +139,14 @@ stages:
               march: ${{ arch.march }}
               cuda_arch: none
               targetarch: ${{ arch.arch }}
-            h100:
-              march: ${{ arch.march }}
-              cuda_arch: '90'
-              targetarch: ${{ arch.arch }}
-            a100:
-              march: ${{ arch.march }}
-              cuda_arch: '80'
-              targetarch: ${{ arch.arch }}
+            #h100:
+            #  march: ${{ arch.march }}
+            #  cuda_arch: '90'
+            #  targetarch: ${{ arch.arch }}
+            #a100:
+            #  march: ${{ arch.march }}
+            #  cuda_arch: '80'
+            #  targetarch: ${{ arch.arch }}
         maxParallel: 3
       displayName: Build Base Docker Image (${{ arch.name }})
       ${{ if eq(arch.arch, 'aarch64') }}:
@@ -332,12 +332,12 @@ stages:
             cpu:
               march: ${{ arch.march }}
               cuda_arch: none
-            h100:
-              march: ${{ arch.march }}
-              cuda_arch: '90'
-            a100:
-              march: ${{ arch.march }}
-              cuda_arch: '80'
+            #h100:
+            #  march: ${{ arch.march }}
+            #  cuda_arch: '90'
+            #a100:
+            #  march: ${{ arch.march }}
+            #  cuda_arch: '80'
         maxParallel: 3
       displayName: Build Developer Docker Image (${{ arch.name }})
       ${{ if eq(arch.arch, 'aarch64') }}:
@@ -481,7 +481,7 @@ stages:
             echo "Testing the QDK/Chemistry Runtime Docker image..."
             docker run --rm $(DEV_ACR)/$(runtimeImageName)-$(march)-$(cuda_arch):$(gitHash) /bin/bash -c "
               echo 'Testing QDK/Chemistry installation...' &&
-              python3 -c 'import qdk.chemistry; print(\"QDK/Chemistry version:\", qdk.chemistry.__version__)' &&
+              python3 -c 'import qdk_chemistry; print(\"QDK/Chemistry version:\", qdk_chemistry.__version__)'
             "
           displayName: Test QDK/Chemistry Runtime Docker Image
           condition: succeeded()
@@ -554,87 +554,7 @@ stages:
             echo "Testing the QDK/Chemistry Runtime Docker image..."
             docker run --rm $(DEV_ACR)/$(runtimeImageName)-$(march)-$(cuda_arch):$(gitHash) /bin/bash -c "
               echo 'Testing QDK/Chemistry installation...' &&
-              python3 -c 'import qdk.chemistry; print(\"QDK/Chemistry version:\", qdk.chemistry.__version__)' &&
-            "
-          displayName: Test QDK/Chemistry Runtime Docker Image
-          condition: succeeded()
-
-        - script: |
-            echo "QDK/Chemistry Runtime Docker image built successfully!"
-            echo "Registry: $(DEV_ACR)"
-            echo "Image: $(runtimeImageName)-$(march)-$(cuda_arch)"
-            echo "Hash Tag: $(gitHash)"
-            echo "Full image name: $(DEV_ACR)/$(runtimeImageName)-$(march)-$(cuda_arch):$(gitHash)"
-            echo ""
-            echo "To use this image locally:"
-            echo "docker pull $(DEV_ACR)/$(runtimeImageName)-$(march)-$(cuda_arch):$(gitHash)"
-            echo ""
-            echo "To run the QDK/Chemistry Runtime container:"
-            echo "docker run -it --rm -v \$(pwd):/workspace/qatk $(DEV_ACR)/$(runtimeImageName)-$(march)-$(cuda_arch):$(gitHash)"
-          displayName: Output QDK/Chemistry Runtime Image Information
-
-  # x86_64 GPU builds (uses GPU pool)
-  - ${{ each arch in parameters.matrix_arch }}:
-    - ${{ if eq(arch.arch, 'x86_64') }}:
-      - job: BuildQDKChemistryRuntimeImage_${{ arch.name }}_gpu
-        strategy:
-          matrix:
-            h100:
-              march: ${{ arch.march }}
-              cuda_arch: '90'
-            a100:
-              march: ${{ arch.march }}
-              cuda_arch: '80'
-          maxParallel: 2
-        displayName: Build QDK/Chemistry Runtime Docker Image (${{ arch.name }} GPU)
-        pool: $(GPU_POOL_X86_SM80)
-        timeoutInMinutes: 1800
-        variables:
-          gitHash: $[stageDependencies.Hash.GenerateTagHashs.outputs['hashingStep.gitHash']]
-        steps:
-        - checkout: self
-          persistCredentials: true
-          path: qatk
-
-        - template: templates/reset-docker-directory.yml
-
-        - task: Docker@2
-          displayName: Container repo login
-          inputs:
-            command: login
-            containerRegistry: $(DEV_ACR_SC)
-
-        - task: Docker@2
-          displayName: Build QDK/Chemistry Runtime Docker Image
-          inputs:
-            command: build
-            dockerfile: $(Agent.BuildDirectory)/qatk/.pipelines/runtimecontainer.Dockerfile
-            buildContext: $(Agent.BuildDirectory)
-            repository: $(runtimeImageName)-$(march)-$(cuda_arch)
-            containerRegistry: $(DEV_ACR_SC)
-            arguments: |
-              --build-arg developmentRegistry=$(DEV_ACR)
-              --build-arg baseImageName=$(baseImageName)
-              --build-arg march=$(march)
-              --build-arg cuda_arch=$(cuda_arch)
-              --build-arg gitHash=$(gitHash)
-            tags: |
-              $(gitHash)
-
-        - task: Docker@2
-          displayName: Push QDK/Chemistry Runtime Docker Image (Hash Tag)
-          inputs:
-            command: push
-            repository: $(runtimeImageName)-$(march)-$(cuda_arch)
-            containerRegistry: $(DEV_ACR_SC)
-            tags: |
-              $(gitHash)
-
-        - script: |
-            echo "Testing the QDK/Chemistry Runtime Docker image..."
-            docker run --rm $(DEV_ACR)/$(runtimeImageName)-$(march)-$(cuda_arch):$(gitHash) /bin/bash -c "
-              echo 'Testing QDK/Chemistry installation...' &&
-              python3 -c 'import qdk.chemistry; print(\"QDK/Chemistry version:\", qdk.chemistry.__version__)' &&
+              python3 -c 'import qdk_chemistry; print(\"QDK/Chemistry version:\", qdk_chemistry.__version__)'
             "
           displayName: Test QDK/Chemistry Runtime Docker Image
           condition: succeeded()
@@ -674,12 +594,12 @@ stages:
             cpu:
               march: ${{ arch.march }}
               cuda_arch: none
-            h100:
-              march: ${{ arch.march }}
-              cuda_arch: '90'
-            a100:
-              march: ${{ arch.march }}
-              cuda_arch: '80'
+            #h100:
+            #  march: ${{ arch.march }}
+            #  cuda_arch: '90'
+            #a100:
+            #  march: ${{ arch.march }}
+            #  cuda_arch: '80'
         maxParallel: 3
       displayName: Publish Latest Tag (${{ arch.name }})
       ${{ if eq(arch.arch, 'aarch64') }}:

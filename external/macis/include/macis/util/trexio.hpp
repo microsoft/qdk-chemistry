@@ -42,7 +42,7 @@ class TREXIOFile {
   void read_determinant_list(int64_t ndet, int64_t* dets,
                              int64_t ioff = 0) const;
 
-  void write_mo_num(int64_t nmo);
+  void write_mo_num(int64_t num_molecular_orbitals);
   void write_nucleus_repulsion(double E);
   void write_mo_1e_int_core_hamiltonian(const double* h);
   void write_mo_2e_int_eri(const double* V);

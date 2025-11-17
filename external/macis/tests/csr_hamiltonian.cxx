@@ -24,7 +24,7 @@ TEMPLATE_TEST_CASE("CSR Hamiltonian", "[ham_gen]",
   ROOT_ONLY(MPI_COMM_WORLD);
 
   size_t norb = macis::read_fcidump_norb(water_ccpvdz_fcidump);
-  size_t nocc = 5;
+  size_t num_occupied_orbitals = 5;
 
   std::vector<double> T(norb * norb);
   std::vector<double> V(norb * norb * norb * norb);
@@ -44,7 +44,8 @@ TEMPLATE_TEST_CASE("CSR Hamiltonian", "[ham_gen]",
 #endif
 
   // Generate configuration space
-  const auto hf_det = wfn_traits::canonical_hf_determinant(nocc, nocc);
+  const auto hf_det = wfn_traits::canonical_hf_determinant(
+      num_occupied_orbitals, num_occupied_orbitals);
   auto dets = macis::generate_cisd_hilbert_space(norb, hf_det);
   std::sort(dets.begin(), dets.end(), wfn_traits::spin_comparator{});
 
@@ -115,7 +116,7 @@ TEMPLATE_TEST_CASE("Distributed CSR Hamiltonian", "[ham_gen]",
                    macis::SortedDoubleLoopHamiltonianGenerator<wfn_type>) {
   MPI_Barrier(MPI_COMM_WORLD);
   size_t norb = macis::read_fcidump_norb(water_ccpvdz_fcidump);
-  size_t nocc = 5;
+  size_t num_occupied_orbitals = 5;
 
   std::vector<double> T(norb * norb);
   std::vector<double> V(norb * norb * norb * norb);
@@ -135,7 +136,8 @@ TEMPLATE_TEST_CASE("Distributed CSR Hamiltonian", "[ham_gen]",
 #endif
 
   // Generate configuration space
-  const auto hf_det = wfn_traits::canonical_hf_determinant(nocc, nocc);
+  const auto hf_det = wfn_traits::canonical_hf_determinant(
+      num_occupied_orbitals, num_occupied_orbitals);
   auto dets = macis::generate_cisd_hilbert_space(norb, hf_det);
   std::sort(dets.begin(), dets.end(), wfn_traits::spin_comparator{});
 

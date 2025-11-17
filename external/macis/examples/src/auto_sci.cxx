@@ -155,7 +155,7 @@ int main(int argc, char** argv) {
     if (n_inactive + n_active > norb)
       throw std::runtime_error("NINACTIVE + NACTIVE > NORB");
 
-    size_t n_virtual = norb - n_active - n_inactive;
+    size_t num_virtual_orbitals = norb - n_active - n_inactive;
 
     if (n_active > nwfn_bits / 2) throw std::runtime_error("Not Enough Bits");
 
@@ -178,7 +178,7 @@ int main(int argc, char** argv) {
       console->info("  * NORBITAL  = {}", norb);
       console->info("  * NINACTIVE = {}", n_inactive);
       console->info("  * NACTIVE   = {}", n_active);
-      console->info("  * NVIRTUAL  = {}", n_virtual);
+      console->info("  * NVIRTUAL  = {}", num_virtual_orbitals);
 
       console->debug("READ {} 1-body integrals and {} 2-body integrals",
                      T.size(), V.size());

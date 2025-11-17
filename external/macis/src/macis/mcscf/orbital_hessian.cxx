@@ -102,9 +102,9 @@ void one_index_transformed_hamiltonian(NumOrbital norb, const double* T,
 }
 
 void orb_orb_hessian_contract(NumOrbital norb, NumInactive ninact,
-                              NumActive nact, NumVirtual nvirt, const double* T,
-                              size_t LDT, const double* V, size_t LDV,
-                              const double* A1RDM, size_t LDD1,
+                              NumActive nact, NumVirtual num_virtual_orbitals,
+                              const double* T, size_t LDT, const double* V,
+                              size_t LDV, const double* A1RDM, size_t LDD1,
                               const double* A2RDM, size_t LDD2,
                               const double* OG, const double* K_lin,
                               double* HK_lin) {
@@ -113,11 +113,13 @@ void orb_orb_hessian_contract(NumOrbital norb, NumInactive ninact,
   const size_t no2 = no * no;
   const size_t no4 = no2 * no2;
   const size_t orb_rot_sz =
-      nvirt.get() * (nact.get() + ninact.get()) + nact.get() * ninact.get();
+      num_virtual_orbitals.get() * (nact.get() + ninact.get()) +
+      nact.get() * ninact.get();
 
   // Expand to full antisymmetric K
   std::vector<double> K_full(no2);
-  linear_orb_rot_to_matrix(ninact, nact, nvirt, K_lin, K_full.data(), no);
+  linear_orb_rot_to_matrix(ninact, nact, num_virtual_orbitals, K_lin,
+                           K_full.data(), no);
 
   // Compute one-index transformed hamiltonian
   std::vector<double> Tk(no2), Vk(no4);
@@ -130,11 +132,13 @@ void orb_orb_hessian_contract(NumOrbital norb, NumInactive ninact,
                                     Vk.data(), no, A1RDM, LDD1, A2RDM, LDD2,
                                     Fk.data(), no);
   // Store in HK to initialize the memory
-  fock_to_linear_orb_grad(ninact, nact, nvirt, Fk.data(), no, HK_lin);
+  fock_to_linear_orb_grad(ninact, nact, num_virtual_orbitals, Fk.data(), no,
+                          HK_lin);
 
   // Expand OG into full antisymmetric matrix (reuse Tk)
   std::fill(Tk.begin(), Tk.end(), 0);
-  linear_orb_rot_to_matrix(ninact, nact, nvirt, OG, Tk.data(), no);
+  linear_orb_rot_to_matrix(ninact, nact, num_virtual_orbitals, OG, Tk.data(),
+                           no);
 
   // Compute G*K in Fk
   blas::gemm(blas::Layout::ColMajor, blas::Op::NoTrans, blas::Op::NoTrans, no,
@@ -148,7 +152,8 @@ void orb_orb_hessian_contract(NumOrbital norb, NumInactive ninact,
 
   // Take out orbital rotation piece into a temporary buffer
   std::vector<double> tmp_hk(orb_rot_sz);
-  matrix_to_linear_orb_rot(ninact, nact, nvirt, Tk.data(), no, tmp_hk.data());
+  matrix_to_linear_orb_rot(ninact, nact, num_virtual_orbitals, Tk.data(), no,
+                           tmp_hk.data());
 
   // Add to final result
   for (size_t i = 0; i < orb_rot_sz; ++i) HK_lin[i] += tmp_hk[i];

@@ -154,14 +154,18 @@ double asci_pt2_constraint(ASCISettings asci_settings,
   }
   MPI_Barrier(comm);
 
-  const auto n_occ_alpha = spin_wfn_traits::count(uniq_alpha[0].first);
-  const auto n_vir_alpha = norb - n_occ_alpha;
-  const auto n_sing_alpha = n_occ_alpha * n_vir_alpha;
+  const auto num_alpha_occupied_orbitals =
+      spin_wfn_traits::count(uniq_alpha[0].first);
+  const auto num_alpha_virtual_orbitals = norb - num_alpha_occupied_orbitals;
+  const auto n_sing_alpha =
+      num_alpha_occupied_orbitals * num_alpha_virtual_orbitals;
   const auto n_doub_alpha = (n_sing_alpha * (n_sing_alpha - norb + 1)) / 4;
 
-  const auto n_occ_beta = cdets_begin->count() - n_occ_alpha;
-  const auto n_vir_beta = norb - n_occ_beta;
-  const auto n_sing_beta = n_occ_beta * n_vir_beta;
+  const auto num_beta_occupied_orbitals =
+      cdets_begin->count() - num_alpha_occupied_orbitals;
+  const auto num_beta_virtual_orbitals = norb - num_beta_occupied_orbitals;
+  const auto n_sing_beta =
+      num_beta_occupied_orbitals * num_beta_virtual_orbitals;
   const auto n_doub_beta = (n_sing_beta * (n_sing_beta - norb + 1)) / 4;
 
   logger->info("  * NS = {} ND = {}", n_sing_alpha, n_doub_alpha);

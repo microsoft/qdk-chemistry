@@ -11,13 +11,13 @@ namespace qdk::chemistry::scf {
  * @brief Perform a fixed-dimension Arnoldi iteration for the eigenvalue problem
  *
  * @param[in] N Problem dimension
- * @param[in] MAX_M Arnoldi dimenion
+ * @param[in] MAX_M Arnoldi dimension
  * @param[in] A Operator action instance
  * @param[in] V0 Initial vector for the Arnoldi iteration
  * @param[out] Q The Krylov subspace
- * @param[in]  LDQ Leading dimention of Q
+ * @param[in]  LDQ Leading dimension of Q
  * @param[out] H A projected into the Krylov subspace
- * @param[in]  LDH Leading dimention of H
+ * @param[in]  LDH Leading dimension of H
  */
 template <typename T>
 void arnoldi_eig(int_t N, int_t MAX_M, const matrix_op_t<T>& A, const T* V0,

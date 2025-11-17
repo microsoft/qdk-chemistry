@@ -14,9 +14,8 @@ import pytest
 from qiskit_aer import AerSimulator
 from qiskit_aer.noise import NoiseModel, depolarizing_error
 
-from qdk.chemistry.data.qubit_hamiltonian import QubitHamiltonian, filter_and_group_pauli_ops_from_statevector
-from qdk.chemistry.plugins.qiskit.energy_estimator import QiskitEnergyEstimator
-from qdk.chemistry.utils.statevector import create_statevector_from_wavefunction
+from qdk_chemistry.data.qubit_hamiltonian import QubitHamiltonian, filter_and_group_pauli_ops_from_wavefunction
+from qdk_chemistry.plugins.qiskit.energy_estimator import QiskitEnergyEstimator
 
 from .reference_tolerances import estimator_energy_tolerance
 
@@ -113,8 +112,9 @@ def test_estimator_for_4e4o_2det_problem(hamiltonian_4e4o, wavefunction_4e4o, ci
     Reference energy is -4.023112557011, noiseless test with 100000 shots should return
     energy expectation value within chemical accuracy 0.001.
     """
-    state_vector = create_statevector_from_wavefunction(wavefunction_4e4o)
-    filtered_hamiltonian, classical_coeffs = filter_and_group_pauli_ops_from_statevector(hamiltonian_4e4o, state_vector)
+    filtered_hamiltonian, classical_coeffs = filter_and_group_pauli_ops_from_wavefunction(
+        hamiltonian_4e4o, wavefunction_4e4o
+    )
     backend = AerSimulator(seed_simulator=42)
     estimator = QiskitEnergyEstimator(backend=backend)
     results, _ = estimator.run(

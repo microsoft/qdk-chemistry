@@ -41,12 +41,12 @@ TEST_CASE("MCSCF") {
 
   size_t n_inactive = 1;
   size_t n_active = 8;
-  size_t n_virtual = norb - n_inactive - n_active;
+  size_t num_virtual_orbitals = norb - n_inactive - n_active;
   NumElectron nalpha(4);
 
   NumInactive ninact(n_inactive);
   NumActive nact(n_active);
-  NumVirtual nvirt(n_virtual);
+  NumVirtual nvirt(num_virtual_orbitals);
 
   size_t na2 = n_active * n_active;
   size_t na4 = na2 * na2;

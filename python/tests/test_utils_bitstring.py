@@ -1,7 +1,7 @@
 """Test for bitstring manipulation utilities in QDK/Chemistry.
 
 This module provides comprehensive tests for the bitstring utility functions
-in qdk.chemistry.utils.bitstring, which are essential for quantum state preparation
+in qdk_chemistry.utils.bitstring, which are essential for quantum state preparation
 algorithms, particularly for converting between classical electronic structure
 representations and quantum circuit formats.
 """
@@ -14,7 +14,7 @@ representations and quantum circuit formats.
 import numpy as np
 import pytest
 
-from qdk.chemistry.utils.bitstring import (
+from qdk_chemistry.utils.bitstring import (
     binary_to_decimal,
     bitstrings_to_binary_matrix,
     separate_alpha_beta_to_binary_string,

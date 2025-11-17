@@ -11,7 +11,7 @@ from pathlib import Path
 
 import numpy as np
 
-from qdk.chemistry.data.estimator_data import EnergyExpectationResult
+from qdk_chemistry.data.estimator_data import EnergyExpectationResult
 
 
 def test_energy_expectation_result_creation():

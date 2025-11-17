@@ -11,7 +11,15 @@ import pickle
 import numpy as np
 import pytest
 
-import qdk.chemistry.data
+from qdk_chemistry.data import (
+    Ansatz,
+    CasWavefunctionContainer,
+    Configuration,
+    Hamiltonian,
+    Orbitals,
+    Structure,
+    Wavefunction,
+)
 
 from .test_helpers import create_test_basis_set
 
@@ -24,14 +32,14 @@ class TestAnsatzSerialization:
         """Create basic orbitals for testing."""
         coeffs = np.array([[0.9, 0.1], [0.1, -0.9], [0.0, 0.0]])
         basis_set = create_test_basis_set(3, "test-ansatz")
-        return qdk.chemistry.data.Orbitals(coeffs, None, None, basis_set)
+        return Orbitals(coeffs, None, None, basis_set)
 
     @pytest.fixture
     def test_structure(self):
         """Create a test structure (H2 molecule)."""
         positions = np.array([[0.0, 0.0, 0.0], [0.0, 0.0, 1.4]])
         elements = ["H", "H"]
-        return qdk.chemistry.data.Structure(positions, elements)
+        return Structure(positions, elements)
 
     @pytest.fixture
     def test_basis_set(self, test_structure):
@@ -41,26 +49,26 @@ class TestAnsatzSerialization:
     @pytest.fixture
     def test_wavefunction(self, basic_orbitals):
         """Create a test wavefunction."""
-        det1 = qdk.chemistry.data.Configuration("20")
+        det1 = Configuration("20")
         coeffs = np.array([1.0])  # Single determinant with coefficient 1.0
 
-        container = qdk.chemistry.data.CasWavefunctionContainer(coeffs, [det1], basic_orbitals)
-        return qdk.chemistry.data.Wavefunction(container)
+        container = CasWavefunctionContainer(coeffs, [det1], basic_orbitals)
+        return Wavefunction(container)
 
     @pytest.fixture
     def test_ansatz(self, test_wavefunction):
         """Create a test ansatz."""
         # Create a hamiltonian using the same orbitals as the wavefunction
         orbitals = test_wavefunction.get_orbitals()
-        num_orbitals = orbitals.get_num_mos()
+        num_orbitals = orbitals.get_num_molecular_orbitals()
 
         # Create simple one and two body integrals
         one_body = np.eye(num_orbitals)
         two_body = np.zeros(num_orbitals**4)
         fock = np.eye(0)
 
-        test_hamiltonian = qdk.chemistry.data.Hamiltonian(one_body, two_body, orbitals, 0.0, fock)
-        return qdk.chemistry.data.Ansatz(test_hamiltonian, test_wavefunction)
+        test_hamiltonian = Hamiltonian(one_body, two_body, orbitals, 0.0, fock)
+        return Ansatz(test_hamiltonian, test_wavefunction)
 
     def test_json_serialization(self, test_ansatz):
         """Test JSON serialization for ansatz."""
@@ -73,7 +81,7 @@ class TestAnsatzSerialization:
         assert "hamiltonian" in json_data
 
         # Test round-trip serialization
-        ansatz_reconstructed = qdk.chemistry.data.Ansatz.from_json(json_str)
+        ansatz_reconstructed = Ansatz.from_json(json_str)
 
         # Verify nested objects are preserved
         assert ansatz_reconstructed.get_wavefunction() is not None
@@ -100,7 +108,7 @@ class TestAnsatzSerialization:
         test_ansatz.to_hdf5_file(str(filename))
 
         # Load from HDF5 file
-        ansatz_reconstructed = qdk.chemistry.data.Ansatz.from_hdf5_file(str(filename))
+        ansatz_reconstructed = Ansatz.from_hdf5_file(str(filename))
 
         # Verify nested objects are preserved
         assert ansatz_reconstructed.get_wavefunction() is not None
@@ -127,7 +135,7 @@ class TestAnsatzSerialization:
         test_ansatz.to_json_file(str(filename))
 
         # Load from JSON file
-        ansatz_reconstructed = qdk.chemistry.data.Ansatz.from_json_file(str(filename))
+        ansatz_reconstructed = Ansatz.from_json_file(str(filename))
 
         # Verify nested objects are preserved
         assert ansatz_reconstructed.get_wavefunction() is not None
@@ -140,12 +148,12 @@ class TestAnsatzSerialization:
 
         # Test JSON format
         test_ansatz.to_file(str(json_filename), "json")
-        ansatz_json = qdk.chemistry.data.Ansatz.from_file(str(json_filename), "json")
+        ansatz_json = Ansatz.from_file(str(json_filename), "json")
         assert ansatz_json.get_wavefunction() is not None
 
         # Test HDF5 format
         test_ansatz.to_file(str(hdf5_filename), "hdf5")
-        ansatz_hdf5 = qdk.chemistry.data.Ansatz.from_file(str(hdf5_filename), "hdf5")
+        ansatz_hdf5 = Ansatz.from_file(str(hdf5_filename), "hdf5")
         assert ansatz_hdf5.get_wavefunction() is not None
 
         # Test invalid format
@@ -153,7 +161,7 @@ class TestAnsatzSerialization:
             test_ansatz.to_file(str(tmp_path / "test.xyz"), "xyz")
 
         with pytest.raises(RuntimeError, match="Unsupported file type"):
-            qdk.chemistry.data.Ansatz.from_file(str(tmp_path / "test.xyz"), "xyz")
+            Ansatz.from_file(str(tmp_path / "test.xyz"), "xyz")
 
     def test_error_handling(self):
         """Test error handling for malformed data."""
@@ -161,20 +169,20 @@ class TestAnsatzSerialization:
         bad_json_str = json.dumps({"wavefunction": "invalid"})
 
         with pytest.raises(RuntimeError):
-            qdk.chemistry.data.Ansatz.from_json(bad_json_str)
+            Ansatz.from_json(bad_json_str)
 
         # Test non-existent files
         with pytest.raises(RuntimeError):
-            qdk.chemistry.data.Ansatz.from_json_file("non_existent.json")
+            Ansatz.from_json_file("non_existent.json")
 
         with pytest.raises(RuntimeError):
-            qdk.chemistry.data.Ansatz.from_hdf5_file("non_existent.h5")
+            Ansatz.from_hdf5_file("non_existent.h5")
 
     def test_nested_serialization_consistency(self, test_ansatz):
         """Test that nested objects maintain consistency through serialization."""
         # Serialize ansatz
         json_str = test_ansatz.to_json()
-        ansatz_reconstructed = qdk.chemistry.data.Ansatz.from_json(json_str)
+        ansatz_reconstructed = Ansatz.from_json(json_str)
 
         # Verify that the orbitals in the wavefunction and hamiltonian are consistent
         recon_wf = ansatz_reconstructed.get_wavefunction()
@@ -249,5 +257,5 @@ class TestAnsatzSerialization:
         if test_ansatz.has_orbitals():
             orig_orbs = test_ansatz.get_orbitals()
             restored_orbs = ansatz_restored.get_orbitals()
-            assert orig_orbs.get_num_mos() == restored_orbs.get_num_mos()
+            assert orig_orbs.get_num_molecular_orbitals() == restored_orbs.get_num_molecular_orbitals()
             np.testing.assert_array_equal(orig_orbs.get_coefficients(), restored_orbs.get_coefficients())

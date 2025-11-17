@@ -22,12 +22,12 @@ from qiskit.circuit.library import PauliEvolutionGate
 from qiskit.synthesis import MatrixExponential
 from qiskit_aer import AerSimulator
 
-from qdk.chemistry.algorithms import (
+from qdk_chemistry.algorithms import (
     IterativePhaseEstimation,
-    SparseIsometryGF2XStatePrep,
     create,
 )
-from qdk.chemistry.data import QpeResult, Structure
+from qdk_chemistry.data import QpeResult, Structure
+from qdk_chemistry.utils.wavefunction import get_top_determinants
 
 if TYPE_CHECKING:
     from qiskit.quantum_info import SparsePauliOp
@@ -92,8 +92,9 @@ def create_exact_iteration_circuit(
 
     power = 2 ** (total_iterations - iteration - 1)
     scaled_time = evolution_time * power
-    evolution_gate = PauliEvolutionGate(pauli_operator, time=scaled_time, synthesis=synthesis)
-    circuit.append(evolution_gate.control(1), [control, *system])
+    evolution_gate = PauliEvolutionGate(pauli_operator, time=scaled_time)
+    systhesize_gate = synthesis.synthesize(evolution_gate)
+    circuit.append(systhesize_gate.control(1), [control, *system])
 
     circuit.h(control)
     circuit.measure(control, classical[0])
@@ -202,14 +203,18 @@ qubit_pauli_op = qubit_hamiltonian.pauli_ops
 num_spin_orbitals = qubit_hamiltonian.num_qubits
 
 # ------------------------------------------------------------------
+# Down select top 2 determinants from the CASCI wavefunction
+# ------------------------------------------------------------------
+top_configurations = get_top_determinants(casci_wavefunction, max_determinants=2)
+pmc = create("projected_multi_configuration_calculator")
+E_sparse, sparse_wavefunction = pmc.run(active_hamiltonian, list(top_configurations.keys()))
+
+# ------------------------------------------------------------------
 # Sparse-isometry state preparation from the leading 2 CASCI determinants.
 # ------------------------------------------------------------------
-sparse_state_prep = SparseIsometryGF2XStatePrep(
-    wavefunction=casci_wavefunction,
-    max_dets=2,
-    save_outputs=False,
-)
-state_prep = qasm3.loads(sparse_state_prep.create_circuit_qasm())
+sparse_state_prep = create("state_prep", algorithm_name="sparse_isometry_gf2x")
+
+state_prep = qasm3.loads(sparse_state_prep.run(sparse_wavefunction))
 state_prep = transpile(
     state_prep,
     basis_gates=["cx", "rz", "h", "x", "s", "sdg"],

@@ -20,7 +20,7 @@ import textwrap
 from pathlib import Path
 
 try:
-    importlib.util.find_spec("qdk.chemistry")
+    importlib.util.find_spec("qdk_chemistry")
 except ImportError as exc:
     raise ImportError("The 'qdk.chemistry' package must be installed to run this test.") from exc
 

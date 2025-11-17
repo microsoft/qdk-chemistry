@@ -10,7 +10,7 @@ from pathlib import Path
 
 import h5py
 
-from qdk.chemistry.data import QpeResult
+from qdk_chemistry.data import QpeResult
 
 
 def test_qpe_result_creation():

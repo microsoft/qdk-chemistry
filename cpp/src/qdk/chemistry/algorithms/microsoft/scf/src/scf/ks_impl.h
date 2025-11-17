@@ -66,7 +66,7 @@ class KSImpl : public SCFImpl {
   /**
    * @brief Get hybridization coefficients for range-separated functionals
    *
-   * @returns A tuple containing the coefficents
+   * @returns A tuple containing the coefficients
    *   0: alpha Fraction of long-range HF exchange (0.0 to 1.0)
    *   1: beta Fraction of short-range HF exchange (for RSH functionals)
    *   2: omega Range-separation parameter (for RSH functionals)

@@ -8,9 +8,8 @@
 import numpy as np
 import pytest
 
-import qdk.chemistry.data
-from qdk.chemistry import algorithms
-from qdk.chemistry.data import Ansatz, Structure
+from qdk_chemistry import algorithms
+from qdk_chemistry.data import Ansatz, CoupledClusterAmplitudes, Settings, Structure
 
 from .reference_tolerances import (
     float_comparison_absolute_tolerance,
@@ -31,9 +30,9 @@ except ImportError:
     PYSCF_AVAILABLE = False
 
 if PYSCF_AVAILABLE:
-    import qdk.chemistry.plugins.pyscf
-    from qdk.chemistry.constants import ANGSTROM_TO_BOHR
-    from qdk.chemistry.plugins.pyscf.utils import (
+    import qdk_chemistry.plugins.pyscf
+    from qdk_chemistry.constants import ANGSTROM_TO_BOHR
+    from qdk_chemistry.plugins.pyscf.utils import (
         basis_to_pyscf_mol,
         hamiltonian_to_scf,
         hamiltonian_to_scf_from_n_electrons_and_multiplicity,
@@ -226,7 +225,7 @@ class TestPyscfPlugin:
 
         # Since the (T) setting was removed, these assertions are no longer valid
         # Instead, let's test that settings is a proper Settings object
-        assert isinstance(settings, qdk.chemistry.data.Settings)
+        assert isinstance(settings, Settings)
 
         # Add a test setting
         settings.set("conv_tol", 1e-8)
@@ -656,7 +655,7 @@ class TestPyscfPlugin:
 
         # Get orbital occupancy information
         num_elec = wavefunction.get_total_num_electrons()
-        nocc = num_elec[0]  # Number of occupied orbitals
+        num_occupied_orbitals = num_elec[0]  # Number of occupied orbitals
 
         # Prepare for Test 2: Calculate can_random_objective_value before localizer creation
         random_occ_indices = [1, 3, 4]  # Random subset of occupied orbitals
@@ -668,8 +667,8 @@ class TestPyscfPlugin:
         localizer = algorithms.create("orbital_localizer", "pyscf_multi")
 
         # Test 1: Localize occupied first, then virtual orbitals on the localized occupied orbitals
-        occ_indices = list(range(nocc))
-        virt_indices = list(range(nocc, orbitals.get_num_mos()))
+        occ_indices = list(range(num_occupied_orbitals))
+        virt_indices = list(range(num_occupied_orbitals, orbitals.get_num_molecular_orbitals()))
 
         # Localize occupied orbitals first
         localized_occ_wfn = localizer.run(wavefunction, occ_indices, occ_indices)
@@ -721,10 +720,10 @@ class TestPyscfPlugin:
 
         # Get orbital occupancy information
         num_elec = wavefunction.get_total_num_electrons()
-        nocc = num_elec[0]  # Number of occupied orbitals
+        num_occupied_orbitals = num_elec[0]  # Number of occupied orbitals
 
         # Prepare for Test 2: Calculate can_random_objective_value before localizer creation
-        random_virt_indices = [5, 7, 9]  # Random subset of virtual orbitals (indices >= nocc)
+        random_virt_indices = [5, 7, 9]  # Random subset of virtual orbitals (indices >= num_occupied_orbitals)
         ca_can, _ = orbitals.get_coefficients()
         ca_selected = ca_can[:, random_virt_indices]
         can_random_objective_value = boys_objective_function(orbitals, ca_selected)
@@ -734,8 +733,8 @@ class TestPyscfPlugin:
         localizer.settings().set("method", "foster-boys")
 
         # Test 1: Localize occupied first, then virtual orbitals on the localized occupied orbitals
-        occ_indices = list(range(nocc))
-        virt_indices = list(range(nocc, orbitals.get_num_mos()))
+        occ_indices = list(range(num_occupied_orbitals))
+        virt_indices = list(range(num_occupied_orbitals, orbitals.get_num_molecular_orbitals()))
 
         # Localize occupied orbitals first
         localized_occ_wfn = localizer.run(wavefunction, occ_indices, occ_indices)
@@ -796,10 +795,10 @@ class TestPyscfPlugin:
 
         # Get orbital occupancy information
         num_elec = wavefunction.get_total_num_electrons()
-        nocc = num_elec[0]  # Number of occupied orbitals
+        num_occupied_orbitals = num_elec[0]  # Number of occupied orbitals
         # Test 1: Localize occupied first, then virtual orbitals on the localized occupied orbitals
-        occ_indices = list(range(nocc))
-        virt_indices = list(range(nocc, orbitals.get_num_mos()))
+        occ_indices = list(range(num_occupied_orbitals))
+        virt_indices = list(range(num_occupied_orbitals, orbitals.get_num_molecular_orbitals()))
 
         # Localize occupied orbitals first
         localized_occ_wfn = localizer.run(wavefunction, occ_indices, occ_indices)
@@ -851,7 +850,7 @@ class TestPyscfPlugin:
 
         # Get orbital occupancy information
         num_elec = wavefunction.get_total_num_electrons()
-        nocc_alpha, nocc_beta = num_elec[0], num_elec[1]
+        num_alpha, num_beta = num_elec[0], num_elec[1]
 
         # Prepare for Test 2: Randomly choose indices from occupied orbitals only for both spin channels
         random_occ_indices_alpha = [2, 3]  # Random subset of occupied alpha orbitals
@@ -865,10 +864,10 @@ class TestPyscfPlugin:
         localizer = algorithms.create("orbital_localizer", "pyscf_multi")
 
         # Test 1: Localize occupied first, then virtual orbitals on the localized occupied orbitals
-        occ_indices_alpha = list(range(nocc_alpha))
-        virt_indices_alpha = list(range(nocc_alpha, orbitals.get_num_mos()))
-        occ_indices_beta = list(range(nocc_beta))
-        virt_indices_beta = list(range(nocc_beta, orbitals.get_num_mos()))
+        occ_indices_alpha = list(range(num_alpha))
+        virt_indices_alpha = list(range(num_alpha, orbitals.get_num_molecular_orbitals()))
+        occ_indices_beta = list(range(num_beta))
+        virt_indices_beta = list(range(num_beta, orbitals.get_num_molecular_orbitals()))
 
         # Localize occupied orbitals first
         localized_occ_wfn = localizer.run(wavefunction, occ_indices_alpha, occ_indices_beta)
@@ -940,11 +939,17 @@ class TestPyscfPlugin:
 
         # Get orbital occupancy information
         num_elec = wavefunction.get_total_num_electrons()
-        nocc_alpha, nocc_beta = num_elec[0], num_elec[1]
+        num_alpha, num_beta = num_elec[0], num_elec[1]
 
         # Prepare for Test 2: Randomly choose indices from virtual orbitals only for both spin channels
-        random_virt_indices_alpha = [nocc_alpha + 1, nocc_alpha + 3]  # Random subset of virtual alpha orbitals
-        random_virt_indices_beta = [nocc_beta + 2, nocc_beta + 4]  # Random subset of virtual beta orbitals
+        random_virt_indices_alpha = [
+            num_alpha + 1,
+            num_alpha + 3,
+        ]  # Random subset of virtual alpha orbitals
+        random_virt_indices_beta = [
+            num_beta + 2,
+            num_beta + 4,
+        ]  # Random subset of virtual beta orbitals
         ca_selected = can_a[:, random_virt_indices_alpha]
         cb_selected = can_b[:, random_virt_indices_beta]
         can_random_objective_value_a = boys_objective_function(orbitals, ca_selected)
@@ -955,10 +960,10 @@ class TestPyscfPlugin:
         localizer.settings().set("method", "foster-boys")
 
         # Test 1: Localize occupied first, then virtual orbitals on the localized occupied orbitals
-        occ_indices_alpha = list(range(nocc_alpha))
-        virt_indices_alpha = list(range(nocc_alpha, orbitals.get_num_mos()))
-        occ_indices_beta = list(range(nocc_beta))
-        virt_indices_beta = list(range(nocc_beta, orbitals.get_num_mos()))
+        occ_indices_alpha = list(range(num_alpha))
+        virt_indices_alpha = list(range(num_alpha, orbitals.get_num_molecular_orbitals()))
+        occ_indices_beta = list(range(num_beta))
+        virt_indices_beta = list(range(num_beta, orbitals.get_num_molecular_orbitals()))
 
         # Localize occupied orbitals first
         localized_occ_wfn = localizer.run(wavefunction, occ_indices_alpha, occ_indices_beta)
@@ -1030,7 +1035,7 @@ class TestPyscfPlugin:
 
         # Get orbital occupancy information
         num_elec = wavefunction.get_total_num_electrons()
-        nocc_alpha, nocc_beta = num_elec[0], num_elec[1]
+        num_alpha, num_beta = num_elec[0], num_elec[1]
 
         # Prepare for Test 2: Randomly choose indices from occupied orbitals only for both spin channels
         random_occ_indices_alpha = [2, 3]  # Random subset of occupied alpha orbitals
@@ -1045,10 +1050,10 @@ class TestPyscfPlugin:
         localizer.settings().set("method", "edmiston-ruedenberg")
 
         # Test 1: Localize occupied first, then virtual orbitals on the localized occupied orbitals
-        occ_indices_alpha = list(range(nocc_alpha))
-        virt_indices_alpha = list(range(nocc_alpha, orbitals.get_num_mos()))
-        occ_indices_beta = list(range(nocc_beta))
-        virt_indices_beta = list(range(nocc_beta, orbitals.get_num_mos()))
+        occ_indices_alpha = list(range(num_alpha))
+        virt_indices_alpha = list(range(num_alpha, orbitals.get_num_molecular_orbitals()))
+        occ_indices_beta = list(range(num_beta))
+        virt_indices_beta = list(range(num_beta, orbitals.get_num_molecular_orbitals()))
 
         # Localize occupied orbitals first
         localized_occ_wfn = localizer.run(wavefunction, occ_indices_alpha, occ_indices_beta)
@@ -1120,7 +1125,7 @@ class TestPyscfPlugin:
 
         # Get orbital occupancy information
         num_elec = wavefunction.get_total_num_electrons()
-        nocc = num_elec[0]  # Number of occupied orbitals (same as alpha for ROHF)
+        num_occupied_orbitals = num_elec[0]  # Number of occupied orbitals (same as alpha for ROHF)
 
         # Prepare for Test 2: Randomly choose indices from occupied orbitals only
         random_occ_indices = [0, 3, 4, 7]  # Random subset of occupied orbitals
@@ -1131,8 +1136,8 @@ class TestPyscfPlugin:
         localizer = algorithms.create("orbital_localizer", "pyscf_multi")
 
         # Test 1: Localize occupied first, then virtual orbitals on the localized occupied orbitals
-        occ_indices = list(range(nocc))
-        virt_indices = list(range(nocc, orbitals.get_num_mos()))
+        occ_indices = list(range(num_occupied_orbitals))
+        virt_indices = list(range(num_occupied_orbitals, orbitals.get_num_molecular_orbitals()))
 
         # Localize occupied orbitals first
         localized_occ_wfn = localizer.run(wavefunction, occ_indices, occ_indices)
@@ -1186,10 +1191,15 @@ class TestPyscfPlugin:
 
         # Get orbital occupancy information
         num_elec = wavefunction.get_total_num_electrons()
-        nocc = num_elec[0]  # Number of occupied orbitals (same as alpha for ROHF)
+        num_occupied_orbitals = num_elec[0]  # Number of occupied orbitals (same as alpha for ROHF)
 
         # Prepare for Test 2: Randomly choose indices from virtual orbitals only
-        random_virt_indices = [nocc + 1, nocc + 3, nocc + 5, nocc + 7]  # Random subset of virtual orbitals
+        random_virt_indices = [
+            num_occupied_orbitals + 1,
+            num_occupied_orbitals + 3,
+            num_occupied_orbitals + 5,
+            num_occupied_orbitals + 7,
+        ]  # Random subset of virtual orbitals
         ca_selected = can_mos[:, random_virt_indices]
         can_random_objective_value = boys_objective_function(orbitals, ca_selected)
 
@@ -1198,8 +1208,8 @@ class TestPyscfPlugin:
         localizer.settings().set("method", "foster-boys")
 
         # Test 1: Localize occupied first, then virtual orbitals on the localized occupied orbitals
-        occ_indices = list(range(nocc))
-        virt_indices = list(range(nocc, orbitals.get_num_mos()))
+        occ_indices = list(range(num_occupied_orbitals))
+        virt_indices = list(range(num_occupied_orbitals, orbitals.get_num_molecular_orbitals()))
 
         # Localize occupied orbitals first
         localized_occ_wfn = localizer.run(wavefunction, occ_indices, occ_indices)
@@ -1253,7 +1263,7 @@ class TestPyscfPlugin:
 
         # Get orbital occupancy information
         num_elec = wavefunction.get_total_num_electrons()
-        nocc = num_elec[0]  # Number of occupied orbitals (same as alpha for ROHF)
+        num_occupied_orbitals = num_elec[0]  # Number of occupied orbitals (same as alpha for ROHF)
 
         # Prepare for Test 2: Randomly choose indices from occupied orbitals only
         random_occ_indices = [0, 3, 4]  # Random subset of occupied orbitals
@@ -1265,8 +1275,8 @@ class TestPyscfPlugin:
         localizer.settings().set("method", "edmiston-ruedenberg")
 
         # Test 1: Localize occupied first, then virtual orbitals on the localized occupied orbitals
-        occ_indices = list(range(nocc))
-        virt_indices = list(range(nocc, orbitals.get_num_mos()))
+        occ_indices = list(range(num_occupied_orbitals))
+        virt_indices = list(range(num_occupied_orbitals, orbitals.get_num_molecular_orbitals()))
 
         # Localize occupied orbitals first
         localized_occ_wfn = localizer.run(wavefunction, occ_indices, occ_indices)
@@ -1360,7 +1370,7 @@ class TestPyscfPlugin:
         cc_calculator = algorithms.create("coupled_cluster_calculator", "pyscf")
         _, cc_amplitudes = cc_calculator.run(Ansatz(hamiltonian, wavefunction))
         assert cc_amplitudes is not None
-        assert isinstance(cc_amplitudes, qdk.chemistry.data.CoupledClusterAmplitudes)
+        assert isinstance(cc_amplitudes, CoupledClusterAmplitudes)
         assert cc_amplitudes.has_t1_amplitudes()
         assert cc_amplitudes.has_t2_amplitudes()
 
@@ -1432,7 +1442,7 @@ class TestQDKChemistryPySCFBasisConversion:
 
     def create_simple_basis_set(self, structure, basis_name="STO-3G"):
         """Create a simple basis set for testing."""
-        scf_solver = qdk.chemistry.algorithms.create("scf_solver")
+        scf_solver = qdk_chemistry.algorithms.create("scf_solver")
         scf_solver.settings().set("basis_set", basis_name.lower())
         _, wavefunction = scf_solver.run(structure, 0, 1)
         return wavefunction.get_orbitals().get_basis_set()
@@ -1625,7 +1635,7 @@ class TestQDKChemistryPySCFBasisConversion:
     def test_molecular_orbital_consistency(self):
         """Test that molecular orbitals remain consistent after basis conversion."""
         # Get QDK/Chemistry solution
-        scf_solver = qdk.chemistry.algorithms.create("scf_solver", "pyscf")
+        scf_solver = qdk_chemistry.algorithms.create("scf_solver", "pyscf")
         scf_solver.settings().set("basis_set", "sto-3g")
         qdk_energy, qdk_wavefunction = scf_solver.run(self.he_structure, 0, 1)
         qdk_orbitals = qdk_wavefunction.get_orbitals()

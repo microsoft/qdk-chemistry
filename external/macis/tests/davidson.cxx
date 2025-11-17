@@ -24,7 +24,7 @@ TEST_CASE("Davidson") {
   }
 
   size_t norb = macis::read_fcidump_norb(water_ccpvdz_fcidump);
-  size_t nocc = 5;
+  size_t num_occupied_orbitals = 5;
 
   std::vector<double> T(norb * norb);
   std::vector<double> V(norb * norb * norb * norb);
@@ -45,7 +45,8 @@ TEST_CASE("Davidson") {
 #endif
 
   // Generate configuration space
-  const auto hf_det = wfn_traits::canonical_hf_determinant(nocc, nocc);
+  const auto hf_det = wfn_traits::canonical_hf_determinant(
+      num_occupied_orbitals, num_occupied_orbitals);
   auto dets = macis::generate_cisd_hilbert_space(norb, hf_det);
   auto E0_ref = -7.623197835987e+01;
 
@@ -84,7 +85,7 @@ TEST_CASE("Parallel Davidson") {
 
   MPI_Barrier(MPI_COMM_WORLD);
   size_t norb = macis::read_fcidump_norb(water_ccpvdz_fcidump);
-  size_t nocc = 5;
+  size_t num_occupied_orbitals = 5;
 
   std::vector<double> T(norb * norb);
   std::vector<double> V(norb * norb * norb * norb);
@@ -105,7 +106,8 @@ TEST_CASE("Parallel Davidson") {
 #endif
 
   // Generate configuration space
-  const auto hf_det = wfn_traits::canonical_hf_determinant(nocc, nocc);
+  const auto hf_det = wfn_traits::canonical_hf_determinant(
+      num_occupied_orbitals, num_occupied_orbitals);
   auto dets = macis::generate_cisd_hilbert_space(norb, hf_det);
   auto E0_ref = -7.623197835987e+01;
 

@@ -64,7 +64,7 @@ TEST_CASE("FCIDUMP") {
 
     SECTION("Validity Checks") {
       auto norb = norb_ref;
-      size_t nocc = 5;
+      size_t num_occupied_orbitals = 5;
       const auto norb2 = norb * norb;
       const auto norb3 = norb2 * norb;
       std::vector<double> T(norb * norb);
@@ -73,9 +73,9 @@ TEST_CASE("FCIDUMP") {
       macis::read_fcidump_2body(water_ccpvdz_fcidump, V.data(), norb);
 
       std::vector<double> eps(norb);
-      macis::canonical_orbital_energies(macis::NumOrbital(norb),
-                                        macis::NumInactive(nocc), T.data(),
-                                        norb, V.data(), norb, eps.data());
+      macis::canonical_orbital_energies(
+          macis::NumOrbital(norb), macis::NumInactive(num_occupied_orbitals),
+          T.data(), norb, V.data(), norb, eps.data());
 
       // Check orbital energies
       std::vector<double> ref_eps = {
@@ -95,10 +95,10 @@ TEST_CASE("FCIDUMP") {
 
       // MP2
       double EMP2 = 0.;
-      for (size_t i = 0; i < nocc; ++i)
-        for (size_t a = nocc; a < norb; ++a)
-          for (size_t j = 0; j < nocc; ++j)
-            for (size_t b = nocc; b < norb; ++b) {
+      for (size_t i = 0; i < num_occupied_orbitals; ++i)
+        for (size_t a = num_occupied_orbitals; a < norb; ++a)
+          for (size_t j = 0; j < num_occupied_orbitals; ++j)
+            for (size_t b = num_occupied_orbitals; b < norb; ++b) {
               double den = eps[a] + eps[b] - eps[i] - eps[j];
               double dir = V[a + i * norb + b * norb2 + j * norb3];
               double exh = V[b + i * norb + a * norb2 + j * norb3];

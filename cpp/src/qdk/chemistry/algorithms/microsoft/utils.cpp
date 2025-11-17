@@ -267,14 +267,15 @@ nlohmann::ordered_json convert_to_json(
   std::transform(atom_z.begin(), atom_z.end(), atom_z_unsigned.begin(),
                  [](double z) { return static_cast<unsigned>(z); });
 
-  j = nlohmann::ordered_json({{"name", basis_set.get_name()},
-                              {"pure", true},
-                              {"mode", "RAW"},
-                              {"atoms", atom_z_unsigned},
-                              {"nbf", basis_set.get_num_basis_functions()},
-                              {"electron_shells", json_shells},
-                              {"ecp_shells", json_ecp_shells},
-                              {"ecp_cores", _elem2ecpcore}});
+  j = nlohmann::ordered_json(
+      {{"name", basis_set.get_name()},
+       {"pure", true},
+       {"mode", "RAW"},
+       {"atoms", atom_z_unsigned},
+       {"num_basis_funcs", basis_set.get_num_basis_functions()},
+       {"electron_shells", json_shells},
+       {"ecp_shells", json_ecp_shells},
+       {"ecp_cores", _elem2ecpcore}});
 
   return j;
 }

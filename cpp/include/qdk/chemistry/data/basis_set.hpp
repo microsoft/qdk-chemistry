@@ -20,7 +20,7 @@ namespace qdk::chemistry::data {
 // Forward declaration
 class Structure;
 
-/// @brief Maximum angular momentum for basis functions suppored in
+/// @brief Maximum angular momentum for basis functions supported in
 /// QDK/Chemistry
 inline static constexpr size_t MAX_ORBITAL_ANGULAR_MOMENTUM =
     6;  // Up to i-orbitals

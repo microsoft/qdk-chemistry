@@ -9,8 +9,8 @@ import warnings
 
 from qiskit_aer.noise import NoiseModel
 
-from qdk.chemistry.noise_models import QuantumErrorProfile, SupportedGate
-from qdk.chemistry.plugins.qiskit._interop.noise_model import get_noise_model_from_profile
+from qdk_chemistry.noise_models import QuantumErrorProfile, SupportedGate
+from qdk_chemistry.plugins.qiskit._interop.noise_model import get_noise_model_from_profile
 
 
 def test_get_qiskit_noise_model(simple_error_profile):

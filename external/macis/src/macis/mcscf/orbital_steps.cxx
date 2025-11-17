@@ -12,17 +12,19 @@
 namespace macis {
 
 void precond_cg_orbital_step(NumOrbital norb, NumInactive ninact,
-                             NumActive nact, NumVirtual nvirt, const double* Fi,
-                             size_t LDFi, const double* Fa, size_t LDFa,
-                             const double* F, size_t LDF, const double* A1RDM,
-                             size_t LDD, const double* OG, double* K_lin) {
+                             NumActive nact, NumVirtual num_virtual_orbitals,
+                             const double* Fi, size_t LDFi, const double* Fa,
+                             size_t LDFa, const double* F, size_t LDF,
+                             const double* A1RDM, size_t LDD, const double* OG,
+                             double* K_lin) {
   const size_t no = norb.get(), ni = ninact.get(), na = nact.get(),
-               nv = nvirt.get(), orb_rot_sz = nv * (na + ni) + na * ni;
+               nv = num_virtual_orbitals.get(),
+               orb_rot_sz = nv * (na + ni) + na * ni;
   std::vector<double> DH(orb_rot_sz);
 
   // Compute approximate diagonal hessian
-  approx_diag_hessian(ninact, nact, nvirt, Fi, LDFi, Fa, LDFa, A1RDM, LDD, F,
-                      LDF, DH.data());
+  approx_diag_hessian(ninact, nact, num_virtual_orbitals, Fi, LDFi, Fa, LDFa,
+                      A1RDM, LDD, F, LDF, DH.data());
 
   // Precondition the gradient
   for (size_t p = 0; p < orb_rot_sz; ++p) {
@@ -45,7 +47,7 @@ struct bfgs_mcscf_functor {
     NumOrbital  norb;
     NumInactive ninact;
     NumActive   nact;
-    NumVirtual  nvirt;
+    NumVirtual  num_virtual_orbitals;
 
     const double grad_tol;
     const double E_core;
@@ -57,7 +59,7 @@ struct bfgs_mcscf_functor {
       NumVirtual nv, double ec, const double* t, const double* v,
       const double* d1, const double* d2, double tol) :
       grad_tol(tol),
-      norb(no), ninact(ni), nact(na), nvirt(nv), E_core(ec),
+      norb(no), ninact(ni), nact(na), num_virtual_orbitals(nv), E_core(ec),
       T(t), V(v), A1RDM(d1), A2RDM(d2) {}
 
     bool converged(const arg_type& X, const arg_type& G) {
@@ -68,7 +70,7 @@ struct bfgs_mcscf_functor {
       // Expand linear rotation vector into full antisymmetric
       // matrix
       std::vector<double> K_expand(norb.get() * norb.get());
-      linear_orb_rot_to_matrix(ninact, nact, nvirt, K.data(),
+      linear_orb_rot_to_matrix(ninact, nact, num_virtual_orbitals, K.data(),
         K_expand.data(), norb.get());
 
       // Compute U = EXP[-K]
@@ -88,7 +90,7 @@ struct bfgs_mcscf_functor {
       // Expand linear rotation vector into full antisymmetric
       // matrix
       std::vector<double> K_expand(norb.get() * norb.get());
-      linear_orb_rot_to_matrix(ninact, nact, nvirt, K.data(),
+      linear_orb_rot_to_matrix(ninact, nact, num_virtual_orbitals, K.data(),
         K_expand.data(), norb.get());
 
       // Compute U = EXP[-K]
@@ -106,7 +108,7 @@ struct bfgs_mcscf_functor {
         no, Tt.data(), no, Vt.data(), no, F.data(), no);
 
       arg_type G(K.size());
-      fock_to_linear_orb_grad(ninact, nact, nvirt, F.data(), no,
+      fock_to_linear_orb_grad(ninact, nact, num_virtual_orbitals, F.data(), no,
         G.data());
 
       return G;
@@ -148,7 +150,7 @@ struct AugHessianOperator {
   NumOrbital  norb;
   NumInactive ninact;
   NumActive   nact;
-  NumVirtual  nvirt;
+  NumVirtual  num_virtual_orbitals;
   const double *m_T, *m_V, *m_OG, *m_A1RDM, *m_A2RDM;
 
   void operator_action(size_t m, double alpha, const double* V, size_t /* */,
@@ -157,7 +159,7 @@ struct AugHessianOperator {
     const size_t no = norb.get();
     const size_t ni = ninact.get();
     const size_t na = nact.get();
-    const size_t nv = nvirt.get();
+    const size_t nv = num_virtual_orbitals.get();
     const size_t orb_rot_sz = nv*(na + ni) + na*ni;
 
     // [AV0] = [0 G**T ] [ V0 ]
@@ -170,7 +172,7 @@ struct AugHessianOperator {
 
     // HK = H*K
     std::vector<double> HK(orb_rot_sz);
-    orb_orb_hessian_contract(norb, ninact, nact, nvirt, m_T, no,
+    orb_orb_hessian_contract(norb, ninact, nact, num_virtual_orbitals, m_T, no,
       m_V, no, m_A1RDM, na, m_A2RDM, na, m_OG, K, HK.data());
 
     // AK = beta*AK + alpha*(H*K + V0*G)
@@ -185,12 +187,12 @@ struct AugHessianOperator {
 
 
 void optimize_orbitals(MCSCFSettings settings, NumOrbital norb,
-  NumInactive ninact, NumActive nact, NumVirtual nvirt, double E_core,
+  NumInactive ninact, NumActive nact, NumVirtual num_virtual_orbitals, double E_core,
   const double* T, size_t LDT, const double* V, size_t LDV,
   const double* A1RDM, size_t LDD1, const double* A2RDM, size_t LDD2,
   double* OG, double *K, size_t LDK) {
 
-  const size_t no = norb.get(), ni = ninact.get(), na = nact.get(), nv = nvirt.get();
+  const size_t no = norb.get(), ni = ninact.get(), na = nact.get(), nv = num_virtual_orbitals.get();
   const size_t orb_rot_sz = nv*(na+ni) + na*ni;
   std::vector<double> DH(orb_rot_sz);
 
@@ -214,12 +216,12 @@ void optimize_orbitals(MCSCFSettings settings, NumOrbital norb,
     A1RDM, LDD1, Q.data(), na, F.data(), no);
 
   // Compute approximate diagonal hessian
-  approx_diag_hessian(ninact, nact, nvirt, Fi.data(), no, Fa.data(), no,
+  approx_diag_hessian(ninact, nact, num_virtual_orbitals, Fi.data(), no, Fa.data(), no,
     A1RDM, LDD1, F.data(), no, DH.data() );
 
   // Compute Gradient
   ///std::vector<double> OG(orb_rot_sz);
-  fock_to_linear_orb_grad(ninact, nact, nvirt, F.data(), no, OG);
+  fock_to_linear_orb_grad(ninact, nact, num_virtual_orbitals, F.data(), no, OG);
 
 #if 1
   // Precondition the gradient
@@ -233,7 +235,7 @@ void optimize_orbitals(MCSCFSettings settings, NumOrbital norb,
   AH_diag[0] = 1.;
   std::copy(DH.begin(), DH.end(), AH_diag.begin()+1);
 
-  AugHessianOperator op{norb, ninact, nact, nvirt, T, V, OG.data(),
+  AugHessianOperator op{norb, ninact, nact, num_virtual_orbitals, T, V, OG.data(),
     A1RDM, A2RDM};
 
   std::vector<double> X(AH_diag.size(), 0);
@@ -270,16 +272,16 @@ void optimize_orbitals(MCSCFSettings settings, NumOrbital norb,
   }
 
   // Expand into full matrix
-  linear_orb_rot_to_matrix(ninact, nact, nvirt, step.data(), K, LDK);
+  linear_orb_rot_to_matrix(ninact, nact, num_virtual_orbitals, step.data(), K, LDK);
 
 #else
 
   // Compute Diagonal Hessian Approximation
-  approx_diag_hessian(norb, ninact, nact, nvirt, T, LDT, V, LDV, A1RDM, LDD1,
+  approx_diag_hessian(norb, ninact, nact, num_virtual_orbitals, T, LDT, V, LDV, A1RDM, LDD1,
     A2RDM, LDD2, DH.data() );
 
   // Create BFGS Functor
-  bfgs_mcscf_functor op(norb, ninact, nact, nvirt, E_core, T, V, A1RDM, A2RDM,
+  bfgs_mcscf_functor op(norb, ninact, nact, num_virtual_orbitals, E_core, T, V, A1RDM, A2RDM,
     settings.orb_grad_tol_bfgs);
 
   // Initial diagonal hessian
@@ -293,7 +295,7 @@ void optimize_orbitals(MCSCFSettings settings, NumOrbital norb,
   K0 = bfgs::bfgs(op, K0, H0, bfgs::BFGSSettings{settings.max_bfgs_iter});
 
   // Expand into full matrix
-  linear_orb_rot_to_matrix(ninact, nact, nvirt, K0.data(), K, LDK);
+  linear_orb_rot_to_matrix(ninact, nact, num_virtual_orbitals, K0.data(), K, LDK);
 
 #endif /* 1 */
 

@@ -179,7 +179,7 @@ BasisSet::BasisSet(std::shared_ptr<Molecule> mol, const std::string& path,
                      });
   }
 
-  n_bf = std::accumulate(
+  num_basis_funcs = std::accumulate(
       shells.begin(), shells.end(), 0, [&pure](auto sum, const auto& sh) {
         int sz = 0;
         if (pure) {
@@ -195,19 +195,19 @@ BasisSet::BasisSet(std::shared_ptr<Molecule> mol, const std::string& path,
 
   if (libint2::initialized()) {
     spdlog::trace("Loaded basis set from {}: n_shells={}, n_basis_funcs={}",
-                  path, shells.size(), n_bf);
+                  path, shells.size(), num_basis_funcs);
     shell_pairs_ = OneBodyIntegral::compute_shell_pairs(shells);
   }
 }
 
 void BasisSet::calc_atom2bf() {
   int bf_idx = 0;
-  atom2bf_ = std::vector<uint8_t>(mol->n_atoms * n_bf, 0);
+  atom2bf_ = std::vector<uint8_t>(mol->n_atoms * num_basis_funcs, 0);
   for (auto& sh : shells) {
     int sz = pure ? 2 * sh.angular_momentum + 1
                   : (sh.angular_momentum + 1) * (sh.angular_momentum + 2) / 2;
     for (int i = 0; i < sz; i++, bf_idx++) {
-      atom2bf_[sh.atom_index * n_bf + bf_idx] = 1;
+      atom2bf_[sh.atom_index * num_basis_funcs + bf_idx] = 1;
     }
   }
 }
@@ -290,7 +290,7 @@ nlohmann::ordered_json BasisSet::to_json() const {
                     ? "PSI4"
                     : (mode == BasisMode::RAW ? "RAW" : "UNKNOWN")},
        {"atoms", mol->atomic_nums},
-       {"nbf", n_bf},
+       {"num_basis_funcs", num_basis_funcs},
        {"electron_shells", json_shells},
        {"ecp_shells", json_ecp_shells},
        {"ecp_cores", elem2ecpcore}});
@@ -345,7 +345,7 @@ BasisSet::BasisSet() = default;
 
 std::shared_ptr<BasisSet> BasisSet::from_serialized_json(
     std::shared_ptr<Molecule> mol, std::string _path) {
-  // Check path existance
+  // Check path existence
   auto path = std::filesystem::path(_path);
   if (!std::filesystem::exists(path))
     throw std::runtime_error(
@@ -369,7 +369,7 @@ std::shared_ptr<BasisSet> BasisSet::from_serialized_json(
   // Read flat(ish) data
   bs->name = json["name"];
   bs->pure = json["pure"].template get<bool>();
-  bs->n_bf = json["nbf"].template get<int>();
+  bs->num_basis_funcs = json["num_basis_funcs"].template get<int>();
   bs->mode = (json["mode"].template get<std::string>() == "PSI4")
                  ? BasisMode::PSI4
                  : BasisMode::RAW;
@@ -387,7 +387,7 @@ std::shared_ptr<BasisSet> BasisSet::from_serialized_json(
   }
 
   spdlog::trace("Loaded basis set: n_shells={}, n_basis_funcs",
-                bs->shells.size(), bs->n_bf);
+                bs->shells.size(), bs->num_basis_funcs);
 
   // Compute derived quantities
   bs->shell_pairs_ = OneBodyIntegral::compute_shell_pairs(bs->shells);

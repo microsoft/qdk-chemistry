@@ -13,8 +13,8 @@ import numpy as np
 import pytest
 from qiskit.quantum_info import Pauli, PauliList
 
-from qdk.chemistry.algorithms import create
-from qdk.chemistry.algorithms.energy_estimator.energy_estimator import (
+from qdk_chemistry.algorithms import create
+from qdk_chemistry.algorithms.energy_estimator.energy_estimator import (
     EnergyEstimator,
     _build_measurement_circuit,
     _compute_expval_and_variance_from_bitstrings,
@@ -24,15 +24,15 @@ from qdk.chemistry.algorithms.energy_estimator.energy_estimator import (
     compute_energy_expectation_from_bitstrings,
     create_measurement_circuits,
 )
-from qdk.chemistry.data import QubitHamiltonian
-from qdk.chemistry.data.estimator_data import MeasurementData
+from qdk_chemistry.data import QubitHamiltonian
+from qdk_chemistry.data.estimator_data import MeasurementData
 
 from .reference_tolerances import float_comparison_absolute_tolerance, float_comparison_relative_tolerance
 
 try:
     from qiskit_aer import AerSimulator
 
-    from qdk.chemistry.plugins.qiskit.energy_estimator import QiskitEnergyEstimator
+    from qdk_chemistry.plugins.qiskit.energy_estimator import QiskitEnergyEstimator
 
     QISKIT_AVAILABLE = True
 except ImportError:
@@ -40,7 +40,7 @@ except ImportError:
     QiskitEnergyEstimator = None
 
 try:
-    from qdk.chemistry.algorithms.energy_estimator import QDKEnergyEstimator
+    from qdk_chemistry.algorithms.energy_estimator import QDKEnergyEstimator
 
     QSHARP_AVAILABLE = True
 except ImportError:

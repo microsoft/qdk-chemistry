@@ -15,12 +15,12 @@ import numpy as np
 from qiskit import qasm3, transpile
 from qiskit_aer import AerSimulator
 
-from qdk.chemistry.algorithms import (
+from qdk_chemistry.algorithms import (
     IterativePhaseEstimation,
-    SparseIsometryGF2XStatePrep,
     create,
 )
-from qdk.chemistry.data import QpeResult, Structure
+from qdk_chemistry.data import QpeResult, Structure
+from qdk_chemistry.utils.wavefunction import get_top_determinants
 
 ACTIVE_ELECTRONS = 2
 ACTIVE_ORBITALS = 2
@@ -63,13 +63,12 @@ qubit_pauli_op = qubit_hamiltonian.pauli_ops
 num_spin_orbitals = qubit_hamiltonian.num_qubits
 
 # Sparse-isometry state preparation from the leading 2 CASCI determinants.
-sparse_state_prep = SparseIsometryGF2XStatePrep(
-    wavefunction=casci_wavefunction,
-    max_dets=2,
-    save_outputs=False,
-)
+sparse_state_prep = create("state_prep", algorithm_name="sparse_isometry_gf2x")
+top_configurations = get_top_determinants(casci_wavefunction, max_determinants=2)
+pmc = create("projected_multi_configuration_calculator")
+E_sparse, sparse_wavefunction = pmc.run(active_hamiltonian, list(top_configurations.keys()))
 
-state_prep = qasm3.loads(sparse_state_prep.create_circuit_qasm())
+state_prep = qasm3.loads(sparse_state_prep.run(sparse_wavefunction))
 NUM_BITS = M_PRECISION
 SIMULATOR_SEED = 42
 SHOTS_PER_ITERATION = 10
@@ -141,6 +140,7 @@ for energy in candidate_energies:
 print(f"Estimated electronic energy: {estimated_electronic_energy:.8f} Hartree")
 print(f"Estimated total energy: {estimated_total_energy:.8f} Hartree")
 print(f"Reference total energy (CASCI): {casci_energy:.8f} Hartree")
+print(f"Reference sparse energy (CASCI): {E_sparse:.8f} Hartree")
 iterative_energy_error = estimated_total_energy - casci_energy
 print(f"Energy difference (QPE - CASCI): {iterative_energy_error:+.8e} Hartree")
 print("Energy error is large due to Trotterization and finite numerical resolution in this demo.")

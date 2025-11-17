@@ -175,7 +175,8 @@ void ConfigurationSet::_validate_configurations() const {
     }
   }
 
-  // Note: We don't strictly validate against orbitals->get_num_mos() because:
+  // Note: We don't strictly validate against
+  // orbitals->get_num_molecular_orbitals() because:
   // 1. Configurations may represent a subset or superset of the MO space
   // 2. Legacy code and tests may have different conventions
   // 3. The ConfigurationSet provides context, but configurations retain their

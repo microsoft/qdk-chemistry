@@ -421,13 +421,14 @@ Hamiltonian::make_restricted_inactive_fock_matrix(
 
 std::string Hamiltonian::get_summary() const {
   std::string summary = "Hamiltonian Summary:\n";
-  size_t nmo = _orbitals->get_num_mos();
+  size_t num_molecular_orbitals = _orbitals->get_num_molecular_orbitals();
   size_t norb = _orbitals->get_active_space_indices().first.size();
   summary += "  Type: ";
   summary += (is_hermitian() ? "Hermitian" : "NonHermitian");
   summary += "\n";
   summary += "  Active Orbitals: " + std::to_string(norb) + "\n";
-  summary += "  Total Orbitals: " + std::to_string(nmo) + "\n";
+  summary +=
+      "  Total Orbitals: " + std::to_string(num_molecular_orbitals) + "\n";
 
   const double thresh = 1e-6;
   const size_t non_negligible_one_body_ints = std::count_if(
@@ -1115,34 +1116,37 @@ void Hamiltonian::_to_fcidump_file(const std::string& filename, size_t nalpha,
     throw std::runtime_error("Cannot open file for writing: " + filename);
   }
 
-  size_t nmo;
+  size_t num_molecular_orbitals;
   if (has_orbitals()) {
     if (_orbitals->has_active_space()) {
-      nmo = _orbitals->get_active_space_indices()
-                .first.size();  // TODO: Assumes the same indices for alpha/beta
+      num_molecular_orbitals =
+          _orbitals->get_active_space_indices()
+              .first.size();  // TODO: Assumes the same indices for alpha/beta
     } else {
-      nmo = _orbitals->get_num_mos();
+      num_molecular_orbitals = _orbitals->get_num_molecular_orbitals();
     }
   } else {
     throw std::runtime_error("Orbitals are not set");
   }
 
   const size_t nelec = nalpha + nbeta;
-  const size_t nmo2 = nmo * nmo;
-  const size_t nmo3 = nmo2 * nmo;
+  const size_t num_molecular_orbitals2 =
+      num_molecular_orbitals * num_molecular_orbitals;
+  const size_t num_molecular_orbitals3 =
+      num_molecular_orbitals2 * num_molecular_orbitals;
   const double print_thresh =
       std::numeric_limits<double>::epsilon();  // TODO: Make configurable?
 
   // We don't use symmetry, so populate with C1 data
   std::string orb_string;
-  for (auto i = 0ul; i < nmo - 1; ++i) {
+  for (auto i = 0ul; i < num_molecular_orbitals - 1; ++i) {
     orb_string += "1,";
   }
   orb_string += "1";
 
   // Write the header of the FCIDUMP file
   file << "&FCI ";
-  file << "NORB=" << nmo << ", ";
+  file << "NORB=" << num_molecular_orbitals << ", ";
   file << "NELEC=" << nelec << ", ";
   file << "MS2=" << (nalpha - nbeta) << ",\n";
   file << "ORBSYM=" << orb_string << ",\n";
@@ -1162,8 +1166,9 @@ void Hamiltonian::_to_fcidump_file(const std::string& filename, size_t nalpha,
   };
 
   auto write_eri = [&](size_t i, size_t j, size_t k, size_t l) {
-    auto eri =
-        (*std::get<0>(_two_body_integrals))(i * nmo3 + j * nmo2 + k * nmo + l);
+    auto eri = (*std::get<0>(_two_body_integrals))(
+        i * num_molecular_orbitals3 + j * num_molecular_orbitals2 +
+        k * num_molecular_orbitals + l);
 
     formatted_line(i + 1, j + 1, k + 1, l + 1, eri);
     file << "\n";
@@ -1179,10 +1184,10 @@ void Hamiltonian::_to_fcidump_file(const std::string& filename, size_t nalpha,
   // Write permutationally unique MO ERIs
   // TODO: This is only valid for integrals with 8 fold symmetry
   // TODO (NAB):  will this TODO be resolved before the release?
-  for (size_t i = 0, ij = 0; i < nmo; ++i)
-    for (size_t j = i; j < nmo; ++j, ij++) {
-      for (size_t k = 0, kl = 0; k < nmo; ++k)
-        for (size_t l = k; l < nmo; ++l, kl++) {
+  for (size_t i = 0, ij = 0; i < num_molecular_orbitals; ++i)
+    for (size_t j = i; j < num_molecular_orbitals; ++j, ij++) {
+      for (size_t k = 0, kl = 0; k < num_molecular_orbitals; ++k)
+        for (size_t l = k; l < num_molecular_orbitals; ++l, kl++) {
           if (ij <= kl) {
             write_eri(i, j, k, l);
           }
@@ -1190,7 +1195,7 @@ void Hamiltonian::_to_fcidump_file(const std::string& filename, size_t nalpha,
     }  // ij loop
 
   // Write permutationally unique MO 1-body integrals
-  for (size_t i = 0; i < nmo; ++i)
+  for (size_t i = 0; i < num_molecular_orbitals; ++i)
     for (size_t j = 0; j <= i; ++j) {
       write_1body(i, j);
     }

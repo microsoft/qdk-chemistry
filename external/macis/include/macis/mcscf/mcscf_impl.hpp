@@ -24,10 +24,10 @@ namespace macis {
 template <typename Functor>
 double mcscf_impl(const Functor& rdm_op, MCSCFSettings settings,
                   NumElectron nalpha, NumElectron nbeta, NumOrbital norb,
-                  NumInactive ninact, NumActive nact, NumVirtual nvirt,
-                  double E_core, double* T, size_t LDT, double* V, size_t LDV,
-                  double* A1RDM, size_t LDD1, double* A2RDM,
-                  size_t LDD2 MACIS_MPI_CODE(, MPI_Comm comm)) {
+                  NumInactive ninact, NumActive nact,
+                  NumVirtual num_virtual_orbitals, double E_core, double* T,
+                  size_t LDT, double* V, size_t LDV, double* A1RDM, size_t LDD1,
+                  double* A2RDM, size_t LDD2 MACIS_MPI_CODE(, MPI_Comm comm)) {
   /******************************************************************
    *  Top of MCSCF Routine - Setup and print header info to logger  *
    ******************************************************************/
@@ -40,7 +40,8 @@ double mcscf_impl(const Functor& rdm_op, MCSCFSettings settings,
                nalpha.get(), "NACTIVE_BETA", nbeta.get(), "NORB_TOTAL",
                norb.get());
   logger->info("  {:13} = {:4}, {:13} = {:3}, {:13} = {:3}", "NINACTIVE",
-               ninact.get(), "NACTIVE", nact.get(), "NVIRTUAL", nvirt.get());
+               ninact.get(), "NACTIVE", nact.get(), "NVIRTUAL",
+               num_virtual_orbitals.get());
   logger->info("  {:13} = {:4}, {:13} = {:3}, {:13} = {:3}", "ENABLE_DIIS",
                settings.enable_diis, "DIIS_START", settings.diis_start_iter,
                "DIIS_NKEEP", settings.diis_nkeep);
@@ -65,7 +66,7 @@ double mcscf_impl(const Functor& rdm_op, MCSCFSettings settings,
    *********************************************************/
 
   const size_t no = norb.get(), ni = ninact.get(), na = nact.get(),
-               nv = nvirt.get();
+               nv = num_virtual_orbitals.get();
 
   const size_t no2 = no * no;
   const size_t no4 = no2 * no2;
@@ -169,7 +170,8 @@ double mcscf_impl(const Functor& rdm_op, MCSCFSettings settings,
   generalized_fock_matrix(norb, ninact, nact, F_inactive.data(), no,
                           F_active.data(), no, A1RDM, LDD1, Q.data(), na,
                           F.data(), no);
-  fock_to_linear_orb_grad(ninact, nact, nvirt, F.data(), no, OG.data());
+  fock_to_linear_orb_grad(ninact, nact, num_virtual_orbitals, F.data(), no,
+                          OG.data());
 
   /**************************************************************
    *      Compute initial Gradient norm and decide whether      *
@@ -200,9 +202,10 @@ double mcscf_impl(const Functor& rdm_op, MCSCFSettings settings,
 
     // Compute the step in linear storage
     std::vector<double> K_step_linear(orb_rot_sz);
-    precond_cg_orbital_step(norb, ninact, nact, nvirt, F_inactive.data(), no,
-                            F_active.data(), no, F.data(), no, A1RDM, LDD1,
-                            OG.data(), K_step_linear.data());
+    precond_cg_orbital_step(norb, ninact, nact, num_virtual_orbitals,
+                            F_inactive.data(), no, F_active.data(), no,
+                            F.data(), no, A1RDM, LDD1, OG.data(),
+                            K_step_linear.data());
 
     // Compute norms / max
     auto step_nrm = blas::nrm2(orb_rot_sz, K_step_linear.data(), 1);
@@ -220,8 +223,8 @@ double mcscf_impl(const Functor& rdm_op, MCSCFSettings settings,
     }
 
     // Expand info full matrix
-    linear_orb_rot_to_matrix(ninact, nact, nvirt, K_step_linear.data(),
-                             K_step.data(), no);
+    linear_orb_rot_to_matrix(ninact, nact, num_virtual_orbitals,
+                             K_step_linear.data(), K_step.data(), no);
 
     // Increment total step
     blas::axpy(no2, 1.0, K_step.data(), 1, K_total.data(), 1);
@@ -311,7 +314,8 @@ double mcscf_impl(const Functor& rdm_op, MCSCFSettings settings,
     generalized_fock_matrix(norb, ninact, nact, F_inactive.data(), no,
                             F_active.data(), no, A1RDM, LDD1, Q.data(), na,
                             F.data(), no);
-    fock_to_linear_orb_grad(ninact, nact, nvirt, F.data(), no, OG.data());
+    fock_to_linear_orb_grad(ninact, nact, num_virtual_orbitals, F.data(), no,
+                            OG.data());
 
     // Gradient Norm
     grad_nrm = blas::nrm2(OG.size(), OG.data(), 1);
@@ -331,7 +335,7 @@ class MCSCFCeresFunctor final : public ceres::FirstOrderFunction {
   NumOrbital norb;
   NumInactive ninact;
   NumActive nact;
-  NumVirtual nvirt;
+  NumVirtual num_virtual_orbitals;
 
   double* A1RDM, *A2RDM;
   size_t LDD1, LDD2;
@@ -348,7 +352,7 @@ MCSCFCeresFunctor(NumOrbital no, NumInactive ni, NumActive na, NumVirtual nv,
   const double* t, size_t ldt, const double* v, size_t ldv,
   double ecore ) :
   ceres::FirstOrderFunction(),
-  norb(no), nact(na), ninact(ni), nvirt(nv),
+  norb(no), nact(na), ninact(ni), num_virtual_orbitals(nv),
   A1RDM(ordm), A2RDM(trdm), LDD1(LDORDM), LDD2(LDTRDM),
   T(t), V(v), LDT(ldt), LDV(ldv), E_core(ecore)
   {}
@@ -363,7 +367,7 @@ bool Evaluate(const double* K_lin, double* E, double* G_lin) const override {
   std::vector<double> F_active(no*no), Q(na*no), F(no*no);
 
   // Expand K into full matrix
-  linear_orb_rot_to_matrix( ninact, nact, nvirt, K_lin, K.data(), no );
+  linear_orb_rot_to_matrix( ninact, nact, num_virtual_orbitals, K_lin, K.data(), no );
 
   // Compute U = EXP[-K]
   compute_orbital_rotation( norb, 1.0, K.data(), no, U.data(), no );
@@ -395,7 +399,7 @@ bool Evaluate(const double* K_lin, double* E, double* G_lin) const override {
 
   generalized_fock_matrix( norb, ninact, nact, F_inactive.data(), no,
     F_active.data(), no, A1RDM, LDD1, Q.data(), na, F.data(), no );
-  fock_to_linear_orb_grad( ninact, nact, nvirt, F.data(), no, G_lin );
+  fock_to_linear_orb_grad( ninact, nact, num_virtual_orbitals, F.data(), no, G_lin );
 
   return true;
 }
@@ -403,7 +407,7 @@ bool Evaluate(const double* K_lin, double* E, double* G_lin) const override {
 int NumParameters() const override {
   const auto no = norb.get();
   const auto na = nact.get();
-  const auto nv = nvirt.get();
+  const auto nv = num_virtual_orbitals.get();
   const auto ni = ninact.get();
   return nv * (ni + na) + na*ni;
 }
@@ -415,7 +419,7 @@ int NumParameters() const override {
 template <typename Functor>
 double mcscf_ceres_impl(const Functor& rdm_op, MCSCFSettings settings, NumElectron nalpha,
   NumElectron nbeta, NumOrbital norb, NumInactive ninact, NumActive nact,
-  NumVirtual nvirt, double E_core, double* T, size_t LDT, double* V, size_t LDV,
+  NumVirtual num_virtual_orbitals, double E_core, double* T, size_t LDT, double* V, size_t LDV,
   double* A1RDM, size_t LDD1, double* A2RDM, size_t LDD2, MPI_Comm comm) {
 
 
@@ -437,7 +441,7 @@ double mcscf_ceres_impl(const Functor& rdm_op, MCSCFSettings settings, NumElectr
     "  {:13} = {:4}, {:13} = {:3}, {:13} = {:3}",
     "NINACTIVE", ninact.get(),
     "NACTIVE",    nact.get(),
-    "NVIRTUAL",  nvirt.get()
+    "NVIRTUAL",  num_virtual_orbitals.get()
   );
   logger->info(
     "  {:13} = {:4}, {:13} = {:3}, {:13} = {:3}",
@@ -472,7 +476,7 @@ double mcscf_ceres_impl(const Functor& rdm_op, MCSCFSettings settings, NumElectr
    *********************************************************/
 
   const size_t no = norb.get(), ni = ninact.get(), na = nact.get(),
-               nv = nvirt.get();
+               nv = num_virtual_orbitals.get();
 
   const size_t no2 = no  * no;
   const size_t no4 = no2 * no2;
@@ -589,7 +593,7 @@ double mcscf_ceres_impl(const Functor& rdm_op, MCSCFSettings settings, NumElectr
   ceres_options.minimizer_progress_to_stdout = true;
   ceres::GradientProblemSolver::Summary summary;
   ceres::GradientProblem problem(
-    new MCSCFCeresFunctor(norb, ninact, nact, nvirt, A1RDM, LDD1, A2RDM, LDD2,
+    new MCSCFCeresFunctor(norb, ninact, nact, num_virtual_orbitals, A1RDM, LDD1, A2RDM, LDD2,
       T, LDT, V, LDV, E_core )
   );
 
@@ -607,7 +611,7 @@ double mcscf_ceres_impl(const Functor& rdm_op, MCSCFSettings settings, NumElectr
     std::cout << "NEW GRAD NRM = " << grad_nrm << std::endl;
 
     // Evaluate rotated Hamiltonian and what not
-    linear_orb_rot_to_matrix(ninact, nact, nvirt, K_opt.data(),
+    linear_orb_rot_to_matrix(ninact, nact, num_virtual_orbitals, K_opt.data(),
       K_total.data(), no);
     compute_orbital_rotation(norb, 1.0, K_total.data(), no,
       U_total.data(), no );

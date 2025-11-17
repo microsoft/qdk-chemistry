@@ -98,24 +98,33 @@ int main(int argc, char** argv) {
   // Compute MP2 to show how to access the MO integrals
   {
     auto [eps_a, eps_b] = orbitals_hf->get_energies();
-    const auto nmo = orbitals_hf->get_num_mos();
-    const size_t nocc = n_alpha;
-    const size_t nvir = nmo - nocc;
+    const auto num_molecular_orbitals =
+        orbitals_hf->get_num_molecular_orbitals();
+    const size_t num_occupied_orbitals = n_alpha;
+    const size_t num_virtual_orbitals =
+        num_molecular_orbitals - num_occupied_orbitals;
 
     const auto& moeri = ham->get_two_body_integrals();
     double EMP2 = 0.0;
-    for (size_t i = 0; i < nocc; ++i)
-      for (size_t j = 0; j < nocc; ++j)
-        for (size_t a = 0; a < nvir; ++a)
-          for (size_t b = 0; b < nvir; ++b) {
+    for (size_t i = 0; i < num_occupied_orbitals; ++i)
+      for (size_t j = 0; j < num_occupied_orbitals; ++j)
+        for (size_t a = 0; a < num_virtual_orbitals; ++a)
+          for (size_t b = 0; b < num_virtual_orbitals; ++b) {
             const auto eri_1 =
-                moeri[i * nmo * nmo * nmo + (a + nocc) * nmo * nmo + j * nmo +
-                      (b + nocc)];
+                moeri[i * num_molecular_orbitals * num_molecular_orbitals *
+                          num_molecular_orbitals +
+                      (a + num_occupied_orbitals) * num_molecular_orbitals *
+                          num_molecular_orbitals +
+                      j * num_molecular_orbitals + (b + num_occupied_orbitals)];
             const auto eri_2 =
-                moeri[i * nmo * nmo * nmo + (b + nocc) * nmo * nmo + j * nmo +
-                      (a + nocc)];
+                moeri[i * num_molecular_orbitals * num_molecular_orbitals *
+                          num_molecular_orbitals +
+                      (b + num_occupied_orbitals) * num_molecular_orbitals *
+                          num_molecular_orbitals +
+                      j * num_molecular_orbitals + (a + num_occupied_orbitals)];
             EMP2 += eri_1 * (2 * eri_1 - eri_2) /
-                    (eps_a[i] + eps_a[j] - eps_a[a + nocc] - eps_a[b + nocc]);
+                    (eps_a[i] + eps_a[j] - eps_a[a + num_occupied_orbitals] -
+                     eps_a[b + num_occupied_orbitals]);
           }
 
     std::cout << "E(MP2) = " << E_hf + EMP2 << std::endl;

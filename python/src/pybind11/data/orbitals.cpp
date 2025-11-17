@@ -93,7 +93,7 @@ void bind_orbitals(py::module &data) {
         --------
         >>> original_orbitals = Orbitals(...)
         >>> copied_orbitals = Orbitals(original_orbitals)
-        >>> print(f"Copied {copied_orbitals.get_num_mos()} orbitals")
+        >>> print(f"Copied {copied_orbitals.get_num_molecular_orbitals()} orbitals")
         )");
 
   // Constructor for restricted orbitals
@@ -106,17 +106,17 @@ void bind_orbitals(py::module &data) {
       R"(
         Constructor for restricted orbitals.
 
-        ``n_aos`` refers to the number of atomic orbitals and ``n_mos`` refers to
+        ``num_atomic_orbitals`` refers to the number of atomic orbitals and ``num_molecular_orbitals`` refers to
         the number of molecular orbitals.
 
         Parameters
         ----------
         coefficients : numpy.ndarray
-            The molecular orbital coefficients matrix (``n_aos`` × ``n_mos``)
+            The molecular orbital coefficients matrix (``num_atomic_orbitals`` × ``num_molecular_orbitals``)
         energies : numpy.ndarray, optional
-            The orbital energies (``n_mos``), can be None
+            The orbital energies (``num_molecular_orbitals``), can be None
         ao_overlap : numpy.ndarray, optional
-            The atomic orbital overlap matrix (``n_aos`` × ``n_aos``), can be ``None``
+            The atomic orbital overlap matrix (``num_atomic_orbitals`` × ``num_atomic_orbitals``), can be ``None``
         basis_set : BasisSet
             The basis set
         indices : tuple of (list of int, list of int), optional
@@ -149,21 +149,21 @@ void bind_orbitals(py::module &data) {
       R"(
         Constructor for unrestricted orbitals.
 
-        ``n_aos`` refers to the number of atomic orbitals and ``n_mos`` refers to
+        ``num_atomic_orbitals`` refers to the number of atomic orbitals and ``num_molecular_orbitals`` refers to
         the number of molecular orbitals.
 
         Parameters
         ----------
         coefficients_alpha : numpy.ndarray
-            The alpha molecular orbital coefficients matrix (``n_aos`` × ``n_mos``)
+            The alpha molecular orbital coefficients matrix (``num_atomic_orbitals`` × ``num_molecular_orbitals``)
         coefficients_beta : numpy.ndarray
-            The beta molecular orbital coefficients matrix (``n_aos`` × ``n_mos``)
+            The beta molecular orbital coefficients matrix (``num_atomic_orbitals`` × ``num_molecular_orbitals``)
         energies_alpha : numpy.ndarray, optional
-            The alpha orbital energies (``n_mos``), can be None
+            The alpha orbital energies (``num_molecular_orbitals``), can be None
         energies_beta : numpy.ndarray, optional
-            The beta orbital energies (``n_mos``), can be None
+            The beta orbital energies (``num_molecular_orbitals``), can be None
         ao_overlap : numpy.ndarray, optional
-            The atomic orbital overlap matrix (``n_aos`` × ``n_aos``), can be None
+            The atomic orbital overlap matrix (``num_atomic_orbitals`` × ``num_atomic_orbitals``), can be None
         basis_set : BasisSet
             The basis set
         indices : tuple of (list of int, list of int, list of int, list of int), optional
@@ -192,14 +192,14 @@ void bind_orbitals(py::module &data) {
                R"(
         Get orbital coefficients as pair of (alpha, beta) matrices.
 
-        ``n_aos`` refers to the number of atomic orbitals and ``n_mos`` refers to
+        ``num_atomic_orbitals`` refers to the number of atomic orbitals and ``num_molecular_orbitals`` refers to
         the number of molecular orbitals.
 
         Returns
         -------
         tuple of numpy.ndarray
             Pair of ``(alpha_coeffs, beta_coeffs)`` matrices, each with shape
-            ``(n_aos, n_mos)``
+            ``(num_atomic_orbitals, num_molecular_orbitals)``
 
         Examples
         --------
@@ -215,7 +215,7 @@ void bind_orbitals(py::module &data) {
         Returns
         -------
         tuple of numpy.ndarray
-            Pair of ``(alpha_energies, beta_energies)`` vectors, each with length ``n_mos``
+            Pair of ``(alpha_energies, beta_energies)`` vectors, each with length ``num_molecular_orbitals``
 
         Raises
         ------
@@ -373,7 +373,7 @@ void bind_orbitals(py::module &data) {
         Returns
         -------
         numpy.ndarray
-            Atomic orbital overlap matrix with shape ``(n_aos, n_aos)``
+            Atomic orbital overlap matrix with shape ``(num_atomic_orbitals, num_atomic_orbitals)``
 
         Examples
         --------
@@ -438,7 +438,8 @@ void bind_orbitals(py::module &data) {
         )");
 
   // Size and dimension queries
-  orbitals.def("get_num_mos", &Orbitals::get_num_mos,
+  orbitals.def("get_num_molecular_orbitals",
+               &Orbitals::get_num_molecular_orbitals,
                R"(
         Get number of molecular orbitals.
 
@@ -449,11 +450,11 @@ void bind_orbitals(py::module &data) {
 
         Examples
         --------
-        >>> n_mos = orbitals.get_num_mos()
-        >>> print(f'Number of MOs: {n_mos}')
+        >>> num_molecular_orbitals = orbitals.get_num_molecular_orbitals()
+        >>> print(f'Number of MOs: {num_molecular_orbitals}')
         )");
 
-  orbitals.def("get_num_aos", &Orbitals::get_num_aos,
+  orbitals.def("get_num_atomic_orbitals", &Orbitals::get_num_atomic_orbitals,
                R"(
         Get number of atomic orbitals (basis functions).
 
@@ -464,8 +465,8 @@ void bind_orbitals(py::module &data) {
 
         Examples
         --------
-        >>> n_aos = orbitals.get_num_aos()
-        >>> print(f'Basis set size: {n_aos}')
+        >>> num_atomic_orbitals = orbitals.get_num_atomic_orbitals()
+        >>> print(f'Basis set size: {num_atomic_orbitals}')
         )");
 
   orbitals.def("is_restricted", &Orbitals::is_restricted,
@@ -511,7 +512,7 @@ void bind_orbitals(py::module &data) {
         Returns
         -------
         numpy.ndarray
-            Alpha orbital coefficients with shape ``(n_aos, n_mos)``
+            Alpha orbital coefficients with shape ``(num_atomic_orbitals, num_molecular_orbitals)``
 
         Examples
         --------
@@ -528,7 +529,7 @@ void bind_orbitals(py::module &data) {
         Returns
         -------
         numpy.ndarray
-            Beta orbital coefficients with shape ``(n_aos, n_mos)``
+            Beta orbital coefficients with shape ``(num_atomic_orbitals, num_molecular_orbitals)``
 
         Examples
         --------
@@ -545,7 +546,7 @@ void bind_orbitals(py::module &data) {
         Returns
         -------
         numpy.ndarray
-            Alpha orbital energies with length ``n_mos``
+            Alpha orbital energies with length ``num_molecular_orbitals``
 
         Examples
         --------
@@ -562,7 +563,7 @@ void bind_orbitals(py::module &data) {
         Returns
         -------
         numpy.ndarray
-            Beta orbital energies with length ``n_mos``
+            Beta orbital energies with length ``num_molecular_orbitals``
 
         Examples
         --------
@@ -814,7 +815,7 @@ void bind_orbitals(py::module &data) {
 
         Examples
         --------
-        >>> orbitals = Orbitals.from_json('{"num_aos": 4, "num_mos": 3, ...}')
+        >>> orbitals = Orbitals.from_json('{"num_atomic_orbitals": 4, "num_molecular_orbitals": 3, ...}')
         )",
       py::arg("json_str"));
 
@@ -923,7 +924,7 @@ void bind_model_orbitals(py::module &data) {
     --------
     >>> # Create a simple 4-orbital restricted model system
     >>> model_orb = ModelOrbitals(4, True)
-    >>> print(f"Number of orbitals: {model_orb.get_num_mos()}")
+    >>> print(f"Number of orbitals: {model_orb.get_num_molecular_orbitals()}")
 
     >>> # Create with active and inactive spaces
     >>> active_indices = [1, 2]
@@ -1056,7 +1057,7 @@ void bind_model_orbitals(py::module &data) {
         --------
         >>> json_str = '{"num_orbitals": 4, "is_restricted": true, ...}'
         >>> model_orb = ModelOrbitals.from_json(json_str)
-        >>> print(f"Loaded {model_orb.get_num_mos()} orbitals")
+        >>> print(f"Loaded {model_orb.get_num_molecular_orbitals()} orbitals")
         )",
           py::arg("json_str"))
 

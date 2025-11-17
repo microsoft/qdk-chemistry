@@ -62,25 +62,27 @@ void schwarz_integral(const BasisSet* iobs, const ParallelConfig& mpi,
 
 void compute_shell_norm(const BasisSet* obs, const double* D, double* res) {
   auto nsh = obs->shells.size();
-  auto nbf = obs->n_bf;
+  auto num_basis_funcs = obs->num_basis_funcs;
   for (size_t i = 0, pi = 0; i < nsh; i++) {
     size_t ag_i = obs->shells[i].angular_momentum;
-    size_t nbf_i = obs->pure ? ag_i * 2 + 1 : (ag_i + 1) * (ag_i + 2) / 2;
+    size_t num_basis_funcs_i =
+        obs->pure ? ag_i * 2 + 1 : (ag_i + 1) * (ag_i + 2) / 2;
 
     for (size_t j = 0, pj = 0; j < nsh; j++) {
       size_t ag_j = obs->shells[j].angular_momentum;
-      size_t nbf_j = obs->pure ? ag_j * 2 + 1 : (ag_j + 1) * (ag_j + 2) / 2;
+      size_t num_basis_funcs_j =
+          obs->pure ? ag_j * 2 + 1 : (ag_j + 1) * (ag_j + 2) / 2;
 
-      double mx = std::fabs(D[pi * nbf + pj]);
-      for (size_t ii = pi; ii < pi + nbf_i; ii++) {
-        for (size_t jj = pj; jj < pj + nbf_j; jj++) {
-          mx = std::max(mx, std::fabs(D[ii * nbf + jj]));
+      double mx = std::fabs(D[pi * num_basis_funcs + pj]);
+      for (size_t ii = pi; ii < pi + num_basis_funcs_i; ii++) {
+        for (size_t jj = pj; jj < pj + num_basis_funcs_j; jj++) {
+          mx = std::max(mx, std::fabs(D[ii * num_basis_funcs + jj]));
         }
       }
       res[i * nsh + j] = mx;
-      pj += nbf_j;
+      pj += num_basis_funcs_j;
     }
-    pi += nbf_i;
+    pi += num_basis_funcs_i;
   }
 }
 }  // namespace qdk::chemistry::scf

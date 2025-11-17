@@ -39,7 +39,8 @@ KSImpl::KSImpl(std::shared_ptr<Molecule> mol, const SCFConfig& cfg)
     spdlog::info("xc={}, grid_level={}", cfg.exc.xc_name,
                  gauxc_util::to_string(cfg.xc_input.grid_spec));
   }
-  XC_ = RowMajorMatrix::Zero(ndm_ * n_ao_, n_ao_);
+  XC_ = RowMajorMatrix::Zero(num_density_matrices_ * num_atomic_orbitals_,
+                             num_atomic_orbitals_);
   TIMEIT(exc_ = EXC::create(bs, cfg), "KSImpl::KS->EXC::create");
 
   // Update SCFConfig w/ RSX data
@@ -59,13 +60,15 @@ KSImpl::KSImpl(std::shared_ptr<Molecule> mol, const SCFConfig& cfg)
 
   if (cfg.require_polarizability) {
     // Host allocations for CPSCF/TDDFT quantities
-    tXC_ = RowMajorMatrix::Zero(ndm_ * n_ao_, n_ao_);
+    tXC_ = RowMajorMatrix::Zero(num_density_matrices_ * num_atomic_orbitals_,
+                                num_atomic_orbitals_);
   }
 }
 KSImpl::KSImpl(std::shared_ptr<Molecule> mol, const SCFConfig& cfg,
                const RowMajorMatrix& dm)
     : KSImpl(mol, cfg) {
-  VERIFY(dm.rows() == ndm_ * n_ao_ && dm.cols() == n_ao_);
+  VERIFY(dm.rows() == num_density_matrices_ * num_atomic_orbitals_ &&
+         dm.cols() == num_atomic_orbitals_);
   P_ = dm;
   density_matrix_initialized_ = true;
 }

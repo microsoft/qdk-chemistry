@@ -20,10 +20,10 @@ import logging
 from collections.abc import Sequence
 from pathlib import Path
 
-from qdk.chemistry.algorithms import create
-from qdk.chemistry.data import Structure
-from qdk.chemistry.utils import compute_valence_space
-from qdk.chemistry.utils.wavefunction import (
+from qdk_chemistry.algorithms import create
+from qdk_chemistry.data import Structure
+from qdk_chemistry.utils import compute_valence_space
+from qdk_chemistry.utils.wavefunction import (
     calculate_sparse_wavefunction,
     get_active_determinants_info,
 )
@@ -180,13 +180,15 @@ def main(argv: Sequence[str] | None = None) -> None:
     ########################################################################################
     # 7. Perform sparse-CI screening.
     ########################################################################################
-    sparse_ci_wavefunction = calculate_sparse_wavefunction(
+    sparse_ci_energy, sparse_ci_wavefunction = calculate_sparse_wavefunction(
         reference_wavefunction=wfn_cas,
         hamiltonian=active_hamiltonian,
         reference_energy=total_casci_energy - core_energy,
         energy_tolerance=args.energy_tolerance,
         max_determinants=args.max_determinants,
     )
+
+    LOGGER.info(f"Sparse CI energy values {sparse_ci_energy:.3f} Hartree")
     LOGGER.info(get_active_determinants_info(sparse_ci_wavefunction))
 
 

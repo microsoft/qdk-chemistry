@@ -1377,7 +1377,7 @@ class WavefunctionActiveSpaceConversionTest : public ::testing::Test {
   void SetUp() override {
     // Create orbitals with active space defined
     // Total: 10 orbitals (3 inactive, 4 active, 3 virtual)
-    size_t num_mos = 10;
+    size_t num_molecular_orbitals = 10;
 
     // Define active space: orbitals 3, 4, 5, 6 (0-indexed)
     std::vector<size_t> active_indices = {3, 4, 5, 6};
@@ -1386,7 +1386,8 @@ class WavefunctionActiveSpaceConversionTest : public ::testing::Test {
     std::vector<size_t> inactive_indices = {0, 1, 2};
 
     // Create base orbitals and then add active space
-    auto base_orbitals = testing::create_test_orbitals(num_mos, num_mos, true);
+    auto base_orbitals = testing::create_test_orbitals(
+        num_molecular_orbitals, num_molecular_orbitals, true);
     orbitals = testing::with_active_space(base_orbitals, active_indices,
                                           inactive_indices);
 
@@ -1534,14 +1535,14 @@ TEST_F(WavefunctionActiveSpaceConversionTest,
 
 TEST_F(WavefunctionActiveSpaceConversionTest, NoActiveSpacePassthrough) {
   // Test behavior when no active space is defined
-  size_t num_aos = 6;
-  size_t num_mos = 6;
+  size_t num_atomic_orbitals = 6;
+  size_t num_molecular_orbitals = 6;
   Eigen::MatrixXd coeffs_no_active =
-      Eigen::MatrixXd::Identity(num_aos, num_mos);
+      Eigen::MatrixXd::Identity(num_atomic_orbitals, num_molecular_orbitals);
 
   auto orbitals_no_active = std::make_shared<Orbitals>(
       coeffs_no_active, std::nullopt, std::nullopt,
-      testing::create_random_basis_set(num_mos), std::nullopt);
+      testing::create_random_basis_set(num_molecular_orbitals), std::nullopt);
 
   Configuration det = Configuration("2ud0ud");
 

@@ -21,7 +21,7 @@ TEST_CASE("Double Loop") {
   auto norb = macis::read_fcidump_norb(water_ccpvdz_fcidump);
   const auto norb2 = norb * norb;
   const auto norb3 = norb2 * norb;
-  const size_t nocc = 5;
+  const size_t num_occupied_orbitals = 5;
 
   std::vector<double> T(norb * norb);
   std::vector<double> V(norb * norb * norb * norb);
@@ -40,12 +40,13 @@ TEST_CASE("Double Loop") {
       macis::matrix_span<double>(T.data(), norb, norb),
       macis::rank4_span<double>(V.data(), norb, norb, norb, norb));
 #endif
-  const auto hf_det = wfn_traits::canonical_hf_determinant(nocc, nocc);
+  const auto hf_det = wfn_traits::canonical_hf_determinant(
+      num_occupied_orbitals, num_occupied_orbitals);
 
   std::vector<double> eps(norb);
   for (auto p = 0ul; p < norb; ++p) {
     double tmp = 0.;
-    for (auto i = 0ul; i < nocc; ++i) {
+    for (auto i = 0ul; i < num_occupied_orbitals; ++i) {
       tmp += 2. * V[p * (norb + 1) + i * (norb2 + norb3)] -
              V[p * (1 + norb3) + i * (norb + norb2)];
     }
@@ -64,36 +65,45 @@ TEST_CASE("Double Loop") {
     std::vector<uint32_t> occ = {0, 1, 2, 3, 4};
 
     SECTION("Singles") {
-      state.flip(0).flip(nocc);
+      state.flip(0).flip(num_occupied_orbitals);
       const auto ES = ham_gen.matrix_element(state, state);
       REQUIRE_THAT(ES, Catch::Matchers::WithinAbs(
                            -6.488097259228e+01, testing::ascii_text_tolerance));
 
-      auto fast_ES = ham_gen.fast_diag_single(occ, occ, 0, nocc, EHF);
+      auto fast_ES =
+          ham_gen.fast_diag_single(occ, occ, 0, num_occupied_orbitals, EHF);
       REQUIRE_THAT(ES, Catch::Matchers::WithinAbs(
                            fast_ES, testing::numerical_zero_tolerance));
     }
 
     SECTION("Doubles - Same Spin") {
-      state.flip(0).flip(nocc).flip(1).flip(nocc + 1);
+      state.flip(0)
+          .flip(num_occupied_orbitals)
+          .flip(1)
+          .flip(num_occupied_orbitals + 1);
       const auto ED = ham_gen.matrix_element(state, state);
       REQUIRE_THAT(ED, Catch::Matchers::WithinAbs(
                            -6.314093508151e+01, testing::ascii_text_tolerance));
 
       auto fast_ED =
-          ham_gen.fast_diag_ss_double(occ, occ, 0, 1, nocc, nocc + 1, EHF);
+          ham_gen.fast_diag_ss_double(occ, occ, 0, 1, num_occupied_orbitals,
+                                      num_occupied_orbitals + 1, EHF);
       REQUIRE_THAT(ED, Catch::Matchers::WithinAbs(
                            fast_ED, testing::numerical_zero_tolerance));
     }
 
     SECTION("Doubles - Opposite Spin") {
-      state.flip(0).flip(nocc).flip(1 + 32).flip(nocc + 1 + 32);
+      state.flip(0)
+          .flip(num_occupied_orbitals)
+          .flip(1 + 32)
+          .flip(num_occupied_orbitals + 1 + 32);
       const auto ED = ham_gen.matrix_element(state, state);
       REQUIRE_THAT(ED, Catch::Matchers::WithinAbs(
                            -6.304547887231e+01, testing::ascii_text_tolerance));
 
       auto fast_ED =
-          ham_gen.fast_diag_os_double(occ, occ, 0, 1, nocc, nocc + 1, EHF);
+          ham_gen.fast_diag_os_double(occ, occ, 0, 1, num_occupied_orbitals,
+                                      num_occupied_orbitals + 1, EHF);
       REQUIRE_THAT(ED, Catch::Matchers::WithinAbs(
                            fast_ED, testing::numerical_zero_tolerance));
     }
@@ -101,8 +111,8 @@ TEST_CASE("Double Loop") {
 
   SECTION("Brilloin") {
     // Alpha -> Alpha
-    for (size_t i = 0; i < nocc; ++i)
-      for (size_t a = nocc; a < norb; ++a) {
+    for (size_t i = 0; i < num_occupied_orbitals; ++i)
+      for (size_t a = num_occupied_orbitals; a < norb; ++a) {
         // Generate excited determinant
         wfn_type state = hf_det;
         state.flip(i).flip(a);
@@ -114,8 +124,8 @@ TEST_CASE("Double Loop") {
       }
 
     // Beta -> Beta
-    for (size_t i = 0; i < nocc; ++i)
-      for (size_t a = nocc; a < norb; ++a) {
+    for (size_t i = 0; i < num_occupied_orbitals; ++i)
+      for (size_t a = num_occupied_orbitals; a < norb; ++a) {
         // Generate excited determinant
         wfn_type state = hf_det;
         state.flip(i + 32).flip(a + 32);
@@ -129,10 +139,10 @@ TEST_CASE("Double Loop") {
 
   SECTION("MP2") {
     double EMP2 = 0.;
-    for (size_t a = nocc; a < norb; ++a)
+    for (size_t a = num_occupied_orbitals; a < norb; ++a)
       for (size_t b = a + 1; b < norb; ++b)
-        for (size_t i = 0; i < nocc; ++i)
-          for (size_t j = i + 1; j < nocc; ++j) {
+        for (size_t i = 0; i < num_occupied_orbitals; ++i)
+          for (size_t j = i + 1; j < num_occupied_orbitals; ++j) {
             auto state = hf_det;
             state.flip(i).flip(j).flip(a).flip(b);
             auto h_el = ham_gen.matrix_element(hf_det, state);
@@ -145,10 +155,10 @@ TEST_CASE("Double Loop") {
                              h_el, testing::ascii_text_tolerance));
           }
 
-    for (size_t a = nocc; a < norb; ++a)
+    for (size_t a = num_occupied_orbitals; a < norb; ++a)
       for (size_t b = a + 1; b < norb; ++b)
-        for (size_t i = 0; i < nocc; ++i)
-          for (size_t j = i + 1; j < nocc; ++j) {
+        for (size_t i = 0; i < num_occupied_orbitals; ++i)
+          for (size_t j = i + 1; j < num_occupied_orbitals; ++j) {
             auto state = hf_det;
             state.flip(i + 32).flip(j + 32).flip(a + 32).flip(b + 32);
             auto h_el = ham_gen.matrix_element(hf_det, state);
@@ -161,10 +171,10 @@ TEST_CASE("Double Loop") {
                              h_el, testing::ascii_text_tolerance));
           }
 
-    for (size_t a = nocc; a < norb; ++a)
-      for (size_t b = nocc; b < norb; ++b)
-        for (size_t i = 0; i < nocc; ++i)
-          for (size_t j = 0; j < nocc; ++j) {
+    for (size_t a = num_occupied_orbitals; a < norb; ++a)
+      for (size_t b = num_occupied_orbitals; b < norb; ++b)
+        for (size_t i = 0; i < num_occupied_orbitals; ++i)
+          for (size_t j = 0; j < num_occupied_orbitals; ++j) {
             auto state = hf_det;
             state.flip(i).flip(j + 32).flip(a).flip(b + 32);
             auto h_el = ham_gen.matrix_element(hf_det, state);
@@ -184,8 +194,8 @@ TEST_CASE("Double Loop") {
 
   SECTION("RDM") {
     std::vector<double> ordm(norb * norb, 0.0), trdm(norb3 * norb, 0.0);
-    std::vector<wfn_type> dets = {
-        wfn_traits::canonical_hf_determinant(nocc, nocc)};
+    std::vector<wfn_type> dets = {wfn_traits::canonical_hf_determinant(
+        num_occupied_orbitals, num_occupied_orbitals)};
 
     std::vector<double> C = {1.};
 
@@ -207,7 +217,7 @@ TEST_CASE("RDMS") {
   auto norb = 34;
   const auto norb2 = norb * norb;
   const auto norb3 = norb2 * norb;
-  const size_t nocc = 5;
+  const size_t num_occupied_orbitals = 5;
 
   std::vector<double> T(norb * norb, 0.0);
   std::vector<double> V(norb3 * norb, 0.0);
@@ -226,25 +236,25 @@ TEST_CASE("RDMS") {
   auto abs_sum = [](auto a, auto b) { return a + std::abs(b); };
 
   SECTION("HF") {
-    std::vector<wfn_type> dets = {
-        wfn_traits::canonical_hf_determinant(nocc, nocc)};
+    std::vector<wfn_type> dets = {wfn_traits::canonical_hf_determinant(
+        num_occupied_orbitals, num_occupied_orbitals)};
 
     std::vector<double> C = {1.};
 
     ham_gen.form_rdms(dets.begin(), dets.end(), dets.begin(), dets.end(),
                       C.data(), ordm_span, trdm_span);
 
-    for (auto i = 0ul; i < nocc; ++i)
-      for (auto j = 0ul; j < nocc; ++j)
-        for (auto k = 0ul; k < nocc; ++k)
-          for (auto l = 0ul; l < nocc; ++l) {
+    for (auto i = 0ul; i < num_occupied_orbitals; ++i)
+      for (auto j = 0ul; j < num_occupied_orbitals; ++j)
+        for (auto k = 0ul; k < num_occupied_orbitals; ++k)
+          for (auto l = 0ul; l < num_occupied_orbitals; ++l) {
             trdm_span(i, j, l, k) -= 0.5 * ordm_span(i, j) * ordm_span(k, l);
             trdm_span(i, j, l, k) += 0.25 * ordm_span(i, l) * ordm_span(k, j);
           }
     auto sum = std::accumulate(trdm.begin(), trdm.end(), 0.0, abs_sum);
     REQUIRE(sum < testing::numerical_zero_tolerance);
 
-    for (auto i = 0ul; i < nocc; ++i) ordm_span(i, i) -= 2.0;
+    for (auto i = 0ul; i < num_occupied_orbitals; ++i) ordm_span(i, i) -= 2.0;
     sum = std::accumulate(ordm.begin(), ordm.end(), 0.0, abs_sum);
     REQUIRE(sum < testing::numerical_zero_tolerance);
   }
@@ -274,8 +284,9 @@ TEST_CASE("RDMS") {
 
     double trace_ordm = 0.;
     for (auto p = 0; p < norb; ++p) trace_ordm += ordm_span(p, p);
-    REQUIRE_THAT(trace_ordm, Catch::Matchers::WithinAbs(
-                                 2.0 * nocc, testing::ascii_text_tolerance));
+    REQUIRE_THAT(trace_ordm,
+                 Catch::Matchers::WithinAbs(2.0 * num_occupied_orbitals,
+                                            testing::ascii_text_tolerance));
 
     // Check symmetries
     for (auto p = 0; p < norb; ++p)

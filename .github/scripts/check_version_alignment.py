@@ -2,7 +2,7 @@
 """Check that all version strings in the codebase are aligned.
 
 This script verifies that version strings across multiple files are consistent:
-- __version__ in python/src/qdk/chemistry/__init__.py
+- __version__ in python/src/qdk_chemistry/__init__.py
 - VERSION in python/CMakeLists.txt
 - VERSION in cpp/CMakeLists.txt
 - release in docs/source/conf.py
@@ -125,7 +125,7 @@ def check_versions() -> int:
     # Define version locations
     version_locations = [
         VersionLocation(
-            file_path=repo_root / "python/src/qdk/chemistry/__init__.py",
+            file_path=repo_root / "python/src/qdk_chemistry/__init__.py",
             pattern=r'__version__\s*=\s*["\']([^"\']+)["\']',
             description="Python __version__",
             is_cmake=False,

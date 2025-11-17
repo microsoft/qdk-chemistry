@@ -118,7 +118,8 @@ class OneBodyIntegral {
    * Evaluates the overlap between all basis function pairs. Required
    * for orthogonalization and solving the generalized eigenvalue problem.
    *
-   * @param[out] res Output buffer for overlap matrix (size: nbf × nbf)
+   * @param[out] res Output buffer for overlap matrix (size: num_basis_funcs ×
+   * num_basis_funcs)
    */
   void overlap_integral(double* res);
 
@@ -128,7 +129,8 @@ class OneBodyIntegral {
    * Evaluates the kinetic energy operator integrals. Combined with
    * nuclear attraction to form the core Hamiltonian.
    *
-   * @param[out] res Output buffer for kinetic matrix (size: nbf × nbf)
+   * @param[out] res Output buffer for kinetic matrix (size: num_basis_funcs ×
+   * num_basis_funcs)
    */
   void kinetic_integral(double* res);
 
@@ -138,8 +140,8 @@ class OneBodyIntegral {
    *
    * Evaluates the electron-nuclear attraction integrals for all nuclei.
    *
-   * @param[out] res Output buffer for nuclear attraction matrix (size: nbf ×
-   * nbf)
+   * @param[out] res Output buffer for nuclear attraction matrix (size:
+   * num_basis_funcs × num_basis_funcs)
    */
   void nuclear_integral(double* res);
 
@@ -149,7 +151,8 @@ class OneBodyIntegral {
    * Evaluates the electric dipole integrals in x, y, z directions relative
    * to a specified center.
    *
-   * @param[out] res Output buffer for 3 dipole matrices (size: 3 × nbf × nbf)
+   * @param[out] res Output buffer for 3 dipole matrices (size: 3 ×
+   * num_basis_funcs × num_basis_funcs)
    * @param cen Center of dipole expansion in Cartesian coordinates (default:
    * origin)
    */
@@ -162,7 +165,8 @@ class OneBodyIntegral {
    * to a specified center.
    *
    * @param[out] res Output buffer for 6 quadrupole matrices
-   *                 order: xx, xy, xz, yy, yz, zz  (size: 6 × nbf × nbf)
+   *                 order: xx, xy, xz, yy, yz, zz  (size: 6 × num_basis_funcs ×
+   * num_basis_funcs)
    * @param cen Center of quadrupole expansion in Cartesian coordinates
    * (default: origin)
    */
@@ -173,7 +177,8 @@ class OneBodyIntegral {
    *
    * Uses libecpint library for ECP evaluation.
    *
-   * @param[out] res Output buffer for ECP matrix (size: nbf × nbf)
+   * @param[out] res Output buffer for ECP matrix (size: num_basis_funcs ×
+   * num_basis_funcs)
    */
   void ecp_integral(double* res);
 
@@ -186,7 +191,8 @@ class OneBodyIntegral {
    * V_QM/MM[μν] = ⟨μ|-Σ_i q_i/|r-r_i||ν⟩
    *
    * @param charges Point charges with positions and magnitudes
-   * @param[out] res Output buffer for point charge matrix (size: nbf × nbf)
+   * @param[out] res Output buffer for point charge matrix (size:
+   * num_basis_funcs × num_basis_funcs)
    */
   void point_charge_integral(const PointCharges* charges, double* res);
 #endif
@@ -197,7 +203,8 @@ class OneBodyIntegral {
    * Evaluates ∂S/∂R_A contribution to nuclear gradients using the
    * energy-weighted density matrix W = C_occ * ε_occ * C_occ**T.
    *
-   * @param[in] W Energy-weighted density matrix (size: nbf × nbf)
+   * @param[in] W Energy-weighted density matrix (size: num_basis_funcs ×
+   * num_basis_funcs)
    * @param[out] res Output gradient contribution (size: 3 × natoms)
    */
   void overlap_integral_deriv(const double* W, double* res);
@@ -207,7 +214,7 @@ class OneBodyIntegral {
    *
    * Evaluates ∂T/∂R_A contribution to nuclear gradients.
    *
-   * @param[in] D Density matrix (size: nbf × nbf)
+   * @param[in] D Density matrix (size: num_basis_funcs × num_basis_funcs)
    * @param[out] res Output gradient contribution (size: 3 × natoms)
    */
   void kinetic_integral_deriv(const double* D, double* res);
@@ -218,7 +225,7 @@ class OneBodyIntegral {
    * Evaluates ∂V/∂R_A contribution to nuclear gradients, including both
    * the derivative of basis functions and the derivative of 1/|r-R_A|.
    *
-   * @param[in] D Density matrix (size: nbf × nbf)
+   * @param[in] D Density matrix (size: num_basis_funcs × num_basis_funcs)
    * @param[out] res Output gradient contribution (size: 3 × natoms)
    */
   void nuclear_integral_deriv(const double* D, double* res);
@@ -230,7 +237,7 @@ class OneBodyIntegral {
    * Evaluates ∂V_QM/MM/∂R for both QM atoms and point charges in QM/MM
    * calculations. Provides forces on both QM and MM subsystems.
    *
-   * @param[in] D Density matrix (size: nbf × nbf)
+   * @param[in] D Density matrix (size: num_basis_funcs × num_basis_funcs)
    * @param[out] res Output gradient for QM atoms (size: 3 × natoms_QM)
    * @param[out] pointcharges_res Output gradient for point charges (size: 3 ×
    * ncharges)
@@ -247,7 +254,7 @@ class OneBodyIntegral {
    * Evaluates ∂V_ECP/∂R_A contribution to nuclear gradients for atoms
    * with effective core potentials.
    *
-   * @param[in] D Density matrix (size: nbf × nbf)
+   * @param[in] D Density matrix (size: num_basis_funcs × num_basis_funcs)
    * @param[out] res Output gradient contribution (size: 3 × natoms)
    */
   void ecp_integral_deriv(const double* D, double* res);

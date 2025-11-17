@@ -31,10 +31,10 @@ libint2::BasisSet convert_to_libint_basisset(const BasisSet& o) {
 std::unique_ptr<double[]> debug_eri(BasisMode basis_mode,
                                     const libint2::BasisSet& obs, double omega,
                                     size_t i_lo, size_t i_hi) {
-  const size_t nbf = obs.nbf();
-  const size_t nbf2 = nbf * nbf;
-  const size_t nbf3 = nbf2 * nbf;
-  const size_t eri_sz = nbf3 * (i_hi - i_lo);
+  const size_t num_basis_funcs = obs.nbf();
+  const size_t num_basis_funcs2 = num_basis_funcs * num_basis_funcs;
+  const size_t num_basis_funcs3 = num_basis_funcs2 * num_basis_funcs;
+  const size_t eri_sz = num_basis_funcs3 * (i_hi - i_lo);
 
   auto h_eri = std::make_unique<double[]>(eri_sz);
   auto* h_eri_ptr = h_eri.get();
@@ -96,15 +96,16 @@ std::unique_ptr<double[]> debug_eri(BasisMode basis_mode,
             const size_t nk = obs[k].size();
             const size_t nl = obs[l].size();
 
-            auto* h_eri_loc = h_eri_ptr + (i_st - i_lo) * nbf3 + j_st * nbf2 +
-                              k_st * nbf + l_st;
+            auto* h_eri_loc = h_eri_ptr + (i_st - i_lo) * num_basis_funcs3 +
+                              j_st * num_basis_funcs2 + k_st * num_basis_funcs +
+                              l_st;
             for (size_t ii = 0, int_ijkl = 0; ii < ni; ++ii)
               for (size_t jj = 0; jj < nj; ++jj)
                 for (size_t kk = 0; kk < nk; ++kk)
                   for (size_t ll = 0; ll < nl; ++ll, int_ijkl++) {
                     if (i_st + ii >= i_lo and i_st + ii < i_hi) {
-                      h_eri_loc[ii * nbf3 + jj * nbf2 + kk * nbf + ll] =
-                          data[int_ijkl];
+                      h_eri_loc[ii * num_basis_funcs3 + jj * num_basis_funcs2 +
+                                kk * num_basis_funcs + ll] = data[int_ijkl];
                     }
                   }
           }
@@ -116,10 +117,10 @@ std::unique_ptr<double[]> debug_eri(BasisMode basis_mode,
 std::unique_ptr<double[]> opt_eri(BasisMode basis_mode,
                                   const libint2::BasisSet& obs, double omega,
                                   size_t i_lo, size_t i_hi) {
-  const size_t nbf = obs.nbf();
-  const size_t nbf2 = nbf * nbf;
-  const size_t nbf3 = nbf2 * nbf;
-  const size_t eri_sz = nbf3 * (i_hi - i_lo);
+  const size_t num_basis_funcs = obs.nbf();
+  const size_t num_basis_funcs2 = num_basis_funcs * num_basis_funcs;
+  const size_t num_basis_funcs3 = num_basis_funcs2 * num_basis_funcs;
+  const size_t eri_sz = num_basis_funcs3 * (i_hi - i_lo);
 
   auto h_eri = std::make_unique<double[]>(eri_sz);
   auto* h_eri_ptr = h_eri.get();
@@ -187,23 +188,31 @@ std::unique_ptr<double[]> opt_eri(BasisMode basis_mode,
 
               auto data = buf[0];
               if (data) {
-                auto* h_eri_ijkl = h_eri_ptr + (i_st - i_lo) * nbf3 +
-                                   j_st * nbf2 + k_st * nbf + l_st;
-                auto* h_eri_ijlk = h_eri_ptr + (i_st - i_lo) * nbf3 +
-                                   j_st * nbf2 + l_st * nbf + k_st;
-                auto* h_eri_jikl = h_eri_ptr + (j_st - i_lo) * nbf3 +
-                                   i_st * nbf2 + k_st * nbf + l_st;
-                auto* h_eri_jilk = h_eri_ptr + (j_st - i_lo) * nbf3 +
-                                   i_st * nbf2 + l_st * nbf + k_st;
+                auto* h_eri_ijkl =
+                    h_eri_ptr + (i_st - i_lo) * num_basis_funcs3 +
+                    j_st * num_basis_funcs2 + k_st * num_basis_funcs + l_st;
+                auto* h_eri_ijlk =
+                    h_eri_ptr + (i_st - i_lo) * num_basis_funcs3 +
+                    j_st * num_basis_funcs2 + l_st * num_basis_funcs + k_st;
+                auto* h_eri_jikl =
+                    h_eri_ptr + (j_st - i_lo) * num_basis_funcs3 +
+                    i_st * num_basis_funcs2 + k_st * num_basis_funcs + l_st;
+                auto* h_eri_jilk =
+                    h_eri_ptr + (j_st - i_lo) * num_basis_funcs3 +
+                    i_st * num_basis_funcs2 + l_st * num_basis_funcs + k_st;
 
-                auto* h_eri_klij = h_eri_ptr + (k_st - i_lo) * nbf3 +
-                                   l_st * nbf2 + i_st * nbf + j_st;
-                auto* h_eri_klji = h_eri_ptr + (k_st - i_lo) * nbf3 +
-                                   l_st * nbf2 + j_st * nbf + i_st;
-                auto* h_eri_lkij = h_eri_ptr + (l_st - i_lo) * nbf3 +
-                                   k_st * nbf2 + i_st * nbf + j_st;
-                auto* h_eri_lkji = h_eri_ptr + (l_st - i_lo) * nbf3 +
-                                   k_st * nbf2 + j_st * nbf + i_st;
+                auto* h_eri_klij =
+                    h_eri_ptr + (k_st - i_lo) * num_basis_funcs3 +
+                    l_st * num_basis_funcs2 + i_st * num_basis_funcs + j_st;
+                auto* h_eri_klji =
+                    h_eri_ptr + (k_st - i_lo) * num_basis_funcs3 +
+                    l_st * num_basis_funcs2 + j_st * num_basis_funcs + i_st;
+                auto* h_eri_lkij =
+                    h_eri_ptr + (l_st - i_lo) * num_basis_funcs3 +
+                    k_st * num_basis_funcs2 + i_st * num_basis_funcs + j_st;
+                auto* h_eri_lkji =
+                    h_eri_ptr + (l_st - i_lo) * num_basis_funcs3 +
+                    k_st * num_basis_funcs2 + j_st * num_basis_funcs + i_st;
 
                 for (size_t ii = 0; ii < ni; ++ii)
                   for (size_t jj = 0; jj < nj; ++jj)
@@ -212,30 +221,46 @@ std::unique_ptr<double[]> opt_eri(BasisMode basis_mode,
                         const auto integral = *data++;
 
                         if (i_st + ii >= i_lo and i_st + ii < i_hi) {
-                          h_eri_ijkl[ii * nbf3 + jj * nbf2 + kk * nbf + ll] =
+                          h_eri_ijkl[ii * num_basis_funcs3 +
+                                     jj * num_basis_funcs2 +
+                                     kk * num_basis_funcs + ll] =
                               integral;  // (ij|kl)
-                          h_eri_ijlk[ii * nbf3 + jj * nbf2 + ll * nbf + kk] =
+                          h_eri_ijlk[ii * num_basis_funcs3 +
+                                     jj * num_basis_funcs2 +
+                                     ll * num_basis_funcs + kk] =
                               integral;  // (ij|lk)
                         }
 
                         if (j_st + jj >= i_lo and j_st + jj < i_hi) {
-                          h_eri_jikl[jj * nbf3 + ii * nbf2 + kk * nbf + ll] =
+                          h_eri_jikl[jj * num_basis_funcs3 +
+                                     ii * num_basis_funcs2 +
+                                     kk * num_basis_funcs + ll] =
                               integral;  // (ji|kl)
-                          h_eri_jilk[jj * nbf3 + ii * nbf2 + ll * nbf + kk] =
+                          h_eri_jilk[jj * num_basis_funcs3 +
+                                     ii * num_basis_funcs2 +
+                                     ll * num_basis_funcs + kk] =
                               integral;  // (ji|lk)
                         }
 
                         if (k_st + kk >= i_lo and k_st + kk < i_hi) {
-                          h_eri_klij[kk * nbf3 + ll * nbf2 + ii * nbf + jj] =
+                          h_eri_klij[kk * num_basis_funcs3 +
+                                     ll * num_basis_funcs2 +
+                                     ii * num_basis_funcs + jj] =
                               integral;  // (kl|ij)
-                          h_eri_klji[kk * nbf3 + ll * nbf2 + jj * nbf + ii] =
+                          h_eri_klji[kk * num_basis_funcs3 +
+                                     ll * num_basis_funcs2 +
+                                     jj * num_basis_funcs + ii] =
                               integral;  // (kl|ji)
                         }
 
                         if (l_st + ll >= i_lo and l_st + ll < i_hi) {
-                          h_eri_lkij[ll * nbf3 + kk * nbf2 + ii * nbf + jj] =
+                          h_eri_lkij[ll * num_basis_funcs3 +
+                                     kk * num_basis_funcs2 +
+                                     ii * num_basis_funcs + jj] =
                               integral;  // (lk|ij)
-                          h_eri_lkji[ll * nbf3 + kk * nbf2 + jj * nbf + ii] =
+                          h_eri_lkji[ll * num_basis_funcs3 +
+                                     kk * num_basis_funcs2 +
+                                     jj * num_basis_funcs + ii] =
                               integral;  // (lk|ji)
                         }
                       }
@@ -255,10 +280,10 @@ std::unique_ptr<double[]> eri_df(BasisMode basis_mode,
                                  const libint2::BasisSet& obs,
                                  const libint2::BasisSet& abs, size_t i_lo,
                                  size_t i_hi) {
-  const size_t nbf = obs.nbf();
+  const size_t num_basis_funcs = obs.nbf();
   const size_t naux = abs.nbf();
-  const size_t nbf2 = nbf * nbf;
-  const size_t eri_sz = nbf2 * (i_hi - i_lo);
+  const size_t num_basis_funcs2 = num_basis_funcs * num_basis_funcs;
+  const size_t eri_sz = num_basis_funcs2 * (i_hi - i_lo);
 
   auto h_eri = std::make_unique<double[]>(eri_sz);
   auto* h_eri_ptr = h_eri.get();
@@ -316,16 +341,18 @@ std::unique_ptr<double[]> eri_df(BasisMode basis_mode,
                   abs[i], unitshell, obs[p], obs[q]);
           auto data = engine.results()[0];
           if (data) {
-            auto* h_eri_loc_pq =
-                h_eri_ptr + (i_st - i_lo) * nbf2 + p_st * nbf + q_st;
-            auto* h_eri_loc_qp =
-                h_eri_ptr + (i_st - i_lo) * nbf2 + q_st * nbf + p_st;
+            auto* h_eri_loc_pq = h_eri_ptr + (i_st - i_lo) * num_basis_funcs2 +
+                                 p_st * num_basis_funcs + q_st;
+            auto* h_eri_loc_qp = h_eri_ptr + (i_st - i_lo) * num_basis_funcs2 +
+                                 q_st * num_basis_funcs + p_st;
             for (size_t ii = 0, int_ipq = 0; ii < ni; ++ii)
               for (size_t pp = 0; pp < np; ++pp)
                 for (size_t qq = 0; qq < nq; ++qq, int_ipq++) {
                   if (i_st + ii >= i_lo and i_st + ii < i_hi) {
-                    h_eri_loc_pq[ii * nbf2 + pp * nbf + qq] = data[int_ipq];
-                    h_eri_loc_qp[ii * nbf2 + qq * nbf + pp] = data[int_ipq];
+                    h_eri_loc_pq[ii * num_basis_funcs2 + pp * num_basis_funcs +
+                                 qq] = data[int_ipq];
+                    h_eri_loc_qp[ii * num_basis_funcs2 + qq * num_basis_funcs +
+                                 pp] = data[int_ipq];
                   }
                 }
           }
@@ -398,9 +425,9 @@ void eri_df_grad(double* dJ, const double* P, const double* X,
                  const std::vector<int>& obs_sh2atom,
                  const std::vector<int>& abs_sh2atom, size_t n_atoms,
                  ParallelConfig mpi) {
-  const size_t nbf = obs.nbf();
+  const size_t num_basis_funcs = obs.nbf();
   const size_t naux = abs.nbf();
-  const size_t nbf2 = nbf * nbf;
+  const size_t num_basis_funcs2 = num_basis_funcs * num_basis_funcs;
   const size_t nshells_obs = obs.size();
   const size_t nshells_abs = abs.size();
   auto shell2bf_obs = obs.shell2bf();
@@ -454,7 +481,8 @@ void eri_df_grad(double* dJ, const double* P, const double* X,
             for (size_t ii = i_st, int_ipq = 0; ii < i_st + ni; ++ii)
               for (size_t pp = p_st; pp < p_st + np; ++pp)
                 for (size_t qq = q_st; qq < q_st + nq; ++qq, int_ipq++)
-                  dJ_coord += P[pp * nbf + qq] * shset[int_ipq] * X[ii];
+                  dJ_coord +=
+                      P[pp * num_basis_funcs + qq] * shset[int_ipq] * X[ii];
             if (q > p) dJ_coord *= 2.0;  // use symmetry of (I|pq) D(p,q)
             dJ[coord] += dJ_coord;
           }

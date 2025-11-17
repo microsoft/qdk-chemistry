@@ -331,7 +331,7 @@ void bind_hamiltonian(pybind11::module& data) {
         Examples
         --------
         >>> orbitals = hamiltonian.get_orbitals()
-        >>> print(f"Number of MOs: {orbitals.get_num_mos()}")
+        >>> print(f"Number of MOs: {orbitals.get_num_molecular_orbitals()}")
         )",
                           py::return_value_policy::reference_internal);
 

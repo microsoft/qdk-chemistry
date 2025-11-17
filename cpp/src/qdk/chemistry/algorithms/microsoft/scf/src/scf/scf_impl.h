@@ -91,7 +91,7 @@ class SCFImpl {
    * @brief Check if calculation is restricted
    * @see SCF::get_restricted() for API details
    */
-  bool get_restricted() const { return ndm_ == 1; }
+  bool get_restricted() const { return num_density_matrices_ == 1; }
 
   /**
    * @brief Get number of electrons
@@ -103,13 +103,13 @@ class SCFImpl {
    * @brief Get number of atomic orbital basis functions
    * @see SCF::get_num_basis_functions() for API details
    */
-  int get_num_basis_functions() const { return n_ao_; }
+  int get_num_basis_functions() const { return num_atomic_orbitals_; }
 
   /**
    * @brief Get number of molecular orbitals
    * @see SCF::get_num_molecular_orbitals() for API details
    */
-  int get_num_molecular_orbitals() const { return n_mo_; }
+  int get_num_molecular_orbitals() const { return num_molecular_orbitals_; }
 
   /**
    * @brief Get orbital eigenvalues (energies)
@@ -139,7 +139,7 @@ class SCFImpl {
    * @brief Get number of density matrices
    * @see SCF::get_num_density_matrices() for API details
    */
-  int get_num_density_matrices() const { return ndm_; }
+  int get_num_density_matrices() const { return num_density_matrices_; }
 
  protected:
   /**
@@ -196,7 +196,7 @@ class SCFImpl {
   /**
    * @brief Get hybridization coefficients for range-separated functionals
    *
-   * @returns A tuple containing the coefficents
+   * @returns A tuple containing the coefficients
    *   0: alpha Fraction of long-range HF exchange (0.0 to 1.0)
    *   1: beta Fraction of short-range HF exchange (for RSH functionals)
    *   2: omega Range-separation parameter (for RSH functionals)
@@ -270,22 +270,32 @@ class SCFImpl {
                                const Molecule* mol = nullptr);
 
   // Core SCF data
-  size_t n_ao_;   ///< Number of atomic orbital basis functions
-  size_t n_mo_;   ///< Number of molecular orbitals
-  int ndm_;       ///< Number of density matrices (1=restricted, 2=unrestricted)
-  int nelec_[2];  ///< Number of [alpha, beta] electrons
+  size_t num_atomic_orbitals_;     ///< Number of atomic orbital basis functions
+  size_t num_molecular_orbitals_;  ///< Number of molecular orbitals
+  int num_density_matrices_;  ///< Number of density matrices (1=restricted,
+                              ///< 2=unrestricted)
+  int nelec_[2];              ///< Number of [alpha, beta] electrons
 
   // SCF matrices
-  RowMajorMatrix H_;  ///< Core Hamiltonian matrix (ndm × NAO × NAO)
-  RowMajorMatrix S_;  ///< Overlap matrix (NAO × NAO)
-  RowMajorMatrix P_;  ///< Density matrix (ndm × NAO × NAO)
-  RowMajorMatrix J_;  ///< Coulomb matrix (ndm × NAO × NAO)
-  RowMajorMatrix K_;  ///< Exchange matrix (ndm × NAO × NAO)
-  RowMajorMatrix F_;  ///< Fock matrix (ndm × NAO × NAO)
-  RowMajorMatrix X_;  ///< Orthogonalization matrix (NAO × NMO)
+  RowMajorMatrix H_;  ///< Core Hamiltonian matrix (num_density_matrices ×
+                      ///< num_atomic_orbitals × num_atomic_orbitals)
   RowMajorMatrix
-      C_;  ///< Molecular orbital coefficient matrix (ndm × NAO × NMO)
-  RowMajorMatrix eigenvalues_;  ///< Orbital energies (ndm × NMO)
+      S_;  ///< Overlap matrix (num_atomic_orbitals × num_atomic_orbitals)
+  RowMajorMatrix P_;  ///< Density matrix (num_density_matrices ×
+                      ///< num_atomic_orbitals × num_atomic_orbitals)
+  RowMajorMatrix J_;  ///< Coulomb matrix (num_density_matrices ×
+                      ///< num_atomic_orbitals × num_atomic_orbitals)
+  RowMajorMatrix K_;  ///< Exchange matrix (num_density_matrices ×
+                      ///< num_atomic_orbitals × num_atomic_orbitals)
+  RowMajorMatrix F_;  ///< Fock matrix (num_density_matrices ×
+                      ///< num_atomic_orbitals × num_atomic_orbitals)
+  RowMajorMatrix X_;  ///< Orthogonalization matrix (num_atomic_orbitals ×
+                      ///< num_molecular_orbitals)
+  RowMajorMatrix
+      C_;  ///< Molecular orbital coefficient matrix (num_density_matrices ×
+           ///< num_atomic_orbitals × num_molecular_orbitals)
+  RowMajorMatrix eigenvalues_;  ///< Orbital energies (num_density_matrices ×
+                                ///< num_molecular_orbitals)
 #ifdef QDK_CHEMISTRY_ENABLE_DFTD3
   RowMajorMatrix disp_grad_;  ///< Dispersion correction gradient
 #endif
@@ -299,12 +309,14 @@ class SCFImpl {
 
 #ifdef QDK_CHEMISTRY_ENABLE_PCM
   std::unique_ptr<pcm::PCM> pcm_;  ///< Polarizable Continuum Model solver
-  RowMajorMatrix Vpcm_;            ///< PCM potential matrix (NAO × NAO)
+  RowMajorMatrix Vpcm_;  ///< PCM potential matrix (num_atomic_orbitals ×
+                         ///< num_atomic_orbitals)
 #endif
 
 #ifdef QDK_CHEMISTRY_ENABLE_QMMM
   bool add_mm_charge_;   ///< Whether to include MM point charges in calculation
-  RowMajorMatrix T_mm_;  ///< QM-MM interaction matrix (NAO × NAO)
+  RowMajorMatrix T_mm_;  ///< QM-MM interaction matrix (num_atomic_orbitals ×
+                         ///< num_atomic_orbitals)
 #endif
 
   bool density_matrix_initialized_;  ///< Whether density matrix has been

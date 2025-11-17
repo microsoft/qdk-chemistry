@@ -211,23 +211,17 @@ class Orbitals : public DataClass,
    * @brief Get number of molecular orbitals
    * @return Number of molecular orbitals (columns in coefficient matrix)
    */
-  virtual size_t get_num_mos() const;
-  // TODO (NAB):  could this be `get_num_molecular_orbitals` or
-  // `get_num_mol_orbitals` for clarity?
-  // https://dev.azure.com/ms-azurequantum/AzureQuantum/_workitems/edit/41291
+  virtual size_t get_num_molecular_orbitals() const;
 
   /**
    * @brief Get number of atomic orbitals
    * @return Number of AOs (rows in coefficient matrix)
    */
-  virtual size_t get_num_aos() const;
-  // TODO (NAB):  could this be `get_num_atomic_orbitals` or
-  // `get_num_atom_orbitals` for clarity?
-  // https://dev.azure.com/ms-azurequantum/AzureQuantum/_workitems/edit/41307
+  virtual size_t get_num_atomic_orbitals() const;
 
   /**
    * @brief Get all molecular orbital indices as a vector
-   * @return Vector containing indices [0, 1, 2, ..., num_mos-1]
+   * @return Vector containing indices [0, 1, 2, ..., num_molecular_orbitals-1]
    */
   virtual std::vector<size_t> get_all_mo_indices() const;
 
@@ -475,8 +469,10 @@ class Orbitals : public DataClass,
   /**
    * Save orbital metadata to HDF5 file with direct parameters
    */
-  static void _save_orbital_metadata_to_hdf5(H5::H5File& file, size_t num_aos,
-                                             size_t num_mos, bool is_restricted,
+  static void _save_orbital_metadata_to_hdf5(H5::H5File& file,
+                                             size_t num_atomic_orbitals,
+                                             size_t num_molecular_orbitals,
+                                             bool is_restricted,
                                              bool has_overlap,
                                              bool has_basis_set);
 
@@ -609,8 +605,8 @@ class ModelOrbitals : public Orbitals {
   Eigen::MatrixXd get_mo_overlap_beta_beta() const override;
 
   // Override size query methods
-  size_t get_num_mos() const override { return _num_orbitals; }
-  size_t get_num_aos() const override { return _num_orbitals; }
+  size_t get_num_molecular_orbitals() const override { return _num_orbitals; }
+  size_t get_num_atomic_orbitals() const override { return _num_orbitals; }
   std::vector<size_t> get_all_mo_indices() const override;
 
   // Override calculation type queries

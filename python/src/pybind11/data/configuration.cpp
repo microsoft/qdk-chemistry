@@ -146,6 +146,20 @@ void bind_configuration(pybind11::module &data) {
         )",
                     py::arg("other"));
 
+  configuration.def(
+      "__hash__",
+      [](const Configuration &c) {
+        return Py_hash_t(std::hash<std::string>()(c.to_string()));
+      },
+      R"(
+        Returns the hash of the Configuration.
+
+        Returns
+        -------
+        py::hash_t
+            Hash value of the Configuration object
+        )");
+
   // Static methods
   configuration.def_static(
       "canonical_hf_configuration", &Configuration::canonical_hf_configuration,

@@ -18,7 +18,7 @@ std::filesystem::path QDKChemistryConfig::resources_dir_ =
 
 std::filesystem::path QDKChemistryConfig::get_resources_dir() {
   if(resources_dir_.empty()) {
-    throw std::runtime_error("The runtime resources directory for QDK/Chemistry is currently emppy. Please set an appropriate resource directory using QDKChemistryConfig:set_resources_dir");
+    throw std::runtime_error("The runtime resources directory for QDK/Chemistry is currently empty. Please set an appropriate resource directory using QDKChemistryConfig:set_resources_dir");
   }
   return resources_dir_;
 }

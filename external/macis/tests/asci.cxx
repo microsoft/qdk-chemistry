@@ -122,10 +122,12 @@ TEST_CASE("Triplets") {
   std::vector<size_t> quad_hist(norb * norb * norb * norb, 0);
   for (auto i = 0; i < nuniq_alpha; ++i) {
     // Constant dimensions
-    const size_t nocc = wfn_a_uniq[i].count();
-    const size_t nvir = norb - nocc;
-    const size_t n_singles = nocc * nvir;
-    const size_t n_doubles = (n_singles * (n_singles - nocc - nvir + 1)) / 4;
+    const size_t num_occupied_orbitals = wfn_a_uniq[i].count();
+    const size_t num_virtual_orbitals = norb - num_occupied_orbitals;
+    const size_t n_singles = num_occupied_orbitals * num_virtual_orbitals;
+    const size_t n_doubles = (n_singles * (n_singles - num_occupied_orbitals -
+                                           num_virtual_orbitals + 1)) /
+                             4;
 
     // Generate singles and doubles
     std::vector<macis::wfn_t<num_bits>> s_a, d_a;
@@ -183,10 +185,12 @@ TEST_CASE("Triplets") {
     auto constraint = macis::make_triplet<num_bits>(i, j, k);
 
     for (auto det : wfn_a_uniq) {
-      const size_t nocc = det.count();
-      const size_t nvir = norb - nocc;
-      const size_t n_singles = nocc * nvir;
-      const size_t n_doubles = (n_singles * (n_singles - nocc - nvir + 1)) / 4;
+      const size_t num_occupied_orbitals = det.count();
+      const size_t num_virtual_orbitals = norb - num_occupied_orbitals;
+      const size_t n_singles = num_occupied_orbitals * num_virtual_orbitals;
+      const size_t n_doubles = (n_singles * (n_singles - num_occupied_orbitals -
+                                             num_virtual_orbitals + 1)) /
+                               4;
 
       new_triplet_hist[label] += macis::constraint_histogram(
           wfn_traits::alpha_string(det), n_singles, n_doubles, constraint);
@@ -210,10 +214,12 @@ TEST_CASE("Triplets") {
     auto constraint = make_quad<num_bits>(i, j, k, l);
 
     for (auto det : wfn_a_uniq) {
-      const size_t nocc = det.count();
-      const size_t nvir = norb - nocc;
-      const size_t n_singles = nocc * nvir;
-      const size_t n_doubles = (n_singles * (n_singles - nocc - nvir + 1)) / 4;
+      const size_t num_occupied_orbitals = det.count();
+      const size_t num_virtual_orbitals = norb - num_occupied_orbitals;
+      const size_t n_singles = num_occupied_orbitals * num_virtual_orbitals;
+      const size_t n_doubles = (n_singles * (n_singles - num_occupied_orbitals -
+                                             num_virtual_orbitals + 1)) /
+                               4;
 
       new_quad_hist[label] += macis::constraint_histogram(
           wfn_traits::alpha_string(det), n_singles, n_doubles, constraint);

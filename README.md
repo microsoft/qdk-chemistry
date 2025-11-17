@@ -139,8 +139,8 @@ auto settings = qdk::chemistry::data::Settings::from_hdf5_file("config.settings.
 ```python
 # Python API
 import numpy as np
-from qdk.chemistry.algorithms import create
-from qdk.chemistry.data import Structure, Settings, Orbitals
+from qdk_chemistry.algorithms import create
+from qdk_chemistry.data import Structure, Settings, Orbitals
 
 # Create water structure
 coords = np.array([[0.0, 0.0, 0.0], [1.431, 1.107, 0.0], [-1.431, 1.107, 0.0]])  # Bohr

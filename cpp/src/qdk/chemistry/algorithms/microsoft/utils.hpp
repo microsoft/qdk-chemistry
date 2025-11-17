@@ -19,7 +19,7 @@ namespace qcs = qdk::chemistry::scf;
  * @brief Normalize shells for PSI4 mode
  *
  * @param shells Vector of shells to be normalized for PSI4 mode
- * @note This tranformation happens in place. For correct results, the shells
+ * @note This transformation happens in place. For correct results, the shells
  * should be initialized with *raw* coefficients (i.e. those obtained from the
  * BasisSetExchange).
  */

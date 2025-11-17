@@ -81,7 +81,7 @@ TEST_F(HamiltonianTest, Constructor) {
   EXPECT_TRUE(h.has_one_body_integrals());
   EXPECT_TRUE(h.has_two_body_integrals());
   EXPECT_TRUE(h.has_orbitals());
-  EXPECT_EQ(h.get_orbitals()->get_num_mos(), 2);
+  EXPECT_EQ(h.get_orbitals()->get_num_molecular_orbitals(), 2);
   EXPECT_EQ(h.get_core_energy(), 1.5);
 }
 
@@ -103,7 +103,7 @@ TEST_F(HamiltonianTest, ConstructorWithInactiveFock) {
   EXPECT_TRUE(h.has_two_body_integrals());
   EXPECT_TRUE(h.has_orbitals());
   EXPECT_TRUE(h.has_inactive_fock_matrix());
-  EXPECT_EQ(h.get_orbitals()->get_num_mos(), 4);
+  EXPECT_EQ(h.get_orbitals()->get_num_molecular_orbitals(), 4);
   EXPECT_EQ(h.get_core_energy(), 1.5);
 }
 
@@ -113,7 +113,7 @@ TEST_F(HamiltonianTest, FullConstructor) {
   EXPECT_TRUE(h.has_one_body_integrals());
   EXPECT_TRUE(h.has_two_body_integrals());
   EXPECT_TRUE(h.has_orbitals());
-  EXPECT_EQ(h.get_orbitals()->get_num_mos(), 2);
+  EXPECT_EQ(h.get_orbitals()->get_num_molecular_orbitals(), 2);
   EXPECT_EQ(h.get_core_energy(), 1.5);
 }
 
@@ -124,7 +124,7 @@ TEST_F(HamiltonianTest, CopyConstructor) {
   EXPECT_TRUE(h2.has_one_body_integrals());
   EXPECT_TRUE(h2.has_two_body_integrals());
   EXPECT_TRUE(h2.has_orbitals());
-  EXPECT_EQ(h2.get_orbitals()->get_num_mos(), 2);
+  EXPECT_EQ(h2.get_orbitals()->get_num_molecular_orbitals(), 2);
   EXPECT_EQ(h2.get_core_energy(), 1.5);
 }
 
@@ -135,7 +135,7 @@ TEST_F(HamiltonianTest, MoveConstructor) {
   EXPECT_TRUE(h2.has_one_body_integrals());
   EXPECT_TRUE(h2.has_two_body_integrals());
   EXPECT_TRUE(h2.has_orbitals());
-  EXPECT_EQ(h2.get_orbitals()->get_num_mos(), 2);
+  EXPECT_EQ(h2.get_orbitals()->get_num_molecular_orbitals(), 2);
   EXPECT_EQ(h2.get_core_energy(), 1.5);
 }
 
@@ -152,7 +152,7 @@ TEST_F(HamiltonianTest, CopyConstructorAndAssignment) {
   EXPECT_TRUE(h2.has_two_body_integrals());
   EXPECT_TRUE(h2.has_orbitals());
   EXPECT_TRUE(h2.has_inactive_fock_matrix());
-  EXPECT_EQ(h2.get_orbitals()->get_num_mos(), 2);
+  EXPECT_EQ(h2.get_orbitals()->get_num_molecular_orbitals(), 2);
   EXPECT_EQ(h2.get_core_energy(), 1.5);
 
   // Verify deep copying of matrices
@@ -172,7 +172,7 @@ TEST_F(HamiltonianTest, CopyConstructorAndAssignment) {
   EXPECT_TRUE(h3.has_two_body_integrals());
   EXPECT_TRUE(h3.has_orbitals());
   EXPECT_TRUE(h3.has_inactive_fock_matrix());
-  EXPECT_EQ(h3.get_orbitals()->get_num_mos(), 2);
+  EXPECT_EQ(h3.get_orbitals()->get_num_molecular_orbitals(), 2);
   EXPECT_EQ(h3.get_core_energy(), 1.5);
 
   // Test self-assignment (should be no-op)
@@ -184,7 +184,7 @@ TEST_F(HamiltonianTest, CopyConstructorAndAssignment) {
   EXPECT_TRUE(h4.has_one_body_integrals());
   EXPECT_TRUE(h4.has_two_body_integrals());
   EXPECT_TRUE(h4.has_orbitals());
-  EXPECT_EQ(h4.get_orbitals()->get_num_mos(), 2);
+  EXPECT_EQ(h4.get_orbitals()->get_num_molecular_orbitals(), 2);
   EXPECT_EQ(h4.get_core_energy(), 1.5);
 }
 
@@ -260,7 +260,7 @@ TEST_F(HamiltonianTest, JSONSerialization) {
   // Test round-trip conversion
   auto h2 = Hamiltonian::from_json(j);
 
-  EXPECT_EQ(h2->get_orbitals()->get_num_mos(), 2);
+  EXPECT_EQ(h2->get_orbitals()->get_num_molecular_orbitals(), 2);
   EXPECT_EQ(h2->get_core_energy(), 1.5);
   EXPECT_TRUE(h2->has_one_body_integrals());
   EXPECT_TRUE(h2->has_two_body_integrals());
@@ -285,7 +285,7 @@ TEST_F(HamiltonianTest, JSONFileIO) {
   auto h2 = Hamiltonian::from_json_file(filename);
 
   // Check loaded data
-  EXPECT_EQ(h2->get_orbitals()->get_num_mos(), 2);
+  EXPECT_EQ(h2->get_orbitals()->get_num_molecular_orbitals(), 2);
   EXPECT_EQ(h2->get_core_energy(), 1.5);
   EXPECT_TRUE(h2->has_one_body_integrals());
   EXPECT_TRUE(h2->has_two_body_integrals());
@@ -310,7 +310,7 @@ TEST_F(HamiltonianTest, HDF5FileIO) {
   auto h2 = Hamiltonian::from_hdf5_file(filename);
 
   // Check loaded data
-  EXPECT_EQ(h2->get_orbitals()->get_num_mos(), 2);
+  EXPECT_EQ(h2->get_orbitals()->get_num_molecular_orbitals(), 2);
   EXPECT_EQ(h2->get_core_energy(), 1.5);
   EXPECT_TRUE(h2->has_one_body_integrals());
   EXPECT_TRUE(h2->has_two_body_integrals());
@@ -366,7 +366,7 @@ TEST_F(HamiltonianTest, GenericFileIO) {
 
   auto h2 = Hamiltonian::from_file(json_filename, "json");
 
-  EXPECT_EQ(h2->get_orbitals()->get_num_mos(), 2);
+  EXPECT_EQ(h2->get_orbitals()->get_num_molecular_orbitals(), 2);
   EXPECT_TRUE(
       h.get_one_body_integrals().isApprox(h2->get_one_body_integrals()));
 
@@ -377,7 +377,7 @@ TEST_F(HamiltonianTest, GenericFileIO) {
 
   auto h3 = Hamiltonian::from_file(hdf5_filename, "hdf5");
 
-  EXPECT_EQ(h3->get_orbitals()->get_num_mos(), 2);
+  EXPECT_EQ(h3->get_orbitals()->get_num_molecular_orbitals(), 2);
   EXPECT_TRUE(
       h.get_one_body_integrals().isApprox(h3->get_one_body_integrals()));
 }

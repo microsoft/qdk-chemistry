@@ -95,8 +95,9 @@ void ERI::build_JK(const double* P, double* J, double* K, double alpha,
   build_JK_impl_(P, J, K, alpha, beta, omega);
 
 #ifdef QDK_CHEMISTRY_ENABLE_MPI
-  int ndm = unrestricted_ ? 2 : 1;
-  int size = ndm * basis_set_.n_bf * basis_set_.n_bf;
+  int num_density_matrices = unrestricted_ ? 2 : 1;
+  int size = num_density_matrices * basis_set_.num_basis_funcs *
+             basis_set_.num_basis_funcs;
   if (mpi_.world_size > 1) {
     MPI_Barrier(MPI_COMM_WORLD);
     AutoTimer t("ERI::build_JK->MPI_Reduce");

@@ -76,7 +76,7 @@ enum class IterativeLinearSolver {
 enum class DensityInitializationMethod {
   SOAD,          ///< Superposition of atomic densities
   Core,          ///< Core Hamiltonian guess (P = 0)
-  UserProvided,  ///< User-provided density marix (incore)
+  UserProvided,  ///< User-provided density matrix (incore)
   File,          ///< User-provided density matrix (file)
   Atom,          ///< Atom-by-atom guess
 };

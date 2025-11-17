@@ -86,8 +86,8 @@ TEST_F(OrbitalsEdgeCasesTest, SingleOrbitalSingleBasis) {
   Orbitals orb(coeffs, std::make_optional(energies), std::nullopt, single_basis,
                std::nullopt);
 
-  EXPECT_EQ(1, orb.get_num_aos());
-  EXPECT_EQ(1, orb.get_num_mos());
+  EXPECT_EQ(1, orb.get_num_atomic_orbitals());
+  EXPECT_EQ(1, orb.get_num_molecular_orbitals());
 
   const auto& [alpha_coeffs, beta_coeffs] = orb.get_coefficients();
   EXPECT_NEAR(1.0, alpha_coeffs(0, 0), testing::numerical_zero_tolerance);
@@ -109,8 +109,8 @@ TEST_F(OrbitalsEdgeCasesTest, AsymmetricDimensions) {
   Orbitals orb(coeffs, std::make_optional(energies), std::nullopt, asym_basis,
                std::nullopt);
 
-  EXPECT_EQ(n_basis, orb.get_num_aos());
-  EXPECT_EQ(n_orbitals, orb.get_num_mos());
+  EXPECT_EQ(n_basis, orb.get_num_atomic_orbitals());
+  EXPECT_EQ(n_orbitals, orb.get_num_molecular_orbitals());
 
   // Test coefficient matrix dimensions
   const auto& [alpha_coeffs, beta_coeffs] = orb.get_coefficients();
@@ -204,8 +204,8 @@ TEST_F(OrbitalsEdgeCasesTest, LargeSystemPerformance) {
   auto end = std::chrono::high_resolution_clock::now();
   auto duration =
       std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
-  EXPECT_EQ(n_basis, orb.get_num_aos());
-  EXPECT_EQ(n_orbitals, orb.get_num_mos());
+  EXPECT_EQ(n_basis, orb.get_num_atomic_orbitals());
+  EXPECT_EQ(n_orbitals, orb.get_num_molecular_orbitals());
 
   // Performance should be reasonable (< 100ms for setup)
   EXPECT_LT(duration.count(), 100);
@@ -255,8 +255,8 @@ TEST_F(OrbitalsEdgeCasesTest, MemoryStress) {
 
   // Verify all objects are still valid
   for (const auto& orb : orbital_objects) {
-    EXPECT_EQ(n_basis, orb->get_num_aos());
-    EXPECT_EQ(n_orbitals, orb->get_num_mos());
+    EXPECT_EQ(n_basis, orb->get_num_atomic_orbitals());
+    EXPECT_EQ(n_orbitals, orb->get_num_molecular_orbitals());
   }
 
   // Objects will be automatically destroyed when vector goes out of scope
@@ -321,8 +321,8 @@ TEST_F(OrbitalsEdgeCasesTest, CopyConstructorWithNullPointers) {
 
   // Test copying
   Orbitals orb2(orb1);
-  EXPECT_EQ(1, orb2.get_num_aos());
-  EXPECT_EQ(1, orb2.get_num_mos());
+  EXPECT_EQ(1, orb2.get_num_atomic_orbitals());
+  EXPECT_EQ(1, orb2.get_num_molecular_orbitals());
 
   // Test copying orbitals with coefficients but missing other data
   Eigen::MatrixXd coeffs(2, 2);
@@ -331,8 +331,8 @@ TEST_F(OrbitalsEdgeCasesTest, CopyConstructorWithNullPointers) {
   Orbitals orb3(coeffs, std::nullopt, std::nullopt, copy_basis, std::nullopt);
 
   Orbitals orb4(orb3);
-  EXPECT_EQ(2, orb4.get_num_aos());
-  EXPECT_EQ(2, orb4.get_num_mos());
+  EXPECT_EQ(2, orb4.get_num_atomic_orbitals());
+  EXPECT_EQ(2, orb4.get_num_molecular_orbitals());
   // Should have coefficients but no energies
   const auto& [alpha_coeffs, beta_coeffs] = orb4.get_coefficients();
   EXPECT_TRUE(coeffs.isApprox(alpha_coeffs, 1e-12));
@@ -419,8 +419,8 @@ TEST_F(OrbitalsEdgeCasesTest, AssignmentOperatorWithNullPointers) {
                 std::nullopt);
 
   orb2 = orb3;
-  EXPECT_EQ(2, orb2.get_num_aos());
-  EXPECT_EQ(2, orb2.get_num_mos());
+  EXPECT_EQ(2, orb2.get_num_atomic_orbitals());
+  EXPECT_EQ(2, orb2.get_num_molecular_orbitals());
 
   // Should have coefficients but missing energies
   const auto& [alpha_coeffs, beta_coeffs] = orb2.get_coefficients();

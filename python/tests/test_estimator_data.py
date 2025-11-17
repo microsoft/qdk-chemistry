@@ -10,8 +10,8 @@ import tempfile
 
 import numpy as np
 
-from qdk.chemistry.data import QubitHamiltonian
-from qdk.chemistry.data.estimator_data import EnergyExpectationResult, MeasurementData
+from qdk_chemistry.data import QubitHamiltonian
+from qdk_chemistry.data.estimator_data import EnergyExpectationResult, MeasurementData
 
 from .reference_tolerances import float_comparison_absolute_tolerance, float_comparison_relative_tolerance
 

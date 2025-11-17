@@ -46,7 +46,7 @@ class EXC {
    * range-separated hybrid functionals. For pure DFT functionals,
    * all parameters are zero.
    *
-   * @returns A tuple containing the coefficents
+   * @returns A tuple containing the coefficients
    *   0: alpha Fraction of long-range HF exchange (0.0 to 1.0)
    *   1: beta Fraction of short-range HF exchange (for RSH functionals)
    *   2: omega Range-separation parameter (for RSH functionals)
@@ -65,12 +65,13 @@ class EXC {
    * This is a pure virtual function that must be implemented by derived
    * classes.
    *
-   * @param[in] P Density matrix in AO basis (size: ndm * nbf * nbf)
-   * @param[out] VXC XC matrix contribution to Fock matrix (size: ndm * nbf *
-   * nbf)
+   * @param[in] P Density matrix in AO basis (size: num_density_matrices *
+   * num_basis_funcs * num_basis_funcs)
+   * @param[out] VXC XC matrix contribution to Fock matrix (size:
+   * num_density_matrices * num_basis_funcs * num_basis_funcs)
    * @param[out] xc_energy Total XC energy E_XC[ρ]
    * @note ``ndm`` is the number of density matrices; 1 for restricted, 2 for
-   *       unrestricted calculations. ``nbf`` is the number of basis functions.
+   *       unrestricted calculations.
    */
   virtual void build_XC(const double* P, double* VXC, double* xc_energy) = 0;
 
@@ -83,10 +84,11 @@ class EXC {
    * This is a pure virtual function that must be implemented by derived
    * classes.
    *
-   * @param[in] P Density matrix in AO basis (size: (ndm, nbf, nbf))
+   * @param[in] P Density matrix in AO basis (size: (num_density_matrices,
+   * num_basis_funcs, num_basis_funcs))
    * @param[out] dXC XC contribution to energy gradient (size: (3,natoms))
    * @note ``ndm`` is the number of density matrices; 1 for restricted, 2 for
-   *       unrestricted calculations. ``nbf`` is the number of basis functions.
+   *       unrestricted calculations.
    */
   virtual void get_gradients(const double* P, double* dXC) = 0;
 
@@ -104,13 +106,13 @@ class EXC {
    * This is a pure virtual function that must be implemented by derived
    * classes.
    *
-   * @param[in] D Ground state density matrix in the AO basis (side: ndm * nbf *
-   * nbf)
-   * @param[in] tD Trial/perturbed density matrix in the AO basis (size: ndm *
-   * nbf * nbf)
+   * @param[in] D Ground state density matrix in the AO basis (side:
+   * num_density_matrices * num_basis_funcs * num_basis_funcs)
+   * @param[in] tD Trial/perturbed density matrix in the AO basis (size:
+   * num_density_matrices * num_basis_funcs * num_basis_funcs)
    * @param[out] Fxc XC kernel contribution to response matrix
    * @note ``ndm`` is the number of density matrices; 1 for restricted, 2 for
-   *       unrestricted calculations. ``nbf`` is the number of basis functions.
+   *       unrestricted calculations.
    */
   virtual void eval_fxc_contraction(const double* D, const double* tD,
                                     double* Fxc) = 0;

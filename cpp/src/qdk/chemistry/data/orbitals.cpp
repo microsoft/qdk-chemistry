@@ -399,12 +399,9 @@ Orbitals::calculate_ao_density_matrix(
     throw std::runtime_error("Orbital coefficients not set");
   }
 
-  // TODO (NAB):  could these function and variable names be more explanatory?
-  // e.g. get_num_mol_orbitals?
-  // https://dev.azure.com/ms-azurequantum/AzureQuantum/_workitems/edit/41351
-  const size_t num_mos = get_num_mos();
-  if (occupations_alpha.size() != num_mos ||
-      occupations_beta.size() != num_mos) {
+  const size_t num_molecular_orbitals = get_num_molecular_orbitals();
+  if (occupations_alpha.size() != num_molecular_orbitals ||
+      occupations_beta.size() != num_molecular_orbitals) {
     throw std::runtime_error(
         "Occupation vector size must match number of molecular orbitals");
   }
@@ -429,8 +426,8 @@ Eigen::MatrixXd Orbitals::calculate_ao_density_matrix(
     throw std::runtime_error("Orbital coefficients not set");
   }
 
-  const size_t num_mos = get_num_mos();
-  if (occupations.size() != num_mos) {
+  const size_t num_molecular_orbitals = get_num_molecular_orbitals();
+  if (occupations.size() != num_molecular_orbitals) {
     throw std::runtime_error(
         "Occupation vector size must match number of molecular orbitals");
   }
@@ -452,9 +449,11 @@ Orbitals::calculate_ao_density_matrix_from_rdm(
     throw std::runtime_error("Orbital coefficients not set");
   }
 
-  const size_t num_mos = get_num_mos();
-  if (rdm_alpha.rows() != num_mos || rdm_alpha.cols() != num_mos ||
-      rdm_beta.rows() != num_mos || rdm_beta.cols() != num_mos) {
+  const size_t num_molecular_orbitals = get_num_molecular_orbitals();
+  if (rdm_alpha.rows() != num_molecular_orbitals ||
+      rdm_alpha.cols() != num_molecular_orbitals ||
+      rdm_beta.rows() != num_molecular_orbitals ||
+      rdm_beta.cols() != num_molecular_orbitals) {
     throw std::runtime_error(
         "1RDM matrix size must match number of molecular orbitals");
   }
@@ -476,8 +475,9 @@ Eigen::MatrixXd Orbitals::calculate_ao_density_matrix_from_rdm(
     throw std::runtime_error("Orbital coefficients not set");
   }
 
-  const size_t num_mos = get_num_mos();
-  if (rdm.rows() != num_mos || rdm.cols() != num_mos) {
+  const size_t num_molecular_orbitals = get_num_molecular_orbitals();
+  if (rdm.rows() != num_molecular_orbitals ||
+      rdm.cols() != num_molecular_orbitals) {
     throw std::runtime_error(
         "1RDM matrix size must match number of molecular orbitals");
   }
@@ -502,7 +502,7 @@ Orbitals::get_inactive_space_indices() const {
 
 std::pair<std::vector<size_t>, std::vector<size_t>>
 Orbitals::get_virtual_space_indices() const {
-  const size_t num_mos = get_num_mos();
+  const size_t num_molecular_orbitals = get_num_molecular_orbitals();
 
   // Create sets for efficient lookup
   std::set<size_t> active_alpha(_active_space_indices.first.begin(),
@@ -517,7 +517,7 @@ Orbitals::get_virtual_space_indices() const {
   // Find virtual orbitals (those not in active or inactive)
   std::vector<size_t> virtual_alpha, virtual_beta;
 
-  for (size_t i = 0; i < num_mos; ++i) {
+  for (size_t i = 0; i < num_molecular_orbitals; ++i) {
     if (active_alpha.find(i) == active_alpha.end() &&
         inactive_alpha.find(i) == inactive_alpha.end()) {
       virtual_alpha.push_back(i);
@@ -608,14 +608,14 @@ std::shared_ptr<BasisSet> Orbitals::get_basis_set() const { return _basis_set; }
 
 bool Orbitals::has_basis_set() const { return _basis_set != nullptr; }
 
-size_t Orbitals::get_num_mos() const {
+size_t Orbitals::get_num_molecular_orbitals() const {
   if (_coefficients.first) {
     return _coefficients.first->cols();
   }
   return 0;
 }
 
-size_t Orbitals::get_num_aos() const {
+size_t Orbitals::get_num_atomic_orbitals() const {
   if (_coefficients.first) {
     return _coefficients.first->rows();
   }
@@ -623,8 +623,8 @@ size_t Orbitals::get_num_aos() const {
 }
 
 std::vector<size_t> Orbitals::get_all_mo_indices() const {
-  const size_t num_mos = get_num_mos();
-  std::vector<size_t> indices(num_mos);
+  const size_t num_molecular_orbitals = get_num_molecular_orbitals();
+  std::vector<size_t> indices(num_molecular_orbitals);
   std::iota(indices.begin(), indices.end(), 0);
   return indices;
 }
@@ -799,8 +799,8 @@ bool Orbitals::_is_valid() const {
 
 std::string Orbitals::get_summary() const {
   std::string summary = "Orbitals Summary:\n";
-  summary += "  AOs: " + std::to_string(get_num_aos()) + "\n";
-  summary += "  MOs: " + std::to_string(get_num_mos()) + "\n";
+  summary += "  AOs: " + std::to_string(get_num_atomic_orbitals()) + "\n";
+  summary += "  MOs: " + std::to_string(get_num_molecular_orbitals()) + "\n";
 
   summary += "  Type: " +
              std::string(is_restricted() ? "Restricted" : "Unrestricted") +
@@ -964,17 +964,17 @@ void Orbitals::to_hdf5(H5::Group& group) const {
     type_attr.write(string_type, type_name);
 
     // Save essential metadata that can't be computed from data
-    unsigned num_aos = get_num_aos();
-    unsigned num_mos = get_num_mos();
+    unsigned num_atomic_orbitals = get_num_atomic_orbitals();
+    unsigned num_molecular_orbitals = get_num_molecular_orbitals();
     bool restricted = is_restricted();
 
     H5::DataSet aos_dataset = metadata_group.createDataSet(
-        "num_aos", H5::PredType::NATIVE_UINT, scalar_space);
-    aos_dataset.write(&num_aos, H5::PredType::NATIVE_UINT);
+        "num_atomic_orbitals", H5::PredType::NATIVE_UINT, scalar_space);
+    aos_dataset.write(&num_atomic_orbitals, H5::PredType::NATIVE_UINT);
 
     H5::DataSet mos_dataset = metadata_group.createDataSet(
-        "num_mos", H5::PredType::NATIVE_UINT, scalar_space);
-    mos_dataset.write(&num_mos, H5::PredType::NATIVE_UINT);
+        "num_molecular_orbitals", H5::PredType::NATIVE_UINT, scalar_space);
+    mos_dataset.write(&num_molecular_orbitals, H5::PredType::NATIVE_UINT);
 
     H5::DataSet restricted_dataset = metadata_group.createDataSet(
         "is_restricted", H5::PredType::NATIVE_HBOOL, scalar_space);
@@ -1176,8 +1176,8 @@ nlohmann::json Orbitals::to_json() const {
   j["type"] = "Orbitals";
 
   // Save metadata
-  j["num_aos"] = get_num_aos();
-  j["num_mos"] = get_num_mos();
+  j["num_atomic_orbitals"] = get_num_atomic_orbitals();
+  j["num_molecular_orbitals"] = get_num_molecular_orbitals();
   j["is_restricted"] = is_restricted();
   j["has_overlap_matrix"] = has_overlap_matrix();
 
@@ -1318,22 +1318,21 @@ std::shared_ptr<Orbitals> Orbitals::from_json(const nlohmann::json& j) {
 
 void Orbitals::_save_metadata_to_hdf5(H5::H5File& file) const {
   // Extract metadata
-  unsigned num_aos = get_num_aos();
-  unsigned num_mos = get_num_mos();
+  unsigned num_atomic_orbitals = get_num_atomic_orbitals();
+  unsigned num_molecular_orbitals = get_num_molecular_orbitals();
   bool restricted = is_restricted();
   bool has_overlap = has_overlap_matrix();
   bool has_basis = has_basis_set();
 
   // Call the generic function
-  _save_orbital_metadata_to_hdf5(file, num_aos, num_mos, restricted,
+  _save_orbital_metadata_to_hdf5(file, num_atomic_orbitals,
+                                 num_molecular_orbitals, restricted,
                                  has_overlap, has_basis);
 }
 
-void Orbitals::_save_orbital_metadata_to_hdf5(H5::H5File& file, size_t num_aos,
-                                              size_t num_mos,
-                                              bool is_restricted,
-                                              bool has_overlap_matrix,
-                                              bool has_basis_set) {
+void Orbitals::_save_orbital_metadata_to_hdf5(
+    H5::H5File& file, size_t num_atomic_orbitals, size_t num_molecular_orbitals,
+    bool is_restricted, bool has_overlap_matrix, bool has_basis_set) {
   // Create metadata group
   H5::Group metadata_group = file.createGroup("metadata");
 
@@ -1341,12 +1340,12 @@ void Orbitals::_save_orbital_metadata_to_hdf5(H5::H5File& file, size_t num_aos,
   H5::DataSpace scalar_space;
 
   H5::DataSet aos_dataset = metadata_group.createDataSet(
-      "num_aos", H5::PredType::NATIVE_UINT, scalar_space);
-  aos_dataset.write(&num_aos, H5::PredType::NATIVE_UINT);
+      "num_atomic_orbitals", H5::PredType::NATIVE_UINT, scalar_space);
+  aos_dataset.write(&num_atomic_orbitals, H5::PredType::NATIVE_UINT);
 
   H5::DataSet mos_dataset = metadata_group.createDataSet(
-      "num_mos", H5::PredType::NATIVE_UINT, scalar_space);
-  mos_dataset.write(&num_mos, H5::PredType::NATIVE_UINT);
+      "num_molecular_orbitals", H5::PredType::NATIVE_UINT, scalar_space);
+  mos_dataset.write(&num_molecular_orbitals, H5::PredType::NATIVE_UINT);
 
   // Save boolean flags
   H5::DataSet restricted_dataset = metadata_group.createDataSet(
@@ -1655,24 +1654,28 @@ Eigen::MatrixXd ModelOrbitals::calculate_ao_density_matrix_from_rdm(
 // MO overlap methods return identity matrices for model systems
 std::tuple<Eigen::MatrixXd, Eigen::MatrixXd, Eigen::MatrixXd>
 ModelOrbitals::get_mo_overlap() const {
-  const size_t num_mos = get_num_mos();
-  Eigen::MatrixXd identity = Eigen::MatrixXd::Identity(num_mos, num_mos);
+  const size_t num_molecular_orbitals = get_num_molecular_orbitals();
+  Eigen::MatrixXd identity =
+      Eigen::MatrixXd::Identity(num_molecular_orbitals, num_molecular_orbitals);
   return std::make_tuple(identity, identity, identity);
 }
 
 Eigen::MatrixXd ModelOrbitals::get_mo_overlap_alpha_alpha() const {
-  const size_t num_mos = get_num_mos();
-  return Eigen::MatrixXd::Identity(num_mos, num_mos);
+  const size_t num_molecular_orbitals = get_num_molecular_orbitals();
+  return Eigen::MatrixXd::Identity(num_molecular_orbitals,
+                                   num_molecular_orbitals);
 }
 
 Eigen::MatrixXd ModelOrbitals::get_mo_overlap_alpha_beta() const {
-  const size_t num_mos = get_num_mos();
-  return Eigen::MatrixXd::Identity(num_mos, num_mos);
+  const size_t num_molecular_orbitals = get_num_molecular_orbitals();
+  return Eigen::MatrixXd::Identity(num_molecular_orbitals,
+                                   num_molecular_orbitals);
 }
 
 Eigen::MatrixXd ModelOrbitals::get_mo_overlap_beta_beta() const {
-  const size_t num_mos = get_num_mos();
-  return Eigen::MatrixXd::Identity(num_mos, num_mos);
+  const size_t num_molecular_orbitals = get_num_molecular_orbitals();
+  return Eigen::MatrixXd::Identity(num_molecular_orbitals,
+                                   num_molecular_orbitals);
 }
 
 std::vector<size_t> ModelOrbitals::get_all_mo_indices() const {

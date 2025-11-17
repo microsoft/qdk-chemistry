@@ -35,6 +35,3 @@ USER $USERNAME
 
 # Setup bash prompt
 RUN echo 'export PS1="\033[1;34m\]\u@prepq-dev:\w$ \[\033[0m\]"' >> ~/.bashrc
-
-# Working directory
-WORKDIR /workspace

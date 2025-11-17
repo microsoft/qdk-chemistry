@@ -138,9 +138,9 @@ std::pair<double, std::shared_ptr<data::Wavefunction>> ScfSolver::_run_impl(
       *qdk_basis_set, *scf->context().basis_set_raw);
 
   // Compute the transformation matrix
-  const size_t nbf = qdk_basis_set->get_num_basis_functions();
+  const size_t num_basis_funcs = qdk_basis_set->get_num_basis_functions();
   auto shells = qdk_basis_set->get_shells();
-  Eigen::MatrixXd qdk_basis_map(nbf, nbf);
+  Eigen::MatrixXd qdk_basis_map(num_basis_funcs, num_basis_funcs);
   qdk_basis_map.setZero();
 
   // Convert internal to libint2 basis
@@ -168,7 +168,7 @@ std::pair<double, std::shared_ptr<data::Wavefunction>> ScfSolver::_run_impl(
     auto [n_alpha, n_beta] =
         calculate_electron_counts(nuclear_charge, charge, multiplicity);
 
-    const size_t nao = coeff_alpha.rows();
+    const size_t num_atomic_orbitals = coeff_alpha.rows();
 
     // Compute density matrix from MO coefficients
     qcs::RowMajorMatrix density_matrix;
@@ -176,7 +176,7 @@ std::pair<double, std::shared_ptr<data::Wavefunction>> ScfSolver::_run_impl(
     if (unrestricted) {
       // For unrestricted case, stack alpha and beta coefficients and compute
       // density
-      const size_t nmo = coeff_alpha.cols();
+      const size_t num_molecular_orbitals = coeff_alpha.cols();
 
       // Transform coefficients
       Eigen::MatrixXd C_alpha_transformed =
@@ -184,32 +184,40 @@ std::pair<double, std::shared_ptr<data::Wavefunction>> ScfSolver::_run_impl(
       Eigen::MatrixXd C_beta_transformed =
           qdk_basis_map.transpose() * coeff_beta;
 
-      // Initialize density matrix for unrestricted case (2 * nao * nao)
-      density_matrix = qcs::RowMajorMatrix::Zero(2 * nao, nao);
+      // Initialize density matrix for unrestricted case (2 *
+      // num_atomic_orbitals * num_atomic_orbitals)
+      density_matrix = qcs::RowMajorMatrix::Zero(2 * num_atomic_orbitals,
+                                                 num_atomic_orbitals);
 
       // Alpha density matrix
-      Eigen::Map<qcs::RowMajorMatrix> P_alpha(density_matrix.data(), nao, nao);
+      Eigen::Map<qcs::RowMajorMatrix> P_alpha(
+          density_matrix.data(), num_atomic_orbitals, num_atomic_orbitals);
       P_alpha.noalias() =
-          C_alpha_transformed.block(0, 0, nao, n_alpha) *
-          C_alpha_transformed.block(0, 0, nao, n_alpha).transpose();
+          C_alpha_transformed.block(0, 0, num_atomic_orbitals, n_alpha) *
+          C_alpha_transformed.block(0, 0, num_atomic_orbitals, n_alpha)
+              .transpose();
 
       // Beta density matrix
-      Eigen::Map<qcs::RowMajorMatrix> P_beta(density_matrix.data() + nao * nao,
-                                             nao, nao);
+      Eigen::Map<qcs::RowMajorMatrix> P_beta(
+          density_matrix.data() + num_atomic_orbitals * num_atomic_orbitals,
+          num_atomic_orbitals, num_atomic_orbitals);
       P_beta.noalias() =
-          C_beta_transformed.block(0, 0, nao, n_beta) *
-          C_beta_transformed.block(0, 0, nao, n_beta).transpose();
+          C_beta_transformed.block(0, 0, num_atomic_orbitals, n_beta) *
+          C_beta_transformed.block(0, 0, num_atomic_orbitals, n_beta)
+              .transpose();
     } else {
       // For restricted case, use alpha coefficients only
       Eigen::MatrixXd C_transformed = qdk_basis_map.transpose() * coeff_alpha;
 
-      // Initialize density matrix for restricted case (nao * nao)
-      density_matrix = qcs::RowMajorMatrix::Zero(nao, nao);
+      // Initialize density matrix for restricted case (num_atomic_orbitals *
+      // num_atomic_orbitals)
+      density_matrix =
+          qcs::RowMajorMatrix::Zero(num_atomic_orbitals, num_atomic_orbitals);
 
       // Density matrix = 2 * C_occ * C_occ^T for restricted case
       density_matrix.noalias() =
-          2.0 * C_transformed.block(0, 0, nao, n_alpha) *
-          C_transformed.block(0, 0, nao, n_alpha).transpose();
+          2.0 * C_transformed.block(0, 0, num_atomic_orbitals, n_alpha) *
+          C_transformed.block(0, 0, num_atomic_orbitals, n_alpha).transpose();
     }
 
     // Create new SCF solver with density matrix
@@ -244,10 +252,15 @@ std::pair<double, std::shared_ptr<data::Wavefunction>> ScfSolver::_run_impl(
   if (unrestricted) {
     // Unrestricted case - store matrices first to avoid temporaries
     const auto& C_full = scf->get_orbitals_matrix();
-    const size_t nao = C_full.rows() / 2;
-    const size_t nmo = C_full.cols();
-    Eigen::MatrixXd C_alpha = qdk_basis_map * C_full.block(0, 0, nao, nmo);
-    Eigen::MatrixXd C_beta = qdk_basis_map * C_full.block(nao, 0, nao, nmo);
+    const size_t num_atomic_orbitals = C_full.rows() / 2;
+    const size_t num_molecular_orbitals = C_full.cols();
+    Eigen::MatrixXd C_alpha =
+        qdk_basis_map *
+        C_full.block(0, 0, num_atomic_orbitals, num_molecular_orbitals);
+    Eigen::MatrixXd C_beta =
+        qdk_basis_map * C_full.block(num_atomic_orbitals, 0,
+                                     num_atomic_orbitals,
+                                     num_molecular_orbitals);
 
     const auto& eps = scf->get_eigenvalues();
     Eigen::VectorXd energies_alpha = eps.row(0);
@@ -278,7 +291,7 @@ std::pair<double, std::shared_ptr<data::Wavefunction>> ScfSolver::_run_impl(
   }
 
   // Create canonical Hartree-Fock Configuration
-  size_t n_orbitals = orbitals->get_num_mos();
+  size_t n_orbitals = orbitals->get_num_molecular_orbitals();
 
   // Create canonical HF configuration string
   std::string config_str(n_orbitals, '0');

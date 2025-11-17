@@ -8,7 +8,7 @@
 import numpy as np
 import pytest
 
-import qdk.chemistry.data
+from qdk_chemistry.data import CoupledClusterAmplitudes, Orbitals
 
 from .reference_tolerances import float_comparison_absolute_tolerance, float_comparison_relative_tolerance
 from .test_helpers import create_test_basis_set
@@ -26,7 +26,7 @@ def test_coupled_cluster_construction():
     # Create basis set
     basis_set = create_test_basis_set(2)
 
-    orb = qdk.chemistry.data.Orbitals(coeffs, energies, ao_overlap, basis_set)
+    orb = Orbitals(coeffs, energies, ao_overlap, basis_set)
 
     # Create T1 and T2 amplitudes
     # For restricted case with 1 occupied, 1 virtual orbital:
@@ -37,7 +37,7 @@ def test_coupled_cluster_construction():
 
     # Create CoupledClusterAmplitudes with data
     # For 1 alpha and 1 beta electron (restricted case)
-    cc = qdk.chemistry.data.CoupledClusterAmplitudes(orb, t1_amplitudes, t2_amplitudes, 1, 1)
+    cc = CoupledClusterAmplitudes(orb, t1_amplitudes, t2_amplitudes, 1, 1)
 
     # Verify data is stored correctly
     assert cc.has_t1_amplitudes()
@@ -58,7 +58,7 @@ def test_coupled_cluster_construction():
     )
 
     # Test copy constructor
-    cc2 = qdk.chemistry.data.CoupledClusterAmplitudes(cc)
+    cc2 = CoupledClusterAmplitudes(cc)
 
     assert cc2.has_t1_amplitudes()
     assert cc2.has_t2_amplitudes()
@@ -89,7 +89,7 @@ def test_coupled_cluster_orbital_indices():
     # Create basis set
     basis_set = create_test_basis_set(3)
 
-    orb = qdk.chemistry.data.Orbitals(coeffs, energies, ao_overlap, basis_set)
+    orb = Orbitals(coeffs, energies, ao_overlap, basis_set)
 
     # Create CoupledClusterAmplitudes object
     # For restricted case with 2 occupied, 1 virtual:
@@ -98,7 +98,7 @@ def test_coupled_cluster_orbital_indices():
     # T2 size should be (no * nv)^2 = (2 * 1)^2 = 4
     t2_amplitudes = np.array([0.001, 0.002, 0.003, 0.004])
 
-    cc = qdk.chemistry.data.CoupledClusterAmplitudes(orb, t1_amplitudes, t2_amplitudes, 2, 2)
+    cc = CoupledClusterAmplitudes(orb, t1_amplitudes, t2_amplitudes, 2, 2)
 
     # Test getting occupied counts
     alpha_occ_count, beta_occ_count = cc.get_num_occupied()
@@ -127,11 +127,11 @@ def test_coupled_cluster_indices_validation():
     # Create basis set
     basis_set = create_test_basis_set(4)
 
-    orb = qdk.chemistry.data.Orbitals(coeffs, energies, ao_overlap, basis_set)
+    orb = Orbitals(coeffs, energies, ao_overlap, basis_set)
 
     # Should fail validation due to non-adjacent indices
     with pytest.raises(ValueError, match="Invalid T1 amplitudes dimension"):
-        qdk.chemistry.data.CoupledClusterAmplitudes(orb, t1_amplitudes, t2_amplitudes, 3, 3)
+        CoupledClusterAmplitudes(orb, t1_amplitudes, t2_amplitudes, 3, 3)
 
     # Test case 2: Unsorted energies
     coeffs2 = np.array([[0.9, 0.1, 0.0], [0.1, 0.8, 0.2], [0.0, 0.1, 0.9]])
@@ -145,11 +145,11 @@ def test_coupled_cluster_indices_validation():
     # Create basis set
     basis_set2 = create_test_basis_set(3)
 
-    orb2 = qdk.chemistry.data.Orbitals(coeffs2, unsorted_energies, ao_overlap2, basis_set2)
+    orb2 = Orbitals(coeffs2, unsorted_energies, ao_overlap2, basis_set2)
 
     # Should fail validation due to unsorted energies
     with pytest.raises(RuntimeError, match="energies"):
-        qdk.chemistry.data.CoupledClusterAmplitudes(orb2, t1_amplitudes, t2_amplitudes, 2, 2)
+        CoupledClusterAmplitudes(orb2, t1_amplitudes, t2_amplitudes, 2, 2)
 
 
 def test_coupled_cluster_amplitude_dimensions():
@@ -164,7 +164,7 @@ def test_coupled_cluster_amplitude_dimensions():
     # Create basis set
     basis_set = create_test_basis_set(3)
 
-    orb = qdk.chemistry.data.Orbitals(coeffs, energies, ao_overlap, basis_set)
+    orb = Orbitals(coeffs, energies, ao_overlap, basis_set)
 
     # For restricted case with 2 occupied, 1 virtual orbitals:
     # T1 size should be no * nv = 2 * 1 = 2
@@ -173,11 +173,11 @@ def test_coupled_cluster_amplitude_dimensions():
     valid_t2 = np.array([0.001, 0.002, 0.003, 0.004])
 
     # Test that valid dimensions work
-    cc = qdk.chemistry.data.CoupledClusterAmplitudes(orb, valid_t1, valid_t2, 2, 2)
+    cc = CoupledClusterAmplitudes(orb, valid_t1, valid_t2, 2, 2)
     assert cc.has_t1_amplitudes()
     assert cc.has_t2_amplitudes()
 
     # Test invalid T1 dimensions
     invalid_t1_large = np.array([0.01, 0.02, 0.03])  # 3 elements instead of 2
     with pytest.raises(ValueError, match="Invalid T1 amplitudes dimension"):
-        qdk.chemistry.data.CoupledClusterAmplitudes(orb, invalid_t1_large, valid_t2, 2, 2)
+        CoupledClusterAmplitudes(orb, invalid_t1_large, valid_t2, 2, 2)

@@ -37,10 +37,10 @@ TREXIOFile::TREXIOFile(TREXIOFile&& other) noexcept {
 }
 
 int64_t TREXIOFile::read_mo_num() const {
-  int64_t nmo;
-  auto rc = trexio_read_mo_num_64(file_handle_, &nmo);
+  int64_t num_molecular_orbitals;
+  auto rc = trexio_read_mo_num_64(file_handle_, &num_molecular_orbitals);
   if (rc != TREXIO_SUCCESS) TREXIO_EXCEPTION(rc);
-  return nmo;
+  return num_molecular_orbitals;
 }
 
 int64_t TREXIOFile::read_mo_2e_int_eri_size() const {
@@ -125,8 +125,8 @@ void TREXIOFile::read_determinant_list(int64_t ndet, int64_t* dets,
   if (rc != TREXIO_SUCCESS) TREXIO_EXCEPTION(rc);
 }
 
-void TREXIOFile::write_mo_num(int64_t nmo) {
-  auto rc = trexio_write_mo_num_64(file_handle_, nmo);
+void TREXIOFile::write_mo_num(int64_t num_molecular_orbitals) {
+  auto rc = trexio_write_mo_num_64(file_handle_, num_molecular_orbitals);
   if (rc != TREXIO_SUCCESS) TREXIO_EXCEPTION(rc);
 }
 

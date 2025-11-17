@@ -8,8 +8,8 @@
 import numpy as np
 import pytest
 
-from qdk.chemistry import algorithms
-from qdk.chemistry.algorithms import (
+from qdk_chemistry import algorithms
+from qdk_chemistry.algorithms import (
     ActiveSpaceSelector,
     CoupledClusterCalculator,
     HamiltonianConstructor,
@@ -19,8 +19,9 @@ from qdk.chemistry.algorithms import (
     ProjectedMultiConfigurationCalculator,
     ScfSolver,
     StabilityChecker,
+    StatePreparation,
 )
-from qdk.chemistry.data import (
+from qdk_chemistry.data import (
     Ansatz,
     CasWavefunctionContainer,
     Configuration,
@@ -149,13 +150,13 @@ class MockHamiltonianConstructor(HamiltonianConstructor):
         # Simple test implementation - create basic Hamiltonian
 
         # Use valid orbitals or create test ones
-        if orbitals.get_num_mos() == 0:
+        if orbitals.get_num_molecular_orbitals() == 0:
             # Create minimal valid orbitals for testing
             coeffs = np.eye(2)  # 2x2 identity matrix
             energies = np.array([0.0, 1.0])
             orbitals = Orbitals(coeffs, np.array([2.0, 0.0]), energies)
 
-        size = orbitals.get_num_mos() if orbitals.get_num_mos() > 0 else 2
+        size = orbitals.get_num_molecular_orbitals() if orbitals.get_num_molecular_orbitals() > 0 else 2
 
         # Create identity matrices for one-body and two-body integrals
         one_body = np.eye(size)
@@ -198,6 +199,23 @@ class MockScfSolver(ScfSolver):
         return "mock_scf_solver"
 
 
+class MockStatePreparation(StatePreparation):
+    def __init__(self):
+        super().__init__()
+        self._settings = Settings()
+        self._settings._set_default("test_parameter", "string", "")
+        self._settings._set_default("numeric_param", "double", 0.0)
+        self._settings._set_default("list_param", "vector<int>", [])
+
+    def _run_impl(self, _) -> str:
+        """A simple test implementation of the prepare_state method."""
+        return "mock_circuit_representation"
+
+    def name(self) -> str:
+        """Return the algorithm name."""
+        return "mock_state_preparation"
+
+
 class MockActiveSpaceSelector(ActiveSpaceSelector):
     def __init__(self):
         super().__init__()
@@ -215,7 +233,14 @@ class MockActiveSpaceSelector(ActiveSpaceSelector):
         # Simple test implementation - return first few orbital indices
         num_active = self._settings.get_or_default("num_active_orbitals", 4)
         orbitals = wavefunction.get_orbitals()
-        indices = list(range(min(num_active, orbitals.get_num_mos() if orbitals.get_num_mos() > 0 else num_active)))
+        indices = list(
+            range(
+                min(
+                    num_active,
+                    orbitals.get_num_molecular_orbitals() if orbitals.get_num_molecular_orbitals() > 0 else num_active,
+                )
+            )
+        )
         # Create a new orbitals object with active space data
         coeffs_data = orbitals.get_coefficients()
         energies_data = orbitals.get_energies() if orbitals.get_energies() is not None else None
@@ -313,10 +338,10 @@ class MockCoupledClusterCalculator(CoupledClusterCalculator):
         # T2 size = (num_occupied * num_virtual)^2 = (1 * 1)^2 = 1
         t2 = np.array([0.005])
 
-        num_alpha_occ, num_beta_occ = ansatz.get_wavefunction().get_total_num_electrons()
+        num_alpha, num_beta = ansatz.get_wavefunction().get_total_num_electrons()
 
         # Create a dummy coupled cluster result
-        cc = CoupledClusterAmplitudes(orbs, t1, t2, num_alpha_occ, num_beta_occ)
+        cc = CoupledClusterAmplitudes(orbs, t1, t2, num_alpha, num_beta)
 
         # Return energy and coupled cluster amplitudes object
         return -10.0, cc
@@ -362,7 +387,7 @@ class TestAlgorithmClasses:
         """Create a test ansatz."""
         # Create a hamiltonian using the same orbitals as the wavefunction
         orbitals = test_wavefunction.get_orbitals()
-        num_orbitals = orbitals.get_num_mos()
+        num_orbitals = orbitals.get_num_molecular_orbitals()
 
         # Create simple one and two body integrals
         one_body = np.eye(num_orbitals)
@@ -412,6 +437,22 @@ class TestAlgorithmClasses:
         energy, result = pmc_calc.run(h, configurations)
         assert isinstance(energy, float)
         assert isinstance(result, Wavefunction)
+
+    def test_state_prep_inheritance(self):
+        """Test that StatePreparation can be inherited from Python."""
+        # Create instance
+        state_prep = MockStatePreparation()
+        assert isinstance(state_prep, StatePreparation)
+
+        # Test settings method
+        settings = state_prep.settings()
+        assert isinstance(settings, Settings)
+
+        # Test prepare_state method
+        wavefunction = Wavefunction(SlaterDeterminantContainer(Configuration("20"), create_test_orbitals(2)))
+        circuit = state_prep.run(wavefunction)
+        assert isinstance(circuit, str)
+        assert circuit == "mock_circuit_representation"
 
     def test_hamiltonian_constructor_inheritance(self):
         """Test that HamiltonianConstructor can be inherited from Python."""
@@ -663,6 +704,26 @@ class TestAlgorithmClasses:
         calculator = algorithms.create("projected_multi_configuration_calculator", key)
         assert isinstance(calculator, MockProjectedMultiConfigurationCalculator)
 
+    def test_state_preparation_registration(self):
+        """Test that State Preparation can be registered and used."""
+
+        def _test_register_state_preparation():
+            """Dummy function to simulate registration."""
+            return MockStatePreparation()
+
+        # Register the state preparation
+        key = "mock_state_preparation"
+        algorithms.register(_test_register_state_preparation)
+
+        # Verify registration worked
+        assert key in algorithms.available("state_prep")
+
+        # Test that the correct instance is created
+        state_prep = algorithms.create("state_prep", key)
+        assert isinstance(state_prep, MockStatePreparation)
+
+        algorithms.unregister("state_prep", key)  # Clean up after test
+
     def test_active_space_selector_registration(self):
         """Test that Active Space Selector can be registered and used."""
 
@@ -728,6 +789,7 @@ class TestAlgorithmClasses:
         selector = MockActiveSpaceSelector()
         mcscf = MockMultiConfigurationScf()
         cc = MockCoupledClusterCalculator()
+        sp = MockStatePreparation()
 
         # Test that repr works (exact string may vary)
         assert "MultiConfigurationCalculator" in repr(mc)
@@ -736,6 +798,7 @@ class TestAlgorithmClasses:
         assert "ActiveSpaceSelector" in repr(selector)
         assert "MultiConfigurationScf" in repr(mcscf)
         assert "CoupledClusterCalculator" in repr(cc)
+        assert "StatePreparation" in repr(sp)
 
     def test_settings_interface(self):
         """Test that all algorithms provide settings interface."""
@@ -747,6 +810,7 @@ class TestAlgorithmClasses:
             | MockActiveSpaceSelector
             | MockMultiConfigurationScf
             | MockCoupledClusterCalculator
+            | MockStatePreparation
         ] = [
             MockMultiConfigurationCalculator(),
             MockHamiltonianConstructor(),
@@ -754,6 +818,7 @@ class TestAlgorithmClasses:
             MockActiveSpaceSelector(),
             MockMultiConfigurationScf(),
             MockCoupledClusterCalculator(),
+            MockStatePreparation(),
         ]
 
         for alg in algorithms:
@@ -795,6 +860,11 @@ class TestAlgorithmClasses:
         except TypeError:
             pass  # Would be expected behavior for abstract classes
 
+        try:
+            sp = StatePreparation()
+            assert sp is not None
+        except TypeError:
+            pass  # Would be expected behavior for abstract classes
         try:
             selector = ActiveSpaceSelector()
             assert selector is not None

@@ -239,12 +239,12 @@ Configuration Wavefunction::get_total_determinant(
   const auto& active_indices = alpha_active;
   const auto& virtual_indices = alpha_virtual;
 
-  size_t num_mos = orbitals->get_num_mos();
-  std::string total_str(num_mos, '0');
+  size_t num_molecular_orbitals = orbitals->get_num_molecular_orbitals();
+  std::string total_str(num_molecular_orbitals, '0');
 
   // Fill inactive orbitals as doubly occupied
   for (size_t idx : inactive_indices) {
-    if (idx < num_mos) {
+    if (idx < num_molecular_orbitals) {
       total_str[idx] = '2';
     }
   }
@@ -254,7 +254,7 @@ Configuration Wavefunction::get_total_determinant(
   for (size_t i = 0; i < active_indices.size() && i < active_str.length();
        ++i) {
     size_t idx = active_indices[i];
-    if (idx < num_mos) {
+    if (idx < num_molecular_orbitals) {
       total_str[idx] = active_str[i];
     }
   }
@@ -535,7 +535,7 @@ std::string Wavefunction::get_summary() const {
       << "\n";
 
   if (auto orbitals = get_orbitals()) {
-    oss << "  Orbitals: " << orbitals->get_num_mos() << " MOs, "
+    oss << "  Orbitals: " << orbitals->get_num_molecular_orbitals() << " MOs, "
         << (orbitals->is_restricted() ? "restricted" : "unrestricted");
   } else {
     oss << "  Orbitals: none";

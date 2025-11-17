@@ -773,7 +773,7 @@ TEST_F(MacisAsciTest, MacisCasDifferentActiveSizes) {
   auto hamiltonian_constructor = HamiltonianConstructorFactory::create();
   auto hamiltonian = hamiltonian_constructor->run(orbitals_small);
 
-  // This should exercise dispatch_by_norb with nmo=2
+  // This should exercise dispatch_by_norb with num_molecular_orbitals=2
   try {
     auto result = calculator->run(hamiltonian, 2, 2);
     EXPECT_TRUE(std::isfinite(result.first));

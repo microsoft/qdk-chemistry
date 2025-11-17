@@ -95,16 +95,17 @@ TEST_F(LocalizationTest, WaterPipekMezey) {
   const auto& S = orbitals->get_overlap_matrix();
   const auto& [Ca_can, Cb_can] = orbitals->get_coefficients();
 
-  const size_t nocc = wfn->get_total_num_electrons().first;
+  const size_t num_occupied_orbitals = wfn->get_total_num_electrons().first;
 
   // Test selected indices
 
   // Localize occupied and virtual orbitals separately
   std::vector<size_t> occ_indices, virt_indices;
-  for (unsigned i = 0; i < nocc; ++i) {
+  for (unsigned i = 0; i < num_occupied_orbitals; ++i) {
     occ_indices.push_back(i);
   }
-  for (unsigned i = nocc; i < orbitals->get_num_mos(); ++i) {
+  for (unsigned i = num_occupied_orbitals;
+       i < orbitals->get_num_molecular_orbitals(); ++i) {
     virt_indices.push_back(i);
   }
 
@@ -172,8 +173,8 @@ TEST_F(LocalizationTest, O2TripletPipekMezey) {
 
   // Get dimensions
   const auto [_na, _nb] = wfn->get_total_num_electrons();
-  const size_t nocc_alpha = std::round(_na);
-  const size_t nocc_beta = std::round(_nb);
+  const size_t num_alpha = std::round(_na);
+  const size_t num_beta = std::round(_nb);
 
   // Test selected indices
 
@@ -181,16 +182,17 @@ TEST_F(LocalizationTest, O2TripletPipekMezey) {
   std::vector<size_t> occ_indices_alpha, virt_indices_alpha;
   std::vector<size_t> occ_indices_beta, virt_indices_beta;
 
-  for (unsigned i = 0; i < nocc_alpha; ++i) {
+  for (unsigned i = 0; i < num_alpha; ++i) {
     occ_indices_alpha.push_back(i);
   }
-  for (unsigned i = nocc_alpha; i < orbitals->get_num_mos(); ++i) {
+  for (unsigned i = num_alpha; i < orbitals->get_num_molecular_orbitals();
+       ++i) {
     virt_indices_alpha.push_back(i);
   }
-  for (unsigned i = 0; i < nocc_beta; ++i) {
+  for (unsigned i = 0; i < num_beta; ++i) {
     occ_indices_beta.push_back(i);
   }
-  for (unsigned i = nocc_beta; i < orbitals->get_num_mos(); ++i) {
+  for (unsigned i = num_beta; i < orbitals->get_num_molecular_orbitals(); ++i) {
     virt_indices_beta.push_back(i);
   }
 
@@ -363,7 +365,7 @@ TEST_F(LocalizationTest, MP2) {
   const auto& S = orbitals->get_overlap_matrix();
   const auto& [Ca_can, Cb_can] = orbitals->get_coefficients();
   const auto& [Ca_mp2, Cb_mp2] = mp2_orbitals.get_coefficients();
-  const size_t nocc = wfn->get_total_num_electrons().first;
+  const size_t num_occupied_orbitals = wfn->get_total_num_electrons().first;
 
   // Randomly choose indices to localize, then the transformation
   // should be unitary and localized orbitals should be orthonormal
@@ -609,14 +611,15 @@ TEST_F(LocalizationTest, WaterVVHV) {
   auto orbitals = wfn->get_orbitals();
   const auto& [Ca_can, Cb_can] = orbitals->get_coefficients();
 
-  const size_t nocc = wfn->get_total_num_electrons().first;
+  const size_t num_occupied_orbitals = wfn->get_total_num_electrons().first;
 
   // First localize occupied orbitals with Pipek-Mezey
   std::vector<size_t> occ_indices, virt_indices;
-  for (unsigned i = 0; i < nocc; ++i) {
+  for (unsigned i = 0; i < num_occupied_orbitals; ++i) {
     occ_indices.push_back(i);
   }
-  for (unsigned i = nocc; i < orbitals->get_num_mos(); ++i) {
+  for (unsigned i = num_occupied_orbitals;
+       i < orbitals->get_num_molecular_orbitals(); ++i) {
     virt_indices.push_back(i);
   }
 
@@ -654,23 +657,24 @@ TEST_F(LocalizationTest, O2TripletVVHV) {
 
   // Get dimensions
   const auto [_na, _nb] = wfn->get_total_num_electrons();
-  const size_t nocc_alpha = std::round(_na);
-  const size_t nocc_beta = std::round(_nb);
+  const size_t num_alpha = std::round(_na);
+  const size_t num_beta = std::round(_nb);
 
   // First localize occupied orbitals with Pipek-Mezey
   std::vector<size_t> occ_indices_alpha, virt_indices_alpha;
   std::vector<size_t> occ_indices_beta, virt_indices_beta;
 
-  for (unsigned i = 0; i < nocc_alpha; ++i) {
+  for (unsigned i = 0; i < num_alpha; ++i) {
     occ_indices_alpha.push_back(i);
   }
-  for (unsigned i = nocc_alpha; i < orbitals->get_num_mos(); ++i) {
+  for (unsigned i = num_alpha; i < orbitals->get_num_molecular_orbitals();
+       ++i) {
     virt_indices_alpha.push_back(i);
   }
-  for (unsigned i = 0; i < nocc_beta; ++i) {
+  for (unsigned i = 0; i < num_beta; ++i) {
     occ_indices_beta.push_back(i);
   }
-  for (unsigned i = nocc_beta; i < orbitals->get_num_mos(); ++i) {
+  for (unsigned i = num_beta; i < orbitals->get_num_molecular_orbitals(); ++i) {
     virt_indices_beta.push_back(i);
   }
 

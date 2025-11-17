@@ -18,19 +18,21 @@ void SCFImpl::polarizability_() {
   std::array<double, 9> polarizability;
 
 #ifdef QDK_CHEMISTRY_ENABLE_MPI
-  MPI_Bcast(P_.data(), ndm_ * n_ao_ * n_ao_, MPI_DOUBLE, 0, MPI_COMM_WORLD);
+  MPI_Bcast(P_.data(),
+            num_density_matrices_ * num_atomic_orbitals_ * num_atomic_orbitals_,
+            MPI_DOUBLE, 0, MPI_COMM_WORLD);
 #endif
 
   // Compute Dipole Integrals
-  RowMajorMatrix dipole(3 * n_ao_, n_ao_);
+  RowMajorMatrix dipole(3 * num_atomic_orbitals_, num_atomic_orbitals_);
   int1e_->dipole_integral(dipole.data());
 
-  const size_t nocca = nelec_[0];
-  const size_t nvira = n_mo_ - nocca;
-  const size_t nova = nocca * nvira;
-  const size_t noccb = nelec_[1];
-  const size_t nvirb = n_mo_ - noccb;
-  const size_t novb = noccb * nvirb;
+  const size_t num_alpha = nelec_[0];
+  const size_t num_alpha_virtual_orbitals = num_molecular_orbitals_ - num_alpha;
+  const size_t nova = num_alpha * num_alpha_virtual_orbitals;
+  const size_t num_beta = nelec_[1];
+  const size_t num_beta_virtual_orbitals = num_molecular_orbitals_ - num_beta;
+  const size_t novb = num_beta * num_beta_virtual_orbitals;
   size_t nov = nova;
   if (ctx_.cfg->unrestricted) nov = nova + novb;
 
@@ -41,14 +43,16 @@ void SCFImpl::polarizability_() {
   };
 
   const double* Ca_occ_ptr = C_.data();
-  const double* Ca_vir_ptr = Ca_occ_ptr + nocca;
-  const double* Cb_occ_ptr = Ca_occ_ptr + n_ao_ * n_mo_;
-  const double* Cb_vir_ptr = Cb_occ_ptr + noccb;
-  Eigen::MatrixXd temp(std::max(nocca, noccb), n_ao_);
+  const double* Ca_vir_ptr = Ca_occ_ptr + num_alpha;
+  const double* Cb_occ_ptr =
+      Ca_occ_ptr + num_atomic_orbitals_ * num_molecular_orbitals_;
+  const double* Cb_vir_ptr = Cb_occ_ptr + num_beta;
+  Eigen::MatrixXd temp(std::max(num_alpha, num_beta), num_atomic_orbitals_);
 
   // for each xyz-direction
   for (auto xyz_1d = 0; xyz_1d < 3; ++xyz_1d) {
-    const double* dipole_x_ptr = dipole.data() + xyz_1d * n_ao_ * n_ao_;
+    const double* dipole_x_ptr =
+        dipole.data() + xyz_1d * num_atomic_orbitals_ * num_atomic_orbitals_;
     Eigen::VectorXd R_vec(nov);
     Eigen::VectorXd X_vec = Eigen::VectorXd::Zero(nov);
 
@@ -57,18 +61,26 @@ void SCFImpl::polarizability_() {
                    xyz_1d);  // forming R^x = u_ai
 
       // R_{ia} = \Sum_{uv} C_{ui} Dipole_{uv} C_{av}
-      // (C is row-major, temp matrix is column-major, R_vec has nvira as
-      // fast-index)
-      blas::gemm("N", "N", nocca, n_ao_, n_ao_, 1.0, Ca_occ_ptr, n_mo_,
-                 dipole_x_ptr, n_ao_, 0.0, temp.data(), nocca);
-      blas::gemm("N", "T", nvira, nocca, n_ao_, 1.0, Ca_vir_ptr, n_mo_,
-                 temp.data(), nocca, 0.0, R_vec.data(), nvira);
+      // (C is row-major, temp matrix is column-major, R_vec has
+      // num_alpha_virtual_orbitals as fast-index)
+      blas::gemm("N", "N", num_alpha, num_atomic_orbitals_,
+                 num_atomic_orbitals_, 1.0, Ca_occ_ptr, num_molecular_orbitals_,
+                 dipole_x_ptr, num_atomic_orbitals_, 0.0, temp.data(),
+                 num_alpha);
+      blas::gemm("N", "T", num_alpha_virtual_orbitals, num_alpha,
+                 num_atomic_orbitals_, 1.0, Ca_vir_ptr, num_molecular_orbitals_,
+                 temp.data(), num_alpha, 0.0, R_vec.data(),
+                 num_alpha_virtual_orbitals);
 
       if (ctx_.cfg->unrestricted) {
-        blas::gemm("N", "N", noccb, n_ao_, n_ao_, 1.0, Cb_occ_ptr, n_mo_,
-                   dipole_x_ptr, n_ao_, 0.0, temp.data(), noccb);
-        blas::gemm("N", "T", nvirb, noccb, n_ao_, 1.0, Cb_vir_ptr, n_mo_,
-                   temp.data(), noccb, 0.0, R_vec.data() + nova, nvirb);
+        blas::gemm("N", "N", num_beta, num_atomic_orbitals_,
+                   num_atomic_orbitals_, 1.0, Cb_occ_ptr,
+                   num_molecular_orbitals_, dipole_x_ptr, num_atomic_orbitals_,
+                   0.0, temp.data(), num_beta);
+        blas::gemm("N", "T", num_beta_virtual_orbitals, num_beta,
+                   num_atomic_orbitals_, 1.0, Cb_vir_ptr,
+                   num_molecular_orbitals_, temp.data(), num_beta, 0.0,
+                   R_vec.data() + nova, num_beta_virtual_orbitals);
       }
     }
 
@@ -79,20 +91,27 @@ void SCFImpl::polarizability_() {
     // Form D_\mu\nu^x = \sum_{ia} (C_{\mu i} C_{\nu a} + C_{\nu i} C_{\mu a})
     // R^x_{ia}
     if (ctx_.cfg->mpi.world_rank == 0) {
-      RowMajorMatrix Dx(n_ao_, n_ao_);
-      blas::gemm("T", "N", nocca, n_ao_, nvira, 1.0, X_vec.data(), nvira,
-                 Ca_vir_ptr, n_mo_, 0.0, temp.data(), nocca);
-      blas::gemm("T", "N", n_ao_, n_ao_, nocca, 1.0, temp.data(), nocca,
-                 Ca_occ_ptr, n_mo_, 0.0, Dx.data(), n_ao_);
+      RowMajorMatrix Dx(num_atomic_orbitals_, num_atomic_orbitals_);
+      blas::gemm("T", "N", num_alpha, num_atomic_orbitals_,
+                 num_alpha_virtual_orbitals, 1.0, X_vec.data(),
+                 num_alpha_virtual_orbitals, Ca_vir_ptr,
+                 num_molecular_orbitals_, 0.0, temp.data(), num_alpha);
+      blas::gemm("T", "N", num_atomic_orbitals_, num_atomic_orbitals_,
+                 num_alpha, 1.0, temp.data(), num_alpha, Ca_occ_ptr,
+                 num_molecular_orbitals_, 0.0, Dx.data(), num_atomic_orbitals_);
       if (ctx_.cfg->unrestricted) {
-        blas::gemm("T", "N", noccb, n_ao_, nvirb, 1.0, X_vec.data() + nova,
-                   nvirb, Cb_vir_ptr, n_mo_, 0.0, temp.data(), noccb);
-        blas::gemm("T", "N", n_ao_, n_ao_, noccb, 1.0, temp.data(), noccb,
-                   Cb_occ_ptr, n_mo_, 1.0, Dx.data(), n_ao_);
+        blas::gemm("T", "N", num_beta, num_atomic_orbitals_,
+                   num_beta_virtual_orbitals, 1.0, X_vec.data() + nova,
+                   num_beta_virtual_orbitals, Cb_vir_ptr,
+                   num_molecular_orbitals_, 0.0, temp.data(), num_beta);
+        blas::gemm("T", "N", num_atomic_orbitals_, num_atomic_orbitals_,
+                   num_beta, 1.0, temp.data(), num_beta, Cb_occ_ptr,
+                   num_molecular_orbitals_, 1.0, Dx.data(),
+                   num_atomic_orbitals_);
       }
       // Symmetrize the matrix
-      for (size_t i = 0; i < n_ao_; ++i)
-        for (size_t j = i; j < n_ao_; ++j) {
+      for (size_t i = 0; i < num_atomic_orbitals_; ++i)
+        for (size_t j = i; j < num_atomic_orbitals_; ++j) {
           const auto symm_ij = Dx(i, j) + Dx(j, i);
           Dx(i, j) = symm_ij;
           Dx(j, i) = symm_ij;
@@ -100,8 +119,11 @@ void SCFImpl::polarizability_() {
 
       for (auto xyz_2d = 0; xyz_2d < 3; ++xyz_2d) {
         // polarizability^{xy} = \sum_{\mu\nu} d_\mu\nu^x D_\mu\nu^y
-        ctx_.result.scf_polarizability[xyz_1d * 3 + xyz_2d] = dot(
-            n_ao_ * n_ao_, dipole.data() + xyz_2d * n_ao_ * n_ao_, Dx.data());
+        ctx_.result.scf_polarizability[xyz_1d * 3 + xyz_2d] =
+            dot(num_atomic_orbitals_ * num_atomic_orbitals_,
+                dipole.data() +
+                    xyz_2d * num_atomic_orbitals_ * num_atomic_orbitals_,
+                Dx.data());
         if (!ctx_.cfg->unrestricted)
           ctx_.result.scf_polarizability[xyz_1d * 3 + xyz_2d] *= 2;
       }
@@ -133,19 +155,21 @@ void SCFImpl::polarizability_() {
 
 void SCFImpl::cpscf_(const double* R_input, double* X_sol) {
   AutoTimer __timer("polarizability:: cpscf");
-  const size_t nocca = nelec_[0];
-  const size_t nvira = n_mo_ - nocca;
-  const size_t nova = nocca * nvira;
-  const size_t noccb = nelec_[1];
-  const size_t nvirb = n_mo_ - noccb;
-  const size_t novb = noccb * nvirb;
+  const size_t num_alpha = nelec_[0];
+  const size_t num_alpha_virtual_orbitals = num_molecular_orbitals_ - num_alpha;
+  const size_t nova = num_alpha * num_alpha_virtual_orbitals;
+  const size_t num_beta = nelec_[1];
+  const size_t num_beta_virtual_orbitals = num_molecular_orbitals_ - num_beta;
+  const size_t novb = num_beta * num_beta_virtual_orbitals;
   size_t nov = nova;
   if (ctx_.cfg->unrestricted) nov = nova + novb;
 
   const double* Ca_occ_ptr = C_.data();
-  const double* Ca_vir_ptr = Ca_occ_ptr + nocca;
-  const double* Cb_occ_ptr = Ca_occ_ptr + (ndm_ - 1) * n_ao_ * n_mo_;
-  const double* Cb_vir_ptr = Cb_occ_ptr + noccb;
+  const double* Ca_vir_ptr = Ca_occ_ptr + num_alpha;
+  const double* Cb_occ_ptr = Ca_occ_ptr + (num_density_matrices_ - 1) *
+                                              num_atomic_orbitals_ *
+                                              num_molecular_orbitals_;
+  const double* Cb_vir_ptr = Cb_occ_ptr + num_beta;
 
 #ifdef QDK_CHEMISTRY_ENABLE_MPI
   int signal = 0;
@@ -160,8 +184,10 @@ void SCFImpl::cpscf_(const double* R_input, double* X_sol) {
 
       if (signal == 1) {
         // Receive the data, tP, from root
-        MPI_Bcast(tP_.data(), ndm_ * n_ao_ * n_ao_, MPI_DOUBLE, 0,
-                  MPI_COMM_WORLD);
+        MPI_Bcast(
+            tP_.data(),
+            num_density_matrices_ * num_atomic_orbitals_ * num_atomic_orbitals_,
+            MPI_DOUBLE, 0, MPI_COMM_WORLD);
         // This function computes the Fock matrix using the current density
         // matrix tP, and will bcast inside
         update_trial_fock_();
@@ -182,7 +208,7 @@ void SCFImpl::cpscf_(const double* R_input, double* X_sol) {
     settings.verbosity = ctx_.cfg->verbose > 3 ? ctx_.cfg->verbose - 3 : 0;
     // Shifts for GMRES (we use zero as we're not shifting)
     double shift = 0.0;
-    Eigen::MatrixXd temp(std::max(nocca, noccb), n_ao_);
+    Eigen::MatrixXd temp(std::max(num_alpha, num_beta), num_atomic_orbitals_);
 
     // Create a matrix operator for GMRES
     // This function computes Y = beta*Y + alpha*(A+B)*X
@@ -208,42 +234,54 @@ void SCFImpl::cpscf_(const double* R_input, double* X_sol) {
         double* Y_rhs = Y + rhs * LDY;
 
         // calculate orbital energy difference term
-        for (size_t i = 0; i < nocca; ++i)
-          for (size_t a = 0; a < nvira; ++a) {
-            Y_rhs[i * nvira + a] +=
-                alpha * (eigenvalues_(0, a + nocca) - eigenvalues_(0, i)) *
-                X_rhs[i * nvira + a];  // δij δab δστ (ϵaσ − ϵiτ )
+        for (size_t i = 0; i < num_alpha; ++i)
+          for (size_t a = 0; a < num_alpha_virtual_orbitals; ++a) {
+            Y_rhs[i * num_alpha_virtual_orbitals + a] +=
+                alpha * (eigenvalues_(0, a + num_alpha) - eigenvalues_(0, i)) *
+                X_rhs[i * num_alpha_virtual_orbitals +
+                      a];  // δij δab δστ (ϵaσ − ϵiτ )
           }
         if (ctx_.cfg->unrestricted) {
-          for (size_t i = 0; i < noccb; ++i)
-            for (size_t a = 0; a < nvirb; ++a)
-              Y_rhs[nova + i * nvirb + a] +=
-                  alpha * (eigenvalues_(1, a + noccb) - eigenvalues_(1, i)) *
-                  X_rhs[nova + i * nvirb + a];  // δij δab δστ (ϵaσ − ϵiτ )
+          for (size_t i = 0; i < num_beta; ++i)
+            for (size_t a = 0; a < num_beta_virtual_orbitals; ++a)
+              Y_rhs[nova + i * num_beta_virtual_orbitals + a] +=
+                  alpha * (eigenvalues_(1, a + num_beta) - eigenvalues_(1, i)) *
+                  X_rhs[nova + i * num_beta_virtual_orbitals +
+                        a];  // δij δab δστ (ϵaσ − ϵiτ )
         }
 
         // tP_{uv} = \sum_{ia}  R_{ia} (C_{ui} C_{av} + C_{vi} C_{au})
-        // R has nvira as fast-index, tP is symmetric
-        blas::gemm("T", "N", nocca, n_ao_, nvira, 1.0, X_rhs, nvira, Ca_vir_ptr,
-                   n_mo_, 0.0, temp.data(), nocca);
-        blas::gemm("T", "N", n_ao_, n_ao_, nocca, 1.0, temp.data(), nocca,
-                   Ca_occ_ptr, n_mo_, 0.0, tP_.data(), n_ao_);
-        for (size_t i = 0; i < n_ao_; ++i)
-          for (size_t j = i; j < n_ao_; ++j) {
+        // R has num_alpha_virtual_orbitals as fast-index, tP is symmetric
+        blas::gemm("T", "N", num_alpha, num_atomic_orbitals_,
+                   num_alpha_virtual_orbitals, 1.0, X_rhs,
+                   num_alpha_virtual_orbitals, Ca_vir_ptr,
+                   num_molecular_orbitals_, 0.0, temp.data(), num_alpha);
+        blas::gemm("T", "N", num_atomic_orbitals_, num_atomic_orbitals_,
+                   num_alpha, 1.0, temp.data(), num_alpha, Ca_occ_ptr,
+                   num_molecular_orbitals_, 0.0, tP_.data(),
+                   num_atomic_orbitals_);
+        for (size_t i = 0; i < num_atomic_orbitals_; ++i)
+          for (size_t j = i; j < num_atomic_orbitals_; ++j) {
             const auto symm_ij = tP_(i, j) + tP_(j, i);
             tP_(i, j) = symm_ij;
             tP_(j, i) = symm_ij;
           }
         if (ctx_.cfg->unrestricted) {
-          blas::gemm("T", "N", noccb, n_ao_, nvirb, 1.0, X_rhs + nova, nvirb,
-                     Cb_vir_ptr, n_mo_, 0.0, temp.data(), noccb);
-          blas::gemm("T", "N", n_ao_, n_ao_, noccb, 1.0, temp.data(), noccb,
-                     Cb_occ_ptr, n_mo_, 0.0, tP_.data() + n_ao_ * n_ao_, n_ao_);
-          for (size_t i = 0; i < n_ao_; ++i)
-            for (size_t j = i; j < n_ao_; ++j) {
-              const auto symm_ij = tP_(i + n_ao_, j) + tP_(j + n_ao_, i);
-              tP_(i + n_ao_, j) = symm_ij;
-              tP_(j + n_ao_, i) = symm_ij;
+          blas::gemm("T", "N", num_beta, num_atomic_orbitals_,
+                     num_beta_virtual_orbitals, 1.0, X_rhs + nova,
+                     num_beta_virtual_orbitals, Cb_vir_ptr,
+                     num_molecular_orbitals_, 0.0, temp.data(), num_beta);
+          blas::gemm("T", "N", num_atomic_orbitals_, num_atomic_orbitals_,
+                     num_beta, 1.0, temp.data(), num_beta, Cb_occ_ptr,
+                     num_molecular_orbitals_, 0.0,
+                     tP_.data() + num_atomic_orbitals_ * num_atomic_orbitals_,
+                     num_atomic_orbitals_);
+          for (size_t i = 0; i < num_atomic_orbitals_; ++i)
+            for (size_t j = i; j < num_atomic_orbitals_; ++j) {
+              const auto symm_ij = tP_(i + num_atomic_orbitals_, j) +
+                                   tP_(j + num_atomic_orbitals_, i);
+              tP_(i + num_atomic_orbitals_, j) = symm_ij;
+              tP_(j + num_atomic_orbitals_, i) = symm_ij;
             }
         }
 
@@ -255,8 +293,10 @@ void SCFImpl::cpscf_(const double* R_input, double* X_sol) {
           MPI_Bcast(&signal, 1, MPI_INT, 0, MPI_COMM_WORLD);
 
           // Broadcast data to workers
-          MPI_Bcast(tP_.data(), ndm_ * n_ao_ * n_ao_, MPI_DOUBLE, 0,
-                    MPI_COMM_WORLD);
+          MPI_Bcast(tP_.data(),
+                    num_density_matrices_ * num_atomic_orbitals_ *
+                        num_atomic_orbitals_,
+                    MPI_DOUBLE, 0, MPI_COMM_WORLD);
 
           // Root also performs computation
           update_trial_fock_();  // This function computes the Fock matrix using
@@ -269,16 +309,24 @@ void SCFImpl::cpscf_(const double* R_input, double* X_sol) {
         }
 
         // ABX_{ia} = \sum_{uv} C_{ui} F_{uv} C_{av}
-        blas::gemm("N", "N", nocca, n_ao_, n_ao_, 1.0, Ca_occ_ptr, n_mo_,
-                   tFock_.data(), n_ao_, 0.0, temp.data(), nocca);
-        blas::gemm("N", "T", nvira, nocca, n_ao_, alpha, Ca_vir_ptr, n_mo_,
-                   temp.data(), nocca, 1.0, Y_rhs, nvira);
+        blas::gemm("N", "N", num_alpha, num_atomic_orbitals_,
+                   num_atomic_orbitals_, 1.0, Ca_occ_ptr,
+                   num_molecular_orbitals_, tFock_.data(), num_atomic_orbitals_,
+                   0.0, temp.data(), num_alpha);
+        blas::gemm("N", "T", num_alpha_virtual_orbitals, num_alpha,
+                   num_atomic_orbitals_, alpha, Ca_vir_ptr,
+                   num_molecular_orbitals_, temp.data(), num_alpha, 1.0, Y_rhs,
+                   num_alpha_virtual_orbitals);
         if (ctx_.cfg->unrestricted) {
-          blas::gemm("N", "N", noccb, n_ao_, n_ao_, 1.0, Cb_occ_ptr, n_mo_,
-                     tFock_.data() + n_ao_ * n_ao_, n_ao_, 0.0, temp.data(),
-                     noccb);
-          blas::gemm("N", "T", nvirb, noccb, n_ao_, alpha, Cb_vir_ptr, n_mo_,
-                     temp.data(), noccb, 1.0, Y_rhs + nova, nvirb);
+          blas::gemm(
+              "N", "N", num_beta, num_atomic_orbitals_, num_atomic_orbitals_,
+              1.0, Cb_occ_ptr, num_molecular_orbitals_,
+              tFock_.data() + num_atomic_orbitals_ * num_atomic_orbitals_,
+              num_atomic_orbitals_, 0.0, temp.data(), num_beta);
+          blas::gemm("N", "T", num_beta_virtual_orbitals, num_beta,
+                     num_atomic_orbitals_, alpha, Cb_vir_ptr,
+                     num_molecular_orbitals_, temp.data(), num_beta, 1.0,
+                     Y_rhs + nova, num_beta_virtual_orbitals);
         }
       }
     };
@@ -295,22 +343,22 @@ void SCFImpl::cpscf_(const double* R_input, double* X_sol) {
         double* X_rhs = X + rhs * LDX;
 
         // Apply the preconditioner for each element of X
-        for (size_t i = 0; i < nocca; ++i)
-          for (size_t a = 0; a < nvira; ++a) {
+        for (size_t i = 0; i < num_alpha; ++i)
+          for (size_t a = 0; a < num_alpha_virtual_orbitals; ++a) {
             // Use orbital energy difference as preconditioner
             double energy_diff =
-                eigenvalues_(0, a + nocca) - eigenvalues_(0, i);
+                eigenvalues_(0, a + num_alpha) - eigenvalues_(0, i);
             // Avoid division by very small numbers
             if (std::abs(energy_diff) > 1e-12)
-              X_rhs[i * nvira + a] /= energy_diff;
+              X_rhs[i * num_alpha_virtual_orbitals + a] /= energy_diff;
           }
         if (ctx_.cfg->unrestricted) {
-          for (size_t i = 0; i < noccb; ++i)
-            for (size_t a = 0; a < nvirb; ++a) {
+          for (size_t i = 0; i < num_beta; ++i)
+            for (size_t a = 0; a < num_beta_virtual_orbitals; ++a) {
               double energy_diff =
-                  eigenvalues_(1, a + noccb) - eigenvalues_(1, i);
+                  eigenvalues_(1, a + num_beta) - eigenvalues_(1, i);
               if (std::abs(energy_diff) > 1e-12)
-                X_rhs[nova + i * nvirb + a] /= energy_diff;
+                X_rhs[nova + i * num_beta_virtual_orbitals + a] /= energy_diff;
             }
         }
       }
@@ -344,12 +392,18 @@ void SCFImpl::update_trial_fock_() {
   eri_->build_JK(tP_.data(), tJ_.data(), tK_.data(), alpha, beta, omega);
 
   if (ctx_.cfg->unrestricted) {
-    tFock_.block(0, 0, n_ao_, n_ao_) = tJ_.block(0, 0, n_ao_, n_ao_) +
-                                       tJ_.block(n_ao_, 0, n_ao_, n_ao_) -
-                                       tK_.block(0, 0, n_ao_, n_ao_);
-    tFock_.block(n_ao_, 0, n_ao_, n_ao_) = tJ_.block(n_ao_, 0, n_ao_, n_ao_) +
-                                           tJ_.block(0, 0, n_ao_, n_ao_) -
-                                           tK_.block(n_ao_, 0, n_ao_, n_ao_);
+    tFock_.block(0, 0, num_atomic_orbitals_, num_atomic_orbitals_) =
+        tJ_.block(0, 0, num_atomic_orbitals_, num_atomic_orbitals_) +
+        tJ_.block(num_atomic_orbitals_, 0, num_atomic_orbitals_,
+                  num_atomic_orbitals_) -
+        tK_.block(0, 0, num_atomic_orbitals_, num_atomic_orbitals_);
+    tFock_.block(num_atomic_orbitals_, 0, num_atomic_orbitals_,
+                 num_atomic_orbitals_) =
+        tJ_.block(num_atomic_orbitals_, 0, num_atomic_orbitals_,
+                  num_atomic_orbitals_) +
+        tJ_.block(0, 0, num_atomic_orbitals_, num_atomic_orbitals_) -
+        tK_.block(num_atomic_orbitals_, 0, num_atomic_orbitals_,
+                  num_atomic_orbitals_);
   } else
     tFock_ = 2 * tJ_ - tK_;
 }

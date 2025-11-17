@@ -245,7 +245,7 @@ inline std::shared_ptr<Structure> create_o2_structure() {
 }
 
 /**
- * @brief Create a streched N2 structure
+ * @brief Create a stretched N2 structure
  */
 inline std::shared_ptr<Structure> create_stretched_n2_structure() {
   std::vector<Eigen::Vector3d> coords = {

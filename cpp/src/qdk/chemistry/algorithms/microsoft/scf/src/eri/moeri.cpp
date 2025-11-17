@@ -24,7 +24,9 @@ MOERI::MOERI(std::shared_ptr<ERI> eri)
 MOERI::~MOERI() noexcept = default;
 
 void MOERI::compute(size_t nb, size_t nt, const double* C, double* out) {
-  if (nt > nb) throw std::runtime_error("MOERI does not support NMO > NAO");
+  if (nt > nb)
+    throw std::runtime_error(
+        "MOERI does not support num_molecular_orbitals > num_atomic_orbitals");
   const size_t nt2 = nt * nt;
   const size_t nt3 = nt2 * nt;
   const size_t nb2 = nb * nb;

@@ -174,7 +174,7 @@ int main(int argc, char** argv) {
     if (n_inactive + n_active > norb)
       throw std::runtime_error("NINACTIVE + NACTIVE > NORB");
 
-    size_t n_virtual = norb - n_active - n_inactive;
+    size_t num_virtual_orbitals = norb - n_active - n_inactive;
 
     // Misc optional files
     std::string rdm_fname, fci_out_fname, ci_wfn_out_fname;
@@ -271,7 +271,7 @@ int main(int argc, char** argv) {
       console->info("  * NORBITAL  = {}", norb);
       console->info("  * NINACTIVE = {}", n_inactive);
       console->info("  * NACTIVE   = {}", n_active);
-      console->info("  * NVIRTUAL  = {}", n_virtual);
+      console->info("  * NVIRTUAL  = {}", num_virtual_orbitals);
       console->info("  * MP2_GUESS = {}", mp2_guess);
 
       console->debug("READ {} 1-body integrals and {} 2-body integrals",
@@ -309,14 +309,14 @@ int main(int argc, char** argv) {
         throw std::runtime_error("MP2 Guess only implemented for closed-shell");
 
       console->info("Calculating MP2 Natural Orbitals");
-      size_t nocc_canon = n_inactive + nalpha;
-      size_t nvir_canon = norb - nocc_canon;
+      size_t num_occupied_orbitals_canon = n_inactive + nalpha;
+      size_t nvir_canon = norb - num_occupied_orbitals_canon;
 
       // Compute MP2 Natural Orbitals
       std::vector<double> MP2_RDM(norb * norb, 0.0);
       std::vector<double> W_occ(norb);
       macis::mp2_natural_orbitals(
-          NumOrbital(norb), NumCanonicalOccupied(nocc_canon),
+          NumOrbital(norb), NumCanonicalOccupied(num_occupied_orbitals_canon),
           NumCanonicalVirtual(nvir_canon), T.data(), norb, V.data(), norb,
           W_occ.data(), MP2_RDM.data(), norb);
 
@@ -521,8 +521,8 @@ int main(int argc, char** argv) {
       E0 = macis::casscf_diis(
           mcscf_settings, NumElectron(nalpha), NumElectron(nbeta),
           NumOrbital(norb), NumInactive(n_inactive), NumActive(n_active),
-          NumVirtual(n_virtual), E_core, T.data(), norb, V.data(), norb,
-          active_ordm.data(), n_active, active_trdm.data(),
+          NumVirtual(num_virtual_orbitals), E_core, T.data(), norb, V.data(),
+          norb, active_ordm.data(), n_active, active_trdm.data(),
           n_active MACIS_MPI_CODE(, MPI_COMM_WORLD));
 
       console->info("E(CASSCF)  = {:.12f} Eh", E0);

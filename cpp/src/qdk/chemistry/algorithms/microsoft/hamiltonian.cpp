@@ -35,8 +35,8 @@ std::shared_ptr<data::Hamiltonian> HamiltonianConstructor::_run_impl(
 
   auto basis_set = orbitals->get_basis_set();
   const auto& [Ca, Cb] = orbitals->get_coefficients();
-  const size_t nbf = basis_set->get_num_basis_functions();
-  const size_t nmo = orbitals->get_num_mos();
+  const size_t num_basis_funcs = basis_set->get_num_basis_functions();
+  const size_t num_molecular_orbitals = orbitals->get_num_molecular_orbitals();
 
   // Determine whether we're doing an active space calculation
   auto indices = orbitals->has_active_space()
@@ -44,19 +44,20 @@ std::shared_ptr<data::Hamiltonian> HamiltonianConstructor::_run_impl(
                      : std::vector<size_t>();
 
   bool active_space_is_contiguous = true;
-  const size_t nactive = indices.size() ? indices.size() : nmo;
+  const size_t nactive =
+      indices.size() ? indices.size() : num_molecular_orbitals;
   if (indices.size()) {
     // Sanity checks on the active orbitals
 
     // Cannot contain more than the total number of MOs
-    if (indices.size() > nmo) {
+    if (indices.size() > num_molecular_orbitals) {
       throw std::runtime_error(
           "Number of requested active orbitals exceeds total number of MOs");
     }
 
     // Make sure that the indices are within bounds
     for (const auto& idx : indices) {
-      if (static_cast<size_t>(idx) >= nmo) {
+      if (static_cast<size_t>(idx) >= num_molecular_orbitals) {
         throw std::runtime_error("Active orbital index out of bounds: " +
                                  std::to_string(idx));
       }
@@ -121,17 +122,18 @@ std::shared_ptr<data::Hamiltonian> HamiltonianConstructor::_run_impl(
       internal_basis_set.get(), mol.get(), scf_config->mpi);
 
   // Compute Core Hamiltonian in AO basis
-  Eigen::MatrixXd T_full(nbf, nbf), V_full(nbf, nbf);
+  Eigen::MatrixXd T_full(num_basis_funcs, num_basis_funcs),
+      V_full(num_basis_funcs, num_basis_funcs);
   int1e->kinetic_integral(T_full.data());
   int1e->nuclear_integral(V_full.data());
   Eigen::MatrixXd H_full = T_full + V_full;
 
-  Eigen::MatrixXd C_active(nbf, nactive);
+  Eigen::MatrixXd C_active(num_basis_funcs, nactive);
   if (indices.empty()) {
     // If no active orbitals are specified, use all orbitals
     C_active = Ca;
   } else if (active_space_is_contiguous) {
-    C_active = Ca.block(0, indices.front(), nbf, nactive);
+    C_active = Ca.block(0, indices.front(), num_basis_funcs, nactive);
   } else {
     for (auto i = 0; i < nactive; i++) {
       C_active.col(i) = Ca.col(indices[i]);
@@ -142,7 +144,7 @@ std::shared_ptr<data::Hamiltonian> HamiltonianConstructor::_run_impl(
       C_active;
   Eigen::VectorXd moeri_active(nactive * nactive * nactive * nactive);
   qcs::MOERI moeri_c(eri);
-  moeri_c.compute(nbf, nactive, C_rm.data(), moeri_active.data());
+  moeri_c.compute(num_basis_funcs, nactive, C_rm.data(), moeri_active.data());
 
   // Early exit
   if (indices.empty()) {
@@ -183,10 +185,11 @@ std::shared_ptr<data::Hamiltonian> HamiltonianConstructor::_run_impl(
   }
 
   // Compute the inactive density matrix
-  Eigen::MatrixXd D_inactive = Eigen::MatrixXd::Zero(nbf, nbf);
+  Eigen::MatrixXd D_inactive =
+      Eigen::MatrixXd::Zero(num_basis_funcs, num_basis_funcs);
   if (inactive_space_is_contiguous) {
-    auto C_inactive =
-        Ca.block(0, inactive_indices.front(), nbf, inactive_indices.size());
+    auto C_inactive = Ca.block(0, inactive_indices.front(), num_basis_funcs,
+                               inactive_indices.size());
     D_inactive = C_inactive * C_inactive.transpose();
   } else {
     for (size_t i : inactive_indices) {
@@ -195,14 +198,15 @@ std::shared_ptr<data::Hamiltonian> HamiltonianConstructor::_run_impl(
   }
 
   // Compute the two electron part of the inactive fock matrix
-  Eigen::MatrixXd J_inactive_ao(nbf, nbf), K_inactive_ao(nbf, nbf);
+  Eigen::MatrixXd J_inactive_ao(num_basis_funcs, num_basis_funcs),
+      K_inactive_ao(num_basis_funcs, num_basis_funcs);
   eri->build_JK(D_inactive.data(), J_inactive_ao.data(), K_inactive_ao.data(),
                 1.0, 0.0, 0.0);
   Eigen::MatrixXd G_inactive_ao = 2 * J_inactive_ao - K_inactive_ao;
 
   // Compute the inactive Fock matrix
   Eigen::MatrixXd F_inactive_ao = G_inactive_ao + H_full;
-  Eigen::MatrixXd F_inactive(nmo, nmo);
+  Eigen::MatrixXd F_inactive(num_molecular_orbitals, num_molecular_orbitals);
   F_inactive = Ca.transpose() * F_inactive_ao * Ca;
 
   // Compute active one body operator

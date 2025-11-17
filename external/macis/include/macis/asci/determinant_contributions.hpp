@@ -81,18 +81,18 @@ void append_ss_doubles_asci_contributions(
     asci_contrib_container<WfnType>& asci_contributions) {
   using wfn_traits = wavefunction_traits<WfnType>;
   using spin_wfn_traits = wavefunction_traits<SpinWfnType>;
-  const size_t nocc = ss_occ.size();
-  const size_t nvir = vir.size();
+  const size_t num_occupied_orbitals = ss_occ.size();
+  const size_t num_virtual_orbitals = vir.size();
 
   const size_t LDG2 = LDG * LDG;
-  for (auto ii = 0; ii < nocc; ++ii)
-    for (auto aa = 0; aa < nvir; ++aa) {
+  for (auto ii = 0; ii < num_occupied_orbitals; ++ii)
+    for (auto aa = 0; aa < num_virtual_orbitals; ++aa) {
       const auto i = ss_occ[ii];
       const auto a = vir[aa];
       const auto G_ai = G + (a + i * LDG) * LDG2;
 
-      for (auto jj = ii + 1; jj < nocc; ++jj)
-        for (auto bb = aa + 1; bb < nvir; ++bb) {
+      for (auto jj = ii + 1; jj < num_occupied_orbitals; ++jj)
+        for (auto bb = aa + 1; bb < num_virtual_orbitals; ++bb) {
           const auto j = ss_occ[jj];
           const auto b = vir[bb];
           const auto jb = b + j * LDG;

@@ -127,13 +127,13 @@ struct wavefunction_traits<std::bitset<N>> {
                                       orbidx_container& occ,
                                       orbidx_container& vir) {
     state_to_occ(state, occ);
-    const auto nocc = occ.size();
-    assert(nocc <= norb);
+    const auto num_occupied_orbitals = occ.size();
+    assert(num_occupied_orbitals <= norb);
 
-    const auto nvir = norb - nocc;
-    vir.resize(nvir);
+    const auto num_virtual_orbitals = norb - num_occupied_orbitals;
+    vir.resize(num_virtual_orbitals);
     state = ~state;
-    for (int i = 0; i < nvir; ++i) {
+    for (int i = 0; i < num_virtual_orbitals; ++i) {
       auto a = ffs(state) - 1;
       vir[i] = a;
       state.flip(a);

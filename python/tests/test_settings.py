@@ -5,7 +5,6 @@
 # Licensed under the MIT License. See LICENSE.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
 
-import contextlib
 import json
 import os
 import tempfile
@@ -14,10 +13,14 @@ from pathlib import Path
 import numpy as np
 import pytest
 
-import qdk.chemistry.data
+from qdk_chemistry.data import (
+    SettingNotFoundError,
+    Settings,
+    SettingTypeMismatch,
+)
 
 
-class _TestSettingsContainer(qdk.chemistry.data.Settings):
+class _TestSettingsContainer(Settings):
     """A test settings class that defines all the settings used in tests."""
 
     def __init__(self):
@@ -414,7 +417,7 @@ class TestSettings:
         assert settings["max_iterations"] == 200
 
         # Test that update throws for non-existing keys
-        with pytest.raises(qdk.chemistry.data.SettingNotFoundError):
+        with pytest.raises(SettingNotFoundError):
             settings.update("nonexistent", "value")
 
         # Test dictionary update method
@@ -433,7 +436,7 @@ class TestSettings:
 
         # Test that dictionary update fails for non-existing keys
         bad_update_dict = {"param1": "another_value", "nonexistent_key": "value"}
-        with pytest.raises(qdk.chemistry.data.SettingNotFoundError):
+        with pytest.raises(SettingNotFoundError):
             settings.update(bad_update_dict)
 
     def test_dictionary_conversion(self):
@@ -524,7 +527,7 @@ class TestSettings:
         assert parsed["active_orbitals"] == [1, 2, 3]
 
         # Test from_json_string
-        new_settings = qdk.chemistry.data.Settings.from_json_string(json_str)
+        new_settings = Settings.from_json_string(json_str)
 
         assert new_settings["method"] == "hf"
         assert new_settings["max_iterations"] == 100
@@ -541,7 +544,7 @@ class TestSettings:
         assert parsed2 == parsed
 
         # Test from_json method
-        new_settings2 = qdk.chemistry.data.Settings.from_json(json_str2)
+        new_settings2 = Settings.from_json(json_str2)
 
         assert new_settings2["method"] == "hf"
         assert new_settings2["max_iterations"] == 100
@@ -551,10 +554,10 @@ class TestSettings:
 
         # Test error handling for malformed JSON
         with pytest.raises(RuntimeError):
-            qdk.chemistry.data.Settings.from_json("invalid json string {{{")
+            Settings.from_json("invalid json string {{{")
 
         with pytest.raises(RuntimeError):
-            qdk.chemistry.data.Settings.from_json_string("another invalid json ]]")
+            Settings.from_json_string("another invalid json ]]")
 
     def test_json_file_operations(self):
         """Test JSON file operations."""
@@ -579,7 +582,7 @@ class TestSettings:
             assert data["tolerance"] == 1e-6
 
             # Test from_json_file
-            new_settings = qdk.chemistry.data.Settings.from_json_file(json_file)
+            new_settings = Settings.from_json_file(json_file)
 
             assert new_settings["method"] == "hf"
             assert new_settings["max_iterations"] == 100
@@ -603,7 +606,7 @@ class TestSettings:
                 assert Path(hdf5_file).exists()
 
                 # Test from_hdf5_file
-                new_settings = qdk.chemistry.data.Settings.from_hdf5_file(str(hdf5_file))
+                new_settings = Settings.from_hdf5_file(str(hdf5_file))
 
                 assert new_settings["method"] == "hf"
                 assert new_settings["max_iterations"] == 100
@@ -623,7 +626,7 @@ class TestSettings:
                 complex_hdf5_file = os.path.join(tmpdir, "complex_test.settings.h5")
                 complex_settings.to_hdf5_file(complex_hdf5_file)
 
-                loaded_complex_settings = qdk.chemistry.data.Settings.from_hdf5_file(complex_hdf5_file)
+                loaded_complex_settings = Settings.from_hdf5_file(complex_hdf5_file)
 
                 assert loaded_complex_settings["string_param"] == "test_string"
                 assert loaded_complex_settings["int_param"] == 42
@@ -660,7 +663,7 @@ class TestSettings:
             assert data["use_symmetry"] is True
 
             # Test loading from JSON
-            new_settings = qdk.chemistry.data.Settings.from_file(json_file, "json")
+            new_settings = Settings.from_file(json_file, "json")
             assert new_settings["method"] == "hf"
             assert new_settings["max_iterations"] == 100
             assert new_settings["tolerance"] == 1e-6
@@ -673,7 +676,7 @@ class TestSettings:
                 assert Path(hdf5_file).exists()
 
                 # Test loading from HDF5
-                new_settings_hdf5 = qdk.chemistry.data.Settings.from_file(hdf5_file, "hdf5")
+                new_settings_hdf5 = Settings.from_file(hdf5_file, "hdf5")
                 assert new_settings_hdf5["method"] == "hf"
                 assert new_settings_hdf5["max_iterations"] == 100
                 assert new_settings_hdf5["tolerance"] == 1e-6
@@ -684,7 +687,7 @@ class TestSettings:
                     settings.to_file(json_file, "xml")
 
                 with pytest.raises(ValueError, match="Unknown file type"):
-                    qdk.chemistry.data.Settings.from_file(json_file, "yaml")
+                    Settings.from_file(json_file, "yaml")
 
             except (ImportError, OSError, RuntimeError) as e:
                 pytest.skip(f"HDF5 test skipped - {e!s}")
@@ -733,7 +736,7 @@ class TestSettings:
             with pytest.raises(ValueError, match="Unknown file type"):
                 settings.to_file(unsupported_file, "unsupported")
             with pytest.raises(ValueError, match="Unknown file type"):
-                qdk.chemistry.data.Settings.from_file(unsupported_file, "unsupported")
+                Settings.from_file(unsupported_file, "unsupported")
 
     def test_file_not_found_error(self):
         """Test error handling when file does not exist."""
@@ -741,7 +744,7 @@ class TestSettings:
 
         # Test with non-existent file
         with pytest.raises(RuntimeError, match="Cannot open file for reading"):
-            qdk.chemistry.data.Settings.from_file("/nonexistent/path/file.settings.json", "json")
+            Settings.from_file("/nonexistent/path/file.settings.json", "json")
         with pytest.raises(RuntimeError, match="Cannot open file for reading"):
             settings.from_json_file("/nonexistent/path/file.settings.json")
 
@@ -797,8 +800,8 @@ class TestSettings:
                 assert f1.read() == f2.read()
 
             # Load with both methods and verify consistency
-            settings1 = qdk.chemistry.data.Settings.from_file(json_file1, "json")
-            settings2 = qdk.chemistry.data.Settings.from_json_file(json_file2)
+            settings1 = Settings.from_file(json_file1, "json")
+            settings2 = Settings.from_json_file(json_file2)
 
             # Convert to dicts for comparison
             dict1 = settings1.to_dict()
@@ -816,8 +819,8 @@ class TestSettings:
                 settings.to_hdf5_file(str(hdf5_file2))
 
                 # Load with both methods and verify consistency
-                settings3 = qdk.chemistry.data.Settings.from_file(str(hdf5_file1), "hdf5")
-                settings4 = qdk.chemistry.data.Settings.from_hdf5_file(str(hdf5_file2))
+                settings3 = Settings.from_file(str(hdf5_file1), "hdf5")
+                settings4 = Settings.from_hdf5_file(str(hdf5_file2))
 
                 # Convert to dicts for comparison
                 dict3 = settings3.to_dict()
@@ -843,7 +846,7 @@ class TestSettings:
             json_file = tmpdir_path / "complex_test.json"
             settings.to_file(json_file, "json")
 
-            new_settings = qdk.chemistry.data.Settings.from_file(json_file, "json")
+            new_settings = Settings.from_file(json_file, "json")
 
             # Verify all data types are preserved
             assert new_settings["method"] == "hf"
@@ -859,7 +862,7 @@ class TestSettings:
                 hdf5_file = tmpdir_path / "complex_test.h5"
                 settings.to_file(hdf5_file, "hdf5")
 
-                new_settings_hdf5 = qdk.chemistry.data.Settings.from_file(hdf5_file, "hdf5")
+                new_settings_hdf5 = Settings.from_file(hdf5_file, "hdf5")
 
                 # Verify all data types are preserved
                 assert new_settings_hdf5["method"] == "hf"
@@ -890,7 +893,7 @@ class TestSettings:
 
             for _ in range(3):
                 current_settings.to_file(json_file, "json")
-                new_settings = qdk.chemistry.data.Settings.from_file(json_file, "json")
+                new_settings = Settings.from_file(json_file, "json")
 
                 # Verify data integrity
                 assert new_settings.to_dict() == original_settings.to_dict()
@@ -903,7 +906,7 @@ class TestSettings:
 
                 for _ in range(3):
                     current_settings.to_file(hdf5_file, "hdf5")
-                    new_settings = qdk.chemistry.data.Settings.from_file(hdf5_file, "hdf5")
+                    new_settings = Settings.from_file(hdf5_file, "hdf5")
 
                     # Verify data integrity
                     assert new_settings.to_dict() == original_settings.to_dict()
@@ -932,7 +935,7 @@ class TestSettings:
         assert "max_iterations" in str_str
 
         # Test with empty settings
-        empty_settings = qdk.chemistry.data.Settings()
+        empty_settings = Settings()
         empty_repr = repr(empty_settings)
         empty_str = str(empty_settings)
 
@@ -977,11 +980,11 @@ class TestSettings:
         settings = _TestSettingsContainer()
 
         # Test accessing non-existent key with get
-        with pytest.raises(qdk.chemistry.data.SettingNotFoundError):
+        with pytest.raises(SettingNotFoundError):
             settings.get("nonexistent")
 
         # Test accessing non-existent key with []
-        with pytest.raises(qdk.chemistry.data.SettingNotFoundError):
+        with pytest.raises(SettingNotFoundError):
             _ = settings["nonexistent"]
 
         # Test accessing non-existent attribute
@@ -992,17 +995,7 @@ class TestSettings:
         """Test the conversion utility functions."""
         # Test direct utility functions (if accessible)
         settings = _TestSettingsContainer()
-        try:
-            # Test setting_value_to_python directly
-            # Create a SettingValue through the raw interface first
-            settings.set_raw("test_key", qdk.chemistry.data.python_to_setting_value(42))
-            val = settings.get_raw("test_key")
-            result = qdk.chemistry.data.setting_value_to_python(val)
-            assert result == 42
-            assert isinstance(result, int)
-        except AttributeError:
-            # Functions might not be directly accessible, test through interface
-            pass
+
         # Test various type conversions through the interface
         settings["int_val"] = 42
         settings["float_val"] = 3.14
@@ -1115,7 +1108,7 @@ class TestSettings:
         settings = _TestSettingsContainer()
 
         # Test unsupported list element types
-        with pytest.raises(qdk.chemistry.data.SettingTypeMismatch):
+        with pytest.raises(SettingTypeMismatch):
             settings["bad_list"] = [{"nested": "dict"}]  # Unsupported nested type
 
     def test_edge_case_conversions(self):
@@ -1163,9 +1156,9 @@ class TestSettings:
         settings["negative_one"] = -1
         settings["int_max"] = 2147483647  # INT_MAX
         settings["int_min"] = -2147483648  # INT_MIN
-        with pytest.raises(qdk.chemistry.data.SettingTypeMismatch):
+        with pytest.raises(SettingTypeMismatch):
             settings["just_over_int_max"] = 2147483648
-        with pytest.raises(qdk.chemistry.data.SettingTypeMismatch):
+        with pytest.raises(SettingTypeMismatch):
             settings["just_under_int_min"] = -2147483649  # Just under INT_MIN
 
         # Verify all are stored correctly
@@ -1199,9 +1192,9 @@ class TestSettings:
         assert bool_result == [1, 0, 1, 0]
 
         # Test sequences with first element determining type
-        with pytest.raises(qdk.chemistry.data.SettingTypeMismatch):
+        with pytest.raises(SettingTypeMismatch):
             settings["first_bool_list"] = [True, 1, 0]  # First is bool
-        with pytest.raises(qdk.chemistry.data.SettingTypeMismatch):
+        with pytest.raises(SettingTypeMismatch):
             settings["first_int_list"] = [1, True, False]  # First is int
         settings["first_float_list"] = [1.0, 2, 3]  # First is float
         settings["first_str_list"] = ["a", "b", "c"]  # First is string
@@ -1239,25 +1232,6 @@ class TestSettings:
         assert "use_symmetry" in all_settings
         assert "active_orbitals" in all_settings
 
-        # Test set_from_map method - only try if utility functions are available
-        try:
-            new_settings = qdk.chemistry.data.Settings()
-            test_map = {
-                "param1": qdk.chemistry.data.python_to_setting_value("value1"),
-                "param2": qdk.chemistry.data.python_to_setting_value(42),
-                "param3": qdk.chemistry.data.python_to_setting_value([1.0, 2.0, 3.0]),
-            }
-
-            new_settings.set_from_map(test_map)
-
-            # Verify the settings were loaded
-            assert new_settings["param1"] == "value1"
-            assert new_settings["param2"] == 42
-            assert new_settings["param3"] == [1.0, 2.0, 3.0]
-        except (AttributeError, TypeError):
-            # Method might not be accessible or utility functions not available
-            pass
-
 
 class TestSettingsCustomClass:
     """Test creating custom settings classes."""
@@ -1265,7 +1239,7 @@ class TestSettingsCustomClass:
     def test_custom_settings_class(self):
         """Test creating a custom settings class in Python."""
 
-        class HfSettings(qdk.chemistry.data.Settings):
+        class HfSettings(Settings):
             def __init__(self):
                 super().__init__()
                 self._set_default("method", "string", "hf")
@@ -1302,7 +1276,7 @@ class TestSettingsCustomClass:
         try:
             fresh_hf_settings.validate_required(["nonexistent_key"])
             pytest.fail("Should have raised SettingNotFoundError")
-        except qdk.chemistry.data.SettingNotFoundError:
+        except SettingNotFoundError:
             pass  # Expected
 
         # Test validate_required method directly
@@ -1314,13 +1288,13 @@ class TestSettingsCustomClass:
         settings.validate_required(["param1", "param2"])
 
         # Should fail with missing key
-        with pytest.raises(qdk.chemistry.data.SettingNotFoundError):
+        with pytest.raises(SettingNotFoundError):
             settings.validate_required(["param1", "param2", "missing_param"])
 
     def test_trampoline_class_methods(self):
         """Test PySettings trampoline class specific methods."""
 
-        class AdvancedSettings(qdk.chemistry.data.Settings):
+        class AdvancedSettings(Settings):
             def __init__(self):
                 super().__init__()
                 # Test _set_default with different types
@@ -1329,12 +1303,6 @@ class TestSettingsCustomClass:
                 self._set_default("float_param", "double", 3.14159)
                 self._set_default("bool_param", "bool", True)
                 self._set_default("list_param", "vector<int>", [1, 2, 3])
-
-                # Test _set_default_setting_value if accessible
-                with contextlib.suppress(AttributeError):
-                    qdk.chemistry.data.python_to_setting_value("raw_default")
-                    # Note: _set_default_setting_value might not be directly accessible
-                    # but we test the functionality through _set_default
 
         settings = AdvancedSettings()
 
@@ -1366,5 +1334,5 @@ class TestSettingsCustomClass:
         settings.validate_required(["param1", "param2"])
 
         # Should fail with missing key
-        with pytest.raises(qdk.chemistry.data.SettingNotFoundError):
+        with pytest.raises(SettingNotFoundError):
             settings.validate_required(["param1", "param2", "missing_param"])

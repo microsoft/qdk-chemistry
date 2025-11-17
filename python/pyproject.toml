@@ -35,7 +35,7 @@ dependencies = [
   "numpy>=1.20.0",
   "scipy>=1.7.0",
   "matplotlib==3.10.0",
-  "qiskit[qasm3-import]>=2.0.0,<2.2.0",
+  "qiskit[qasm3-import]>=2.2.0",
   "qiskit-aer",
   "qiskit-nature",
   "pylatexenc==2.10",
@@ -237,8 +237,8 @@ install.components = ["_core", "qdk_chemistry_resources"]
 metadata.version.provider = "scikit_build_core.metadata.setuptools_scm"
 
 [tool.scikit-build.wheel]
-packages = ["src/qdk"]
-install-dir = "qdk/chemistry"
+packages = ["src/qdk_chemistry"]
+install-dir = "qdk_chemistry"
 
 [tool.scikit-build.cmake.define]
 BUILD_SHARED_LIBS = "OFF"

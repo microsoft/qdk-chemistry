@@ -119,7 +119,6 @@ repos:
     require_serial: true
     files: >
       (?x)^(
-        python/src/qdk/chemistry/__init__\.py|
         python/CMakeLists\.txt|
         cpp/CMakeLists\.txt|
         docs/source/conf\.py

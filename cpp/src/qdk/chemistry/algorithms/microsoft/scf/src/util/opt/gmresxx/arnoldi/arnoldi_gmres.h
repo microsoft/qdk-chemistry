@@ -17,7 +17,7 @@ namespace detail {
  *
  * Z = ALPHA * X + BETA * Y
  *
- * @param[in] N Problem dimention
+ * @param[in] N Problem dimension
  * @param[in] K Number of vectors to shift
  * @param[in] ALPHA X-laden scaling factor
  * @param[in] X Input block vector
@@ -93,7 +93,7 @@ auto gmres_apply_givens_rotation(int32_t K, T* H, const T* C, const T* S) {
 }
 
 /**
- *  @brief Simultaniously compute the residuals and residual norms for current
+ *  @brief Simultaneously compute the residuals and residual norms for current
  *  approximations of linear system solutions for multiple shifts and right
  *  hand sides.
  *
@@ -224,7 +224,7 @@ void gmres_arnoldi_nosync(int32_t N, int32_t NRHS, int32_t NS, int32_t K,
  *  @brief Performs the Arnoldi step required for GMRES-Arnoldi.
  *
  *  Appends a Krylov vector and updates the Hessenberg matrix. All matrix-
- *  vector products are performed simultaniously using Level-3 BLAS or similar
+ *  vector products are performed simultaneously using Level-3 BLAS or similar
  *
  *  @tparam T Field type of the underlying matrix data
  *

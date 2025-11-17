@@ -11,7 +11,14 @@ import pickle
 import numpy as np
 import pytest
 
-import qdk.chemistry.data
+from qdk_chemistry.data import (
+    CasWavefunctionContainer,
+    Configuration,
+    Orbitals,
+    SlaterDeterminantContainer,
+    Wavefunction,
+    WavefunctionType,
+)
 
 from .test_helpers import create_test_basis_set
 
@@ -21,8 +28,7 @@ class TestWavefunctionType:
 
     def test_wavefunction_type_values(self):
         """Test that WavefunctionType enum values are accessible."""
-        assert hasattr(qdk.chemistry.data, "WavefunctionType")
-        wf_type = qdk.chemistry.data.WavefunctionType
+        wf_type = WavefunctionType
 
         # Test enum values exist
         assert hasattr(wf_type, "SelfDual")
@@ -37,13 +43,13 @@ class TestWavefunction:
         """Create basic orbitals for testing."""
         coeffs = np.array([[0.9, 0.1], [0.1, -0.9], [0.0, 0.0]])
         basis_set = create_test_basis_set(3, "test-wavefunction")
-        return qdk.chemistry.data.Orbitals(coeffs, None, None, basis_set)
+        return Orbitals(coeffs, None, None, basis_set)
 
     @pytest.fixture
     def cas_wavefunction(self, basic_orbitals):
         """Create a SCI-based wavefunction for testing."""
-        det1 = qdk.chemistry.data.Configuration("20")
-        det2 = qdk.chemistry.data.Configuration("ud")
+        det1 = Configuration("20")
+        det2 = Configuration("ud")
         dets = [det1, det2]
         coeffs = np.array([0.9, 0.436])  # Roughly normalized
 
@@ -51,15 +57,15 @@ class TestWavefunction:
         rdm_aa = np.array([[1.0, 0.0], [0.0, 0.0]])
         rdm_bb = np.array([[1.0, 0.0], [0.0, 0.0]])
 
-        container = qdk.chemistry.data.CasWavefunctionContainer(coeffs, dets, basic_orbitals, None, rdm_aa, rdm_bb)
-        return qdk.chemistry.data.Wavefunction(container)
+        container = CasWavefunctionContainer(coeffs, dets, basic_orbitals, None, rdm_aa, rdm_bb)
+        return Wavefunction(container)
 
     @pytest.fixture
     def slater_wavefunction(self, basic_orbitals):
         """Create a single Slater determinant wavefunction for testing."""
-        det = qdk.chemistry.data.Configuration("20")
-        container = qdk.chemistry.data.SlaterDeterminantContainer(det, basic_orbitals)
-        return qdk.chemistry.data.Wavefunction(container)
+        det = Configuration("20")
+        container = SlaterDeterminantContainer(det, basic_orbitals)
+        return Wavefunction(container)
 
     def test_wavefunction_construction(self, cas_wavefunction):
         """Test Wavefunction construction with container."""
@@ -101,7 +107,7 @@ class TestWavefunction:
         """Test accessing coefficients through wavefunction."""
         wf = cas_wavefunction
 
-        det1 = qdk.chemistry.data.Configuration("20")
+        det1 = Configuration("20")
         coeff1 = wf.get_coefficient(det1)
         assert abs(coeff1 - 0.9) < 1e-10
 
@@ -118,7 +124,7 @@ class TestWavefunction:
         assert len(dets) == 2
         # Test that we can access the configurations
         for det in dets:
-            assert isinstance(det, qdk.chemistry.data.Configuration)
+            assert isinstance(det, Configuration)
 
     def test_wavefunction_norm(self, cas_wavefunction, slater_wavefunction):
         """Test wavefunction norm calculation."""
@@ -134,18 +140,18 @@ class TestWavefunction:
     def test_wavefunction_overlap(self, basic_orbitals):
         """Test overlap calculation between wavefunctions."""
         # Create two similar wavefunctions
-        det1 = qdk.chemistry.data.Configuration("20")
-        det2 = qdk.chemistry.data.Configuration("ud")
+        det1 = Configuration("20")
+        det2 = Configuration("ud")
         dets = [det1, det2]
 
         coeffs1 = np.array([0.9, 0.1])
         coeffs2 = np.array([0.8, 0.2])
 
-        container1 = qdk.chemistry.data.CasWavefunctionContainer(coeffs1, dets, basic_orbitals)
-        container2 = qdk.chemistry.data.CasWavefunctionContainer(coeffs2, dets, basic_orbitals)
+        container1 = CasWavefunctionContainer(coeffs1, dets, basic_orbitals)
+        container2 = CasWavefunctionContainer(coeffs2, dets, basic_orbitals)
 
-        wf1 = qdk.chemistry.data.Wavefunction(container1)
-        wf2 = qdk.chemistry.data.Wavefunction(container2)
+        wf1 = Wavefunction(container1)
+        wf2 = Wavefunction(container2)
 
         overlap = wf1.overlap(wf2)
         expected_overlap = 0.9 * 0.8 + 0.1 * 0.2
@@ -182,7 +188,7 @@ class TestWavefunction:
         """Test accessing wavefunction type."""
         wf = cas_wavefunction
         wf_type = wf.get_type()
-        assert wf_type == qdk.chemistry.data.WavefunctionType.SelfDual
+        assert wf_type == WavefunctionType.SelfDual
 
     def test_wavefunction_repr(self, cas_wavefunction):
         """Test string representation of wavefunction."""
@@ -243,7 +249,7 @@ class TestWavefunction:
         # Verify orbital consistency
         orig_orbs = cas_wavefunction.get_orbitals()
         restored_orbs = wf_restored.get_orbitals()
-        assert orig_orbs.get_num_mos() == restored_orbs.get_num_mos()
+        assert orig_orbs.get_num_molecular_orbitals() == restored_orbs.get_num_molecular_orbitals()
 
 
 class TestWavefunctionRDMs:
@@ -254,12 +260,12 @@ class TestWavefunctionRDMs:
         """Create basic orbitals for testing."""
         coeffs = np.array([[1.0, 0.0], [0.0, 1.0]])  # Simple 2x2 identity
         basis_set = create_test_basis_set(2, "test-rdm")
-        return qdk.chemistry.data.Orbitals(coeffs, None, None, basis_set)
+        return Orbitals(coeffs, None, None, basis_set)
 
     @pytest.fixture
     def cas_wavefunction_with_rdms(self, basic_orbitals):
         """Create CAS wavefunction with RDMs for testing."""
-        det = qdk.chemistry.data.Configuration("20")  # Closed shell
+        det = Configuration("20")  # Closed shell
         dets = [det]
         coeffs = np.array([1.0])
 
@@ -268,10 +274,8 @@ class TestWavefunctionRDMs:
         one_rdm_aa = np.array([[1.0, 0.0], [0.0, 0.0]])
         one_rdm_bb = np.array([[1.0, 0.0], [0.0, 0.0]])
 
-        container = qdk.chemistry.data.CasWavefunctionContainer(
-            coeffs, dets, basic_orbitals, one_rdm_traced, one_rdm_aa, one_rdm_bb
-        )
-        return qdk.chemistry.data.Wavefunction(container)
+        container = CasWavefunctionContainer(coeffs, dets, basic_orbitals, one_rdm_traced, one_rdm_aa, one_rdm_bb)
+        return Wavefunction(container)
 
     def test_one_rdm_spin_traced_access(self, cas_wavefunction_with_rdms):
         """Test accessing spin-traced one-particle RDM."""
@@ -297,12 +301,12 @@ class TestWavefunctionRDMs:
     def test_rdm_error_handling(self, basic_orbitals):
         """Test that appropriate errors are raised when RDMs are not available."""
         # Create simple SCI wavefunction without RDMs
-        det = qdk.chemistry.data.Configuration("20")
+        det = Configuration("20")
         dets = [det]
         coeffs = np.array([1.0])
 
-        container = qdk.chemistry.data.CasWavefunctionContainer(coeffs, dets, basic_orbitals)
-        wf = qdk.chemistry.data.Wavefunction(container)
+        container = CasWavefunctionContainer(coeffs, dets, basic_orbitals)
+        wf = Wavefunction(container)
 
         # These should raise RuntimeError if not available
         if not wf.has_one_rdm_spin_traced():
@@ -330,19 +334,19 @@ class TestWavefunctionComplexSupport:
         """Create basic orbitals for testing."""
         coeffs = np.array([[0.9, 0.1], [0.1, -0.9], [0.0, 0.0]])
         basis_set = create_test_basis_set(3, "test-complex")
-        return qdk.chemistry.data.Orbitals(coeffs, None, None, basis_set)
+        return Orbitals(coeffs, None, None, basis_set)
 
     def test_complex_wavefunction(self, basic_orbitals):
         """Test complex coefficient wavefunctions."""
-        det1 = qdk.chemistry.data.Configuration("20")
-        det2 = qdk.chemistry.data.Configuration("ud")
+        det1 = Configuration("20")
+        det2 = Configuration("ud")
         dets = [det1, det2]
 
         # Complex coefficients
         coeffs = np.array([0.8 + 0.2j, 0.3 - 0.4j])
 
-        container = qdk.chemistry.data.CasWavefunctionContainer(coeffs, dets, basic_orbitals)
-        wf = qdk.chemistry.data.Wavefunction(container)
+        container = CasWavefunctionContainer(coeffs, dets, basic_orbitals)
+        wf = Wavefunction(container)
 
         # Test coefficient retrieval
         coeff1 = wf.get_coefficient(det1)
@@ -355,18 +359,18 @@ class TestWavefunctionComplexSupport:
 
     def test_complex_overlap(self, basic_orbitals):
         """Test overlap with complex wavefunctions."""
-        det1 = qdk.chemistry.data.Configuration("20")
-        det2 = qdk.chemistry.data.Configuration("ud")
+        det1 = Configuration("20")
+        det2 = Configuration("ud")
         dets = [det1, det2]
 
         coeffs1 = np.array([0.8 + 0.2j, 0.3 - 0.4j])
         coeffs2 = np.array([0.7 - 0.1j, 0.2 + 0.3j])
 
-        container1 = qdk.chemistry.data.CasWavefunctionContainer(coeffs1, dets, basic_orbitals)
-        container2 = qdk.chemistry.data.CasWavefunctionContainer(coeffs2, dets, basic_orbitals)
+        container1 = CasWavefunctionContainer(coeffs1, dets, basic_orbitals)
+        container2 = CasWavefunctionContainer(coeffs2, dets, basic_orbitals)
 
-        wf1 = qdk.chemistry.data.Wavefunction(container1)
-        wf2 = qdk.chemistry.data.Wavefunction(container2)
+        wf1 = Wavefunction(container1)
+        wf2 = Wavefunction(container2)
 
         overlap = wf1.overlap(wf2)
         # For complex wavefunctions: ⟨ψ₁|ψ₂⟩ = Σᵢ c₁ᵢ* c₂ᵢ
@@ -382,27 +386,27 @@ class TestWavefunctionEdgeCases:
         """Create basic orbitals for testing."""
         coeffs = np.array([[1.0, 0.0], [0.0, 1.0]])
         basis_set = create_test_basis_set(2, "test-edge-cases")
-        return qdk.chemistry.data.Orbitals(coeffs, None, None, basis_set)
+        return Orbitals(coeffs, None, None, basis_set)
 
     def test_empty_wavefunction(self, basic_orbitals):
         """Test wavefunction with no determinants."""
-        dets: list[qdk.chemistry.data.Configuration] = []
+        dets: list[Configuration] = []
         coeffs = np.array([])
 
-        container = qdk.chemistry.data.CasWavefunctionContainer(coeffs, dets, basic_orbitals)
-        wf = qdk.chemistry.data.Wavefunction(container)
+        container = CasWavefunctionContainer(coeffs, dets, basic_orbitals)
+        wf = Wavefunction(container)
 
         assert wf.size() == 0
         assert wf.norm() == 0.0
 
     def test_single_determinant_wavefunction(self, basic_orbitals):
         """Test wavefunction with single determinant."""
-        det = qdk.chemistry.data.Configuration("20")
+        det = Configuration("20")
         dets = [det]
         coeffs = np.array([0.7])
 
-        container = qdk.chemistry.data.CasWavefunctionContainer(coeffs, dets, basic_orbitals)
-        wf = qdk.chemistry.data.Wavefunction(container)
+        container = CasWavefunctionContainer(coeffs, dets, basic_orbitals)
+        wf = Wavefunction(container)
 
         assert wf.size() == 1
         assert abs(wf.norm() - 0.7) < 1e-10
@@ -412,13 +416,13 @@ class TestWavefunctionEdgeCases:
 
     def test_zero_coefficient_handling(self, basic_orbitals):
         """Test handling of zero coefficients."""
-        det1 = qdk.chemistry.data.Configuration("20")
-        det2 = qdk.chemistry.data.Configuration("ud")
+        det1 = Configuration("20")
+        det2 = Configuration("ud")
         dets = [det1, det2]
         coeffs = np.array([1.0, 0.0])  # Second coefficient is zero
 
-        container = qdk.chemistry.data.CasWavefunctionContainer(coeffs, dets, basic_orbitals)
-        wf = qdk.chemistry.data.Wavefunction(container)
+        container = CasWavefunctionContainer(coeffs, dets, basic_orbitals)
+        wf = Wavefunction(container)
 
         assert wf.size() == 2  # Still contains both determinants
 
@@ -432,11 +436,11 @@ class TestWavefunctionEdgeCases:
 
     def test_empty_wavefunction_bounds_checking(self, basic_orbitals):
         """Test that empty wavefunctions properly raise exceptions for determinant-dependent methods."""
-        dets: list[qdk.chemistry.data.Configuration] = []
+        dets: list[Configuration] = []
         coeffs = np.array([])
 
-        container = qdk.chemistry.data.CasWavefunctionContainer(coeffs, dets, basic_orbitals)
-        wf = qdk.chemistry.data.Wavefunction(container)
+        container = CasWavefunctionContainer(coeffs, dets, basic_orbitals)
+        wf = Wavefunction(container)
 
         # These methods should raise RuntimeError for empty wavefunctions
         with pytest.raises(RuntimeError, match="No determinants available"):
@@ -449,17 +453,17 @@ class TestWavefunctionEdgeCases:
             wf.get_active_orbital_occupations()
 
         with pytest.raises(RuntimeError, match="No determinants available"):
-            wf.get_coefficient(qdk.chemistry.data.Configuration("20"))
+            wf.get_coefficient(Configuration("20"))
 
     def test_entropy_bounds_checking(self, basic_orbitals):
         """Test that entropy calculation fails gracefully when RDMs are missing."""
-        det = qdk.chemistry.data.Configuration("20")
+        det = Configuration("20")
         dets = [det]
         coeffs = np.array([1.0])
 
         # Create wavefunction without RDMs
-        container = qdk.chemistry.data.CasWavefunctionContainer(coeffs, dets, basic_orbitals)
-        wf = qdk.chemistry.data.Wavefunction(container)
+        container = CasWavefunctionContainer(coeffs, dets, basic_orbitals)
+        wf = Wavefunction(container)
 
         # Should raise RuntimeError when trying to calculate entropies without RDMs
         with pytest.raises(RuntimeError):
@@ -474,36 +478,36 @@ class TestWavefunctionSerialization:
         """Create basic orbitals for testing."""
         coeffs = np.array([[0.9, 0.1], [0.1, -0.9], [0.0, 0.0]])
         basis_set = create_test_basis_set(3, "test-wavefunction")
-        return qdk.chemistry.data.Orbitals(coeffs, None, None, basis_set)
+        return Orbitals(coeffs, None, None, basis_set)
 
     @pytest.fixture
     def cas_wavefunction_real(self, basic_orbitals):
         """Create a real CAS wavefunction for testing."""
-        det1 = qdk.chemistry.data.Configuration("20")
-        det2 = qdk.chemistry.data.Configuration("ud")
+        det1 = Configuration("20")
+        det2 = Configuration("ud")
         dets = [det1, det2]
         coeffs = np.array([0.8, 0.6])
 
-        container = qdk.chemistry.data.CasWavefunctionContainer(coeffs, dets, basic_orbitals)
-        return qdk.chemistry.data.Wavefunction(container)
+        container = CasWavefunctionContainer(coeffs, dets, basic_orbitals)
+        return Wavefunction(container)
 
     @pytest.fixture
     def cas_wavefunction_complex(self, basic_orbitals):
         """Create a complex CAS wavefunction for testing."""
-        det1 = qdk.chemistry.data.Configuration("20")
-        det2 = qdk.chemistry.data.Configuration("ud")
+        det1 = Configuration("20")
+        det2 = Configuration("ud")
         dets = [det1, det2]
         coeffs = np.array([0.8 + 0.1j, 0.6 - 0.2j])
 
-        container = qdk.chemistry.data.CasWavefunctionContainer(coeffs, dets, basic_orbitals)
-        return qdk.chemistry.data.Wavefunction(container)
+        container = CasWavefunctionContainer(coeffs, dets, basic_orbitals)
+        return Wavefunction(container)
 
     @pytest.fixture
     def sd_wavefunction(self, basic_orbitals):
         """Create a Slater determinant wavefunction for testing."""
-        det = qdk.chemistry.data.Configuration("20")
-        container = qdk.chemistry.data.SlaterDeterminantContainer(det, basic_orbitals)
-        return qdk.chemistry.data.Wavefunction(container)
+        det = Configuration("20")
+        container = SlaterDeterminantContainer(det, basic_orbitals)
+        return Wavefunction(container)
 
     def test_json_serialization_cas_real(self, cas_wavefunction_real):
         """Test JSON serialization for real CAS wavefunction."""
@@ -517,7 +521,7 @@ class TestWavefunctionSerialization:
         assert json_data["container_type"] == "cas"
 
         # Test round-trip serialization
-        wf_reconstructed = qdk.chemistry.data.Wavefunction.from_json(json_str)
+        wf_reconstructed = Wavefunction.from_json(json_str)
 
         # Verify properties are preserved
         assert wf_reconstructed.size() == cas_wavefunction_real.size()
@@ -544,7 +548,7 @@ class TestWavefunctionSerialization:
         assert json_data["container_type"] == "cas"
 
         # Test round-trip serialization
-        wf_reconstructed = qdk.chemistry.data.Wavefunction.from_json(json_str)
+        wf_reconstructed = Wavefunction.from_json(json_str)
 
         # Verify properties are preserved
         assert wf_reconstructed.size() == cas_wavefunction_complex.size()
@@ -562,7 +566,7 @@ class TestWavefunctionSerialization:
         assert json_data["container_type"] == "sd"
 
         # Test round-trip serialization
-        wf_reconstructed = qdk.chemistry.data.Wavefunction.from_json(json_str)
+        wf_reconstructed = Wavefunction.from_json(json_str)
 
         # Verify properties are preserved
         assert wf_reconstructed.size() == 1
@@ -577,7 +581,7 @@ class TestWavefunctionSerialization:
         cas_wavefunction_real.to_hdf5_file(str(filename))
 
         # Load from HDF5 file
-        wf_reconstructed = qdk.chemistry.data.Wavefunction.from_hdf5_file(str(filename))
+        wf_reconstructed = Wavefunction.from_hdf5_file(str(filename))
 
         # Verify properties are preserved
         assert wf_reconstructed.size() == cas_wavefunction_real.size()
@@ -597,7 +601,7 @@ class TestWavefunctionSerialization:
         cas_wavefunction_complex.to_hdf5_file(str(filename))
 
         # Load from HDF5 file
-        wf_reconstructed = qdk.chemistry.data.Wavefunction.from_hdf5_file(str(filename))
+        wf_reconstructed = Wavefunction.from_hdf5_file(str(filename))
 
         # Verify properties are preserved
         assert wf_reconstructed.size() == cas_wavefunction_complex.size()
@@ -612,7 +616,7 @@ class TestWavefunctionSerialization:
         sd_wavefunction.to_hdf5_file(str(filename))
 
         # Load from HDF5 file
-        wf_reconstructed = qdk.chemistry.data.Wavefunction.from_hdf5_file(str(filename))
+        wf_reconstructed = Wavefunction.from_hdf5_file(str(filename))
 
         # Verify properties are preserved
         assert wf_reconstructed.size() == 1
@@ -627,7 +631,7 @@ class TestWavefunctionSerialization:
         cas_wavefunction_real.to_json_file(str(filename))
 
         # Load from JSON file
-        wf_reconstructed = qdk.chemistry.data.Wavefunction.from_json_file(str(filename))
+        wf_reconstructed = Wavefunction.from_json_file(str(filename))
 
         # Verify properties are preserved
         assert wf_reconstructed.size() == cas_wavefunction_real.size()
@@ -640,12 +644,12 @@ class TestWavefunctionSerialization:
 
         # Test JSON format
         cas_wavefunction_real.to_file(str(json_filename), "json")
-        wf_json = qdk.chemistry.data.Wavefunction.from_file(str(json_filename), "json")
+        wf_json = Wavefunction.from_file(str(json_filename), "json")
         assert abs(wf_json.norm() - cas_wavefunction_real.norm()) < 1e-10
 
         # Test HDF5 format
         cas_wavefunction_real.to_file(str(hdf5_filename), "hdf5")
-        wf_hdf5 = qdk.chemistry.data.Wavefunction.from_file(str(hdf5_filename), "hdf5")
+        wf_hdf5 = Wavefunction.from_file(str(hdf5_filename), "hdf5")
         assert abs(wf_hdf5.norm() - cas_wavefunction_real.norm()) < 1e-10
 
         # Test invalid format
@@ -653,7 +657,7 @@ class TestWavefunctionSerialization:
             cas_wavefunction_real.to_file(str(tmp_path / "test.xyz"), "xyz")
 
         with pytest.raises(ValueError, match="Unsupported file type"):
-            qdk.chemistry.data.Wavefunction.from_file(str(tmp_path / "test.xyz"), "xyz")
+            Wavefunction.from_file(str(tmp_path / "test.xyz"), "xyz")
 
     def test_error_handling(self):
         """Test error handling for malformed data."""
@@ -661,11 +665,11 @@ class TestWavefunctionSerialization:
         bad_json = {"container_type": "unknown"}
 
         with pytest.raises(TypeError):
-            qdk.chemistry.data.Wavefunction.from_json(bad_json)
+            Wavefunction.from_json(bad_json)
 
         # Test non-existent files
         with pytest.raises(RuntimeError):
-            qdk.chemistry.data.Wavefunction.from_json_file("non_existent.json")
+            Wavefunction.from_json_file("non_existent.json")
 
         with pytest.raises(RuntimeError):
-            qdk.chemistry.data.Wavefunction.from_hdf5_file("non_existent.h5")
+            Wavefunction.from_hdf5_file("non_existent.h5")

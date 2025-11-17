@@ -125,9 +125,9 @@ class VVHVLocalization : public IterativeOrbitalLocalizationScheme {
    * valence virtuals and constructs hard virtual orbitals.
    *
    * @param occupied_orbitals Matrix of occupied orbital coefficients
-   * (num_basis_funcs x n_occ)
+   * (num_basis_funcs x num_occupied_orbitals)
    * @return Localized virtual orbital coefficient matrix (num_basis_funcs x
-   * n_virt)
+   * num_virtual_orbitals)
    */
   Eigen::MatrixXd localize(const Eigen::MatrixXd& occupied_orbitals);
 
@@ -226,9 +226,9 @@ class VVHVLocalization : public IterativeOrbitalLocalizationScheme {
    * atom+angular momentum block.
    *
    * @param overlap_ori_al Overlap matrix block (original basis) for the atom+l
-   * block (size nbf_al_ori x nbf_al_ori)
+   * block (size num_basis_funcs_al_ori x num_basis_funcs_al_ori)
    * @param overlap_mix_al Mixed overlap block between original and minimal
-   * basis (size nbf_al_ori x nbf_al_min)
+   * basis (size num_basis_funcs_al_ori x num_basis_funcs_al_min)
    * @param bf_al_ori Index list (global AO indices) for this atom+l in the
    * original basis
    * @param bf_al_min Index list for this atom+l in the minimal basis

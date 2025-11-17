@@ -170,8 +170,8 @@ void bind_coupled_cluster(pybind11::module& data) {
 
         Examples
         --------
-        >>> n_occ_alpha, n_occ_beta = cc.get_num_occupied()
-        >>> print(f"Occupied orbitals: α={n_occ_alpha}, β={n_occ_beta}")
+        >>> num_alpha_occupied_orbitals, num_beta_occupied_orbitals = cc.get_num_occupied()
+        >>> print(f"Occupied orbitals: α={num_alpha_occupied_orbitals}, β={num_beta_occupied_orbitals}")
         )");
 
   coupled_cluster.def("get_num_virtual",
@@ -187,7 +187,7 @@ void bind_coupled_cluster(pybind11::module& data) {
 
         Examples
         --------
-        >>> n_virt_alpha, n_virt_beta = cc.get_num_virtual()
-        >>> print(f"Virtual orbitals: α={n_virt_alpha}, β={n_virt_beta}")
+        >>> num_alpha_virtual_orbitalslpha, num_beta_virtual_orbitals = cc.get_num_virtual()
+        >>> print(f"Virtual orbitals: α={num_alpha_virtual_orbitalslpha}, β={num_beta_virtual_orbitals}")
         )");
 }

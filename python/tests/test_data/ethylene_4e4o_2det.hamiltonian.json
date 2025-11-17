@@ -10143,8 +10143,8 @@
       ]
     },
     "is_restricted": true,
-    "num_aos": 48,
-    "num_mos": 48,
+    "num_atomic_orbitals": 48,
+    "num_molecular_orbitals": 48,
     "type": "Orbitals",
     "version": "0.1.0"
   },

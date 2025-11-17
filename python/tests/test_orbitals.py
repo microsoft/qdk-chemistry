@@ -13,7 +13,7 @@ import tempfile
 import numpy as np
 import pytest
 
-import qdk.chemistry.data
+from qdk_chemistry.data import ModelOrbitals, Orbitals
 
 from .reference_tolerances import float_comparison_absolute_tolerance, float_comparison_relative_tolerance
 from .test_helpers import create_test_basis_set
@@ -24,10 +24,10 @@ def test_orbitals_construction():
     # Test constructor with minimal data
     coeffs = np.array([[0.9, 0.1], [0.1, -0.9], [0.0, 0.0]])
     basis_set = create_test_basis_set(3, "test-construction")
-    orb = qdk.chemistry.data.Orbitals(coeffs, None, None, basis_set)
+    orb = Orbitals(coeffs, None, None, basis_set)
 
     # Copy constructor
-    orb2 = qdk.chemistry.data.Orbitals(orb)
+    orb2 = Orbitals(orb)
 
     # Get coefficients and check they match
     alpha, beta = orb.get_coefficients()
@@ -44,7 +44,7 @@ def test_coefficient_management():
     # Test restricted case
     coeffs = np.array([[0.9, 0.1], [0.1, -0.9], [0.0, 0.0]])
     basis_set = create_test_basis_set(3, "test-coeff-restricted")
-    orb = qdk.chemistry.data.Orbitals(coeffs, None, None, basis_set)
+    orb = Orbitals(coeffs, None, None, basis_set)
     alpha, beta = orb.get_coefficients()
 
     assert np.allclose(
@@ -57,7 +57,7 @@ def test_coefficient_management():
     coeffs_alpha = np.array([[0.9, 0.1], [0.1, -0.9], [0.0, 0.0]])
     coeffs_beta = np.array([[0.8, 0.2], [0.2, -0.8], [0.1, 0.0]])
     basis_set_unres = create_test_basis_set(3, "test-coeff-unrestricted")
-    orb_unres = qdk.chemistry.data.Orbitals(coeffs_alpha, coeffs_beta, None, None, None, basis_set_unres)
+    orb_unres = Orbitals(coeffs_alpha, coeffs_beta, None, None, None, basis_set_unres)
 
     alpha, beta = orb_unres.get_coefficients()
     assert np.allclose(
@@ -75,7 +75,7 @@ def test_energy_management():
     coeffs = np.array([[0.9, 0.1], [0.1, -0.9], [0.0, 0.0]])
     energies = np.array([-1.0, 0.5])
     basis_set = create_test_basis_set(3, "test-energy-restricted")
-    orb = qdk.chemistry.data.Orbitals(coeffs, energies, None, basis_set)
+    orb = Orbitals(coeffs, energies, None, basis_set)
 
     alpha, beta = orb.get_energies()
     assert np.allclose(
@@ -92,9 +92,7 @@ def test_energy_management():
     beta_energies = np.array([-0.8, 0.7])
     basis_set_unres = create_test_basis_set(3, "test-energy-unrestricted")
 
-    orb_unres = qdk.chemistry.data.Orbitals(
-        coeffs_alpha, coeffs_beta, alpha_energies, beta_energies, None, basis_set_unres
-    )
+    orb_unres = Orbitals(coeffs_alpha, coeffs_beta, alpha_energies, beta_energies, None, basis_set_unres)
     alpha, beta = orb_unres.get_energies()
 
     assert np.allclose(
@@ -112,7 +110,7 @@ def test_ao_overlap():
     basis_set = create_test_basis_set(2, "test-ao-overlap")
 
     # Test with overlap matrix
-    orb = qdk.chemistry.data.Orbitals(coeffs, None, overlap, basis_set)
+    orb = Orbitals(coeffs, None, overlap, basis_set)
 
     # Check that we have an overlap now
     assert orb.has_overlap_matrix()
@@ -124,7 +122,7 @@ def test_ao_overlap():
     )
 
     # Test without overlap
-    orb_no_overlap = qdk.chemistry.data.Orbitals(coeffs, None, None, basis_set)
+    orb_no_overlap = Orbitals(coeffs, None, None, basis_set)
     assert not orb_no_overlap.has_overlap_matrix()
 
 
@@ -138,7 +136,7 @@ def test_basis_info():
     basis_set = create_test_basis_set(2, "6-31G")
 
     # Inject basis set via constructor
-    orb = qdk.chemistry.data.Orbitals(coeffs, occupations, None, basis_set)
+    orb = Orbitals(coeffs, occupations, None, basis_set)
 
     assert orb.has_basis_set()
     retrieved_basis = orb.get_basis_set()
@@ -153,21 +151,21 @@ def test_calculation_restriction_query():
     # Restricted
     coeffs = np.zeros((3, 2))
     basis_set = create_test_basis_set(3, "test-calc-type-restricted")
-    orb_r = qdk.chemistry.data.Orbitals(coeffs, None, None, basis_set)
+    orb_r = Orbitals(coeffs, None, None, basis_set)
     assert orb_r.is_restricted()
 
     # Unrestricted with open shell
     alpha_coeffs = np.ones((3, 2))
     beta_coeffs = np.zeros((3, 2))
     basis_set_unres = create_test_basis_set(3, "test-calc-type-unrestricted")
-    orb_u = qdk.chemistry.data.Orbitals(alpha_coeffs, beta_coeffs, None, None, None, basis_set_unres)
+    orb_u = Orbitals(alpha_coeffs, beta_coeffs, None, None, None, basis_set_unres)
     assert not orb_u.is_restricted()
 
     # Equal electrons but different distributions still open shell
     alpha_coeffs2 = np.ones((3, 2))
     beta_coeffs2 = np.zeros((3, 2))
     basis_set_unres2 = create_test_basis_set(3, "test-calc-type-unrestricted2")
-    orb_u2 = qdk.chemistry.data.Orbitals(alpha_coeffs2, beta_coeffs2, None, None, None, basis_set_unres2)
+    orb_u2 = Orbitals(alpha_coeffs2, beta_coeffs2, None, None, None, basis_set_unres2)
     assert not orb_u2.is_restricted()
 
 
@@ -176,7 +174,7 @@ def test_validation_and_summary():
     # Minimal valid orbital
     coeffs = np.array([[0.9, 0.1], [0.1, -0.9]])
     basis_set = create_test_basis_set(2, "test-validation")
-    orb = qdk.chemistry.data.Orbitals(coeffs, None, None, basis_set)
+    orb = Orbitals(coeffs, None, None, basis_set)
     summary = orb.get_summary()
     assert isinstance(summary, str)
     assert len(summary) > 0
@@ -188,11 +186,11 @@ def test_json_serialization():
     energies = np.array([-2.0, 0.5])
     overlap = np.array([[1.0, 0.1, 0.0], [0.1, 1.0, 0.0], [0.0, 0.0, 1.0]])
     basis_set = create_test_basis_set(3, "test-json-serialization")
-    orb_out = qdk.chemistry.data.Orbitals(coeffs, energies, overlap, basis_set)
+    orb_out = Orbitals(coeffs, energies, overlap, basis_set)
 
     # Test direct JSON conversion
     json_data = orb_out.to_json()
-    orb_in = qdk.chemistry.data.Orbitals.from_json(json_data)
+    orb_in = Orbitals.from_json(json_data)
 
     coeffs_out_a, coeffs_out_b = orb_out.get_coefficients()
     coeffs_in_a, coeffs_in_b = orb_in.get_coefficients()
@@ -208,7 +206,7 @@ def test_json_serialization():
         filename = tmp.name
         orb_out.to_json_file(filename)
 
-        orb_file = qdk.chemistry.data.Orbitals.from_json_file(filename)
+        orb_file = Orbitals.from_json_file(filename)
 
         coeffs_file_a, coeffs_file_b = orb_file.get_coefficients()
         assert np.allclose(
@@ -231,14 +229,14 @@ def test_hdf5_serialization():
     energies = np.array([-2.0, 0.5])
     overlap = np.array([[1.0, 0.1, 0.0], [0.1, 1.0, 0.0], [0.0, 0.0, 1.0]])
     basis_set = create_test_basis_set(3, "test-hdf5-serialization")
-    orb_out = qdk.chemistry.data.Orbitals(coeffs, energies, overlap, basis_set)
+    orb_out = Orbitals(coeffs, energies, overlap, basis_set)
 
     try:
         with tempfile.NamedTemporaryFile(suffix=".orbitals.h5") as tmp:
             filename = tmp.name
             orb_out.to_hdf5_file(filename)
 
-            orb_in = qdk.chemistry.data.Orbitals.from_hdf5_file(filename)
+            orb_in = Orbitals.from_hdf5_file(filename)
 
             coeffs_out_a, coeffs_out_b = orb_out.get_coefficients()
             coeffs_in_a, coeffs_in_b = orb_in.get_coefficients()
@@ -264,18 +262,18 @@ def test_complete_orbitals_workflow():
     energies = np.array([-1.5, 0.8])
     overlap = np.array([[1.0, 0.1, 0.0], [0.1, 1.0, 0.0], [0.0, 0.0, 1.0]])
     basis_set = create_test_basis_set(3, "test-complete-workflow")
-    orb = qdk.chemistry.data.Orbitals(coeffs, energies, overlap, basis_set)
+    orb = Orbitals(coeffs, energies, overlap, basis_set)
 
-    assert orb.get_num_aos() == 3
-    assert orb.get_num_mos() == 2
+    assert orb.get_num_atomic_orbitals() == 3
+    assert orb.get_num_molecular_orbitals() == 2
     assert orb.is_restricted()
 
     with tempfile.NamedTemporaryFile(suffix=".orbitals.json") as tmp_json:
         json_filename = tmp_json.name
         orb.to_json_file(json_filename)
-        orb2 = qdk.chemistry.data.Orbitals.from_json_file(json_filename)
-        assert orb2.get_num_aos() == orb.get_num_aos()
-        assert orb2.get_num_mos() == orb.get_num_mos()
+        orb2 = Orbitals.from_json_file(json_filename)
+        assert orb2.get_num_atomic_orbitals() == orb.get_num_atomic_orbitals()
+        assert orb2.get_num_molecular_orbitals() == orb.get_num_molecular_orbitals()
         orig_coeffs_a, orig_coeffs_b = orb.get_coefficients()
         new_coeffs_a, new_coeffs_b = orb2.get_coefficients()
         assert np.allclose(
@@ -298,7 +296,7 @@ def test_orbitals_file_io_generic():
     energies = np.array([-1.0, 0.5])
     overlap = np.array([[1.0, 0.1, 0.0], [0.1, 1.0, 0.0], [0.0, 0.0, 1.0]])
     basis_set = create_test_basis_set(3, "test-file-io-generic")
-    orb = qdk.chemistry.data.Orbitals(coeffs, energies, overlap, basis_set)
+    orb = Orbitals(coeffs, energies, overlap, basis_set)
 
     # Test JSON file I/O
     with tempfile.NamedTemporaryFile(suffix=".orbitals.json") as tmp_json:
@@ -308,11 +306,11 @@ def test_orbitals_file_io_generic():
         orb.to_file(json_filename, "json")
 
         # Load using generic method (static)
-        orb2 = qdk.chemistry.data.Orbitals.from_file(json_filename, "json")
+        orb2 = Orbitals.from_file(json_filename, "json")
 
         # Check equality
-        assert orb2.get_num_aos() == orb.get_num_aos()
-        assert orb2.get_num_mos() == orb.get_num_mos()
+        assert orb2.get_num_atomic_orbitals() == orb.get_num_atomic_orbitals()
+        assert orb2.get_num_molecular_orbitals() == orb.get_num_molecular_orbitals()
 
         # Check coefficients
         orig_coeffs_a, orig_coeffs_b = orb.get_coefficients()
@@ -338,11 +336,11 @@ def test_orbitals_file_io_generic():
         orb.to_file(hdf5_filename, "hdf5")
 
         # Load using generic method (static)
-        orb3 = qdk.chemistry.data.Orbitals.from_file(hdf5_filename, "hdf5")
+        orb3 = Orbitals.from_file(hdf5_filename, "hdf5")
 
         # Check equality
-        assert orb3.get_num_aos() == orb.get_num_aos()
-        assert orb3.get_num_mos() == orb.get_num_mos()
+        assert orb3.get_num_atomic_orbitals() == orb.get_num_atomic_orbitals()
+        assert orb3.get_num_molecular_orbitals() == orb.get_num_molecular_orbitals()
 
         # Check coefficients
         orig_coeffs_a, orig_coeffs_b = orb.get_coefficients()
@@ -365,7 +363,7 @@ def test_orbitals_file_io_generic():
         orb.to_file("test.orbitals.xyz", "xyz")
 
     with pytest.raises(RuntimeError, match="Unsupported file type"):
-        qdk.chemistry.data.Orbitals.from_file("test.orbitals.xyz", "xyz")
+        Orbitals.from_file("test.orbitals.xyz", "xyz")
 
 
 def test_orbitals_hdf5_specific():
@@ -374,7 +372,7 @@ def test_orbitals_hdf5_specific():
     energies = np.array([-1.0, 0.5])
     overlap = np.array([[1.0, 0.1, 0.0], [0.1, 1.0, 0.0], [0.0, 0.0, 1.0]])
     basis_set = create_test_basis_set(3, "test-file-io-hdf5-specific")
-    orb = qdk.chemistry.data.Orbitals(coeffs, energies, overlap, basis_set)
+    orb = Orbitals(coeffs, energies, overlap, basis_set)
 
     # Test HDF5 file I/O methods
     with tempfile.NamedTemporaryFile(suffix=".orbitals.h5") as tmp_hdf5:
@@ -384,11 +382,11 @@ def test_orbitals_hdf5_specific():
         orb.to_hdf5_file(hdf5_filename)
 
         # Load using new method (static)
-        orb2 = qdk.chemistry.data.Orbitals.from_hdf5_file(hdf5_filename)
+        orb2 = Orbitals.from_hdf5_file(hdf5_filename)
 
         # Check equality
-        assert orb2.get_num_aos() == orb.get_num_aos()
-        assert orb2.get_num_mos() == orb.get_num_mos()
+        assert orb2.get_num_atomic_orbitals() == orb.get_num_atomic_orbitals()
+        assert orb2.get_num_molecular_orbitals() == orb.get_num_molecular_orbitals()
 
         # Check coefficients
         orig_coeffs_a, orig_coeffs_b = orb.get_coefficients()
@@ -438,11 +436,11 @@ def test_orbitals_hdf5_specific():
         orb.to_hdf5_file(hdf5_filename)
 
         # Load using method (static)
-        orb3 = qdk.chemistry.data.Orbitals.from_hdf5_file(hdf5_filename)
+        orb3 = Orbitals.from_hdf5_file(hdf5_filename)
 
         # Check equality
-        assert orb3.get_num_aos() == orb.get_num_aos()
-        assert orb3.get_num_mos() == orb.get_num_mos()
+        assert orb3.get_num_atomic_orbitals() == orb.get_num_atomic_orbitals()
+        assert orb3.get_num_molecular_orbitals() == orb.get_num_molecular_orbitals()
 
 
 def test_orbitals_file_io_validation():
@@ -450,28 +448,28 @@ def test_orbitals_file_io_validation():
     coeffs = np.array([[0.9, 0.1], [0.1, -0.9], [0.0, 0.0]])
     occupations = np.array([2.0, 0.0])
     basis_set = create_test_basis_set(3, "test-file-io-validation")
-    orb = qdk.chemistry.data.Orbitals(coeffs, occupations, None, basis_set)
+    orb = Orbitals(coeffs, occupations, None, basis_set)
 
     # Test filename validation for JSON files
     with pytest.raises(ValueError, match=re.escape("'.orbitals.' before the file extension")):
         orb.to_json_file("test.json")
 
     with pytest.raises(ValueError, match=re.escape("'.orbitals.' before the file extension")):
-        qdk.chemistry.data.Orbitals.from_json_file("test.json")
+        Orbitals.from_json_file("test.json")
 
     # Test filename validation for HDF5 files
     with pytest.raises(ValueError, match=re.escape("'.orbitals.' before the file extension")):
         orb.to_hdf5_file("test.h5")
 
     with pytest.raises(ValueError, match=re.escape("'.orbitals.' before the file extension")):
-        qdk.chemistry.data.Orbitals.from_hdf5_file("test.h5")
+        Orbitals.from_hdf5_file("test.h5")
 
     # Test non-existent file
     with pytest.raises(RuntimeError, match="Cannot open file for reading"):
-        qdk.chemistry.data.Orbitals.from_json_file("nonexistent.orbitals.json")
+        Orbitals.from_json_file("nonexistent.orbitals.json")
 
     with pytest.raises(RuntimeError):
-        qdk.chemistry.data.Orbitals.from_hdf5_file("nonexistent.orbitals.h5")
+        Orbitals.from_hdf5_file("nonexistent.orbitals.h5")
 
 
 def test_orbitals_file_io_round_trip():
@@ -483,7 +481,7 @@ def test_orbitals_file_io_round_trip():
     energies_beta = np.array([-0.9, 0.6])
     overlap = np.array([[1.0, 0.1, 0.0], [0.1, 1.0, 0.0], [0.0, 0.0, 1.0]])
     basis_set = create_test_basis_set(3, "test-file-io-validation")
-    orb = qdk.chemistry.data.Orbitals(
+    orb = Orbitals(
         coeffs_alpha,
         coeffs_beta,
         energies_alpha,
@@ -498,11 +496,11 @@ def test_orbitals_file_io_round_trip():
 
         # Save and reload
         orb.to_json_file(json_filename)
-        orb_json = qdk.chemistry.data.Orbitals.from_json_file(json_filename)
+        orb_json = Orbitals.from_json_file(json_filename)
 
         # Check all properties are preserved
-        assert orb_json.get_num_aos() == orb.get_num_aos()
-        assert orb_json.get_num_mos() == orb.get_num_mos()
+        assert orb_json.get_num_atomic_orbitals() == orb.get_num_atomic_orbitals()
+        assert orb_json.get_num_molecular_orbitals() == orb.get_num_molecular_orbitals()
 
         # Check coefficients
         orig_coeffs_a, orig_coeffs_b = orb.get_coefficients()
@@ -550,11 +548,11 @@ def test_orbitals_file_io_round_trip():
 
         # Save and reload
         orb.to_hdf5_file(hdf5_filename)
-        orb_hdf5 = qdk.chemistry.data.Orbitals.from_hdf5_file(hdf5_filename)
+        orb_hdf5 = Orbitals.from_hdf5_file(hdf5_filename)
 
         # Check all properties are preserved
-        assert orb_hdf5.get_num_aos() == orb.get_num_aos()
-        assert orb_hdf5.get_num_mos() == orb.get_num_mos()
+        assert orb_hdf5.get_num_atomic_orbitals() == orb.get_num_atomic_orbitals()
+        assert orb_hdf5.get_num_molecular_orbitals() == orb.get_num_molecular_orbitals()
 
         # Check coefficients
         orig_coeffs_a, orig_coeffs_b = orb.get_coefficients()
@@ -609,7 +607,7 @@ def test_active_space_management():
     )
     active_indices = [1, 2]
     basis_set = create_test_basis_set(4, "test-active-space-management")
-    orb = qdk.chemistry.data.Orbitals(coeffs, None, None, basis_set, [active_indices, []])
+    orb = Orbitals(coeffs, None, None, basis_set, [active_indices, []])
 
     assert orb.has_active_space()
     alpha_indices, beta_indices = orb.get_active_space_indices()
@@ -629,7 +627,7 @@ def test_inactive_space_management():
     )
     inactive_indices = [0, 1]
     basis_set = create_test_basis_set(4, "test-inactive-space-management")
-    orb = qdk.chemistry.data.Orbitals(coeffs, None, None, basis_set, [[], inactive_indices])
+    orb = Orbitals(coeffs, None, None, basis_set, [[], inactive_indices])
 
     alpha_indices, beta_indices = orb.get_inactive_space_indices()
     assert np.array_equal(alpha_indices, inactive_indices)
@@ -643,7 +641,7 @@ def test_active_space_unrestricted():
     alpha_active = [0, 1]
     beta_active = [1, 2]
     basis_set = create_test_basis_set(3, "test-active-space-unrestricted")
-    orb = qdk.chemistry.data.Orbitals(
+    orb = Orbitals(
         alpha_coeffs,
         beta_coeffs,
         None,
@@ -663,7 +661,7 @@ def test_active_space_serialization():
     coeffs = np.array([[0.9, 0.1, 0.0], [0.1, -0.9, 0.0], [0.0, 0.0, 1.0]])
     active_indices = [0, 2]
     basis_set = create_test_basis_set(3, "test-active-space-serialization")
-    orb = qdk.chemistry.data.Orbitals(coeffs, None, None, basis_set, [active_indices, []])
+    orb = Orbitals(coeffs, None, None, basis_set, [active_indices, []])
 
     # Test JSON serialization
     with tempfile.NamedTemporaryFile(suffix=".orbitals.json") as tmp_json:
@@ -671,7 +669,7 @@ def test_active_space_serialization():
         orb.to_json_file(json_filename)
 
         # Load into a new object
-        orb_json = qdk.chemistry.data.Orbitals.from_json_file(json_filename)
+        orb_json = Orbitals.from_json_file(json_filename)
 
         # Check that active space was preserved
         assert orb_json.has_active_space()
@@ -688,7 +686,7 @@ def test_active_space_serialization():
             orb.to_hdf5_file(hdf5_filename)
 
             # Load into a new object
-            orb_hdf5 = qdk.chemistry.data.Orbitals.from_hdf5_file(hdf5_filename)
+            orb_hdf5 = Orbitals.from_hdf5_file(hdf5_filename)
 
             # Check that active space was preserved
             assert orb_hdf5.has_active_space()
@@ -706,10 +704,10 @@ def test_active_space_copy_assign():
     """Test that active space is preserved when copying or assigning orbitals."""
     coeffs = np.array([[0.9, 0.1], [0.1, -0.9]])
     basis_set = create_test_basis_set(2, "test-active-space-copy-assign")
-    orb = qdk.chemistry.data.Orbitals(coeffs, None, None, basis_set, [[0], []])
+    orb = Orbitals(coeffs, None, None, basis_set, [[0], []])
 
     # Test copy constructor
-    orb_copy = qdk.chemistry.data.Orbitals(orb)
+    orb_copy = Orbitals(orb)
     assert orb_copy.has_active_space()
 
     copy_alpha, copy_beta = orb_copy.get_active_space_indices()
@@ -723,7 +721,7 @@ def test_active_space_validation():
     # Set up basic data with 3 MOs and valid active space in constructor
     coeffs = np.array([[0.9, 0.1, 0.0], [0.1, -0.9, 0.0], [0.0, 0.0, 1.0]])
     basis_set = create_test_basis_set(3, "test-active-space-validation")
-    orb = qdk.chemistry.data.Orbitals(coeffs, None, None, basis_set, [[0, 1], []])
+    orb = Orbitals(coeffs, None, None, basis_set, [[0, 1], []])
     alpha_indices, beta_indices = orb.get_active_space_indices()
     assert np.array_equal(alpha_indices, [0, 1])
     assert np.array_equal(beta_indices, [0, 1])
@@ -737,31 +735,31 @@ def test_error_handling():
     coeffs_beta = np.array([[1.0, 0.0, 0.0], [0.0, 1.0, 0.0]])  # 2x3
     basis = create_test_basis_set(2, "test-error-handling")
     with contextlib.suppress(Exception):
-        qdk.chemistry.data.Orbitals(coeffs_alpha, coeffs_beta, None, basis)  # may raise
+        Orbitals(coeffs_alpha, coeffs_beta, None, basis)  # may raise
 
 
 def test_large_orbital_set(tmp_path):
     """Test handling of large orbital sets."""
     # Create fairly large matrices (e.g., 500 AOs, 200 MOs)
-    num_aos = 500
-    num_mos = 200
+    num_atomic_orbitals = 500
+    num_molecular_orbitals = 200
 
     # Generate large matrices using modern random generator
     rng = np.random.default_rng(42)  # Use fixed seed for reproducibility
-    coeffs = rng.random((num_aos, num_mos))
-    energies = rng.random(num_mos) - 0.5  # centered around zero
-    occupations = np.zeros(num_mos)
+    coeffs = rng.random((num_atomic_orbitals, num_molecular_orbitals))
+    energies = rng.random(num_molecular_orbitals) - 0.5  # centered around zero
+    occupations = np.zeros(num_molecular_orbitals)
     occupations[:100] = 2.0  # 100 doubly occupied orbitals = 200 electrons
-    overlap = np.eye(num_aos)  # identity for simplicity
+    overlap = np.eye(num_atomic_orbitals)  # identity for simplicity
 
-    basis = create_test_basis_set(num_aos, "test-large-orbitals")
+    basis = create_test_basis_set(num_atomic_orbitals, "test-large-orbitals")
 
     # Construct directly
-    orb = qdk.chemistry.data.Orbitals(coeffs, energies, overlap, basis)
+    orb = Orbitals(coeffs, energies, overlap, basis)
 
     # Check dimensions
-    assert orb.get_num_aos() == num_aos
-    assert orb.get_num_mos() == num_mos
+    assert orb.get_num_atomic_orbitals() == num_atomic_orbitals
+    assert orb.get_num_molecular_orbitals() == num_molecular_orbitals
 
     # Check that serialization works with large data
     json_file = tmp_path / "large_orbitals.orbitals.json"
@@ -770,11 +768,11 @@ def test_large_orbital_set(tmp_path):
     orb.to_json_file(json_file)
 
     # Load back and check
-    orb2 = qdk.chemistry.data.Orbitals.from_json_file(json_file)
+    orb2 = Orbitals.from_json_file(json_file)
 
     # Check dimensions
-    assert orb2.get_num_aos() == orb.get_num_aos()
-    assert orb2.get_num_mos() == orb.get_num_mos()
+    assert orb2.get_num_atomic_orbitals() == orb.get_num_atomic_orbitals()
+    assert orb2.get_num_molecular_orbitals() == orb.get_num_molecular_orbitals()
 
 
 def test_orbitals_pickling_and_repr():
@@ -785,7 +783,7 @@ def test_orbitals_pickling_and_repr():
     overlap = np.eye(3)
     basis_set = create_test_basis_set(3, "test-pickling")
 
-    original = qdk.chemistry.data.Orbitals(coeffs, energies, overlap, basis_set)
+    original = Orbitals(coeffs, energies, overlap, basis_set)
 
     # Test pickling and unpickling
     pickled_data = pickle.dumps(original)
@@ -795,8 +793,8 @@ def test_orbitals_pickling_and_repr():
     unpickled = pickle.loads(pickled_data)
 
     # Verify orbitals are preserved
-    assert unpickled.get_num_aos() == original.get_num_aos()
-    assert unpickled.get_num_mos() == original.get_num_mos()
+    assert unpickled.get_num_atomic_orbitals() == original.get_num_atomic_orbitals()
+    assert unpickled.get_num_molecular_orbitals() == original.get_num_molecular_orbitals()
     assert unpickled.is_restricted() == original.is_restricted()
 
     # Check coefficients are preserved
@@ -842,8 +840,8 @@ def test_orbitals_pickling_and_repr():
         current = pickle.loads(pickled)
 
         # Verify data integrity after each round trip
-        assert current.get_num_aos() == original.get_num_aos()
-        assert current.get_num_mos() == original.get_num_mos()
+        assert current.get_num_atomic_orbitals() == original.get_num_atomic_orbitals()
+        assert current.get_num_molecular_orbitals() == original.get_num_molecular_orbitals()
         assert current.is_restricted() == original.is_restricted()
 
     # Test __repr__ uses summary function
@@ -854,7 +852,9 @@ def test_orbitals_pickling_and_repr():
     assert repr_output == summary_output
 
     # Check that typical summary content is present
-    assert "Orbitals" in repr_output or "MOs" in repr_output or str(original.get_num_mos()) in repr_output
+    assert (
+        "Orbitals" in repr_output or "MOs" in repr_output or str(original.get_num_molecular_orbitals()) in repr_output
+    )
 
     # Test __str__ vs __repr__ consistency
     str_output = str(original)
@@ -881,7 +881,7 @@ def test_orbitals_unrestricted_pickling():
     overlap = np.eye(3)
     basis_set = create_test_basis_set(3, "test-unrestricted-pickling")
 
-    original = qdk.chemistry.data.Orbitals(coeffs_alpha, coeffs_beta, energies_alpha, energies_beta, overlap, basis_set)
+    original = Orbitals(coeffs_alpha, coeffs_beta, energies_alpha, energies_beta, overlap, basis_set)
 
     # Test pickling and unpickling
     pickled_data = pickle.dumps(original)
@@ -923,7 +923,7 @@ def test_orbitals_unrestricted_pickling():
 def test_model_orbitals_pickling_and_repr():
     """Test pickling support and string representation for ModelOrbitals."""
     # Create a test ModelOrbitals object
-    original = qdk.chemistry.data.ModelOrbitals(4, True)  # 4 orbitals, restricted
+    original = ModelOrbitals(4, True)  # 4 orbitals, restricted
 
     # Test pickling and unpickling
     pickled_data = pickle.dumps(original)
@@ -933,8 +933,8 @@ def test_model_orbitals_pickling_and_repr():
     unpickled = pickle.loads(pickled_data)
 
     # Verify model orbitals are preserved
-    assert unpickled.get_num_aos() == original.get_num_aos()
-    assert unpickled.get_num_mos() == original.get_num_mos()
+    assert unpickled.get_num_atomic_orbitals() == original.get_num_atomic_orbitals()
+    assert unpickled.get_num_molecular_orbitals() == original.get_num_molecular_orbitals()
     assert unpickled.is_restricted() == original.is_restricted()
 
     # Test __repr__ uses summary function
@@ -945,7 +945,7 @@ def test_model_orbitals_pickling_and_repr():
     assert repr_output == summary_output
 
     # Test unrestricted ModelOrbitals
-    original_unres = qdk.chemistry.data.ModelOrbitals(6, False)  # 6 orbitals, unrestricted
+    original_unres = ModelOrbitals(6, False)  # 6 orbitals, unrestricted
 
     pickled_data = pickle.dumps(original_unres)
     unpickled_unres = pickle.loads(pickled_data)

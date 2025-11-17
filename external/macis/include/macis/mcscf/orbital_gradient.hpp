@@ -16,8 +16,8 @@ void compute_orbital_rotation(NumOrbital _norb, double alpha, const double* K,
                               size_t LDK, double* U, size_t LDU);
 
 void fock_to_gradient(NumOrbital _norb, NumInactive _ninact, NumActive _nact,
-                      NumVirtual _nvirt, const double* F, size_t LDF,
-                      double* OG, size_t LDOG);
+                      NumVirtual _num_virtual_orbitals, const double* F,
+                      size_t LDF, double* OG, size_t LDOG);
 
 void orbital_rotated_generalized_fock(
     NumOrbital norb, NumInactive ninact, NumActive nact, const double* T,

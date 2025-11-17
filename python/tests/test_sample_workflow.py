@@ -12,7 +12,6 @@ summary values when executed as scripts.
 
 import math
 import os
-import platform
 import re
 import subprocess
 import sys
@@ -244,10 +243,6 @@ def test_sample_non_commuting_qpe_outputs_expected_values():
     assert energies == pytest.approx([1.12500000, -0.08984375], abs=1e-8)
 
 
-@pytest.mark.skipif(
-    platform.machine() in ["arm64", "aarch64"],
-    reason="Skipping QPE Direct test on ARM architectures due non-deterministic transpilation.",
-)
 def test_qiskit_qpe_direct_outputs_consistency():
     """Execute the exact-evolution IQPE sample and validate reported energies."""
     repo_root = Path(__file__).resolve().parents[2]

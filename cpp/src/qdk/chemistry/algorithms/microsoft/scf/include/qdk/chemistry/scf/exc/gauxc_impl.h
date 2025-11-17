@@ -58,10 +58,11 @@ class GAUXC {
    * where one electron is integrated numerically on a grid while the other
    * is handled analytically.
    *
-   * @param[in] D Density matrix (size: (ndm, nbf, nbf))
-   * @param[out] K Semi-numerical exchange matrix (size: (ndm, nbf, nbf))
+   * @param[in] D Density matrix (size: (ndm, num_basis_funcs, num_basis_funcs))
+   * @param[out] K Semi-numerical exchange matrix (size: (ndm, num_basis_funcs,
+   * num_basis_funcs))
    * @note ``ndm`` is the number of density matrices; 1 for restricted, 2 for
-   *       unrestricted calculations. ``nbf`` is the number of basis functions.
+   *       unrestricted calculations.
    */
   void build_snK(const double* D, double* K);
 
@@ -73,10 +74,11 @@ class GAUXC {
    * ddPCM) for solvation.
    *
    * @param[in] lmax Maximum angular momentum for multipole expansion
-   * @param[in] D Density matrix (size: ndm*nbf×nbf)
+   * @param[in] D Density matrix (size:
+   * num_density_matrices * num_basis_funcs × num_basis_funcs)
    * @param[out] dd_psi Density-dependent (size: ((2*lmax+1),natoms))
    * @note ``ndm`` is the number of density matrices; 1 for restricted, 2 for
-   *       unrestricted calculations. ``nbf`` is the number of basis functions.
+   *       unrestricted calculations.
    */
   void eval_dd_psi(int lmax, const double* D, double* dd_psi);
 
@@ -91,7 +93,7 @@ class GAUXC {
    * @param[in] x Input multipole coefficients from external environment (size:
    * ((2*lmax+1),natoms))
    * @param[out] dd_psi_potential Potential contribution to Fock matrix (size:
-   * (ndm,nbf,nbf))
+   * (num_density_matrices,num_basis_funcs,num_basis_funcs))
    */
   void eval_dd_psi_potential(int lmax, const double* x,
                              double* dd_psi_potential);

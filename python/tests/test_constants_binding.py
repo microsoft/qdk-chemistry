@@ -15,8 +15,8 @@ import pytest
 from .reference_tolerances import float_comparison_absolute_tolerance, float_comparison_relative_tolerance
 
 try:
-    import qdk.chemistry._core.constants as core_constants
-    from qdk.chemistry import constants
+    import qdk_chemistry._core.constants as core_constants
+    from qdk_chemistry import constants
 
     CORE_AVAILABLE = True
 except ImportError:

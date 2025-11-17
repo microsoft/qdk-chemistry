@@ -10,7 +10,7 @@ from pathlib import Path
 
 import pytest
 
-from qdk.chemistry.noise_models import (
+from qdk_chemistry.noise_models import (
     QuantumErrorProfile,
     SupportedErrorTypes,
     SupportedGate,

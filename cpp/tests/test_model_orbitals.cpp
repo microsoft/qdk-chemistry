@@ -31,15 +31,15 @@ TEST_F(ModelOrbitalsTest, BasicConstructor) {
   ModelOrbitals model_restricted(basis_size, true);
   EXPECT_TRUE(model_restricted.is_restricted());
   EXPECT_FALSE(model_restricted.is_unrestricted());
-  EXPECT_EQ(basis_size, model_restricted.get_num_aos());
-  EXPECT_EQ(basis_size, model_restricted.get_num_mos());
+  EXPECT_EQ(basis_size, model_restricted.get_num_atomic_orbitals());
+  EXPECT_EQ(basis_size, model_restricted.get_num_molecular_orbitals());
 
   // Unrestricted case
   ModelOrbitals model_unrestricted(basis_size, false);
   EXPECT_FALSE(model_unrestricted.is_restricted());
   EXPECT_TRUE(model_unrestricted.is_unrestricted());
-  EXPECT_EQ(basis_size, model_unrestricted.get_num_aos());
-  EXPECT_EQ(basis_size, model_unrestricted.get_num_mos());
+  EXPECT_EQ(basis_size, model_unrestricted.get_num_atomic_orbitals());
+  EXPECT_EQ(basis_size, model_unrestricted.get_num_molecular_orbitals());
 }
 
 TEST_F(ModelOrbitalsTest, RestrictedActiveSpaceConstructor) {
@@ -52,8 +52,8 @@ TEST_F(ModelOrbitalsTest, RestrictedActiveSpaceConstructor) {
                       std::make_tuple(active_indices, inactive_indices));
 
   EXPECT_TRUE(model.is_restricted());
-  EXPECT_EQ(basis_size, model.get_num_aos());
-  EXPECT_EQ(basis_size, model.get_num_mos());
+  EXPECT_EQ(basis_size, model.get_num_atomic_orbitals());
+  EXPECT_EQ(basis_size, model.get_num_molecular_orbitals());
 
   // Check active space
   EXPECT_TRUE(model.has_active_space());
@@ -82,8 +82,8 @@ TEST_F(ModelOrbitalsTest, UnrestrictedActiveSpaceConstructor) {
 
   EXPECT_FALSE(model.is_restricted());
   EXPECT_TRUE(model.is_unrestricted());
-  EXPECT_EQ(basis_size, model.get_num_aos());
-  EXPECT_EQ(basis_size, model.get_num_mos());
+  EXPECT_EQ(basis_size, model.get_num_atomic_orbitals());
+  EXPECT_EQ(basis_size, model.get_num_molecular_orbitals());
 
   // Check active space
   EXPECT_TRUE(model.has_active_space());
@@ -333,8 +333,10 @@ TEST_F(ModelOrbitalsTest, JSONRoundTrip) {
   auto reconstructed = ModelOrbitals::from_json(json_data);
 
   // Check that properties are preserved
-  EXPECT_EQ(original.get_num_aos(), reconstructed->get_num_aos());
-  EXPECT_EQ(original.get_num_mos(), reconstructed->get_num_mos());
+  EXPECT_EQ(original.get_num_atomic_orbitals(),
+            reconstructed->get_num_atomic_orbitals());
+  EXPECT_EQ(original.get_num_molecular_orbitals(),
+            reconstructed->get_num_molecular_orbitals());
   EXPECT_EQ(original.is_restricted(), reconstructed->is_restricted());
 
   // Check active space indices
@@ -364,8 +366,10 @@ TEST_F(ModelOrbitalsTest, SimpleRestrictedJSONRoundTrip) {
   auto json_data = original.to_json();
   auto reconstructed = ModelOrbitals::from_json(json_data);
 
-  EXPECT_EQ(original.get_num_aos(), reconstructed->get_num_aos());
-  EXPECT_EQ(original.get_num_mos(), reconstructed->get_num_mos());
+  EXPECT_EQ(original.get_num_atomic_orbitals(),
+            reconstructed->get_num_atomic_orbitals());
+  EXPECT_EQ(original.get_num_molecular_orbitals(),
+            reconstructed->get_num_molecular_orbitals());
   EXPECT_EQ(original.is_restricted(), reconstructed->is_restricted());
 }
 
@@ -399,8 +403,8 @@ TEST_F(ModelOrbitalsTest, LargerSystem) {
   ModelOrbitals model(basis_size,
                       std::make_tuple(active_indices, inactive_indices));
 
-  EXPECT_EQ(basis_size, model.get_num_aos());
-  EXPECT_EQ(basis_size, model.get_num_mos());
+  EXPECT_EQ(basis_size, model.get_num_atomic_orbitals());
+  EXPECT_EQ(basis_size, model.get_num_molecular_orbitals());
 
   auto [alpha_active, beta_active] = model.get_active_space_indices();
   EXPECT_EQ(active_indices, alpha_active);
@@ -425,8 +429,8 @@ TEST_F(ModelOrbitalsTest, InheritanceBehavior) {
   std::shared_ptr<Orbitals> orbitals_ptr =
       std::make_shared<ModelOrbitals>(model);
 
-  EXPECT_EQ(basis_size, orbitals_ptr->get_num_aos());
-  EXPECT_EQ(basis_size, orbitals_ptr->get_num_mos());
+  EXPECT_EQ(basis_size, orbitals_ptr->get_num_atomic_orbitals());
+  EXPECT_EQ(basis_size, orbitals_ptr->get_num_molecular_orbitals());
   EXPECT_TRUE(orbitals_ptr->is_restricted());
 
   // Test that methods that should throw still throw through base pointer
@@ -446,8 +450,9 @@ TEST_F(ModelOrbitalsTest, CopyAndMoveSemantics) {
 
   // Test copy constructor
   ModelOrbitals copy(original);
-  EXPECT_EQ(original.get_num_aos(), copy.get_num_aos());
-  EXPECT_EQ(original.get_num_mos(), copy.get_num_mos());
+  EXPECT_EQ(original.get_num_atomic_orbitals(), copy.get_num_atomic_orbitals());
+  EXPECT_EQ(original.get_num_molecular_orbitals(),
+            copy.get_num_molecular_orbitals());
   EXPECT_EQ(original.is_restricted(), copy.is_restricted());
 
   // Test that active/inactive spaces are preserved
@@ -460,6 +465,7 @@ TEST_F(ModelOrbitalsTest, CopyAndMoveSemantics) {
   // Test assignment
   ModelOrbitals assigned(2, false);  // Different initial state
   assigned = original;
-  EXPECT_EQ(original.get_num_aos(), assigned.get_num_aos());
+  EXPECT_EQ(original.get_num_atomic_orbitals(),
+            assigned.get_num_atomic_orbitals());
   EXPECT_EQ(original.is_restricted(), assigned.is_restricted());
 }

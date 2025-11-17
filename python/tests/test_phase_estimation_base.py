@@ -10,13 +10,13 @@ import pytest
 from qiskit import QuantumCircuit
 from qiskit.quantum_info import SparsePauliOp
 
-from qdk.chemistry.algorithms import (
+from qdk_chemistry.algorithms import (
     IterativePhaseEstimation,
     PhaseEstimation,
     PhaseEstimationAlgorithm,
     TraditionalPhaseEstimation,
 )
-from qdk.chemistry.data import QubitHamiltonian
+from qdk_chemistry.data import QubitHamiltonian
 
 
 @pytest.fixture

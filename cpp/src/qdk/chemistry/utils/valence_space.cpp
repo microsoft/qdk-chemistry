@@ -87,11 +87,11 @@ std::pair<size_t, size_t> compute_valence_space(
                          total_valence_electrons) /
                         2;
   std::shared_ptr<Orbitals> orbitals = wavefunction->get_orbitals();
-  size_t num_mos = orbitals->get_num_mos();
+  size_t num_molecular_orbitals = orbitals->get_num_molecular_orbitals();
   // number of available valence orbitals should be the upper bound of active
   // space
   size_t num_active_valence_orbitals =
-      std::min(num_mos - num_core_mos, total_valence_orbitals);
+      std::min(num_molecular_orbitals - num_core_mos, total_valence_orbitals);
 
   size_t num_active_valence_electrons =
       total_valence_electrons -

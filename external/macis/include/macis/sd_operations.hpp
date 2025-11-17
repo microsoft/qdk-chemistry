@@ -51,13 +51,13 @@ namespace macis {
 //                        std::vector<uint32_t>& occ, std::vector<uint32_t>&
 //                        vir) {
 //   occ = bits_to_indices(state);
-//   const auto nocc = occ.size();
-//   assert(nocc < norb);
+//   const auto num_occupied_orbitals = occ.size();
+//   assert(num_occupied_orbitals < norb);
 //
-//   const auto nvir = norb - nocc;
-//   vir.resize(nvir);
+//   const auto num_virtual_orbitals = norb - num_occupied_orbitals;
+//   vir.resize(num_virtual_orbitals);
 //   state = ~state;
-//   for(int i = 0; i < nvir; ++i) {
+//   for(int i = 0; i < num_virtual_orbitals; ++i) {
 //     auto a = ffs(state) - 1;
 //     vir[i] = a;
 //     state.flip(a);
@@ -117,14 +117,14 @@ template <typename WfnType, typename WfnContainer>
 void append_singles(WfnType state, const std::vector<uint32_t>& occ,
                     const std::vector<uint32_t>& vir, WfnContainer& singles) {
   using wfn_traits = wavefunction_traits<WfnType>;
-  const size_t nocc = occ.size();
-  const size_t nvir = vir.size();
+  const size_t num_occupied_orbitals = occ.size();
+  const size_t num_virtual_orbitals = vir.size();
 
   singles.clear();
-  singles.reserve(nocc * nvir);
+  singles.reserve(num_occupied_orbitals * num_virtual_orbitals);
 
-  for (size_t a = 0; a < nvir; ++a)
-    for (size_t i = 0; i < nocc; ++i) {
+  for (size_t a = 0; a < num_virtual_orbitals; ++a)
+    for (size_t i = 0; i < num_occupied_orbitals; ++i) {
       singles.emplace_back(
           wfn_traits::single_excitation_no_check(state, occ[i], vir[a]));
     }
@@ -134,18 +134,18 @@ template <typename WfnType, typename WfnContainer>
 void append_doubles(WfnType state, const std::vector<uint32_t>& occ,
                     const std::vector<uint32_t>& vir, WfnContainer& doubles) {
   using wfn_traits = wavefunction_traits<WfnType>;
-  const size_t nocc = occ.size();
-  const size_t nvir = vir.size();
+  const size_t num_occupied_orbitals = occ.size();
+  const size_t num_virtual_orbitals = vir.size();
 
   doubles.clear();
-  const size_t nv2 = (nvir * (nvir - 1)) / 2;
-  const size_t no2 = (nocc * (nocc - 1)) / 2;
+  const size_t nv2 = (num_virtual_orbitals * (num_virtual_orbitals - 1)) / 2;
+  const size_t no2 = (num_occupied_orbitals * (num_occupied_orbitals - 1)) / 2;
   doubles.reserve(nv2 * no2);
 
-  for (size_t a = 0; a < nvir; ++a)
-    for (size_t i = 0; i < nocc; ++i)
-      for (size_t b = a + 1; b < nvir; ++b)
-        for (size_t j = i + 1; j < nocc; ++j) {
+  for (size_t a = 0; a < num_virtual_orbitals; ++a)
+    for (size_t i = 0; i < num_occupied_orbitals; ++i)
+      for (size_t b = a + 1; b < num_virtual_orbitals; ++b)
+        for (size_t j = i + 1; j < num_occupied_orbitals; ++j) {
           doubles.emplace_back(wfn_traits::double_excitation_no_check(
               state, occ[i], occ[j], vir[a], vir[b]));
         }

@@ -39,7 +39,7 @@ struct asci_helper {
 
     auto orbitals = hamiltonian.get_orbitals();
     std::vector<size_t> active_indices = detail::get_active_indices(*orbitals);
-    const size_t nmo = active_indices.size();
+    const size_t num_molecular_orbitals = active_indices.size();
 
     const auto& T = hamiltonian.get_one_body_integrals();
     const auto& V = hamiltonian.get_two_body_integrals();
@@ -52,10 +52,13 @@ struct asci_helper {
     std::vector<wfn_type> dets;
     double E_casci = 0.0;
 
-    generator_t ham_gen(
-        macis::matrix_span<double>(const_cast<double*>(T.data()), nmo, nmo),
-        macis::rank4_span<double>(const_cast<double*>(V.data()), nmo, nmo, nmo,
-                                  nmo));
+    generator_t ham_gen(macis::matrix_span<double>(
+                            const_cast<double*>(T.data()),
+                            num_molecular_orbitals, num_molecular_orbitals),
+                        macis::rank4_span<double>(
+                            const_cast<double*>(V.data()),
+                            num_molecular_orbitals, num_molecular_orbitals,
+                            num_molecular_orbitals, num_molecular_orbitals));
     // HF Guess
     dets = {macis::wavefunction_traits<wfn_type>::canonical_hf_determinant(
         nalpha, nbeta)};
@@ -65,13 +68,15 @@ struct asci_helper {
     // Growth phase
     std::tie(E_casci, dets, C_casci) = macis::asci_grow<N, int64_t>(
         asci_settings, mcscf_settings, E_casci, std::move(dets),
-        std::move(C_casci), ham_gen, nmo MACIS_MPI_CODE(, MPI_COMM_WORLD));
+        std::move(C_casci), ham_gen,
+        num_molecular_orbitals MACIS_MPI_CODE(, MPI_COMM_WORLD));
 
     // Refinement phase
     if (asci_settings.max_refine_iter) {
       std::tie(E_casci, dets, C_casci) = macis::asci_refine<N, int64_t>(
           asci_settings, mcscf_settings, E_casci, std::move(dets),
-          std::move(C_casci), ham_gen, nmo MACIS_MPI_CODE(, MPI_COMM_WORLD));
+          std::move(C_casci), ham_gen,
+          num_molecular_orbitals MACIS_MPI_CODE(, MPI_COMM_WORLD));
     }
 
     // Copy-back data to return struct
@@ -79,7 +84,7 @@ struct asci_helper {
     std::vector<data::Configuration> dets_configs;
     for (auto det : dets) {
       // Convert macis::wfn_t to data::Configuration
-      dets_configs.emplace_back(det, nmo);
+      dets_configs.emplace_back(det, num_molecular_orbitals);
     }
     std::copy(C_casci.begin(), C_casci.end(), C_vector.data());
 
@@ -87,20 +92,31 @@ struct asci_helper {
       if (settings_.get<bool>("calculate_one_rdm") ||
           settings_.get<bool>("calculate_two_rdm")) {
         // Calculate RDMs from CI coefficients
-        std::vector<double> active_ordm(nmo * nmo, 0.0);
-        std::vector<double> active_trdm(nmo * nmo * nmo * nmo, 0.0);
+        std::vector<double> active_ordm(
+            num_molecular_orbitals * num_molecular_orbitals, 0.0);
+        std::vector<double> active_trdm(
+            num_molecular_orbitals * num_molecular_orbitals *
+                num_molecular_orbitals * num_molecular_orbitals,
+            0.0);
 
         // Calculate RDMs using the Hamiltonian generator
-        ham_gen.form_rdms(
-            dets.begin(), dets.end(), dets.begin(), dets.end(), C_casci.data(),
-            macis::matrix_span<double>(active_ordm.data(), nmo, nmo),
-            macis::rank4_span<double>(active_trdm.data(), nmo, nmo, nmo, nmo));
+        ham_gen.form_rdms(dets.begin(), dets.end(), dets.begin(), dets.end(),
+                          C_casci.data(),
+                          macis::matrix_span<double>(active_ordm.data(),
+                                                     num_molecular_orbitals,
+                                                     num_molecular_orbitals),
+                          macis::rank4_span<double>(
+                              active_trdm.data(), num_molecular_orbitals,
+                              num_molecular_orbitals, num_molecular_orbitals,
+                              num_molecular_orbitals));
 
         // Convert to Eigen format
-        Eigen::MatrixXd one_rdm =
-            Eigen::Map<Eigen::MatrixXd>(active_ordm.data(), nmo, nmo);
+        Eigen::MatrixXd one_rdm = Eigen::Map<Eigen::MatrixXd>(
+            active_ordm.data(), num_molecular_orbitals, num_molecular_orbitals);
         Eigen::VectorXd two_rdm = Eigen::Map<Eigen::VectorXd>(
-            active_trdm.data(), nmo * nmo * nmo * nmo);
+            active_trdm.data(),
+            num_molecular_orbitals * num_molecular_orbitals *
+                num_molecular_orbitals * num_molecular_orbitals);
 
         // Create wavefunction with RDMs
         return data::Wavefunction(

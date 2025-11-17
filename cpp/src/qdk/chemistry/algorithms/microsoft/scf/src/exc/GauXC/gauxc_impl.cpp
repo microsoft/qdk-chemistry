@@ -243,22 +243,23 @@ GAUXC::GAUXC(BasisSet& basis_set, const GAUXCInput& gauxc_input,
 }
 
 void GAUXC::eval_dd_psi(int lmax, const double* D, double* dd_psi) {
-  auto nbf = integrator_->load_balancer().basis().nbf();
+  auto num_basis_funcs = integrator_->load_balancer().basis().nbf();
   auto natom = integrator_->load_balancer().molecule().size();
   auto nharmonics = (lmax + 1) * (lmax + 1);
-  Eigen::MatrixXd D_eigen = Eigen::Map<const Eigen::MatrixXd>(D, nbf, nbf);
+  Eigen::MatrixXd D_eigen =
+      Eigen::Map<const Eigen::MatrixXd>(D, num_basis_funcs, num_basis_funcs);
   auto dd_psi_vec = integrator_->eval_dd_psi(D_eigen, lmax);
   std::copy(dd_psi_vec.begin(), dd_psi_vec.end(), dd_psi);
 }
 
 void GAUXC::eval_dd_psi_potential(int lmax, const double* x,
                                   double* dd_psi_potential) {
-  auto nbf = integrator_->load_balancer().basis().nbf();
+  auto num_basis_funcs = integrator_->load_balancer().basis().nbf();
   auto natom = integrator_->load_balancer().molecule().size();
   auto nharmonics = (lmax + 1) * (lmax + 1);
   Eigen::Map<const Eigen::MatrixXd> x_eigen(x, nharmonics, natom);
-  Eigen::Map<Eigen::MatrixXd> dd_psi_potential_eigen(dd_psi_potential, nbf,
-                                                     nbf);
+  Eigen::Map<Eigen::MatrixXd> dd_psi_potential_eigen(
+      dd_psi_potential, num_basis_funcs, num_basis_funcs);
   dd_psi_potential_eigen = integrator_->eval_dd_psi_potential(x_eigen, lmax);
 }
 
@@ -288,20 +289,25 @@ void GAUXC::build_XC(const double* D, double* XC, double* xc_energy) {
   allocate_device_buffer_async_(device_buffer_sz_, 0);
 #endif
 
-  auto nbf = integrator_->load_balancer().basis().nbf();
+  auto num_basis_funcs = integrator_->load_balancer().basis().nbf();
 
   if (not unrestricted_) {
     // GauXC expects P[alpha] not P[total] for RKS
-    Eigen::MatrixXd D_eigen =
-        0.5 * Eigen::Map<const Eigen::MatrixXd>(D, nbf, nbf);
-    Eigen::Map<Eigen::MatrixXd> VXC(XC, nbf, nbf);
+    Eigen::MatrixXd D_eigen = 0.5 * Eigen::Map<const Eigen::MatrixXd>(
+                                        D, num_basis_funcs, num_basis_funcs);
+    Eigen::Map<Eigen::MatrixXd> VXC(XC, num_basis_funcs, num_basis_funcs);
 
     std::tie(*xc_energy, VXC) = integrator_->eval_exc_vxc(D_eigen);
   } else {
-    Eigen::Map<const Eigen::MatrixXd> D_alpha(D, nbf, nbf);
-    Eigen::Map<const Eigen::MatrixXd> D_beta(D + nbf * nbf, nbf, nbf);
-    Eigen::Map<Eigen::MatrixXd> VXC_scalar(XC, nbf, nbf);
-    Eigen::Map<Eigen::MatrixXd> VXC_z(XC + nbf * nbf, nbf, nbf);
+    Eigen::Map<const Eigen::MatrixXd> D_alpha(D, num_basis_funcs,
+                                              num_basis_funcs);
+    Eigen::Map<const Eigen::MatrixXd> D_beta(
+        D + num_basis_funcs * num_basis_funcs, num_basis_funcs,
+        num_basis_funcs);
+    Eigen::Map<Eigen::MatrixXd> VXC_scalar(XC, num_basis_funcs,
+                                           num_basis_funcs);
+    Eigen::Map<Eigen::MatrixXd> VXC_z(XC + num_basis_funcs * num_basis_funcs,
+                                      num_basis_funcs, num_basis_funcs);
 
     // GauXC expects Pauli basis for UKS
     Eigen::MatrixXd D_scalar = D_alpha + D_beta;
@@ -310,15 +316,15 @@ void GAUXC::build_XC(const double* D, double* XC, double* xc_energy) {
     std::tie(*xc_energy, VXC_scalar, VXC_z) =
         integrator_->eval_exc_vxc(D_scalar, D_z);
 
-    for (size_t i = 0; i < nbf * nbf; ++i) {
+    for (size_t i = 0; i < num_basis_funcs * num_basis_funcs; ++i) {
       const auto v_scalar = XC[i];
-      const auto v_z = XC[i + nbf * nbf];
+      const auto v_z = XC[i + num_basis_funcs * num_basis_funcs];
 
       const auto v_alpha = (v_scalar + v_z);
       const auto v_beta = (v_scalar - v_z);
 
       XC[i] = v_alpha;
-      XC[i + nbf * nbf] = v_beta;
+      XC[i + num_basis_funcs * num_basis_funcs] = v_beta;
     }
   }
 
@@ -336,18 +342,21 @@ void GAUXC::get_gradients(const double* D, double* dXC) {
 
   GauXC::IntegratorSettingsEXC_GRAD settings;
   settings.include_weight_derivatives = false;
-  auto nbf = integrator_->load_balancer().basis().nbf();
+  auto num_basis_funcs = integrator_->load_balancer().basis().nbf();
   auto nat = integrator_->load_balancer().molecule().size();
   std::vector<double> exc_grad;
 
   if (not unrestricted_) {
     // GauXC expects P[alpha] not P[total] for RKS
-    Eigen::MatrixXd D_eigen =
-        0.5 * Eigen::Map<const Eigen::MatrixXd>(D, nbf, nbf);
+    Eigen::MatrixXd D_eigen = 0.5 * Eigen::Map<const Eigen::MatrixXd>(
+                                        D, num_basis_funcs, num_basis_funcs);
     exc_grad = integrator_->eval_exc_grad(D_eigen, settings);
   } else {
-    Eigen::Map<const Eigen::MatrixXd> D_alpha(D, nbf, nbf);
-    Eigen::Map<const Eigen::MatrixXd> D_beta(D + nbf * nbf, nbf, nbf);
+    Eigen::Map<const Eigen::MatrixXd> D_alpha(D, num_basis_funcs,
+                                              num_basis_funcs);
+    Eigen::Map<const Eigen::MatrixXd> D_beta(
+        D + num_basis_funcs * num_basis_funcs, num_basis_funcs,
+        num_basis_funcs);
 
     // GauXC expects Pauli basis for UKS
     Eigen::MatrixXd D_scalar = D_alpha + D_beta;
@@ -356,7 +365,7 @@ void GAUXC::get_gradients(const double* D, double* dXC) {
     exc_grad = integrator_->eval_exc_grad(D_scalar, D_z, settings);
   }
 
-  // Gradients are expectes as a (3,NATOM) *ROW-MAJOR* matrix on return
+  // Gradients are expected as a (3,NATOM) *ROW-MAJOR* matrix on return
   for (auto i = 0; i < nat; ++i)
     for (auto w = 0; w < 3; ++w) {
       dXC[w * nat + i] = exc_grad[3 * i + w];
@@ -373,15 +382,20 @@ void GAUXC::build_snK(const double* D, double* K) {
   allocate_device_buffer_async_(device_buffer_sz_, 0);
 #endif
 
-  auto nbf = integrator_->load_balancer().basis().nbf();
-  Eigen::MatrixXd D_eigen = Eigen::Map<const Eigen::MatrixXd>(D, nbf, nbf);
-  Eigen::Map<Eigen::MatrixXd> K_eigen(K, nbf, nbf);
+  auto num_basis_funcs = integrator_->load_balancer().basis().nbf();
+  Eigen::MatrixXd D_eigen =
+      Eigen::Map<const Eigen::MatrixXd>(D, num_basis_funcs, num_basis_funcs);
+  Eigen::Map<Eigen::MatrixXd> K_eigen(K, num_basis_funcs, num_basis_funcs);
 
   K_eigen = integrator_->eval_exx(D_eigen);
 
   if (unrestricted_) {
-    Eigen::Map<Eigen::MatrixXd> K_beta_eigen(K + nbf * nbf, nbf, nbf);
-    D_eigen = Eigen::Map<const Eigen::MatrixXd>(D + nbf * nbf, nbf, nbf);
+    Eigen::Map<Eigen::MatrixXd> K_beta_eigen(
+        K + num_basis_funcs * num_basis_funcs, num_basis_funcs,
+        num_basis_funcs);
+    D_eigen =
+        Eigen::Map<const Eigen::MatrixXd>(D + num_basis_funcs * num_basis_funcs,
+                                          num_basis_funcs, num_basis_funcs);
     K_beta_eigen = integrator_->eval_exx(D_eigen);
   }
 
@@ -398,24 +412,32 @@ void GAUXC::eval_fxc_contraction(const double* D, const double* tD,
   allocate_device_buffer_async_(device_buffer_sz_, 0);
 #endif
 
-  auto nbf = integrator_->load_balancer().basis().nbf();
+  auto num_basis_funcs = integrator_->load_balancer().basis().nbf();
 
   if (not unrestricted_) {
     // GauXC expects P[alpha] not P[total] for RKS
-    Eigen::MatrixXd D_eigen =
-        0.5 * Eigen::Map<const Eigen::MatrixXd>(D, nbf, nbf);
-    Eigen::MatrixXd tD_eigen = Eigen::Map<const Eigen::MatrixXd>(tD, nbf, nbf);
-    Eigen::Map<Eigen::MatrixXd> FXC(Fxc, nbf, nbf);
+    Eigen::MatrixXd D_eigen = 0.5 * Eigen::Map<const Eigen::MatrixXd>(
+                                        D, num_basis_funcs, num_basis_funcs);
+    Eigen::MatrixXd tD_eigen =
+        Eigen::Map<const Eigen::MatrixXd>(tD, num_basis_funcs, num_basis_funcs);
+    Eigen::Map<Eigen::MatrixXd> FXC(Fxc, num_basis_funcs, num_basis_funcs);
 
     FXC = integrator_->eval_fxc_contraction(D_eigen, tD_eigen);
 
   } else {
-    Eigen::Map<const Eigen::MatrixXd> D_alpha(D, nbf, nbf);
-    Eigen::Map<const Eigen::MatrixXd> D_beta(D + nbf * nbf, nbf, nbf);
-    Eigen::Map<const Eigen::MatrixXd> tD_alpha(tD, nbf, nbf);
-    Eigen::Map<const Eigen::MatrixXd> tD_beta(tD + nbf * nbf, nbf, nbf);
-    Eigen::Map<Eigen::MatrixXd> FXCa(Fxc, nbf, nbf);
-    Eigen::Map<Eigen::MatrixXd> FXCb(Fxc + nbf * nbf, nbf, nbf);
+    Eigen::Map<const Eigen::MatrixXd> D_alpha(D, num_basis_funcs,
+                                              num_basis_funcs);
+    Eigen::Map<const Eigen::MatrixXd> D_beta(
+        D + num_basis_funcs * num_basis_funcs, num_basis_funcs,
+        num_basis_funcs);
+    Eigen::Map<const Eigen::MatrixXd> tD_alpha(tD, num_basis_funcs,
+                                               num_basis_funcs);
+    Eigen::Map<const Eigen::MatrixXd> tD_beta(
+        tD + num_basis_funcs * num_basis_funcs, num_basis_funcs,
+        num_basis_funcs);
+    Eigen::Map<Eigen::MatrixXd> FXCa(Fxc, num_basis_funcs, num_basis_funcs);
+    Eigen::Map<Eigen::MatrixXd> FXCb(Fxc + num_basis_funcs * num_basis_funcs,
+                                     num_basis_funcs, num_basis_funcs);
 
     // GauXC expects Pauli basis for UKS
     Eigen::MatrixXd D_scalar = D_alpha + D_beta;
@@ -428,11 +450,11 @@ void GAUXC::eval_fxc_contraction(const double* D, const double* tD,
         integrator_->eval_fxc_contraction(D_scalar, D_z, tD_scalar, tD_z);
 
     // Convert from scalar/z to alpha/beta
-    for (size_t i = 0; i < nbf * nbf; ++i) {
+    for (size_t i = 0; i < num_basis_funcs * num_basis_funcs; ++i) {
       const auto fxc_scalar = Fxc[i];
-      const auto fxc_z = Fxc[i + nbf * nbf];
+      const auto fxc_z = Fxc[i + num_basis_funcs * num_basis_funcs];
       Fxc[i] = fxc_scalar + fxc_z;
-      Fxc[i + nbf * nbf] = fxc_scalar - fxc_z;
+      Fxc[i + num_basis_funcs * num_basis_funcs] = fxc_scalar - fxc_z;
     }
   }
 

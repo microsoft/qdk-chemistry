@@ -7,14 +7,17 @@
 
 import numpy as np
 
-import qdk.chemistry.data
-from qdk.chemistry.data import (
+from qdk_chemistry.data import (
+    Ansatz,
     BasisSet,
+    CasWavefunctionContainer,
+    Configuration,
     Hamiltonian,
     Orbitals,
     OrbitalType,
     Shell,
     Structure,
+    Wavefunction,
 )
 
 
@@ -27,7 +30,7 @@ def create_test_basis_set(num_basis_functions, name="test-basis", structure=None
         structure: a structure to attach
 
     Returns:
-        qdk.chemistry.data.BasisSet: A valid basis set for testing
+        qdk_chemistry.data.BasisSet: A valid basis set for testing
 
     """
     shells = []
@@ -147,13 +150,13 @@ def create_test_wavefunction(num_orbitals: int = 2):
 
     # Create single determinant configuration (e.g., "20" for 2 electrons in first orbital)
     config_string = "2" + "0" * (num_orbitals - 1)
-    det = qdk.chemistry.data.Configuration(config_string)
+    det = Configuration(config_string)
 
     # Single determinant with coefficient 1.0
     coeffs = np.array([1.0])
-    container = qdk.chemistry.data.CasWavefunctionContainer(coeffs, [det], orbitals)
+    container = CasWavefunctionContainer(coeffs, [det], orbitals)
 
-    return qdk.chemistry.data.Wavefunction(container)
+    return Wavefunction(container)
 
 
 def create_test_ansatz(num_orbitals: int = 2):
@@ -178,11 +181,11 @@ def create_test_ansatz(num_orbitals: int = 2):
     # Create wavefunction using the same shared orbitals
     # Create single determinant configuration (e.g., "20" for 2 electrons in first orbital)
     config_string = "2" + "0" * (num_orbitals - 1)
-    det = qdk.chemistry.data.Configuration(config_string)
+    det = Configuration(config_string)
 
     # Single determinant with coefficient 1.0
     coeffs = np.array([1.0])
-    container = qdk.chemistry.data.CasWavefunctionContainer(coeffs, [det], orbitals)
-    wavefunction = qdk.chemistry.data.Wavefunction(container)
+    container = CasWavefunctionContainer(coeffs, [det], orbitals)
+    wavefunction = Wavefunction(container)
 
-    return qdk.chemistry.data.Ansatz(hamiltonian, wavefunction)
+    return Ansatz(hamiltonian, wavefunction)

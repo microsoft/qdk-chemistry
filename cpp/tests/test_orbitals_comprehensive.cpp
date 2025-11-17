@@ -48,18 +48,19 @@ TEST_F(OrbitalsTest, Constructors) {
   auto basis_set = testing::create_random_basis_set(n_basis);
   Orbitals orb1(coeffs, energies, std::nullopt, basis_set, std::nullopt);
 
-  EXPECT_EQ(n_basis, orb1.get_num_aos());
-  EXPECT_EQ(n_orbitals, orb1.get_num_mos());
+  EXPECT_EQ(n_basis, orb1.get_num_atomic_orbitals());
+  EXPECT_EQ(n_orbitals, orb1.get_num_molecular_orbitals());
 
   // Copy constructor
   Orbitals orb2(orb1);
-  EXPECT_EQ(orb1.get_num_aos(), orb2.get_num_aos());
-  EXPECT_EQ(orb1.get_num_mos(), orb2.get_num_mos());
+  EXPECT_EQ(orb1.get_num_atomic_orbitals(), orb2.get_num_atomic_orbitals());
+  EXPECT_EQ(orb1.get_num_molecular_orbitals(),
+            orb2.get_num_molecular_orbitals());
 
   // Test constructor with restricted calculation
   Orbitals orb3(coeffs, energies, std::nullopt, basis_set, std::nullopt);
-  EXPECT_EQ(n_basis, orb3.get_num_aos());
-  EXPECT_EQ(n_orbitals, orb3.get_num_mos());
+  EXPECT_EQ(n_basis, orb3.get_num_atomic_orbitals());
+  EXPECT_EQ(n_orbitals, orb3.get_num_molecular_orbitals());
 }
 
 TEST_F(OrbitalsTest, CoefficientManagement) {
@@ -72,8 +73,8 @@ TEST_F(OrbitalsTest, CoefficientManagement) {
   auto basis_set = testing::create_random_basis_set(n_basis);
   Orbitals orb(coeffs, std::nullopt, std::nullopt, basis_set, std::nullopt);
 
-  EXPECT_EQ(n_basis, orb.get_num_aos());
-  EXPECT_EQ(n_orbitals, orb.get_num_mos());
+  EXPECT_EQ(n_basis, orb.get_num_atomic_orbitals());
+  EXPECT_EQ(n_orbitals, orb.get_num_molecular_orbitals());
 
   const auto& [alpha_coeffs, beta_coeffs] = orb.get_coefficients();
   EXPECT_EQ(coeffs.rows(), alpha_coeffs.rows());
@@ -163,8 +164,8 @@ TEST_F(OrbitalsTest, SizeAndDimensionQueries) {
   auto basis_set = testing::create_random_basis_set(n_basis);
   Orbitals orb(coeffs, energies, std::nullopt, basis_set, std::nullopt);
 
-  EXPECT_EQ(n_basis, orb.get_num_aos());
-  EXPECT_EQ(n_orbitals, orb.get_num_mos());
+  EXPECT_EQ(n_basis, orb.get_num_atomic_orbitals());
+  EXPECT_EQ(n_orbitals, orb.get_num_molecular_orbitals());
 
   // Test matrix dimensions
   const auto& [alpha_coeffs, beta_coeffs] = orb.get_coefficients();
@@ -271,8 +272,9 @@ TEST_F(OrbitalsTest, JSONSerialization) {
   auto orb_json = Orbitals::from_json_file("test.orbitals.json");
 
   // Verify dimensions are preserved
-  EXPECT_EQ(orb.get_num_aos(), orb_json->get_num_aos());
-  EXPECT_EQ(orb.get_num_mos(), orb_json->get_num_mos());
+  EXPECT_EQ(orb.get_num_atomic_orbitals(), orb_json->get_num_atomic_orbitals());
+  EXPECT_EQ(orb.get_num_molecular_orbitals(),
+            orb_json->get_num_molecular_orbitals());
 
   // Check coefficients are preserved
   auto [orig_coeffs_a, orig_coeffs_b] = orb.get_coefficients();
@@ -304,8 +306,10 @@ TEST_F(OrbitalsTest, HDF5Serialization) {
   orb.to_hdf5_file(hdf5_filename);
 
   auto orb_from_file = Orbitals::from_hdf5_file(hdf5_filename);
-  EXPECT_EQ(orb.get_num_aos(), orb_from_file->get_num_aos());
-  EXPECT_EQ(orb.get_num_mos(), orb_from_file->get_num_mos());
+  EXPECT_EQ(orb.get_num_atomic_orbitals(),
+            orb_from_file->get_num_atomic_orbitals());
+  EXPECT_EQ(orb.get_num_molecular_orbitals(),
+            orb_from_file->get_num_molecular_orbitals());
 }
 
 TEST_F(OrbitalsTest, UnrestrictedCalculations) {
@@ -442,8 +446,9 @@ TEST_F(OrbitalsTest, FileIOGeneric) {
 
   auto orb_json = Orbitals::from_file("test.orbitals.json", "json");
 
-  EXPECT_EQ(orb_json->get_num_aos(), orb.get_num_aos());
-  EXPECT_EQ(orb_json->get_num_mos(), orb.get_num_mos());
+  EXPECT_EQ(orb_json->get_num_atomic_orbitals(), orb.get_num_atomic_orbitals());
+  EXPECT_EQ(orb_json->get_num_molecular_orbitals(),
+            orb.get_num_molecular_orbitals());
 
   // Check coefficients are preserved
   auto [orig_coeffs_a, orig_coeffs_b] = orb.get_coefficients();
@@ -456,8 +461,9 @@ TEST_F(OrbitalsTest, FileIOGeneric) {
 
   auto orb_hdf5 = Orbitals::from_file("test.orbitals.h5", "hdf5");
 
-  EXPECT_EQ(orb_hdf5->get_num_aos(), orb.get_num_aos());
-  EXPECT_EQ(orb_hdf5->get_num_mos(), orb.get_num_mos());
+  EXPECT_EQ(orb_hdf5->get_num_atomic_orbitals(), orb.get_num_atomic_orbitals());
+  EXPECT_EQ(orb_hdf5->get_num_molecular_orbitals(),
+            orb.get_num_molecular_orbitals());
 
   // Check coefficients are preserved
   auto [hdf5_coeffs_a, hdf5_coeffs_b] = orb_hdf5->get_coefficients();
@@ -488,8 +494,9 @@ TEST_F(OrbitalsTest, FileIOSpecific) {
 
   auto orb_hdf5 = Orbitals::from_hdf5_file("test.orbitals.h5");
 
-  EXPECT_EQ(orb_hdf5->get_num_aos(), orb.get_num_aos());
-  EXPECT_EQ(orb_hdf5->get_num_mos(), orb.get_num_mos());
+  EXPECT_EQ(orb_hdf5->get_num_atomic_orbitals(), orb.get_num_atomic_orbitals());
+  EXPECT_EQ(orb_hdf5->get_num_molecular_orbitals(),
+            orb.get_num_molecular_orbitals());
 
   // Check all data is preserved
   auto [orig_coeffs_a, orig_coeffs_b] = orb.get_coefficients();
@@ -512,8 +519,9 @@ TEST_F(OrbitalsTest, FileIOSpecific) {
 
   auto orb_json = Orbitals::from_json_file("test.orbitals.json");
 
-  EXPECT_EQ(orb_json->get_num_aos(), orb.get_num_aos());
-  EXPECT_EQ(orb_json->get_num_mos(), orb.get_num_mos());
+  EXPECT_EQ(orb_json->get_num_atomic_orbitals(), orb.get_num_atomic_orbitals());
+  EXPECT_EQ(orb_json->get_num_molecular_orbitals(),
+            orb.get_num_molecular_orbitals());
 
   // Check coefficients are preserved
   auto [json_coeffs_a, json_coeffs_b] = orb_json->get_coefficients();
@@ -726,8 +734,9 @@ TEST_F(OrbitalsTest, FileIORoundTrip) {
   auto orb_json = Orbitals::from_json_file("test.orbitals.json");
 
   // Check all properties are preserved
-  EXPECT_EQ(orb_json->get_num_aos(), orb.get_num_aos());
-  EXPECT_EQ(orb_json->get_num_mos(), orb.get_num_mos());
+  EXPECT_EQ(orb_json->get_num_atomic_orbitals(), orb.get_num_atomic_orbitals());
+  EXPECT_EQ(orb_json->get_num_molecular_orbitals(),
+            orb.get_num_molecular_orbitals());
 
   // Check coefficients
   auto [orig_coeffs_a, orig_coeffs_b] = orb.get_coefficients();
@@ -752,8 +761,9 @@ TEST_F(OrbitalsTest, FileIORoundTrip) {
   auto orb_hdf5 = Orbitals::from_hdf5_file("test.orbitals.h5");
 
   // Check all properties are preserved
-  EXPECT_EQ(orb_hdf5->get_num_aos(), orb.get_num_aos());
-  EXPECT_EQ(orb_hdf5->get_num_mos(), orb.get_num_mos());
+  EXPECT_EQ(orb_hdf5->get_num_atomic_orbitals(), orb.get_num_atomic_orbitals());
+  EXPECT_EQ(orb_hdf5->get_num_molecular_orbitals(),
+            orb.get_num_molecular_orbitals());
 
   // Check coefficients
   auto [hdf5_coeffs_a, hdf5_coeffs_b] = orb_hdf5->get_coefficients();

@@ -27,10 +27,10 @@ parameters:
   default: $(System.DefaultWorkingDirectory)
 - name: artifactProject
   type: string
-  default: 37e07de7-e7fd-4be8-8379-dc164a4401f3
+  default: ""
 - name: artifactFeed
   type: string
-  default: quantum-apps-dependencies
+  default: ""
 
 steps:
 # Checkout all required repositories

@@ -22,8 +22,8 @@ from qiskit import QuantumCircuit, transpile
 from qiskit.quantum_info import SparsePauliOp
 from qiskit_aer import AerSimulator
 
-from qdk.chemistry.algorithms import IterativePhaseEstimation
-from qdk.chemistry.data import QpeResult, QubitHamiltonian
+from qdk_chemistry.algorithms import IterativePhaseEstimation
+from qdk_chemistry.data import QpeResult, QubitHamiltonian
 
 TIME_STEP = np.pi / 4
 NUM_BITS = 6

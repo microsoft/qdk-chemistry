@@ -8,9 +8,9 @@
 import numpy as np
 import pytest
 
-from qdk.chemistry import algorithms
-from qdk.chemistry.constants import ANGSTROM_TO_BOHR
-from qdk.chemistry.data import Structure
+from qdk_chemistry import algorithms
+from qdk_chemistry.constants import ANGSTROM_TO_BOHR
+from qdk_chemistry.data import Structure
 
 from .reference_tolerances import (
     ci_energy_tolerance,

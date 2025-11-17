@@ -123,79 +123,79 @@ stages:
           imageSuffix: cpu-arm64-py313
         # GPU configurations (amd64 only - ARM64 GPU support is limited)
         # H100 GPU (SM90 architecture)
-        sm90_amd64_py310:
-          architecture: amd64
-          platform: linux/amd64
-          pool: $(GPU_POOL_X86_SM80)
-          pythonVersion: '3.10'
-          imageType: gpu
-          cudaArch: '90'
-          gpuType: h100
-          imageSuffix: sm90-amd64-py310
-        sm90_amd64_py311:
-          architecture: amd64
-          platform: linux/amd64
-          pool: $(GPU_POOL_X86_SM80)
-          pythonVersion: '3.11'
-          imageType: gpu
-          cudaArch: '90'
-          gpuType: h100
-          imageSuffix: sm90-amd64-py311
-        sm90_amd64_py312:
-          architecture: amd64
-          platform: linux/amd64
-          pool: $(GPU_POOL_X86_SM80)
-          pythonVersion: '3.12'
-          imageType: gpu
-          cudaArch: '90'
-          gpuType: h100
-          imageSuffix: sm90-amd64-py312
-        sm90_amd64_py313:
-          architecture: amd64
-          platform: linux/amd64
-          pool: $(GPU_POOL_X86_SM80)
-          pythonVersion: '3.13'
-          imageType: gpu
-          cudaArch: '90'
-          gpuType: h100
-          imageSuffix: sm90-amd64-py313
-        # A100 GPU (SM80 architecture)
-        sm80_amd64_py310:
-          architecture: amd64
-          platform: linux/amd64
-          pool: $(GPU_POOL_X86_SM80)
-          pythonVersion: '3.10'
-          imageType: gpu
-          cudaArch: '80'
-          gpuType: a100
-          imageSuffix: sm80-amd64-py310
-        sm80_amd64_py311:
-          architecture: amd64
-          platform: linux/amd64
-          pool: $(GPU_POOL_X86_SM80)
-          pythonVersion: '3.11'
-          imageType: gpu
-          cudaArch: '80'
-          gpuType: a100
-          imageSuffix: sm80-amd64-py311
-        sm80_amd64_py312:
-          architecture: amd64
-          platform: linux/amd64
-          pool: $(GPU_POOL_X86_SM80)
-          pythonVersion: '3.12'
-          imageType: gpu
-          cudaArch: '80'
-          gpuType: a100
-          imageSuffix: sm80-amd64-py312
-        sm80_amd64_py313:
-          architecture: amd64
-          platform: linux/amd64
-          pool: $(GPU_POOL_X86_SM80)
-          pythonVersion: '3.13'
-          imageType: gpu
-          cudaArch: '80'
-          gpuType: a100
-          imageSuffix: sm80-amd64-py313
+        #sm90_amd64_py310:
+        #  architecture: amd64
+        #  platform: linux/amd64
+        #  pool: ${{ parameters.amd64GpuPool }}
+        #  pythonVersion: '3.10'
+        #  imageType: gpu
+        #  cudaArch: '90'
+        #  gpuType: h100
+        #  imageSuffix: sm90-amd64-py310
+        #sm90_amd64_py311:
+        #  architecture: amd64
+        #  platform: linux/amd64
+        #  pool: ${{ parameters.amd64GpuPool }}
+        #  pythonVersion: '3.11'
+        #  imageType: gpu
+        #  cudaArch: '90'
+        #  gpuType: h100
+        #  imageSuffix: sm90-amd64-py311
+        #sm90_amd64_py312:
+        #  architecture: amd64
+        #  platform: linux/amd64
+        #  pool: ${{ parameters.amd64GpuPool }}
+        #  pythonVersion: '3.12'
+        #  imageType: gpu
+        #  cudaArch: '90'
+        #  gpuType: h100
+        #  imageSuffix: sm90-amd64-py312
+        #sm90_amd64_py313:
+        #  architecture: amd64
+        #  platform: linux/amd64
+        #  pool: ${{ parameters.amd64GpuPool }}
+        #  pythonVersion: '3.13'
+        #  imageType: gpu
+        #  cudaArch: '90'
+        #  gpuType: h100
+        #  imageSuffix: sm90-amd64-py313
+      # A100 GPU (SM80 architecture)
+        #sm80_amd64_py310:
+        #  architecture: amd64
+        #  platform: linux/amd64
+        #  pool: ${{ parameters.amd64GpuPool }}
+        #  pythonVersion: '3.10'
+        #  imageType: gpu
+        #  cudaArch: '80'
+        #  gpuType: a100
+        #  imageSuffix: sm80-amd64-py310
+        #sm80_amd64_py311:
+        #  architecture: amd64
+        #  platform: linux/amd64
+        #  pool: ${{ parameters.amd64GpuPool }}
+        #  pythonVersion: '3.11'
+        #  imageType: gpu
+        #  cudaArch: '80'
+        #  gpuType: a100
+        #  imageSuffix: sm80-amd64-py311
+        #sm80_amd64_py312:
+        #  architecture: amd64
+        #  platform: linux/amd64
+        #  pool: ${{ parameters.amd64GpuPool }}
+        #  pythonVersion: '3.12'
+        #  imageType: gpu
+        #  cudaArch: '80'
+        #  gpuType: a100
+        #  imageSuffix: sm80-amd64-py312
+        #sm80_amd64_py313:
+        #  architecture: amd64
+        #  platform: linux/amd64
+        #  pool: ${{ parameters.amd64GpuPool }}
+        #  pythonVersion: '3.13'
+        #  imageType: gpu
+        #  cudaArch: '80'
+        #  gpuType: a100
+        #  imageSuffix: sm80-amd64-py313
       maxParallel: 6
     displayName: Build QDK Azure Linux Base Images
     pool: $(pool)
@@ -346,31 +346,31 @@ stages:
           imageSuffix: cpu-arm64-py313
           platform: linux/arm64
         # GPU configurations - SM90 (H100)
-        sm90_amd64_py310:
-          imageSuffix: sm90-amd64-py310
-          platform: linux/amd64
-        sm90_amd64_py311:
-          imageSuffix: sm90-amd64-py311
-          platform: linux/amd64
-        sm90_amd64_py312:
-          imageSuffix: sm90-amd64-py312
-          platform: linux/amd64
-        sm90_amd64_py313:
-          imageSuffix: sm90-amd64-py313
-          platform: linux/amd64
+        #sm90_amd64_py310:
+        #  imageSuffix: sm90-amd64-py310
+        #  platform: linux/amd64
+        #sm90_amd64_py311:
+        #  imageSuffix: sm90-amd64-py311
+        #  platform: linux/amd64
+        #sm90_amd64_py312:
+        #  imageSuffix: sm90-amd64-py312
+        #  platform: linux/amd64
+        #sm90_amd64_py313:
+        #  imageSuffix: sm90-amd64-py313
+        #  platform: linux/amd64
         # GPU configurations - SM80 (A100)
-        sm80_amd64_py310:
-          imageSuffix: sm80-amd64-py310
-          platform: linux/amd64
-        sm80_amd64_py311:
-          imageSuffix: sm80-amd64-py311
-          platform: linux/amd64
-        sm80_amd64_py312:
-          imageSuffix: sm80-amd64-py312
-          platform: linux/amd64
-        sm80_amd64_py313:
-          imageSuffix: sm80-amd64-py313
-          platform: linux/amd64
+        #sm80_amd64_py310:
+        #  imageSuffix: sm80-amd64-py310
+        #  platform: linux/amd64
+        #sm80_amd64_py311:
+        #  imageSuffix: sm80-amd64-py311
+        #  platform: linux/amd64
+        #sm80_amd64_py312:
+        #  imageSuffix: sm80-amd64-py312
+        #  platform: linux/amd64
+        #sm80_amd64_py313:
+        #  imageSuffix: sm80-amd64-py313
+        #  platform: linux/amd64
       maxParallel: 6
     displayName: Publish Latest Tag
     pool: $(CPU_POOL_X86)

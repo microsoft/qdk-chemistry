@@ -5,9 +5,9 @@
 
 import numpy as np
 
-from qdk.chemistry.algorithms import create
-from qdk.chemistry.data import Configuration, Orbitals, SlaterDeterminantContainer, Structure, Wavefunction
-from qdk.chemistry.utils import compute_valence_space
+from qdk_chemistry.algorithms import create
+from qdk_chemistry.data import Configuration, Orbitals, SlaterDeterminantContainer, Structure, Wavefunction
+from qdk_chemistry.utils import compute_valence_space
 
 
 def solve_wavefunction(structure, charge, multiplicity):

@@ -1,15 +1,15 @@
 parameters:
 - name: cpuPool
   displayName: The pool to use for CPU builds
-  default: aqe-1es-HB120-pool
+  default: ""
   type: string
 - name: developmentRegistry
   displayName: Development Registry URL
-  default: quantumapps.azurecr.io
+  default: ""
   type: string
 - name: developmentRegistryServiceConnection
   displayName: Development Registry Service Connection
-  default: discovery-quantumapps-sc
+  default: ""
   type: string
 - name: baseImageName
   displayName: Base Image Name
@@ -21,11 +21,11 @@ parameters:
   type: string
 - name: artifactProject
   displayName: Azure DevOps Project ID
-  default: 37e07de7-e7fd-4be8-8379-dc164a4401f3
+  default: ""
   type: string
 - name: artifactFeed
   displayName: Azure Artifacts Feed Name
-  default: quantum-apps-dependencies
+  default: ""
   type: string
 - name: libintEnable1Body
   displayName: libint 1-body integral level

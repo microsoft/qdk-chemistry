@@ -13,9 +13,9 @@ from pathlib import Path
 import numpy as np
 import pytest
 
-from qdk.chemistry.algorithms import create
-from qdk.chemistry.data import Hamiltonian, Wavefunction
-from qdk.chemistry.noise_models import QuantumErrorProfile
+from qdk_chemistry.algorithms import create
+from qdk_chemistry.data import CasWavefunctionContainer, Configuration, Hamiltonian, Orbitals, Wavefunction
+from qdk_chemistry.noise_models import QuantumErrorProfile
 
 from .test_helpers import create_test_orbitals
 
@@ -50,8 +50,6 @@ if build_dir.exists():
         if lib_dir_found:
             break
 
-import qdk.chemistry.data  # noqa: E402
-
 
 @pytest.fixture
 def basic_orbital():
@@ -60,7 +58,7 @@ def basic_orbital():
     coeffs = np.array([[0.85, 0.15], [0.15, -0.85], [0.0, 0.0]])
     energies = np.array([-1.5, 0.8])
     occupations = np.array([2.0, 0.0])
-    return qdk.chemistry.data.Orbitals(coeffs, occupations, energies)
+    return Orbitals(coeffs, occupations, energies)
 
 
 @pytest.fixture
@@ -73,7 +71,7 @@ def unrestricted_orbital():
     beta_energies = np.array([-1.3, 0.9])
     alpha_occupations = np.array([1.0, 0.0])
     beta_occupations = np.array([0.0, 0.0])
-    return qdk.chemistry.data.Orbitals(
+    return Orbitals(
         alpha_coeffs,
         beta_coeffs,
         alpha_occupations,
@@ -117,12 +115,12 @@ def hamiltonian_10e6o(test_data_files_path):
 def wavefunction_4e4o():
     """Fixture to create the Wavefunction for 4e4o ethylene 2det problem."""
     test_orbitals = create_test_orbitals(4)
-    det1 = qdk.chemistry.data.Configuration("2200")
-    det2 = qdk.chemistry.data.Configuration("2020")
+    det1 = Configuration("2200")
+    det2 = Configuration("2020")
     dets = [det1, det2]
     coeffs = np.array([-0.9837947571031265, 0.17929828748875612])
 
-    container = qdk.chemistry.data.CasWavefunctionContainer(coeffs, dets, test_orbitals)
+    container = CasWavefunctionContainer(coeffs, dets, test_orbitals)
     return Wavefunction(container)
 
 
@@ -130,13 +128,13 @@ def wavefunction_4e4o():
 def wavefunction_10e6o():
     """Fixture to create the Wavefunction for 10e6o f2 problem."""
     test_orbitals = create_test_orbitals(6)
-    det1 = qdk.chemistry.data.Configuration("222220")
-    det2 = qdk.chemistry.data.Configuration("220222")
-    det3 = qdk.chemistry.data.Configuration("222202")
+    det1 = Configuration("222220")
+    det2 = Configuration("220222")
+    det3 = Configuration("222202")
     dets = [det1, det2, det3]
     coeffs = np.array([-0.9731147049456421, 0.22612369393111892, 0.04377037881377919])
 
-    container = qdk.chemistry.data.CasWavefunctionContainer(coeffs, dets, test_orbitals)
+    container = CasWavefunctionContainer(coeffs, dets, test_orbitals)
     return Wavefunction(container)
 
 

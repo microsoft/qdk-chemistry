@@ -12,7 +12,7 @@ import pytest
 from qiskit import QuantumCircuit, QuantumRegister
 from qiskit.quantum_info import SparsePauliOp
 
-from qdk.chemistry.utils.time_evolution import (
+from qdk_chemistry.utils.time_evolution import (
     PauliEvolutionTerm,
     append_controlled_time_evolution,
     controlled_pauli_rotation,

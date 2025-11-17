@@ -60,7 +60,7 @@ class ManagedcuSolverHandle {
  *
  * Performs in-place Cholesky factorization of a symmetric positive definite
  * matrix stored in device memory. This wrapper also allocates workspace
- * if necessacary and checks for sucessful completion.
+ * if necessary and checks for successful completion.
  *
  * @see https://docs.nvidia.com/cuda/cusolver/index.html#cusolverdn-t-potrf for
  * API details
@@ -73,7 +73,7 @@ void potrf(cusolverDnHandle_t handle, cublasFillMode_t uplo, int N, double* A,
  *
  * Performs in-place Cholesky solve given Cholesky factors stored
  * in device memory. This wrapper also allocates workspace
- * if necessacary and checks for sucessful completion.
+ * if necessary and checks for successful completion.
  *
  * @see https://docs.nvidia.com/cuda/cusolver/index.html#cusolverdn-t-potrs for
  * API details
@@ -86,8 +86,8 @@ void potrs(cusolverDnHandle_t handle, cublasFillMode_t uplo, int N, int NRHS,
  *
  * Performs an in-place eigenvalue decomposition of a symmetric matrix. If
  * requested eigenvectors are returned in place of the input matrix, otherwise
- * the input matrix is destroyed. This wrapper also allocates workespace if
- * nessacary and checks for sucessful completion.
+ * the input matrix is destroyed. This wrapper also allocates workspace if
+ * necessary and checks for successful completion.
  *
  * @see https://docs.nvidia.com/cuda/cusolver/index.html#cusolverdn-t-syevd for
  * API details

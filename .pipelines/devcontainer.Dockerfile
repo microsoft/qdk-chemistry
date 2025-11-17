@@ -91,7 +91,8 @@ RUN git config --global credential.helper manager && \
 # Set environment variables for Git Credential Manager
 ENV GCM_CREDENTIAL_STORE=cache \
     GCM_CREDENTIAL_CACHE_OPTIONS="--timeout 7200" \
-    GCM_PLAINTEXT_STORE_PATH=/tmp/gcm-store
+    GCM_PLAINTEXT_STORE_PATH=/tmp/gcm-store \
+    LC_ALL=C.utf8
 
 # Set working directory to workspace root
 WORKDIR /workspace

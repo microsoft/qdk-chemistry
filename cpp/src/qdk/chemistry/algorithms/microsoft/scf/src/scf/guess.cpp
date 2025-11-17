@@ -48,7 +48,7 @@ void atom_guess(const BasisSet& obs, const Molecule& mol, double* D) {
     }
     atom_dm[atomic_number] = d;
   }
-  int N = obs.n_bf;
+  int N = obs.num_basis_funcs;
   RowMajorMatrix tD = RowMajorMatrix::Zero(N, N);
 
   for (size_t i = 0, p = 0; i < mol.n_atoms; i++) {
@@ -72,23 +72,23 @@ void atom_guess(const BasisSet& obs, const Molecule& mol, double* D) {
                       : a.exponents[0] > b.exponents[0]);
   });
 
-  auto shell_nbf = [&](int am) {
+  auto shell_num_basis_funcs = [&](int am) {
     return obs.pure ? 2 * am + 1 : (am + 1) * (am + 2) / 2;
   };
   std::vector<int> sh2bf;
   for (size_t i = 0, p = 0; i < obs.shells.size(); i++) {
     sh2bf.push_back(p);
     int am = obs.shells[i].angular_momentum;
-    p += shell_nbf(am);
+    p += shell_num_basis_funcs(am);
   }
 
   RowMajorMatrix nD = RowMajorMatrix::Zero(N, N);
   for (size_t i = 0, bf1 = 0; i < obs.shells.size(); i++) {
     int am1 = obs.shells[order[i]].angular_momentum;
-    int n1 = shell_nbf(am1);
+    int n1 = shell_num_basis_funcs(am1);
     for (size_t j = 0, bf2 = 0; j < obs.shells.size(); j++) {
       int am2 = obs.shells[order[j]].angular_momentum;
-      int n2 = shell_nbf(am2);
+      int n2 = shell_num_basis_funcs(am2);
       nD.block(sh2bf[order[i]], sh2bf[order[j]], n1, n2) =
           tD.block(bf1, bf2, n1, n2);
       bf2 += n2;

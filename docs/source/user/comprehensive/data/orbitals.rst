@@ -124,8 +124,8 @@ For spin-dependent properties, methods return pairs of (alpha, beta) data.
       bool is_open_shell = orbitals.is_open_shell();
 
       // Get size information
-      size_t num_mos = orbitals.get_num_mos();
-      size_t num_aos = orbitals.get_num_aos();
+      size_t num_molecular_orbitals = orbitals.get_num_molecular_orbitals();
+      size_t num_atomic_orbitals = orbitals.get_num_atomic_orbitals();
       auto [n_electrons_alpha, n_electrons_beta] = orbitals.get_num_electrons();  // returns std::pair<double, double>
 
       std::string summary = orbitals.get_summary()
@@ -155,8 +155,8 @@ For spin-dependent properties, methods return pairs of (alpha, beta) data.
       is_open_shell = orbitals.is_open_shell()
 
       # Get size information
-      num_mos = orbitals.get_num_mos()
-      num_aos = orbitals.get_num_aos()
+      num_molecular_orbitals = orbitals.get_num_molecular_orbitals()
+      num_atomic_orbitals = orbitals.get_num_atomic_orbitals()
       n_electrons_alpha, n_electrons_beta = orbitals.get_num_electrons()
 
       summary = orbitals.get_summary()
@@ -205,9 +205,9 @@ JSON representation of an ``Orbitals`` object has the following structure (showi
      "has_overlap_matrix":true,
      "is_open_shell":false,
      "is_restricted":true,
-     "num_aos":2,
+     "num_atomic_orbitals":2,
      "num_electrons":{"alpha":1.0,"beta":1.0},
-     "num_mos":2,
+     "num_molecular_orbitals":2,
      "occupations":{"alpha":[1.0,0.0],"beta":[1.0,0.0]}
    }
 
@@ -242,10 +242,10 @@ HDF5 representation of an ``Orbitals`` object has the following structure (showi
        ├── has_basis_set        # Dataset: uint8, 0 if false, 1 if true
        ├── is_open_shell        # Dataset: uint8, 0 if false, 1 if true
        ├── is_restricted        # Dataset: uint8, 0 if false, 1 if true
-       ├── num_aos              # Dataset: uint32, number of atomic orbitals
+       ├── num_atomic_orbitals              # Dataset: uint32, number of atomic orbitals
        ├── num_electrons_alpha  # Dataset: uint32, number of alpha electrons
        ├── num_electrons_beta   # Dataset: uint32, number of beta electrons
-       └── num_mos              # Dataset: uint32, number of molecular orbital coefficients
+       └── num_molecular_orbitals              # Dataset: uint32, number of molecular orbital coefficients
 
 .. todo::
    TODO (NAB):  finish documentation above and below

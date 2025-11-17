@@ -47,10 +47,10 @@ ERI::ERI(bool unr, const BasisSet& basis, ParallelConfig mpi, double omega) {
 
 void ERI::generate_eri_() {
   // Allocate and populate ERIs on host
-  const size_t nbf = obs_.nbf();
-  const size_t nbf2 = nbf * nbf;
-  const size_t nbf3 = nbf2 * nbf;
-  const size_t eri_sz = nbf3 * (loc_i_en_ - loc_i_st_);
+  const size_t num_basis_funcs = obs_.nbf();
+  const size_t num_basis_funcs2 = num_basis_funcs * num_basis_funcs;
+  const size_t num_basis_funcs3 = num_basis_funcs2 * num_basis_funcs;
+  const size_t eri_sz = num_basis_funcs3 * (loc_i_en_ - loc_i_st_);
 
   const bool is_rsx = std::abs(omega_) > 1e-12;
 
@@ -77,7 +77,7 @@ void ERI::generate_eri_() {
   // Allocate ERIs on the device and ship data
   if (!mpi_.world_rank) {
     spdlog::debug("Saving ERIs in Device Memory");
-    spdlog::debug("Using cuTensor for GPU ERI Conraction");
+    spdlog::debug("Using cuTensor for GPU ERI Contraction");
   }
   CUDA_CHECK(cudaMallocAsync(&d_eri_, eri_sz * sizeof(double), 0));
   CUDA_CHECK(cudaStreamSynchronize(0));
@@ -97,11 +97,14 @@ void ERI::generate_eri_() {
   // Setup cuTensor
   handle_ = std::make_shared<cutensor::TensorHandle>();
 
-  std::vector<int64_t> extents4 = {loc_i_en_ - loc_i_st_, nbf, nbf, nbf};
-  std::vector<int64_t> extents2_P = {unrestricted_ ? 2 : 1, nbf, nbf};
+  std::vector<int64_t> extents4 = {loc_i_en_ - loc_i_st_, num_basis_funcs,
+                                   num_basis_funcs, num_basis_funcs};
+  std::vector<int64_t> extents2_P = {unrestricted_ ? 2 : 1, num_basis_funcs,
+                                     num_basis_funcs};
   std::vector<int64_t> extents2_R = {unrestricted_ ? 2 : 1,
-                                     loc_i_en_ - loc_i_st_, nbf};
-  std::vector<int64_t> strides2 = {nbf * nbf, nbf, 1};  // Output is full space
+                                     loc_i_en_ - loc_i_st_, num_basis_funcs};
+  std::vector<int64_t> strides2 = {num_basis_funcs * num_basis_funcs,
+                                   num_basis_funcs, 1};  // Output is full space
   descERI_ = std::make_shared<cutensor::TensorDesc>(
       *handle_, 4, extents4.data(), CUTENSOR_R_64F);
   descR_ = std::make_shared<cutensor::TensorDesc>(
@@ -128,40 +131,42 @@ void ERI::build_JK(const double* P, double* J, double* K, double alpha,
 
   const bool is_rsx = std::abs(omega_) > 1e-12;
 
-  const size_t nbf = obs_.nbf();
-  const size_t nbf2 = nbf * nbf;
-  const size_t mat_size = (unrestricted_ ? 2 : 1) * nbf2;
+  const size_t num_basis_funcs = obs_.nbf();
+  const size_t num_basis_funcs2 = num_basis_funcs * num_basis_funcs;
+  const size_t mat_size = (unrestricted_ ? 2 : 1) * num_basis_funcs2;
 
   // Clear out data
   if (J) std::fill_n(J, mat_size, 0.0);
   if (K) std::fill_n(K, mat_size, 0.0);
 
 #if (QDK_CHEMISTRY_INCORE_ERI_STRATEGY & INCORE_ERI_CON_HOST) > 0
-  const size_t nbf3 = nbf2 * nbf;
-  const size_t nbf4 = nbf2 * nbf2;
+  const size_t num_basis_funcs3 = num_basis_funcs2 * num_basis_funcs;
+  const size_t num_basis_funcs4 = num_basis_funcs2 * num_basis_funcs2;
   const auto* h_eri_ptr = h_eri_.get();
   const auto* h_eri_erf_ptr = h_eri_erf_.get();
 
   const auto* Pa = P;
-  const auto* Pb = unrestricted_ ? Pa + nbf2 : nullptr;
+  const auto* Pb = unrestricted_ ? Pa + num_basis_funcs2 : nullptr;
 
   if (J)
     for (size_t idm = 0; idm < (unrestricted_ ? 2 : 1); ++idm) {
-      blas::gemv("T", nbf2, nbf2, 1.0, h_eri_ptr, nbf2, P + idm * nbf2, 1, 0.0,
-                 J + idm * nbf2, 1);
+      blas::gemv("T", num_basis_funcs2, num_basis_funcs2, 1.0, h_eri_ptr,
+                 num_basis_funcs2, P + idm * num_basis_funcs2, 1, 0.0,
+                 J + idm * num_basis_funcs2, 1);
     }
 
   if (K)
     for (size_t idm = 0; idm < (unrestricted_ ? 2 : 1); ++idm)
       for (size_t i = loc_i_st_; i < loc_i_en_; ++i) {
-        const double* eri_i = h_eri_ptr + i * nbf3;
-        double* K_i = K + i * nbf + idm * nbf2;
-        for (size_t k = 0; k < nbf; ++k)
-          for (size_t l = 0; l < nbf; ++l) {
-            const auto val = P[k * nbf + l + idm * nbf2];
-            const auto* eri_ikl = eri_i + k * nbf2 + l;
-            for (size_t j = 0; j < nbf; ++j) {
-              K_i[j] += (alpha + beta) * val * eri_ikl[j * nbf];
+        const double* eri_i = h_eri_ptr + i * num_basis_funcs3;
+        double* K_i = K + i * num_basis_funcs + idm * num_basis_funcs2;
+        for (size_t k = 0; k < num_basis_funcs; ++k)
+          for (size_t l = 0; l < num_basis_funcs; ++l) {
+            const auto val =
+                P[k * num_basis_funcs + l + idm * num_basis_funcs2];
+            const auto* eri_ikl = eri_i + k * num_basis_funcs2 + l;
+            for (size_t j = 0; j < num_basis_funcs; ++j) {
+              K_i[j] += (alpha + beta) * val * eri_ikl[j * num_basis_funcs];
             }
           }
       }
@@ -169,14 +174,15 @@ void ERI::build_JK(const double* P, double* J, double* K, double alpha,
   if (K and is_rsx)
     for (size_t idm = 0; idm < (unrestricted_ ? 2 : 1); ++idm)
       for (size_t i = loc_i_st_; i < loc_i_en_; ++i) {
-        const double* eri_i = h_eri_erf_ptr + i * nbf3;
-        double* K_i = K + i * nbf + idm * nbf2;
-        for (size_t k = 0; k < nbf; ++k)
-          for (size_t l = 0; l < nbf; ++l) {
-            const auto val = P[k * nbf + l + idm * nbf2];
-            const auto* eri_ikl = eri_i + k * nbf2 + l;
-            for (size_t j = 0; j < nbf; ++j) {
-              K_i[j] -= beta * val * eri_ikl[j * nbf];
+        const double* eri_i = h_eri_erf_ptr + i * num_basis_funcs3;
+        double* K_i = K + i * num_basis_funcs + idm * num_basis_funcs2;
+        for (size_t k = 0; k < num_basis_funcs; ++k)
+          for (size_t l = 0; l < num_basis_funcs; ++l) {
+            const auto val =
+                P[k * num_basis_funcs + l + idm * num_basis_funcs2];
+            const auto* eri_ikl = eri_i + k * num_basis_funcs2 + l;
+            for (size_t j = 0; j < num_basis_funcs; ++j) {
+              K_i[j] -= beta * val * eri_ikl[j * num_basis_funcs];
             }
           }
       }
@@ -196,17 +202,17 @@ void ERI::build_JK(const double* P, double* J, double* K, double alpha,
   // Perform Contractions
   if (J)
     couContraction_->contract(1.0, d_eri_, dP->data(), 0.0,
-                              dJ->data() + loc_i_st_ * nbf);
+                              dJ->data() + loc_i_st_ * num_basis_funcs);
   if (K) {
     exxContraction_->contract(alpha + beta, d_eri_, dP->data(), 0.0,
-                              dK->data() + loc_i_st_ * nbf);
+                              dK->data() + loc_i_st_ * num_basis_funcs);
     if (is_rsx) {
       exxContraction_->contract(-beta, d_eri_erf_, dP->data(), 1.0,
-                                dK->data() + loc_i_st_ * nbf);
+                                dK->data() + loc_i_st_ * num_basis_funcs);
     }
   }
 
-  // Retreive J/K
+  // Retrieve J/K
   if (J)
     CUDA_CHECK(cudaMemcpy(J, dJ->data(), mat_size * sizeof(double),
                           cudaMemcpyDeviceToHost));
@@ -223,16 +229,17 @@ void ERI::get_gradients(const double* P, double* dJ, double* dK, double alpha,
 }
 
 void ERI::quarter_trans(size_t nt, const double* C, double* out) {
-  const size_t nbf = obs_.nbf();
-  const size_t nbf2 = nbf * nbf;
-  const size_t nbf3 = nbf2 * nbf;
-  const size_t nbf4 = nbf2 * nbf2;
+  const size_t num_basis_funcs = obs_.nbf();
+  const size_t num_basis_funcs2 = num_basis_funcs * num_basis_funcs;
+  const size_t num_basis_funcs3 = num_basis_funcs2 * num_basis_funcs;
+  const size_t num_basis_funcs4 = num_basis_funcs2 * num_basis_funcs2;
 
 #ifdef QDK_CHEMISTRY_ENABLE_GPU
 
   // Setup
-  std::vector<int64_t> extents_out = {nbf, nbf, nbf, nt};
-  std::vector<int64_t> extents_mat = {nbf, nt};
+  std::vector<int64_t> extents_out = {num_basis_funcs, num_basis_funcs,
+                                      num_basis_funcs, nt};
+  std::vector<int64_t> extents_mat = {num_basis_funcs, nt};
 
   auto descOut = std::make_shared<cutensor::TensorDesc>(
       *handle_, 4, extents_out.data(), CUTENSOR_R_64F);
@@ -246,26 +253,27 @@ void ERI::quarter_trans(size_t nt, const double* C, double* out) {
       handle_, descERI_, eri_ind, descMat, mat_ind, descOut, out_ind);
 
   // Allocation
-  auto dC = cuda::alloc<double>(nbf * nt);
-  auto dOut = cuda::alloc<double>(nbf3 * nt);
+  auto dC = cuda::alloc<double>(num_basis_funcs * nt);
+  auto dOut = cuda::alloc<double>(num_basis_funcs3 * nt);
 
-  CUDA_CHECK(cudaMemcpy(dC->data(), C, nbf * nt * sizeof(double),
+  CUDA_CHECK(cudaMemcpy(dC->data(), C, num_basis_funcs * nt * sizeof(double),
                         cudaMemcpyHostToDevice));
 
   // 1st Quarter Contraction
   quarterTrans->contract(1.0, d_eri_, dC->data(), 0.0, dOut->data());
 
-  CUDA_CHECK(cudaMemcpy(out, dOut->data(), nbf3 * nt * sizeof(double),
+  CUDA_CHECK(cudaMemcpy(out, dOut->data(),
+                        num_basis_funcs3 * nt * sizeof(double),
                         cudaMemcpyDeviceToHost));
 
 #else
 
   if (omega_ > 1e-12) {
-    blas::gemm("N", "N", nt, nbf3, nbf, 1.0, C, nt, h_eri_erf_.get(), nbf, 0.0,
-               out, nt);
+    blas::gemm("N", "N", nt, num_basis_funcs3, num_basis_funcs, 1.0, C, nt,
+               h_eri_erf_.get(), num_basis_funcs, 0.0, out, nt);
   } else {
-    blas::gemm("N", "N", nt, nbf3, nbf, 1.0, C, nt, h_eri_.get(), nbf, 0.0, out,
-               nt);
+    blas::gemm("N", "N", nt, num_basis_funcs3, num_basis_funcs, 1.0, C, nt,
+               h_eri_.get(), num_basis_funcs, 0.0, out, nt);
   }
 
 #endif  // QDK_CHEMISTRY_ENABLE_GPU

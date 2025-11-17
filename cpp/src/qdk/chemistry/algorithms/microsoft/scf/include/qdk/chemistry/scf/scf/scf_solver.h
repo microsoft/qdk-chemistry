@@ -89,7 +89,7 @@ class SCF {
   /**
    * @brief Get number of molecular orbitals
 
-   * @return Number of molecular orbitals (nmo)
+   * @return Number of molecular orbitals (num_molecular_orbitals)
    */
   int get_num_molecular_orbitals() const;
 
