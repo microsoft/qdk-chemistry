@@ -101,7 +101,7 @@ std::shared_ptr<data::Hamiltonian> HamiltonianConstructor::_run_impl(
   scf_config->cartesian = !internal_basis_set->pure;
   scf_config->unrestricted = false;
   // TODO: Handle unrestricted
-  // https://dev.azure.com/ms-azurequantum/AzureQuantum/_workitems/edit/41317
+  // 41317
 
   // Set ERI method based on settings
   std::string method_name = _settings->get<std::string>("eri_method");

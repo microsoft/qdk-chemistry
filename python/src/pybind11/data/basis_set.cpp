@@ -82,7 +82,7 @@ void bind_basis_set(py::module& m) {
   // Bind Shell struct
   py::class_<Shell>(m, "Shell", "Shell of basis functions")
       // TODO (NAB):  Is there a class-level docstring for this?
-      // https://dev.azure.com/ms-azurequantum/AzureQuantum/_workitems/edit/41395
+      // 41395
       .def(py::init<size_t, OrbitalType, const Eigen::VectorXd&,
                     const Eigen::VectorXd&>(),
            R"(
@@ -185,7 +185,7 @@ void bind_basis_set(py::module& m) {
     --------
     Create a simple basis set:
 
-    >>> from qdk.chemistry.data import BasisSet, OrbitalType
+    >>> from qdk_chemistry.data import BasisSet, OrbitalType
     >>> basis = BasisSet("STO-3G")
     >>> basis.add_shell(0, OrbitalType.S, 1.0, 1.0)  # s orbital on atom 0
     >>> print(f"Number of basis functions: {basis.get_num_basis_functions()}")
@@ -208,7 +208,7 @@ void bind_basis_set(py::module& m) {
 
         Examples
         --------
-        >>> from qdk.chemistry.data import Structure
+        >>> from qdk_chemistry.data import Structure
         >>> structure = Structure.from_xyz_file("water.xyz")
         >>> basis = BasisSet("cc-pVDZ", structure, BasisType.Spherical)
         >>> print(f"Basis set for {structure.get_num_atoms()} atoms")
@@ -260,7 +260,7 @@ void bind_basis_set(py::module& m) {
 
         Examples
         --------
-        >>> from qdk.chemistry.data import Structure
+        >>> from qdk_chemistry.data import Structure
         >>> structure = Structure.from_xyz_file("water.xyz")
         >>> shells = [Shell(0, OrbitalType.S), Shell(1, OrbitalType.S)]
         >>> basis = BasisSet("custom", shells, structure)

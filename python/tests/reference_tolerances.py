@@ -29,6 +29,9 @@ cc_tolerance = 1e-6
 # Consistency of the tested modules can only be expected to agree up to this tolerance.
 ci_energy_tolerance = 1e-8
 
+# This is the MCSCF energy convergence tolerance used for the reference values
+# Consistency of the tested modules can only be expected to agree up to this tolerance.
+mcscf_energy_tolerance = 1e-8
 
 # Energy tolerance for estimating expectation values from a limited number of shots.
 # The goal is to achieve energy estimates within chemical accuracy (~1e-3 Hartree) of the exact value.

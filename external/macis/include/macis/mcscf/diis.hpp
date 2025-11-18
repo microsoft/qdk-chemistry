@@ -2,6 +2,7 @@
  * MACIS Copyright (c) 2023, The Regents of the University of California,
  * through Lawrence Berkeley National Laboratory (subject to receipt of
  * any required approvals from the U.S. Dept. of Energy). All rights reserved.
+ * Portions Copyright (c) Microsoft Corporation.
  *
  * See LICENSE.txt for details
  */
@@ -17,13 +18,35 @@
 
 namespace macis {
 
+/**
+ * @brief Direct Inversion in the Iterative Subspace (DIIS) acceleration class
+ *
+ * This class implements the DIIS method for accelerating convergence of
+ * iterative procedures by extrapolating from previous iterations using
+ * error vectors.
+ *
+ * @tparam VecType Type of the vectors to be extrapolated (e.g.,
+ * std::vector<double>)
+ */
 template <typename VecType>
 class DIIS {
+ private:
+  /** @brief Maximum number of vector pairs to keep in the DIIS space */
   size_t ndiis_max_;
+
+  /** @brief Storage for (solution vector, error vector) pairs */
   std::vector<std::pair<VecType, VecType>> diis_pairs_;
+
+  /** @brief Logger instance for debugging and information output */
   std::shared_ptr<spdlog::logger> logger_;
 
  public:
+  /**
+   * @brief Constructor for DIIS class
+   *
+   * @param nmax Maximum number of vector pairs to store in DIIS subspace
+   * (default: 10)
+   */
   DIIS(size_t nmax = 10) : ndiis_max_(nmax) {
     logger_ = spdlog::get("diis");
     if (!logger_) {
@@ -31,6 +54,15 @@ class DIIS {
     }
   };
 
+  /**
+   * @brief Add a vector pair to the DIIS subspace
+   *
+   * Adds a (solution vector, error vector) pair to the DIIS subspace.
+   * If the maximum number of pairs is reached, the oldest pair is removed.
+   *
+   * @param v Solution vector to add
+   * @param e Error vector corresponding to the solution vector
+   */
   void add_vector(const VecType& v, const VecType& e) {
     logger_->debug(
         "Appending new vector v_size = {}, e_size = {} e_nrm = {:.5e}",
@@ -46,6 +78,15 @@ class DIIS {
     }
   }
 
+  /**
+   * @brief Perform DIIS extrapolation to obtain an improved solution vector
+   *
+   * Constructs the DIIS matrix from error vector overlaps, solves the DIIS
+   * linear system to obtain optimal coefficients, and returns the extrapolated
+   * solution vector as a linear combination of stored solution vectors.
+   *
+   * @return Extrapolated solution vector
+   */
   VecType extrapolate() {
     const size_t ndiis = diis_pairs_.size();
     std::vector<double> B((ndiis + 1) * (ndiis + 1));

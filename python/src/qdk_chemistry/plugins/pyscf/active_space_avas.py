@@ -1,4 +1,4 @@
-"""PySCF AVAS active space selector implementation for qdk.chemistry.
+"""PySCF AVAS active space selector implementation for qdk_chemistry.
 
 This module provides an interface to the PySCF Automated Valence Active Space (AVAS)
 method for selecting active spaces in quantum chemistry calculations. The AVAS method
@@ -12,7 +12,7 @@ The module contains:
 
 References
 ----------
->>> from qdk.chemistry.plugins.pyscf.active_space import PyscfAVAS
+>>> from qdk_chemistry.plugins.pyscf.active_space import PyscfAVAS
 >>> avas_selector = PyscfAVAS()
 >>> avas_selector.settings().set("ao_labels", ["Fe 3d", "Fe 4d"])
 >>> active_orbitals = avas_selector.run(molecular_orbitals)

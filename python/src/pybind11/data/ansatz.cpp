@@ -62,6 +62,7 @@ void bind_ansatz(pybind11::module& data) {
     Represents a quantum chemical ansatz combining a Hamiltonian and wavefunction.
 
     This class represents a complete quantum chemical ansatz, which consists of:
+
     - A Hamiltonian operator describing the system's energy
     - A wavefunction describing the quantum state
 
@@ -71,6 +72,7 @@ void bind_ansatz(pybind11::module& data) {
     calculation.
 
     Common use cases:
+
     - Configuration interaction (CI) methods
     - Multi-configuration self-consistent field (MCSCF) calculations
     - Coupled cluster calculations
@@ -80,7 +82,7 @@ void bind_ansatz(pybind11::module& data) {
     --------
     Create an ``Ansatz`` from ``Hamiltonian`` and ``Wavefunction``:
 
-    >>> import qdk.chemistry.data as data
+    >>> import qdk_chemistry.data as data
     >>> # Assuming you have hamiltonian and wavefunction objects
     >>> ansatz = data.Ansatz(hamiltonian, wavefunction)
     True
@@ -114,9 +116,9 @@ void bind_ansatz(pybind11::module& data) {
 
         Parameters
         ----------
-        hamiltonian : qdk.chemistry.data.Hamiltonian
+        hamiltonian : qdk_chemistry.data.Hamiltonian
             The Hamiltonian operator for the system
-        wavefunction : qdk.chemistry.data.Wavefunction
+        wavefunction : qdk_chemistry.data.Wavefunction
             The wavefunction describing the quantum state
 
         Raises
@@ -133,9 +135,9 @@ void bind_ansatz(pybind11::module& data) {
 
         Parameters
         ----------
-        hamiltonian : qdk.chemistry.data.Hamiltonian
+        hamiltonian : qdk_chemistry.data.Hamiltonian
             Shared pointer to the Hamiltonian operator
-        wavefunction : qdk.chemistry.data.Wavefunction
+        wavefunction : qdk_chemistry.data.Wavefunction
             Shared pointer to the wavefunction
 
         Raises
@@ -155,7 +157,7 @@ void bind_ansatz(pybind11::module& data) {
 
         Returns
         -------
-        qdk.chemistry.data.Hamiltonian
+        qdk_chemistry.data.Hamiltonian
             Shared pointer to the Hamiltonian object
 
         Raises
@@ -182,7 +184,7 @@ void bind_ansatz(pybind11::module& data) {
 
         Returns
         -------
-        qdk.chemistry.data.Wavefunction
+        qdk_chemistry.data.Wavefunction
             Shared pointer to the Wavefunction object
 
         Raises
@@ -209,7 +211,7 @@ void bind_ansatz(pybind11::module& data) {
 
         Returns
         -------
-        qdk.chemistry.data.Orbitals
+        qdk_chemistry.data.Orbitals
             Shared pointer to the Orbitals object
 
         Raises
@@ -303,7 +305,7 @@ void bind_ansatz(pybind11::module& data) {
 
         Returns
         -------
-        qdk.chemistry.data.Ansatz
+        qdk_chemistry.data.Ansatz
             New Ansatz loaded from file
 
         Raises
@@ -341,7 +343,7 @@ void bind_ansatz(pybind11::module& data) {
 
         Returns
         -------
-        qdk.chemistry.data.Ansatz
+        qdk_chemistry.data.Ansatz
             Ansatz loaded from file
 
         Raises
@@ -379,7 +381,7 @@ void bind_ansatz(pybind11::module& data) {
 
         Returns
         -------
-        qdk.chemistry.data.Ansatz
+        qdk_chemistry.data.Ansatz
             Ansatz loaded from file
 
         Raises
@@ -417,7 +419,7 @@ void bind_ansatz(pybind11::module& data) {
 
         Returns
         -------
-        qdk.chemistry.data.Ansatz
+        qdk_chemistry.data.Ansatz
             Ansatz loaded from JSON string
 
         Raises

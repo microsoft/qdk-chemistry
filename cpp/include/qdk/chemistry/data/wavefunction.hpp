@@ -51,6 +51,97 @@ using MatrixVariant = std::variant<Eigen::MatrixXd, Eigen::MatrixXcd>;
 using DeterminantVector = std::vector<Configuration>;
 };  // namespace ContainerTypes
 
+namespace detail {
+/**
+ * @brief Helper to create a ContainerTypes::MatrixVariant from scalar
+ * multiplication
+ * @param matrix The matrix variant to multiply
+ * @param scalar The scalar value to multiply by
+ * @return Shared pointer to new ContainerTypes::MatrixVariant containing the
+ * result
+ */
+template <typename Scalar>
+std::shared_ptr<ContainerTypes::MatrixVariant> multiply_matrix_variant(
+    const ContainerTypes::MatrixVariant& matrix, Scalar scalar) {
+  return std::visit(
+      [scalar](
+          const auto& mat) -> std::shared_ptr<ContainerTypes::MatrixVariant> {
+        using MatType = std::decay_t<decltype(mat)>;
+        return std::make_shared<ContainerTypes::MatrixVariant>(
+            std::in_place_type<MatType>, mat * scalar);
+      },
+      matrix);
+}
+
+/**
+ * @brief Helper to create a ContainerTypes::VectorVariant from scalar
+ * multiplication
+ * @param vector The vector variant to multiply
+ * @param scalar The scalar value to multiply by
+ * @return Shared pointer to new ContainerTypes::VectorVariant containing the
+ * result
+ */
+template <typename Scalar>
+std::shared_ptr<ContainerTypes::VectorVariant> multiply_vector_variant(
+    const ContainerTypes::VectorVariant& vector, Scalar scalar) {
+  return std::visit(
+      [scalar](
+          const auto& vec) -> std::shared_ptr<ContainerTypes::VectorVariant> {
+        using VecType = std::decay_t<decltype(vec)>;
+        return std::make_shared<ContainerTypes::VectorVariant>(
+            std::in_place_type<VecType>, vec * scalar);
+      },
+      vector);
+}
+
+/**
+ * @brief Helper to add two ContainerTypes::MatrixVariants
+ * @param mat1 First matrix variant
+ * @param mat2 Second matrix variant
+ * @return Shared pointer to new ContainerTypes::MatrixVariant containing the
+ * sum
+ */
+std::shared_ptr<ContainerTypes::MatrixVariant> add_matrix_variants(
+    const ContainerTypes::MatrixVariant& mat1,
+    const ContainerTypes::MatrixVariant& mat2);
+
+/**
+ * @brief Helper to add two ContainerTypes::VectorVariants
+ * @param vec1 First vector variant
+ * @param vec2 Second vector variant
+ * @return Shared pointer to new ContainerTypes::VectorVariant containing the
+ * sum
+ */
+std::shared_ptr<ContainerTypes::VectorVariant> add_vector_variants(
+    const ContainerTypes::VectorVariant& vec1,
+    const ContainerTypes::VectorVariant& vec2);
+
+/**
+ * @brief Check if a ContainerTypes::MatrixVariant contains complex type
+ * @param variant The matrix variant to check
+ * @return True if contains Eigen::MatrixXcd, false if Eigen::MatrixXd
+ */
+bool is_matrix_variant_complex(const ContainerTypes::MatrixVariant& variant);
+
+/**
+ * @brief Check if a ContainerTypes::VectorVariant contains complex type
+ * @param variant The vector variant to check
+ * @return True if contains Eigen::VectorXcd, false if Eigen::VectorXd
+ */
+bool is_vector_variant_complex(const ContainerTypes::VectorVariant& variant);
+
+/**
+ * @brief Transpose a 2-RDM vector from (ij|kl) to (kl|ij) ordering
+ * @param variant The vector variant to transpose
+ * @param norbs Number of orbitals
+ * @return shared pointer to new ContainerTypes::VectorVariant containing the
+ * transposed data
+ */
+std::shared_ptr<ContainerTypes::VectorVariant>
+transpose_ijkl_klij_vector_variant(const ContainerTypes::VectorVariant& variant,
+                                   int norbs);
+}  // namespace detail
+
 /**
  * @brief Abstract base class for wavefunction containers
  *
@@ -73,6 +164,43 @@ class WavefunctionContainer {
    * @param type Type of wavefunction (SelfDual or NotSelfDual)
    */
   WavefunctionContainer(WavefunctionType type = WavefunctionType::SelfDual);
+
+  /**
+   * @brief Constructs a wavefunction with spin-traced reduced density matrix
+   * (RDM) data
+   *
+   * @param one_rdm_spin_traced Spin-traced 1-RDM for active orbitals (optional)
+   * @param two_rdm_spin_traced Spin-traced 2-RDM for active orbitals (optional)
+   * @param type The type of wavefunction
+   */
+  WavefunctionContainer(const std::optional<MatrixVariant>& one_rdm_spin_traced,
+                        const std::optional<VectorVariant>& two_rdm_spin_traced,
+                        WavefunctionType type = WavefunctionType::SelfDual);
+
+  /**
+   * @brief Constructs a wavefunction container with reduced density matrix
+   * (RDM) data
+   *
+   * @param one_rdm_spin_traced Spin-traced 1-RDM for active orbitals (optional)
+   * @param one_rdm_aa Alpha-alpha block of 1-RDM for active orbitals (optional)
+   * @param one_rdm_bb Beta-beta block of 1-RDM for active orbitals (optional)
+   * @param two_rdm_spin_traced Spin-traced 2-RDM for active orbitals (optional)
+   * @param two_rdm_aabb Alpha-beta-alpha-beta block of 2-RDM for active
+   * orbitals (optional)
+   * @param two_rdm_aaaa Alpha-alpha-alpha-alpha block of 2-RDM for active
+   * orbitals (optional)
+   * @param two_rdm_bbbb Beta-beta-beta-beta block of 2-RDM for active orbitals
+   * (optional)
+   * @param type The type of wavefunction
+   */
+  WavefunctionContainer(const std::optional<MatrixVariant>& one_rdm_spin_traced,
+                        const std::optional<MatrixVariant>& one_rdm_aa,
+                        const std::optional<MatrixVariant>& one_rdm_bb,
+                        const std::optional<VectorVariant>& two_rdm_spin_traced,
+                        const std::optional<VectorVariant>& two_rdm_aabb,
+                        const std::optional<VectorVariant>& two_rdm_aaaa,
+                        const std::optional<VectorVariant>& two_rdm_bbbb,
+                        WavefunctionType type = WavefunctionType::SelfDual);
 
   virtual ~WavefunctionContainer() = default;
 
@@ -126,27 +254,27 @@ class WavefunctionContainer {
    * orbitals
    */
   virtual std::tuple<const MatrixVariant&, const MatrixVariant&>
-  get_one_rdm_spin_dependent() const = 0;
+  get_active_one_rdm_spin_dependent() const;
 
   /**
    * @brief Get spin-dependent two-particle RDMs for active orbitals only
-   * @return Tuple of (abba, aaaa, bbbb) two-particle RDMs for active orbitals
+   * @return Tuple of (aabb, aaaa, bbbb) two-particle RDMs for active orbitals
    */
   virtual std::tuple<const VectorVariant&, const VectorVariant&,
                      const VectorVariant&>
-  get_two_rdm_spin_dependent() const = 0;
+  get_active_two_rdm_spin_dependent() const;
 
   /**
    * @brief Get spin-traced one-particle RDM for active orbitals only
    * @return Spin-traced one-particle RDM for active orbitals
    */
-  virtual const MatrixVariant& get_one_rdm_spin_traced() const = 0;
+  virtual const MatrixVariant& get_active_one_rdm_spin_traced() const;
 
   /**
    * @brief Get spin-traced two-particle RDM for active orbitals only
    * @return Spin-traced two-particle RDM for active orbitals
    */
-  virtual const VectorVariant& get_two_rdm_spin_traced() const = 0;
+  virtual const VectorVariant& get_active_two_rdm_spin_traced() const;
 
   /**
    * @brief Checks if single-orbital entropies for active orbitals are available
@@ -157,9 +285,11 @@ class WavefunctionContainer {
 
   /**
    * @brief Calculate single orbital entropies for active orbitals only
+   * TODO(MM): add bibtex entry for https://doi.org/10.1002/qua.24832 to
+   * docstring
    * @return Vector of orbital entropies for active orbitals (always real)
    */
-  virtual Eigen::VectorXd get_single_orbital_entropies() const = 0;
+  virtual Eigen::VectorXd get_single_orbital_entropies() const;
 
   /**
    * @brief Get total number of alpha and beta electrons (active + inactive)
@@ -193,41 +323,34 @@ class WavefunctionContainer {
    * available
    * @return True if available
    */
-  virtual bool has_one_rdm_spin_dependent() const = 0;
+  virtual bool has_one_rdm_spin_dependent() const;
 
   /**
    * @brief Check if spin-traced one-particle RDM for active orbitals is
    * available
    * @return True if available
    */
-  virtual bool has_one_rdm_spin_traced() const = 0;
+  virtual bool has_one_rdm_spin_traced() const;
 
   /**
    * @brief Check if spin-dependent two-particle RDMs for active orbitals are
    * available
    * @return True if available
    */
-  virtual bool has_two_rdm_spin_dependent() const = 0;
-
-  /**
-   * @brief Check if alpha-beta two-particle RDM for active orbitals is
-   * available
-   * @return True if available
-   */
-  virtual bool has_two_rdm_spin_dependent_ab() const = 0;
+  virtual bool has_two_rdm_spin_dependent() const;
 
   /**
    * @brief Check if spin-traced two-particle RDM for active orbitals is
    * available
    * @return True if available
    */
-  virtual bool has_two_rdm_spin_traced() const = 0;
+  virtual bool has_two_rdm_spin_traced() const;
 
   /**
    * @brief Clear cached data to release memory
    *
    * This method cleans up memoized evaluations of data derived from the
-   * wavefunction, such as reduced density matrices (RDMs), and other computed *
+   * wavefunction, such as reduced density matrices (RDMs), and other computed
    * properties. Each derived container implementation decides specifically what
    * cached data to clear based on its internal structure.
    *
@@ -292,74 +415,18 @@ class WavefunctionContainer {
  protected:
   /// Wavefunction type (SelfDual or NotSelfDual)
   WavefunctionType _type;
+  // spin-traced RDMs
+  mutable std::shared_ptr<MatrixVariant> _one_rdm_spin_traced = nullptr;
+  mutable std::shared_ptr<VectorVariant> _two_rdm_spin_traced = nullptr;
+  // spin-dependent RDMs
+  mutable std::shared_ptr<MatrixVariant> _one_rdm_spin_dependent_aa = nullptr;
+  mutable std::shared_ptr<MatrixVariant> _one_rdm_spin_dependent_bb = nullptr;
+  mutable std::shared_ptr<VectorVariant> _two_rdm_spin_dependent_aaaa = nullptr;
+  mutable std::shared_ptr<VectorVariant> _two_rdm_spin_dependent_aabb = nullptr;
+  mutable std::shared_ptr<VectorVariant> _two_rdm_spin_dependent_bbbb = nullptr;
 
-  /**
-   * @brief Helper to create a MatrixVariant from scalar multiplication
-   * @param matrix The matrix variant to multiply
-   * @param scalar The scalar value to multiply by
-   * @return Shared pointer to new MatrixVariant containing the result
-   */
-  template <typename Scalar>
-  std::shared_ptr<MatrixVariant> multiply_matrix_variant(
-      const MatrixVariant& matrix, Scalar scalar) const {
-    return std::visit(
-        [scalar](const auto& mat) -> std::shared_ptr<MatrixVariant> {
-          using MatType = std::decay_t<decltype(mat)>;
-          return std::make_shared<MatrixVariant>(std::in_place_type<MatType>,
-                                                 mat * scalar);
-        },
-        matrix);
-  }
-
-  /**
-   * @brief Helper to create a VectorVariant from scalar multiplication
-   * @param vector The vector variant to multiply
-   * @param scalar The scalar value to multiply by
-   * @return Shared pointer to new VectorVariant containing the result
-   */
-  template <typename Scalar>
-  std::shared_ptr<VectorVariant> multiply_vector_variant(
-      const VectorVariant& vector, Scalar scalar) const {
-    return std::visit(
-        [scalar](const auto& vec) -> std::shared_ptr<VectorVariant> {
-          using VecType = std::decay_t<decltype(vec)>;
-          return std::make_shared<VectorVariant>(std::in_place_type<VecType>,
-                                                 vec * scalar);
-        },
-        vector);
-  }
-
-  /**
-   * @brief Helper to add two MatrixVariants
-   * @param mat1 First matrix variant
-   * @param mat2 Second matrix variant
-   * @return Shared pointer to new MatrixVariant containing the sum
-   */
-  std::shared_ptr<MatrixVariant> add_matrix_variants(
-      const MatrixVariant& mat1, const MatrixVariant& mat2) const;
-
-  /**
-   * @brief Helper to add two VectorVariants
-   * @param vec1 First vector variant
-   * @param vec2 Second vector variant
-   * @return Shared pointer to new VectorVariant containing the sum
-   */
-  std::shared_ptr<VectorVariant> add_vector_variants(
-      const VectorVariant& vec1, const VectorVariant& vec2) const;
-
-  /**
-   * @brief Check if a MatrixVariant contains complex type
-   * @param variant The matrix variant to check
-   * @return True if contains Eigen::MatrixXcd, false if Eigen::MatrixXd
-   */
-  bool is_matrix_variant_complex(const MatrixVariant& variant) const;
-
-  /**
-   * @brief Check if a VectorVariant contains complex type
-   * @param variant The vector variant to check
-   * @return True if contains Eigen::VectorXcd, false if Eigen::VectorXd
-   */
-  bool is_vector_variant_complex(const VectorVariant& variant) const;
+  /** @brief Clear cached RDMs */
+  void _clear_rdms() const;
 };
 
 /**
@@ -419,6 +486,12 @@ class Wavefunction : public DataClass,
    * @return Shared pointer to orbitals
    */
   virtual std::shared_ptr<Orbitals> get_orbitals() const;
+
+  /**
+   * @brief Get the type of the underlying container
+   * @return String identifying the container type (e.g., "cas", "sci", "sd")
+   */
+  virtual std::string get_container_type() const;
 
   /**
    * @brief Get typed reference to the underlying container
@@ -556,26 +629,26 @@ class Wavefunction : public DataClass,
    * @return Tuple of (alpha-alpha, beta-beta) one-particle RDMs
    */
   std::tuple<const MatrixVariant&, const MatrixVariant&>
-  get_one_rdm_spin_dependent() const;
+  get_active_one_rdm_spin_dependent() const;
 
   /**
    * @brief Get spin-dependent two-particle RDMs
-   * @return Tuple of (abba, aaaa, bbbb) two-particle RDMs
+   * @return Tuple of (aabb, aaaa, bbbb) two-particle RDMs
    */
   std::tuple<const VectorVariant&, const VectorVariant&, const VectorVariant&>
-  get_two_rdm_spin_dependent() const;
+  get_active_two_rdm_spin_dependent() const;
 
   /**
    * @brief Get spin-traced one-particle RDM
    * @return Spin-traced one-particle RDM
    */
-  const MatrixVariant& get_one_rdm_spin_traced() const;
+  const MatrixVariant& get_active_one_rdm_spin_traced() const;
 
   /**
    * @brief Get spin-traced two-particle RDM
    * @return Spin-traced two-particle RDM
    */
-  const VectorVariant& get_two_rdm_spin_traced() const;
+  const VectorVariant& get_active_two_rdm_spin_traced() const;
 
   /**
    * @brief Checks if single-orbital entropies for active orbitals are available
@@ -608,21 +681,10 @@ class Wavefunction : public DataClass,
   bool has_two_rdm_spin_dependent() const;
 
   /**
-   * @brief Check if alpha-beta two-particle RDM is available
-   * @return True if available
-   */
-  bool has_two_rdm_spin_dependent_ab() const;
-
-  /**
    * @brief Check if spin-traced two-particle RDM is available
    * @return True if available
    */
   bool has_two_rdm_spin_traced() const;
-
-  /**
-   * @brief Clear cached data to release memory
-   */
-  void clear_caches() const;
 
   /**
    * @brief Convert wavefunction to JSON format
@@ -724,12 +786,6 @@ class Wavefunction : public DataClass,
 
   /// Serialization version
   static constexpr const char* SERIALIZATION_VERSION = "0.1.0";
-
-  /**
-   * @brief Save to JSON file without filename validation (internal use)
-   * @param filename Path to JSON file to create/overwrite
-   * @throws std::runtime_error if I/O error occurs
-   */
 
   /**
    * @brief Clear cached data to release memory

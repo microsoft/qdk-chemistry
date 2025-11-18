@@ -2,6 +2,7 @@
  * MACIS Copyright (c) 2023, The Regents of the University of California,
  * through Lawrence Berkeley National Laboratory (subject to receipt of
  * any required approvals from the U.S. Dept. of Energy). All rights reserved.
+ * Portions Copyright (c) Microsoft Corporation.
  *
  * See LICENSE.txt for details
  */
@@ -13,6 +14,35 @@
 
 namespace macis {
 
+/**
+ * @brief Perform a single ASCI (Adaptive Sampling Configuration Interaction)
+ * iteration
+ *
+ * This function executes one complete iteration of the ASCI algorithm,
+ * including determinant sorting, space expansion through search, and
+ * Hamiltonian rediagonalization. It represents the core computational cycle of
+ * ASCI calculations.
+ *
+ * @tparam N Size of the wavefunction bitset representation
+ * @tparam index_t Integer type for indexing operations
+ *
+ * @param[in] asci_settings ASCI algorithm parameters
+ * @param[in] mcscf_settings MCSCF parameters for CI diagonalization
+ * @param[in] ndets_max Maximum number of determinants for expanded space
+ * @param[in] E0 Reference energy from previous iteration
+ * @param[in] wfn Current wavefunction determinants
+ * @param[in] X Current CI coefficients corresponding to wavefunction
+ * @param[in,out] ham_gen Hamiltonian generator containing integrals and methods
+ * @param[in] norb Number of molecular orbitals
+ * @param[in] comm MPI communicator for parallel execution (if MPI enabled)
+ *
+ * @return Tuple containing:
+ *   - New ground state energy
+ *   - Expanded and rediagonalized wavefunction determinants
+ *   - New CI coefficients
+ *
+ * @see asci_search, selected_ci_diag, reorder_ci_on_coeff, reorder_ci_on_alpha
+ */
 template <size_t N, typename index_t>
 auto asci_iter(ASCISettings asci_settings, MCSCFSettings mcscf_settings,
                size_t ndets_max, double E0, std::vector<wfn_t<N>> wfn,

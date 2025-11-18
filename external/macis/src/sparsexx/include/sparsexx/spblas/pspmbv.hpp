@@ -20,30 +20,81 @@ namespace sparsexx::spblas {
 
 namespace detail {
 using namespace sparsexx::detail;
+
+/**
+ * @brief Creates an uninitialized array of type T with size n.
+ *
+ * This function allocates memory for an array of type T without initializing
+ * the elements, which can be more efficient when the array will be populated
+ * immediately after allocation.
+ *
+ * @tparam T The element type of the array
+ * @param n The number of elements to allocate
+ * @return std::unique_ptr<T[]> A unique pointer to the allocated array
+ */
 template <typename T>
 auto no_init_array(size_t n) {
   return std::unique_ptr<T[]>(new T[n]);
 }
 }  // namespace detail
 
+/**
+ * @brief Communication information for parallel sparse matrix-vector
+ * multiplication.
+ *
+ * This struct stores all necessary information for MPI communication patterns
+ * required in distributed sparse matrix-vector multiplication (SpMV)
+ * operations. It contains indices, offsets, and counts for both sending and
+ * receiving data between MPI processes.
+ *
+ * @tparam IndexType The type used for matrix indices (typically int or long)
+ */
 template <typename IndexType>
 struct spmv_info {
-  using index_type = IndexType;
+  using index_type = IndexType;  ///< Type alias for the index type
 
-  MPI_Comm comm;
+  MPI_Comm comm;  ///< MPI communicator for this SpMV operation
 
-  std::vector<index_type> send_indices;
-  std::vector<index_type> recv_indices;
-  std::vector<size_t> send_offsets;
-  std::vector<size_t> recv_offsets;
-  std::vector<size_t> send_counts;
-  std::vector<size_t> recv_counts;
+  std::vector<index_type>
+      send_indices;  ///< Local indices of elements to send to remote processes
+  std::vector<index_type> recv_indices;  ///< Remote indices of elements to
+                                         ///< receive from remote processes
+  std::vector<size_t>
+      send_offsets;  ///< Byte offsets for data to send to each process
+  std::vector<size_t>
+      recv_offsets;  ///< Byte offsets for data to receive from each process
+  std::vector<size_t>
+      send_counts;  ///< Number of elements to send to each process
+  std::vector<size_t>
+      recv_counts;  ///< Number of elements to receive from each process
 
+  /**
+   * @brief Calculates the total communication volume across all MPI processes.
+   *
+   * This method computes the global communication volume for the SpMV operation
+   * by summing the local communication volumes (send + receive indices) across
+   * all processes and dividing by 2 to avoid double counting.
+   *
+   * @return size_t Total communication volume across all processes
+   */
   inline size_t communication_volume() {
     size_t local_comm_vol = (send_indices.size() + recv_indices.size()) / 2;
     return detail::mpi_allreduce(local_comm_vol, MPI_SUM, comm);
   }
 
+  /**
+   * @brief Posts asynchronous MPI receives for remote data.
+   *
+   * This method initiates non-blocking MPI receive operations to receive
+   * vector elements from remote processes. The received data will be stored
+   * in the provided buffer X at the appropriate offsets.
+   *
+   * @tparam T The data type of the vector elements
+   * @param X Pointer to the buffer where received data will be stored
+   * @return std::vector<MPI_Request> Vector of MPI request handles for the
+   * receive operations
+   * @throws const char* If any receive count exceeds int32_t maximum value
+   */
   template <typename T>
   std::vector<MPI_Request> post_remote_recv(T* X) const {
     std::vector<MPI_Request> reqs;
@@ -58,6 +109,19 @@ struct spmv_info {
     return reqs;
   }
 
+  /**
+   * @brief Posts asynchronous MPI sends for local data to remote processes.
+   *
+   * This method initiates non-blocking MPI send operations to send vector
+   * elements to remote processes. The data is sent from the provided buffer X
+   * starting at the appropriate offsets.
+   *
+   * @tparam T The data type of the vector elements
+   * @param X Pointer to the buffer containing data to be sent
+   * @return std::vector<MPI_Request> Vector of MPI request handles for the send
+   * operations
+   * @throws const char* If any send count exceeds int32_t maximum value
+   */
   template <typename T>
   std::vector<MPI_Request> post_remote_send(const T* X) const {
     std::vector<MPI_Request> reqs;
@@ -73,6 +137,28 @@ struct spmv_info {
   }
 };
 
+/**
+ * @brief Generates communication information for distributed sparse
+ * matrix-vector multiplication.
+ *
+ * This function analyzes a distributed sparse matrix and generates all
+ * necessary communication patterns and data structures required for efficient
+ * parallel SpMV operations. It determines which vector elements need to be
+ * exchanged between MPI processes and sets up the communication buffers and
+ * patterns.
+ *
+ * The function performs the following steps:
+ * 1. Identifies off-diagonal column indices that require remote vector elements
+ * 2. Determines which processes own the required vector elements
+ * 3. Sets up send/receive patterns and buffers
+ * 4. Exchanges index information between processes
+ * 5. Computes offsets and counts for efficient data packing
+ *
+ * @tparam DistSpMatrixType Type of the distributed sparse matrix
+ * @param A The distributed sparse matrix to analyze
+ * @return spmv_info<index_type> Communication information structure containing
+ *         all necessary data for parallel SpMV operations
+ */
 template <typename DistSpMatrixType>
 auto generate_spmv_comm_info(const DistSpMatrixType& A) {
   using index_type = sparsexx::detail::index_type_t<DistSpMatrixType>;
@@ -199,6 +285,34 @@ auto generate_spmv_comm_info(const DistSpMatrixType& A) {
   return info;
 }
 
+/**
+ * @brief Performs parallel distributed sparse matrix-vector multiplication.
+ *
+ * This function implements the operation AV = ALPHA * A * V + BETA * AV for
+ * distributed sparse matrices. It uses the provided communication information
+ * to efficiently exchange vector elements between MPI processes and performs
+ * both diagonal and off-diagonal matrix-vector multiplications.
+ *
+ * The algorithm follows these steps:
+ * 1. Post asynchronous receives for remote vector elements
+ * 2. Pack and send local vector elements to remote processes
+ * 3. Perform diagonal tile matrix-vector multiplication
+ * 4. Wait for remote data and unpack into contiguous buffer
+ * 5. Perform off-diagonal tile matrix-vector multiplication
+ * 6. Wait for all communications to complete
+ *
+ * @tparam DistSpMatType Type of the distributed sparse matrix
+ * @tparam ScalarType Type of the scalar values (default: inferred from matrix)
+ * @tparam IndexType Type of the matrix indices (default: inferred from matrix)
+ *
+ * @param ALPHA Scalar multiplier for the matrix-vector product A*V
+ * @param A The distributed sparse matrix
+ * @param V Pointer to the input vector (must be accessible on all processes)
+ * @param BETA Scalar multiplier for the existing values in AV
+ * @param AV Pointer to the output vector (result of ALPHA*A*V + BETA*AV)
+ * @param spmv_info Communication information structure containing send/receive
+ * patterns
+ */
 template <typename DistSpMatType,
           typename ScalarType = detail::value_type_t<DistSpMatType>,
           typename IndexType = detail::index_type_t<DistSpMatType>>

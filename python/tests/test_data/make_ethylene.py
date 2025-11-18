@@ -7,8 +7,8 @@
 
 from pathlib import Path
 
-from qdk.chemistry.algorithms import create
-from qdk.chemistry.data import Configuration, Orbitals, Structure
+from qdk_chemistry.algorithms import create
+from qdk_chemistry.data import Configuration, Orbitals, Structure
 
 if __name__ == "__main__":
     ethylene = Structure.from_xyz_file(Path("ethylene.structure.xyz"))

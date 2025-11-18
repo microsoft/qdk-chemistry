@@ -2,6 +2,7 @@
  * MACIS Copyright (c) 2023, The Regents of the University of California,
  * through Lawrence Berkeley National Laboratory (subject to receipt of
  * any required approvals from the U.S. Dept. of Energy). All rights reserved.
+ * Portions Copyright (c) Microsoft Corporation.
  *
  * See LICENSE.txt for details
  */
@@ -11,6 +12,34 @@
 
 namespace macis {
 
+/**
+ * @brief Perform ASCI (Adaptive Sampling Configuration Interaction)
+ * wavefunction refinement phase
+ *
+ * This function implements the refinement phase of the ASCI algorithm, where
+ * the size of the wave function is kept fixed while iteratively improving
+ * the configurations and CI coefficients and energy until convergence.
+ *
+ * @tparam N Size of the wavefunction bitset representation
+ * @tparam index_t Integer type for indexing operations (default: int32_t)
+ *
+ * @param[in] asci_settings ASCI algorithm parameters including refinement
+ * tolerance
+ * @param[in] mcscf_settings MCSCF parameters for CI diagonalization
+ * @param[in] E0 Initial reference energy from growth phase
+ * @param[in] wfn Final wavefunction determinants from growth phase
+ * @param[in] X Initial CI coefficients corresponding to wavefunction
+ * @param[in] ham_gen Hamiltonian generator containing integrals and methods
+ * @param[in] norb Number of molecular orbitals
+ * @param[in] comm MPI communicator for parallel execution (MPI builds only)
+ *
+ * @return Tuple containing:
+ *   - Final refined energy
+ *   - Unchanged wavefunction determinants
+ *   - Refined CI coefficients
+ *
+ * @see asci_iter, asci_grow
+ */
 template <size_t N, typename index_t = int32_t>
 auto asci_refine(ASCISettings asci_settings, MCSCFSettings mcscf_settings,
                  double E0, std::vector<wfn_t<N>> wfn, std::vector<double> X,

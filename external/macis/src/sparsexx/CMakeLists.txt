@@ -24,8 +24,6 @@ if(CMAKE_PROJECT_NAME STREQUAL PROJECT_NAME)
 endif()
 
 
-option( SPARSEXX_ENABLE_MKL       "Enable MKL Bindings"             OFF )
-option( SPARSEXX_ENABLE_CEREAL    "Enable serialization via cereal" OFF )
 option( SPARSEXX_ENABLE_RANGES_V3 "Enable Ranges-v3"                OFF )
 option( SPARSEXX_ENABLE_METIS     "Enable METIS"                    OFF )
 option( SPARSEXX_ENABLE_OPENMP    "Enable OpenMP" ${MACIS_ENABLE_OPENMP})
@@ -36,13 +34,6 @@ find_package( MPI   REQUIRED )
 endif()
 if(SPARSEXX_ENABLE_OPENMP)
 find_package( OpenMP         )
-endif()
-
-if( SPARSEXX_ENABLE_MKL )
-  find_package( IntelMKL COMPONENTS lp64 REQUIRED )
-  if( TARGET IntelMKL::IntelMKL )
-    set( SPARSEXX_EXTERNAL_LIBRARIES IntelMKL::IntelMKL )
-  endif()
 endif()
 
 
@@ -97,28 +88,6 @@ if( SPARSEXX_ENABLE_RANGES_V3 )
   endif()
   list(APPEND SPARSEXX_EXTERNAL_LIBRARIES ranges)
 endif()
-
-
-
-
-# CEREAL
-if( SPARSEXX_ENABLE_CEREAL )
-  FetchContent_Declare(
-    cereal_download
-    GIT_REPOSITORY https://github.com/USCiLab/cereal.git
-  )
-  FetchContent_GetProperties(cereal_download)
-  if(NOT cereal_download_POPULATED)
-    FetchContent_Populate( cereal_download )
-    add_library( cereal INTERFACE IMPORTED )
-    set_target_properties( cereal PROPERTIES
-      INTERFACE_INCLUDE_DIRECTORIES "${cereal_download_SOURCE_DIR}/include"
-      INTERFACE_COMPILE_DEFINITIONS "CEREAL_THREAD_SAFE=1;SPARSEXX_ENABLE_CEREAL=1"
-    )
-  endif()
-  list(APPEND SPARSEXX_EXTERNAL_LIBRARIES cereal)
-endif()
-
 
 add_library( sparsexx src/metis_wrapper.cxx )
 target_compile_features( sparsexx PUBLIC cxx_std_20 )

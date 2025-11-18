@@ -2,6 +2,7 @@
  * MACIS Copyright (c) 2023, The Regents of the University of California,
  * through Lawrence Berkeley National Laboratory (subject to receipt of
  * any required approvals from the U.S. Dept. of Energy). All rights reserved.
+ * Portions Copyright (c) Microsoft Corporation.
  *
  * See LICENSE.txt for details
  */
@@ -154,8 +155,6 @@ void active_fock_matrix(NumOrbital norb, NumInactive ninact, NumActive nact,
  *  generalized Fock matrix. Takes full dimensional MO
  *  integrals and the all-active 2RDM.
  *
- *  TODO: This only requires GAAA MO integrals
- *
  *  Q(v,p) = \sum_{wxy} \Gamma^A(v,w,x,y) * V(p,w,x,y)
  *
  *  @param[in]  nact   Number of active orbitals
@@ -208,8 +207,6 @@ void generalized_fock_matrix(NumOrbital norb, NumInactive ninact,
  *  will compute the active Fock and auxillary Q internally and discard.
  *  The function requires full dimenional MO integrals must be structured
  *  as [inactive, active, virtual].
- *
- *  TODO: This function should only require GAAA integrals
  *
  *  @param[in]  norb   Number of total orbitals
  *  @param[in]  ninact Number if inactive orbitals

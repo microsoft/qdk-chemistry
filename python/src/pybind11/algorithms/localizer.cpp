@@ -57,8 +57,8 @@ void bind_localizer(py::module &m) {
     --------
     To create a custom orbital localizer, inherit from this class:
 
-        >>> import qdk.chemistry.algorithms as alg
-        >>> import qdk.chemistry.data as data
+        >>> import qdk_chemistry.algorithms as alg
+        >>> import qdk_chemistry.data as data
         >>> class MyLocalizer(alg.Localizer):
         ...     def __init__(self):
         ...         super().__init__()  # Call the base class constructor
@@ -89,7 +89,7 @@ void bind_localizer(py::module &m) {
 
         Parameters
         ----------
-        wavefunction : qdk.chemistry.data.Wavefunction
+        wavefunction : qdk_chemistry.data.Wavefunction
             The canonical molecular wavefunction to localize
         loc_indices_a : list of int
             Indices of alpha orbitals to localize (empty for no localization)
@@ -99,7 +99,7 @@ void bind_localizer(py::module &m) {
 
         Returns
         -------
-        qdk.chemistry.data.Wavefunction
+        qdk_chemistry.data.Wavefunction
             The localized molecular wavefunction
 
         Raises
@@ -118,7 +118,7 @@ void bind_localizer(py::module &m) {
 
         Returns
         -------
-        qdk.chemistry.data.Settings
+        qdk_chemistry.data.Settings
             Reference to the settings object for configuring the localizer
         )",
                 py::return_value_policy::reference_internal);
@@ -143,7 +143,7 @@ void bind_localizer(py::module &m) {
         >>> class MyLocalizer(alg.Localizer):
         ...     def __init__(self):
         ...         super().__init__()
-        ...         from qdk.chemistry.data import ElectronicStructureSettings
+        ...         from qdk_chemistry.data import ElectronicStructureSettings
         ...         self._settings = ElectronicStructureSettings()
         )");
 
@@ -158,7 +158,7 @@ void bind_localizer(py::module &m) {
         )");
 
   localizer.def("__repr__", [](const Localizer &) {
-    return "<qdk.chemistry.algorithms.Localizer>";
+    return "<qdk_chemistry.algorithms.Localizer>";
   });
 
   // Factory class binding - creates LocalizerFactory class
@@ -168,6 +168,6 @@ void bind_localizer(py::module &m) {
       m, "LocalizerFactory");
 
   localizer.def("__repr__", [](const Localizer &) {
-    return "<qdk.chemistry.algorithms.Localizer>";
+    return "<qdk_chemistry.algorithms.Localizer>";
   });
 }

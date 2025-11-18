@@ -41,7 +41,7 @@
 // TODO (NAB):  this is one of our only end-to-end examples in C++.  We should
 // make it more pedagogical, explaining the role of each step, writing out
 // acronyms, making the variable names clearer, etc.
-// https://dev.azure.com/ms-azurequantum/AzureQuantum/_workitems/edit/41302
+// 41302
 
 int main(int argc, char** argv) {
   std::shared_ptr<qdk::chemistry::data::Structure> structure;
@@ -82,13 +82,13 @@ int main(int argc, char** argv) {
   {
     auto localizer = qdk::chemistry::algorithms::LocalizerFactory::create();
     // TODO (NAB):  describe localizer
-    // https://dev.azure.com/ms-azurequantum/AzureQuantum/_workitems/edit/41291/
-    // https://dev.azure.com/ms-azurequantum/AzureQuantum/_workitems/edit/41302
+    // 41291/
+    // 41302
     auto localized_hf_wfn = localizer->run(wfn_hf, n_alpha, n_beta);
   }
 
   // TODO (NAB):  we need an end-to-end C++ example for active space selection
-  // https://dev.azure.com/ms-azurequantum/AzureQuantum/_workitems/edit/41302
+  // 41302
 
   // Compute the Hamiltonian
   auto hamiltonian_constructor =

@@ -21,6 +21,35 @@
 
 namespace sparsexx {
 
+/**
+ * @brief Sorts the COO matrix entries by row index, with column index as
+ * secondary sort key.
+ *
+ * This function reorders the COO matrix triplets (row, column, value) such that
+ * they are sorted first by row index, then by column index within each row.
+ * This ordering is particularly useful for efficient conversion to CSR format.
+ *
+ * @tparam T The value type for matrix elements
+ * @tparam index_t The index type for matrix indices
+ * @tparam Alloc The allocator type for memory management
+ *
+ * @note Sorting algorithm:
+ *       - If SPARSEXX_ENABLE_RANGES_V3: Uses ranges::sort on zipped triplets
+ *       - Otherwise: Uses indirect sorting with index permutation for cache
+ * efficiency
+ *
+ * @note Sort order:
+ *       - Primary key: row index (ascending)
+ *       - Secondary key: column index (ascending)
+ *       - Lexicographic ordering: (i1, j1) < (i2, j2) if i1 < i2 or (i1 == i2
+ * and j1 < j2)
+ *
+ * @note Performance:
+ *       - Time complexity: O(nnz * log(nnz))
+ *       - Space complexity: O(nnz) for indirect sort, O(1) for ranges version
+ *
+ * @see sort_by_col_index() for column-major ordering
+ */
 template <typename T, typename index_t, typename Alloc>
 void coo_matrix<T, index_t, Alloc>::sort_by_row_index() {
 #ifdef SPARSEXX_ENABLE_RANGES_V3
@@ -71,6 +100,37 @@ void coo_matrix<T, index_t, Alloc>::sort_by_row_index() {
 #endif /* SPARSEXX_ENABLE_RANGES_V3 */
 }
 
+/**
+ * @brief Expands a triangular matrix to its full symmetric form.
+ *
+ * This function takes a matrix stored in triangular form (either upper or lower
+ * triangle) and expands it to the full symmetric matrix by mirroring the
+ * off-diagonal elements. Diagonal elements are preserved as-is.
+ *
+ * @tparam T The value type for matrix elements
+ * @tparam index_t The index type for matrix indices
+ * @tparam Alloc The allocator type for memory management
+ *
+ * @note Matrix type detection:
+ *       - Lower triangle: All entries satisfy row_index <= column_index
+ *       - Upper triangle: All entries satisfy row_index >= column_index
+ *       - Diagonal: Both conditions true (only diagonal entries)
+ *       - Full matrix: Neither condition true (already expanded)
+ *
+ * @note Expansion process:
+ *       1. Detects if matrix is lower triangular, upper triangular, or already
+ * full
+ *       2. If diagonal-only or already full, returns without modification
+ *       3. For triangular matrices, adds mirrored off-diagonal entries
+ *       4. Diagonal entries are not duplicated
+ *
+ * @note Memory requirements:
+ *       - New nnz = 2 * old_nnz - n (for triangular input)
+ *       - Arrays are resized to accommodate new entries
+ *
+ * @warning Function includes debug output that may affect performance
+ * @warning No validation of matrix symmetry is performed
+ */
 template <typename T, typename index_t, typename Alloc>
 void coo_matrix<T, index_t, Alloc>::expand_from_triangle() {
 #ifdef SPARSEXX_ENABLE_RANGES_V3
@@ -103,10 +163,6 @@ void coo_matrix<T, index_t, Alloc>::expand_from_triangle() {
 #endif /* SPARSEXX_ENABLE_RANGES_V3 */
   bool diagonal = lower_triangle and upper_triangle;
   bool full_matrix = (not lower_triangle) and (not upper_triangle);
-
-  std::cout << std::boolalpha;
-  std::cout << "LT " << lower_triangle << std::endl;
-  std::cout << "UT " << upper_triangle << std::endl;
   if (diagonal or full_matrix) return;
 
   // std::cout << "Performing Expansion..." << std::endl;
@@ -129,6 +185,35 @@ void coo_matrix<T, index_t, Alloc>::expand_from_triangle() {
   nnz_ = new_nnz;
 }
 
+/**
+ * @brief Sorts the COO matrix entries by column index, with row index as
+ * secondary sort key.
+ *
+ * This function reorders the COO matrix triplets (row, column, value) such that
+ * they are sorted first by column index, then by row index within each column.
+ * This ordering is particularly useful for efficient conversion to CSC format.
+ *
+ * @tparam T The value type for matrix elements
+ * @tparam index_t The index type for matrix indices
+ * @tparam Alloc The allocator type for memory management
+ *
+ * @note Sorting algorithm:
+ *       - If SPARSEXX_ENABLE_RANGES_V3: Uses ranges::sort on zipped triplets
+ *       - Otherwise: Uses indirect sorting with index permutation for cache
+ * efficiency
+ *
+ * @note Sort order:
+ *       - Primary key: column index (ascending)
+ *       - Secondary key: row index (ascending)
+ *       - Lexicographic ordering: (i1, j1) < (i2, j2) if j1 < j2 or (j1 == j2
+ * and i1 < i2)
+ *
+ * @note Performance:
+ *       - Time complexity: O(nnz * log(nnz))
+ *       - Space complexity: O(nnz) for indirect sort, O(1) for ranges version
+ *
+ * @see sort_by_row_index() for row-major ordering
+ */
 template <typename T, typename index_t, typename Alloc>
 void coo_matrix<T, index_t, Alloc>::sort_by_col_index() {
 #ifdef SPARSEXX_ENABLE_RANGES_V3

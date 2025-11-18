@@ -2,6 +2,7 @@
  * MACIS Copyright (c) 2023, The Regents of the University of California,
  * through Lawrence Berkeley National Laboratory (subject to receipt of
  * any required approvals from the U.S. Dept. of Energy). All rights reserved.
+ * Portions Copyright (c) Microsoft Corporation.
  *
  * See LICENSE.txt for details
  */
@@ -16,6 +17,18 @@
 
 namespace macis {
 
+/**
+ * @brief Reorder determinants and coefficients by decreasing absolute
+ * coefficient magnitude
+ *
+ * This function sorts both the determinant list and coefficient array based on
+ * the absolute values of the coefficients in descending order. This is useful
+ * for ordering CI wavefunctions by importance.
+ *
+ * @tparam WfnT Wavefunction type representing quantum determinants
+ * @param[in,out] dets Vector of determinants to be reordered
+ * @param[in,out] C Vector of CI coefficients to be reordered
+ */
 template <typename WfnT>
 void reorder_ci_on_coeff(std::vector<WfnT>& dets, std::vector<double>& C) {
   size_t nlocal = C.size();
@@ -37,6 +50,18 @@ void reorder_ci_on_coeff(std::vector<WfnT>& dets, std::vector<double>& C) {
   dets = std::move(reorder_dets);
 }
 
+/**
+ * @brief Reorder determinants and coefficients based on alpha spin ordering
+ *
+ * This function sorts determinants according to their alpha spin configuration
+ * using the wavefunction's natural spin comparator. The corresponding
+ * coefficients are reordered to maintain consistency.
+ *
+ * @tparam WfnIterator Iterator type for wavefunction container
+ * @param[in,out] begin Iterator to the beginning of the determinant range
+ * @param[in,out] end Iterator to the end of the determinant range
+ * @param[in,out] C Array of CI coefficients to be reordered
+ */
 template <typename WfnIterator>
 void reorder_ci_on_alpha(WfnIterator begin, WfnIterator end, double* C) {
   using wfn_type = typename WfnIterator::value_type;
@@ -62,6 +87,18 @@ void reorder_ci_on_alpha(WfnIterator begin, WfnIterator end, double* C) {
   std::copy(reorder_C.begin(), reorder_C.end(), C);
 }
 
+/**
+ * @brief Accumulate ASCI contributions for duplicate candidates states
+ *
+ * This function processes a sorted range of ASCI contributions and accumulates
+ * the matrix elements for candidate states. Duplicate entries are marked with
+ * NaN and can be removed later with std::unique.
+ *
+ * @tparam PairIterator Iterator type for ASCI contribution container
+ * @param[in,out] pairs_begin Iterator to the beginning of the pairs range
+ * @param[in,out] pairs_end Iterator to the end of the pairs range
+ * @return Iterator pointing to the new end after removing duplicates
+ */
 template <typename PairIterator>
 PairIterator accumulate_asci_pairs(PairIterator pairs_begin,
                                    PairIterator pairs_end) {
@@ -85,6 +122,18 @@ PairIterator accumulate_asci_pairs(PairIterator pairs_begin,
                      [](auto x, auto y) { return x.state == y.state; });
 }
 
+/**
+ * @brief Sort ASCI pairs by bitstring and accumulate duplicate contributions
+ *
+ * This function sorts ASCI contributions by their quantum state bitstrings
+ * and then accumulates matrix elements for duplicate states. Uses either
+ * Boost's pdqsort or std::sort depending on availability.
+ *
+ * @tparam PairIterator Iterator type for ASCI contribution container
+ * @param[in,out] pairs_begin Iterator to the beginning of the pairs range
+ * @param[in,out] pairs_end Iterator to the end of the pairs range
+ * @return Iterator pointing to the new end after removing duplicates
+ */
 template <typename PairIterator>
 PairIterator sort_and_accumulate_asci_pairs(PairIterator pairs_begin,
                                             PairIterator pairs_end) {
@@ -107,6 +156,19 @@ PairIterator sort_and_accumulate_asci_pairs(PairIterator pairs_begin,
   return accumulate_asci_pairs(pairs_begin, pairs_end);
 }
 
+/**
+ * @brief Stable sort ASCI pairs by bitstring and accumulate duplicate
+ * contributions
+ *
+ * This function performs a stable sort of ASCI contributions by their quantum
+ * state bitstrings and then accumulates matrix elements for duplicate states.
+ * The stable sort preserves the relative order of equal elements.
+ *
+ * @tparam PairIterator Iterator type for ASCI contribution container
+ * @param[in,out] pairs_begin Iterator to the beginning of the pairs range
+ * @param[in,out] pairs_end Iterator to the end of the pairs range
+ * @return Iterator pointing to the new end after removing duplicates
+ */
 template <typename PairIterator>
 PairIterator stable_sort_and_accumulate_asci_pairs(PairIterator pairs_begin,
                                                    PairIterator pairs_end) {
@@ -129,6 +191,17 @@ PairIterator stable_sort_and_accumulate_asci_pairs(PairIterator pairs_begin,
   return accumulate_asci_pairs(pairs_begin, pairs_end);
 }
 
+/**
+ * @brief Sort and accumulate ASCI pairs in a container
+ *
+ * Convenience function that sorts and accumulates ASCI contributions within
+ * a container, automatically erasing the invalidated elements after processing.
+ * This is a wrapper around the iterator-based version that handles container
+ * management.
+ *
+ * @tparam WfnT Wavefunction type for the ASCI contributions
+ * @param[in,out] asci_pairs Container of ASCI contributions to process
+ */
 template <typename WfnT>
 void sort_and_accumulate_asci_pairs(asci_contrib_container<WfnT>& asci_pairs) {
   auto uit =
@@ -136,6 +209,16 @@ void sort_and_accumulate_asci_pairs(asci_contrib_container<WfnT>& asci_pairs) {
   asci_pairs.erase(uit, asci_pairs.end());  // Erase dead space
 }
 
+/**
+ * @brief Keep only the largest contribution for each unique determinant state
+ *
+ * This function sorts ASCI contributions by bitstring and for each unique
+ * quantum state, retains only the contribution with the largest absolute
+ * matrix element.
+ *
+ * @tparam WfnT Wavefunction type for the ASCI contributions
+ * @param[in,out] asci_pairs Container of ASCI contributions to process
+ */
 template <typename WfnT>
 void keep_only_largest_copy_asci_pairs(
     asci_contrib_container<WfnT>& asci_pairs) {

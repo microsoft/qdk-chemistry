@@ -2,6 +2,7 @@
  * MACIS Copyright (c) 2023, The Regents of the University of California,
  * through Lawrence Berkeley National Laboratory (subject to receipt of
  * any required approvals from the U.S. Dept. of Energy). All rights reserved.
+ * Portions Copyright (c) Microsoft Corporation.
  *
  * See LICENSE.txt for details
  */
@@ -27,6 +28,15 @@
 
 namespace macis {
 
+/**
+ * @brief Operator wrapper for sparse matrix-vector multiplication operations.
+ *
+ * This class provides a unified interface for performing matrix-vector
+ * multiplication with sparse matrices, supporting both sequential and
+ * parallel (MPI) operations.
+ *
+ * @tparam SpMatType Type of the sparse matrix
+ */
 template <typename SpMatType>
 class SparseMatrixOperator {
   using index_type = typename SpMatType::index_type;
@@ -37,6 +47,13 @@ class SparseMatrixOperator {
 #endif /* MACIS_ENABLE_MPI */
 
  public:
+  /**
+   * @brief Constructor for SparseMatrixOperator.
+   *
+   * If matrix is distributed, initializes SPMVcommunication info.
+   *
+   * @param[in] m Reference to the sparse matrix
+   */
   SparseMatrixOperator(const SpMatType& m) : m_matrix_(m) {
 #ifdef MACIS_ENABLE_MPI
     if constexpr (sparsexx::is_dist_sparse_matrix_v<SpMatType>) {
@@ -45,6 +62,21 @@ class SparseMatrixOperator {
 #endif /* MACIS_ENABLE_MPI */
   }
 
+  /**
+   * @brief Perform sparse matrix-vector multiplication:
+   *
+   * AV = alpha * A * V + beta * AV.
+   *
+   * Requires that `SpMatType` supports a (p)gespmv overload.
+   *
+   * @param[in] m      Number of vectors to multiply
+   * @param[in] alpha  Scalar multiplier for A*V
+   * @param[in] V      Input vector(s)
+   * @param[in] LDV    Leading dimension of V
+   * @param[in] beta   Scalar multiplier for AV
+   * @param[in,out] AV Output vector(s)
+   * @param[in] LDAV   Leading dimension of AV
+   */
   void operator_action(size_t m, double alpha, const double* V, size_t LDV,
                        double beta, double* AV, size_t LDAV) const {
 #ifdef MACIS_ENABLE_MPI
@@ -59,6 +91,19 @@ class SparseMatrixOperator {
   }
 };
 
+/**
+ * @brief Generate an initial guess vector based on the diagonal elements of a
+ * sparse matrix.
+ *
+ * This function extracts the diagonal elements from the sparse matrix, finds
+ * the minimum element, and sets the corresponding position in the guess vector
+ * to 1.
+ *
+ * @tparam SpMatType Type of the sparse matrix
+ * @param[in] N Size of the matrix/vector
+ * @param[in] A Sparse matrix to extract diagonal from
+ * @param[out] X Initial guess vector (zeroed except for one element)
+ */
 template <typename SpMatType>
 void diagonal_guess(size_t N, const SpMatType& A, double* X) {
   // Extract diagonal and setup guess
@@ -69,6 +114,19 @@ void diagonal_guess(size_t N, const SpMatType& A, double* X) {
 }
 
 #ifdef MACIS_ENABLE_MPI
+/**
+ * @brief Generate an initial guess vector based on diagonal elements in
+ * parallel (MPI).
+ *
+ * This is the MPI-parallel version of diagonal_guess. It gathers diagonal
+ * elements from all processes, finds the global minimum, and sets the
+ * appropriate element on the owning process.
+ *
+ * @tparam SpMatType Type of the distributed sparse matrix
+ * @param[in] N_local Local size of the matrix/vector on this process
+ * @param[in] A Distributed sparse matrix
+ * @param[out] X Local portion of the initial guess vector
+ */
 template <typename SpMatType>
 void p_diagonal_guess(size_t N_local, const SpMatType& A, double* X) {
   auto comm = A.comm();
@@ -110,6 +168,19 @@ void p_diagonal_guess(size_t N_local, const SpMatType& A, double* X) {
 }
 #endif /* MACIS_ENABLE_MPI */
 
+/**
+ * @brief Perform Gram-Schmidt orthogonalization of a new vector against
+ * existing vectors.
+ *
+ * Orthogonalizes V_new against the K columns of V_old using the classical
+ * Gram-Schmidt process with reorthogonalization and normalization.
+ *
+ * @param[in] N     Dimension of the vectors
+ * @param[in] K     Number of existing vectors to orthogonalize against
+ * @param[in] V_old Matrix containing K orthonormal columns
+ * @param[in] LDV   Leading dimension of V_old
+ * @param[in,out] V_new Vector to orthogonalize and normalize
+ */
 inline void gram_schmidt(int64_t N, int64_t K, const double* V_old, int64_t LDV,
                          double* V_new) {
   std::vector<double> inner(K);
@@ -127,6 +198,23 @@ inline void gram_schmidt(int64_t N, int64_t K, const double* V_old, int64_t LDV,
   blas::scal(N, 1. / nrm, V_new, 1);
 }
 
+/**
+ * @brief Davidson eigensolver for finding the lowest eigenvalue and
+ * eigenvector.
+ *
+ * Implements the Davidson algorithm to find the lowest eigenvalue and
+ * corresponding eigenvector of a symmetric matrix using the provided operator
+ * and diagonal preconditioner.
+ *
+ * @tparam Functor Type of the matrix-vector operation functor
+ * @param[in] N      Size of the matrix
+ * @param[in] max_m  Maximum dimension of the Davidson subspace
+ * @param[in] op     Matrix-vector operation functor
+ * @param[in] D      Diagonal elements for preconditioning
+ * @param[in] tol    Convergence tolerance for residual norm
+ * @param[in,out] X  Input: initial guess vector, Output: converged eigenvector
+ * @return Pair containing (number of iterations, converged eigenvalue)
+ */
 template <typename Functor>
 auto davidson(int64_t N, int64_t max_m, const Functor& op, const double* D,
               double tol, double* X) {
@@ -227,6 +315,20 @@ auto davidson(int64_t N, int64_t max_m, const Functor& op, const double* D,
 }
 
 #ifdef MACIS_ENABLE_MPI
+/**
+ * @brief Parallel (MPI) Gram-Schmidt orthogonalization.
+ *
+ * MPI-parallel version of Gram-Schmidt orthogonalization. Each process works
+ * on its local portion of the vectors, with global communication for inner
+ * products and normalization.
+ *
+ * @param[in] N_local Local dimension of vectors on this process
+ * @param[in] K       Number of existing vectors to orthogonalize against
+ * @param[in] V_old   Local portion of matrix containing K orthonormal columns
+ * @param[in] LDV     Leading dimension of V_old
+ * @param[in,out] V_new Local portion of vector to orthogonalize and normalize
+ * @param[in] comm    MPI communicator
+ */
 inline void p_gram_schmidt(int64_t N_local, int64_t K, const double* V_old,
                            int64_t LDV, double* V_new, MPI_Comm comm) {
   std::vector<double> inner(K);
@@ -259,6 +361,25 @@ inline void p_gram_schmidt(int64_t N_local, int64_t K, const double* V_old,
   blas::scal(N_local, 1. / nrm, V_new, 1);
 }
 
+/**
+ * @brief Parallel (MPI) Rayleigh-Ritz procedure for subspace eigenvalue
+ * problems.
+ *
+ * Performs the Rayleigh-Ritz procedure in parallel: computes the projected
+ * matrix X^T * AX, diagonalizes it on root process, and broadcasts the
+ * eigenvalues and eigenvectors to all processes.
+ *
+ * @param[in] N_local Local dimension of vectors on this process
+ * @param[in] K       Dimension of the subspace
+ * @param[in] X       Local portion of subspace vectors
+ * @param[in] LDX     Leading dimension of X
+ * @param[in] AX      Local portion of A*X vectors
+ * @param[in] LDAX    Leading dimension of AX
+ * @param[out] W      Eigenvalues (output on all processes)
+ * @param[out] C      Eigenvectors (output on all processes)
+ * @param[in] LDC     Leading dimension of C
+ * @param[in] comm    MPI communicator
+ */
 inline void p_rayleigh_ritz(int64_t N_local, int64_t K, const double* X,
                             int64_t LDX, const double* AX, int64_t LDAX,
                             double* W, double* C, int64_t LDC, MPI_Comm comm) {
@@ -270,7 +391,10 @@ inline void p_rayleigh_ritz(int64_t N_local, int64_t K, const double* X,
              K, N_local, 1., X, LDX, AX, LDAX, 0., C, LDC);
 
   // Reduce result
-  if (LDC != K) throw std::runtime_error("DIE DIE DIE RR");
+  if (LDC != K)
+    throw std::runtime_error(
+        "Rayleigh-Ritz does not accept submatrices for eigenvector return "
+        "storage");
   // allreduce(C, K * K, MPI_SUM, comm);
   std::allocator<double> alloc;
   double* tmp_c = world_rank ? nullptr : alloc.allocate(K * K);
@@ -288,6 +412,25 @@ inline void p_rayleigh_ritz(int64_t N_local, int64_t K, const double* X,
   MPI_Bcast(C, K * K, MPI_DOUBLE, 0, comm);
 }
 
+/**
+ * @brief Parallel (MPI) Davidson eigensolver for finding the lowest eigenvalue
+ * and eigenvector.
+ *
+ * MPI-parallel implementation of the Davidson algorithm. Each process works on
+ * its local portion of vectors, with global communication for inner products,
+ * reductions, and broadcasts as needed.
+ *
+ * @tparam Functor Type of the matrix-vector operation functor
+ * @param[in] N_local   Local size of vectors on this process
+ * @param[in] max_m     Maximum dimension of the Davidson subspace
+ * @param[in] op        Matrix-vector operation functor
+ * @param[in] D_local   Local portion of diagonal elements for preconditioning
+ * @param[in] tol       Convergence tolerance for residual norm
+ * @param[in,out] X_local Input: local portion of initial guess, Output: local
+ * portion of eigenvector
+ * @param[in] comm      MPI communicator
+ * @return Pair containing (number of iterations, converged eigenvalue)
+ */
 template <typename Functor>
 auto p_davidson(int64_t N_local, int64_t max_m, const Functor& op,
                 const double* D_local, double tol, double* X_local,

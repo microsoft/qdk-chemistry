@@ -2,6 +2,7 @@
  * MACIS Copyright (c) 2023, The Regents of the University of California,
  * through Lawrence Berkeley National Laboratory (subject to receipt of
  * any required approvals from the U.S. Dept. of Energy). All rights reserved.
+ * Portions Copyright (c) Microsoft Corporation.
  *
  * See LICENSE.txt for details
  */
@@ -12,6 +13,7 @@
 #include <spdlog/spdlog.h>
 #include <spdlog/stopwatch.h>
 
+#include <filesystem>
 #include <iomanip>
 #include <iostream>
 #include <macis/asci/grow.hpp>
@@ -27,8 +29,6 @@
 #include <macis/util/moller_plesset.hpp>
 #include <macis/util/mpi.hpp>
 #include <macis/util/transform.hpp>
-// #include <macis/util/trexio.hpp>
-#include <filesystem>
 #include <macis/wavefunction_io.hpp>
 #include <map>
 #include <sparsexx/io/write_dist_mm.hpp>
@@ -128,19 +128,8 @@ int main(int argc, char** argv) {
       E_core = macis::read_fcidump_core(reference_data_file);
       macis::read_fcidump_1body(reference_data_file, T.data(), norb);
       macis::read_fcidump_2body(reference_data_file, V.data(), norb);
-    } else {  // TREXIO
-      // macis::TREXIOFile trexio_file(reference_data_file, 'r', TREXIO_AUTO);
-      // norb = trexio_file.read_mo_num();
-      // norb2 = norb * norb;
-      // norb3 = norb2 * norb;
-      // norb4 = norb2 * norb2;
-
-      //// XXX: Consider reading this into shared memory to avoid replication
-      // T.resize(norb2);
-      // V.resize(norb4);
-      // E_core = trexio_file.read_nucleus_repulsion();
-      // trexio_file.read_mo_1e_int_core_hamiltonian(T.data());
-      // trexio_file.read_mo_2e_int_eri(V.data());
+    } else {
+      throw std::runtime_error("Reference data format not recognized");
     }
 
     // Set up job
@@ -468,16 +457,8 @@ int main(int argc, char** argv) {
       console->info("WFN FILE{}", ci_wfn_out_fname);
       if (ci_wfn_out_fname.size() and !world_rank) {
         console->info("Writing ASCI Wavefunction to {}", ci_wfn_out_fname);
-        // if(reference_data_format == "TREXIO") {
-        //   console->info("  * Format TREXIO");
-        //   macis::TREXIOFile trexio_file(ci_wfn_out_fname, 'w',
-        //   TREXIO_HDF5); trexio_file.write_mo_num(nwfn_bits/2); // Trick
-        //   TREXIO trexio_file.write_determinant_list(dets.size(),
-        //     reinterpret_cast<int64_t*>(dets.data()));
-        // } else {
         console->info("  * Format TEXT");
         macis::write_wavefunction(ci_wfn_out_fname, n_active, dets, C);
-        //}
       }
 
       if (print_determinants) {

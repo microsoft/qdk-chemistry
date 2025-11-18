@@ -118,7 +118,7 @@ std::shared_ptr<data::Wavefunction> VVHVLocalizer::_run_impl(
 
   // TODO (DBWY): Adding configurable inner localizer
   // Work Item:
-  // https://dev.azure.com/ms-azurequantum/AzureQuantum/_workitems/edit/41816
+  // 41816
   // Create reusable Pipek-Mezey localizer for inner localization
   const size_t num_atoms = basis_set->get_structure()->get_num_atoms();
   const size_t num_basis_funcs = basis_set->get_num_basis_functions();

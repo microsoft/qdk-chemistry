@@ -22,7 +22,7 @@ from pathlib import Path
 try:
     importlib.util.find_spec("qdk_chemistry")
 except ImportError as exc:
-    raise ImportError("The 'qdk.chemistry' package must be installed to run this test.") from exc
+    raise ImportError("The 'qdk_chemistry' package must be installed to run this test.") from exc
 
 # Regular expression to match fenced Python code blocks in Markdown.
 # Matches ```python, ```py, or ```python3 fences.
@@ -59,7 +59,7 @@ def extract_snippets(text: str) -> list[tuple[str, int]]:
         start_line = text[: match.start(1)].count("\n") + 1
         snippets.append((code, start_line))
         # TODO (NAB):  change output to logger rather than print() here and elsewhere
-        # https://dev.azure.com/ms-azurequantum/AzureQuantum/_workitems/edit/41426
+        # 41426
         print(f"Extracted snippet starting at line {start_line}:\n{code}\n")
     return snippets
 

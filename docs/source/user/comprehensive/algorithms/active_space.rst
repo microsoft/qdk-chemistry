@@ -1,8 +1,5 @@
-ActiveSpaceSelector
-===================
+Active space selection
+======================
 
 .. todo::
-🔧 **TODO**
-
-   TODO (NAB):  finish ActiveSpaceSelector documentation
-   https://dev.azure.com/ms-azurequantum/AzureQuantum/_workitems/edit/41376
+   The active space selection documentation is currently under construction.

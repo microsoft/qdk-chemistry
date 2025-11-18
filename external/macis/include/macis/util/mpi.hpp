@@ -2,6 +2,7 @@
  * MACIS Copyright (c) 2023, The Regents of the University of California,
  * through Lawrence Berkeley National Laboratory (subject to receipt of
  * any required approvals from the U.S. Dept. of Energy). All rights reserved.
+ * Portions Copyright (c) Microsoft Corporation.
  *
  * See LICENSE.txt for details
  */
@@ -30,7 +31,7 @@ namespace detail {
 
 /// @brief Implementation class for default-aware lifetime-managed MPI_Datatype
 struct mpi_datatype_impl {
-  MPI_Datatype dtype;
+  MPI_Datatype dtype;  ///< Underlying MPI_Datatype instance
   mpi_datatype_impl() = delete;
   mpi_datatype_impl(MPI_Datatype d) : dtype(d) {}
 
@@ -241,14 +242,48 @@ struct mpi_traits<std::bitset<N>> {
   }
 };
 
+/**
+ * @brief Distributed atomic variable for thread-safe operations across MPI
+ * processes
+ *
+ * This class implements a globally accessible atomic variable that can be
+ * safely accessed and modified by multiple MPI processes concurrently. It uses
+ * MPI-3 one-sided communication (RMA - Remote Memory Access) to provide atomic
+ * operations on shared data without explicit synchronization between processes.
+ *
+ * @tparam T The type of the atomic variable (must be MPI-serializable)
+ *
+ * @note This class requires MPI-3 support for one-sided communication
+ * @note T must be a type supported by mpi_traits (e.g., int, double, size_t)
+ * @note The class is non-copyable and non-movable to prevent resource conflicts
+ */
 template <typename T>
 class global_atomic {
-  MPI_Win window_;
-  T* buffer_;
+  MPI_Win window_;  ///< MPI window for remote memory access
+  T* buffer_;       ///< Pointer to the shared atomic variable
 
  public:
+  /// Deleted default constructor - requires MPI communicator
   global_atomic() = delete;
 
+  /**
+   * @brief Constructs a global atomic variable shared across MPI processes
+   *
+   * Creates an MPI window that allows all processes in the communicator to
+   * perform atomic operations on the shared variable. The variable is
+   * initialized to the specified value on all processes.
+   *
+   * @param comm MPI communicator defining which processes share this atomic
+   * variable
+   * @param init Initial value for the atomic variable (default: 0)
+   *
+   * @throws std::runtime_error if MPI window creation fails
+   *
+   * @note This is a collective operation - all processes in comm must call it
+   * @note Memory allocation is done collectively across all processes
+   * @note After construction, the variable is immediately available for atomic
+   * operations
+   */
   global_atomic(MPI_Comm comm, T init = 0) {
     MPI_Win_allocate(sizeof(T), sizeof(T), MPI_INFO_NULL, comm, &buffer_,
                      &window_);
@@ -260,14 +295,50 @@ class global_atomic {
     MPI_Win_lock_all(MPI_MODE_NOCHECK, window_);
   }
 
+  /**
+   * @brief Destructor that properly cleans up MPI resources
+   *
+   * Unlocks the MPI window and frees associated resources. This ensures
+   * proper cleanup of the distributed memory structures.
+   *
+   * @note This must be called collectively by all processes that created the
+   * window
+   */
   ~global_atomic() noexcept {
     MPI_Win_unlock_all(window_);
     MPI_Win_free(&window_);
   }
 
+  /// Deleted copy constructor - prevents resource conflicts
   global_atomic(const global_atomic&) = delete;
+  /// Deleted move constructor - prevents resource conflicts
   global_atomic(global_atomic&&) noexcept = delete;
 
+  /**
+   * @brief Performs an atomic fetch-and-operate operation
+   *
+   * Atomically applies the specified MPI operation to the global variable
+   * and returns the previous value. This is the fundamental building block
+   * for all atomic operations provided by this class.
+   *
+   * The operation is performed as: new_value = old_value OP val
+   *
+   * @param val The value to use in the operation
+   * @param op The MPI operation to perform (e.g., MPI_SUM, MPI_MIN, MPI_MAX)
+   *
+   * @return The value of the atomic variable before the operation
+   *
+   * @note The operation is atomic across all processes
+   * @note Results are immediately flushed to ensure global consistency
+   * @note This function can be called from any process in the communicator
+   *
+   * Supported operations include:
+   * - MPI_SUM: Addition
+   * - MPI_MIN: Minimum value
+   * - MPI_MAX: Maximum value
+   * - MPI_PROD: Multiplication
+   * - And other MPI reduction operations
+   */
   T fetch_and_op(T val, MPI_Op op) {
     T next_val;
     MPI_Fetch_and_op(&val, &next_val, mpi_traits<T>::datatype(), 0, 0, op,
@@ -276,7 +347,39 @@ class global_atomic {
     return next_val;
   }
 
+  /**
+   * @brief Atomically adds a value to the global variable
+   *
+   * Convenience function that atomically adds the given value to the
+   * global atomic variable and returns the previous value.
+   *
+   * @param val The value to add
+   * @return The value before the addition
+   *
+   * Example:
+   * ```cpp
+   * global_atomic<int> counter(comm, 0);
+   * int old_count = counter.fetch_add(5);  // Adds 5, returns previous value
+   * ```
+   */
   T fetch_add(T val) { return fetch_and_op(val, MPI_SUM); }
+
+  /**
+   * @brief Atomically updates the global variable to the minimum value
+   *
+   * Convenience function that atomically compares the given value with
+   * the current global value and updates it to the minimum of the two.
+   * Returns the previous value.
+   *
+   * @param val The value to compare with current minimum
+   * @return The value before the potential update
+   *
+   * Example:
+   * ```cpp
+   * global_atomic<double> global_min(comm, 1e9);
+   * double old_min = global_min.fetch_and_min(local_result);
+   * ```
+   */
   T fetch_and_min(T val) { return fetch_and_op(val, MPI_MIN); }
 };
 

@@ -1,0 +1,70 @@
+{
+    "name": "qdk-chemistry",
+    "build": {
+        "dockerfile": "Dockerfile",
+        "context": "../"
+    },
+    "runArgs": [
+        "--cgroupns=private"
+    ],
+    "customizations": {
+        "vscode": {
+            "extensions": [
+                "ms-python.python",
+                "ms-python.vscode-pylance",
+                "charliermarsh.ruff",
+                "ms-azuretools.vscode-docker",
+                "ms-vscode.cpptools",
+                "ms-vscode.cmake-tools",
+                "ms-vscode.cpptools-extension-pack",
+                "ms-toolsai.jupyter"
+            ],
+            "settings": {
+                "python.defaultInterpreterPath": "/usr/local/bin/python",
+                "python.formatting.provider": "none",
+                "editor.formatOnSave": true,
+                "editor.codeActionsOnSave": {
+                    "source.fixAll.ruff": true,
+                    "source.organizeImports.ruff": true
+                },
+                "python.linting.enabled": true,
+                "python.linting.lintOnSave": true,
+                "[python]": {
+                    "editor.defaultFormatter": "charliermarsh.ruff",
+                    "editor.formatOnSave": true,
+                    "editor.rulers": [
+                        120
+                    ]
+                },
+                "[cpp]": {
+                    "editor.formatOnSave": true,
+                    "editor.defaultFormatter": "ms-vscode.cpptools",
+                    "editor.rulers": [
+                        80
+                    ]
+                },
+                "[c]": {
+                    "editor.formatOnSave": true,
+                    "editor.defaultFormatter": "ms-vscode.cpptools",
+                    "editor.rulers": [
+                        80
+                    ]
+                },
+                "C_Cpp.codeAnalysis.clangTidy.enabled": true,
+                "C_Cpp.codeAnalysis.runAutomatically": true,
+                "C_Cpp.codeAnalysis.clangTidy.runAutomatically": true,
+                "C_Cpp.formatting": "clangFormat",
+                "C_Cpp.clang_format_style": "file",
+                "C_Cpp.clang_format_fallbackStyle": "Google"
+            }
+        }
+    },
+    "features": {
+        "ghcr.io/devcontainers/features/git:1": {}
+    },
+    "remoteEnv": {
+        "CPATH": "${containerEnv:CPATH}:/usr/include/hdf5/serial:/usr/include/eigen3"
+    },
+    "postCreateCommand": "bash .devcontainer/scripts/venv_and_widget.sh",
+    "remoteUser": "vscode"
+}

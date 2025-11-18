@@ -10,7 +10,7 @@ custom algorithms that can be registered and used within the QDK/Chemistry frame
 # --------------------------------------------------------------------------------------------
 
 # TODO (NAB):  Need to add copyright here and elsewhere.
-# https://dev.azure.com/ms-azurequantum/AzureQuantum/_workitems/edit/41401
+# 41401
 
 from qdk_chemistry._core._algorithms import (
     ActiveSpaceSelector,

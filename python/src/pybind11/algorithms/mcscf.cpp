@@ -37,19 +37,22 @@ class MultiConfigurationScfBase
 
  protected:
   MultiConfigurationScfReturnType _run_impl(
-      std::shared_ptr<Hamiltonian> hamiltonian,
+      std::shared_ptr<Orbitals> orbitals,
+      std::shared_ptr<HamiltonianConstructor> ham_ctor,
+      std::shared_ptr<MultiConfigurationCalculator> mc_calculator,
       unsigned int n_active_alpha_electrons,
       unsigned int n_active_beta_electrons) const override {
     PYBIND11_OVERRIDE_PURE(MultiConfigurationScfReturnType,
-                           MultiConfigurationScf, _run_impl, hamiltonian,
-                           n_active_alpha_electrons, n_active_beta_electrons);
+                           MultiConfigurationScf, _run_impl, orbitals, ham_ctor,
+                           mc_calculator, n_active_alpha_electrons,
+                           n_active_beta_electrons);
   }
 };
 
 void bind_mcscf(py::module& m) {
   // MultiConfigurationScf abstract base class
   py::class_<MultiConfigurationScf, MultiConfigurationScfBase, py::smart_holder>
-      mcscf(m, "MultiConfigurationScf", R"(
+      multi_configuration_scf(m, "MultiConfigurationScf", R"(
     Abstract base class for multi-configurational Self-Consistent Field (MultiConfigurationScf) algorithms.
 
     This class defines the interface for MultiConfigurationScf calculations that simultaneously optimize
@@ -61,21 +64,23 @@ void bind_mcscf(py::module& m) {
     --------
     To create a custom MultiConfigurationScf solver, inherit from this class:
 
-    >>> import qdk.chemistry.algorithms as alg
-    >>> import qdk.chemistry.data as data
+    >>> import qdk_chemistry.algorithms as alg
+    >>> import qdk_chemistry.data as data
     >>> class MyMultiConfigurationScf(alg.MultiConfigurationScf):
     ...     def __init__(self):
     ...         super().__init__()  # Call the base class constructor
     ...     def _run_impl(self,
-    ...                   hamiltonian : data.Hamiltonian,
+    ...                   orbitals : data.Orbitals,
+    ...                   ham_ctor : alg.HamiltonianConstructor,
+    ...                   mc_calculator : alg.MultiConfigurationCalculator,
     ...                   n_active_alpha_electrons : int,
     ...                   n_active_beta_electrons : int) ->tuple[float, data.Wavefunction] :
-    ...         #Custom MultiConfigurationScf implementation
+    ...         # Custom MCSCF implementation
     ...         return -1.0, data.Wavefunction()
     )");
 
-  mcscf.def(py::init<>(),
-            R"(
+  multi_configuration_scf.def(py::init<>(),
+                              R"(
     Create a MultiConfigurationScf instance.
 
     Default constructor for the abstract base class.
@@ -89,16 +94,21 @@ void bind_mcscf(py::module& m) {
     ...         super().__init__()  # Calls this constructor
     )");
 
-  mcscf.def("run", &MultiConfigurationScf::run,
-            R"(
+  multi_configuration_scf.def(
+      "run", &MultiConfigurationScf::run,
+      R"(
         Perform an MultiConfigurationScf calculation.
 
         This method automatically locks settings before execution.
 
         Parameters
         ----------
-        hamiltonian : qdk.chemistry.data.Hamiltonian
-            The Hamiltonian operator describing the quantum system
+        orbitals : qdk_chemistry.data.Orbitals
+            The initial molecular orbitals for the calculation
+        ham_ctor : qdk_chemistry.algorithms.HamiltonianConstructor
+            The Hamiltonian constructor for building and updating the Hamiltonian
+        mc_calculator : qdk_chemistry.algorithms.MultiConfigurationCalculator
+            The MC calculator to evaluate the active space
         n_active_alpha_electrons : int
             The number of alpha electrons in the active space
         n_active_beta_electrons : int
@@ -106,33 +116,33 @@ void bind_mcscf(py::module& m) {
 
         Returns
         -------
-        tuple[float, qdk.chemistry.data.Wavefunction]
+        tuple[float, qdk_chemistry.data.Wavefunction]
             A tuple containing the calculated energy and the resulting
-            multi-configurational wavefunction
+            wavefunction
         )",
-            py::arg("hamiltonian"), py::arg("n_active_alpha_electrons"),
-            py::arg("n_active_beta_electrons"));
+      py::arg("orbitals"), py::arg("ham_ctor"), py::arg("mc_calculator"),
+      py::arg("n_active_alpha_electrons"), py::arg("n_active_beta_electrons"));
 
-  mcscf.def("settings", &MultiConfigurationScf::settings,
-            R"(
+  multi_configuration_scf.def("settings", &MultiConfigurationScf::settings,
+                              R"(
         Access the MultiConfigurationScf calculation settings.
 
         Returns
         -------
-        qdk.chemistry.data.Settings
+        qdk_chemistry.data.Settings
             Reference to the settings object for configuring the MultiConfigurationScf calculation
         )",
-            py::return_value_policy::reference_internal);
+                              py::return_value_policy::reference_internal);
 
   // Expose _settings as a writable property for derived classes
-  mcscf.def_property(
+  multi_configuration_scf.def_property(
       "_settings",
-      [](MultiConfigurationScfBase& mcscf_inst) -> Settings& {
-        return mcscf_inst.settings();
+      [](MultiConfigurationScfBase& multi_configuration_scf_inst) -> Settings& {
+        return multi_configuration_scf_inst.settings();
       },
-      [](MultiConfigurationScfBase& mcscf_inst,
+      [](MultiConfigurationScfBase& multi_configuration_scf_inst,
          std::unique_ptr<qdk::chemistry::data::Settings> new_settings) {
-        mcscf_inst.replace_settings(std::move(new_settings));
+        multi_configuration_scf_inst.replace_settings(std::move(new_settings));
       },
       py::return_value_policy::reference_internal,
       R"(
@@ -146,12 +156,12 @@ void bind_mcscf(py::module& m) {
         >>> class MyMCSCF(alg.MultiConfigurationScf):
         ...     def __init__(self):
         ...         super().__init__()
-        ...         from qdk.chemistry.data import ElectronicStructureSettings
+        ...         from qdk_chemistry.data import ElectronicStructureSettings
         ...         self._settings = ElectronicStructureSettings()
         )");
 
-  mcscf.def("type_name", &MultiConfigurationScf::type_name,
-            R"(
+  multi_configuration_scf.def("type_name", &MultiConfigurationScf::type_name,
+                              R"(
         The algorithm's type name.
 
         Returns
@@ -160,8 +170,8 @@ void bind_mcscf(py::module& m) {
             The type name of the algorithm
         )");
 
-  mcscf.def("__repr__", [](const MultiConfigurationScf&) {
-    return "<qdk.chemistry.algorithms.MultiConfigurationScf>";
+  multi_configuration_scf.def("__repr__", [](const MultiConfigurationScf&) {
+    return "<qdk_chemistry.algorithms.MultiConfigurationScf>";
   });
 
   // Factory class binding - creates MultiConfigurationScfFactory class with

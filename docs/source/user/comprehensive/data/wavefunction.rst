@@ -2,5 +2,4 @@ Wavefunction
 ============
 
 .. todo::
-   TODO (NAB):  finish Wavefunction documentation
-   https://dev.azure.com/ms-azurequantum/AzureQuantum/_workitems/edit/41388
+   The wavefunction documentation is currently under construction.

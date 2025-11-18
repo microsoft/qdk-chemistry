@@ -1,4 +1,4 @@
-"""PySCF-based Coupled Cluster calculator implementation for qdk.chemistry.
+"""PySCF-based Coupled Cluster calculator implementation for qdk_chemistry.
 
 This module provides integration between QDK/Chemistry and PySCF for performing
 Coupled Cluster (CC) calculations. It implements a CCSD (Coupled Cluster Singles and Doubles)
@@ -19,7 +19,7 @@ Upon import, this module automatically registers the PySCF CC calculator with QD
 CC calculator registry under the name "pyscf".
 
 Examples:
-    >>> from qdk.chemistry.plugins.pyscf.coupled_cluster import PyscfCoupledClusterCalculator
+    >>> from qdk_chemistry.plugins.pyscf.coupled_cluster import PyscfCoupledClusterCalculator
     >>> cc_calculator = PyscfCoupledClusterCalculator()
     >>> energy, amplitudes = cc_calculator.calculate(hamiltonian)
 

@@ -1,6 +1,7 @@
 # MACIS Copyright (c) 2023, The Regents of the University of California,
 # through Lawrence Berkeley National Laboratory (subject to receipt of
 # any required approvals from the U.S. Dept. of Energy). All rights reserved.
+# Portions Copyright (c) Microsoft Corporation.
 #
 # See LICENSE.txt for details
 
@@ -23,11 +24,6 @@ add_executable( macis_test
 )
 target_link_libraries( macis_test PUBLIC macis Catch2::Catch2 )
 target_include_directories( macis_test PUBLIC ${PROJECT_BINARY_DIR}/tests )
-
-if(MACIS_ENABLE_TREXIO)
-  add_executable( fcidump_to_trexio fcidump_to_trexio.cxx )
-  target_link_libraries( fcidump_to_trexio PUBLIC macis )
-endif()
 
 set(REF_DATA_PREFIX "${PROJECT_SOURCE_DIR}/tests/ref_data")
 configure_file( ut_common.hpp.in ${PROJECT_BINARY_DIR}/tests/ut_common.hpp)

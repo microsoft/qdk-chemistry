@@ -1,23 +1,26 @@
 ARG HOST_ARCH
 ARG CUDA_ARCH
-FROM quantumapps.azurecr.io/qatk-dev-${HOST_ARCH}-${CUDA_ARCH}:latest
+FROM ubuntu:24.04:latest
 
 # Create a non-root user with sudo privileges
 ARG USERNAME=vscode
 ARG USER_UID=1000
 ARG USER_GID=$USER_UID
 
-# Configure pip to not use Azure feeds during container setup
-# Will copy the project's pip config during postCreateCommand
-RUN mkdir -p /tmp/pip-config-backup
-COPY pip.conf* /tmp/pip-config-backup/
-COPY pip.ini* /tmp/pip-config-backup/
-
-# Create standard pip config to avoid authentication prompts during build
-# The original config file will be restored in postCreateCommand
-RUN echo "[global]" > /etc/pip.conf && \
-    echo "index-url=https://pypi.org/simple" >> /etc/pip.conf && \
-    echo "trusted-host=pypi.org" >> /etc/pip.conf
+RUN apt-get update && \
+    apt-get install -y \
+    libeigen3-dev \
+    nlohmann-json3-dev \
+    libhdf5-dev \
+    libopenblas-dev \
+    libboost-all-dev \
+    libgtest-dev \
+    libgmock-dev \
+    libfmt-dev \
+    libecpint-dev \
+    ninja-build \
+    gcovr \
+    patchelf
 
 # Create the non-root user
 RUN groupadd --gid $USER_GID $USERNAME \

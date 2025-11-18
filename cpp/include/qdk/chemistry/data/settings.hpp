@@ -146,7 +146,7 @@ class Settings : public DataClass,
    */
   // TODO (NAB):  Doesn't this function also throw exceptions if the key doesn't
   // exist?
-  // https://dev.azure.com/ms-azurequantum/AzureQuantum/_workitems/edit/38750/
+  // 38750/
   void set(const std::string& key, const SettingValue& value);
 
   /**

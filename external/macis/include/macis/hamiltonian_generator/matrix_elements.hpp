@@ -2,6 +2,7 @@
  * MACIS Copyright (c) 2023, The Regents of the University of California,
  * through Lawrence Berkeley National Laboratory (subject to receipt of
  * any required approvals from the U.S. Dept. of Energy). All rights reserved.
+ * Portions Copyright (c) Microsoft Corporation.
  *
  * See LICENSE.txt for details
  */
@@ -11,6 +12,18 @@
 
 namespace macis {
 
+/**
+ * @brief Compute matrix element between two full determinants
+ *
+ * This method computes the Hamiltonian matrix element ⟨bra|H|ket⟩ between
+ * two full determinants by decomposing them into alpha and beta components
+ * and delegating to the spin-resolved matrix element calculation.
+ *
+ * @tparam WfnType Wavefunction type defining determinant representation
+ * @param bra The bra determinant
+ * @param ket The ket determinant
+ * @return Matrix element value
+ */
 template <typename WfnType>
 double HamiltonianGenerator<WfnType>::matrix_element(full_det_t bra,
                                                      full_det_t ket) const {
@@ -30,6 +43,25 @@ double HamiltonianGenerator<WfnType>::matrix_element(full_det_t bra,
                         ex_beta, bra_occ_alpha, bra_occ_beta);
 }
 
+/**
+ * @brief Compute matrix element between spin-resolved determinants with
+ * excitation analysis
+ *
+ * This is the core matrix element computation method that analyzes the
+ * excitation patterns between bra and ket determinants and dispatches to
+ * specialized methods based on the number and type of excitations.
+ *
+ * @tparam WfnType Wavefunction type defining determinant representation
+ * @param bra_alpha Alpha component of bra determinant
+ * @param ket_alpha Alpha component of ket determinant
+ * @param ex_alpha Excitation pattern in alpha spin
+ * @param bra_beta Beta component of bra determinant
+ * @param ket_beta Beta component of ket determinant
+ * @param ex_beta Excitation pattern in beta spin
+ * @param bra_occ_alpha Occupied alpha orbitals in bra
+ * @param bra_occ_beta Occupied beta orbitals in bra
+ * @return Matrix element value
+ */
 template <typename WfnType>
 double HamiltonianGenerator<WfnType>::matrix_element(
     spin_det_t bra_alpha, spin_det_t ket_alpha, spin_det_t ex_alpha,
@@ -64,6 +96,20 @@ double HamiltonianGenerator<WfnType>::matrix_element(
     return matrix_element_diag(bra_occ_alpha, bra_occ_beta);
 }
 
+/**
+ * @brief Compute matrix element for same-spin double excitation (4 excitations
+ * in one spin)
+ *
+ * Calculates the matrix element for determinants that differ by a double
+ * excitation within the same spin channel. Uses antisymmetrized integrals
+ * G_pqrs.
+ *
+ * @tparam WfnType Wavefunction type defining determinant representation
+ * @param bra Bra spin determinant
+ * @param ket Ket spin determinant
+ * @param ex Excitation pattern
+ * @return Matrix element value
+ */
 template <typename WfnType>
 double HamiltonianGenerator<WfnType>::matrix_element_4(spin_det_t bra,
                                                        spin_det_t ket,
@@ -73,6 +119,23 @@ double HamiltonianGenerator<WfnType>::matrix_element_4(spin_det_t bra,
   return sign * G_pqrs_(v1, o1, v2, o2);
 }
 
+/**
+ * @brief Compute matrix element for opposite-spin double excitation (2+2
+ * excitations)
+ *
+ * Calculates the matrix element for determinants that differ by single
+ * excitations in both alpha and beta spin channels. Uses Coulomb integrals
+ * V_pqrs.
+ *
+ * @tparam WfnType Wavefunction type defining determinant representation
+ * @param bra_alpha Alpha component of bra determinant
+ * @param ket_alpha Alpha component of ket determinant
+ * @param ex_alpha Alpha excitation pattern
+ * @param bra_beta Beta component of bra determinant
+ * @param ket_beta Beta component of ket determinant
+ * @param ex_beta Beta excitation pattern
+ * @return Matrix element value
+ */
 template <typename WfnType>
 double HamiltonianGenerator<WfnType>::matrix_element_22(
     spin_det_t bra_alpha, spin_det_t ket_alpha, spin_det_t ex_alpha,
@@ -86,6 +149,22 @@ double HamiltonianGenerator<WfnType>::matrix_element_22(
   return sign * V_pqrs_(v1, o1, v2, o2);
 }
 
+/**
+ * @brief Compute matrix element for single excitation (2 excitations in one
+ * spin)
+ *
+ * Calculates the matrix element for determinants that differ by a single
+ * excitation. Includes one-electron terms and contracted two-electron terms
+ * with other occupied orbitals.
+ *
+ * @tparam WfnType Wavefunction type defining determinant representation
+ * @param bra Bra spin determinant
+ * @param ket Ket spin determinant
+ * @param ex Excitation pattern
+ * @param bra_occ_alpha Occupied alpha orbitals in bra
+ * @param bra_occ_beta Occupied beta orbitals in bra
+ * @return Matrix element value
+ */
 template <typename WfnType>
 double HamiltonianGenerator<WfnType>::matrix_element_2(
     spin_det_t bra, spin_det_t ket, spin_det_t ex,
@@ -108,6 +187,18 @@ double HamiltonianGenerator<WfnType>::matrix_element_2(
   return sign * h_el;
 }
 
+/**
+ * @brief Compute diagonal matrix element (no excitations)
+ *
+ * Calculates the diagonal matrix element for identical determinants.
+ * Includes one-electron terms and all two-electron interactions between
+ * occupied orbitals.
+ *
+ * @tparam WfnType Wavefunction type defining determinant representation
+ * @param occ_alpha Occupied alpha orbitals
+ * @param occ_beta Occupied beta orbitals
+ * @return Diagonal matrix element value
+ */
 template <typename WfnType>
 double HamiltonianGenerator<WfnType>::matrix_element_diag(
     const std::vector<uint32_t>& occ_alpha,

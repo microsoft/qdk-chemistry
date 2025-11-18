@@ -20,6 +20,7 @@
 
 using namespace qdk::chemistry::data;
 
+<<<<<<< HEAD
 class WavefunctionRDMTest : public ::testing::Test {
  protected:
   void SetUp() override {
@@ -458,7 +459,7 @@ TEST_F(WavefunctionRDMTest, TwoRDMConversions) {
   //      std::make_optional(two_rdm_abba),
   //      std::make_optional(two_rdm_aaaa),
   //      std::make_optional(two_rdm_bbbb)));
-  // https://dev.azure.com/ms-azurequantum/AzureQuantum/_workitems/edit/41343
+  // 41343
 
   EXPECT_TRUE(wf_r_dependent.has_two_rdm_spin_traced());
 
@@ -688,6 +689,8 @@ TEST_F(WavefunctionRDMTest, OrbitEntropyOutOfBoundsError) {
   // due to size consistency checks
 }
 
+=======
+>>>>>>> origin/main
 // ===== Tests for Core Wavefunction Functionality =====
 
 class WavefunctionCoreTest : public ::testing::Test {
@@ -1508,7 +1511,8 @@ TEST_F(WavefunctionActiveSpaceConversionTest, GetTotalDeterminantsMultiple) {
 
 TEST_F(WavefunctionActiveSpaceConversionTest,
        ActiveDetsPreservedInWavefunction) {
-  // Verify that get_active_determinants returns the original active space dets
+  // Verify that get_active_determinants returns the original active space
+  // dets
   Eigen::VectorXd coeffs(3);
   coeffs << 0.7, 0.2, 0.1;
 

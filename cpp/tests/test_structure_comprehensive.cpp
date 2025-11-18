@@ -996,7 +996,7 @@ TEST_F(StructureTest, HDF5GroupFunctionality) {
 }
 
 // TODO (NAB):  why does this test file have a main() function?
-// https://dev.azure.com/ms-azurequantum/AzureQuantum/_workitems/edit/41363
+// 41363
 int main(int argc, char** argv) {
   ::testing::InitGoogleTest(&argc, argv);
   return RUN_ALL_TESTS();

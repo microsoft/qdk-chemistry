@@ -2,6 +2,7 @@
  * MACIS Copyright (c) 2023, The Regents of the University of California,
  * through Lawrence Berkeley National Laboratory (subject to receipt of
  * any required approvals from the U.S. Dept. of Energy). All rights reserved.
+ * Portions Copyright (c) Microsoft Corporation.
  *
  * See LICENSE.txt for details
  */
@@ -63,9 +64,24 @@ double compute_casci_rdms(
   return E0;
 }
 
-/// Functor wraper around `compute_casci_rdms`
+/**
+ * @brief Functor wrapper around compute_casci_rdms for use in MCSCF
+ * implementations
+ *
+ * This functor provides a convenient interface to the compute_casci_rdms
+ * function that can be used as a template parameter in MCSCF implementations.
+ *
+ * @tparam HamGen Type of the Hamiltonian Generator used for matrix element
+ * computation
+ */
 template <typename HamGen>
 struct CASRDMFunctor {
+  /**
+   * @brief Static function that forwards arguments to compute_casci_rdms
+   *
+   * @param args Variadic arguments forwarded to compute_casci_rdms
+   * @return Result of compute_casci_rdms function call
+   */
   template <typename... Args>
   static auto rdms(Args&&... args) {
     return compute_casci_rdms<HamGen>(std::forward<Args>(args)...);

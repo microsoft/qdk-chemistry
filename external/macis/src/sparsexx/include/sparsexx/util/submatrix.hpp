@@ -14,6 +14,21 @@ namespace sparsexx {
 
 namespace detail {
 
+/**
+ * @brief Counts non-zero values per row that satisfy a column filter
+ *
+ * This function counts the number of non-zero elements in each row that
+ * pass the provided column index filter function.
+ *
+ * @tparam IndexType The integer type for indices
+ * @tparam Functor The type of the filter function
+ * @param nrow Number of rows to process
+ * @param rowptr Row pointer array in CSR format
+ * @param colind Column indices array in CSR format
+ * @param indexing The indexing scheme (0 or 1-based)
+ * @param rowcounts Output array to store counts per row
+ * @param colidx_filter Function that returns true for column indices to include
+ */
 template <typename IndexType, typename Functor>
 void count_row_nzval_submat(size_t nrow, const IndexType* rowptr,
                             const IndexType* colind, size_t indexing,
@@ -30,6 +45,19 @@ void count_row_nzval_submat(size_t nrow, const IndexType* rowptr,
   }
 }
 
+/**
+ * @brief Constructs row pointer array from row counts
+ *
+ * Given an array of row counts, computes the corresponding row pointer
+ * array for CSR format. The row pointer at index i contains the starting
+ * position of row i in the column indices array.
+ *
+ * @tparam IndexType The integer type for indices
+ * @param nrow Number of rows
+ * @param rowcnts Array of non-zero counts per row
+ * @param rowptr Output row pointer array (size nrow+1)
+ * @param indexing The indexing scheme (0 or 1-based)
+ */
 template <typename IndexType>
 void rowptr_from_rowcnts(size_t nrow, const size_t* rowcnts, IndexType* rowptr,
                          size_t indexing) {
@@ -39,13 +67,27 @@ void rowptr_from_rowcnts(size_t nrow, const size_t* rowcnts, IndexType* rowptr,
 
 }  // namespace detail
 
+/**
+ * @brief Extracts a rectangular submatrix from a sparse matrix
+ *
+ * Creates a new sparse matrix containing only the elements within the
+ * specified row and column ranges. The column indices in the result are
+ * offset to start from 0.
+ *
+ * @tparam SpMatType The sparse matrix type (must be CSR matrix)
+ * @param A The input sparse matrix
+ * @param lo Lower bounds as (row_start, col_start)
+ * @param up Upper bounds as (row_end, col_end) - exclusive
+ * @return New sparse matrix containing the specified submatrix
+ *
+ * @note The resulting submatrix has dimensions (row_end-row_start) x
+ * (col_end-col_start)
+ * @note Column indices in the result are re-indexed to start from 0
+ */
 template <typename SpMatType,
           typename = detail::enable_if_csr_matrix_t<SpMatType> >
 SpMatType extract_submatrix(const SpMatType& A, std::pair<int64_t, int64_t> lo,
                             std::pair<int64_t, int64_t> up) {
-  // const auto M = A.m();
-  // const auto N = A.n();
-
   const auto* Anz = A.nzval().data();
   const auto* Arp = A.rowptr().data();
   const auto* Aci = A.colind().data();
@@ -117,6 +159,24 @@ SpMatType extract_submatrix(const SpMatType& A, std::pair<int64_t, int64_t> lo,
   return sub;
 }
 
+/**
+ * @brief Extracts a submatrix including specified rows and excluding specified
+ * columns
+ *
+ * Creates a new sparse matrix containing the specified rows but excluding
+ * the elements in the specified column range. This effectively removes
+ * a vertical strip of columns from the matrix while keeping all rows.
+ *
+ * @tparam SpMatType The sparse matrix type (must be CSR matrix)
+ * @param A The input sparse matrix
+ * @param lo Lower bounds as (row_start, col_start)
+ * @param up Upper bounds as (row_end, col_end) - exclusive
+ * @return New sparse matrix with specified rows and excluded columns
+ *
+ * @note The resulting matrix has the same number of columns as the original
+ * @note Column indices are not re-indexed (gaps remain where columns were
+ * excluded)
+ */
 template <typename SpMatType,
           typename = detail::enable_if_csr_matrix_t<SpMatType> >
 SpMatType extract_submatrix_inclrow_exclcol(const SpMatType& A,
@@ -200,6 +260,20 @@ SpMatType extract_submatrix_inclrow_exclcol(const SpMatType& A,
   return sub;
 }
 
+/**
+ * @brief Extracts the upper triangular part of a sparse matrix
+ *
+ * Creates a new sparse matrix containing only the upper triangular elements
+ * (including the diagonal) of the input matrix. Elements where column index
+ * is greater than or equal to row index are included.
+ *
+ * @tparam SpMatType The sparse matrix type (must be CSR matrix)
+ * @param A The input sparse matrix
+ * @return New sparse matrix containing only the upper triangular elements
+ *
+ * @note The resulting matrix has the same dimensions as the input matrix
+ * @note Diagonal elements are included in the upper triangle
+ */
 template <typename SpMatType,
           typename = detail::enable_if_csr_matrix_t<SpMatType> >
 SpMatType extract_upper_triangle(const SpMatType& A) {
@@ -261,6 +335,20 @@ SpMatType extract_upper_triangle(const SpMatType& A) {
   return U;
 }
 
+/**
+ * @brief Extracts the diagonal elements from a sparse matrix
+ *
+ * Returns a vector containing the diagonal elements of the sparse matrix.
+ * If a diagonal element is not present in the sparse structure, it is
+ * treated as zero.
+ *
+ * @tparam SpMatType The sparse matrix type (must be CSR matrix)
+ * @param A The input sparse matrix
+ * @return Vector containing the diagonal elements (size = min(m,n))
+ *
+ * @note Missing diagonal elements are set to zero
+ * @note The function works for both square and rectangular matrices
+ */
 template <typename SpMatType,
           typename = detail::enable_if_csr_matrix_t<SpMatType> >
 std::vector<typename SpMatType::value_type> extract_diagonal_elements(
@@ -295,11 +383,24 @@ std::vector<typename SpMatType::value_type> extract_diagonal_elements(
   return D;
 }
 
+/**
+ * @brief Computes the trace (sum of diagonal elements) of a sparse matrix
+ *
+ * Calculates the sum of all diagonal elements in the sparse matrix.
+ * Diagonal elements that are not explicitly stored in the sparse structure
+ * are treated as zero and do not contribute to the sum.
+ *
+ * @tparam SpMatType The sparse matrix type (must be CSR matrix)
+ * @param A The input sparse matrix
+ * @return The trace (sum of diagonal elements)
+ *
+ * @note Only explicitly stored diagonal elements contribute to the trace
+ * @note The function works for both square and rectangular matrices
+ */
 template <typename SpMatType,
           typename = detail::enable_if_csr_matrix_t<SpMatType> >
 typename SpMatType::value_type trace(const SpMatType& A) {
   const auto M = A.m();
-  // const auto N = A.n();
 
   const auto* Anz = A.nzval().data();
   const auto* Arp = A.rowptr().data();

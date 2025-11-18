@@ -6,6 +6,8 @@
 #include <functional>
 #include <iostream>
 #include <qdk/chemistry/algorithms/algorithm.hpp>
+#include <qdk/chemistry/algorithms/hamiltonian.hpp>
+#include <qdk/chemistry/algorithms/mc.hpp>
 #include <qdk/chemistry/data/hamiltonian.hpp>
 #include <qdk/chemistry/data/settings.hpp>
 #include <qdk/chemistry/data/wavefunction.hpp>
@@ -34,8 +36,10 @@ namespace qdk::chemistry::algorithms {
 class MultiConfigurationScf
     : public Algorithm<MultiConfigurationScf,
                        std::pair<double, std::shared_ptr<data::Wavefunction>>,
-                       std::shared_ptr<data::Hamiltonian>, unsigned int,
-                       unsigned int> {
+                       std::shared_ptr<data::Orbitals>,
+                       std::shared_ptr<HamiltonianConstructor>,
+                       std::shared_ptr<MultiConfigurationCalculator>,
+                       unsigned int, unsigned int> {
  public:
   /**
    * @brief Default constructor
@@ -61,7 +65,11 @@ class MultiConfigurationScf
    * multi-configurational wavefunction, including both optimized orbital
    * coefficients and CI coefficients.
    *
-   * @param hamiltonian The Hamiltonian operator describing the quantum system
+   * @param orbitals The initial molecular orbitals for the calculation
+   * @param hamiltonian_ctor The Hamiltonian constructor for building the
+   * Hamiltonian
+   * @param mc_calculator The multi-configurational calculator for evaluation
+   * of the active space
    * @param n_active_alpha_electrons The number of alpha electrons in the
    * active space, inactive orbitals are assumed to be fully occupied.
    * @param n_active_beta_electrons The number of beta electrons in the
@@ -94,24 +102,36 @@ class MultiConfigurationScf
    *
    * @return The algorithm's type name
    */
-  std::string type_name() const final { return "mcscf_solver"; };
+  std::string type_name() const final { return "multi_configuration_scf"; };
 
  protected:
   /**
-   * @brief Implementation of the MCSCF calculation
+   * @brief Perform an MCSCF calculation
    *
-   * This method contains the actual MCSCF algorithm logic. It is automatically
-   * called by run() after settings have been locked.
+   * This pure virtual method must be implemented by derived classes to perform
+   * the MCSCF calculation, which optimizes both orbital and CI coefficients.
+   * The method takes initial orbitals, a Hamiltonian constructor and a
+   * multi-configurational calculator, then returns both the calculated energy
+   * and the optimized multi-configurational wavefunction, including both
+   * optimized orbital coefficients and CI coefficients.
    *
-   * @param hamiltonian The Hamiltonian operator describing the quantum system
-   * @param n_active_alpha_electrons The number of alpha electrons in the active
-   * space
-   * @param n_active_beta_electrons The number of beta electrons in the active
-   * space
-   * @return A pair containing the energy and wavefunction
+   * @param orbitals The initial molecular orbitals for the calculation
+   * @param hamiltonian_ctor The Hamiltonian constructor for building the
+   * Hamiltonian
+   * @param mc_calculator The multi-configurational calculator for evaluation
+   * of the active space
+   * @param n_active_alpha_electrons The number of alpha electrons in the
+   * active space, inactive orbitals are assumed to be fully occupied.
+   * @param n_active_beta_electrons The number of beta electrons in the
+   * active space, inactive orbitals are assumed to be fully occupied.
+   *
+   * @return A pair containing the calculated energy (first) and the resulting
+   *         multi-configurational wavefunction (second)
    */
   virtual std::pair<double, std::shared_ptr<data::Wavefunction>> _run_impl(
-      std::shared_ptr<data::Hamiltonian> hamiltonian,
+      std::shared_ptr<data::Orbitals> orbitals,
+      std::shared_ptr<HamiltonianConstructor> hamiltonian_ctor,
+      std::shared_ptr<MultiConfigurationCalculator> mc_calculator,
       unsigned int n_active_alpha_electrons,
       unsigned int n_active_beta_electrons) const = 0;
 };
@@ -141,12 +161,13 @@ class MultiConfigurationScf
  * auto mcscf = MultiConfigurationScfFactory::create("my_mcscf");
  * ```
  *
- * @see MultiConfigurationScf for the interface implemented by concrete solvers
+ * @see MultiConfigurationScf for the interface implemented by concrete
+ * solvers
  */
 struct MultiConfigurationScfFactory
     : public AlgorithmFactory<MultiConfigurationScf,
                               MultiConfigurationScfFactory> {
-  static std::string algorithm_type_name() { return "mcscf_solver"; }
+  static std::string algorithm_type_name() { return "multi_configuration_scf"; }
   static void register_default_instances() {};
   static std::string default_algorithm_name() { return "pyscf"; }
 };

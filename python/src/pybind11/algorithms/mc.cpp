@@ -60,8 +60,8 @@ void bind_mc(py::module &m) {
     --------
     To create a custom MC calculator, inherit from this class:
 
-    >>> import qdk.chemistry.algorithms as alg
-    >>> import qdk.chemistry.data as data
+    >>> import qdk_chemistry.algorithms as alg
+    >>> import qdk_chemistry.data as data
     >>> class MyMultiConfigurationCalculator(alg.MultiConfigurationCalculator):
     ...     def __init__(self):
     ...         super().__init__()  # Call the base class constructor
@@ -92,7 +92,7 @@ void bind_mc(py::module &m) {
 
         Parameters
         ----------
-        hamiltonian : qdk.chemistry.data.Hamiltonian
+        hamiltonian : qdk_chemistry.data.Hamiltonian
             The Hamiltonian to perform the calculation on
         n_active_alpha_electrons : int
             The number of alpha electrons in the active space
@@ -101,7 +101,7 @@ void bind_mc(py::module &m) {
 
         Returns
         -------
-        tuple[float, qdk.chemistry.data.Wavefunction]
+        tuple[float, qdk_chemistry.data.Wavefunction]
             A tuple containing the computed total energy (active + core)
             and wavefunction
 
@@ -119,7 +119,7 @@ void bind_mc(py::module &m) {
 
         Returns
         -------
-        qdk.chemistry.data.Settings
+        qdk_chemistry.data.Settings
             Reference to the settings object for configuring the calculator
         )",
                     py::return_value_policy::reference_internal);
@@ -146,7 +146,7 @@ void bind_mc(py::module &m) {
         >>> class MyMCCalculator(alg.MultiConfigurationCalculator):
         ...     def __init__(self):
         ...         super().__init__()
-        ...         from qdk.chemistry.data import ElectronicStructureSettings
+        ...         from qdk_chemistry.data import ElectronicStructureSettings
         ...         self._settings = ElectronicStructureSettings()
         )");
 
@@ -168,6 +168,6 @@ void bind_mc(py::module &m) {
                                         "MultiConfigurationCalculatorFactory");
 
   mc_calculator.def("__repr__", [](const MultiConfigurationCalculator &) {
-    return "<qdk.chemistry.algorithms.MultiConfigurationCalculator>";
+    return "<qdk_chemistry.algorithms.MultiConfigurationCalculator>";
   });
 }

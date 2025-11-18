@@ -1,6 +1,7 @@
 # MACIS Copyright (c) 2023, The Regents of the University of California,
 # through Lawrence Berkeley National Laboratory (subject to receipt of
 # any required approvals from the U.S. Dept. of Energy). All rights reserved.
+# Portions Copyright (c) Microsoft Corporation.
 #
 # See LICENSE.txt for details
 
@@ -11,7 +12,6 @@ include(CMakeDependentOption)
 
 option( MACIS_ENABLE_OPENMP "Enable OpenMP Bindings" ON )
 option( MACIS_ENABLE_BOOST  "Enable Boost" ON )
-option( MACIS_ENABLE_TREXIO "Enable TrexIO" OFF )
 option( MACIS_ENABLE_PYTHON "Enable Python Bindings" OFF )
 option( MACIS_ENABLE_EXAMPLES "Build Examples" ON )
 

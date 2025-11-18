@@ -7,6 +7,10 @@
 #include <cstdio>
 #include <memory>
 #include <nlohmann/json.hpp>
+#include <qdk/chemistry/algorithms/active_space.hpp>
+#include <qdk/chemistry/algorithms/hamiltonian.hpp>
+#include <qdk/chemistry/algorithms/mc.hpp>
+#include <qdk/chemistry/algorithms/scf.hpp>
 #include <qdk/chemistry/data/ansatz.hpp>
 #include <qdk/chemistry/data/hamiltonian.hpp>
 #include <qdk/chemistry/data/wavefunction.hpp>
@@ -17,6 +21,7 @@
 #include "ut_common.hpp"
 
 using namespace qdk::chemistry::data;
+using namespace qdk::chemistry::algorithms;
 
 class AnsatzSerializationTest : public ::testing::Test {
  protected:
@@ -148,3 +153,93 @@ TEST_F(AnsatzSerializationTest, ErrorHandling) {
   EXPECT_THROW(Ansatz::from_json_file("non_existent.json"), std::runtime_error);
   EXPECT_THROW(Ansatz::from_hdf5_file("non_existent.h5"), std::runtime_error);
 }
+
+class AnsatzEnergyCalculationTest : public ::testing::Test {
+ protected:
+  void SetUp() override {}
+};
+
+TEST_F(AnsatzEnergyCalculationTest, N2SingletCAS_6e6o) {
+  // N2 structure
+  auto structure = testing::create_stretched_n2_structure();
+
+  // get wavefunction
+  auto scf = ScfSolverFactory::create();
+  const auto& [E_scf, wfn_scf] = scf->run(structure, 0, 1);
+
+  // // get full hamiltonian
+  auto hamil_ctor = HamiltonianConstructorFactory::create();
+  auto hamiltonian_hf = hamil_ctor->run(wfn_scf->get_orbitals());
+
+  // get ansatz and energy
+  auto ansatz_hf = Ansatz(hamiltonian_hf, wfn_scf);
+  double energy_hf = ansatz_hf.calculate_energy();
+
+  EXPECT_NEAR(energy_hf, E_scf, 1e-6);
+
+  // select active space
+  auto active_space = ActiveSpaceSelectorFactory::create("qdk_valence");
+  active_space->settings().set("num_active_electrons", 6);
+  active_space->settings().set("num_active_orbitals", 6);
+  auto active_space_wfn = active_space->run(wfn_scf);
+
+  // get hamiltonian
+  auto hamiltonian_cas = hamil_ctor->run(active_space_wfn->get_orbitals());
+
+  // get cas wavefunction
+  auto mc_calc = MultiConfigurationCalculatorFactory::create("macis_cas");
+  mc_calc->settings().set("calculate_two_rdm", true);
+  mc_calc->settings().set("calculate_one_rdm", true);
+  auto [E_cas, wfn_cas] = mc_calc->run(
+      hamiltonian_cas, active_space_wfn->get_active_num_electrons().first,
+      active_space_wfn->get_active_num_electrons().second);
+
+  // get ansatz and energy
+  auto ansatz = Ansatz(hamiltonian_cas, wfn_cas);
+  double energy = ansatz.calculate_energy();
+
+  // energy should match SCF energy
+  EXPECT_NEAR(energy, E_cas, 1e-6);
+}
+
+// TODO(MM): Comment in as soon as the unrestricted Hamiltonian is merged
+// TEST_F(AnsatzEnergyCalculationTest, O2TripletCAS_8e6o) {
+//   // O2 structure
+//   auto structure = testing::create_o2_structure();
+
+//   // get wavefunction
+//   auto scf = ScfSolverFactory::create();
+//   const auto& [E_scf, wfn_scf] = scf->run(structure, 0, 3);
+
+//   // get full hamiltonian
+//   auto hamil_ctor = HamiltonianConstructorFactory::create();
+//   auto hamiltonian_hf = hamil_ctor->run(wfn_scf->get_orbitals());
+
+//   // get ansatz and energy
+//   auto ansatz_hf = Ansatz(hamiltonian_hf, wfn_scf);
+//   double energy_hf = ansatz_hf.calculate_energy();
+
+//   EXPECT_NEAR(energy_hf, E_scf, 1e-6);
+
+//   // select active space
+//   auto active_space = ActiveSpaceSelectorFactory::create("valence");
+//   active_space->settings().set("num_active_electrons", 8);
+//   active_space->settings().set("num_active_orbitals", 6);
+//   auto active_space_wfn = active_space->run(wfn_scf);
+
+//   // get hamiltonian
+//   auto hamiltonian_cas = hamil_ctor->run(wfn_scf->get_orbitals());
+
+//   // get cas wavefunction
+//   auto mc_calc = MultiConfigurationCalculatorFactory::create("macis_cas");
+//   auto [E_cas, wfn_cas] = mc_calc->run(
+//       hamiltonian_hf, active_space_wfn->get_active_num_electrons().first,
+//       active_space_wfn->get_active_num_electrons().second);
+
+//   // get ansatz and energy
+//   auto ansatz = Ansatz(hamiltonian_cas, wfn_cas);
+//   double energy = ansatz.calculate_energy();
+
+//   // energy should match SCF energy
+//   EXPECT_NEAR(energy, E_cas, 1e-6);
+// }

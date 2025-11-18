@@ -1,4 +1,4 @@
-"""PySCF orbital localization module for qdk.chemistry.
+"""PySCF orbital localization module for qdk_chemistry.
 
 This module provides orbital localization capabilities using the PySCF library
 and integrates PySCF localization algorithms into the QDK/Chemistry framework.
@@ -17,7 +17,7 @@ Supported localization methods (selected via the settings `method`):
 
 This module registers a ``pyscf`` localizer with the QDK/Chemistry localizer registry at
 import time, making the functionality available via
-``qdk.chemistry.algorithms.create("localizer", "pyscf")``.
+``qdk_chemistry.algorithms.create("localizer", "pyscf")``.
 
 Requires: PySCF (the code uses the ``pyscf.lo`` localization routines).
 """
@@ -138,11 +138,11 @@ class PyscfLocalizer(Localizer):
         if len(loc_indices_a) == 0 and len(loc_indices_b) == 0:
             return wavefunction
         # TODO (NAB): fix TODO above
-        # https://dev.azure.com/ms-azurequantum/AzureQuantum/_workitems/edit/41404
+        # 41404
 
         # TODO assumes aufbau filling
         # TODO (NAB): fix TODO above
-        # https://dev.azure.com/ms-azurequantum/AzureQuantum/_workitems/edit/41404
+        # 41404
         pop_method = self._settings.get("population_method")
         loc_method = self._settings.get("method").lower()
 

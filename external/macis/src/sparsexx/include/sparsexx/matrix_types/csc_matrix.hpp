@@ -10,10 +10,6 @@
 
 #include "type_fwd.hpp"
 
-#ifdef SPARSEXX_ENABLE_CEREAL
-#include <cereal/types/vector.hpp>
-#endif /* SPARSEXX_ENABLE_CEREAL */
-
 namespace sparsexx {
 
 /**
@@ -173,13 +169,6 @@ class csc_matrix {
    *  column pointer indirection array of the sparse matrix in CSC format
    */
   const auto& colptr() const { return colptr_; };
-
-#ifdef SPARSEXX_ENABLE_CEREAL
-  template <class Archive>
-  void serialize(Archive& ar) {
-    ar(m_, n_, nnz_, indexing_, colptr_, rowind_, nzval_);
-  }
-#endif /* SPARSEXX_ENABLE_CEREAL */
 
 };  // class csc_matrix
 

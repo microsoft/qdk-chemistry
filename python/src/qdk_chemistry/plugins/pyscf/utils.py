@@ -20,7 +20,7 @@ Note:
     * Assumes atomic numbers do not exceed 200
 
 Examples:
-    >>> from qdk.chemistry.plugins.pyscf.utils import structure_to_pyscf_atom_labels, basis_to_pyscf_mol
+    >>> from qdk_chemistry.plugins.pyscf.utils import structure_to_pyscf_atom_labels, basis_to_pyscf_mol
     >>> # Convert structure to PySCF format
     >>> atoms, pyscf_symbols, elements = structure_to_pyscf_atom_labels(structure)
     >>> # Convert basis set to PySCF Mole object
@@ -129,7 +129,7 @@ def basis_to_pyscf_mol(basis: BasisSet) -> gto.Mole:
         basis_dict[pyscf_symbols[i]] = atom_basis
 
     # TODO Handle Cartesian basis sets
-    # https://dev.azure.com/ms-azurequantum/AzureQuantum/_workitems/edit/41406
+    # 41406
     mol = gto.Mole(atom=atoms, basis=basis_dict, unit="Bohr")
 
     # Store the original QDK/Chemistry basis name as an attribute for round-trip conversion
@@ -170,10 +170,10 @@ def pyscf_mol_to_qdk_basis(pyscf_mol: gto.Mole, structure: Structure, basis_name
     shells = []
     # TODO: This should deduce the structure from the PySCF Mole object
     # For now, we'll collect the shells and pass structure to constructor
-    # https://dev.azure.com/ms-azurequantum/AzureQuantum/_workitems/edit/41407
+    # 41407
 
     # TODO Handle Cartesian
-    # https://dev.azure.com/ms-azurequantum/AzureQuantum/_workitems/edit/41406
+    # 41406
     atom_symbols = [pyscf_mol.atom_symbol(i) for i in range(pyscf_mol.natm)]
     for iatm in range(pyscf_mol.natm):
         atom_symbol = atom_symbols[iatm]
@@ -194,7 +194,12 @@ def pyscf_mol_to_qdk_basis(pyscf_mol: gto.Mole, structure: Structure, basis_name
     return BasisSet(basis_name, shells, structure, BasisType.Spherical)
 
 
-def orbitals_to_scf(orbitals: Orbitals, occ_alpha: np.ndarray, occ_beta: np.ndarray, force_restricted: bool = False):
+def orbitals_to_scf(
+    orbitals: Orbitals,
+    occ_alpha: np.ndarray,
+    occ_beta: np.ndarray,
+    force_restricted: bool = False,
+):
     """Convert an Orbitals object to a PySCF SCF object.
 
     This function takes a QDK/Chemistry Orbitals object and converts it into the appropriate
@@ -221,6 +226,23 @@ def orbitals_to_scf(orbitals: Orbitals, occ_alpha: np.ndarray, occ_beta: np.ndar
 
     """
     mol = basis_to_pyscf_mol(orbitals.get_basis_set())
+    charge = mol.charge
+
+    # spin from occupations
+    nalpha = int(np.sum(occ_alpha))
+    nbeta = int(np.sum(occ_beta))
+    spin = abs(nalpha - nbeta)
+
+    # charge from occupations
+    nelectrons = nalpha + nbeta
+    charge = mol.nelectron - nelectrons
+
+    # update mol object
+    mol.charge = charge
+    mol.spin = spin
+    mol.build()
+
+    energy_a, energy_b = orbitals.get_energies()
     coeff_a, coeff_b = orbitals.get_coefficients()
     # Get energies if available, otherwise use zero arrays as placeholders
     if orbitals.has_energies():
@@ -328,7 +350,7 @@ def hamiltonian_to_scf(hamiltonian: Hamiltonian, alpha_occ: np.ndarray, beta_occ
 
     Examples:
         >>> import numpy as np
-        >>> from qdk.chemistry.plugins.pyscf.utils import hamiltonian_to_scf
+        >>> from qdk_chemistry.plugins.pyscf.utils import hamiltonian_to_scf
         >>> # Convert a QDK/Chemistry Hamiltonian to a PySCF SCF object
         >>> # Example for 10-electron system with 5 doubly occupied orbitals
         >>> norb = hamiltonian.get_orbitals().get_num_molecular_orbitals()
@@ -414,7 +436,7 @@ def hamiltonian_to_scf_from_n_electrons_and_multiplicity(
         ValueError: If the electron count or multiplicity is invalid.
 
     Examples:
-        >>> from qdk.chemistry.plugins.pyscf.utils import hamiltonian_to_scf_from_n_electrons_and_multiplicity
+        >>> from qdk_chemistry.plugins.pyscf.utils import hamiltonian_to_scf_from_n_electrons_and_multiplicity
         >>> # Convert a QDK/Chemistry Hamiltonian to a PySCF SCF object
         >>> # Example for a 10-electron singlet system
         >>> pyscf_scf = hamiltonian_to_scf_from_n_electrons_and_multiplicity(

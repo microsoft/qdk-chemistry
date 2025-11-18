@@ -107,7 +107,7 @@ void base_class_to_hdf5_wrapper(DataClass &self, const py::object &h5py_group) {
 
   // Check if it's actually overridden (not just inherited from DataClass)
   py::object base_class =
-      py::module_::import("qdk.chemistry.data").attr("DataClass");
+      py::module_::import("qdk_chemistry.data").attr("DataClass");
   if (py::isinstance(py_self, base_class)) {
     // Check if the method is overridden
     py::object self_method = py_self.attr("__class__").attr("to_hdf5");

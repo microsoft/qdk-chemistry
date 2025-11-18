@@ -2,13 +2,14 @@
  * MACIS Copyright (c) 2023, The Regents of the University of California,
  * through Lawrence Berkeley National Laboratory (subject to receipt of
  * any required approvals from the U.S. Dept. of Energy). All rights reserved.
+ * Portions Copyright (c) Microsoft Corporation.
  *
  * See LICENSE.txt for details
  */
 
 #include <iomanip>
 #include <macis/mcscf/fock_matrices.hpp>
-#include <macis/util/detail/rdm_files.hpp>
+#include <macis/util/binary_rdms.hpp>
 #include <macis/util/fcidump.hpp>
 #include <numeric>
 

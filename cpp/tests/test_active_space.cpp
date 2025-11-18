@@ -60,7 +60,8 @@ class TestActiveSpaceSelector : public ActiveSpaceSelector {
           ao_overlap, basis_set,
           std::make_tuple(std::move(active_alpha), std::move(active_beta),
                           std::vector<size_t>{}, std::vector<size_t>{}));
-      return detail::new_wavefunction(wavefunction, new_orbitals);
+      return qdk::chemistry::algorithms::detail::new_wavefunction(wavefunction,
+                                                                  new_orbitals);
     } else {
       // Restricted case - use first coefficient matrix only
       auto coeffs = orbitals->get_coefficients();
@@ -85,7 +86,8 @@ class TestActiveSpaceSelector : public ActiveSpaceSelector {
       auto new_orbitals = std::make_shared<Orbitals>(
           coeffs.first, energies, ao_overlap, basis_set,
           std::make_tuple(std::move(active_indices), std::vector<size_t>{}));
-      return detail::new_wavefunction(wavefunction, new_orbitals);
+      return qdk::chemistry::algorithms::detail::new_wavefunction(wavefunction,
+                                                                  new_orbitals);
     }
   }
 };
@@ -476,27 +478,25 @@ class MockWavefunctionContainer : public WavefunctionContainer {
 
   bool has_two_rdm_spin_dependent() const override { return false; }
 
-  bool has_two_rdm_spin_dependent_ab() const override { return false; }
-
   bool has_two_rdm_spin_traced() const override { return false; }
 
   bool has_single_orbital_entropies() const override { return true; }
 
   std::tuple<const MatrixVariant&, const MatrixVariant&>
-  get_one_rdm_spin_dependent() const override {
+  get_active_one_rdm_spin_dependent() const override {
     throw std::runtime_error("Not implemented");
   }
 
   std::tuple<const VectorVariant&, const VectorVariant&, const VectorVariant&>
-  get_two_rdm_spin_dependent() const override {
+  get_active_two_rdm_spin_dependent() const override {
     throw std::runtime_error("Not implemented");
   }
 
-  const MatrixVariant& get_one_rdm_spin_traced() const override {
+  const MatrixVariant& get_active_one_rdm_spin_traced() const override {
     throw std::runtime_error("Not implemented");
   }
 
-  const VectorVariant& get_two_rdm_spin_traced() const override {
+  const VectorVariant& get_active_two_rdm_spin_traced() const override {
     throw std::runtime_error("Not implemented");
   }
 

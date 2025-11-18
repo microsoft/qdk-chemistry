@@ -4,6 +4,7 @@
 
 #include <fstream>
 #include <qdk/chemistry/data/ansatz.hpp>
+#include <qdk/chemistry/data/wavefunction_containers/sd.hpp>
 #include <sstream>
 #include <stdexcept>
 
@@ -84,12 +85,63 @@ double Ansatz::calculate_energy() const {
     throw std::runtime_error("Cannot calculate energy for invalid Ansatz");
   }
 
-  // TODO: Implement energy calculation ⟨ψ|H|ψ⟩
-  // This will require integration with energy calculation algorithms
-  // https://dev.azure.com/ms-azurequantum/AzureQuantum/_workitems/edit/41344
-  throw std::runtime_error(
-      "Energy calculation not yet implemented - requires energy calculation "
-      "algorithms");
+  if (!_wavefunction->has_one_rdm_spin_traced() ||
+      !_wavefunction->has_two_rdm_spin_traced()) {
+    throw std::runtime_error(
+        "Wavefunction does not have spin-traced RDMs available for energy "
+        "calculation");
+  }
+
+  // get 2 rdm from wavefunction
+  const auto& rdm2 = std::get<Eigen::VectorXd>(
+      _wavefunction->get_active_two_rdm_spin_traced());
+  const auto& rdm1 = std::get<Eigen::MatrixXd>(
+      _wavefunction->get_active_one_rdm_spin_traced());
+
+  // get integrals from hamiltonian
+  const auto& h1 = _hamiltonian->get_one_body_integrals();
+  const auto& h2 = _hamiltonian->get_two_body_integrals();
+
+  // check that active space indices are consistent
+  auto active_space_indices =
+      _wavefunction->get_orbitals()->get_active_space_indices();
+  if (active_space_indices.first.size() != active_space_indices.second.size()) {
+    throw std::runtime_error(
+        "Active space indices are inconsistent between Hamiltonian and "
+        "wavefunction");
+  }
+  size_t norb = active_space_indices.first.size();
+
+  // Compute energy expectation value
+  double energy = 0.0;
+
+  // One-body contribution
+  for (int p = 0; p < norb; ++p) {
+    for (int q = 0; q < norb; ++q) {
+      energy += h1(p, q) * rdm1(q, p);
+    }
+  }
+
+  // Two-body contribution
+  const size_t norb2 = norb * norb;
+  const size_t norb3 = norb * norb2;
+  for (int p = 0; p < norb; ++p) {
+    for (int q = 0; q < norb; ++q) {
+      for (int r = 0; r < norb; ++r) {
+        for (int s = 0; s < norb; ++s) {
+          size_t index_co = p * norb3 + q * norb2 + r * norb + s;
+          size_t index_dm = r * norb3 + s * norb2 + p * norb + q;
+          energy += 0.5 * h2(index_co) * rdm2(index_dm);
+        }
+      }
+    }
+  }
+
+  // core energy contribution
+  energy += _hamiltonian->get_core_energy();
+  std::cout << "Core energy: " << _hamiltonian->get_core_energy() << std::endl;
+
+  return energy;
 }
 
 bool Ansatz::_is_valid() const {
@@ -136,7 +188,8 @@ void Ansatz::validate_orbital_consistency() const {
   // If they're not the same object instance, throw an error
   if (&ham_orbitals != &wf_orbitals) {
     throw std::runtime_error(
-        "Orbital inconsistency: Hamiltonian and Wavefunction must use the same "
+        "Orbital inconsistency: Hamiltonian and Wavefunction must use the "
+        "same "
         "Orbitals object instance");
   }
 }

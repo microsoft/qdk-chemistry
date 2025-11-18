@@ -10,7 +10,7 @@ wavefunction stability analysis including:
 
 This module registers a `pyscf` stability checker with the QDK stability checker registry at
 import time, making the functionality available via
-`qdk.chemistry.algorithms.create('stability_checker', 'pyscf')`.
+`qdk_chemistry.algorithms.create('stability_checker', 'pyscf')`.
 
 Requires: PySCF (the code uses `pyscf.lib`, `pyscf.scf`, `pyscf.soscf`,
           and `pyscf.scf.stability` routines).
@@ -235,11 +235,7 @@ class PyscfStabilityChecker(StabilityChecker):
 
         """
         # Verify wavefunction compatibility: Only SlaterDeterminantContainer currently supported
-        if (
-            (not wavefunction.has_sd_container())
-            or wavefunction.has_sci_container()
-            or wavefunction.has_cas_container()
-        ):
+        if wavefunction.get_container_type() != "sd":
             raise ValueError("Stability analysis currently only supports SlaterDeterminantContainer wavefunctions")
 
         # Extract settings

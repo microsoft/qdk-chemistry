@@ -619,6 +619,38 @@ void bind_orbitals(py::module &data) {
         >>> print(f"Inactive space size: {len(alpha_inactive)}")
         )");
 
+  orbitals.def("get_inactive_space_indices",
+               &Orbitals::get_inactive_space_indices,
+               R"(
+        Get the inactive space orbital indices.
+
+        Returns
+        -------
+        tuple
+            Pair of (alpha_indices, beta_indices) for inactive space orbitals
+
+        Examples
+        --------
+        >>> alpha_inactive, beta_inactive = orbitals.get_inactive_space_indices()
+        >>> print(f"Inactive space size: {len(inalpha_active)}")
+        )");
+
+  orbitals.def("get_virtual_space_indices",
+               &Orbitals::get_virtual_space_indices,
+               R"(
+        Get the virtual space orbital indices.
+
+        Returns
+        -------
+        tuple
+            Pair of (alpha_indices, beta_indices) for virtual orbitals
+
+        Examples
+        --------
+        >>> alpha_virtual , beta_virtual = orbitals.get_virtual_space_indices()
+        >>> print(f"Virtual space size: {len(virtual_active)}")
+        )");
+
   orbitals.def("has_active_space", &Orbitals::has_active_space,
                R"(
         Check if active space data is set.

@@ -30,13 +30,26 @@ class MacisPmcSettings : public ProjectedMultiConfigurationSettings {
    *
    * Creates PMC settings object with default parameter values taken directly
    * from the MACIS library's ASCISettings struct to ensure consistency.
+   *
+   * iterative_solver_dimension_cutoff: matrix size cutoff for using iterative
+   * eigensolver. If the number of determinants is below this value, dense
+   * diagonalization is used instead.
+   * H_thresh: Hamiltonian matrix entries threshold for dense diagonalization
+   * h_el_tol: electron interaction tolerance, used for Hamiltonian-wavefunction
+   * product in iterative solver
+   * davidson_res_tol: Residual tolerance for Davidson solver convergence
+   * davidson_max_m: Maximum subspace size for Davidson solver
    */
   MacisPmcSettings() {
     // Use MACIS library defaults directly
     macis::ASCISettings macis_defaults;
 
     // Tolerance parameters
+    set_default<size_t>("iterative_solver_dimension_cutoff", 100);
+    set_default<double>("H_thresh", 1e-16);
     set_default<double>("h_el_tol", macis_defaults.h_el_tol);
+    set_default<double>("davidson_res_tol", 1e-8);
+    set_default<size_t>("davidson_max_m", 200);
   }
 
   /**

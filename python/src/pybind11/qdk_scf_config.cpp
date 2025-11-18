@@ -21,7 +21,7 @@ void bind_qdk_chemistry_config(py::module& m) {
 
         Examples
         --------
-        >>> import qdk.chemistry._core as core
+        >>> import qdk_chemistry._core as core
         >>> config = core.QDKChemistryConfig()
         >>>
         >>> # Get current resources directory
@@ -54,7 +54,7 @@ void bind_qdk_chemistry_config(py::module& m) {
 
         Examples
         --------
-        >>> import qdk.chemistry._core as core
+        >>> import qdk_chemistry._core as core
         >>> resources_path = core.QDKChemistryConfig.get_resources_dir()
         >>> print(f"Resources directory: {resources_path}")
         )")
@@ -75,7 +75,7 @@ void bind_qdk_chemistry_config(py::module& m) {
 
         Examples
         --------
-        >>> import qdk.chemistry._core as core
+        >>> import qdk_chemistry._core as core
         >>> core.QDKChemistryConfig.set_resources_dir("/path/to/custom/resources")
         >>> # Verify the change
         >>> print(core.QDKChemistryConfig.get_resources_dir())

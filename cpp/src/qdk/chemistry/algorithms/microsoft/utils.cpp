@@ -174,7 +174,7 @@ qdk::chemistry::data::BasisSet convert_basis_set_to_qdk(
   if (not basis_set.pure) {
     // TODO (NAB):  is basis_set.pure always false for cartesian basis sets?
     // Does it mean anything else?
-    // https://dev.azure.com/ms-azurequantum/AzureQuantum/_workitems/edit/41332
+    // 41332
     throw std::runtime_error("QDK Does Not Support Cartesian Basis Functions");
   }
 
@@ -257,7 +257,7 @@ nlohmann::ordered_json convert_to_json(
   }
 
   // TODO: Handle ECPs
-  // https://dev.azure.com/ms-azurequantum/AzureQuantum/_workitems/edit/41333
+  // 41333
   std::vector<nlohmann::ordered_json> json_ecp_shells;
   std::vector<int> _elem2ecpcore;
 

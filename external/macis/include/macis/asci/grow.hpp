@@ -2,6 +2,7 @@
  * MACIS Copyright (c) 2023, The Regents of the University of California,
  * through Lawrence Berkeley National Laboratory (subject to receipt of
  * any required approvals from the U.S. Dept. of Energy). All rights reserved.
+ * Portions Copyright (c) Microsoft Corporation.
  *
  * See LICENSE.txt for details
  */
@@ -13,6 +14,34 @@
 
 namespace macis {
 
+/**
+ * @brief Perform ASCI (Adaptive Sampling Configuration Interaction)
+ * wavefunction growth phase
+ *
+ * This function implements the iterative growth phase of the ASCI algorithm,
+ * where the wavefunction is systematically expanded by adding important
+ * determinants until a maximum size is reached. The growth process includes
+ * optional natural orbital rotations to improve orbital basis optimization.
+ *
+ * @tparam N Size of the wavefunction bitset representation
+ * @tparam index_t Integer type for indexing (default: int32_t)
+ *
+ * @param[in] asci_settings ASCI algorithm parameter
+ * @param[in] mcscf_settings MCSCF parameters for CI diagonalization
+ * @param[in] E0 Initial reference energy
+ * @param[in] wfn Initial wavefunction as vector of determinants
+ * @param[in] X Initial CI coefficients corresponding to wavefunction
+ * @param[in,out] ham_gen Hamiltonian generator containing integrals and methods
+ * @param[in] norb Number of molecular orbitals
+ * @param[in] comm MPI communicator for parallel execution (MPI builds only)
+ *
+ * @return Tuple containing:
+ *   - Final converged energy
+ *   - Expanded wavefunction determinants
+ *   - Final CI coefficients
+ *
+ * @see asci_iter, selected_ci_diag, two_index_transform, four_index_transform
+ */
 template <size_t N, typename index_t = int32_t>
 auto asci_grow(ASCISettings asci_settings, MCSCFSettings mcscf_settings,
                double E0, std::vector<wfn_t<N>> wfn, std::vector<double> X,
@@ -70,13 +99,11 @@ auto asci_grow(ASCISettings asci_settings, MCSCFSettings mcscf_settings,
 
       // Only do rotation on root rank
       if (!world_rank) {
-        // Form RDMs: TODO Make 1RDM-only work
         logger->trace("  * Forming RDMs");
         auto rdm_st = hrt_t::now();
-        std::vector<double> ordm(norb * norb, 0.0),
-            trdm(norb * norb * norb * norb, 0.0);
+        std::vector<double> ordm(norb * norb, 0.0);
         matrix_span<double> ORDM(ordm.data(), norb, norb);
-        rank4_span<double> TRDM(trdm.data(), norb, norb, norb, norb);
+        rank4_span<double> TRDM(nullptr, 1, 1, 1, 1);
         ham_gen.form_rdms(wfn.begin(), wfn.end(), wfn.begin(), wfn.end(),
                           X.data(), ORDM, TRDM);
         auto rdm_en = hrt_t::now();
@@ -124,7 +151,6 @@ auto asci_grow(ASCISettings asci_settings, MCSCFSettings mcscf_settings,
       logger->trace("  * Rediagonalizing");
       auto rdg_st = hrt_t::now();
       std::vector<double> X_local;
-      throw "DIE DIE DIE";
       selected_ci_diag<index_t>(
           wfn.begin(), wfn.end(), ham_gen, mcscf_settings.ci_matel_tol,
           mcscf_settings.ci_max_subspace, mcscf_settings.ci_res_tol,

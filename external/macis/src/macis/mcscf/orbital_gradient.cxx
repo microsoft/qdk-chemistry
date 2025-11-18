@@ -2,6 +2,7 @@
  * MACIS Copyright (c) 2023, The Regents of the University of California,
  * through Lawrence Berkeley National Laboratory (subject to receipt of
  * any required approvals from the U.S. Dept. of Energy). All rights reserved.
+ * Portions Copyright (c) Microsoft Corporation.
  *
  * See LICENSE.txt for details
  */
@@ -286,28 +287,8 @@ void numerical_orbital_hessian(NumOrbital _norb, NumInactive ninact,
           compute_orbital_rotation(_norb, 1.0, K.data(), norb, U.data(), norb);
           auto E_xm2_ym2 = energy();
 
-#if 0
-    OH[a + i*LDOH + b*LDOH*LDOH + j*LDOH*LDOH*LDOH] =
-      (E_xp1_yp1 + E_xm1_ym1 - E_xp1_ym1 - E_xm1_yp1) / (4 * dk*dk);
-#else
-          std::vector<double> c = {-1.0, 8.0, -8.0, 1.0};
-          std::vector<double> e_p2 = {E_xp2_yp2, E_xp2_yp1, E_xp2_ym1,
-                                      E_xp2_ym2};
-          std::vector<double> e_p1 = {E_xp1_yp2, E_xp1_yp1, E_xp1_ym1,
-                                      E_xp1_ym2};
-          std::vector<double> e_m1 = {E_xm1_yp2, E_xm1_yp1, E_xm1_ym1,
-                                      E_xm1_ym2};
-          std::vector<double> e_m2 = {E_xm2_yp2, E_xm2_yp1, E_xm2_ym1,
-                                      E_xm2_ym2};
-          std::vector<std::vector<double> > e = {e_p2, e_p1, e_m1, e_m2};
-          double tmp = 0.0;
-          for (auto p = 0; p < c.size(); ++p)
-            for (auto q = 0; q < c.size(); ++q) {
-              tmp += c[p] * c[q] * e[p][q];
-            }
           OH[a + i * LDOH + b * LDOH * LDOH + j * LDOH * LDOH * LDOH] =
-              tmp / (144 * dk * dk);
-#endif /* 0 */
+              (E_xp1_yp1 + E_xm1_ym1 - E_xp1_ym1 - E_xm1_yp1) / (4 * dk * dk);
         }
 }
 

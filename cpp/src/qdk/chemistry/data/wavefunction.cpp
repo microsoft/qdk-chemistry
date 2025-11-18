@@ -18,59 +18,425 @@
 #include "json_serialization.hpp"
 
 namespace qdk::chemistry::data {
-// WavefunctionContainer constructor
-WavefunctionContainer::WavefunctionContainer(WavefunctionType type)
-    : _type(type) {}
-
-bool WavefunctionContainer::has_single_orbital_entropies() const {
-  return has_one_rdm_spin_dependent() &&
-         (has_two_rdm_spin_dependent_ab() || has_two_rdm_spin_traced());
-}
-
-std::shared_ptr<WavefunctionContainer::MatrixVariant>
-WavefunctionContainer::add_matrix_variants(const MatrixVariant& mat1,
-                                           const MatrixVariant& mat2) const {
+namespace detail {
+std::shared_ptr<ContainerTypes::MatrixVariant> add_matrix_variants(
+    const ContainerTypes::MatrixVariant& mat1,
+    const ContainerTypes::MatrixVariant& mat2) {
   return std::visit(
-      [](const auto& m1, const auto& m2) -> std::shared_ptr<MatrixVariant> {
+      [](const auto& m1,
+         const auto& m2) -> std::shared_ptr<ContainerTypes::MatrixVariant> {
         if constexpr (std::is_same_v<std::decay_t<decltype(m1)>,
                                      std::decay_t<decltype(m2)>>) {
           using MatType = std::decay_t<decltype(m1)>;
-          return std::make_shared<MatrixVariant>(std::in_place_type<MatType>,
-                                                 m1 + m2);
+          return std::make_shared<ContainerTypes::MatrixVariant>(
+              std::in_place_type<MatType>, m1 + m2);
         } else {
           throw std::runtime_error(
-              "Cannot add MatrixVariants of different types");
+              "Cannot add ContainerTypes::MatrixVariants of different types");
         }
       },
       mat1, mat2);
 }
 
-std::shared_ptr<WavefunctionContainer::VectorVariant>
-WavefunctionContainer::add_vector_variants(const VectorVariant& vec1,
-                                           const VectorVariant& vec2) const {
+std::shared_ptr<ContainerTypes::VectorVariant> add_vector_variants(
+    const ContainerTypes::VectorVariant& vec1,
+    const ContainerTypes::VectorVariant& vec2) {
   return std::visit(
-      [](const auto& v1, const auto& v2) -> std::shared_ptr<VectorVariant> {
+      [](const auto& v1,
+         const auto& v2) -> std::shared_ptr<ContainerTypes::VectorVariant> {
         if constexpr (std::is_same_v<std::decay_t<decltype(v1)>,
                                      std::decay_t<decltype(v2)>>) {
           using VecType = std::decay_t<decltype(v1)>;
-          return std::make_shared<VectorVariant>(std::in_place_type<VecType>,
-                                                 v1 + v2);
+          return std::make_shared<ContainerTypes::VectorVariant>(
+              std::in_place_type<VecType>, v1 + v2);
         } else {
           throw std::runtime_error(
-              "Cannot add VectorVariants of different types");
+              "Cannot add ContainerTypes::VectorVariants of different types");
         }
       },
       vec1, vec2);
 }
 
-bool WavefunctionContainer::is_matrix_variant_complex(
-    const MatrixVariant& variant) const {
+bool is_matrix_variant_complex(const ContainerTypes::MatrixVariant& variant) {
   return std::holds_alternative<Eigen::MatrixXcd>(variant);
 }
 
-bool WavefunctionContainer::is_vector_variant_complex(
-    const VectorVariant& variant) const {
+bool is_vector_variant_complex(const ContainerTypes::VectorVariant& variant) {
   return std::holds_alternative<Eigen::VectorXcd>(variant);
+}
+
+std::shared_ptr<ContainerTypes::VectorVariant>
+transpose_ijkl_klij_vector_variant(const ContainerTypes::VectorVariant& variant,
+                                   int norbs) {
+  return std::visit(
+      [norbs](
+          const auto& vec) -> std::shared_ptr<ContainerTypes::VectorVariant> {
+        using VecType = std::decay_t<decltype(vec)>;
+        VecType output(vec.size());
+        output.setZero();
+
+        for (int i = 0; i < norbs; ++i)
+          for (int j = 0; j < norbs; ++j)
+            for (int k = 0; k < norbs; ++k)
+              for (int l = 0; l < norbs; ++l) {
+                int new_index = k * norbs * norbs * norbs + l * norbs * norbs +
+                                i * norbs + j;
+                int index = i * norbs * norbs * norbs + j * norbs * norbs +
+                            k * norbs + l;
+                output(new_index) = vec(index);
+              }
+        return make_shared<ContainerTypes::VectorVariant>(
+            std::in_place_type<VecType>, output);
+      },
+      variant);
+}
+
+}  // namespace detail
+
+// WavefunctionContainer constructor
+WavefunctionContainer::WavefunctionContainer(WavefunctionType type)
+    : WavefunctionContainer(std::nullopt,  // one_rdm_spin_traced
+                            std::nullopt,  // one_rdm_aa
+                            std::nullopt,  // one_rdm_bb
+                            std::nullopt,  // two_rdm_spin_traced
+                            std::nullopt,  // two_rdm_aabb
+                            std::nullopt,  // two_rdm_aaaa
+                            std::nullopt,  // two_rdm_bbbb
+                            type) {}
+
+WavefunctionContainer::WavefunctionContainer(
+    const std::optional<ContainerTypes::MatrixVariant>& one_rdm_spin_traced,
+    const std::optional<ContainerTypes::VectorVariant>& two_rdm_spin_traced,
+    WavefunctionType type)
+    : WavefunctionContainer(one_rdm_spin_traced,
+                            std::nullopt,  // one_rdm_aa
+                            std::nullopt,  // one_rdm_bb
+                            two_rdm_spin_traced,
+                            std::nullopt,  // two_rdm_aabb
+                            std::nullopt,  // two_rdm_aaaa
+                            std::nullopt,  // two_rdm_bbbb
+                            type) {}
+
+WavefunctionContainer::WavefunctionContainer(
+    const std::optional<ContainerTypes::MatrixVariant>& one_rdm_spin_traced,
+    const std::optional<ContainerTypes::MatrixVariant>& one_rdm_aa,
+    const std::optional<ContainerTypes::MatrixVariant>& one_rdm_bb,
+    const std::optional<ContainerTypes::VectorVariant>& two_rdm_spin_traced,
+    const std::optional<ContainerTypes::VectorVariant>& two_rdm_aabb,
+    const std::optional<ContainerTypes::VectorVariant>& two_rdm_aaaa,
+    const std::optional<ContainerTypes::VectorVariant>& two_rdm_bbbb,
+    WavefunctionType type)
+    : _type(type) {
+  if (one_rdm_spin_traced.has_value()) {
+    _one_rdm_spin_traced = std::make_shared<ContainerTypes::MatrixVariant>(
+        one_rdm_spin_traced.value());
+  } else {
+    _one_rdm_spin_traced = nullptr;
+  }
+  if (one_rdm_aa.has_value()) {
+    _one_rdm_spin_dependent_aa =
+        std::make_shared<ContainerTypes::MatrixVariant>(one_rdm_aa.value());
+  } else {
+    _one_rdm_spin_dependent_aa = nullptr;
+  }
+  if (one_rdm_bb.has_value()) {
+    _one_rdm_spin_dependent_bb =
+        std::make_shared<ContainerTypes::MatrixVariant>(one_rdm_bb.value());
+  } else {
+    _one_rdm_spin_dependent_bb = nullptr;
+  }
+  if (two_rdm_spin_traced.has_value()) {
+    _two_rdm_spin_traced = std::make_shared<ContainerTypes::VectorVariant>(
+        two_rdm_spin_traced.value());
+  } else {
+    _two_rdm_spin_traced = nullptr;
+  }
+  if (two_rdm_aabb.has_value()) {
+    _two_rdm_spin_dependent_aabb =
+        std::make_shared<ContainerTypes::VectorVariant>(two_rdm_aabb.value());
+  } else {
+    _two_rdm_spin_dependent_aabb = nullptr;
+  }
+  if (two_rdm_aaaa.has_value()) {
+    _two_rdm_spin_dependent_aaaa =
+        std::make_shared<ContainerTypes::VectorVariant>(two_rdm_aaaa.value());
+  } else {
+    _two_rdm_spin_dependent_aaaa = nullptr;
+  }
+  if (two_rdm_bbbb.has_value()) {
+    _two_rdm_spin_dependent_bbbb =
+        std::make_shared<ContainerTypes::VectorVariant>(two_rdm_bbbb.value());
+  } else {
+    _two_rdm_spin_dependent_bbbb = nullptr;
+  }
+}
+
+// RDM handling
+std::tuple<const ContainerTypes::MatrixVariant&,
+           const ContainerTypes::MatrixVariant&>
+WavefunctionContainer::get_active_one_rdm_spin_dependent() const {
+  if (!has_one_rdm_spin_dependent()) {
+    throw std::runtime_error("Spin-dependent one-body RDM not set");
+  }
+  bool is_singlet =
+      get_active_num_electrons().first == get_active_num_electrons().second;
+  if (_one_rdm_spin_dependent_aa != nullptr &&
+      _one_rdm_spin_dependent_bb != nullptr) {
+    return std::make_tuple(std::cref(*_one_rdm_spin_dependent_aa),
+                           std::cref(*_one_rdm_spin_dependent_bb));
+  }
+
+  // For restricted singlets, if only one spin component is available, use it
+  // for both
+  if ((get_orbitals()->is_restricted() && is_singlet) &&
+      _one_rdm_spin_dependent_aa != nullptr) {
+    return std::make_tuple(std::cref(*_one_rdm_spin_dependent_aa),
+                           std::cref(*_one_rdm_spin_dependent_aa));
+  }
+  if ((get_orbitals()->is_restricted() && is_singlet) &&
+      _one_rdm_spin_dependent_bb != nullptr) {
+    return std::make_tuple(std::cref(*_one_rdm_spin_dependent_bb),
+                           std::cref(*_one_rdm_spin_dependent_bb));
+  }
+
+  // If restricted singlet and only spin-traced RDM is available, derive spin
+  // components
+  if (get_orbitals()->is_restricted() && is_singlet &&
+      _one_rdm_spin_traced != nullptr) {
+    // Lazy evaluation - only compute if necessary
+    if (_one_rdm_spin_dependent_aa == nullptr) {
+      _one_rdm_spin_dependent_aa =
+          detail::multiply_matrix_variant(*_one_rdm_spin_traced, 0.5);
+    }
+    return std::make_tuple(std::cref(*_one_rdm_spin_dependent_aa),
+                           std::cref(*_one_rdm_spin_dependent_aa));
+  }
+
+  // Should not reach this exception
+  throw std::runtime_error("No one-body RDMs are set");
+}
+
+const ContainerTypes::MatrixVariant&
+WavefunctionContainer::get_active_one_rdm_spin_traced() const {
+  if (!has_one_rdm_spin_traced()) {
+    throw std::runtime_error("Spin-traced one-body RDM not set");
+  }
+  bool is_singlet =
+      get_active_num_electrons().first == get_active_num_electrons().second;
+  if (_one_rdm_spin_traced != nullptr) {
+    return *_one_rdm_spin_traced;
+  }
+  if (_one_rdm_spin_dependent_aa != nullptr &&
+      _one_rdm_spin_dependent_bb != nullptr) {
+    // evaluate only if necessary
+    _one_rdm_spin_traced = detail::add_matrix_variants(
+        *_one_rdm_spin_dependent_aa, *_one_rdm_spin_dependent_bb);
+    return *_one_rdm_spin_traced;
+  }
+  // If restricted singlets, we can use the 0.5 * spin-traced RDM.
+  if (get_orbitals()->is_restricted() && is_singlet &&
+      _one_rdm_spin_dependent_aa != nullptr) {
+    _one_rdm_spin_traced =
+        detail::multiply_matrix_variant(*_one_rdm_spin_dependent_aa, 2.0);
+    return *_one_rdm_spin_traced;
+  }
+  if (get_orbitals()->is_restricted() && is_singlet &&
+      _one_rdm_spin_dependent_bb != nullptr) {
+    _one_rdm_spin_traced =
+        detail::multiply_matrix_variant(*_one_rdm_spin_dependent_bb, 2.0);
+    return *_one_rdm_spin_traced;
+  }
+  // Should not reach this exception.
+  throw std::runtime_error("No spin-traced one-body RDMs are set");
+}
+
+std::tuple<const ContainerTypes::VectorVariant&,
+           const ContainerTypes::VectorVariant&,
+           const ContainerTypes::VectorVariant&>
+WavefunctionContainer::get_active_two_rdm_spin_dependent() const {
+  if (!has_two_rdm_spin_dependent()) {
+    throw std::runtime_error("Spin-dependent two-body RDM not set");
+  }
+  bool is_singlet =
+      get_active_num_electrons().first == get_active_num_electrons().second;
+  if (_two_rdm_spin_dependent_aabb != nullptr &&
+      _two_rdm_spin_dependent_aaaa != nullptr &&
+      _two_rdm_spin_dependent_bbbb != nullptr) {
+    return std::make_tuple(std::cref(*_two_rdm_spin_dependent_aabb),
+                           std::cref(*_two_rdm_spin_dependent_aaaa),
+                           std::cref(*_two_rdm_spin_dependent_bbbb));
+  }
+  if (get_orbitals()->is_restricted() && is_singlet &&
+      _two_rdm_spin_dependent_aabb != nullptr &&
+      _two_rdm_spin_dependent_aaaa != nullptr) {
+    return std::make_tuple(std::cref(*_two_rdm_spin_dependent_aabb),
+                           std::cref(*_two_rdm_spin_dependent_aaaa),
+                           std::cref(*_two_rdm_spin_dependent_aaaa));
+  }
+  // Should not reach this exception
+  throw std::runtime_error("No spin-dependent two-body RDMs are set");
+}
+
+const ContainerTypes::VectorVariant&
+WavefunctionContainer::get_active_two_rdm_spin_traced() const {
+  if (!has_two_rdm_spin_traced()) {
+    throw std::runtime_error("Spin-traced two-body RDM not set");
+  }
+  bool is_singlet =
+      get_active_num_electrons().first == get_active_num_electrons().second;
+  if (_two_rdm_spin_traced != nullptr) {
+    return *_two_rdm_spin_traced;
+  }
+  if (_two_rdm_spin_dependent_aabb != nullptr &&
+      _two_rdm_spin_dependent_aaaa != nullptr &&
+      _two_rdm_spin_dependent_bbbb != nullptr) {
+    auto two_rdm_ss_part = detail::add_vector_variants(
+        *(_two_rdm_spin_dependent_aaaa), *(_two_rdm_spin_dependent_bbbb));
+    auto two_rdm_spin_bbaa = detail::transpose_ijkl_klij_vector_variant(
+        *_two_rdm_spin_dependent_aabb,
+        get_orbitals()->get_active_space_indices().first.size());
+
+    auto two_rdm_os_part = detail::add_vector_variants(
+        *(_two_rdm_spin_dependent_aabb), *(two_rdm_spin_bbaa));
+
+    _two_rdm_spin_traced =
+        detail::add_vector_variants(*two_rdm_os_part, *two_rdm_ss_part);
+
+    return *_two_rdm_spin_traced;
+  }
+  if (get_orbitals()->is_restricted() && is_singlet &&
+      _two_rdm_spin_dependent_aabb != nullptr &&
+      _two_rdm_spin_dependent_aaaa != nullptr) {
+    // For restricted singlet case: aabb + bbaa + aaaa + bbbb = 2*aabb + 2*aaaa
+    auto double_aabb =
+        detail::multiply_vector_variant(*_two_rdm_spin_dependent_aabb, 2.0);
+    auto double_aaaa =
+        detail::multiply_vector_variant(*_two_rdm_spin_dependent_aaaa, 2.0);
+    _two_rdm_spin_traced =
+        detail::add_vector_variants(*double_aabb, *double_aaaa);
+    return *_two_rdm_spin_traced;
+  }
+  // Should not reach this exception
+  throw std::runtime_error("No spin-traced two-body RDMs are set");
+}
+
+bool WavefunctionContainer::has_one_rdm_spin_dependent() const {
+  bool is_singlet =
+      get_active_num_electrons().first == get_active_num_electrons().second;
+  return (_one_rdm_spin_dependent_aa != nullptr &&
+          _one_rdm_spin_dependent_bb != nullptr) ||
+         ((get_orbitals()->is_restricted() && is_singlet) &&
+          (_one_rdm_spin_dependent_aa != nullptr ||
+           _one_rdm_spin_dependent_bb != nullptr)) ||
+         (get_orbitals()->is_restricted() && _one_rdm_spin_traced != nullptr);
+}
+
+bool WavefunctionContainer::has_one_rdm_spin_traced() const {
+  return _one_rdm_spin_traced != nullptr || has_one_rdm_spin_dependent();
+}
+
+bool WavefunctionContainer::has_two_rdm_spin_dependent() const {
+  bool is_singlet =
+      get_active_num_electrons().first == get_active_num_electrons().second;
+  return (_two_rdm_spin_dependent_aabb != nullptr &&
+          _two_rdm_spin_dependent_aaaa != nullptr &&
+          _two_rdm_spin_dependent_bbbb != nullptr) ||
+         ((get_orbitals()->is_restricted() && is_singlet) &&
+          _two_rdm_spin_dependent_aabb != nullptr &&
+          (_two_rdm_spin_dependent_aaaa != nullptr ||
+           _two_rdm_spin_dependent_bbbb != nullptr));
+}
+
+bool WavefunctionContainer::has_two_rdm_spin_traced() const {
+  return _two_rdm_spin_traced != nullptr || has_two_rdm_spin_dependent();
+}
+
+// entropies
+Eigen::VectorXd WavefunctionContainer::get_single_orbital_entropies() const {
+  if (!has_one_rdm_spin_dependent()) {
+    throw std::runtime_error(
+        "Spin-dependent one-body RDMs must be set to evaluate "
+        "single-orbital entropies");
+  }
+  if (_two_rdm_spin_dependent_aabb == nullptr) {
+    throw std::runtime_error(
+        "alpha-alpha-beta-beta block of spin-dependent two-body RDMs must be "
+        "set to evaluate single-orbital entropies");
+  }
+
+  const auto& one_rdm_aa_var = std::get<0>(get_active_one_rdm_spin_dependent());
+  const auto& one_rdm_bb_var = std::get<1>(get_active_one_rdm_spin_dependent());
+  const auto& two_rdm_ab_var = std::get<0>(get_active_two_rdm_spin_dependent());
+
+  Eigen::MatrixXd one_rdm_aa;
+  Eigen::MatrixXd one_rdm_bb;
+  Eigen::VectorXd two_rdm_ab;
+
+  if (detail::is_matrix_variant_complex(one_rdm_aa_var) ||
+      detail::is_vector_variant_complex(two_rdm_ab_var) ||
+      detail::is_matrix_variant_complex(one_rdm_bb_var)) {
+    throw std::runtime_error("Complex entropy calculation not yet implemented");
+  } else {
+    one_rdm_aa = std::get<Eigen::MatrixXd>(one_rdm_aa_var);
+    one_rdm_bb = std::get<Eigen::MatrixXd>(one_rdm_bb_var);
+    two_rdm_ab = std::get<Eigen::VectorXd>(two_rdm_ab_var);
+  }
+
+  int norbs = one_rdm_aa.rows();
+
+  // Lambda function to get the two-body RDM element
+  auto get_active_two_rdm_element = [&two_rdm_ab, norbs](int i, int j, int k,
+                                                         int l) {
+    if (i >= norbs || j >= norbs || k >= norbs || l >= norbs) {
+      throw std::out_of_range("Index out of bounds for two-body RDM");
+    }
+    int norbs2 = norbs * norbs;
+    return two_rdm_ab(i * norbs * norbs2 + j * norbs2 + k * norbs + l);
+  };
+
+  // Source: https://doi.org/10.1002/qua.24832
+  // s1_i  = - \sum_alpha \omega_i,alpha * ln(omega_i,alpha)
+  Eigen::VectorXd s1_entropies = Eigen::VectorXd::Zero(norbs);
+  for (std::size_t i = 0; i < norbs; ++i) {
+    // omega_1 = 1 - \gamma_{ii} - \gamma_{\bar{i}\bar{i}} +
+    // \Gamma_{i\bar{i}i\bar{i}}
+    auto ordm1 = 1 - one_rdm_aa(i, i) - one_rdm_bb(i, i) +
+                 get_active_two_rdm_element(i, i, i, i);
+    if (ordm1 > 0) {
+      s1_entropies(i) -= ordm1 * std::log(ordm1);
+    }
+    // omega_2 = \gamma_{ii} - \Gamma_{i\bar{i}i\bar{i}}
+    auto ordm2 = one_rdm_aa(i, i) - get_active_two_rdm_element(i, i, i, i);
+    if (ordm2 > 0) {
+      s1_entropies(i) -= ordm2 * std::log(ordm2);
+    }
+    // omega_3 = \gamma_{\bar{i}\bar{i}} - \Gamma_{i\bar{i}i\bar{i}}
+    auto ordm3 = one_rdm_bb(i, i) - get_active_two_rdm_element(i, i, i, i);
+    if (ordm3 > 0) {
+      s1_entropies(i) -= ordm3 * std::log(ordm3);
+    }
+    // omega_4 = \Gamma_{i\bar{i}i\bar{i}}
+    auto ordm4 = get_active_two_rdm_element(i, i, i, i);
+    if (ordm4 > 0) {
+      s1_entropies(i) -= ordm4 * std::log(ordm4);
+    }
+  }
+  return s1_entropies;
+}
+
+bool WavefunctionContainer::has_single_orbital_entropies() const {
+  return has_one_rdm_spin_dependent() &&
+         _two_rdm_spin_dependent_aabb != nullptr;
+}
+
+void WavefunctionContainer::_clear_rdms() const {
+  _one_rdm_spin_traced.reset();
+  _one_rdm_spin_dependent_aa.reset();
+  _one_rdm_spin_dependent_bb.reset();
+  _two_rdm_spin_traced.reset();
+  _two_rdm_spin_dependent_aabb.reset();
+  _two_rdm_spin_dependent_aaaa.reset();
+  _two_rdm_spin_dependent_bbbb.reset();
 }
 
 std::unique_ptr<WavefunctionContainer> WavefunctionContainer::from_json(
@@ -145,6 +511,10 @@ std::shared_ptr<Orbitals> Wavefunction::get_orbitals() const {
   return _container->get_orbitals();
 }
 
+std::string Wavefunction::get_container_type() const {
+  return _container->get_container_type();
+}
+
 std::pair<size_t, size_t> Wavefunction::get_total_num_electrons() const {
   return _container->get_total_num_electrons();
 }
@@ -199,7 +569,7 @@ Configuration Wavefunction::get_active_determinant(
   }
 
   auto [alpha_active, beta_active] = orbitals->get_active_space_indices();
-  const auto& active_indices = alpha_active;  // For restricted case
+  const auto& active_indices = alpha_active;
 
   if (active_indices.empty()) {
     // Empty active space - return empty configuration
@@ -259,8 +629,6 @@ Configuration Wavefunction::get_total_determinant(
     }
   }
 
-  // Virtual orbitals remain as '0' (unoccupied)
-
   return Configuration(total_str);
 }
 
@@ -275,25 +643,25 @@ Wavefunction::ScalarVariant Wavefunction::overlap(
 
 std::tuple<const Wavefunction::MatrixVariant&,
            const Wavefunction::MatrixVariant&>
-Wavefunction::get_one_rdm_spin_dependent() const {
-  return _container->get_one_rdm_spin_dependent();
+Wavefunction::get_active_one_rdm_spin_dependent() const {
+  return _container->get_active_one_rdm_spin_dependent();
 }
 
 std::tuple<const Wavefunction::VectorVariant&,
            const Wavefunction::VectorVariant&,
            const Wavefunction::VectorVariant&>
-Wavefunction::get_two_rdm_spin_dependent() const {
-  return _container->get_two_rdm_spin_dependent();
+Wavefunction::get_active_two_rdm_spin_dependent() const {
+  return _container->get_active_two_rdm_spin_dependent();
 }
 
-const Wavefunction::MatrixVariant& Wavefunction::get_one_rdm_spin_traced()
-    const {
-  return _container->get_one_rdm_spin_traced();
+const Wavefunction::MatrixVariant&
+Wavefunction::get_active_one_rdm_spin_traced() const {
+  return _container->get_active_one_rdm_spin_traced();
 }
 
-const Wavefunction::VectorVariant& Wavefunction::get_two_rdm_spin_traced()
-    const {
-  return _container->get_two_rdm_spin_traced();
+const Wavefunction::VectorVariant&
+Wavefunction::get_active_two_rdm_spin_traced() const {
+  return _container->get_active_two_rdm_spin_traced();
 }
 
 bool Wavefunction::has_single_orbital_entropies() const {
@@ -314,10 +682,6 @@ bool Wavefunction::has_one_rdm_spin_traced() const {
 
 bool Wavefunction::has_two_rdm_spin_dependent() const {
   return _container->has_two_rdm_spin_dependent();
-}
-
-bool Wavefunction::has_two_rdm_spin_dependent_ab() const {
-  return _container->has_two_rdm_spin_dependent_ab();
 }
 
 bool Wavefunction::has_two_rdm_spin_traced() const {

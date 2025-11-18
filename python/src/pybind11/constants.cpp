@@ -41,14 +41,14 @@ in use, ensuring accurate provenance information.
 
 Examples
 --------
->>> from qdk.chemistry.constants import ANGSTROM_TO_BOHR, HARTREE_TO_EV
+>>> from qdk_chemistry.constants import ANGSTROM_TO_BOHR, HARTREE_TO_EV
 >>> length_angstrom = 1.5
 >>> length_bohr = length_angstrom * ANGSTROM_TO_BOHR
 >>> energy_hartree = -0.5
 >>> energy_ev = energy_hartree * HARTREE_TO_EV
 
 >>> # Access documentation for constants (reflects current CODATA version)
->>> from qdk.chemistry.constants import get_constant_info
+>>> from qdk_chemistry.constants import get_constant_info
 >>> info = get_constant_info('bohr_to_angstrom')
 >>> print(f"{info.description} ({info.symbol}): {info.value} {info.units}")
 >>> print(f"Source: {info.source}")

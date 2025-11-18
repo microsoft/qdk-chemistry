@@ -95,7 +95,7 @@ SPHINX_API_EXTRA_OPTIONS ?=
 sphinx-api:
 	@echo "** Building Sphinx API documentation..."
 	sphinx-apidoc $(SPHINX_API_OPTIONS) $(SPHINX_API_EXTRA_OPTIONS) \
-		-o $(SPHINX_API_DIR) $(PYTHON_SRC_DIR)/qdk | tee $(SPHINX_API_DEBUG) 2>&1
+		-o $(SPHINX_API_DIR) $(PYTHON_SRC_DIR)/qdk_chemistry | tee $(SPHINX_API_DEBUG) 2>&1
 	@echo "** Sphinx API documentation generated."
 	@echo "** Saved output to $(SPHINX_API_DEBUG)."
 	@echo

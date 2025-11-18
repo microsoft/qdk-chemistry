@@ -13,7 +13,7 @@ repos:
     files: *linted_files
     args: [--maxkb=500000]
   - id: check-merge-conflict
-    files: ^(?!(qatk/.*\.rst$)).*$
+    files: ^(?!(docs/.*\.rst$)).*$
   - id: check-yaml
     files: *linted_files
   - id: check-json

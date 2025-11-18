@@ -37,7 +37,7 @@ class MacisAsciSettings : public MultiConfigurationSettings {
 
     // TODO (NAB):  are these parameters documented somewhere?
     // Can we provide a pointer to that file here?
-    // https://dev.azure.com/ms-azurequantum/AzureQuantum/_workitems/edit/41318
+    // 41318
 
     // ASCI determinant control parameters
     set_default<size_t>("ntdets_max", macis_defaults.ntdets_max);

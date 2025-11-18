@@ -16,23 +16,35 @@ namespace sparsexx::spblas {
 /**
  *  @brief Generic CSR sparse matrix - dense block vector product.
  *
- *  AV = ALPHA * A * V + BETA * AV
+ *  Computes the operation AV = ALPHA * A * V + BETA * AV where A is a sparse
+ * matrix in Compressed Sparse Row (CSR) format and V, AV are dense block
+ * vectors. This generic implementation works over any semiring and supports
+ * OpenMP parallelization.
  *
- *  Generic implementation over any semiring.
+ *  The algorithm iterates over each row of the sparse matrix and computes the
+ *  matrix-vector product for each column of the block vector. The computation
+ *  is performed using the standard CSR format with row pointers, column
+ * indices, and non-zero values.
  *
- *  @tparam SpMatType Sparse matrix type s.t. is_csr_matrix_v is true
- *  @tparam ALPHAT    Type of ALPHA, must be convertible to
+ *  @tparam SpMatType Sparse matrix type that satisfies is_csr_matrix_v trait
+ *  @tparam ALPHAT    Type of ALPHA scaling factor, must be convertible to
  * SpMatType::value_type
- *  @tparam BETAT     Type of BETA, must be convertible to SpMatType::value_type
+ *  @tparam BETAT     Type of BETA scaling factor, must be convertible to
+ * SpMatType::value_type
  *
- *  @param[in]     K      Number of columns in V/AV
- *  @param[in]     ALPHA  First scaling factor
- *  @param[in]     A      Sparse matrix in CSR format
- *  @param[in]     V      Input block vector stored in column major format
- *  @param[in]     LDV    Leading dimension of V
- *  @param[in]     BETA   Second scaling factor
- *  @param[in/out] AV     Output block vector stored in column major format
- *  @param[in]     LDAV   Leading dimension of AV
+ *  @param[in]     K      Number of columns in the block vectors V and AV
+ *  @param[in]     ALPHA  Scaling factor for the matrix-vector product A*V
+ *  @param[in]     A      Input sparse matrix in CSR format
+ *  @param[in]     V      Input dense block vector stored in column-major format
+ *  @param[in]     LDV    Leading dimension of input vector V (must be >= A.n())
+ *  @param[in]     BETA   Scaling factor for the existing values in AV
+ *  @param[in,out] AV     Output dense block vector stored in column-major
+ * format
+ *  @param[in]     LDAV   Leading dimension of output vector AV (must be >=
+ * A.m())
+ *
+ *  @note This function uses OpenMP parallelization when available.
+ *  @note The matrix indexing (0-based or 1-based) is automatically handled.
  */
 template <typename SpMatType, typename ALPHAT, typename BETAT>
 std::enable_if_t<detail::spmbv_uses_generic_csr_v<SpMatType, ALPHAT, BETAT> >
@@ -75,23 +87,38 @@ gespmbv(int64_t K, ALPHAT ALPHA, const SpMatType& A,
 /**
  *  @brief Generic COO sparse matrix - dense block vector product.
  *
- *  AV = ALPHA * A * V + BETA * AV
+ *  Computes the operation AV = ALPHA * A * V + BETA * AV where A is a sparse
+ *  matrix in Coordinate (COO) format and V, AV are dense block vectors. This
+ *  generic implementation works over any semiring and supports OpenMP
+ *  parallelization.
  *
- *  Generic implementation over any semiring.
+ *  The algorithm first prescales the output vector AV by BETA, then iterates
+ *  through all non-zero elements of the sparse matrix to accumulate the
+ *  matrix-vector product. Unlike CSR format, COO format stores each non-zero
+ *  element with its explicit row and column indices.
  *
- *  @tparam SpMatType Sparse matrix type s.t. is_csr_matrix_v is true
- *  @tparam ALPHAT    Type of ALPHA, must be convertible to
- * SpMatType::value_type
- *  @tparam BETAT     Type of BETA, must be convertible to SpMatType::value_type
+ *  @tparam SpMatType Sparse matrix type that satisfies is_coo_matrix_v trait
+ *  @tparam ALPHAT    Type of ALPHA scaling factor, must be convertible to
+ *  SpMatType::value_type
+ *  @tparam BETAT     Type of BETA scaling factor, must be convertible to
+ *  SpMatType::value_type
  *
- *  @param[in]     K      Number of columns in V/AV
- *  @param[in]     ALPHA  First scaling factor
- *  @param[in]     A      Sparse matrix in COO format
- *  @param[in]     V      Input block vector stored in column major format
- *  @param[in]     LDV    Leading dimension of V
- *  @param[in]     BETA   Second scaling factor
- *  @param[in/out] AV     Output block vector stored in column major format
- *  @param[in]     LDAV   Leading dimension of AV
+ *  @param[in]     K      Number of columns in the block vectors V and AV
+ *  @param[in]     ALPHA  Scaling factor for the matrix-vector product A*V
+ *  @param[in]     A      Input sparse matrix in COO format
+ *  @param[in]     V      Input dense block vector stored in column-major format
+ *  @param[in]     LDV    Leading dimension of input vector V (must be >= A.n())
+ *  @param[in]     BETA   Scaling factor for the existing values in AV
+ *  @param[in,out] AV     Output dense block vector stored in column-major
+ * format
+ *  @param[in]     LDAV   Leading dimension of output vector AV (must be >=
+ * A.m())
+ *
+ *  @note This function uses OpenMP parallelization for the prescaling step when
+ * available.
+ *  @note The matrix indexing (0-based or 1-based) is automatically handled.
+ *  @note COO format may have worse cache performance compared to CSR for SpMV
+ * operations.
  */
 template <typename SpMatType, typename ALPHAT, typename BETAT>
 std::enable_if_t<detail::spmbv_uses_generic_coo_v<SpMatType, ALPHAT, BETAT> >
@@ -126,51 +153,5 @@ gespmbv(int64_t K, ALPHAT ALPHA, const SpMatType& A,
       AV[i + k * LDAV] += alpha * Anz[inz] * V[j + k * LDV];
     }
 }
-
-#if SPARSEXX_ENABLE_MKL
-/**
- *  @brief Optimized sparse matrix - dense block vector product.
- *
- *  AV = ALPHA * A * V + BETA * AV
- *
- *  Optimized MKL implementation over any semiring and any MKL supported
- *  sparse matrix format.
- *
- *  @tparam SpMatType Sparse matrix type s.t. is_mkl_matrix_v is true
- *  @tparam ALPHAT    Type of ALPHA, must be convertible to
- * SpMatType::value_type
- *  @tparam BETAT     Type of BETA, must be convertible to SpMatType::value_type
- *
- *  @param[in]     K      Number of columns in V/AV
- *  @param[in]     ALPHA  First scaling factor
- *  @param[in]     A      Sparse matrix stored in any MKL compatible format
- *  @param[in]     V      Input block vector stored in column major format
- *  @param[in]     LDV    Leading dimension of V
- *  @param[in]     BETA   Second scaling factor
- *  @param[in/out] AV     Output block vector stored in column major format
- *  @param[in]     LDAV   Leading dimension of AV
- */
-template <typename SpMatType, typename ALPHAT, typename BETAT>
-std::enable_if_t<detail::spmbv_uses_mkl_v<SpMatType, ALPHAT, BETAT> > gespmbv(
-    int64_t K, ALPHAT ALPHA, const SpMatType& A,
-    const typename SpMatType::value_type* V, int64_t LDV, BETAT BETA,
-    typename SpMatType::value_type* AV, int64_t LDAV) {
-  sparse_status_t stat;
-
-  using value_type = typename SpMatType::value_type;
-  static_assert(std::is_same_v<value_type, double>,
-                "MKL SPMBV is only implemented for double precision");
-
-  value_type alpha = ALPHA;
-  value_type beta = BETA;
-
-  stat = mkl_sparse_d_mm(SPARSE_OPERATION_NON_TRANSPOSE, alpha, A.handle(),
-                         A.descr(), SPARSE_LAYOUT_COLUMN_MAJOR, V, K, LDV, beta,
-                         AV, LDAV);
-
-  if (stat != SPARSE_STATUS_SUCCESS)
-    throw sparsexx::detail::mkl::mkl_sparse_exception(stat);
-}
-#endif /* SPARSEXX_ENABLE_MKL */
 
 }  // namespace sparsexx::spblas

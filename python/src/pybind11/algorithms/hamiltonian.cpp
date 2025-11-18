@@ -56,8 +56,8 @@ void bind_hamiltonian_constructor(py::module &m) {
     --------
     To create a custom Hamiltonian constructor, inherit from this class:
 
-    >>> import qdk.chemistry.algorithms as alg
-    >>> import qdk.chemistry.data as data
+    >>> import qdk_chemistry.algorithms as alg
+    >>> import qdk_chemistry.data as data
     >>> class MyHamiltonianConstructor(alg.HamiltonianConstructor):
     ...     def __init__(self):
     ...         super().__init__()  # Call the base class constructor
@@ -91,12 +91,12 @@ void bind_hamiltonian_constructor(py::module &m) {
 
         Parameters
         ----------
-        orbitals : qdk.chemistry.data.Orbitals
+        orbitals : qdk_chemistry.data.Orbitals
             The orbital data to construct the Hamiltonian from
 
         Returns
         -------
-        qdk.chemistry.data.Hamiltonian
+        qdk_chemistry.data.Hamiltonian
             The constructed Hamiltonian matrix
 
         Raises
@@ -112,7 +112,7 @@ void bind_hamiltonian_constructor(py::module &m) {
 
         Returns
         -------
-        qdk.chemistry.data.Settings
+        qdk_chemistry.data.Settings
             Reference to the settings object for configuring the constructor
         )",
                               py::return_value_policy::reference_internal);
@@ -139,7 +139,7 @@ void bind_hamiltonian_constructor(py::module &m) {
         >>> class MyConstructor(alg.HamiltonianConstructor):
         ...     def __init__(self):
         ...         super().__init__()
-        ...         from qdk.chemistry.data import ElectronicStructureSettings
+        ...         from qdk_chemistry.data import ElectronicStructureSettings
         ...         self._settings = ElectronicStructureSettings()
         )");
 
@@ -161,6 +161,6 @@ void bind_hamiltonian_constructor(py::module &m) {
       m, "HamiltonianConstructorFactory");
 
   hamiltonian_constructor.def("__repr__", [](const HamiltonianConstructor &) {
-    return "<qdk.chemistry.algorithms.HamiltonianConstructor>";
+    return "<qdk_chemistry.algorithms.HamiltonianConstructor>";
   });
 }

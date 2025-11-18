@@ -47,7 +47,7 @@ class Orbitals : public DataClass,
    * @param basis_set The basis set as shared pointer
    * @param indices Orbital indices (shared for alpha/beta)
    * @todo TODO (NAB):  need to clarify the purpose/scope of these indices
-   * https://dev.azure.com/ms-azurequantum/AzureQuantum/_workitems/edit/41469
+   * 41469
    */
   Orbitals(const Eigen::MatrixXd& coefficients,
            const std::optional<Eigen::VectorXd>& energies,
@@ -66,7 +66,7 @@ class Orbitals : public DataClass,
    * @param basis_set The basis set as shared pointer
    * @param indices Orbital indices (shared for alpha/beta)
    * @todo TODO (NAB):  need to clarify the purpose/scope of these indices
-   * https://dev.azure.com/ms-azurequantum/AzureQuantum/_workitems/edit/41469
+   * 41469
    */
   Orbitals(const Eigen::MatrixXd& coefficients_alpha,
            const Eigen::MatrixXd& coefficients_beta,
@@ -548,7 +548,7 @@ class ModelOrbitals : public Orbitals {
    * @param basis_size Number of basis functions (and molecular orbitals)
    * @param indices Orbital indices (shared for alpha/beta)
    * @todo TODO (NAB):  need to clarify the purpose/scope of these indices
-   * https://dev.azure.com/ms-azurequantum/AzureQuantum/_workitems/edit/41469
+   * 41469
    */
   ModelOrbitals(
       size_t basis_size,
@@ -559,7 +559,7 @@ class ModelOrbitals : public Orbitals {
    * @param basis_size Number of basis functions (and molecular orbitals)
    * @param indices Orbital indices (shared for alpha/beta)
    * @todo TODO (NAB):  need to clarify the purpose/scope of these indices
-   * https://dev.azure.com/ms-azurequantum/AzureQuantum/_workitems/edit/41469
+   * 41469
    */
   ModelOrbitals(
       size_t basis_size,

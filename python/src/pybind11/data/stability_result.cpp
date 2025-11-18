@@ -81,7 +81,7 @@ void bind_stability_result(py::module &m) {
     --------
     Create a stability result:
 
-    >>> import qdk.chemistry.data as data
+    >>> import qdk_chemistry.data as data
     >>> import numpy as np
     >>> internal_eigenvals = np.array([1.0, 2.0, 3.0])
     >>> external_eigenvals = np.array([0.5, 1.5])
@@ -133,7 +133,7 @@ void bind_stability_result(py::module &m) {
         Examples
         --------
         >>> import numpy as np
-        >>> from qdk.chemistry.data import StabilityResult
+        >>> from qdk_chemistry.data import StabilityResult
         >>> internal_eigenvals = np.array([1.0, 2.0, 3.0])
         >>> external_eigenvals = np.array([0.5, 1.5])
         >>> internal_eigenvecs = np.eye(3)

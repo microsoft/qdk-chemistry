@@ -58,8 +58,8 @@ void bind_cc(py::module &m) {
     --------
     To create a custom coupled cluster calculator, inherit from this class:
 
-    >>> import qdk.chemistry.algorithms as alg
-    >>> import qdk.chemistry.data as data
+    >>> import qdk_chemistry.algorithms as alg
+    >>> import qdk_chemistry.data as data
     >>> class MyCCCalculator(alg.CoupledClusterCalculator):
     ...     def __init__(self):
     ...         super().__init__()  # Call the base class constructor
@@ -90,12 +90,12 @@ void bind_cc(py::module &m) {
 
         Parameters
         ----------
-        ansatz : qdk.chemistry.data.Ansatz
+        ansatz : qdk_chemistry.data.Ansatz
             The ``Ansatz`` (``Wavefunction`` and ``Hamiltonian``) describing the quantum system
 
         Returns
         -------
-        tuple[float, qdk.chemistry.data.CoupledClusterAmplitudes]
+        tuple[float, qdk_chemistry.data.CoupledClusterAmplitudes]
             A tuple containing the computed energy and coupled cluster amplitudes
 
         Raises
@@ -111,7 +111,7 @@ void bind_cc(py::module &m) {
 
         Returns
         -------
-        qdk.chemistry.data.Settings
+        qdk_chemistry.data.Settings
             Reference to the settings object for configuring the calculator
         )",
                     py::return_value_policy::reference_internal);
@@ -138,7 +138,7 @@ void bind_cc(py::module &m) {
         >>> class MyCCCalculator(alg.CoupledClusterCalculator):
         ...     def __init__(self):
         ...         super().__init__()
-        ...         from qdk.chemistry.data import ElectronicStructureSettings
+        ...         from qdk_chemistry.data import ElectronicStructureSettings
         ...         self._settings = ElectronicStructureSettings()
         )");
 
@@ -159,6 +159,6 @@ void bind_cc(py::module &m) {
       CoupledClusterCalculatorBase>(m, "CoupledClusterCalculatorFactory");
 
   cc_calculator.def("__repr__", [](const CoupledClusterCalculator &) {
-    return "<qdk.chemistry.algorithms.CoupledClusterCalculator>";
+    return "<qdk_chemistry.algorithms.CoupledClusterCalculator>";
   });
 }

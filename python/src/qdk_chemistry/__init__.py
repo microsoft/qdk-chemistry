@@ -92,8 +92,8 @@ def _update_stub_references(stub_file: Path) -> None:
     """Update references in stub files from _core to public API paths.
 
     Replaces:
-    - _core.data -> qdk.chemistry.data
-    - _core._algorithms -> qdk.chemistry.algorithms
+    - _core.data -> qdk_chemistry.data
+    - _core._algorithms -> qdk_chemistry.algorithms
 
     Also adds necessary imports if they don't exist.
     """
@@ -105,12 +105,12 @@ def _update_stub_references(stub_file: Path) -> None:
 
         # Replace _core.data references
         if "_core.data" in content:
-            content = content.replace("_core.data", "qdk.chemistry.data")
+            content = content.replace("_core.data", "qdk_chemistry.data")
             needs_data_import = True
 
         # Replace _core._algorithms references
         if "_core._algorithms" in content:
-            content = content.replace("_core._algorithms", "qdk.chemistry.algorithms")
+            content = content.replace("_core._algorithms", "qdk_chemistry.algorithms")
             needs_algorithms_import = True
 
         # Only update if changes were made
@@ -126,9 +126,9 @@ def _update_stub_references(stub_file: Path) -> None:
                 stripped = line.strip()
                 if stripped.startswith(("import ", "from ")):
                     import_section_end = i + 1
-                    if "qdk.chemistry.data" in line:
+                    if "qdk_chemistry.data" in line:
                         has_data_import = True
-                    if "qdk.chemistry.algorithms" in line:
+                    if "qdk_chemistry.algorithms" in line:
                         has_algorithms_import = True
                 elif stripped and not stripped.startswith("#"):
                     # Found non-import, non-comment line
@@ -137,9 +137,9 @@ def _update_stub_references(stub_file: Path) -> None:
             # Add missing imports
             new_imports = []
             if needs_data_import and not has_data_import:
-                new_imports.append("import qdk.chemistry.data")
+                new_imports.append("import qdk_chemistry.data")
             if needs_algorithms_import and not has_algorithms_import:
-                new_imports.append("import qdk.chemistry.algorithms")
+                new_imports.append("import qdk_chemistry.algorithms")
 
             if new_imports:
                 # Insert imports at the end of the import section
@@ -210,7 +210,7 @@ def _generate_stubs_on_first_import() -> None:
             pass  # pybind11-stubgen not available, skip
 
     # Generate registry overloads (deferred until algorithms module is imported)
-    # This is done in qdk.chemistry.algorithms.__init__.py to avoid circular imports
+    # This is done in qdk_chemistry.algorithms.__init__.py to avoid circular imports
 
 
 def _generate_registry_stubs() -> None:

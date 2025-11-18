@@ -40,7 +40,7 @@ void bind_configuration(pybind11::module &data) {
 
         Examples
         --------
-        >>> config = qdk.chemistry.Configuration()
+        >>> config = qdk_chemistry.Configuration()
         )");
 
   configuration.def(py::init<const std::string &>(),
@@ -58,7 +58,7 @@ void bind_configuration(pybind11::module &data) {
 
         Examples
         --------
-        >>> config = qdk.chemistry.Configuration("3322110")  # 7 orbitals with different occupations
+        >>> config = qdk_chemistry.Configuration("3322110")  # 7 orbitals with different occupations
         )",
                     py::arg("str"));
 
@@ -78,7 +78,7 @@ void bind_configuration(pybind11::module &data) {
 
         Examples
         --------
-        >>> config = qdk.chemistry.Configuration("3322110")
+        >>> config = qdk_chemistry.Configuration("3322110")
         >>> print(config.to_string())
         3322110
         )");
@@ -95,7 +95,7 @@ void bind_configuration(pybind11::module &data) {
 
         Examples
         --------
-        >>> config = qdk.chemistry.Configuration("3322110")
+        >>> config = qdk_chemistry.Configuration("3322110")
         >>> n_alpha, n_beta = config.get_n_electrons()
         >>> print(f"Alpha electrons: {n_alpha}, Beta electrons: {n_beta}")
         )");
@@ -116,8 +116,8 @@ void bind_configuration(pybind11::module &data) {
 
         Examples
         --------
-        >>> config1 = qdk.chemistry.Configuration("3322110")
-        >>> config2 = qdk.chemistry.Configuration("3322110")
+        >>> config1 = qdk_chemistry.Configuration("3322110")
+        >>> config2 = qdk_chemistry.Configuration("3322110")
         >>> print(config1 == config2)
         True
         )",
@@ -139,8 +139,8 @@ void bind_configuration(pybind11::module &data) {
 
         Examples
         --------
-        >>> config1 = qdk.chemistry.Configuration("3322110")
-        >>> config2 = qdk.chemistry.Configuration("3322111")
+        >>> config1 = qdk_chemistry.Configuration("3322110")
+        >>> config2 = qdk_chemistry.Configuration("3322111")
         >>> print(config1 != config2)
         True
         )",
@@ -187,7 +187,7 @@ void bind_configuration(pybind11::module &data) {
 
         Examples
         --------
-        >>> config = qdk.chemistry.Configuration.canonical_hf_configuration(3, 2, 5)
+        >>> config = qdk_chemistry.Configuration.canonical_hf_configuration(3, 2, 5)
         >>> print(config.to_string())
         22u00
         )",
@@ -196,7 +196,7 @@ void bind_configuration(pybind11::module &data) {
   configuration.def(
       "__repr__",
       [](const Configuration &c) {
-        return "<qdk.chemistry.Configuration '" + c.to_string() + "'>";
+        return "<qdk_chemistry.Configuration '" + c.to_string() + "'>";
       },
       R"(
         Returns a string representation of the Configuration.

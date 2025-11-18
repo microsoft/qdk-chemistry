@@ -2,6 +2,7 @@
  * MACIS Copyright (c) 2023, The Regents of the University of California,
  * through Lawrence Berkeley National Laboratory (subject to receipt of
  * any required approvals from the U.S. Dept. of Energy). All rights reserved.
+ * Portions Copyright (c) Microsoft Corporation.
  *
  * See LICENSE.txt for details
  */
@@ -21,14 +22,6 @@ TEST_CASE("Slater Det Operations") {
       auto hf = wfn_traits::canonical_hf_determinant(4, 2);
       REQUIRE(hf == 0x0003000F);
     }
-
-#if 0
-    SECTION("Unordered") {
-      std::vector<double> orb_energies = {3, 2, 7, 8, 5};
-      auto hf = macis::canonical_hf_determinant<32>(3, 2, orb_energies);
-      REQUIRE(hf == 0x00030013);
-    }
-#endif
   }
 
   SECTION("Occupied / Unoccupied Conversion") {
@@ -46,7 +39,7 @@ TEST_CASE("Slater Det Operations") {
       REQUIRE_THAT(vir, Catch::Matchers::Equals(ref_vir));
     }
 
-    SECTION("With Orbs") {}  // TODO: Check bitset_to_occ_vir_as
+    SECTION("With Orbs") {}
   }
 
   SECTION("Singles") {

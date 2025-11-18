@@ -112,23 +112,23 @@ class SlaterDeterminantContainer : public WavefunctionContainer {
    * @brief Get spin-dependent one-particle RDMs for active orbitals only
    */
   std::tuple<const MatrixVariant&, const MatrixVariant&>
-  get_one_rdm_spin_dependent() const override;
+  get_active_one_rdm_spin_dependent() const override;
 
   /**
    * @brief Get spin-dependent two-particle RDMs for active orbitals only
    */
   std::tuple<const VectorVariant&, const VectorVariant&, const VectorVariant&>
-  get_two_rdm_spin_dependent() const override;
+  get_active_two_rdm_spin_dependent() const override;
 
   /**
    * @brief Get spin-traced one-particle RDM for active orbitals only
    */
-  const MatrixVariant& get_one_rdm_spin_traced() const override;
+  const MatrixVariant& get_active_one_rdm_spin_traced() const override;
 
   /**
    * @brief Get spin-traced two-particle RDM for active orbitals only
    */
-  const VectorVariant& get_two_rdm_spin_traced() const override;
+  const VectorVariant& get_active_two_rdm_spin_traced() const override;
 
   /**
    * @brief Calculate single orbital entropies for active orbitals only
@@ -182,13 +182,6 @@ class SlaterDeterminantContainer : public WavefunctionContainer {
    * @return True if available
    */
   bool has_two_rdm_spin_dependent() const override;
-
-  /**
-   * @brief Check if alpha-beta two-particle RDM for active orbitals is
-   * available
-   * @return True if available
-   */
-  bool has_two_rdm_spin_dependent_ab() const override;
 
   /**
    * @brief Check if spin-traced two-particle RDM for active orbitals is

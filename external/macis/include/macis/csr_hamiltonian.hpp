@@ -2,6 +2,7 @@
  * MACIS Copyright (c) 2023, The Regents of the University of California,
  * through Lawrence Berkeley National Laboratory (subject to receipt of
  * any required approvals from the U.S. Dept. of Energy). All rights reserved.
+ * Portions Copyright (c) Microsoft Corporation.
  *
  * See LICENSE.txt for details
  */
@@ -18,7 +19,25 @@
 #include <sparsexx/matrix_types/csr_matrix.hpp>
 namespace macis {
 
-// Base implementation of CSR hamiltonian generation
+/**
+ *  @brief Base implementation of CSR Hamiltonian generation for a block
+ *
+ *  Generates a Compressed Sparse Row (CSR) matrix representation of a
+ *  Hamiltonian block between specified bra and ket wavefunction ranges.
+ *  Returns an empty matrix if either range is empty.
+ *
+ *  @tparam index_t Integer type for matrix indices
+ *  @tparam WfnType Type of the wavefunction determinants
+ *  @tparam WfnIterator Iterator type for wavefunction containers
+ *
+ *  @param[in] bra_begin Iterator to the beginning of bra determinants
+ *  @param[in] bra_end Iterator to the end of bra determinants
+ *  @param[in] ket_begin Iterator to the beginning of ket determinants
+ *  @param[in] ket_end Iterator to the end of ket determinants
+ *  @param[in] ham_gen Hamiltonian generator object
+ *  @param[in] H_thresh Threshold for matrix element inclusion
+ *  @returns CSR matrix representation of the Hamiltonian block
+ */
 template <typename index_t, typename WfnType, typename WfnIterator>
 sparsexx::csr_matrix<double, index_t> make_csr_hamiltonian_block(
     WfnIterator bra_begin, WfnIterator bra_end, WfnIterator ket_begin,
@@ -35,6 +54,23 @@ sparsexx::csr_matrix<double, index_t> make_csr_hamiltonian_block(
   }
 }
 
+/**
+ *  @brief Generate CSR Hamiltonian matrix for a set of determinants
+ *
+ *  Creates a full Compressed Sparse Row (CSR) matrix representation of
+ *  the Hamiltonian for a given set of wavefunction determinants. This is
+ *  a convenience wrapper around make_csr_hamiltonian_block for square matrices.
+ *
+ *  @tparam index_t Integer type for matrix indices
+ *  @tparam WfnType Type of the wavefunction determinants
+ *  @tparam WfnIterator Iterator type for wavefunction containers
+ *
+ *  @param[in] sd_begin Iterator to the beginning of determinants
+ *  @param[in] sd_end Iterator to the end of determinants
+ *  @param[in] ham_gen Hamiltonian generator object
+ *  @param[in] H_thresh Threshold for matrix element inclusion
+ *  @returns CSR matrix representation of the full Hamiltonian
+ */
 template <typename index_t, typename WfnType, typename WfnIterator>
 sparsexx::csr_matrix<double, index_t> make_csr_hamiltonian(
     WfnIterator sd_begin, WfnIterator sd_end,
@@ -44,7 +80,25 @@ sparsexx::csr_matrix<double, index_t> make_csr_hamiltonian(
 }
 
 #ifdef MACIS_ENABLE_MPI
-// Base implementation of dist-CSR H construction for bitsets
+/**
+ *  @brief Generate distributed CSR Hamiltonian matrix
+ *
+ *  Creates a distributed Compressed Sparse Row (CSR) matrix representation
+ *  of the Hamiltonian using MPI for parallel computation. The matrix is
+ *  distributed across MPI ranks with each rank handling a subset of rows.
+ *  Constructs both diagonal and off-diagonal tiles separately for efficiency.
+ *
+ *  @tparam index_t Integer type for matrix indices
+ *  @tparam WfnType Type of the wavefunction determinants
+ *  @tparam WfnIterator Iterator type for wavefunction containers
+ *
+ *  @param[in] comm MPI communicator for distributed computation
+ *  @param[in] sd_begin Iterator to the beginning of determinants
+ *  @param[in] sd_end Iterator to the end of determinants
+ *  @param[in] ham_gen Hamiltonian generator object
+ *  @param[in] H_thresh Threshold for matrix element inclusion
+ *  @returns Distributed CSR matrix representation of the Hamiltonian
+ */
 template <typename index_t, typename WfnType, typename WfnIterator>
 sparsexx::dist_sparse_matrix<sparsexx::csr_matrix<double, index_t>>
 make_dist_csr_hamiltonian(MPI_Comm comm, WfnIterator sd_begin,

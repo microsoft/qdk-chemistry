@@ -2,6 +2,7 @@
  * MACIS Copyright (c) 2023, The Regents of the University of California,
  * through Lawrence Berkeley National Laboratory (subject to receipt of
  * any required approvals from the U.S. Dept. of Energy). All rights reserved.
+ * Portions Copyright (c) Microsoft Corporation.
  *
  * See LICENSE.txt for details
  */
@@ -210,20 +211,6 @@ TEST_CASE("Bitset Operations") {
     SECTION("128") { indices_test<128>(); }
     SECTION("256") { indices_test<256>(); }
   }
-
-#if 0
-  SECTION("Truncate") {
-    bs<64> a_64(0xCCCCCCCCDEADDEAD);
-    bs<32> ref(0xDEADDEAD);
-    REQUIRE(macis::truncate_bitset<32>(a_64) == ref);
-  }
-
-  SECTION("Expand") {
-    bs<32> a_32(0xDEADDEAD);
-    bs<64> ref(0x00000000DEADDEAD);
-    REQUIRE(macis::expand_bitset<64>(a_32) == ref);
-  }
-#endif
 
   SECTION("LO WORDS") {
     SECTION("64") { lo_word_test<64>(); }

@@ -164,7 +164,7 @@ def run_iterative_exact_qpe(
 
 
 # ------------------------------------------------------------------
-# QATK calculation for H₂ (0.76 Å, STO-3G)
+# qdk-chemistry calculation for H₂ (0.76 Å, STO-3G)
 # ------------------------------------------------------------------
 structure = Structure(
     np.array([[0.0, 0.0, -0.72], [0.0, 0.0, 0.72]], dtype=float),
@@ -192,7 +192,7 @@ casci_energy, casci_wavefunction = mc_calculator.run(active_hamiltonian, n_alpha
 
 core_energy = active_hamiltonian.get_core_energy()
 
-print("=== Generating QATK artifacts for H2 (0.76 Å, STO-3G) ===")
+print("=== Generating qdk-chemistry artifacts for H2 (0.76 Å, STO-3G) ===")
 print(f"  SCF total energy:   {scf_energy: .8f} Hartree")
 print(f"  CASCI total energy: {casci_energy: .8f} Hartree")
 

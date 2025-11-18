@@ -15,7 +15,7 @@ namespace qdk::chemistry::data {
  *
  * TODO: this class will undergo API changes as it is currently not suited
  * for the use with unrestricted orbitals. It assumes aufbau occupations.
- * https://dev.azure.com/ms-azurequantum/AzureQuantum/_workitems/edit/41285/
+ * 41285/
  */
 class CoupledClusterAmplitudes
     : public DataClass,

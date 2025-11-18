@@ -19,8 +19,8 @@ sys.path.insert(
 # -----------------------------------------------------------------------------
 # Project information
 # -----------------------------------------------------------------------------
-project = "QDK/Chemistry"
-copyright = "T.B.D."
+project = "qdk-chemistry"
+copyright = "Microsoft Corporation. All rights reserved. Licensed under the MIT License"
 author = "QDK/Chemistry Team"
 release = "1.0.0-rc1"
 
@@ -46,6 +46,8 @@ extensions = [
     "sphinx.ext.napoleon",  # Support for Google-style and NumPy-style docstrings
     "sphinx.ext.todo",  # Support for listing to-dos
     "sphinx.ext.graphviz",  # Support for Graphviz diagrams
+    "sphinxcontrib.bibtex",  # Support for bibliographic references
+    "sphinx_copybutton",  # Add "copy" buttons to code blocks
 ]
 
 # -----------------------------------------------------------------------------
@@ -54,6 +56,13 @@ extensions = [
 # Configure viewcode to only show source for project modules, not dependencies
 viewcode_follow_imported_members = False
 viewcode_enable_epub = False
+
+
+# -----------------------------------------------------------------------------
+# Bibtex configuration
+# -----------------------------------------------------------------------------
+bibtex_bibfiles = ["references.bib"]
+bibtex_reference_style = "label"  # alternatives: author_year
 
 # -----------------------------------------------------------------------------
 # Autodoc settings
@@ -80,12 +89,11 @@ autodoc_docstring_signature = True  # Try to extract signatures from docstrings
 autodoc_preserve_defaults = True  # Preserve default values in function signatures
 # Configure autodoc to handle C++ extension modules and internal modules
 autodoc_mock_imports = [
-    "qdk.chemistry.libblaspp",  # These are still mocked since they're only used for implementation
-    "qdk.chemistry.liblapackpp",
-    "qdk.chemistry.libmacis",
-    "qdk.chemistry.libchemistry",
-    "qdk.chemistry.libsparsexx",
-    # "qdk.chemistry._core",  # Skip internal implementation modules to avoid duplicate docs
+    "qdk_chemistry.libblaspp",  # These are still mocked since they're only used for implementation
+    "qdk_chemistry.liblapackpp",
+    "qdk_chemistry.libmacis",
+    "qdk_chemistry.libchemistry",
+    "qdk_chemistry.libsparsexx",
 ]
 
 # -----------------------------------------------------------------------------
@@ -136,7 +144,10 @@ breathe_default_members = (
 # Theme settings - using ReadTheDocs theme
 html_theme = "sphinx_rtd_theme"  # Use the ReadTheDocs theme for styling
 templates_path = ["_templates"]  # Path to custom HTML templates
-html_static_path: list[str] = []  # Path to static files (CSS, JS, images)
+html_static_path: list[str] = ["_static"]  # Path to static files (CSS, JS, images)
+html_css_files = [
+    "custom.css",
+]  # Include custom CSS file for additional styling
 html_compact_lists = True  # Render lists more compactly
 # Set master doc (the main page)
 master_doc = "index"  # The name of the main documentation page
@@ -198,7 +209,7 @@ def autodoc_skip_imports(app, what, name, obj, skip, options):
 # def viewcode_find_source(app, modname):
 #     """Prevent viewcode from generating source pages for external modules."""
 #     # Only allow source pages for QDK/Chemistry modules
-#     if not modname.startswith("qdk.chemistry"):
+#     if not modname.startswith("qdk_chemistry"):
 #         # Return None to skip source generation for this module
 #         msg = "Skipping source generation for external module: {}".format(modname)
 #         warn(msg)

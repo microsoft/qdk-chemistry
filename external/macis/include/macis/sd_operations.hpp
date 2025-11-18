@@ -2,6 +2,7 @@
  * MACIS Copyright (c) 2023, The Regents of the University of California,
  * through Lawrence Berkeley National Laboratory (subject to receipt of
  * any required approvals from the U.S. Dept. of Energy). All rights reserved.
+ * Portions Copyright (c) Microsoft Corporation.
  *
  * See LICENSE.txt for details
  */
@@ -17,90 +18,25 @@
 namespace macis {
 
 /**
- *  @brief Generate canonical HF determinant.
- *
- *  Generates a string representation of the canonical HF determinant
- *  consisting of a specifed number of alpha and beta orbitals.
- *
- *  @tparam N Number of bits for the total bit string of the state
- *  @param[in] nalpha Number of occupied alpha orbitals in the HF state
- *  @param[in] nbeta  Number of occupied beta orbitals in the HF state
- *
- *  @returns The bitstring HF state consisting of the specified number of
- *    occupied orbitals.
+ * @brief Find the first occupied orbital that is flipped in an excitation.
+ * @tparam N Size of the bitset
+ * @param[in] state The reference state bitset
+ * @param[in] ex The excitation pattern bitset
+ * @return Index of the first occupied orbital that is flipped (0-based)
  */
-// template <size_t N>
-// std::bitset<N> canonical_hf_determinant(uint32_t nalpha, uint32_t nbeta) {
-//   static_assert((N % 2) == 0, "N Must Be Even");
-//   std::bitset<N> alpha = full_mask<N>(nalpha);
-//   std::bitset<N> beta = full_mask<N>(nbeta) << (N / 2);
-//   return alpha | beta;
-// }
-
-/**
- *  @brief Generate the list of (un)occupied orbitals for a paricular state.
- *
- *  @tparam N Number of bits for the total bit string of the state
- *  @param[in]  norb   Number of orbitals used to describe the state (<= `N`)
- *  @param[in]  state  The state from which to determine orbital occupations.
- *  @param[out] occ    List of occupied orbitals in `state`
- *  @param[out] vir    List of unoccupied orbitals in `state`
- */
-// template <size_t N>
-// void bitset_to_occ_vir(size_t norb, std::bitset<N> state,
-//                        std::vector<uint32_t>& occ, std::vector<uint32_t>&
-//                        vir) {
-//   occ = bits_to_indices(state);
-//   const auto num_occupied_orbitals = occ.size();
-//   assert(num_occupied_orbitals < norb);
-//
-//   const auto num_virtual_orbitals = norb - num_occupied_orbitals;
-//   vir.resize(num_virtual_orbitals);
-//   state = ~state;
-//   for(int i = 0; i < num_virtual_orbitals; ++i) {
-//     auto a = ffs(state) - 1;
-//     vir[i] = a;
-//     state.flip(a);
-//   }
-// }
-
-// template <size_t N>
-// auto single_excitation(std::bitset<N> state, unsigned p, unsigned q) {
-//   return state.flip(p).flip(q);
-// }
-
-// template <Spin Sigma, size_t N>
-// auto single_excitation_spin(std::bitset<N> state, unsigned p, unsigned q) {
-//   static_assert(N%2 == 0, "Num Bits Must Be Even");
-//   if constexpr (Sigma == Spin::Alpha)
-//     return single_excitation(state,p,q);
-//   else
-//     return single_excitation(state,p+N/2,q+N/2);
-// }
-
-// template <size_t N>
-// auto double_excitation(std::bitset<N> state, unsigned p, unsigned q, unsigned
-// r, unsigned s) {
-//   return state.flip(p).flip(q).flip(r).flip(s);
-// }
-
-// template <Spin Sigma, size_t N>
-// auto double_excitation_spin(std::bitset<N> state, unsigned p, unsigned q,
-// unsigned r, unsigned s) {
-//   static_assert(N%2 == 0, "Num Bits Must Be Even");
-//   if constexpr (Sigma == Spin::Alpha)
-//     return double_excitation(state,p,q,r,s);
-//   else
-//     return double_excitation(state,p+N/2,q+N/2,r+N/2,s+N/2);
-// }
-
-// TODO: Test this function
 template <size_t N>
 uint32_t first_occupied_flipped(std::bitset<N> state, std::bitset<N> ex) {
   return ffs(state & ex) - 1u;
 }
 
-// TODO: Test this function
+/**
+ * @brief Calculate the sign of a single excitation.
+ * @tparam N Size of the bitset
+ * @param[in] state The reference state bitset
+ * @param[in] p First orbital index
+ * @param[in] q Second orbital index
+ * @return Sign factor (+1.0 or -1.0) for the single excitation
+ */
 template <size_t N>
 double single_excitation_sign(std::bitset<N> state, unsigned p, unsigned q) {
   std::bitset<N> mask = 0ul;
@@ -113,6 +49,16 @@ double single_excitation_sign(std::bitset<N> state, unsigned p, unsigned q) {
   return (mask.count() % 2) ? -1. : 1.;
 }
 
+/**
+ * @brief Generate all single excitations from a reference state and append to
+ * container.
+ * @tparam WfnType Type of the wavefunction state
+ * @tparam WfnContainer Container type for storing excitations
+ * @param[in] state The reference state
+ * @param[in] occ Vector of occupied orbital indices
+ * @param[in] vir Vector of virtual orbital indices
+ * @param[out] singles Container to store generated single excitations
+ */
 template <typename WfnType, typename WfnContainer>
 void append_singles(WfnType state, const std::vector<uint32_t>& occ,
                     const std::vector<uint32_t>& vir, WfnContainer& singles) {
@@ -130,6 +76,16 @@ void append_singles(WfnType state, const std::vector<uint32_t>& occ,
     }
 }
 
+/**
+ * @brief Generate all double excitations from a reference state and append to
+ * container.
+ * @tparam WfnType Type of the wavefunction state
+ * @tparam WfnContainer Container type for storing excitations
+ * @param[in] state The reference state
+ * @param[in] occ Vector of occupied orbital indices
+ * @param[in] vir Vector of virtual orbital indices
+ * @param[out] doubles Container to store generated double excitations
+ */
 template <typename WfnType, typename WfnContainer>
 void append_doubles(WfnType state, const std::vector<uint32_t>& occ,
                     const std::vector<uint32_t>& vir, WfnContainer& doubles) {
@@ -151,6 +107,14 @@ void append_doubles(WfnType state, const std::vector<uint32_t>& occ,
         }
 }
 
+/**
+ * @brief Generate all single excitations from a reference state.
+ * @tparam WfnType Type of the wavefunction state
+ * @tparam WfnContainer Container type for storing excitations
+ * @param[in] norb Total number of orbitals
+ * @param[in] state The reference state
+ * @param[out] singles Container to store generated single excitations
+ */
 template <typename WfnType, typename WfnContainer>
 void generate_singles(size_t norb, WfnType state, WfnContainer& singles) {
   using wfn_traits = wavefunction_traits<WfnType>;
@@ -161,6 +125,14 @@ void generate_singles(size_t norb, WfnType state, WfnContainer& singles) {
   append_singles(state, occ_orbs, vir_orbs, singles);
 }
 
+/**
+ * @brief Generate all double excitations from a reference state.
+ * @tparam WfnType Type of the wavefunction state
+ * @tparam WfnContainer Container type for storing excitations
+ * @param[in] norb Total number of orbitals
+ * @param[in] state The reference state
+ * @param[out] doubles Container to store generated double excitations
+ */
 template <typename WfnType, typename WfnContainer>
 void generate_doubles(size_t norb, WfnType state, WfnContainer& doubles) {
   using wfn_traits = wavefunction_traits<WfnType>;
@@ -171,6 +143,15 @@ void generate_doubles(size_t norb, WfnType state, WfnContainer& doubles) {
   append_doubles(state, occ_orbs, vir_orbs, doubles);
 }
 
+/**
+ * @brief Generate all single and double excitations from a reference state.
+ * @tparam WfnType Type of the wavefunction state
+ * @tparam WfnContainer Container type for storing excitations
+ * @param[in] norb Total number of orbitals
+ * @param[in] state The reference state
+ * @param[out] singles Container to store generated single excitations
+ * @param[out] doubles Container to store generated double excitations
+ */
 template <typename WfnType, typename WfnContainer>
 void generate_singles_doubles(size_t norb, WfnType state, WfnContainer& singles,
                               WfnContainer& doubles) {
@@ -184,6 +165,14 @@ void generate_singles_doubles(size_t norb, WfnType state, WfnContainer& singles,
   append_doubles(state, occ_orbs, vir_orbs, doubles);
 }
 
+/**
+ * @brief Generate all single excitations with explicit spin handling.
+ * @tparam WfnType Type of the wavefunction state
+ * @tparam WfnContainer Container type for storing excitations
+ * @param[in] norb Total number of orbitals
+ * @param[in] state The reference state
+ * @param[out] singles Container to store generated single excitations
+ */
 template <typename WfnType, typename WfnContainer>
 void generate_singles_spin(size_t norb, WfnType state, WfnContainer& singles) {
   using wfn_traits = wavefunction_traits<WfnType>;
@@ -212,6 +201,16 @@ void generate_singles_spin(size_t norb, WfnType state, WfnContainer& singles) {
   }
 }
 
+/**
+ * @brief Generate all single and double excitations with explicit spin
+ * handling.
+ * @tparam WfnType Type of the wavefunction state
+ * @tparam WfnContainer Container type for storing excitations
+ * @param[in] norb Total number of orbitals
+ * @param[in] state The reference state
+ * @param[out] singles Container to store generated single excitations
+ * @param[out] doubles Container to store generated double excitations
+ */
 template <typename WfnType, typename WfnContainer>
 void generate_singles_doubles_spin(size_t norb, WfnType state,
                                    WfnContainer& singles,
@@ -262,6 +261,15 @@ void generate_singles_doubles_spin(size_t norb, WfnType state,
     }
 }
 
+/**
+ * @brief Generate CISD (Configuration Interaction Singles and Doubles) Hilbert
+ * space.
+ * @tparam WfnType Type of the wavefunction state
+ * @tparam WfnContainer Container type for storing determinants
+ * @param[in] norb Total number of orbitals
+ * @param[in] state The reference state
+ * @param[out] dets Container to store all determinants in the CISD space
+ */
 template <typename WfnType, typename WfnContainer>
 void generate_cisd_hilbert_space(size_t norb, WfnType state,
                                  WfnContainer& dets) {
@@ -273,6 +281,13 @@ void generate_cisd_hilbert_space(size_t norb, WfnType state,
   dets.insert(dets.end(), doubles.begin(), doubles.end());
 }
 
+/**
+ * @brief Generate CISD Hilbert space and return as a vector.
+ * @tparam WfnType Type of the wavefunction state
+ * @param[in] norb Total number of orbitals
+ * @param[in] state The reference state
+ * @return Vector containing all determinants in the CISD space
+ */
 template <typename WfnType>
 auto generate_cisd_hilbert_space(size_t norb, WfnType state) {
   std::vector<WfnType> dets;
@@ -280,6 +295,13 @@ auto generate_cisd_hilbert_space(size_t norb, WfnType state) {
   return dets;
 }
 
+/**
+ * @brief Generate all combinations of setting nset bits in nbits positions.
+ * @tparam WfnType Type of the wavefunction state
+ * @param[in] nbits Total number of bits
+ * @param[in] nset Number of bits to set
+ * @return Vector of all possible combinations
+ */
 template <typename WfnType>
 std::vector<WfnType> generate_combs(uint64_t nbits, uint64_t nset) {
   using wfn_traits = wavefunction_traits<WfnType>;
@@ -300,6 +322,14 @@ std::vector<WfnType> generate_combs(uint64_t nbits, uint64_t nset) {
   return store;
 }
 
+/**
+ * @brief Generate the full Hilbert space for given orbital and electron counts.
+ * @tparam WfnType Type of the wavefunction state
+ * @param[in] norbs Total number of orbitals
+ * @param[in] nalpha Number of alpha electrons
+ * @param[in] nbeta Number of beta electrons
+ * @return Vector containing all possible determinants
+ */
 template <typename WfnType>
 std::vector<WfnType> generate_hilbert_space(size_t norbs, size_t nalpha,
                                             size_t nbeta) {
@@ -320,6 +350,14 @@ std::vector<WfnType> generate_hilbert_space(size_t norbs, size_t nalpha,
   return states;
 }
 
+/**
+ * @brief Generate CIS (Configuration Interaction Singles) Hilbert space.
+ * @tparam WfnType Type of the wavefunction state
+ * @tparam WfnContainer Container type for storing determinants
+ * @param[in] norb Total number of orbitals
+ * @param[in] state The reference state
+ * @param[out] dets Container to store all determinants in the CIS space
+ */
 template <typename WfnType, typename WfnContainer>
 void generate_cis_hilbert_space(size_t norb, WfnType state,
                                 WfnContainer& dets) {
@@ -330,6 +368,13 @@ void generate_cis_hilbert_space(size_t norb, WfnType state,
   dets.insert(dets.end(), singles.begin(), singles.end());
 }
 
+/**
+ * @brief Generate CIS Hilbert space and return as a vector.
+ * @tparam WfnType Type of the wavefunction state
+ * @param[in] norb Total number of orbitals
+ * @param[in] state The reference state
+ * @return Vector containing all determinants in the CIS space
+ */
 template <typename WfnType>
 std::vector<WfnType> generate_cis_hilbert_space(size_t norb, WfnType state) {
   std::vector<WfnType> dets;
@@ -337,7 +382,15 @@ std::vector<WfnType> generate_cis_hilbert_space(size_t norb, WfnType state) {
   return dets;
 }
 
-// TODO: Test this function
+/**
+ * @brief Calculate sign and indices for a single excitation between bra and ket
+ * states.
+ * @tparam WfnType Type of the wavefunction state
+ * @param[in] bra The bra state
+ * @param[in] ket The ket state
+ * @param[in] ex The excitation pattern
+ * @return Tuple containing (occupied index, virtual index, sign)
+ */
 template <typename WfnType>
 inline auto single_excitation_sign_indices(WfnType bra, WfnType ket,
                                            WfnType ex) {
@@ -348,7 +401,15 @@ inline auto single_excitation_sign_indices(WfnType bra, WfnType ket,
   return std::make_tuple(o1, v1, sign);
 }
 
-// TODO: Test this function
+/**
+ * @brief Calculate sign and indices for a double excitation between bra and ket
+ * states.
+ * @tparam WfnType Type of the wavefunction state
+ * @param[in] bra The bra state
+ * @param[in] ket The ket state
+ * @param[in] ex The excitation pattern
+ * @return Tuple containing (occupied1, virtual1, occupied2, virtual2, sign)
+ */
 template <typename WfnType>
 inline auto doubles_sign_indices(WfnType bra, WfnType ket, WfnType ex) {
   using wfn_traits = wavefunction_traits<WfnType>;
@@ -363,13 +424,28 @@ inline auto doubles_sign_indices(WfnType bra, WfnType ket, WfnType ex) {
   return std::make_tuple(o1, v1, o2, v2, sign);
 }
 
-// TODO: Test this function
+/**
+ * @brief Calculate the sign factor for a double excitation.
+ * @tparam WfnType Type of the wavefunction state
+ * @param[in] bra The bra state
+ * @param[in] ket The ket state
+ * @param[in] ex The excitation pattern
+ * @return Sign factor for the double excitation
+ */
 template <typename WfnType>
 inline auto doubles_sign(WfnType bra, WfnType ket, WfnType ex) {
   auto [p, q, r, s, sign] = doubles_sign_indices(bra, ket, ex);
   return sign;
 }
 
+/**
+ * @brief Get unique alpha strings and their counts from a range of
+ * wavefunctions.
+ * @tparam WfnIterator Iterator type for wavefunction states
+ * @param[in] begin Iterator to the beginning of the range
+ * @param[in] end Iterator to the end of the range
+ * @return Vector of pairs containing (unique alpha string, count)
+ */
 template <typename WfnIterator>
 auto get_unique_alpha(WfnIterator begin, WfnIterator end) {
   using wfn_type = typename std::iterator_traits<WfnIterator>::value_type;
@@ -391,6 +467,13 @@ auto get_unique_alpha(WfnIterator begin, WfnIterator end) {
   return unique_alpha;
 }
 
+/**
+ * @brief Convert a wavefunction state to a canonical string representation.
+ * @tparam WfnType Type of the wavefunction state
+ * @param[in] state The wavefunction state to convert
+ * @return String representation where '2'=doubly occupied, 'u'=alpha only,
+ * 'd'=beta only, '0'=empty
+ */
 template <typename WfnType>
 std::string to_canonical_string(WfnType state) {
   using wfn_traits = wavefunction_traits<WfnType>;
@@ -414,6 +497,13 @@ std::string to_canonical_string(WfnType state) {
   return str;
 }
 
+/**
+ * @brief Convert a canonical string representation to a wavefunction state.
+ * @tparam WfnType Type of the wavefunction state
+ * @param[in] str String representation where '2'=doubly occupied, 'u'=alpha
+ * only, 'd'=beta only, '0'=empty
+ * @return The corresponding wavefunction state
+ */
 template <typename WfnType>
 WfnType from_canonical_string(std::string str) {
   using spin_wfn_type = spin_wfn_t<WfnType>;

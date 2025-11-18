@@ -13,10 +13,6 @@
 
 #include "type_fwd.hpp"
 
-#ifdef SPARSEXX_ENABLE_CEREAL
-#include <cereal/types/vector.hpp>
-#endif /* SPARSEXX_ENABLE_CEREAL */
-
 namespace sparsexx {
 
 /**
@@ -74,6 +70,26 @@ class coo_matrix {
         colind_(nnz),
         rowind_(nnz) {}
 
+  /**
+   * @brief Construct a COO matrix from existing vectors.
+   *
+   * This constructor creates a COO matrix by moving existing vectors of row
+   * indices, column indices, and non-zero values. This allows efficient
+   * construction without copying large data arrays.
+   *
+   * @param m Number of rows in the sparse matrix
+   * @param n Number of columns in the sparse matrix
+   * @param colind Vector of column indices (will be moved)
+   * @param rowind Vector of row indices (will be moved)
+   * @param nzval Vector of non-zero values (will be moved)
+   * @param indexing Indexing base (default: 1)
+   *
+   * @throws std::runtime_error if the vectors have incompatible sizes
+   *
+   * @note The nnz is automatically determined from the vector sizes
+   * @note All input vectors must have the same size
+   * @note The input vectors will be moved (emptied) after construction
+   */
   coo_matrix(size_type m, size_type n, std::vector<index_type>&& colind,
              std::vector<index_type>&& rowind, std::vector<value_type>&& nzval,
              size_type indexing = 1)
@@ -193,6 +209,21 @@ class coo_matrix {
    */
   const auto& rowind() const { return rowind_; };
 
+  /**
+   * @brief Automatically determines the indexing base from the matrix data.
+   *
+   * This function analyzes the row and column indices to determine whether the
+   * matrix uses 0-based or 1-based indexing. It sets the indexing_ member
+   * variable accordingly.
+   *
+   * @note Detection logic:
+   *       - If any index is 0, assumes 0-based indexing
+   *       - Otherwise, assumes 1-based indexing
+   *       - Checks both row and column indices
+   *
+   * @warning This function modifies the indexing_ member variable
+   * @warning Should only be called when the indexing base is unknown
+   */
   void determine_indexing_from_adj() {
     auto eq_zero = [](const auto x) { return x == 0; };
     bool zero_based = std::any_of(rowind_.begin(), rowind_.end(), eq_zero) or
@@ -203,15 +234,68 @@ class coo_matrix {
   void sort_by_row_index();
   void sort_by_col_index();
 
+  /**
+   * @brief Checks if the matrix is sorted by row indices.
+   *
+   * This function determines whether the COO matrix entries are currently
+   * sorted by row index in ascending order. This is useful for determining if
+   * the matrix is suitable for efficient CSR conversion.
+   *
+   * @return true if entries are sorted by row index, false otherwise
+   *
+   * @note Only checks row index ordering, not secondary column index ordering
+   * @note This is a simple check using std::is_sorted on the row index array
+   *
+   * @see sort_by_row_index() to sort the matrix by row indices
+   */
   bool is_sorted_by_row_index() const {
     return std::is_sorted(rowind_.begin(), rowind_.end());
   }
+
+  /**
+   * @brief Checks if the matrix is sorted by column indices.
+   *
+   * This function determines whether the COO matrix entries are currently
+   * sorted by column index in ascending order. This is useful for determining
+   * if the matrix is suitable for efficient CSC conversion.
+   *
+   * @return true if entries are sorted by column index, false otherwise
+   *
+   * @note Only checks column index ordering, not secondary row index ordering
+   * @note This is a simple check using std::is_sorted on the column index array
+   *
+   * @see sort_by_col_index() to sort the matrix by column indices
+   */
   bool is_sorted_by_col_index() const {
     return std::is_sorted(colind_.begin(), colind_.end());
   }
 
   void expand_from_triangle();
 
+  /**
+   * @brief Insert a new triplet (row, column, value) into the COO matrix.
+   *
+   * This function adds a new non-zero element to the COO matrix by appending
+   * the triplet to the internal storage arrays. The matrix size (nnz) is
+   * automatically incremented.
+   *
+   * @tparam Check Template parameter for bounds checking (currently not
+   * implemented)
+   *
+   * @param i Row index of the element to insert
+   * @param j Column index of the element to insert
+   * @param v Value of the element to insert
+   *
+   * @note The function is marked noexcept and performs no bounds checking
+   * @note The Check template parameter is not yet implemented (will trigger
+   * static_assert)
+   * @note Elements are appended in insertion order, no sorting is maintained
+   * @note nnz_ counter is automatically incremented
+   *
+   * @warning No duplicate checking is performed
+   * @warning No bounds validation against matrix dimensions is performed
+   * @warning Check template parameter must be false (implementation limitation)
+   */
   template <bool Check>
   inline void insert(index_type i, index_type j, value_type v) noexcept {
     static_assert(not Check, "insert check NYI");
@@ -220,13 +304,6 @@ class coo_matrix {
     nzval_.emplace_back(v);
     nnz_++;
   }
-
-#ifdef SPARSEXX_ENABLE_CEREAL
-  template <class Archive>
-  void serialize(Archive& ar) {
-    ar(m_, n_, nnz_, indexing_, rowind_, colind_, nzval_);
-  }
-#endif /* SPARSEXX_ENABLE_CEREAL */
 
 };  // coo_matrix
 

@@ -116,48 +116,79 @@ void SlaterDeterminantContainer::clear_caches() const {
   _determinant_vector_cache.reset();
 
   // Clear all cached RDMs
-  _one_rdm_spin_traced.reset();
-  _two_rdm_spin_traced.reset();
-  _one_rdm_spin_dependent_aa.reset();
-  _one_rdm_spin_dependent_bb.reset();
-  _two_rdm_spin_dependent_aaaa.reset();
-  _two_rdm_spin_dependent_aabb.reset();
-  _two_rdm_spin_dependent_bbbb.reset();
+  _clear_rdms();
 }
 
 std::tuple<const ContainerTypes::MatrixVariant&,
            const ContainerTypes::MatrixVariant&>
-SlaterDeterminantContainer::get_one_rdm_spin_dependent() const {
+SlaterDeterminantContainer::get_active_one_rdm_spin_dependent() const {
   // TODO: Implement RDM calculation for single determinant
   throw std::runtime_error(
-      "get_one_rdm_spin_dependent not yet implemented for "
+      "get_active_one_rdm_spin_dependent not yet implemented for "
       "SlaterDeterminantContainer");
 }
 
 std::tuple<const ContainerTypes::VectorVariant&,
            const ContainerTypes::VectorVariant&,
            const ContainerTypes::VectorVariant&>
-SlaterDeterminantContainer::get_two_rdm_spin_dependent() const {
+SlaterDeterminantContainer::get_active_two_rdm_spin_dependent() const {
   // TODO: Implement RDM calculation for single determinant
   throw std::runtime_error(
-      "get_two_rdm_spin_dependent not yet implemented for "
+      "get_active_two_rdm_spin_dependent not yet implemented for "
       "SlaterDeterminantContainer");
 }
 
 const ContainerTypes::MatrixVariant&
-SlaterDeterminantContainer::get_one_rdm_spin_traced() const {
-  // TODO: Implement RDM calculation for single determinant
-  throw std::runtime_error(
-      "get_one_rdm_spin_traced not yet implemented for "
-      "SlaterDeterminantContainer");
+SlaterDeterminantContainer::get_active_one_rdm_spin_traced() const {
+  if (!_one_rdm_spin_traced) {
+    auto [alpha_occupations, beta_occupations] =
+        get_active_orbital_occupations();
+    size_t n_orbs = _orbitals->get_active_space_indices().first.size();
+    Eigen::MatrixXd tmp_one_rdm = Eigen::MatrixXd::Zero(n_orbs, n_orbs);
+    for (size_t i = 0; i < alpha_occupations.size(); ++i) {
+      tmp_one_rdm(i, i) += alpha_occupations(i);
+    }
+    for (size_t i = 0; i < beta_occupations.size(); ++i) {
+      tmp_one_rdm(i, i) += beta_occupations(i);
+    }
+    _one_rdm_spin_traced =
+        std::make_unique<ContainerTypes::MatrixVariant>(std::move(tmp_one_rdm));
+  }
+  return *_one_rdm_spin_traced;
 }
 
 const ContainerTypes::VectorVariant&
-SlaterDeterminantContainer::get_two_rdm_spin_traced() const {
-  // TODO: Implement RDM calculation for single determinant
-  throw std::runtime_error(
-      "get_two_rdm_spin_traced not yet implemented for "
-      "SlaterDeterminantContainer");
+SlaterDeterminantContainer::get_active_two_rdm_spin_traced() const {
+  if (!_two_rdm_spin_traced) {
+    auto [alpha_occupations, beta_occupations] =
+        get_active_orbital_occupations();
+    const auto& one_rdm_var = get_active_one_rdm_spin_traced();
+    const Eigen::MatrixXd& one_rdm = std::get<Eigen::MatrixXd>(one_rdm_var);
+    size_t norbs = one_rdm.rows();
+    Eigen::VectorXd tmp_two_rdm =
+        Eigen::VectorXd::Zero(norbs * norbs * norbs * norbs);
+    size_t norb2 = norbs * norbs;
+    size_t norb3 = norbs * norb2;
+    for (size_t i = 0; i < alpha_occupations.size(); ++i) {
+      if (alpha_occupations(i) != 1.0) continue;
+      for (size_t j = 0; j < beta_occupations.size(); ++j) {
+        if (beta_occupations(j) != 1.0 || i == j) continue;
+        size_t index1 = i * norb3 + j * norb2 + j * norbs + i;
+        tmp_two_rdm(index1) = -2.0;
+        size_t index2 = j * norb3 + i * norb2 + i * norbs + j;
+        tmp_two_rdm(index2) = -2.0;
+        size_t index3 = i * norb3 + i * norb2 + j * norbs + j;
+        tmp_two_rdm(index3) = 4.0;
+        size_t index4 = j * norb3 + j * norb2 + i * norbs + i;
+        tmp_two_rdm(index4) = 4.0;
+      }
+      size_t index_diag = i * norb3 + i * norb2 + i * norbs + i;
+      tmp_two_rdm(index_diag) = 2.0;
+    }
+    _two_rdm_spin_traced =
+        std::make_unique<ContainerTypes::VectorVariant>(std::move(tmp_two_rdm));
+  }
+  return *_two_rdm_spin_traced;
 }
 
 Eigen::VectorXd SlaterDeterminantContainer::get_single_orbital_entropies()
@@ -290,11 +321,6 @@ bool SlaterDeterminantContainer::has_one_rdm_spin_traced() const {
 }
 
 bool SlaterDeterminantContainer::has_two_rdm_spin_dependent() const {
-  // Always available for Slater determinants (can be computed on-the-fly)
-  return true;
-}
-
-bool SlaterDeterminantContainer::has_two_rdm_spin_dependent_ab() const {
   // Always available for Slater determinants (can be computed on-the-fly)
   return true;
 }

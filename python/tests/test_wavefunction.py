@@ -11,11 +11,13 @@ import pickle
 import numpy as np
 import pytest
 
+import qdk_chemistry.algorithms
 from qdk_chemistry.data import (
     CasWavefunctionContainer,
     Configuration,
     Orbitals,
     SlaterDeterminantContainer,
+    Structure,
     Wavefunction,
     WavefunctionType,
 )
@@ -174,14 +176,12 @@ class TestWavefunction:
         has_1rdm_spin_dep = wf.has_one_rdm_spin_dependent()
         has_1rdm_spin_traced = wf.has_one_rdm_spin_traced()
         has_2rdm_spin_dep = wf.has_two_rdm_spin_dependent()
-        has_2rdm_spin_dep_ab = wf.has_two_rdm_spin_dependent_ab()
         has_2rdm_spin_traced = wf.has_two_rdm_spin_traced()
 
         # Should return boolean values
         assert isinstance(has_1rdm_spin_dep, bool)
         assert isinstance(has_1rdm_spin_traced, bool)
         assert isinstance(has_2rdm_spin_dep, bool)
-        assert isinstance(has_2rdm_spin_dep_ab, bool)
         assert isinstance(has_2rdm_spin_traced, bool)
 
     def test_wavefunction_type_access(self, cas_wavefunction):
@@ -195,14 +195,14 @@ class TestWavefunction:
         wf = cas_wavefunction
         repr_str = repr(wf)
 
-        assert "qdk.chemistry.Wavefunction" in repr_str
+        assert "qdk_chemistry.Wavefunction" in repr_str
         assert "size=2" in repr_str
         assert "norm=" in repr_str
 
     def test_repr_method(self, cas_wavefunction):
         """Test that __repr__ returns appropriate string representation."""
         repr_str = repr(cas_wavefunction)
-        assert "qdk.chemistry.Wavefunction" in repr_str
+        assert "qdk_chemistry.Wavefunction" in repr_str
         assert "size=" in repr_str
         assert "norm=" in repr_str
         assert str(cas_wavefunction.size()) in repr_str
@@ -210,7 +210,7 @@ class TestWavefunction:
     def test_str_method(self, cas_wavefunction):
         """Test that __str__ returns appropriate string representation."""
         str_str = str(cas_wavefunction)
-        assert "qdk.chemistry.Wavefunction" in str_str
+        assert "qdk_chemistry.Wavefunction" in str_str
         assert "size=" in str_str
         assert "norm=" in str_str
         assert str(cas_wavefunction.size()) in str_str
@@ -282,7 +282,7 @@ class TestWavefunctionRDMs:
         wf = cas_wavefunction_with_rdms
 
         if wf.has_one_rdm_spin_traced():
-            rdm = wf.get_one_rdm_spin_traced()
+            rdm = wf.get_active_one_rdm_spin_traced()
             assert rdm.shape == (2, 2)
             assert rdm[0, 0] == 2.0  # Doubly occupied
             assert rdm[1, 1] == 0.0  # Unoccupied
@@ -292,7 +292,7 @@ class TestWavefunctionRDMs:
         wf = cas_wavefunction_with_rdms
 
         if wf.has_one_rdm_spin_dependent():
-            rdm_aa, rdm_bb = wf.get_one_rdm_spin_dependent()
+            rdm_aa, rdm_bb = wf.get_active_one_rdm_spin_dependent()
             assert rdm_aa.shape == (2, 2)
             assert rdm_bb.shape == (2, 2)
             assert rdm_aa[0, 0] == 1.0  # Singly occupied alpha
@@ -311,19 +311,19 @@ class TestWavefunctionRDMs:
         # These should raise RuntimeError if not available
         if not wf.has_one_rdm_spin_traced():
             with pytest.raises(RuntimeError):
-                wf.get_one_rdm_spin_traced()
+                wf.get_active_one_rdm_spin_traced()
 
         if not wf.has_one_rdm_spin_dependent():
             with pytest.raises(RuntimeError):
-                wf.get_one_rdm_spin_dependent()
+                wf.get_active_one_rdm_spin_dependent()
 
         if not wf.has_two_rdm_spin_traced():
             with pytest.raises(RuntimeError):
-                wf.get_two_rdm_spin_traced()
+                wf.get_active_two_rdm_spin_traced()
 
         if not wf.has_two_rdm_spin_dependent():
             with pytest.raises(RuntimeError):
-                wf.get_two_rdm_spin_dependent()
+                wf.get_active_two_rdm_spin_dependent()
 
 
 class TestWavefunctionComplexSupport:
@@ -673,3 +673,116 @@ class TestWavefunctionSerialization:
 
         with pytest.raises(RuntimeError):
             Wavefunction.from_hdf5_file("non_existent.h5")
+
+
+class TestWavefunctionRdmIntegraion:
+    """Test integration of RDMs within the Wavefunction class."""
+
+    def test_rdm_n2_singlet_6_6(self):
+        """Test RDM properties for N2 singlet 6e 6o wavefunction."""
+        nelec_alpha = 3
+        nelec_beta = 3
+        norb = 6
+        ntot = nelec_alpha + nelec_beta
+
+        mol = Structure(["N", "N"], [[0.0, 0.0, 2.0], [0.0, 0.0, 0.0]])
+        scf_solver = qdk_chemistry.algorithms.create("scf_solver")
+        scf_solver.settings().set("basis_set", "def2-svp")
+        sd_wf = scf_solver.run(mol, 0, np.abs(nelec_alpha - nelec_beta) + 1)[1]
+
+        active_space_selector = qdk_chemistry.algorithms.create("active_space_selector", "qdk_valence")
+        active_space_selector.settings().set("num_active_electrons", ntot)
+        active_space_selector.settings().set("num_active_orbitals", norb)
+        active_orbs_sd = active_space_selector.run(sd_wf)
+
+        hamil_ctor = qdk_chemistry.algorithms.create("hamiltonian_constructor")
+        hamiltonian = hamil_ctor.run(active_orbs_sd.get_orbitals())
+
+        macis_calc = qdk_chemistry.algorithms.create("multi_configuration_calculator", "macis_cas")
+        macis_calc.settings().set("calculate_one_rdm", True)
+        macis_calc.settings().set("calculate_two_rdm", True)
+        wfn = macis_calc.run(hamiltonian, nelec_alpha, nelec_beta)[1]
+
+        one_rdm = wfn.get_active_one_rdm_spin_traced()
+        two_rdm = wfn.get_active_two_rdm_spin_traced()
+        one_rdm_aa, one_rdm_bb = wfn.get_active_one_rdm_spin_dependent()
+        two_rdm_ab, two_rdm_aa, two_rdm_bb = wfn.get_active_two_rdm_spin_dependent()
+
+        two_rdm = np.reshape(two_rdm, (norb, norb, norb, norb))
+        two_rdm_aa = np.reshape(two_rdm_aa, (norb, norb, norb, norb))
+        two_rdm_bb = np.reshape(two_rdm_bb, (norb, norb, norb, norb))
+        two_rdm_ab = np.reshape(two_rdm_ab, (norb, norb, norb, norb))
+        two_rdm_ba = np.einsum("pqrs->rspq", two_rdm_ab)
+
+        assert np.allclose(one_rdm, one_rdm_aa + one_rdm_bb, atol=1e-6)
+        assert np.allclose(
+            two_rdm,
+            two_rdm_aa + two_rdm_bb + two_rdm_ab + two_rdm_ba,
+            atol=1e-6,
+        )
+        assert np.allclose(one_rdm, np.einsum("pqrr->pq", two_rdm) / (ntot - 1), atol=1e-6)
+        assert np.allclose(one_rdm_aa, np.einsum("pqrr->pq", two_rdm_ab) / (nelec_beta), atol=1e-6)
+        assert np.allclose(one_rdm_bb, np.einsum("rrpq->pq", two_rdm_ab) / (nelec_alpha), atol=1e-6)
+
+        s1_entropy = wfn.get_single_orbital_entropies()
+        assert np.allclose(
+            s1_entropy, np.array([0.02040482, 0.17135976, 0.17135976, 0.17651599, 0.17651599, 0.00478807]), atol=1e-6
+        )
+
+    def test_rdm_o2_triplet_6_6(self):
+        """Test RDM retrieval for O2 triplet 6e 6o wavefunction."""
+        try:
+            import pyscf  # noqa: PLC0415, F401
+        except ImportError:
+            pytest.skip("pyscf not available, skipping O2 triplet RDM test")
+        import qdk_chemistry.plugins.pyscf  # noqa: PLC0415
+
+        nelec_alpha = 5
+        nelec_beta = 3
+        norb = 6
+        ntot = nelec_alpha + nelec_beta
+
+        mol = Structure(["O", "O"], [[0.0, 0.0, 2.0], [0.0, 0.0, 0.0]])
+        scf_solver = qdk_chemistry.algorithms.create("scf_solver", "pyscf")
+        scf_solver.settings().set("basis_set", "def2-svp")
+        scf_solver.settings().set("force_restricted", True)
+        sd_wf = scf_solver.run(mol, 0, np.abs(nelec_alpha - nelec_beta) + 1)[1]
+
+        active_space_selector = qdk_chemistry.algorithms.create("active_space_selector", "qdk_valence")
+        active_space_selector.settings().set("num_active_electrons", ntot)
+        active_space_selector.settings().set("num_active_orbitals", norb)
+        active_orbs_sd = active_space_selector.run(sd_wf)
+
+        hamil_ctor = qdk_chemistry.algorithms.create("hamiltonian_constructor")
+        hamiltonian = hamil_ctor.run(active_orbs_sd.get_orbitals())
+
+        macis_calc = qdk_chemistry.algorithms.create("multi_configuration_calculator", "macis_cas")
+        macis_calc.settings().set("calculate_one_rdm", True)
+        macis_calc.settings().set("calculate_two_rdm", True)
+        wfn = macis_calc.run(hamiltonian, nelec_alpha, nelec_beta)[1]
+
+        one_rdm = wfn.get_active_one_rdm_spin_traced()
+        two_rdm = wfn.get_active_two_rdm_spin_traced()
+        one_rdm_aa, one_rdm_bb = wfn.get_active_one_rdm_spin_dependent()
+        two_rdm_ab, two_rdm_aa, two_rdm_bb = wfn.get_active_two_rdm_spin_dependent()
+
+        two_rdm = np.reshape(two_rdm, (norb, norb, norb, norb))
+        two_rdm_aa = np.reshape(two_rdm_aa, (norb, norb, norb, norb))
+        two_rdm_bb = np.reshape(two_rdm_bb, (norb, norb, norb, norb))
+        two_rdm_ab = np.reshape(two_rdm_ab, (norb, norb, norb, norb))
+        two_rdm_ba = np.einsum("pqrs->rspq", two_rdm_ab)
+
+        assert np.allclose(one_rdm, one_rdm_aa + one_rdm_bb, atol=1e-6)
+        assert np.allclose(
+            two_rdm,
+            two_rdm_aa + two_rdm_bb + two_rdm_ab + two_rdm_ba,
+            atol=1e-6,
+        )
+        assert np.allclose(one_rdm, np.einsum("pqrr->pq", two_rdm) / (ntot - 1), atol=1e-6)
+        assert np.allclose(one_rdm_aa, np.einsum("pqrr->pq", two_rdm_ab) / (nelec_beta), atol=1e-6)
+        assert np.allclose(one_rdm_bb, np.einsum("rrpq->pq", two_rdm_ab) / (nelec_alpha), atol=1e-6)
+
+        s1_entropy = wfn.get_single_orbital_entropies()
+        assert np.allclose(
+            s1_entropy, np.array([0.11641596, 0.11641596, 0.03304609, 0.11492634, 0.11492634, 0.03494613]), atol=1e-6
+        )

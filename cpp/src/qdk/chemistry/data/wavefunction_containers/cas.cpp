@@ -27,7 +27,7 @@ CasWavefunctionContainer::CasWavefunctionContainer(
                                std::nullopt,  // one_rdm_aa
                                std::nullopt,  // one_rdm_bb
                                std::nullopt,  // two_rdm_spin_traced
-                               std::nullopt,  // two_rdm_abba
+                               std::nullopt,  // two_rdm_aabb
                                std::nullopt,  // two_rdm_aaaa
                                std::nullopt,  // two_rdm_bbbb
                                type) {}
@@ -42,7 +42,7 @@ CasWavefunctionContainer::CasWavefunctionContainer(
                                std::nullopt,  // one_rdm_aa
                                std::nullopt,  // one_rdm_bb
                                two_rdm_spin_traced,
-                               std::nullopt,  // two_rdm_abba
+                               std::nullopt,  // two_rdm_aabb
                                std::nullopt,  // two_rdm_aaaa
                                std::nullopt,  // two_rdm_bbbb
                                type) {}
@@ -54,55 +54,14 @@ CasWavefunctionContainer::CasWavefunctionContainer(
     const std::optional<MatrixVariant>& one_rdm_aa,
     const std::optional<MatrixVariant>& one_rdm_bb,
     const std::optional<VectorVariant>& two_rdm_spin_traced,
-    const std::optional<VectorVariant>& two_rdm_abba,
+    const std::optional<VectorVariant>& two_rdm_aabb,
     const std::optional<VectorVariant>& two_rdm_aaaa,
     const std::optional<VectorVariant>& two_rdm_bbbb, WavefunctionType type)
-    : WavefunctionContainer(type),
+    : WavefunctionContainer(one_rdm_spin_traced, one_rdm_aa, one_rdm_bb,
+                            two_rdm_spin_traced, two_rdm_aabb, two_rdm_aaaa,
+                            two_rdm_bbbb, type),
       _coefficients(coeffs),
-      _configuration_set(dets, orbitals) {
-  if (one_rdm_spin_traced.has_value()) {
-    _one_rdm_spin_traced =
-        std::make_shared<MatrixVariant>(one_rdm_spin_traced.value());
-  } else {
-    _one_rdm_spin_traced = nullptr;
-  }
-  if (one_rdm_aa.has_value()) {
-    _one_rdm_spin_dependent_aa =
-        std::make_shared<MatrixVariant>(one_rdm_aa.value());
-  } else {
-    _one_rdm_spin_dependent_aa = nullptr;
-  }
-  if (one_rdm_bb.has_value()) {
-    _one_rdm_spin_dependent_bb =
-        std::make_shared<MatrixVariant>(one_rdm_bb.value());
-  } else {
-    _one_rdm_spin_dependent_bb = nullptr;
-  }
-  if (two_rdm_spin_traced.has_value()) {
-    _two_rdm_spin_traced =
-        std::make_shared<VectorVariant>(two_rdm_spin_traced.value());
-  } else {
-    _two_rdm_spin_traced = nullptr;
-  }
-  if (two_rdm_abba.has_value()) {
-    _two_rdm_spin_dependent_abba =
-        std::make_shared<VectorVariant>(two_rdm_abba.value());
-  } else {
-    _two_rdm_spin_dependent_abba = nullptr;
-  }
-  if (two_rdm_aaaa.has_value()) {
-    _two_rdm_spin_dependent_aaaa =
-        std::make_shared<VectorVariant>(two_rdm_aaaa.value());
-  } else {
-    _two_rdm_spin_dependent_aaaa = nullptr;
-  }
-  if (two_rdm_bbbb.has_value()) {
-    _two_rdm_spin_dependent_bbbb =
-        std::make_shared<VectorVariant>(two_rdm_bbbb.value());
-  } else {
-    _two_rdm_spin_dependent_bbbb = nullptr;
-  }
-}
+      _configuration_set(dets, orbitals) {}
 
 std::unique_ptr<WavefunctionContainer> CasWavefunctionContainer::clone() const {
   return std::make_unique<CasWavefunctionContainer>(
@@ -118,8 +77,8 @@ std::unique_ptr<WavefunctionContainer> CasWavefunctionContainer::clone() const {
           : std::nullopt,
       _two_rdm_spin_traced ? std::optional<VectorVariant>(*_two_rdm_spin_traced)
                            : std::nullopt,
-      _two_rdm_spin_dependent_abba
-          ? std::optional<VectorVariant>(*_two_rdm_spin_dependent_abba)
+      _two_rdm_spin_dependent_aabb
+          ? std::optional<VectorVariant>(*_two_rdm_spin_dependent_aabb)
           : std::nullopt,
       _two_rdm_spin_dependent_aaaa
           ? std::optional<VectorVariant>(*_two_rdm_spin_dependent_aaaa)
@@ -140,7 +99,7 @@ ScalarVariant CasWavefunctionContainer::get_coefficient(
   auto it = std::find(determinants.begin(), determinants.end(), det);
   if (it != determinants.end()) {
     size_t index = std::distance(determinants.begin(), it);
-    if (is_vector_variant_complex(_coefficients)) {
+    if (detail::is_vector_variant_complex(_coefficients)) {
       return std::get<Eigen::VectorXcd>(_coefficients)(index);
     }
     return std::get<Eigen::VectorXd>(_coefficients)(index);
@@ -167,7 +126,7 @@ size_t CasWavefunctionContainer::size() const {
   if (determinants.empty()) {
     return 0;  // Empty wavefunction has size 0
   }
-  if (is_vector_variant_complex(_coefficients)) {
+  if (detail::is_vector_variant_complex(_coefficients)) {
     return std::get<Eigen::VectorXcd>(_coefficients).size();
   }
   return std::get<Eigen::VectorXd>(_coefficients).size();
@@ -194,7 +153,7 @@ CasWavefunctionContainer::ScalarVariant CasWavefunctionContainer::overlap(
         "electrons");
   }
   // TODO: implement proper overlap calculation
-  // https://dev.azure.com/ms-azurequantum/AzureQuantum/_workitems/edit/41338
+  // 41338
   if (this->get_orbitals() != other_cas->get_orbitals()) {
     throw std::runtime_error(
         "Overlap only implemented for wavefunctions with same orbitals");
@@ -204,8 +163,8 @@ CasWavefunctionContainer::ScalarVariant CasWavefunctionContainer::overlap(
   const auto& coeffs1 = this->get_coefficients();
   const auto& coeffs2 = other_cas->get_coefficients();
 
-  bool coeffs1_complex = is_vector_variant_complex(coeffs1);
-  bool coeffs2_complex = is_vector_variant_complex(coeffs2);
+  bool coeffs1_complex = detail::is_vector_variant_complex(coeffs1);
+  bool coeffs2_complex = detail::is_vector_variant_complex(coeffs2);
 
   if (!coeffs1_complex && !coeffs2_complex) {
     // Both real
@@ -234,7 +193,7 @@ CasWavefunctionContainer::ScalarVariant CasWavefunctionContainer::overlap(
 
 double CasWavefunctionContainer::norm() const {
   const auto& coeffs = this->get_coefficients();
-  if (is_vector_variant_complex(coeffs)) {
+  if (detail::is_vector_variant_complex(coeffs)) {
     const auto& complex_coeffs = std::get<Eigen::VectorXcd>(coeffs);
     return std::sqrt((complex_coeffs.adjoint() * complex_coeffs)(0).real());
   } else {
@@ -243,235 +202,9 @@ double CasWavefunctionContainer::norm() const {
   }
 }
 
-std::tuple<const MatrixVariant&, const MatrixVariant&>
-CasWavefunctionContainer::get_one_rdm_spin_dependent() const {
-  if (!has_one_rdm_spin_dependent()) {
-    throw std::runtime_error("Spin-dependent one-body RDM not set");
-  }
-  if (_one_rdm_spin_dependent_aa != nullptr &&
-      _one_rdm_spin_dependent_bb != nullptr) {
-    return std::make_tuple(std::cref(*_one_rdm_spin_dependent_aa),
-                           std::cref(*_one_rdm_spin_dependent_bb));
-  }
-
-  // For restricted case, if only one spin component is available, use it for
-  // both
-  if (get_orbitals()->is_restricted() &&
-      _one_rdm_spin_dependent_aa != nullptr) {
-    return std::make_tuple(std::cref(*_one_rdm_spin_dependent_aa),
-                           std::cref(*_one_rdm_spin_dependent_aa));
-  }
-  if (get_orbitals()->is_restricted() &&
-      _one_rdm_spin_dependent_bb != nullptr) {
-    return std::make_tuple(std::cref(*_one_rdm_spin_dependent_bb),
-                           std::cref(*_one_rdm_spin_dependent_bb));
-  }
-
-  // If restricted and only spin-traced RDM is available, derive spin components
-  if (get_orbitals()->is_restricted() && _one_rdm_spin_traced != nullptr) {
-    // Lazy evaluation - only compute if necessary
-    if (_one_rdm_spin_dependent_aa == nullptr) {
-      _one_rdm_spin_dependent_aa =
-          multiply_matrix_variant(*_one_rdm_spin_traced, 0.5);
-    }
-    return std::make_tuple(std::cref(*_one_rdm_spin_dependent_aa),
-                           std::cref(*_one_rdm_spin_dependent_aa));
-  }
-
-  // Should not reach this exception
-  throw std::runtime_error("No one-body RDMs are set");
-}
-
-const MatrixVariant& CasWavefunctionContainer::get_one_rdm_spin_traced() const {
-  if (!has_one_rdm_spin_traced()) {
-    throw std::runtime_error("Spin-traced one-body RDM not set");
-  }
-  if (_one_rdm_spin_traced != nullptr) {
-    return *_one_rdm_spin_traced;
-  }
-  if (_one_rdm_spin_dependent_aa != nullptr &&
-      _one_rdm_spin_dependent_bb != nullptr) {
-    // evaluate only if necessary
-    _one_rdm_spin_traced = add_matrix_variants(*_one_rdm_spin_dependent_aa,
-                                               *_one_rdm_spin_dependent_bb);
-    return *_one_rdm_spin_traced;
-  }
-  if (get_orbitals()->is_restricted() &&
-      _one_rdm_spin_dependent_aa != nullptr) {
-    _one_rdm_spin_traced =
-        multiply_matrix_variant(*_one_rdm_spin_dependent_aa, 2.0);
-    return *_one_rdm_spin_traced;
-  }
-  if (get_orbitals()->is_restricted() &&
-      _one_rdm_spin_dependent_bb != nullptr) {
-    _one_rdm_spin_traced =
-        multiply_matrix_variant(*_one_rdm_spin_dependent_bb, 2.0);
-    return *_one_rdm_spin_traced;
-  }
-  // If restricted, we can use the 0.5 * spin-traced RDM.
-  // Should not reach this exception.
-  throw std::runtime_error("No spin-traced one-body RDMs are set");
-}
-
-std::tuple<const VectorVariant&, const VectorVariant&, const VectorVariant&>
-CasWavefunctionContainer::get_two_rdm_spin_dependent() const {
-  if (!has_two_rdm_spin_dependent()) {
-    throw std::runtime_error("Spin-dependent two-body RDM not set");
-  }
-  if (_two_rdm_spin_dependent_abba != nullptr &&
-      _two_rdm_spin_dependent_aaaa != nullptr &&
-      _two_rdm_spin_dependent_bbbb != nullptr) {
-    return std::make_tuple(std::cref(*_two_rdm_spin_dependent_abba),
-                           std::cref(*_two_rdm_spin_dependent_aaaa),
-                           std::cref(*_two_rdm_spin_dependent_bbbb));
-  }
-  if (get_orbitals()->is_restricted() &&
-      _two_rdm_spin_dependent_abba != nullptr &&
-      _two_rdm_spin_dependent_aaaa != nullptr) {
-    return std::make_tuple(std::cref(*_two_rdm_spin_dependent_abba),
-                           std::cref(*_two_rdm_spin_dependent_aaaa),
-                           std::cref(*_two_rdm_spin_dependent_aaaa));
-  }
-  // Should not reach this exception
-  throw std::runtime_error("No spin-dependent two-body RDMs are set");
-}
-
-const VectorVariant& CasWavefunctionContainer::get_two_rdm_spin_traced() const {
-  if (!has_two_rdm_spin_traced()) {
-    throw std::runtime_error("Spin-traced two-body RDM not set");
-  }
-  if (_two_rdm_spin_traced != nullptr) {
-    return *_two_rdm_spin_traced;
-  }
-  if (get_orbitals()->is_restricted() &&
-      _two_rdm_spin_dependent_abba != nullptr &&
-      _two_rdm_spin_dependent_aaaa != nullptr) {
-    // For restricted case: abba + baba + aaaa + bbbb = 2*abba + 2*aaaa
-    auto double_abba =
-        multiply_vector_variant(*_two_rdm_spin_dependent_abba, 2.0);
-    auto double_aaaa =
-        multiply_vector_variant(*_two_rdm_spin_dependent_aaaa, 2.0);
-    _two_rdm_spin_traced = add_vector_variants(*double_abba, *double_aaaa);
-    return *_two_rdm_spin_traced;
-  }
-  if (_two_rdm_spin_dependent_abba != nullptr &&
-      _two_rdm_spin_dependent_aaaa != nullptr &&
-      _two_rdm_spin_dependent_bbbb != nullptr) {
-    // Compute traced RDM: abba + baba + aaaa + bbbb using helper functions
-    // abba + baba = 2.0 * abba (baba = abba with appropriate index mapping)
-    // TODO: abba should transpose to baba!
-    // https://dev.azure.com/ms-azurequantum/AzureQuantum/_workitems/edit/41343
-    throw std::runtime_error(
-        "Need to implement transpose for abba to get baba");
-  }
-  // Should not reach this exception
-  throw std::runtime_error("No spin-traced two-body RDMs are set");
-}
-
-// entropies
-Eigen::VectorXd CasWavefunctionContainer::get_single_orbital_entropies() const {
-  if (!has_one_rdm_spin_dependent()) {
-    throw std::runtime_error("One-body RDMs must be set");
-  }
-
-  // We can get away with the abba RDM, because we only need the diagonal
-  // elements
-  const Eigen::VectorXd* two_rdm_ab_ptr = nullptr;
-
-  if (has_two_rdm_spin_dependent_ab()) {
-    if (_two_rdm_spin_dependent_abba != nullptr) {
-      two_rdm_ab_ptr =
-          &std::get<Eigen::VectorXd>(*_two_rdm_spin_dependent_abba);
-    } else {
-      // we can get away with spin traced for entropies
-      two_rdm_ab_ptr = &std::get<Eigen::VectorXd>(*_two_rdm_spin_traced);
-    }
-  } else if (has_two_rdm_spin_traced()) {
-    const auto& spin_traced_variant = get_two_rdm_spin_traced();
-    if (is_vector_variant_complex(spin_traced_variant)) {
-      throw std::runtime_error(
-          "Complex entropy calculation not yet implemented");
-    } else {
-      two_rdm_ab_ptr = &std::get<Eigen::VectorXd>(spin_traced_variant);
-    }
-  } else {
-    throw std::runtime_error("Two-body RDMs must be set");
-  }
-
-  if (two_rdm_ab_ptr == nullptr) {
-    throw std::runtime_error("Two-body RDMs must be set");
-  }
-
-  const auto& two_rdm_ab = *two_rdm_ab_ptr;
-
-  const auto& one_rdm_aa_var = std::get<0>(get_one_rdm_spin_dependent());
-  const auto& one_rdm_bb_var = std::get<1>(get_one_rdm_spin_dependent());
-
-  Eigen::MatrixXd one_rdm_aa;
-  Eigen::MatrixXd one_rdm_bb;
-
-  if (is_matrix_variant_complex(one_rdm_aa_var)) {
-    throw std::runtime_error("Complex entropy calculation not yet implemented");
-  } else {
-    one_rdm_aa = std::get<Eigen::MatrixXd>(one_rdm_aa_var);
-  }
-
-  if (is_matrix_variant_complex(one_rdm_bb_var)) {
-    throw std::runtime_error("Complex entropy calculation not yet implemented");
-  } else {
-    one_rdm_bb = std::get<Eigen::MatrixXd>(one_rdm_bb_var);
-  }
-
-  int norbs = one_rdm_aa.rows();
-
-  // Lambda function to get the two-body RDM element
-  auto get_two_rdm_element = [&two_rdm_ab, norbs](int i, int j, int k, int l) {
-    if (i >= norbs || j >= norbs || k >= norbs || l >= norbs) {
-      throw std::out_of_range("Index out of bounds for two-body RDM");
-    }
-    int norbs2 = norbs * norbs;
-    return two_rdm_ab(i * norbs * norbs2 + j * norbs2 + k * norbs + l);
-  };
-
-  // Source: https://doi.org/10.1002/qua.24832
-  // s1_i  = - \sum_alpha \omega_i,alpha * ln(omega_i,alpha)
-  Eigen::VectorXd s1_entropies = Eigen::VectorXd::Zero(norbs);
-  for (std::size_t i = 0; i < norbs; ++i) {
-    // omega_1 = 1 - \gamma_{ii} - \gamma_{\bar{i}\bar{i}} +
-    // \Gamma_{i\bar{i}i\bar{i}}
-    auto ordm1 = 1 - one_rdm_aa(i, i) - one_rdm_bb(i, i) +
-                 get_two_rdm_element(i, i, i, i);
-    if (ordm1 > 0) {
-      s1_entropies(i) -= ordm1 * std::log(ordm1);
-    }
-    // omega_2 = \gamma_{ii} - \Gamma_{i\bar{i}i\bar{i}}
-    auto ordm2 = one_rdm_aa(i, i) - get_two_rdm_element(i, i, i, i);
-    if (ordm2 > 0) {
-      s1_entropies(i) -= ordm2 * std::log(ordm2);
-    }
-    // omega_3 = \gamma_{\bar{i}\bar{i}} - \Gamma_{i\bar{i}i\bar{i}}
-    auto ordm3 = one_rdm_bb(i, i) - get_two_rdm_element(i, i, i, i);
-    if (ordm3 > 0) {
-      s1_entropies(i) -= ordm3 * std::log(ordm3);
-    }
-    // omega_4 = \Gamma_{i\bar{i}i\bar{i}}
-    auto ordm4 = get_two_rdm_element(i, i, i, i);
-    if (ordm4 > 0) {
-      s1_entropies(i) -= ordm4 * std::log(ordm4);
-    }
-  }
-  return s1_entropies;
-}
-
 void CasWavefunctionContainer::clear_caches() const {
   // Clear all cached RDMs
-  _one_rdm_spin_traced.reset();
-  _two_rdm_spin_traced.reset();
-  _one_rdm_spin_dependent_aa.reset();
-  _one_rdm_spin_dependent_bb.reset();
-  _two_rdm_spin_dependent_aaaa.reset();
-  _two_rdm_spin_dependent_abba.reset();
-  _two_rdm_spin_dependent_bbbb.reset();
+  _clear_rdms();
 }
 
 std::pair<size_t, size_t> CasWavefunctionContainer::get_total_num_electrons()
@@ -589,13 +322,13 @@ CasWavefunctionContainer::get_active_orbital_occupations() const {
 
   // For active space orbitals, get occupations from 1RDM eigenvalues
   if (has_one_rdm_spin_dependent()) {
-    const auto& rdm_tuple = get_one_rdm_spin_dependent();
+    const auto& rdm_tuple = get_active_one_rdm_spin_dependent();
     const auto& alpha_rdm_var = std::get<0>(rdm_tuple);
     const auto& beta_rdm_var = std::get<1>(rdm_tuple);
 
     // Extract real matrices (assuming real for now)
-    if (is_matrix_variant_complex(alpha_rdm_var) ||
-        is_matrix_variant_complex(beta_rdm_var)) {
+    if (detail::is_matrix_variant_complex(alpha_rdm_var) ||
+        detail::is_matrix_variant_complex(beta_rdm_var)) {
       throw std::runtime_error(
           "Complex 1RDM diagonalization not yet implemented");
     }
@@ -647,54 +380,12 @@ CasWavefunctionContainer::get_active_orbital_occupations() const {
   return {alpha_occupations, beta_occupations};
 }
 
-bool CasWavefunctionContainer::has_one_rdm_spin_dependent() const {
-  return (_one_rdm_spin_dependent_aa != nullptr &&
-          _one_rdm_spin_dependent_bb != nullptr) ||
-         (get_orbitals()->is_restricted() &&
-          (_one_rdm_spin_dependent_aa != nullptr ||
-           _one_rdm_spin_dependent_bb != nullptr)) ||
-         (get_orbitals()->is_restricted() && _one_rdm_spin_traced != nullptr);
-}
-
-bool CasWavefunctionContainer::has_one_rdm_spin_traced() const {
-  return _one_rdm_spin_traced != nullptr ||
-         (_one_rdm_spin_dependent_aa != nullptr &&
-          _one_rdm_spin_dependent_bb != nullptr) ||
-         (get_orbitals()->is_restricted() &&
-          (_one_rdm_spin_dependent_aa != nullptr ||
-           _one_rdm_spin_dependent_bb != nullptr));
-}
-
-bool CasWavefunctionContainer::has_two_rdm_spin_dependent() const {
-  return (_two_rdm_spin_dependent_abba != nullptr &&
-          _two_rdm_spin_dependent_aaaa != nullptr &&
-          _two_rdm_spin_dependent_bbbb != nullptr) ||
-         (get_orbitals()->is_restricted() &&
-          _two_rdm_spin_dependent_abba != nullptr &&
-          _two_rdm_spin_dependent_aaaa != nullptr);
-}
-
-bool CasWavefunctionContainer::has_two_rdm_spin_dependent_ab() const {
-  return _two_rdm_spin_dependent_abba != nullptr ||
-         _two_rdm_spin_traced != nullptr;
-}
-
-bool CasWavefunctionContainer::has_two_rdm_spin_traced() const {
-  return _two_rdm_spin_traced != nullptr ||
-         (_two_rdm_spin_dependent_abba != nullptr &&
-          _two_rdm_spin_dependent_aaaa != nullptr &&
-          _two_rdm_spin_dependent_bbbb != nullptr) ||
-         (get_orbitals()->is_restricted() &&
-          _two_rdm_spin_dependent_abba != nullptr &&
-          _two_rdm_spin_dependent_aaaa != nullptr);
-}
-
 std::string CasWavefunctionContainer::get_container_type() const {
   return "cas";
 }
 
 bool CasWavefunctionContainer::is_complex() const {
-  return is_vector_variant_complex(_coefficients);
+  return detail::is_vector_variant_complex(_coefficients);
 }
 
 nlohmann::json CasWavefunctionContainer::to_json() const {
@@ -711,7 +402,7 @@ nlohmann::json CasWavefunctionContainer::to_json() const {
       (_type == WavefunctionType::SelfDual) ? "self_dual" : "not_self_dual";
 
   // Store coefficients
-  bool is_complex = is_vector_variant_complex(_coefficients);
+  bool is_complex = detail::is_vector_variant_complex(_coefficients);
   j["is_complex"] = is_complex;
   if (is_complex) {
     const auto& coeffs_complex = std::get<Eigen::VectorXcd>(_coefficients);
@@ -835,7 +526,7 @@ void CasWavefunctionContainer::to_hdf5(H5::Group& group) const {
     wf_type_attr.write(string_type, wf_type);
 
     // Store complexity flag
-    bool is_complex = is_vector_variant_complex(_coefficients);
+    bool is_complex = detail::is_vector_variant_complex(_coefficients);
     H5::Attribute complex_attr = group.createAttribute(
         "is_complex", H5::PredType::NATIVE_HBOOL, H5::DataSpace(H5S_SCALAR));
     hbool_t is_complex_flag = is_complex ? 1 : 0;

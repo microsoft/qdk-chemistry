@@ -2,6 +2,7 @@
  * MACIS Copyright (c) 2023, The Regents of the University of California,
  * through Lawrence Berkeley National Laboratory (subject to receipt of
  * any required approvals from the U.S. Dept. of Energy). All rights reserved.
+ * Portions Copyright (c) Microsoft Corporation.
  *
  * See LICENSE.txt for details
  */
@@ -13,19 +14,82 @@
 
 namespace macis {
 
+/**
+ * @brief Structure representing ASCI (Adaptive Sampling Configuration
+ * Interaction) score contributions for candidate determinants
+ *
+ * For each determinant in the reference state (P-space), connected determinants
+ * (Q-space) scored according to their ability to lower the energy via
+ * perturbative corrections are stored in this structure. In the ASCI procedure,
+ * the Q-space determinants are generatated on the fly by looping over all
+ * possible connections to the P-space and three pieces of information are
+ * stored for each connection:
+ * 1. The Q-space determinant
+ * 2. <Q|H|P> * c_P, the product of the Hamiltonian matrix element and the
+ * coefficient of the P-space determinant
+ * 3. The diagonal Hamiltonian matrix element for the Q-space determinant:
+ * <Q|H|Q>
+ *
+ * @tparam WfnT Wavefunction type representing the quantum state
+ */
 template <typename WfnT>
 struct asci_contrib {
+  /// @brief The excited determinant state |Q>
   WfnT state;
+  /// @brief Product of coefficient and matrix element with the generating
+  /// P-space state
   double c_times_matel;
+  /// @brief <Q|H|Q> diagonal matrix element
   double h_diag;
 
+  /**
+   * @brief Calculate the ratio value for perturbative selection
+   * @return The ratio c_times_matel / h_diag
+   */
   auto rv() const { return c_times_matel / h_diag; }
+
+  /**
+   * @brief Calculate the second-order perturbation theory contribution
+   * @return The PT2 energy contribution (rv() * c_times_matel)
+   */
   auto pt2() const { return rv() * c_times_matel; }
 };
 
+/// @brief Container type for storing multiple ASCI contributions
 template <typename WfnT>
 using asci_contrib_container = std::vector<asci_contrib<WfnT>>;
 
+/**
+ * @brief Generate single excitation ASCI contributions for a given spin
+ *
+ * This function computes matrix elements and contributions for all possible
+ * single excitations from occupied to virtual orbitals of the specified spin.
+ * It calculates the Hamiltonian matrix elements including one-electron and
+ * two-electron terms.
+ *
+ * @tparam Sigma The spin type (Alpha or Beta) for the excitations
+ * @tparam WfnType Full wavefunction type
+ * @tparam SpinWfnType Spin-specific wavefunction type
+ * @param[in] coeff Coefficient of the reference determinant
+ * @param[in] state_full Full determinant state (both alpha and beta spins)
+ * @param[in] state_same Spin component being excited
+ * @param[in] occ_same Occupied orbital indices for the same spin
+ * @param[in] vir_same Virtual orbital indices for the same spin
+ * @param[in] occ_othr Occupied orbital indices for the opposite spin
+ * @param[in] eps_same Orbital energies for the same spin
+ * @param[in] T_pq One-electron integral matrix
+ * @param[in] LDT Leading dimension of T_pq matrix
+ * @param[in] G_kpq Same-spin two-electron integral tensor
+ * @param[in] LDG Leading dimension of G_kpq tensor
+ * @param[in] V_kpq Opposite-spin two-electron integral tensor
+ * @param[in] LDV Leading dimension of V_kpq tensor
+ * @param[in] h_el_tol Threshold for matrix element magnitude
+ * @param[in] root_diag Root diagonal correction term
+ * @param[in] E0 Reference energy
+ * @param[in] ham_gen Hamiltonian generator for fast diagonal evaluation
+ * @param[in,out] asci_contributions Container to store the computed
+ * contributions
+ */
 template <Spin Sigma, typename WfnType, typename SpinWfnType>
 void append_singles_asci_contributions(
     double coeff, WfnType state_full, SpinWfnType state_same,
@@ -62,7 +126,6 @@ void append_singles_asci_contributions(
       // Calculate fast diagonal matrix element
       auto h_diag =
           ham_gen.fast_diag_single(eps_same[i], eps_same[a], i, a, root_diag);
-      // h_el /= (E0 - h_diag);
 
       // Append to return values
       asci_contributions.push_back({ex_det, coeff * h_el, E0 - h_diag});
@@ -70,6 +133,34 @@ void append_singles_asci_contributions(
     }  // Loop over single extitations
 }
 
+/**
+ * @brief Generate same-spin double excitation ASCI contributions
+ *
+ * This function computes matrix elements and contributions for all possible
+ * double excitations within the same spin manifold. It handles same-spin
+ * electron correlation effects through two-electron integrals and enforces
+ * antisymmetry requirements.
+ *
+ * @tparam Sigma The spin type (Alpha or Beta) for the excitations
+ * @tparam WfnType Full wavefunction type
+ * @tparam SpinWfnType Spin-specific wavefunction type
+ * @param[in] coeff Coefficient of the reference determinant
+ * @param[in] state_full Full determinant state (both alpha and beta spins)
+ * @param[in] state_same Spin component being excited
+ * @param[in] state_other Opposite spin component (unchanged)
+ * @param[in] ss_occ Same-spin occupied orbital indices
+ * @param[in] vir Virtual orbital indices
+ * @param[in] os_occ Opposite-spin occupied orbital indices
+ * @param[in] eps_same Orbital energies for the same spin
+ * @param[in] G Same-spin two-electron integral tensor
+ * @param[in] LDG Leading dimension of G tensor
+ * @param[in] h_el_tol Threshold for matrix element magnitude
+ * @param[in] root_diag Root diagonal correction term
+ * @param[in] E0 Reference energy
+ * @param[in] ham_gen Hamiltonian generator for fast diagonal evaluation
+ * @param[in,out] asci_contributions Container to store the computed
+ * contributions
+ */
 template <Spin Sigma, typename WfnType, typename SpinWfnType>
 void append_ss_doubles_asci_contributions(
     double coeff, WfnType state_full, SpinWfnType state_same,
@@ -100,20 +191,6 @@ void append_ss_doubles_asci_contributions(
 
           if (std::abs(coeff * G_aibj) < h_el_tol) continue;
 
-#if 0
-          // Calculate excited determinant string (spin)
-          const auto full_ex_spin = wfn_t<N>(0).flip(i).flip(j).flip(a).flip(b);
-          auto ex_det_spin = state_spin ^ full_ex_spin;
-
-          // Calculate the sign in a canonical way
-          double sign = doubles_sign(state_spin, ex_det_spin, full_ex_spin);
-
-          // Calculate full excited determinant
-          const auto full_ex = expand_bitset<2 * N>(full_ex_spin) << NShift;
-          auto ex_det = state_full ^ full_ex;
-#else
-          // TODO: Can this be made faster since the orbital indices are known
-          //       in advance?
           // Compute excited determinant (spin)
           const auto full_ex_spin = spin_wfn_traits::double_excitation_no_check(
               SpinWfnType(0), i, j, a, b);
@@ -125,7 +202,6 @@ void append_ss_doubles_asci_contributions(
           // Calculate full excited determinant
           auto ex_det =
               wfn_traits::template from_spin<Sigma>(ex_det_spin, state_other);
-#endif /* USE_GENERIC_RDEP */
 
           // Update sign of matrix element
           auto h_el = sign * G_aibj;
@@ -134,7 +210,6 @@ void append_ss_doubles_asci_contributions(
           auto h_diag =
               ham_gen.fast_diag_ss_double(eps_same[i], eps_same[j], eps_same[a],
                                           eps_same[b], i, j, a, b, root_diag);
-          // h_el /= (E0 - h_diag);
 
           // Append {det, c*h_el}
           asci_contributions.push_back({ex_det, coeff * h_el, E0 - h_diag});
@@ -143,6 +218,35 @@ void append_ss_doubles_asci_contributions(
     }  // AI Loop
 }
 
+/**
+ * @brief Generate opposite-spin double excitation ASCI contributions
+ *
+ * This function computes matrix elements and contributions for all possible
+ * double excitations between different spin manifolds (alpha-beta). It handles
+ * opposite-spin electron correlation effects and is typically the dominant
+ * contribution to correlation.
+ *
+ * @tparam WfnType Full wavefunction type
+ * @tparam SpinWfnType Spin-specific wavefunction type
+ * @param[in] coeff Coefficient of the reference determinant
+ * @param[in] state_full Full determinant state (both alpha and beta spins)
+ * @param[in] state_alpha Alpha spin component
+ * @param[in] state_beta Beta spin component
+ * @param[in] occ_alpha Occupied alpha orbital indices
+ * @param[in] occ_beta Occupied beta orbital indices
+ * @param[in] vir_alpha Virtual alpha orbital indices
+ * @param[in] vir_beta Virtual beta orbital indices
+ * @param[in] eps_alpha Alpha orbital energies
+ * @param[in] eps_beta Beta orbital energies
+ * @param[in] V Opposite-spin two-electron integral tensor
+ * @param[in] LDV Leading dimension of V tensor
+ * @param[in] h_el_tol Threshold for matrix element magnitude
+ * @param[in] root_diag Root diagonal correction term
+ * @param[in] E0 Reference energy
+ * @param[in] ham_gen Hamiltonian generator for fast diagonal evaluation
+ * @param[in,out] asci_contributions Container to store the computed
+ * contributions
+ */
 template <typename WfnType, typename SpinWfnType>
 void append_os_doubles_asci_contributions(
     double coeff, WfnType state_full, SpinWfnType state_alpha,
@@ -170,8 +274,7 @@ void append_os_doubles_asci_contributions(
 
           double sign_beta = single_excitation_sign(state_beta, b, j);
           double sign = sign_alpha * sign_beta;
-          // auto ex_det = state_full;
-          // ex_det.flip(a).flip(i).flip(j + N).flip(b + N);
+
           auto ex_det =
               wfn_traits::template single_excitation_no_check<Spin::Alpha>(
                   state_full, a, i);
@@ -183,13 +286,24 @@ void append_os_doubles_asci_contributions(
           auto h_diag = ham_gen.fast_diag_os_double(eps_alpha[i], eps_beta[j],
                                                     eps_alpha[a], eps_beta[b],
                                                     i, j, a, b, root_diag);
-          // h_el /= (E0 - h_diag);
 
           asci_contributions.push_back({ex_det, coeff * h_el, E0 - h_diag});
         }  // BJ loop
     }  // AI loop
 }
 
+/**
+ * @brief Generate all unique pairs of orbitals for double excitations
+ *
+ * This utility function creates all possible pairs from a given set of orbital
+ * indices, storing them as bitsets with two bits flipped. This is useful for
+ * generating double excitation patterns efficiently.
+ *
+ * @tparam N Size of the wavefunction bitset
+ * @tparam IndContainer Container type for orbital indices
+ * @param[in] inds Container of orbital indices to pair
+ * @param[out] w Output vector of wavefunction bitsets with orbital pairs
+ */
 template <size_t N, typename IndContainer>
 void generate_pairs(const IndContainer& inds, std::vector<wfn_t<N>>& w) {
   const size_t nind = inds.size();

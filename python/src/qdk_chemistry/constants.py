@@ -28,12 +28,12 @@ using the ``get_constant_info()`` function or by examining the ``__doc__`` attri
 of individual constants.
 
 Examples:
-    >>> from qdk.chemistry.constants import ANGSTROM_TO_BOHR, HARTREE_TO_EV
+    >>> from qdk_chemistry.constants import ANGSTROM_TO_BOHR, HARTREE_TO_EV
     >>> length_angstrom = 1.5
     >>> length_bohr = length_angstrom * ANGSTROM_TO_BOHR
 
     >>> # Access detailed documentation (reflects current CODATA version)
-    >>> from qdk.chemistry.constants import get_constant_info
+    >>> from qdk_chemistry.constants import get_constant_info
     >>> info = get_constant_info('bohr_to_angstrom')
     >>> print(f"{info.description} ({info.symbol}): {info.value} {info.units}")
     >>> print(f"Source: {info.source}")
@@ -42,15 +42,15 @@ Examples:
     >>> help(angstrom_to_bohr)
 
     >>> # List all available constants with their documentation
-    >>> from qdk.chemistry.constants import list_constants
+    >>> from qdk_chemistry.constants import list_constants
     >>> list_constants()
 
 Todo:
     * TODO (NAB): convert `print` statements throughout this module to use logging.
       Decide whether the functions should return strings instead of printing/logging directly.
-      https://dev.azure.com/ms-azurequantum/AzureQuantum/_workitems/edit/41417
+      41417
     * TODO (NAB):  add typing information for the functions in this module
-      https://dev.azure.com/ms-azurequantum/AzureQuantum/_workitems/edit/41419
+      41419
 
 """
 
@@ -103,7 +103,7 @@ def list_constants(show_values: bool = True, show_units: bool = True):
 
     # TODO (NAB):  change output to logger rather than print() here and elsewhere
     # or just return strings
-    # https://dev.azure.com/ms-azurequantum/AzureQuantum/_workitems/edit/41417
+    # 41417
     print("QDK/Chemistry Physical Constants (CODATA 2018)")
     print("=" * 50)
 

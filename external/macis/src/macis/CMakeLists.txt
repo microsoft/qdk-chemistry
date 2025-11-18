@@ -1,6 +1,7 @@
 # MACIS Copyright (c) 2023, The Regents of the University of California,
 # through Lawrence Berkeley National Laboratory (subject to receipt of
 # any required approvals from the U.S. Dept. of Energy). All rights reserved.
+# Portions Copyright (c) Microsoft Corporation.
 #
 # See LICENSE.txt for details
 
@@ -19,17 +20,6 @@ add_library( macis
 
   hamiltonian_generator/base.cxx
 )
-
-if(MACIS_ENABLE_TREXIO)
-  FetchContent_Declare( trexio
-    #GIT_REPOSITORY https://github.com/TREX-CoE/trexio
-    GIT_REPOSITORY https://github.com/wavefunction91/trexio
-    GIT_TAG cmake_fixup
-  )
-  FetchContent_MakeAvailable(trexio)
-  target_link_libraries(macis PUBLIC trexio::trexio)
-  target_sources(macis PRIVATE trexio.cxx)
-endif()
 
 target_include_directories( macis PUBLIC
     $<BUILD_INTERFACE:${PROJECT_SOURCE_DIR}/include>

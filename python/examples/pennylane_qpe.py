@@ -14,8 +14,8 @@ no Trotter approximation in this example. Use it to cross-check the Trotterized
 import numpy as np
 import pennylane as qml
 
-from qdk.chemistry.algorithms import create
-from qdk.chemistry.data import QpeResult, Structure
+from qdk_chemistry.algorithms import create
+from qdk_chemistry.data import QpeResult, Structure
 
 ACTIVE_ELECTRONS = 2
 ACTIVE_ORBITALS = 2

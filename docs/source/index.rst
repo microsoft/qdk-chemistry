@@ -2,8 +2,8 @@
 QDK/Chemistry:  A Quantum Applications Toolkit
 ===================================
 
-Welcome to QDK/Chemistry    Documentation
-=============================
+Welcome to QDK/Chemistry Documentation
+======================================
 
 **QDK/Chemistry** (Quantum Applications Toolkit) provides a comprehensive set of tools and libraries for quantum chemistry calculations and simulations.
 It features a unified interface for vast community of quantum chemistry packages.
@@ -17,14 +17,14 @@ Key Features
 * **Plugin System** - Extendable architecture for integrating with other quantum chemistry packages
 
 .. toctree::
-   :maxdepth: 1
+   :maxdepth: 2
    :caption: User Documentation
 
-   user/Quickstart
+   user/quickstart
    user/comprehensive/index
 
 .. toctree::
-   :maxdepth: 1
+   :maxdepth: 2
    :caption:  API Reference
 
    api/python_api
@@ -35,5 +35,6 @@ Key Features
    :caption:  Supporting Information
 
    glossary
+   references
 
 .. todolist::

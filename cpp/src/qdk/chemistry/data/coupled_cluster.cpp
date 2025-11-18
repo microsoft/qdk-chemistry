@@ -28,7 +28,7 @@ CoupledClusterAmplitudes::CoupledClusterAmplitudes(
 
   // Validate dimension of input tensors
   // TODO: This is incorrect for Unrestricted.
-  // https://dev.azure.com/ms-azurequantum/AzureQuantum/_workitems/edit/41348
+  // 41348
   if (not orbitals->is_restricted()) {
     throw std::runtime_error(
         "CoupledClusterAmplitudes + Unrestricted Not Yet Implemented");

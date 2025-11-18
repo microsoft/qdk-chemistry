@@ -20,7 +20,7 @@ namespace data {
 
 // TODO (NAB):  this is a huge file.  Is there a way to break it up into smaller
 // pieces?
-// https://dev.azure.com/ms-azurequantum/AzureQuantum/_workitems/edit/41350
+// 41350
 
 Orbitals::Orbitals(
     const Eigen::MatrixXd& coefficients,

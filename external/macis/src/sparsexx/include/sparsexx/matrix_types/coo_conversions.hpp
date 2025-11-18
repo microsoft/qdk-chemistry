@@ -15,6 +15,28 @@
 
 namespace sparsexx {
 
+/**
+ * @brief Constructor to create a COO matrix from a CSR matrix.
+ *
+ * This constructor converts a CSR (Compressed Sparse Row) matrix to COO
+ * (Coordinate) format. The conversion expands the compressed row representation
+ * into explicit row indices, creating triplet format (row, column, value)
+ * suitable for COO storage.
+ *
+ * @tparam T The value type for matrix elements
+ * @tparam index_t The index type for matrix indices
+ * @tparam Alloc The allocator type for memory management
+ *
+ * @param other The CSR matrix to convert from
+ *
+ * @note The resulting COO matrix will have the same indexing base as the input
+ * CSR matrix
+ * @note Matrix dimensions and non-zero count are preserved exactly
+ * @note The COO matrix will maintain the same element ordering as the CSR
+ * matrix
+ *
+ * @see csr_matrix for details on CSR format
+ */
 template <typename T, typename index_t, typename Alloc>
 coo_matrix<T, index_t, Alloc>::coo_matrix(
     const csr_matrix<T, index_t, Alloc>& other)

@@ -8,8 +8,6 @@
 
 #pragma once
 
-#cmakedefine SPARSEXX_ENABLE_MKL
 #cmakedefine SPARSEXX_ENABLE_MPI
-#cmakedefine SPARSEXX_ENABLE_CEREAL
 #cmakedefine SPARSEXX_ENABLE_RANGES_V3
 #cmakedefine SPARSEXX_ENABLE_METIS

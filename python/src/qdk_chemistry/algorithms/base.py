@@ -27,8 +27,8 @@ class Algorithm(ABC):
     Examples:
         Creating a custom SCF solver algorithm:
 
-        >>> from qdk.chemistry.algorithms import Algorithm, registry
-        >>> from qdk.chemistry.data import Structure, Wavefunction, ElectronicStructureSettings
+        >>> from qdk_chemistry.algorithms import Algorithm, registry
+        >>> from qdk_chemistry.data import Structure, Wavefunction, ElectronicStructureSettings
         >>>
         >>> class MyCustomScfSolver(Algorithm):
         ...     def __init__(self):
@@ -185,16 +185,16 @@ class AlgorithmFactory(ABC):
 
     Note:
         This class is typically not used directly by end users. Instead, use the
-        higher-level registry functions in `qdk.chemistry.algorithms` for
+        higher-level registry functions in `qdk_chemistry.algorithms` for
         creating and registering algorithms.
 
     Examples:
         Creating a custom factory for a new algorithm type:
 
-        >>> from qdk.chemistry.algorithms.base import AlgorithmFactory, Algorithm
-        >>> import qdk.chemistry.algorithms.registry as registry
-        >>> import qdk.chemistry.algorithms as algorithms
-        >>> from qdk.chemistry.data import Structure
+        >>> from qdk_chemistry.algorithms.base import AlgorithmFactory, Algorithm
+        >>> import qdk_chemistry.algorithms.registry as registry
+        >>> import qdk_chemistry.algorithms as algorithms
+        >>> from qdk_chemistry.data import Structure
         >>>
         >>> # Example custom algorithm type
         >>> class GeometryOptimizer(Algorithm):
@@ -231,7 +231,7 @@ class AlgorithmFactory(ABC):
         {'geometry_optimizer': ['bfgs']}
 
     See Also:
-        qdk.chemistry.algorithms.registry: Higher-level registry functions for
+        qdk_chemistry.algorithms.registry: Higher-level registry functions for
             creating and managing algorithms across all types.
 
     """

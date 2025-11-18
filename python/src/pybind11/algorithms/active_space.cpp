@@ -62,8 +62,8 @@ void bind_active_space(py::module& m) {
     --------
     To create a custom active space selector, inherit from this class:
 
-    >>> import qdk.chemistry.algorithms as alg
-    >>> import qdk.chemistry.data as data
+    >>> import qdk_chemistry.algorithms as alg
+    >>> import qdk_chemistry.data as data
     >>> class MyActiveSpaceSelector(alg.ActiveSpaceSelector):
     ...     def __init__(self):
     ...         super().__init__()  # Call the base class constructor
@@ -104,12 +104,12 @@ void bind_active_space(py::module& m) {
 
                Parameters
                ----------
-               wavefunction : qdk.chemistry.data.Wavefunction
+               wavefunction : qdk_chemistry.data.Wavefunction
                    The wavefunction from which to select the active space
 
                Returns
                -------
-               qdk.chemistry.data.Wavefunction
+               qdk_chemistry.data.Wavefunction
                    Wavefunction with active space data populated
 
                Raises
@@ -125,7 +125,7 @@ void bind_active_space(py::module& m) {
 
         Returns
         -------
-        qdk.chemistry.data.Settings
+        qdk_chemistry.data.Settings
             Reference to the settings object for configuring the active space selector
         )");
 
@@ -149,7 +149,7 @@ void bind_active_space(py::module& m) {
         >>> class MySelector(alg.ActiveSpaceSelector):
         ...     def __init__(self):
         ...         super().__init__()
-        ...         from qdk.chemistry.data import ElectronicStructureSettings
+        ...         from qdk_chemistry.data import ElectronicStructureSettings
         ...         self._settings = ElectronicStructureSettings()
         )");
 
@@ -170,6 +170,6 @@ void bind_active_space(py::module& m) {
       m, "ActiveSpaceSelectorFactory");
 
   selector.def("__repr__", [](const ActiveSpaceSelector&) {
-    return "<qdk.chemistry.algorithms.ActiveSpaceSelector>";
+    return "<qdk_chemistry.algorithms.ActiveSpaceSelector>";
   });
 }

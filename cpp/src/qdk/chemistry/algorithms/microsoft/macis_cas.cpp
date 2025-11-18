@@ -37,7 +37,14 @@ struct cas_helper {
     using generator_t = macis::SortedDoubleLoopHamiltonianGenerator<wfn_type>;
 
     auto orbitals = hamiltonian.get_orbitals();
-    std::vector<size_t> active_indices = detail::get_active_indices(*orbitals);
+    const auto& [active_indices, active_indices_beta] =
+        orbitals->get_active_space_indices();
+    // check that alpha and beta active space indices are the same
+    if (active_indices != active_indices_beta) {
+      throw std::runtime_error(
+          "MacisAsci only supports identical alpha and beta active "
+          "space indices.");
+    }
     const size_t num_molecular_orbitals = active_indices.size();
 
     const auto& T = hamiltonian.get_one_body_integrals();
@@ -59,69 +66,18 @@ struct cas_helper {
     dets = macis::generate_hilbert_space<typename generator_t::full_det_t>(
         num_molecular_orbitals, nalpha, nbeta);
 
-    // Copy-back data to return struct
-    Eigen::VectorXd C_vector(C_casci.size());
-    std::copy(C_casci.begin(), C_casci.end(), C_vector.data());
+    // Build Hamiltonian generator and delegate wavefunction construction via
+    // unified builder
+    generator_t ham_gen(macis::matrix_span<double>(
+                            const_cast<double*>(T.data()),
+                            num_molecular_orbitals, num_molecular_orbitals),
+                        macis::rank4_span<double>(
+                            const_cast<double*>(V.data()),
+                            num_molecular_orbitals, num_molecular_orbitals,
+                            num_molecular_orbitals, num_molecular_orbitals));
 
-    std::vector<data::Configuration> dets_configs;
-    for (auto det : dets) {
-      // Convert macis::wfn_t to data::Configuration
-      dets_configs.emplace_back(det, num_molecular_orbitals);
-    }
-
-    data::Wavefunction wfn = [&]() {
-      if (settings_.get<bool>("calculate_one_rdm") ||
-          settings_.get<bool>("calculate_two_rdm")) {
-        // Calculate RDMs from CI coefficients
-        std::vector<double> active_ordm(
-            num_molecular_orbitals * num_molecular_orbitals, 0.0);
-        std::vector<double> active_trdm(
-            num_molecular_orbitals * num_molecular_orbitals *
-                num_molecular_orbitals * num_molecular_orbitals,
-            0.0);
-
-        // Calculate RDMs using the Hamiltonian generator
-        generator_t ham_gen(
-            macis::matrix_span<double>(const_cast<double*>(T.data()),
-                                       num_molecular_orbitals,
-                                       num_molecular_orbitals),
-            macis::rank4_span<double>(
-                const_cast<double*>(V.data()), num_molecular_orbitals,
-                num_molecular_orbitals, num_molecular_orbitals,
-                num_molecular_orbitals));
-
-        ham_gen.form_rdms(dets.begin(), dets.end(), dets.begin(), dets.end(),
-                          C_casci.data(),
-                          macis::matrix_span<double>(active_ordm.data(),
-                                                     num_molecular_orbitals,
-                                                     num_molecular_orbitals),
-                          macis::rank4_span<double>(
-                              active_trdm.data(), num_molecular_orbitals,
-                              num_molecular_orbitals, num_molecular_orbitals,
-                              num_molecular_orbitals));
-
-        // Convert to Eigen format
-        Eigen::MatrixXd one_rdm = Eigen::Map<Eigen::MatrixXd>(
-            active_ordm.data(), num_molecular_orbitals, num_molecular_orbitals);
-        Eigen::VectorXd two_rdm = Eigen::Map<Eigen::VectorXd>(
-            active_trdm.data(),
-            num_molecular_orbitals * num_molecular_orbitals *
-                num_molecular_orbitals * num_molecular_orbitals);
-
-        // Create wavefunction with RDMs
-        return data::Wavefunction(
-            std::make_unique<data::CasWavefunctionContainer>(
-                std::move(C_vector), std::move(dets_configs),
-                hamiltonian.get_orbitals(), std::move(one_rdm),
-                std::move(two_rdm)));
-      } else {
-        // Create wavefunction without RDMs
-        return data::Wavefunction(
-            std::make_unique<data::CasWavefunctionContainer>(
-                std::move(C_vector), std::move(dets_configs),
-                hamiltonian.get_orbitals()));
-      }
-    }();
+    data::Wavefunction wfn = build_wavefunction<data::CasWavefunctionContainer>(
+        settings_, hamiltonian, ham_gen, num_molecular_orbitals, C_casci, dets);
 
     // Add core energy to get total energy
     double final_energy = E_casci + hamiltonian.get_core_energy();
@@ -136,7 +92,14 @@ std::pair<double, std::shared_ptr<data::Wavefunction>> MacisCas::_run_impl(
     unsigned int n_active_alpha_electrons,
     unsigned int n_active_beta_electrons) const {
   const auto& orbitals = hamiltonian->get_orbitals();
-  std::vector<size_t> active_indices = detail::get_active_indices(*orbitals);
+  const auto& [active_indices, active_indices_beta] =
+      orbitals->get_active_space_indices();
+  // check that alpha and beta active space indices are the same
+  if (active_indices != active_indices_beta) {
+    throw std::runtime_error(
+        "MacisCas only supports identical alpha and beta active "
+        "space indices.");
+  }
   auto result = dispatch_by_norb<cas_helper>(
       active_indices.size(), *hamiltonian, *_settings, n_active_alpha_electrons,
       n_active_beta_electrons);

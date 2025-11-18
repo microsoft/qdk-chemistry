@@ -57,8 +57,8 @@ void bind_stability(py::module &m) {
     --------
     To create a custom stability checker, inherit from this class:
 
-    >>> import qdk.chemistry.algorithms as alg
-    >>> import qdk.chemistry.data as data
+    >>> import qdk_chemistry.algorithms as alg
+    >>> import qdk_chemistry.data as data
     >>> class MyStabilityChecker(alg.StabilityChecker):
     ...     def __init__(self):
     ...         super().__init__()  # Call the base class constructor
@@ -103,15 +103,15 @@ void bind_stability(py::module &m) {
 
         Parameters
         ----------
-        wavefunction : qdk.chemistry.data.Wavefunction
+        wavefunction : qdk_chemistry.data.Wavefunction
             The wavefunction to analyze for stability
 
         Returns
         -------
-        tuple[bool, qdk.chemistry.data.StabilityResult]
+        tuple[bool, qdk_chemistry.data.StabilityResult]
             A tuple containing:
             - bool: Overall stability status (True if stable, False if unstable)
-            - qdk.chemistry.data.StabilityResult: Detailed stability information containing:
+            - qdk_chemistry.data.StabilityResult: Detailed stability information containing:
               - internal and external stability status (accessible via is_internal_stable(), is_external_stable())
               - overall stability status (accessible via is_stable(), requires both internal and external to be stable)
               - internal eigenvalues and eigenvectors (accessible via get_internal_eigenvalues(), get_internal_eigenvectors())
@@ -126,7 +126,7 @@ void bind_stability(py::module &m) {
 
         Returns
         -------
-        qdk.chemistry.data.Settings
+        qdk_chemistry.data.Settings
             Reference to the settings object for configuring the stability checker
         )",
                         py::return_value_policy::reference_internal);
@@ -165,6 +165,6 @@ void bind_stability(py::module &m) {
                          StabilityCheckerBase>(m, "StabilityCheckerFactory");
 
   stability_checker.def("__repr__", [](const StabilityChecker &) {
-    return "<qdk.chemistry.algorithms.StabilityChecker>";
+    return "<qdk_chemistry.algorithms.StabilityChecker>";
   });
 }

@@ -2,7 +2,7 @@
 
 Plugins are bridge modules that connect QDK/Chemistry with external quantum chemistry
 software packages. They implement QDK/Chemistry's algorithm interfaces (such as
-:class:`~qdk.chemistry.algorithms.ScfSolver`, :class:`~qdk.chemistry.algorithms.CoupledClusterCalculator`,
+:class:`~qdk_chemistry.algorithms.ScfSolver`, :class:`~qdk_chemistry.algorithms.CoupledClusterCalculator`,
 etc.) while internally using the external library to perform the actual calculations.
 This allows users to leverage specialized capabilities from established quantum chemistry
 packages while maintaining a consistent QDK/Chemistry API.
@@ -15,12 +15,12 @@ Plugins serve several key purposes:
    chemistry packages (e.g., PySCF's diverse DFT functionals, orbital localization methods).
 
 2. **Automatic Format Conversion**: Handle conversion between QDK/Chemistry data structures
-   (e.g., :class:`~qdk.chemistry.data.Structure`, :class:`~qdk.chemistry.data.Orbitals`,
-   :class:`~qdk.chemistry.data.Hamiltonian`) and external library formats automatically.
+   (e.g., :class:`~qdk_chemistry.data.Structure`, :class:`~qdk_chemistry.data.Orbitals`,
+   :class:`~qdk_chemistry.data.Hamiltonian`) and external library formats automatically.
 
 3. **Registry Integration**: Plugin implementations are automatically registered with
    QDK/Chemistry's algorithm registry system, making them available through the
-   :func:`~qdk.chemistry.algorithms.create` factory function.
+   :func:`~qdk_chemistry.algorithms.create` factory function.
 
 4. **Consistent Interface**: Provide a uniform API for different backend implementations,
    allowing users to easily switch between different computational engines without
@@ -30,7 +30,7 @@ Available Plugins
 -----------------
 Currently available plugin packages:
 
-* :mod:`qdk.chemistry.plugins.pyscf`: PySCF integration providing SCF solvers, coupled
+* :mod:`qdk_chemistry.plugins.pyscf`: PySCF integration providing SCF solvers, coupled
   cluster calculators, orbital localization, active space selection (AVAS), and
   stability analysis.
 
@@ -41,9 +41,9 @@ and then creating instances through the registry or directly:
 
 Examples:
     >>> # Import the plugin to register its implementations
-    >>> import qdk.chemistry.plugins.pyscf
+    >>> import qdk_chemistry.plugins.pyscf
     >>> # Create a PySCF SCF solver through the registry
-    >>> from qdk.chemistry.algorithms import create
+    >>> from qdk_chemistry.algorithms import create
     >>> scf_solver = create("scf_solver", "pyscf")
     >>> # Configure and use like any other algorithm
     >>> scf_solver.settings()["basis_set"] = "cc-pvdz"
@@ -55,8 +55,8 @@ Notes:
     separately.
 
 See Also:
-    :mod:`qdk.chemistry.algorithms`: Algorithm base classes and registry system
-    :mod:`qdk.chemistry.plugins.pyscf`: PySCF integration plugin
+    :mod:`qdk_chemistry.algorithms`: Algorithm base classes and registry system
+    :mod:`qdk_chemistry.plugins.pyscf`: PySCF integration plugin
 
 """
 # --------------------------------------------------------------------------------------------

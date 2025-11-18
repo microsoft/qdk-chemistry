@@ -2,6 +2,7 @@
  * MACIS Copyright (c) 2023, The Regents of the University of California,
  * through Lawrence Berkeley National Laboratory (subject to receipt of
  * any required approvals from the U.S. Dept. of Energy). All rights reserved.
+ * Portions Copyright (c) Microsoft Corporation.
  *
  * See LICENSE.txt for details
  */
@@ -20,6 +21,22 @@
 namespace macis {
 
 #ifdef MACIS_ENABLE_MPI
+/**
+ * @brief Parallel (MPI) selected CI diagonalization using Davidson solver.
+ *
+ * Performs diagonalization of a distributed sparse Hamiltonian matrix using
+ * the parallel Davidson eigensolver to find the ground state energy and
+ * wavefunction.
+ *
+ * @tparam SpMatType Type of the distributed sparse matrix
+ * @param[in] H Distributed sparse Hamiltonian matrix
+ * @param[in] davidson_max_m Maximum dimension of the Davidson subspace
+ * @param[in] davidson_res_tol Convergence tolerance for Davidson residual
+ * @param[in,out] C_local Local portion of eigenvector (input: guess, output:
+ * converged)
+ * @param[in] comm MPI communicator
+ * @return Ground state energy
+ */
 template <typename SpMatType>
 double parallel_selected_ci_diag(const SpMatType& H, size_t davidson_max_m,
                                  double davidson_res_tol,
@@ -73,6 +90,19 @@ double parallel_selected_ci_diag(const SpMatType& H, size_t davidson_max_m,
 }
 #endif /* MACIS_ENABLE_MPI */
 
+/**
+ * @brief Serial selected CI diagonalization using Davidson solver.
+ *
+ * Performs diagonalization of a sparse Hamiltonian matrix using the serial
+ * Davidson eigensolver to find the ground state energy and wavefunction.
+ *
+ * @tparam SpMatType Type of the sparse matrix
+ * @param[in] H Sparse Hamiltonian matrix
+ * @param[in] davidson_max_m Maximum dimension of the Davidson subspace
+ * @param[in] davidson_res_tol Convergence tolerance for Davidson residual
+ * @param[in,out] C Eigenvector (input: guess, output: converged)
+ * @return Ground state energy
+ */
 template <typename SpMatType>
 double serial_selected_ci_diag(const SpMatType& H, size_t davidson_max_m,
                                double davidson_res_tol,
@@ -122,6 +152,29 @@ double serial_selected_ci_diag(const SpMatType& H, size_t davidson_max_m,
   return E;
 }
 
+/**
+ * @brief Main selected CI diagonalization routine with Hamiltonian
+ * construction.
+ *
+ * This function constructs the selected CI Hamiltonian matrix from determinants
+ * and performs diagonalization to find the ground state energy. It
+ * automatically chooses between serial and parallel implementations based on
+ * compilation flags.
+ *
+ * @tparam index_t Type for matrix indices
+ * @tparam WfnType Type of wavefunction/determinant
+ * @tparam WfnIterator Iterator type for determinant container
+ * @param[in] dets_begin Iterator to beginning of determinant list
+ * @param[in] dets_end Iterator to end of determinant list
+ * @param[in,out] ham_gen Hamiltonian generator for matrix elements
+ * @param[in] h_el_tol Tolerance for Hamiltonian matrix elements
+ * @param[in] davidson_max_m Maximum dimension of Davidson subspace
+ * @param[in] davidson_res_tol Davidson convergence tolerance
+ * @param[in,out] C_local Eigenvector coefficients (local portion for MPI)
+ * @param[in] comm MPI communicator (MPI builds only)
+ * @param[in] quiet Flag to suppress output (default: false)
+ * @return Ground state energy
+ */
 template <typename index_t, typename WfnType, typename WfnIterator>
 double selected_ci_diag(WfnIterator dets_begin, WfnIterator dets_end,
                         HamiltonianGenerator<WfnType>& ham_gen, double h_el_tol,
@@ -150,22 +203,9 @@ double selected_ci_diag(WfnIterator dets_begin, WfnIterator dets_end,
 
   auto world_size = comm_size(comm);
   auto world_rank = comm_rank(comm);
-  //{
-  // std::ofstream wfn_file("wfn_" +
-  // std::to_string(std::distance(dets_begin,dets_end)) + "_" +
-  // std::to_string(world_rank) + "." + std::to_string(world_size) + ".txt");
-  // for(auto it = dets_begin; it != dets_end; ++it) {
-  //  wfn_file << *it << "\n";
-  //}
-  // wfn_file << std::flush;
-  //}
 
   auto H = make_dist_csr_hamiltonian<index_t>(comm, dets_begin, dets_end,
                                               ham_gen, h_el_tol);
-  // sparsexx::write_dist_mm("ham_" + std::to_string(H.n()) + "." +
-  // std::to_string(world_size) + ".mtx", H, 1);
-  // MACIS_MPI_CODE(MPI_Barrier(comm);)
-  // if(H.n() >= 10000000) throw "DIE DIE DIE";
 #else
   auto H =
       make_csr_hamiltonian<index_t>(dets_begin, dets_end, ham_gen, h_el_tol);

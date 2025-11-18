@@ -15,77 +15,31 @@ QDK/Chemistry provides a comprehensive suite of tools for:
 
 ## Documentation
 
+- **Website**: The static documentation is hosted at [microsoft.github.io/qdk-cheistry](https://microsoft.github.io/qdk-cheistry/index.html)
 - **C++ API**: Headers in `cpp/include/` contain comprehensive Doxygen documentation
 - **Python API**: All methods include detailed docstrings with Parameters, Returns, Raises, and Examples sections
-- **Examples**: See `tests/` directories for usage examples
-
-```txt
-TODO (NAB):  include a link to the online documentation
-https://dev.azure.com/ms-azurequantum/AzureQuantum/_workitems/edit/41432
-```
+- **Examples**: See below, or the `python/examples/` and `docs/examples` directories for usage examples
 
 ## Project Structure
 
 ```txt
 qdk-chemistry/
-├── cpp/                 # C++ core library
-│   ├── include/         # Header files
+├── cpp/                # C++ core library
+│   ├── include/        # Header files
 │   ├── src/            # Implementation files
 │   └── tests/          # C++ unit tests
-├── python/             # Python bindings
-│   ├── src/            # pybind11 wrapper and python code
-│   └── tests/          # Python unit tests
+├── docs/               # Static documentation
 ├── external/           # External libraries and scripts
-└── vscode/             # VS Code extension
+└── python/             # Python bindings
+    ├── src/            # pybind11 wrapper and python code
+    └── tests/          # Python unit tests
 ```
 
 ## Installing
 
 Detailed instructions for installing QDK/Chemistry can be found in [INSTALL.md](./INSTALL.md)
 
-## Core Classes
-
-```txt
-TODO (DBWY): Can we nix the following in favor of the "proper" docs?
-https://dev.azure.com/ms-azurequantum/AzureQuantum/_workitems/edit/41432
-```
-
-### Data Classes
-
-All QDK/Chemistry data classes provide consistent serialization APIs:
-
-- **Structure**: Molecular geometry with atomic coordinates, elements, and properties
-- **Orbitals**: Molecular orbital coefficients, energies, and occupations
-- **BasisSet**: Atomic orbital basis sets with shells and primitives
-- **Settings**: Configuration parameters with type-safe storage
-
-### Serialization Standards
-
-QDK/Chemistry uses a standardized naming convention for all serialization operations:
-
-#### Naming Convention
-
-- `to_<format>()` / `to_<format>_file()` - Serialization methods
-- `from_<format>()` / `from_<format>_file()` - Deserialization methods
-
-#### File Naming Requirements
-
-All data files must follow a strict naming convention that includes the data type before the file extension:
-
-- **Structure**: `filename.structure.json`, `filename.structure.xyz`
-- **Orbitals**: `filename.orbitals.json`, `filename.orbitals.h5`
-- **BasisSet**: `filename.basis_set.json`, `filename.basis_set.h5`
-- **Settings**: `filename.settings.json`, `filename.settings.h5`
-
-This naming convention ensures type safety and prevents accidental loading of wrong data types.
-
-#### Supported Formats
-
-- **JSON**: Human-readable, for debugging and data exchange
-- **HDF5**: Binary format with high precision for production data
-- **XYZ**: Standard molecular structure format (Structure only)
-
-#### Example Usage
+## Example Usage
 
 ```cpp
 #include <Eigen/Dense>
@@ -170,22 +124,6 @@ loaded_structure = Structure.from_json_file("water.structure.json")
 loaded_orbitals = Orbitals.from_hdf5_file("molecule.orbitals.h5")
 loaded_settings = Settings.from_hdf5_file("config.settings.h5")
 ```
-
-## Error Handling
-
-All serialization methods use consistent error handling:
-
-- Throw `std::runtime_error` (C++) or `RuntimeError` (Python) for:
-  - Invalid data that cannot be serialized
-  - File I/O errors
-  - Malformed input data during deserialization
-
-## Best Practices
-
-1. **Use HDF5 for production data**: Preserves full numerical precision
-1. **Use JSON for debugging**: Human-readable and editable
-1. **Use XYZ for structure exchange**: Standard chemistry format
-1. **Handle exceptions**: Always wrap I/O operations in try-catch blocks
 
 ## Contributing
 

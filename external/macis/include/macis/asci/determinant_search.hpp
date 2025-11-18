@@ -2,6 +2,7 @@
  * MACIS Copyright (c) 2023, The Regents of the University of California,
  * through Lawrence Berkeley National Laboratory (subject to receipt of
  * any required approvals from the U.S. Dept. of Energy). All rights reserved.
+ * Portions Copyright (c) Microsoft Corporation.
  *
  * See LICENSE.txt for details
  */
@@ -25,48 +26,122 @@
 
 namespace macis {
 
+/**
+ * @brief Comparator for selecting top-k ASCI contributions
+ *
+ * This comparator orders ASCI contributions by their absolute ratio value (rv)
+ * in descending order, allowing efficient selection of the most important
+ * determinant contributions for variational space expansion.
+ *
+ * @tparam WfnT Wavefunction type representing quantum states
+ */
 template <typename WfnT>
 struct asci_contrib_topk_comparator {
   using type = asci_contrib<WfnT>;
+
+  /**
+   * @brief Compare two ASCI contributions by their absolute ratio values
+   * @param a First ASCI contribution
+   * @param b Second ASCI contribution
+   * @return true if |a.rv()| > |b.rv()|, false otherwise
+   */
   constexpr bool operator()(const type& a, const type& b) const {
     return std::abs(a.rv()) > std::abs(b.rv());
   }
 };
 
+/**
+ * @brief Configuration parameters for ASCI (Adaptive Sampling Configuration
+ * Interaction) calculations
+ *
+ * This structure contains all the settings and thresholds used to control the
+ * behavior of ASCI calculations, including determinant selection criteria,
+ * perturbation theory corrections, parallelization parameters, and convergence
+ * tolerances.
+ */
 struct ASCISettings {
+  /// @brief Maximum number of trial determinants in the variational space
   size_t ntdets_max = 1e5;
+  /// @brief Minimum number of trial determinants required
   size_t ntdets_min = 100;
+  /// @brief Maximum number of core determinants
   size_t ncdets_max = 100;
+  /// @brief Threshold for Hamiltonian matrix element magnitude
   double h_el_tol = 1e-8;
+  /// @brief Threshold for ratio value pruning in determinant selection
   double rv_prune_tol = 1e-8;
+  /// @brief Maximum number of ASCI contribution pairs to store in memory
   size_t pair_size_max = 5e8;
 
+  /// @brief Tolerance for second-order perturbation theory corrections
   double pt2_tol = 1e-16;
+  /// @brief Reserve count for PT2 calculations
   size_t pt2_reserve_count = 70000000;
+  /// @brief Enable pruning in PT2 calculations
   bool pt2_prune = false;
+  /// @brief Precompute orbital energies for PT2
   bool pt2_precompute_eps = false;
+  /// @brief Precompute indices for PT2
   bool pt2_precompute_idx = false;
+  /// @brief Print progress information during PT2 calculations
   bool pt2_print_progress = false;
+  /// @brief Threshold for big constraint handling in PT2
   size_t pt2_bigcon_thresh = 250;
 
+  /// @brief Threshold for next value batch count
   size_t nxtval_bcount_thresh = 1000;
+  /// @brief Increment for next value batch count
   size_t nxtval_bcount_inc = 10;
 
+  /// @brief If true, only consider single excitations (no doubles)
   bool just_singles = false;
+  /// @brief Factor by which to grow the variational space
   size_t grow_factor = 8;
+  /// @brief Maximum number of refinement iterations
   size_t max_refine_iter = 6;
+  /// @brief Energy convergence tolerance for refinement
   double refine_energy_tol = 1e-6;
 
+  /// @brief Enable growing with rotations
   bool grow_with_rot = false;
+  /// @brief Starting size for rotations
   size_t rot_size_start = 1000;
 
-  // bool dist_triplet_random = false;
-  int constraint_level = 2;  // Up To Quints
+  /// @brief Constraint level for excitation generation (0=triplets,
+  /// 1=quadruplets, 2=quintuplets, etc.)
+  int constraint_level = 2;
+  /// @brief Maximum constraint level for PT2 calculations
   int pt2_max_constraint_level = 5;
+  /// @brief Minimum constraint level for PT2 calculations
   int pt2_min_constraint_level = 0;
+  /// @brief Force constraint refinement for PT2 calculations
   int64_t pt2_constraint_refine_force = 0;
 };
 
+/**
+ * @brief Generate ASCI contributions using standard determinant-by-determinant
+ * approach
+ *
+ * This function computes ASCI contributions for all possible single and double
+ * excitations from the current determinant set using a straightforward approach
+ * that loops over each determinant individually. It generates matrix elements
+ * for all connected excitations and stores them for later selection.
+ *
+ * @tparam N Size of the wavefunction bitset
+ * @param[in] asci_settings Configuration parameters for the ASCI calculation
+ * @param[in] cdets_begin Iterator to the beginning of core determinants
+ * @param[in] cdets_end Iterator to the end of core determinants
+ * @param[in] E_ASCI Reference energy for the ASCI calculation
+ * @param[in] C Coefficients of the core determinants
+ * @param[in] norb Number of orbitals in the system
+ * @param[in] T_pq One-electron integral matrix
+ * @param[in] G_red Reduced same-spin two-electron integral tensor
+ * @param[in] V_red Reduced opposite-spin two-electron integral tensor
+ * @param[in] G_pqrs Full same-spin two-electron integral tensor
+ * @param[in] V_pqrs Full opposite-spin two-electron integral tensor
+ * @param[in] ham_gen Hamiltonian generator for matrix element evaluation
+ * @return Container of ASCI contributions with their associated scores
+ */
 template <size_t N>
 asci_contrib_container<wfn_t<N>> asci_contributions_standard(
     ASCISettings asci_settings, wavefunction_iterator_t<N> cdets_begin,
@@ -160,6 +235,39 @@ asci_contrib_container<wfn_t<N>> asci_contributions_standard(
   return asci_pairs;
 }
 
+/**
+ * @brief Generate ASCI contributions using constraint-based approach for
+ * parallel efficiency
+ *
+ * This function computes ASCI contributions using a constraint-based algorithm
+ * that groups determinants by common alpha strings and generates excitations
+ * systematically. This approach is more memory-efficient and parallelizes
+ * better than the standard approach, particularly for large systems and
+ * distributed computing environments.
+ *
+ * The algorithm works by:
+ * 1. Grouping determinants by unique alpha strings
+ * 2. Generating mask constraints for systematic excitation enumeration
+ * 3. Processing constraints in parallel across MPI ranks and threads
+ * 4. Accumulating and pruning contributions on-the-fly
+ *
+ * @tparam N Size of the wavefunction bitset
+ * @param[in] asci_settings Configuration parameters for the ASCI calculation
+ * @param[in] ntdets Target number of determinants for the expanded space
+ * @param[in] cdets_begin Iterator to the beginning of core determinants
+ * @param[in] cdets_end Iterator to the end of core determinants
+ * @param[in] E_ASCI Reference energy for the ASCI calculation
+ * @param[in] C Coefficients of the core determinants
+ * @param[in] norb Number of orbitals in the system
+ * @param[in] T_pq One-electron integral matrix
+ * @param[in] G_red Reduced same-spin two-electron integral tensor
+ * @param[in] V_red Reduced opposite-spin two-electron integral tensor
+ * @param[in] G_pqrs Full same-spin two-electron integral tensor
+ * @param[in] V_pqrs Full opposite-spin two-electron integral tensor
+ * @param[in] ham_gen Hamiltonian generator for matrix element evaluation
+ * @param[in] comm MPI communicator for parallel execution (if MPI enabled)
+ * @return Container of ASCI contributions with their associated scores
+ */
 template <size_t N>
 asci_contrib_container<wfn_t<N>> asci_contributions_constraint(
     ASCISettings asci_settings, const size_t ntdets,
@@ -190,15 +298,39 @@ asci_contrib_container<wfn_t<N>> asci_contributions_constraint(
 #endif /* MACIS_ENABLE_MPI */
 
   // For each unique alpha, create a list of beta string and store metadata
+  /**
+   * @brief Data structure for storing beta string metadata in constraint-based
+   * ASCI
+   *
+   * This structure efficiently stores precomputed information for beta strings
+   * that share the same alpha string, enabling fast evaluation of matrix
+   * elements during excitation generation. All necessary data is precomputed to
+   * avoid redundant calculations during the constraint processing loop.
+   */
   struct beta_coeff_data {
+    /// @brief The beta spin string component of the determinant
     spin_wfn_type beta_string;
+    /// @brief Occupied orbital indices in the beta string
     std::vector<uint32_t> occ_beta;
+    /// @brief Virtual orbital indices in the beta string
     std::vector<uint32_t> vir_beta;
+    /// @brief Precomputed alpha orbital energies for this determinant
     std::vector<double> orb_ens_alpha;
+    /// @brief Precomputed beta orbital energies for this determinant
     std::vector<double> orb_ens_beta;
+    /// @brief Coefficient of this determinant in the wavefunction
     double coeff;
+    /// @brief Diagonal Hamiltonian matrix element <det|H|det>
     double h_diag;
 
+    /**
+     * @brief Constructor to initialize beta coefficient data
+     * @param[in] c Coefficient of the determinant
+     * @param[in] norb Number of orbitals in the system
+     * @param[in] occ_alpha Occupied alpha orbital indices
+     * @param[in] w Full determinant wavefunction
+     * @param[in] ham_gen Hamiltonian generator for matrix element computation
+     */
     beta_coeff_data(double c, size_t norb,
                     const std::vector<uint32_t>& occ_alpha, wfn_t<N> w,
                     const HamiltonianGenerator<wfn_t<N>>& ham_gen) {
@@ -240,8 +372,6 @@ asci_contrib_container<wfn_t<N>> asci_contributions_constraint(
     }
   }
 
-  // const auto num_alpha_occupied_orbitals =
-  // wfn_traits::count(uniq_alpha_wfn[0]);
   const auto num_alpha_occupied_orbitals =
       spin_wfn_traits::count(uniq_alpha[0].first);
   const auto num_alpha_virtual_orbitals = norb - num_alpha_occupied_orbitals;
@@ -255,8 +385,6 @@ asci_contrib_container<wfn_t<N>> asci_contributions_constraint(
   const auto n_sing_beta =
       num_beta_occupied_orbitals * num_beta_virtual_orbitals;
   const auto n_doub_beta = (n_sing_beta * (n_sing_beta - norb + 1)) / 4;
-
-  // logger->info("  * NS = {} ND = {}", n_sing_alpha, n_doub_alpha);
 
   // Generate mask constraints
   if (!world_rank) {
@@ -329,8 +457,6 @@ asci_contrib_container<wfn_t<N>> asci_contributions_constraint(
       const size_t c_end = std::min(ncon_total, ic + ntake);
       for (; ic < c_end; ++ic) {
         const auto& con = constraints[ic].first;
-        // printf("[rank %4d tid:%4d] %10lu / %10lu\n", world_rank,
-        //        omp_get_thread_num(), ic, ncon_total);
 
         for (size_t i_alpha = 0, iw = 0; i_alpha < nuniq_alpha; ++i_alpha) {
           const auto& alpha_det = uniq_alpha[i_alpha].first;
@@ -391,16 +517,12 @@ asci_contrib_container<wfn_t<N>> asci_contributions_constraint(
             auto uit = sort_and_accumulate_asci_pairs(
                 asci_pairs.begin() + size_before, asci_pairs.end());
             asci_pairs.erase(uit, asci_pairs.end());
-            if (asci_pairs.size() > asci_settings.pair_size_max)
-              throw std::runtime_error("DIE DIE DIE");
           }
 
         }  // Unique Alpha Loop
 
         // Local S&A for each quad
         {
-          if (size_before > asci_pairs.size())
-            throw std::runtime_error("DIE DIE DIE");
           auto uit = sort_and_accumulate_asci_pairs(
               asci_pairs.begin() + size_before, asci_pairs.end());
           asci_pairs.erase(uit, asci_pairs.end());
@@ -435,6 +557,42 @@ asci_contrib_container<wfn_t<N>> asci_contributions_constraint(
   return asci_pairs_total;
 }
 
+/**
+ * @brief Main ASCI determinant search algorithm
+ *
+ * This is the primary function for ASCI (Adaptive Sampling Configuration
+ * Interaction) determinant selection. It expands the variational space by
+ * identifying the most important determinants connected to the current
+ * reference space through single and double excitations.
+ *
+ * The algorithm performs the following steps:
+ * 1. Generate all possible excitation contributions from reference determinants
+ * 2. Score each contribution using perturbative estimates
+ * 3. Select the top-scoring determinants up to the specified limit
+ * 4. Return the expanded determinant set for the next CI iteration
+ *
+ * The function uses either standard or constraint-based contribution generation
+ * depending on the system size and parallelization requirements.
+ *
+ * @tparam N Size of the wavefunction bitset
+ * @param[in] asci_settings Configuration parameters controlling the search
+ * @param[in] ndets_max Maximum number of determinants to include in expanded
+ * space
+ * @param[in] cdets_begin Iterator to the beginning of current reference
+ * determinants
+ * @param[in] cdets_end Iterator to the end of current reference determinants
+ * @param[in] E_ASCI Current ASCI energy estimate
+ * @param[in] C Coefficients of the reference determinants
+ * @param[in] norb Number of orbitals in the system
+ * @param[in] T_pq One-electron integral matrix
+ * @param[in] G_red Reduced same-spin two-electron integral tensor
+ * @param[in] V_red Reduced opposite-spin two-electron integral tensor
+ * @param[in] G_pqrs Full same-spin two-electron integral tensor
+ * @param[in] V_pqrs Full opposite-spin two-electron integral tensor
+ * @param[in] ham_gen Hamiltonian generator for matrix element evaluation
+ * @param[in] comm MPI communicator for parallel execution (if MPI enabled)
+ * @return Vector of determinants for the expanded variational space
+ */
 template <size_t N>
 std::vector<wfn_t<N>> asci_search(
     ASCISettings asci_settings, size_t ndets_max,
@@ -493,16 +651,9 @@ std::vector<wfn_t<N>> asci_search(
   // Expand Search Space with Connected ASCI Contributions
   auto pairs_st = clock_type::now();
   asci_contrib_container<wfn_t<N>> asci_pairs;
-  // if(world_size == 1)
-  //   asci_pairs = asci_contributions_standard(
-  //       asci_settings, cdets_begin, cdets_end, E_ASCI, C, norb, T_pq, G_red,
-  //       V_red, G_pqrs, V_pqrs, ham_gen);
-  // #ifdef MACIS_ENABLE_MPI
-  // else
   asci_pairs = asci_contributions_constraint(
       asci_settings, ndets_max, cdets_begin, cdets_end, E_ASCI, C, norb, T_pq,
       G_red, V_red, G_pqrs, V_pqrs, ham_gen MACIS_MPI_CODE(, comm));
-  // #endif /* MACIS_ENABLE_MPI */
   auto pairs_en = clock_type::now();
 
   {
@@ -535,14 +686,6 @@ std::vector<wfn_t<N>> asci_search(
 #endif /* MACIS_ENABLE_MPI */
     }
   }
-
-#if 0
-  // #TODO: Replace this ad-hoc std::cout debugging with structured logging or remove before release.
-  std::cout << "ASCI PAIRS" << std::endl;
-  for(auto [s,rv] : asci_pairs) {
-    std::cout << to_canonical_string(s) << ", " << std::scientific << rv << std::endl;
-  }
-#endif /* 0 */
 
   // Accumulate unique score contributions
   // MPI + Constraint Search already does S&A
@@ -578,36 +721,14 @@ std::vector<wfn_t<N>> asci_search(
   }
 
   auto keep_large_st = clock_type::now();
-#if 0
-  // Finalize scores
-  for(auto& x : asci_pairs) {
-    x.c_times_matel = -std::abs(x.c_times_matel);
-    x.h_diag = std::abs(x.h_diag);
-  }
 
-  // Insert all dets with their coefficients as seeds
-  for(size_t i = 0; i < ncdets; ++i) {
-    auto state = *(cdets_begin + i);
-    asci_pairs.push_back({state, std::abs(C[i])});
-  }
-
-  // Check duplicates (which correspond to the initial truncation),
-  // and keep only the duplicate with positive coefficient.
-  keep_only_largest_copy_asci_pairs(asci_pairs);
-
-  asci_pairs.erase(std::partition(asci_pairs.begin(), asci_pairs.end(),
-                                  [](const auto& p) { return p.rv() < 0.0; }),
-                   asci_pairs.end());
-
-#else
   // Remove core dets
-  // XXX: This assumes the constraint search for now
+  // This assumes the constraint search
   {
     auto inf_ptr = std::partition(asci_pairs.begin(), asci_pairs.end(),
                                   [](auto& p) { return !std::isinf(p.rv()); });
     asci_pairs.erase(inf_ptr, asci_pairs.end());
   }
-#endif /* 0 */
 
   auto keep_large_en = clock_type::now();
   duration_type keep_large_dur = keep_large_en - keep_large_st;

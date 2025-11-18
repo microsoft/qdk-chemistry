@@ -2,6 +2,7 @@
  * MACIS Copyright (c) 2023, The Regents of the University of California,
  * through Lawrence Berkeley National Laboratory (subject to receipt of
  * any required approvals from the U.S. Dept. of Energy). All rights reserved.
+ * Portions Copyright (c) Microsoft Corporation.
  *
  * See LICENSE.txt for details
  */
@@ -16,6 +17,46 @@
 #ifdef MACIS_ENABLE_MPI
 namespace macis {
 
+/**
+ * @brief Calculate second-order perturbation theory (PT2) correction using
+ * constraint-based parallelization
+ *
+ * This function computes the PT2 energy correction for ASCI wavefunctions using
+ * a constraint-based approach for efficient parallelization over MPI processes
+ * and OpenMP threads. The method generates all possible excitations from the
+ * reference wavefunction subject to orbital constraints, evaluating their
+ * contributions to the PT2 energy.
+ *
+ * @tparam N Size of the wavefunction bitset representation
+ *
+ * @param[in] asci_settings ASCI algorithm parameters including PT2 tolerances
+ * @param[in] cdets_begin Iterator to beginning of converged determinants
+ * @param[in] cdets_end Iterator to end of converged determinants
+ * @param[in] E_ASCI Converged ASCI energy (denominator reference)
+ * @param[in] C CI coefficients for the converged wavefunction
+ * @param[in] norb Number of molecular orbitals
+ * @param[in] T_pq One-electron integral matrix (kinetic + nuclear attraction)
+ * @param[in] G_red Reduced two-electron repulsion integrals (same-spin)
+ * @param[in] V_red Reduced two-electron exchange integrals (same-spin)
+ * @param[in] G_pqrs Full two-electron repulsion integral tensor (same-spin)
+ * @param[in] V_pqrs Full two-electron repulsion integral tensor (opposite-spin)
+ * @param[in] ham_gen Hamiltonian generator for matrix element evaluation
+ * @param[in] comm MPI communicator for parallel execution
+ *
+ * @return PT2 energy correction (EPT2)
+ *
+ * @pre Determinants must be sorted according to spin comparator
+ * @pre MPI must be enabled (MACIS_ENABLE_MPI defined)
+ *
+ * @note This implementation uses both "big" and "small" constraint categories
+ *       for load balancing, with different parallelization strategies
+ * @note Memory requirements are logged for optimization purposes
+ * @note Progress reporting can be enabled via PT2 settings
+ *
+ * @see generate_constraint_singles_contributions_ss,
+ * generate_constraint_doubles_contributions_ss,
+ * generate_constraint_doubles_contributions_os
+ */
 template <size_t N>
 double asci_pt2_constraint(ASCISettings asci_settings,
                            wavefunction_iterator_t<N> cdets_begin,
@@ -66,15 +107,26 @@ double asci_pt2_constraint(ASCISettings asci_settings,
   logger->info("");
 
   // For each unique alpha, create a list of beta string and store metadata
+  /**
+   * @brief Data structure for storing beta string metadata and coefficients
+   *
+   * This structure encapsulates all necessary information for a beta string
+   * in the context of PT2 calculations, including orbital occupations,
+   * precomputed orbital energies, and Hamiltonian matrix elements.
+   */
   struct beta_coeff_data {
-    spin_wfn_type beta_string;
-    std::vector<uint8_t> occ_beta;
-    std::vector<uint8_t> vir_beta;
-    std::vector<double> orb_ens_alpha;
-    std::vector<double> orb_ens_beta;
-    double coeff;
-    double h_diag;
+    spin_wfn_type beta_string;          ///< Beta spin orbital configuration
+    std::vector<uint8_t> occ_beta;      ///< Occupied beta orbital indices
+    std::vector<uint8_t> vir_beta;      ///< Virtual beta orbital indices
+    std::vector<double> orb_ens_alpha;  ///< Precomputed alpha orbital energies
+    std::vector<double> orb_ens_beta;   ///< Precomputed beta orbital energies
+    double coeff;   ///< CI coefficient for this configuration
+    double h_diag;  ///< Diagonal Hamiltonian matrix element
 
+    /**
+     * @brief Calculate memory footprint of this data structure
+     * @return Memory usage in bytes
+     */
     size_t mem() const {
       return sizeof(spin_wfn_type) +
              (occ_beta.capacity() + vir_beta.capacity()) * sizeof(uint8_t) +
@@ -82,6 +134,21 @@ double asci_pt2_constraint(ASCISettings asci_settings,
                  sizeof(double);
     }
 
+    /**
+     * @brief Constructor for beta coefficient data
+     *
+     * Initializes all metadata for a beta string configuration, including
+     * orbital occupations, virtual orbitals, diagonal matrix elements,
+     * and optionally precomputed orbital energies for efficiency.
+     *
+     * @param[in] c CI coefficient for this configuration
+     * @param[in] norb Number of molecular orbitals
+     * @param[in] occ_alpha Occupied alpha orbital indices
+     * @param[in] w Full wavefunction determinant
+     * @param[in] ham_gen Hamiltonian generator for matrix elements
+     * @param[in] pce Whether to precompute orbital energies
+     * @param[in] pci Whether to precompute orbital indices
+     */
     beta_coeff_data(double c, size_t norb,
                     const std::vector<uint32_t>& occ_alpha, wfn_t<N> w,
                     const HamiltonianGenerator<wfn_t<N>>& ham_gen, bool pce,
@@ -181,24 +248,6 @@ double asci_pt2_constraint(ASCISettings asci_settings,
   auto gen_c_en = clock_type::now();
   duration_type gen_c_dur = gen_c_en - gen_c_st;
   logger->info("  * GEN_DUR = {:.2e} ms", gen_c_dur.count());
-  // if(!world_rank) {
-  //   std::ofstream c_file("constraint_work.txt");
-  //   std::stringstream ss;
-  //   for(auto [c,s] : constraints) {
-  //     ss << c.C() << " " << s << std::endl;
-  //   }
-  //   auto str = ss.str();
-  //   c_file.write(str.c_str(), str.size());
-  // }
-  // if(!world_rank) {
-  //   std::ofstream c_file("unique_alpha.txt");
-  //   std::stringstream ss;
-  //   for(size_t i = 0; i < nuniq_alpha; ++i) {
-  //     ss << uniq_alpha[i].first << " " << uniq_alpha[i].second << std::endl;
-  //   }
-  //   auto str = ss.str();
-  //   c_file.write(str.c_str(), str.size());
-  // }
 
   double EPT2 = 0.0;
   size_t NPT2 = 0;
@@ -222,8 +271,8 @@ double asci_pt2_constraint(ASCISettings asci_settings,
       ic = nxtval_big.fetch_add(1);
       if (ic >= ncon_big) continue;
       if (asci_settings.pt2_print_progress)
-        printf("[pt2_big rank %4d] %10lu / %10lu\n", world_rank, ic,
-               ncon_total);
+        logger->info("[pt2_big rank {:4d}] {:10d} / {:10d}", world_rank, ic,
+                     ncon_total);
       const auto& con = constraints[ic].first;
 
       asci_contrib_container<wfn_t<N>> asci_pairs_con;
@@ -248,18 +297,9 @@ double asci_pt2_constraint(ASCISettings asci_settings,
             const auto& beta_det = bcd[j_beta].beta_string;
             const auto h_diag = bcd[j_beta].h_diag;
 
-// TODO: These copies are slow
-#if 0
-          const auto& occ_beta_8 = bcd[j_beta].occ_beta;
-          const auto& vir_beta_8 = bcd[j_beta].vir_beta;
-          std::vector<uint32_t> occ_beta(occ_beta_8.size()), vir_beta(vir_beta_8.size());
-          std::copy(occ_beta_8.begin(), occ_beta_8.end(), occ_beta.begin());
-          std::copy(vir_beta_8.begin(), vir_beta_8.end(), vir_beta.begin());
-#else
             std::vector<uint32_t> occ_beta, vir_beta;
             spin_wfn_traits::state_to_occ_vir(norb, beta_det, occ_beta,
                                               vir_beta);
-#endif /* 0 */
 
             std::vector<double> orb_ens_alpha, orb_ens_beta;
             if (asci_settings.pt2_precompute_eps) {
@@ -307,19 +347,6 @@ double asci_pt2_constraint(ASCISettings asci_settings,
                   {w, std::numeric_limits<double>::infinity(), 1.0});
             }
           }
-#if 0
-        if(asci_settings.pt2_prune and asci_pairs.size() > asci_settings.pt2_reserve_count and asci_pairs.size() != old_pair_size) {
-        // Cleanup
-        auto uit = stable_sort_and_accumulate_asci_pairs(asci_pairs.begin(),
-                                                  asci_pairs.end());
-        asci_pairs.erase(uit, asci_pairs.end());
-        //uit = std::stable_partition(asci_pairs.begin(), asci_pairs.end(), [&](const auto& p){ return std::abs(p.pt2()) > h_el_tol; });
-        //asci_pairs.erase(uit, asci_pairs.end());
-          printf("[pt2_prune rank %4d tid:%4d] IC = %lu / %lu IA = %lu / %lu SZ = %lu\n", world_rank,
-                 omp_get_thread_num(), ic, ncon_total, i_alpha,
-                 nuniq_alpha, asci_pairs.size());
-        }
-#endif /* 0 */
 
         }  // Unique Alpha Loop
 
@@ -356,8 +383,8 @@ double asci_pt2_constraint(ASCISettings asci_settings,
         }
         asci_pairs_con.clear();
         if (asci_settings.pt2_print_progress)
-          printf("[pt2_big rank %4d] CAPACITY %lu SZ %lu\n", world_rank,
-                 asci_pairs_con.capacity(), pair_size);
+          logger->info("[pt2_big rank {:4d}] CAPACITY {} SZ {}", world_rank,
+                       asci_pairs_con.capacity(), pair_size);
       }
 
       EPT2 += EPT2_local;
@@ -370,7 +397,6 @@ double asci_pt2_constraint(ASCISettings asci_settings,
   {
     // Process ASCI pair contributions for each constraint
     asci_contrib_container<wfn_t<N>> asci_pairs;
-    // asci_pairs.reserve(asci_settings.pt2_reserve_count);
     size_t ic = 0;
     while (ic < ncon_total) {
       // Atomically get the next task ID and increment for other
@@ -385,8 +411,8 @@ double asci_pt2_constraint(ASCISettings asci_settings,
       for (; ic < c_end; ++ic) {
         const auto& con = constraints[ic].first;
         if (asci_settings.pt2_print_progress)
-          printf("[pt2_small rank %4d tid:%4d] %10lu / %10lu\n", world_rank,
-                 omp_get_thread_num(), ic, ncon_total);
+          logger->info("[pt2_small rank {:4d} tid:{:4d}] {:10d} / {:10d}",
+                       world_rank, omp_get_thread_num(), ic, ncon_total);
 
         for (size_t i_alpha = 0; i_alpha < nuniq_alpha; ++i_alpha) {
           const size_t old_pair_size = asci_pairs.size();
@@ -405,18 +431,9 @@ double asci_pt2_constraint(ASCISettings asci_settings,
             const auto& beta_det = bcd[j_beta].beta_string;
             const auto h_diag = bcd[j_beta].h_diag;
 
-// TODO: These copies are slow
-#if 0
-            const auto& occ_beta_8 = bcd[j_beta].occ_beta;
-            const auto& vir_beta_8 = bcd[j_beta].vir_beta;
-            std::vector<uint32_t> occ_beta(occ_beta_8.size()), vir_beta(vir_beta_8.size());
-            std::copy(occ_beta_8.begin(), occ_beta_8.end(), occ_beta.begin());
-            std::copy(vir_beta_8.begin(), vir_beta_8.end(), vir_beta.begin());
-#else
             std::vector<uint32_t> occ_beta, vir_beta;
             spin_wfn_traits::state_to_occ_vir(norb, beta_det, occ_beta,
                                               vir_beta);
-#endif /* 0 */
 
             std::vector<double> orb_ens_alpha, orb_ens_beta;
             if (asci_settings.pt2_precompute_eps) {
@@ -471,18 +488,15 @@ double asci_pt2_constraint(ASCISettings asci_settings,
             auto uit = stable_sort_and_accumulate_asci_pairs(asci_pairs.begin(),
                                                              asci_pairs.end());
             asci_pairs.erase(uit, asci_pairs.end());
-            // uit = std::stable_partition(asci_pairs.begin(), asci_pairs.end(),
-            // [&](const auto& p){ return std::abs(p.pt2()) > h_el_tol; });
-            // asci_pairs.erase(uit, asci_pairs.end());
             if (asci_settings.pt2_print_progress)
-              printf(
-                  "[pt2_prune rank %4d tid:%4d] IC = %lu / %lu IA = %lu / %lu "
-                  "SZ = %lu\n",
+              logger->info(
+                  "[pt2_prune rank {:4d} tid:{:4d}] IC = {} / {} IA = {} / {} "
+                  "SZ = {}",
                   world_rank, omp_get_thread_num(), ic, ncon_total, i_alpha,
                   nuniq_alpha, asci_pairs.size());
 
             if (asci_pairs.size() > asci_settings.pt2_reserve_count) {
-              printf("* WARNING: PRUNED SIZE LARGER THAN RESERVE COUNT\n");
+              logger->warn("PRUNED SIZE LARGER THAN RESERVE COUNT");
             }
           }
 

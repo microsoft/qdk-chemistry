@@ -7,7 +7,7 @@ several common methods.
 
 ```txt
 TODO (DBWY): Once the wheels are worked out, documentation needs to be added here.
-Work Item: https://dev.azure.com/ms-azurequantum/AzureQuantum/_workitems/edit/41464
+Work Item: 41464
 ```
 
 ## Building from Source
@@ -18,10 +18,10 @@ Work Item: https://dev.azure.com/ms-azurequantum/AzureQuantum/_workitems/edit/41
 
 ```txt
 TODO (DBWY): Link the CGManifest when available
-Work Item: https://dev.azure.com/ms-azurequantum/AzureQuantum/_workitems/edit/41466
+Work Item: 41466
 
 TODO (DBWY): Flesh out DNF Installation instructions
-Work Item: https://dev.azure.com/ms-azurequantum/AzureQuantum/_workitems/edit/41432
+Work Item: 41432
 ```
 
 #### System Dependencies
@@ -30,22 +30,17 @@ This section details the QDK/Chemistry dependencies which must be installed prio
 starting from-source builds, as they are not managed by the build system. See [Managed Dependencies](#managed-dependencies) for a discussion on the dependencies which are managed by the C++ build system. See the [C++ configuration section](#configuring-the-c-library) for
 instructions on how to notify the build system where dependencies have been installed.
 
-```txt
-TODO (DBWY): Amend this to C++20 after Puck's PR
-Work Item: https://dev.azure.com/ms-azurequantum/AzureQuantum/_workitems/edit/41467
-```
-
-QDK/Chemistry requires both a C and a C++ compiler to be installed. Additionally, the C++ compiler must support the ISO C++17 standard. See [this website](https://en.cppreference.com/w/cpp/compiler_support/17) to determine if your compiler admits appropriate C++17 support. Below is a table of the compilers and versions tested for the full-stack QDK/Chemistry build.
+QDK/Chemistry requires both a C and a C++ compiler to be installed. Additionally, the C++ compiler must support the ISO C++20 standard. See [this website](https://en.cppreference.com/w/cpp/compiler_support/20) to determine if your compiler admits appropriate C++20 support. Below is a table of the compilers and versions tested for the full-stack QDK/Chemistry build.
 
 | Compiler Family | Versions |
 |-----------------|----------|
-| GNU  | 10.0 + |
+| GNU  | 11.0 + |
 | Clang | `TODO (DBWY)` |
 | MCVC | `TODO (DBWY)` |
 
 ```txt
 TODO (DBWY): Add compiler support documentation
-Work Item: https://dev.azure.com/ms-azurequantum/AzureQuantum/_workitems/edit/41432
+Work Item: 41432
 ```
 
 Additionally, QDK/Chemistry requires the following software dependencies:
@@ -74,36 +69,7 @@ dependencies, see the [C++ build instructions](#configuring-the-c-library) for g
 
 **NOTE**: As Libint and GauXC exhibit very long build times, it is **strongly encouraged** that these dependencies are separately installed to avoid excessive build costs. Example CMake invocations for these libraries may be found in [install-libint2.sh](.pipelines/install-scripts/install-libint2.sh) and [install-gauxc.sh](.pipelines/install-scripts/install-gauxc.sh), respectively.
 
-**NOTE**: The source code of MACIS is included in the `external` directory of QDK/Chemistry. `MACIS` carries it's own set of dependencies which are automatically managed by the `MACIS` build system. While building `MACIS` and its dependencies can be time consuming, it is strongly encouraged to allow the QDK/Chemistry build system handle this dependency to ensure proper interaction of up- and down-stream components. Appropriate transitive dependencies are installed in the [VSCode Dev Container](#using-the-vscode-dev-container) to minimize build times for developers.
-
-#### Using the VSCode Dev Container
-
-```txt
-TODO (DBWY): We need to decide how we're handling this for the product.
-Work Item: https://dev.azure.com/ms-azurequantum/AzureQuantum/_workitems/edit/41432
-```
-
-The easiest way to get started with QDK/Chemistry development is to use the provided VS Code Dev Container. The container contains
-a number of pre-compiled dependencies for various architectures aimed at lowering build times and barriers to entry for developers
-to get started. The container is based on an image hosted in an internal ACR, prior to usage please authenticate against the ACR
-using the following commands:
-
-```bash
-az login --use-device-code
-az account set --subscription Quantum-Discovery
-az acr login -n quantumapps
-```
-
-If you are using a WSL/WSL2 on Windows or are generally using Windows as an operating system ensure that the Docker
-engine is running, the easiest way to do so is by starting the Docker Desktop app and ensuring the Docker engine is
-marked as running.
-
-Afterwards, simply open the project in VS Code, and when prompted, select "Reopen in Container" (or use the Command
-Palette: `Dev Containers: Reopen in Container`). This action will open a command palette asking which version of the Dev Container to use, choose the version which mostly closely matches your local architecture.
-
-The container includes all necessary dependencies
-pre-installed: C++ build tools, Python 3, etc. Once the container is running, you can immediately start building the C++
-library, its dependencies and Python bindings without any additional setup.
+**NOTE**: The source code of MACIS is included in the `external` directory of QDK/Chemistry. `MACIS` carries it's own set of dependencies which are automatically managed by the `MACIS` build system. While building `MACIS` and its dependencies can be time consuming, it is strongly encouraged to allow the QDK/Chemistry build system handle this dependency to ensure proper interaction of up- and down-stream components.
 
 ### Building the C++ Library
 
@@ -126,7 +92,7 @@ The following table contains information pertaining to influential CMake configu
 cmake [...] -D<VARIABLE>=<VALUE>
 ```
 
-Where possible, the official CMake documentation is linked for further information. See [GPU Build Configuration](#gpu-build-configuration) for GPU-specific build options
+Where possible, the official CMake documentation is linked for further information.
 
 | Variable | Description | Type | Default | Other Values |
 |----------|-------------|------|---------|--------------|
@@ -137,7 +103,6 @@ Where possible, the official CMake documentation is linked for further informati
 |[`BUILD_TESTING`](https://cmake.org/cmake/help/latest/variable/BUILD_TESTING.html) | Whether to build unit and integration tests | Bool | `True` | `False` |
 |`QDK_UARCH`| The instruction set architecture (ISA) to compile for. This is not a mandatory setting, but it is strongly encouraged for good performance | String | N/A | [See below](#note-on-qdk_uarch-specification) |
 |`QDK_CHEMISTRY_ENABLE_COVERAGE` | Enable coverage reports | Bool | `True` | `False` |
-|`QDK_CHEMISTRY_ENABLE_GPU` | Enable GPU bindings. See [GPU build documentation](#gpu-support) for more information | Bool | `False` | `True` |
 |`QDK_CHEMISTRY_ENABLE_LONG_TESTS` | Enable long running tests (useful on HPC architectures) | Bool | `False` | `True` |
 
 #### Note on CMake Lists from the Command Line
@@ -189,76 +154,6 @@ For the most up-to-date list of python dependencies, see [`pyproject.toml`](pyth
 #### Linking to an Existing C++ Installation
 
 The official way to notify the python package build of an existing QDK/Chemistry C++ installation is to append the `CMAKE_PREFIX_PATH` environment variable with the installation prefix: e.g. `CMAKE_PREFIX_PATH="$CMAKE_PREFIX_PATH:/full/qdk/chemistry/prefix"`. See the [CMake documentation](https://cmake.org/cmake/help/latest/variable/CMAKE_PREFIX_PATH.html) for a discussing surrounding the use of environment variables for prefix paths.
-
-#### Install QDK from the Azure Quantum private feed
-
-First run `az login` to authenticate with Azure.
-
-```bash
-az login --use-device-code
-```
-
-Then we need to install QDK from the Azure Quantum private feed. You can do this with the following command:
-
-```bash
-TOKEN=$(az account get-access-token --resource 499b84ac-1321-427f-aa17-267ca6975798 --query accessToken --output tsv);
-
-ARTIFACTS_KEYRING_NONINTERACTIVE_MODE=true \
-pip install --timeout 300 --no-input "qdk-chemistry[plugins]==1.0.0.20250828.4" \
---extra-index-url "https://build:${TOKEN}@pkgs.dev.azure.com/ms-azurequantum/AzureQuantum/_packaging/quantum-apps-dependencies/pypi/simple/"
-```
-
-To ensure that your system is compatible with the pre-built wheels, you can check your Python version, platform, and
-architecture with:
-
-```shell
-python -c "import sys, platform; print(f'Python: {sys.version}'); print(f'Platform: {platform.platform()}'); print(f'Architecture: {platform.architecture()}')"
-```
-
-Platforms with glibc version 2.30 or higher are supported.
-
-```shell
-Platform: Linux-6.6.87.2-microsoft-standard-WSL2-x86_64-with-glibc2.35
-```
-
-If you are using a conda environment and encounter an error like:
-
-```shell
-ImportError: /home/<...>/miniconda3/envs/qdk-chemistry/bin/../lib/libstdc++.so.6: version `GLIBCXX_3.4.30' not found
-```
-
-try running:
-
-```shell
-conda install -c conda-forge libstdcxx-ng>=12
-```
-
-### GPU Support
-
-Currently, QDK/Chemistry offers limited GPU support. The following architectures are regularly tested:
-
-| Vendor | Architecture |
-|--------|--------------|
-| NVIDIA | A100 (`sm_80`) |
-| NVIDIA | H100 (`sm_90`) |
-
-**NOTE:** Computational chemistry workloads are compute intensive and often require double precision floating point operations. As such, only server-grade GPUs are tested for QDK/Chemistry. While it is possible to run on consumer hardware, there are known performance and numerical stability challenges for QDK/Chemistry dependencies on these types of devices.
-
-#### GPU Dependencies
-
-**NVIDIA GPUs:** See the NVIDIA documentation for how to install CUDA-related dependencies on your particular machine.
-Currently, we require CUDA 12+ support and minimum compute capability 7.0 for NVIDIA GPU builds.
-In addition to the CUDA compiler, we require the following system dependencies:
-
-- cuBLAS
-- cuSOLVER
-- cuTENSOR
-
-#### GPU Build Configuration
-
-| Variable | Description | Type | Default | Other Values |
-|----------|-------------|------|---------|--------------|
-|[`CMAKE_CUDA_ARCHITECTURES`](https://cmake.org/cmake/help/latest/variable/CMAKE_CUDA_ARCHITECTURES.html) | A list of CUDA architectures to support in the resulting binary | [List](#note-on-cmake-lists-from-the-command-line) | N/A (but required) | e.g. `80` for compute capability 8.0|
 
 ### Note on LAPACK Usage
 

@@ -18,6 +18,35 @@ namespace sparsexx {
 
 namespace detail {
 
+/**
+ * @brief Converts CSR (Compressed Sparse Row) format to CSC (Compressed Sparse
+ * Column) format.
+ *
+ * This function performs an in-place conversion from CSR format to CSC format
+ * using an algorithm adapted from SciPy's csr_tocsc implementation. The
+ * conversion handles arbitrary indexing bases (0-based or 1-based) and
+ * efficiently reorders the sparse matrix data.
+ *
+ * @tparam T The value type for matrix elements
+ * @tparam index_t The index type for matrix indices
+ *
+ * @param M Number of rows in the input CSR matrix
+ * @param N Number of columns in the input CSR matrix
+ * @param Ap Input CSR row pointer array (size M+1)
+ * @param Ai Input CSR column indices array (size nnz)
+ * @param Az Input CSR non-zero values array (size nnz)
+ * @param Bp Output CSC column pointer array (size N+1)
+ * @param Bi Output CSC row indices array (size nnz)
+ * @param Bz Output CSC non-zero values array (size nnz)
+ * @param indexing The indexing base (0 for 0-based, 1 for 1-based indexing)
+ *
+ * @note The function assumes all input arrays are pre-allocated with correct
+ * sizes
+ * @note Output arrays Bp, Bi, Bz will be overwritten completely
+ *
+ * @warning Input and output arrays must not overlap (undefined behavior)
+ * @warning No bounds checking is performed on input parameters
+ */
 template <typename T, typename index_t>
 void csr_to_csc(size_t M, size_t N, const index_t* Ap, const index_t* Ai,
                 const T* Az, index_t* Bp, index_t* Bi, T* Bz, size_t indexing) {
@@ -61,6 +90,30 @@ void csr_to_csc(size_t M, size_t N, const index_t* Ap, const index_t* Ai,
 
 }  // namespace detail
 
+/**
+ * @brief Constructor to create a CSR matrix from a COO matrix.
+ *
+ * This constructor converts a COO (Coordinate) sparse matrix to CSR (Compressed
+ * Sparse Row) format. The conversion requires the input COO matrix to be sorted
+ * by row indices for efficient processing.
+ *
+ * @tparam T The value type for matrix elements
+ * @tparam index_t The index type for matrix indices
+ * @tparam Alloc The allocator type for memory management
+ *
+ * @param other The COO matrix to convert from
+ *
+ * @throws std::runtime_error if the COO matrix is not sorted by row indices
+ * @throws std::runtime_error if non-zero indexing is used (temporary
+ * limitation)
+ *
+ * @note The resulting CSR matrix will have the same indexing base as the input
+ * COO matrix
+ * @note Matrix dimensions and non-zero count are preserved exactly
+ *
+ * @warning Current implementation has a limitation with non-zero indexing and
+ * will throw
+ */
 template <typename T, typename index_t, typename Alloc>
 csr_matrix<T, index_t, Alloc>::csr_matrix(
     const coo_matrix<T, index_t, Alloc>& other)
@@ -74,17 +127,8 @@ csr_matrix<T, index_t, Alloc>::csr_matrix(
   const auto& colind_coo = other.colind();
   const auto& nzval_coo = other.nzval();
 
-// Compute rowptr
-#if 0
-  rowptr_.at(0) = other.indexing();
-  auto cur_row = 0;
-  for(size_type i = 0; i < nnz_; ++i)
-    while(rowind_coo[i] != (cur_row + indexing_)) {
-      cur_row++;
-      rowptr_.at(cur_row) = i + indexing_;
-    }
-  rowptr_.at(m_) = nnz_ + indexing_;
-#else
+  // Compute rowptr
+
   if (indexing_) throw std::runtime_error("NONZERO INDEXING");
   for (size_type i = 0; i < nnz_; ++i) {
     rowptr_[rowind_coo[i] - indexing_ + 1]++;
@@ -96,23 +140,32 @@ csr_matrix<T, index_t, Alloc>::csr_matrix(
     for (size_type i = 0; i < m_ + 1; ++i) {
       rowptr_[i] += indexing_;
     }
-#endif /* 0 */
-
-  // for(size_type i = 0; i < m_; ++i) {
-  //   auto row_st = rowptr_[i];
-  //   auto row_en = rowptr_[i+1];
-  //   for(size_type j = row_st; j < row_en; ++j) {
-  //     if(rowind_coo[j] != i) throw std::runtime_error("ROWPTR WRONG");
-  //   }
-  //   if(!std::is_sorted(colind_coo.begin() + row_st, colind_coo.begin() +
-  //   row_en))
-  //     throw std::runtime_error("COLIND WRONG");
-  // }
 
   std::copy(colind_coo.begin(), colind_coo.end(), colind_.begin());
   std::copy(nzval_coo.begin(), nzval_coo.end(), nzval_.begin());
 }
 
+/**
+ * @brief Constructor to create a CSC matrix from a COO matrix.
+ *
+ * This constructor converts a COO (Coordinate) sparse matrix to CSC (Compressed
+ * Sparse Column) format. The conversion requires the input COO matrix to be
+ * sorted by column indices for efficient processing.
+ *
+ * @tparam T The value type for matrix elements
+ * @tparam index_t The index type for matrix indices
+ * @tparam Alloc The allocator type for memory management
+ *
+ * @param other The COO matrix to convert from
+ *
+ * @throws std::runtime_error if the COO matrix is not sorted by column indices
+ *
+ * @note The resulting CSC matrix will have the same indexing base as the input
+ * COO matrix
+ * @note Matrix dimensions and non-zero count are preserved exactly
+ * @note Column pointer computation handles sparse columns (columns with no
+ * non-zeros)
+ */
 template <typename T, typename index_t, typename Alloc>
 csc_matrix<T, index_t, Alloc>::csc_matrix(
     const coo_matrix<T, index_t, Alloc>& other)
@@ -140,6 +193,27 @@ csc_matrix<T, index_t, Alloc>::csc_matrix(
   std::copy(nzval_coo.begin(), nzval_coo.end(), nzval_.begin());
 }
 
+/**
+ * @brief Constructor to create a CSR matrix from a CSC matrix.
+ *
+ * This constructor converts a CSC (Compressed Sparse Column) matrix to CSR
+ * (Compressed Sparse Row) format using the transpose conversion algorithm. The
+ * conversion efficiently reorders the sparse matrix data from column-major to
+ * row-major storage.
+ *
+ * @tparam T The value type for matrix elements
+ * @tparam index_t The index type for matrix indices
+ * @tparam Alloc The allocator type for memory management
+ *
+ * @param other The CSC matrix to convert from
+ *
+ * @note The resulting CSR matrix will have the same indexing base as the input
+ * CSC matrix
+ * @note Matrix dimensions and non-zero count are preserved exactly
+ * @note Time complexity is O(nnz) for the conversion
+ *
+ * @see detail::csr_to_csc for the underlying conversion algorithm
+ */
 template <typename T, typename index_t, typename Alloc>
 csr_matrix<T, index_t, Alloc>::csr_matrix(
     const csc_matrix<T, index_t, Alloc>& other)

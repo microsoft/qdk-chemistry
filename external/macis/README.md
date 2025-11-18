@@ -140,11 +140,13 @@ target_link_libraries( my_target PUBLIC macis::macis )
 ### Influential CMake Variables
 
 | Variable Name | Description | Default |
-|----------------------------|-----------------------------------------------------------|----------| |
-`MACIS_ENABLE_OPENMP` | Enable OpenMP Bindings | `ON` | | `MACIS_ENABLE_MPI` | Enable MPI Bindings | `ON` | |
-`MACIS_ENABLE_BOOST` | Enable Boost Bindings | `ON` | | `MACIS_ENABLE_TREXIO` | Enable TREXIO IO (Experimental) | `OFF`
-| | `BLAS_LIBRARIES` | Full BLAS linker. | -- | | `LAPACK_LIBRARIES` | Full LAPACK linker. | -- | | `BUILD_TESTING` |
-Whether to build unit tests | `ON` |
+|----------------------------|-----------------------------------------------------------|----------|
+| `MACIS_ENABLE_OPENMP` | Enable OpenMP Bindings | `ON` |
+| `MACIS_ENABLE_MPI` | Enable MPI Bindings | `ON` |
+|`MACIS_ENABLE_BOOST` | Enable Boost Bindings | `ON` |
+| `BLAS_LIBRARIES` | Full BLAS linker. | -- |
+| `LAPACK_LIBRARIES` | Full LAPACK linker. | -- |
+| `BUILD_TESTING` | Whether to build unit tests | `ON` |
 
 ## Example Usage
 

@@ -2,6 +2,7 @@
  * MACIS Copyright (c) 2023, The Regents of the University of California,
  * through Lawrence Berkeley National Laboratory (subject to receipt of
  * any required approvals from the U.S. Dept. of Energy). All rights reserved.
+ * Portions Copyright (c) Microsoft Corporation.
  *
  * See LICENSE.txt for details
  */
@@ -15,12 +16,19 @@
 namespace macis {
 
 // FCIDUMP header structure
+/**
+ * @brief Header structure for storing FCIDUMP file metadata
+ *
+ * This structure contains the essential parameters found in the header section
+ * of an FCIDUMP file, which is a standard format for storing molecular
+ * integrals and Hamiltonian data in quantum chemistry calculations.
+ */
 struct FCIDumpHeader {
-  uint32_t norb = 0;
-  uint32_t nelec = 0;
-  int32_t ms2 = 0;
-  int32_t isym = 1;
-  std::vector<int32_t> orbsym;
+  uint32_t norb = 0;   ///< Number of orbitals
+  uint32_t nelec = 0;  ///< Number of electrons
+  int32_t ms2 = 0;     ///< Twice the spin projection quantum number (2 * Ms)
+  int32_t isym = 1;  ///< Molecular symmetry representation (MOLPRO convention))
+  std::vector<int32_t> orbsym;  ///< Orbital symmetries
 };
 
 /**

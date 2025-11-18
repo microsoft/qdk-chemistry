@@ -18,7 +18,7 @@
 #include "json_serialization.hpp"
 
 // TODO (NAB):  This file is also very long.  Should we break it up?
-// https://dev.azure.com/ms-azurequantum/AzureQuantum/_workitems/edit/41353
+// 41353
 
 namespace qdk::chemistry::data {
 

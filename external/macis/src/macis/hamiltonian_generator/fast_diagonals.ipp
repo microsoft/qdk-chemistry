@@ -2,6 +2,7 @@
  * MACIS Copyright (c) 2023, The Regents of the University of California,
  * through Lawrence Berkeley National Laboratory (subject to receipt of
  * any required approvals from the U.S. Dept. of Energy). All rights reserved.
+ * Portions Copyright (c) Microsoft Corporation.
  *
  * See LICENSE.txt for details
  */
@@ -19,11 +20,11 @@ double HamiltonianGeneratorBase<Scalar>::single_orbital_en(
   double orb_en = T_pq_(orb, orb);
 
   // Same-spin two-body term
-  for(auto q : ss_occ) orb_en += G2_red_(orb, q) + G2_red_(q, orb);
+  for (auto q : ss_occ) orb_en += G2_red_(orb, q) + G2_red_(q, orb);
   orb_en -= G2_red_(orb, orb);
 
   // Opposite-spin two-body term
-  for(auto q : os_occ) orb_en += V2_red_(orb, q);
+  for (auto q : os_occ) orb_en += V2_red_(orb, q);
 
   return orb_en;
 }
@@ -33,16 +34,16 @@ std::vector<double> HamiltonianGeneratorBase<Scalar>::single_orbital_ens(
     size_t norb, const std::vector<uint32_t>& ss_occ,
     const std::vector<uint32_t>& os_occ) const {
   std::vector<double> ens(norb);
-  for(size_t i = 0; i < norb; ++i) {
+  for (size_t i = 0; i < norb; ++i) {
     // One electron component
     auto e = T_pq_(i, i);
 
     // Same-spin two-body term
-    for(auto q : ss_occ) e += G2_red_(i, q) + G2_red_(q, i);
+    for (auto q : ss_occ) e += G2_red_(i, q) + G2_red_(q, i);
     e -= G2_red_(i, i);
 
     // Opposite-spin two-body term
-    for(auto q : os_occ) e += V2_red_(i, q);
+    for (auto q : os_occ) e += V2_red_(i, q);
 
     ens[i] = e;
   }

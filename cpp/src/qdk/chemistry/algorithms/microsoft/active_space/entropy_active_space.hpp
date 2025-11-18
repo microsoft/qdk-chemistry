@@ -48,7 +48,7 @@ class YetAnotherActiveSpaceSettings : public data::Settings {
 
 // TODO (NAB):  We need to describe the details of this selection method and how
 // it is different from other methods
-// https://dev.azure.com/ms-azurequantum/AzureQuantum/_workitems/edit/41270
+// 41270
 
 /**
  * @class AutocasEosActiveSpaceSelector

@@ -16,6 +16,37 @@
 
 namespace sparsexx {
 
+/**
+ * @brief Writes a distributed sparse matrix to a Matrix Market format
+ *
+ * This function writes a distributed sparse matrix to a file in Matrix Market
+ (MM) format.
+ * The function coordinates across all MPI processes to write a single coherent
+ file, with
+ * each process contributing its local matrix data. The writing is done in a
+ ring pattern
+ * to ensure proper ordering and avoid file conflicts.
+ *
+ * @tparam SpMatType The underlying sparse matrix type stored in the distributed
+ matrix
+ *
+ * @param fname The filename/path where the Matrix Market file will be written
+ * @param A The distributed sparse matrix to write to file
+ * @param forced_index Optional index base override (default: -1 for automatic
+ detection)
+ *                     - If >= 0, forces the specified indexing base (0 or 1) in
+ output
+ *                     - If -1, uses the matrix's natural indexing scheme
+ *
+ * @throws std::runtime_error if file creation or writing fails
+ * @throws std::ios_base::failure if file I/O operations fail
+
+ * @warning All processes in the communicator must call this function
+ collectively
+ *
+ * @see write_mm for single-process Matrix Market writing
+ * @see write_mm_csr_block for the underlying block writing implementation
+ */
 template <typename SpMatType>
 void write_dist_mm(std::string fname, const dist_sparse_matrix<SpMatType>& A,
                    int forced_index = -1) {

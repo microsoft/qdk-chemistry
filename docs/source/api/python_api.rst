@@ -7,16 +7,19 @@ This section provides complete documentation for the QDK/Chemistry Python API.
 QDK/Chemistry provides Python interfaces for quantum chemistry calculations with a unified API.
 The Python interface offers a user-friendly way to set up, run, and analyze quantum chemistry calculations without requiring extensive knowledge of the underlying implementation details.
 
-API Reference
-=============
-
 Data Classes
 ------------
 
 The data classes provide fundamental structures for representing quantum chemistry concepts such as molecular structures, electronic states, and computational results.
 These classes handle the storage, manipulation, and exchange of quantum chemistry data throughout the QDK/Chemistry ecosystem.
 
-For detailed information, see :doc:`api_autogen/chemistry.data`.
+For detailed information, see :doc:`api_autogen/qdk_chemistry.data`.
+
+.. toctree::
+   :maxdepth: 2
+
+   api_autogen/qdk_chemistry.data
+
 
 Algorithms
 ----------
@@ -24,15 +27,12 @@ Algorithms
 The algorithms module contains implementations of various quantum chemistry methods and computational techniques.
 This includes electronic structure methods, post-Hartree-Fock correlation methods, and other advanced computational approaches for studying molecular systems and their properties.
 
-For detailed information, see :doc:`api_autogen/chemistry.algorithms`.
+For detailed information, see :doc:`api_autogen/qdk_chemistry.algorithms`.
 
-Constants
----------
+.. toctree::
+   :maxdepth: 2
 
-The constants module provides access to fundamental physical constants, conversion factors, and reference values frequently used in quantum chemistry calculations.
-These constants ensure consistency and accuracy throughout all computational procedures.
-
-For detailed information, see :doc:`api_autogen/chemistry.constants`.
+   api_autogen/qdk_chemistry.algorithms
 
 Plugins
 -------
@@ -40,16 +40,36 @@ Plugins
 The plugins module offers extensions and integrations with other quantum chemistry software packages and computational tools.
 These plugins allow QDK/Chemistry to leverage functionality from other established quantum chemistry codes and expand its capabilities.
 
-For detailed information, see :doc:`api_autogen/chemistry.plugins`.
-
-Detailed Documentation
-======================
-
-This section provides a comprehensive reference with in-depth details about each module, class, function, and attribute in the QDK/Chemistry Python API.
-Here you'll find complete signatures, parameters, return types, exceptions, and usage examples.
-This detailed documentation is particularly useful for developers implementing advanced functionality or extending QDK/Chemistry capabilities.
+For detailed information, see :doc:`api_autogen/qdk_chemistry.plugins`.
 
 .. toctree::
    :maxdepth: 2
 
-   api_autogen/modules
+   api_autogen/qdk_chemistry.plugins
+
+Utilities
+---------
+
+The utils module provides various utility functions and helper routines that support the core functionality of QDK/Chemistry.
+These utilities facilitate common tasks such as data manipulation, file I/O, and other ancillary operations.
+
+For detailed information, see :doc:`api_autogen/qdk_chemistry.utils`.
+
+.. toctree::
+   :maxdepth: 2
+
+   api_autogen/qdk_chemistry.utils
+
+
+Constants
+---------
+
+The constants module provides access to fundamental physical constants, conversion factors, and reference values frequently used in quantum chemistry calculations.
+These constants ensure consistency and accuracy throughout all computational procedures.
+
+For detailed information, see :doc:`api_autogen/qdk_chemistry.constants`.
+
+.. toctree::
+   :maxdepth: 2
+
+   api_autogen/qdk_chemistry.constants

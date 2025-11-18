@@ -12,10 +12,6 @@
 
 #include "type_fwd.hpp"
 
-#ifdef SPARSEXX_ENABLE_CEREAL
-#include <cereal/types/vector.hpp>
-#endif /* SPARSEXX_ENABLE_CEREAL */
-
 namespace sparsexx {
 
 /**
@@ -73,6 +69,24 @@ class csr_matrix {
         colind_(nnz),
         rowptr_(m + 1) {}
 
+  /**
+   * @brief Construct a CSR matrix from existing vectors.
+   *
+   * This constructor creates a CSR matrix by moving existing vectors of row
+   * pointers, column indices, and non-zero values. This allows efficient
+   * construction without copying large data arrays.
+   *
+   * @param m Number of rows in the sparse matrix
+   * @param n Number of columns in the sparse matrix
+   * @param rowptr Vector of row pointers (will be moved)
+   * @param colind Vector of column indices (will be moved)
+   * @param nzval Vector of non-zero values (will be moved)
+   *
+   * @note The nnz is automatically determined from the nzval vector size
+   * @note The indexing base is determined from rowptr[0]
+   * @note The input vectors will be moved (emptied) after construction
+   * @note This constructor assumes double for value type
+   */
   csr_matrix(size_type m, size_type n, std::vector<index_t>&& rowptr,
              std::vector<index_t>&& colind, std::vector<double>&& nzval)
       : m_(m),
@@ -188,6 +202,25 @@ class csr_matrix {
    */
   const auto& rowptr() const { return rowptr_; };
 
+  /**
+   * @brief Changes the indexing base of the sparse matrix.
+   *
+   * This function converts the matrix between 0-based and 1-based indexing
+   * by adjusting all indices in the column indices and row pointer arrays.
+   * If the target indexing is the same as current, no operation is performed.
+   *
+   * @param idx The new indexing base (0 for 0-based, 1 for 1-based)
+   *
+   * @note Conversion process:
+   *       - Adjusts all column indices by (indexing_ - idx)
+   *       - Adjusts all row pointer values by (indexing_ - idx)
+   *       - Updates the indexing_ member variable
+   *
+   * @note This is an in-place operation that modifies the matrix data
+   * @note No validation is performed on the input indexing value
+   *
+   * @warning Calling this function  with invalid values may corrupt the matrix
+   */
   inline void set_indexing(index_type idx) {
     if (idx == indexing_) return;
     for (auto& i : colind_) i -= (indexing_ - idx);
@@ -195,29 +228,74 @@ class csr_matrix {
     indexing_ = idx;
   }
 
-#ifdef SPARSEXX_ENABLE_CEREAL
-  template <class Archive>
-  void serialize(Archive& ar) {
-    ar(m_, n_, nnz_, indexing_, rowptr_, colind_, nzval_);
-  }
-#endif /* SPARSEXX_ENABLE_CEREAL */
-
+  /**
+   * @brief Equality comparison operator for CSR matrices.
+   *
+   * This function compares two CSR matrices for exact equality by checking
+   * all matrix properties and data arrays.
+   *
+   * @param other The CSR matrix to compare against
+   *
+   * @return true if matrices are identical, false otherwise
+   *
+   * @note This is an exact comparison; no tolerance is used for floating-point
+   * values
+   */
   bool operator==(const csr_matrix& other) const noexcept {
     return m_ == other.m_ and n_ == other.n_ and
            indexing_ == other.indexing_ and colind_ == other.colind_ and
            rowptr_ == other.rowptr_ and nzval_ == other.nzval_;
   }
 
+  /**
+   * @brief Inequality comparison operator for CSR matrices.
+   *
+   * This function compares two CSR matrices for inequality by negating
+   * the equality comparison.
+   *
+   * @param other The CSR matrix to compare against
+   *
+   * @return true if matrices are different, false if identical
+   *
+   * @note This function delegates to operator== and negates the result
+   */
   bool operator!=(const csr_matrix& other) const noexcept {
     return not((*this) == other);
   }
 
+  /**
+   * @brief Calculates the memory footprint of the CSR matrix in bytes.
+   *
+   * This function computes the total memory usage of the matrix by summing
+   * the capacity of all internal storage vectors multiplied by their element
+   * sizes.
+   *
+   * @return Total memory footprint in bytes
+   *
+   * @note Uses capacity() rather than size() to account for potential
+   * over-allocation
+   * @note Does not include the size of the matrix object itself, only data
+   * arrays
+   */
   size_type mem_footprint() const noexcept {
     return nzval_.capacity() * sizeof(T) +
            colind_.capacity() * sizeof(index_t) +
            rowptr_.capacity() * sizeof(index_t);
   }
 
+  /**
+   * @brief Shrinks the storage of all internal vectors to fit their actual
+   * size.
+   *
+   * This function calls shrink_to_fit() on all internal storage vectors to
+   * release any excess allocated memory and minimize memory usage.
+   *
+   * @note This operation may trigger memory reallocation and copying
+   * @note Useful for reducing memory footprint after matrix
+   * construction/modification
+   * @note No guarantee that memory will actually be released (implementation
+   * dependent)
+   */
   void shrink_storage_to_fit() {
     nzval_.shrink_to_fit();
     colind_.shrink_to_fit();

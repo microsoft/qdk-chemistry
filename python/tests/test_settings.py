@@ -924,7 +924,7 @@ class TestSettings:
 
         # Test __repr__
         repr_str = repr(settings)
-        assert "qdk.chemistry.Settings" in repr_str
+        assert "qdk_chemistry.Settings" in repr_str
         # Don't check exact size since there are many predefined settings
         assert "size=" in repr_str
 

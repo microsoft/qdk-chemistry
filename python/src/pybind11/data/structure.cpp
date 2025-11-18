@@ -68,7 +68,7 @@ void bind_structure(py::module &m) {
 
     Examples
     --------
-    >>> from qdk.chemistry.data import Element
+    >>> from qdk_chemistry.data import Element
     >>> Element.H  # Hydrogen
     >>> Element.C  # Carbon
     >>> Element.O  # Oxygen
@@ -228,7 +228,7 @@ void bind_structure(py::module &m) {
     Create a water molecule from symbols and coordinates:
 
     >>> import numpy as np
-    >>> from qdk.chemistry.data import Structure
+    >>> from qdk_chemistry.data import Structure
     >>> coords = np.array([[0.0, 0.0, 0.0],
     ...                    [0.757, 0.586, 0.0],
     ...                    [-0.757, 0.586, 0.0]])
@@ -239,7 +239,7 @@ void bind_structure(py::module &m) {
 
     Create from elements enum:
 
-    >>> from qdk.chemistry.data import Element
+    >>> from qdk_chemistry.data import Element
     >>> coords = np.array([[0.0, 0.0, 0.0], [0.0, 0.0, 0.74]])
     >>> elements = [Element.H, Element.H]
     >>> h2 = Structure(coords, elements)
@@ -282,7 +282,7 @@ void bind_structure(py::module &m) {
         Examples
         --------
         >>> import numpy as np
-        >>> from qdk.chemistry.data import Structure, Element
+        >>> from qdk_chemistry.data import Structure, Element
         >>> coords = np.array([[0.0, 0.0, 0.0], [0.0, 0.0, 0.74]])
         >>> elements = [Element.H, Element.H]
         >>> masses = np.array([1.008, 1.008])

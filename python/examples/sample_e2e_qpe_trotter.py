@@ -28,7 +28,7 @@ M_PRECISION = 10  # number of phase qubits ~ bits of precision
 T_TIME = 0.1  # evolution time; lower if you see 2π wrap
 
 # ------------------------------------------------------------------
-# QATK calculation for H₂ (1.44 Bohr bond length in STO-3G)
+# qdk-chemistry calculation for H₂ (1.44 Bohr bond length in STO-3G)
 # ------------------------------------------------------------------
 structure = Structure(np.array([[0.0, 0.0, -0.72], [0.0, 0.0, 0.72]], dtype=float), ["H", "H"])  # Geometry in bohr
 nuclear_repulsion = structure.calculate_nuclear_repulsion_energy()
@@ -52,7 +52,7 @@ mc_calculator = create("multi_configuration_calculator")
 casci_energy, casci_wavefunction = mc_calculator.run(active_hamiltonian, n_alpha, n_beta)
 core_energy = active_hamiltonian.get_core_energy()
 
-print("=== Generating QATK artifacts for H2 (0.76 Å, STO-3G) ===")
+print("=== Generating qdk-chemistry artifacts for H2 (0.76 Å, STO-3G) ===")
 print(f"  SCF total energy:   {scf_energy: .8f} Hartree")
 print(f"  CASCI total energy: {casci_energy: .8f} Hartree")
 
@@ -87,7 +87,7 @@ print(state_prep.draw(output="text"))
 # ------------------------------------------------------------------
 # Execute iterative phase estimation
 # ------------------------------------------------------------------
-print("\n=== Running iterative phase estimation (QATK) ===")
+print("\n=== Running iterative phase estimation (qdk-chemistry) ===")
 print(f"  Hamiltonian terms: {len(qubit_pauli_op.paulis)}")
 print(f"  System qubits (spin orbitals): {num_spin_orbitals}")
 print(f"  Electron sector (alpha, beta): ({n_alpha}, {n_beta})")

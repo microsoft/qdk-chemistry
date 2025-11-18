@@ -677,8 +677,8 @@ TEST_F(MacisAsciTest, MacisCasWithOneRDM) {
     const auto& wavefunction = result.second;
     // If successful, should have 1-RDM available
     if (wavefunction->has_one_rdm_spin_traced()) {
-      auto one_rdm =
-          std::get<Eigen::MatrixXd>(wavefunction->get_one_rdm_spin_traced());
+      auto one_rdm = std::get<Eigen::MatrixXd>(
+          wavefunction->get_active_one_rdm_spin_traced());
       EXPECT_GT(one_rdm.rows(), 0);
       EXPECT_GT(one_rdm.cols(), 0);
     }
@@ -711,8 +711,8 @@ TEST_F(MacisAsciTest, MacisCasWithTwoRDM) {
     const auto& wavefunction = result.second;
     // If successful, should have 2-RDM available
     if (wavefunction->has_two_rdm_spin_traced()) {
-      auto two_rdm =
-          std::get<Eigen::VectorXd>(wavefunction->get_two_rdm_spin_traced());
+      auto two_rdm = std::get<Eigen::VectorXd>(
+          wavefunction->get_active_two_rdm_spin_traced());
       EXPECT_GT(two_rdm.size(), 0);
     }
 
@@ -917,6 +917,50 @@ TEST_F(MacisAsciTest, MacisCasDeterminantHandling) {
   EXPECT_GT(wavefunction->size(), 0);
 }
 
+// Test MACIS CAS selective RDM evaluation
+TEST_F(MacisAsciTest, MacisCasSelectiveRDMEvaluation) {
+  auto calculator = MultiConfigurationCalculatorFactory::create("macis_cas");
+  if (!calculator) {
+    GTEST_SKIP() << "MACIS CAS not available";
+  }
+
+  // Use a small active space for fast execution
+  auto orbitals_small = testing::with_active_space(
+      water_scf_wavefunction_->get_orbitals(), std::vector<size_t>{2, 3, 4},
+      std::vector<size_t>{0, 1});
+
+  auto hamiltonian_constructor = HamiltonianConstructorFactory::create();
+  auto hamiltonian = hamiltonian_constructor->run(orbitals_small);
+
+  // Lambda to run a single variant
+  auto run_variant = [&](bool calc_one_rdm, bool calc_two_rdm,
+                         bool expect_one_traced, bool expect_two_traced,
+                         bool expect_one_spin, bool expect_two_spin) {
+    auto c = MultiConfigurationCalculatorFactory::create("macis_cas");
+    ASSERT_NE(c, nullptr);
+    auto& s = c->settings();
+    s.set("ci_residual_tolerance", testing::ci_energy_tolerance);
+    s.set("davidson_iterations", macis_params::davidson_iterations);
+    s.set("calculate_one_rdm", calc_one_rdm);
+    s.set("calculate_two_rdm", calc_two_rdm);
+    auto [E, wfn] = c->run(hamiltonian, 2, 2);
+    EXPECT_TRUE(std::isfinite(E));
+    EXPECT_EQ(wfn->has_one_rdm_spin_traced(), expect_one_traced);
+    EXPECT_EQ(wfn->has_two_rdm_spin_traced(), expect_two_traced);
+    EXPECT_EQ(wfn->has_one_rdm_spin_dependent(), expect_one_spin);
+    EXPECT_EQ(wfn->has_two_rdm_spin_dependent(), expect_two_spin);
+  };
+
+  // 1: Only 1-RDM
+  run_variant(true, false, true, false, true, false);
+  // 2: 1- and 2-RDM
+  run_variant(true, true, true, true, true, true);
+  // 3: None
+  run_variant(false, false, false, false, false, false);
+  // 4: Only 2-RDM
+  run_variant(false, true, false, true, false, true);
+}
+
 // ========== Tests for MacisPmc (Projected Multi-Configuration) ==========
 // Test suite for the newly added PMC functionality using MACIS library
 
@@ -1088,7 +1132,7 @@ TEST_F(MacisPmcTest, PMCWithRDMCalculation) {
   calculator->settings().set("calculate_two_rdm", false);
 
   auto result1 = calculator->run(hamiltonian, test_configurations_);
-  EXPECT_NO_THROW(result1.second->get_one_rdm_spin_traced());
+  EXPECT_NO_THROW(result1.second->get_active_one_rdm_spin_traced());
 
   // Test with 2-RDM calculation enabled
   auto calculator2 =
@@ -1097,7 +1141,7 @@ TEST_F(MacisPmcTest, PMCWithRDMCalculation) {
   calculator2->settings().set("calculate_two_rdm", true);
 
   auto result2 = calculator2->run(hamiltonian, test_configurations_);
-  EXPECT_NO_THROW(result2.second->get_two_rdm_spin_traced());
+  EXPECT_NO_THROW(result2.second->get_active_two_rdm_spin_traced());
 
   // Test with both RDMs enabled
   auto calculator3 =
@@ -1106,8 +1150,8 @@ TEST_F(MacisPmcTest, PMCWithRDMCalculation) {
   calculator3->settings().set("calculate_two_rdm", true);
 
   auto result3 = calculator3->run(hamiltonian, test_configurations_);
-  EXPECT_NO_THROW(result3.second->get_one_rdm_spin_traced());
-  EXPECT_NO_THROW(result3.second->get_two_rdm_spin_traced());
+  EXPECT_NO_THROW(result3.second->get_active_one_rdm_spin_traced());
+  EXPECT_NO_THROW(result3.second->get_active_two_rdm_spin_traced());
 }
 
 // Test PMC error handling for invalid configurations

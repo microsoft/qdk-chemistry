@@ -70,7 +70,7 @@ class CasWavefunctionContainer : public WavefunctionContainer {
    * @param one_rdm_aa Alpha-alpha block of 1-RDM for active orbitals (optional)
    * @param one_rdm_bb Beta-beta block of 1-RDM for active orbitals (optional)
    * @param two_rdm_spin_traced Spin-traced 2-RDM for active orbitals (optional)
-   * @param two_rdm_abba Alpha-beta-alpha-beta block of 2-RDM for active
+   * @param two_rdm_aabb Alpha-alpha-beta-beta block of 2-RDM for active
    * orbitals (optional)
    * @param two_rdm_aaaa Alpha-alpha-alpha-alpha block of 2-RDM for active
    * orbitals (optional)
@@ -85,7 +85,7 @@ class CasWavefunctionContainer : public WavefunctionContainer {
       const std::optional<MatrixVariant>& one_rdm_aa,
       const std::optional<MatrixVariant>& one_rdm_bb,
       const std::optional<VectorVariant>& two_rdm_spin_traced,
-      const std::optional<VectorVariant>& two_rdm_abba,
+      const std::optional<VectorVariant>& two_rdm_aabb,
       const std::optional<VectorVariant>& two_rdm_aaaa,
       const std::optional<VectorVariant>& two_rdm_bbbb,
       WavefunctionType type = WavefunctionType::SelfDual);
@@ -145,39 +145,6 @@ class CasWavefunctionContainer : public WavefunctionContainer {
   double norm() const override;
 
   /**
-   * @brief Get spin-dependent one-particle RDMs for active orbitals only
-   * @return Tuple of (alpha-alpha, beta-beta) one-particle RDMs for active
-   * orbitals
-   */
-  std::tuple<const MatrixVariant&, const MatrixVariant&>
-  get_one_rdm_spin_dependent() const override;
-
-  /**
-   * @brief Get spin-dependent two-particle RDMs for active orbitals only
-   * @return Tuple of (abba, aaaa, bbbb) two-particle RDMs for active orbitals
-   */
-  std::tuple<const VectorVariant&, const VectorVariant&, const VectorVariant&>
-  get_two_rdm_spin_dependent() const override;
-
-  /**
-   * @brief Get spin-traced one-particle RDM for active orbitals only
-   * @return Spin-traced one-particle RDM for active orbitals
-   */
-  const MatrixVariant& get_one_rdm_spin_traced() const override;
-
-  /**
-   * @brief Get spin-traced two-particle RDM for active orbitals only
-   * @return Spin-traced two-particle RDM for active orbitals
-   */
-  const VectorVariant& get_two_rdm_spin_traced() const override;
-
-  /**
-   * @brief Calculate single orbital entropies for active orbitals only
-   * @return Vector of orbital entropies for active orbitals
-   */
-  Eigen::VectorXd get_single_orbital_entropies() const override;
-
-  /**
    * @brief Get total number of alpha and beta electrons (active + inactive)
    * @return Pair of (n_alpha_total, n_beta_total) electrons
    */
@@ -205,41 +172,6 @@ class CasWavefunctionContainer : public WavefunctionContainer {
       const override;
 
   /**
-   * @brief Check if spin-dependent one-particle RDMs for active orbitals are
-   * available
-   * @return True if available
-   */
-  bool has_one_rdm_spin_dependent() const override;
-
-  /**
-   * @brief Check if spin-traced one-particle RDM for active orbitals is
-   * available
-   * @return True if available
-   */
-  bool has_one_rdm_spin_traced() const override;
-
-  /**
-   * @brief Check if spin-dependent two-particle RDMs for active orbitals are
-   * available
-   * @return True if available
-   */
-  bool has_two_rdm_spin_dependent() const override;
-
-  /**
-   * @brief Check if alpha-beta two-particle RDM for active orbitals is
-   * available
-   * @return True if available
-   */
-  bool has_two_rdm_spin_dependent_ab() const override;
-
-  /**
-   * @brief Check if spin-traced two-particle RDM for active orbitals is
-   * available
-   * @return True if available
-   */
-  bool has_two_rdm_spin_traced() const override;
-
-  /**
    * @brief Clear cached data to release memory
    *
    * Clears the following cached data for Complete Active Space (CAS)
@@ -248,7 +180,7 @@ class CasWavefunctionContainer : public WavefunctionContainer {
    *   spin-dependent (_one_rdm_spin_dependent_aa, _one_rdm_spin_dependent_bb)
    * - Two-particle RDMs: spin-traced (_two_rdm_spin_traced) and
    *   spin-dependent (_two_rdm_spin_dependent_aaaa,
-   * _two_rdm_spin_dependent_abba, _two_rdm_spin_dependent_bbbb)
+   * _two_rdm_spin_dependent_aabb, _two_rdm_spin_dependent_bbbb)
    */
   void clear_caches() const override;
 
@@ -297,15 +229,6 @@ class CasWavefunctionContainer : public WavefunctionContainer {
  private:
   /// Serialization version
   static constexpr const char* SERIALIZATION_VERSION = "0.1.0";
-
-  mutable std::shared_ptr<MatrixVariant> _one_rdm_spin_traced = nullptr;
-  mutable std::shared_ptr<VectorVariant> _two_rdm_spin_traced = nullptr;
-  // spin-dependent RDMs
-  mutable std::shared_ptr<MatrixVariant> _one_rdm_spin_dependent_aa = nullptr;
-  mutable std::shared_ptr<MatrixVariant> _one_rdm_spin_dependent_bb = nullptr;
-  mutable std::shared_ptr<VectorVariant> _two_rdm_spin_dependent_aaaa = nullptr;
-  mutable std::shared_ptr<VectorVariant> _two_rdm_spin_dependent_abba = nullptr;
-  mutable std::shared_ptr<VectorVariant> _two_rdm_spin_dependent_bbbb = nullptr;
   // Coefficients of the wavefunction
   const CoeffContainer _coefficients;
   // Configuration set (contains determinants and orbital information)

@@ -74,18 +74,17 @@ docs = [
   "myst-parser",
   "breathe",
   "sphinx-autodoc-typehints",
-  # Enabling both numpydoc and napoleon results in duplicate documentation for
-  # class members.  Napoleon is the cleaner option.
-  # "numpydoc",
   "sphinx-inline-tabs",
-  "sphinxcontrib-napoleon", # For Google- and NumPy-style docstrings
+  "sphinxcontrib-napoleon",
+  "sphinxcontrib-bibtex",
+  "sphinx_copybutton"
 ]
 plugins = [
   "pyscf>=2.9.0"
 ]
 
 # TODO (NAB): update these URLs with final ones
-# https://dev.azure.com/ms-azurequantum/AzureQuantum/_workitems/edit/41430
+# 41430
 [project.urls]
 Documentation = "https://qdk-chemistry.readthedocs.io"
 Homepage = "https://github.com/example/qdk-chemistry"

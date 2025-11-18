@@ -10,30 +10,6 @@
 
 namespace qdk::chemistry::algorithms::microsoft {
 
-namespace detail {
-std::vector<size_t> get_active_indices(const data::Orbitals& orbitals) {
-  auto [active_indices_alpha, active_indices_beta] =
-      orbitals.get_active_space_indices();
-
-  // Merge active indices for alpha and beta into a single vector with unique
-  // indices
-  std::set<size_t> indices_set(active_indices_alpha.begin(),
-                               active_indices_alpha.end());
-  indices_set.insert(active_indices_beta.begin(), active_indices_beta.end());
-  std::vector<size_t> active_indices(indices_set.begin(), indices_set.end());
-
-  // If no active indices are provided, use all orbitals
-  if (active_indices.empty()) {
-    const size_t num_molecular_orbitals = orbitals.get_num_molecular_orbitals();
-    active_indices.resize(num_molecular_orbitals);
-    std::iota(active_indices.begin(), active_indices.end(), 0);
-  }
-
-  return active_indices;
-}
-
-}  // namespace detail
-
 macis::MCSCFSettings get_mcscf_settings_(const data::Settings& settings_) {
   macis::MCSCFSettings mcscf_settings;
   // Respect MACIS native setting names

@@ -1,4 +1,4 @@
-"""PySCF-based Self-Consistent Field (SCF) solver implementation for qdk.chemistry.
+"""PySCF-based Self-Consistent Field (SCF) solver implementation for qdk_chemistry.
 
 This module provides integration between QDK/Chemistry and PySCF for performing
 Self-Consistent Field calculations supporting both Hartree-Fock (HF) and
@@ -19,7 +19,7 @@ various basis sets and exchange-correlation functionals through the settings int
 Upon import, this module automatically registers the PySCF solver with QDK/Chemistry's
 SCF solver registry under the name "pyscf".
 
->>> from qdk.chemistry.plugins.pyscf.scf_solver import PyscfScfSolver
+>>> from qdk_chemistry.plugins.pyscf.scf_solver import PyscfScfSolver
 >>> solver = PyscfScfSolver()
 >>> solver.settings()["method"] = "b3lyp"  # Use B3LYP DFT
 >>> energy, orbitals = solver.run(molecule)
@@ -149,7 +149,7 @@ class PyscfScfSolver(ScfSolver):
 
         Returns:
             * The electronic energy of the system in atomic units (Hartree), excluding nuclear repulsion energy
-                for consistency with qdk.chemistry.
+                for consistency with qdk_chemistry.
             * A single-determinant Slater determinant wavefunction representing the Hartree-Fock ground state.
 
         Note:
@@ -218,7 +218,7 @@ class PyscfScfSolver(ScfSolver):
             occ_alpha = np.array([1.0 if i < num_alpha else 0.0 for i in range(norb)])
             occ_beta = np.array([1.0 if i < num_beta else 0.0 for i in range(norb)])
 
-            # Use utility function to convert QATK orbitals to PySCF format
+            # Use utility function to convert qdk-chemistry orbitals to PySCF format
             temp_mf = orbitals_to_scf(initial_guess, occ_alpha, occ_beta, force_restricted)
 
             # Extract density matrix from the temporary SCF object

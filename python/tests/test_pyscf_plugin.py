@@ -14,6 +14,7 @@ from qdk_chemistry.data import Ansatz, CoupledClusterAmplitudes, Settings, Struc
 from .reference_tolerances import (
     float_comparison_absolute_tolerance,
     float_comparison_relative_tolerance,
+    mcscf_energy_tolerance,
     plain_text_tolerance,
     scf_energy_tolerance,
     scf_orbital_tolerance,
@@ -23,6 +24,7 @@ try:
     import pyscf
     import pyscf.gto
     import pyscf.lo
+    import pyscf.mcscf
     import pyscf.scf
 
     PYSCF_AVAILABLE = True
@@ -32,6 +34,7 @@ except ImportError:
 if PYSCF_AVAILABLE:
     import qdk_chemistry.plugins.pyscf
     from qdk_chemistry.constants import ANGSTROM_TO_BOHR
+    from qdk_chemistry.plugins.pyscf.mcscf import mcsolver_to_fcisolver
     from qdk_chemistry.plugins.pyscf.utils import (
         basis_to_pyscf_mol,
         hamiltonian_to_scf,
@@ -39,10 +42,23 @@ if PYSCF_AVAILABLE:
         orbitals_to_scf,
         orbitals_to_scf_from_n_electrons_and_multiplicity,
         pyscf_mol_to_qdk_basis,
+        structure_to_pyscf_atom_labels,
     )
 
 
 pytestmark = pytest.mark.skipif(not PYSCF_AVAILABLE, reason="PySCF not available")
+
+
+def create_n2_structure():
+    """Create a nitrogen molecule structure."""
+    symbols = ["N", "N"]
+    coords = np.array(
+        [
+            [0.000000000, 0.0000000000, 2.000000000000 * ANGSTROM_TO_BOHR],
+            [0.000000000, 0.0000000000, 0.000000000000],
+        ]
+    )
+    return Structure(symbols, coords)
 
 
 def create_water_structure():
@@ -408,7 +424,7 @@ class TestPyscfPlugin:
         # Check that we get reasonable results
         assert isinstance(energy, float)
         # TODO (NAB):  change output to logger rather than print() here and elsewhere
-        # https://dev.azure.com/ms-azurequantum/AzureQuantum/_workitems/edit/40460
+        # 40460
         assert abs(energy - (-149.49029917454197)) < scf_energy_tolerance
         assert orbitals is not None
         assert orbitals.has_basis_set()
@@ -1373,6 +1389,186 @@ class TestPyscfPlugin:
         assert isinstance(cc_amplitudes, CoupledClusterAmplitudes)
         assert cc_amplitudes.has_t1_amplitudes()
         assert cc_amplitudes.has_t2_amplitudes()
+
+    def test_pyscf_mcscf_singlet(self):
+        """Test PySCF MCSCF for n2 with cc-pvdz basis and CAS(6,6)."""
+        # Create N2 structure
+        n2 = create_n2_structure()
+
+        # Perform SCF calculation with qdk-chemistry
+        scf_solver = algorithms.create("scf_solver")
+        scf_solver.settings().set("basis_set", "cc-pvdz")
+        _, wavefunction = scf_solver.run(n2, 0, 1)
+
+        # Construct qdk-chemistry Hamiltonian for active space
+        ham_calculator = algorithms.create("hamiltonian_constructor")
+
+        # Create MACIS calculator
+        macis_calc = algorithms.create("multi_configuration_calculator", "macis_cas")
+        macis_calc.settings().set("calculate_one_rdm", True)
+        macis_calc.settings().set("calculate_two_rdm", True)
+
+        # Select active space: 6 orbitals, 6 electrons
+        valence_selector = algorithms.create("active_space_selector", "qdk_valence")
+        valence_selector.settings().set("num_active_electrons", 6)
+        valence_selector.settings().set("num_active_orbitals", 6)
+        active_orbitals_sd = valence_selector.run(wavefunction)
+
+        # Calculate with qdk-chemistry/MACIS
+        pyscf_mcscf = algorithms.create("multi_configuration_scf", "pyscf")
+        pyscf_mcscf_energy, _ = pyscf_mcscf.run(active_orbitals_sd.get_orbitals(), ham_calculator, macis_calc, 3, 3)
+
+        assert np.isclose(pyscf_mcscf_energy, -108.78966139913287, atol=mcscf_energy_tolerance)
+
+    def test_pyscf_mcscf_triplet(self):
+        """Test PySCF MCSCF for o2 triplet with cc-pvdz basis and CAS(6,6)."""
+        # Create O2 structure
+        o2 = create_o2_structure()
+
+        # Perform SCF calculation with qdk-chemistry
+        scf_solver = algorithms.create("scf_solver", "pyscf")
+        scf_solver.settings().set("basis_set", "cc-pvdz")
+        scf_solver.settings().set("force_restricted", True)
+        _, wavefunction = scf_solver.run(o2, 0, 3)
+
+        # Construct qdk-chemistry Hamiltonian for active space
+        ham_calculator = algorithms.create("hamiltonian_constructor")
+
+        # Create MACIS calculator
+        macis_calc = algorithms.create("multi_configuration_calculator", "macis_cas")
+        macis_calc.settings().set("calculate_one_rdm", True)
+        macis_calc.settings().set("calculate_two_rdm", True)
+        macis_calc.settings().set("ci_residual_tolerance", 1e-10)
+
+        # Select active space: 6 orbitals, 6 electrons
+        valence_selector = algorithms.create("active_space_selector", "qdk_valence")
+        valence_selector.settings().set("num_active_electrons", 6)
+        valence_selector.settings().set("num_active_orbitals", 6)
+        active_orbitals_sd = valence_selector.run(wavefunction)
+
+        # Calculate with qdk-chemistry/MACIS
+        pyscf_mcscf = algorithms.create("multi_configuration_scf", "pyscf")
+        pyscf_mcscf_energy, _ = pyscf_mcscf.run(active_orbitals_sd.get_orbitals(), ham_calculator, macis_calc, 4, 2)
+
+        assert np.isclose(pyscf_mcscf_energy, -149.68131616317658, atol=mcscf_energy_tolerance)
+
+    def test_pyscf_fciwrapper_casci_singlet(self):
+        """Test MC wrapper for n2 with cc-pvdz basis and CAS(6,6)."""
+        # Create N2 structure
+        n2 = create_n2_structure()
+        pyscf_mol = pyscf.gto.M(
+            atom=structure_to_pyscf_atom_labels(n2)[0], basis="cc-pvdz", unit="Bohr", charge=0, spin=0
+        )
+
+        # Perform SCF calculation with qdk-chemistry
+        scf_solver = algorithms.create("scf_solver")
+        scf_solver.settings().set("basis_set", "cc-pvdz")
+        _, wavefunction = scf_solver.run(n2, 0, 1)
+
+        # Get pyscf object from hf orbitals
+        occ_a, occ_b = wavefunction.get_total_orbital_occupations()
+        pyscf_scf = orbitals_to_scf(wavefunction.get_orbitals(), occ_alpha=occ_a, occ_beta=occ_b, force_restricted=True)
+
+        # Create MACIS calculator
+        macis_calc = algorithms.create("multi_configuration_calculator", "macis_cas")
+        macis_calc.settings().set("calculate_one_rdm", True)
+        macis_calc.settings().set("calculate_two_rdm", True)
+
+        # Create PySCF CASCI calculation with macis
+        casci = pyscf.mcscf.CASCI(pyscf_scf, 6, 6)
+        casci.fcisolver = mcsolver_to_fcisolver(pyscf_mol, macis_calc)
+        casci.verbose = 0
+        casci_energy = casci.kernel()[0]
+
+        assert np.isclose(casci_energy, -108.74113344655625, atol=mcscf_energy_tolerance)
+
+    def test_pyscf_fciwrapper_casci_triplet(self):
+        """Test MC wrapper for o2 triplet with cc-pvdz basis and CAS(6,6)."""
+        # Create O2 structure
+        o2 = create_o2_structure()
+        pyscf_mol = pyscf.gto.M(atom=structure_to_pyscf_atom_labels(o2)[0], basis="cc-pvdz", charge=0, spin=2)
+
+        # Perform SCF calculation with qdk-chemistry
+        scf_solver = algorithms.create("scf_solver", "pyscf")
+        scf_solver.settings().set("basis_set", "cc-pvdz")
+        _, wavefunction = scf_solver.run(o2, 0, 3)
+
+        # Get pyscf object from hf orbitals
+        occ_a, occ_b = wavefunction.get_total_orbital_occupations()
+        pyscf_scf = orbitals_to_scf(wavefunction.get_orbitals(), occ_alpha=occ_a, occ_beta=occ_b, force_restricted=True)
+
+        # Create MACIS calculator
+        macis_calc = algorithms.create("multi_configuration_calculator", "macis_cas")
+        macis_calc.settings().set("calculate_one_rdm", True)
+        macis_calc.settings().set("calculate_two_rdm", True)
+
+        # Create PySCF CASCI calculation with macis
+        casci = pyscf.mcscf.CASCI(pyscf_scf, 8, 6)
+        casci.fcisolver = mcsolver_to_fcisolver(pyscf_mol, macis_calc)
+        casci.verbose = 0
+        casci_energy = casci.kernel()[0]
+
+        assert np.isclose(casci_energy, -149.661310389037, atol=mcscf_energy_tolerance)
+
+    def test_pyscf_fciwrapper_casscf_singlet(self):
+        """Test MC wrapper in casscf for n2 with cc-pvdz basis and CAS(6,6)."""
+        # Create N2 structure
+        n2 = create_n2_structure()
+        pyscf_mol = pyscf.gto.M(
+            atom=structure_to_pyscf_atom_labels(n2)[0], basis="cc-pvdz", unit="Bohr", charge=0, spin=0
+        )
+
+        # Perform SCF calculation with qdk-chemistry
+        scf_solver = algorithms.create("scf_solver")
+        scf_solver.settings().set("basis_set", "cc-pvdz")
+        _, wavefunction = scf_solver.run(n2, 0, 1)
+
+        # Get pyscf object from hf orbitals
+        occ_a, occ_b = wavefunction.get_total_orbital_occupations()
+        pyscf_scf = orbitals_to_scf(wavefunction.get_orbitals(), occ_alpha=occ_a, occ_beta=occ_b, force_restricted=True)
+
+        # Create MACIS calculator
+        macis_calc = algorithms.create("multi_configuration_calculator", "macis_cas")
+        macis_calc.settings().set("calculate_one_rdm", True)
+        macis_calc.settings().set("calculate_two_rdm", True)
+
+        # Create PySCF CASSCF calculation with macis
+        casscf = pyscf.mcscf.CASSCF(pyscf_scf, 6, 6)
+        casscf.fcisolver = mcsolver_to_fcisolver(pyscf_mol, macis_calc)
+        casscf.verbose = 0
+        casscf_energy = casscf.kernel()[0]
+
+        assert np.isclose(casscf_energy, -108.78966139913287, atol=mcscf_energy_tolerance)
+
+    def test_pyscf_fciwrapper_casscf_triplet(self):
+        """Test MC wrapper in casscf for o2 triplet with cc-pvdz basis and CAS(6,6)."""
+        # Create O2 structure
+        o2 = create_o2_structure()
+        pyscf_mol = pyscf.gto.M(atom=structure_to_pyscf_atom_labels(o2)[0], basis="cc-pvdz", charge=0, spin=2)
+
+        # Perform SCF calculation with qdk-chemistry
+        scf_solver = algorithms.create("scf_solver", "pyscf")
+        scf_solver.settings().set("basis_set", "cc-pvdz")
+        scf_solver.settings().set("force_restricted", True)
+        _, wavefunction = scf_solver.run(o2, 0, 3)
+
+        # Get pyscf object from hf orbitals
+        occ_a, occ_b = wavefunction.get_total_orbital_occupations()
+        pyscf_scf = orbitals_to_scf(wavefunction.get_orbitals(), occ_alpha=occ_a, occ_beta=occ_b, force_restricted=True)
+
+        # Create MACIS calculator
+        macis_calc = algorithms.create("multi_configuration_calculator", "macis_cas")
+        macis_calc.settings().set("calculate_one_rdm", True)
+        macis_calc.settings().set("calculate_two_rdm", True)
+        macis_calc.settings().set("ci_residual_tolerance", 1e-10)
+
+        # Create PySCF CASSCF calculation with macis
+        casscf = pyscf.mcscf.CASSCF(pyscf_scf, 6, 6)
+        casscf.fcisolver = mcsolver_to_fcisolver(pyscf_mol, macis_calc)
+        casscf.verbose = 0
+        casscf_energy = casscf.kernel()[0]
+
+        assert np.isclose(casscf_energy, -149.68131616317658, atol=mcscf_energy_tolerance)
 
     def test_pyscf_occupations_from_n_electrons_and_multiplicity(self):
         """Test occupations from n_electrons and multiplicity on water with def2-svp basis."""

@@ -8,5 +8,6 @@
 import qdk_chemistry.plugins.pyscf.active_space_avas
 import qdk_chemistry.plugins.pyscf.coupled_cluster
 import qdk_chemistry.plugins.pyscf.localization
+import qdk_chemistry.plugins.pyscf.mcscf
 import qdk_chemistry.plugins.pyscf.scf_solver
 import qdk_chemistry.plugins.pyscf.stability

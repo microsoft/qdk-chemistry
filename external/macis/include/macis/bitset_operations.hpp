@@ -2,6 +2,7 @@
  * MACIS Copyright (c) 2023, The Regents of the University of California,
  * through Lawrence Berkeley National Laboratory (subject to receipt of
  * any required approvals from the U.S. Dept. of Energy). All rights reserved.
+ * Portions Copyright (c) Microsoft Corporation.
  *
  * See LICENSE.txt for details
  */
@@ -24,8 +25,6 @@ namespace macis {
  *  @param[in] i integral input for CLZ
  *  @returns CLZ for `i`
  */
-// #TODO: Guard against zero inputs; __builtin_clz is undefined for 0 and we
-// should throw or handle explicitly.
 inline auto clz(unsigned int i) { return __builtin_clz(i); }
 
 /**
@@ -36,7 +35,6 @@ inline auto clz(unsigned int i) { return __builtin_clz(i); }
  *  @param[in] i integral input for CLZ
  *  @returns CLZ for `i`
  */
-// #TODO: Same zero-input concern as above
 inline auto clz(unsigned long int i) { return __builtin_clzl(i); }
 
 /**
@@ -47,7 +45,6 @@ inline auto clz(unsigned long int i) { return __builtin_clzl(i); }
  *  @param[in] i integral input for CLZ
  *  @returns CLZ for `i`
  */
-// #TODO: Same zero-input concern as above
 inline auto clz(unsigned long long int i) { return __builtin_clzll(i); }
 
 /**
@@ -67,28 +64,65 @@ fls(Integral i) {
   return CHAR_BIT * sizeof(Integral) - clz(i) - 1;
 }
 
-/// Fast conversion of bitset to unsigned long long
+/**
+ *  @brief Fast conversion of bitset to unsigned long long
+ *
+ *  Efficiently converts a bitset to an unsigned long long by using
+ *  direct memory access when possible, avoiding the overhead of
+ *  the standard bitset::to_ullong() method for larger bitsets.
+ *
+ *  @tparam N Width of the input bitset
+ *
+ *  @param[in] bits The bitset to convert
+ *  @returns The bitset converted to unsigned long long
+ */
 template <size_t N>
 unsigned long long fast_to_ullong(const std::bitset<N>& bits) {
   // Low words
-  if constexpr (N == 64 or N == 128)
+  if constexpr (N >= 64 && sizeof(unsigned long long) >= 8) {
     return *reinterpret_cast<const uint64_t*>(&bits);
-  if constexpr (N == 32) return *reinterpret_cast<const uint32_t*>(&bits);
-  return bits.to_ullong();
+  } else if constexpr (N >= 32 && sizeof(unsigned long long) >= 4) {
+    return *reinterpret_cast<const uint32_t*>(&bits);
+  } else {
+    return bits.to_ullong();
+  }
 }
 
-/// Fast conversion of bitset to unsigned long
+/**
+ *  @brief Fast conversion of bitset to unsigned long
+ *
+ *  Efficiently converts a bitset to an unsigned long by using
+ *  direct memory access when possible, avoiding the overhead of
+ *  the standard bitset::to_ulong() method for larger bitsets.
+ *
+ *  @tparam N Width of the input bitset
+ *
+ *  @param[in] bits The bitset to convert
+ *  @returns The bitset converted to unsigned long
+ */
 template <size_t N>
 unsigned long fast_to_ulong(const std::bitset<N>& bits) {
-  // Low words
-  if constexpr (N == 32 or N == 64 or N == 128)
-    // #TODO: I am a bit confused here. On a 64-bit system, unsigned long is 64
-    // bits, so are we throwing away data? Is this intended?
+  if constexpr (N >= 64 && sizeof(unsigned long) >= 8) {
+    return *reinterpret_cast<const uint64_t*>(&bits);
+  } else if constexpr (N >= 32 && sizeof(unsigned long) >= 4) {
     return *reinterpret_cast<const uint32_t*>(&bits);
-  return bits.to_ulong();
+  } else {
+    return bits.to_ulong();
+  }
 }
 
-/// Conversion of bitset to uint128
+/**
+ *  @brief Conversion of bitset to uint128
+ *
+ *  Converts a bitset to a 128-bit unsigned integer. For 128-bit bitsets,
+ *  uses direct memory access for efficiency. For smaller bitsets, delegates
+ *  to fast_to_ullong.
+ *
+ *  @tparam N Width of the input bitset (must be <= 128)
+ *
+ *  @param[in] bits The bitset to convert
+ *  @returns The bitset converted to uint128_t
+ */
 template <size_t N>
 uint128_t to_uint128(std::bitset<N> bits) {
   static_assert(N <= 128, "N > 128");
@@ -216,7 +250,18 @@ uint32_t fls(std::bitset<N> bits) {
   abort();
 }
 
-/// Convert bitset to a list of indices (inplace)
+/**
+ *  @brief Convert bitset to a list of indices (in-place)
+ *
+ *  Converts a bitset to a vector of indices where bits are set to 1.
+ *  The indices vector is modified in-place and resized to fit the exact
+ *  number of set bits.
+ *
+ *  @tparam N Width of the input bitset
+ *
+ *  @param[in] bits The bitset to convert
+ *  @param[out] indices Vector to store the indices of set bits
+ */
 template <size_t N>
 void bits_to_indices(std::bitset<N> bits, std::vector<uint32_t>& indices) {
   indices.clear();
@@ -230,7 +275,17 @@ void bits_to_indices(std::bitset<N> bits, std::vector<uint32_t>& indices) {
   }
 }
 
-/// Convert bitset to a list of indices (out-of-place)
+/**
+ *  @brief Convert bitset to a list of indices (out-of-place)
+ *
+ *  Converts a bitset to a vector of indices where bits are set to 1.
+ *  Returns a new vector containing the indices of all set bits.
+ *
+ *  @tparam N Width of the input bitset
+ *
+ *  @param[in] bits The bitset to convert
+ *  @returns Vector containing the indices of set bits
+ */
 template <size_t N>
 std::vector<uint32_t> bits_to_indices(std::bitset<N> bits) {
   std::vector<uint32_t> indices;
@@ -238,29 +293,19 @@ std::vector<uint32_t> bits_to_indices(std::bitset<N> bits) {
   return indices;
 }
 
-#if 0
-// #TODO: Dead code, need to be removed?
-/// Truncate a bitset to one of smaller width
-template <size_t N, size_t M>
-inline std::bitset<N> truncate_bitset(std::bitset<M> bits) {
-  static_assert(M >= N, "M < N");
-  if constexpr(M == N) return bits;
-
-  const auto mask = full_mask<N, M>();
-  if constexpr(N <= 32) {
-    return (bits & mask).to_ulong();
-  } else if constexpr(N <= 64) {
-    return (bits & mask).to_ullong();
-  } else {
-    std::bitset<N> trunc_bits = 0;
-    for(size_t i = 0; i < N; ++i)
-      if(bits[i]) trunc_bits[i] = 1;
-    return trunc_bits;
-  }
-}
-#endif /* 0 */
-
-/// Expand a bitset to one of larger width
+/**
+ *  @brief Expand a bitset to one of larger width
+ *
+ *  Expands a bitset of width M to a larger bitset of width N by
+ *  copying all bits from the smaller bitset to the lower bits
+ *  of the larger bitset. Higher bits are initialized to 0.
+ *
+ *  @tparam N Width of the output bitset (must be >= M)
+ *  @tparam M Width of the input bitset
+ *
+ *  @param[in] bits The bitset to expand
+ *  @returns Expanded bitset of width N
+ */
 template <size_t N, size_t M>
 inline std::bitset<N> expand_bitset(std::bitset<M> bits) {
   static_assert(N >= M, "N < M");
@@ -278,7 +323,17 @@ inline std::bitset<N> expand_bitset(std::bitset<M> bits) {
   }
 }
 
-/// Extract to lo word of a bitset of even width
+/**
+ *  @brief Extract the low word of a bitset of even width
+ *
+ *  Extracts the lower half of a bitset as a separate bitset.
+ *  The input bitset must have even width and be aligned to 64-bit boundaries.
+ *
+ *  @tparam N Width of the input bitset (must be even and aligned)
+ *
+ *  @param[in] bits The bitset to extract from
+ *  @returns Bitset containing the lower N/2 bits
+ */
 template <size_t N>
 inline std::bitset<N / 2> bitset_lo_word(std::bitset<N> bits) {
   static_assert((N % 64 == 0) and (N == 64 or N / 2 % 64 == 0),
@@ -295,6 +350,18 @@ inline std::bitset<N / 2> bitset_lo_word(std::bitset<N> bits) {
   }
 }
 
+/**
+ *  @brief Set the low word of a bitset of even width
+ *
+ *  Sets the lower half of a bitset from another bitset of half the width.
+ *  The input bitset must have even width and be aligned to 64-bit boundaries.
+ *  The upper half of the target bitset remains unchanged.
+ *
+ *  @tparam N Width of the target bitset (must be even and aligned)
+ *
+ *  @param[in,out] bits The bitset to modify
+ *  @param[in] word The bitset containing values for the lower N/2 bits
+ */
 template <size_t N>
 inline void set_bitset_lo_word(std::bitset<N>& bits, std::bitset<N / 2> word) {
   static_assert((N % 64 == 0) and (N == 64 or N / 2 % 64 == 0),
@@ -312,7 +379,17 @@ inline void set_bitset_lo_word(std::bitset<N>& bits, std::bitset<N / 2> word) {
   }
 }
 
-/// Extract to hi word of a bitset of even width
+/**
+ *  @brief Extract the high word of a bitset of even width
+ *
+ *  Extracts the upper half of a bitset as a separate bitset.
+ *  The input bitset must have even width and be aligned to 64-bit boundaries.
+ *
+ *  @tparam N Width of the input bitset (must be even and aligned)
+ *
+ *  @param[in] bits The bitset to extract from
+ *  @returns Bitset containing the upper N/2 bits
+ */
 template <size_t N>
 inline std::bitset<N / 2> bitset_hi_word(std::bitset<N> bits) {
   static_assert((N % 64 == 0) and (N == 64 or N / 2 % 64 == 0),
@@ -329,6 +406,18 @@ inline std::bitset<N / 2> bitset_hi_word(std::bitset<N> bits) {
   }
 }
 
+/**
+ *  @brief Set the high word of a bitset of even width
+ *
+ *  Sets the upper half of a bitset from another bitset of half the width.
+ *  The input bitset must have even width and be aligned to 64-bit boundaries.
+ *  The lower half of the target bitset remains unchanged.
+ *
+ *  @tparam N Width of the target bitset (must be even and aligned)
+ *
+ *  @param[in,out] bits The bitset to modify
+ *  @param[in] word The bitset containing values for the upper N/2 bits
+ */
 template <size_t N>
 inline void set_bitset_hi_word(std::bitset<N>& bits, std::bitset<N / 2> word) {
   static_assert((N % 64 == 0) and (N == 64 or N / 2 % 64 == 0),
@@ -346,7 +435,19 @@ inline void set_bitset_hi_word(std::bitset<N>& bits, std::bitset<N / 2> word) {
   }
 }
 
-/// Bitwise less-than operator for bitset
+/**
+ *  @brief Bitwise less-than operator for bitset
+ *
+ *  Performs lexicographic comparison of two bitsets, treating them as
+ *  big-endian binary numbers. Uses optimized comparison methods based
+ *  on bitset size for better performance.
+ *
+ *  @tparam N Width of the bitsets to compare
+ *
+ *  @param[in] x First bitset to compare
+ *  @param[in] y Second bitset to compare
+ *  @returns true if x is lexicographically less than y, false otherwise
+ */
 template <size_t N>
 bool bitset_less(std::bitset<N> x, std::bitset<N> y) {
   if constexpr (N <= 32)
@@ -376,9 +477,24 @@ bool bitset_less(std::bitset<N> x, std::bitset<N> y) {
   abort();
 }
 
-/// Bitwise less-than comparator for bitset
+/**
+ *  @brief Bitwise less-than comparator for bitset
+ *
+ *  Function object that implements lexicographic comparison of bitsets.
+ *  Can be used with STL containers and algorithms that require a
+ *  comparison function (e.g., std::set, std::map, std::sort).
+ *
+ *  @tparam N Width of the bitsets to compare
+ */
 template <size_t N>
 struct bitset_less_comparator {
+  /**
+   *  @brief Function call operator for comparison
+   *
+   *  @param[in] x First bitset to compare
+   *  @param[in] y Second bitset to compare
+   *  @returns true if x is lexicographically less than y, false otherwise
+   */
   bool operator()(std::bitset<N> x, std::bitset<N> y) const {
     return bitset_less(x, y);
   }

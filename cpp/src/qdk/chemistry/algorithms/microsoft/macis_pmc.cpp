@@ -35,12 +35,23 @@ struct pmc_helper {
       const data::Hamiltonian& hamiltonian,
       const std::vector<data::Configuration>& configurations,
       const data::Settings& settings_) {
+    // Create MacisPmcSettings instance for accessing PMC-specific settings
+    MacisPmcSettings macis_pmc_settings;
+    double h_el_tol = macis_pmc_settings.get<double>("h_el_tol");
+    double H_thresh = macis_pmc_settings.get<double>("H_thresh");
+    double davidson_res_tol =
+        macis_pmc_settings.get<double>("davidson_res_tol");
+    size_t iterative_solver_dimension_cutoff =
+        macis_pmc_settings.get<size_t>("iterative_solver_dimension_cutoff");
+    size_t davidson_max_m = macis_pmc_settings.get<size_t>("davidson_max_m");
+
     using wfn_type = macis::wfn_t<N>;
     using wfn_traits = macis::wavefunction_traits<wfn_type>;
     using generator_t = macis::SortedDoubleLoopHamiltonianGenerator<wfn_type>;
 
     auto orbitals = hamiltonian.get_orbitals();
-    std::vector<size_t> active_indices = detail::get_active_indices(*orbitals);
+    std::vector<size_t> active_indices =
+        orbitals->get_active_space_indices().first;
     const size_t num_molecular_orbitals = active_indices.size();
 
     const auto& T = hamiltonian.get_one_body_integrals();
@@ -83,11 +94,9 @@ struct pmc_helper {
     if (dets.size() == 1) {
       E_pmc = ham_gen.matrix_element(dets[0], dets[0]);
       C_pmc = {1.0};
-    } else if (dets.size() < 100) {
-      // TODO (NAB):  Magic numbers 100 and 1e-16 - make these settings?
-      // https://dev.azure.com/ms-azurequantum/AzureQuantum/_workitems/edit/41321
+    } else if (dets.size() < iterative_solver_dimension_cutoff) {
       auto H = macis::make_csr_hamiltonian<int32_t>(dets.begin(), dets.end(),
-                                                    ham_gen, 1e-16);
+                                                    ham_gen, H_thresh);
       std::vector<double> H_dense(dets.size() * dets.size(), 0.0);
       std::vector<double> evals(dets.size(), 0.0);
 
@@ -100,10 +109,9 @@ struct pmc_helper {
       C_pmc.resize(dets.size());
       std::copy(H_dense.begin(), H_dense.begin() + dets.size(), C_pmc.begin());
     } else {
-      // TODO (NAB):  Magic number 1e-16, 200, 1e-8 - make these settings?
-      // https://dev.azure.com/ms-azurequantum/AzureQuantum/_workitems/edit/41321
       E_pmc = macis::selected_ci_diag<int64_t, wfn_type>(
-          dets.begin(), dets.end(), ham_gen, 1e-16, 200, 1e-8, C_pmc);
+          dets.begin(), dets.end(), ham_gen, h_el_tol, davidson_max_m,
+          davidson_res_tol, C_pmc);
     }
 
     // Copy-back data to return struct
@@ -172,7 +180,8 @@ std::pair<double, std::shared_ptr<data::Wavefunction>> MacisPmc::_run_impl(
     std::shared_ptr<data::Hamiltonian> hamiltonian,
     const std::vector<data::Configuration>& configurations) const {
   const auto& orbitals = hamiltonian->get_orbitals();
-  std::vector<size_t> active_indices = detail::get_active_indices(*orbitals);
+  std::vector<size_t> active_indices =
+      orbitals->get_active_space_indices().first;
   auto result = dispatch_by_norb<pmc_helper>(
       active_indices.size(), *hamiltonian, configurations, *_settings);
   return std::make_pair(result.first, std::make_shared<data::Wavefunction>(

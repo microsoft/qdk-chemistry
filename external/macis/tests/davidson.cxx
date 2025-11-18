@@ -2,6 +2,7 @@
  * MACIS Copyright (c) 2023, The Regents of the University of California,
  * through Lawrence Berkeley National Laboratory (subject to receipt of
  * any required approvals from the U.S. Dept. of Energy). All rights reserved.
+ * Portions Copyright (c) Microsoft Corporation.
  *
  * See LICENSE.txt for details
  */
@@ -36,13 +37,9 @@ TEST_CASE("Davidson") {
   using wfn_traits = macis::wavefunction_traits<wfn_type>;
   using generator_type = macis::DoubleLoopHamiltonianGenerator<wfn_type>;
 
-#if 0
-  generator_type ham_gen(norb, V.data(), T.data());
-#else
   generator_type ham_gen(
       macis::matrix_span<double>(T.data(), norb, norb),
       macis::rank4_span<double>(V.data(), norb, norb, norb, norb));
-#endif
 
   // Generate configuration space
   const auto hf_det = wfn_traits::canonical_hf_determinant(
@@ -97,13 +94,9 @@ TEST_CASE("Parallel Davidson") {
   using wfn_traits = macis::wavefunction_traits<wfn_type>;
   using generator_type = macis::DoubleLoopHamiltonianGenerator<wfn_type>;
 
-#if 0
-  generator_type ham_gen(norb, V.data(), T.data());
-#else
   generator_type ham_gen(
       macis::matrix_span<double>(T.data(), norb, norb),
       macis::rank4_span<double>(V.data(), norb, norb, norb, norb));
-#endif
 
   // Generate configuration space
   const auto hf_det = wfn_traits::canonical_hf_determinant(

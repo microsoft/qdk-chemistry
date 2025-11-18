@@ -2,6 +2,7 @@
  * MACIS Copyright (c) 2023, The Regents of the University of California,
  * through Lawrence Berkeley National Laboratory (subject to receipt of
  * any required approvals from the U.S. Dept. of Energy). All rights reserved.
+ * Portions Copyright (c) Microsoft Corporation.
  *
  * See LICENSE.txt for details
  */
@@ -592,8 +593,6 @@ void read_fcidump_all(std::string fname, double* T, size_t LDT, double* V,
                           std::istreambuf_iterator<char>());
   }
 
-  std::istringstream file(content);
-  // #TODO: This local stringstream seems unused? Should it be removed?
   std::string line;
   bool header_passed = false;
   bool format_detected = false;

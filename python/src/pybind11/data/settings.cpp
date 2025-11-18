@@ -581,7 +581,7 @@ void bind_settings(pybind11::module &data) {
 
         Examples
         --------
-        >>> import qdk.chemistry.data as data
+        >>> import qdk_chemistry.data as data
         >>> # Assuming you have a SettingValue from C++
         >>> py_value = data.setting_value_to_python(setting_val)
         )",
@@ -606,7 +606,7 @@ void bind_settings(pybind11::module &data) {
     --------
 
     To create a custom settings class in Python:
-    >>> class MySettings(qdk.chemistry.data.Settings):
+    >>> class MySettings(qdk_chemistry.data.Settings):
     ...     def __init__(self):
     ...         super().__init__()
     ...         self._set_default("method", "string", "default")
@@ -1426,7 +1426,7 @@ void bind_settings(pybind11::module &data) {
 
         Examples
         --------
-        >>> class MySettings(qdk.chemistry.data.Settings):
+        >>> class MySettings(qdk_chemistry.data.Settings):
         ...     def __init__(self):
         ...         super().__init__()
         ...         self._set_default("method", "string", "default")
@@ -1811,7 +1811,7 @@ void bind_settings(pybind11::module &data) {
   settings.def(
       "__repr__",
       [](const Settings &self) {
-        return "<qdk.chemistry.Settings size=" + std::to_string(self.size()) +
+        return "<qdk_chemistry.Settings size=" + std::to_string(self.size()) +
                ">";
       },
       R"(
@@ -1827,7 +1827,7 @@ void bind_settings(pybind11::module &data) {
         Examples
         --------
         >>> repr(settings)
-        '<qdk.chemistry.Settings size=3>'
+        '<qdk_chemistry.Settings size=3>'
         )");
 
   settings.def(
@@ -2097,7 +2097,7 @@ void bind_settings(pybind11::module &data) {
 
         Examples
         --------
-        >>> class MySettings(qdk.chemistry.data.Settings):
+        >>> class MySettings(qdk_chemistry.data.Settings):
         ...     def __init__(self):
         ...         super().__init__()
         ...         self._set_default("method", "string", "default")
@@ -2482,7 +2482,7 @@ void bind_settings(pybind11::module &data) {
   settings.def(
       "__repr__",
       [](const Settings &self) {
-        return "<qdk.chemistry.Settings size=" + std::to_string(self.size()) +
+        return "<qdk_chemistry.Settings size=" + std::to_string(self.size()) +
                ">";
       },
       R"(
@@ -2498,7 +2498,7 @@ void bind_settings(pybind11::module &data) {
         Examples
         --------
         >>> repr(settings)
-        '<qdk.chemistry.Settings size=3>'
+        '<qdk_chemistry.Settings size=3>'
         )");
 
   settings.def(
@@ -2535,7 +2535,7 @@ void bind_settings(pybind11::module &data) {
   settings.def(
       "__repr__",
       [](const Settings &self) {
-        return "<qdk.chemistry.Settings size=" + std::to_string(self.size()) +
+        return "<qdk_chemistry.Settings size=" + std::to_string(self.size()) +
                ">";
       },
       R"(
@@ -2551,7 +2551,7 @@ void bind_settings(pybind11::module &data) {
         Examples
         --------
         >>> repr(settings)
-        '<qdk.chemistry.Settings size=3>'
+        '<qdk_chemistry.Settings size=3>'
         )");
 
   settings.def(
@@ -2757,7 +2757,7 @@ void bind_settings(pybind11::module &data) {
 
     Examples
     --------
-    >>> import qdk.chemistry.data as data
+    >>> import qdk_chemistry.data as data
     >>> settings = data.ElectronicStructureSettings()
     >>> print(settings.method)  # "hf"
     >>> print(settings.basis_set)  # "def2-svp"

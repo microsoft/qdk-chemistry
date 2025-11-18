@@ -48,7 +48,7 @@ class MockLocalizationPy(Localizer):
     def _run_impl(self, orbitals, loc_indices_a, loc_indices_b):  # noqa: ARG002
         """Fake localize orbitals in Python."""
         # TODO (NAB):  change output to logger rather than print() here and elsewhere
-        # https://dev.azure.com/ms-azurequantum/AzureQuantum/_workitems/edit/41426
+        # 41426
         print("MockLocalization: Localizing orbitals in python...")
         return orbitals
 
@@ -291,7 +291,7 @@ class MockMultiConfigurationScf(MultiConfigurationScf):
         self._settings._set_default("numeric_param", "double", 0.0)
         self._settings._set_default("list_param", "vector<int>", [])
 
-    def _run_impl(self, _, __: int, ___: int):
+    def _run_impl(self, _orbs, _hamil_constr, _mc_solver, __: int, ___: int):
         """A simple test implementation of the solve method."""
         # Simple test implementation - return basic energy and wavefunction
         energy = -1.5  # Mock energy value
@@ -559,9 +559,11 @@ class TestAlgorithmClasses:
         settings["basis_set"] = "6-31G"
         assert settings["basis_set"] == "6-31G"
 
-        # Test solve method with basic hamiltonian
-        hamiltonian = create_test_hamiltonian(2)  # Create basic 2x2 Hamiltonian
-        energy, wavefunction = mcscf_solver.run(hamiltonian, 1, 1)
+        # Test solve method with basic hamiltonian and mc calculator
+        orbitals = create_test_orbitals(2)
+        hamiltonian_creator = MockHamiltonianConstructor()
+        cas_solver = MockMultiConfigurationCalculator()
+        energy, wavefunction = mcscf_solver.run(orbitals, hamiltonian_creator, cas_solver, 1, 1)
         assert isinstance(energy, float)
         assert isinstance(wavefunction, Wavefunction)
 
@@ -754,10 +756,10 @@ class TestAlgorithmClasses:
         algorithms.register(_test_register_mcscf)
 
         # Verify registration worked
-        assert key in algorithms.available("mcscf_solver")
+        assert key in algorithms.available("multi_configuration_scf")
 
         # Test that the correct instance is created
-        mcscf_solver = algorithms.create("mcscf_solver", key)
+        mcscf_solver = algorithms.create("multi_configuration_scf", key)
         assert isinstance(mcscf_solver, MockMultiConfigurationScf)
 
     def test_coupled_cluster_calculator_registration(self):
@@ -900,7 +902,7 @@ class TestAlgorithmClasses:
 
         # Test __repr__ method
         repr_str = repr(localizer)
-        assert "<qdk.chemistry.algorithms.Localizer>" in repr_str
+        assert "<qdk_chemistry.algorithms.Localizer>" in repr_str
 
     def test_localizer_factory_functions(self):
         """Test Localizer factory functions and unregistration."""
@@ -929,7 +931,7 @@ class TestAlgorithmClasses:
 
             # Test __repr__ method
             repr_str = repr(localizer)
-            assert "<qdk.chemistry.algorithms.Localizer>" in repr_str
+            assert "<qdk_chemistry.algorithms.Localizer>" in repr_str
 
         except TypeError:
             # Expected behavior for abstract classes
@@ -1096,7 +1098,7 @@ class TestAlgorithmClasses:
 
         # Test __repr__ method
         repr_str = repr(checker)
-        assert "<qdk.chemistry.algorithms.StabilityChecker>" in repr_str
+        assert "<qdk_chemistry.algorithms.StabilityChecker>" in repr_str
 
     def test_stability_checker_factory_functions(self):
         """Test StabilityChecker factory functions and error handling."""

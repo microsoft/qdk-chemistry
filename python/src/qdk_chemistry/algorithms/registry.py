@@ -86,7 +86,7 @@ def create(algorithm_type: str, algorithm_name: str | None = None, **kwargs) -> 
         KeyError: If the specified algorithm type is not registered in the system.
 
     Examples:
-        >>> from qdk.chemistry.algorithms import registry
+        >>> from qdk_chemistry.algorithms import registry
         >>> # Create the default SCF solver
         >>> scf = registry.create("scf_solver")
         >>> # Create a specific SCF solver by name
@@ -148,7 +148,7 @@ def show_settings(algorithm_type: str, algorithm_name: str) -> list[tuple[str, s
         KeyError: If the specified algorithm type is not registered in the system.
 
     Examples:
-        >>> from qdk.chemistry.algorithms import registry
+        >>> from qdk_chemistry.algorithms import registry
         >>> # Show settings for the PySCF SCF solver
         >>> settings_info = registry.show_settings("scf_solver", "pyscf")
         >>> for name, python_type, default in settings_info:
@@ -195,8 +195,8 @@ def register(generator: Callable[[], Algorithm]) -> None:
         KeyError: If the algorithm's type is not a recognized algorithm type in the system.
 
     Examples:
-        >>> from qdk.chemistry.algorithms import registry
-        >>> from qdk.chemistry.algorithms import ScfSolver
+        >>> from qdk_chemistry.algorithms import registry
+        >>> from qdk_chemistry.algorithms import ScfSolver
         >>> class MyCustomScf(ScfSolver):
         ...     def name(self):
         ...         return "my_custom_scf"
@@ -242,7 +242,7 @@ def available(algorithm_type: str | None = None) -> dict[str, list[str]] | list[
             algorithms are available).
 
     Examples:
-        >>> from qdk.chemistry.algorithms import registry
+        >>> from qdk_chemistry.algorithms import registry
         >>> # List all available algorithms across all types
         >>> all_algorithms = registry.available()
         >>> print(all_algorithms)
@@ -283,7 +283,7 @@ def unregister(algorithm_type: str, algorithm_name: str) -> None:
         KeyError: If the specified algorithm type is not registered in the system.
 
     Examples:
-        >>> from qdk.chemistry.algorithms import registry
+        >>> from qdk_chemistry.algorithms import registry
         >>> # Assuming you previously registered a custom algorithm
         >>> registry.unregister("scf_solver", "my_custom_scf")
 

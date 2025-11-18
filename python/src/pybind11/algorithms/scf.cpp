@@ -57,8 +57,8 @@ void bind_scf(py::module &m) {
     --------
     To create a custom SCF solver, inherit from this class:
 
-    >>> import qdk.chemistry.algorithms as alg
-    >>> import qdk.chemistry.data as data
+    >>> import qdk_chemistry.algorithms as alg
+    >>> import qdk_chemistry.data as data
     >>> class MyScfSolver(alg.ScfSolver):
     ...     def __init__(self):
     ...         super().__init__()  # Call the base class constructor
@@ -98,18 +98,18 @@ void bind_scf(py::module &m) {
 
         Parameters
         ----------
-        structure : qdk.chemistry.data.Structure
+        structure : qdk_chemistry.data.Structure
             The molecular structure to solve
         charge : int
             The molecular charge
         spin_multiplicity : int
             The spin multiplicity of the molecular system
-        initial_guess : qdk.chemistry.data.Orbitals, optional
+        initial_guess : qdk_chemistry.data.Orbitals, optional
             Initial orbital guess for the SCF calculation (optional, defaults to no guess)
 
         Returns
         -------
-        tuple[float, qdk.chemistry.data.Wavefunction]
+        tuple[float, qdk_chemistry.data.Wavefunction]
             A tuple containing the converged total energy (nuclear + electronic) and wavefunction
         )",
       py::arg("structure"), py::arg("charge"), py::arg("spin_multiplicity"),
@@ -129,7 +129,7 @@ void bind_scf(py::module &m) {
 
         Parameters
         ----------
-        structure : qdk.chemistry.data.Structure
+        structure : qdk_chemistry.data.Structure
             The molecular structure to solve
         charge : int
             The molecular charge
@@ -138,7 +138,7 @@ void bind_scf(py::module &m) {
 
         Returns
         -------
-        tuple[float, qdk.chemistry.data.Wavefunction]
+        tuple[float, qdk_chemistry.data.Wavefunction]
             A tuple containing the converged total energy (nuclear + electronic) and wavefunction
         )",
       py::arg("structure"), py::arg("charge"), py::arg("spin_multiplicity"));
@@ -149,7 +149,7 @@ void bind_scf(py::module &m) {
 
         Returns
         -------
-        qdk.chemistry.data.Settings
+        qdk_chemistry.data.Settings
             Reference to the settings object for configuring the solver
         )",
                  py::return_value_policy::reference_internal);
@@ -174,7 +174,7 @@ void bind_scf(py::module &m) {
         >>> class MyScfSolver(alg.ScfSolver):
         ...     def __init__(self):
         ...         super().__init__()
-        ...         from qdk.chemistry.data import ElectronicStructureSettings
+        ...         from qdk_chemistry.data import ElectronicStructureSettings
         ...         self._settings = ElectronicStructureSettings()
         )");
 
@@ -193,6 +193,6 @@ void bind_scf(py::module &m) {
       m, "ScfSolverFactory");
 
   scf_solver.def("__repr__", [](const ScfSolver &) {
-    return "<qdk.chemistry.algorithms.ScfSolver>";
+    return "<qdk_chemistry.algorithms.ScfSolver>";
   });
 }

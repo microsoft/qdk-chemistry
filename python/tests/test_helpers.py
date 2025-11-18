@@ -143,7 +143,7 @@ def create_test_wavefunction(num_orbitals: int = 2):
         num_orbitals: Number of orbitals (default 2)
 
     Returns:
-        qdk.chemistry.data.Wavefunction: A simple wavefunction with single determinant
+        qdk_chemistry.data.Wavefunction: A simple wavefunction with single determinant
 
     """
     orbitals = create_test_orbitals(num_orbitals)
@@ -166,7 +166,7 @@ def create_test_ansatz(num_orbitals: int = 2):
         num_orbitals: Number of orbitals (default 2)
 
     Returns:
-        qdk.chemistry.data.Ansatz: A simple ansatz with hamiltonian and wavefunction
+        qdk_chemistry.data.Ansatz: A simple ansatz with hamiltonian and wavefunction
 
     """
     # Create shared orbitals for both hamiltonian and wavefunction

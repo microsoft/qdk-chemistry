@@ -430,31 +430,27 @@ std::string Hamiltonian::get_summary() const {
   summary +=
       "  Total Orbitals: " + std::to_string(num_molecular_orbitals) + "\n";
 
-  const double thresh = 1e-6;
+  const double threshold = 1e-6;  // Threshold for determining negligible
+                                  // integrals in summary statistics
   const size_t non_negligible_one_body_ints = std::count_if(
       get_one_body_integrals().data(),
       get_one_body_integrals().data() + get_one_body_integrals().size(),
-      [thresh](double val) { return std::abs(val) > thresh; });
+      [threshold](double val) { return std::abs(val) > threshold; });
   const size_t non_negligible_two_body_ints = std::count_if(
       get_two_body_integrals().data(),
       get_two_body_integrals().data() + get_two_body_integrals().size(),
-      [thresh](double val) { return std::abs(val) > thresh; });
+      [threshold](double val) { return std::abs(val) > threshold; });
 
   summary += "  Core Energy: " + std::to_string(get_core_energy()) + "\n";
   summary += "  Integral Statistics:\n";
-  summary +=
-      "    One-body Integrals: " +
-      std::to_string(get_one_body_integrals().size()) +
-      " (larger than 1e-6: " + std::to_string(non_negligible_one_body_ints) +
-      ")\n";
-  summary +=
-      "    Two-body Integrals: " +
-      std::to_string(get_two_body_integrals().size()) +
-      " (larger than 1e-6: " + std::to_string(non_negligible_two_body_ints) +
-      ")\n";
-  // TODO (NAB):  why is 1e-6 hardcoded here?  Should it be user-adjustable
-  // and/or provided as a constant?
-  // https://dev.azure.com/ms-azurequantum/AzureQuantum/_workitems/edit/41349
+  summary += "    One-body Integrals: " +
+             std::to_string(get_one_body_integrals().size()) +
+             " (larger than " + std::to_string(threshold) + ": " +
+             std::to_string(non_negligible_one_body_ints) + ")\n";
+  summary += "    Two-body Integrals: " +
+             std::to_string(get_two_body_integrals().size()) +
+             " (larger than " + std::to_string(threshold) + ": " +
+             std::to_string(non_negligible_two_body_ints) + ")\n";
 
   return summary;
 }

@@ -73,7 +73,7 @@ std::shared_ptr<data::Wavefunction> MP2NaturalOrbitalLocalizer::_run_impl(
 
   // TODO (DBWY): Wrap consistency checking into a common function and reused
   // when needed. Work Item:
-  // https://dev.azure.com/ms-azurequantum/AzureQuantum/_workitems/edit/41816
+  // 41816
   // Validate that indices are sorted
   if (!std::is_sorted(loc_indices_a.begin(), loc_indices_a.end())) {
     throw std::invalid_argument("loc_indices_a must be sorted");
