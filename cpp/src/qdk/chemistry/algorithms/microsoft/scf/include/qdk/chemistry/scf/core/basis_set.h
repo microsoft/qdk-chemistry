@@ -71,8 +71,8 @@ class BasisSet {
 
   std::vector<Shell> ecp_shells;  ///< Effective core potential shells
   std::unordered_map<int, int>
-      elem2ecpcore;  ///< Map from atomic number to number ECP cores
-  int ecp_cores;     ///< Total number of core electrons replaced by ECPs
+      element_ecp_electrons;  ///< Map from atomic number to ECP electron number
+  int n_ecp_electrons;  ///< Total number of core electrons replaced by ECPs
 
   /**
    * @brief Load basis set from database (QCSchema) JSON file

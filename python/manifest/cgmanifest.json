@@ -1,0 +1,969 @@
+{
+  "$schema": "https://json.schemastore.org/component-detection-manifest.json",
+  "version": 1,
+  "registrations": [
+    {
+      "component": {
+        "type": "pip",
+        "pip": {
+          "name": "alabaster",
+          "version": "1.0.0"
+        }
+      }
+    },
+    {
+      "component": {
+        "type": "pip",
+        "pip": {
+          "name": "annotated-types",
+          "version": "0.7.0"
+        }
+      }
+    },
+    {
+      "component": {
+        "type": "pip",
+        "pip": {
+          "name": "antlr4-python3-runtime",
+          "version": "4.13.2"
+        }
+      }
+    },
+    {
+      "component": {
+        "type": "pip",
+        "pip": {
+          "name": "anywidget",
+          "version": "0.9.18"
+        }
+      }
+    },
+    {
+      "component": {
+        "type": "pip",
+        "pip": {
+          "name": "asttokens",
+          "version": "3.0.0"
+        }
+      }
+    },
+    {
+      "component": {
+        "type": "pip",
+        "pip": {
+          "name": "babel",
+          "version": "2.17.0"
+        }
+      }
+    },
+    {
+      "component": {
+        "type": "pip",
+        "pip": {
+          "name": "breathe",
+          "version": "4.36.0"
+        }
+      }
+    },
+    {
+      "component": {
+        "type": "pip",
+        "pip": {
+          "name": "certifi",
+          "version": "2025.10.5"
+        }
+      }
+    },
+    {
+      "component": {
+        "type": "pip",
+        "pip": {
+          "name": "charset-normalizer",
+          "version": "3.4.4"
+        }
+      }
+    },
+    {
+      "component": {
+        "type": "pip",
+        "pip": {
+          "name": "colorlog",
+          "version": "6.10.1"
+        }
+      }
+    },
+    {
+      "component": {
+        "type": "pip",
+        "pip": {
+          "name": "comm",
+          "version": "0.2.3"
+        }
+      }
+    },
+    {
+      "component": {
+        "type": "pip",
+        "pip": {
+          "name": "contourpy",
+          "version": "1.3.3"
+        }
+      }
+    },
+    {
+      "component": {
+        "type": "pip",
+        "pip": {
+          "name": "coverage",
+          "version": "7.11.0"
+        }
+      }
+    },
+    {
+      "component": {
+        "type": "pip",
+        "pip": {
+          "name": "cycler",
+          "version": "0.12.1"
+        }
+      }
+    },
+    {
+      "component": {
+        "type": "pip",
+        "pip": {
+          "name": "decorator",
+          "version": "5.2.1"
+        }
+      }
+    },
+    {
+      "component": {
+        "type": "pip",
+        "pip": {
+          "name": "dill",
+          "version": "0.4.0"
+        }
+      }
+    },
+    {
+      "component": {
+        "type": "pip",
+        "pip": {
+          "name": "docutils",
+          "version": "0.21.2"
+        }
+      }
+    },
+    {
+      "component": {
+        "type": "pip",
+        "pip": {
+          "name": "executing",
+          "version": "2.2.1"
+        }
+      }
+    },
+    {
+      "component": {
+        "type": "pip",
+        "pip": {
+          "name": "fonttools",
+          "version": "4.60.1"
+        }
+      }
+    },
+    {
+      "component": {
+        "type": "pip",
+        "pip": {
+          "name": "gcovr",
+          "version": "8.4"
+        }
+      }
+    },
+    {
+      "component": {
+        "type": "pip",
+        "pip": {
+          "name": "h5py",
+          "version": "3.15.1"
+        }
+      }
+    },
+    {
+      "component": {
+        "type": "pip",
+        "pip": {
+          "name": "idna",
+          "version": "3.11"
+        }
+      }
+    },
+    {
+      "component": {
+        "type": "pip",
+        "pip": {
+          "name": "imagesize",
+          "version": "1.4.1"
+        }
+      }
+    },
+    {
+      "component": {
+        "type": "pip",
+        "pip": {
+          "name": "iniconfig",
+          "version": "2.3.0"
+        }
+      }
+    },
+    {
+      "component": {
+        "type": "pip",
+        "pip": {
+          "name": "ipython",
+          "version": "9.6.0"
+        }
+      }
+    },
+    {
+      "component": {
+        "type": "pip",
+        "pip": {
+          "name": "ipython-pygments-lexers",
+          "version": "1.1.1"
+        }
+      }
+    },
+    {
+      "component": {
+        "type": "pip",
+        "pip": {
+          "name": "ipywidgets",
+          "version": "8.1.8"
+        }
+      }
+    },
+    {
+      "component": {
+        "type": "pip",
+        "pip": {
+          "name": "jedi",
+          "version": "0.19.2"
+        }
+      }
+    },
+    {
+      "component": {
+        "type": "pip",
+        "pip": {
+          "name": "jinja2",
+          "version": "3.1.6"
+        }
+      }
+    },
+    {
+      "component": {
+        "type": "pip",
+        "pip": {
+          "name": "jupyterlab-widgets",
+          "version": "3.0.16"
+        }
+      }
+    },
+    {
+      "component": {
+        "type": "pip",
+        "pip": {
+          "name": "kiwisolver",
+          "version": "1.4.9"
+        }
+      }
+    },
+    {
+      "component": {
+        "type": "pip",
+        "pip": {
+          "name": "lxml",
+          "version": "6.0.2"
+        }
+      }
+    },
+    {
+      "component": {
+        "type": "pip",
+        "pip": {
+          "name": "markdown-it-py",
+          "version": "3.0.0"
+        }
+      }
+    },
+    {
+      "component": {
+        "type": "pip",
+        "pip": {
+          "name": "markupsafe",
+          "version": "3.0.3"
+        }
+      }
+    },
+    {
+      "component": {
+        "type": "pip",
+        "pip": {
+          "name": "matplotlib",
+          "version": "3.10.0"
+        }
+      }
+    },
+    {
+      "component": {
+        "type": "pip",
+        "pip": {
+          "name": "matplotlib-inline",
+          "version": "0.2.1"
+        }
+      }
+    },
+    {
+      "component": {
+        "type": "pip",
+        "pip": {
+          "name": "mdit-py-plugins",
+          "version": "0.5.0"
+        }
+      }
+    },
+    {
+      "component": {
+        "type": "pip",
+        "pip": {
+          "name": "mdurl",
+          "version": "0.1.2"
+        }
+      }
+    },
+    {
+      "component": {
+        "type": "pip",
+        "pip": {
+          "name": "mypy",
+          "version": "1.18.2"
+        }
+      }
+    },
+    {
+      "component": {
+        "type": "pip",
+        "pip": {
+          "name": "mypy-extensions",
+          "version": "1.1.0"
+        }
+      }
+    },
+    {
+      "component": {
+        "type": "pip",
+        "pip": {
+          "name": "myst-parser",
+          "version": "4.0.1"
+        }
+      }
+    },
+    {
+      "component": {
+        "type": "pip",
+        "pip": {
+          "name": "numpy",
+          "version": "2.3.4"
+        }
+      }
+    },
+    {
+      "component": {
+        "type": "pip",
+        "pip": {
+          "name": "openqasm3",
+          "version": "1.0.1"
+        }
+      }
+    },
+    {
+      "component": {
+        "type": "pip",
+        "pip": {
+          "name": "packaging",
+          "version": "25.0"
+        }
+      }
+    },
+    {
+      "component": {
+        "type": "pip",
+        "pip": {
+          "name": "parso",
+          "version": "0.8.5"
+        }
+      }
+    },
+    {
+      "component": {
+        "type": "pip",
+        "pip": {
+          "name": "pathspec",
+          "version": "0.12.1"
+        }
+      }
+    },
+    {
+      "component": {
+        "type": "pip",
+        "pip": {
+          "name": "pexpect",
+          "version": "4.9.0"
+        }
+      }
+    },
+    {
+      "component": {
+        "type": "pip",
+        "pip": {
+          "name": "pillow",
+          "version": "12.0.0"
+        }
+      }
+    },
+    {
+      "component": {
+        "type": "pip",
+        "pip": {
+          "name": "pluggy",
+          "version": "1.6.0"
+        }
+      }
+    },
+    {
+      "component": {
+        "type": "pip",
+        "pip": {
+          "name": "pockets",
+          "version": "0.9.1"
+        }
+      }
+    },
+    {
+      "component": {
+        "type": "pip",
+        "pip": {
+          "name": "prompt-toolkit",
+          "version": "3.0.52"
+        }
+      }
+    },
+    {
+      "component": {
+        "type": "pip",
+        "pip": {
+          "name": "psutil",
+          "version": "7.1.3"
+        }
+      }
+    },
+    {
+      "component": {
+        "type": "pip",
+        "pip": {
+          "name": "psygnal",
+          "version": "0.15.0"
+        }
+      }
+    },
+    {
+      "component": {
+        "type": "pip",
+        "pip": {
+          "name": "ptyprocess",
+          "version": "0.7.0"
+        }
+      }
+    },
+    {
+      "component": {
+        "type": "pip",
+        "pip": {
+          "name": "pure-eval",
+          "version": "0.2.3"
+        }
+      }
+    },
+    {
+      "component": {
+        "type": "pip",
+        "pip": {
+          "name": "pybind11-stubgen",
+          "version": "2.5.5"
+        }
+      }
+    },
+    {
+      "component": {
+        "type": "pip",
+        "pip": {
+          "name": "pydantic",
+          "version": "2.12.3"
+        }
+      }
+    },
+    {
+      "component": {
+        "type": "pip",
+        "pip": {
+          "name": "pydantic-core",
+          "version": "2.41.4"
+        }
+      }
+    },
+    {
+      "component": {
+        "type": "pip",
+        "pip": {
+          "name": "pydantic-settings",
+          "version": "2.11.0"
+        }
+      }
+    },
+    {
+      "component": {
+        "type": "pip",
+        "pip": {
+          "name": "pygments",
+          "version": "2.19.2"
+        }
+      }
+    },
+    {
+      "component": {
+        "type": "pip",
+        "pip": {
+          "name": "pylatexenc",
+          "version": "2.10"
+        }
+      }
+    },
+    {
+      "component": {
+        "type": "pip",
+        "pip": {
+          "name": "pyparsing",
+          "version": "3.2.5"
+        }
+      }
+    },
+    {
+      "component": {
+        "type": "pip",
+        "pip": {
+          "name": "pyscf",
+          "version": "2.11.0"
+        }
+      }
+    },
+    {
+      "component": {
+        "type": "pip",
+        "pip": {
+          "name": "pytest",
+          "version": "8.4.2"
+        }
+      }
+    },
+    {
+      "component": {
+        "type": "pip",
+        "pip": {
+          "name": "pytest-cov",
+          "version": "7.0.0"
+        }
+      }
+    },
+    {
+      "component": {
+        "type": "pip",
+        "pip": {
+          "name": "python-dateutil",
+          "version": "2.9.0.post0"
+        }
+      }
+    },
+    {
+      "component": {
+        "type": "pip",
+        "pip": {
+          "name": "python-dotenv",
+          "version": "1.2.1"
+        }
+      }
+    },
+    {
+      "component": {
+        "type": "pip",
+        "pip": {
+          "name": "pyyaml",
+          "version": "6.0.3"
+        }
+      }
+    },
+    {
+      "component": {
+        "type": "pip",
+        "pip": {
+          "name": "qdk-chemistry",
+          "version": "1.0.4.dev59+g0a56f93fc.d20251104"
+        }
+      }
+    },
+    {
+      "component": {
+        "type": "pip",
+        "pip": {
+          "name": "qiskit",
+          "version": "2.1.2"
+        }
+      }
+    },
+    {
+      "component": {
+        "type": "pip",
+        "pip": {
+          "name": "qiskit-aer",
+          "version": "0.17.2"
+        }
+      }
+    },
+    {
+      "component": {
+        "type": "pip",
+        "pip": {
+          "name": "qiskit-algorithms",
+          "version": "0.4.0"
+        }
+      }
+    },
+    {
+      "component": {
+        "type": "pip",
+        "pip": {
+          "name": "qiskit-nature",
+          "version": "0.7.2"
+        }
+      }
+    },
+    {
+      "component": {
+        "type": "pip",
+        "pip": {
+          "name": "qiskit-qasm3-import",
+          "version": "0.6.0"
+        }
+      }
+    },
+    {
+      "component": {
+        "type": "pip",
+        "pip": {
+          "name": "qsharp",
+          "version": "1.22.0"
+        }
+      }
+    },
+    {
+      "component": {
+        "type": "pip",
+        "pip": {
+          "name": "qsharp-widgets",
+          "version": "1.22.0"
+        }
+      }
+    },
+    {
+      "component": {
+        "type": "pip",
+        "pip": {
+          "name": "requests",
+          "version": "2.32.5"
+        }
+      }
+    },
+    {
+      "component": {
+        "type": "pip",
+        "pip": {
+          "name": "roman-numerals-py",
+          "version": "3.1.0"
+        }
+      }
+    },
+    {
+      "component": {
+        "type": "pip",
+        "pip": {
+          "name": "ruamel-yaml",
+          "version": "0.18.16"
+        }
+      }
+    },
+    {
+      "component": {
+        "type": "pip",
+        "pip": {
+          "name": "ruamel-yaml-clib",
+          "version": "0.2.14"
+        }
+      }
+    },
+    {
+      "component": {
+        "type": "pip",
+        "pip": {
+          "name": "ruff",
+          "version": "0.14.3"
+        }
+      }
+    },
+    {
+      "component": {
+        "type": "pip",
+        "pip": {
+          "name": "rustworkx",
+          "version": "0.17.1"
+        }
+      }
+    },
+    {
+      "component": {
+        "type": "pip",
+        "pip": {
+          "name": "scipy",
+          "version": "1.16.3"
+        }
+      }
+    },
+    {
+      "component": {
+        "type": "pip",
+        "pip": {
+          "name": "setuptools",
+          "version": "80.9.0"
+        }
+      }
+    },
+    {
+      "component": {
+        "type": "pip",
+        "pip": {
+          "name": "six",
+          "version": "1.17.0"
+        }
+      }
+    },
+    {
+      "component": {
+        "type": "pip",
+        "pip": {
+          "name": "snowballstemmer",
+          "version": "3.0.1"
+        }
+      }
+    },
+    {
+      "component": {
+        "type": "pip",
+        "pip": {
+          "name": "sphinx",
+          "version": "8.2.3"
+        }
+      }
+    },
+    {
+      "component": {
+        "type": "pip",
+        "pip": {
+          "name": "sphinx-autodoc-typehints",
+          "version": "3.5.2"
+        }
+      }
+    },
+    {
+      "component": {
+        "type": "pip",
+        "pip": {
+          "name": "sphinx-inline-tabs",
+          "version": "2023.4.21"
+        }
+      }
+    },
+    {
+      "component": {
+        "type": "pip",
+        "pip": {
+          "name": "sphinx-rtd-theme",
+          "version": "3.0.2"
+        }
+      }
+    },
+    {
+      "component": {
+        "type": "pip",
+        "pip": {
+          "name": "sphinxcontrib-applehelp",
+          "version": "2.0.0"
+        }
+      }
+    },
+    {
+      "component": {
+        "type": "pip",
+        "pip": {
+          "name": "sphinxcontrib-devhelp",
+          "version": "2.0.0"
+        }
+      }
+    },
+    {
+      "component": {
+        "type": "pip",
+        "pip": {
+          "name": "sphinxcontrib-htmlhelp",
+          "version": "2.1.0"
+        }
+      }
+    },
+    {
+      "component": {
+        "type": "pip",
+        "pip": {
+          "name": "sphinxcontrib-jquery",
+          "version": "4.1"
+        }
+      }
+    },
+    {
+      "component": {
+        "type": "pip",
+        "pip": {
+          "name": "sphinxcontrib-jsmath",
+          "version": "1.0.1"
+        }
+      }
+    },
+    {
+      "component": {
+        "type": "pip",
+        "pip": {
+          "name": "sphinxcontrib-mermaid",
+          "version": "1.0.0"
+        }
+      }
+    },
+    {
+      "component": {
+        "type": "pip",
+        "pip": {
+          "name": "sphinxcontrib-napoleon",
+          "version": "0.7"
+        }
+      }
+    },
+    {
+      "component": {
+        "type": "pip",
+        "pip": {
+          "name": "sphinxcontrib-qthelp",
+          "version": "2.0.0"
+        }
+      }
+    },
+    {
+      "component": {
+        "type": "pip",
+        "pip": {
+          "name": "sphinxcontrib-serializinghtml",
+          "version": "2.0.0"
+        }
+      }
+    },
+    {
+      "component": {
+        "type": "pip",
+        "pip": {
+          "name": "stack-data",
+          "version": "0.6.3"
+        }
+      }
+    },
+    {
+      "component": {
+        "type": "pip",
+        "pip": {
+          "name": "stevedore",
+          "version": "5.5.0"
+        }
+      }
+    },
+    {
+      "component": {
+        "type": "pip",
+        "pip": {
+          "name": "traitlets",
+          "version": "5.14.3"
+        }
+      }
+    },
+    {
+      "component": {
+        "type": "pip",
+        "pip": {
+          "name": "typing-extensions",
+          "version": "4.15.0"
+        }
+      }
+    },
+    {
+      "component": {
+        "type": "pip",
+        "pip": {
+          "name": "typing-inspection",
+          "version": "0.4.2"
+        }
+      }
+    },
+    {
+      "component": {
+        "type": "pip",
+        "pip": {
+          "name": "urllib3",
+          "version": "2.5.0"
+        }
+      }
+    },
+    {
+      "component": {
+        "type": "pip",
+        "pip": {
+          "name": "wcwidth",
+          "version": "0.2.14"
+        }
+      }
+    },
+    {
+      "component": {
+        "type": "pip",
+        "pip": {
+          "name": "widgetsnbextension",
+          "version": "4.0.15"
+        }
+      }
+    }
+  ]
+}

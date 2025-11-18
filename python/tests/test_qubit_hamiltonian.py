@@ -60,9 +60,9 @@ class TestQubitHamiltonian:
         assert len(grouped) == 2
 
         # Verify coefficients are preserved
-        coeff_map = dict(zip(qubit_hamiltonian.pauli_strings, qubit_hamiltonian.coefficients, strict=False))
+        coeff_map = dict(zip(qubit_hamiltonian.pauli_strings, qubit_hamiltonian.coefficients, strict=True))
         for group in grouped:
-            for pauli_str, coeff in zip(group.pauli_strings, group.coefficients, strict=False):
+            for pauli_str, coeff in zip(group.pauli_strings, group.coefficients, strict=True):
                 assert np.isclose(
                     coeff,
                     coeff_map[pauli_str],

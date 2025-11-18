@@ -95,20 +95,29 @@ def structure_to_pyscf_atom_labels(structure: Structure) -> tuple:
     return atoms, pyscf_symbols, elements
 
 
-def basis_to_pyscf_mol(basis: BasisSet) -> gto.Mole:
+def basis_to_pyscf_mol(basis: BasisSet, charge: int = 0, multiplicity: int = 1) -> gto.Mole:
     """Convert QDK/Chemistry BasisSet instance to PySCF Mole object.
 
     This function extracts the structure and basis information from the QDK/Chemistry
-    BasisSet instance and uses it to initialize a PySCF Mole object.
+    BasisSet instance and uses it to initialize a PySCF Mole object. If the BasisSet
+    contains ECP shells, they are converted to PySCF's ECP format.
 
     Args:
         basis: QDK/Chemistry BasisSet instance with populated basis set.
+        charge: Total charge of the molecule (default: 0).
+        multiplicity: Spin multiplicity (2S + 1) of the molecule (default: 1).
 
     Returns:
-        PySCF Mole object initialized with the QDK/Chemistry basis set data.
+        PySCF Mole object initialized with the QDK/Chemistry basis set data,
+        including ECP shells if present.
+
+    Note:
+        When ECP shells are present, the function reconstructs the full PySCF ECP
+        structure from QDK's ECP shells with radial powers, preserving all
+        exponents, coefficients, and r^n terms for each angular momentum channel.
 
     Examples:
-        >>> pyscf_mol = basis_to_pyscf_mol(basis)
+        >>> pyscf_mol = basis_to_pyscf_mol(basis, charge=0, multiplicity=1)
         >>> print(pyscf_mol.atom)
 
     """
@@ -128,12 +137,70 @@ def basis_to_pyscf_mol(basis: BasisSet) -> gto.Mole:
             atom_basis.append(gto.parse(shell_rec))
         basis_dict[pyscf_symbols[i]] = atom_basis
 
-    # TODO Handle Cartesian basis sets
-    # 41406
-    mol = gto.Mole(atom=atoms, basis=basis_dict, unit="Bohr")
+    # TODO Handle Cartesian basis sets, workitem: 41406
+    mol = gto.Mole(atom=atoms, basis=basis_dict, unit="Bohr", charge=charge, spin=multiplicity - 1)
 
     # Store the original QDK/Chemistry basis name as an attribute for round-trip conversion
     mol.qdk_basis_name = basis.get_name()
+
+    # Handle ECP (Effective Core Potential) if present
+    if basis.has_ecp_shells() and basis.has_ecp_electrons():
+        # Build PySCF ECP structure from QDK ECP shells
+        ecp_dict = {}
+        ecp_electrons = basis.get_ecp_electrons()
+
+        for iatm in range(natoms):
+            ncore = ecp_electrons[iatm]
+
+            if ncore > 0:
+                # Get ECP shells for this atom
+                ecp_shells_atom = basis.get_ecp_shells_for_atom(iatm)
+
+                if ecp_shells_atom:
+                    # Group shells by angular momentum: {l_value: {r_power: [(exp, coeff), ...]}}
+                    shells_by_l: dict[int, dict[int, list[tuple[float, float]]]] = {}
+
+                    for shell in ecp_shells_atom:
+                        # Get l value from orbital type (OrbitalType enum values == l values)
+                        l_value = int(shell.orbital_type)
+
+                        if l_value not in shells_by_l:
+                            shells_by_l[l_value] = {}
+
+                        # Each primitive may have different r-power
+                        for k in range(len(shell.exponents)):
+                            r_power = int(shell.rpowers[k])
+                            exp = float(shell.exponents[k])
+                            coeff = float(shell.coefficients[k])
+
+                            if r_power not in shells_by_l[l_value]:
+                                shells_by_l[l_value][r_power] = []
+
+                            shells_by_l[l_value][r_power].append((exp, coeff))
+
+                    # Build PySCF format: [ncore, [[l, [term0, term1, ...]], ...]]
+                    l_components = []
+                    for l_value in sorted(shells_by_l.keys()):
+                        # Find max r-power for this l to know array size
+                        max_r = max(shells_by_l[l_value].keys())
+
+                        # Build terms list with empty lists for unused r-powers
+                        terms: list[list[tuple[float, float]]] = [[] for _ in range(max_r + 1)]
+                        for r_power, primitives in shells_by_l[l_value].items():
+                            terms[r_power] = primitives
+
+                        l_components.append([l_value, terms])
+
+                    # Store in ecp_dict using elements
+                    ecp_dict[elements[iatm]] = [ncore, l_components]
+
+        if ecp_dict:
+            mol.ecp = ecp_dict
+            # Store ECP name as attribute for roundtrip conversion
+            mol.qdk_ecp_name = basis.get_ecp_name()
+    elif basis.has_ecp_electrons():
+        # Fallback: only ECP name available, no shells
+        mol.ecp = basis.get_ecp_name()
 
     mol.build()
 
@@ -144,7 +211,9 @@ def pyscf_mol_to_qdk_basis(pyscf_mol: gto.Mole, structure: Structure, basis_name
     """Convert PySCF Mole object to QDK/Chemistry BasisSet instance.
 
     This function extracts the basis set information from a PySCF Mole object
-    and returns a corresponding QDK/Chemistry BasisSet instance.
+    and returns a corresponding QDK/Chemistry BasisSet instance. Both regular
+    basis shells and ECP (Effective Core Potential) shells are extracted and
+    converted.
 
     Args:
         pyscf_mol: PySCF Mole object with basis set data.
@@ -153,7 +222,13 @@ def pyscf_mol_to_qdk_basis(pyscf_mol: gto.Mole, structure: Structure, basis_name
             molecule's basis set or defaults to "pyscf_basis".
 
     Returns:
-        QDK/Chemistry BasisSet instance initialized with the PySCF basis set data.
+        QDK/Chemistry BasisSet instance initialized with the PySCF basis set data,
+        including both regular shells and ECP shells.
+
+    Note:
+        ECP shells are extracted with their radial powers (r^n terms) preserved.
+        Each combination of (atom, angular momentum, radial power) with non-empty
+        primitives creates a separate ECP shell.
 
     """
     # Determine the basis set name if not provided
@@ -190,8 +265,114 @@ def pyscf_mol_to_qdk_basis(pyscf_mol: gto.Mole, structure: Structure, basis_name
                 qdk_shell = Shell(iatm, BasisSet.l_to_orbital_type(angular_momentum), exponents, j_coeffs)
                 shells.append(qdk_shell)
 
-    # Create BasisSet with name, shells, structure and basis type
-    return BasisSet(basis_name, shells, structure, BasisType.Spherical)
+    # Extract ECP shells if present
+    ecp_shells = []
+    if hasattr(pyscf_mol, "_ecp") and pyscf_mol._ecp:  # noqa: SLF001
+        for iatm in range(pyscf_mol.natm):
+            atom_symbol = atom_symbols[iatm]
+            element = atom_symbol.rstrip("0123456789")
+            if element in pyscf_mol._ecp:  # noqa: SLF001
+                ecp_data = pyscf_mol._ecp[element]  # noqa: SLF001
+                # Structure: [ncore, [[l, [[[exp, coeff]], ...]], ...]], where the inner structure has r-power terms
+                ecp_components = ecp_data[1]
+
+                for component in ecp_components:
+                    l_value = component[0]
+                    terms = component[1]
+
+                    # Process each r-power term
+                    for r_power, term in enumerate(terms):
+                        if term:  # Skip empty terms
+                            # Extract exponents and coefficients from [exp, coeff] pairs
+                            exponents = [pair[0] for pair in term]
+                            coefficients = [pair[1] for pair in term]
+                            rpowers = [r_power] * len(exponents)
+
+                            # Create ECP shell with radial powers
+                            ecp_shell = Shell(
+                                iatm, BasisSet.l_to_orbital_type(l_value), exponents, coefficients, rpowers
+                            )
+                            ecp_shells.append(ecp_shell)
+
+    # Extract ECP name and electron counts if present
+    if hasattr(pyscf_mol, "ecp") and pyscf_mol.ecp:
+        ecp_name = "none"
+        ecp_electrons = [0] * pyscf_mol.natm
+
+        if isinstance(pyscf_mol.ecp, str):
+            # Simple case: ECP specified as a uniform string name
+            ecp_name = pyscf_mol.ecp
+
+            # Extract electron counts from PySCF molecule
+            if hasattr(pyscf_mol, "atom_nelec_core"):
+                ecp_electrons = [pyscf_mol.atom_nelec_core(iatm) for iatm in range(pyscf_mol.natm)]
+            else:
+                raise RuntimeError("ECP electron counts could not be determined from PySCF Mole object.")
+
+        elif isinstance(pyscf_mol.ecp, dict) and len(pyscf_mol.ecp) > 0:
+            # Dictionary case: check if all values are strings (uniform ECP name)
+            # or full structure [ncore, [[l, terms], ...]] from basis_to_pyscf_mol
+            ecp_dict_values = list(pyscf_mol.ecp.values())
+            first_value = ecp_dict_values[0]
+
+            # Case 1: Dictionary with uniform string values (ECP names)
+            if isinstance(first_value, str):
+                # Check that all values are strings and identical
+                if not all(isinstance(v, str) for v in ecp_dict_values):
+                    raise ValueError("ECP dictionary contains mixed value types (strings and non-strings).")
+                ecp_names_set = set(ecp_dict_values)
+                if len(ecp_names_set) != 1:
+                    raise NotImplementedError(f"Non-uniform ECP names are not supported: {ecp_names_set}.")
+                ecp_name = next(iter(ecp_names_set))
+
+                # Extract electron counts from PySCF molecule
+                if hasattr(pyscf_mol, "atom_nelec_core"):
+                    ecp_electrons = [pyscf_mol.atom_nelec_core(iatm) for iatm in range(pyscf_mol.natm)]
+                else:
+                    raise RuntimeError("ECP electron counts could not be determined from PySCF Mole object.")
+
+            # Case 2: Dictionary with full ECP structure [ncore, [[l, terms], ...]]
+            elif isinstance(first_value, list) and len(first_value) >= 2:
+                # Verify all values have the expected structure
+                for atom_sym, ecp_data in pyscf_mol.ecp.items():
+                    if not isinstance(ecp_data, list) or len(ecp_data) < 2:
+                        raise ValueError(
+                            f"Invalid ECP structure for atom '{atom_sym}': "
+                            f"expected [ncore, [[l, terms], ...]], got {type(ecp_data)}"
+                        )
+
+                # Extract ECP name from stored attribute if available (roundtrip case) otherwise use generic name
+                ecp_name = pyscf_mol.qdk_ecp_name if hasattr(pyscf_mol, "qdk_ecp_name") else "custom"
+
+                # Extract ncore values directly from the ECP dictionary structure
+                for iatm in range(pyscf_mol.natm):
+                    element = atom_symbols[iatm].rstrip("0123456789")
+                    if element in pyscf_mol.ecp:
+                        ecp_electrons[iatm] = pyscf_mol.ecp[element][0]
+
+                # Validate consistency with mol.atom_nelec_core if available
+                if hasattr(pyscf_mol, "atom_nelec_core"):
+                    for iatm in range(pyscf_mol.natm):
+                        mol_ncore = pyscf_mol.atom_nelec_core(iatm)
+                        if ecp_electrons[iatm] != mol_ncore:
+                            raise ValueError(
+                                f"Inconsistent ECP electron count for atom {iatm}: "
+                                f"ECP dict has {ecp_electrons[iatm]}, mol.atom_nelec_core has {mol_ncore}"
+                            )
+            else:
+                raise ValueError(
+                    f"Unsupported ECP dictionary value type: {type(first_value)}. "
+                    "Expected uniform strings or [ncore, [[l, terms], ...]] structure."
+                )
+        else:
+            raise ValueError(f"PySCF ECP data must be a string or dict, got {type(pyscf_mol.ecp)}.")
+
+        # Create BasisSet with name, shells, ecp_name, ecp_shells, ecp_electrons, structure, and basis type
+        if any(n > 0 for n in ecp_electrons):
+            return BasisSet(basis_name, shells, ecp_name, ecp_shells, ecp_electrons, structure, BasisType.Spherical)
+
+    # Create BasisSet with name, shells, ecp_shells, structure, and basis type
+    return BasisSet(basis_name, shells, ecp_shells, structure, BasisType.Spherical)
 
 
 def orbitals_to_scf(
@@ -249,9 +430,9 @@ def orbitals_to_scf(
         energy_a, energy_b = orbitals.get_energies()
     else:
         # Energies not set (e.g., from rotated orbitals) - use zero arrays as placeholders
-        num_molecular_orbitalss = orbitals.get_num_molecular_orbitals()
-        energy_a = np.zeros(num_molecular_orbitalss)
-        energy_b = np.zeros(num_molecular_orbitalss)
+        num_molecular_orbitals = orbitals.get_num_molecular_orbitals()
+        energy_a = np.zeros(num_molecular_orbitals)
+        energy_b = np.zeros(num_molecular_orbitals)
 
     if force_restricted or orbitals.is_restricted():
         # For restricted Orbitals, internal occupations are per-spin (each 0 or 1 for closed shell),

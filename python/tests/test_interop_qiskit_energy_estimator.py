@@ -17,7 +17,7 @@ from qiskit_aer.noise import NoiseModel, depolarizing_error
 from qdk_chemistry.data.qubit_hamiltonian import QubitHamiltonian, filter_and_group_pauli_ops_from_wavefunction
 from qdk_chemistry.plugins.qiskit.energy_estimator import QiskitEnergyEstimator
 
-from .reference_tolerances import estimator_energy_tolerance
+from .reference_tolerances import estimator_energy_tolerance, float_comparison_relative_tolerance
 
 
 @pytest.fixture
@@ -75,10 +75,15 @@ def test_estimator_run():
     # So expected value = 0.2*0 + 0.3*0 + 0.4*1 + 0.5*1 = 0.9
     expected = [[0.0, 0.0, 1.0], [1.0]]
     assert all(
-        np.allclose(e, a, atol=estimator_energy_tolerance)
-        for e, a in zip(expected, results.expvals_each_term, strict=False)
+        np.allclose(e, a, rtol=float_comparison_relative_tolerance, atol=estimator_energy_tolerance)
+        for e, a in zip(expected, results.expvals_each_term, strict=True)
     )
-    assert np.isclose(results.energy_expectation_value, 0.9, atol=estimator_energy_tolerance)
+    assert np.isclose(
+        results.energy_expectation_value,
+        0.9,
+        rtol=float_comparison_relative_tolerance,
+        atol=estimator_energy_tolerance,
+    )
     assert np.less(results.energy_variance, 1e-5)
 
 
@@ -123,7 +128,12 @@ def test_estimator_for_4e4o_2det_problem(hamiltonian_4e4o, wavefunction_4e4o, ci
         total_shots=100000,
         classical_coeffs=classical_coeffs,
     )
-    assert np.isclose(results.energy_expectation_value, ref_energy_4e4o, atol=estimator_energy_tolerance)
+    assert np.isclose(
+        results.energy_expectation_value,
+        ref_energy_4e4o,
+        rtol=float_comparison_relative_tolerance,
+        atol=estimator_energy_tolerance,
+    )
     assert np.less(results.energy_variance, 1e-5)
 
 

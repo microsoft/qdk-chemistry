@@ -351,12 +351,12 @@ TEST_F(BasisSetTest, BasisFunctionQueries) {
   EXPECT_EQ(1u, info_1.first);  // shell index
 
   // Test basis indices for atoms
-  auto indices_0 = basis.get_basis_fuction_indices_for_atom(0);
+  auto indices_0 = basis.get_basis_function_indices_for_atom(0);
   EXPECT_EQ(4u, indices_0.size());  // s + p = 1 + 3 = 4
   EXPECT_EQ(0u, indices_0[0]);
   EXPECT_EQ(3u, indices_0[3]);
 
-  auto indices_1 = basis.get_basis_fuction_indices_for_atom(1);
+  auto indices_1 = basis.get_basis_function_indices_for_atom(1);
   EXPECT_EQ(1u, indices_1.size());  // s = 1
   EXPECT_EQ(4u, indices_1[0]);
 }
@@ -529,6 +529,504 @@ TEST_F(BasisSetTest, FileIO) {
   // Clean up the temporary directory
   std::error_code ec2;
   std::filesystem::remove_all(tmp_dir, ec2);
+}
+
+// ============================================================================
+// ECP (Effective Core Potential) Tests
+// ============================================================================
+
+TEST_F(BasisSetTest, ECPDefaultInitialization) {
+  // Test that ECP is initialized with default values
+  std::vector<Eigen::Vector3d> coords = {{0.0, 0.0, 0.0}, {1.0, 0.0, 0.0}};
+  std::vector<std::string> symbols = {"O", "H"};
+  Structure structure(coords, symbols);
+
+  std::vector<Shell> shells;
+  shells.emplace_back(0, OrbitalType::S, std::vector{1.0}, std::vector{1.0});
+  shells.emplace_back(1, OrbitalType::S, std::vector{1.0}, std::vector{1.0});
+
+  BasisSet basis("test-basis", shells, structure);
+
+  // Check default ECP values
+  EXPECT_FALSE(basis.has_ecp_electrons());
+  EXPECT_EQ("none", basis.get_ecp_name());
+  EXPECT_EQ(2u, basis.get_ecp_electrons().size());
+  EXPECT_EQ(0u, basis.get_ecp_electrons()[0]);
+  EXPECT_EQ(0u, basis.get_ecp_electrons()[1]);
+
+  // Check default ECP shell values
+  EXPECT_FALSE(basis.has_ecp_shells());
+  EXPECT_EQ(0u, basis.get_num_ecp_shells());
+  EXPECT_TRUE(basis.get_ecp_shells().empty());
+}
+
+TEST_F(BasisSetTest, ECPGet) {
+  // Test getting ECP data
+  std::vector<Eigen::Vector3d> coords = {{0.0, 0.0, 0.0}, {1.0, 0.0, 0.0}};
+  std::vector<std::string> symbols = {"Ag", "H"};
+  Structure structure(coords, symbols);
+
+  std::vector<Shell> shells;
+  shells.emplace_back(0, OrbitalType::S, std::vector{1.0}, std::vector{1.0});
+  shells.emplace_back(1, OrbitalType::S, std::vector{1.0}, std::vector{1.0});
+
+  // Create ECP shells with radial powers
+  std::vector<Shell> ecp_shells;
+
+  // ECP shell for Ag: s-type with r^0 and r^2 terms
+  Eigen::VectorXd exp_s(2), coeff_s(2);
+  Eigen::VectorXi rpow_s(2);
+  exp_s << 10.0, 5.0;
+  coeff_s << 50.0, 20.0;
+  rpow_s << 0, 2;
+  ecp_shells.emplace_back(0, OrbitalType::S, exp_s, coeff_s, rpow_s);
+
+  // ECP shell for Ag: p-type with r^1 term
+  Eigen::VectorXd exp_p(1), coeff_p(1);
+  Eigen::VectorXi rpow_p(1);
+  exp_p << 8.0;
+  coeff_p << 30.0;
+  rpow_p << 1;
+  ecp_shells.emplace_back(0, OrbitalType::P, exp_p, coeff_p, rpow_p);
+
+  // Create ECP data
+  std::string ecp_name = "def2-tzvp";
+  std::vector<size_t> ecp_electrons = {28, 0};
+
+  // Create basis with ECP data using constructor
+  BasisSet basis("test-basis", shells, ecp_name, ecp_shells, ecp_electrons,
+                 structure);
+
+  // Get ECP data
+  EXPECT_TRUE(basis.has_ecp_electrons());
+  EXPECT_EQ("def2-tzvp", basis.get_ecp_name());
+  EXPECT_EQ(2u, basis.get_ecp_electrons().size());
+  EXPECT_EQ(28u, basis.get_ecp_electrons()[0]);
+  EXPECT_EQ(0u, basis.get_ecp_electrons()[1]);
+}
+
+TEST_F(BasisSetTest, ECPShellConstruction) {
+  // Test creating ECP shells with radial powers
+  std::vector<Eigen::Vector3d> coords = {{0.0, 0.0, 0.0}, {1.0, 0.0, 0.0}};
+  std::vector<std::string> symbols = {"Ag", "H"};
+  Structure structure(coords, symbols);
+
+  // Create regular shells
+  std::vector<Shell> shells;
+  shells.emplace_back(0, OrbitalType::S, std::vector{1.0}, std::vector{1.0});
+  shells.emplace_back(1, OrbitalType::S, std::vector{1.0}, std::vector{1.0});
+
+  // Create ECP shells with radial powers
+  std::vector<Shell> ecp_shells;
+
+  // ECP shell for Ag: s-type with r^0 and r^2 terms
+  Eigen::VectorXd exp_s(2), coeff_s(2);
+  Eigen::VectorXi rpow_s(2);
+  exp_s << 10.0, 5.0;
+  coeff_s << 50.0, 20.0;
+  rpow_s << 0, 2;
+  ecp_shells.emplace_back(0, OrbitalType::S, exp_s, coeff_s, rpow_s);
+
+  // ECP shell for Ag: p-type with r^1 term
+  Eigen::VectorXd exp_p(1), coeff_p(1);
+  Eigen::VectorXi rpow_p(1);
+  exp_p << 8.0;
+  coeff_p << 30.0;
+  rpow_p << 1;
+  ecp_shells.emplace_back(0, OrbitalType::P, exp_p, coeff_p, rpow_p);
+
+  BasisSet basis("test-basis", shells, ecp_shells, structure);
+
+  // Check ECP shell data
+  EXPECT_TRUE(basis.has_ecp_shells());
+  EXPECT_EQ(2u, basis.get_num_ecp_shells());
+
+  // Check first ECP shell (s-type)
+  const Shell& ecp_shell_s = basis.get_ecp_shell(0);
+  EXPECT_EQ(0u, ecp_shell_s.atom_index);
+  EXPECT_EQ(OrbitalType::S, ecp_shell_s.orbital_type);
+  EXPECT_EQ(2u, ecp_shell_s.get_num_primitives());
+  EXPECT_TRUE(ecp_shell_s.has_radial_powers());
+  EXPECT_NEAR(10.0, ecp_shell_s.exponents(0), testing::plain_text_tolerance);
+  EXPECT_NEAR(50.0, ecp_shell_s.coefficients(0), testing::plain_text_tolerance);
+  EXPECT_EQ(0, ecp_shell_s.rpowers(0));
+  EXPECT_EQ(2, ecp_shell_s.rpowers(1));
+
+  // Check second ECP shell (p-type)
+  const Shell& ecp_shell_p = basis.get_ecp_shell(1);
+  EXPECT_EQ(0u, ecp_shell_p.atom_index);
+  EXPECT_EQ(OrbitalType::P, ecp_shell_p.orbital_type);
+  EXPECT_EQ(1u, ecp_shell_p.get_num_primitives());
+  EXPECT_TRUE(ecp_shell_p.has_radial_powers());
+  EXPECT_NEAR(8.0, ecp_shell_p.exponents(0), testing::plain_text_tolerance);
+  EXPECT_NEAR(30.0, ecp_shell_p.coefficients(0), testing::plain_text_tolerance);
+  EXPECT_EQ(1, ecp_shell_p.rpowers(0));
+
+  // Check ECP shells for specific atom
+  auto ecp_shells_atom0 = basis.get_ecp_shells_for_atom(0);
+  EXPECT_EQ(2u, ecp_shells_atom0.size());
+
+  auto ecp_shells_atom1 = basis.get_ecp_shells_for_atom(1);
+  EXPECT_EQ(0u, ecp_shells_atom1.size());
+}
+
+TEST_F(BasisSetTest, ECPValidation) {
+  // Test ECP validation and edge cases
+  std::vector<Eigen::Vector3d> coords = {{0.0, 0.0, 0.0}, {1.0, 0.0, 0.0}};
+  std::vector<std::string> symbols = {"Ag", "H"};
+  Structure structure(coords, symbols);
+
+  std::vector<Shell> shells;
+  shells.emplace_back(0, OrbitalType::S, std::vector{1.0}, std::vector{1.0});
+  shells.emplace_back(1, OrbitalType::S, std::vector{1.0}, std::vector{1.0});
+
+  // Create ECP shells with radial powers
+  std::vector<Shell> ecp_shells;
+
+  // ECP shell for Ag: s-type with r^0 and r^2 terms
+  Eigen::VectorXd exp_s(2), coeff_s(2);
+  Eigen::VectorXi rpow_s(2);
+  exp_s << 10.0, 5.0;
+  coeff_s << 50.0, 20.0;
+  rpow_s << 0, 2;
+  ecp_shells.emplace_back(0, OrbitalType::S, exp_s, coeff_s, rpow_s);
+
+  // ECP shell for Ag: p-type with r^1 term
+  Eigen::VectorXd exp_p(1), coeff_p(1);
+  Eigen::VectorXi rpow_p(1);
+  exp_p << 8.0;
+  coeff_p << 30.0;
+  rpow_p << 1;
+  ecp_shells.emplace_back(0, OrbitalType::P, exp_p, coeff_p, rpow_p);
+
+  // Test size validation - wrong size should throw
+  std::vector<size_t> wrong_size_ecp = {28};  // Only 1 atom, but we have 2
+  EXPECT_THROW(BasisSet("test-basis", shells, "test-ecp", ecp_shells,
+                        wrong_size_ecp, structure),
+               std::invalid_argument);
+
+  // Correct size should work
+  std::vector<size_t> correct_size_ecp = {28, 0};
+  EXPECT_NO_THROW(BasisSet("test-basis", shells, "test-ecp", ecp_shells,
+                           correct_size_ecp, structure));
+
+  // Verify ECP electrons were set correctly
+  BasisSet basis("test-basis", shells, "test-ecp", ecp_shells, correct_size_ecp,
+                 structure);
+  EXPECT_TRUE(basis.has_ecp_electrons());
+  EXPECT_EQ("test-ecp", basis.get_ecp_name());
+}
+
+TEST_F(BasisSetTest, ECPCopyConstructorAndAssignment) {
+  // Test that ECP data and ECP shells are copied correctly via both copy
+  // constructor and assignment
+  std::vector<Eigen::Vector3d> coords = {{0.0, 0.0, 0.0}, {1.0, 0.0, 0.0}};
+  std::vector<std::string> symbols = {"Ag", "H"};
+  Structure structure(coords, symbols);
+
+  std::vector<Shell> shells;
+  shells.emplace_back(0, OrbitalType::S, std::vector{1.0}, std::vector{1.0});
+  shells.emplace_back(1, OrbitalType::S, std::vector{1.0}, std::vector{1.0});
+
+  // Create ECP shells
+  std::vector<Shell> ecp_shells;
+  Eigen::VectorXd exp(2), coeff(2);
+  Eigen::VectorXi rpow(2);
+  exp << 10.0, 5.0;
+  coeff << 50.0, 20.0;
+  rpow << 0, 2;
+  ecp_shells.emplace_back(0, OrbitalType::S, exp, coeff, rpow);
+
+  BasisSet basis1("test-basis", shells, "def2-tzvp", ecp_shells, {28, 0},
+                  structure);
+
+  // Test copy constructor
+  BasisSet basis2(basis1);
+  EXPECT_TRUE(basis2.has_ecp_electrons());
+  EXPECT_EQ("def2-tzvp", basis2.get_ecp_name());
+  EXPECT_EQ(28u, basis2.get_ecp_electrons()[0]);
+  EXPECT_EQ(0u, basis2.get_ecp_electrons()[1]);
+  EXPECT_TRUE(basis2.has_ecp_shells());
+  EXPECT_EQ(1u, basis2.get_num_ecp_shells());
+  EXPECT_EQ(2u, basis2.get_ecp_shell(0).get_num_primitives());
+
+  // Test copy assignment
+  BasisSet basis3("test-basis-3", shells, structure);
+  basis3 = basis1;
+  EXPECT_TRUE(basis3.has_ecp_electrons());
+  EXPECT_EQ("def2-tzvp", basis3.get_ecp_name());
+  EXPECT_EQ(28u, basis3.get_ecp_electrons()[0]);
+  EXPECT_EQ(0u, basis3.get_ecp_electrons()[1]);
+  EXPECT_TRUE(basis3.has_ecp_shells());
+  EXPECT_EQ(1u, basis3.get_num_ecp_shells());
+  EXPECT_EQ(2u, basis3.get_ecp_shell(0).get_num_primitives());
+}
+
+TEST_F(BasisSetTest, ECPJSONSerialization) {
+  // Test comprehensive JSON serialization with and without ECP and ECP shells
+  std::vector<Eigen::Vector3d> coords = {{0.0, 0.0, 0.0}, {1.0, 0.0, 0.0}};
+  std::vector<std::string> symbols = {"Ag", "H"};
+  Structure structure(coords, symbols);
+
+  std::vector<Shell> shells;
+  shells.emplace_back(0, OrbitalType::S, std::vector{1.0}, std::vector{1.0});
+  shells.emplace_back(1, OrbitalType::S, std::vector{1.0}, std::vector{1.0});
+
+  // Create ECP shells with radial powers
+  std::vector<Shell> ecp_shells;
+  Eigen::VectorXd exp(2), coeff(2);
+  Eigen::VectorXi rpow(2);
+  exp << 10.0, 5.0;
+  coeff << 50.0, 20.0;
+  rpow << 0, 2;
+  ecp_shells.emplace_back(0, OrbitalType::S, exp, coeff, rpow);
+
+  // Test with ECP and ECP shells
+  BasisSet basis_with_ecp("test-basis", shells, "def2-tzvp", ecp_shells,
+                          {28, 0}, structure);
+
+  // In-memory JSON round-trip
+  auto json = basis_with_ecp.to_json();
+  EXPECT_TRUE(json.contains("ecp_name"));
+  EXPECT_TRUE(json.contains("ecp_electrons"));
+  EXPECT_EQ("def2-tzvp", json["ecp_name"]);
+
+  // Check that ECP shells are serialized in the atoms array
+  EXPECT_TRUE(json.contains("atoms"));
+  EXPECT_FALSE(json["atoms"].empty());
+  bool found_ecp_shells = false;
+  for (const auto& atom : json["atoms"]) {
+    if (atom.contains("ecp_shells") && !atom["ecp_shells"].empty()) {
+      found_ecp_shells = true;
+      // Verify rpowers are present in ECP shell
+      EXPECT_TRUE(atom["ecp_shells"][0].contains("rpowers"));
+      break;
+    }
+  }
+  EXPECT_TRUE(found_ecp_shells);
+
+  auto loaded_basis = BasisSet::from_json(json);
+  EXPECT_TRUE(loaded_basis->has_ecp_electrons());
+  EXPECT_EQ("def2-tzvp", loaded_basis->get_ecp_name());
+  EXPECT_EQ(28u, loaded_basis->get_ecp_electrons()[0]);
+  EXPECT_EQ(0u, loaded_basis->get_ecp_electrons()[1]);
+
+  // Verify ECP shells were preserved
+  EXPECT_TRUE(loaded_basis->has_ecp_shells());
+  EXPECT_EQ(1u, loaded_basis->get_num_ecp_shells());
+  const Shell& loaded_ecp_shell = loaded_basis->get_ecp_shell(0);
+  EXPECT_EQ(2u, loaded_ecp_shell.get_num_primitives());
+  EXPECT_TRUE(loaded_ecp_shell.has_radial_powers());
+  EXPECT_NEAR(10.0, loaded_ecp_shell.exponents(0),
+              testing::plain_text_tolerance);
+  EXPECT_NEAR(50.0, loaded_ecp_shell.coefficients(0),
+              testing::plain_text_tolerance);
+  EXPECT_EQ(0, loaded_ecp_shell.rpowers(0));
+  EXPECT_EQ(2, loaded_ecp_shell.rpowers(1));
+
+  // File-based JSON round-trip
+  std::string filename = "test_ecp.basis_set.json";
+  basis_with_ecp.to_json_file(filename);
+  auto loaded_from_file = BasisSet::from_json_file(filename);
+  EXPECT_TRUE(loaded_from_file->has_ecp_electrons());
+  EXPECT_EQ("def2-tzvp", loaded_from_file->get_ecp_name());
+  EXPECT_TRUE(loaded_from_file->has_ecp_shells());
+  EXPECT_EQ(1u, loaded_from_file->get_num_ecp_shells());
+  std::filesystem::remove(filename);
+
+  // Test without ECP (verify default handling)
+  BasisSet basis_without_ecp("test-basis", shells, structure);
+  auto json_no_ecp = basis_without_ecp.to_json();
+  auto loaded_no_ecp = BasisSet::from_json(json_no_ecp);
+  EXPECT_FALSE(loaded_no_ecp->has_ecp_electrons());
+  EXPECT_EQ("none", loaded_no_ecp->get_ecp_name());
+  EXPECT_FALSE(loaded_no_ecp->has_ecp_shells());
+  EXPECT_EQ(0u, loaded_no_ecp->get_num_ecp_shells());
+}
+
+TEST_F(BasisSetTest, ECPShellQueries) {
+  // Test various query methods for ECP shells
+  std::vector<Eigen::Vector3d> coords = {
+      {0.0, 0.0, 0.0}, {1.0, 0.0, 0.0}, {2.0, 0.0, 0.0}};
+  std::vector<std::string> symbols = {"Ag", "Au", "H"};
+  Structure structure(coords, symbols);
+
+  std::vector<Shell> shells;
+  shells.emplace_back(0, OrbitalType::S, std::vector{1.0}, std::vector{1.0});
+  shells.emplace_back(1, OrbitalType::S, std::vector{1.0}, std::vector{1.0});
+  shells.emplace_back(2, OrbitalType::S, std::vector{1.0}, std::vector{1.0});
+
+  // Create ECP shells for different atoms and angular momenta
+  std::vector<Shell> ecp_shells;
+
+  // Ag (atom 0): s-type and p-type ECP shells
+  Eigen::VectorXd exp_s(1), coeff_s(1);
+  Eigen::VectorXi rpow_s(1);
+  exp_s << 10.0;
+  coeff_s << 50.0;
+  rpow_s << 0;
+  ecp_shells.emplace_back(0, OrbitalType::S, exp_s, coeff_s, rpow_s);
+
+  Eigen::VectorXd exp_p(1), coeff_p(1);
+  Eigen::VectorXi rpow_p(1);
+  exp_p << 8.0;
+  coeff_p << 30.0;
+  rpow_p << 1;
+  ecp_shells.emplace_back(0, OrbitalType::P, exp_p, coeff_p, rpow_p);
+
+  // Au (atom 1): d-type ECP shell
+  Eigen::VectorXd exp_d(1), coeff_d(1);
+  Eigen::VectorXi rpow_d(1);
+  exp_d << 12.0;
+  coeff_d << 40.0;
+  rpow_d << 2;
+  ecp_shells.emplace_back(1, OrbitalType::D, exp_d, coeff_d, rpow_d);
+
+  BasisSet basis("test-basis", shells, ecp_shells, structure);
+
+  // Test get_num_ecp_shells
+  EXPECT_EQ(3u, basis.get_num_ecp_shells());
+
+  // Test get_ecp_shells (all shells)
+  auto all_ecp_shells = basis.get_ecp_shells();
+  EXPECT_EQ(3u, all_ecp_shells.size());
+
+  // Test get_ecp_shells_for_atom
+  auto ecp_shells_atom0 = basis.get_ecp_shells_for_atom(0);
+  EXPECT_EQ(2u, ecp_shells_atom0.size());
+  EXPECT_EQ(OrbitalType::S, ecp_shells_atom0[0].orbital_type);
+  EXPECT_EQ(OrbitalType::P, ecp_shells_atom0[1].orbital_type);
+
+  auto ecp_shells_atom1 = basis.get_ecp_shells_for_atom(1);
+  EXPECT_EQ(1u, ecp_shells_atom1.size());
+  EXPECT_EQ(OrbitalType::D, ecp_shells_atom1[0].orbital_type);
+
+  auto ecp_shells_atom2 = basis.get_ecp_shells_for_atom(2);
+  EXPECT_EQ(0u, ecp_shells_atom2.size());
+
+  // Test get_ecp_shell by index
+  const Shell& shell0 = basis.get_ecp_shell(0);
+  EXPECT_EQ(0u, shell0.atom_index);
+  EXPECT_EQ(OrbitalType::S, shell0.orbital_type);
+
+  const Shell& shell1 = basis.get_ecp_shell(1);
+  EXPECT_EQ(0u, shell1.atom_index);
+  EXPECT_EQ(OrbitalType::P, shell1.orbital_type);
+
+  const Shell& shell2 = basis.get_ecp_shell(2);
+  EXPECT_EQ(1u, shell2.atom_index);
+  EXPECT_EQ(OrbitalType::D, shell2.orbital_type);
+
+  // Test out-of-range access
+  EXPECT_THROW(basis.get_ecp_shell(3), std::out_of_range);
+}
+
+TEST_F(BasisSetTest, ECPShellWithVectorConstructor) {
+  // Test Shell construction using vector constructor with radial powers
+  std::vector<double> exponents = {10.0, 5.0, 2.0};
+  std::vector<double> coefficients = {50.0, 20.0, 10.0};
+  std::vector<int> rpowers = {0, 1, 2};
+
+  Shell ecp_shell(0, OrbitalType::S, exponents, coefficients, rpowers);
+
+  EXPECT_EQ(0u, ecp_shell.atom_index);
+  EXPECT_EQ(OrbitalType::S, ecp_shell.orbital_type);
+  EXPECT_EQ(3u, ecp_shell.get_num_primitives());
+  EXPECT_TRUE(ecp_shell.has_radial_powers());
+  EXPECT_EQ(0, ecp_shell.get_angular_momentum());
+
+  // Verify data
+  EXPECT_NEAR(10.0, ecp_shell.exponents(0), testing::plain_text_tolerance);
+  EXPECT_NEAR(50.0, ecp_shell.coefficients(0), testing::plain_text_tolerance);
+  EXPECT_EQ(0, ecp_shell.rpowers(0));
+  EXPECT_EQ(1, ecp_shell.rpowers(1));
+  EXPECT_EQ(2, ecp_shell.rpowers(2));
+}
+
+TEST_F(BasisSetTest, ECPShellValidation) {
+  // Test validation for ECP shell construction
+  std::vector<double> exponents = {10.0, 5.0};
+  std::vector<double> coefficients = {50.0, 20.0};
+  std::vector<int> rpowers_wrong_size = {0};  // Wrong size
+  std::vector<int> rpowers_correct = {0, 2};  // Correct size
+
+  // Mismatched sizes should throw
+  EXPECT_THROW(
+      Shell(0, OrbitalType::S, exponents, coefficients, rpowers_wrong_size),
+      std::invalid_argument);
+
+  // Correct sizes should work
+  EXPECT_NO_THROW(
+      Shell(0, OrbitalType::S, exponents, coefficients, rpowers_correct));
+
+  // Regular shell without rpowers should work
+  EXPECT_NO_THROW(Shell(0, OrbitalType::S, exponents, coefficients));
+
+  // Regular shell should not have radial powers
+  Shell regular_shell(0, OrbitalType::S, exponents, coefficients);
+  EXPECT_FALSE(regular_shell.has_radial_powers());
+}
+
+TEST_F(BasisSetTest, ECPShellsWithoutECPMetadata) {
+  // Test that we can have ECP shells without setting ECP metadata
+  std::vector<Eigen::Vector3d> coords = {{0.0, 0.0, 0.0}};
+  std::vector<std::string> symbols = {"Ag"};
+  Structure structure(coords, symbols);
+
+  std::vector<Shell> shells;
+  shells.emplace_back(0, OrbitalType::S, std::vector{1.0}, std::vector{1.0});
+
+  std::vector<Shell> ecp_shells;
+  Eigen::VectorXd exp(1), coeff(1);
+  Eigen::VectorXi rpow(1);
+  exp << 10.0;
+  coeff << 50.0;
+  rpow << 0;
+  ecp_shells.emplace_back(0, OrbitalType::S, exp, coeff, rpow);
+
+  BasisSet basis("test-basis", shells, ecp_shells, structure);
+
+  // Should have ECP shells but no ECP metadata
+  EXPECT_TRUE(basis.has_ecp_shells());
+  EXPECT_EQ(1u, basis.get_num_ecp_shells());
+  EXPECT_FALSE(basis.has_ecp_electrons());
+  EXPECT_EQ("none", basis.get_ecp_name());
+  EXPECT_EQ(0u, basis.get_ecp_electrons()[0]);
+}
+
+TEST_F(BasisSetTest, ECPHDF5Serialization) {
+  // Test HDF5 serialization with ECP data
+  std::vector<Eigen::Vector3d> coords = {{0.0, 0.0, 0.0}, {1.0, 0.0, 0.0}};
+  std::vector<std::string> symbols = {"Ag", "H"};
+  Structure structure(coords, symbols);
+
+  std::vector<Shell> shells;
+  shells.emplace_back(0, OrbitalType::S, std::vector{1.0}, std::vector{1.0});
+  shells.emplace_back(1, OrbitalType::S, std::vector{1.0}, std::vector{1.0});
+
+  // Create ECP shells with radial powers
+  std::vector<Shell> ecp_shells;
+  Eigen::VectorXd exp(2), coeff(2);
+  Eigen::VectorXi rpow(2);
+  exp << 10.0, 5.0;
+  coeff << 50.0, 20.0;
+  rpow << 0, 2;
+  ecp_shells.emplace_back(0, OrbitalType::S, exp, coeff, rpow);
+
+  BasisSet basis("test-basis", shells, "def2-tzvp", ecp_shells, {28, 0},
+                 structure);
+
+  // HDF5 file round-trip
+  std::string filename = "test_ecp.basis_set.h5";
+  basis.to_hdf5_file(filename);
+
+  auto loaded_basis = BasisSet::from_hdf5_file(filename);
+  EXPECT_TRUE(loaded_basis->has_ecp_electrons());
+  EXPECT_EQ("def2-tzvp", loaded_basis->get_ecp_name());
+  EXPECT_EQ(28u, loaded_basis->get_ecp_electrons()[0]);
+  EXPECT_EQ(0u, loaded_basis->get_ecp_electrons()[1]);
+
+  std::filesystem::remove(filename);
 }
 
 TEST_F(BasisSetTest, IndexConversion) {

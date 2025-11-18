@@ -210,7 +210,7 @@ def _filter_and_group_pauli_ops_from_statevector(
     expectations: list[float] = []
     classical: list[float] = []
 
-    for pauli, coeff in zip(hamiltonian.pauli_ops.paulis, hamiltonian.coefficients, strict=False):
+    for pauli, coeff in zip(hamiltonian.pauli_ops.paulis, hamiltonian.coefficients, strict=True):
         expval = float(np.vdot(psi, pauli.to_matrix(sparse=True) @ psi).real)
 
         if not trimming:
@@ -236,7 +236,7 @@ def _filter_and_group_pauli_ops_from_statevector(
     grouped: dict[int, list[tuple[str, complex, float]]] = {}
     key_counter = 0
     # Assign approximate groups based on tolerance
-    for pauli, coeff, expval in zip(retained_paulis, retained_coeffs, expectations, strict=False):
+    for pauli, coeff, expval in zip(retained_paulis, retained_coeffs, expectations, strict=True):
         matched_key = None
         for k, terms in grouped.items():
             if np.isclose(expval, terms[0][2], atol=trimming_tolerance):

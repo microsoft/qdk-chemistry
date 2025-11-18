@@ -534,7 +534,7 @@ class TestWavefunctionSerialization:
         recon_dets = wf_reconstructed.get_active_determinants()
         assert len(recon_dets) == len(orig_dets)
 
-        for orig_det, recon_det in zip(orig_dets, recon_dets, strict=False):
+        for orig_det, recon_det in zip(orig_dets, recon_dets, strict=True):
             assert orig_det.to_string() == recon_det.to_string()
 
     def test_json_serialization_cas_complex(self, cas_wavefunction_complex):

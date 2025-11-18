@@ -20,11 +20,11 @@ CoupledClusterAmplitudes::CoupledClusterAmplitudes(
       _t1_amplitudes(std::make_unique<amplitude_type>(t1_amplitudes)),
       _t2_amplitudes(std::make_unique<amplitude_type>(t2_amplitudes)) {
   // Get occupied and virtual indices
-  auto num_molecular_orbitalss = orbitals->get_num_molecular_orbitals();
+  auto num_molecular_orbitals = orbitals->get_num_molecular_orbitals();
   // Store counts of occupied and virtual orbitals
   _num_occupied = {n_alpha_electrons, n_beta_electrons};
-  _num_virtual = {num_molecular_orbitalss - _num_occupied.first,
-                  num_molecular_orbitalss - _num_occupied.second};
+  _num_virtual = {num_molecular_orbitals - _num_occupied.first,
+                  num_molecular_orbitals - _num_occupied.second};
 
   // Validate dimension of input tensors
   // TODO: This is incorrect for Unrestricted.

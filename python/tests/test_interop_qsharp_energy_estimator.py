@@ -37,8 +37,8 @@ class TestQSharpEnergyEstimator:
         assert np.isclose(
             estimator.qubit_loss,
             0.0,
-            atol=float_comparison_absolute_tolerance,
             rtol=float_comparison_relative_tolerance,
+            atol=float_comparison_absolute_tolerance,
         )
 
     def test_estimator_run(self, circuit_4e4o, wavefunction_4e4o, hamiltonian_4e4o, ref_energy_4e4o):
@@ -60,7 +60,10 @@ class TestQSharpEnergyEstimator:
 
         # Limited shots within 1 mHartree
         assert np.isclose(
-            energy_expectations.energy_expectation_value, ref_energy_4e4o, atol=estimator_energy_tolerance
+            energy_expectations.energy_expectation_value,
+            ref_energy_4e4o,
+            rtol=float_comparison_relative_tolerance,
+            atol=estimator_energy_tolerance,
         )
 
     def test_estimator_fewer_shots(self):

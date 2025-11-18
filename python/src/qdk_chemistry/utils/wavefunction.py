@@ -30,7 +30,7 @@ def get_top_determinants(
     """
     coefficients = list(wavefunction.get_coefficients())
     determinants = wavefunction.get_active_determinants()
-    pairs = sorted(zip(coefficients, determinants, strict=False), key=lambda pair: -abs(pair[0]))
+    pairs = sorted(zip(coefficients, determinants, strict=True), key=lambda pair: -abs(pair[0]))
     if max_determinants is not None:
         pairs = pairs[:max_determinants]
     return {det: coeff for coeff, det in pairs}

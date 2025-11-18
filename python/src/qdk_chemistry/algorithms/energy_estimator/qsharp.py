@@ -63,7 +63,7 @@ class QDKEnergyEstimator(EnergyEstimator):
 
         """
         all_bitstring_counts: list[dict[str, int]] = []
-        for circuit_qasm, shots in zip(measurement_circuits, shots_list, strict=False):
+        for circuit_qasm, shots in zip(measurement_circuits, shots_list, strict=True):
             result = run(
                 circuit_qasm,
                 shots=shots,

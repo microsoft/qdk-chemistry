@@ -178,14 +178,10 @@ qdk::chemistry::data::BasisSet convert_basis_set_to_qdk(
     throw std::runtime_error("QDK Does Not Support Cartesian Basis Functions");
   }
 
-  if (basis_set.ecp_cores != 0) {
-    throw std::runtime_error("QDK Does Not Support ECPs");
-  }
-
   // Convert the BasisSet to a qdk::chemistry::data::BasisSet
   auto structure = convert_to_structure(*basis_set.mol);
 
-  // Collect all shells first
+  // Collect shells
   std::vector<qdk::chemistry::data::Shell> qdk_shells;
   for (const auto& shell : basis_set.shells) {
     Eigen::VectorXd exponents(shell.contraction);
@@ -201,11 +197,55 @@ qdk::chemistry::data::BasisSet convert_basis_set_to_qdk(
         exponents, coefficients);
   }
 
-  // Create the BasisSet with shells and structure
-  qdk::chemistry::data::BasisSet qdk_basis_set(basis_set.name, qdk_shells,
-                                               structure);
+  // Collect ECP shells
+  std::vector<qdk::chemistry::data::Shell> qdk_ecp_shells;
+  for (const auto& ecp_shell : basis_set.ecp_shells) {
+    Eigen::VectorXd exponents(ecp_shell.contraction);
+    Eigen::VectorXd coefficients(ecp_shell.contraction);
+    Eigen::VectorXi rpowers(ecp_shell.contraction);
 
-  return qdk_basis_set;
+    std::memcpy(exponents.data(), ecp_shell.exponents,
+                exponents.size() * sizeof(double));
+    std::memcpy(coefficients.data(), ecp_shell.coefficients,
+                coefficients.size() * sizeof(double));
+    std::memcpy(rpowers.data(), ecp_shell.rpowers,
+                rpowers.size() * sizeof(int));
+
+    qdk_ecp_shells.emplace_back(ecp_shell.atom_index,
+                                static_cast<qdk::chemistry::data::OrbitalType>(
+                                    ecp_shell.angular_momentum),
+                                exponents, coefficients, rpowers);
+  }
+
+  // Handle ECP (Effective Core Potential) information if present
+  if (basis_set.n_ecp_electrons != 0 || !basis_set.ecp_shells.empty() ||
+      !basis_set.element_ecp_electrons.empty()) {
+    // Use basis set name as ECP name
+    std::string qdk_ecp_name = basis_set.name;
+
+    // Build ECP electrons per atom vector
+    std::vector<size_t> qdk_ecp_electrons(basis_set.mol->n_atoms, 0);
+    for (size_t i = 0; i < basis_set.mol->n_atoms; ++i) {
+      int atomic_num = basis_set.mol->atomic_nums[i];
+      auto it = basis_set.element_ecp_electrons.find(atomic_num);
+      if (it != basis_set.element_ecp_electrons.end()) {
+        qdk_ecp_electrons[i] = static_cast<size_t>(it->second);
+      }
+    }
+
+    // Create the BasisSet with shells, ECP shells, ECP name, ECP electrons, and
+    // structure
+    qdk::chemistry::data::BasisSet qdk_basis_set(basis_set.name, qdk_shells,
+                                                 qdk_ecp_name, qdk_ecp_shells,
+                                                 qdk_ecp_electrons, structure);
+    return qdk_basis_set;
+  } else {
+    // Create the BasisSet with shells, ECP shells, and structure (no ECP
+    // name/electrons)
+    qdk::chemistry::data::BasisSet qdk_basis_set(basis_set.name, qdk_shells,
+                                                 qdk_ecp_shells, structure);
+    return qdk_basis_set;
+  }
 }
 
 std::shared_ptr<qcs::BasisSet> convert_basis_set_from_qdk(
@@ -244,6 +284,15 @@ nlohmann::ordered_json convert_to_json(
       {"am", static_cast<unsigned>(shell.orbital_type)},
       {"exp", exponents},
       {"coeff", coefficients}};
+
+  // Add rpowers for ECP shells
+  if (shell.rpowers.size() > 0) {
+    std::vector<int> rpowers(contraction);
+    std::memcpy(rpowers.data(), shell.rpowers.data(),
+                contraction * sizeof(int));
+    record["rpowers"] = rpowers;
+  }
+
   return record;
 }
 
@@ -256,26 +305,48 @@ nlohmann::ordered_json convert_to_json(
     json_shells.push_back(convert_to_json(sh));
   }
 
-  // TODO: Handle ECPs
-  // 41333
+  // Handle ECP
   std::vector<nlohmann::ordered_json> json_ecp_shells;
-  std::vector<int> _elem2ecpcore;
+  if (basis_set.has_ecp_shells()) {
+    for (const auto& ecp_shell : basis_set.get_ecp_shells()) {
+      json_ecp_shells.push_back(convert_to_json(ecp_shell));
+    }
+  }
 
+  // Build element_ecp_electrons map from ecp_electrons vector
   auto& structure = basis_set.get_structure();
-  auto atom_z = structure->get_nuclear_charges();
-  std::vector<unsigned> atom_z_unsigned(atom_z.size());
-  std::transform(atom_z.begin(), atom_z.end(), atom_z_unsigned.begin(),
+  auto nuclear_charges = structure->get_nuclear_charges();
+  auto ecp_electrons = basis_set.get_ecp_electrons();
+
+  std::map<int, int> element_ecp_electrons;
+  for (size_t i = 0; i < ecp_electrons.size(); ++i) {
+    if (ecp_electrons[i] > 0) {
+      int atomic_num = static_cast<int>(nuclear_charges[i]);
+      element_ecp_electrons[atomic_num] = static_cast<int>(ecp_electrons[i]);
+    }
+  }
+
+  // Serialize element_ecp_electrons as flat list
+  std::vector<int> json_element_ecp_electrons;
+  for (const auto& [k, v] : element_ecp_electrons) {
+    json_element_ecp_electrons.push_back(k);
+    json_element_ecp_electrons.push_back(v);
+  }
+
+  std::vector<unsigned> nuclear_charges_unsigned(nuclear_charges.size());
+  std::transform(nuclear_charges.begin(), nuclear_charges.end(),
+                 nuclear_charges_unsigned.begin(),
                  [](double z) { return static_cast<unsigned>(z); });
 
   j = nlohmann::ordered_json(
       {{"name", basis_set.get_name()},
        {"pure", true},
        {"mode", "RAW"},
-       {"atoms", atom_z_unsigned},
+       {"atoms", nuclear_charges_unsigned},
        {"num_basis_funcs", basis_set.get_num_basis_functions()},
        {"electron_shells", json_shells},
        {"ecp_shells", json_ecp_shells},
-       {"ecp_cores", _elem2ecpcore}});
+       {"element_ecp_electrons", json_element_ecp_electrons}});
 
   return j;
 }

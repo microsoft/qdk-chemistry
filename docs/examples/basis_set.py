@@ -45,7 +45,7 @@
 # atom_index = basis_set.get_atom_index_for_basis_function(0)
 
 # # Get indices for specific atoms/orbitals
-# basis_indices = basis_set.get_basis_fuction_indices_for_atom(0)
+# basis_indices = basis_set.get_basis_function_indices_for_atom(0)
 # shell_indices = basis_set.get_shell_indices_for_orbital_type(OrbitalType.P)
 
 # # Check validity

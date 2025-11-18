@@ -11,6 +11,7 @@
 #include <omp.h>
 #endif
 
+#include "../src/qdk/chemistry/algorithms/microsoft/utils.hpp"
 #include "ut_common.hpp"
 
 using namespace qdk::chemistry::data;
@@ -189,8 +190,8 @@ TEST_F(ScfTest, LithiumDftB3lypUks) {
       wfn_b3lyp->get_total_orbital_occupations();
   double total_alpha_electrons = occupations_alpha.sum();
   double total_beta_electrons = occupations_beta.sum();
-  EXPECT_NEAR(total_alpha_electrons, 2.0, 1e-10);
-  EXPECT_NEAR(total_beta_electrons, 1.0, 1e-10);
+  EXPECT_NEAR(total_alpha_electrons, 2.0, testing::numerical_zero_tolerance);
+  EXPECT_NEAR(total_beta_electrons, 1.0, testing::numerical_zero_tolerance);
 }
 
 TEST_F(ScfTest, LithiumDftPbeUks) {
@@ -217,8 +218,8 @@ TEST_F(ScfTest, LithiumDftPbeUks) {
       wfn_pbe->get_total_orbital_occupations();
   double total_alpha_electrons = occupations_alpha.sum();
   double total_beta_electrons = occupations_beta.sum();
-  EXPECT_NEAR(total_alpha_electrons, 2.0, 1e-10);
-  EXPECT_NEAR(total_beta_electrons, 1.0, 1e-10);
+  EXPECT_NEAR(total_alpha_electrons, 2.0, testing::numerical_zero_tolerance);
+  EXPECT_NEAR(total_beta_electrons, 1.0, testing::numerical_zero_tolerance);
 
   // Energy should be reasonable for lithium
   EXPECT_LT(energy_pbe, -7.0);  // Should be reasonable for lithium
@@ -257,8 +258,8 @@ TEST_F(ScfTest, OxygenTripletDftB3lypUks) {
       wfn_b3lyp->get_total_orbital_occupations();
   double total_alpha_electrons = occupations_alpha.sum();
   double total_beta_electrons = occupations_beta.sum();
-  EXPECT_NEAR(total_alpha_electrons, 9.0, 1e-10);
-  EXPECT_NEAR(total_beta_electrons, 7.0, 1e-10);
+  EXPECT_NEAR(total_alpha_electrons, 9.0, testing::numerical_zero_tolerance);
+  EXPECT_NEAR(total_beta_electrons, 7.0, testing::numerical_zero_tolerance);
 }
 
 TEST_F(ScfTest, OxygenTripletDftPbeUks) {
@@ -285,8 +286,8 @@ TEST_F(ScfTest, OxygenTripletDftPbeUks) {
       wfn_pbe->get_total_orbital_occupations();
   double total_alpha_electrons = occupations_alpha.sum();
   double total_beta_electrons = occupations_beta.sum();
-  EXPECT_NEAR(total_alpha_electrons, 9.0, 1e-10);
-  EXPECT_NEAR(total_beta_electrons, 7.0, 1e-10);
+  EXPECT_NEAR(total_alpha_electrons, 9.0, testing::numerical_zero_tolerance);
+  EXPECT_NEAR(total_beta_electrons, 7.0, testing::numerical_zero_tolerance);
 
   // Energy should be reasonable for O2
   EXPECT_LT(energy_pbe - oxygen_molecule->calculate_nuclear_repulsion_energy(),
@@ -414,4 +415,522 @@ TEST_F(ScfTest, OxygenTripletInitialGuessRestart) {
 
   // Should get the same energy (within tight tolerance)
   EXPECT_NEAR(energy_o2_first, energy_o2_second, testing::scf_energy_tolerance);
+}
+
+TEST_F(ScfTest, AgHDef2SvpWithEcp) {
+  // Test AgH with def2-svp basis set (includes ECP for Ag)
+  auto agh = testing::create_agh_structure();
+  auto scf_solver = ScfSolverFactory::create();
+
+  // Set def2-svp basis which includes ECP for Ag
+  scf_solver->settings().set("basis_set", "def2-svp");
+  scf_solver->settings().set("method", "hf");
+
+  // Run SCF calculation - AgH has 48 electrons (Ag: 47, H: 1)
+  // but with ECP, Ag has 19 valence electrons, so total is 20 electrons
+  auto [energy, wfn] = scf_solver->run(agh, 0, 1);
+  auto orbitals = wfn->get_orbitals();
+
+  // Verify the calculation completed successfully
+  EXPECT_TRUE(orbitals->is_restricted());
+  EXPECT_TRUE(orbitals->has_basis_set());
+
+  // Verify basis set includes ECP information
+  auto basis_set = orbitals->get_basis_set();
+  EXPECT_TRUE(basis_set->has_ecp_shells());
+
+  // Check that ECP is properly configured for Ag
+  // def2-svp has 4 ECP shells for Ag
+  EXPECT_EQ(basis_set->get_num_ecp_shells(), 4);
+
+  // Verify ECP name matches the basis set
+  EXPECT_EQ(basis_set->get_ecp_name(), "def2-svp");
+
+  // Check ECP electrons configuration
+  EXPECT_TRUE(basis_set->has_ecp_electrons());
+  auto ecp_electrons = basis_set->get_ecp_electrons();
+  EXPECT_EQ(ecp_electrons.size(), 2);  // Two atoms: Ag and H
+  EXPECT_EQ(ecp_electrons[0], 28);  // Ag has 28 core electrons replaced by ECP
+  EXPECT_EQ(ecp_electrons[1], 0);   // H has no ECP (0 core electrons)
+
+  // Verify the electronic energy matches expected value
+  double nuclear_repulsion = agh->calculate_nuclear_repulsion_energy();
+  double electronic_energy = energy - nuclear_repulsion;
+  EXPECT_NEAR(electronic_energy, -162.0054639416,
+              testing::scf_energy_tolerance);
+
+  // Check electron count - with ECP, should have 20 valence electrons
+  auto [occupations_alpha, occupations_beta] =
+      wfn->get_total_orbital_occupations();
+  double total_electrons = occupations_alpha.sum() + occupations_beta.sum();
+  EXPECT_NEAR(total_electrons, 20.0, testing::numerical_zero_tolerance);
+
+  // Verify ECP angular momentum types are present
+  // def2-svp ECP for Ag includes different angular momentum shells
+  auto ecp_shells = basis_set->get_ecp_shells();
+  EXPECT_EQ(ecp_shells.size(), 4);
+
+  // Verify ECP shells belong to the correct atom (Ag is atom 0)
+  for (const auto& shell : ecp_shells) {
+    EXPECT_EQ(shell.atom_index, 0);  // All ECP shells should be for Ag
+  }
+
+  // Verify that H (atom 1) has no ECP shells
+  auto h_ecp_shells = basis_set->get_ecp_shells_for_atom(1);
+  EXPECT_EQ(h_ecp_shells.size(), 0);
+
+  // Verify Ag (atom 0) has all the ECP shells
+  auto ag_ecp_shells = basis_set->get_ecp_shells_for_atom(0);
+  EXPECT_EQ(ag_ecp_shells.size(), 4);
+
+  // Verify ECP shells have various angular momentum types
+  // def2-svp ECP for Ag should have different angular momentum values
+  std::set<int> angular_momenta;
+  for (const auto& shell : ag_ecp_shells) {
+    angular_momenta.insert(shell.get_angular_momentum());
+  }
+  EXPECT_GT(angular_momenta.size(),
+            1);  // Should have multiple angular momentum types
+}
+
+TEST_F(ScfTest, AgHBasisSetRoundTripSerialization) {
+  // Test that basis set with ECP can be serialized and deserialized
+  // This tests both to_json() and from_serialized_json() methods,
+  // specifically covering ECP data preservation
+  auto agh = testing::create_agh_structure();
+  auto scf_solver = ScfSolverFactory::create();
+
+  // Set def2-svp basis which includes ECP for Ag
+  scf_solver->settings().set("basis_set", "def2-svp");
+  scf_solver->settings().set("method", "hf");
+
+  // Run SCF calculation to get original basis set with ECP
+  auto [energy1, wfn1] = scf_solver->run(agh, 0, 1);
+  auto orbitals1 = wfn1->get_orbitals();
+  auto basis_set1 = orbitals1->get_basis_set();
+
+  // Save basis set to JSON file
+  std::string temp_json_file = "temp_test.basis_set.json";
+  basis_set1->to_json_file(temp_json_file);
+
+  // Load basis set from JSON file
+  auto basis_set2 = BasisSet::from_json_file(temp_json_file);
+
+  // Clean up temp file
+  std::filesystem::remove(temp_json_file);
+
+  // Verify the loaded basis set has the same properties as the original
+  EXPECT_STREQ(basis_set2->get_name().c_str(), basis_set1->get_name().c_str());
+  EXPECT_EQ(basis_set2->get_num_shells(), basis_set1->get_num_shells());
+  EXPECT_EQ(basis_set2->get_num_basis_functions(),
+            basis_set1->get_num_basis_functions());
+  EXPECT_EQ(basis_set2->get_num_atoms(), basis_set1->get_num_atoms());
+
+  // Verify ECP data is preserved
+  EXPECT_TRUE(basis_set2->has_ecp_shells());
+  EXPECT_EQ(basis_set2->get_num_ecp_shells(), basis_set1->get_num_ecp_shells());
+  EXPECT_STREQ(basis_set2->get_ecp_name().c_str(),
+               basis_set1->get_ecp_name().c_str());
+
+  // Verify ECP electrons are correctly deserialized
+  EXPECT_TRUE(basis_set2->has_ecp_electrons());
+  auto ecp_electrons1 = basis_set1->get_ecp_electrons();
+  auto ecp_electrons2 = basis_set2->get_ecp_electrons();
+  EXPECT_EQ(ecp_electrons2.size(), ecp_electrons1.size());
+  EXPECT_EQ(ecp_electrons2[0], 28);  // Ag has 28 core electrons
+  EXPECT_EQ(ecp_electrons2[1], 0);   // H has no ECP
+
+  // Verify ECP shells are correctly deserialized
+  auto ecp_shells1 = basis_set1->get_ecp_shells();
+  auto ecp_shells2 = basis_set2->get_ecp_shells();
+  EXPECT_EQ(ecp_shells2.size(), ecp_shells1.size());
+  EXPECT_EQ(ecp_shells2.size(), 4);  // 4 ECP shells for Ag
+
+  // Verify each ECP shell is correctly deserialized
+  for (size_t i = 0; i < ecp_shells2.size(); ++i) {
+    EXPECT_EQ(ecp_shells2[i].atom_index, ecp_shells1[i].atom_index);
+    EXPECT_EQ(ecp_shells2[i].get_angular_momentum(),
+              ecp_shells1[i].get_angular_momentum());
+    EXPECT_EQ(ecp_shells2[i].get_num_basis_functions(),
+              ecp_shells1[i].get_num_basis_functions());
+  }
+
+  // Verify ECP shells for individual atoms are correctly preserved
+  auto ag_ecp_shells2 = basis_set2->get_ecp_shells_for_atom(0);
+  EXPECT_EQ(ag_ecp_shells2.size(), 4);  // Ag should have 4 ECP shells
+
+  auto h_ecp_shells2 = basis_set2->get_ecp_shells_for_atom(1);
+  EXPECT_EQ(h_ecp_shells2.size(), 0);  // H should have no ECP shells
+
+  // Verify regular shells are also preserved
+  auto shells1 = basis_set1->get_shells();
+  auto shells2 = basis_set2->get_shells();
+  EXPECT_EQ(shells2.size(), shells1.size());
+
+  // Verify the basis set structure can be used to create valid orbitals
+  auto [coeff_alpha, coeff_beta] = orbitals1->get_coefficients();
+  auto [energies_alpha, energies_beta] = orbitals1->get_energies();
+  auto overlap = orbitals1->get_overlap_matrix();
+
+  // Create orbitals with the deserialized basis set - this validates
+  // that the basis set is fully functional
+  auto orbitals2 = std::make_shared<Orbitals>(
+      coeff_alpha, energies_alpha, overlap, basis_set2, std::nullopt);
+
+  EXPECT_TRUE(orbitals2->has_basis_set());
+  EXPECT_EQ(orbitals2->get_basis_set()->get_name(), "def2-svp");
+}
+
+TEST_F(ScfTest, AgHBasisSetEcpConversion) {
+  // Test ECP conversion
+  auto agh = testing::create_agh_structure();
+  auto scf_solver = ScfSolverFactory::create();
+
+  scf_solver->settings().set("basis_set", "def2-svp");
+  scf_solver->settings().set("method", "hf");
+
+  auto [energy, wfn] = scf_solver->run(agh, 0, 1);
+  auto orbitals = wfn->get_orbitals();
+  auto basis_set = orbitals->get_basis_set();
+
+  // Test ECP shell conversion
+  EXPECT_TRUE(basis_set->has_ecp_shells());
+  EXPECT_EQ(basis_set->get_num_ecp_shells(), 4);
+
+  auto ecp_shells = basis_set->get_ecp_shells();
+  EXPECT_EQ(ecp_shells.size(), 4);
+
+  // Verify ECP shells have correct structure
+  for (const auto& shell : ecp_shells) {
+    // Each ECP shell should belong to atom 0 (Ag)
+    EXPECT_EQ(shell.atom_index, 0);
+
+    // ECP shells should have exponents, coefficients, and rpowers
+    const auto& exponents = shell.exponents;
+    const auto& coefficients = shell.coefficients;
+    const auto& rpowers = shell.rpowers;
+
+    EXPECT_GT(exponents.size(), 0);
+    EXPECT_EQ(exponents.size(), coefficients.size());
+    EXPECT_EQ(exponents.size(), rpowers.size());
+
+    // Verify all exponents are positive (physical constraint)
+    for (int i = 0; i < exponents.size(); ++i) {
+      EXPECT_GT(exponents[i], 0.0);
+    }
+
+    // Verify rpowers are non-negative integers (r^n where n >= 0)
+    for (int i = 0; i < rpowers.size(); ++i) {
+      EXPECT_GE(rpowers[i], 0);
+    }
+  }
+
+  // Test ECP metadata conversion
+  // Verify ECP name was set correctly
+  EXPECT_EQ(basis_set->get_ecp_name(), "def2-svp");
+
+  // Verify per-atom ECP electrons vector was built correctly
+  auto ecp_electrons = basis_set->get_ecp_electrons();
+  EXPECT_EQ(ecp_electrons.size(), 2);  // 2 atoms: Ag and H
+
+  // Ag (atom 0) should have 28 core electrons replaced by ECP
+  EXPECT_EQ(ecp_electrons[0], 28);
+
+  // H (atom 1) should have 0 core electrons (no ECP)
+  EXPECT_EQ(ecp_electrons[1], 0);
+
+  // Verify the element_ecp_electrons mapping was correctly applied
+  // Total electrons: Ag=47, H=1 -> 48 total
+  // With ECP: Ag has 28 core electrons removed -> 19 valence
+  // So total valence electrons = 19 (Ag) + 1 (H) = 20
+  size_t total_ecp_electrons = 0;
+  for (size_t ecp : ecp_electrons) {
+    total_ecp_electrons += ecp;
+  }
+  EXPECT_EQ(total_ecp_electrons, 28);
+
+  // Verify the orbital count is consistent with valence electrons
+  // With 20 valence electrons and restricted calculation, we expect 10 occupied
+  // orbitals
+  auto [coeff_alpha, coeff_beta] = orbitals->get_coefficients();
+  EXPECT_EQ(coeff_alpha.rows(), basis_set->get_num_basis_functions());
+}
+
+TEST_F(ScfTest, AgHBasisSetEcpJsonMapping) {
+  // Test element_ecp_electrons mapping in convert_to_json
+  // This validates that the element_ecp_electrons map is correctly built
+  // from per-atom ECP electrons and serialized as a flat list in JSON
+  auto agh = testing::create_agh_structure();
+  auto scf_solver = ScfSolverFactory::create();
+
+  scf_solver->settings().set("basis_set", "def2-svp");
+  scf_solver->settings().set("method", "hf");
+
+  auto [energy, wfn] = scf_solver->run(agh, 0, 1);
+  auto orbitals = wfn->get_orbitals();
+  auto basis_set = orbitals->get_basis_set();
+
+  // Serialize to JSON using convert_to_json
+  auto json = qdk::chemistry::utils::microsoft::convert_to_json(*basis_set);
+
+  // Verify ECP shells are present in JSON
+  EXPECT_TRUE(json.contains("ecp_shells"));
+  auto ecp_shells_json = json["ecp_shells"];
+  EXPECT_EQ(ecp_shells_json.size(), 4);
+
+  // Each ECP shell should have rpowers field
+  for (const auto& shell_json : ecp_shells_json) {
+    EXPECT_TRUE(shell_json.contains("rpowers"));
+    EXPECT_TRUE(shell_json.contains("atom"));
+    EXPECT_TRUE(shell_json.contains("am"));
+    EXPECT_TRUE(shell_json.contains("exp"));
+    EXPECT_TRUE(shell_json.contains("coeff"));
+  }
+
+  // Verify element_ecp_electrons mapping
+  EXPECT_TRUE(json.contains("element_ecp_electrons"));
+  auto element_ecp_electrons_json = json["element_ecp_electrons"];
+
+  // element_ecp_electrons should be a flat list: [atomic_num1, ecp_elec1,
+  // atomic_num2, ecp_elec2, ...] For AgH: Ag (Z=47) has 28 ECP electrons, H
+  // (Z=1) has 0 (not in map) So the flat list should be: [47, 28]
+  EXPECT_TRUE(element_ecp_electrons_json.is_array());
+  EXPECT_EQ(element_ecp_electrons_json.size(),
+            2);  // One element (Ag) with non-zero ECP
+
+  // Parse the flat list
+  std::map<int, int> element_ecp_map;
+  for (size_t i = 0; i + 1 < element_ecp_electrons_json.size(); i += 2) {
+    int atomic_num = element_ecp_electrons_json[i];
+    int ecp_elec = element_ecp_electrons_json[i + 1];
+    element_ecp_map[atomic_num] = ecp_elec;
+  }
+
+  // Verify Ag (Z=47) has 28 ECP electrons
+  EXPECT_EQ(element_ecp_map.size(), 1);
+  EXPECT_TRUE(element_ecp_map.find(47) != element_ecp_map.end());
+  EXPECT_EQ(element_ecp_map[47], 28);
+
+  // Verify H (Z=1) is NOT in the map (has 0 ECP electrons)
+  EXPECT_TRUE(element_ecp_map.find(1) == element_ecp_map.end());
+
+  // Verify the logic that builds element_ecp_electrons from per-atom vector
+  // Iterating through atoms and filtering non-zero ECP
+  auto ecp_electrons = basis_set->get_ecp_electrons();
+  auto structure = basis_set->get_structure();
+  auto nuclear_charges = structure->get_nuclear_charges();
+
+  // Build the map manually to verify the algorithm
+  std::map<int, int> expected_map;
+  for (size_t i = 0; i < ecp_electrons.size(); ++i) {
+    if (ecp_electrons[i] > 0) {
+      int atomic_num = static_cast<int>(nuclear_charges[i]);
+      expected_map[atomic_num] = static_cast<int>(ecp_electrons[i]);
+    }
+  }
+
+  EXPECT_EQ(expected_map.size(), element_ecp_map.size());
+  EXPECT_EQ(expected_map, element_ecp_map);
+
+  // Verify the flat list serialization
+  std::vector<int> expected_flat_list;
+  for (const auto& [k, v] : expected_map) {
+    expected_flat_list.push_back(k);
+    expected_flat_list.push_back(v);
+  }
+
+  std::vector<int> actual_flat_list = element_ecp_electrons_json;
+  EXPECT_EQ(actual_flat_list, expected_flat_list);
+
+  // Verify nuclear_charges transformation
+  EXPECT_TRUE(json.contains("atoms"));
+  auto atoms_json = json["atoms"];
+  EXPECT_EQ(atoms_json.size(), 2);  // Ag and H
+
+  std::vector<unsigned> expected_atoms = {47, 1};  // Ag, H
+  std::vector<unsigned> actual_atoms = atoms_json;
+  EXPECT_EQ(actual_atoms, expected_atoms);
+
+  // Verify the complete JSON structure matches the template
+  EXPECT_TRUE(json.contains("name"));
+  EXPECT_EQ(json["name"], "def2-svp");
+
+  EXPECT_TRUE(json.contains("pure"));
+  EXPECT_EQ(json["pure"], true);
+
+  EXPECT_TRUE(json.contains("mode"));
+  EXPECT_EQ(json["mode"], "RAW");
+
+  EXPECT_TRUE(json.contains("num_basis_funcs"));
+  EXPECT_EQ(json["num_basis_funcs"], basis_set->get_num_basis_functions());
+
+  EXPECT_TRUE(json.contains("electron_shells"));
+  auto electron_shells_json = json["electron_shells"];
+  EXPECT_GT(electron_shells_json.size(), 0);
+}
+
+TEST_F(ScfTest, AgHEcpShellIndices) {
+  // Test ECP shell index retrieval methods
+  auto agh = testing::create_agh_structure();
+  auto scf_solver = ScfSolverFactory::create();
+
+  scf_solver->settings().set("basis_set", "def2-svp");
+  scf_solver->settings().set("method", "hf");
+
+  auto [energy, wfn] = scf_solver->run(agh, 0, 1);
+  auto orbitals = wfn->get_orbitals();
+  auto basis_set = orbitals->get_basis_set();
+
+  // Test get_ecp_shell_indices_for_atom
+  // Ag (atom 0) should have ECP shells
+  auto ag_ecp_indices = basis_set->get_ecp_shell_indices_for_atom(0);
+  EXPECT_EQ(ag_ecp_indices.size(), 4);  // def2-svp has 4 ECP shells for Ag
+
+  // All indices should be valid (< total number of ECP shells)
+  for (size_t idx : ag_ecp_indices) {
+    EXPECT_LT(idx, basis_set->get_num_ecp_shells());
+  }
+
+  // H (atom 1) should have no ECP shells
+  auto h_ecp_indices = basis_set->get_ecp_shell_indices_for_atom(1);
+  EXPECT_EQ(h_ecp_indices.size(), 0);
+
+  // Test get_ecp_shell_indices_for_orbital_type
+  // Get all ECP shells to determine which orbital types are present
+  auto ecp_shells = basis_set->get_ecp_shells();
+  std::map<OrbitalType, size_t> orbital_type_counts;
+
+  for (const auto& shell : ecp_shells) {
+    int l = shell.get_angular_momentum();
+    OrbitalType type;
+    if (l == -1) {
+      type = OrbitalType::UL;  // Local potential
+    } else if (l == 0) {
+      type = OrbitalType::S;
+    } else if (l == 1) {
+      type = OrbitalType::P;
+    } else if (l == 2) {
+      type = OrbitalType::D;
+    } else if (l == 3) {
+      type = OrbitalType::F;
+    } else if (l == 4) {
+      type = OrbitalType::G;
+    } else if (l == 5) {
+      type = OrbitalType::H;
+    } else if (l == 6) {
+      type = OrbitalType::I;
+    } else {
+      continue;  // Skip unknown types
+    }
+    orbital_type_counts[type]++;
+  }
+
+  // Test that we can retrieve shells by orbital type
+  EXPECT_GT(orbital_type_counts.size(), 0);
+
+  for (const auto& [orbital_type, expected_count] : orbital_type_counts) {
+    auto indices =
+        basis_set->get_ecp_shell_indices_for_orbital_type(orbital_type);
+    EXPECT_EQ(indices.size(), expected_count);
+
+    // Verify all indices are valid
+    for (size_t idx : indices) {
+      EXPECT_LT(idx, basis_set->get_num_ecp_shells());
+      // Verify the shell at this index has the correct orbital type
+      auto shell = ecp_shells[idx];
+      int l = shell.get_angular_momentum();
+      if (orbital_type == OrbitalType::UL) {
+        EXPECT_EQ(l, -1);
+      } else {
+        EXPECT_EQ(l, static_cast<int>(orbital_type));
+      }
+    }
+  }
+
+  // Test get_ecp_shell_indices_for_atom_and_orbital_type
+  for (const auto& [orbital_type, _] : orbital_type_counts) {
+    // Get indices for Ag (atom 0) with this orbital type
+    auto ag_type_indices =
+        basis_set->get_ecp_shell_indices_for_atom_and_orbital_type(
+            0, orbital_type);
+
+    // Should be a subset of both atom 0 shells and orbital type shells
+    auto ag_all_indices = basis_set->get_ecp_shell_indices_for_atom(0);
+    auto type_all_indices =
+        basis_set->get_ecp_shell_indices_for_orbital_type(orbital_type);
+
+    EXPECT_LE(ag_type_indices.size(), ag_all_indices.size());
+    EXPECT_LE(ag_type_indices.size(), type_all_indices.size());
+
+    // Verify each index is in both sets
+    for (size_t idx : ag_type_indices) {
+      EXPECT_TRUE(std::find(ag_all_indices.begin(), ag_all_indices.end(),
+                            idx) != ag_all_indices.end());
+      EXPECT_TRUE(std::find(type_all_indices.begin(), type_all_indices.end(),
+                            idx) != type_all_indices.end());
+
+      // Verify the shell matches both criteria
+      auto shell = ecp_shells[idx];
+      EXPECT_EQ(shell.atom_index, 0);
+      int l = shell.get_angular_momentum();
+      if (orbital_type == OrbitalType::UL) {
+        EXPECT_EQ(l, -1);
+      } else {
+        EXPECT_EQ(l, static_cast<int>(orbital_type));
+      }
+    }
+
+    // H (atom 1) should have no ECP shells for any orbital type
+    auto h_type_indices =
+        basis_set->get_ecp_shell_indices_for_atom_and_orbital_type(
+            1, orbital_type);
+    EXPECT_EQ(h_type_indices.size(), 0);
+  }
+}
+
+TEST_F(ScfTest, H2ScanDIISNumericalStability) {
+  // Test that SCF handles numerical edge cases in H2 bond scans
+  // This reproduces issues found with exact floating-point values from linspace
+  // where b_max can become zero in DIIS extrapolation
+
+  // Helper lambda to generate linspace values like numpy
+  auto linspace = [](double start, double stop, size_t num) {
+    std::vector<double> result(num);
+    if (num == 1) {
+      result[0] = start;
+      return result;
+    }
+    double step = (stop - start) / (num - 1);
+    for (size_t i = 0; i < num; ++i) {
+      result[i] = start + i * step;
+    }
+    return result;
+  };
+
+  auto full_linspace = linspace(0.5, 5.0, 100);
+  std::vector<double> test_lengths = {
+      full_linspace[3],                            // b_max = 0 in DIIS
+      std::round(full_linspace[3] * 1e15) / 1e15,  // b_max approx 0 in DIIS
+      full_linspace[0]                             // b_max != 0 in DIIS
+  };
+  std::vector<double> expected_energies = {
+      -0.7383108980408086,  // full_linspace[3]
+      -0.7383108980408086,  // rounded full_linspace[3]
+      -0.4033264392907958   // full_linspace[0]
+  };
+
+  auto scf_solver = ScfSolverFactory::create();
+  scf_solver->settings().set("basis_set", "sto-3g");
+
+  std::vector<std::string> symbols = {"H", "H"};
+  for (size_t i = 0; i < test_lengths.size(); ++i) {
+    std::vector<Eigen::Vector3d> coordinates = {
+        Eigen::Vector3d(0.0, 0.0, 0.0),
+        Eigen::Vector3d(0.0, 0.0, test_lengths[i])};
+
+    auto structure = std::make_shared<Structure>(coordinates, symbols);
+    auto [energy, wavefunction] = scf_solver->run(structure, 0, 1);
+
+    EXPECT_NEAR(energy, expected_energies[i], testing::scf_energy_tolerance);
+  }
 }

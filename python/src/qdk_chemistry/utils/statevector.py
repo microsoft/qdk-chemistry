@@ -32,7 +32,7 @@ def _create_statevector_from_coeffs_and_dets_string(
     if len(coeffs) != len(dets_string):
         raise ValueError("Number of coefficients must match number of bitstrings.")
     statevector = np.zeros(2**num_qubits, dtype=complex)
-    for coeff, det in zip(coeffs, dets_string, strict=False):
+    for coeff, det in zip(coeffs, dets_string, strict=True):
         det_num = binary_to_decimal(det)
         if det_num >= len(statevector):
             raise ValueError(f"Determinant {det} exceeds the size of 2**{num_qubits}.")

@@ -15,7 +15,7 @@ QDK/Chemistry provides a comprehensive suite of tools for:
 
 ## Documentation
 
-- **Website**: The static documentation is hosted at [microsoft.github.io/qdk-chemistry](https://microsoft.github.io/qdk-chemistry/index.html)
+- **Website**: The static documentation is hosted at [microsoft.github.io/qdk-cheistry](https://microsoft.github.io/qdk-cheistry/index.html)
 - **C++ API**: Headers in `cpp/include/` contain comprehensive Doxygen documentation
 - **Python API**: All methods include detailed docstrings with Parameters, Returns, Raises, and Examples sections
 - **Examples**: See below, or the `python/examples/` and `docs/examples` directories for usage examples

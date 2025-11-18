@@ -175,7 +175,7 @@ stages:
         # Run pytest with explicit error handling
         set +e
         python3 -m pytest \
-          --cov=src \
+          --cov=qdk_chemistry \
           --cov-report=xml:$(System.DefaultWorkingDirectory)/coverage-reports/python_coverage.xml \
           --cov-report=html:$(System.DefaultWorkingDirectory)/coverage-reports/python_coverage_html \
           --cov-report=term \
@@ -341,7 +341,7 @@ stages:
 
     - script: |
         cd $(Agent.BuildDirectory)/qdk-chemistry/docs
-        python generate_docs.py --clean
+        make clean all
       displayName: Generate Sphinx Documentation
 
     - script: |

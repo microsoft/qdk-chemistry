@@ -25,8 +25,30 @@ Shell::Shell(size_t atom_idx, OrbitalType orb_type,
   }
   exponents.resize(exp_list.size());
   coefficients.resize(coeff_list.size());
+  rpowers.resize(0);  // No radial powers by default
   std::copy(exp_list.begin(), exp_list.end(), exponents.data());
   std::copy(coeff_list.begin(), coeff_list.end(), coefficients.data());
+}
+
+Shell::Shell(size_t atom_idx, OrbitalType orb_type,
+             const std::vector<double>& exp_list,
+             const std::vector<double>& coeff_list,
+             const std::vector<int>& rpow_list)
+    : atom_index(atom_idx), orbital_type(orb_type) {
+  if (exp_list.size() != coeff_list.size()) {
+    throw std::invalid_argument(
+        "Exponents and coefficients must have the same size");
+  }
+  if (!rpow_list.empty() && rpow_list.size() != exp_list.size()) {
+    throw std::invalid_argument(
+        "Radial powers must have the same size as exponents and coefficients");
+  }
+  exponents.resize(exp_list.size());
+  coefficients.resize(coeff_list.size());
+  rpowers.resize(rpow_list.size());
+  std::copy(exp_list.begin(), exp_list.end(), exponents.data());
+  std::copy(coeff_list.begin(), coeff_list.end(), coefficients.data());
+  std::copy(rpow_list.begin(), rpow_list.end(), rpowers.data());
 }
 
 BasisSet::BasisSet(const std::string& name, const Structure& structure,
@@ -35,7 +57,7 @@ BasisSet::BasisSet(const std::string& name, const Structure& structure,
 
 BasisSet::BasisSet(const std::string& name, const std::vector<Shell>& shells,
                    BasisType basis_type)
-    : _name(name), _basis_type(basis_type) {
+    : _name(name), _basis_type(basis_type), _ecp_name("none") {
   // Organize shells by atom index
   for (const auto& shell : shells) {
     size_t atom_index = shell.atom_index;
@@ -47,6 +69,10 @@ BasisSet::BasisSet(const std::string& name, const std::vector<Shell>& shells,
 
     _shells_per_atom[atom_index].push_back(shell);
   }
+
+  // Initialize ECP electrons vector with zeros for each atom
+  _ecp_electrons.resize(_shells_per_atom.size(), 0);
+
   if (!_is_valid()) {
     throw std::invalid_argument("Tried to generate invalid BasisSet");
   }
@@ -59,13 +85,20 @@ BasisSet::BasisSet(const std::string& name, const std::vector<Shell>& shells,
 
 BasisSet::BasisSet(const std::string& name,
                    std::shared_ptr<Structure> structure, BasisType basis_type)
-    : _name(name), _basis_type(basis_type), _structure(structure) {
+    : _name(name),
+      _basis_type(basis_type),
+      _structure(structure),
+      _ecp_name("none") {
   if (_name.empty()) {
     throw std::invalid_argument("BasisSet name cannot be empty");
   }
   if (!structure) {
     throw std::invalid_argument("Structure shared_ptr cannot be nullptr");
   }
+
+  // Initialize ECP electrons vector with zeros for each atom
+  _ecp_electrons.resize(structure->get_num_atoms(), 0);
+
   if (!_is_valid()) {
     throw std::invalid_argument("Tried to generate invalid BasisSet");
   }
@@ -73,7 +106,10 @@ BasisSet::BasisSet(const std::string& name,
 
 BasisSet::BasisSet(const std::string& name, const std::vector<Shell>& shells,
                    std::shared_ptr<Structure> structure, BasisType basis_type)
-    : _name(name), _basis_type(basis_type), _structure(structure) {
+    : _name(name),
+      _basis_type(basis_type),
+      _structure(structure),
+      _ecp_name("none") {
   if (!structure) {
     throw std::invalid_argument("Structure shared_ptr cannot be nullptr");
   }
@@ -89,6 +125,115 @@ BasisSet::BasisSet(const std::string& name, const std::vector<Shell>& shells,
 
     _shells_per_atom[atom_index].push_back(shell);
   }
+
+  // Initialize ECP electrons vector with zeros for each atom
+  _ecp_electrons.resize(structure->get_num_atoms(), 0);
+
+  if (!_is_valid()) {
+    throw std::invalid_argument("Tried to generate invalid BasisSet");
+  }
+}
+
+BasisSet::BasisSet(const std::string& name, const std::vector<Shell>& shells,
+                   const std::vector<Shell>& ecp_shells,
+                   const Structure& structure, BasisType basis_type)
+    : BasisSet(name, shells, ecp_shells, std::make_shared<Structure>(structure),
+               basis_type) {}
+
+BasisSet::BasisSet(const std::string& name, const std::vector<Shell>& shells,
+                   const std::vector<Shell>& ecp_shells,
+                   std::shared_ptr<Structure> structure, BasisType basis_type)
+    : _name(name),
+      _basis_type(basis_type),
+      _structure(structure),
+      _ecp_name("none") {
+  if (!structure) {
+    throw std::invalid_argument("Structure shared_ptr cannot be nullptr");
+  }
+
+  // Organize shells by atom index
+  for (const auto& shell : shells) {
+    size_t atom_index = shell.atom_index;
+
+    // Ensure we have enough space for this atom
+    if (atom_index >= _shells_per_atom.size()) {
+      _shells_per_atom.resize(atom_index + 1);
+    }
+
+    _shells_per_atom[atom_index].push_back(shell);
+  }
+
+  // Organize ECP shells by atom index
+  for (const auto& ecp_shell : ecp_shells) {
+    size_t atom_index = ecp_shell.atom_index;
+
+    // Ensure we have enough space for this atom
+    if (atom_index >= _ecp_shells_per_atom.size()) {
+      _ecp_shells_per_atom.resize(atom_index + 1);
+    }
+
+    _ecp_shells_per_atom[atom_index].push_back(ecp_shell);
+  }
+
+  // Initialize ECP electrons vector with zeros for each atom
+  _ecp_electrons.resize(structure->get_num_atoms(), 0);
+
+  if (!_is_valid()) {
+    throw std::invalid_argument("Tried to generate invalid BasisSet");
+  }
+}
+
+BasisSet::BasisSet(const std::string& name, const std::vector<Shell>& shells,
+                   const std::string& ecp_name,
+                   const std::vector<Shell>& ecp_shells,
+                   const std::vector<size_t>& ecp_electrons,
+                   const Structure& structure, BasisType basis_type)
+    : BasisSet(name, shells, ecp_name, ecp_shells, ecp_electrons,
+               std::make_shared<Structure>(structure), basis_type) {}
+
+BasisSet::BasisSet(const std::string& name, const std::vector<Shell>& shells,
+                   const std::string& ecp_name,
+                   const std::vector<Shell>& ecp_shells,
+                   const std::vector<size_t>& ecp_electrons,
+                   std::shared_ptr<Structure> structure, BasisType basis_type)
+    : _name(name),
+      _basis_type(basis_type),
+      _structure(structure),
+      _ecp_name(ecp_name),
+      _ecp_electrons(ecp_electrons) {
+  if (!structure) {
+    throw std::invalid_argument("Structure shared_ptr cannot be nullptr");
+  }
+
+  if (ecp_electrons.size() != structure->get_num_atoms()) {
+    throw std::invalid_argument(
+        "ECP electrons vector size must match number of atoms");
+  }
+
+  // Organize shells by atom index
+  for (const auto& shell : shells) {
+    size_t atom_index = shell.atom_index;
+
+    // Ensure we have enough space for this atom
+    if (atom_index >= _shells_per_atom.size()) {
+      _shells_per_atom.resize(atom_index + 1);
+    }
+
+    _shells_per_atom[atom_index].push_back(shell);
+  }
+
+  // Organize ECP shells by atom index
+  for (const auto& ecp_shell : ecp_shells) {
+    size_t atom_index = ecp_shell.atom_index;
+
+    // Ensure we have enough space for this atom
+    if (atom_index >= _ecp_shells_per_atom.size()) {
+      _ecp_shells_per_atom.resize(atom_index + 1);
+    }
+
+    _ecp_shells_per_atom[atom_index].push_back(ecp_shell);
+  }
+
   if (!_is_valid()) {
     throw std::invalid_argument("Tried to generate invalid BasisSet");
   }
@@ -97,7 +242,10 @@ BasisSet::BasisSet(const std::string& name, const std::vector<Shell>& shells,
 BasisSet::BasisSet(const BasisSet& other)
     : _name(other._name),
       _basis_type(other._basis_type),
-      _shells_per_atom(other._shells_per_atom) {
+      _shells_per_atom(other._shells_per_atom),
+      _ecp_name(other._ecp_name),
+      _ecp_shells_per_atom(other._ecp_shells_per_atom),
+      _ecp_electrons(other._ecp_electrons) {
   if (other._structure) {
     _structure = std::make_shared<Structure>(*other._structure);
   }
@@ -112,6 +260,9 @@ BasisSet& BasisSet::operator=(const BasisSet& other) {
     _name = other._name;
     _basis_type = other._basis_type;
     _shells_per_atom = other._shells_per_atom;
+    _ecp_name = other._ecp_name;
+    _ecp_shells_per_atom = other._ecp_shells_per_atom;
+    _ecp_electrons = other._ecp_electrons;
     if (other._structure) {
       _structure = std::make_shared<Structure>(*other._structure);
     } else {
@@ -167,6 +318,58 @@ size_t BasisSet::get_num_shells() const {
 
 size_t BasisSet::get_num_atoms() const { return _shells_per_atom.size(); }
 
+std::vector<Shell> BasisSet::get_ecp_shells() const {
+  std::vector<Shell> all_ecp_shells;
+
+  for (const auto& atom_ecp_shells : _ecp_shells_per_atom) {
+    for (const auto& shell : atom_ecp_shells) {
+      all_ecp_shells.push_back(shell);
+    }
+  }
+
+  return all_ecp_shells;
+}
+
+const std::vector<Shell>& BasisSet::get_ecp_shells_for_atom(
+    size_t atom_index) const {
+  _validate_atom_index(atom_index);
+  if (atom_index >= _ecp_shells_per_atom.size()) {
+    static const std::vector<Shell> empty_vector;
+    return empty_vector;
+  }
+  return _ecp_shells_per_atom[atom_index];
+}
+
+const Shell& BasisSet::get_ecp_shell(size_t shell_index) const {
+  size_t total_ecp_shells = get_num_ecp_shells();
+  if (shell_index >= total_ecp_shells) {
+    throw std::out_of_range("ECP shell index " + std::to_string(shell_index) +
+                            " out of range [0, " +
+                            std::to_string(total_ecp_shells) + ")");
+  }
+
+  size_t current_index = 0;
+  for (const auto& atom_ecp_shells : _ecp_shells_per_atom) {
+    if (shell_index < current_index + atom_ecp_shells.size()) {
+      return atom_ecp_shells[shell_index - current_index];
+    }
+    current_index += atom_ecp_shells.size();
+  }
+
+  // Should never reach here if validation worked correctly
+  throw std::out_of_range("ECP shell index not found");
+}
+
+size_t BasisSet::get_num_ecp_shells() const {
+  size_t total = 0;
+  for (const auto& atom_ecp_shells : _ecp_shells_per_atom) {
+    total += atom_ecp_shells.size();
+  }
+  return total;
+}
+
+bool BasisSet::has_ecp_shells() const { return get_num_ecp_shells() > 0; }
+
 std::pair<size_t, int> BasisSet::get_basis_function_info(
     size_t basis_index) const {
   _validate_basis_index(basis_index);
@@ -189,7 +392,7 @@ size_t BasisSet::get_atom_index_for_basis_function(size_t basis_index) const {
   return _basis_to_atom_map[basis_index];
 }
 
-std::vector<size_t> BasisSet::get_basis_fuction_indices_for_atom(
+std::vector<size_t> BasisSet::get_basis_function_indices_for_atom(
     size_t atom_index) const {
   _validate_atom_index(atom_index);
 
@@ -298,6 +501,76 @@ std::vector<size_t> BasisSet::get_shell_indices_for_atom_and_orbital_type(
   return result;
 }
 
+std::vector<size_t> BasisSet::get_ecp_shell_indices_for_atom(
+    size_t atom_index) const {
+  _validate_atom_index(atom_index);
+
+  std::vector<size_t> result;
+
+  if (atom_index >= _ecp_shells_per_atom.size()) {
+    return result;  // No ECP shells for this atom
+  }
+
+  size_t ecp_shell_idx = 0;
+
+  // Count ECP shells from atoms before this one
+  for (size_t i = 0; i < atom_index && i < _ecp_shells_per_atom.size(); ++i) {
+    ecp_shell_idx += _ecp_shells_per_atom[i].size();
+  }
+
+  // Add ECP shell indices from this atom
+  for (size_t j = 0; j < _ecp_shells_per_atom[atom_index].size(); ++j) {
+    result.push_back(ecp_shell_idx + j);
+  }
+
+  return result;
+}
+
+std::vector<size_t> BasisSet::get_ecp_shell_indices_for_orbital_type(
+    OrbitalType orbital_type) const {
+  std::vector<size_t> result;
+  size_t ecp_shell_idx = 0;
+
+  for (const auto& atom_ecp_shells : _ecp_shells_per_atom) {
+    for (const auto& ecp_shell : atom_ecp_shells) {
+      if (ecp_shell.orbital_type == orbital_type) {
+        result.push_back(ecp_shell_idx);
+      }
+      ecp_shell_idx++;
+    }
+  }
+
+  return result;
+}
+
+std::vector<size_t> BasisSet::get_ecp_shell_indices_for_atom_and_orbital_type(
+    size_t atom_index, OrbitalType orbital_type) const {
+  _validate_atom_index(atom_index);
+
+  std::vector<size_t> result;
+
+  if (atom_index >= _ecp_shells_per_atom.size()) {
+    return result;  // No ECP shells for this atom
+  }
+
+  size_t ecp_shell_idx = 0;
+
+  // Count ECP shells from atoms before this one
+  for (size_t i = 0; i < atom_index && i < _ecp_shells_per_atom.size(); ++i) {
+    ecp_shell_idx += _ecp_shells_per_atom[i].size();
+  }
+
+  // Check ECP shells for this atom
+  for (const auto& ecp_shell : _ecp_shells_per_atom[atom_index]) {
+    if (ecp_shell.orbital_type == orbital_type) {
+      result.push_back(ecp_shell_idx);
+    }
+    ecp_shell_idx++;
+  }
+
+  return result;
+}
+
 const std::string& BasisSet::get_name() const { return _name; }
 
 const std::shared_ptr<Structure> BasisSet::get_structure() const {
@@ -308,6 +581,22 @@ const std::shared_ptr<Structure> BasisSet::get_structure() const {
 }
 
 bool BasisSet::has_structure() const { return _structure != nullptr; }
+
+const std::string& BasisSet::get_ecp_name() const { return _ecp_name; }
+
+const std::vector<size_t>& BasisSet::get_ecp_electrons() const {
+  return _ecp_electrons;
+}
+
+bool BasisSet::has_ecp_electrons() const {
+  // Check if any atom has a finite number of ECP electrons
+  for (size_t ecp_electrons : _ecp_electrons) {
+    if (ecp_electrons > 0) {
+      return true;
+    }
+  }
+  return false;
+}
 
 bool BasisSet::_is_consistent_with_structure() const {
   if (!has_structure()) {
@@ -571,6 +860,98 @@ void BasisSet::to_hdf5(H5::Group& group) const {
       }
     }
 
+    // Save ECP shell data
+    if (get_num_ecp_shells() > 0) {
+      H5::Group ecp_shell_group = group.createGroup("ecp_shells");
+
+      // Get all ECP shells in flat format for HDF5 storage
+      auto all_ecp_shells = get_ecp_shells();
+      unsigned num_ecp_shells = all_ecp_shells.size();
+      hsize_t ecp_dims[1] = {num_ecp_shells};
+      H5::DataSpace ecp_dataspace(1, ecp_dims);
+
+      // Create datasets for each ECP shell property
+      H5::DataSet ecp_atom_indices = ecp_shell_group.createDataSet(
+          "atom_indices", H5::PredType::NATIVE_UINT, ecp_dataspace);
+      H5::DataSet ecp_orbital_types = ecp_shell_group.createDataSet(
+          "orbital_types", H5::PredType::NATIVE_INT, ecp_dataspace);
+      H5::DataSet ecp_num_primitives = ecp_shell_group.createDataSet(
+          "num_primitives", H5::PredType::NATIVE_UINT, ecp_dataspace);
+
+      // Prepare data arrays
+      std::vector<unsigned> ecp_atom_idx_data;
+      std::vector<int> ecp_orbital_type_data;
+      std::vector<unsigned> ecp_num_prim_data;
+      std::vector<double> ecp_all_exponents;
+      std::vector<double> ecp_all_coefficients;
+      std::vector<int> ecp_all_rpowers;
+
+      ecp_atom_idx_data.reserve(num_ecp_shells);
+      ecp_orbital_type_data.reserve(num_ecp_shells);
+      ecp_num_prim_data.reserve(num_ecp_shells);
+      for (const auto& ecp_shell : all_ecp_shells) {
+        ecp_atom_idx_data.push_back(ecp_shell.atom_index);
+        ecp_orbital_type_data.push_back(
+            static_cast<int>(ecp_shell.orbital_type));
+        ecp_num_prim_data.push_back(ecp_shell.exponents.size());
+
+        // Flatten primitives
+        for (unsigned i = 0; i < ecp_shell.exponents.size(); ++i) {
+          ecp_all_exponents.push_back(ecp_shell.exponents(i));
+          ecp_all_coefficients.push_back(ecp_shell.coefficients(i));
+          if (ecp_shell.rpowers.size() > 0) {
+            ecp_all_rpowers.push_back(ecp_shell.rpowers(i));
+          } else {
+            ecp_all_rpowers.push_back(0);  // Default to 0 if not specified
+          }
+        }
+      }
+
+      // Write ECP shell data
+      ecp_atom_indices.write(ecp_atom_idx_data.data(),
+                             H5::PredType::NATIVE_UINT);
+      ecp_orbital_types.write(ecp_orbital_type_data.data(),
+                              H5::PredType::NATIVE_INT);
+      ecp_num_primitives.write(ecp_num_prim_data.data(),
+                               H5::PredType::NATIVE_UINT);
+
+      // Write ECP primitive data
+      if (!ecp_all_exponents.empty()) {
+        hsize_t ecp_prim_dims[1] = {ecp_all_exponents.size()};
+        H5::DataSpace ecp_prim_dataspace(1, ecp_prim_dims);
+
+        H5::DataSet ecp_exponents = ecp_shell_group.createDataSet(
+            "exponents", H5::PredType::NATIVE_DOUBLE, ecp_prim_dataspace);
+        H5::DataSet ecp_coefficients = ecp_shell_group.createDataSet(
+            "coefficients", H5::PredType::NATIVE_DOUBLE, ecp_prim_dataspace);
+        H5::DataSet ecp_rpowers = ecp_shell_group.createDataSet(
+            "rpowers", H5::PredType::NATIVE_INT, ecp_prim_dataspace);
+
+        ecp_exponents.write(ecp_all_exponents.data(),
+                            H5::PredType::NATIVE_DOUBLE);
+        ecp_coefficients.write(ecp_all_coefficients.data(),
+                               H5::PredType::NATIVE_DOUBLE);
+        ecp_rpowers.write(ecp_all_rpowers.data(), H5::PredType::NATIVE_INT);
+      }
+    }
+
+    // Save ECP name and electrons if present
+    if (has_ecp_electrons() || !_ecp_name.empty()) {
+      // Save ECP name as attribute
+      H5::Attribute ecp_name_attr =
+          group.createAttribute("ecp_name", string_type, scalar_space);
+      ecp_name_attr.write(string_type, _ecp_name);
+
+      // Save ECP electrons array as dataset
+      if (!_ecp_electrons.empty()) {
+        hsize_t ecp_dims[1] = {_ecp_electrons.size()};
+        H5::DataSpace ecp_dataspace(1, ecp_dims);
+        H5::DataSet ecp_electrons = group.createDataSet(
+            "ecp_electrons", H5::PredType::NATIVE_UINT64, ecp_dataspace);
+        ecp_electrons.write(_ecp_electrons.data(), H5::PredType::NATIVE_UINT64);
+      }
+    }
+
     // Save nested structure if present
     if (has_structure()) {
       H5::Group structure_group = group.createGroup("structure");
@@ -700,14 +1081,145 @@ std::shared_ptr<BasisSet> BasisSet::from_hdf5(H5::Group& group) {
       }
     }
 
+    // Collect ECP shells
+    std::vector<Shell> ecp_shells;
+
+    // Load ECP shells if present
+    if (group.nameExists("ecp_shells")) {
+      H5::Group ecp_shell_group = group.openGroup("ecp_shells");
+
+      H5::DataSet ecp_atom_indices =
+          ecp_shell_group.openDataSet("atom_indices");
+      H5::DataSpace ecp_dataspace = ecp_atom_indices.getSpace();
+
+      hsize_t ecp_dims[1];
+      ecp_dataspace.getSimpleExtentDims(ecp_dims);
+      unsigned num_ecp_shells = ecp_dims[0];
+
+      if (num_ecp_shells > 0) {
+        // Read data arrays
+        std::vector<unsigned> ecp_atom_idx_data(num_ecp_shells);
+        std::vector<int> ecp_orbital_type_data(num_ecp_shells);
+        std::vector<unsigned> ecp_num_prim_data(num_ecp_shells);
+
+        ecp_atom_indices.read(ecp_atom_idx_data.data(),
+                              H5::PredType::NATIVE_UINT);
+
+        H5::DataSet ecp_orbital_types =
+            ecp_shell_group.openDataSet("orbital_types");
+        ecp_orbital_types.read(ecp_orbital_type_data.data(),
+                               H5::PredType::NATIVE_INT);
+
+        H5::DataSet ecp_num_primitives =
+            ecp_shell_group.openDataSet("num_primitives");
+        ecp_num_primitives.read(ecp_num_prim_data.data(),
+                                H5::PredType::NATIVE_UINT);
+
+        // Read primitive data
+        std::vector<double> ecp_all_exponents;
+        std::vector<double> ecp_all_coefficients;
+        std::vector<int> ecp_all_rpowers;
+
+        if (ecp_shell_group.nameExists("exponents") &&
+            ecp_shell_group.nameExists("coefficients")) {
+          H5::DataSet ecp_exponents = ecp_shell_group.openDataSet("exponents");
+          H5::DataSet ecp_coefficients =
+              ecp_shell_group.openDataSet("coefficients");
+
+          H5::DataSpace ecp_exp_space = ecp_exponents.getSpace();
+          hsize_t ecp_exp_dims[1];
+          ecp_exp_space.getSimpleExtentDims(ecp_exp_dims);
+
+          ecp_all_exponents.resize(ecp_exp_dims[0]);
+          ecp_all_coefficients.resize(ecp_exp_dims[0]);
+
+          ecp_exponents.read(ecp_all_exponents.data(),
+                             H5::PredType::NATIVE_DOUBLE);
+          ecp_coefficients.read(ecp_all_coefficients.data(),
+                                H5::PredType::NATIVE_DOUBLE);
+
+          // Read radial powers if present
+          if (ecp_shell_group.nameExists("rpowers")) {
+            H5::DataSet ecp_rpowers = ecp_shell_group.openDataSet("rpowers");
+            ecp_all_rpowers.resize(ecp_exp_dims[0]);
+            ecp_rpowers.read(ecp_all_rpowers.data(), H5::PredType::NATIVE_INT);
+          } else {
+            ecp_all_rpowers.resize(ecp_exp_dims[0], 0);
+          }
+        }
+
+        // Reconstruct ECP shells
+        unsigned ecp_prim_offset = 0;
+
+        for (unsigned i = 0; i < num_ecp_shells; ++i) {
+          unsigned num_prims = ecp_num_prim_data[i];
+
+          // Prepare primitive data vectors
+          Eigen::VectorXd shell_exponents(num_prims);
+          Eigen::VectorXd shell_coefficients(num_prims);
+          Eigen::VectorXi shell_rpowers(num_prims);
+
+          for (unsigned j = 0; j < num_prims; ++j) {
+            if (ecp_prim_offset + j < ecp_all_exponents.size()) {
+              shell_exponents(j) = ecp_all_exponents[ecp_prim_offset + j];
+              shell_coefficients(j) = ecp_all_coefficients[ecp_prim_offset + j];
+              shell_rpowers(j) = ecp_all_rpowers[ecp_prim_offset + j];
+            }
+          }
+          ecp_prim_offset += num_prims;
+
+          Shell ecp_shell(ecp_atom_idx_data[i],
+                          static_cast<OrbitalType>(ecp_orbital_type_data[i]),
+                          shell_exponents, shell_coefficients, shell_rpowers);
+
+          ecp_shells.push_back(ecp_shell);
+        }
+      }
+    }
+
+    // Load ECP name and electrons
+    std::string ecp_name;
+    std::vector<size_t> ecp_electrons;
+
+    if (group.attrExists("ecp_name")) {
+      H5::Attribute ecp_name_attr = group.openAttribute("ecp_name");
+      ecp_name_attr.read(string_type, ecp_name);
+    }
+
+    if (group.nameExists("ecp_electrons")) {
+      H5::DataSet ecp_electrons_ds = group.openDataSet("ecp_electrons");
+      H5::DataSpace ecp_dataspace = ecp_electrons_ds.getSpace();
+
+      hsize_t ecp_dims[1];
+      ecp_dataspace.getSimpleExtentDims(ecp_dims);
+      ecp_electrons.resize(ecp_dims[0]);
+
+      ecp_electrons_ds.read(ecp_electrons.data(), H5::PredType::NATIVE_UINT64);
+    }
+
     // Load nested structure if present
+    std::shared_ptr<BasisSet> basis_set;
     if (group.nameExists("structure")) {
       H5::Group structure_group = group.openGroup("structure");
       auto structure = Structure::from_hdf5(structure_group);
-      return std::make_shared<BasisSet>(name, shells, *structure, basis_type);
+      if (!ecp_shells.empty()) {
+        if (!ecp_name.empty() && !ecp_electrons.empty()) {
+          basis_set =
+              std::make_shared<BasisSet>(name, shells, ecp_name, ecp_shells,
+                                         ecp_electrons, *structure, basis_type);
+        } else {
+          basis_set = std::make_shared<BasisSet>(name, shells, ecp_shells,
+                                                 *structure, basis_type);
+        }
+      } else {
+        basis_set =
+            std::make_shared<BasisSet>(name, shells, *structure, basis_type);
+      }
     } else {
-      return std::make_shared<BasisSet>(name, shells, basis_type);
+      basis_set = std::make_shared<BasisSet>(name, shells, basis_type);
     }
+
+    return basis_set;
 
   } catch (const H5::Exception& e) {
     throw std::runtime_error("HDF5 error: " + std::string(e.getCDetailMsg()));
@@ -728,33 +1240,79 @@ nlohmann::json BasisSet::to_json() const {
 
   // Serialize shells organized by atom
   j["atoms"] = nlohmann::json::array();
-  for (size_t atom_idx = 0; atom_idx < _shells_per_atom.size(); ++atom_idx) {
-    const auto& atom_shells = _shells_per_atom[atom_idx];
+  for (size_t atom_idx = 0; atom_idx < get_num_atoms(); ++atom_idx) {
+    bool has_shells = atom_idx < _shells_per_atom.size() &&
+                      !_shells_per_atom[atom_idx].empty();
+    bool has_ecp_shells = atom_idx < _ecp_shells_per_atom.size() &&
+                          !_ecp_shells_per_atom[atom_idx].empty();
 
-    if (!atom_shells.empty()) {
+    if (has_shells || has_ecp_shells) {
       nlohmann::json atom_json;
       atom_json["atom_index"] = atom_idx;
-      atom_json["shells"] = nlohmann::json::array();
 
-      for (const auto& shell : atom_shells) {
-        nlohmann::json shell_json;
-        shell_json["orbital_type"] = orbital_type_to_string(shell.orbital_type);
+      // Serialize regular shells
+      if (has_shells) {
+        const auto& atom_shells = _shells_per_atom[atom_idx];
+        atom_json["shells"] = nlohmann::json::array();
 
-        // Serialize primitive data as separate arrays
-        std::vector<double> exp_vec(
-            shell.exponents.data(),
-            shell.exponents.data() + shell.exponents.size());
-        std::vector<double> coeff_vec(
-            shell.coefficients.data(),
-            shell.coefficients.data() + shell.coefficients.size());
-        shell_json["exponents"] = exp_vec;
-        shell_json["coefficients"] = coeff_vec;
+        for (const auto& shell : atom_shells) {
+          nlohmann::json shell_json;
+          shell_json["orbital_type"] =
+              orbital_type_to_string(shell.orbital_type);
 
-        atom_json["shells"].push_back(shell_json);
+          // Serialize primitive data as separate arrays
+          std::vector<double> exp_vec(
+              shell.exponents.data(),
+              shell.exponents.data() + shell.exponents.size());
+          std::vector<double> coeff_vec(
+              shell.coefficients.data(),
+              shell.coefficients.data() + shell.coefficients.size());
+          shell_json["exponents"] = exp_vec;
+          shell_json["coefficients"] = coeff_vec;
+
+          atom_json["shells"].push_back(shell_json);
+        }
+      }
+
+      // Serialize ECP shells
+      if (has_ecp_shells) {
+        const auto& atom_ecp_shells = _ecp_shells_per_atom[atom_idx];
+        atom_json["ecp_shells"] = nlohmann::json::array();
+
+        for (const auto& ecp_shell : atom_ecp_shells) {
+          nlohmann::json ecp_shell_json;
+          ecp_shell_json["orbital_type"] =
+              orbital_type_to_string(ecp_shell.orbital_type);
+
+          // Serialize primitive data as separate arrays
+          std::vector<double> exp_vec(
+              ecp_shell.exponents.data(),
+              ecp_shell.exponents.data() + ecp_shell.exponents.size());
+          std::vector<double> coeff_vec(
+              ecp_shell.coefficients.data(),
+              ecp_shell.coefficients.data() + ecp_shell.coefficients.size());
+          ecp_shell_json["exponents"] = exp_vec;
+          ecp_shell_json["coefficients"] = coeff_vec;
+
+          // Serialize radial powers for ECP shells
+          if (ecp_shell.rpowers.size() > 0) {
+            std::vector<int> rpowers_vec(
+                ecp_shell.rpowers.data(),
+                ecp_shell.rpowers.data() + ecp_shell.rpowers.size());
+            ecp_shell_json["rpowers"] = rpowers_vec;
+          }
+
+          atom_json["ecp_shells"].push_back(ecp_shell_json);
+        }
       }
 
       j["atoms"].push_back(atom_json);
     }
+  }
+
+  if (has_ecp_electrons() || !_ecp_name.empty()) {
+    j["ecp_name"] = _ecp_name;
+    j["ecp_electrons"] = _ecp_electrons;
   }
 
   if (has_structure()) {
@@ -782,14 +1340,16 @@ std::shared_ptr<BasisSet> BasisSet::from_json(const nlohmann::json& j) {
       basis_type = BasisType::Spherical;
     }
 
-    // Collect all shells
+    // Collect all shells and ECP shells
     std::vector<Shell> shells;
+    std::vector<Shell> ecp_shells;
 
     // Try to load new per-atom format first
     if (j.contains("atoms") && j["atoms"].is_array()) {
       for (const auto& atom_json : j["atoms"]) {
         size_t atom_index = atom_json["atom_index"];
 
+        // Load regular shells
         if (atom_json.contains("shells") && atom_json["shells"].is_array()) {
           for (const auto& shell_json : atom_json["shells"]) {
             // Load primitive data - try new array format first
@@ -828,6 +1388,47 @@ std::shared_ptr<BasisSet> BasisSet::from_json(const nlohmann::json& j) {
                           string_to_orbital_type(shell_json["orbital_type"]),
                           shell_exponents, shell_coefficients);
               shells.push_back(shell);
+            }
+          }
+        }
+
+        // Load ECP shells
+        if (atom_json.contains("ecp_shells") &&
+            atom_json["ecp_shells"].is_array()) {
+          for (const auto& ecp_shell_json : atom_json["ecp_shells"]) {
+            // Load primitive data
+            if (ecp_shell_json.contains("exponents") &&
+                ecp_shell_json.contains("coefficients") &&
+                ecp_shell_json["exponents"].is_array() &&
+                ecp_shell_json["coefficients"].is_array()) {
+              auto exp_vec =
+                  ecp_shell_json["exponents"].get<std::vector<double>>();
+              auto coeff_vec =
+                  ecp_shell_json["coefficients"].get<std::vector<double>>();
+              Eigen::VectorXd shell_exponents =
+                  Eigen::Map<const Eigen::VectorXd>(exp_vec.data(),
+                                                    exp_vec.size());
+              Eigen::VectorXd shell_coefficients =
+                  Eigen::Map<const Eigen::VectorXd>(coeff_vec.data(),
+                                                    coeff_vec.size());
+
+              // Load radial powers if present
+              Eigen::VectorXi shell_rpowers;
+              if (ecp_shell_json.contains("rpowers") &&
+                  ecp_shell_json["rpowers"].is_array()) {
+                auto rpowers_vec =
+                    ecp_shell_json["rpowers"].get<std::vector<int>>();
+                shell_rpowers = Eigen::Map<const Eigen::VectorXi>(
+                    rpowers_vec.data(), rpowers_vec.size());
+              } else {
+                shell_rpowers = Eigen::VectorXi::Zero(0);
+              }
+
+              Shell ecp_shell(
+                  atom_index,
+                  string_to_orbital_type(ecp_shell_json["orbital_type"]),
+                  shell_exponents, shell_coefficients, shell_rpowers);
+              ecp_shells.push_back(ecp_shell);
             }
           }
         }
@@ -924,13 +1525,41 @@ std::shared_ptr<BasisSet> BasisSet::from_json(const nlohmann::json& j) {
       }
     }
 
+    // Load ECP name and electrons if present
+    std::string ecp_name;
+    std::vector<size_t> ecp_electrons;
+    if (j.contains("ecp_name") && j.contains("ecp_electrons")) {
+      ecp_name = j["ecp_name"];
+      ecp_electrons = j["ecp_electrons"].get<std::vector<size_t>>();
+    }
+
     // Create the BasisSet with or without structure
+    std::shared_ptr<BasisSet> basis_set;
     if (j.contains("structure")) {
       auto structure = Structure::from_json(j["structure"]);
-      return std::make_shared<BasisSet>(name, shells, *structure, basis_type);
+      if (!ecp_shells.empty()) {
+        if (!ecp_name.empty() && !ecp_electrons.empty()) {
+          basis_set =
+              std::make_shared<BasisSet>(name, shells, ecp_name, ecp_shells,
+                                         ecp_electrons, *structure, basis_type);
+        } else {
+          basis_set = std::make_shared<BasisSet>(name, shells, ecp_shells,
+                                                 *structure, basis_type);
+        }
+      } else {
+        basis_set =
+            std::make_shared<BasisSet>(name, shells, *structure, basis_type);
+      }
     } else {
-      return std::make_shared<BasisSet>(name, shells, basis_type);
+      if (!ecp_shells.empty()) {
+        // Create a minimal structure for ecp_shells constructor
+        throw std::runtime_error(
+            "Cannot create BasisSet with ECP shells but without structure");
+      }
+      basis_set = std::make_shared<BasisSet>(name, shells, basis_type);
     }
+
+    return basis_set;
 
   } catch (const std::exception& e) {
     throw std::runtime_error("Failed to parse BasisSet from JSON: " +
@@ -940,6 +1569,8 @@ std::shared_ptr<BasisSet> BasisSet::from_json(const nlohmann::json& j) {
 
 std::string BasisSet::orbital_type_to_string(OrbitalType orbital_type) {
   switch (orbital_type) {
+    case OrbitalType::UL:
+      return "ul";
     case OrbitalType::S:
       return "s";
     case OrbitalType::P:
@@ -961,6 +1592,8 @@ std::string BasisSet::orbital_type_to_string(OrbitalType orbital_type) {
 
 OrbitalType BasisSet::l_to_orbital_type(int l) {
   switch (l) {
+    case -1:
+      return OrbitalType::UL;
     case 0:
       return OrbitalType::S;
     case 1:
@@ -987,6 +1620,7 @@ OrbitalType BasisSet::string_to_orbital_type(
   std::transform(lower_str.begin(), lower_str.end(), lower_str.begin(),
                  ::tolower);
 
+  if (lower_str == "ul") return OrbitalType::UL;
   if (lower_str == "s") return OrbitalType::S;
   if (lower_str == "p") return OrbitalType::P;
   if (lower_str == "d") return OrbitalType::D;

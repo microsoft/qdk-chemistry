@@ -13,6 +13,7 @@ from qdk_chemistry.constants import ANGSTROM_TO_BOHR
 from qdk_chemistry.data import Structure
 
 from .reference_tolerances import (
+    float_comparison_relative_tolerance,
     scf_energy_tolerance,
 )
 
@@ -177,3 +178,39 @@ class TestScfSolver:
 
         # Should get the same energy (within tight tolerance)
         assert abs(energy_o2_first - energy_o2_second) < scf_energy_tolerance
+
+    def test_h2_scan_diis_numerical_stability(self):
+        """Test that SCF handles numerical edge cases in H2 bond scans.
+
+        This reproduces issues found with exact floating-point values from linspace
+        where b_max can become zero in DIIS extrapolation.
+        """
+        # Test different bond lengths to trigger edge cases
+        full_linspace = np.linspace(0.5, 5.0, 100)
+        test_lengths = [
+            full_linspace[3],  # b_max = 0 in DIIS
+            np.round(full_linspace[3], 15),  # b_max approx 0 in DIIS
+            full_linspace[0],  # b_max != 0 in DIIS
+        ]
+
+        expected_energies = [
+            -0.7383108980408086,  # full_linspace[3]
+            -0.7383108980408086,  # rounded full_linspace[3]
+            -0.4033264392907958,  # full_linspace[0]
+        ]
+
+        scf_solver = algorithms.create("scf_solver")
+        scf_solver.settings().set("basis_set", "sto-3g")
+
+        for i, length in enumerate(test_lengths):
+            h2 = Structure(
+                ["H", "H"],
+                np.array([[0.0, 0.0, 0.0], [0.0, 0.0, length]]),
+            )
+            energy, _ = scf_solver.run(h2, 0, 1)
+            assert np.isclose(
+                energy,
+                expected_energies[i],
+                rtol=float_comparison_relative_tolerance,
+                atol=scf_energy_tolerance,
+            )

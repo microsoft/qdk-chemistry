@@ -66,7 +66,7 @@ void bind_mcscf(py::module& m) {
 
     >>> import qdk_chemistry.algorithms as alg
     >>> import qdk_chemistry.data as data
-    >>> class MyMultiConfigurationScf(alg.MultiConfigurationScf):
+    >>> class MyMCSCF(alg.MultiConfigurationScf):
     ...     def __init__(self):
     ...         super().__init__()  # Call the base class constructor
     ...     def _run_impl(self,

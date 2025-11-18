@@ -37,9 +37,9 @@ size_t load_from_database_json(std::filesystem::path bs_path, BasisSet& basis) {
   auto& mol = *basis.mol;
   auto& shells = basis.shells;
   auto& ecp_shells = basis.ecp_shells;
-  auto& elem2ecpcore = basis.elem2ecpcore;
+  auto& element_ecp_electrons = basis.element_ecp_electrons;
 
-  size_t ecp_cores = 0;
+  size_t n_ecp_electrons = 0;
   for (uint64_t i = 0; i < mol.n_atoms; ++i) {
     auto atomic_num = std::to_string(mol.atomic_nums[i]);
     VERIFY_INPUT(data["elements"].contains(atomic_num),
@@ -80,10 +80,10 @@ size_t load_from_database_json(std::filesystem::path bs_path, BasisSet& basis) {
 
     if (!elem.contains("ecp_potentials")) continue;
 
-    auto ncores = elem["ecp_electrons"].get<int>();
-    elem2ecpcore[mol.atomic_nums[i]] = ncores;
-    mol.atomic_charges[i] = mol.atomic_nums[i] - ncores;
-    ecp_cores += ncores;
+    auto n_core_electrons = elem["ecp_electrons"].get<int>();
+    element_ecp_electrons[mol.atomic_nums[i]] = n_core_electrons;
+    mol.atomic_charges[i] = mol.atomic_nums[i] - n_core_electrons;
+    n_ecp_electrons += n_core_electrons;
     auto ecp = elem["ecp_potentials"];
     for (const auto& entry : ecp) {
       if (entry["ecp_type"].get<std::string>() != "scalar_ecp") {
@@ -112,7 +112,7 @@ size_t load_from_database_json(std::filesystem::path bs_path, BasisSet& basis) {
     }
   }
 
-  return ecp_cores;
+  return n_ecp_electrons;
 }
 
 std::shared_ptr<BasisSet> BasisSet::from_database_json(
@@ -164,7 +164,7 @@ BasisSet::BasisSet(std::shared_ptr<Molecule> mol, const std::string& path,
 #endif
 
   // Load basis from JSON
-  ecp_cores = load_from_database_json(bs_path, *this);
+  n_ecp_electrons = load_from_database_json(bs_path, *this);
 
   if (mode == BasisMode::PSI4) {
     norm_psi4_mode(shells);
@@ -277,10 +277,10 @@ nlohmann::ordered_json BasisSet::to_json() const {
     json_ecp_shells.push_back(sh.to_json(true /*is_ecp*/));
   }
 
-  std::vector<int> _elem2ecpcore;
-  for (const auto& [k, v] : elem2ecpcore) {
-    _elem2ecpcore.push_back(k);
-    _elem2ecpcore.push_back(v);
+  std::vector<int> json_element_ecp_electrons;
+  for (const auto& [k, v] : element_ecp_electrons) {
+    json_element_ecp_electrons.push_back(k);
+    json_element_ecp_electrons.push_back(v);
   }
 
   auto basis_set_json = nlohmann::ordered_json(
@@ -293,7 +293,7 @@ nlohmann::ordered_json BasisSet::to_json() const {
        {"num_basis_funcs", num_basis_funcs},
        {"electron_shells", json_shells},
        {"ecp_shells", json_ecp_shells},
-       {"ecp_cores", elem2ecpcore}});
+       {"element_ecp_electrons", json_element_ecp_electrons}});
   return basis_set_json;
 }
 
@@ -388,6 +388,50 @@ std::shared_ptr<BasisSet> BasisSet::from_serialized_json(
 
   spdlog::trace("Loaded basis set: n_shells={}, n_basis_funcs",
                 bs->shells.size(), bs->num_basis_funcs);
+
+  // Read ECP Shells
+  nlohmann::ordered_json _ecp_shells = json["ecp_shells"];
+  std::vector<Shell> ecp_shells;
+  for (auto rec : _ecp_shells) {
+    Shell sh = Shell::from_json(rec, bs->mol);
+    ecp_shells.push_back(sh);
+  }
+  bs->ecp_shells = std::move(ecp_shells);
+
+  // Read element_ecp_electrons from flat list format (support both old and new
+  // keys)
+  std::vector<int> element_ecp_electrons_json;
+  if (json.contains("element_ecp_electrons")) {
+    element_ecp_electrons_json =
+        json["element_ecp_electrons"].get<std::vector<int>>();
+  } else if (json.contains("elem2ecpcore")) {
+    // Backward compatibility: support old key name
+    element_ecp_electrons_json = json["elem2ecpcore"].get<std::vector<int>>();
+  }
+
+  if (element_ecp_electrons_json.size() % 2 != 0) {
+    throw std::runtime_error(
+        "element_ecp_electrons_json expects an even number of elements.");
+  }
+  for (size_t i = 0; i < element_ecp_electrons_json.size(); i += 2) {
+    int atomic_num = element_ecp_electrons_json[i];
+    int ecp_electrons = element_ecp_electrons_json[i + 1];
+    bs->element_ecp_electrons[atomic_num] = ecp_electrons;
+  }
+
+  // Update atomic charges, total nuclear charge, and n_electrons based on ECPs
+  bs->n_ecp_electrons = 0;
+  for (size_t i = 0; i < bs->mol->n_atoms; ++i) {
+    int atomic_num = bs->mol->atomic_nums[i];
+    if (bs->element_ecp_electrons.count(atomic_num)) {
+      int ecp_electrons = bs->element_ecp_electrons[atomic_num];
+      bs->mol->atomic_charges[i] = atomic_num - ecp_electrons;
+      bs->n_ecp_electrons += ecp_electrons;
+    }
+  }
+  bs->mol->total_nuclear_charge = std::accumulate(
+      bs->mol->atomic_charges.begin(), bs->mol->atomic_charges.end(), 0);
+  bs->mol->n_electrons = bs->mol->total_nuclear_charge - bs->mol->charge;
 
   // Compute derived quantities
   bs->shell_pairs_ = OneBodyIntegral::compute_shell_pairs(bs->shells);
