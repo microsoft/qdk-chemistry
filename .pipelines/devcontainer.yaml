@@ -1,14 +1,9 @@
 trigger:
   branches:
     include:
-    - '*'
+    - main
 
-# Trigger this pipeline on PRs targeting any branch
-pr:
-  branches:
-    include:
-    - '*'
-  drafts: true
+pr: none
 
 parameters:
 - name: matrix_arch

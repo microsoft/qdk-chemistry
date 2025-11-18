@@ -7,16 +7,7 @@ trigger:
     - .pipelines/qdk-azurelinux-base.yaml
     - .pipelines/bases/azurelinux/*
 
-# Trigger this pipeline on PRs targeting any branch
-pr:
-  branches:
-    include:
-    - '*'
-  paths:
-    include:
-    - .pipelines/qdk-azurelinux-base.yaml
-    - .pipelines/bases/azurelinux/*
-  drafts: true
+pr: none
 
 parameters:
 - name: forcePublishing
