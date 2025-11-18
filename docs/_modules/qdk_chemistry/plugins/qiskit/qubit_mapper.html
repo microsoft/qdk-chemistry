@@ -1,0 +1,228 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../../../../">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>qdk_chemistry.plugins.qiskit.qubit_mapper &mdash; qdk-chemistry 1.0.0-rc1 documentation</title>
+      <link rel="stylesheet" type="text/css" href="../../../../_static/pygments.css?v=b86133f3" />
+      <link rel="stylesheet" type="text/css" href="../../../../_static/css/theme.css?v=e59714d7" />
+      <link rel="stylesheet" type="text/css" href="../../../../_static/tabs.css?v=4c969af8" />
+      <link rel="stylesheet" type="text/css" href="../../../../_static/graphviz.css?v=4ae1632d" />
+      <link rel="stylesheet" type="text/css" href="../../../../_static/copybutton.css?v=76b2166b" />
+      <link rel="stylesheet" type="text/css" href="../../../../_static/custom.css?v=a64bac2b" />
+
+  
+      <script src="../../../../_static/jquery.js?v=5d32c60e"></script>
+      <script src="../../../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="../../../../_static/documentation_options.js?v=81bd8d55"></script>
+      <script src="../../../../_static/doctools.js?v=9bcbadda"></script>
+      <script src="../../../../_static/sphinx_highlight.js?v=dc90522c"></script>
+      <script src="../../../../_static/tabs.js?v=3ee01567"></script>
+      <script src="../../../../_static/clipboard.min.js?v=a7894cd8"></script>
+      <script src="../../../../_static/copybutton.js?v=f281be69"></script>
+    <script src="../../../../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../../../../genindex.html" />
+    <link rel="search" title="Search" href="../../../../search.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="../../../../index.html" class="icon icon-home">
+            qdk-chemistry
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../../../../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">User Documentation</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../../user/quickstart.html">Quickstart</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../../user/comprehensive/index.html">In-depth user guide</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">API Reference</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../../api/python_api.html">Python API</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../../api/cpp_api.html">C++ API</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Supporting Information</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../../glossary.html">Acronym definitions</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../../references.html">References</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../../../../index.html">qdk-chemistry</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../../../../index.html" class="icon icon-home" aria-label="Home"></a></li>
+          <li class="breadcrumb-item"><a href="../../../index.html">Module code</a></li>
+      <li class="breadcrumb-item active">qdk_chemistry.plugins.qiskit.qubit_mapper</li>
+      <li class="wy-breadcrumbs-aside">
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <h1>Source code for qdk_chemistry.plugins.qiskit.qubit_mapper</h1><div class="highlight"><pre>
+<span></span><span class="sd">&quot;&quot;&quot;Qiskit-based qubit mappers to map electronic structure Hamiltonians to qubit Hamiltonians.</span>
+
+<span class="sd">This module provides a QiskitQubitMapper class to convert Hamiltonians to QubitHamiltonians</span>
+<span class="sd">using different mapping strategies (&quot;jordan-wigner&quot;, &quot;bravyi-kitaev&quot;, and &quot;parity&quot;).</span>
+<span class="sd">&quot;&quot;&quot;</span>
+
+<span class="c1"># --------------------------------------------------------------------------------------------</span>
+<span class="c1"># Copyright (c) Microsoft Corporation. All rights reserved.</span>
+<span class="c1"># Licensed under the MIT License. See LICENSE.txt in the project root for license information.</span>
+<span class="c1"># --------------------------------------------------------------------------------------------</span>
+
+<span class="kn">from</span><span class="w"> </span><span class="nn">typing</span><span class="w"> </span><span class="kn">import</span> <span class="n">ClassVar</span>
+
+<span class="kn">from</span><span class="w"> </span><span class="nn">qiskit_nature.second_q.hamiltonians</span><span class="w"> </span><span class="kn">import</span> <span class="n">ElectronicEnergy</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">qiskit_nature.second_q.mappers</span><span class="w"> </span><span class="kn">import</span> <span class="p">(</span>
+    <span class="n">BravyiKitaevMapper</span><span class="p">,</span>
+    <span class="n">JordanWignerMapper</span><span class="p">,</span>
+    <span class="n">ParityMapper</span><span class="p">,</span>
+<span class="p">)</span>
+
+<span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.algorithms</span><span class="w"> </span><span class="kn">import</span> <span class="n">register</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.algorithms.qubit_mapper</span><span class="w"> </span><span class="kn">import</span> <span class="n">QubitMapper</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.data</span><span class="w"> </span><span class="kn">import</span> <span class="n">Hamiltonian</span><span class="p">,</span> <span class="n">QubitHamiltonian</span><span class="p">,</span> <span class="n">Settings</span>
+
+
+<div class="viewcode-block" id="QiskitQubitMapperSettings">
+<a class="viewcode-back" href="../../../../api/api_autogen/qdk_chemistry.plugins.qiskit.qubit_mapper.html#qdk_chemistry.plugins.qiskit.qubit_mapper.QiskitQubitMapperSettings">[docs]</a>
+<span class="k">class</span><span class="w"> </span><span class="nc">QiskitQubitMapperSettings</span><span class="p">(</span><span class="n">Settings</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Settings configuration for a QiskitQubitMapper.</span>
+
+<span class="sd">    QiskitQubitMapper-specific settings:</span>
+<span class="sd">        encoding (string, default=&quot;jordan-wigner&quot;): Qubit mapping strategy to use.</span>
+
+<span class="sd">    &quot;&quot;&quot;</span>
+
+<div class="viewcode-block" id="QiskitQubitMapperSettings.__init__">
+<a class="viewcode-back" href="../../../../api/api_autogen/qdk_chemistry.plugins.qiskit.qubit_mapper.html#qdk_chemistry.plugins.qiskit.qubit_mapper.QiskitQubitMapperSettings.__init__">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Initialize QiskitQubitMapperSettings.&quot;&quot;&quot;</span>
+        <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">()</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_set_default</span><span class="p">(</span><span class="s2">&quot;encoding&quot;</span><span class="p">,</span> <span class="s2">&quot;string&quot;</span><span class="p">,</span> <span class="s2">&quot;jordan-wigner&quot;</span><span class="p">)</span></div>
+</div>
+
+
+
+<div class="viewcode-block" id="QiskitQubitMapper">
+<a class="viewcode-back" href="../../../../api/api_autogen/qdk_chemistry.plugins.qiskit.qubit_mapper.html#qdk_chemistry.plugins.qiskit.qubit_mapper.QiskitQubitMapper">[docs]</a>
+<span class="k">class</span><span class="w"> </span><span class="nc">QiskitQubitMapper</span><span class="p">(</span><span class="n">QubitMapper</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Class to map an electronic structure Hamiltonian to a QubitHamiltonian using a Qiskit mapper.&quot;&quot;&quot;</span>
+
+    <span class="n">QubitMappers</span><span class="p">:</span> <span class="n">ClassVar</span> <span class="o">=</span> <span class="p">{</span>
+        <span class="s2">&quot;bravyi-kitaev&quot;</span><span class="p">:</span> <span class="n">BravyiKitaevMapper</span><span class="p">,</span>
+        <span class="s2">&quot;jordan-wigner&quot;</span><span class="p">:</span> <span class="n">JordanWignerMapper</span><span class="p">,</span>
+        <span class="s2">&quot;parity&quot;</span><span class="p">:</span> <span class="n">ParityMapper</span><span class="p">,</span>
+    <span class="p">}</span>
+
+<div class="viewcode-block" id="QiskitQubitMapper.__init__">
+<a class="viewcode-back" href="../../../../api/api_autogen/qdk_chemistry.plugins.qiskit.qubit_mapper.html#qdk_chemistry.plugins.qiskit.qubit_mapper.QiskitQubitMapper.__init__">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">encoding</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;jordan-wigner&quot;</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Initialize QiskitQubitMapper with a specific mapping strategy.</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            encoding (str): Qubit mapping strategy to use (&quot;jordan-wigner&quot;, &quot;bravyi-kitaev&quot;, or &quot;parity&quot;).</span>
+<span class="sd">                Default: &quot;jordan-wigner&quot;.</span>
+
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">()</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_settings</span> <span class="o">=</span> <span class="n">QiskitQubitMapperSettings</span><span class="p">()</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_settings</span><span class="o">.</span><span class="n">set</span><span class="p">(</span><span class="s2">&quot;encoding&quot;</span><span class="p">,</span> <span class="n">encoding</span><span class="p">)</span></div>
+
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">_run_impl</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">hamiltonian</span><span class="p">:</span> <span class="n">Hamiltonian</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">QubitHamiltonian</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Construct a QubitHamiltonian from a Hamiltonian using the selected mapping strategy.</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            hamiltonian (Hamiltonian): The fermionic Hamiltonian.</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            QubitHamiltonian: An instance of the QubitHamiltonian.</span>
+
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">encoding</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_settings</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;encoding&quot;</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">encoding</span> <span class="ow">not</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">QubitMappers</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
+                <span class="sa">f</span><span class="s2">&quot;Encoding </span><span class="si">{</span><span class="n">encoding</span><span class="si">}</span><span class="s2"> is unknown for QiskitQubitMapper.</span><span class="se">\n</span><span class="s2">&quot;</span>
+                <span class="sa">f</span><span class="s2">&quot;Please use one of the following options: </span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">QubitMappers</span><span class="o">.</span><span class="n">keys</span><span class="p">()</span><span class="si">}</span><span class="s2">&quot;</span>
+            <span class="p">)</span>
+
+        <span class="n">h1_a</span> <span class="o">=</span> <span class="n">hamiltonian</span><span class="o">.</span><span class="n">get_one_body_integrals</span><span class="p">()</span>
+        <span class="n">h2_aa</span> <span class="o">=</span> <span class="n">hamiltonian</span><span class="o">.</span><span class="n">get_two_body_integrals</span><span class="p">()</span>
+        <span class="n">num_orbs</span> <span class="o">=</span> <span class="nb">len</span><span class="p">(</span><span class="n">hamiltonian</span><span class="o">.</span><span class="n">get_orbitals</span><span class="p">()</span><span class="o">.</span><span class="n">get_active_space_indices</span><span class="p">()[</span><span class="mi">0</span><span class="p">])</span>
+        <span class="n">electronic_hamiltonian</span> <span class="o">=</span> <span class="n">ElectronicEnergy</span><span class="o">.</span><span class="n">from_raw_integrals</span><span class="p">(</span>
+            <span class="n">h1_a</span><span class="o">=</span><span class="n">h1_a</span><span class="p">,</span> <span class="n">h2_aa</span><span class="o">=</span><span class="n">h2_aa</span><span class="o">.</span><span class="n">reshape</span><span class="p">(</span><span class="n">num_orbs</span><span class="p">,</span> <span class="n">num_orbs</span><span class="p">,</span> <span class="n">num_orbs</span><span class="p">,</span> <span class="n">num_orbs</span><span class="p">)</span>
+        <span class="p">)</span>
+        <span class="n">fermionic_op</span> <span class="o">=</span> <span class="n">electronic_hamiltonian</span><span class="o">.</span><span class="n">second_q_op</span><span class="p">()</span>
+        <span class="n">qubit_mapper</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">QubitMappers</span><span class="p">[</span><span class="n">encoding</span><span class="p">]()</span>
+        <span class="n">qubit_op</span> <span class="o">=</span> <span class="n">qubit_mapper</span><span class="o">.</span><span class="n">map</span><span class="p">(</span><span class="n">fermionic_op</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">QubitHamiltonian</span><span class="p">(</span><span class="n">pauli_strings</span><span class="o">=</span><span class="n">qubit_op</span><span class="o">.</span><span class="n">paulis</span><span class="o">.</span><span class="n">to_labels</span><span class="p">(),</span> <span class="n">coefficients</span><span class="o">=</span><span class="n">qubit_op</span><span class="o">.</span><span class="n">coeffs</span><span class="p">)</span>
+
+<div class="viewcode-block" id="QiskitQubitMapper.name">
+<a class="viewcode-back" href="../../../../api/api_autogen/qdk_chemistry.plugins.qiskit.qubit_mapper.html#qdk_chemistry.plugins.qiskit.qubit_mapper.QiskitQubitMapper.name">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">name</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Return the algorithm name ``qiskit``.&quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="s2">&quot;qiskit&quot;</span></div>
+</div>
+
+
+
+<span class="n">register</span><span class="p">(</span><span class="k">lambda</span><span class="p">:</span> <span class="n">QiskitQubitMapper</span><span class="p">())</span>
+</pre></div>
+
+           </div>
+          </div>
+          <footer>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright Microsoft Corporation. All rights reserved. Licensed under the MIT License.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

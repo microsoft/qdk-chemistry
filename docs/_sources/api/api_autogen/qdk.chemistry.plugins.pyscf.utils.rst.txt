@@ -1,8 +1,0 @@
-qdk.chemistry.plugins.pyscf.utils module
-========================================
-
-.. automodule:: qdk.chemistry.plugins.pyscf.utils
-   :members:
-   :private-members:
-   :show-inheritance:
-   :undoc-members:

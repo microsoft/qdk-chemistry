@@ -3,14 +3,13 @@ Serialization in QDK/Chemistry
 
 QDK/Chemistry provides comprehensive serialization capabilities for all its data classes, allowing you to save and load
 computational results in various formats.
-This document explains the serialization mechanisms and formats supported by
-QDK/Chemistry.
+This document explains the serialization mechanisms and formats supported by QDK/Chemistry.
 
 Overview
 --------
 
-Serialization is the process of converting complex data structures into a format that can be stored or transmitted. In
-QDK/Chemistry, this is crucial for:
+Serialization is the process of converting complex data structures into a format that can be stored or transmitted.
+In QDK/Chemistry, this is crucial for:
 
 - Saving intermediate results of calculations
 - Sharing data between different programs or languages
@@ -18,11 +17,10 @@ QDK/Chemistry, this is crucial for:
 - Implementing checkpoint and restart capabilities
 
 .. note::
-   For detailed information about the structure and organization of serialized data for each class, refer to
-   the corresponding class documentation. Each data class page includes examples of the JSON and HDF5 schema used for
-   serialization.
+   For detailed information about the structure and organization of serialized data for each class, refer to the corresponding class documentation.
+   Each data class page includes examples of the JSON and HDF5 schema used for serialization.
 
-Supported Formats
+Supported formats
 -----------------
 
 QDK/Chemistry supports multiple serialization formats:
@@ -32,17 +30,13 @@ QDK/Chemistry supports multiple serialization formats:
 - **XYZ**: Standard format for molecular geometries (for ``Structure`` only)
 - **FCIDUMP**: Format for Hamiltonian integrals (for ``Hamiltonian`` only)
 
-Common Serialization Interface
+Common serialization interface
 ------------------------------
 
-All QDK/Chemistry data classes implement a consistent serialization interface:
+All QDK/Chemistry data classes implement a consistent serialization interface as described below.
 
-JSON Serialization
+JSON serialization
 ~~~~~~~~~~~~~~~~~~
-
-.. todo::
-   TODO (NAB):  Check Serialization code examples after finalizing API.
-   https://dev.azure.com/ms-azurequantum/AzureQuantum/_workitems/edit/41366
 
 .. tab:: C++ API
 
@@ -62,21 +56,11 @@ JSON Serialization
 
 .. tab:: Python API
 
-   .. code-block:: python
+   .. literalinclude:: ../../../../examples/serialization.py
+      :language: python
+      :lines: 14-20,26-32
 
-      # Serialize to JSON object
-      json_data = object.to_json()
-
-      # Deserialize from JSON object
-      object_from_json = ObjectType.from_json(json_data)
-
-      # Serialize to JSON file
-      object.to_json_file("filename.ext.json")  # Extension depends on object type
-
-      # Deserialize from JSON file
-      object_from_json_file = ObjectType.from_json_file("filename.ext.json")
-
-HDF5 Serialization
+HDF5 serialization
 ~~~~~~~~~~~~~~~~~~
 
 .. tab:: C++ API
@@ -91,15 +75,11 @@ HDF5 Serialization
 
 .. tab:: Python API
 
-   .. code-block:: python
+   .. literalinclude:: ../../../../examples/serialization.py
+      :language: python
+      :lines: 35-41
 
-      # Serialize to HDF5 file
-      object.to_hdf5_file("filename.ext.h5")  # Extension depends on object type
-
-      # Deserialize from HDF5 file
-      object_from_hdf5_file = ObjectType.from_hdf5_file("filename.ext.h5")
-
-File Extensions
+File extensions
 ---------------
 
 QDK/Chemistry enforces specific file extensions to ensure clarity about the content type:
@@ -108,10 +88,10 @@ QDK/Chemistry enforces specific file extensions to ensure clarity about the cont
    :header-rows: 1
    :widths: 20 20 20 40
 
-   * - Data Class
-     - JSON Extension
-     - HDF5 Extension
-     - Other Formats
+   * - Data class
+     - JSON extension
+     - HDF5 extension
+     - Other formats
    * - :doc:`Structure <../data/structure>`
      - ``.structure.json``
      - ``.structure.h5``
@@ -133,7 +113,7 @@ QDK/Chemistry enforces specific file extensions to ensure clarity about the cont
      - ``.wavefunction.h5``
      - -
 
-Related Topics
+Related topics
 --------------
 
 - :doc:`Structure <../data/structure>`: Molecular geometry and atomic information

@@ -1,8 +1,0 @@
-qdk.chemistry.phase\_estimation.base module
-===========================================
-
-.. automodule:: qdk.chemistry.phase_estimation.base
-   :members:
-   :private-members:
-   :show-inheritance:
-   :undoc-members:

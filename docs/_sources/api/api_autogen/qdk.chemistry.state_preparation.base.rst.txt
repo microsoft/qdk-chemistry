@@ -1,8 +1,0 @@
-qdk.chemistry.state\_preparation.base module
-============================================
-
-.. automodule:: qdk.chemistry.state_preparation.base
-   :members:
-   :private-members:
-   :show-inheritance:
-   :undoc-members:

@@ -1,0 +1,295 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../../../../">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>qdk_chemistry.plugins.pyscf.coupled_cluster &mdash; qdk-chemistry 1.0.0-rc1 documentation</title>
+      <link rel="stylesheet" type="text/css" href="../../../../_static/pygments.css?v=b86133f3" />
+      <link rel="stylesheet" type="text/css" href="../../../../_static/css/theme.css?v=e59714d7" />
+      <link rel="stylesheet" type="text/css" href="../../../../_static/tabs.css?v=4c969af8" />
+      <link rel="stylesheet" type="text/css" href="../../../../_static/graphviz.css?v=4ae1632d" />
+      <link rel="stylesheet" type="text/css" href="../../../../_static/copybutton.css?v=76b2166b" />
+      <link rel="stylesheet" type="text/css" href="../../../../_static/custom.css?v=a64bac2b" />
+
+  
+      <script src="../../../../_static/jquery.js?v=5d32c60e"></script>
+      <script src="../../../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="../../../../_static/documentation_options.js?v=81bd8d55"></script>
+      <script src="../../../../_static/doctools.js?v=9bcbadda"></script>
+      <script src="../../../../_static/sphinx_highlight.js?v=dc90522c"></script>
+      <script src="../../../../_static/tabs.js?v=3ee01567"></script>
+      <script src="../../../../_static/clipboard.min.js?v=a7894cd8"></script>
+      <script src="../../../../_static/copybutton.js?v=f281be69"></script>
+    <script src="../../../../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../../../../genindex.html" />
+    <link rel="search" title="Search" href="../../../../search.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="../../../../index.html" class="icon icon-home">
+            qdk-chemistry
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../../../../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">User Documentation</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../../user/quickstart.html">Quickstart</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../../user/comprehensive/index.html">In-depth user guide</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">API Reference</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../../api/python_api.html">Python API</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../../api/cpp_api.html">C++ API</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Supporting Information</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../../glossary.html">Acronym definitions</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../../references.html">References</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../../../../index.html">qdk-chemistry</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../../../../index.html" class="icon icon-home" aria-label="Home"></a></li>
+          <li class="breadcrumb-item"><a href="../../../index.html">Module code</a></li>
+      <li class="breadcrumb-item active">qdk_chemistry.plugins.pyscf.coupled_cluster</li>
+      <li class="wy-breadcrumbs-aside">
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <h1>Source code for qdk_chemistry.plugins.pyscf.coupled_cluster</h1><div class="highlight"><pre>
+<span></span><span class="sd">&quot;&quot;&quot;PySCF-based Coupled Cluster calculator implementation for qdk_chemistry.</span>
+
+<span class="sd">This module provides integration between QDK/Chemistry and PySCF for performing</span>
+<span class="sd">Coupled Cluster (CC) calculations. It implements a CCSD (Coupled Cluster Singles and Doubles)</span>
+<span class="sd">calculator that can be used within the QDK/Chemistry framework for accurate electronic structure</span>
+<span class="sd">calculations.</span>
+
+<span class="sd">The module contains:</span>
+
+<span class="sd">* :class:`PyscfCoupledClusterSettings`: Configuration class for CC calculation parameters</span>
+<span class="sd">* :class:`PyscfCoupledClusterCalculator`: Main calculator class that performs CC calculations</span>
+<span class="sd">* Registration utilities to integrate the calculator with QDK/Chemistry&#39;s plugin system</span>
+
+<span class="sd">The calculator handles automatic conversion between QDK/Chemistry Hamiltonian objects and PySCF</span>
+<span class="sd">format, performs the CC calculation, and returns results (energy and</span>
+<span class="sd">excitation amplitudes) in QDK/Chemistry-compatible format.</span>
+
+<span class="sd">Upon import, this module automatically registers the PySCF CC calculator with QDK/Chemistry&#39;s</span>
+<span class="sd">CC calculator registry under the name &quot;pyscf&quot;.</span>
+
+<span class="sd">Examples:</span>
+<span class="sd">    &gt;&gt;&gt; from qdk_chemistry.plugins.pyscf.coupled_cluster import PyscfCoupledClusterCalculator</span>
+<span class="sd">    &gt;&gt;&gt; cc_calculator = PyscfCoupledClusterCalculator()</span>
+<span class="sd">    &gt;&gt;&gt; energy, amplitudes = cc_calculator.calculate(hamiltonian)</span>
+
+<span class="sd">This module requires both QDK/Chemistry and PySCF to be installed.</span>
+
+<span class="sd">&quot;&quot;&quot;</span>
+
+<span class="c1"># --------------------------------------------------------------------------------------------</span>
+<span class="c1"># Copyright (c) Microsoft Corporation. All rights reserved.</span>
+<span class="c1"># Licensed under the MIT License. See LICENSE.txt in the project root for license information.</span>
+<span class="c1"># --------------------------------------------------------------------------------------------</span>
+
+<span class="kn">import</span><span class="w"> </span><span class="nn">numpy</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">np</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">pyscf</span><span class="w"> </span><span class="kn">import</span> <span class="n">cc</span>
+
+<span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.algorithms</span><span class="w"> </span><span class="kn">import</span> <span class="n">CoupledClusterCalculator</span><span class="p">,</span> <span class="n">register</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.data</span><span class="w"> </span><span class="kn">import</span> <span class="n">CoupledClusterAmplitudes</span><span class="p">,</span> <span class="n">Settings</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.plugins.pyscf.utils</span><span class="w"> </span><span class="kn">import</span> <span class="n">hamiltonian_to_scf</span>
+
+
+<div class="viewcode-block" id="PyscfCoupledClusterSettings">
+<a class="viewcode-back" href="../../../../api/api_autogen/qdk_chemistry.plugins.pyscf.coupled_cluster.html#qdk_chemistry.plugins.pyscf.coupled_cluster.PyscfCoupledClusterSettings">[docs]</a>
+<span class="k">class</span><span class="w"> </span><span class="nc">PyscfCoupledClusterSettings</span><span class="p">(</span><span class="n">Settings</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Settings configuration for the PySCF Coupled Cluster calculator.</span>
+
+<span class="sd">    This class manages the configuration parameters for the PySCF Coupled Cluster</span>
+<span class="sd">    calculator, providing default settings and allowing customization of</span>
+<span class="sd">    quantum chemistry calculations.</span>
+
+<span class="sd">    Attributes:</span>
+<span class="sd">        verbose (int): Print level. Default value equals to ``Mole.verbose``.</span>
+<span class="sd">        max_memory (float or int): Allowed memory in MB. Default value equals to ``Mole.max_memory``.</span>
+<span class="sd">        conv_tol (float): Convergence threshold. Default is 1e-7.</span>
+<span class="sd">        conv_tol_norm (float): Convergence threshold for norm(t1,t2). Default is 1e-5.</span>
+<span class="sd">        max_cycle (int): Max number of iterations. Default is 50.</span>
+<span class="sd">        diis_space (int): DIIS space size. Default is 6.</span>
+<span class="sd">        diis_start_cycle (int): The step to start DIIS. Default is 0.</span>
+<span class="sd">        direct (bool): AO-direct CCSD. Default is False.</span>
+<span class="sd">        async_io (bool): Allow for asynchronous function execution. Default is True.</span>
+<span class="sd">        incore_complete (bool): Avoid all I/O. Default is True.</span>
+<span class="sd">        frozen (int or list): If integer is given, the inner-most orbitals are frozen from CC amplitudes.</span>
+<span class="sd">            Given the orbital indices (0-based) in a list, both occupied and virtual orbitals can be frozen in the</span>
+<span class="sd">            CC calculation.</span>
+
+<span class="sd">    Examples:</span>
+<span class="sd">        &gt;&gt;&gt; settings = PyscfCoupledClusterSettings()</span>
+<span class="sd">        &gt;&gt;&gt; settings.set(&quot;max_cycle&quot;, 100)</span>
+
+<span class="sd">    &quot;&quot;&quot;</span>
+
+<div class="viewcode-block" id="PyscfCoupledClusterSettings.__init__">
+<a class="viewcode-back" href="../../../../api/api_autogen/qdk_chemistry.plugins.pyscf.coupled_cluster.html#qdk_chemistry.plugins.pyscf.coupled_cluster.PyscfCoupledClusterSettings.__init__">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Initialize the settings with default values.&quot;&quot;&quot;</span>
+        <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">()</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_set_default</span><span class="p">(</span><span class="s2">&quot;conv_tol&quot;</span><span class="p">,</span> <span class="s2">&quot;double&quot;</span><span class="p">,</span> <span class="mf">1e-7</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_set_default</span><span class="p">(</span><span class="s2">&quot;conv_tol_normt&quot;</span><span class="p">,</span> <span class="s2">&quot;double&quot;</span><span class="p">,</span> <span class="mf">1e-5</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_set_default</span><span class="p">(</span><span class="s2">&quot;max_cycle&quot;</span><span class="p">,</span> <span class="s2">&quot;int&quot;</span><span class="p">,</span> <span class="mi">50</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_set_default</span><span class="p">(</span><span class="s2">&quot;diis_space&quot;</span><span class="p">,</span> <span class="s2">&quot;int&quot;</span><span class="p">,</span> <span class="mi">6</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_set_default</span><span class="p">(</span><span class="s2">&quot;diis_start_cycle&quot;</span><span class="p">,</span> <span class="s2">&quot;int&quot;</span><span class="p">,</span> <span class="mi">0</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_set_default</span><span class="p">(</span><span class="s2">&quot;direct&quot;</span><span class="p">,</span> <span class="s2">&quot;bool&quot;</span><span class="p">,</span> <span class="kc">False</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_set_default</span><span class="p">(</span><span class="s2">&quot;async_io&quot;</span><span class="p">,</span> <span class="s2">&quot;bool&quot;</span><span class="p">,</span> <span class="kc">True</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_set_default</span><span class="p">(</span><span class="s2">&quot;incore_complete&quot;</span><span class="p">,</span> <span class="s2">&quot;bool&quot;</span><span class="p">,</span> <span class="kc">True</span><span class="p">)</span></div>
+</div>
+
+
+
+<div class="viewcode-block" id="PyscfCoupledClusterCalculator">
+<a class="viewcode-back" href="../../../../api/api_autogen/qdk_chemistry.plugins.pyscf.coupled_cluster.html#qdk_chemistry.plugins.pyscf.coupled_cluster.PyscfCoupledClusterCalculator">[docs]</a>
+<span class="k">class</span><span class="w"> </span><span class="nc">PyscfCoupledClusterCalculator</span><span class="p">(</span><span class="n">CoupledClusterCalculator</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;PySCF-based Coupled Cluster calculator for quantum chemistry calculations.</span>
+
+<span class="sd">    This class provides an interface between QDK/Chemistry and PySCF for performing</span>
+<span class="sd">    Coupled Cluster calculations on molecular systems. It handles the conversion</span>
+<span class="sd">    between QDK/Chemistry Hamiltonian objects and PySCF representations, performs the</span>
+<span class="sd">    CC calculation, and returns the results in QDK/Chemistry-compatible format.</span>
+
+<span class="sd">    The calculator uses CCSD (Coupled Cluster Singles and Doubles) method.</span>
+
+<span class="sd">    &quot;&quot;&quot;</span>
+
+<div class="viewcode-block" id="PyscfCoupledClusterCalculator.__init__">
+<a class="viewcode-back" href="../../../../api/api_autogen/qdk_chemistry.plugins.pyscf.coupled_cluster.html#qdk_chemistry.plugins.pyscf.coupled_cluster.PyscfCoupledClusterCalculator.__init__">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Initialize the calculator with default settings.&quot;&quot;&quot;</span>
+        <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">()</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_settings</span> <span class="o">=</span> <span class="n">PyscfCoupledClusterSettings</span><span class="p">()</span></div>
+
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">_run_impl</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">ansatz</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Perform a Coupled Cluster calculation using PySCF.</span>
+
+<span class="sd">        This method takes a QDK/Chemistry Hamiltonian object, converts it to the PySCF format,</span>
+<span class="sd">        performs a CCSD calculation, and returns the results as a pair of energy and</span>
+<span class="sd">        QDK/Chemistry CoupledClusterAmplitudes object.</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            ansatz: The QDK/Chemistry :class:`Ansatz` object representing the system to calculate.</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            A tuple containing the total energy and a QDK/Chemistry CoupledClusterAmplitudes</span>
+<span class="sd">            object containing the excitation amplitudes.</span>
+
+<span class="sd">        Raises:</span>
+<span class="sd">            RuntimeError: If the CCSD calculation does not converge.</span>
+
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">hamiltonian</span> <span class="o">=</span> <span class="n">ansatz</span><span class="o">.</span><span class="n">get_hamiltonian</span><span class="p">()</span>
+        <span class="n">alpha_occ</span><span class="p">,</span> <span class="n">beta_occ</span> <span class="o">=</span> <span class="n">ansatz</span><span class="o">.</span><span class="n">get_wavefunction</span><span class="p">()</span><span class="o">.</span><span class="n">get_total_orbital_occupations</span><span class="p">()</span>
+        <span class="n">pyscf_scf</span> <span class="o">=</span> <span class="n">hamiltonian_to_scf</span><span class="p">(</span><span class="n">hamiltonian</span><span class="p">,</span> <span class="n">alpha_occ</span><span class="p">,</span> <span class="n">beta_occ</span><span class="p">)</span>
+        <span class="n">pyscf_cc</span> <span class="o">=</span> <span class="n">cc</span><span class="o">.</span><span class="n">CCSD</span><span class="p">(</span><span class="n">pyscf_scf</span><span class="p">)</span>
+        <span class="c1"># Handle Settings</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">_settings</span><span class="o">.</span><span class="n">get_or_default</span><span class="p">(</span><span class="s2">&quot;verbose&quot;</span><span class="p">,</span> <span class="o">-</span><span class="mi">1</span><span class="p">)</span> <span class="o">!=</span> <span class="o">-</span><span class="mi">1</span><span class="p">:</span>
+            <span class="n">pyscf_cc</span><span class="o">.</span><span class="n">verbose</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_settings</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;verbose&quot;</span><span class="p">))</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">_settings</span><span class="o">.</span><span class="n">get_or_default</span><span class="p">(</span><span class="s2">&quot;max_memory&quot;</span><span class="p">,</span> <span class="o">-</span><span class="mi">1</span><span class="p">)</span> <span class="o">!=</span> <span class="o">-</span><span class="mi">1</span><span class="p">:</span>
+            <span class="n">pyscf_cc</span><span class="o">.</span><span class="n">max_memory</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_settings</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;max_memory&quot;</span><span class="p">))</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">_settings</span><span class="o">.</span><span class="n">get_or_default</span><span class="p">(</span><span class="s2">&quot;frozen&quot;</span><span class="p">,</span> <span class="o">-</span><span class="mi">1</span><span class="p">)</span> <span class="o">!=</span> <span class="o">-</span><span class="mi">1</span><span class="p">:</span>
+            <span class="n">pyscf_cc</span><span class="o">.</span><span class="n">frozen</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_settings</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;frozen&quot;</span><span class="p">)</span>
+        <span class="n">pyscf_cc</span><span class="o">.</span><span class="n">conv_tol</span> <span class="o">=</span> <span class="nb">float</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_settings</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;conv_tol&quot;</span><span class="p">))</span>
+        <span class="n">pyscf_cc</span><span class="o">.</span><span class="n">conv_tol_normt</span> <span class="o">=</span> <span class="nb">float</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_settings</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;conv_tol_normt&quot;</span><span class="p">))</span>
+        <span class="n">pyscf_cc</span><span class="o">.</span><span class="n">max_cycle</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_settings</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;max_cycle&quot;</span><span class="p">))</span>
+        <span class="n">pyscf_cc</span><span class="o">.</span><span class="n">diis_space</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_settings</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;diis_space&quot;</span><span class="p">))</span>
+        <span class="n">pyscf_cc</span><span class="o">.</span><span class="n">diis_start_cycle</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_settings</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;diis_start_cycle&quot;</span><span class="p">))</span>
+        <span class="n">pyscf_cc</span><span class="o">.</span><span class="n">direct</span> <span class="o">=</span> <span class="nb">bool</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_settings</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;direct&quot;</span><span class="p">))</span>
+        <span class="n">pyscf_cc</span><span class="o">.</span><span class="n">async_io</span> <span class="o">=</span> <span class="nb">bool</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_settings</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;async_io&quot;</span><span class="p">))</span>
+        <span class="n">pyscf_cc</span><span class="o">.</span><span class="n">incore_complete</span> <span class="o">=</span> <span class="nb">bool</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_settings</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;incore_complete&quot;</span><span class="p">))</span>
+
+        <span class="n">pyscf_cc</span><span class="o">.</span><span class="n">kernel</span><span class="p">()</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">pyscf_cc</span><span class="o">.</span><span class="n">converged</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">RuntimeError</span><span class="p">(</span><span class="s2">&quot;CCSD calculation did not converge&quot;</span><span class="p">)</span>
+        <span class="n">t1</span> <span class="o">=</span> <span class="n">pyscf_cc</span><span class="o">.</span><span class="n">t1</span>
+        <span class="n">t2</span> <span class="o">=</span> <span class="n">pyscf_cc</span><span class="o">.</span><span class="n">t2</span>
+        <span class="n">t1</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">reshape</span><span class="p">(</span><span class="n">t1</span><span class="p">,</span> <span class="p">(</span><span class="n">t1</span><span class="o">.</span><span class="n">size</span><span class="p">,</span> <span class="mi">1</span><span class="p">))</span>
+        <span class="n">t2</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">reshape</span><span class="p">(</span><span class="n">t2</span><span class="p">,</span> <span class="p">(</span><span class="n">t2</span><span class="o">.</span><span class="n">size</span><span class="p">,</span> <span class="mi">1</span><span class="p">))</span>
+
+        <span class="c1"># Create amplitudes object without correlation energy</span>
+        <span class="n">nalpha</span><span class="p">,</span> <span class="n">nbeta</span> <span class="o">=</span> <span class="n">ansatz</span><span class="o">.</span><span class="n">get_wavefunction</span><span class="p">()</span><span class="o">.</span><span class="n">get_total_num_electrons</span><span class="p">()</span>
+        <span class="n">qdk_cc_amplitudes</span> <span class="o">=</span> <span class="n">CoupledClusterAmplitudes</span><span class="p">(</span><span class="n">hamiltonian</span><span class="o">.</span><span class="n">get_orbitals</span><span class="p">(),</span> <span class="n">t1</span><span class="p">,</span> <span class="n">t2</span><span class="p">,</span> <span class="n">nalpha</span><span class="p">,</span> <span class="n">nbeta</span><span class="p">)</span>
+
+        <span class="c1"># Total energy = SCF energy + correlation energy</span>
+        <span class="n">total_energy</span> <span class="o">=</span> <span class="n">pyscf_scf</span><span class="o">.</span><span class="n">e_tot</span> <span class="o">+</span> <span class="n">pyscf_cc</span><span class="o">.</span><span class="n">e_corr</span>
+
+        <span class="k">return</span> <span class="n">total_energy</span><span class="p">,</span> <span class="n">qdk_cc_amplitudes</span>
+
+<div class="viewcode-block" id="PyscfCoupledClusterCalculator.name">
+<a class="viewcode-back" href="../../../../api/api_autogen/qdk_chemistry.plugins.pyscf.coupled_cluster.html#qdk_chemistry.plugins.pyscf.coupled_cluster.PyscfCoupledClusterCalculator.name">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">name</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Return the name of the Coupled Cluster calculator.&quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="s2">&quot;pyscf&quot;</span></div>
+</div>
+
+
+
+<span class="n">register</span><span class="p">(</span><span class="k">lambda</span><span class="p">:</span> <span class="n">PyscfCoupledClusterCalculator</span><span class="p">())</span>
+</pre></div>
+
+           </div>
+          </div>
+          <footer>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright Microsoft Corporation. All rights reserved. Licensed under the MIT License.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

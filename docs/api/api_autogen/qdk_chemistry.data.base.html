@@ -1,0 +1,524 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../../">
+<head>
+  <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>qdk_chemistry.data.base module &mdash; qdk-chemistry 1.0.0-rc1 documentation</title>
+      <link rel="stylesheet" type="text/css" href="../../_static/pygments.css?v=b86133f3" />
+      <link rel="stylesheet" type="text/css" href="../../_static/css/theme.css?v=e59714d7" />
+      <link rel="stylesheet" type="text/css" href="../../_static/tabs.css?v=4c969af8" />
+      <link rel="stylesheet" type="text/css" href="../../_static/graphviz.css?v=4ae1632d" />
+      <link rel="stylesheet" type="text/css" href="../../_static/copybutton.css?v=76b2166b" />
+      <link rel="stylesheet" type="text/css" href="../../_static/custom.css?v=a64bac2b" />
+
+  
+      <script src="../../_static/jquery.js?v=5d32c60e"></script>
+      <script src="../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="../../_static/documentation_options.js?v=81bd8d55"></script>
+      <script src="../../_static/doctools.js?v=9bcbadda"></script>
+      <script src="../../_static/sphinx_highlight.js?v=dc90522c"></script>
+      <script src="../../_static/tabs.js?v=3ee01567"></script>
+      <script src="../../_static/clipboard.min.js?v=a7894cd8"></script>
+      <script src="../../_static/copybutton.js?v=f281be69"></script>
+    <script src="../../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../../genindex.html" />
+    <link rel="search" title="Search" href="../../search.html" />
+    <link rel="next" title="qdk_chemistry.data.estimator_data module" href="qdk_chemistry.data.estimator_data.html" />
+    <link rel="prev" title="qdk_chemistry.data package" href="qdk_chemistry.data.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="../../index.html" class="icon icon-home">
+            qdk-chemistry
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">User Documentation</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../user/quickstart.html">Quickstart</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../user/comprehensive/index.html">In-depth user guide</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">API Reference</span></p>
+<ul class="current">
+<li class="toctree-l1 current"><a class="reference internal" href="../python_api.html">Python API</a><ul class="current">
+<li class="toctree-l2 current"><a class="reference internal" href="../python_api.html#data-classes">Data Classes</a><ul class="current">
+<li class="toctree-l3 current"><a class="reference internal" href="qdk_chemistry.data.html">qdk_chemistry.data package</a><ul class="current">
+<li class="toctree-l4"><a class="reference internal" href="qdk_chemistry.data.html#qdk_chemistry.data.Ansatz"><code class="docutils literal notranslate"><span class="pre">Ansatz</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="qdk_chemistry.data.html#qdk_chemistry.data.BasisSet"><code class="docutils literal notranslate"><span class="pre">BasisSet</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="qdk_chemistry.data.html#qdk_chemistry.data.BasisType"><code class="docutils literal notranslate"><span class="pre">BasisType</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="qdk_chemistry.data.html#qdk_chemistry.data.CasWavefunctionContainer"><code class="docutils literal notranslate"><span class="pre">CasWavefunctionContainer</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="qdk_chemistry.data.html#qdk_chemistry.data.Configuration"><code class="docutils literal notranslate"><span class="pre">Configuration</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="qdk_chemistry.data.html#qdk_chemistry.data.CoupledClusterAmplitudes"><code class="docutils literal notranslate"><span class="pre">CoupledClusterAmplitudes</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="qdk_chemistry.data.html#qdk_chemistry.data.DataClass"><code class="docutils literal notranslate"><span class="pre">DataClass</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="qdk_chemistry.data.html#qdk_chemistry.data.ElectronicStructureSettings"><code class="docutils literal notranslate"><span class="pre">ElectronicStructureSettings</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="qdk_chemistry.data.html#qdk_chemistry.data.Element"><code class="docutils literal notranslate"><span class="pre">Element</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="qdk_chemistry.data.html#qdk_chemistry.data.EnergyExpectationResult"><code class="docutils literal notranslate"><span class="pre">EnergyExpectationResult</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="qdk_chemistry.data.html#qdk_chemistry.data.Hamiltonian"><code class="docutils literal notranslate"><span class="pre">Hamiltonian</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="qdk_chemistry.data.html#qdk_chemistry.data.MeasurementData"><code class="docutils literal notranslate"><span class="pre">MeasurementData</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="qdk_chemistry.data.html#qdk_chemistry.data.ModelOrbitals"><code class="docutils literal notranslate"><span class="pre">ModelOrbitals</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="qdk_chemistry.data.html#qdk_chemistry.data.OrbitalType"><code class="docutils literal notranslate"><span class="pre">OrbitalType</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="qdk_chemistry.data.html#qdk_chemistry.data.Orbitals"><code class="docutils literal notranslate"><span class="pre">Orbitals</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="qdk_chemistry.data.html#qdk_chemistry.data.QpeResult"><code class="docutils literal notranslate"><span class="pre">QpeResult</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="qdk_chemistry.data.html#qdk_chemistry.data.QubitHamiltonian"><code class="docutils literal notranslate"><span class="pre">QubitHamiltonian</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="qdk_chemistry.data.html#qdk_chemistry.data.SciWavefunctionContainer"><code class="docutils literal notranslate"><span class="pre">SciWavefunctionContainer</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="qdk_chemistry.data.html#qdk_chemistry.data.SettingNotFound"><code class="docutils literal notranslate"><span class="pre">SettingNotFound</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="qdk_chemistry.data.html#qdk_chemistry.data.SettingNotFoundError"><code class="docutils literal notranslate"><span class="pre">SettingNotFoundError</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="qdk_chemistry.data.html#qdk_chemistry.data.SettingTypeMismatch"><code class="docutils literal notranslate"><span class="pre">SettingTypeMismatch</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="qdk_chemistry.data.html#qdk_chemistry.data.SettingTypeMismatchError"><code class="docutils literal notranslate"><span class="pre">SettingTypeMismatchError</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="qdk_chemistry.data.html#qdk_chemistry.data.SettingValue"><code class="docutils literal notranslate"><span class="pre">SettingValue</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="qdk_chemistry.data.html#qdk_chemistry.data.Settings"><code class="docutils literal notranslate"><span class="pre">Settings</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="qdk_chemistry.data.html#qdk_chemistry.data.Shell"><code class="docutils literal notranslate"><span class="pre">Shell</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="qdk_chemistry.data.html#qdk_chemistry.data.SlaterDeterminantContainer"><code class="docutils literal notranslate"><span class="pre">SlaterDeterminantContainer</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="qdk_chemistry.data.html#qdk_chemistry.data.StabilityResult"><code class="docutils literal notranslate"><span class="pre">StabilityResult</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="qdk_chemistry.data.html#qdk_chemistry.data.Structure"><code class="docutils literal notranslate"><span class="pre">Structure</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="qdk_chemistry.data.html#qdk_chemistry.data.Wavefunction"><code class="docutils literal notranslate"><span class="pre">Wavefunction</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="qdk_chemistry.data.html#qdk_chemistry.data.WavefunctionContainer"><code class="docutils literal notranslate"><span class="pre">WavefunctionContainer</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="qdk_chemistry.data.html#qdk_chemistry.data.WavefunctionType"><code class="docutils literal notranslate"><span class="pre">WavefunctionType</span></code></a></li>
+<li class="toctree-l4 current"><a class="reference internal" href="qdk_chemistry.data.html#submodules">Submodules</a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="../python_api.html#algorithms">Algorithms</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../python_api.html#plugins">Plugins</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../python_api.html#utilities">Utilities</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../python_api.html#constants">Constants</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="../cpp_api.html">C++ API</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Supporting Information</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../glossary.html">Acronym definitions</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../references.html">References</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../../index.html">qdk-chemistry</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../../index.html" class="icon icon-home" aria-label="Home"></a></li>
+          <li class="breadcrumb-item"><a href="../python_api.html">Python API</a></li>
+          <li class="breadcrumb-item"><a href="qdk_chemistry.data.html">qdk_chemistry.data package</a></li>
+      <li class="breadcrumb-item active">qdk_chemistry.data.base module</li>
+      <li class="wy-breadcrumbs-aside">
+            <a href="../../_sources/api/api_autogen/qdk_chemistry.data.base.rst.txt" rel="nofollow"> View page source</a>
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <section id="module-qdk_chemistry.data.base">
+<span id="qdk-chemistry-data-base-module"></span><h1>qdk_chemistry.data.base module<a class="headerlink" href="#module-qdk_chemistry.data.base" title="Link to this heading"></a></h1>
+<p>Base class for immutable data classes with common serialization methods.</p>
+<dl class="py class">
+<dt class="sig sig-object py" id="qdk_chemistry.data.base.DataClass">
+<em class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">DataClass</span></span><a class="reference internal" href="../../_modules/qdk_chemistry/data/base.html#DataClass"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#qdk_chemistry.data.base.DataClass" title="Link to this definition"></a></dt>
+<dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">DataClass</span></code></p>
+<p>Base class for immutable data classes with common serialization methods.</p>
+<p>This abstract base class provides:
+- Immutability after construction (__setattr__ and __delattr__ protection)
+- Common implementations of to_json_file, to_hdf5_file, and to_file
+- Filename validation to enforce naming convention (.&lt;data_type&gt;.&lt;extension&gt;)
+- Requires derived classes to implement abstract methods</p>
+<p>Derived classes MUST implement:
+1. get_summary() -&gt; str</p>
+<blockquote>
+<div><p>Return a human-readable summary string of the object</p>
+</div></blockquote>
+<ol class="arabic simple" start="2">
+<li><dl class="simple">
+<dt>to_json() -&gt; dict</dt><dd><p>Return a dictionary representation suitable for JSON serialization</p>
+</dd>
+</dl>
+</li>
+<li><dl class="simple">
+<dt>to_hdf5(group: h5py.Group) -&gt; None</dt><dd><p>Write the object’s data to an HDF5 group</p>
+</dd>
+</dl>
+</li>
+<li><dl class="simple">
+<dt>to_file(filename: str, format_type: str) -&gt; None</dt><dd><p>Save the object to a file with the specified format
+(default implementation provided, but can be overridden)</p>
+</dd>
+</dl>
+</li>
+</ol>
+<p>Derived classes should:
+- Set all attributes before calling super().__init__()
+- Call super().__init__() at the end of __init__ to enable immutability
+- Set the _data_type_name class attribute (e.g., “structure”, “wavefunction”)</p>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>These methods are pure virtual in the C++ base class and MUST be
+overridden. The C++ binding will enforce this at runtime.</p>
+<p>Filename validation enforces the convention that filenames must include
+the data type, e.g., “example.structure.json” or “data.wavefunction.h5”</p>
+</div>
+<p>Initialize the base class and mark instance as initialized.</p>
+<p>This must be called by derived classes after setting all attributes.</p>
+<dl class="field-list simple">
+</dl>
+<dl class="py method">
+<dt class="sig sig-object py" id="qdk_chemistry.data.base.DataClass.__init__">
+<span class="sig-name descname"><span class="pre">__init__</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="../../_modules/qdk_chemistry/data/base.html#DataClass.__init__"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#qdk_chemistry.data.base.DataClass.__init__" title="Link to this definition"></a></dt>
+<dd><p>Initialize the base class and mark instance as initialized.</p>
+<p>This must be called by derived classes after setting all attributes.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p>None</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="qdk_chemistry.data.base.DataClass.get_summary">
+<span class="sig-name descname"><span class="pre">get_summary</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="../../_modules/qdk_chemistry/data/base.html#DataClass.get_summary"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#qdk_chemistry.data.base.DataClass.get_summary" title="Link to this definition"></a></dt>
+<dd><p>Get a human-readable summary of the object.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p><span class="sphinx_autodoc_typehints-type"><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)"><code class="xref py py-class docutils literal notranslate"><span class="pre">str</span></code></a></span></p>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>Summary string describing the object’s contents and properties</p>
+</dd>
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)">str</a></p>
+</dd>
+</dl>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>This method must be implemented by derived classes.
+The C++ binding enforces this as a pure virtual function.</p>
+</div>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="qdk_chemistry.data.base.DataClass.to_dict">
+<span class="sig-name descname"><span class="pre">to_dict</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="../../_modules/qdk_chemistry/data/base.html#DataClass.to_dict"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#qdk_chemistry.data.base.DataClass.to_dict" title="Link to this definition"></a></dt>
+<dd><p>Convert the object to a dictionary.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p><span class="sphinx_autodoc_typehints-type"><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#dict" title="(in Python v3.14)"><code class="xref py py-class docutils literal notranslate"><span class="pre">dict</span></code></a>[<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)"><code class="xref py py-class docutils literal notranslate"><span class="pre">str</span></code></a>, <a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.Any" title="(in Python v3.14)"><code class="xref py py-data docutils literal notranslate"><span class="pre">Any</span></code></a>]</span></p>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>Dictionary representation of the object</p>
+</dd>
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#dict" title="(in Python v3.14)">dict</a></p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="qdk_chemistry.data.base.DataClass.to_json">
+<span class="sig-name descname"><span class="pre">to_json</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="../../_modules/qdk_chemistry/data/base.html#DataClass.to_json"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#qdk_chemistry.data.base.DataClass.to_json" title="Link to this definition"></a></dt>
+<dd><p>Convert the object to a dictionary for JSON serialization.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p><span class="sphinx_autodoc_typehints-type"><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#dict" title="(in Python v3.14)"><code class="xref py py-class docutils literal notranslate"><span class="pre">dict</span></code></a></span></p>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>Dictionary representation of the object</p>
+</dd>
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#dict" title="(in Python v3.14)">dict</a></p>
+</dd>
+</dl>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>This method must be implemented by derived classes.
+The returned dictionary should contain all data needed to
+reconstruct the object. The C++ binding enforces this as
+a pure virtual function.</p>
+</div>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="qdk_chemistry.data.base.DataClass.to_hdf5">
+<span class="sig-name descname"><span class="pre">to_hdf5</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">group</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../../_modules/qdk_chemistry/data/base.html#DataClass.to_hdf5"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#qdk_chemistry.data.base.DataClass.to_hdf5" title="Link to this definition"></a></dt>
+<dd><p>Save the object to an HDF5 group.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p><span class="sphinx_autodoc_typehints-type"><a class="reference external" href="https://docs.python.org/3/library/constants.html#None" title="(in Python v3.14)"><code class="xref py py-obj docutils literal notranslate"><span class="pre">None</span></code></a></span></p>
+</dd>
+<dt class="field-even">Parameters<span class="colon">:</span></dt>
+<dd class="field-even"><p><strong>group</strong> (<em>Group</em>) – HDF5 group or file to write data to</p>
+</dd>
+</dl>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>This method must be implemented by derived classes.
+Use group.attrs for attributes and group.create_dataset()
+for array data. The C++ binding enforces this as a pure
+virtual function.</p>
+</div>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="qdk_chemistry.data.base.DataClass.to_json_file">
+<span class="sig-name descname"><span class="pre">to_json_file</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">filename</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../../_modules/qdk_chemistry/data/base.html#DataClass.to_json_file"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#qdk_chemistry.data.base.DataClass.to_json_file" title="Link to this definition"></a></dt>
+<dd><p>Save the object to a JSON file.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p><span class="sphinx_autodoc_typehints-type"><a class="reference external" href="https://docs.python.org/3/library/constants.html#None" title="(in Python v3.14)"><code class="xref py py-obj docutils literal notranslate"><span class="pre">None</span></code></a></span></p>
+</dd>
+<dt class="field-even">Parameters<span class="colon">:</span></dt>
+<dd class="field-even"><p><strong>filename</strong> (<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)"><em>str</em></a><em> | </em><a class="reference external" href="https://docs.python.org/3/library/pathlib.html#pathlib.Path" title="(in Python v3.14)"><em>Path</em></a>) – Path to the output JSON file
+Must match pattern: &lt;name&gt;.&lt;data_type&gt;.json</p>
+</dd>
+<dt class="field-odd">Raises<span class="colon">:</span></dt>
+<dd class="field-odd"><p><a class="reference external" href="https://docs.python.org/3/library/exceptions.html#ValueError" title="(in Python v3.14)"><strong>ValueError</strong></a> – If filename doesn’t match required pattern</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="qdk_chemistry.data.base.DataClass.to_hdf5_file">
+<span class="sig-name descname"><span class="pre">to_hdf5_file</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">filename</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../../_modules/qdk_chemistry/data/base.html#DataClass.to_hdf5_file"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#qdk_chemistry.data.base.DataClass.to_hdf5_file" title="Link to this definition"></a></dt>
+<dd><p>Save the object to an HDF5 file.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p><span class="sphinx_autodoc_typehints-type"><a class="reference external" href="https://docs.python.org/3/library/constants.html#None" title="(in Python v3.14)"><code class="xref py py-obj docutils literal notranslate"><span class="pre">None</span></code></a></span></p>
+</dd>
+<dt class="field-even">Parameters<span class="colon">:</span></dt>
+<dd class="field-even"><p><strong>filename</strong> (<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)"><em>str</em></a><em> | </em><a class="reference external" href="https://docs.python.org/3/library/pathlib.html#pathlib.Path" title="(in Python v3.14)"><em>Path</em></a>) – Path to the output HDF5 file
+Must match pattern: &lt;name&gt;.&lt;data_type&gt;.h5 or &lt;name&gt;.&lt;data_type&gt;.hdf5</p>
+</dd>
+<dt class="field-odd">Raises<span class="colon">:</span></dt>
+<dd class="field-odd"><p><a class="reference external" href="https://docs.python.org/3/library/exceptions.html#ValueError" title="(in Python v3.14)"><strong>ValueError</strong></a> – If filename doesn’t match required pattern</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="qdk_chemistry.data.base.DataClass.to_file">
+<span class="sig-name descname"><span class="pre">to_file</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">filename</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">format_type</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../../_modules/qdk_chemistry/data/base.html#DataClass.to_file"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#qdk_chemistry.data.base.DataClass.to_file" title="Link to this definition"></a></dt>
+<dd><p>Save the object to a file with the specified format.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p><span class="sphinx_autodoc_typehints-type"><a class="reference external" href="https://docs.python.org/3/library/constants.html#None" title="(in Python v3.14)"><code class="xref py py-obj docutils literal notranslate"><span class="pre">None</span></code></a></span></p>
+</dd>
+<dt class="field-even">Parameters<span class="colon">:</span></dt>
+<dd class="field-even"><ul class="simple">
+<li><p><strong>filename</strong> (<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)"><em>str</em></a><em> | </em><a class="reference external" href="https://docs.python.org/3/library/pathlib.html#pathlib.Path" title="(in Python v3.14)"><em>Path</em></a>) – Path to the output file
+Must match pattern: &lt;name&gt;.&lt;data_type&gt;.&lt;extension&gt;</p></li>
+<li><p><strong>format_type</strong> (<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)"><em>str</em></a>) – Format type (“json”, “hdf5”, or “h5”)</p></li>
+</ul>
+</dd>
+<dt class="field-odd">Raises<span class="colon">:</span></dt>
+<dd class="field-odd"><p><a class="reference external" href="https://docs.python.org/3/library/exceptions.html#ValueError" title="(in Python v3.14)"><strong>ValueError</strong></a> – If format_type is not supported or filename doesn’t match required pattern</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="qdk_chemistry.data.base.DataClass.from_dict">
+<em class="property"><span class="k"><span class="pre">classmethod</span></span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">from_dict</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">dict_data</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../../_modules/qdk_chemistry/data/base.html#DataClass.from_dict"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#qdk_chemistry.data.base.DataClass.from_dict" title="Link to this definition"></a></dt>
+<dd><p>Create an instance from a dictionary.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p><span class="sphinx_autodoc_typehints-type"><a class="reference internal" href="#qdk_chemistry.data.base.DataClass" title="qdk_chemistry.data.base.DataClass"><code class="xref py py-class docutils literal notranslate"><span class="pre">DataClass</span></code></a></span></p>
+</dd>
+<dt class="field-even">Parameters<span class="colon">:</span></dt>
+<dd class="field-even"><p><strong>dict_data</strong> (<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#dict" title="(in Python v3.14)"><em>dict</em></a><em>[</em><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)"><em>str</em></a><em>, </em><a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.Any" title="(in Python v3.14)"><em>Any</em></a><em>]</em>) – Dictionary containing the serialized data</p>
+</dd>
+<dt class="field-odd">Returns<span class="colon">:</span></dt>
+<dd class="field-odd"><p>New instance of the derived class</p>
+</dd>
+<dt class="field-even">Return type<span class="colon">:</span></dt>
+<dd class="field-even"><p><a class="reference internal" href="#qdk_chemistry.data.base.DataClass" title="qdk_chemistry.data.base.DataClass">DataClass</a></p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="qdk_chemistry.data.base.DataClass.from_json">
+<em class="property"><span class="k"><span class="pre">classmethod</span></span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">from_json</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">json_data</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../../_modules/qdk_chemistry/data/base.html#DataClass.from_json"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#qdk_chemistry.data.base.DataClass.from_json" title="Link to this definition"></a></dt>
+<dd><p>Create an instance from a JSON dictionary.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p><span class="sphinx_autodoc_typehints-type"><a class="reference internal" href="#qdk_chemistry.data.base.DataClass" title="qdk_chemistry.data.base.DataClass"><code class="xref py py-class docutils literal notranslate"><span class="pre">DataClass</span></code></a></span></p>
+</dd>
+<dt class="field-even">Parameters<span class="colon">:</span></dt>
+<dd class="field-even"><p><strong>json_data</strong> (<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#dict" title="(in Python v3.14)"><em>dict</em></a><em>[</em><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)"><em>str</em></a><em>, </em><a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.Any" title="(in Python v3.14)"><em>Any</em></a><em>]</em>) – Dictionary containing the serialized data</p>
+</dd>
+<dt class="field-odd">Returns<span class="colon">:</span></dt>
+<dd class="field-odd"><p>New instance of the derived class</p>
+</dd>
+<dt class="field-even">Return type<span class="colon">:</span></dt>
+<dd class="field-even"><p><a class="reference internal" href="#qdk_chemistry.data.base.DataClass" title="qdk_chemistry.data.base.DataClass">DataClass</a></p>
+</dd>
+</dl>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>This method must be implemented by derived classes.
+The C++ binding enforces this as a static method requirement.</p>
+</div>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="qdk_chemistry.data.base.DataClass.from_json_file">
+<em class="property"><span class="k"><span class="pre">classmethod</span></span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">from_json_file</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">filename</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../../_modules/qdk_chemistry/data/base.html#DataClass.from_json_file"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#qdk_chemistry.data.base.DataClass.from_json_file" title="Link to this definition"></a></dt>
+<dd><p>Load an instance from a JSON file.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p><span class="sphinx_autodoc_typehints-type"><a class="reference internal" href="#qdk_chemistry.data.base.DataClass" title="qdk_chemistry.data.base.DataClass"><code class="xref py py-class docutils literal notranslate"><span class="pre">DataClass</span></code></a></span></p>
+</dd>
+<dt class="field-even">Parameters<span class="colon">:</span></dt>
+<dd class="field-even"><p><strong>filename</strong> (<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)"><em>str</em></a><em> | </em><a class="reference external" href="https://docs.python.org/3/library/pathlib.html#pathlib.Path" title="(in Python v3.14)"><em>Path</em></a>) – Path to the input JSON file
+Must match pattern: &lt;name&gt;.&lt;data_type&gt;.json</p>
+</dd>
+<dt class="field-odd">Returns<span class="colon">:</span></dt>
+<dd class="field-odd"><p>New instance of the derived class</p>
+</dd>
+<dt class="field-even">Return type<span class="colon">:</span></dt>
+<dd class="field-even"><p><a class="reference internal" href="#qdk_chemistry.data.base.DataClass" title="qdk_chemistry.data.base.DataClass">DataClass</a></p>
+</dd>
+<dt class="field-odd">Raises<span class="colon">:</span></dt>
+<dd class="field-odd"><p><a class="reference external" href="https://docs.python.org/3/library/exceptions.html#ValueError" title="(in Python v3.14)"><strong>ValueError</strong></a> – If filename doesn’t match required pattern</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="qdk_chemistry.data.base.DataClass.from_hdf5">
+<em class="property"><span class="k"><span class="pre">classmethod</span></span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">from_hdf5</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">group</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../../_modules/qdk_chemistry/data/base.html#DataClass.from_hdf5"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#qdk_chemistry.data.base.DataClass.from_hdf5" title="Link to this definition"></a></dt>
+<dd><p>Load an instance from an HDF5 group.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p><span class="sphinx_autodoc_typehints-type"><a class="reference internal" href="#qdk_chemistry.data.base.DataClass" title="qdk_chemistry.data.base.DataClass"><code class="xref py py-class docutils literal notranslate"><span class="pre">DataClass</span></code></a></span></p>
+</dd>
+<dt class="field-even">Parameters<span class="colon">:</span></dt>
+<dd class="field-even"><p><strong>group</strong> (<em>Group</em>) – HDF5 group or file to read data from</p>
+</dd>
+<dt class="field-odd">Returns<span class="colon">:</span></dt>
+<dd class="field-odd"><p>New instance of the derived class</p>
+</dd>
+<dt class="field-even">Return type<span class="colon">:</span></dt>
+<dd class="field-even"><p><a class="reference internal" href="#qdk_chemistry.data.base.DataClass" title="qdk_chemistry.data.base.DataClass">DataClass</a></p>
+</dd>
+</dl>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>This method must be implemented by derived classes.
+Read data using group.attrs for attributes and group[key]
+for datasets. The C++ binding enforces this as a static
+method requirement.</p>
+</div>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="qdk_chemistry.data.base.DataClass.from_hdf5_file">
+<em class="property"><span class="k"><span class="pre">classmethod</span></span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">from_hdf5_file</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">filename</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../../_modules/qdk_chemistry/data/base.html#DataClass.from_hdf5_file"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#qdk_chemistry.data.base.DataClass.from_hdf5_file" title="Link to this definition"></a></dt>
+<dd><p>Load an instance from an HDF5 file.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p><span class="sphinx_autodoc_typehints-type"><a class="reference internal" href="#qdk_chemistry.data.base.DataClass" title="qdk_chemistry.data.base.DataClass"><code class="xref py py-class docutils literal notranslate"><span class="pre">DataClass</span></code></a></span></p>
+</dd>
+<dt class="field-even">Parameters<span class="colon">:</span></dt>
+<dd class="field-even"><p><strong>filename</strong> (<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)"><em>str</em></a><em> | </em><a class="reference external" href="https://docs.python.org/3/library/pathlib.html#pathlib.Path" title="(in Python v3.14)"><em>Path</em></a>) – Path to the input HDF5 file
+Must match pattern: &lt;name&gt;.&lt;data_type&gt;.h5 or &lt;name&gt;.&lt;data_type&gt;.hdf5</p>
+</dd>
+<dt class="field-odd">Returns<span class="colon">:</span></dt>
+<dd class="field-odd"><p>New instance of the derived class</p>
+</dd>
+<dt class="field-even">Return type<span class="colon">:</span></dt>
+<dd class="field-even"><p><a class="reference internal" href="#qdk_chemistry.data.base.DataClass" title="qdk_chemistry.data.base.DataClass">DataClass</a></p>
+</dd>
+<dt class="field-odd">Raises<span class="colon">:</span></dt>
+<dd class="field-odd"><p><a class="reference external" href="https://docs.python.org/3/library/exceptions.html#ValueError" title="(in Python v3.14)"><strong>ValueError</strong></a> – If filename doesn’t match required pattern</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="qdk_chemistry.data.base.DataClass.from_file">
+<em class="property"><span class="k"><span class="pre">classmethod</span></span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">from_file</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">filename</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">format_type</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../../_modules/qdk_chemistry/data/base.html#DataClass.from_file"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#qdk_chemistry.data.base.DataClass.from_file" title="Link to this definition"></a></dt>
+<dd><p>Load an instance from a file with the specified format.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p><span class="sphinx_autodoc_typehints-type"><a class="reference internal" href="#qdk_chemistry.data.base.DataClass" title="qdk_chemistry.data.base.DataClass"><code class="xref py py-class docutils literal notranslate"><span class="pre">DataClass</span></code></a></span></p>
+</dd>
+<dt class="field-even">Parameters<span class="colon">:</span></dt>
+<dd class="field-even"><ul class="simple">
+<li><p><strong>filename</strong> (<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)"><em>str</em></a><em> | </em><a class="reference external" href="https://docs.python.org/3/library/pathlib.html#pathlib.Path" title="(in Python v3.14)"><em>Path</em></a>) – Path to the input file
+Must match pattern: &lt;name&gt;.&lt;data_type&gt;.&lt;extension&gt;</p></li>
+<li><p><strong>format_type</strong> (<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)"><em>str</em></a>) – Format type (“json”, “hdf5”, or “h5”)</p></li>
+</ul>
+</dd>
+<dt class="field-odd">Returns<span class="colon">:</span></dt>
+<dd class="field-odd"><p>New instance of the derived class</p>
+</dd>
+<dt class="field-even">Return type<span class="colon">:</span></dt>
+<dd class="field-even"><p><a class="reference internal" href="#qdk_chemistry.data.base.DataClass" title="qdk_chemistry.data.base.DataClass">DataClass</a></p>
+</dd>
+<dt class="field-odd">Raises<span class="colon">:</span></dt>
+<dd class="field-odd"><p><a class="reference external" href="https://docs.python.org/3/library/exceptions.html#ValueError" title="(in Python v3.14)"><strong>ValueError</strong></a> – If format_type is not supported or filename doesn’t match required pattern</p>
+</dd>
+</dl>
+</dd></dl>
+
+</dd></dl>
+
+</section>
+
+
+           </div>
+          </div>
+          <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
+        <a href="qdk_chemistry.data.html" class="btn btn-neutral float-left" title="qdk_chemistry.data package" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+        <a href="qdk_chemistry.data.estimator_data.html" class="btn btn-neutral float-right" title="qdk_chemistry.data.estimator_data module" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright Microsoft Corporation. All rights reserved. Licensed under the MIT License.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

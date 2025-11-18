@@ -1,0 +1,512 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../../">
+<head>
+  <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>qdk_chemistry.algorithms.state_preparation package &mdash; qdk-chemistry 1.0.0-rc1 documentation</title>
+      <link rel="stylesheet" type="text/css" href="../../_static/pygments.css?v=b86133f3" />
+      <link rel="stylesheet" type="text/css" href="../../_static/css/theme.css?v=e59714d7" />
+      <link rel="stylesheet" type="text/css" href="../../_static/tabs.css?v=4c969af8" />
+      <link rel="stylesheet" type="text/css" href="../../_static/graphviz.css?v=4ae1632d" />
+      <link rel="stylesheet" type="text/css" href="../../_static/copybutton.css?v=76b2166b" />
+      <link rel="stylesheet" type="text/css" href="../../_static/custom.css?v=a64bac2b" />
+
+  
+      <script src="../../_static/jquery.js?v=5d32c60e"></script>
+      <script src="../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="../../_static/documentation_options.js?v=81bd8d55"></script>
+      <script src="../../_static/doctools.js?v=9bcbadda"></script>
+      <script src="../../_static/sphinx_highlight.js?v=dc90522c"></script>
+      <script src="../../_static/tabs.js?v=3ee01567"></script>
+      <script src="../../_static/clipboard.min.js?v=a7894cd8"></script>
+      <script src="../../_static/copybutton.js?v=f281be69"></script>
+    <script src="../../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../../genindex.html" />
+    <link rel="search" title="Search" href="../../search.html" />
+    <link rel="next" title="qdk_chemistry.algorithms.state_preparation.sparse_isometry module" href="qdk_chemistry.algorithms.state_preparation.sparse_isometry.html" />
+    <link rel="prev" title="qdk_chemistry.algorithms.energy_estimator.qsharp module" href="qdk_chemistry.algorithms.energy_estimator.qsharp.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="../../index.html" class="icon icon-home">
+            qdk-chemistry
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">User Documentation</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../user/quickstart.html">Quickstart</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../user/comprehensive/index.html">In-depth user guide</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">API Reference</span></p>
+<ul class="current">
+<li class="toctree-l1 current"><a class="reference internal" href="../python_api.html">Python API</a><ul class="current">
+<li class="toctree-l2"><a class="reference internal" href="../python_api.html#data-classes">Data Classes</a></li>
+<li class="toctree-l2 current"><a class="reference internal" href="../python_api.html#algorithms">Algorithms</a><ul class="current">
+<li class="toctree-l3 current"><a class="reference internal" href="qdk_chemistry.algorithms.html">qdk_chemistry.algorithms package</a><ul class="current">
+<li class="toctree-l4"><a class="reference internal" href="qdk_chemistry.algorithms.html#qdk_chemistry.algorithms.ActiveSpaceSelector"><code class="docutils literal notranslate"><span class="pre">ActiveSpaceSelector</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="qdk_chemistry.algorithms.html#qdk_chemistry.algorithms.CoupledClusterCalculator"><code class="docutils literal notranslate"><span class="pre">CoupledClusterCalculator</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="qdk_chemistry.algorithms.html#qdk_chemistry.algorithms.EnergyEstimator"><code class="docutils literal notranslate"><span class="pre">EnergyEstimator</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="qdk_chemistry.algorithms.html#qdk_chemistry.algorithms.HamiltonianConstructor"><code class="docutils literal notranslate"><span class="pre">HamiltonianConstructor</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="qdk_chemistry.algorithms.html#qdk_chemistry.algorithms.IterativePhaseEstimation"><code class="docutils literal notranslate"><span class="pre">IterativePhaseEstimation</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="qdk_chemistry.algorithms.html#qdk_chemistry.algorithms.IterativePhaseEstimationIteration"><code class="docutils literal notranslate"><span class="pre">IterativePhaseEstimationIteration</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="qdk_chemistry.algorithms.html#qdk_chemistry.algorithms.Localizer"><code class="docutils literal notranslate"><span class="pre">Localizer</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="qdk_chemistry.algorithms.html#qdk_chemistry.algorithms.MultiConfigurationCalculator"><code class="docutils literal notranslate"><span class="pre">MultiConfigurationCalculator</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="qdk_chemistry.algorithms.html#qdk_chemistry.algorithms.MultiConfigurationScf"><code class="docutils literal notranslate"><span class="pre">MultiConfigurationScf</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="qdk_chemistry.algorithms.html#qdk_chemistry.algorithms.PhaseEstimation"><code class="docutils literal notranslate"><span class="pre">PhaseEstimation</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="qdk_chemistry.algorithms.html#qdk_chemistry.algorithms.PhaseEstimationAlgorithm"><code class="docutils literal notranslate"><span class="pre">PhaseEstimationAlgorithm</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="qdk_chemistry.algorithms.html#qdk_chemistry.algorithms.ProjectedMultiConfigurationCalculator"><code class="docutils literal notranslate"><span class="pre">ProjectedMultiConfigurationCalculator</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="qdk_chemistry.algorithms.html#qdk_chemistry.algorithms.QubitMapper"><code class="docutils literal notranslate"><span class="pre">QubitMapper</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="qdk_chemistry.algorithms.html#qdk_chemistry.algorithms.ScfSolver"><code class="docutils literal notranslate"><span class="pre">ScfSolver</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="qdk_chemistry.algorithms.html#qdk_chemistry.algorithms.StabilityChecker"><code class="docutils literal notranslate"><span class="pre">StabilityChecker</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="qdk_chemistry.algorithms.html#qdk_chemistry.algorithms.StatePreparation"><code class="docutils literal notranslate"><span class="pre">StatePreparation</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="qdk_chemistry.algorithms.html#qdk_chemistry.algorithms.TraditionalPhaseEstimation"><code class="docutils literal notranslate"><span class="pre">TraditionalPhaseEstimation</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="qdk_chemistry.algorithms.html#qdk_chemistry.algorithms.available"><code class="docutils literal notranslate"><span class="pre">available()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="qdk_chemistry.algorithms.html#qdk_chemistry.algorithms.create"><code class="docutils literal notranslate"><span class="pre">create()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="qdk_chemistry.algorithms.html#qdk_chemistry.algorithms.energy_from_phase"><code class="docutils literal notranslate"><span class="pre">energy_from_phase()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="qdk_chemistry.algorithms.html#qdk_chemistry.algorithms.register"><code class="docutils literal notranslate"><span class="pre">register()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="qdk_chemistry.algorithms.html#qdk_chemistry.algorithms.show_settings"><code class="docutils literal notranslate"><span class="pre">show_settings()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="qdk_chemistry.algorithms.html#qdk_chemistry.algorithms.unregister"><code class="docutils literal notranslate"><span class="pre">unregister()</span></code></a></li>
+<li class="toctree-l4 current"><a class="reference internal" href="qdk_chemistry.algorithms.html#subpackages">Subpackages</a></li>
+<li class="toctree-l4"><a class="reference internal" href="qdk_chemistry.algorithms.html#submodules">Submodules</a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="../python_api.html#plugins">Plugins</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../python_api.html#utilities">Utilities</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../python_api.html#constants">Constants</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="../cpp_api.html">C++ API</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Supporting Information</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../glossary.html">Acronym definitions</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../references.html">References</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../../index.html">qdk-chemistry</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../../index.html" class="icon icon-home" aria-label="Home"></a></li>
+          <li class="breadcrumb-item"><a href="../python_api.html">Python API</a></li>
+          <li class="breadcrumb-item"><a href="qdk_chemistry.algorithms.html">qdk_chemistry.algorithms package</a></li>
+      <li class="breadcrumb-item active">qdk_chemistry.algorithms.state_preparation package</li>
+      <li class="wy-breadcrumbs-aside">
+            <a href="../../_sources/api/api_autogen/qdk_chemistry.algorithms.state_preparation.rst.txt" rel="nofollow"> View page source</a>
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <section id="module-qdk_chemistry.algorithms.state_preparation">
+<span id="qdk-chemistry-algorithms-state-preparation-package"></span><h1>qdk_chemistry.algorithms.state_preparation package<a class="headerlink" href="#module-qdk_chemistry.algorithms.state_preparation" title="Link to this heading"></a></h1>
+<p>QDK/Chemistry state preparation algorithms module.</p>
+<p>This module provides quantum state preparation algorithms for preparing
+quantum states from classical wavefunctions.</p>
+<dl class="py class">
+<dt class="sig sig-object py" id="qdk_chemistry.algorithms.state_preparation.SparseIsometryGF2XStatePreparation">
+<em class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">SparseIsometryGF2XStatePreparation</span></span><a class="headerlink" href="#qdk_chemistry.algorithms.state_preparation.SparseIsometryGF2XStatePreparation" title="Link to this definition"></a></dt>
+<dd><p>Bases: <a class="reference internal" href="qdk_chemistry.algorithms.state_preparation.state_preparation.html#qdk_chemistry.algorithms.state_preparation.state_preparation.StatePreparation" title="qdk_chemistry.algorithms.state_preparation.state_preparation.StatePreparation"><code class="xref py py-class docutils literal notranslate"><span class="pre">StatePreparation</span></code></a></p>
+<p>State preparation using sparse isometry with enhanced GF2+X elimination.</p>
+<p>This class implements “GF2+X” state preparation for electronic structure problems using
+the <code class="docutils literal notranslate"><span class="pre">gf2x_with_tracking</span></code> function which performs smart preprocessing
+before GF2 Gaussian elimination. The preprocessing includes:</p>
+<blockquote>
+<div><ol class="arabic simple">
+<li><p>Removing duplicate rows using CNOT operations</p></li>
+<li><p>Removing all-ones rows using X operations</p></li>
+<li><p>Then performing standard GF2 Gaussian elimination</p></li>
+<li><p>Apply the additional rank reduction if the reduced row-echelon matrix is diagonal</p></li>
+</ol>
+</div></blockquote>
+<p>This enhanced approach can be more efficient than standard GF2 Gaussian elimination,
+particularly for matrices with duplicate rows or all-ones rows. The algorithm
+tracks both CNOT and X operations for proper circuit reconstruction.</p>
+<p>The algorithm:</p>
+<blockquote>
+<div><ol class="arabic simple">
+<li><p>Reads the wavefunction to get coefficients and bitstrings</p></li>
+<li><p>Converts bitstrings to a binary matrix</p></li>
+<li><p>Applies enhanced GF2+X elimination (duplicate removal + all-ones removal + GF2)</p></li>
+<li><p>Performs dense state preparation on the reduced space</p></li>
+<li><p>Applies recorded operations (both CNOT and X) in reverse order to expand back to full space</p></li>
+</ol>
+</div></blockquote>
+<p>Key References:</p>
+<blockquote>
+<div><ul class="simple">
+<li><p>Sparse isometry: Malvetti, Iten and Colbeck, <a class="reference external" href="https://arxiv.org/abs/2006.00016">arXiv:2006.00016</a></p></li>
+</ul>
+</div></blockquote>
+<p>Initialize the SparseIsometryGF2XStatePreparation.</p>
+<dl class="py method">
+<dt class="sig sig-object py" id="qdk_chemistry.algorithms.state_preparation.SparseIsometryGF2XStatePreparation.__init__">
+<span class="sig-name descname"><span class="pre">__init__</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#qdk_chemistry.algorithms.state_preparation.SparseIsometryGF2XStatePreparation.__init__" title="Link to this definition"></a></dt>
+<dd><p>Initialize the SparseIsometryGF2XStatePreparation.</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="qdk_chemistry.algorithms.state_preparation.SparseIsometryGF2XStatePreparation.name">
+<span class="sig-name descname"><span class="pre">name</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#qdk_chemistry.algorithms.state_preparation.SparseIsometryGF2XStatePreparation.name" title="Link to this definition"></a></dt>
+<dd><p>Return the name of the state preparation method.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p><span class="sphinx_autodoc_typehints-type"><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)"><code class="xref py py-class docutils literal notranslate"><span class="pre">str</span></code></a></span></p>
+</dd>
+</dl>
+</dd></dl>
+
+</dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="qdk_chemistry.algorithms.state_preparation.StatePreparation">
+<em class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">StatePreparation</span></span><a class="headerlink" href="#qdk_chemistry.algorithms.state_preparation.StatePreparation" title="Link to this definition"></a></dt>
+<dd><p>Bases: <a class="reference internal" href="qdk_chemistry.algorithms.base.html#qdk_chemistry.algorithms.base.Algorithm" title="qdk_chemistry.algorithms.base.Algorithm"><code class="xref py py-class docutils literal notranslate"><span class="pre">Algorithm</span></code></a></p>
+<p>Abstract base class for state preparation algorithms.</p>
+<p>Initialize the StatePreparation with default settings.</p>
+<dl class="py method">
+<dt class="sig sig-object py" id="qdk_chemistry.algorithms.state_preparation.StatePreparation.__init__">
+<span class="sig-name descname"><span class="pre">__init__</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#qdk_chemistry.algorithms.state_preparation.StatePreparation.__init__" title="Link to this definition"></a></dt>
+<dd><p>Initialize the StatePreparation with default settings.</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="qdk_chemistry.algorithms.state_preparation.StatePreparation.run">
+<span class="sig-name descname"><span class="pre">run</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">wavefunction</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#qdk_chemistry.algorithms.state_preparation.StatePreparation.run" title="Link to this definition"></a></dt>
+<dd><p>Prepare a quantum circuit that encodes the given wavefunction.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p><span class="sphinx_autodoc_typehints-type"><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)"><code class="xref py py-class docutils literal notranslate"><span class="pre">str</span></code></a></span></p>
+</dd>
+<dt class="field-even">Parameters<span class="colon">:</span></dt>
+<dd class="field-even"><p><strong>wavefunction</strong> (<a class="reference internal" href="qdk_chemistry.utils.wavefunction.html#qdk_chemistry.utils.wavefunction.Wavefunction" title="qdk_chemistry._core.data.Wavefunction"><em>Wavefunction</em></a>) – The target wavefunction to prepare.</p>
+</dd>
+<dt class="field-odd">Returns<span class="colon">:</span></dt>
+<dd class="field-odd"><p>OpenQASM3 string of the quantum circuit that prepares the wavefunction.</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="qdk_chemistry.algorithms.state_preparation.StatePreparation.type_name">
+<span class="sig-name descname"><span class="pre">type_name</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#qdk_chemistry.algorithms.state_preparation.StatePreparation.type_name" title="Link to this definition"></a></dt>
+<dd><p>Return the algorithm type name as state_prep.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p><span class="sphinx_autodoc_typehints-type"><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)"><code class="xref py py-class docutils literal notranslate"><span class="pre">str</span></code></a></span></p>
+</dd>
+</dl>
+</dd></dl>
+
+</dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="qdk_chemistry.algorithms.state_preparation.StatePreparationFactory">
+<em class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">StatePreparationFactory</span></span><a class="headerlink" href="#qdk_chemistry.algorithms.state_preparation.StatePreparationFactory" title="Link to this definition"></a></dt>
+<dd><p>Bases: <a class="reference internal" href="qdk_chemistry.algorithms.base.html#qdk_chemistry.algorithms.base.AlgorithmFactory" title="qdk_chemistry.algorithms.base.AlgorithmFactory"><code class="xref py py-class docutils literal notranslate"><span class="pre">AlgorithmFactory</span></code></a></p>
+<p>Factory class for creating StatePreparation instances.</p>
+<p>Initialize the StatePreparationFactory.</p>
+<dl class="py method">
+<dt class="sig sig-object py" id="qdk_chemistry.algorithms.state_preparation.StatePreparationFactory.__init__">
+<span class="sig-name descname"><span class="pre">__init__</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#qdk_chemistry.algorithms.state_preparation.StatePreparationFactory.__init__" title="Link to this definition"></a></dt>
+<dd><p>Initialize the StatePreparationFactory.</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="qdk_chemistry.algorithms.state_preparation.StatePreparationFactory.algorithm_type_name">
+<span class="sig-name descname"><span class="pre">algorithm_type_name</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#qdk_chemistry.algorithms.state_preparation.StatePreparationFactory.algorithm_type_name" title="Link to this definition"></a></dt>
+<dd><p>Return the algorithm type name as state_prep.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p><span class="sphinx_autodoc_typehints-type"><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)"><code class="xref py py-class docutils literal notranslate"><span class="pre">str</span></code></a></span></p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="qdk_chemistry.algorithms.state_preparation.StatePreparationFactory.default_algorithm_name">
+<span class="sig-name descname"><span class="pre">default_algorithm_name</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#qdk_chemistry.algorithms.state_preparation.StatePreparationFactory.default_algorithm_name" title="Link to this definition"></a></dt>
+<dd><p>Return the sparse_isometry_gf2x as default algorithm name.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p><span class="sphinx_autodoc_typehints-type"><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)"><code class="xref py py-class docutils literal notranslate"><span class="pre">str</span></code></a></span></p>
+</dd>
+</dl>
+</dd></dl>
+
+</dd></dl>
+
+<section id="submodules">
+<h2>Submodules<a class="headerlink" href="#submodules" title="Link to this heading"></a></h2>
+<div class="toctree-wrapper compound">
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="qdk_chemistry.algorithms.state_preparation.sparse_isometry.html">qdk_chemistry.algorithms.state_preparation.sparse_isometry module</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="qdk_chemistry.algorithms.state_preparation.sparse_isometry.html#qdk_chemistry.algorithms.state_preparation.sparse_isometry.StatePreparation"><code class="docutils literal notranslate"><span class="pre">StatePreparation</span></code></a><ul>
+<li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.algorithms.state_preparation.sparse_isometry.html#qdk_chemistry.algorithms.state_preparation.sparse_isometry.StatePreparation.__init__"><code class="docutils literal notranslate"><span class="pre">StatePreparation.__init__()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.algorithms.state_preparation.sparse_isometry.html#qdk_chemistry.algorithms.state_preparation.sparse_isometry.StatePreparation.run"><code class="docutils literal notranslate"><span class="pre">StatePreparation.run()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.algorithms.state_preparation.sparse_isometry.html#qdk_chemistry.algorithms.state_preparation.sparse_isometry.StatePreparation.type_name"><code class="docutils literal notranslate"><span class="pre">StatePreparation.type_name()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="qdk_chemistry.algorithms.state_preparation.sparse_isometry.html#qdk_chemistry.algorithms.state_preparation.sparse_isometry.StatePreparationSettings"><code class="docutils literal notranslate"><span class="pre">StatePreparationSettings</span></code></a><ul>
+<li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.algorithms.state_preparation.sparse_isometry.html#qdk_chemistry.algorithms.state_preparation.sparse_isometry.StatePreparationSettings.__init__"><code class="docutils literal notranslate"><span class="pre">StatePreparationSettings.__init__()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="qdk_chemistry.algorithms.state_preparation.sparse_isometry.html#qdk_chemistry.algorithms.state_preparation.sparse_isometry.Wavefunction"><code class="docutils literal notranslate"><span class="pre">Wavefunction</span></code></a><ul>
+<li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.algorithms.state_preparation.sparse_isometry.html#qdk_chemistry.algorithms.state_preparation.sparse_isometry.Wavefunction.__init__"><code class="docutils literal notranslate"><span class="pre">Wavefunction.__init__()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.algorithms.state_preparation.sparse_isometry.html#qdk_chemistry.algorithms.state_preparation.sparse_isometry.Wavefunction.from_file"><code class="docutils literal notranslate"><span class="pre">Wavefunction.from_file()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.algorithms.state_preparation.sparse_isometry.html#qdk_chemistry.algorithms.state_preparation.sparse_isometry.Wavefunction.from_hdf5_file"><code class="docutils literal notranslate"><span class="pre">Wavefunction.from_hdf5_file()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.algorithms.state_preparation.sparse_isometry.html#qdk_chemistry.algorithms.state_preparation.sparse_isometry.Wavefunction.from_json"><code class="docutils literal notranslate"><span class="pre">Wavefunction.from_json()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.algorithms.state_preparation.sparse_isometry.html#qdk_chemistry.algorithms.state_preparation.sparse_isometry.Wavefunction.from_json_file"><code class="docutils literal notranslate"><span class="pre">Wavefunction.from_json_file()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.algorithms.state_preparation.sparse_isometry.html#qdk_chemistry.algorithms.state_preparation.sparse_isometry.Wavefunction.get_active_determinant"><code class="docutils literal notranslate"><span class="pre">Wavefunction.get_active_determinant()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.algorithms.state_preparation.sparse_isometry.html#qdk_chemistry.algorithms.state_preparation.sparse_isometry.Wavefunction.get_active_determinants"><code class="docutils literal notranslate"><span class="pre">Wavefunction.get_active_determinants()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.algorithms.state_preparation.sparse_isometry.html#qdk_chemistry.algorithms.state_preparation.sparse_isometry.Wavefunction.get_active_num_electrons"><code class="docutils literal notranslate"><span class="pre">Wavefunction.get_active_num_electrons()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.algorithms.state_preparation.sparse_isometry.html#qdk_chemistry.algorithms.state_preparation.sparse_isometry.Wavefunction.get_active_one_rdm_spin_dependent"><code class="docutils literal notranslate"><span class="pre">Wavefunction.get_active_one_rdm_spin_dependent()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.algorithms.state_preparation.sparse_isometry.html#qdk_chemistry.algorithms.state_preparation.sparse_isometry.Wavefunction.get_active_one_rdm_spin_traced"><code class="docutils literal notranslate"><span class="pre">Wavefunction.get_active_one_rdm_spin_traced()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.algorithms.state_preparation.sparse_isometry.html#qdk_chemistry.algorithms.state_preparation.sparse_isometry.Wavefunction.get_active_orbital_occupations"><code class="docutils literal notranslate"><span class="pre">Wavefunction.get_active_orbital_occupations()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.algorithms.state_preparation.sparse_isometry.html#qdk_chemistry.algorithms.state_preparation.sparse_isometry.Wavefunction.get_active_two_rdm_spin_dependent"><code class="docutils literal notranslate"><span class="pre">Wavefunction.get_active_two_rdm_spin_dependent()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.algorithms.state_preparation.sparse_isometry.html#qdk_chemistry.algorithms.state_preparation.sparse_isometry.Wavefunction.get_active_two_rdm_spin_traced"><code class="docutils literal notranslate"><span class="pre">Wavefunction.get_active_two_rdm_spin_traced()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.algorithms.state_preparation.sparse_isometry.html#qdk_chemistry.algorithms.state_preparation.sparse_isometry.Wavefunction.get_coefficient"><code class="docutils literal notranslate"><span class="pre">Wavefunction.get_coefficient()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.algorithms.state_preparation.sparse_isometry.html#qdk_chemistry.algorithms.state_preparation.sparse_isometry.Wavefunction.get_coefficients"><code class="docutils literal notranslate"><span class="pre">Wavefunction.get_coefficients()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.algorithms.state_preparation.sparse_isometry.html#qdk_chemistry.algorithms.state_preparation.sparse_isometry.Wavefunction.get_container"><code class="docutils literal notranslate"><span class="pre">Wavefunction.get_container()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.algorithms.state_preparation.sparse_isometry.html#qdk_chemistry.algorithms.state_preparation.sparse_isometry.Wavefunction.get_container_type"><code class="docutils literal notranslate"><span class="pre">Wavefunction.get_container_type()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.algorithms.state_preparation.sparse_isometry.html#qdk_chemistry.algorithms.state_preparation.sparse_isometry.Wavefunction.get_orbitals"><code class="docutils literal notranslate"><span class="pre">Wavefunction.get_orbitals()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.algorithms.state_preparation.sparse_isometry.html#qdk_chemistry.algorithms.state_preparation.sparse_isometry.Wavefunction.get_single_orbital_entropies"><code class="docutils literal notranslate"><span class="pre">Wavefunction.get_single_orbital_entropies()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.algorithms.state_preparation.sparse_isometry.html#qdk_chemistry.algorithms.state_preparation.sparse_isometry.Wavefunction.get_total_determinant"><code class="docutils literal notranslate"><span class="pre">Wavefunction.get_total_determinant()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.algorithms.state_preparation.sparse_isometry.html#qdk_chemistry.algorithms.state_preparation.sparse_isometry.Wavefunction.get_total_determinants"><code class="docutils literal notranslate"><span class="pre">Wavefunction.get_total_determinants()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.algorithms.state_preparation.sparse_isometry.html#qdk_chemistry.algorithms.state_preparation.sparse_isometry.Wavefunction.get_total_num_electrons"><code class="docutils literal notranslate"><span class="pre">Wavefunction.get_total_num_electrons()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.algorithms.state_preparation.sparse_isometry.html#qdk_chemistry.algorithms.state_preparation.sparse_isometry.Wavefunction.get_total_orbital_occupations"><code class="docutils literal notranslate"><span class="pre">Wavefunction.get_total_orbital_occupations()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.algorithms.state_preparation.sparse_isometry.html#qdk_chemistry.algorithms.state_preparation.sparse_isometry.Wavefunction.get_type"><code class="docutils literal notranslate"><span class="pre">Wavefunction.get_type()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.algorithms.state_preparation.sparse_isometry.html#qdk_chemistry.algorithms.state_preparation.sparse_isometry.Wavefunction.has_one_rdm_spin_dependent"><code class="docutils literal notranslate"><span class="pre">Wavefunction.has_one_rdm_spin_dependent()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.algorithms.state_preparation.sparse_isometry.html#qdk_chemistry.algorithms.state_preparation.sparse_isometry.Wavefunction.has_one_rdm_spin_traced"><code class="docutils literal notranslate"><span class="pre">Wavefunction.has_one_rdm_spin_traced()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.algorithms.state_preparation.sparse_isometry.html#qdk_chemistry.algorithms.state_preparation.sparse_isometry.Wavefunction.has_two_rdm_spin_dependent"><code class="docutils literal notranslate"><span class="pre">Wavefunction.has_two_rdm_spin_dependent()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.algorithms.state_preparation.sparse_isometry.html#qdk_chemistry.algorithms.state_preparation.sparse_isometry.Wavefunction.has_two_rdm_spin_traced"><code class="docutils literal notranslate"><span class="pre">Wavefunction.has_two_rdm_spin_traced()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.algorithms.state_preparation.sparse_isometry.html#qdk_chemistry.algorithms.state_preparation.sparse_isometry.Wavefunction.is_complex"><code class="docutils literal notranslate"><span class="pre">Wavefunction.is_complex()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.algorithms.state_preparation.sparse_isometry.html#qdk_chemistry.algorithms.state_preparation.sparse_isometry.Wavefunction.norm"><code class="docutils literal notranslate"><span class="pre">Wavefunction.norm()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.algorithms.state_preparation.sparse_isometry.html#qdk_chemistry.algorithms.state_preparation.sparse_isometry.Wavefunction.orbitals"><code class="docutils literal notranslate"><span class="pre">Wavefunction.orbitals</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.algorithms.state_preparation.sparse_isometry.html#qdk_chemistry.algorithms.state_preparation.sparse_isometry.Wavefunction.overlap"><code class="docutils literal notranslate"><span class="pre">Wavefunction.overlap()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.algorithms.state_preparation.sparse_isometry.html#qdk_chemistry.algorithms.state_preparation.sparse_isometry.Wavefunction.size"><code class="docutils literal notranslate"><span class="pre">Wavefunction.size()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.algorithms.state_preparation.sparse_isometry.html#qdk_chemistry.algorithms.state_preparation.sparse_isometry.Wavefunction.to_file"><code class="docutils literal notranslate"><span class="pre">Wavefunction.to_file()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.algorithms.state_preparation.sparse_isometry.html#qdk_chemistry.algorithms.state_preparation.sparse_isometry.Wavefunction.to_hdf5_file"><code class="docutils literal notranslate"><span class="pre">Wavefunction.to_hdf5_file()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.algorithms.state_preparation.sparse_isometry.html#qdk_chemistry.algorithms.state_preparation.sparse_isometry.Wavefunction.to_json"><code class="docutils literal notranslate"><span class="pre">Wavefunction.to_json()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.algorithms.state_preparation.sparse_isometry.html#qdk_chemistry.algorithms.state_preparation.sparse_isometry.Wavefunction.to_json_file"><code class="docutils literal notranslate"><span class="pre">Wavefunction.to_json_file()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="qdk_chemistry.algorithms.state_preparation.sparse_isometry.html#qdk_chemistry.algorithms.state_preparation.sparse_isometry.MergeZBasisRotations"><code class="docutils literal notranslate"><span class="pre">MergeZBasisRotations</span></code></a><ul>
+<li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.algorithms.state_preparation.sparse_isometry.html#qdk_chemistry.algorithms.state_preparation.sparse_isometry.MergeZBasisRotations.__init__"><code class="docutils literal notranslate"><span class="pre">MergeZBasisRotations.__init__()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.algorithms.state_preparation.sparse_isometry.html#qdk_chemistry.algorithms.state_preparation.sparse_isometry.MergeZBasisRotations.run"><code class="docutils literal notranslate"><span class="pre">MergeZBasisRotations.run()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="qdk_chemistry.algorithms.state_preparation.sparse_isometry.html#qdk_chemistry.algorithms.state_preparation.sparse_isometry.RemoveZBasisOnZeroState"><code class="docutils literal notranslate"><span class="pre">RemoveZBasisOnZeroState</span></code></a><ul>
+<li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.algorithms.state_preparation.sparse_isometry.html#qdk_chemistry.algorithms.state_preparation.sparse_isometry.RemoveZBasisOnZeroState.__init__"><code class="docutils literal notranslate"><span class="pre">RemoveZBasisOnZeroState.__init__()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.algorithms.state_preparation.sparse_isometry.html#qdk_chemistry.algorithms.state_preparation.sparse_isometry.RemoveZBasisOnZeroState.run"><code class="docutils literal notranslate"><span class="pre">RemoveZBasisOnZeroState.run()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="qdk_chemistry.algorithms.state_preparation.sparse_isometry.html#qdk_chemistry.algorithms.state_preparation.sparse_isometry.SubstituteCliffordRz"><code class="docutils literal notranslate"><span class="pre">SubstituteCliffordRz</span></code></a><ul>
+<li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.algorithms.state_preparation.sparse_isometry.html#qdk_chemistry.algorithms.state_preparation.sparse_isometry.SubstituteCliffordRz.__init__"><code class="docutils literal notranslate"><span class="pre">SubstituteCliffordRz.__init__()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.algorithms.state_preparation.sparse_isometry.html#qdk_chemistry.algorithms.state_preparation.sparse_isometry.SubstituteCliffordRz.run"><code class="docutils literal notranslate"><span class="pre">SubstituteCliffordRz.run()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.algorithms.state_preparation.sparse_isometry.html#qdk_chemistry.algorithms.state_preparation.sparse_isometry.SubstituteCliffordRz.settings"><code class="docutils literal notranslate"><span class="pre">SubstituteCliffordRz.settings()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="qdk_chemistry.algorithms.state_preparation.sparse_isometry.html#qdk_chemistry.algorithms.state_preparation.sparse_isometry.bitstrings_to_binary_matrix"><code class="docutils literal notranslate"><span class="pre">bitstrings_to_binary_matrix()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="qdk_chemistry.algorithms.state_preparation.sparse_isometry.html#qdk_chemistry.algorithms.state_preparation.sparse_isometry.separate_alpha_beta_to_binary_string"><code class="docutils literal notranslate"><span class="pre">separate_alpha_beta_to_binary_string()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="qdk_chemistry.algorithms.state_preparation.sparse_isometry.html#qdk_chemistry.algorithms.state_preparation.sparse_isometry.SparseIsometryGF2XStatePreparation"><code class="docutils literal notranslate"><span class="pre">SparseIsometryGF2XStatePreparation</span></code></a><ul>
+<li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.algorithms.state_preparation.sparse_isometry.html#qdk_chemistry.algorithms.state_preparation.sparse_isometry.SparseIsometryGF2XStatePreparation.__init__"><code class="docutils literal notranslate"><span class="pre">SparseIsometryGF2XStatePreparation.__init__()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.algorithms.state_preparation.sparse_isometry.html#qdk_chemistry.algorithms.state_preparation.sparse_isometry.SparseIsometryGF2XStatePreparation.name"><code class="docutils literal notranslate"><span class="pre">SparseIsometryGF2XStatePreparation.name()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="qdk_chemistry.algorithms.state_preparation.sparse_isometry.html#qdk_chemistry.algorithms.state_preparation.sparse_isometry.GF2XEliminationResult"><code class="docutils literal notranslate"><span class="pre">GF2XEliminationResult</span></code></a><ul>
+<li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.algorithms.state_preparation.sparse_isometry.html#qdk_chemistry.algorithms.state_preparation.sparse_isometry.GF2XEliminationResult.reduced_matrix"><code class="docutils literal notranslate"><span class="pre">GF2XEliminationResult.reduced_matrix</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.algorithms.state_preparation.sparse_isometry.html#qdk_chemistry.algorithms.state_preparation.sparse_isometry.GF2XEliminationResult.row_map"><code class="docutils literal notranslate"><span class="pre">GF2XEliminationResult.row_map</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.algorithms.state_preparation.sparse_isometry.html#qdk_chemistry.algorithms.state_preparation.sparse_isometry.GF2XEliminationResult.col_map"><code class="docutils literal notranslate"><span class="pre">GF2XEliminationResult.col_map</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.algorithms.state_preparation.sparse_isometry.html#qdk_chemistry.algorithms.state_preparation.sparse_isometry.GF2XEliminationResult.operations"><code class="docutils literal notranslate"><span class="pre">GF2XEliminationResult.operations</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.algorithms.state_preparation.sparse_isometry.html#qdk_chemistry.algorithms.state_preparation.sparse_isometry.GF2XEliminationResult.rank"><code class="docutils literal notranslate"><span class="pre">GF2XEliminationResult.rank</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.algorithms.state_preparation.sparse_isometry.html#qdk_chemistry.algorithms.state_preparation.sparse_isometry.GF2XEliminationResult.__init__"><code class="docutils literal notranslate"><span class="pre">GF2XEliminationResult.__init__()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="qdk_chemistry.algorithms.state_preparation.sparse_isometry.html#qdk_chemistry.algorithms.state_preparation.sparse_isometry.gf2x_with_tracking"><code class="docutils literal notranslate"><span class="pre">gf2x_with_tracking()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="qdk_chemistry.algorithms.state_preparation.state_preparation.html">qdk_chemistry.algorithms.state_preparation.state_preparation module</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="qdk_chemistry.algorithms.state_preparation.state_preparation.html#qdk_chemistry.algorithms.state_preparation.state_preparation.Algorithm"><code class="docutils literal notranslate"><span class="pre">Algorithm</span></code></a><ul>
+<li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.algorithms.state_preparation.state_preparation.html#qdk_chemistry.algorithms.state_preparation.state_preparation.Algorithm.__init__"><code class="docutils literal notranslate"><span class="pre">Algorithm.__init__()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.algorithms.state_preparation.state_preparation.html#qdk_chemistry.algorithms.state_preparation.state_preparation.Algorithm.aliases"><code class="docutils literal notranslate"><span class="pre">Algorithm.aliases()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.algorithms.state_preparation.state_preparation.html#qdk_chemistry.algorithms.state_preparation.state_preparation.Algorithm.name"><code class="docutils literal notranslate"><span class="pre">Algorithm.name()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.algorithms.state_preparation.state_preparation.html#qdk_chemistry.algorithms.state_preparation.state_preparation.Algorithm.run"><code class="docutils literal notranslate"><span class="pre">Algorithm.run()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.algorithms.state_preparation.state_preparation.html#qdk_chemistry.algorithms.state_preparation.state_preparation.Algorithm.settings"><code class="docutils literal notranslate"><span class="pre">Algorithm.settings()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.algorithms.state_preparation.state_preparation.html#qdk_chemistry.algorithms.state_preparation.state_preparation.Algorithm.type_name"><code class="docutils literal notranslate"><span class="pre">Algorithm.type_name()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="qdk_chemistry.algorithms.state_preparation.state_preparation.html#qdk_chemistry.algorithms.state_preparation.state_preparation.AlgorithmFactory"><code class="docutils literal notranslate"><span class="pre">AlgorithmFactory</span></code></a><ul>
+<li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.algorithms.state_preparation.state_preparation.html#qdk_chemistry.algorithms.state_preparation.state_preparation.AlgorithmFactory.__init__"><code class="docutils literal notranslate"><span class="pre">AlgorithmFactory.__init__()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.algorithms.state_preparation.state_preparation.html#qdk_chemistry.algorithms.state_preparation.state_preparation.AlgorithmFactory.algorithm_type_name"><code class="docutils literal notranslate"><span class="pre">AlgorithmFactory.algorithm_type_name()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.algorithms.state_preparation.state_preparation.html#qdk_chemistry.algorithms.state_preparation.state_preparation.AlgorithmFactory.available"><code class="docutils literal notranslate"><span class="pre">AlgorithmFactory.available()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.algorithms.state_preparation.state_preparation.html#qdk_chemistry.algorithms.state_preparation.state_preparation.AlgorithmFactory.clear"><code class="docutils literal notranslate"><span class="pre">AlgorithmFactory.clear()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.algorithms.state_preparation.state_preparation.html#qdk_chemistry.algorithms.state_preparation.state_preparation.AlgorithmFactory.create"><code class="docutils literal notranslate"><span class="pre">AlgorithmFactory.create()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.algorithms.state_preparation.state_preparation.html#qdk_chemistry.algorithms.state_preparation.state_preparation.AlgorithmFactory.default_algorithm_name"><code class="docutils literal notranslate"><span class="pre">AlgorithmFactory.default_algorithm_name()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.algorithms.state_preparation.state_preparation.html#qdk_chemistry.algorithms.state_preparation.state_preparation.AlgorithmFactory.has"><code class="docutils literal notranslate"><span class="pre">AlgorithmFactory.has()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.algorithms.state_preparation.state_preparation.html#qdk_chemistry.algorithms.state_preparation.state_preparation.AlgorithmFactory.register_instance"><code class="docutils literal notranslate"><span class="pre">AlgorithmFactory.register_instance()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.algorithms.state_preparation.state_preparation.html#qdk_chemistry.algorithms.state_preparation.state_preparation.AlgorithmFactory.unregister_instance"><code class="docutils literal notranslate"><span class="pre">AlgorithmFactory.unregister_instance()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="qdk_chemistry.algorithms.state_preparation.state_preparation.html#qdk_chemistry.algorithms.state_preparation.state_preparation.Settings"><code class="docutils literal notranslate"><span class="pre">Settings</span></code></a><ul>
+<li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.algorithms.state_preparation.state_preparation.html#qdk_chemistry.algorithms.state_preparation.state_preparation.Settings.__init__"><code class="docutils literal notranslate"><span class="pre">Settings.__init__()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.algorithms.state_preparation.state_preparation.html#qdk_chemistry.algorithms.state_preparation.state_preparation.Settings.empty"><code class="docutils literal notranslate"><span class="pre">Settings.empty()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.algorithms.state_preparation.state_preparation.html#qdk_chemistry.algorithms.state_preparation.state_preparation.Settings.from_dict"><code class="docutils literal notranslate"><span class="pre">Settings.from_dict()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.algorithms.state_preparation.state_preparation.html#qdk_chemistry.algorithms.state_preparation.state_preparation.Settings.from_file"><code class="docutils literal notranslate"><span class="pre">Settings.from_file()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.algorithms.state_preparation.state_preparation.html#qdk_chemistry.algorithms.state_preparation.state_preparation.Settings.from_hdf5_file"><code class="docutils literal notranslate"><span class="pre">Settings.from_hdf5_file()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.algorithms.state_preparation.state_preparation.html#qdk_chemistry.algorithms.state_preparation.state_preparation.Settings.from_json"><code class="docutils literal notranslate"><span class="pre">Settings.from_json()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.algorithms.state_preparation.state_preparation.html#qdk_chemistry.algorithms.state_preparation.state_preparation.Settings.from_json_file"><code class="docutils literal notranslate"><span class="pre">Settings.from_json_file()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.algorithms.state_preparation.state_preparation.html#qdk_chemistry.algorithms.state_preparation.state_preparation.Settings.from_json_string"><code class="docutils literal notranslate"><span class="pre">Settings.from_json_string()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.algorithms.state_preparation.state_preparation.html#qdk_chemistry.algorithms.state_preparation.state_preparation.Settings.get"><code class="docutils literal notranslate"><span class="pre">Settings.get()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.algorithms.state_preparation.state_preparation.html#qdk_chemistry.algorithms.state_preparation.state_preparation.Settings.get_all_settings"><code class="docutils literal notranslate"><span class="pre">Settings.get_all_settings()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.algorithms.state_preparation.state_preparation.html#qdk_chemistry.algorithms.state_preparation.state_preparation.Settings.get_as_string"><code class="docutils literal notranslate"><span class="pre">Settings.get_as_string()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.algorithms.state_preparation.state_preparation.html#qdk_chemistry.algorithms.state_preparation.state_preparation.Settings.get_expected_python_type"><code class="docutils literal notranslate"><span class="pre">Settings.get_expected_python_type()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.algorithms.state_preparation.state_preparation.html#qdk_chemistry.algorithms.state_preparation.state_preparation.Settings.get_or_default"><code class="docutils literal notranslate"><span class="pre">Settings.get_or_default()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.algorithms.state_preparation.state_preparation.html#qdk_chemistry.algorithms.state_preparation.state_preparation.Settings.get_or_default_raw"><code class="docutils literal notranslate"><span class="pre">Settings.get_or_default_raw()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.algorithms.state_preparation.state_preparation.html#qdk_chemistry.algorithms.state_preparation.state_preparation.Settings.get_raw"><code class="docutils literal notranslate"><span class="pre">Settings.get_raw()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.algorithms.state_preparation.state_preparation.html#qdk_chemistry.algorithms.state_preparation.state_preparation.Settings.get_type_name"><code class="docutils literal notranslate"><span class="pre">Settings.get_type_name()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.algorithms.state_preparation.state_preparation.html#qdk_chemistry.algorithms.state_preparation.state_preparation.Settings.has"><code class="docutils literal notranslate"><span class="pre">Settings.has()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.algorithms.state_preparation.state_preparation.html#qdk_chemistry.algorithms.state_preparation.state_preparation.Settings.items"><code class="docutils literal notranslate"><span class="pre">Settings.items()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.algorithms.state_preparation.state_preparation.html#qdk_chemistry.algorithms.state_preparation.state_preparation.Settings.keys"><code class="docutils literal notranslate"><span class="pre">Settings.keys()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.algorithms.state_preparation.state_preparation.html#qdk_chemistry.algorithms.state_preparation.state_preparation.Settings.lock"><code class="docutils literal notranslate"><span class="pre">Settings.lock()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.algorithms.state_preparation.state_preparation.html#qdk_chemistry.algorithms.state_preparation.state_preparation.Settings.set"><code class="docutils literal notranslate"><span class="pre">Settings.set()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.algorithms.state_preparation.state_preparation.html#qdk_chemistry.algorithms.state_preparation.state_preparation.Settings.set_from_map"><code class="docutils literal notranslate"><span class="pre">Settings.set_from_map()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.algorithms.state_preparation.state_preparation.html#qdk_chemistry.algorithms.state_preparation.state_preparation.Settings.set_raw"><code class="docutils literal notranslate"><span class="pre">Settings.set_raw()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.algorithms.state_preparation.state_preparation.html#qdk_chemistry.algorithms.state_preparation.state_preparation.Settings.size"><code class="docutils literal notranslate"><span class="pre">Settings.size()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.algorithms.state_preparation.state_preparation.html#qdk_chemistry.algorithms.state_preparation.state_preparation.Settings.to_dict"><code class="docutils literal notranslate"><span class="pre">Settings.to_dict()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.algorithms.state_preparation.state_preparation.html#qdk_chemistry.algorithms.state_preparation.state_preparation.Settings.to_file"><code class="docutils literal notranslate"><span class="pre">Settings.to_file()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.algorithms.state_preparation.state_preparation.html#qdk_chemistry.algorithms.state_preparation.state_preparation.Settings.to_hdf5_file"><code class="docutils literal notranslate"><span class="pre">Settings.to_hdf5_file()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.algorithms.state_preparation.state_preparation.html#qdk_chemistry.algorithms.state_preparation.state_preparation.Settings.to_json"><code class="docutils literal notranslate"><span class="pre">Settings.to_json()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.algorithms.state_preparation.state_preparation.html#qdk_chemistry.algorithms.state_preparation.state_preparation.Settings.to_json_file"><code class="docutils literal notranslate"><span class="pre">Settings.to_json_file()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.algorithms.state_preparation.state_preparation.html#qdk_chemistry.algorithms.state_preparation.state_preparation.Settings.to_json_string"><code class="docutils literal notranslate"><span class="pre">Settings.to_json_string()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.algorithms.state_preparation.state_preparation.html#qdk_chemistry.algorithms.state_preparation.state_preparation.Settings.update"><code class="docutils literal notranslate"><span class="pre">Settings.update()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.algorithms.state_preparation.state_preparation.html#qdk_chemistry.algorithms.state_preparation.state_preparation.Settings.update_raw"><code class="docutils literal notranslate"><span class="pre">Settings.update_raw()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.algorithms.state_preparation.state_preparation.html#qdk_chemistry.algorithms.state_preparation.state_preparation.Settings.validate_required"><code class="docutils literal notranslate"><span class="pre">Settings.validate_required()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.algorithms.state_preparation.state_preparation.html#qdk_chemistry.algorithms.state_preparation.state_preparation.Settings.values"><code class="docutils literal notranslate"><span class="pre">Settings.values()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="qdk_chemistry.algorithms.state_preparation.state_preparation.html#qdk_chemistry.algorithms.state_preparation.state_preparation.Wavefunction"><code class="docutils literal notranslate"><span class="pre">Wavefunction</span></code></a><ul>
+<li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.algorithms.state_preparation.state_preparation.html#qdk_chemistry.algorithms.state_preparation.state_preparation.Wavefunction.__init__"><code class="docutils literal notranslate"><span class="pre">Wavefunction.__init__()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.algorithms.state_preparation.state_preparation.html#qdk_chemistry.algorithms.state_preparation.state_preparation.Wavefunction.from_file"><code class="docutils literal notranslate"><span class="pre">Wavefunction.from_file()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.algorithms.state_preparation.state_preparation.html#qdk_chemistry.algorithms.state_preparation.state_preparation.Wavefunction.from_hdf5_file"><code class="docutils literal notranslate"><span class="pre">Wavefunction.from_hdf5_file()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.algorithms.state_preparation.state_preparation.html#qdk_chemistry.algorithms.state_preparation.state_preparation.Wavefunction.from_json"><code class="docutils literal notranslate"><span class="pre">Wavefunction.from_json()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.algorithms.state_preparation.state_preparation.html#qdk_chemistry.algorithms.state_preparation.state_preparation.Wavefunction.from_json_file"><code class="docutils literal notranslate"><span class="pre">Wavefunction.from_json_file()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.algorithms.state_preparation.state_preparation.html#qdk_chemistry.algorithms.state_preparation.state_preparation.Wavefunction.get_active_determinant"><code class="docutils literal notranslate"><span class="pre">Wavefunction.get_active_determinant()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.algorithms.state_preparation.state_preparation.html#qdk_chemistry.algorithms.state_preparation.state_preparation.Wavefunction.get_active_determinants"><code class="docutils literal notranslate"><span class="pre">Wavefunction.get_active_determinants()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.algorithms.state_preparation.state_preparation.html#qdk_chemistry.algorithms.state_preparation.state_preparation.Wavefunction.get_active_num_electrons"><code class="docutils literal notranslate"><span class="pre">Wavefunction.get_active_num_electrons()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.algorithms.state_preparation.state_preparation.html#qdk_chemistry.algorithms.state_preparation.state_preparation.Wavefunction.get_active_one_rdm_spin_dependent"><code class="docutils literal notranslate"><span class="pre">Wavefunction.get_active_one_rdm_spin_dependent()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.algorithms.state_preparation.state_preparation.html#qdk_chemistry.algorithms.state_preparation.state_preparation.Wavefunction.get_active_one_rdm_spin_traced"><code class="docutils literal notranslate"><span class="pre">Wavefunction.get_active_one_rdm_spin_traced()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.algorithms.state_preparation.state_preparation.html#qdk_chemistry.algorithms.state_preparation.state_preparation.Wavefunction.get_active_orbital_occupations"><code class="docutils literal notranslate"><span class="pre">Wavefunction.get_active_orbital_occupations()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.algorithms.state_preparation.state_preparation.html#qdk_chemistry.algorithms.state_preparation.state_preparation.Wavefunction.get_active_two_rdm_spin_dependent"><code class="docutils literal notranslate"><span class="pre">Wavefunction.get_active_two_rdm_spin_dependent()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.algorithms.state_preparation.state_preparation.html#qdk_chemistry.algorithms.state_preparation.state_preparation.Wavefunction.get_active_two_rdm_spin_traced"><code class="docutils literal notranslate"><span class="pre">Wavefunction.get_active_two_rdm_spin_traced()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.algorithms.state_preparation.state_preparation.html#qdk_chemistry.algorithms.state_preparation.state_preparation.Wavefunction.get_coefficient"><code class="docutils literal notranslate"><span class="pre">Wavefunction.get_coefficient()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.algorithms.state_preparation.state_preparation.html#qdk_chemistry.algorithms.state_preparation.state_preparation.Wavefunction.get_coefficients"><code class="docutils literal notranslate"><span class="pre">Wavefunction.get_coefficients()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.algorithms.state_preparation.state_preparation.html#qdk_chemistry.algorithms.state_preparation.state_preparation.Wavefunction.get_container"><code class="docutils literal notranslate"><span class="pre">Wavefunction.get_container()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.algorithms.state_preparation.state_preparation.html#qdk_chemistry.algorithms.state_preparation.state_preparation.Wavefunction.get_container_type"><code class="docutils literal notranslate"><span class="pre">Wavefunction.get_container_type()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.algorithms.state_preparation.state_preparation.html#qdk_chemistry.algorithms.state_preparation.state_preparation.Wavefunction.get_orbitals"><code class="docutils literal notranslate"><span class="pre">Wavefunction.get_orbitals()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.algorithms.state_preparation.state_preparation.html#qdk_chemistry.algorithms.state_preparation.state_preparation.Wavefunction.get_single_orbital_entropies"><code class="docutils literal notranslate"><span class="pre">Wavefunction.get_single_orbital_entropies()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.algorithms.state_preparation.state_preparation.html#qdk_chemistry.algorithms.state_preparation.state_preparation.Wavefunction.get_total_determinant"><code class="docutils literal notranslate"><span class="pre">Wavefunction.get_total_determinant()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.algorithms.state_preparation.state_preparation.html#qdk_chemistry.algorithms.state_preparation.state_preparation.Wavefunction.get_total_determinants"><code class="docutils literal notranslate"><span class="pre">Wavefunction.get_total_determinants()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.algorithms.state_preparation.state_preparation.html#qdk_chemistry.algorithms.state_preparation.state_preparation.Wavefunction.get_total_num_electrons"><code class="docutils literal notranslate"><span class="pre">Wavefunction.get_total_num_electrons()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.algorithms.state_preparation.state_preparation.html#qdk_chemistry.algorithms.state_preparation.state_preparation.Wavefunction.get_total_orbital_occupations"><code class="docutils literal notranslate"><span class="pre">Wavefunction.get_total_orbital_occupations()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.algorithms.state_preparation.state_preparation.html#qdk_chemistry.algorithms.state_preparation.state_preparation.Wavefunction.get_type"><code class="docutils literal notranslate"><span class="pre">Wavefunction.get_type()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.algorithms.state_preparation.state_preparation.html#qdk_chemistry.algorithms.state_preparation.state_preparation.Wavefunction.has_one_rdm_spin_dependent"><code class="docutils literal notranslate"><span class="pre">Wavefunction.has_one_rdm_spin_dependent()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.algorithms.state_preparation.state_preparation.html#qdk_chemistry.algorithms.state_preparation.state_preparation.Wavefunction.has_one_rdm_spin_traced"><code class="docutils literal notranslate"><span class="pre">Wavefunction.has_one_rdm_spin_traced()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.algorithms.state_preparation.state_preparation.html#qdk_chemistry.algorithms.state_preparation.state_preparation.Wavefunction.has_two_rdm_spin_dependent"><code class="docutils literal notranslate"><span class="pre">Wavefunction.has_two_rdm_spin_dependent()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.algorithms.state_preparation.state_preparation.html#qdk_chemistry.algorithms.state_preparation.state_preparation.Wavefunction.has_two_rdm_spin_traced"><code class="docutils literal notranslate"><span class="pre">Wavefunction.has_two_rdm_spin_traced()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.algorithms.state_preparation.state_preparation.html#qdk_chemistry.algorithms.state_preparation.state_preparation.Wavefunction.is_complex"><code class="docutils literal notranslate"><span class="pre">Wavefunction.is_complex()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.algorithms.state_preparation.state_preparation.html#qdk_chemistry.algorithms.state_preparation.state_preparation.Wavefunction.norm"><code class="docutils literal notranslate"><span class="pre">Wavefunction.norm()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.algorithms.state_preparation.state_preparation.html#qdk_chemistry.algorithms.state_preparation.state_preparation.Wavefunction.orbitals"><code class="docutils literal notranslate"><span class="pre">Wavefunction.orbitals</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.algorithms.state_preparation.state_preparation.html#qdk_chemistry.algorithms.state_preparation.state_preparation.Wavefunction.overlap"><code class="docutils literal notranslate"><span class="pre">Wavefunction.overlap()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.algorithms.state_preparation.state_preparation.html#qdk_chemistry.algorithms.state_preparation.state_preparation.Wavefunction.size"><code class="docutils literal notranslate"><span class="pre">Wavefunction.size()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.algorithms.state_preparation.state_preparation.html#qdk_chemistry.algorithms.state_preparation.state_preparation.Wavefunction.to_file"><code class="docutils literal notranslate"><span class="pre">Wavefunction.to_file()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.algorithms.state_preparation.state_preparation.html#qdk_chemistry.algorithms.state_preparation.state_preparation.Wavefunction.to_hdf5_file"><code class="docutils literal notranslate"><span class="pre">Wavefunction.to_hdf5_file()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.algorithms.state_preparation.state_preparation.html#qdk_chemistry.algorithms.state_preparation.state_preparation.Wavefunction.to_json"><code class="docutils literal notranslate"><span class="pre">Wavefunction.to_json()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.algorithms.state_preparation.state_preparation.html#qdk_chemistry.algorithms.state_preparation.state_preparation.Wavefunction.to_json_file"><code class="docutils literal notranslate"><span class="pre">Wavefunction.to_json_file()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="qdk_chemistry.algorithms.state_preparation.state_preparation.html#qdk_chemistry.algorithms.state_preparation.state_preparation.StatePreparationSettings"><code class="docutils literal notranslate"><span class="pre">StatePreparationSettings</span></code></a><ul>
+<li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.algorithms.state_preparation.state_preparation.html#qdk_chemistry.algorithms.state_preparation.state_preparation.StatePreparationSettings.__init__"><code class="docutils literal notranslate"><span class="pre">StatePreparationSettings.__init__()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="qdk_chemistry.algorithms.state_preparation.state_preparation.html#qdk_chemistry.algorithms.state_preparation.state_preparation.StatePreparation"><code class="docutils literal notranslate"><span class="pre">StatePreparation</span></code></a><ul>
+<li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.algorithms.state_preparation.state_preparation.html#qdk_chemistry.algorithms.state_preparation.state_preparation.StatePreparation.__init__"><code class="docutils literal notranslate"><span class="pre">StatePreparation.__init__()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.algorithms.state_preparation.state_preparation.html#qdk_chemistry.algorithms.state_preparation.state_preparation.StatePreparation.type_name"><code class="docutils literal notranslate"><span class="pre">StatePreparation.type_name()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.algorithms.state_preparation.state_preparation.html#qdk_chemistry.algorithms.state_preparation.state_preparation.StatePreparation.run"><code class="docutils literal notranslate"><span class="pre">StatePreparation.run()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="qdk_chemistry.algorithms.state_preparation.state_preparation.html#qdk_chemistry.algorithms.state_preparation.state_preparation.StatePreparationFactory"><code class="docutils literal notranslate"><span class="pre">StatePreparationFactory</span></code></a><ul>
+<li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.algorithms.state_preparation.state_preparation.html#qdk_chemistry.algorithms.state_preparation.state_preparation.StatePreparationFactory.__init__"><code class="docutils literal notranslate"><span class="pre">StatePreparationFactory.__init__()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.algorithms.state_preparation.state_preparation.html#qdk_chemistry.algorithms.state_preparation.state_preparation.StatePreparationFactory.algorithm_type_name"><code class="docutils literal notranslate"><span class="pre">StatePreparationFactory.algorithm_type_name()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.algorithms.state_preparation.state_preparation.html#qdk_chemistry.algorithms.state_preparation.state_preparation.StatePreparationFactory.default_algorithm_name"><code class="docutils literal notranslate"><span class="pre">StatePreparationFactory.default_algorithm_name()</span></code></a></li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</div>
+</section>
+</section>
+
+
+           </div>
+          </div>
+          <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
+        <a href="qdk_chemistry.algorithms.energy_estimator.qsharp.html" class="btn btn-neutral float-left" title="qdk_chemistry.algorithms.energy_estimator.qsharp module" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+        <a href="qdk_chemistry.algorithms.state_preparation.sparse_isometry.html" class="btn btn-neutral float-right" title="qdk_chemistry.algorithms.state_preparation.sparse_isometry module" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright Microsoft Corporation. All rights reserved. Licensed under the MIT License.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

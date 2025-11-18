@@ -1,0 +1,22 @@
+qdk\_chemistry.plugins.pyscf package
+====================================
+
+.. automodule:: qdk_chemistry.plugins.pyscf
+   :members:
+   :private-members:
+   :show-inheritance:
+   :undoc-members:
+
+Submodules
+----------
+
+.. toctree::
+   :maxdepth: 4
+
+   qdk_chemistry.plugins.pyscf.active_space_avas
+   qdk_chemistry.plugins.pyscf.coupled_cluster
+   qdk_chemistry.plugins.pyscf.localization
+   qdk_chemistry.plugins.pyscf.mcscf
+   qdk_chemistry.plugins.pyscf.scf_solver
+   qdk_chemistry.plugins.pyscf.stability
+   qdk_chemistry.plugins.pyscf.utils

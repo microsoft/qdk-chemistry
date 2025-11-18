@@ -1,8 +1,0 @@
-qdk.chemistry.state\_preparation.regular\_isometry module
-=========================================================
-
-.. automodule:: qdk.chemistry.state_preparation.regular_isometry
-   :members:
-   :private-members:
-   :show-inheritance:
-   :undoc-members:

@@ -1,8 +1,0 @@
-qdk.chemistry.phase\_estimation.iterative\_qpe module
-=====================================================
-
-.. automodule:: qdk.chemistry.phase_estimation.iterative_qpe
-   :members:
-   :private-members:
-   :show-inheritance:
-   :undoc-members:

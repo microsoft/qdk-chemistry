@@ -1,0 +1,8 @@
+qdk\_chemistry.utils.cubegen module
+===================================
+
+.. automodule:: qdk_chemistry.utils.cubegen
+   :members:
+   :private-members:
+   :show-inheritance:
+   :undoc-members:

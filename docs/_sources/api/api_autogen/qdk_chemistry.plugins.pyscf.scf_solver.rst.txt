@@ -1,0 +1,8 @@
+qdk\_chemistry.plugins.pyscf.scf\_solver module
+===============================================
+
+.. automodule:: qdk_chemistry.plugins.pyscf.scf_solver
+   :members:
+   :private-members:
+   :show-inheritance:
+   :undoc-members:

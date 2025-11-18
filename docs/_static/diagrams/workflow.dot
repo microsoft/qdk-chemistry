@@ -1,0 +1,93 @@
+digraph QuantumWorkflow {
+    // Graph settings for vertical layout
+    rankdir=TB;
+    ranksep=1.8;
+    nodesep=1.0;
+    newrank=true;
+    compound=true;
+    overlap=false;
+    sep="+0.5";
+    bgcolor="#FAFAFA";
+
+    // Default node style
+    node [shape=box, style="rounded,filled", fontname="Arial", width=3.2, height=1.0, fixedsize=true, margin=0.2];
+
+    // Input subgraph
+    subgraph cluster_0 {
+        label="Input chemical structure";
+        style="filled,rounded";
+        fillcolor="#E8EAF6";
+        color="#5C6BC0";
+        penwidth=2.5;
+        fontsize=14;
+        fontname="Arial Bold";
+        fontcolor="#3949AB";
+
+        Start [label=<<B>Input Structure</B><BR/><BR/><FONT POINT-SIZE="12" COLOR="#666666">2D, 3D (xyz format)</FONT>>, fillcolor="#FFFFFF", color="#5C6BC0", penwidth=2.5, group=g1];
+    }
+
+    // Classical Data Preparation subgraph
+    subgraph cluster_1 {
+        label="Classical Data Preparation";
+        style="filled,rounded";
+        fillcolor="#E3F2FD";
+        color="#42A5F5";
+        penwidth=2.5;
+        fontsize=14;
+        fontname="Arial Bold";
+        fontcolor="#1976D2";
+        rank=same;
+
+        GeomOpt [label=<<B>Geometry Optimization</B><BR/><BR/><FONT POINT-SIZE="12" COLOR="#E3F2FD">Energy-optimized input structure</FONT>>, fillcolor="#1976D2", fontcolor=white, color="#0D47A1", penwidth=2.5, group=g1];
+        SCF [label=<<B>Self-Consistent Field</B><BR/><BR/><FONT POINT-SIZE="12" COLOR="#E3F2FD">Initial electronic structure guess</FONT>>, fillcolor="#1976D2", fontcolor=white, color="#0D47A1", penwidth=2.5];
+        ActiveSpace [label=<<B>Active Space Engineering</B><BR/><BR/><FONT POINT-SIZE="12" COLOR="#E3F2FD">Select orbitals and electrons</FONT>>, fillcolor="#1976D2", fontcolor=white, color="#0D47A1", penwidth=2.5];
+        Hamilton [label=<<B>Hamiltonian Formation</B><BR/><BR/><FONT POINT-SIZE="12" COLOR="#E3F2FD">Generate energy terms</FONT>>, fillcolor="#1976D2", fontcolor=white, color="#0D47A1", penwidth=2.5];
+        ApproxCI [label=<<B>Approximate CI Wavefunction</B><BR/><BR/><FONT POINT-SIZE="12" COLOR="#E3F2FD">Electronic configuration description</FONT>>, fillcolor="#1976D2", fontcolor=white, color="#0D47A1", penwidth=2.5];
+
+        GeomOpt -> SCF -> ActiveSpace -> Hamilton -> ApproxCI;
+    }
+
+    // Building Quantum Circuit subgraph
+    subgraph cluster_2 {
+        label="Building the Quantum Circuit";
+        style="filled,rounded";
+        fillcolor="#E0F2F1";
+        color="#26A69A";
+        penwidth=2.5;
+        fontsize=14;
+        fontname="Arial Bold";
+        fontcolor="#00796B";
+        rank=same;
+
+        HamEncode [label=<<B>Hamiltonian Encoding</B><BR/><BR/><FONT POINT-SIZE="12" COLOR="#E0F2F1">Map fermionic operators to qubit operators</FONT>>, fillcolor="#00796B", fontcolor=white, color="#004D40", penwidth=2.5, group=g1];
+        PauliOpt [label=<<B>Pauli Operators Optimization</B><BR/><BR/><FONT POINT-SIZE="12" COLOR="#E0F2F1">Reduce measurement circuit complexity</FONT>>, fillcolor="#00796B", fontcolor=white, color="#004D40", penwidth=2.5];
+        StatePrep [label=<<B>State Prep</B><BR/><BR/><FONT POINT-SIZE="12" COLOR="#E0F2F1">Load chemically relevant states to QC</FONT>>, fillcolor="#00796B", fontcolor=white, color="#004D40", penwidth=2.5];
+        Transpilation [label=<<B>Transpilation</B><BR/><BR/><FONT POINT-SIZE="12" COLOR="#E0F2F1">Convert abstract circuit into native gates</FONT>>, fillcolor="#00796B", fontcolor=white, color="#004D40", penwidth=2.5];
+
+        HamEncode -> PauliOpt -> StatePrep -> Transpilation;
+    }
+
+    // Simulation and Execution subgraph
+    subgraph cluster_3 {
+        label="Simulation and Execution";
+        style="filled,rounded";
+        fillcolor="#F3E5F5";
+        color="#AB47BC";
+        penwidth=2.5;
+        fontsize=14;
+        fontname="Arial Bold";
+        fontcolor="#7B1FA2";
+        rank=same;
+
+        Debug [label=<<B>Debugging in QDK</B><BR/><BR/><FONT POINT-SIZE="12" COLOR="#F3E5F5">Test and validate circuit logic</FONT>>, fillcolor="#7B1FA2", fontcolor=white, color="#4A148C", penwidth=2.5, group=g1];
+        Simulator [label=<<B>Simulator in QDK</B><BR/><BR/><FONT POINT-SIZE="12" COLOR="#F3E5F5">Incorporate noise models</FONT>>, fillcolor="#7B1FA2", fontcolor=white, color="#4A148C", penwidth=2.5];
+        Execute [label=<<B>Execution on Quantum Hardware</B><BR/><BR/><FONT POINT-SIZE="12" COLOR="#F3E5F5">Run on quantum processors</FONT>>, fillcolor="#7B1FA2", fontcolor=white, color="#4A148C", penwidth=2.5];
+
+        Debug -> Simulator -> Execute;
+    }
+
+    // Workflow connections between subgraphs
+    Start:s -> GeomOpt:n [color="#1976D2", penwidth=2.5, weight=0, arrowsize=1.2];
+    ApproxCI:s -> HamEncode:n [color="#00796B", penwidth=2.5, weight=0, arrowsize=1.2];
+    Transpilation:s -> Debug:n [color="#7B1FA2", penwidth=2.5, weight=0, arrowsize=1.2];
+}

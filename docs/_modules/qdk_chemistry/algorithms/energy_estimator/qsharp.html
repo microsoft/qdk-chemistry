@@ -1,0 +1,322 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../../../../">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>qdk_chemistry.algorithms.energy_estimator.qsharp &mdash; qdk-chemistry 1.0.0-rc1 documentation</title>
+      <link rel="stylesheet" type="text/css" href="../../../../_static/pygments.css?v=b86133f3" />
+      <link rel="stylesheet" type="text/css" href="../../../../_static/css/theme.css?v=e59714d7" />
+      <link rel="stylesheet" type="text/css" href="../../../../_static/tabs.css?v=4c969af8" />
+      <link rel="stylesheet" type="text/css" href="../../../../_static/graphviz.css?v=4ae1632d" />
+      <link rel="stylesheet" type="text/css" href="../../../../_static/copybutton.css?v=76b2166b" />
+      <link rel="stylesheet" type="text/css" href="../../../../_static/custom.css?v=a64bac2b" />
+
+  
+      <script src="../../../../_static/jquery.js?v=5d32c60e"></script>
+      <script src="../../../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="../../../../_static/documentation_options.js?v=81bd8d55"></script>
+      <script src="../../../../_static/doctools.js?v=9bcbadda"></script>
+      <script src="../../../../_static/sphinx_highlight.js?v=dc90522c"></script>
+      <script src="../../../../_static/tabs.js?v=3ee01567"></script>
+      <script src="../../../../_static/clipboard.min.js?v=a7894cd8"></script>
+      <script src="../../../../_static/copybutton.js?v=f281be69"></script>
+    <script src="../../../../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../../../../genindex.html" />
+    <link rel="search" title="Search" href="../../../../search.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="../../../../index.html" class="icon icon-home">
+            qdk-chemistry
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../../../../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">User Documentation</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../../user/quickstart.html">Quickstart</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../../user/comprehensive/index.html">In-depth user guide</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">API Reference</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../../api/python_api.html">Python API</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../../api/cpp_api.html">C++ API</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Supporting Information</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../../glossary.html">Acronym definitions</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../../references.html">References</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../../../../index.html">qdk-chemistry</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../../../../index.html" class="icon icon-home" aria-label="Home"></a></li>
+          <li class="breadcrumb-item"><a href="../../../index.html">Module code</a></li>
+      <li class="breadcrumb-item active">qdk_chemistry.algorithms.energy_estimator.qsharp</li>
+      <li class="wy-breadcrumbs-aside">
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <h1>Source code for qdk_chemistry.algorithms.energy_estimator.qsharp</h1><div class="highlight"><pre>
+<span></span><span class="sd">&quot;&quot;&quot;Energy Estimator using QDK simulator.&quot;&quot;&quot;</span>
+
+<span class="c1"># --------------------------------------------------------------------------------------------</span>
+<span class="c1"># Copyright (c) Microsoft Corporation. All rights reserved.</span>
+<span class="c1"># Licensed under the MIT License. See LICENSE.txt in the project root for license information.</span>
+<span class="c1"># --------------------------------------------------------------------------------------------</span>
+
+<span class="kn">import</span><span class="w"> </span><span class="nn">logging</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">collections</span><span class="w"> </span><span class="kn">import</span> <span class="n">Counter</span>
+
+<span class="kn">from</span><span class="w"> </span><span class="nn">qsharp</span><span class="w"> </span><span class="kn">import</span> <span class="n">BitFlipNoise</span><span class="p">,</span> <span class="n">DepolarizingNoise</span><span class="p">,</span> <span class="n">PauliNoise</span><span class="p">,</span> <span class="n">PhaseFlipNoise</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">qsharp.openqasm</span><span class="w"> </span><span class="kn">import</span> <span class="n">run</span>
+
+<span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.algorithms.energy_estimator.energy_estimator</span><span class="w"> </span><span class="kn">import</span> <span class="p">(</span>
+    <span class="n">EnergyEstimator</span><span class="p">,</span>
+    <span class="n">compute_energy_expectation_from_bitstrings</span><span class="p">,</span>
+    <span class="n">create_measurement_circuits</span><span class="p">,</span>
+<span class="p">)</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.data</span><span class="w"> </span><span class="kn">import</span> <span class="n">EnergyExpectationResult</span><span class="p">,</span> <span class="n">MeasurementData</span><span class="p">,</span> <span class="n">QubitHamiltonian</span>
+
+<span class="n">_LOGGER</span> <span class="o">=</span> <span class="n">logging</span><span class="o">.</span><span class="n">getLogger</span><span class="p">(</span><span class="vm">__name__</span><span class="p">)</span>
+
+
+<div class="viewcode-block" id="QDKEnergyEstimator">
+<a class="viewcode-back" href="../../../../api/api_autogen/qdk_chemistry.algorithms.energy_estimator.qsharp.html#qdk_chemistry.algorithms.energy_estimator.qsharp.QDKEnergyEstimator">[docs]</a>
+<span class="k">class</span><span class="w"> </span><span class="nc">QDKEnergyEstimator</span><span class="p">(</span><span class="n">EnergyEstimator</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Energy Estimator to estimate expectation values of quantum circuits with respect to a given observable.</span>
+
+<span class="sd">    This class uses a QDK base simulator backend to run quantum circuits and estimate</span>
+<span class="sd">    the expectation values of qubit Hamiltonians. It supports optional noise models for noise simulation.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+<div class="viewcode-block" id="QDKEnergyEstimator.__init__">
+<a class="viewcode-back" href="../../../../api/api_autogen/qdk_chemistry.algorithms.energy_estimator.qsharp.html#qdk_chemistry.algorithms.energy_estimator.qsharp.QDKEnergyEstimator.__init__">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span>
+        <span class="n">seed</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">42</span><span class="p">,</span>
+        <span class="n">noise_model</span><span class="p">:</span> <span class="n">DepolarizingNoise</span> <span class="o">|</span> <span class="n">BitFlipNoise</span> <span class="o">|</span> <span class="n">PauliNoise</span> <span class="o">|</span> <span class="n">PhaseFlipNoise</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+        <span class="n">qubit_loss</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="mf">0.0</span><span class="p">,</span>
+    <span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Initialize the Estimator with a backend and optional transpilation settings.</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            seed: Random seed for reproducibility.</span>
+<span class="sd">            noise_model: Optional noise model to simulate noise in the quantum circuit.</span>
+<span class="sd">            qubit_loss: Probability of qubit loss in simulation.</span>
+
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">()</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">seed</span> <span class="o">=</span> <span class="n">seed</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">noise_model</span> <span class="o">=</span> <span class="n">noise_model</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">qubit_loss</span> <span class="o">=</span> <span class="n">qubit_loss</span></div>
+
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">_run_measurement_circuits_and_get_bitstring_counts</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span>
+        <span class="n">measurement_circuits</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="nb">str</span><span class="p">],</span>
+        <span class="n">shots_list</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="nb">int</span><span class="p">],</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">list</span><span class="p">[</span><span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="nb">int</span><span class="p">]]:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Run the measurement circuits and return the bitstring counts.</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            measurement_circuits: A list of measurement circuits in OpenQASM3 format to run.</span>
+<span class="sd">            shots_list: A list of shots allocated for each measurement circuit.</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            A list of dictionaries containing the bitstring counts for each measurement circuit.</span>
+
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">all_bitstring_counts</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="nb">int</span><span class="p">]]</span> <span class="o">=</span> <span class="p">[]</span>
+        <span class="k">for</span> <span class="n">circuit_qasm</span><span class="p">,</span> <span class="n">shots</span> <span class="ow">in</span> <span class="nb">zip</span><span class="p">(</span><span class="n">measurement_circuits</span><span class="p">,</span> <span class="n">shots_list</span><span class="p">,</span> <span class="n">strict</span><span class="o">=</span><span class="kc">False</span><span class="p">):</span>
+            <span class="n">result</span> <span class="o">=</span> <span class="n">run</span><span class="p">(</span>
+                <span class="n">circuit_qasm</span><span class="p">,</span>
+                <span class="n">shots</span><span class="o">=</span><span class="n">shots</span><span class="p">,</span>
+                <span class="n">noise</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">noise_model</span><span class="p">,</span>
+                <span class="n">qubit_loss</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">qubit_loss</span><span class="p">,</span>
+                <span class="n">as_bitstring</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+                <span class="n">seed</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">seed</span><span class="p">,</span>
+            <span class="p">)</span>
+            <span class="n">bitstring_count</span> <span class="o">=</span> <span class="p">{</span>
+                <span class="n">bitstring</span><span class="p">[::</span><span class="o">-</span><span class="mi">1</span><span class="p">]:</span> <span class="n">count</span> <span class="k">for</span> <span class="n">bitstring</span><span class="p">,</span> <span class="n">count</span> <span class="ow">in</span> <span class="n">Counter</span><span class="p">(</span><span class="n">result</span><span class="p">)</span><span class="o">.</span><span class="n">items</span><span class="p">()</span>
+            <span class="p">}</span>  <span class="c1"># Reverse bitstrings to match Little-Endian convention</span>
+            <span class="n">all_bitstring_counts</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">bitstring_count</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">all_bitstring_counts</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">_get_measurement_data</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span>
+        <span class="n">measurement_circuits</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="nb">str</span><span class="p">],</span>
+        <span class="n">qubit_hamiltonians</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="n">QubitHamiltonian</span><span class="p">],</span>
+        <span class="n">shots_list</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="nb">int</span><span class="p">],</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">MeasurementData</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Get ``MeasurementData`` from running measurement circuits.</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            measurement_circuits: A list of measurement circuits to run.</span>
+<span class="sd">            qubit_hamiltonians: A list of ``QubitHamiltonian`` to be evaluated.</span>
+<span class="sd">            shots_list: A list of shots allocated for each measurement circuit.</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            ``MeasurementData`` containing the measurement counts and Hamiltonian data.</span>
+
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">counts</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_run_measurement_circuits_and_get_bitstring_counts</span><span class="p">(</span><span class="n">measurement_circuits</span><span class="p">,</span> <span class="n">shots_list</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">MeasurementData</span><span class="p">(</span><span class="n">bitstring_counts</span><span class="o">=</span><span class="n">counts</span><span class="p">,</span> <span class="n">hamiltonians</span><span class="o">=</span><span class="n">qubit_hamiltonians</span><span class="p">,</span> <span class="n">shots_list</span><span class="o">=</span><span class="n">shots_list</span><span class="p">)</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">_run_impl</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span>
+        <span class="n">circuit_qasm</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
+        <span class="n">qubit_hamiltonians</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="n">QubitHamiltonian</span><span class="p">],</span>
+        <span class="n">total_shots</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span>
+        <span class="n">classical_coeffs</span><span class="p">:</span> <span class="nb">list</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">tuple</span><span class="p">[</span><span class="n">EnergyExpectationResult</span><span class="p">,</span> <span class="n">MeasurementData</span><span class="p">]:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Estimate the expectation value and variance of Hamiltonians.</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            circuit_qasm: OpenQASM3 string of the quantum circuit to be evaluated.</span>
+<span class="sd">            qubit_hamiltonians: List of ``QubitHamiltonian`` to estimate.</span>
+<span class="sd">            total_shots: Total number of shots to allocate across the observable terms.</span>
+<span class="sd">            classical_coeffs: Optional list of coefficients for classical Pauli terms to calculate energy offset.</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            ``EnergyExpectationResult`` containing the energy expectation value and variance.</span>
+
+<span class="sd">        Note:</span>
+<span class="sd">            * Measurement circuits are generated for each QubitHamiltonian term.</span>
+<span class="sd">            * Parameterized circuits are not supported.</span>
+<span class="sd">            * Only one circuit is supported per run.</span>
+
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">num_observables</span> <span class="o">=</span> <span class="nb">len</span><span class="p">(</span><span class="n">qubit_hamiltonians</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">total_shots</span> <span class="o">&lt;</span> <span class="n">num_observables</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
+                <span class="sa">f</span><span class="s2">&quot;Total shots </span><span class="si">{</span><span class="n">total_shots</span><span class="si">}</span><span class="s2"> is less than the number of observables </span><span class="si">{</span><span class="n">num_observables</span><span class="si">}</span><span class="s2">. &quot;</span>
+                <span class="s2">&quot;Please increase total shots to ensure each observable is measured.&quot;</span>
+            <span class="p">)</span>
+
+        <span class="c1"># Evenly distribute shots across all observables</span>
+        <span class="n">shots_list</span> <span class="o">=</span> <span class="p">[</span><span class="n">total_shots</span> <span class="o">//</span> <span class="n">num_observables</span><span class="p">]</span> <span class="o">*</span> <span class="n">num_observables</span>
+        <span class="n">_LOGGER</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Shots allocated: </span><span class="si">{</span><span class="n">shots_list</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+
+        <span class="n">energy_offset</span> <span class="o">=</span> <span class="nb">sum</span><span class="p">(</span><span class="n">classical_coeffs</span><span class="p">)</span> <span class="k">if</span> <span class="n">classical_coeffs</span> <span class="k">else</span> <span class="mf">0.0</span>
+
+        <span class="c1"># Create measurement circuits</span>
+        <span class="n">measurement_circuits_qasm</span> <span class="o">=</span> <span class="n">create_measurement_circuits</span><span class="p">(</span>
+            <span class="n">circuit_qasm</span><span class="o">=</span><span class="n">circuit_qasm</span><span class="p">,</span>
+            <span class="n">grouped_hamiltonians</span><span class="o">=</span><span class="n">qubit_hamiltonians</span><span class="p">,</span>
+        <span class="p">)</span>
+
+        <span class="n">measurement_data</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_get_measurement_data</span><span class="p">(</span>
+            <span class="n">measurement_circuits</span><span class="o">=</span><span class="n">measurement_circuits_qasm</span><span class="p">,</span>
+            <span class="n">qubit_hamiltonians</span><span class="o">=</span><span class="n">qubit_hamiltonians</span><span class="p">,</span>
+            <span class="n">shots_list</span><span class="o">=</span><span class="n">shots_list</span><span class="p">,</span>
+        <span class="p">)</span>
+
+        <span class="k">return</span> <span class="n">compute_energy_expectation_from_bitstrings</span><span class="p">(</span>
+            <span class="n">qubit_hamiltonians</span><span class="p">,</span> <span class="n">measurement_data</span><span class="o">.</span><span class="n">bitstring_counts</span><span class="p">,</span> <span class="n">energy_offset</span>
+        <span class="p">),</span> <span class="n">measurement_data</span>
+
+<div class="viewcode-block" id="QDKEnergyEstimator.name">
+<a class="viewcode-back" href="../../../../api/api_autogen/qdk_chemistry.algorithms.energy_estimator.qsharp.html#qdk_chemistry.algorithms.energy_estimator.qsharp.QDKEnergyEstimator.name">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">name</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Get the name of the estimator for registry purposes.&quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="s2">&quot;qdk_base_simulator&quot;</span></div>
+</div>
+
+
+
+<span class="k">if</span> <span class="vm">__name__</span> <span class="o">==</span> <span class="s2">&quot;__main__&quot;</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Example usage of the Estimator from different backends.&quot;&quot;&quot;</span>
+    <span class="kn">import</span><span class="w"> </span><span class="nn">logging</span>
+
+    <span class="kn">import</span><span class="w"> </span><span class="nn">numpy</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">np</span>
+
+    <span class="n">logging</span><span class="o">.</span><span class="n">basicConfig</span><span class="p">(</span><span class="n">level</span><span class="o">=</span><span class="n">logging</span><span class="o">.</span><span class="n">WARNING</span><span class="p">)</span>
+    <span class="n">_LOGGER</span> <span class="o">=</span> <span class="n">logging</span><span class="o">.</span><span class="n">getLogger</span><span class="p">(</span><span class="vm">__name__</span><span class="p">)</span>
+    <span class="n">_LOGGER</span><span class="o">.</span><span class="n">setLevel</span><span class="p">(</span><span class="n">logging</span><span class="o">.</span><span class="n">INFO</span><span class="p">)</span>
+
+    <span class="n">circuit_qasm</span> <span class="o">=</span> <span class="s2">&quot;&quot;&quot;</span>
+<span class="s2">        include &quot;stdgates.inc&quot;;</span>
+<span class="s2">        qubit[2] q;</span>
+<span class="s2">        rz(pi) q[0];</span>
+<span class="s2">        x q[0];</span>
+<span class="s2">        cx q[0], q[1];</span>
+<span class="s2">        &quot;&quot;&quot;</span>
+    <span class="n">qubit_hamiltonians</span> <span class="o">=</span> <span class="p">[</span><span class="n">QubitHamiltonian</span><span class="p">([</span><span class="s2">&quot;ZZ&quot;</span><span class="p">],</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">([</span><span class="mf">1.0</span><span class="p">]))]</span>
+
+    <span class="c1"># Example usage: qsharp simulator</span>
+    <span class="n">estimator</span> <span class="o">=</span> <span class="n">QDKEnergyEstimator</span><span class="p">()</span>
+    <span class="n">results</span> <span class="o">=</span> <span class="n">estimator</span><span class="o">.</span><span class="n">run</span><span class="p">(</span><span class="n">circuit_qasm</span><span class="p">,</span> <span class="n">qubit_hamiltonians</span><span class="p">,</span> <span class="n">total_shots</span><span class="o">=</span><span class="mi">1000</span><span class="p">)</span>
+    <span class="n">_LOGGER</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Energy expectation value from QDK Simulator: </span><span class="si">{</span><span class="n">results</span><span class="p">[</span><span class="s1">&#39;energy_expectation_value&#39;</span><span class="p">]</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+
+    <span class="c1"># Example usage: qsharp simulator with depolarizing noise</span>
+    <span class="n">noise_model</span> <span class="o">=</span> <span class="n">DepolarizingNoise</span><span class="p">(</span><span class="mf">0.01</span><span class="p">)</span>
+    <span class="n">estimator</span> <span class="o">=</span> <span class="n">QDKEnergyEstimator</span><span class="p">(</span><span class="n">noise_model</span><span class="o">=</span><span class="n">noise_model</span><span class="p">)</span>
+    <span class="n">results</span> <span class="o">=</span> <span class="n">estimator</span><span class="o">.</span><span class="n">run</span><span class="p">(</span><span class="n">circuit_qasm</span><span class="p">,</span> <span class="n">qubit_hamiltonians</span><span class="p">,</span> <span class="n">total_shots</span><span class="o">=</span><span class="mi">1000</span><span class="p">)</span>
+    <span class="n">_LOGGER</span><span class="o">.</span><span class="n">info</span><span class="p">(</span>
+        <span class="sa">f</span><span class="s2">&quot;Energy expectation value from QDK Simulator with depolarizing noise: </span><span class="si">{</span><span class="n">results</span><span class="p">[</span><span class="s1">&#39;energy_expectation_value&#39;</span><span class="p">]</span><span class="si">}</span><span class="s2">&quot;</span>
+    <span class="p">)</span>
+
+    <span class="c1"># Example usage: qsharp simulator with qubit loss</span>
+    <span class="n">estimator</span> <span class="o">=</span> <span class="n">QDKEnergyEstimator</span><span class="p">(</span><span class="n">qubit_loss</span><span class="o">=</span><span class="mf">0.05</span><span class="p">)</span>
+    <span class="n">results</span> <span class="o">=</span> <span class="n">estimator</span><span class="o">.</span><span class="n">run</span><span class="p">(</span><span class="n">circuit_qasm</span><span class="p">,</span> <span class="n">qubit_hamiltonians</span><span class="p">,</span> <span class="n">total_shots</span><span class="o">=</span><span class="mi">1000</span><span class="p">)</span>
+    <span class="n">_LOGGER</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Energy expectation value from QDK Simulator with qubit loss: </span><span class="si">{</span><span class="n">results</span><span class="p">[</span><span class="s1">&#39;energy_expectation_value&#39;</span><span class="p">]</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+</pre></div>
+
+           </div>
+          </div>
+          <footer>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright Microsoft Corporation. All rights reserved. Licensed under the MIT License.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

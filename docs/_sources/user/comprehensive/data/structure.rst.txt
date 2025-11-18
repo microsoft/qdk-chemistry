@@ -13,14 +13,8 @@ It provides the foundation for all quantum chemistry calculations by defining th
 Properties
 ~~~~~~~~~~
 
-.. todo::
-   TODO (NAB):  finish documentation throughout the Structure file
-   https://dev.azure.com/ms-azurequantum/AzureQuantum/_workitems/edit/41387
-
 - **Coordinates**: 3D Cartesian coordinates for each atom
 - **Elements**: Chemical elements of the atoms
-- **Spin multiplicity**: Number of unpaired electrons plus one (2S+1) (🔧 **TODO**)
-- **Total charge**: Net electric charge of the molecular system (🔧 **TODO**)
 
 .. note::
    By default, the total charge of a new structure is 0 (neutral) and the spin multiplicity is set to the
@@ -35,14 +29,10 @@ It is used to define the molecular system before performing electronic structure
 .. note::
    Coordinates are in Angstrom by default when creating or importing a Structure. See the `Units`_ section below for more details on unit conversions.
 
-Creating a Structure Object Manually
+Creating a structure object manually
 ------------------------------------
 
 A ``Structure`` object can be created manually by adding atoms one by one:
-
-.. todo::
-   TODO (NAB):  check Structure code after API changes
-   https://dev.azure.com/ms-azurequantum/AzureQuantum/_workitems/edit/41366
 
 .. tab:: C++ API
 
@@ -54,28 +44,21 @@ A ``Structure`` object can be created manually by adding atoms one by one:
       // Create an empty structure
       Structure structure;
 
-      // Add atoms with their 3D coordinates and element symbols
+      // Add atoms with their 3D coordinates and element symbols (coordinates in Bohr/atomic units)
       structure.add_atom(Eigen::Vector3d(0.0, 0.0, 0.0), "H");
-      structure.add_atom(Eigen::Vector3d(0.0, 0.0, 0.74), "H");
+      structure.add_atom(Eigen::Vector3d(0.0, 0.0, 1.4), "H");
 
 .. tab:: Python API
 
-   .. code-block:: python
+   .. literalinclude:: ../../../../examples/structure.py
+      :language: python
+      :lines: 1-11
 
-      from qdk.chemistry.data import Structure
-
-      # Create an empty structure
-      structure = Structure()
-
-      # Add atoms with their 3D coordinates and element symbols
-      structure.add_atom([0.0, 0.0, 0.0], "H")
-      structure.add_atom([0.0, 0.0, 0.74], "H")
-
-Loading From Files
+Loading from files
 ------------------
 
-The ``Structure`` class can load molecular structures from various file formats. For detailed format specifications, see
-the `File Formats`_ section below.
+The ``Structure`` class can load molecular structures from various file formats.
+For detailed format specifications, see the `File Formats`_ section below.
 
 .. note::
    All structure-related files require the ``.structure`` suffix before the file type extension, for example
@@ -93,15 +76,14 @@ the `File Formats`_ section below.
 
 .. tab:: Python API
 
-   .. code-block:: python
+   .. note::
+      These examples show the API pattern. For complete working examples, see the test suite.
 
-      # Load from XYZ file
-      structure = Structure.from_xyz_file("molecule.structure.xyz")  # Required .structure.xyz suffix
+   .. literalinclude:: ../../../../examples/structure.py
+      :language: python
+      :lines: 13-17
 
-      # Load from JSON file
-      structure = Structure.from_json_file("molecule.structure.json")  # Required .structure.json suffix
-
-Accessing Structure Data
+Accessing structure data
 ------------------------
 
 The ``Structure`` class provides methods to access atomic data:
@@ -129,36 +111,26 @@ The ``Structure`` class provides methods to access atomic data:
 
 .. tab:: Python API
 
-   .. code-block:: python
-
-      # Get coordinates of a specific atom in angstrom
-      coords = structure.get_atom_coordinates(0)  # First atom
-
-      # Get element of a specific atom
-      element = structure.get_atom_element(0)  # First atom
-
-      # Get all coordinates (in angstrom) as a numpy array
-      all_coords = structure.get_coordinates()
-
-      # Get all elements as a list
-      all_elements = structure.get_elements()
+   .. literalinclude:: ../../../../examples/structure.py
+      :language: python
+      :lines: 13-23
 
 Serialization
 -------------
 
-The ``Structure`` class supports serialization to and from various formats. For detailed information about serialization
-in QDK/Chemistry, see the :doc:`Serialization <../advanced/serialization>` documentation.
+The ``Structure`` class supports serialization to and from various formats.
+For detailed information about serialization in QDK/Chemistry, see the :doc:`Serialization <../advanced/serialization>` documentation.
 
 .. note::
    All structure-related files require the ``.structure`` suffix before the file type extension, for example ``molecule.structure.xyz`` and ``h2.structure.json`` for XYZ and JSON files respectively.
    This naming convention is enforced to maintain consistency across the QDK/Chemistry ecosystem.
 
-File Formats
+File formats
 ~~~~~~~~~~~~
 
 QDK/Chemistry supports multiple serialization formats for molecular structures:
 
-JSON Format
+JSON format
 ^^^^^^^^^^^
 
 JSON representation of a ``Structure`` looks like:
@@ -166,7 +138,7 @@ JSON representation of a ``Structure`` looks like:
 .. code-block:: json
 
     {
-      "coordinates":[[0.0,0.0,0.0],[0.0,0.0,0.74]],
+      "coordinates":[[0.0,0.0,0.0],[0.0,0.0,1.4]],
       "elements":[1,1],
       "masses":[1.008,1.008],
       "nuclear_charges":[1.0,1.0],
@@ -176,7 +148,7 @@ JSON representation of a ``Structure`` looks like:
       "spin_multiplicity":1  // TODO: Verify these field names
     }
 
-XYZ Format
+XYZ format
 ^^^^^^^^^^
 
 `XYZ representation <https://en.wikipedia.org/wiki/XYZ_file_format>`_ of the same ``Structure``:
@@ -184,15 +156,12 @@ XYZ Format
 .. note::
    QDK/Chemistry utilizes the comment field (second line) of the XYZ format to store the charge and spin multiplicity information, as this data is not part of the standard XYZ specification.
 
-.. todo::
-   Why is there a TODO in the XYZ code block below?
-
 .. code-block:: text
 
     2
     charge = 0, spin_multiplicity = 1  (TODO)
     H      0.000000    0.000000    0.000000
-    H      0.000000    0.000000    0.740000
+    H      0.000000    0.000000    1.400000
 
 .. tab:: C++ API
 
@@ -218,27 +187,11 @@ XYZ Format
 
 .. tab:: Python API
 
-   .. code-block:: python
+   .. literalinclude:: ../../../../examples/serialization.py
+      :language: python
+      :lines: 1-18
 
-      # Serialize to JSON object
-      json_data = structure.to_json()
-
-      # Deserialize from JSON object
-      structure_from_json = Structure.from_json(json_data)
-
-      # Serialize to JSON file
-      structure.to_json_file("molecule.structure.json")  # Required .structure.json suffix
-
-      # Get XYZ format as string
-      xyz_string = structure.to_xyz()
-
-      # Load from XYZ string
-      structure_from_xyz = Structure.from_xyz(xyz_string)
-
-      # Serialize to XYZ file
-      structure.to_xyz_file("molecule.structure.xyz")  # Required .structure.xyz suffix
-
-Molecular Manipulation
+Molecular manipulation
 ----------------------
 
 The ``Structure`` class provides methods for basic molecular manipulations:
@@ -255,25 +208,28 @@ The ``Structure`` class provides methods for basic molecular manipulations:
 
 .. tab:: Python API
 
-   .. code-block:: python
+   .. note::
+      This example shows the API pattern. For complete working examples, see the test suite.
 
-      # Add an atom with coordinates and element
-      structure.add_atom([1.0, 0.0, 0.0], "O")  # Add an oxygen atom
-
-      # Remove an atom
-      structure.remove_atom(2)  # Remove the third atom
+   .. literalinclude:: ../../../../examples/structure.py
+      :language: python
+      :lines: 19-24
 
 Units
 -----
 
-All coordinates in the ``Structure`` class are in Angstrom by default. This applies to all methods that return or accept
-coordinates.
+All internal coordinates in the ``Structure`` class are in Bohr by default.
+This applies to all methods that return or accept coordinates.
+
+.. todo::
+   Check the Structure code below -- do these functions exist?
+   If not, they need to be fixed.
 
 .. tab:: C++ API
 
    .. code-block:: cpp
 
-      // Create a structure with coordinates in Angstroms (default)
+      // Create a structure with coordinates in Bohr (default)
       Structure structure_angstrom(coords_matrix, elements_vector);
 
       // Explicitly specify units as Angstrom
@@ -281,29 +237,24 @@ coordinates.
 
 .. tab:: Python API
 
-   .. code-block:: python
+   .. note::
+      This example shows the API pattern.
+      For complete working examples, see the test suite.
 
-      # Create a structure with coordinates in Angstroms (default)
-      structure_angstrom = Structure(coords_matrix, elements_list)
-
-      # Explicitly specify units as Angstrom
-      structure_angstrom_explicit = Structure(coords_matrix, elements_list, "angstrom")
-
-.. todo::
-   🔧 **TODO** Add functions to get coordinates in Bohr units, such as ``get_coordinates_bohr()`` and
-   ``get_atom_coordinates_bohr(index)``, for cases where atomic units are needed for calculations.
+   .. literalinclude:: ../../../../examples/structure.py
+      :language: python
+      :lines: 26-30
 
 .. todo::
-   TODO (NAB):  finish Structure documentation
-   https://dev.azure.com/ms-azurequantum/AzureQuantum/_workitems/edit/41387
+   🔧 **TODO** Add functions to Structure documentation for getting coordinates in Bohr units, such as ``get_coordinates_bohr()`` and ``get_atom_coordinates_bohr(index)``, for cases where atomic units are needed for calculations.
 
-Related Classes
+Related classes
 ---------------
 
 - :doc:`Orbitals <orbitals>`: Molecular orbitals calculated from the structure
 - :doc:`ScfSolver <../algorithms/scf_solver>`: Algorithm that performs calculations on the structure
 
-Related Topics
+Related topics
 --------------
 
 - :doc:`Serialization <../advanced/serialization>`: Data serialization and deserialization

@@ -1,8 +1,0 @@
-qdk.chemistry.data.estimator\_data module
-=========================================
-
-.. automodule:: qdk.chemistry.data.estimator_data
-   :members:
-   :private-members:
-   :show-inheritance:
-   :undoc-members:

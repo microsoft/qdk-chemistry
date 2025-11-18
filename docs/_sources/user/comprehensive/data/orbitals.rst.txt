@@ -11,13 +11,13 @@ Molecular orbitals are a fundamental concept in quantum chemistry.
 They are formed through linear combinations of atomic orbitals and provide a framework for understanding chemical bonding and electronic structure.
 In QDK/Chemistry, the ``Orbitals`` class encapsulates all relevant information about these orbitals, including their coefficients, energies, and occupation numbers.
 
-Restricted vs. Unrestricted Calculations
+Restricted vs. unrestricted calculations
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 The ``Orbitals`` class supports both restricted and unrestricted calculations:
 
-- **Restricted**: Alpha and beta electrons share the same spatial orbitals (RHF/RKS)
-- **Unrestricted**: Alpha and beta electrons have separate spatial orbitals (UHF/UKS)
+- **Restricted**: Alpha and beta electrons share the same spatial orbitals (:term:`RHF`, :term:`RKS`)
+- **Unrestricted**: Alpha and beta electrons have separate spatial orbitals (:term:`UHF`, :term:`UKS`)
 
 For restricted calculations, the alpha and beta components are identical. The class maintains separate alpha and beta
 data internally, but they reference the same underlying data for restricted cases.
@@ -25,35 +25,31 @@ data internally, but they reference the same underlying data for restricted case
 Properties
 ----------
 
-- **Coefficients**: Matrix of orbital coefficients [AO × MO] for alpha and beta spin channels
+- **Coefficients**: Matrix of orbital coefficients [:term:`AO` × :term:`MO`] for alpha and beta spin channels
 - **Energies**: Vector of orbital energies for alpha and beta spin channels
 - **Occupations**: Vector of occupation numbers for alpha and beta spin channels
-- **AO Overlap**: Atomic orbital overlap matrix [AO × AO]
+- **AO Overlap**: Atomic orbital overlap matrix [:term:`AO` × :term:`AO`]
 - **Basis Set**: Comprehensive basis set information
 
 .. note::
-   For detailed information about basis sets in QDK/Chemistry, including available basis sets, creation, manipulation,
-   and serialization, refer to the :doc:`Basis Set documentation <basis_set>`. The basis set defines the atomic orbitals
-   used to construct molecular orbitals and is a critical component for accurate quantum chemistry calculations.
+   For detailed information about basis sets in QDK/Chemistry, including available basis sets, creation, manipulation, and serialization, refer to the :doc:`Basis Set documentation <basis_set>`.
+   The basis set defines the atomic orbitals used to construct molecular orbitals and is a critical component for accurate quantum chemistry calculations.
 
 Usage
 -----
 
-The ``Orbitals`` class is typically created as the output of an :doc:`SCF calculation <../algorithms/scf_solver>` or
-:doc:`orbital transformation <../algorithms/localizer>`. It serves as input to various post-HF methods such as
-:doc:`active space selection <../algorithms/active_space>` and
-:doc:`Hamiltonian construction <../algorithms/hamiltonian_constructor>`.
+The ``Orbitals`` class is typically created as the output of an :doc:`SCF calculation <../algorithms/scf_solver>` or :doc:`orbital transformation <../algorithms/localizer>`.
+It serves as input to various post-:term:`HF` methods such as :doc:`active space selection <../algorithms/active_space>` and :doc:`Hamiltonian construction <../algorithms/hamiltonian_constructor>`.
 
-Creating an Orbitals Object
+Creating an Orbitals object
 ---------------------------
 
-The ``Orbitals`` object is typically created by algorithms rather than manually. However, for advanced use cases, you can
-create and populate orbitals directly:
+The ``Orbitals`` object is typically created by algorithms rather than manually.
+However, for advanced use cases, you can create and populate orbitals directly:
 
 .. note::
-   The class provides overloaded setter methods for coefficients, energies, and occupations. The
-   single-argument versions (restricted setters) set the same values for both alpha and beta channels, while the
-   two-argument versions (unrestricted setters) allow setting different values for alpha and beta channels.
+   The class provides overloaded setter methods for coefficients, energies, and occupations.
+   The single-argument versions (restricted setters) set the same values for both alpha and beta channels, while the two-argument versions (unrestricted setters) allow setting different values for alpha and beta channels.
 
 .. tab:: C++ API
 
@@ -76,22 +72,12 @@ create and populate orbitals directly:
 
 .. tab:: Python API
 
-   .. code-block:: python
+   .. note::
+      This example shows the API pattern. For complete working examples, see the test suite.
 
-      # Obtain orbitals from an SCF calculation
-      scf_solver = create_scf_solver()
-      E_scf, orbitals = scf_solver.solve(structure)
-
-      # set coefficients manually example (restricted)
-      orbs_manual = Orbitals()
-      coeffs = # coefficient matrix
-      orbs_manual.set_coefficients(coeffs)            # Same for alpha and beta
-
-      # set coefficients manually example (unrestricted)
-      orbs_unrestricted = Orbitals()
-      coeffs_alpha = # alpha coefficients
-      coeffs_beta = # beta coefficients
-      orbs_unrestricted.set_coefficients(coeffs_alpha, coeffs_beta)
+   .. literalinclude:: ../../../../examples/orbitals.py
+      :language: python
+      :lines: 7-15
 
 Accessing Orbital Data
 ----------------------
@@ -124,8 +110,8 @@ For spin-dependent properties, methods return pairs of (alpha, beta) data.
       bool is_open_shell = orbitals.is_open_shell();
 
       // Get size information
-      size_t num_mos = orbitals.get_num_mos();
-      size_t num_aos = orbitals.get_num_aos();
+      size_t num_molecular_orbitals = orbitals.get_num_molecular_orbitals();
+      size_t num_atomic_orbitals = orbitals.get_num_atomic_orbitals();
       auto [n_electrons_alpha, n_electrons_beta] = orbitals.get_num_electrons();  // returns std::pair<double, double>
 
       std::string summary = orbitals.get_summary()
@@ -133,57 +119,34 @@ For spin-dependent properties, methods return pairs of (alpha, beta) data.
 
 .. tab:: Python API
 
-   .. code-block:: python
+   .. note::
+      This example shows the API pattern. For complete working examples, see the test suite.
 
-      # Access orbital coefficients (returns tuple of alpha/beta matrices)
-      coeffs_alpha, coeffs_beta = orbitals.get_coefficients()
-
-      # Access orbital energies (returns tuple of alpha/beta vectors)
-      energies_alpha, energies_beta = orbitals.get_energies()
-
-      # Access orbital occupations (returns tuple of alpha/beta vectors)
-      occs_alpha, occs_beta = orbitals.get_occupations()
-
-      # Access atomic orbital overlap matrix
-      ao_overlap = orbitals.get_overlap_matrix()
-
-      # Access basis set information
-      basis_set = orbitals.get_basis_set()
-
-      # Check calculation type
-      is_restricted = orbitals.is_restricted()
-      is_open_shell = orbitals.is_open_shell()
-
-      # Get size information
-      num_mos = orbitals.get_num_mos()
-      num_aos = orbitals.get_num_aos()
-      n_electrons_alpha, n_electrons_beta = orbitals.get_num_electrons()
-
-      summary = orbitals.get_summary()
-      print(summary)
+   .. literalinclude:: ../../../../examples/orbitals.py
+      :language: python
+      :lines: 30-43
 
 Serialization
 -------------
 
-The ``Orbitals`` class supports serialization to and from JSON and HDF5 formats. For detailed information about
-serialization in QDK/Chemistry, see the :doc:`Serialization <../advanced/serialization>` documentation.
+The ``Orbitals`` class supports serialization to and from JSON and HDF5 formats.
+For detailed information about serialization in QDK/Chemistry, see the :doc:`Serialization <../advanced/serialization>` documentation.
 
 .. note::
    All orbitals-related files require the ``.orbitals`` suffix before the file type extension, for example ``molecule.orbitals.json`` and ``h2.orbitals.h5`` for JSON and HDF5 files respectively.
    This naming convention is enforced to maintain consistency across the QDK/Chemistry ecosystem.
 
-File Formats
+File formats
 ~~~~~~~~~~~~
 
-QDK/Chemistry supports multiple serialization formats for orbital data:
+QDK/Chemistry supports multiple serialization formats for orbital data, as described below.
 
-JSON Format
+JSON format
 ^^^^^^^^^^^
 
 .. note::
    The ``basis_set`` field in the JSON representation contains a complete serialization of the ``BasisSet`` object.
-   For details on how basis sets are serialized, see the
-   :ref:`JSON Format section in the Basis Set documentation <json-format>`.
+   For details on how basis sets are serialized, see the :ref:`JSON Format section in the Basis Set documentation <json-format>`.
 
 JSON representation of an ``Orbitals`` object has the following structure (showing simplified content):
 
@@ -205,24 +168,22 @@ JSON representation of an ``Orbitals`` object has the following structure (showi
      "has_overlap_matrix":true,
      "is_open_shell":false,
      "is_restricted":true,
-     "num_aos":2,
+     "num_atomic_orbitals":2,
      "num_electrons":{"alpha":1.0,"beta":1.0},
-     "num_mos":2,
+     "num_molecular_orbitals":2,
      "occupations":{"alpha":[1.0,0.0],"beta":[1.0,0.0]}
    }
 
-HDF5 Format
+HDF5 format
 ^^^^^^^^^^^
 
 .. note::
-   The ``basis_set/`` group in the HDF5 representation contains a complete serialization of the ``BasisSet``
-   object. For details on the HDF5 structure of basis sets, see the
-   :ref:`HDF5 Format section in the Basis Set documentation <hdf5-format>`. 🔧 **TODO**: The exact structure of the
-   basis set group in HDF5 format needs verification.
+   The ``basis_set/`` group in the HDF5 representation contains a complete serialization of the ``BasisSet`` object.
+   For details on the HDF5 structure of basis sets, see the :ref:`HDF5 Format section in the Basis Set documentation <hdf5-format>`.
 
 .. todo::
-   TODO (NAB):  finish documentation above
-   https://dev.azure.com/ms-azurequantum/AzureQuantum/_workitems/edit/41386
+   🔧 **TODO**: The exact structure of the basis set group in HDF5 format needs verification.
+   See the "TODO" in the code block below.
 
 HDF5 representation of an ``Orbitals`` object has the following structure (showing groups and datasets):
 
@@ -242,22 +203,14 @@ HDF5 representation of an ``Orbitals`` object has the following structure (showi
        ├── has_basis_set        # Dataset: uint8, 0 if false, 1 if true
        ├── is_open_shell        # Dataset: uint8, 0 if false, 1 if true
        ├── is_restricted        # Dataset: uint8, 0 if false, 1 if true
-       ├── num_aos              # Dataset: uint32, number of atomic orbitals
+       ├── num_atomic_orbitals              # Dataset: uint32, number of atomic orbitals
        ├── num_electrons_alpha  # Dataset: uint32, number of alpha electrons
        ├── num_electrons_beta   # Dataset: uint32, number of beta electrons
-       └── num_mos              # Dataset: uint32, number of molecular orbital coefficients
+       └── num_molecular_orbitals              # Dataset: uint32, number of molecular orbital coefficients
 
 .. todo::
-   TODO (NAB):  finish documentation above and below
-   https://dev.azure.com/ms-azurequantum/AzureQuantum/_workitems/edit/41386
-
-.. todo::
-   🔧 **TODO**: Verify if this HDF5 serialization structure is complete and accurate. Are basis set details properly
-   included?
-
-.. todo::
-   TODO (NAB):  check code after API changes
-   https://dev.azure.com/ms-azurequantum/AzureQuantum/_workitems/edit/41366
+   🔧 **TODO**: Verify if this basis set HDF5 serialization structure is complete and accurate.
+   Are basis set details properly included?
 
 .. tab:: C++ API
 
@@ -281,39 +234,29 @@ HDF5 representation of an ``Orbitals`` object has the following structure (showi
 
 .. tab:: Python API
 
-   .. code-block:: python
+   .. note::
+      This example shows the API pattern. For complete working examples, see the test suite.
 
-      # Generic serialization with format specification
-      orbitals.to_file("molecule.orbitals.json", "json")
-      orbitals_from_file = Orbitals.from_file("molecule.orbitals.json", "json")
+   .. literalinclude:: ../../../../examples/orbitals.py
+      :language: python
+      :lines: 45-56
 
-      # JSON serialization
-      orbitals.to_json_file("molecule.orbitals.json")
-      orbitals_from_json_file = Orbitals.from_json_file("molecule.orbitals.json")
-
-      # Direct JSON conversion
-      j = orbitals.to_json()
-      orbitals_from_json = Orbitals.from_json(j)
-
-      # HDF5 serialization
-      orbitals.to_hdf5_file("molecule.orbitals.h5")
-      orbitals_from_hdf5_file = Orbitals.from_hdf5_file("molecule.orbitals.h5")
-
-Orbital Transformations and Applications
+Orbital transformations and applications
 ----------------------------------------
 
 The ``Orbitals`` class serves as a foundation for several important quantum chemical applications and transformations:
 
-- **Orbital Localization**: Transform delocalized SCF orbitals into localized representations for better chemical
-  interpretation and more efficient correlation methods. See :doc:`Localizer <../algorithms/localizer>` for details.
+- **Orbital Localization**: Transform delocalized :term:`SCF` orbitals into localized representations for better chemical interpretation and more efficient correlation methods.
+  See :doc:`Localizer <../algorithms/localizer>` for details.
 
 - **Active Space Selection**: Automatically identify important orbitals for multi-reference calculations based on
-  various criteria. See :doc:`ActiveSpaceSelector <../algorithms/active_space>` for details.
+  various criteria.
+  See :doc:`ActiveSpaceSelector <../algorithms/active_space>` for details.
 
-- **Hamiltonian Construction**: Build electronic Hamiltonians for post-HF methods using the orbital information. See
-  :doc:`HamiltonianConstructor <../algorithms/hamiltonian_constructor>` for details.
+- **Hamiltonian Construction**: Build electronic Hamiltonians for post-HF methods using the orbital information.
+  See :doc:`HamiltonianConstructor <../algorithms/hamiltonian_constructor>` for details.
 
-Related Classes
+Related classes
 ---------------
 
 - :doc:`Structure <structure>`: Molecular structure representation
@@ -323,7 +266,7 @@ Related Classes
 - :doc:`ScfSolver <../algorithms/scf_solver>`: Algorithm that produces orbitals
 - :doc:`Localizer <../algorithms/localizer>`: Algorithms for orbital transformations
 
-Related Topics
+Related topics
 --------------
 
 - :doc:`Serialization <../advanced/serialization>`: Data serialization and deserialization

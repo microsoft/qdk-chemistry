@@ -1,0 +1,18 @@
+qdk\_chemistry.plugins.qiskit.\_interop package
+===============================================
+
+.. automodule:: qdk_chemistry.plugins.qiskit._interop
+   :members:
+   :private-members:
+   :show-inheritance:
+   :undoc-members:
+
+Submodules
+----------
+
+.. toctree::
+   :maxdepth: 4
+
+   qdk_chemistry.plugins.qiskit._interop.circuit
+   qdk_chemistry.plugins.qiskit._interop.noise_model
+   qdk_chemistry.plugins.qiskit._interop.transpiler

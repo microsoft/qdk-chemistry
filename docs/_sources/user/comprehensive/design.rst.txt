@@ -1,12 +1,13 @@
-Design and Architecture
+Design and architecture
 =======================
 
 .. toctree::
    :maxdepth: 1
-   :caption: Design and Architecture
+   :caption: Contents
 
    advanced/design_principles
    advanced/factory_pattern
    advanced/serialization
    advanced/interfaces
    advanced/settings
+   advanced/model_hamiltonians

@@ -1,0 +1,354 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../../../../">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>qdk_chemistry.plugins.pyscf.localization &mdash; qdk-chemistry 1.0.0-rc1 documentation</title>
+      <link rel="stylesheet" type="text/css" href="../../../../_static/pygments.css?v=b86133f3" />
+      <link rel="stylesheet" type="text/css" href="../../../../_static/css/theme.css?v=e59714d7" />
+      <link rel="stylesheet" type="text/css" href="../../../../_static/tabs.css?v=4c969af8" />
+      <link rel="stylesheet" type="text/css" href="../../../../_static/graphviz.css?v=4ae1632d" />
+      <link rel="stylesheet" type="text/css" href="../../../../_static/copybutton.css?v=76b2166b" />
+      <link rel="stylesheet" type="text/css" href="../../../../_static/custom.css?v=a64bac2b" />
+
+  
+      <script src="../../../../_static/jquery.js?v=5d32c60e"></script>
+      <script src="../../../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="../../../../_static/documentation_options.js?v=81bd8d55"></script>
+      <script src="../../../../_static/doctools.js?v=9bcbadda"></script>
+      <script src="../../../../_static/sphinx_highlight.js?v=dc90522c"></script>
+      <script src="../../../../_static/tabs.js?v=3ee01567"></script>
+      <script src="../../../../_static/clipboard.min.js?v=a7894cd8"></script>
+      <script src="../../../../_static/copybutton.js?v=f281be69"></script>
+    <script src="../../../../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../../../../genindex.html" />
+    <link rel="search" title="Search" href="../../../../search.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="../../../../index.html" class="icon icon-home">
+            qdk-chemistry
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../../../../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">User Documentation</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../../user/quickstart.html">Quickstart</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../../user/comprehensive/index.html">In-depth user guide</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">API Reference</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../../api/python_api.html">Python API</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../../api/cpp_api.html">C++ API</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Supporting Information</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../../glossary.html">Acronym definitions</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../../references.html">References</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../../../../index.html">qdk-chemistry</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../../../../index.html" class="icon icon-home" aria-label="Home"></a></li>
+          <li class="breadcrumb-item"><a href="../../../index.html">Module code</a></li>
+      <li class="breadcrumb-item active">qdk_chemistry.plugins.pyscf.localization</li>
+      <li class="wy-breadcrumbs-aside">
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <h1>Source code for qdk_chemistry.plugins.pyscf.localization</h1><div class="highlight"><pre>
+<span></span><span class="sd">&quot;&quot;&quot;PySCF orbital localization module for qdk_chemistry.</span>
+
+<span class="sd">This module provides orbital localization capabilities using the PySCF library</span>
+<span class="sd">and integrates PySCF localization algorithms into the QDK/Chemistry framework.</span>
+
+<span class="sd">The implementation supports both restricted (closed-shell) and</span>
+<span class="sd">unrestricted (open-shell) orbitals: occupied, singly-occupied and</span>
+<span class="sd">virtual spaces are detected and localized separately to preserve</span>
+<span class="sd">orthogonality and physical character.</span>
+
+<span class="sd">Supported localization methods (selected via the settings `method`):</span>
+
+<span class="sd">* &quot;pipek-mezey&quot; (Pipek-Mezey, supports a configurable population analysis),</span>
+<span class="sd">* &quot;foster-boys&quot; (Foster-Boys),</span>
+<span class="sd">* &quot;edmiston-ruedenberg&quot; (Edmiston-Ruedenberg),</span>
+<span class="sd">* &quot;cholseky&quot; (Cholesky-based orthogonalization/localization).</span>
+
+<span class="sd">This module registers a ``pyscf`` localizer with the QDK/Chemistry localizer registry at</span>
+<span class="sd">import time, making the functionality available via</span>
+<span class="sd">``qdk_chemistry.algorithms.create(&quot;localizer&quot;, &quot;pyscf&quot;)``.</span>
+
+<span class="sd">Requires: PySCF (the code uses the ``pyscf.lo`` localization routines).</span>
+<span class="sd">&quot;&quot;&quot;</span>
+
+<span class="c1"># --------------------------------------------------------------------------------------------</span>
+<span class="c1"># Copyright (c) Microsoft Corporation. All rights reserved.</span>
+<span class="c1"># Licensed under the MIT License. See LICENSE.txt in the project root for license information.</span>
+<span class="c1"># --------------------------------------------------------------------------------------------</span>
+
+<span class="kn">from</span><span class="w"> </span><span class="nn">pyscf</span><span class="w"> </span><span class="kn">import</span> <span class="n">lo</span>
+
+<span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.algorithms</span><span class="w"> </span><span class="kn">import</span> <span class="n">Localizer</span><span class="p">,</span> <span class="n">register</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.data</span><span class="w"> </span><span class="kn">import</span> <span class="n">Orbitals</span><span class="p">,</span> <span class="n">SciWavefunctionContainer</span><span class="p">,</span> <span class="n">Settings</span><span class="p">,</span> <span class="n">SlaterDeterminantContainer</span><span class="p">,</span> <span class="n">Wavefunction</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.plugins.pyscf.utils</span><span class="w"> </span><span class="kn">import</span> <span class="n">basis_to_pyscf_mol</span>
+
+
+<div class="viewcode-block" id="PyscfLocalizerSettings">
+<a class="viewcode-back" href="../../../../api/api_autogen/qdk_chemistry.plugins.pyscf.localization.html#qdk_chemistry.plugins.pyscf.localization.PyscfLocalizerSettings">[docs]</a>
+<span class="k">class</span><span class="w"> </span><span class="nc">PyscfLocalizerSettings</span><span class="p">(</span><span class="n">Settings</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Configuration settings for PySCF orbital localization.</span>
+
+<span class="sd">    This class manages settings for orbital localization procedures using</span>
+<span class="sd">    PySCF. It inherits from the Settings base class and exposes the</span>
+<span class="sd">    configurable options used by :class:`PyscfLocalizer`.</span>
+
+<span class="sd">    Attributes:</span>
+<span class="sd">        method (str, default = &quot;pipek-mezey&quot;): The localization algorithm to use.</span>
+<span class="sd">        Supported values (case-insensitive) include &quot;pipek-mezey&quot;, &quot;foster-boys&quot;, &quot;edmiston-ruedenberg&quot;,</span>
+<span class="sd">        and &quot;cholesky&quot;.</span>
+
+<span class="sd">    population_method (str, default = &quot;mulliken&quot;): The population analysis used for the Pipek-Mezey localization.</span>
+<span class="sd">        Passed through to PySCF&#39;s PM implementation (for example, &quot;mulliken&quot;).</span>
+
+<span class="sd">    occupation_threshold (float, default = 1e-10): Tolerance threshold used to classify orbitals as occupied,</span>
+<span class="sd">        singly-occupied (for ROHF/UHF), or virtual. Orbitals with occupations below this threshold are considered</span>
+<span class="sd">        unoccupied.</span>
+
+<span class="sd">    Examples:</span>
+<span class="sd">        &gt;&gt;&gt; settings = PyscfLocalizerSettings()</span>
+<span class="sd">        &gt;&gt;&gt; settings.get(&quot;occupation_threshold&quot;)</span>
+<span class="sd">        1e-10</span>
+<span class="sd">        &gt;&gt;&gt; settings.set(&quot;occupation_threshold&quot;, 1e-8)</span>
+<span class="sd">        &gt;&gt;&gt; settings.set(&quot;population_method&quot;, &quot;mulliken&quot;)</span>
+
+<span class="sd">    &quot;&quot;&quot;</span>
+
+<div class="viewcode-block" id="PyscfLocalizerSettings.__init__">
+<a class="viewcode-back" href="../../../../api/api_autogen/qdk_chemistry.plugins.pyscf.localization.html#qdk_chemistry.plugins.pyscf.localization.PyscfLocalizerSettings.__init__">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Initialize the localization object with default parameters.&quot;&quot;&quot;</span>
+        <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">()</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_set_default</span><span class="p">(</span><span class="s2">&quot;method&quot;</span><span class="p">,</span> <span class="s2">&quot;string&quot;</span><span class="p">,</span> <span class="s2">&quot;pipek-mezey&quot;</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_set_default</span><span class="p">(</span><span class="s2">&quot;occupation_threshold&quot;</span><span class="p">,</span> <span class="s2">&quot;double&quot;</span><span class="p">,</span> <span class="mf">1e-10</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_set_default</span><span class="p">(</span><span class="s2">&quot;population_method&quot;</span><span class="p">,</span> <span class="s2">&quot;string&quot;</span><span class="p">,</span> <span class="s2">&quot;mulliken&quot;</span><span class="p">)</span></div>
+</div>
+
+
+
+<div class="viewcode-block" id="PyscfLocalizer">
+<a class="viewcode-back" href="../../../../api/api_autogen/qdk_chemistry.plugins.pyscf.localization.html#qdk_chemistry.plugins.pyscf.localization.PyscfLocalizer">[docs]</a>
+<span class="k">class</span><span class="w"> </span><span class="nc">PyscfLocalizer</span><span class="p">(</span><span class="n">Localizer</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;PySCF-based orbital localizer for quantum chemistry calculations.</span>
+
+<span class="sd">    This class implements orbital localization using routines from PySCF.</span>
+<span class="sd">    It supports multiple localization algorithms and works with both</span>
+<span class="sd">    restricted (closed-shell) and unrestricted (open-shell) orbital inputs.</span>
+
+<span class="sd">    Key behavior:</span>
+<span class="sd">    - Supported algorithms: Pipek-Mezey (PM), Foster-Boys (FB),</span>
+<span class="sd">      Edmiston-Ruedenberg (ER), and a Cholesky-based localizer.</span>
+<span class="sd">    - It is the user&#39;s responsibility to provide appropriate orbital indices</span>
+<span class="sd">      (e.g., only occupied orbitals or only virtual orbitals).</span>
+
+<span class="sd">    Examples:</span>
+<span class="sd">        &gt;&gt;&gt; localizer = PyscfLocalizer()</span>
+<span class="sd">        &gt;&gt;&gt; # Localize occupied orbitals (user provides appropriate indices)</span>
+<span class="sd">        &gt;&gt;&gt; occ_indices = [0, 1, 2, 3, 4]  # indices of occupied orbitals</span>
+<span class="sd">        &gt;&gt;&gt; localized_orbitals = localizer.run(canonical_orbitals, occ_indices, occ_indices)</span>
+
+<span class="sd">    Notes:</span>
+<span class="sd">        Uses Mulliken population analysis for the Pipek-Mezey method by default.</span>
+<span class="sd">        The population method can be configured via the `population_method` setting.</span>
+
+<span class="sd">    &quot;&quot;&quot;</span>
+
+<div class="viewcode-block" id="PyscfLocalizer.__init__">
+<a class="viewcode-back" href="../../../../api/api_autogen/qdk_chemistry.plugins.pyscf.localization.html#qdk_chemistry.plugins.pyscf.localization.PyscfLocalizer.__init__">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Initialize the PySCF localizer with default settings.&quot;&quot;&quot;</span>
+        <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">()</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_settings</span> <span class="o">=</span> <span class="n">PyscfLocalizerSettings</span><span class="p">()</span></div>
+
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">_run_impl</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">wavefunction</span><span class="p">:</span> <span class="n">Wavefunction</span><span class="p">,</span> <span class="n">loc_indices_a</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="nb">int</span><span class="p">],</span> <span class="n">loc_indices_b</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="nb">int</span><span class="p">]):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Perform orbital localization using PySCF localization method.</span>
+
+<span class="sd">        This method operates on an input Wavefunction object and returns a new Wavefunction</span>
+<span class="sd">        instance containing localized molecular orbitals. Only orbitals specified in</span>
+<span class="sd">        the index lists are localized, with all specified orbitals localized together</span>
+<span class="sd">        as a single group.</span>
+
+<span class="sd">        The method supports both restricted (closed-shell) and unrestricted (open-shell)</span>
+<span class="sd">        orbital inputs. For restricted orbitals, loc_indices_a and loc_indices_b must</span>
+<span class="sd">        be identical.</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            wavefunction: The wavefunction with molecular orbitals to be localized.</span>
+<span class="sd">                Can be restricted or unrestricted (spin-polarized).</span>
+<span class="sd">            loc_indices_a: Indices of alpha orbitals to localize (must be sorted, empty for no localization).</span>
+<span class="sd">            loc_indices_b: Indices of beta orbitals to localize (must be sorted, empty for no localization).</span>
+<span class="sd">                For restricted orbitals, this must be identical to loc_indices_a.</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            A new Orbitals object containing the localized molecular orbitals.</span>
+
+<span class="sd">        Raises:</span>
+<span class="sd">            ValueError: If an unknown localization method is requested, if</span>
+<span class="sd">                loc_indices_a and loc_indices_b differ for restricted orbitals,</span>
+<span class="sd">                or if the indices are not sorted.</span>
+
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="c1"># Validate that indices are sorted</span>
+        <span class="k">if</span> <span class="n">loc_indices_a</span> <span class="o">!=</span> <span class="nb">sorted</span><span class="p">(</span><span class="n">loc_indices_a</span><span class="p">):</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;loc_indices_a must be sorted&quot;</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">loc_indices_b</span> <span class="o">!=</span> <span class="nb">sorted</span><span class="p">(</span><span class="n">loc_indices_b</span><span class="p">):</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;loc_indices_b must be sorted&quot;</span><span class="p">)</span>
+
+        <span class="c1"># If both index vectors are empty, return original orbitals unchanged</span>
+        <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">loc_indices_a</span><span class="p">)</span> <span class="o">==</span> <span class="mi">0</span> <span class="ow">and</span> <span class="nb">len</span><span class="p">(</span><span class="n">loc_indices_b</span><span class="p">)</span> <span class="o">==</span> <span class="mi">0</span><span class="p">:</span>
+            <span class="k">return</span> <span class="n">wavefunction</span>
+        <span class="c1"># TODO (NAB): fix TODO above</span>
+        <span class="c1"># https://dev.azure.com/ms-azurequantum/AzureQuantum/_workitems/edit/41404</span>
+
+        <span class="c1"># TODO assumes aufbau filling</span>
+        <span class="c1"># TODO (NAB): fix TODO above</span>
+        <span class="c1"># https://dev.azure.com/ms-azurequantum/AzureQuantum/_workitems/edit/41404</span>
+        <span class="n">pop_method</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_settings</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;population_method&quot;</span><span class="p">)</span>
+        <span class="n">loc_method</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_settings</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;method&quot;</span><span class="p">)</span><span class="o">.</span><span class="n">lower</span><span class="p">()</span>
+
+        <span class="n">orbitals</span> <span class="o">=</span> <span class="n">wavefunction</span><span class="o">.</span><span class="n">get_orbitals</span><span class="p">()</span>
+
+        <span class="c1"># Convert basis set to PySCF Mole object</span>
+        <span class="n">mol</span> <span class="o">=</span> <span class="n">basis_to_pyscf_mol</span><span class="p">(</span><span class="n">orbitals</span><span class="o">.</span><span class="n">get_basis_set</span><span class="p">())</span>
+
+        <span class="k">def</span><span class="w"> </span><span class="nf">_do_loc</span><span class="p">(</span><span class="n">inp</span><span class="p">,</span> <span class="n">indices</span><span class="p">):</span>
+<span class="w">            </span><span class="sd">&quot;&quot;&quot;Perform localization on the specified orbitals.&quot;&quot;&quot;</span>
+            <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">indices</span><span class="p">)</span> <span class="ow">in</span> <span class="p">[</span><span class="mi">0</span><span class="p">,</span> <span class="mi">1</span><span class="p">]:</span>
+                <span class="k">return</span> <span class="n">inp</span>
+            <span class="k">if</span> <span class="n">loc_method</span> <span class="o">==</span> <span class="s2">&quot;pipek-mezey&quot;</span><span class="p">:</span>
+                <span class="k">return</span> <span class="n">lo</span><span class="o">.</span><span class="n">PM</span><span class="p">(</span><span class="n">mol</span><span class="p">,</span> <span class="n">inp</span><span class="p">[:,</span> <span class="n">indices</span><span class="p">],</span> <span class="n">mf</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">pop_method</span><span class="o">=</span><span class="n">pop_method</span><span class="p">)</span><span class="o">.</span><span class="n">kernel</span><span class="p">()</span>
+            <span class="k">if</span> <span class="n">loc_method</span> <span class="o">==</span> <span class="s2">&quot;foster-boys&quot;</span><span class="p">:</span>
+                <span class="k">return</span> <span class="n">lo</span><span class="o">.</span><span class="n">Boys</span><span class="p">(</span><span class="n">mol</span><span class="p">,</span> <span class="n">inp</span><span class="p">[:,</span> <span class="n">indices</span><span class="p">])</span><span class="o">.</span><span class="n">kernel</span><span class="p">()</span>
+            <span class="k">if</span> <span class="n">loc_method</span> <span class="o">==</span> <span class="s2">&quot;edmiston-ruedenberg&quot;</span><span class="p">:</span>
+                <span class="k">return</span> <span class="n">lo</span><span class="o">.</span><span class="n">ER</span><span class="p">(</span><span class="n">mol</span><span class="p">,</span> <span class="n">inp</span><span class="p">[:,</span> <span class="n">indices</span><span class="p">])</span><span class="o">.</span><span class="n">kernel</span><span class="p">()</span>
+            <span class="k">if</span> <span class="n">loc_method</span> <span class="o">==</span> <span class="s2">&quot;cholesky&quot;</span><span class="p">:</span>
+                <span class="k">return</span> <span class="n">lo</span><span class="o">.</span><span class="n">cholesky_mos</span><span class="p">(</span><span class="n">inp</span><span class="p">[:,</span> <span class="n">indices</span><span class="p">])</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Unknown localization method: </span><span class="si">{</span><span class="n">loc_method</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+
+        <span class="c1"># Perform localization and populate localized orbitals instance</span>
+        <span class="k">if</span> <span class="n">orbitals</span><span class="o">.</span><span class="n">is_restricted</span><span class="p">():</span>
+            <span class="k">if</span> <span class="n">loc_indices_a</span> <span class="o">!=</span> <span class="n">loc_indices_b</span><span class="p">:</span>
+                <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;For restricted orbitals, loc_indices_a and loc_indices_b must be identical&quot;</span><span class="p">)</span>
+
+            <span class="c1"># Start with original coefficients</span>
+            <span class="n">mo_coeffs</span> <span class="o">=</span> <span class="n">orbitals</span><span class="o">.</span><span class="n">get_coefficients</span><span class="p">()[</span><span class="mi">0</span><span class="p">]</span>  <span class="c1"># For restricted, get alpha coefficients</span>
+            <span class="n">mo_loc</span> <span class="o">=</span> <span class="n">mo_coeffs</span><span class="o">.</span><span class="n">copy</span><span class="p">()</span>
+
+            <span class="n">localized_mos</span> <span class="o">=</span> <span class="n">_do_loc</span><span class="p">(</span><span class="n">mo_coeffs</span><span class="p">,</span> <span class="n">loc_indices_a</span><span class="p">)</span>
+            <span class="k">for</span> <span class="n">i</span><span class="p">,</span> <span class="n">idx</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="n">loc_indices_a</span><span class="p">):</span>
+                <span class="n">mo_loc</span><span class="p">[:,</span> <span class="n">idx</span><span class="p">]</span> <span class="o">=</span> <span class="n">localized_mos</span><span class="p">[:,</span> <span class="n">i</span><span class="p">]</span>
+
+            <span class="n">loc_orbitals</span> <span class="o">=</span> <span class="n">Orbitals</span><span class="p">(</span>
+                <span class="n">coefficients</span><span class="o">=</span><span class="n">mo_loc</span><span class="p">,</span>
+                <span class="n">energies</span><span class="o">=</span><span class="n">orbitals</span><span class="o">.</span><span class="n">get_energies</span><span class="p">()[</span><span class="mi">0</span><span class="p">]</span> <span class="k">if</span> <span class="n">orbitals</span><span class="o">.</span><span class="n">has_energies</span><span class="p">()</span> <span class="k">else</span> <span class="kc">None</span><span class="p">,</span>
+                <span class="n">ao_overlap</span><span class="o">=</span><span class="n">orbitals</span><span class="o">.</span><span class="n">get_overlap_matrix</span><span class="p">()</span> <span class="k">if</span> <span class="n">orbitals</span><span class="o">.</span><span class="n">has_overlap_matrix</span><span class="p">()</span> <span class="k">else</span> <span class="kc">None</span><span class="p">,</span>
+                <span class="n">basis_set</span><span class="o">=</span><span class="n">orbitals</span><span class="o">.</span><span class="n">get_basis_set</span><span class="p">(),</span>
+            <span class="p">)</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="c1"># Unrestricted case - handle alpha and beta separately</span>
+            <span class="n">mo_coeffs_alpha</span><span class="p">,</span> <span class="n">mo_coeffs_beta</span> <span class="o">=</span> <span class="n">orbitals</span><span class="o">.</span><span class="n">get_coefficients</span><span class="p">()</span>
+            <span class="n">mo_a</span> <span class="o">=</span> <span class="n">mo_coeffs_alpha</span><span class="o">.</span><span class="n">copy</span><span class="p">()</span>
+            <span class="n">mo_b</span> <span class="o">=</span> <span class="n">mo_coeffs_beta</span><span class="o">.</span><span class="n">copy</span><span class="p">()</span>
+
+            <span class="n">localized_a</span> <span class="o">=</span> <span class="n">_do_loc</span><span class="p">(</span><span class="n">mo_coeffs_alpha</span><span class="p">,</span> <span class="n">loc_indices_a</span><span class="p">)</span>
+            <span class="k">for</span> <span class="n">i</span><span class="p">,</span> <span class="n">idx</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="n">loc_indices_a</span><span class="p">):</span>
+                <span class="n">mo_a</span><span class="p">[:,</span> <span class="n">idx</span><span class="p">]</span> <span class="o">=</span> <span class="n">localized_a</span><span class="p">[:,</span> <span class="n">i</span><span class="p">]</span>
+
+            <span class="n">localized_b</span> <span class="o">=</span> <span class="n">_do_loc</span><span class="p">(</span><span class="n">mo_coeffs_beta</span><span class="p">,</span> <span class="n">loc_indices_b</span><span class="p">)</span>
+            <span class="k">for</span> <span class="n">i</span><span class="p">,</span> <span class="n">idx</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="n">loc_indices_b</span><span class="p">):</span>
+                <span class="n">mo_b</span><span class="p">[:,</span> <span class="n">idx</span><span class="p">]</span> <span class="o">=</span> <span class="n">localized_b</span><span class="p">[:,</span> <span class="n">i</span><span class="p">]</span>
+
+            <span class="n">energies_alpha</span><span class="p">,</span> <span class="n">energies_beta</span> <span class="o">=</span> <span class="n">orbitals</span><span class="o">.</span><span class="n">get_energies</span><span class="p">()</span> <span class="k">if</span> <span class="n">orbitals</span><span class="o">.</span><span class="n">has_energies</span><span class="p">()</span> <span class="k">else</span> <span class="p">(</span><span class="kc">None</span><span class="p">,</span> <span class="kc">None</span><span class="p">)</span>
+            <span class="n">loc_orbitals</span> <span class="o">=</span> <span class="n">Orbitals</span><span class="p">(</span>
+                <span class="n">coefficients_alpha</span><span class="o">=</span><span class="n">mo_a</span><span class="p">,</span>
+                <span class="n">coefficients_beta</span><span class="o">=</span><span class="n">mo_b</span><span class="p">,</span>
+                <span class="n">energies_alpha</span><span class="o">=</span><span class="n">energies_alpha</span><span class="p">,</span>
+                <span class="n">energies_beta</span><span class="o">=</span><span class="n">energies_beta</span><span class="p">,</span>
+                <span class="n">ao_overlap</span><span class="o">=</span><span class="n">orbitals</span><span class="o">.</span><span class="n">get_overlap_matrix</span><span class="p">()</span> <span class="k">if</span> <span class="n">orbitals</span><span class="o">.</span><span class="n">has_overlap_matrix</span><span class="p">()</span> <span class="k">else</span> <span class="kc">None</span><span class="p">,</span>
+                <span class="n">basis_set</span><span class="o">=</span><span class="n">orbitals</span><span class="o">.</span><span class="n">get_basis_set</span><span class="p">(),</span>
+            <span class="p">)</span>
+        <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">wavefunction</span><span class="o">.</span><span class="n">get_active_determinants</span><span class="p">())</span> <span class="o">==</span> <span class="mi">1</span><span class="p">:</span>
+            <span class="c1"># Single determinant case - return new wavefunction with localized orbitals</span>
+            <span class="k">return</span> <span class="n">Wavefunction</span><span class="p">(</span><span class="n">SlaterDeterminantContainer</span><span class="p">(</span><span class="n">wavefunction</span><span class="o">.</span><span class="n">get_active_determinants</span><span class="p">()[</span><span class="mi">0</span><span class="p">],</span> <span class="n">loc_orbitals</span><span class="p">))</span>
+        <span class="k">return</span> <span class="n">Wavefunction</span><span class="p">(</span><span class="n">SciWavefunctionContainer</span><span class="p">(</span><span class="n">wavefunction</span><span class="o">.</span><span class="n">get_active_determinants</span><span class="p">(),</span> <span class="n">loc_orbitals</span><span class="p">))</span>
+
+<div class="viewcode-block" id="PyscfLocalizer.name">
+<a class="viewcode-back" href="../../../../api/api_autogen/qdk_chemistry.plugins.pyscf.localization.html#qdk_chemistry.plugins.pyscf.localization.PyscfLocalizer.name">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">name</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Return the settings for the localizer.&quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="s2">&quot;pyscf_multi&quot;</span></div>
+</div>
+
+
+
+<span class="n">register</span><span class="p">(</span><span class="k">lambda</span><span class="p">:</span> <span class="n">PyscfLocalizer</span><span class="p">())</span>
+</pre></div>
+
+           </div>
+          </div>
+          <footer>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright Microsoft Corporation. All rights reserved. Licensed under the MIT License.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

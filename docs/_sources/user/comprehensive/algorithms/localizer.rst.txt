@@ -1,20 +1,16 @@
-Localizer
-=========
+Orbital localization
+====================
 
-The ``Localizer`` algorithm in QDK/Chemistry performs various orbital transformations to create localized or otherwise transformed
-molecular orbitals. Following QDK/Chemistry's :doc:`algorithm design principles <../advanced/design_principles>`, it takes an
-:doc:`Orbitals <../data/orbitals>` instance as input and produces a new :doc:`Orbitals <../data/orbitals>` instance as
-output. These transformations preserve the overall electronic state but provide orbitals with different properties that
-are useful for chemical analysis or subsequent calculations.
+The ``Localizer`` algorithm in QDK/Chemistry performs various orbital transformations to create localized or otherwise transformed molecular orbitals.
+Following QDK/Chemistry's :doc:`algorithm design principles <../advanced/design_principles>`, it takes an :doc:`Orbitals <../data/orbitals>` instance as input and produces a new :doc:`Orbitals <../data/orbitals>` instance as output.
+These transformations preserve the overall electronic state but provide orbitals with different properties that are useful for chemical analysis or subsequent calculations.
 
 Overview
 --------
 
-Canonical molecular orbitals from SCF calculations are often delocalized over the entire molecule, which can make
-chemical interpretation difficult and lead to slow convergence in post-HF methods. The ``Localizer`` algorithm applies
-unitary transformations to these orbitals to obtain alternative representations that may be more physically intuitive or
-computationally advantageous. Multiple localization methods are available through a unified interface, each optimizing
-different criteria to achieve localization.
+Canonical molecular orbitals from :term:`SCF` calculations are often delocalized over the entire molecule, which can make chemical interpretation difficult and lead to slow convergence in post-:term:`HF` methods.
+The ``Localizer`` algorithm applies unitary transformations to these orbitals to obtain alternative representations that may be more physically intuitive or computationally advantageous.
+Multiple localization methods are available through a unified interface, each optimizing different criteria to achieve localization.
 
 Localization Methods
 --------------------
@@ -23,22 +19,14 @@ QDK/Chemistry provides several orbital transformation methods through the ``Loca
 
 - **Pipek-Mezey Localization**
 - **Natural Orbitals**
-- **MP2 Natural Orbitals**
+- **Second-order Møller-Plesset (MP2) Natural Orbitals**
 
-.. todo::
-   TODO (NAB):  add names for invoking localizer methods to list (e.g., "mp2_natural_orbitals")
-
-Creating a Localizer
+Creating a localizer
 --------------------
 
-As an algorithm class in QDK/Chemistry, the ``Localizer`` follows the
-:doc:`factory pattern design principle <../advanced/design_principles>`. It is created using its corresponding factory,
-which provides a unified interface for different localization method implementations. For more information about this
-pattern, see the :doc:`Factory Pattern <../advanced/factory_pattern>` documentation.
-
-.. todo::
-   TODO (NAB):  Check Localizer code examples after finalizing API.
-   https://dev.azure.com/ms-azurequantum/AzureQuantum/_workitems/edit/41366
+As an algorithm class in QDK/Chemistry, the ``Localizer`` follows the :doc:`factory pattern design principle <../advanced/design_principles>`.
+It is created using its corresponding factory, which provides a unified interface for different localization method implementations.
+For more information about this pattern, see the :doc:`Factory Pattern <../advanced/factory_pattern>` documentation.
 
 .. tab:: C++ API
 
@@ -52,24 +40,15 @@ pattern, see the :doc:`Factory Pattern <../advanced/factory_pattern>` documentat
 
 .. tab:: Python API
 
-   .. code-block:: python
+   .. literalinclude:: ../../../../examples/localizer.py
+      :language: python
+      :lines: 3-6
 
-      from qdk.chemistry.algorithms import create_localizer
 
-      # Create an MP2 natural orbital localizer
-      mp2_localizer = create_localizer("mp2_natural_orbitals")
-
-Configuring the Localizer
+Configuring the localizer
 -------------------------
 
 The ``Localizer`` can be configured using the ``Settings`` object:
-
-.. note::
-   🔧 **TODO**: Check implementational details
-
-.. todo::
-   TODO (NAB):  finish Localizer documentation
-   https://dev.azure.com/ms-azurequantum/AzureQuantum/_workitems/edit/41380
 
 .. tab:: C++ API
 
@@ -80,19 +59,16 @@ The ``Localizer`` can be configured using the ``Settings`` object:
 
 .. tab:: Python API
 
-   .. code-block:: python
+   .. literalinclude:: ../../../../examples/localizer.py
+      :language: python
+      :lines: 10-10
 
-      # Set the convergence threshold
-      localizer.settings().set("tolerance", 1.0e-6)
-
-Performing Orbital Localization
+Performing orbital localization
 -------------------------------
 
-Before performing localization, you need an :doc:`Orbitals <../data/orbitals>` instance as input. This is typically
-obtained from an :doc:`ScfSolver <scf_solver>` calculation, as localization is usually applied to converged SCF orbitals.
-Following QDK/Chemistry's :doc:`algorithm design principles <../advanced/design_principles>`, the ``Localizer`` algorithm takes an
-``Orbitals`` object as input and produces a new ``Orbitals`` object as output, preserving the original orbitals while
-creating a transformed representation.
+Before performing localization, you need an :doc:`Orbitals <../data/orbitals>` instance as input.
+This is typically obtained from an :doc:`ScfSolver <scf_solver>` calculation, as localization is usually applied to converged :term:`SCF` orbitals.
+Following QDK/Chemistry's :doc:`algorithm design principles <../advanced/design_principles>`, the ``Localizer`` algorithm takes an ``Orbitals`` object as input and produces a new ``Orbitals`` object as output, preserving the original orbitals while creating a transformed representation.
 
 The ``run`` method requires three parameters:
 
@@ -127,45 +103,27 @@ Once configured, the localization can be performed on a set of orbitals:
 
 .. tab:: Python API
 
-   .. code-block:: python
+   .. note::
+      This example shows the API pattern. For complete working examples, see the test suite.
 
-      # Obtain a valid Orbitals instance
-      orbitals = Orbitals()
-      # orbitals = ...
+   .. literalinclude:: ../../../../examples/factory_pattern.py
+      :language: python
+      :lines: 1-9
 
-      # Configure electron counts in settings for methods that require them
-      localizer.settings().set("n_alpha_electrons", n_alpha)
-      localizer.settings().set("n_beta_electrons", n_beta)
-
-      # Create indices for orbitals to localize
-      loc_indices_a = [0, 1, 2, 3]  # Alpha orbital indices
-      loc_indices_b = [0, 1, 2, 3]  # Beta orbital indices
-
-      # Localize the specified orbitals
-      localized_orbitals = localizer.run(orbitals, loc_indices_a, loc_indices_b)
-
-Available Localization Methods
+Available localization methods
 ------------------------------
 
 .. todo::
-   🔧 **TODO**: Add detailed descriptions of each localization method with theory and practical considerations
+   The detailed descriptions of each localization method are currently under construction.
 
-   TODO (NAB):  finish Localizer documentation
-   https://dev.azure.com/ms-azurequantum/AzureQuantum/_workitems/edit/41380
 
-Available Settings
+Available settings
 ------------------
 
 The ``Localizer`` accepts a range of settings to control its behavior. These settings are divided into base settings
 (common to all localization methods) and specialized settings (specific to certain localization variants).
 
-.. todo::
-   🔧 **TODO**: Verify and complete the settings tables with accurate parameters and descriptions
-
-   TODO (NAB):  finish Localizer documentation
-   https://dev.azure.com/ms-azurequantum/AzureQuantum/_workitems/edit/41380
-
-Base Settings
+Base settings
 ~~~~~~~~~~~~~
 
 These settings apply to all localization methods:
@@ -179,7 +137,7 @@ These settings apply to all localization methods:
      - Default
      - Description
 
-Specialized Settings
+Specialized settings
 ~~~~~~~~~~~~~~~~~~~~
 
 These settings apply only to specific variants of localization:
@@ -197,27 +155,29 @@ These settings apply only to specific variants of localization:
      - float
      - 1.0e-6
      - Convergence criterion for localization iterations
-     - Pipek-Mezey, VVHV
+     - Pipek-Mezey, Valence Virtual Hard Virtual (VVHV)
    * - ``max_iterations``
      - int
      - 10000
      - Maximum number of localization iterations
-     - Pipek-Mezey, VVHV
+     - Pipek-Mezey, :term:`VVHV`
    * - ``small_rotation_tolerance``
      - float
      - 1.0e-12
      - Threshold for small rotation detection
-     - Pipek-Mezey, VVHV
+     - Pipek-Mezey, :term:`VVHV`
    * - ``n_alpha_electrons``
      - int
      - Required
-     - Number of alpha electrons. Orbital indices < n_alpha_electrons are treated as occupied, indices >= n_alpha_electrons are treated as virtual.
-     - MP2 Natural Orbitals, VVHV
+     - Number of alpha electrons.
+       Orbital indices < n_alpha_electrons are treated as occupied, indices >= n_alpha_electrons are treated as virtual.
+     - :term:`MP2` Natural Orbitals, :term:`VVHV`
    * - ``n_beta_electrons``
      - int
      - Required
-     - Number of beta electrons. Orbital indices < n_beta_electrons are treated as occupied, indices >= n_beta_electrons are treated as virtual.
-     - MP2 Natural Orbitals, VVHV
+     - Number of beta electrons.
+       Orbital indices < n_beta_electrons are treated as occupied, indices >= n_beta_electrons are treated as virtual.
+     - :term:`MP2` Natural Orbitals, :term:`VVHV`
    * - ``method``
      - string
      - "pipek-mezey"
@@ -237,14 +197,14 @@ These settings apply only to specific variants of localization:
      - string
      - "sto-3g"
      - Name of the minimal basis set used for valence virtual projection
-     - VVHV
+     - :term:`VVHV`
    * - ``weighted_orthogonalization``
      - bool
      - true
      - Whether to use weighted orthogonalization in hard virtual construction
-     - VVHV
+     - :term:`VVHV`
 
-Computational Scaling
+Computational scaling
 ---------------------
 
 .. todo::
@@ -259,35 +219,30 @@ The computational cost of orbital localization methods scales with the size of t
    * - Method
      - Scaling
      - Notes
-   * - MP2 Natural Orbitals
+   * - :term:`MP2` Natural Orbitals
      - O(N⁵)
-     - Requires MP2 density matrix construction
+     - Requires :term:`MP2` density matrix construction
 
-Implemented Interface
+Implemented interface
 ---------------------
 
-QDK/Chemistry's ``Localizer`` provides a unified interface for localization methods::
+QDK/Chemistry's ``Localizer`` provides a unified interface for localization methods.
 
-QDK/Chemistry Implementations
+QDK/Chemistry implementations
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-- **QDK/Chemistry**: Native implementation of Pipek-Mezey, and MP2 natural orbital localization
+- **QDK/Chemistry**: Native implementation of Pipek-Mezey, and :term:`MP2` natural orbital localization
 
-Third-Party Interfaces
+Third-party interfaces
 ~~~~~~~~~~~~~~~~~~~~~~
 
-- **PySCF**: Interface to PySCF's orbital localization methods (TODO: is this true?)
-
-.. todo::
-   TODO (NAB):  correct Localizer documentation if needed and remove TODO
-   https://dev.azure.com/ms-azurequantum/AzureQuantum/_workitems/edit/41380
+- **PySCF**: Interface to PySCF's orbital localization methods
 
 The factory pattern allows seamless selection between these implementations.
 
-For more details on how QDK/Chemistry interfaces with external packages, see the :doc:`Interfaces <../advanced/interfaces>`
-documentation.
+For more details on how QDK/Chemistry interfaces with external packages, see the :doc:`Interfaces <../advanced/interfaces>` documentation.
 
-Related Classes
+Related classes
 ---------------
 
 - :doc:`Orbitals <../data/orbitals>`: Input and output orbitals

@@ -1,4 +1,4 @@
-Interface System in QDK/Chemistry
+Interface system in QDK/Chemistry
 =================================
 
 This document describes QDK/Chemistry's interface system, which provides unified access to various quantum chemistry packages.
@@ -10,11 +10,10 @@ Overview
 QDK/Chemistry is designed with an extensible plugin architecture that allows algorithms to be implemented either natively within QDK/Chemistry or as interfaces to established third-party quantum chemistry packages.
 This approach combines the benefits of a consistent API with the specialized capabilities of different software packages, following QDK/Chemistry's core :doc:`design principles <design_principles>` of extensibility and interoperability.
 
-The interface system implements the :doc:`factory pattern <factory_pattern>`, which allows algorithms to be instantiated by
-name without the user needing to know the specific implementation details. This abstraction enables seamless switching
-between different backends without changing your code, making it easier to benchmark and compare different approaches.
+The interface system implements the :doc:`factory pattern <factory_pattern>`, which allows algorithms to be instantiated by name without the user needing to know the specific implementation details.
+This abstraction enables seamless switching between different backends without changing your code, making it easier to benchmark and compare different approaches.
 
-Interface Architecture
+Interface architecture
 ----------------------
 
 The interface system is built on the following principles:
@@ -28,26 +27,23 @@ The interface system is built on the following principles:
 
 .. graphviz:: /_static/diagrams/interface_architecture.dot
 
-Supported Interfaces
+Supported interfaces
 --------------------
 
-QDK/Chemistry provides interfaces to many popular quantum chemistry packages, each carefully integrated to preserve their strengths while presenting a unified API to the user. These include:
+QDK/Chemistry provides interfaces to many popular quantum chemistry packages, each carefully integrated to preserve their strengths while presenting a unified API to the user.
+These include:
 
 - **PySCF**: Python-based Simulations of Chemistry Framework
 
 Each interface is implemented as a derived class that inherits from the appropriate algorithm base class (e.g.,
 ``ScfSolver``, ``Localizer``), ensuring type safety and consistent behavior across implementations.
 
-Using Interfaces
+Using interfaces
 ----------------
 
 Interfaces are accessed through the standard algorithm factory pattern, which provides a consistent way to instantiate
 any algorithm regardless of its implementation.
 This pattern is implemented across all major algorithm types in QDK/Chemistry.
-
-.. todo::
-   TODO (NAB):  check Interfaces code examples
-   https://dev.azure.com/ms-azurequantum/AzureQuantum/_workitems/edit/41366
 
 .. tab:: C++ API
 
@@ -67,21 +63,11 @@ This pattern is implemented across all major algorithm types in QDK/Chemistry.
 
 .. tab:: Python API
 
-   .. code-block:: python
+   .. literalinclude:: ../../../../examples/interfaces.py
+      :language: python
+      :lines: 1-14
 
-      from qdk.chemistry.algorithms import create_scf_solver
-
-      # Create an SCF solver that uses the QDK/Chemistry library as solver
-      scf = create_scf_solver()
-
-      # Configure it using the standard settings interface
-      scf.settings().set("basis_set", "cc-pvdz")
-      scf.settings().set("method", "hf")
-
-      # Run calculation with the same API as native implementations
-      energy, orbitals = scf.solve(structure)
-
-Listing Available Implementations
+Listing available implementations
 ---------------------------------
 
 You can discover what implementations are available for each algorithm type:
@@ -104,18 +90,11 @@ You can discover what implementations are available for each algorithm type:
 
 .. tab:: Python API
 
-   .. code-block:: python
+   .. literalinclude:: ../../../../examples/factory_pattern.py
+      :language: python
+      :lines: 1-13
 
-      from qdk.chemistry.algorithms import list_scf_solvers, get_scf_solver_description
-
-      # Get a list of available SCF solver implementations
-      available_solvers = list_scf_solvers()
-      print(available_solvers)
-
-      # Get documentation for a specific implementation
-      print(get_scf_solver_description("default"))
-
-Adding New Interfaces
+Adding new interfaces
 ---------------------
 
 QDK/Chemistry's plugin architecture makes it straightforward to add interfaces to new packages.
@@ -180,7 +159,7 @@ To create a new interface:
 
    .. code-block:: python
 
-      from qdk.chemistry.algorithms import register_scf_solver
+      from qdk_chemistry.algorithms import register_scf_solver
       import custom_chemistry_package as ccp
 
       class CustomScfSolver(ScfSolver):
@@ -208,10 +187,9 @@ To create a new interface:
       register_scf_solver("custom", CustomScfSolver,
                          "Interface to Custom Chemistry Package")
 
-For developers interested in adding new interfaces, please refer to the
-:doc:`Factory Pattern <factory_pattern>` documentation for more detailed guidance.
+For developers interested in adding new interfaces, please refer to the :doc:`Factory pattern <factory_pattern>` documentation for more detailed guidance.
 
-Interface-Specific Settings
+Interface-specific settings
 ---------------------------
 
 While QDK/Chemistry provides a unified API for all implementations, each backend may support additional options specific to that package.
@@ -237,7 +215,7 @@ This approach leverages the flexibility of QDK/Chemistry's :doc:`settings system
 Each interface implementation typically documents its specific settings, including both the common settings that are
 translated to the backend and the backend-specific settings that are passed through directly.
 
-Data Conversion
+Data conversion
 ---------------
 
 QDK/Chemistry handles the conversion of data between its own format and third-party packages automatically.
@@ -256,12 +234,11 @@ The conversion process is optimized to minimize data copying when possible, espe
 electron repulsion integrals (ERIs).
 When working with large systems, QDK/Chemistry may use direct algorithms or disk-based approaches to manage memory usage efficiently.
 
-Performance Considerations
+Performance considerations
 --------------------------
 
-Using an interface to a third-party package may involve some overhead for data conversion. However, this overhead is
-typically negligible compared to the computational cost of the quantum chemical calculations themselves, especially for
-larger systems and more computationally intensive methods.
+Using an interface to a third-party package may involve some overhead for data conversion.
+However, this overhead is typically negligible compared to the computational cost of the quantum chemical calculations themselves, especially for larger systems and more computationally intensive methods.
 
 QDK/Chemistry implements several optimizations to minimize this overhead:
 
@@ -272,19 +249,19 @@ QDK/Chemistry implements several optimizations to minimize this overhead:
 Different backend implementations may have different performance characteristics depending on the system size, method,
 and hardware environment.
 
-Available Interfaces by Algorithm
+Available interfaces by algorithm
 ---------------------------------
 
-.. note::
-   This section requires verification. PySCF and other third-party interfaces may not be fully implemented for
-   all algorithm classes mentioned. The table should be updated to reflect the actual implementation status of each
-   interface.
+.. todo::
+   This section of the interfaces documentation requires verification.
+   PySCF and other third-party interfaces may not be fully implemented for all algorithm classes mentioned.
+   The table should be updated to reflect the actual implementation status of each interface.
 
 The following table provides an overview of the available interfaces for each algorithm class in QDK/Chemistry.
 Each algorithm class is implemented through the factory pattern, allowing you to select different implementations at runtime.
 
 +---------------------+-----------------------------+------------------------+
-| Algorithm Class     | QDK/Chemistry Implementations | Third-Party Interfaces |
+| Algorithm class     | QDK/Chemistry implementations | Third-Party interfaces |
 +=====================+=============================+========================+
 | ScfSolver           | "qdk"                         | "pyscf"                |
 +---------------------+-----------------------------+------------------------+
@@ -298,10 +275,10 @@ Each algorithm class is implemented through the factory pattern, allowing you to
 You can discover all available implementations for a particular algorithm using the appropriate listing function (e.g.,
 ``list_scf_solvers()`` in Python or ``ScfSolverFactory::available()`` in C++).
 
-Related Topics
+Related topics
 --------------
 
-- :doc:`Design Principles <design_principles>`: Core architectural principles of QDK/Chemistry
-- :doc:`Factory Pattern <factory_pattern>`: How to extend QDK/Chemistry with new algorithms and interfaces
+- :doc:`Design principles <design_principles>`: Core architectural principles of QDK/Chemistry
+- :doc:`Factory pattern <factory_pattern>`: How to extend QDK/Chemistry with new algorithms and interfaces
 - :doc:`Settings <settings>`: Configuring algorithm behavior consistently across implementations
 - :doc:`Serialization <serialization>`: Data persistence and conversion in QDK/Chemistry

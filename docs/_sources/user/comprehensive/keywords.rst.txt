@@ -1,4 +1,4 @@
-Functionals and Basis Sets
+Functionals and basis sets
 ==========================
 
 .. toctree::

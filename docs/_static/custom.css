@@ -1,0 +1,9 @@
+/* Increase main content width */
+.wy-nav-content {
+    max-width: 1300px !important;
+}
+
+/* Also increase the inner content area */
+.wy-nav-content .rst-content {
+    max-width: 1300px !important;
+}

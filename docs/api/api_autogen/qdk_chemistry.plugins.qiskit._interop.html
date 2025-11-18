@@ -1,0 +1,260 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../../">
+<head>
+  <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>qdk_chemistry.plugins.qiskit._interop package &mdash; qdk-chemistry 1.0.0-rc1 documentation</title>
+      <link rel="stylesheet" type="text/css" href="../../_static/pygments.css?v=b86133f3" />
+      <link rel="stylesheet" type="text/css" href="../../_static/css/theme.css?v=e59714d7" />
+      <link rel="stylesheet" type="text/css" href="../../_static/tabs.css?v=4c969af8" />
+      <link rel="stylesheet" type="text/css" href="../../_static/graphviz.css?v=4ae1632d" />
+      <link rel="stylesheet" type="text/css" href="../../_static/copybutton.css?v=76b2166b" />
+      <link rel="stylesheet" type="text/css" href="../../_static/custom.css?v=a64bac2b" />
+
+  
+      <script src="../../_static/jquery.js?v=5d32c60e"></script>
+      <script src="../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="../../_static/documentation_options.js?v=81bd8d55"></script>
+      <script src="../../_static/doctools.js?v=9bcbadda"></script>
+      <script src="../../_static/sphinx_highlight.js?v=dc90522c"></script>
+      <script src="../../_static/tabs.js?v=3ee01567"></script>
+      <script src="../../_static/clipboard.min.js?v=a7894cd8"></script>
+      <script src="../../_static/copybutton.js?v=f281be69"></script>
+    <script src="../../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../../genindex.html" />
+    <link rel="search" title="Search" href="../../search.html" />
+    <link rel="next" title="qdk_chemistry.plugins.qiskit._interop.circuit module" href="qdk_chemistry.plugins.qiskit._interop.circuit.html" />
+    <link rel="prev" title="qdk_chemistry.plugins.qiskit package" href="qdk_chemistry.plugins.qiskit.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="../../index.html" class="icon icon-home">
+            qdk-chemistry
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">User Documentation</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../user/quickstart.html">Quickstart</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../user/comprehensive/index.html">In-depth user guide</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">API Reference</span></p>
+<ul class="current">
+<li class="toctree-l1 current"><a class="reference internal" href="../python_api.html">Python API</a><ul class="current">
+<li class="toctree-l2"><a class="reference internal" href="../python_api.html#data-classes">Data Classes</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../python_api.html#algorithms">Algorithms</a></li>
+<li class="toctree-l2 current"><a class="reference internal" href="../python_api.html#plugins">Plugins</a><ul class="current">
+<li class="toctree-l3 current"><a class="reference internal" href="qdk_chemistry.plugins.html">qdk_chemistry.plugins package</a><ul class="current">
+<li class="toctree-l4"><a class="reference internal" href="qdk_chemistry.plugins.html#purpose-and-benefits">Purpose and Benefits</a></li>
+<li class="toctree-l4"><a class="reference internal" href="qdk_chemistry.plugins.html#available-plugins">Available Plugins</a></li>
+<li class="toctree-l4"><a class="reference internal" href="qdk_chemistry.plugins.html#using-plugins">Using Plugins</a></li>
+<li class="toctree-l4 current"><a class="reference internal" href="qdk_chemistry.plugins.html#subpackages">Subpackages</a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="../python_api.html#utilities">Utilities</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../python_api.html#constants">Constants</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="../cpp_api.html">C++ API</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Supporting Information</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../glossary.html">Acronym definitions</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../references.html">References</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../../index.html">qdk-chemistry</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../../index.html" class="icon icon-home" aria-label="Home"></a></li>
+          <li class="breadcrumb-item"><a href="../python_api.html">Python API</a></li>
+          <li class="breadcrumb-item"><a href="qdk_chemistry.plugins.html">qdk_chemistry.plugins package</a></li>
+          <li class="breadcrumb-item"><a href="qdk_chemistry.plugins.qiskit.html">qdk_chemistry.plugins.qiskit package</a></li>
+      <li class="breadcrumb-item active">qdk_chemistry.plugins.qiskit._interop package</li>
+      <li class="wy-breadcrumbs-aside">
+            <a href="../../_sources/api/api_autogen/qdk_chemistry.plugins.qiskit._interop.rst.txt" rel="nofollow"> View page source</a>
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <section id="module-qdk_chemistry.plugins.qiskit._interop">
+<span id="qdk-chemistry-plugins-qiskit-interop-package"></span><h1>qdk_chemistry.plugins.qiskit._interop package<a class="headerlink" href="#module-qdk_chemistry.plugins.qiskit._interop" title="Link to this heading"></a></h1>
+<p>QDK/Chemistry Qiskit interoperability module.</p>
+<p>This module provides interoperability features for QDK/Chemistry,
+enabling integration with Qiskit.</p>
+<section id="submodules">
+<h2>Submodules<a class="headerlink" href="#submodules" title="Link to this heading"></a></h2>
+<div class="toctree-wrapper compound">
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="qdk_chemistry.plugins.qiskit._interop.circuit.html">qdk_chemistry.plugins.qiskit._interop.circuit module</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="qdk_chemistry.plugins.qiskit._interop.circuit.html#qdk_chemistry.plugins.qiskit._interop.circuit.analyze_qubit_status"><code class="docutils literal notranslate"><span class="pre">analyze_qubit_status()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="qdk_chemistry.plugins.qiskit._interop.circuit.html#qdk_chemistry.plugins.qiskit._interop.circuit.CircuitInfo"><code class="docutils literal notranslate"><span class="pre">CircuitInfo</span></code></a><ul>
+<li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.plugins.qiskit._interop.circuit.html#qdk_chemistry.plugins.qiskit._interop.circuit.CircuitInfo.circuit"><code class="docutils literal notranslate"><span class="pre">CircuitInfo.circuit</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.plugins.qiskit._interop.circuit.html#qdk_chemistry.plugins.qiskit._interop.circuit.CircuitInfo.num_qubits"><code class="docutils literal notranslate"><span class="pre">CircuitInfo.num_qubits</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.plugins.qiskit._interop.circuit.html#qdk_chemistry.plugins.qiskit._interop.circuit.CircuitInfo.depth"><code class="docutils literal notranslate"><span class="pre">CircuitInfo.depth</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.plugins.qiskit._interop.circuit.html#qdk_chemistry.plugins.qiskit._interop.circuit.CircuitInfo.num_gates"><code class="docutils literal notranslate"><span class="pre">CircuitInfo.num_gates</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.plugins.qiskit._interop.circuit.html#qdk_chemistry.plugins.qiskit._interop.circuit.CircuitInfo.gate_counts"><code class="docutils literal notranslate"><span class="pre">CircuitInfo.gate_counts</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.plugins.qiskit._interop.circuit.html#qdk_chemistry.plugins.qiskit._interop.circuit.CircuitInfo.count_gate_category"><code class="docutils literal notranslate"><span class="pre">CircuitInfo.count_gate_category()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.plugins.qiskit._interop.circuit.html#qdk_chemistry.plugins.qiskit._interop.circuit.CircuitInfo.count_gate"><code class="docutils literal notranslate"><span class="pre">CircuitInfo.count_gate()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.plugins.qiskit._interop.circuit.html#qdk_chemistry.plugins.qiskit._interop.circuit.CircuitInfo.num_single_qubit_clifford"><code class="docutils literal notranslate"><span class="pre">CircuitInfo.num_single_qubit_clifford</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.plugins.qiskit._interop.circuit.html#qdk_chemistry.plugins.qiskit._interop.circuit.CircuitInfo.__init__"><code class="docutils literal notranslate"><span class="pre">CircuitInfo.__init__()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.plugins.qiskit._interop.circuit.html#qdk_chemistry.plugins.qiskit._interop.circuit.CircuitInfo.num_two_qubit_clifford"><code class="docutils literal notranslate"><span class="pre">CircuitInfo.num_two_qubit_clifford</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.plugins.qiskit._interop.circuit.html#qdk_chemistry.plugins.qiskit._interop.circuit.CircuitInfo.num_non_clifford"><code class="docutils literal notranslate"><span class="pre">CircuitInfo.num_non_clifford</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.plugins.qiskit._interop.circuit.html#qdk_chemistry.plugins.qiskit._interop.circuit.CircuitInfo.summary"><code class="docutils literal notranslate"><span class="pre">CircuitInfo.summary()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="qdk_chemistry.plugins.qiskit._interop.circuit.html#qdk_chemistry.plugins.qiskit._interop.circuit.plot_circuit_diagram"><code class="docutils literal notranslate"><span class="pre">plot_circuit_diagram()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="qdk_chemistry.plugins.qiskit._interop.noise_model.html">qdk_chemistry.plugins.qiskit._interop.noise_model module</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="qdk_chemistry.plugins.qiskit._interop.noise_model.html#qdk_chemistry.plugins.qiskit._interop.noise_model.QuantumErrorProfile"><code class="docutils literal notranslate"><span class="pre">QuantumErrorProfile</span></code></a><ul>
+<li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.plugins.qiskit._interop.noise_model.html#qdk_chemistry.plugins.qiskit._interop.noise_model.QuantumErrorProfile.__init__"><code class="docutils literal notranslate"><span class="pre">QuantumErrorProfile.__init__()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.plugins.qiskit._interop.noise_model.html#qdk_chemistry.plugins.qiskit._interop.noise_model.QuantumErrorProfile.basis_gates"><code class="docutils literal notranslate"><span class="pre">QuantumErrorProfile.basis_gates</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.plugins.qiskit._interop.noise_model.html#qdk_chemistry.plugins.qiskit._interop.noise_model.QuantumErrorProfile.from_yaml"><code class="docutils literal notranslate"><span class="pre">QuantumErrorProfile.from_yaml()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.plugins.qiskit._interop.noise_model.html#qdk_chemistry.plugins.qiskit._interop.noise_model.QuantumErrorProfile.supported_yaml_keys"><code class="docutils literal notranslate"><span class="pre">QuantumErrorProfile.supported_yaml_keys</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.plugins.qiskit._interop.noise_model.html#qdk_chemistry.plugins.qiskit._interop.noise_model.QuantumErrorProfile.to_dict"><code class="docutils literal notranslate"><span class="pre">QuantumErrorProfile.to_dict()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.plugins.qiskit._interop.noise_model.html#qdk_chemistry.plugins.qiskit._interop.noise_model.QuantumErrorProfile.to_yaml"><code class="docutils literal notranslate"><span class="pre">QuantumErrorProfile.to_yaml()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.plugins.qiskit._interop.noise_model.html#qdk_chemistry.plugins.qiskit._interop.noise_model.QuantumErrorProfile.name"><code class="docutils literal notranslate"><span class="pre">QuantumErrorProfile.name</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.plugins.qiskit._interop.noise_model.html#qdk_chemistry.plugins.qiskit._interop.noise_model.QuantumErrorProfile.description"><code class="docutils literal notranslate"><span class="pre">QuantumErrorProfile.description</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.plugins.qiskit._interop.noise_model.html#qdk_chemistry.plugins.qiskit._interop.noise_model.QuantumErrorProfile.errors"><code class="docutils literal notranslate"><span class="pre">QuantumErrorProfile.errors</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.plugins.qiskit._interop.noise_model.html#qdk_chemistry.plugins.qiskit._interop.noise_model.QuantumErrorProfile.one_qubit_gates"><code class="docutils literal notranslate"><span class="pre">QuantumErrorProfile.one_qubit_gates</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.plugins.qiskit._interop.noise_model.html#qdk_chemistry.plugins.qiskit._interop.noise_model.QuantumErrorProfile.two_qubit_gates"><code class="docutils literal notranslate"><span class="pre">QuantumErrorProfile.two_qubit_gates</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="qdk_chemistry.plugins.qiskit._interop.noise_model.html#qdk_chemistry.plugins.qiskit._interop.noise_model.SupportedErrorTypes"><code class="docutils literal notranslate"><span class="pre">SupportedErrorTypes</span></code></a><ul>
+<li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.plugins.qiskit._interop.noise_model.html#qdk_chemistry.plugins.qiskit._interop.noise_model.SupportedErrorTypes.DEPOLARIZING_ERROR"><code class="docutils literal notranslate"><span class="pre">SupportedErrorTypes.DEPOLARIZING_ERROR</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="qdk_chemistry.plugins.qiskit._interop.noise_model.html#qdk_chemistry.plugins.qiskit._interop.noise_model.get_noise_model_from_profile"><code class="docutils literal notranslate"><span class="pre">get_noise_model_from_profile()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="qdk_chemistry.plugins.qiskit._interop.transpiler.html">qdk_chemistry.plugins.qiskit._interop.transpiler module</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="qdk_chemistry.plugins.qiskit._interop.transpiler.html#qdk_chemistry.plugins.qiskit._interop.transpiler.Settings"><code class="docutils literal notranslate"><span class="pre">Settings</span></code></a><ul>
+<li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.plugins.qiskit._interop.transpiler.html#qdk_chemistry.plugins.qiskit._interop.transpiler.Settings.__init__"><code class="docutils literal notranslate"><span class="pre">Settings.__init__()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.plugins.qiskit._interop.transpiler.html#qdk_chemistry.plugins.qiskit._interop.transpiler.Settings.empty"><code class="docutils literal notranslate"><span class="pre">Settings.empty()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.plugins.qiskit._interop.transpiler.html#qdk_chemistry.plugins.qiskit._interop.transpiler.Settings.from_dict"><code class="docutils literal notranslate"><span class="pre">Settings.from_dict()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.plugins.qiskit._interop.transpiler.html#qdk_chemistry.plugins.qiskit._interop.transpiler.Settings.from_file"><code class="docutils literal notranslate"><span class="pre">Settings.from_file()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.plugins.qiskit._interop.transpiler.html#qdk_chemistry.plugins.qiskit._interop.transpiler.Settings.from_hdf5_file"><code class="docutils literal notranslate"><span class="pre">Settings.from_hdf5_file()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.plugins.qiskit._interop.transpiler.html#qdk_chemistry.plugins.qiskit._interop.transpiler.Settings.from_json"><code class="docutils literal notranslate"><span class="pre">Settings.from_json()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.plugins.qiskit._interop.transpiler.html#qdk_chemistry.plugins.qiskit._interop.transpiler.Settings.from_json_file"><code class="docutils literal notranslate"><span class="pre">Settings.from_json_file()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.plugins.qiskit._interop.transpiler.html#qdk_chemistry.plugins.qiskit._interop.transpiler.Settings.from_json_string"><code class="docutils literal notranslate"><span class="pre">Settings.from_json_string()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.plugins.qiskit._interop.transpiler.html#qdk_chemistry.plugins.qiskit._interop.transpiler.Settings.get"><code class="docutils literal notranslate"><span class="pre">Settings.get()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.plugins.qiskit._interop.transpiler.html#qdk_chemistry.plugins.qiskit._interop.transpiler.Settings.get_all_settings"><code class="docutils literal notranslate"><span class="pre">Settings.get_all_settings()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.plugins.qiskit._interop.transpiler.html#qdk_chemistry.plugins.qiskit._interop.transpiler.Settings.get_as_string"><code class="docutils literal notranslate"><span class="pre">Settings.get_as_string()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.plugins.qiskit._interop.transpiler.html#qdk_chemistry.plugins.qiskit._interop.transpiler.Settings.get_expected_python_type"><code class="docutils literal notranslate"><span class="pre">Settings.get_expected_python_type()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.plugins.qiskit._interop.transpiler.html#qdk_chemistry.plugins.qiskit._interop.transpiler.Settings.get_or_default"><code class="docutils literal notranslate"><span class="pre">Settings.get_or_default()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.plugins.qiskit._interop.transpiler.html#qdk_chemistry.plugins.qiskit._interop.transpiler.Settings.get_or_default_raw"><code class="docutils literal notranslate"><span class="pre">Settings.get_or_default_raw()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.plugins.qiskit._interop.transpiler.html#qdk_chemistry.plugins.qiskit._interop.transpiler.Settings.get_raw"><code class="docutils literal notranslate"><span class="pre">Settings.get_raw()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.plugins.qiskit._interop.transpiler.html#qdk_chemistry.plugins.qiskit._interop.transpiler.Settings.get_type_name"><code class="docutils literal notranslate"><span class="pre">Settings.get_type_name()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.plugins.qiskit._interop.transpiler.html#qdk_chemistry.plugins.qiskit._interop.transpiler.Settings.has"><code class="docutils literal notranslate"><span class="pre">Settings.has()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.plugins.qiskit._interop.transpiler.html#qdk_chemistry.plugins.qiskit._interop.transpiler.Settings.items"><code class="docutils literal notranslate"><span class="pre">Settings.items()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.plugins.qiskit._interop.transpiler.html#qdk_chemistry.plugins.qiskit._interop.transpiler.Settings.keys"><code class="docutils literal notranslate"><span class="pre">Settings.keys()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.plugins.qiskit._interop.transpiler.html#qdk_chemistry.plugins.qiskit._interop.transpiler.Settings.lock"><code class="docutils literal notranslate"><span class="pre">Settings.lock()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.plugins.qiskit._interop.transpiler.html#qdk_chemistry.plugins.qiskit._interop.transpiler.Settings.set"><code class="docutils literal notranslate"><span class="pre">Settings.set()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.plugins.qiskit._interop.transpiler.html#qdk_chemistry.plugins.qiskit._interop.transpiler.Settings.set_from_map"><code class="docutils literal notranslate"><span class="pre">Settings.set_from_map()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.plugins.qiskit._interop.transpiler.html#qdk_chemistry.plugins.qiskit._interop.transpiler.Settings.set_raw"><code class="docutils literal notranslate"><span class="pre">Settings.set_raw()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.plugins.qiskit._interop.transpiler.html#qdk_chemistry.plugins.qiskit._interop.transpiler.Settings.size"><code class="docutils literal notranslate"><span class="pre">Settings.size()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.plugins.qiskit._interop.transpiler.html#qdk_chemistry.plugins.qiskit._interop.transpiler.Settings.to_dict"><code class="docutils literal notranslate"><span class="pre">Settings.to_dict()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.plugins.qiskit._interop.transpiler.html#qdk_chemistry.plugins.qiskit._interop.transpiler.Settings.to_file"><code class="docutils literal notranslate"><span class="pre">Settings.to_file()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.plugins.qiskit._interop.transpiler.html#qdk_chemistry.plugins.qiskit._interop.transpiler.Settings.to_hdf5_file"><code class="docutils literal notranslate"><span class="pre">Settings.to_hdf5_file()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.plugins.qiskit._interop.transpiler.html#qdk_chemistry.plugins.qiskit._interop.transpiler.Settings.to_json"><code class="docutils literal notranslate"><span class="pre">Settings.to_json()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.plugins.qiskit._interop.transpiler.html#qdk_chemistry.plugins.qiskit._interop.transpiler.Settings.to_json_file"><code class="docutils literal notranslate"><span class="pre">Settings.to_json_file()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.plugins.qiskit._interop.transpiler.html#qdk_chemistry.plugins.qiskit._interop.transpiler.Settings.to_json_string"><code class="docutils literal notranslate"><span class="pre">Settings.to_json_string()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.plugins.qiskit._interop.transpiler.html#qdk_chemistry.plugins.qiskit._interop.transpiler.Settings.update"><code class="docutils literal notranslate"><span class="pre">Settings.update()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.plugins.qiskit._interop.transpiler.html#qdk_chemistry.plugins.qiskit._interop.transpiler.Settings.update_raw"><code class="docutils literal notranslate"><span class="pre">Settings.update_raw()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.plugins.qiskit._interop.transpiler.html#qdk_chemistry.plugins.qiskit._interop.transpiler.Settings.validate_required"><code class="docutils literal notranslate"><span class="pre">Settings.validate_required()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.plugins.qiskit._interop.transpiler.html#qdk_chemistry.plugins.qiskit._interop.transpiler.Settings.values"><code class="docutils literal notranslate"><span class="pre">Settings.values()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="qdk_chemistry.plugins.qiskit._interop.transpiler.html#qdk_chemistry.plugins.qiskit._interop.transpiler.MergeZBasisRotations"><code class="docutils literal notranslate"><span class="pre">MergeZBasisRotations</span></code></a><ul>
+<li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.plugins.qiskit._interop.transpiler.html#qdk_chemistry.plugins.qiskit._interop.transpiler.MergeZBasisRotations.__init__"><code class="docutils literal notranslate"><span class="pre">MergeZBasisRotations.__init__()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.plugins.qiskit._interop.transpiler.html#qdk_chemistry.plugins.qiskit._interop.transpiler.MergeZBasisRotations.run"><code class="docutils literal notranslate"><span class="pre">MergeZBasisRotations.run()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="qdk_chemistry.plugins.qiskit._interop.transpiler.html#qdk_chemistry.plugins.qiskit._interop.transpiler.SubstituteCliffordRzSettings"><code class="docutils literal notranslate"><span class="pre">SubstituteCliffordRzSettings</span></code></a><ul>
+<li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.plugins.qiskit._interop.transpiler.html#qdk_chemistry.plugins.qiskit._interop.transpiler.SubstituteCliffordRzSettings.__init__"><code class="docutils literal notranslate"><span class="pre">SubstituteCliffordRzSettings.__init__()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.plugins.qiskit._interop.transpiler.html#qdk_chemistry.plugins.qiskit._interop.transpiler.SubstituteCliffordRzSettings.set"><code class="docutils literal notranslate"><span class="pre">SubstituteCliffordRzSettings.set()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.plugins.qiskit._interop.transpiler.html#qdk_chemistry.plugins.qiskit._interop.transpiler.SubstituteCliffordRzSettings.update"><code class="docutils literal notranslate"><span class="pre">SubstituteCliffordRzSettings.update()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="qdk_chemistry.plugins.qiskit._interop.transpiler.html#qdk_chemistry.plugins.qiskit._interop.transpiler.SubstituteCliffordRz"><code class="docutils literal notranslate"><span class="pre">SubstituteCliffordRz</span></code></a><ul>
+<li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.plugins.qiskit._interop.transpiler.html#qdk_chemistry.plugins.qiskit._interop.transpiler.SubstituteCliffordRz.__init__"><code class="docutils literal notranslate"><span class="pre">SubstituteCliffordRz.__init__()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.plugins.qiskit._interop.transpiler.html#qdk_chemistry.plugins.qiskit._interop.transpiler.SubstituteCliffordRz.run"><code class="docutils literal notranslate"><span class="pre">SubstituteCliffordRz.run()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.plugins.qiskit._interop.transpiler.html#qdk_chemistry.plugins.qiskit._interop.transpiler.SubstituteCliffordRz.settings"><code class="docutils literal notranslate"><span class="pre">SubstituteCliffordRz.settings()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="qdk_chemistry.plugins.qiskit._interop.transpiler.html#qdk_chemistry.plugins.qiskit._interop.transpiler.RemoveZBasisOnZeroState"><code class="docutils literal notranslate"><span class="pre">RemoveZBasisOnZeroState</span></code></a><ul>
+<li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.plugins.qiskit._interop.transpiler.html#qdk_chemistry.plugins.qiskit._interop.transpiler.RemoveZBasisOnZeroState.__init__"><code class="docutils literal notranslate"><span class="pre">RemoveZBasisOnZeroState.__init__()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.plugins.qiskit._interop.transpiler.html#qdk_chemistry.plugins.qiskit._interop.transpiler.RemoveZBasisOnZeroState.run"><code class="docutils literal notranslate"><span class="pre">RemoveZBasisOnZeroState.run()</span></code></a></li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</div>
+</section>
+</section>
+
+
+           </div>
+          </div>
+          <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
+        <a href="qdk_chemistry.plugins.qiskit.html" class="btn btn-neutral float-left" title="qdk_chemistry.plugins.qiskit package" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+        <a href="qdk_chemistry.plugins.qiskit._interop.circuit.html" class="btn btn-neutral float-right" title="qdk_chemistry.plugins.qiskit._interop.circuit module" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright Microsoft Corporation. All rights reserved. Licensed under the MIT License.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

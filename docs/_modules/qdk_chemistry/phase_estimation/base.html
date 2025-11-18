@@ -1,0 +1,262 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../../../">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>qdk_chemistry.phase_estimation.base &mdash; qdk-chemistry 1.0.0-rc1 documentation</title>
+      <link rel="stylesheet" type="text/css" href="../../../_static/pygments.css?v=b86133f3" />
+      <link rel="stylesheet" type="text/css" href="../../../_static/css/theme.css?v=e59714d7" />
+      <link rel="stylesheet" type="text/css" href="../../../_static/tabs.css?v=4c969af8" />
+      <link rel="stylesheet" type="text/css" href="../../../_static/graphviz.css?v=4ae1632d" />
+      <link rel="stylesheet" type="text/css" href="../../../_static/copybutton.css?v=76b2166b" />
+      <link rel="stylesheet" type="text/css" href="../../../_static/custom.css?v=a64bac2b" />
+
+  
+      <script src="../../../_static/jquery.js?v=5d32c60e"></script>
+      <script src="../../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="../../../_static/documentation_options.js?v=81bd8d55"></script>
+      <script src="../../../_static/doctools.js?v=9bcbadda"></script>
+      <script src="../../../_static/sphinx_highlight.js?v=dc90522c"></script>
+      <script src="../../../_static/tabs.js?v=3ee01567"></script>
+      <script src="../../../_static/clipboard.min.js?v=a7894cd8"></script>
+      <script src="../../../_static/copybutton.js?v=f281be69"></script>
+    <script src="../../../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../../../genindex.html" />
+    <link rel="search" title="Search" href="../../../search.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="../../../index.html" class="icon icon-home">
+            qdk-chemistry
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../../../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">User Documentation</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../user/quickstart.html">Quickstart</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../user/comprehensive/index.html">In-depth user guide</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">API Reference</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../api/python_api.html">Python API</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../api/cpp_api.html">C++ API</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Supporting Information</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../glossary.html">Acronym definitions</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../references.html">References</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../../../index.html">qdk-chemistry</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../../../index.html" class="icon icon-home" aria-label="Home"></a></li>
+          <li class="breadcrumb-item"><a href="../../index.html">Module code</a></li>
+      <li class="breadcrumb-item active">qdk_chemistry.phase_estimation.base</li>
+      <li class="wy-breadcrumbs-aside">
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <h1>Source code for qdk_chemistry.phase_estimation.base</h1><div class="highlight"><pre>
+<span></span><span class="sd">&quot;&quot;&quot;Base classes for phase estimation algorithms in QDK/Chemistry.</span>
+
+<span class="sd">This module provides standalone abstractions for phase estimation workflows.</span>
+<span class="sd">Concrete algorithms should inherit from :class:`PhaseEstimation` and expose</span>
+<span class="sd">creation helpers (for example, :meth:`create_circuit` or</span>
+<span class="sd">:meth:`create_iterations`) that assemble the circuits required by the chosen</span>
+<span class="sd">phase estimation variant.</span>
+<span class="sd">&quot;&quot;&quot;</span>
+
+<span class="c1"># --------------------------------------------------------------------------------------------</span>
+<span class="c1"># Copyright (c) Microsoft Corporation. All rights reserved.</span>
+<span class="c1"># Licensed under the MIT License. See LICENSE.txt in the project root for license information.</span>
+<span class="c1"># --------------------------------------------------------------------------------------------</span>
+
+<span class="kn">from</span><span class="w"> </span><span class="nn">abc</span><span class="w"> </span><span class="kn">import</span> <span class="n">ABC</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">collections.abc</span><span class="w"> </span><span class="kn">import</span> <span class="n">Iterable</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">enum</span><span class="w"> </span><span class="kn">import</span> <span class="n">StrEnum</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">typing</span><span class="w"> </span><span class="kn">import</span> <span class="n">TYPE_CHECKING</span><span class="p">,</span> <span class="n">TypeVar</span><span class="p">,</span> <span class="n">cast</span>
+
+<span class="kn">from</span><span class="w"> </span><span class="nn">qiskit</span><span class="w"> </span><span class="kn">import</span> <span class="n">QuantumCircuit</span>
+
+<span class="k">if</span> <span class="n">TYPE_CHECKING</span><span class="p">:</span>  <span class="c1"># pragma: no cover - import only needed for type checking</span>
+    <span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.data</span><span class="w"> </span><span class="kn">import</span> <span class="n">QubitHamiltonian</span>
+
+<span class="n">AlgorithmT</span> <span class="o">=</span> <span class="n">TypeVar</span><span class="p">(</span><span class="s2">&quot;AlgorithmT&quot;</span><span class="p">,</span> <span class="n">bound</span><span class="o">=</span><span class="s2">&quot;PhaseEstimation&quot;</span><span class="p">)</span>
+
+
+<div class="viewcode-block" id="PhaseEstimationAlgorithm">
+<a class="viewcode-back" href="../../../api/api_autogen/qdk_chemistry.phase_estimation.base.html#qdk_chemistry.phase_estimation.base.PhaseEstimationAlgorithm">[docs]</a>
+<span class="k">class</span><span class="w"> </span><span class="nc">PhaseEstimationAlgorithm</span><span class="p">(</span><span class="n">StrEnum</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Enumeration of supported phase estimation routines.</span>
+
+<span class="sd">    References:</span>
+<span class="sd">        Iterative QPE: Kitaev, A. (1995). &quot;Quantum measurements and the Abelian</span>
+<span class="sd">            Stabilizer Problem.&quot; arXiv:quant-ph/9511026.</span>
+<span class="sd">            https://arxiv.org/abs/quant-ph/9511026</span>
+<span class="sd">        Traditional QPE: Nielsen, M. A., &amp; Chuang, I. L. (2010). &quot;Quantum Computation</span>
+<span class="sd">            and Quantum Information&quot; (10th Anniversary Edition), Ch. 5.2.</span>
+
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="n">ITERATIVE</span> <span class="o">=</span> <span class="s2">&quot;iterative&quot;</span>
+    <span class="n">TRADITIONAL</span> <span class="o">=</span> <span class="s2">&quot;traditional&quot;</span></div>
+
+
+
+<div class="viewcode-block" id="PhaseEstimation">
+<a class="viewcode-back" href="../../../api/api_autogen/qdk_chemistry.phase_estimation.base.html#qdk_chemistry.phase_estimation.base.PhaseEstimation">[docs]</a>
+<span class="k">class</span><span class="w"> </span><span class="nc">PhaseEstimation</span><span class="p">(</span><span class="n">ABC</span><span class="p">):</span>  <span class="c1"># noqa: B024</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Abstract interface for phase estimation strategies.&quot;&quot;&quot;</span>
+
+    <span class="n">algorithm</span><span class="p">:</span> <span class="n">PhaseEstimationAlgorithm</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span>
+
+<div class="viewcode-block" id="PhaseEstimation.__init__">
+<a class="viewcode-back" href="../../../api/api_autogen/qdk_chemistry.phase_estimation.base.html#qdk_chemistry.phase_estimation.base.PhaseEstimation.__init__">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">hamiltonian</span><span class="p">:</span> <span class="s2">&quot;QubitHamiltonian&quot;</span><span class="p">,</span> <span class="n">evolution_time</span><span class="p">:</span> <span class="nb">float</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Store common data for phase estimation routines.</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            hamiltonian: Target Hamiltonian whose eigenvalues are estimated.</span>
+<span class="sd">            evolution_time: Time parameter ``t`` used in the time-evolution</span>
+<span class="sd">                unitary ``U = exp(-i H t)``.</span>
+
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_hamiltonian</span> <span class="o">=</span> <span class="n">hamiltonian</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_evolution_time</span> <span class="o">=</span> <span class="n">evolution_time</span></div>
+
+
+<div class="viewcode-block" id="PhaseEstimation.hamiltonian">
+<a class="viewcode-back" href="../../../api/api_autogen/qdk_chemistry.phase_estimation.base.html#qdk_chemistry.phase_estimation.base.PhaseEstimation.hamiltonian">[docs]</a>
+    <span class="nd">@property</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">hamiltonian</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="s2">&quot;QubitHamiltonian&quot;</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Return the Hamiltonian used by the algorithm.&quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_hamiltonian</span></div>
+
+
+<div class="viewcode-block" id="PhaseEstimation.evolution_time">
+<a class="viewcode-back" href="../../../api/api_autogen/qdk_chemistry.phase_estimation.base.html#qdk_chemistry.phase_estimation.base.PhaseEstimation.evolution_time">[docs]</a>
+    <span class="nd">@property</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">evolution_time</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">float</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Return the evolution time used for ``U = exp(-i H t)``.&quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_evolution_time</span></div>
+
+
+<div class="viewcode-block" id="PhaseEstimation.from_algorithm">
+<a class="viewcode-back" href="../../../api/api_autogen/qdk_chemistry.phase_estimation.base.html#qdk_chemistry.phase_estimation.base.PhaseEstimation.from_algorithm">[docs]</a>
+    <span class="nd">@classmethod</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">from_algorithm</span><span class="p">(</span>
+        <span class="bp">cls</span><span class="p">:</span> <span class="nb">type</span><span class="p">[</span><span class="n">AlgorithmT</span><span class="p">],</span>
+        <span class="n">algorithm</span><span class="p">:</span> <span class="n">PhaseEstimationAlgorithm</span> <span class="o">|</span> <span class="nb">str</span> <span class="o">|</span> <span class="kc">None</span><span class="p">,</span>
+        <span class="o">*</span><span class="p">,</span>
+        <span class="n">hamiltonian</span><span class="p">:</span> <span class="s2">&quot;QubitHamiltonian&quot;</span><span class="p">,</span>
+        <span class="n">evolution_time</span><span class="p">:</span> <span class="nb">float</span><span class="p">,</span>
+        <span class="o">**</span><span class="n">kwargs</span><span class="p">,</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">AlgorithmT</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Factory method returning the requested phase estimation strategy.</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            algorithm: Identifier for the desired algorithm.  ``None`` selects</span>
+<span class="sd">                :class:`PhaseEstimationAlgorithm.ITERATIVE`.</span>
+<span class="sd">            hamiltonian: Target Hamiltonian.</span>
+<span class="sd">            evolution_time: Time parameter ``t`` for ``U = exp(-i H t)``.</span>
+<span class="sd">            **kwargs: Additional options forwarded to the algorithm</span>
+<span class="sd">                constructor.</span>
+
+<span class="sd">        Raises:</span>
+<span class="sd">            ValueError: If the requested algorithm is not registered.</span>
+
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">normalized_algorithm</span> <span class="o">=</span> <span class="bp">cls</span><span class="o">.</span><span class="n">_normalize_algorithm</span><span class="p">(</span><span class="n">algorithm</span><span class="p">)</span>
+
+        <span class="k">for</span> <span class="n">subclass</span> <span class="ow">in</span> <span class="bp">cls</span><span class="o">.</span><span class="n">_iter_subclasses</span><span class="p">():</span>
+            <span class="k">if</span> <span class="n">subclass</span><span class="o">.</span><span class="n">algorithm</span> <span class="o">==</span> <span class="n">normalized_algorithm</span><span class="p">:</span>
+                <span class="k">return</span> <span class="n">cast</span><span class="p">(</span><span class="s2">&quot;AlgorithmT&quot;</span><span class="p">,</span> <span class="n">subclass</span><span class="p">(</span><span class="n">hamiltonian</span><span class="p">,</span> <span class="n">evolution_time</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">))</span>
+
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Phase estimation algorithm </span><span class="si">{</span><span class="n">normalized_algorithm</span><span class="o">.</span><span class="n">value</span><span class="si">}</span><span class="s2"> is not implemented.&quot;</span><span class="p">)</span></div>
+
+
+    <span class="nd">@staticmethod</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">_normalize_algorithm</span><span class="p">(</span><span class="n">algorithm</span><span class="p">:</span> <span class="n">PhaseEstimationAlgorithm</span> <span class="o">|</span> <span class="nb">str</span> <span class="o">|</span> <span class="kc">None</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">PhaseEstimationAlgorithm</span><span class="p">:</span>
+        <span class="k">if</span> <span class="n">algorithm</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="k">return</span> <span class="n">PhaseEstimationAlgorithm</span><span class="o">.</span><span class="n">ITERATIVE</span>
+        <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">algorithm</span><span class="p">,</span> <span class="n">PhaseEstimationAlgorithm</span><span class="p">):</span>
+            <span class="k">return</span> <span class="n">algorithm</span>
+        <span class="k">try</span><span class="p">:</span>
+            <span class="k">return</span> <span class="n">PhaseEstimationAlgorithm</span><span class="p">(</span><span class="n">algorithm</span><span class="o">.</span><span class="n">lower</span><span class="p">())</span>
+        <span class="k">except</span> <span class="ne">ValueError</span> <span class="k">as</span> <span class="n">exc</span><span class="p">:</span>  <span class="c1"># pragma: no cover - defensive branch</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Unrecognized phase estimation algorithm &#39;</span><span class="si">{</span><span class="n">algorithm</span><span class="si">}</span><span class="s2">&#39;.&quot;</span><span class="p">)</span> <span class="kn">from</span><span class="w"> </span><span class="nn">exc</span>
+
+    <span class="nd">@classmethod</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">_iter_subclasses</span><span class="p">(</span><span class="bp">cls</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Iterable</span><span class="p">[</span><span class="nb">type</span><span class="p">[</span><span class="s2">&quot;PhaseEstimation&quot;</span><span class="p">]]:</span>
+        <span class="k">for</span> <span class="n">subclass</span> <span class="ow">in</span> <span class="bp">cls</span><span class="o">.</span><span class="n">__subclasses__</span><span class="p">():</span>
+            <span class="k">yield</span> <span class="n">subclass</span>
+            <span class="k">yield from</span> <span class="n">subclass</span><span class="o">.</span><span class="n">_iter_subclasses</span><span class="p">()</span>  <span class="c1"># noqa: SLF001</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">_validate_state_prep_qubits</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">state_prep</span><span class="p">:</span> <span class="n">QuantumCircuit</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Ensure ``state_prep`` matches the Hamiltonian system size.&quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="n">state_prep</span><span class="o">.</span><span class="n">num_qubits</span> <span class="o">!=</span> <span class="bp">self</span><span class="o">.</span><span class="n">hamiltonian</span><span class="o">.</span><span class="n">num_qubits</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
+                <span class="s2">&quot;state_prep must prepare the same number of system qubits as the Hamiltonian &quot;</span>
+                <span class="sa">f</span><span class="s2">&quot;(expected </span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">hamiltonian</span><span class="o">.</span><span class="n">num_qubits</span><span class="si">}</span><span class="s2">, received </span><span class="si">{</span><span class="n">state_prep</span><span class="o">.</span><span class="n">num_qubits</span><span class="si">}</span><span class="s2">).&quot;</span><span class="p">,</span>
+            <span class="p">)</span></div>
+
+</pre></div>
+
+           </div>
+          </div>
+          <footer>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright Microsoft Corporation. All rights reserved. Licensed under the MIT License.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

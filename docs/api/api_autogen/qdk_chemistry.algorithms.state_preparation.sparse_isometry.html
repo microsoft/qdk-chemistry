@@ -1,0 +1,1450 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../../">
+<head>
+  <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>qdk_chemistry.algorithms.state_preparation.sparse_isometry module &mdash; qdk-chemistry 1.0.0-rc1 documentation</title>
+      <link rel="stylesheet" type="text/css" href="../../_static/pygments.css?v=b86133f3" />
+      <link rel="stylesheet" type="text/css" href="../../_static/css/theme.css?v=e59714d7" />
+      <link rel="stylesheet" type="text/css" href="../../_static/tabs.css?v=4c969af8" />
+      <link rel="stylesheet" type="text/css" href="../../_static/graphviz.css?v=4ae1632d" />
+      <link rel="stylesheet" type="text/css" href="../../_static/copybutton.css?v=76b2166b" />
+      <link rel="stylesheet" type="text/css" href="../../_static/custom.css?v=a64bac2b" />
+
+  
+      <script src="../../_static/jquery.js?v=5d32c60e"></script>
+      <script src="../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="../../_static/documentation_options.js?v=81bd8d55"></script>
+      <script src="../../_static/doctools.js?v=9bcbadda"></script>
+      <script src="../../_static/sphinx_highlight.js?v=dc90522c"></script>
+      <script src="../../_static/tabs.js?v=3ee01567"></script>
+      <script src="../../_static/clipboard.min.js?v=a7894cd8"></script>
+      <script src="../../_static/copybutton.js?v=f281be69"></script>
+      <script async="async" src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
+    <script src="../../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../../genindex.html" />
+    <link rel="search" title="Search" href="../../search.html" />
+    <link rel="next" title="qdk_chemistry.algorithms.state_preparation.state_preparation module" href="qdk_chemistry.algorithms.state_preparation.state_preparation.html" />
+    <link rel="prev" title="qdk_chemistry.algorithms.state_preparation package" href="qdk_chemistry.algorithms.state_preparation.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="../../index.html" class="icon icon-home">
+            qdk-chemistry
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">User Documentation</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../user/quickstart.html">Quickstart</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../user/comprehensive/index.html">In-depth user guide</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">API Reference</span></p>
+<ul class="current">
+<li class="toctree-l1 current"><a class="reference internal" href="../python_api.html">Python API</a><ul class="current">
+<li class="toctree-l2"><a class="reference internal" href="../python_api.html#data-classes">Data Classes</a></li>
+<li class="toctree-l2 current"><a class="reference internal" href="../python_api.html#algorithms">Algorithms</a><ul class="current">
+<li class="toctree-l3 current"><a class="reference internal" href="qdk_chemistry.algorithms.html">qdk_chemistry.algorithms package</a><ul class="current">
+<li class="toctree-l4"><a class="reference internal" href="qdk_chemistry.algorithms.html#qdk_chemistry.algorithms.ActiveSpaceSelector"><code class="docutils literal notranslate"><span class="pre">ActiveSpaceSelector</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="qdk_chemistry.algorithms.html#qdk_chemistry.algorithms.CoupledClusterCalculator"><code class="docutils literal notranslate"><span class="pre">CoupledClusterCalculator</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="qdk_chemistry.algorithms.html#qdk_chemistry.algorithms.EnergyEstimator"><code class="docutils literal notranslate"><span class="pre">EnergyEstimator</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="qdk_chemistry.algorithms.html#qdk_chemistry.algorithms.HamiltonianConstructor"><code class="docutils literal notranslate"><span class="pre">HamiltonianConstructor</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="qdk_chemistry.algorithms.html#qdk_chemistry.algorithms.IterativePhaseEstimation"><code class="docutils literal notranslate"><span class="pre">IterativePhaseEstimation</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="qdk_chemistry.algorithms.html#qdk_chemistry.algorithms.IterativePhaseEstimationIteration"><code class="docutils literal notranslate"><span class="pre">IterativePhaseEstimationIteration</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="qdk_chemistry.algorithms.html#qdk_chemistry.algorithms.Localizer"><code class="docutils literal notranslate"><span class="pre">Localizer</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="qdk_chemistry.algorithms.html#qdk_chemistry.algorithms.MultiConfigurationCalculator"><code class="docutils literal notranslate"><span class="pre">MultiConfigurationCalculator</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="qdk_chemistry.algorithms.html#qdk_chemistry.algorithms.MultiConfigurationScf"><code class="docutils literal notranslate"><span class="pre">MultiConfigurationScf</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="qdk_chemistry.algorithms.html#qdk_chemistry.algorithms.PhaseEstimation"><code class="docutils literal notranslate"><span class="pre">PhaseEstimation</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="qdk_chemistry.algorithms.html#qdk_chemistry.algorithms.PhaseEstimationAlgorithm"><code class="docutils literal notranslate"><span class="pre">PhaseEstimationAlgorithm</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="qdk_chemistry.algorithms.html#qdk_chemistry.algorithms.ProjectedMultiConfigurationCalculator"><code class="docutils literal notranslate"><span class="pre">ProjectedMultiConfigurationCalculator</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="qdk_chemistry.algorithms.html#qdk_chemistry.algorithms.QubitMapper"><code class="docutils literal notranslate"><span class="pre">QubitMapper</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="qdk_chemistry.algorithms.html#qdk_chemistry.algorithms.ScfSolver"><code class="docutils literal notranslate"><span class="pre">ScfSolver</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="qdk_chemistry.algorithms.html#qdk_chemistry.algorithms.StabilityChecker"><code class="docutils literal notranslate"><span class="pre">StabilityChecker</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="qdk_chemistry.algorithms.html#qdk_chemistry.algorithms.StatePreparation"><code class="docutils literal notranslate"><span class="pre">StatePreparation</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="qdk_chemistry.algorithms.html#qdk_chemistry.algorithms.TraditionalPhaseEstimation"><code class="docutils literal notranslate"><span class="pre">TraditionalPhaseEstimation</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="qdk_chemistry.algorithms.html#qdk_chemistry.algorithms.available"><code class="docutils literal notranslate"><span class="pre">available()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="qdk_chemistry.algorithms.html#qdk_chemistry.algorithms.create"><code class="docutils literal notranslate"><span class="pre">create()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="qdk_chemistry.algorithms.html#qdk_chemistry.algorithms.energy_from_phase"><code class="docutils literal notranslate"><span class="pre">energy_from_phase()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="qdk_chemistry.algorithms.html#qdk_chemistry.algorithms.register"><code class="docutils literal notranslate"><span class="pre">register()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="qdk_chemistry.algorithms.html#qdk_chemistry.algorithms.show_settings"><code class="docutils literal notranslate"><span class="pre">show_settings()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="qdk_chemistry.algorithms.html#qdk_chemistry.algorithms.unregister"><code class="docutils literal notranslate"><span class="pre">unregister()</span></code></a></li>
+<li class="toctree-l4 current"><a class="reference internal" href="qdk_chemistry.algorithms.html#subpackages">Subpackages</a></li>
+<li class="toctree-l4"><a class="reference internal" href="qdk_chemistry.algorithms.html#submodules">Submodules</a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="../python_api.html#plugins">Plugins</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../python_api.html#utilities">Utilities</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../python_api.html#constants">Constants</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="../cpp_api.html">C++ API</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Supporting Information</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../glossary.html">Acronym definitions</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../references.html">References</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../../index.html">qdk-chemistry</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../../index.html" class="icon icon-home" aria-label="Home"></a></li>
+          <li class="breadcrumb-item"><a href="../python_api.html">Python API</a></li>
+          <li class="breadcrumb-item"><a href="qdk_chemistry.algorithms.html">qdk_chemistry.algorithms package</a></li>
+          <li class="breadcrumb-item"><a href="qdk_chemistry.algorithms.state_preparation.html">qdk_chemistry.algorithms.state_preparation package</a></li>
+      <li class="breadcrumb-item active">qdk_chemistry.algorithms.state_preparation.sparse_isometry module</li>
+      <li class="wy-breadcrumbs-aside">
+            <a href="../../_sources/api/api_autogen/qdk_chemistry.algorithms.state_preparation.sparse_isometry.rst.txt" rel="nofollow"> View page source</a>
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <section id="module-qdk_chemistry.algorithms.state_preparation.sparse_isometry">
+<span id="qdk-chemistry-algorithms-state-preparation-sparse-isometry-module"></span><h1>qdk_chemistry.algorithms.state_preparation.sparse_isometry module<a class="headerlink" href="#module-qdk_chemistry.algorithms.state_preparation.sparse_isometry" title="Link to this heading"></a></h1>
+<p>Sparse isometry module for quantum state preparation.</p>
+<p>This module implements sparse isometry algorithms for efficient quantum circuit
+generation from electronic structure wavefunctions. Sparse isometry methods
+leverage the sparsity of quantum states to create optimized circuits that
+prepare only the non-zero amplitude components, significantly reducing circuit
+depth and gate count compared to dense state preparation methods.</p>
+<p><strong>SparseIsometryGF2XStatePrep</strong>: Enhanced sparse isometry using GF2+X elimination.
+This method performs duplicate row removal, all-ones row removal, and diagonal
+matrix rank reduction besides standard GF2 Gaussian elimination. It tracks both
+CNOT and X operations for optimal circuit reconstruction and can be more
+efficient than standard GF2 for matrices with specific structural patterns.</p>
+<p>The sparse isometry algorithms are particularly well-suited for quantum chemistry
+applications where electronic structure wavefunctions often have a small number of
+dominant determinants.</p>
+<p>The implementations prepare the same quantum state with much more efficient
+circuits, featuring significantly reduced gate counts and circuit depths
+compared to traditional isometry methods.</p>
+<p>Algorithm Details:</p>
+<ul class="simple">
+<li><p>SparseIsometryGF2X: Applies enhanced GF2+X elimination (preprocessing + GF2
++ postprocessing), performs dense state preparation on the reduced space,
+then applies recorded operations (CNOT and X) in reverse to expand back to
+the full space.</p></li>
+</ul>
+<dl class="py class">
+<dt class="sig sig-object py" id="qdk_chemistry.algorithms.state_preparation.sparse_isometry.StatePreparation">
+<em class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">StatePreparation</span></span><a class="headerlink" href="#qdk_chemistry.algorithms.state_preparation.sparse_isometry.StatePreparation" title="Link to this definition"></a></dt>
+<dd><p>Bases: <a class="reference internal" href="qdk_chemistry.algorithms.base.html#qdk_chemistry.algorithms.base.Algorithm" title="qdk_chemistry.algorithms.base.Algorithm"><code class="xref py py-class docutils literal notranslate"><span class="pre">Algorithm</span></code></a></p>
+<p>Abstract base class for state preparation algorithms.</p>
+<p>Initialize the StatePreparation with default settings.</p>
+<dl class="py method">
+<dt class="sig sig-object py" id="qdk_chemistry.algorithms.state_preparation.sparse_isometry.StatePreparation.__init__">
+<span class="sig-name descname"><span class="pre">__init__</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#qdk_chemistry.algorithms.state_preparation.sparse_isometry.StatePreparation.__init__" title="Link to this definition"></a></dt>
+<dd><p>Initialize the StatePreparation with default settings.</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="qdk_chemistry.algorithms.state_preparation.sparse_isometry.StatePreparation.run">
+<span class="sig-name descname"><span class="pre">run</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">wavefunction</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#qdk_chemistry.algorithms.state_preparation.sparse_isometry.StatePreparation.run" title="Link to this definition"></a></dt>
+<dd><p>Prepare a quantum circuit that encodes the given wavefunction.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p><span class="sphinx_autodoc_typehints-type"><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)"><code class="xref py py-class docutils literal notranslate"><span class="pre">str</span></code></a></span></p>
+</dd>
+<dt class="field-even">Parameters<span class="colon">:</span></dt>
+<dd class="field-even"><p><strong>wavefunction</strong> (<a class="reference internal" href="qdk_chemistry.utils.wavefunction.html#qdk_chemistry.utils.wavefunction.Wavefunction" title="qdk_chemistry._core.data.Wavefunction"><em>Wavefunction</em></a>) – The target wavefunction to prepare.</p>
+</dd>
+<dt class="field-odd">Returns<span class="colon">:</span></dt>
+<dd class="field-odd"><p>OpenQASM3 string of the quantum circuit that prepares the wavefunction.</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="qdk_chemistry.algorithms.state_preparation.sparse_isometry.StatePreparation.type_name">
+<span class="sig-name descname"><span class="pre">type_name</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#qdk_chemistry.algorithms.state_preparation.sparse_isometry.StatePreparation.type_name" title="Link to this definition"></a></dt>
+<dd><p>Return the algorithm type name as state_prep.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p><span class="sphinx_autodoc_typehints-type"><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)"><code class="xref py py-class docutils literal notranslate"><span class="pre">str</span></code></a></span></p>
+</dd>
+</dl>
+</dd></dl>
+
+</dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="qdk_chemistry.algorithms.state_preparation.sparse_isometry.StatePreparationSettings">
+<em class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">StatePreparationSettings</span></span><a class="headerlink" href="#qdk_chemistry.algorithms.state_preparation.sparse_isometry.StatePreparationSettings" title="Link to this definition"></a></dt>
+<dd><p>Bases: <a class="reference internal" href="qdk_chemistry.plugins.qiskit.qubit_mapper.html#qdk_chemistry.plugins.qiskit.qubit_mapper.Settings" title="qdk_chemistry._core.data.Settings"><code class="xref py py-class docutils literal notranslate"><span class="pre">Settings</span></code></a></p>
+<p>Settings for state preparation algorithms.</p>
+<p>Initialize the StatePreparationSettings.</p>
+<dl class="py method">
+<dt class="sig sig-object py" id="qdk_chemistry.algorithms.state_preparation.sparse_isometry.StatePreparationSettings.__init__">
+<span class="sig-name descname"><span class="pre">__init__</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#qdk_chemistry.algorithms.state_preparation.sparse_isometry.StatePreparationSettings.__init__" title="Link to this definition"></a></dt>
+<dd><p>Initialize the StatePreparationSettings.</p>
+</dd></dl>
+
+</dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="qdk_chemistry.algorithms.state_preparation.sparse_isometry.Wavefunction">
+<em class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">Wavefunction</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">self</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference internal" href="qdk_chemistry.utils.wavefunction.html#qdk_chemistry.utils.wavefunction.Wavefunction" title="qdk_chemistry._core.data.Wavefunction"><span class="pre">qdk_chemistry._core.data.Wavefunction</span></a></span></em>, <em class="sig-param"><span class="n"><span class="pre">container</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference internal" href="qdk_chemistry.data.html#qdk_chemistry.data.WavefunctionContainer" title="qdk_chemistry._core.data.WavefunctionContainer"><span class="pre">qdk_chemistry._core.data.WavefunctionContainer</span></a></span></em><span class="sig-paren">)</span><a class="headerlink" href="#qdk_chemistry.algorithms.state_preparation.sparse_isometry.Wavefunction" title="Link to this definition"></a></dt>
+<dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">DataClass</span></code></p>
+<blockquote>
+<div><p>Represents a wavefunction with associated properties.</p>
+</div></blockquote>
+<p>This class encapsulates wavefunction data including:</p>
+<ul class="simple">
+<li><p>Configuration interaction coefficients</p></li>
+<li><p>Reduced density matrices (RDMs) in spin-dependent and spin-traced forms</p></li>
+<li><p>Methods for computing properties</p></li>
+</ul>
+<p>Supports both restricted and unrestricted wavefunctions with real or complex coefficients.</p>
+<p>Constructs a wavefunction with a container implementation.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>container</strong> (<a class="reference internal" href="qdk_chemistry.data.html#qdk_chemistry.data.WavefunctionContainer" title="qdk_chemistry.data.WavefunctionContainer"><em>WavefunctionContainer</em></a>) – The container holding the wavefunction implementation</p>
+</dd>
+</dl>
+<p class="rubric">Examples</p>
+<div class="doctest highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="n">container</span> <span class="o">=</span> <span class="n">qdk_chemistry</span><span class="o">.</span><span class="n">SciWavefunctionContainer</span><span class="p">(</span><span class="n">coeffs</span><span class="p">,</span> <span class="n">dets</span><span class="p">,</span> <span class="n">orbitals</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">wf</span> <span class="o">=</span> <span class="n">qdk_chemistry</span><span class="o">.</span><span class="n">Wavefunction</span><span class="p">(</span><span class="n">container</span><span class="p">)</span>
+</pre></div>
+</div>
+<dl class="py method">
+<dt class="sig sig-object py" id="qdk_chemistry.algorithms.state_preparation.sparse_isometry.Wavefunction.__init__">
+<span class="sig-name descname"><span class="pre">__init__</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">self</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference internal" href="qdk_chemistry.utils.wavefunction.html#qdk_chemistry.utils.wavefunction.Wavefunction" title="qdk_chemistry._core.data.Wavefunction"><span class="pre">qdk_chemistry._core.data.Wavefunction</span></a></span></em>, <em class="sig-param"><span class="n"><span class="pre">container</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference internal" href="qdk_chemistry.data.html#qdk_chemistry.data.WavefunctionContainer" title="qdk_chemistry._core.data.WavefunctionContainer"><span class="pre">qdk_chemistry._core.data.WavefunctionContainer</span></a></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><a class="reference external" href="https://docs.python.org/3/library/constants.html#None" title="(in Python v3.14)"><span class="pre">None</span></a></span></span><a class="headerlink" href="#qdk_chemistry.algorithms.state_preparation.sparse_isometry.Wavefunction.__init__" title="Link to this definition"></a></dt>
+<dd><p>Constructs a wavefunction with a container implementation.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>container</strong> (<a class="reference internal" href="qdk_chemistry.data.html#qdk_chemistry.data.WavefunctionContainer" title="qdk_chemistry.data.WavefunctionContainer"><em>WavefunctionContainer</em></a>) – The container holding the wavefunction implementation</p>
+</dd>
+</dl>
+<p class="rubric">Examples</p>
+<div class="doctest highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="n">container</span> <span class="o">=</span> <span class="n">qdk_chemistry</span><span class="o">.</span><span class="n">SciWavefunctionContainer</span><span class="p">(</span><span class="n">coeffs</span><span class="p">,</span> <span class="n">dets</span><span class="p">,</span> <span class="n">orbitals</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">wf</span> <span class="o">=</span> <span class="n">qdk_chemistry</span><span class="o">.</span><span class="n">Wavefunction</span><span class="p">(</span><span class="n">container</span><span class="p">)</span>
+</pre></div>
+</div>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="qdk_chemistry.algorithms.state_preparation.sparse_isometry.Wavefunction.from_file">
+<em class="property"><span class="k"><span class="pre">static</span></span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">from_file</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">filename</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)"><span class="pre">str</span></a></span></em>, <em class="sig-param"><span class="n"><span class="pre">format</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)"><span class="pre">str</span></a></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><a class="reference internal" href="qdk_chemistry.utils.wavefunction.html#qdk_chemistry.utils.wavefunction.Wavefunction" title="qdk_chemistry._core.data.Wavefunction"><span class="pre">qdk_chemistry._core.data.Wavefunction</span></a></span></span><a class="headerlink" href="#qdk_chemistry.algorithms.state_preparation.sparse_isometry.Wavefunction.from_file" title="Link to this definition"></a></dt>
+<dd><p>Load wavefunction from file in specified format.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>filename</strong> (<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)"><em>str</em></a>) – Path to file to read</p></li>
+<li><p><strong>format</strong> (<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)"><em>str</em></a>) – Format type (“json” or “hdf5”)</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>Wavefunction object created from file</p>
+</dd>
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p><a class="reference internal" href="#qdk_chemistry.algorithms.state_preparation.sparse_isometry.Wavefunction" title="qdk_chemistry.algorithms.state_preparation.sparse_isometry.Wavefunction">Wavefunction</a></p>
+</dd>
+</dl>
+<p class="rubric">Examples</p>
+<div class="doctest highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="n">wf</span> <span class="o">=</span> <span class="n">qdk_chemistry</span><span class="o">.</span><span class="n">Wavefunction</span><span class="o">.</span><span class="n">from_file</span><span class="p">(</span><span class="s2">&quot;wavefunction.json&quot;</span><span class="p">,</span> <span class="s2">&quot;json&quot;</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">wf</span> <span class="o">=</span> <span class="n">qdk_chemistry</span><span class="o">.</span><span class="n">Wavefunction</span><span class="o">.</span><span class="n">from_file</span><span class="p">(</span><span class="s2">&quot;wavefunction.h5&quot;</span><span class="p">,</span> <span class="s2">&quot;hdf5&quot;</span><span class="p">)</span>
+</pre></div>
+</div>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="qdk_chemistry.algorithms.state_preparation.sparse_isometry.Wavefunction.from_hdf5_file">
+<em class="property"><span class="k"><span class="pre">static</span></span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">from_hdf5_file</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">filename</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)"><span class="pre">str</span></a></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><a class="reference internal" href="qdk_chemistry.utils.wavefunction.html#qdk_chemistry.utils.wavefunction.Wavefunction" title="qdk_chemistry._core.data.Wavefunction"><span class="pre">qdk_chemistry._core.data.Wavefunction</span></a></span></span><a class="headerlink" href="#qdk_chemistry.algorithms.state_preparation.sparse_isometry.Wavefunction.from_hdf5_file" title="Link to this definition"></a></dt>
+<dd><p>Load wavefunction from HDF5 file.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>filename</strong> (<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)"><em>str</em></a>) – Path to HDF5 file to read</p>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>Wavefunction object created from HDF5 file</p>
+</dd>
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p><a class="reference internal" href="#qdk_chemistry.algorithms.state_preparation.sparse_isometry.Wavefunction" title="qdk_chemistry.algorithms.state_preparation.sparse_isometry.Wavefunction">Wavefunction</a></p>
+</dd>
+</dl>
+<p class="rubric">Examples</p>
+<div class="doctest highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="n">wf</span> <span class="o">=</span> <span class="n">qdk_chemistry</span><span class="o">.</span><span class="n">Wavefunction</span><span class="o">.</span><span class="n">from_hdf5_file</span><span class="p">(</span><span class="s2">&quot;wavefunction.h5&quot;</span><span class="p">)</span>
+</pre></div>
+</div>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="qdk_chemistry.algorithms.state_preparation.sparse_isometry.Wavefunction.from_json">
+<em class="property"><span class="k"><span class="pre">static</span></span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">from_json</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">json_str</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)"><span class="pre">str</span></a></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><a class="reference internal" href="qdk_chemistry.utils.wavefunction.html#qdk_chemistry.utils.wavefunction.Wavefunction" title="qdk_chemistry._core.data.Wavefunction"><span class="pre">qdk_chemistry._core.data.Wavefunction</span></a></span></span><a class="headerlink" href="#qdk_chemistry.algorithms.state_preparation.sparse_isometry.Wavefunction.from_json" title="Link to this definition"></a></dt>
+<dd><p>Load wavefunction from JSON string format.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>json_str</strong> (<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)"><em>str</em></a>) – JSON string containing wavefunction data</p>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>Wavefunction object created from JSON string</p>
+</dd>
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p><a class="reference internal" href="#qdk_chemistry.algorithms.state_preparation.sparse_isometry.Wavefunction" title="qdk_chemistry.algorithms.state_preparation.sparse_isometry.Wavefunction">Wavefunction</a></p>
+</dd>
+</dl>
+<p class="rubric">Examples</p>
+<div class="doctest highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="n">wf</span> <span class="o">=</span> <span class="n">qdk_chemistry</span><span class="o">.</span><span class="n">Wavefunction</span><span class="o">.</span><span class="n">from_json</span><span class="p">(</span><span class="n">json_str</span><span class="p">)</span>
+</pre></div>
+</div>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="qdk_chemistry.algorithms.state_preparation.sparse_isometry.Wavefunction.from_json_file">
+<em class="property"><span class="k"><span class="pre">static</span></span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">from_json_file</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">filename</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)"><span class="pre">str</span></a></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><a class="reference internal" href="qdk_chemistry.utils.wavefunction.html#qdk_chemistry.utils.wavefunction.Wavefunction" title="qdk_chemistry._core.data.Wavefunction"><span class="pre">qdk_chemistry._core.data.Wavefunction</span></a></span></span><a class="headerlink" href="#qdk_chemistry.algorithms.state_preparation.sparse_isometry.Wavefunction.from_json_file" title="Link to this definition"></a></dt>
+<dd><p>Load wavefunction from JSON file.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>filename</strong> (<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)"><em>str</em></a>) – Path to JSON file to read</p>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>Wavefunction object created from JSON file</p>
+</dd>
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p><a class="reference internal" href="#qdk_chemistry.algorithms.state_preparation.sparse_isometry.Wavefunction" title="qdk_chemistry.algorithms.state_preparation.sparse_isometry.Wavefunction">Wavefunction</a></p>
+</dd>
+</dl>
+<p class="rubric">Examples</p>
+<div class="doctest highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="n">wf</span> <span class="o">=</span> <span class="n">qdk_chemistry</span><span class="o">.</span><span class="n">Wavefunction</span><span class="o">.</span><span class="n">from_json_file</span><span class="p">(</span><span class="s2">&quot;wavefunction.json&quot;</span><span class="p">)</span>
+</pre></div>
+</div>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="qdk_chemistry.algorithms.state_preparation.sparse_isometry.Wavefunction.get_active_determinant">
+<span class="sig-name descname"><span class="pre">get_active_determinant</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">self</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference internal" href="qdk_chemistry.utils.wavefunction.html#qdk_chemistry.utils.wavefunction.Wavefunction" title="qdk_chemistry._core.data.Wavefunction"><span class="pre">qdk_chemistry._core.data.Wavefunction</span></a></span></em>, <em class="sig-param"><span class="n"><span class="pre">total_determinant</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference internal" href="qdk_chemistry.utils.wavefunction.html#qdk_chemistry.utils.wavefunction.Configuration" title="qdk_chemistry._core.data.Configuration"><span class="pre">qdk_chemistry._core.data.Configuration</span></a></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><a class="reference internal" href="qdk_chemistry.utils.wavefunction.html#qdk_chemistry.utils.wavefunction.Configuration" title="qdk_chemistry._core.data.Configuration"><span class="pre">qdk_chemistry._core.data.Configuration</span></a></span></span><a class="headerlink" href="#qdk_chemistry.algorithms.state_preparation.sparse_isometry.Wavefunction.get_active_determinant" title="Link to this definition"></a></dt>
+<dd><p>Extract active space determinant from a full orbital space determinant.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>total_determinant</strong> (<a class="reference internal" href="qdk_chemistry.data.html#qdk_chemistry.data.Configuration" title="qdk_chemistry.data.Configuration"><em>Configuration</em></a>) – Configuration representing full orbital space</p>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>Configuration representing only the active space portion</p>
+</dd>
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p><a class="reference internal" href="qdk_chemistry.data.html#qdk_chemistry.data.Configuration" title="qdk_chemistry.data.Configuration">Configuration</a></p>
+</dd>
+</dl>
+<p class="rubric">Notes</p>
+<p>Removes inactive and virtual orbital information, keeping only the active
+space orbitals.</p>
+<p class="rubric">Examples</p>
+<div class="doctest highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="n">total_det</span> <span class="o">=</span> <span class="n">qdk_chemistry</span><span class="o">.</span><span class="n">Configuration</span><span class="p">(</span><span class="s2">&quot;2222uudd0000&quot;</span><span class="p">)</span>  <span class="c1"># 4 inactive, 4 active, 4 virtual</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">active_det</span> <span class="o">=</span> <span class="n">wf</span><span class="o">.</span><span class="n">get_active_determinant</span><span class="p">(</span><span class="n">total_det</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="c1"># active_det now contains only &quot;uudd&quot; (the 4 active orbitals)</span>
+</pre></div>
+</div>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="qdk_chemistry.algorithms.state_preparation.sparse_isometry.Wavefunction.get_active_determinants">
+<span class="sig-name descname"><span class="pre">get_active_determinants</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">self</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference internal" href="qdk_chemistry.utils.wavefunction.html#qdk_chemistry.utils.wavefunction.Wavefunction" title="qdk_chemistry._core.data.Wavefunction"><span class="pre">qdk_chemistry._core.data.Wavefunction</span></a></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#list" title="(in Python v3.14)"><span class="pre">list</span></a><span class="p"><span class="pre">[</span></span><a class="reference internal" href="qdk_chemistry.utils.wavefunction.html#qdk_chemistry.utils.wavefunction.Configuration" title="qdk_chemistry._core.data.Configuration"><span class="pre">qdk_chemistry._core.data.Configuration</span></a><span class="p"><span class="pre">]</span></span></span></span><a class="headerlink" href="#qdk_chemistry.algorithms.state_preparation.sparse_isometry.Wavefunction.get_active_determinants" title="Link to this definition"></a></dt>
+<dd><p>Get all determinants in the wavefunction (active space only).</p>
+<dl class="field-list simple">
+<dt class="field-odd">Returns<span class="colon">:</span></dt>
+<dd class="field-odd"><p>Vector of all configurations/determinants representing only the active space</p>
+</dd>
+<dt class="field-even">Return type<span class="colon">:</span></dt>
+<dd class="field-even"><p><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#list" title="(in Python v3.14)">list</a> of <a class="reference internal" href="qdk_chemistry.data.html#qdk_chemistry.data.Configuration" title="qdk_chemistry.data.Configuration">Configuration</a></p>
+</dd>
+</dl>
+<p class="rubric">Notes</p>
+<p>The determinants only include the active space orbitals. To get determinants
+with full orbital space (including inactive and virtual orbitals), use
+<code class="docutils literal notranslate"><span class="pre">get_total_determinants()</span></code>.</p>
+<p class="rubric">Examples</p>
+<div class="doctest highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="n">dets</span> <span class="o">=</span> <span class="n">wf</span><span class="o">.</span><span class="n">get_active_determinants</span><span class="p">()</span>
+</pre></div>
+</div>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="qdk_chemistry.algorithms.state_preparation.sparse_isometry.Wavefunction.get_active_num_electrons">
+<span class="sig-name descname"><span class="pre">get_active_num_electrons</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">self</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference internal" href="qdk_chemistry.utils.wavefunction.html#qdk_chemistry.utils.wavefunction.Wavefunction" title="qdk_chemistry._core.data.Wavefunction"><span class="pre">qdk_chemistry._core.data.Wavefunction</span></a></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#tuple" title="(in Python v3.14)"><span class="pre">tuple</span></a><span class="p"><span class="pre">[</span></span><a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(in Python v3.14)"><span class="pre">int</span></a><span class="p"><span class="pre">,</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(in Python v3.14)"><span class="pre">int</span></a><span class="p"><span class="pre">]</span></span></span></span><a class="headerlink" href="#qdk_chemistry.algorithms.state_preparation.sparse_isometry.Wavefunction.get_active_num_electrons" title="Link to this definition"></a></dt>
+<dd><p>Get number of active alpha and beta electrons.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Returns<span class="colon">:</span></dt>
+<dd class="field-odd"><p>Pair of <code class="docutils literal notranslate"><span class="pre">(n_alpha,</span> <span class="pre">n_beta)</span></code> electrons</p>
+</dd>
+<dt class="field-even">Return type<span class="colon">:</span></dt>
+<dd class="field-even"><p><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#tuple" title="(in Python v3.14)">tuple</a></p>
+</dd>
+</dl>
+<p class="rubric">Examples</p>
+<div class="doctest highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="n">n_alpha</span><span class="p">,</span> <span class="n">n_beta</span> <span class="o">=</span> <span class="n">wf</span><span class="o">.</span><span class="n">get_active_num_electrons</span><span class="p">()</span>
+</pre></div>
+</div>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="qdk_chemistry.algorithms.state_preparation.sparse_isometry.Wavefunction.get_active_one_rdm_spin_dependent">
+<span class="sig-name descname"><span class="pre">get_active_one_rdm_spin_dependent</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">self</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference internal" href="qdk_chemistry.utils.wavefunction.html#qdk_chemistry.utils.wavefunction.Wavefunction" title="qdk_chemistry._core.data.Wavefunction"><span class="pre">qdk_chemistry._core.data.Wavefunction</span></a></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#tuple" title="(in Python v3.14)"><span class="pre">tuple</span></a></span></span><a class="headerlink" href="#qdk_chemistry.algorithms.state_preparation.sparse_isometry.Wavefunction.get_active_one_rdm_spin_dependent" title="Link to this definition"></a></dt>
+<dd><p>Get spin-dependent one-particle reduced density matrices (RDMs) for active orbitals only.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Returns<span class="colon">:</span></dt>
+<dd class="field-odd"><p>Tuple of (alpha-alpha, beta-beta) one-particle RDMs for active orbitals</p>
+</dd>
+<dt class="field-even">Return type<span class="colon">:</span></dt>
+<dd class="field-even"><p><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#tuple" title="(in Python v3.14)">tuple</a></p>
+</dd>
+<dt class="field-odd">Raises<span class="colon">:</span></dt>
+<dd class="field-odd"><p><a class="reference external" href="https://docs.python.org/3/library/exceptions.html#RuntimeError" title="(in Python v3.14)"><strong>RuntimeError</strong></a> – If the spin-dependent 1-RDM is not available</p>
+</dd>
+</dl>
+<p class="rubric">Examples</p>
+<div class="doctest highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="n">rdm_aa</span><span class="p">,</span> <span class="n">rdm_bb</span> <span class="o">=</span> <span class="n">wf</span><span class="o">.</span><span class="n">get_active_one_rdm_spin_dependent</span><span class="p">()</span>
+</pre></div>
+</div>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="qdk_chemistry.algorithms.state_preparation.sparse_isometry.Wavefunction.get_active_one_rdm_spin_traced">
+<span class="sig-name descname"><span class="pre">get_active_one_rdm_spin_traced</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">self</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference internal" href="qdk_chemistry.utils.wavefunction.html#qdk_chemistry.utils.wavefunction.Wavefunction" title="qdk_chemistry._core.data.Wavefunction"><span class="pre">qdk_chemistry._core.data.Wavefunction</span></a></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><a class="reference external" href="https://docs.python.org/3/library/functions.html#object" title="(in Python v3.14)"><span class="pre">object</span></a></span></span><a class="headerlink" href="#qdk_chemistry.algorithms.state_preparation.sparse_isometry.Wavefunction.get_active_one_rdm_spin_traced" title="Link to this definition"></a></dt>
+<dd><p>Get spin-traced one-particle reduced density matrix (RDM) for active orbitals only.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Returns<span class="colon">:</span></dt>
+<dd class="field-odd"><p>Spin-traced one-particle RDM for active orbitals</p>
+</dd>
+<dt class="field-even">Return type<span class="colon">:</span></dt>
+<dd class="field-even"><p><a class="reference external" href="https://numpy.org/doc/stable/reference/generated/numpy.ndarray.html#numpy.ndarray" title="(in NumPy v2.3)">numpy.ndarray</a></p>
+</dd>
+<dt class="field-odd">Raises<span class="colon">:</span></dt>
+<dd class="field-odd"><p><a class="reference external" href="https://docs.python.org/3/library/exceptions.html#RuntimeError" title="(in Python v3.14)"><strong>RuntimeError</strong></a> – If the 1-RDM is not available</p>
+</dd>
+</dl>
+<p class="rubric">Examples</p>
+<div class="doctest highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="n">rdm</span> <span class="o">=</span> <span class="n">wf</span><span class="o">.</span><span class="n">get_active_one_rdm_spin_traced</span><span class="p">()</span>
+</pre></div>
+</div>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="qdk_chemistry.algorithms.state_preparation.sparse_isometry.Wavefunction.get_active_orbital_occupations">
+<span class="sig-name descname"><span class="pre">get_active_orbital_occupations</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">self</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference internal" href="qdk_chemistry.utils.wavefunction.html#qdk_chemistry.utils.wavefunction.Wavefunction" title="qdk_chemistry._core.data.Wavefunction"><span class="pre">qdk_chemistry._core.data.Wavefunction</span></a></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#tuple" title="(in Python v3.14)"><span class="pre">tuple</span></a><span class="p"><span class="pre">[</span></span><a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.Annotated" title="(in Python v3.14)"><span class="pre">Annotated</span></a><span class="p"><span class="pre">[</span></span><span class="pre">numpy.typing.NDArray</span><span class="p"><span class="pre">[</span></span><span class="pre">numpy.float64</span><span class="p"><span class="pre">]</span></span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="s"><span class="pre">'[m,</span> <span class="pre">1]'</span></span><span class="p"><span class="pre">]</span></span><span class="p"><span class="pre">,</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.Annotated" title="(in Python v3.14)"><span class="pre">Annotated</span></a><span class="p"><span class="pre">[</span></span><span class="pre">numpy.typing.NDArray</span><span class="p"><span class="pre">[</span></span><span class="pre">numpy.float64</span><span class="p"><span class="pre">]</span></span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="s"><span class="pre">'[m,</span> <span class="pre">1]'</span></span><span class="p"><span class="pre">]</span></span><span class="p"><span class="pre">]</span></span></span></span><a class="headerlink" href="#qdk_chemistry.algorithms.state_preparation.sparse_isometry.Wavefunction.get_active_orbital_occupations" title="Link to this definition"></a></dt>
+<dd><p>Get orbital occupations for active orbitals only.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Returns<span class="colon">:</span></dt>
+<dd class="field-odd"><p>Pair of <code class="docutils literal notranslate"><span class="pre">(alpha_active_occupations,</span> <span class="pre">beta_active_occupations)</span></code></p>
+</dd>
+<dt class="field-even">Return type<span class="colon">:</span></dt>
+<dd class="field-even"><p><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#tuple" title="(in Python v3.14)">tuple</a></p>
+</dd>
+</dl>
+<p class="rubric">Examples</p>
+<div class="doctest highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="n">alpha_active</span><span class="p">,</span> <span class="n">beta_active</span> <span class="o">=</span> <span class="n">wf</span><span class="o">.</span><span class="n">get_active_orbital_occupations</span><span class="p">()</span>
+</pre></div>
+</div>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="qdk_chemistry.algorithms.state_preparation.sparse_isometry.Wavefunction.get_active_two_rdm_spin_dependent">
+<span class="sig-name descname"><span class="pre">get_active_two_rdm_spin_dependent</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">self</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference internal" href="qdk_chemistry.utils.wavefunction.html#qdk_chemistry.utils.wavefunction.Wavefunction" title="qdk_chemistry._core.data.Wavefunction"><span class="pre">qdk_chemistry._core.data.Wavefunction</span></a></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#tuple" title="(in Python v3.14)"><span class="pre">tuple</span></a></span></span><a class="headerlink" href="#qdk_chemistry.algorithms.state_preparation.sparse_isometry.Wavefunction.get_active_two_rdm_spin_dependent" title="Link to this definition"></a></dt>
+<dd><p>Get spin-dependent two-particle reduced density matrices (RDMs) for active orbitals only.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Returns<span class="colon">:</span></dt>
+<dd class="field-odd"><p>Tuple of (aaaa, aabb, bbbb) two-particle RDMs for active orbitals</p>
+</dd>
+<dt class="field-even">Return type<span class="colon">:</span></dt>
+<dd class="field-even"><p><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#tuple" title="(in Python v3.14)">tuple</a></p>
+</dd>
+<dt class="field-odd">Raises<span class="colon">:</span></dt>
+<dd class="field-odd"><p><a class="reference external" href="https://docs.python.org/3/library/exceptions.html#RuntimeError" title="(in Python v3.14)"><strong>RuntimeError</strong></a> – If the spin-dependent 2-RDM is not available</p>
+</dd>
+</dl>
+<p class="rubric">Examples</p>
+<div class="doctest highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="n">aaaa</span><span class="p">,</span> <span class="n">aabb</span><span class="p">,</span> <span class="n">bbbb</span> <span class="o">=</span> <span class="n">wf</span><span class="o">.</span><span class="n">get_active_two_rdm_spin_dependent</span><span class="p">()</span>
+</pre></div>
+</div>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="qdk_chemistry.algorithms.state_preparation.sparse_isometry.Wavefunction.get_active_two_rdm_spin_traced">
+<span class="sig-name descname"><span class="pre">get_active_two_rdm_spin_traced</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">self</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference internal" href="qdk_chemistry.utils.wavefunction.html#qdk_chemistry.utils.wavefunction.Wavefunction" title="qdk_chemistry._core.data.Wavefunction"><span class="pre">qdk_chemistry._core.data.Wavefunction</span></a></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><a class="reference external" href="https://docs.python.org/3/library/functions.html#object" title="(in Python v3.14)"><span class="pre">object</span></a></span></span><a class="headerlink" href="#qdk_chemistry.algorithms.state_preparation.sparse_isometry.Wavefunction.get_active_two_rdm_spin_traced" title="Link to this definition"></a></dt>
+<dd><p>Get spin-traced two-particle reduced density matrix (RDM) for active orbitals only.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Returns<span class="colon">:</span></dt>
+<dd class="field-odd"><p>Spin-traced two-particle RDM for active orbitals</p>
+</dd>
+<dt class="field-even">Return type<span class="colon">:</span></dt>
+<dd class="field-even"><p><a class="reference external" href="https://numpy.org/doc/stable/reference/generated/numpy.ndarray.html#numpy.ndarray" title="(in NumPy v2.3)">numpy.ndarray</a></p>
+</dd>
+<dt class="field-odd">Raises<span class="colon">:</span></dt>
+<dd class="field-odd"><p><a class="reference external" href="https://docs.python.org/3/library/exceptions.html#RuntimeError" title="(in Python v3.14)"><strong>RuntimeError</strong></a> – If the 2-RDM is not available</p>
+</dd>
+</dl>
+<p class="rubric">Examples</p>
+<div class="doctest highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="n">two_rdm</span> <span class="o">=</span> <span class="n">wf</span><span class="o">.</span><span class="n">get_active_two_rdm_spin_traced</span><span class="p">()</span>
+</pre></div>
+</div>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="qdk_chemistry.algorithms.state_preparation.sparse_isometry.Wavefunction.get_coefficient">
+<span class="sig-name descname"><span class="pre">get_coefficient</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">self</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference internal" href="qdk_chemistry.utils.wavefunction.html#qdk_chemistry.utils.wavefunction.Wavefunction" title="qdk_chemistry._core.data.Wavefunction"><span class="pre">qdk_chemistry._core.data.Wavefunction</span></a></span></em>, <em class="sig-param"><span class="n"><span class="pre">det</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference internal" href="qdk_chemistry.utils.wavefunction.html#qdk_chemistry.utils.wavefunction.Configuration" title="qdk_chemistry._core.data.Configuration"><span class="pre">qdk_chemistry._core.data.Configuration</span></a></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><a class="reference external" href="https://docs.python.org/3/library/functions.html#object" title="(in Python v3.14)"><span class="pre">object</span></a></span></span><a class="headerlink" href="#qdk_chemistry.algorithms.state_preparation.sparse_isometry.Wavefunction.get_coefficient" title="Link to this definition"></a></dt>
+<dd><p>Get coefficient for a specific determinant.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>det</strong> (<a class="reference internal" href="qdk_chemistry.data.html#qdk_chemistry.data.Configuration" title="qdk_chemistry.data.Configuration"><em>Configuration</em></a>) – The determinant configuration to look up</p>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>The coefficient for the determinant if found, zero otherwise</p>
+</dd>
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p><a class="reference external" href="https://docs.python.org/3/library/functions.html#complex" title="(in Python v3.14)">complex</a> or <a class="reference external" href="https://docs.python.org/3/library/functions.html#float" title="(in Python v3.14)">float</a></p>
+</dd>
+</dl>
+<p class="rubric">Examples</p>
+<div class="doctest highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="n">coeff</span> <span class="o">=</span> <span class="n">wf</span><span class="o">.</span><span class="n">get_coefficient</span><span class="p">(</span><span class="n">qdk_chemistry</span><span class="o">.</span><span class="n">Configuration</span><span class="p">(</span><span class="s2">&quot;33221100&quot;</span><span class="p">))</span>
+</pre></div>
+</div>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="qdk_chemistry.algorithms.state_preparation.sparse_isometry.Wavefunction.get_coefficients">
+<span class="sig-name descname"><span class="pre">get_coefficients</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">self</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference internal" href="qdk_chemistry.utils.wavefunction.html#qdk_chemistry.utils.wavefunction.Wavefunction" title="qdk_chemistry._core.data.Wavefunction"><span class="pre">qdk_chemistry._core.data.Wavefunction</span></a></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><a class="reference external" href="https://docs.python.org/3/library/functions.html#object" title="(in Python v3.14)"><span class="pre">object</span></a></span></span><a class="headerlink" href="#qdk_chemistry.algorithms.state_preparation.sparse_isometry.Wavefunction.get_coefficients" title="Link to this definition"></a></dt>
+<dd><p>Get coefficients for all determinants as a vector, in which the
+sequence of coefficients is consistent with the vector from
+<code class="docutils literal notranslate"><span class="pre">get_active_determinants()</span></code></p>
+<dl class="field-list simple">
+<dt class="field-odd">Returns<span class="colon">:</span></dt>
+<dd class="field-odd"><p>Vector of all coefficients (real or complex)</p>
+</dd>
+<dt class="field-even">Return type<span class="colon">:</span></dt>
+<dd class="field-even"><p><a class="reference external" href="https://numpy.org/doc/stable/reference/generated/numpy.ndarray.html#numpy.ndarray" title="(in NumPy v2.3)">numpy.ndarray</a></p>
+</dd>
+</dl>
+<p class="rubric">Examples</p>
+<div class="doctest highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="n">coeffs</span> <span class="o">=</span> <span class="n">wf</span><span class="o">.</span><span class="n">get_coefficients</span><span class="p">()</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Number of coefficients: </span><span class="si">{</span><span class="nb">len</span><span class="p">(</span><span class="n">coeffs</span><span class="p">)</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+</pre></div>
+</div>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="qdk_chemistry.algorithms.state_preparation.sparse_isometry.Wavefunction.get_container">
+<span class="sig-name descname"><span class="pre">get_container</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">self</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference internal" href="qdk_chemistry.utils.wavefunction.html#qdk_chemistry.utils.wavefunction.Wavefunction" title="qdk_chemistry._core.data.Wavefunction"><span class="pre">qdk_chemistry._core.data.Wavefunction</span></a></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><a class="reference internal" href="qdk_chemistry.data.html#qdk_chemistry.data.WavefunctionContainer" title="qdk_chemistry._core.data.WavefunctionContainer"><span class="pre">qdk_chemistry._core.data.WavefunctionContainer</span></a></span></span><a class="headerlink" href="#qdk_chemistry.algorithms.state_preparation.sparse_isometry.Wavefunction.get_container" title="Link to this definition"></a></dt>
+<dd><p>Get the underlying wavefunciton container.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Returns<span class="colon">:</span></dt>
+<dd class="field-odd"><p>The underlying wavefunction container</p>
+</dd>
+<dt class="field-even">Return type<span class="colon">:</span></dt>
+<dd class="field-even"><p><a class="reference internal" href="qdk_chemistry.data.html#qdk_chemistry.data.WavefunctionContainer" title="qdk_chemistry.data.WavefunctionContainer">WavefunctionContainer</a></p>
+</dd>
+<dt class="field-odd">Raises<span class="colon">:</span></dt>
+<dd class="field-odd"><p><a class="reference external" href="https://docs.python.org/3/library/exceptions.html#RuntimeError" title="(in Python v3.14)"><strong>RuntimeError</strong></a> – If the container is not available</p>
+</dd>
+</dl>
+<p class="rubric">Examples</p>
+<div class="doctest highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="n">container</span> <span class="o">=</span> <span class="n">wf</span><span class="o">.</span><span class="n">get_container</span><span class="p">()</span>
+</pre></div>
+</div>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="qdk_chemistry.algorithms.state_preparation.sparse_isometry.Wavefunction.get_container_type">
+<span class="sig-name descname"><span class="pre">get_container_type</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">self</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference internal" href="qdk_chemistry.utils.wavefunction.html#qdk_chemistry.utils.wavefunction.Wavefunction" title="qdk_chemistry._core.data.Wavefunction"><span class="pre">qdk_chemistry._core.data.Wavefunction</span></a></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)"><span class="pre">str</span></a></span></span><a class="headerlink" href="#qdk_chemistry.algorithms.state_preparation.sparse_isometry.Wavefunction.get_container_type" title="Link to this definition"></a></dt>
+<dd><p>Get the type of the underlying wavefunction container.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Returns<span class="colon">:</span></dt>
+<dd class="field-odd"><p>Type name of the underlying wavefunction container</p>
+</dd>
+<dt class="field-even">Return type<span class="colon">:</span></dt>
+<dd class="field-even"><p><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)">str</a></p>
+</dd>
+</dl>
+<p class="rubric">Examples</p>
+<div class="doctest highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="n">container_type</span> <span class="o">=</span> <span class="n">wf</span><span class="o">.</span><span class="n">get_container_type</span><span class="p">()</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Container type: </span><span class="si">{</span><span class="n">container_type</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+</pre></div>
+</div>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="qdk_chemistry.algorithms.state_preparation.sparse_isometry.Wavefunction.get_orbitals">
+<span class="sig-name descname"><span class="pre">get_orbitals</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">self</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference internal" href="qdk_chemistry.utils.wavefunction.html#qdk_chemistry.utils.wavefunction.Wavefunction" title="qdk_chemistry._core.data.Wavefunction"><span class="pre">qdk_chemistry._core.data.Wavefunction</span></a></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><a class="reference internal" href="qdk_chemistry.utils.cubegen.html#qdk_chemistry.utils.cubegen.Orbitals" title="qdk_chemistry._core.data.Orbitals"><span class="pre">qdk_chemistry._core.data.Orbitals</span></a></span></span><a class="headerlink" href="#qdk_chemistry.algorithms.state_preparation.sparse_isometry.Wavefunction.get_orbitals" title="Link to this definition"></a></dt>
+<dd><p>Get reference to orbital basis set.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Returns<span class="colon">:</span></dt>
+<dd class="field-odd"><p>Shared pointer to orbital basis set</p>
+</dd>
+<dt class="field-even">Return type<span class="colon">:</span></dt>
+<dd class="field-even"><p><a class="reference internal" href="qdk_chemistry.data.html#qdk_chemistry.data.Orbitals" title="qdk_chemistry.data.Orbitals">Orbitals</a></p>
+</dd>
+</dl>
+<p class="rubric">Examples</p>
+<div class="doctest highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="n">orbitals</span> <span class="o">=</span> <span class="n">wf</span><span class="o">.</span><span class="n">get_orbitals</span><span class="p">()</span>
+</pre></div>
+</div>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="qdk_chemistry.algorithms.state_preparation.sparse_isometry.Wavefunction.get_single_orbital_entropies">
+<span class="sig-name descname"><span class="pre">get_single_orbital_entropies</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">self</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference internal" href="qdk_chemistry.utils.wavefunction.html#qdk_chemistry.utils.wavefunction.Wavefunction" title="qdk_chemistry._core.data.Wavefunction"><span class="pre">qdk_chemistry._core.data.Wavefunction</span></a></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.Annotated" title="(in Python v3.14)"><span class="pre">Annotated</span></a><span class="p"><span class="pre">[</span></span><span class="pre">numpy.typing.NDArray</span><span class="p"><span class="pre">[</span></span><span class="pre">numpy.float64</span><span class="p"><span class="pre">]</span></span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="s"><span class="pre">'[m,</span> <span class="pre">1]'</span></span><span class="p"><span class="pre">]</span></span></span></span><a class="headerlink" href="#qdk_chemistry.algorithms.state_preparation.sparse_isometry.Wavefunction.get_single_orbital_entropies" title="Link to this definition"></a></dt>
+<dd><p>Calculate single orbital entropies for active orbitals only.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Returns<span class="colon">:</span></dt>
+<dd class="field-odd"><p>Vector of orbital entropies for active orbitals (always real)</p>
+</dd>
+<dt class="field-even">Return type<span class="colon">:</span></dt>
+<dd class="field-even"><p><a class="reference external" href="https://numpy.org/doc/stable/reference/generated/numpy.ndarray.html#numpy.ndarray" title="(in NumPy v2.3)">numpy.ndarray</a></p>
+</dd>
+<dt class="field-odd">Raises<span class="colon">:</span></dt>
+<dd class="field-odd"><p><a class="reference external" href="https://docs.python.org/3/library/exceptions.html#RuntimeError" title="(in Python v3.14)"><strong>RuntimeError</strong></a> – If the required reduced density matrices (RDMs) are not available</p>
+</dd>
+</dl>
+<p class="rubric">Examples</p>
+<div class="doctest highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="n">entropies</span> <span class="o">=</span> <span class="n">wf</span><span class="o">.</span><span class="n">get_single_orbital_entropies</span><span class="p">()</span>
+</pre></div>
+</div>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="qdk_chemistry.algorithms.state_preparation.sparse_isometry.Wavefunction.get_total_determinant">
+<span class="sig-name descname"><span class="pre">get_total_determinant</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">self</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference internal" href="qdk_chemistry.utils.wavefunction.html#qdk_chemistry.utils.wavefunction.Wavefunction" title="qdk_chemistry._core.data.Wavefunction"><span class="pre">qdk_chemistry._core.data.Wavefunction</span></a></span></em>, <em class="sig-param"><span class="n"><span class="pre">active_determinant</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference internal" href="qdk_chemistry.utils.wavefunction.html#qdk_chemistry.utils.wavefunction.Configuration" title="qdk_chemistry._core.data.Configuration"><span class="pre">qdk_chemistry._core.data.Configuration</span></a></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><a class="reference internal" href="qdk_chemistry.utils.wavefunction.html#qdk_chemistry.utils.wavefunction.Configuration" title="qdk_chemistry._core.data.Configuration"><span class="pre">qdk_chemistry._core.data.Configuration</span></a></span></span><a class="headerlink" href="#qdk_chemistry.algorithms.state_preparation.sparse_isometry.Wavefunction.get_total_determinant" title="Link to this definition"></a></dt>
+<dd><p>Convert active space determinant to full orbital space determinant.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>active_determinant</strong> (<a class="reference internal" href="qdk_chemistry.data.html#qdk_chemistry.data.Configuration" title="qdk_chemistry.data.Configuration"><em>Configuration</em></a>) – Configuration representing only active space</p>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>Configuration representing full orbital space</p>
+</dd>
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p><a class="reference internal" href="qdk_chemistry.data.html#qdk_chemistry.data.Configuration" title="qdk_chemistry.data.Configuration">Configuration</a></p>
+</dd>
+</dl>
+<p class="rubric">Notes</p>
+<p>Expands active-space-only determinant to full orbital space by prepending
+doubly occupied inactive orbitals and appending unoccupied virtual orbitals.</p>
+<p class="rubric">Examples</p>
+<div class="doctest highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="n">active_det</span> <span class="o">=</span> <span class="n">qdk_chemistry</span><span class="o">.</span><span class="n">Configuration</span><span class="p">(</span><span class="s2">&quot;uudd&quot;</span><span class="p">)</span>  <span class="c1"># 4 active orbitals</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">total_det</span> <span class="o">=</span> <span class="n">wf</span><span class="o">.</span><span class="n">get_total_determinant</span><span class="p">(</span><span class="n">active_det</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="c1"># If there are 4 inactive and 4 virtual orbitals, total_det will be &quot;2222uudd0000&quot;</span>
+</pre></div>
+</div>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="qdk_chemistry.algorithms.state_preparation.sparse_isometry.Wavefunction.get_total_determinants">
+<span class="sig-name descname"><span class="pre">get_total_determinants</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">self</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference internal" href="qdk_chemistry.utils.wavefunction.html#qdk_chemistry.utils.wavefunction.Wavefunction" title="qdk_chemistry._core.data.Wavefunction"><span class="pre">qdk_chemistry._core.data.Wavefunction</span></a></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#list" title="(in Python v3.14)"><span class="pre">list</span></a><span class="p"><span class="pre">[</span></span><a class="reference internal" href="qdk_chemistry.utils.wavefunction.html#qdk_chemistry.utils.wavefunction.Configuration" title="qdk_chemistry._core.data.Configuration"><span class="pre">qdk_chemistry._core.data.Configuration</span></a><span class="p"><span class="pre">]</span></span></span></span><a class="headerlink" href="#qdk_chemistry.algorithms.state_preparation.sparse_isometry.Wavefunction.get_total_determinants" title="Link to this definition"></a></dt>
+<dd><p>Get all determinants in the wavefunction with full orbital space.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Returns<span class="colon">:</span></dt>
+<dd class="field-odd"><p>Vector of all configurations/determinants including inactive and virtual orbitals</p>
+</dd>
+<dt class="field-even">Return type<span class="colon">:</span></dt>
+<dd class="field-even"><p><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#list" title="(in Python v3.14)">list</a> of <a class="reference internal" href="qdk_chemistry.data.html#qdk_chemistry.data.Configuration" title="qdk_chemistry.data.Configuration">Configuration</a></p>
+</dd>
+</dl>
+<p class="rubric">Notes</p>
+<p>Converts active-space-only determinants to full orbital space by prepending
+doubly occupied inactive orbitals and appending unoccupied virtual orbitals.</p>
+<p class="rubric">Examples</p>
+<div class="doctest highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="n">total_dets</span> <span class="o">=</span> <span class="n">wf</span><span class="o">.</span><span class="n">get_total_determinants</span><span class="p">()</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="c1"># Each determinant now includes inactive (doubly occupied) and virtual (unoccupied) orbitals</span>
+</pre></div>
+</div>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="qdk_chemistry.algorithms.state_preparation.sparse_isometry.Wavefunction.get_total_num_electrons">
+<span class="sig-name descname"><span class="pre">get_total_num_electrons</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">self</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference internal" href="qdk_chemistry.utils.wavefunction.html#qdk_chemistry.utils.wavefunction.Wavefunction" title="qdk_chemistry._core.data.Wavefunction"><span class="pre">qdk_chemistry._core.data.Wavefunction</span></a></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#tuple" title="(in Python v3.14)"><span class="pre">tuple</span></a><span class="p"><span class="pre">[</span></span><a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(in Python v3.14)"><span class="pre">int</span></a><span class="p"><span class="pre">,</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(in Python v3.14)"><span class="pre">int</span></a><span class="p"><span class="pre">]</span></span></span></span><a class="headerlink" href="#qdk_chemistry.algorithms.state_preparation.sparse_isometry.Wavefunction.get_total_num_electrons" title="Link to this definition"></a></dt>
+<dd><p>Get total number of alpha and beta electrons.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Returns<span class="colon">:</span></dt>
+<dd class="field-odd"><p>Pair of <code class="docutils literal notranslate"><span class="pre">(n_alpha,</span> <span class="pre">n_beta)</span></code> electrons</p>
+</dd>
+<dt class="field-even">Return type<span class="colon">:</span></dt>
+<dd class="field-even"><p><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#tuple" title="(in Python v3.14)">tuple</a></p>
+</dd>
+</dl>
+<p class="rubric">Examples</p>
+<div class="doctest highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="n">n_alpha</span><span class="p">,</span> <span class="n">n_beta</span> <span class="o">=</span> <span class="n">wf</span><span class="o">.</span><span class="n">get_total_num_electrons</span><span class="p">()</span>
+</pre></div>
+</div>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="qdk_chemistry.algorithms.state_preparation.sparse_isometry.Wavefunction.get_total_orbital_occupations">
+<span class="sig-name descname"><span class="pre">get_total_orbital_occupations</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">self</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference internal" href="qdk_chemistry.utils.wavefunction.html#qdk_chemistry.utils.wavefunction.Wavefunction" title="qdk_chemistry._core.data.Wavefunction"><span class="pre">qdk_chemistry._core.data.Wavefunction</span></a></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#tuple" title="(in Python v3.14)"><span class="pre">tuple</span></a><span class="p"><span class="pre">[</span></span><a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.Annotated" title="(in Python v3.14)"><span class="pre">Annotated</span></a><span class="p"><span class="pre">[</span></span><span class="pre">numpy.typing.NDArray</span><span class="p"><span class="pre">[</span></span><span class="pre">numpy.float64</span><span class="p"><span class="pre">]</span></span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="s"><span class="pre">'[m,</span> <span class="pre">1]'</span></span><span class="p"><span class="pre">]</span></span><span class="p"><span class="pre">,</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.Annotated" title="(in Python v3.14)"><span class="pre">Annotated</span></a><span class="p"><span class="pre">[</span></span><span class="pre">numpy.typing.NDArray</span><span class="p"><span class="pre">[</span></span><span class="pre">numpy.float64</span><span class="p"><span class="pre">]</span></span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="s"><span class="pre">'[m,</span> <span class="pre">1]'</span></span><span class="p"><span class="pre">]</span></span><span class="p"><span class="pre">]</span></span></span></span><a class="headerlink" href="#qdk_chemistry.algorithms.state_preparation.sparse_isometry.Wavefunction.get_total_orbital_occupations" title="Link to this definition"></a></dt>
+<dd><p>Get orbital occupations for all orbitals.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Returns<span class="colon">:</span></dt>
+<dd class="field-odd"><p>Pair of <code class="docutils literal notranslate"><span class="pre">(alpha_occupations,</span> <span class="pre">beta_occupations)</span></code></p>
+</dd>
+<dt class="field-even">Return type<span class="colon">:</span></dt>
+<dd class="field-even"><p><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#tuple" title="(in Python v3.14)">tuple</a></p>
+</dd>
+</dl>
+<p class="rubric">Examples</p>
+<div class="doctest highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="n">alpha_occ</span><span class="p">,</span> <span class="n">beta_occ</span> <span class="o">=</span> <span class="n">wf</span><span class="o">.</span><span class="n">get_total_orbital_occupations</span><span class="p">()</span>
+</pre></div>
+</div>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="qdk_chemistry.algorithms.state_preparation.sparse_isometry.Wavefunction.get_type">
+<span class="sig-name descname"><span class="pre">get_type</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">self</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference internal" href="qdk_chemistry.utils.wavefunction.html#qdk_chemistry.utils.wavefunction.Wavefunction" title="qdk_chemistry._core.data.Wavefunction"><span class="pre">qdk_chemistry._core.data.Wavefunction</span></a></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><a class="reference internal" href="qdk_chemistry.data.html#qdk_chemistry.data.WavefunctionType" title="qdk_chemistry._core.data.WavefunctionType"><span class="pre">qdk_chemistry._core.data.WavefunctionType</span></a></span></span><a class="headerlink" href="#qdk_chemistry.algorithms.state_preparation.sparse_isometry.Wavefunction.get_type" title="Link to this definition"></a></dt>
+<dd><p>Get the wavefunction type (Bra, Ket, or Both).</p>
+<dl class="field-list simple">
+<dt class="field-odd">Returns<span class="colon">:</span></dt>
+<dd class="field-odd"><p>Enum value representing the wavefunction type</p>
+</dd>
+<dt class="field-even">Return type<span class="colon">:</span></dt>
+<dd class="field-even"><p><a class="reference internal" href="qdk_chemistry.data.html#qdk_chemistry.data.WavefunctionType" title="qdk_chemistry.data.WavefunctionType">WavefunctionType</a></p>
+</dd>
+</dl>
+<p class="rubric">Examples</p>
+<div class="doctest highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="n">wf_type</span> <span class="o">=</span> <span class="n">wf</span><span class="o">.</span><span class="n">get_type</span><span class="p">()</span>
+</pre></div>
+</div>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="qdk_chemistry.algorithms.state_preparation.sparse_isometry.Wavefunction.has_one_rdm_spin_dependent">
+<span class="sig-name descname"><span class="pre">has_one_rdm_spin_dependent</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">self</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference internal" href="qdk_chemistry.utils.wavefunction.html#qdk_chemistry.utils.wavefunction.Wavefunction" title="qdk_chemistry._core.data.Wavefunction"><span class="pre">qdk_chemistry._core.data.Wavefunction</span></a></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><a class="reference external" href="https://docs.python.org/3/library/functions.html#bool" title="(in Python v3.14)"><span class="pre">bool</span></a></span></span><a class="headerlink" href="#qdk_chemistry.algorithms.state_preparation.sparse_isometry.Wavefunction.has_one_rdm_spin_dependent" title="Link to this definition"></a></dt>
+<dd><p>Check if spin-dependent one-particle RDMs for active orbitals are available.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Returns<span class="colon">:</span></dt>
+<dd class="field-odd"><p>True if available</p>
+</dd>
+<dt class="field-even">Return type<span class="colon">:</span></dt>
+<dd class="field-even"><p><a class="reference external" href="https://docs.python.org/3/library/functions.html#bool" title="(in Python v3.14)">bool</a></p>
+</dd>
+</dl>
+<p class="rubric">Examples</p>
+<div class="doctest highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="k">if</span> <span class="n">wf</span><span class="o">.</span><span class="n">has_one_rdm_spin_dependent</span><span class="p">():</span>
+<span class="gp">... </span>    <span class="n">rdm_aa</span><span class="p">,</span> <span class="n">rdm_bb</span> <span class="o">=</span> <span class="n">wf</span><span class="o">.</span><span class="n">get_active_one_rdm_spin_dependent</span><span class="p">()</span>
+</pre></div>
+</div>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="qdk_chemistry.algorithms.state_preparation.sparse_isometry.Wavefunction.has_one_rdm_spin_traced">
+<span class="sig-name descname"><span class="pre">has_one_rdm_spin_traced</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">self</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference internal" href="qdk_chemistry.utils.wavefunction.html#qdk_chemistry.utils.wavefunction.Wavefunction" title="qdk_chemistry._core.data.Wavefunction"><span class="pre">qdk_chemistry._core.data.Wavefunction</span></a></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><a class="reference external" href="https://docs.python.org/3/library/functions.html#bool" title="(in Python v3.14)"><span class="pre">bool</span></a></span></span><a class="headerlink" href="#qdk_chemistry.algorithms.state_preparation.sparse_isometry.Wavefunction.has_one_rdm_spin_traced" title="Link to this definition"></a></dt>
+<dd><p>Check if spin-traced one-particle RDM for active orbitals is available.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Returns<span class="colon">:</span></dt>
+<dd class="field-odd"><p>True if available</p>
+</dd>
+<dt class="field-even">Return type<span class="colon">:</span></dt>
+<dd class="field-even"><p><a class="reference external" href="https://docs.python.org/3/library/functions.html#bool" title="(in Python v3.14)">bool</a></p>
+</dd>
+</dl>
+<p class="rubric">Examples</p>
+<div class="doctest highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="k">if</span> <span class="n">wf</span><span class="o">.</span><span class="n">has_one_rdm_spin_traced</span><span class="p">():</span>
+<span class="gp">... </span>    <span class="n">rdm</span> <span class="o">=</span> <span class="n">wf</span><span class="o">.</span><span class="n">get_active_one_rdm_spin_traced</span><span class="p">()</span>
+</pre></div>
+</div>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="qdk_chemistry.algorithms.state_preparation.sparse_isometry.Wavefunction.has_two_rdm_spin_dependent">
+<span class="sig-name descname"><span class="pre">has_two_rdm_spin_dependent</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">self</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference internal" href="qdk_chemistry.utils.wavefunction.html#qdk_chemistry.utils.wavefunction.Wavefunction" title="qdk_chemistry._core.data.Wavefunction"><span class="pre">qdk_chemistry._core.data.Wavefunction</span></a></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><a class="reference external" href="https://docs.python.org/3/library/functions.html#bool" title="(in Python v3.14)"><span class="pre">bool</span></a></span></span><a class="headerlink" href="#qdk_chemistry.algorithms.state_preparation.sparse_isometry.Wavefunction.has_two_rdm_spin_dependent" title="Link to this definition"></a></dt>
+<dd><p>Check if spin-dependent two-particle RDMs for active orbitals are available.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Returns<span class="colon">:</span></dt>
+<dd class="field-odd"><p>True if available</p>
+</dd>
+<dt class="field-even">Return type<span class="colon">:</span></dt>
+<dd class="field-even"><p><a class="reference external" href="https://docs.python.org/3/library/functions.html#bool" title="(in Python v3.14)">bool</a></p>
+</dd>
+</dl>
+<p class="rubric">Examples</p>
+<div class="doctest highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="k">if</span> <span class="n">wf</span><span class="o">.</span><span class="n">has_two_rdm_spin_dependent</span><span class="p">():</span>
+<span class="gp">... </span>    <span class="n">aaaa</span><span class="p">,</span> <span class="n">aabb</span><span class="p">,</span> <span class="n">bbbb</span> <span class="o">=</span> <span class="n">wf</span><span class="o">.</span><span class="n">get_active_two_rdm_spin_dependent</span><span class="p">()</span>
+</pre></div>
+</div>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="qdk_chemistry.algorithms.state_preparation.sparse_isometry.Wavefunction.has_two_rdm_spin_traced">
+<span class="sig-name descname"><span class="pre">has_two_rdm_spin_traced</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">self</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference internal" href="qdk_chemistry.utils.wavefunction.html#qdk_chemistry.utils.wavefunction.Wavefunction" title="qdk_chemistry._core.data.Wavefunction"><span class="pre">qdk_chemistry._core.data.Wavefunction</span></a></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><a class="reference external" href="https://docs.python.org/3/library/functions.html#bool" title="(in Python v3.14)"><span class="pre">bool</span></a></span></span><a class="headerlink" href="#qdk_chemistry.algorithms.state_preparation.sparse_isometry.Wavefunction.has_two_rdm_spin_traced" title="Link to this definition"></a></dt>
+<dd><p>Check if spin-traced two-particle RDM for active orbitals is available.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Returns<span class="colon">:</span></dt>
+<dd class="field-odd"><p>True if available</p>
+</dd>
+<dt class="field-even">Return type<span class="colon">:</span></dt>
+<dd class="field-even"><p><a class="reference external" href="https://docs.python.org/3/library/functions.html#bool" title="(in Python v3.14)">bool</a></p>
+</dd>
+</dl>
+<p class="rubric">Examples</p>
+<div class="doctest highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="k">if</span> <span class="n">wf</span><span class="o">.</span><span class="n">has_two_rdm_spin_traced</span><span class="p">():</span>
+<span class="gp">... </span>    <span class="n">two_rdm</span> <span class="o">=</span> <span class="n">wf</span><span class="o">.</span><span class="n">get_active_two_rdm_spin_traced</span><span class="p">()</span>
+</pre></div>
+</div>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="qdk_chemistry.algorithms.state_preparation.sparse_isometry.Wavefunction.is_complex">
+<span class="sig-name descname"><span class="pre">is_complex</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">self</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference internal" href="qdk_chemistry.utils.wavefunction.html#qdk_chemistry.utils.wavefunction.Wavefunction" title="qdk_chemistry._core.data.Wavefunction"><span class="pre">qdk_chemistry._core.data.Wavefunction</span></a></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><a class="reference external" href="https://docs.python.org/3/library/functions.html#bool" title="(in Python v3.14)"><span class="pre">bool</span></a></span></span><a class="headerlink" href="#qdk_chemistry.algorithms.state_preparation.sparse_isometry.Wavefunction.is_complex" title="Link to this definition"></a></dt>
+<dd><p>Check if the wavefunction is complex-valued.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Returns<span class="colon">:</span></dt>
+<dd class="field-odd"><p>True if the wavefunction uses complex coefficients, False if real</p>
+</dd>
+<dt class="field-even">Return type<span class="colon">:</span></dt>
+<dd class="field-even"><p><a class="reference external" href="https://docs.python.org/3/library/functions.html#bool" title="(in Python v3.14)">bool</a></p>
+</dd>
+</dl>
+<p class="rubric">Examples</p>
+<div class="doctest highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="n">is_complex</span> <span class="o">=</span> <span class="n">wf</span><span class="o">.</span><span class="n">is_complex</span><span class="p">()</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Wavefunction uses complex coefficients: </span><span class="si">{</span><span class="n">is_complex</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+</pre></div>
+</div>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="qdk_chemistry.algorithms.state_preparation.sparse_isometry.Wavefunction.norm">
+<span class="sig-name descname"><span class="pre">norm</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">self</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference internal" href="qdk_chemistry.utils.wavefunction.html#qdk_chemistry.utils.wavefunction.Wavefunction" title="qdk_chemistry._core.data.Wavefunction"><span class="pre">qdk_chemistry._core.data.Wavefunction</span></a></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><a class="reference external" href="https://docs.python.org/3/library/functions.html#float" title="(in Python v3.14)"><span class="pre">float</span></a></span></span><a class="headerlink" href="#qdk_chemistry.algorithms.state_preparation.sparse_isometry.Wavefunction.norm" title="Link to this definition"></a></dt>
+<dd><p>Calculate norm of the wavefunction.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Returns<span class="colon">:</span></dt>
+<dd class="field-odd"><p>Norm (always real)</p>
+</dd>
+<dt class="field-even">Return type<span class="colon">:</span></dt>
+<dd class="field-even"><p><a class="reference external" href="https://docs.python.org/3/library/functions.html#float" title="(in Python v3.14)">float</a></p>
+</dd>
+</dl>
+<p class="rubric">Examples</p>
+<div class="doctest highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="n">norm_value</span> <span class="o">=</span> <span class="n">wf</span><span class="o">.</span><span class="n">norm</span><span class="p">()</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Wavefunction norm: </span><span class="si">{</span><span class="n">norm_value</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+</pre></div>
+</div>
+</dd></dl>
+
+<dl class="py property">
+<dt class="sig sig-object py" id="qdk_chemistry.algorithms.state_preparation.sparse_isometry.Wavefunction.orbitals">
+<em class="property"><span class="k"><span class="pre">property</span></span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">orbitals</span></span><a class="headerlink" href="#qdk_chemistry.algorithms.state_preparation.sparse_isometry.Wavefunction.orbitals" title="Link to this definition"></a></dt>
+<dd><p>Get reference to orbital basis set.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Returns<span class="colon">:</span></dt>
+<dd class="field-odd"><p>Shared pointer to orbital basis set</p>
+</dd>
+<dt class="field-even">Return type<span class="colon">:</span></dt>
+<dd class="field-even"><p><a class="reference internal" href="qdk_chemistry.data.html#qdk_chemistry.data.Orbitals" title="qdk_chemistry.data.Orbitals">Orbitals</a></p>
+</dd>
+</dl>
+<p class="rubric">Examples</p>
+<div class="doctest highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="n">orbitals</span> <span class="o">=</span> <span class="n">wf</span><span class="o">.</span><span class="n">get_orbitals</span><span class="p">()</span>
+</pre></div>
+</div>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="qdk_chemistry.algorithms.state_preparation.sparse_isometry.Wavefunction.overlap">
+<span class="sig-name descname"><span class="pre">overlap</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">self</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference internal" href="qdk_chemistry.utils.wavefunction.html#qdk_chemistry.utils.wavefunction.Wavefunction" title="qdk_chemistry._core.data.Wavefunction"><span class="pre">qdk_chemistry._core.data.Wavefunction</span></a></span></em>, <em class="sig-param"><span class="n"><span class="pre">other</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference internal" href="qdk_chemistry.utils.wavefunction.html#qdk_chemistry.utils.wavefunction.Wavefunction" title="qdk_chemistry._core.data.Wavefunction"><span class="pre">qdk_chemistry._core.data.Wavefunction</span></a></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><a class="reference external" href="https://docs.python.org/3/library/functions.html#object" title="(in Python v3.14)"><span class="pre">object</span></a></span></span><a class="headerlink" href="#qdk_chemistry.algorithms.state_preparation.sparse_isometry.Wavefunction.overlap" title="Link to this definition"></a></dt>
+<dd><p>Calculate overlap with another wavefunction.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>other</strong> (<a class="reference internal" href="#qdk_chemistry.algorithms.state_preparation.sparse_isometry.Wavefunction" title="qdk_chemistry.algorithms.state_preparation.sparse_isometry.Wavefunction"><em>Wavefunction</em></a>) – Other wavefunction</p>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>Overlap value (real or complex)</p>
+</dd>
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p><a class="reference external" href="https://docs.python.org/3/library/functions.html#complex" title="(in Python v3.14)">complex</a> or <a class="reference external" href="https://docs.python.org/3/library/functions.html#float" title="(in Python v3.14)">float</a></p>
+</dd>
+</dl>
+<p class="rubric">Examples</p>
+<div class="doctest highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="n">wf1</span> <span class="o">=</span> <span class="n">qdk_chemistry</span><span class="o">.</span><span class="n">Wavefunction</span><span class="p">(</span><span class="n">container1</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">wf2</span> <span class="o">=</span> <span class="n">qdk_chemistry</span><span class="o">.</span><span class="n">Wavefunction</span><span class="p">(</span><span class="n">container2</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">overlap</span> <span class="o">=</span> <span class="n">wf1</span><span class="o">.</span><span class="n">overlap</span><span class="p">(</span><span class="n">wf2</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Overlap: </span><span class="si">{</span><span class="n">overlap</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+</pre></div>
+</div>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="qdk_chemistry.algorithms.state_preparation.sparse_isometry.Wavefunction.size">
+<span class="sig-name descname"><span class="pre">size</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">self</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference internal" href="qdk_chemistry.utils.wavefunction.html#qdk_chemistry.utils.wavefunction.Wavefunction" title="qdk_chemistry._core.data.Wavefunction"><span class="pre">qdk_chemistry._core.data.Wavefunction</span></a></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(in Python v3.14)"><span class="pre">int</span></a></span></span><a class="headerlink" href="#qdk_chemistry.algorithms.state_preparation.sparse_isometry.Wavefunction.size" title="Link to this definition"></a></dt>
+<dd><p>Get number of determinants.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Returns<span class="colon">:</span></dt>
+<dd class="field-odd"><p>Number of determinants in the wavefunction</p>
+</dd>
+<dt class="field-even">Return type<span class="colon">:</span></dt>
+<dd class="field-even"><p><a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(in Python v3.14)">int</a></p>
+</dd>
+</dl>
+<p class="rubric">Examples</p>
+<div class="doctest highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="n">dim</span> <span class="o">=</span> <span class="n">wf</span><span class="o">.</span><span class="n">size</span><span class="p">()</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Wavefunction dimension: </span><span class="si">{</span><span class="n">dim</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+</pre></div>
+</div>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="qdk_chemistry.algorithms.state_preparation.sparse_isometry.Wavefunction.to_file">
+<span class="sig-name descname"><span class="pre">to_file</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">self</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference internal" href="qdk_chemistry.utils.wavefunction.html#qdk_chemistry.utils.wavefunction.Wavefunction" title="qdk_chemistry._core.data.Wavefunction"><span class="pre">qdk_chemistry._core.data.Wavefunction</span></a></span></em>, <em class="sig-param"><span class="n"><span class="pre">filename</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)"><span class="pre">str</span></a></span></em>, <em class="sig-param"><span class="n"><span class="pre">format</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)"><span class="pre">str</span></a></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><a class="reference external" href="https://docs.python.org/3/library/constants.html#None" title="(in Python v3.14)"><span class="pre">None</span></a></span></span><a class="headerlink" href="#qdk_chemistry.algorithms.state_preparation.sparse_isometry.Wavefunction.to_file" title="Link to this definition"></a></dt>
+<dd><p>Save wavefunction to file in specified format.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>filename</strong> (<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)"><em>str</em></a>) – Path to file to create/overwrite</p></li>
+<li><p><strong>format</strong> (<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)"><em>str</em></a>) – Format type (“json” or “hdf5”)</p></li>
+</ul>
+</dd>
+</dl>
+<p class="rubric">Examples</p>
+<div class="doctest highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="n">wf</span><span class="o">.</span><span class="n">to_file</span><span class="p">(</span><span class="s2">&quot;wavefunction.json&quot;</span><span class="p">,</span> <span class="s2">&quot;json&quot;</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">wf</span><span class="o">.</span><span class="n">to_file</span><span class="p">(</span><span class="s2">&quot;wavefunction.h5&quot;</span><span class="p">,</span> <span class="s2">&quot;hdf5&quot;</span><span class="p">)</span>
+</pre></div>
+</div>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="qdk_chemistry.algorithms.state_preparation.sparse_isometry.Wavefunction.to_hdf5_file">
+<span class="sig-name descname"><span class="pre">to_hdf5_file</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">self</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference internal" href="qdk_chemistry.utils.wavefunction.html#qdk_chemistry.utils.wavefunction.Wavefunction" title="qdk_chemistry._core.data.Wavefunction"><span class="pre">qdk_chemistry._core.data.Wavefunction</span></a></span></em>, <em class="sig-param"><span class="n"><span class="pre">filename</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)"><span class="pre">str</span></a></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><a class="reference external" href="https://docs.python.org/3/library/constants.html#None" title="(in Python v3.14)"><span class="pre">None</span></a></span></span><a class="headerlink" href="#qdk_chemistry.algorithms.state_preparation.sparse_isometry.Wavefunction.to_hdf5_file" title="Link to this definition"></a></dt>
+<dd><p>Save wavefunction to HDF5 file.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>filename</strong> (<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)"><em>str</em></a>) – Path to HDF5 file to create/overwrite</p>
+</dd>
+</dl>
+<p class="rubric">Examples</p>
+<div class="doctest highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="n">wf</span><span class="o">.</span><span class="n">to_hdf5_file</span><span class="p">(</span><span class="s2">&quot;wavefunction.h5&quot;</span><span class="p">)</span>
+</pre></div>
+</div>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="qdk_chemistry.algorithms.state_preparation.sparse_isometry.Wavefunction.to_json">
+<span class="sig-name descname"><span class="pre">to_json</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">self</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference internal" href="qdk_chemistry.utils.wavefunction.html#qdk_chemistry.utils.wavefunction.Wavefunction" title="qdk_chemistry._core.data.Wavefunction"><span class="pre">qdk_chemistry._core.data.Wavefunction</span></a></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)"><span class="pre">str</span></a></span></span><a class="headerlink" href="#qdk_chemistry.algorithms.state_preparation.sparse_isometry.Wavefunction.to_json" title="Link to this definition"></a></dt>
+<dd><p>Convert wavefunction to JSON string format.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Returns<span class="colon">:</span></dt>
+<dd class="field-odd"><p>JSON string containing wavefunction data</p>
+</dd>
+<dt class="field-even">Return type<span class="colon">:</span></dt>
+<dd class="field-even"><p><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)">str</a></p>
+</dd>
+</dl>
+<p class="rubric">Examples</p>
+<div class="doctest highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="n">json_str</span> <span class="o">=</span> <span class="n">wf</span><span class="o">.</span><span class="n">to_json</span><span class="p">()</span>
+</pre></div>
+</div>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="qdk_chemistry.algorithms.state_preparation.sparse_isometry.Wavefunction.to_json_file">
+<span class="sig-name descname"><span class="pre">to_json_file</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">self</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference internal" href="qdk_chemistry.utils.wavefunction.html#qdk_chemistry.utils.wavefunction.Wavefunction" title="qdk_chemistry._core.data.Wavefunction"><span class="pre">qdk_chemistry._core.data.Wavefunction</span></a></span></em>, <em class="sig-param"><span class="n"><span class="pre">filename</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)"><span class="pre">str</span></a></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><a class="reference external" href="https://docs.python.org/3/library/constants.html#None" title="(in Python v3.14)"><span class="pre">None</span></a></span></span><a class="headerlink" href="#qdk_chemistry.algorithms.state_preparation.sparse_isometry.Wavefunction.to_json_file" title="Link to this definition"></a></dt>
+<dd><p>Save wavefunction to JSON file.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>filename</strong> (<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)"><em>str</em></a>) – Path to JSON file to create/overwrite</p>
+</dd>
+</dl>
+<p class="rubric">Examples</p>
+<div class="doctest highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="n">wf</span><span class="o">.</span><span class="n">to_json_file</span><span class="p">(</span><span class="s2">&quot;wavefunction.json&quot;</span><span class="p">)</span>
+</pre></div>
+</div>
+</dd></dl>
+
+</dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="qdk_chemistry.algorithms.state_preparation.sparse_isometry.MergeZBasisRotations">
+<em class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">MergeZBasisRotations</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="o"><span class="pre">*</span></span><span class="n"><span class="pre">args</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">kwargs</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#qdk_chemistry.algorithms.state_preparation.sparse_isometry.MergeZBasisRotations" title="Link to this definition"></a></dt>
+<dd><p>Bases: <a class="reference external" href="https://quantum.cloud.ibm.com/docs/api/qiskit/qiskit.transpiler.TransformationPass" title="(in Qiskit v2.2)"><code class="xref py py-class docutils literal notranslate"><span class="pre">TransformationPass</span></code></a></p>
+<p>Transformation pass to merge consecutive Z-basis rotations into a single Rz gate and remove identity gates.</p>
+<p>This pass identifies sequences of single-qubit gates in the Z-basis,
+specifically Rz(θ), Z, S, and Sdg, and combines them into a single Rz(θ_new)
+operation whenever possible. These gates all correspond to rotations around the
+Z-axis of the Bloch sphere and can be represented in a unified form.</p>
+<p>Gates:</p>
+<ul class="simple">
+<li><p>Rz(θ): Arbitrary rotation by angle θ.</p></li>
+<li><p>Z: Equivalent to Rz(π).</p></li>
+<li><p>S: Equivalent to Rz(π/2).</p></li>
+<li><p>Sdg: Equivalent to Rz(-π/2).</p></li>
+<li><p>Id: Equivalent to Rz(0) (no effect, removed).</p></li>
+</ul>
+<p>Behavior:</p>
+<ul class="simple">
+<li><p>Does not merge across non-Z-basis gates (e.g., X, H, CX).</p></li>
+<li><p>Removes Id gates entirely since they have no effect.</p></li>
+<li><p>Respects circuit boundaries and barriers.</p></li>
+</ul>
+<p class="rubric">Example</p>
+<dl class="simple">
+<dt>Input sequence:</dt><dd><p><span class="math notranslate nohighlight">\(S \rightarrow R_z(π/3) \rightarrow S^\dagger \rightarrow Z\)</span></p>
+</dd>
+<dt>Output:</dt><dd><p><span class="math notranslate nohighlight">\(R_z(π/2 + π/3 - π/2 + π) = R_z(π + π/3)\)</span></p>
+</dd>
+</dl>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<ul class="simple">
+<li><p>Useful for simplifying circuits before basis gate decomposition.</p></li>
+<li><p>Reduces gate count and improves optimization opportunities downstream.</p></li>
+</ul>
+</div>
+<p>Use Optimize1qGatesDecomposition to handle gate optimization to merge Z basis rotations.</p>
+<dl class="py method">
+<dt class="sig sig-object py" id="qdk_chemistry.algorithms.state_preparation.sparse_isometry.MergeZBasisRotations.__init__">
+<span class="sig-name descname"><span class="pre">__init__</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#qdk_chemistry.algorithms.state_preparation.sparse_isometry.MergeZBasisRotations.__init__" title="Link to this definition"></a></dt>
+<dd><p>Use Optimize1qGatesDecomposition to handle gate optimization to merge Z basis rotations.</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="qdk_chemistry.algorithms.state_preparation.sparse_isometry.MergeZBasisRotations.run">
+<span class="sig-name descname"><span class="pre">run</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">dag</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#qdk_chemistry.algorithms.state_preparation.sparse_isometry.MergeZBasisRotations.run" title="Link to this definition"></a></dt>
+<dd><p>Run the pass on the given <code class="docutils literal notranslate"><span class="pre">DAGCircuit</span></code>.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p><span class="sphinx_autodoc_typehints-type"><a class="reference external" href="https://quantum.cloud.ibm.com/docs/api/qiskit/qiskit.dagcircuit.DAGCircuit" title="(in Qiskit v2.2)"><code class="xref py py-class docutils literal notranslate"><span class="pre">DAGCircuit</span></code></a></span></p>
+</dd>
+<dt class="field-even">Parameters<span class="colon">:</span></dt>
+<dd class="field-even"><p><strong>dag</strong> (<a class="reference external" href="https://quantum.cloud.ibm.com/docs/api/qiskit/qiskit.dagcircuit.DAGCircuit" title="(in Qiskit v2.2)"><em>DAGCircuit</em></a>) – The input <code class="docutils literal notranslate"><span class="pre">DAGCircuit</span></code> to transform.</p>
+</dd>
+<dt class="field-odd">Returns<span class="colon">:</span></dt>
+<dd class="field-odd"><p>The transformed <code class="docutils literal notranslate"><span class="pre">DAGCircuit</span></code> with merged Z-basis rotations.</p>
+</dd>
+</dl>
+</dd></dl>
+
+</dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="qdk_chemistry.algorithms.state_preparation.sparse_isometry.RemoveZBasisOnZeroState">
+<em class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">RemoveZBasisOnZeroState</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="o"><span class="pre">*</span></span><span class="n"><span class="pre">args</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">kwargs</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#qdk_chemistry.algorithms.state_preparation.sparse_isometry.RemoveZBasisOnZeroState" title="Link to this definition"></a></dt>
+<dd><p>Bases: <a class="reference external" href="https://quantum.cloud.ibm.com/docs/api/qiskit/qiskit.transpiler.TransformationPass" title="(in Qiskit v2.2)"><code class="xref py py-class docutils literal notranslate"><span class="pre">TransformationPass</span></code></a></p>
+<p>Transformation pass to remove Z-basis operations on qubits that are in the <span class="math notranslate nohighlight">\(\lvert 0 \rangle\)</span> state.</p>
+<p>This optimization eliminates gates that apply only a global phase to the qubit,
+which has no effect on observable outcomes (measurement probabilities) or
+downstream quantum operations. Specifically, diagonal gates in the computational
+basis (e.g., Rz(θ), Z, S, Sdg) act trivially on the <span class="math notranslate nohighlight">\(\lvert 0 \rangle\)</span> state:</p>
+<ul class="simple">
+<li><p><span class="math notranslate nohighlight">\(R_z(θ) \lvert 0 \rangle = e^{-iθ/2} \lvert 0 \rangle\)</span></p></li>
+<li><p><span class="math notranslate nohighlight">\(Z \lvert 0 \rangle = +1 \lvert 0 \rangle\)</span></p></li>
+<li><p><span class="math notranslate nohighlight">\(S \lvert 0 \rangle = +1 \lvert 0 \rangle\)</span></p></li>
+<li><p><span class="math notranslate nohighlight">\(S^\dagger \lvert 0 \rangle = +1 \lvert 0 \rangle\)</span></p></li>
+</ul>
+<p>These gates only introduce a global phase factor, which is physically unobservable.</p>
+<p>This transformation must not be applied to qubits in superposition or entangled
+states, since Z-basis rotations there modify relative phases between basis states.</p>
+<p>Initialize the <code class="docutils literal notranslate"><span class="pre">RemoveZBasisOnZeroState</span></code> transformation pass.</p>
+<dl class="py method">
+<dt class="sig sig-object py" id="qdk_chemistry.algorithms.state_preparation.sparse_isometry.RemoveZBasisOnZeroState.__init__">
+<span class="sig-name descname"><span class="pre">__init__</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#qdk_chemistry.algorithms.state_preparation.sparse_isometry.RemoveZBasisOnZeroState.__init__" title="Link to this definition"></a></dt>
+<dd><p>Initialize the <code class="docutils literal notranslate"><span class="pre">RemoveZBasisOnZeroState</span></code> transformation pass.</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="qdk_chemistry.algorithms.state_preparation.sparse_isometry.RemoveZBasisOnZeroState.run">
+<span class="sig-name descname"><span class="pre">run</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">dag</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#qdk_chemistry.algorithms.state_preparation.sparse_isometry.RemoveZBasisOnZeroState.run" title="Link to this definition"></a></dt>
+<dd><p>Run the pass on the given <code class="docutils literal notranslate"><span class="pre">DAGCircuit</span></code>.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p><span class="sphinx_autodoc_typehints-type"><a class="reference external" href="https://quantum.cloud.ibm.com/docs/api/qiskit/qiskit.dagcircuit.DAGCircuit" title="(in Qiskit v2.2)"><code class="xref py py-class docutils literal notranslate"><span class="pre">DAGCircuit</span></code></a></span></p>
+</dd>
+<dt class="field-even">Parameters<span class="colon">:</span></dt>
+<dd class="field-even"><p><strong>dag</strong> (<a class="reference external" href="https://quantum.cloud.ibm.com/docs/api/qiskit/qiskit.dagcircuit.DAGCircuit" title="(in Qiskit v2.2)"><em>DAGCircuit</em></a>) – The input <code class="docutils literal notranslate"><span class="pre">DAGCircuit</span></code> to transform.</p>
+</dd>
+<dt class="field-odd">Returns<span class="colon">:</span></dt>
+<dd class="field-odd"><p>The transformed <code class="docutils literal notranslate"><span class="pre">DAGCircuit</span></code> with Z-basis gates removed.</p>
+</dd>
+</dl>
+</dd></dl>
+
+</dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="qdk_chemistry.algorithms.state_preparation.sparse_isometry.SubstituteCliffordRz">
+<em class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">SubstituteCliffordRz</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">equivalent_gate_set</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">tolerance</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">2.220446049250313e-16</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#qdk_chemistry.algorithms.state_preparation.sparse_isometry.SubstituteCliffordRz" title="Link to this definition"></a></dt>
+<dd><p>Bases: <a class="reference external" href="https://quantum.cloud.ibm.com/docs/api/qiskit/qiskit.transpiler.TransformationPass" title="(in Qiskit v2.2)"><code class="xref py py-class docutils literal notranslate"><span class="pre">TransformationPass</span></code></a></p>
+<p>Transformation pass to substitute Rz(θ) gates with equivalent Clifford gates for special angles.</p>
+<p>This pass replaces Rz(θ) gates with one of the following Clifford gates:</p>
+<ul class="simple">
+<li><p>Identity (Id)</p></li>
+<li><p>Phase gate (S)</p></li>
+<li><p>Inverse Phase gate (Sdg)</p></li>
+<li><p>Pauli-Z (Z)</p></li>
+</ul>
+<p>Substitution rules:</p>
+<table class="docutils align-default">
+<thead>
+<tr class="row-odd"><th class="head"><p>Rz angle (θ)</p></th>
+<th class="head"><p>Equivalent Clifford gate</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p>0</p></td>
+<td><p>Id</p></td>
+</tr>
+<tr class="row-odd"><td><p>π/2</p></td>
+<td><p>S</p></td>
+</tr>
+<tr class="row-even"><td><p>π</p></td>
+<td><p>Z</p></td>
+</tr>
+<tr class="row-odd"><td><p>-π/2 or 3π/2</p></td>
+<td><p>Sdg</p></td>
+</tr>
+</tbody>
+</table>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<ul class="simple">
+<li><p>Only substitutes gates whose angle is non-parameterized and matches
+one of the above special Clifford phases within the specified tolerance.</p></li>
+<li><p>Leaves parameterized Rz gates untouched to preserve symbolic expressions.</p></li>
+<li><p>Ignores gates not in the user-specified <code class="docutils literal notranslate"><span class="pre">equivalent_gate_set</span></code></p></li>
+</ul>
+</div>
+<p>Initialize the SubstituteCliffordRz transformation pass.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>equivalent_gate_set</strong> (<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#list" title="(in Python v3.14)"><em>list</em></a><em>[</em><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)"><em>str</em></a><em>] </em><em>| </em><em>None</em>) – List of gates to substitute rz with special
+angles. Default is None, which means [‘id’, ‘s’, ‘sdg’, ‘z’].</p></li>
+<li><p><strong>tolerance</strong> (<a class="reference external" href="https://docs.python.org/3/library/functions.html#float" title="(in Python v3.14)"><em>float</em></a>) – Angle comparison tolerance. Default is np.finfo(np.float64).eps.</p></li>
+</ul>
+</dd>
+</dl>
+<dl class="py method">
+<dt class="sig sig-object py" id="qdk_chemistry.algorithms.state_preparation.sparse_isometry.SubstituteCliffordRz.__init__">
+<span class="sig-name descname"><span class="pre">__init__</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">equivalent_gate_set</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">tolerance</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">float(np.finfo(np.float64).eps)</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#qdk_chemistry.algorithms.state_preparation.sparse_isometry.SubstituteCliffordRz.__init__" title="Link to this definition"></a></dt>
+<dd><p>Initialize the SubstituteCliffordRz transformation pass.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>equivalent_gate_set</strong> (<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#list" title="(in Python v3.14)"><em>list</em></a><em>[</em><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)"><em>str</em></a><em>] </em><em>| </em><em>None</em>) – List of gates to substitute rz with special
+angles. Default is None, which means [‘id’, ‘s’, ‘sdg’, ‘z’].</p></li>
+<li><p><strong>tolerance</strong> (<a class="reference external" href="https://docs.python.org/3/library/functions.html#float" title="(in Python v3.14)"><em>float</em></a>) – Angle comparison tolerance. Default is np.finfo(np.float64).eps.</p></li>
+</ul>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="qdk_chemistry.algorithms.state_preparation.sparse_isometry.SubstituteCliffordRz.run">
+<span class="sig-name descname"><span class="pre">run</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">dag</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#qdk_chemistry.algorithms.state_preparation.sparse_isometry.SubstituteCliffordRz.run" title="Link to this definition"></a></dt>
+<dd><p>Run the pass on the given <code class="docutils literal notranslate"><span class="pre">DAGCircuit</span></code>.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p><span class="sphinx_autodoc_typehints-type"><a class="reference external" href="https://quantum.cloud.ibm.com/docs/api/qiskit/qiskit.dagcircuit.DAGCircuit" title="(in Qiskit v2.2)"><code class="xref py py-class docutils literal notranslate"><span class="pre">DAGCircuit</span></code></a></span></p>
+</dd>
+<dt class="field-even">Parameters<span class="colon">:</span></dt>
+<dd class="field-even"><p><strong>dag</strong> (<a class="reference external" href="https://quantum.cloud.ibm.com/docs/api/qiskit/qiskit.dagcircuit.DAGCircuit" title="(in Qiskit v2.2)"><em>DAGCircuit</em></a>) – The input <code class="docutils literal notranslate"><span class="pre">DAGCircuit</span></code> to transform.</p>
+</dd>
+<dt class="field-odd">Returns<span class="colon">:</span></dt>
+<dd class="field-odd"><p>The transformed <code class="docutils literal notranslate"><span class="pre">DAGCircuit</span></code> with Rz substitutions.</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="qdk_chemistry.algorithms.state_preparation.sparse_isometry.SubstituteCliffordRz.settings">
+<span class="sig-name descname"><span class="pre">settings</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#qdk_chemistry.algorithms.state_preparation.sparse_isometry.SubstituteCliffordRz.settings" title="Link to this definition"></a></dt>
+<dd><p>Get the settings for SubstituteCliffordRz.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p><span class="sphinx_autodoc_typehints-type"><a class="reference internal" href="qdk_chemistry.plugins.qiskit.qubit_mapper.html#qdk_chemistry.plugins.qiskit.qubit_mapper.Settings" title="qdk_chemistry._core.data.Settings"><code class="xref py py-class docutils literal notranslate"><span class="pre">Settings</span></code></a></span></p>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>The settings object associated with SubstituteCliffordRz.</p>
+</dd>
+</dl>
+</dd></dl>
+
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="qdk_chemistry.algorithms.state_preparation.sparse_isometry.bitstrings_to_binary_matrix">
+<span class="sig-name descname"><span class="pre">bitstrings_to_binary_matrix</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">bitstrings</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#qdk_chemistry.algorithms.state_preparation.sparse_isometry.bitstrings_to_binary_matrix" title="Link to this definition"></a></dt>
+<dd><p>Convert a list of bitstrings to a binary matrix.</p>
+<p>This function converts a list of bitstrings (determinants) into a binary matrix
+where each column represents a determinant and each row represents a qubit.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p><span class="sphinx_autodoc_typehints-type"><a class="reference external" href="https://numpy.org/doc/stable/reference/generated/numpy.ndarray.html#numpy.ndarray" title="(in NumPy v2.3)"><code class="xref py py-class docutils literal notranslate"><span class="pre">ndarray</span></code></a></span></p>
+</dd>
+<dt class="field-even">Parameters<span class="colon">:</span></dt>
+<dd class="field-even"><p><strong>bitstrings</strong> (<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#list" title="(in Python v3.14)"><em>list</em></a><em>[</em><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)"><em>str</em></a><em>]</em>) – List of bitstrings in Qiskit little endian order.
+Each bitstring represents a determinant where the string is ordered
+as “q[N-1]…q[0]” (most significant bit first in the string).</p>
+</dd>
+<dt class="field-odd">Returns<span class="colon">:</span></dt>
+<dd class="field-odd"><p><p>Binary matrix M of shape (N, k) where</p>
+<blockquote>
+<div><ul class="simple">
+<li><p>N is the number of qubits (rows)</p></li>
+<li><p>k is the number of determinants (columns)</p></li>
+</ul>
+</div></blockquote>
+<p>The matrix follows Qiskit circuit top-down convention with row ordering “q[0]…q[N-1]” (qubit 0 at the top).</p>
+</p>
+</dd>
+</dl>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>The input bitstrings are in Qiskit little endian order (“q[N-1]…q[0]”),
+but the output binary matrix follows the Qiskit circuit convention with
+row ordering “q[0]…q[N-1]”. This means each bitstring is reversed
+when converting to a column in the matrix.</p>
+</div>
+<p class="rubric">Example</p>
+<div class="doctest highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="n">bitstrings</span> <span class="o">=</span> <span class="p">[</span><span class="s2">&quot;101&quot;</span><span class="p">,</span> <span class="s2">&quot;010&quot;</span><span class="p">]</span>  <span class="c1"># q[2]q[1]q[0] format</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">matrix</span> <span class="o">=</span> <span class="n">bitstrings_to_binary_matrix</span><span class="p">(</span><span class="n">bitstrings</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="nb">print</span><span class="p">(</span><span class="n">matrix</span><span class="p">)</span>
+<span class="go">[[1 0]  # q[0]</span>
+<span class="go"> [0 1]  # q[1]</span>
+<span class="go"> [1 0]] # q[2]</span>
+</pre></div>
+</div>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="qdk_chemistry.algorithms.state_preparation.sparse_isometry.separate_alpha_beta_to_binary_string">
+<span class="sig-name descname"><span class="pre">separate_alpha_beta_to_binary_string</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">input_string</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#qdk_chemistry.algorithms.state_preparation.sparse_isometry.separate_alpha_beta_to_binary_string" title="Link to this definition"></a></dt>
+<dd><p>Separate a compact alpha-beta bitstring into separate alpha and beta parts.</p>
+<p>Compact format uses:</p>
+<blockquote>
+<div><ul class="simple">
+<li><p>2: orbital doubly occupied</p></li>
+<li><p>u: orbital up electron</p></li>
+<li><p>d: orbital down electron</p></li>
+<li><p>0: orbital unoccupied</p></li>
+</ul>
+</div></blockquote>
+<p class="rubric">Example</p>
+<p>Compact: 2du0 -&gt; alpha: 1010, beta: 1100</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>input_string</strong> (<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)"><em>str</em></a>) – The compact bitstring.</p>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>A tuple containing the alpha and beta bitstrings.</p>
+</dd>
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p><span class="sphinx_autodoc_typehints-type"><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#tuple" title="(in Python v3.14)"><code class="xref py py-class docutils literal notranslate"><span class="pre">tuple</span></code></a>[<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)"><code class="xref py py-class docutils literal notranslate"><span class="pre">str</span></code></a>, <a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)"><code class="xref py py-class docutils literal notranslate"><span class="pre">str</span></code></a>]</span></p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="qdk_chemistry.algorithms.state_preparation.sparse_isometry.SparseIsometryGF2XStatePreparation">
+<em class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">SparseIsometryGF2XStatePreparation</span></span><a class="reference internal" href="../../_modules/qdk_chemistry/algorithms/state_preparation/sparse_isometry.html#SparseIsometryGF2XStatePreparation"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#qdk_chemistry.algorithms.state_preparation.sparse_isometry.SparseIsometryGF2XStatePreparation" title="Link to this definition"></a></dt>
+<dd><p>Bases: <a class="reference internal" href="qdk_chemistry.algorithms.state_preparation.state_preparation.html#qdk_chemistry.algorithms.state_preparation.state_preparation.StatePreparation" title="qdk_chemistry.algorithms.state_preparation.state_preparation.StatePreparation"><code class="xref py py-class docutils literal notranslate"><span class="pre">StatePreparation</span></code></a></p>
+<p>State preparation using sparse isometry with enhanced GF2+X elimination.</p>
+<p>This class implements “GF2+X” state preparation for electronic structure problems using
+the <code class="docutils literal notranslate"><span class="pre">gf2x_with_tracking</span></code> function which performs smart preprocessing
+before GF2 Gaussian elimination. The preprocessing includes:</p>
+<blockquote>
+<div><ol class="arabic simple">
+<li><p>Removing duplicate rows using CNOT operations</p></li>
+<li><p>Removing all-ones rows using X operations</p></li>
+<li><p>Then performing standard GF2 Gaussian elimination</p></li>
+<li><p>Apply the additional rank reduction if the reduced row-echelon matrix is diagonal</p></li>
+</ol>
+</div></blockquote>
+<p>This enhanced approach can be more efficient than standard GF2 Gaussian elimination,
+particularly for matrices with duplicate rows or all-ones rows. The algorithm
+tracks both CNOT and X operations for proper circuit reconstruction.</p>
+<p>The algorithm:</p>
+<blockquote>
+<div><ol class="arabic simple">
+<li><p>Reads the wavefunction to get coefficients and bitstrings</p></li>
+<li><p>Converts bitstrings to a binary matrix</p></li>
+<li><p>Applies enhanced GF2+X elimination (duplicate removal + all-ones removal + GF2)</p></li>
+<li><p>Performs dense state preparation on the reduced space</p></li>
+<li><p>Applies recorded operations (both CNOT and X) in reverse order to expand back to full space</p></li>
+</ol>
+</div></blockquote>
+<p>Key References:</p>
+<blockquote>
+<div><ul class="simple">
+<li><p>Sparse isometry: Malvetti, Iten and Colbeck, <a class="reference external" href="https://arxiv.org/abs/2006.00016">arXiv:2006.00016</a></p></li>
+</ul>
+</div></blockquote>
+<p>Initialize the SparseIsometryGF2XStatePreparation.</p>
+<dl class="py method">
+<dt class="sig sig-object py" id="qdk_chemistry.algorithms.state_preparation.sparse_isometry.SparseIsometryGF2XStatePreparation.__init__">
+<span class="sig-name descname"><span class="pre">__init__</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="../../_modules/qdk_chemistry/algorithms/state_preparation/sparse_isometry.html#SparseIsometryGF2XStatePreparation.__init__"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#qdk_chemistry.algorithms.state_preparation.sparse_isometry.SparseIsometryGF2XStatePreparation.__init__" title="Link to this definition"></a></dt>
+<dd><p>Initialize the SparseIsometryGF2XStatePreparation.</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="qdk_chemistry.algorithms.state_preparation.sparse_isometry.SparseIsometryGF2XStatePreparation.name">
+<span class="sig-name descname"><span class="pre">name</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="../../_modules/qdk_chemistry/algorithms/state_preparation/sparse_isometry.html#SparseIsometryGF2XStatePreparation.name"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#qdk_chemistry.algorithms.state_preparation.sparse_isometry.SparseIsometryGF2XStatePreparation.name" title="Link to this definition"></a></dt>
+<dd><p>Return the name of the state preparation method.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p><span class="sphinx_autodoc_typehints-type"><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)"><code class="xref py py-class docutils literal notranslate"><span class="pre">str</span></code></a></span></p>
+</dd>
+</dl>
+</dd></dl>
+
+</dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="qdk_chemistry.algorithms.state_preparation.sparse_isometry.GF2XEliminationResult">
+<em class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">GF2XEliminationResult</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">reduced_matrix</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">row_map</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">col_map</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">operations</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">rank</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../../_modules/qdk_chemistry/algorithms/state_preparation/sparse_isometry.html#GF2XEliminationResult"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#qdk_chemistry.algorithms.state_preparation.sparse_isometry.GF2XEliminationResult" title="Link to this definition"></a></dt>
+<dd><p>Bases: <a class="reference external" href="https://docs.python.org/3/library/functions.html#object" title="(in Python v3.14)"><code class="xref py py-class docutils literal notranslate"><span class="pre">object</span></code></a></p>
+<p>Data class to hold the results of GF2+X elimination.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>reduced_matrix</strong> (<a class="reference external" href="https://numpy.org/doc/stable/reference/generated/numpy.ndarray.html#numpy.ndarray" title="(in NumPy v2.3)"><em>ndarray</em></a>)</p></li>
+<li><p><strong>row_map</strong> (<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#list" title="(in Python v3.14)"><em>list</em></a><em>[</em><a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(in Python v3.14)"><em>int</em></a><em>]</em>)</p></li>
+<li><p><strong>col_map</strong> (<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#list" title="(in Python v3.14)"><em>list</em></a><em>[</em><a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(in Python v3.14)"><em>int</em></a><em>]</em>)</p></li>
+<li><p><strong>operations</strong> (<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#list" title="(in Python v3.14)"><em>list</em></a><em>[</em><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#tuple" title="(in Python v3.14)"><em>tuple</em></a><em>[</em><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)"><em>str</em></a><em>, </em><a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(in Python v3.14)"><em>int</em></a><em> | </em><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#tuple" title="(in Python v3.14)"><em>tuple</em></a><em>[</em><a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(in Python v3.14)"><em>int</em></a><em>, </em><a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(in Python v3.14)"><em>int</em></a><em>]</em><em>]</em><em>]</em>)</p></li>
+<li><p><strong>rank</strong> (<a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(in Python v3.14)"><em>int</em></a>)</p></li>
+</ul>
+</dd>
+</dl>
+<dl class="py attribute">
+<dt class="sig sig-object py" id="qdk_chemistry.algorithms.state_preparation.sparse_isometry.GF2XEliminationResult.reduced_matrix">
+<span class="sig-name descname"><span class="pre">reduced_matrix</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><a class="reference external" href="https://numpy.org/doc/stable/reference/generated/numpy.ndarray.html#numpy.ndarray" title="(in NumPy v2.3)"><code class="xref py py-class docutils literal notranslate"><span class="pre">ndarray</span></code></a></em><a class="headerlink" href="#qdk_chemistry.algorithms.state_preparation.sparse_isometry.GF2XEliminationResult.reduced_matrix" title="Link to this definition"></a></dt>
+<dd><p>Reduced row-echelon binary matrix with zero rows removed.</p>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="qdk_chemistry.algorithms.state_preparation.sparse_isometry.GF2XEliminationResult.row_map">
+<span class="sig-name descname"><span class="pre">row_map</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#list" title="(in Python v3.14)"><code class="xref py py-class docutils literal notranslate"><span class="pre">list</span></code></a><span class="pre">[</span><a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(in Python v3.14)"><code class="xref py py-class docutils literal notranslate"><span class="pre">int</span></code></a><span class="pre">]</span></em><a class="headerlink" href="#qdk_chemistry.algorithms.state_preparation.sparse_isometry.GF2XEliminationResult.row_map" title="Link to this definition"></a></dt>
+<dd><p>Map of reduced matrix row i to original row index.</p>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="qdk_chemistry.algorithms.state_preparation.sparse_isometry.GF2XEliminationResult.col_map">
+<span class="sig-name descname"><span class="pre">col_map</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#list" title="(in Python v3.14)"><code class="xref py py-class docutils literal notranslate"><span class="pre">list</span></code></a><span class="pre">[</span><a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(in Python v3.14)"><code class="xref py py-class docutils literal notranslate"><span class="pre">int</span></code></a><span class="pre">]</span></em><a class="headerlink" href="#qdk_chemistry.algorithms.state_preparation.sparse_isometry.GF2XEliminationResult.col_map" title="Link to this definition"></a></dt>
+<dd><p>Map of reduced matrix col j to original column index.</p>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="qdk_chemistry.algorithms.state_preparation.sparse_isometry.GF2XEliminationResult.operations">
+<span class="sig-name descname"><span class="pre">operations</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#list" title="(in Python v3.14)"><code class="xref py py-class docutils literal notranslate"><span class="pre">list</span></code></a><span class="pre">[</span><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#tuple" title="(in Python v3.14)"><code class="xref py py-class docutils literal notranslate"><span class="pre">tuple</span></code></a><span class="pre">[</span><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)"><code class="xref py py-class docutils literal notranslate"><span class="pre">str</span></code></a><span class="pre">,</span> <a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(in Python v3.14)"><code class="xref py py-class docutils literal notranslate"><span class="pre">int</span></code></a> <span class="pre">|</span> <a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#tuple" title="(in Python v3.14)"><code class="xref py py-class docutils literal notranslate"><span class="pre">tuple</span></code></a><span class="pre">[</span><a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(in Python v3.14)"><code class="xref py py-class docutils literal notranslate"><span class="pre">int</span></code></a><span class="pre">,</span> <a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(in Python v3.14)"><code class="xref py py-class docutils literal notranslate"><span class="pre">int</span></code></a><span class="pre">]]]</span></em><a class="headerlink" href="#qdk_chemistry.algorithms.state_preparation.sparse_isometry.GF2XEliminationResult.operations" title="Link to this definition"></a></dt>
+<dd><p>List of operations in the form:</p>
+<blockquote>
+<div><ul class="simple">
+<li><p>(‘cnot’, (target_row, control_row)) for CNOT operations</p></li>
+<li><p>(‘x’, row_index) for X operations on entire rows</p></li>
+</ul>
+</div></blockquote>
+<p>All indices refer to original matrix positions.</p>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="qdk_chemistry.algorithms.state_preparation.sparse_isometry.GF2XEliminationResult.rank">
+<span class="sig-name descname"><span class="pre">rank</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(in Python v3.14)"><code class="xref py py-class docutils literal notranslate"><span class="pre">int</span></code></a></em><a class="headerlink" href="#qdk_chemistry.algorithms.state_preparation.sparse_isometry.GF2XEliminationResult.rank" title="Link to this definition"></a></dt>
+<dd><p>Rank of the reduced matrix (number of non-zero rows).</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="qdk_chemistry.algorithms.state_preparation.sparse_isometry.GF2XEliminationResult.__init__">
+<span class="sig-name descname"><span class="pre">__init__</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">reduced_matrix</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">row_map</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">col_map</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">operations</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">rank</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#qdk_chemistry.algorithms.state_preparation.sparse_isometry.GF2XEliminationResult.__init__" title="Link to this definition"></a></dt>
+<dd><dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>reduced_matrix</strong> (<a class="reference external" href="https://numpy.org/doc/stable/reference/generated/numpy.ndarray.html#numpy.ndarray" title="(in NumPy v2.3)"><em>ndarray</em></a>)</p></li>
+<li><p><strong>row_map</strong> (<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#list" title="(in Python v3.14)"><em>list</em></a><em>[</em><a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(in Python v3.14)"><em>int</em></a><em>]</em>)</p></li>
+<li><p><strong>col_map</strong> (<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#list" title="(in Python v3.14)"><em>list</em></a><em>[</em><a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(in Python v3.14)"><em>int</em></a><em>]</em>)</p></li>
+<li><p><strong>operations</strong> (<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#list" title="(in Python v3.14)"><em>list</em></a><em>[</em><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#tuple" title="(in Python v3.14)"><em>tuple</em></a><em>[</em><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)"><em>str</em></a><em>, </em><a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(in Python v3.14)"><em>int</em></a><em> | </em><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#tuple" title="(in Python v3.14)"><em>tuple</em></a><em>[</em><a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(in Python v3.14)"><em>int</em></a><em>, </em><a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(in Python v3.14)"><em>int</em></a><em>]</em><em>]</em><em>]</em>)</p></li>
+<li><p><strong>rank</strong> (<a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(in Python v3.14)"><em>int</em></a>)</p></li>
+</ul>
+</dd>
+<dt class="field-even">Return type<span class="colon">:</span></dt>
+<dd class="field-even"><p>None</p>
+</dd>
+</dl>
+</dd></dl>
+
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="qdk_chemistry.algorithms.state_preparation.sparse_isometry.gf2x_with_tracking">
+<span class="sig-name descname"><span class="pre">gf2x_with_tracking</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">matrix</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../../_modules/qdk_chemistry/algorithms/state_preparation/sparse_isometry.html#gf2x_with_tracking"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#qdk_chemistry.algorithms.state_preparation.sparse_isometry.gf2x_with_tracking" title="Link to this definition"></a></dt>
+<dd><p>Perform enhanced GF2+X Gaussian elimination with smart preprocessing and X operations.</p>
+<p>This function implements a smarter approach to GF2 Gaussian elimination by:</p>
+<blockquote>
+<div><ol class="arabic simple">
+<li><p>First removing duplicate rows using CNOT operations</p></li>
+<li><p>Removing all-ones rows using X operations</p></li>
+<li><p>Then performing standard Gaussian elimination</p></li>
+<li><p>Performing further reduction if the resulting matrix is diagonal</p></li>
+</ol>
+</div></blockquote>
+<p>This approach can be more efficient than standard Gaussian elimination alone,
+especially for certain types of matrices.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>matrix</strong> (<em>np.ndarray</em>) – shape (m, n), binary (0/1) matrix</p>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>A dataclass containing GF2+X elimination results.</p>
+</dd>
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p><span class="sphinx_autodoc_typehints-type"><a class="reference internal" href="#qdk_chemistry.algorithms.state_preparation.sparse_isometry.GF2XEliminationResult" title="qdk_chemistry.algorithms.state_preparation.sparse_isometry.GF2XEliminationResult"><code class="xref py py-class docutils literal notranslate"><span class="pre">GF2XEliminationResult</span></code></a></span></p>
+</dd>
+</dl>
+</dd></dl>
+
+</section>
+
+
+           </div>
+          </div>
+          <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
+        <a href="qdk_chemistry.algorithms.state_preparation.html" class="btn btn-neutral float-left" title="qdk_chemistry.algorithms.state_preparation package" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+        <a href="qdk_chemistry.algorithms.state_preparation.state_preparation.html" class="btn btn-neutral float-right" title="qdk_chemistry.algorithms.state_preparation.state_preparation module" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright Microsoft Corporation. All rights reserved. Licensed under the MIT License.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

@@ -1,8 +1,0 @@
-qdk.chemistry.plugins.pyscf.coupled\_cluster module
-===================================================
-
-.. automodule:: qdk.chemistry.plugins.pyscf.coupled_cluster
-   :members:
-   :private-members:
-   :show-inheritance:
-   :undoc-members:

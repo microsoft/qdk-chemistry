@@ -1,8 +1,0 @@
-qdk.chemistry.interop.qiskit.qubit\_mapper module
-=================================================
-
-.. automodule:: qdk.chemistry.interop.qiskit.qubit_mapper
-   :members:
-   :private-members:
-   :show-inheritance:
-   :undoc-members:

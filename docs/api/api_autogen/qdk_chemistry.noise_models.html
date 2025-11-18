@@ -1,0 +1,605 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../../">
+<head>
+  <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>qdk_chemistry.noise_models module &mdash; qdk-chemistry 1.0.0-rc1 documentation</title>
+      <link rel="stylesheet" type="text/css" href="../../_static/pygments.css?v=b86133f3" />
+      <link rel="stylesheet" type="text/css" href="../../_static/css/theme.css?v=e59714d7" />
+      <link rel="stylesheet" type="text/css" href="../../_static/tabs.css?v=4c969af8" />
+      <link rel="stylesheet" type="text/css" href="../../_static/graphviz.css?v=4ae1632d" />
+      <link rel="stylesheet" type="text/css" href="../../_static/copybutton.css?v=76b2166b" />
+      <link rel="stylesheet" type="text/css" href="../../_static/custom.css?v=a64bac2b" />
+
+  
+      <script src="../../_static/jquery.js?v=5d32c60e"></script>
+      <script src="../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="../../_static/documentation_options.js?v=81bd8d55"></script>
+      <script src="../../_static/doctools.js?v=9bcbadda"></script>
+      <script src="../../_static/sphinx_highlight.js?v=dc90522c"></script>
+      <script src="../../_static/tabs.js?v=3ee01567"></script>
+      <script src="../../_static/clipboard.min.js?v=a7894cd8"></script>
+      <script src="../../_static/copybutton.js?v=f281be69"></script>
+    <script src="../../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../../genindex.html" />
+    <link rel="search" title="Search" href="../../search.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="../../index.html" class="icon icon-home">
+            qdk-chemistry
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">User Documentation</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../user/quickstart.html">Quickstart</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../user/comprehensive/index.html">In-depth user guide</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">API Reference</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../python_api.html">Python API</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../cpp_api.html">C++ API</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Supporting Information</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../glossary.html">Acronym definitions</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../references.html">References</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../../index.html">qdk-chemistry</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../../index.html" class="icon icon-home" aria-label="Home"></a></li>
+      <li class="breadcrumb-item active">qdk_chemistry.noise_models module</li>
+      <li class="wy-breadcrumbs-aside">
+            <a href="../../_sources/api/api_autogen/qdk_chemistry.noise_models.rst.txt" rel="nofollow"> View page source</a>
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <section id="module-qdk_chemistry.noise_models">
+<span id="qdk-chemistry-noise-models-module"></span><h1>qdk_chemistry.noise_models module<a class="headerlink" href="#module-qdk_chemistry.noise_models" title="Link to this heading"></a></h1>
+<p>QDK/Chemistry noise model module for simulating noise in quantum circuits.</p>
+<dl class="py class">
+<dt class="sig sig-object py" id="qdk_chemistry.noise_models.CaseInsensitiveStrEnum">
+<em class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">CaseInsensitiveStrEnum</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">new_class_name</span></span></em>, <em class="sig-param"><span class="positional-only-separator o"><abbr title="Positional-only parameter separator (PEP 570)"><span class="pre">/</span></abbr></span></em>, <em class="sig-param"><span class="n"><span class="pre">names</span></span></em>, <em class="sig-param"><span class="keyword-only-separator o"><abbr title="Keyword-only parameters separator (PEP 3102)"><span class="pre">*</span></abbr></span></em>, <em class="sig-param"><span class="n"><span class="pre">module</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">qualname</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">type</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">start</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">1</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">boundary</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../../_modules/qdk_chemistry/noise_models.html#CaseInsensitiveStrEnum"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#qdk_chemistry.noise_models.CaseInsensitiveStrEnum" title="Link to this definition"></a></dt>
+<dd><p>Bases: <a class="reference external" href="https://docs.python.org/3/library/enum.html#enum.StrEnum" title="(in Python v3.14)"><code class="xref py py-class docutils literal notranslate"><span class="pre">StrEnum</span></code></a></p>
+<p>StrEnum that allows case-insensitive lookup of values.</p>
+</dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="qdk_chemistry.noise_models.SupportedGate">
+<em class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">SupportedGate</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="o"><span class="pre">*</span></span><span class="n"><span class="pre">values</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../../_modules/qdk_chemistry/noise_models.html#SupportedGate"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#qdk_chemistry.noise_models.SupportedGate" title="Link to this definition"></a></dt>
+<dd><p>Bases: <a class="reference internal" href="#qdk_chemistry.noise_models.CaseInsensitiveStrEnum" title="qdk_chemistry.noise_models.CaseInsensitiveStrEnum"><code class="xref py py-class docutils literal notranslate"><span class="pre">CaseInsensitiveStrEnum</span></code></a></p>
+<p>An enumeration of quantum gate types.</p>
+<p>Gathered from qiskit
+<a class="reference external" href="https://github.com/Qiskit/qiskit/blob/a88ed60615eeb988f404f9afaf142775478aceb9/qiskit/circuit/quantumcircuit.py#L673C1-L731C1">https://github.com/Qiskit/qiskit/blob/a88ed60615eeb988f404f9afaf142775478aceb9/qiskit/circuit/quantumcircuit.py#L673C1-L731C1</a></p>
+<dl class="py attribute">
+<dt class="sig sig-object py" id="qdk_chemistry.noise_models.SupportedGate.BARRIER">
+<span class="sig-name descname"><span class="pre">BARRIER</span></span><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">'barrier'</span></em><a class="headerlink" href="#qdk_chemistry.noise_models.SupportedGate.BARRIER" title="Link to this definition"></a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="qdk_chemistry.noise_models.SupportedGate.CCX">
+<span class="sig-name descname"><span class="pre">CCX</span></span><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">'ccx'</span></em><a class="headerlink" href="#qdk_chemistry.noise_models.SupportedGate.CCX" title="Link to this definition"></a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="qdk_chemistry.noise_models.SupportedGate.CCZ">
+<span class="sig-name descname"><span class="pre">CCZ</span></span><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">'ccz'</span></em><a class="headerlink" href="#qdk_chemistry.noise_models.SupportedGate.CCZ" title="Link to this definition"></a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="qdk_chemistry.noise_models.SupportedGate.CH">
+<span class="sig-name descname"><span class="pre">CH</span></span><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">'ch'</span></em><a class="headerlink" href="#qdk_chemistry.noise_models.SupportedGate.CH" title="Link to this definition"></a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="qdk_chemistry.noise_models.SupportedGate.CP">
+<span class="sig-name descname"><span class="pre">CP</span></span><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">'cp'</span></em><a class="headerlink" href="#qdk_chemistry.noise_models.SupportedGate.CP" title="Link to this definition"></a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="qdk_chemistry.noise_models.SupportedGate.CRX">
+<span class="sig-name descname"><span class="pre">CRX</span></span><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">'crx'</span></em><a class="headerlink" href="#qdk_chemistry.noise_models.SupportedGate.CRX" title="Link to this definition"></a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="qdk_chemistry.noise_models.SupportedGate.CRY">
+<span class="sig-name descname"><span class="pre">CRY</span></span><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">'cry'</span></em><a class="headerlink" href="#qdk_chemistry.noise_models.SupportedGate.CRY" title="Link to this definition"></a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="qdk_chemistry.noise_models.SupportedGate.CRZ">
+<span class="sig-name descname"><span class="pre">CRZ</span></span><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">'crz'</span></em><a class="headerlink" href="#qdk_chemistry.noise_models.SupportedGate.CRZ" title="Link to this definition"></a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="qdk_chemistry.noise_models.SupportedGate.CS">
+<span class="sig-name descname"><span class="pre">CS</span></span><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">'cs'</span></em><a class="headerlink" href="#qdk_chemistry.noise_models.SupportedGate.CS" title="Link to this definition"></a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="qdk_chemistry.noise_models.SupportedGate.CSDG">
+<span class="sig-name descname"><span class="pre">CSDG</span></span><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">'csdg'</span></em><a class="headerlink" href="#qdk_chemistry.noise_models.SupportedGate.CSDG" title="Link to this definition"></a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="qdk_chemistry.noise_models.SupportedGate.CSWAP">
+<span class="sig-name descname"><span class="pre">CSWAP</span></span><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">'cswap'</span></em><a class="headerlink" href="#qdk_chemistry.noise_models.SupportedGate.CSWAP" title="Link to this definition"></a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="qdk_chemistry.noise_models.SupportedGate.CSX">
+<span class="sig-name descname"><span class="pre">CSX</span></span><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">'csx'</span></em><a class="headerlink" href="#qdk_chemistry.noise_models.SupportedGate.CSX" title="Link to this definition"></a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="qdk_chemistry.noise_models.SupportedGate.CU">
+<span class="sig-name descname"><span class="pre">CU</span></span><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">'cu'</span></em><a class="headerlink" href="#qdk_chemistry.noise_models.SupportedGate.CU" title="Link to this definition"></a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="qdk_chemistry.noise_models.SupportedGate.CX">
+<span class="sig-name descname"><span class="pre">CX</span></span><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">'cx'</span></em><a class="headerlink" href="#qdk_chemistry.noise_models.SupportedGate.CX" title="Link to this definition"></a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="qdk_chemistry.noise_models.SupportedGate.CY">
+<span class="sig-name descname"><span class="pre">CY</span></span><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">'cy'</span></em><a class="headerlink" href="#qdk_chemistry.noise_models.SupportedGate.CY" title="Link to this definition"></a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="qdk_chemistry.noise_models.SupportedGate.CZ">
+<span class="sig-name descname"><span class="pre">CZ</span></span><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">'cz'</span></em><a class="headerlink" href="#qdk_chemistry.noise_models.SupportedGate.CZ" title="Link to this definition"></a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="qdk_chemistry.noise_models.SupportedGate.DCX">
+<span class="sig-name descname"><span class="pre">DCX</span></span><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">'dcx'</span></em><a class="headerlink" href="#qdk_chemistry.noise_models.SupportedGate.DCX" title="Link to this definition"></a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="qdk_chemistry.noise_models.SupportedGate.DELAY">
+<span class="sig-name descname"><span class="pre">DELAY</span></span><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">'delay'</span></em><a class="headerlink" href="#qdk_chemistry.noise_models.SupportedGate.DELAY" title="Link to this definition"></a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="qdk_chemistry.noise_models.SupportedGate.ECR">
+<span class="sig-name descname"><span class="pre">ECR</span></span><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">'ecr'</span></em><a class="headerlink" href="#qdk_chemistry.noise_models.SupportedGate.ECR" title="Link to this definition"></a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="qdk_chemistry.noise_models.SupportedGate.H">
+<span class="sig-name descname"><span class="pre">H</span></span><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">'h'</span></em><a class="headerlink" href="#qdk_chemistry.noise_models.SupportedGate.H" title="Link to this definition"></a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="qdk_chemistry.noise_models.SupportedGate.ID">
+<span class="sig-name descname"><span class="pre">ID</span></span><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">'id'</span></em><a class="headerlink" href="#qdk_chemistry.noise_models.SupportedGate.ID" title="Link to this definition"></a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="qdk_chemistry.noise_models.SupportedGate.INITIALIZE">
+<span class="sig-name descname"><span class="pre">INITIALIZE</span></span><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">'initialize'</span></em><a class="headerlink" href="#qdk_chemistry.noise_models.SupportedGate.INITIALIZE" title="Link to this definition"></a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="qdk_chemistry.noise_models.SupportedGate.ISWAP">
+<span class="sig-name descname"><span class="pre">ISWAP</span></span><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">'iswap'</span></em><a class="headerlink" href="#qdk_chemistry.noise_models.SupportedGate.ISWAP" title="Link to this definition"></a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="qdk_chemistry.noise_models.SupportedGate.MCP">
+<span class="sig-name descname"><span class="pre">MCP</span></span><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">'mcp'</span></em><a class="headerlink" href="#qdk_chemistry.noise_models.SupportedGate.MCP" title="Link to this definition"></a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="qdk_chemistry.noise_models.SupportedGate.MCRX">
+<span class="sig-name descname"><span class="pre">MCRX</span></span><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">'mcrx'</span></em><a class="headerlink" href="#qdk_chemistry.noise_models.SupportedGate.MCRX" title="Link to this definition"></a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="qdk_chemistry.noise_models.SupportedGate.MCRY">
+<span class="sig-name descname"><span class="pre">MCRY</span></span><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">'mcry'</span></em><a class="headerlink" href="#qdk_chemistry.noise_models.SupportedGate.MCRY" title="Link to this definition"></a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="qdk_chemistry.noise_models.SupportedGate.MCRZ">
+<span class="sig-name descname"><span class="pre">MCRZ</span></span><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">'mcrz'</span></em><a class="headerlink" href="#qdk_chemistry.noise_models.SupportedGate.MCRZ" title="Link to this definition"></a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="qdk_chemistry.noise_models.SupportedGate.MCX">
+<span class="sig-name descname"><span class="pre">MCX</span></span><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">'mcx'</span></em><a class="headerlink" href="#qdk_chemistry.noise_models.SupportedGate.MCX" title="Link to this definition"></a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="qdk_chemistry.noise_models.SupportedGate.MEASURE">
+<span class="sig-name descname"><span class="pre">MEASURE</span></span><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">'measure'</span></em><a class="headerlink" href="#qdk_chemistry.noise_models.SupportedGate.MEASURE" title="Link to this definition"></a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="qdk_chemistry.noise_models.SupportedGate.MS">
+<span class="sig-name descname"><span class="pre">MS</span></span><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">'ms'</span></em><a class="headerlink" href="#qdk_chemistry.noise_models.SupportedGate.MS" title="Link to this definition"></a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="qdk_chemistry.noise_models.SupportedGate.P">
+<span class="sig-name descname"><span class="pre">P</span></span><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">'p'</span></em><a class="headerlink" href="#qdk_chemistry.noise_models.SupportedGate.P" title="Link to this definition"></a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="qdk_chemistry.noise_models.SupportedGate.PAULI">
+<span class="sig-name descname"><span class="pre">PAULI</span></span><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">'pauli'</span></em><a class="headerlink" href="#qdk_chemistry.noise_models.SupportedGate.PAULI" title="Link to this definition"></a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="qdk_chemistry.noise_models.SupportedGate.R">
+<span class="sig-name descname"><span class="pre">R</span></span><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">'r'</span></em><a class="headerlink" href="#qdk_chemistry.noise_models.SupportedGate.R" title="Link to this definition"></a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="qdk_chemistry.noise_models.SupportedGate.RCCCX">
+<span class="sig-name descname"><span class="pre">RCCCX</span></span><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">'rcccx'</span></em><a class="headerlink" href="#qdk_chemistry.noise_models.SupportedGate.RCCCX" title="Link to this definition"></a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="qdk_chemistry.noise_models.SupportedGate.RCCX">
+<span class="sig-name descname"><span class="pre">RCCX</span></span><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">'rccx'</span></em><a class="headerlink" href="#qdk_chemistry.noise_models.SupportedGate.RCCX" title="Link to this definition"></a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="qdk_chemistry.noise_models.SupportedGate.RESET">
+<span class="sig-name descname"><span class="pre">RESET</span></span><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">'reset'</span></em><a class="headerlink" href="#qdk_chemistry.noise_models.SupportedGate.RESET" title="Link to this definition"></a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="qdk_chemistry.noise_models.SupportedGate.RV">
+<span class="sig-name descname"><span class="pre">RV</span></span><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">'rv'</span></em><a class="headerlink" href="#qdk_chemistry.noise_models.SupportedGate.RV" title="Link to this definition"></a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="qdk_chemistry.noise_models.SupportedGate.RX">
+<span class="sig-name descname"><span class="pre">RX</span></span><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">'rx'</span></em><a class="headerlink" href="#qdk_chemistry.noise_models.SupportedGate.RX" title="Link to this definition"></a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="qdk_chemistry.noise_models.SupportedGate.RXX">
+<span class="sig-name descname"><span class="pre">RXX</span></span><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">'rxx'</span></em><a class="headerlink" href="#qdk_chemistry.noise_models.SupportedGate.RXX" title="Link to this definition"></a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="qdk_chemistry.noise_models.SupportedGate.RY">
+<span class="sig-name descname"><span class="pre">RY</span></span><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">'ry'</span></em><a class="headerlink" href="#qdk_chemistry.noise_models.SupportedGate.RY" title="Link to this definition"></a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="qdk_chemistry.noise_models.SupportedGate.RYY">
+<span class="sig-name descname"><span class="pre">RYY</span></span><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">'ryy'</span></em><a class="headerlink" href="#qdk_chemistry.noise_models.SupportedGate.RYY" title="Link to this definition"></a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="qdk_chemistry.noise_models.SupportedGate.RZ">
+<span class="sig-name descname"><span class="pre">RZ</span></span><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">'rz'</span></em><a class="headerlink" href="#qdk_chemistry.noise_models.SupportedGate.RZ" title="Link to this definition"></a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="qdk_chemistry.noise_models.SupportedGate.RZX">
+<span class="sig-name descname"><span class="pre">RZX</span></span><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">'rzx'</span></em><a class="headerlink" href="#qdk_chemistry.noise_models.SupportedGate.RZX" title="Link to this definition"></a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="qdk_chemistry.noise_models.SupportedGate.RZZ">
+<span class="sig-name descname"><span class="pre">RZZ</span></span><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">'rzz'</span></em><a class="headerlink" href="#qdk_chemistry.noise_models.SupportedGate.RZZ" title="Link to this definition"></a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="qdk_chemistry.noise_models.SupportedGate.S">
+<span class="sig-name descname"><span class="pre">S</span></span><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">'s'</span></em><a class="headerlink" href="#qdk_chemistry.noise_models.SupportedGate.S" title="Link to this definition"></a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="qdk_chemistry.noise_models.SupportedGate.SDG">
+<span class="sig-name descname"><span class="pre">SDG</span></span><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">'sdg'</span></em><a class="headerlink" href="#qdk_chemistry.noise_models.SupportedGate.SDG" title="Link to this definition"></a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="qdk_chemistry.noise_models.SupportedGate.SWAP">
+<span class="sig-name descname"><span class="pre">SWAP</span></span><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">'swap'</span></em><a class="headerlink" href="#qdk_chemistry.noise_models.SupportedGate.SWAP" title="Link to this definition"></a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="qdk_chemistry.noise_models.SupportedGate.SX">
+<span class="sig-name descname"><span class="pre">SX</span></span><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">'sx'</span></em><a class="headerlink" href="#qdk_chemistry.noise_models.SupportedGate.SX" title="Link to this definition"></a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="qdk_chemistry.noise_models.SupportedGate.SXDG">
+<span class="sig-name descname"><span class="pre">SXDG</span></span><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">'sxdg'</span></em><a class="headerlink" href="#qdk_chemistry.noise_models.SupportedGate.SXDG" title="Link to this definition"></a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="qdk_chemistry.noise_models.SupportedGate.T">
+<span class="sig-name descname"><span class="pre">T</span></span><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">'t'</span></em><a class="headerlink" href="#qdk_chemistry.noise_models.SupportedGate.T" title="Link to this definition"></a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="qdk_chemistry.noise_models.SupportedGate.TDG">
+<span class="sig-name descname"><span class="pre">TDG</span></span><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">'tdg'</span></em><a class="headerlink" href="#qdk_chemistry.noise_models.SupportedGate.TDG" title="Link to this definition"></a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="qdk_chemistry.noise_models.SupportedGate.U">
+<span class="sig-name descname"><span class="pre">U</span></span><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">'u'</span></em><a class="headerlink" href="#qdk_chemistry.noise_models.SupportedGate.U" title="Link to this definition"></a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="qdk_chemistry.noise_models.SupportedGate.UNITARY">
+<span class="sig-name descname"><span class="pre">UNITARY</span></span><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">'unitary'</span></em><a class="headerlink" href="#qdk_chemistry.noise_models.SupportedGate.UNITARY" title="Link to this definition"></a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="qdk_chemistry.noise_models.SupportedGate.X">
+<span class="sig-name descname"><span class="pre">X</span></span><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">'x'</span></em><a class="headerlink" href="#qdk_chemistry.noise_models.SupportedGate.X" title="Link to this definition"></a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="qdk_chemistry.noise_models.SupportedGate.Y">
+<span class="sig-name descname"><span class="pre">Y</span></span><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">'y'</span></em><a class="headerlink" href="#qdk_chemistry.noise_models.SupportedGate.Y" title="Link to this definition"></a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="qdk_chemistry.noise_models.SupportedGate.Z">
+<span class="sig-name descname"><span class="pre">Z</span></span><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">'z'</span></em><a class="headerlink" href="#qdk_chemistry.noise_models.SupportedGate.Z" title="Link to this definition"></a></dt>
+<dd></dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="qdk_chemistry.noise_models.SupportedGate.from_string">
+<em class="property"><span class="k"><span class="pre">classmethod</span></span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">from_string</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">gate_str</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../../_modules/qdk_chemistry/noise_models.html#SupportedGate.from_string"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#qdk_chemistry.noise_models.SupportedGate.from_string" title="Link to this definition"></a></dt>
+<dd><p>Get a Gate enum value from its string representation.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p><span class="sphinx_autodoc_typehints-type"><a class="reference internal" href="#qdk_chemistry.noise_models.SupportedGate" title="qdk_chemistry.noise_models.SupportedGate"><code class="xref py py-class docutils literal notranslate"><span class="pre">SupportedGate</span></code></a></span></p>
+</dd>
+<dt class="field-even">Parameters<span class="colon">:</span></dt>
+<dd class="field-even"><p><strong>gate_str</strong> (<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)"><em>str</em></a>) – String representation of the gate (case-insensitive)</p>
+</dd>
+<dt class="field-odd">Returns<span class="colon">:</span></dt>
+<dd class="field-odd"><p>The corresponding SupportedGate enum value</p>
+</dd>
+<dt class="field-even">Raises<span class="colon">:</span></dt>
+<dd class="field-even"><p><a class="reference external" href="https://docs.python.org/3/library/exceptions.html#ValueError" title="(in Python v3.14)"><strong>ValueError</strong></a> – If no matching gate is found</p>
+</dd>
+</dl>
+</dd></dl>
+
+</dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="qdk_chemistry.noise_models.SupportedErrorTypes">
+<em class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">SupportedErrorTypes</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="o"><span class="pre">*</span></span><span class="n"><span class="pre">values</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../../_modules/qdk_chemistry/noise_models.html#SupportedErrorTypes"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#qdk_chemistry.noise_models.SupportedErrorTypes" title="Link to this definition"></a></dt>
+<dd><p>Bases: <a class="reference internal" href="#qdk_chemistry.noise_models.CaseInsensitiveStrEnum" title="qdk_chemistry.noise_models.CaseInsensitiveStrEnum"><code class="xref py py-class docutils literal notranslate"><span class="pre">CaseInsensitiveStrEnum</span></code></a></p>
+<p>Supported error types for quantum gates.</p>
+<dl class="py attribute">
+<dt class="sig sig-object py" id="qdk_chemistry.noise_models.SupportedErrorTypes.DEPOLARIZING_ERROR">
+<span class="sig-name descname"><span class="pre">DEPOLARIZING_ERROR</span></span><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">'depolarizing_error'</span></em><a class="headerlink" href="#qdk_chemistry.noise_models.SupportedErrorTypes.DEPOLARIZING_ERROR" title="Link to this definition"></a></dt>
+<dd></dd></dl>
+
+</dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="qdk_chemistry.noise_models.GateErrorDef">
+<em class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">GateErrorDef</span></span><a class="reference internal" href="../../_modules/qdk_chemistry/noise_models.html#GateErrorDef"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#qdk_chemistry.noise_models.GateErrorDef" title="Link to this definition"></a></dt>
+<dd><p>Bases: <a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.TypedDict" title="(in Python v3.14)"><code class="xref py py-class docutils literal notranslate"><span class="pre">TypedDict</span></code></a></p>
+<p>Typed dictionary for error definitions.</p>
+<dl class="py attribute">
+<dt class="sig sig-object py" id="qdk_chemistry.noise_models.GateErrorDef.type">
+<span class="sig-name descname"><span class="pre">type</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><a class="reference internal" href="#qdk_chemistry.noise_models.SupportedErrorTypes" title="qdk_chemistry.noise_models.SupportedErrorTypes"><code class="xref py py-class docutils literal notranslate"><span class="pre">SupportedErrorTypes</span></code></a></em><a class="headerlink" href="#qdk_chemistry.noise_models.GateErrorDef.type" title="Link to this definition"></a></dt>
+<dd><p>Error type.</p>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="qdk_chemistry.noise_models.GateErrorDef.rate">
+<span class="sig-name descname"><span class="pre">rate</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/library/functions.html#float" title="(in Python v3.14)"><code class="xref py py-class docutils literal notranslate"><span class="pre">float</span></code></a></em><a class="headerlink" href="#qdk_chemistry.noise_models.GateErrorDef.rate" title="Link to this definition"></a></dt>
+<dd><p>Error rate.</p>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="qdk_chemistry.noise_models.GateErrorDef.num_qubits">
+<span class="sig-name descname"><span class="pre">num_qubits</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(in Python v3.14)"><code class="xref py py-class docutils literal notranslate"><span class="pre">int</span></code></a></em><a class="headerlink" href="#qdk_chemistry.noise_models.GateErrorDef.num_qubits" title="Link to this definition"></a></dt>
+<dd><p>Number of qubits the gate acts on.</p>
+</dd></dl>
+
+</dd></dl>
+
+<dl class="py data">
+<dt class="sig sig-object py" id="qdk_chemistry.noise_models.BASIS_GATES_EXCLUSION">
+<span class="sig-name descname"><span class="pre">BASIS_GATES_EXCLUSION</span></span><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">{'barrier',</span> <span class="pre">'measure',</span> <span class="pre">'reset'}</span></em><a class="headerlink" href="#qdk_chemistry.noise_models.BASIS_GATES_EXCLUSION" title="Link to this definition"></a></dt>
+<dd><p>Gates to exclude from basis gates in noise model.</p>
+</dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="qdk_chemistry.noise_models.QuantumErrorProfile">
+<em class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">QuantumErrorProfile</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">name</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">description</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">errors=&lt;factory&gt;</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">one_qubit_gates=&lt;factory&gt;</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">two_qubit_gates=&lt;factory&gt;</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../../_modules/qdk_chemistry/noise_models.html#QuantumErrorProfile"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#qdk_chemistry.noise_models.QuantumErrorProfile" title="Link to this definition"></a></dt>
+<dd><p>Bases: <a class="reference external" href="https://docs.python.org/3/library/functions.html#object" title="(in Python v3.14)"><code class="xref py py-class docutils literal notranslate"><span class="pre">object</span></code></a></p>
+<p>A class representing a quantum error profile containing information about quantum gates and error properties.</p>
+<p>This class provides functionalities to define, load, and save quantum error profiles
+from YAML files, and convert them to Qiskit noise models for simulations.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>name</strong> (<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)"><em>str</em></a>)</p></li>
+<li><p><strong>description</strong> (<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)"><em>str</em></a>)</p></li>
+<li><p><strong>errors</strong> (<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#dict" title="(in Python v3.14)"><em>dict</em></a><em>[</em><a class="reference internal" href="#qdk_chemistry.noise_models.SupportedGate" title="qdk_chemistry.noise_models.SupportedGate"><em>SupportedGate</em></a><em>, </em><a class="reference internal" href="#qdk_chemistry.noise_models.GateErrorDef" title="qdk_chemistry.noise_models.GateErrorDef"><em>GateErrorDef</em></a><em>]</em>)</p></li>
+<li><p><strong>one_qubit_gates</strong> (<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#list" title="(in Python v3.14)"><em>list</em></a><em>[</em><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)"><em>str</em></a><em>]</em>)</p></li>
+<li><p><strong>two_qubit_gates</strong> (<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#list" title="(in Python v3.14)"><em>list</em></a><em>[</em><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)"><em>str</em></a><em>]</em>)</p></li>
+</ul>
+</dd>
+</dl>
+<dl class="py attribute">
+<dt class="sig sig-object py" id="qdk_chemistry.noise_models.QuantumErrorProfile.name">
+<span class="sig-name descname"><span class="pre">name</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)"><code class="xref py py-class docutils literal notranslate"><span class="pre">str</span></code></a></em><a class="headerlink" href="#qdk_chemistry.noise_models.QuantumErrorProfile.name" title="Link to this definition"></a></dt>
+<dd><p>Name of the quantum error profile.</p>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="qdk_chemistry.noise_models.QuantumErrorProfile.description">
+<span class="sig-name descname"><span class="pre">description</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)"><code class="xref py py-class docutils literal notranslate"><span class="pre">str</span></code></a></em><a class="headerlink" href="#qdk_chemistry.noise_models.QuantumErrorProfile.description" title="Link to this definition"></a></dt>
+<dd><p>Description of what the error profile represents.</p>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="qdk_chemistry.noise_models.QuantumErrorProfile.errors">
+<span class="sig-name descname"><span class="pre">errors</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#dict" title="(in Python v3.14)"><code class="xref py py-class docutils literal notranslate"><span class="pre">dict</span></code></a><span class="pre">[</span><a class="reference internal" href="#qdk_chemistry.noise_models.SupportedGate" title="qdk_chemistry.noise_models.SupportedGate"><code class="xref py py-class docutils literal notranslate"><span class="pre">SupportedGate</span></code></a><span class="pre">,</span> <a class="reference internal" href="#qdk_chemistry.noise_models.GateErrorDef" title="qdk_chemistry.noise_models.GateErrorDef"><code class="xref py py-class docutils literal notranslate"><span class="pre">GateErrorDef</span></code></a><span class="pre">]</span></em><a class="headerlink" href="#qdk_chemistry.noise_models.QuantumErrorProfile.errors" title="Link to this definition"></a></dt>
+<dd><p>Dictionary mapping gate names to their error properties.</p>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="qdk_chemistry.noise_models.QuantumErrorProfile.one_qubit_gates">
+<span class="sig-name descname"><span class="pre">one_qubit_gates</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#list" title="(in Python v3.14)"><code class="xref py py-class docutils literal notranslate"><span class="pre">list</span></code></a><span class="pre">[</span><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)"><code class="xref py py-class docutils literal notranslate"><span class="pre">str</span></code></a><span class="pre">]</span></em><a class="headerlink" href="#qdk_chemistry.noise_models.QuantumErrorProfile.one_qubit_gates" title="Link to this definition"></a></dt>
+<dd><p>Set of gate names that operate on a single qubit.</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="qdk_chemistry.noise_models.QuantumErrorProfile.__init__">
+<span class="sig-name descname"><span class="pre">__init__</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">name</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">description</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">errors=&lt;factory&gt;</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">one_qubit_gates=&lt;factory&gt;</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">two_qubit_gates=&lt;factory&gt;</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#qdk_chemistry.noise_models.QuantumErrorProfile.__init__" title="Link to this definition"></a></dt>
+<dd><dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>name</strong> (<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)"><em>str</em></a>)</p></li>
+<li><p><strong>description</strong> (<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)"><em>str</em></a>)</p></li>
+<li><p><strong>errors</strong> (<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#dict" title="(in Python v3.14)"><em>dict</em></a><em>[</em><a class="reference internal" href="#qdk_chemistry.noise_models.SupportedGate" title="qdk_chemistry.noise_models.SupportedGate"><em>SupportedGate</em></a><em>, </em><a class="reference internal" href="#qdk_chemistry.noise_models.GateErrorDef" title="qdk_chemistry.noise_models.GateErrorDef"><em>GateErrorDef</em></a><em>]</em>)</p></li>
+<li><p><strong>one_qubit_gates</strong> (<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#list" title="(in Python v3.14)"><em>list</em></a><em>[</em><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)"><em>str</em></a><em>]</em>)</p></li>
+<li><p><strong>two_qubit_gates</strong> (<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#list" title="(in Python v3.14)"><em>list</em></a><em>[</em><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)"><em>str</em></a><em>]</em>)</p></li>
+</ul>
+</dd>
+<dt class="field-even">Return type<span class="colon">:</span></dt>
+<dd class="field-even"><p>None</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="qdk_chemistry.noise_models.QuantumErrorProfile.two_qubit_gates">
+<span class="sig-name descname"><span class="pre">two_qubit_gates</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#list" title="(in Python v3.14)"><code class="xref py py-class docutils literal notranslate"><span class="pre">list</span></code></a><span class="pre">[</span><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)"><code class="xref py py-class docutils literal notranslate"><span class="pre">str</span></code></a><span class="pre">]</span></em><a class="headerlink" href="#qdk_chemistry.noise_models.QuantumErrorProfile.two_qubit_gates" title="Link to this definition"></a></dt>
+<dd><p>Set of gate names that operate on two qubits.</p>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="qdk_chemistry.noise_models.QuantumErrorProfile.supported_yaml_keys">
+<span class="sig-name descname"><span class="pre">supported_yaml_keys</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.ClassVar" title="(in Python v3.14)"><code class="xref py py-data docutils literal notranslate"><span class="pre">ClassVar</span></code></a><span class="pre">[</span><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#set" title="(in Python v3.14)"><code class="xref py py-class docutils literal notranslate"><span class="pre">set</span></code></a><span class="pre">[</span><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)"><code class="xref py py-class docutils literal notranslate"><span class="pre">str</span></code></a><span class="pre">]]</span></em><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">{'description',</span> <span class="pre">'errors',</span> <span class="pre">'name'}</span></em><a class="headerlink" href="#qdk_chemistry.noise_models.QuantumErrorProfile.supported_yaml_keys" title="Link to this definition"></a></dt>
+<dd><p>YAML keys supported in the quantum error profile.</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="qdk_chemistry.noise_models.QuantumErrorProfile.to_dict">
+<span class="sig-name descname"><span class="pre">to_dict</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="../../_modules/qdk_chemistry/noise_models.html#QuantumErrorProfile.to_dict"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#qdk_chemistry.noise_models.QuantumErrorProfile.to_dict" title="Link to this definition"></a></dt>
+<dd><p>Convert to a dictionary suitable for YAML serialization.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p><span class="sphinx_autodoc_typehints-type"><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#dict" title="(in Python v3.14)"><code class="xref py py-class docutils literal notranslate"><span class="pre">dict</span></code></a>[<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)"><code class="xref py py-class docutils literal notranslate"><span class="pre">str</span></code></a>, <a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.Any" title="(in Python v3.14)"><code class="xref py py-data docutils literal notranslate"><span class="pre">Any</span></code></a>]</span></p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="qdk_chemistry.noise_models.QuantumErrorProfile.from_yaml">
+<em class="property"><span class="k"><span class="pre">classmethod</span></span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">from_yaml</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">yaml_file</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../../_modules/qdk_chemistry/noise_models.html#QuantumErrorProfile.from_yaml"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#qdk_chemistry.noise_models.QuantumErrorProfile.from_yaml" title="Link to this definition"></a></dt>
+<dd><p>Load quantum error profile from YAML file.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p><span class="sphinx_autodoc_typehints-type"><a class="reference internal" href="#qdk_chemistry.noise_models.QuantumErrorProfile" title="qdk_chemistry.noise_models.QuantumErrorProfile"><code class="xref py py-class docutils literal notranslate"><span class="pre">QuantumErrorProfile</span></code></a></span></p>
+</dd>
+<dt class="field-even">Parameters<span class="colon">:</span></dt>
+<dd class="field-even"><p><strong>yaml_file</strong> (<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)"><em>str</em></a><em> | </em><a class="reference external" href="https://docs.python.org/3/library/pathlib.html#pathlib.Path" title="(in Python v3.14)"><em>Path</em></a>) – Path to YAML file</p>
+</dd>
+<dt class="field-odd">Returns<span class="colon">:</span></dt>
+<dd class="field-odd"><p>Loaded profile</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="qdk_chemistry.noise_models.QuantumErrorProfile.to_yaml">
+<span class="sig-name descname"><span class="pre">to_yaml</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">yaml_file</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../../_modules/qdk_chemistry/noise_models.html#QuantumErrorProfile.to_yaml"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#qdk_chemistry.noise_models.QuantumErrorProfile.to_yaml" title="Link to this definition"></a></dt>
+<dd><p>Save quantum error profile to YAML file.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p><span class="sphinx_autodoc_typehints-type"><a class="reference external" href="https://docs.python.org/3/library/constants.html#None" title="(in Python v3.14)"><code class="xref py py-obj docutils literal notranslate"><span class="pre">None</span></code></a></span></p>
+</dd>
+<dt class="field-even">Parameters<span class="colon">:</span></dt>
+<dd class="field-even"><p><strong>yaml_file</strong> (<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)"><em>str</em></a><em> | </em><a class="reference external" href="https://docs.python.org/3/library/pathlib.html#pathlib.Path" title="(in Python v3.14)"><em>Path</em></a>) – Path to save YAML file</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py property">
+<dt class="sig sig-object py" id="qdk_chemistry.noise_models.QuantumErrorProfile.basis_gates">
+<em class="property"><span class="k"><span class="pre">property</span></span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">basis_gates</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#list" title="(in Python v3.14)"><span class="pre">list</span></a><span class="p"><span class="pre">[</span></span><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)"><span class="pre">str</span></a><span class="p"><span class="pre">]</span></span></em><a class="reference internal" href="../../_modules/qdk_chemistry/noise_models.html#QuantumErrorProfile.basis_gates"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#qdk_chemistry.noise_models.QuantumErrorProfile.basis_gates" title="Link to this definition"></a></dt>
+<dd><p>Get basis gates from profile.</p>
+</dd></dl>
+
+</dd></dl>
+
+</section>
+
+
+           </div>
+          </div>
+          <footer>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright Microsoft Corporation. All rights reserved. Licensed under the MIT License.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

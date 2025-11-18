@@ -1,8 +1,0 @@
-qdk.chemistry.data.qpe\_result module
-=====================================
-
-.. automodule:: qdk.chemistry.data.qpe_result
-   :members:
-   :private-members:
-   :show-inheritance:
-   :undoc-members:

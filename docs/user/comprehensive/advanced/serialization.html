@@ -6,17 +6,18 @@
   <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
 
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Serialization in QDK/Chemistry &mdash; QDK/Chemistry 0.0.1 documentation</title>
+  <title>Serialization in QDK/Chemistry &mdash; qdk-chemistry 1.0.0-rc1 documentation</title>
       <link rel="stylesheet" type="text/css" href="../../../_static/pygments.css?v=b86133f3" />
       <link rel="stylesheet" type="text/css" href="../../../_static/css/theme.css?v=e59714d7" />
       <link rel="stylesheet" type="text/css" href="../../../_static/tabs.css?v=4c969af8" />
       <link rel="stylesheet" type="text/css" href="../../../_static/graphviz.css?v=4ae1632d" />
       <link rel="stylesheet" type="text/css" href="../../../_static/copybutton.css?v=76b2166b" />
+      <link rel="stylesheet" type="text/css" href="../../../_static/custom.css?v=a64bac2b" />
 
   
       <script src="../../../_static/jquery.js?v=5d32c60e"></script>
       <script src="../../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
-      <script src="../../../_static/documentation_options.js?v=d45e8c67"></script>
+      <script src="../../../_static/documentation_options.js?v=81bd8d55"></script>
       <script src="../../../_static/doctools.js?v=9bcbadda"></script>
       <script src="../../../_static/sphinx_highlight.js?v=dc90522c"></script>
       <script src="../../../_static/tabs.js?v=3ee01567"></script>
@@ -25,8 +26,8 @@
     <script src="../../../_static/js/theme.js"></script>
     <link rel="index" title="Index" href="../../../genindex.html" />
     <link rel="search" title="Search" href="../../../search.html" />
-    <link rel="next" title="Interface System in QDK/Chemistry" href="interfaces.html" />
-    <link rel="prev" title="Factory Pattern in QDK/Chemistry" href="factory_pattern.html" /> 
+    <link rel="next" title="Interface system in QDK/Chemistry" href="interfaces.html" />
+    <link rel="prev" title="Factory pattern in QDK/Chemistry" href="factory_pattern.html" /> 
 </head>
 
 <body class="wy-body-for-nav"> 
@@ -38,7 +39,7 @@
           
           
           <a href="../../../index.html" class="icon icon-home">
-            QDK/Chemistry
+            qdk-chemistry
           </a>
 <div role="search">
   <form id="rtd-search-form" class="wy-form" action="../../../search.html" method="get">
@@ -50,26 +51,27 @@
         </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
               <p class="caption" role="heading"><span class="caption-text">User Documentation</span></p>
 <ul class="current">
-<li class="toctree-l1"><a class="reference internal" href="../../Quickstart.html">Quickstart</a></li>
-<li class="toctree-l1 current"><a class="reference internal" href="../index.html">In-Depth Guide</a><ul class="current">
-<li class="toctree-l2 current"><a class="reference internal" href="../design.html">Design and Architecture</a><ul class="current">
-<li class="toctree-l3"><a class="reference internal" href="design_principles.html">Design Principles of QDK/Chemistry</a></li>
-<li class="toctree-l3"><a class="reference internal" href="factory_pattern.html">Factory Pattern in QDK/Chemistry</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../quickstart.html">Quickstart</a></li>
+<li class="toctree-l1 current"><a class="reference internal" href="../index.html">In-depth user guide</a><ul class="current">
+<li class="toctree-l2 current"><a class="reference internal" href="../design.html">Design and architecture</a><ul class="current">
+<li class="toctree-l3"><a class="reference internal" href="design_principles.html">Design principles of QDK/Chemistry</a></li>
+<li class="toctree-l3"><a class="reference internal" href="factory_pattern.html">Factory pattern in QDK/Chemistry</a></li>
 <li class="toctree-l3 current"><a class="current reference internal" href="#">Serialization in QDK/Chemistry</a><ul>
 <li class="toctree-l4"><a class="reference internal" href="#overview">Overview</a></li>
-<li class="toctree-l4"><a class="reference internal" href="#supported-formats">Supported Formats</a></li>
-<li class="toctree-l4"><a class="reference internal" href="#common-serialization-interface">Common Serialization Interface</a></li>
-<li class="toctree-l4"><a class="reference internal" href="#file-extensions">File Extensions</a></li>
-<li class="toctree-l4"><a class="reference internal" href="#related-topics">Related Topics</a></li>
+<li class="toctree-l4"><a class="reference internal" href="#supported-formats">Supported formats</a></li>
+<li class="toctree-l4"><a class="reference internal" href="#common-serialization-interface">Common serialization interface</a></li>
+<li class="toctree-l4"><a class="reference internal" href="#file-extensions">File extensions</a></li>
+<li class="toctree-l4"><a class="reference internal" href="#related-topics">Related topics</a></li>
 </ul>
 </li>
-<li class="toctree-l3"><a class="reference internal" href="interfaces.html">Interface System in QDK/Chemistry</a></li>
+<li class="toctree-l3"><a class="reference internal" href="interfaces.html">Interface system in QDK/Chemistry</a></li>
 <li class="toctree-l3"><a class="reference internal" href="settings.html">Settings</a></li>
+<li class="toctree-l3"><a class="reference internal" href="model_hamiltonians.html">Model Hamiltonians</a></li>
 </ul>
 </li>
-<li class="toctree-l2"><a class="reference internal" href="../data.html">Data Classes</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../data.html">Data classes</a></li>
 <li class="toctree-l2"><a class="reference internal" href="../algorithms.html">Algorithms</a></li>
-<li class="toctree-l2"><a class="reference internal" href="../keywords.html">Functionals and Basis Sets</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../keywords.html">Functionals and basis sets</a></li>
 <li class="toctree-l2"><a class="reference internal" href="../plugins.html">Plugins</a></li>
 </ul>
 </li>
@@ -81,7 +83,7 @@
 </ul>
 <p class="caption" role="heading"><span class="caption-text">Supporting Information</span></p>
 <ul>
-<li class="toctree-l1"><a class="reference internal" href="../../../glossary.html">Glossary</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../glossary.html">Acronym definitions</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../../references.html">References</a></li>
 </ul>
 
@@ -91,7 +93,7 @@
 
     <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
           <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
-          <a href="../../../index.html">QDK/Chemistry</a>
+          <a href="../../../index.html">qdk-chemistry</a>
       </nav>
 
       <div class="wy-nav-content">
@@ -99,8 +101,8 @@
           <div role="navigation" aria-label="Page navigation">
   <ul class="wy-breadcrumbs">
       <li><a href="../../../index.html" class="icon icon-home" aria-label="Home"></a></li>
-          <li class="breadcrumb-item"><a href="../index.html">In-Depth Guide</a></li>
-          <li class="breadcrumb-item"><a href="../design.html">Design and Architecture</a></li>
+          <li class="breadcrumb-item"><a href="../index.html">In-depth user guide</a></li>
+          <li class="breadcrumb-item"><a href="../design.html">Design and architecture</a></li>
       <li class="breadcrumb-item active">Serialization in QDK/Chemistry</li>
       <li class="wy-breadcrumbs-aside">
             <a href="../../../_sources/user/comprehensive/advanced/serialization.rst.txt" rel="nofollow"> View page source</a>
@@ -115,12 +117,11 @@
 <h1>Serialization in QDK/Chemistry<a class="headerlink" href="#serialization-in-qdk-chemistry" title="Link to this heading"></a></h1>
 <p>QDK/Chemistry provides comprehensive serialization capabilities for all its data classes, allowing you to save and load
 computational results in various formats.
-This document explains the serialization mechanisms and formats supported by
-QDK/Chemistry.</p>
+This document explains the serialization mechanisms and formats supported by QDK/Chemistry.</p>
 <section id="overview">
 <h2>Overview<a class="headerlink" href="#overview" title="Link to this heading"></a></h2>
-<p>Serialization is the process of converting complex data structures into a format that can be stored or transmitted. In
-QDK/Chemistry, this is crucial for:</p>
+<p>Serialization is the process of converting complex data structures into a format that can be stored or transmitted.
+In QDK/Chemistry, this is crucial for:</p>
 <ul class="simple">
 <li><p>Saving intermediate results of calculations</p></li>
 <li><p>Sharing data between different programs or languages</p></li>
@@ -129,13 +130,12 @@ QDK/Chemistry, this is crucial for:</p>
 </ul>
 <div class="admonition note">
 <p class="admonition-title">Note</p>
-<p>For detailed information about the structure and organization of serialized data for each class, refer to
-the corresponding class documentation. Each data class page includes examples of the JSON and HDF5 schema used for
-serialization.</p>
+<p>For detailed information about the structure and organization of serialized data for each class, refer to the corresponding class documentation.
+Each data class page includes examples of the JSON and HDF5 schema used for serialization.</p>
 </div>
 </section>
 <section id="supported-formats">
-<h2>Supported Formats<a class="headerlink" href="#supported-formats" title="Link to this heading"></a></h2>
+<h2>Supported formats<a class="headerlink" href="#supported-formats" title="Link to this heading"></a></h2>
 <p>QDK/Chemistry supports multiple serialization formats:</p>
 <ul class="simple">
 <li><p><strong>JSON</strong>: Human-readable text format, suitable for small to medium data</p></li>
@@ -145,15 +145,10 @@ serialization.</p>
 </ul>
 </section>
 <section id="common-serialization-interface">
-<h2>Common Serialization Interface<a class="headerlink" href="#common-serialization-interface" title="Link to this heading"></a></h2>
-<p>All QDK/Chemistry data classes implement a consistent serialization interface:</p>
+<h2>Common serialization interface<a class="headerlink" href="#common-serialization-interface" title="Link to this heading"></a></h2>
+<p>All QDK/Chemistry data classes implement a consistent serialization interface as described below.</p>
 <section id="json-serialization">
-<h3>JSON Serialization<a class="headerlink" href="#json-serialization" title="Link to this heading"></a></h3>
-<div class="admonition-todo admonition" id="id1">
-<p class="admonition-title">Todo</p>
-<p>TODO (NAB):  Check Serialization code examples after finalizing API.
-<a class="reference external" href="https://dev.azure.com/ms-azurequantum/AzureQuantum/_workitems/edit/41366">https://dev.azure.com/ms-azurequantum/AzureQuantum/_workitems/edit/41366</a></p>
-</div>
+<h3>JSON serialization<a class="headerlink" href="#json-serialization" title="Link to this heading"></a></h3>
 <div class="tab-set docutils container">
 <input checked="True" class="tab-input" id="tab-set--0-input--1" name="tab-set--0" type="radio"><label class="tab-label" for="tab-set--0-input--1">C++ API</label><div class="tab-content docutils container">
 <div class="highlight-cpp notranslate"><div class="highlight"><pre><span></span><span class="c1">// Serialize to JSON object</span>
@@ -171,24 +166,27 @@ serialization.</p>
 </div>
 </div>
 <input class="tab-input" id="tab-set--0-input--2" name="tab-set--0" type="radio"><label class="tab-label" for="tab-set--0-input--2">Python API</label><div class="tab-content docutils container">
-<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="c1"># Serialize to JSON object</span>
-<span class="n">json_data</span> <span class="o">=</span> <span class="nb">object</span><span class="o">.</span><span class="n">to_json</span><span class="p">()</span>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span>
+<span class="c1"># Create a structure (coordinates in Bohr/atomic units)</span>
+<span class="n">coords</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">([[</span><span class="mf">0.0</span><span class="p">,</span> <span class="mf">0.0</span><span class="p">,</span> <span class="mf">0.0</span><span class="p">],</span> <span class="p">[</span><span class="mf">0.0</span><span class="p">,</span> <span class="mf">0.0</span><span class="p">,</span> <span class="mf">1.4</span><span class="p">]])</span>
+<span class="n">structure</span> <span class="o">=</span> <span class="n">Structure</span><span class="p">(</span><span class="n">coords</span><span class="p">,</span> <span class="p">[</span><span class="s2">&quot;H&quot;</span><span class="p">,</span> <span class="s2">&quot;H&quot;</span><span class="p">])</span>
 
-<span class="c1"># Deserialize from JSON object</span>
-<span class="n">object_from_json</span> <span class="o">=</span> <span class="n">ObjectType</span><span class="o">.</span><span class="n">from_json</span><span class="p">(</span><span class="n">json_data</span><span class="p">)</span>
+<span class="c1"># Serialize to JSON object</span>
+<span class="n">json_data</span> <span class="o">=</span> <span class="n">structure</span><span class="o">.</span><span class="n">to_json</span><span class="p">()</span>
+
+<span class="c1"># Serialize to/from file using temporary directory</span>
+<span class="n">tmpdir</span> <span class="o">=</span> <span class="n">tempfile</span><span class="o">.</span><span class="n">mkdtemp</span><span class="p">()</span>
+<span class="n">json_file</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">tmpdir</span><span class="p">,</span> <span class="s2">&quot;molecule.structure.json&quot;</span><span class="p">)</span>
 
 <span class="c1"># Serialize to JSON file</span>
-<span class="nb">object</span><span class="o">.</span><span class="n">to_json_file</span><span class="p">(</span><span class="s2">&quot;filename.ext.json&quot;</span><span class="p">)</span>  <span class="c1"># Extension depends on object type</span>
-
-<span class="c1"># Deserialize from JSON file</span>
-<span class="n">object_from_json_file</span> <span class="o">=</span> <span class="n">ObjectType</span><span class="o">.</span><span class="n">from_json_file</span><span class="p">(</span><span class="s2">&quot;filename.ext.json&quot;</span><span class="p">)</span>
+<span class="n">structure</span><span class="o">.</span><span class="n">to_json_file</span><span class="p">(</span><span class="n">json_file</span><span class="p">)</span>
 </pre></div>
 </div>
 </div>
 </div>
 </section>
 <section id="hdf5-serialization">
-<h3>HDF5 Serialization<a class="headerlink" href="#hdf5-serialization" title="Link to this heading"></a></h3>
+<h3>HDF5 serialization<a class="headerlink" href="#hdf5-serialization" title="Link to this heading"></a></h3>
 <div class="tab-set docutils container">
 <input checked="True" class="tab-input" id="tab-set--1-input--1" name="tab-set--1" type="radio"><label class="tab-label" for="tab-set--1-input--1">C++ API</label><div class="tab-content docutils container">
 <div class="highlight-cpp notranslate"><div class="highlight"><pre><span></span><span class="c1">// Serialize to HDF5 file</span>
@@ -200,11 +198,13 @@ serialization.</p>
 </div>
 </div>
 <input class="tab-input" id="tab-set--1-input--2" name="tab-set--1" type="radio"><label class="tab-label" for="tab-set--1-input--2">Python API</label><div class="tab-content docutils container">
-<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="c1"># Serialize to HDF5 file</span>
-<span class="nb">object</span><span class="o">.</span><span class="n">to_hdf5_file</span><span class="p">(</span><span class="s2">&quot;filename.ext.h5&quot;</span><span class="p">)</span>  <span class="c1"># Extension depends on object type</span>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="c1"># Deserialize from JSON file</span>
+<span class="n">structure_from_file</span> <span class="o">=</span> <span class="n">Structure</span><span class="o">.</span><span class="n">from_json_file</span><span class="p">(</span><span class="n">json_file</span><span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Loaded structure from file: </span><span class="si">{</span><span class="n">structure_from_file</span><span class="o">.</span><span class="n">get_num_atoms</span><span class="p">()</span><span class="si">}</span><span class="s2"> atoms&quot;</span><span class="p">)</span>
 
-<span class="c1"># Deserialize from HDF5 file</span>
-<span class="n">object_from_hdf5_file</span> <span class="o">=</span> <span class="n">ObjectType</span><span class="o">.</span><span class="n">from_hdf5_file</span><span class="p">(</span><span class="s2">&quot;filename.ext.h5&quot;</span><span class="p">)</span>
+<span class="n">hdf5_file</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">tmpdir</span><span class="p">,</span> <span class="s2">&quot;molecule.structure.h5&quot;</span><span class="p">)</span>
+<span class="c1"># Serialize to HDF5 file</span>
+<span class="c1"># structure.to_hdf5_file(hdf5_file)</span>
 </pre></div>
 </div>
 </div>
@@ -212,7 +212,7 @@ serialization.</p>
 </section>
 </section>
 <section id="file-extensions">
-<h2>File Extensions<a class="headerlink" href="#file-extensions" title="Link to this heading"></a></h2>
+<h2>File extensions<a class="headerlink" href="#file-extensions" title="Link to this heading"></a></h2>
 <p>QDK/Chemistry enforces specific file extensions to ensure clarity about the content type:</p>
 <table class="docutils align-default">
 <colgroup>
@@ -222,10 +222,10 @@ serialization.</p>
 <col style="width: 40.0%" />
 </colgroup>
 <thead>
-<tr class="row-odd"><th class="head"><p>Data Class</p></th>
-<th class="head"><p>JSON Extension</p></th>
-<th class="head"><p>HDF5 Extension</p></th>
-<th class="head"><p>Other Formats</p></th>
+<tr class="row-odd"><th class="head"><p>Data class</p></th>
+<th class="head"><p>JSON extension</p></th>
+<th class="head"><p>HDF5 extension</p></th>
+<th class="head"><p>Other formats</p></th>
 </tr>
 </thead>
 <tbody>
@@ -267,7 +267,7 @@ serialization.</p>
 </table>
 </section>
 <section id="related-topics">
-<h2>Related Topics<a class="headerlink" href="#related-topics" title="Link to this heading"></a></h2>
+<h2>Related topics<a class="headerlink" href="#related-topics" title="Link to this heading"></a></h2>
 <ul class="simple">
 <li><p><a class="reference internal" href="../data/structure.html"><span class="doc">Structure</span></a>: Molecular geometry and atomic information</p></li>
 <li><p><a class="reference internal" href="../data/basis_set.html"><span class="doc">BasisSet</span></a>: Quantum chemistry basis set definitions</p></li>
@@ -282,14 +282,14 @@ serialization.</p>
            </div>
           </div>
           <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
-        <a href="factory_pattern.html" class="btn btn-neutral float-left" title="Factory Pattern in QDK/Chemistry" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
-        <a href="interfaces.html" class="btn btn-neutral float-right" title="Interface System in QDK/Chemistry" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+        <a href="factory_pattern.html" class="btn btn-neutral float-left" title="Factory pattern in QDK/Chemistry" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+        <a href="interfaces.html" class="btn btn-neutral float-right" title="Interface system in QDK/Chemistry" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
     </div>
 
   <hr/>
 
   <div role="contentinfo">
-    <p>&#169; Copyright Copyright (c) Microsoft Corporation. All rights reserved. Licensed under the MIT License..</p>
+    <p>&#169; Copyright Microsoft Corporation. All rights reserved. Licensed under the MIT License.</p>
   </div>
 
   Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a

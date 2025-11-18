@@ -1,0 +1,640 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../../../../">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>qdk_chemistry.plugins.pyscf.mcscf &mdash; qdk-chemistry 1.0.0-rc1 documentation</title>
+      <link rel="stylesheet" type="text/css" href="../../../../_static/pygments.css?v=b86133f3" />
+      <link rel="stylesheet" type="text/css" href="../../../../_static/css/theme.css?v=e59714d7" />
+      <link rel="stylesheet" type="text/css" href="../../../../_static/tabs.css?v=4c969af8" />
+      <link rel="stylesheet" type="text/css" href="../../../../_static/graphviz.css?v=4ae1632d" />
+      <link rel="stylesheet" type="text/css" href="../../../../_static/copybutton.css?v=76b2166b" />
+      <link rel="stylesheet" type="text/css" href="../../../../_static/custom.css?v=a64bac2b" />
+
+  
+      <script src="../../../../_static/jquery.js?v=5d32c60e"></script>
+      <script src="../../../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="../../../../_static/documentation_options.js?v=81bd8d55"></script>
+      <script src="../../../../_static/doctools.js?v=9bcbadda"></script>
+      <script src="../../../../_static/sphinx_highlight.js?v=dc90522c"></script>
+      <script src="../../../../_static/tabs.js?v=3ee01567"></script>
+      <script src="../../../../_static/clipboard.min.js?v=a7894cd8"></script>
+      <script src="../../../../_static/copybutton.js?v=f281be69"></script>
+    <script src="../../../../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../../../../genindex.html" />
+    <link rel="search" title="Search" href="../../../../search.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="../../../../index.html" class="icon icon-home">
+            qdk-chemistry
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../../../../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">User Documentation</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../../user/quickstart.html">Quickstart</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../../user/comprehensive/index.html">In-depth user guide</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">API Reference</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../../api/python_api.html">Python API</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../../api/cpp_api.html">C++ API</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Supporting Information</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../../glossary.html">Acronym definitions</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../../references.html">References</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../../../../index.html">qdk-chemistry</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../../../../index.html" class="icon icon-home" aria-label="Home"></a></li>
+          <li class="breadcrumb-item"><a href="../../../index.html">Module code</a></li>
+      <li class="breadcrumb-item active">qdk_chemistry.plugins.pyscf.mcscf</li>
+      <li class="wy-breadcrumbs-aside">
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <h1>Source code for qdk_chemistry.plugins.pyscf.mcscf</h1><div class="highlight"><pre>
+<span></span><span class="sd">&quot;&quot;&quot;PySCF-based Multi-Configurational Self-Consistent Field (MCSCF) solver implementation for qdk_chemistry.</span>
+
+<span class="sd">This module integrates QDK/Chemistry and PySCF to perform Multi-Configurational Self-Consistent</span>
+<span class="sd">Field (MCSCF) calculations.</span>
+<span class="sd">It implements a wrapper that adapts a QDK multi-configuration calculator to PySCF&#39;s FCI solver interface,</span>
+<span class="sd">allowing it to be used in PySCF&#39;s MCSCF framework.</span>
+
+<span class="sd">The module contains:</span>
+
+<span class="sd">* :class:`PyscfMcscfSettings`: Configuration class for MCSCF calculation parameters</span>
+<span class="sd">* :class:`PyscfMcscfCalculator`: Main calculator class that performs CASSCF/MCSCF calculations</span>
+<span class="sd">* Registration utilities to integrate the calculator with QDK/Chemistry&#39;s plugin system</span>
+<span class="sd">* Utilities to convert QDK multi-configuration calculators to PySCF FCI solvers</span>
+
+<span class="sd">Upon import, this module automatically registers the PySCF MCSCF calculator with QDK/Chemistry&#39;s</span>
+<span class="sd">MCSCF calculator registry under the name &quot;pyscf&quot;.</span>
+
+<span class="sd">Examples</span>
+<span class="sd">--------</span>
+<span class="sd">&gt;&gt;&gt; from qdk_chemistry.plugins.pyscf.mcscf import PyscfMcscfCalculator</span>
+<span class="sd">&gt;&gt;&gt; mcscf = PyscfMcscfCalculator()</span>
+<span class="sd">&gt;&gt;&gt; energy, wfn = mcscf.solve(</span>
+<span class="sd">...     orbitals,</span>
+<span class="sd">...     hamiltonian_constructor,</span>
+<span class="sd">...     multi_configuration_calculator,</span>
+<span class="sd">...     n_active_alpha_electrons,</span>
+<span class="sd">...     n_active_beta_electrons,</span>
+<span class="sd">... )</span>
+<span class="sd">&gt;&gt;&gt; print(f&quot;MCSCF energy: {energy} Hartree&quot;)</span>
+
+<span class="sd">This module requires both QDK/Chemistry and PySCF to be installed.</span>
+
+<span class="sd">Notes</span>
+<span class="sd">-----</span>
+<span class="sd">* Restricted orbitals with identical alpha/beta active and inactive spaces are required.</span>
+<span class="sd">* The Hamiltonian constructor parameter is currently unused but included for interface consistency.</span>
+
+<span class="sd">&quot;&quot;&quot;</span>
+
+<span class="c1"># --------------------------------------------------------------------------------------------</span>
+<span class="c1"># Copyright (c) Microsoft Corporation. All rights reserved.</span>
+<span class="c1"># Licensed under the MIT License. See LICENSE.txt in the project root for license information.</span>
+<span class="c1"># --------------------------------------------------------------------------------------------</span>
+
+<span class="kn">from</span><span class="w"> </span><span class="nn">typing</span><span class="w"> </span><span class="kn">import</span> <span class="n">Any</span>
+
+<span class="kn">import</span><span class="w"> </span><span class="nn">numpy</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">np</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">pyscf</span><span class="w"> </span><span class="kn">import</span> <span class="n">ao2mo</span><span class="p">,</span> <span class="n">gto</span><span class="p">,</span> <span class="n">mcscf</span>
+
+<span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.algorithms</span><span class="w"> </span><span class="kn">import</span> <span class="p">(</span>
+    <span class="n">MultiConfigurationCalculator</span><span class="p">,</span>
+    <span class="n">MultiConfigurationScf</span><span class="p">,</span>
+    <span class="n">register</span><span class="p">,</span>
+<span class="p">)</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.data</span><span class="w"> </span><span class="kn">import</span> <span class="p">(</span>
+    <span class="n">CasWavefunctionContainer</span><span class="p">,</span>
+    <span class="n">Hamiltonian</span><span class="p">,</span>
+    <span class="n">ModelOrbitals</span><span class="p">,</span>
+    <span class="n">Orbitals</span><span class="p">,</span>
+    <span class="n">SciWavefunctionContainer</span><span class="p">,</span>
+    <span class="n">Settings</span><span class="p">,</span>
+    <span class="n">Wavefunction</span><span class="p">,</span>
+<span class="p">)</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.plugins.pyscf.utils</span><span class="w"> </span><span class="kn">import</span> <span class="n">orbitals_to_scf</span>
+
+
+<span class="k">class</span><span class="w"> </span><span class="nc">_QdkMcSolverWrapper</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Wrapper class to make a QDK MultiConfigurationCalculator compatible with PySCF FCI solver interface.</span>
+
+<span class="sd">    This class adapts a QDK MultiConfigurationCalculator to work as a PySCF FCI solver</span>
+<span class="sd">    that can be used in CASCI and CASSCF calculations. It provides the necessary interface</span>
+<span class="sd">    methods that PySCF expects from an FCI solver.</span>
+
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">mol</span><span class="p">:</span> <span class="n">gto</span><span class="o">.</span><span class="n">Mole</span><span class="p">,</span> <span class="n">mc_calculator</span><span class="p">:</span> <span class="n">MultiConfigurationCalculator</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Initialize the _QdkMcSolverWrapper.</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            mol: PySCF molecule object (required by PySCF FCI interface).</span>
+<span class="sd">            mc_calculator: The QDK multi-configurational calculator to wrap.</span>
+
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">mol</span> <span class="o">=</span> <span class="n">mol</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">mc_calculator</span> <span class="o">=</span> <span class="n">mc_calculator</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">wavefunction</span> <span class="o">=</span> <span class="kc">None</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">kernel</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span>
+        <span class="n">h1e</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">,</span>
+        <span class="n">eri</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">,</span>
+        <span class="n">norb</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span>
+        <span class="n">nelec</span><span class="p">:</span> <span class="nb">int</span> <span class="o">|</span> <span class="nb">tuple</span><span class="p">[</span><span class="nb">int</span><span class="p">,</span> <span class="nb">int</span><span class="p">],</span>
+        <span class="n">ci0</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>  <span class="c1"># noqa: ARG002</span>
+        <span class="n">ecore</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="mi">0</span><span class="p">,</span>
+        <span class="o">**</span><span class="n">kwargs</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span>  <span class="c1"># noqa: ARG002</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">tuple</span><span class="p">[</span><span class="nb">float</span><span class="p">,</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">]:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Run the FCI calculation.</span>
+
+<span class="sd">        This method is called by PySCF&#39;s CASCI/CASSCF to solve the CI problem.</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            h1e: One-body integrals in the active space.</span>
+<span class="sd">            eri: Two-body integrals in the active space.</span>
+<span class="sd">            norb: Number of active orbitals.</span>
+<span class="sd">            nelec: Number of electrons in active space. Can be total electrons or (alpha, beta) tuple.</span>
+<span class="sd">            ci0: Initial CI guess vector.</span>
+<span class="sd">            ecore: Core energy contribution.</span>
+<span class="sd">            **kwargs: Additional keyword arguments.</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            A tuple containing the total energy and CI coefficients.</span>
+
+<span class="sd">        Raises:</span>
+<span class="sd">            RuntimeError: If the wavefunction is not returned from the MC calculator.</span>
+
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="c1"># Handle nelec format (can be int or tuple)</span>
+        <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">nelec</span><span class="p">,</span> <span class="p">(</span><span class="nb">tuple</span><span class="p">,</span> <span class="nb">list</span><span class="p">)):</span>
+            <span class="n">n_alpha</span><span class="p">,</span> <span class="n">n_beta</span> <span class="o">=</span> <span class="n">nelec</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="c1"># If total electrons given, assume equal spin</span>
+            <span class="n">n_beta</span> <span class="o">=</span> <span class="n">nelec</span> <span class="o">//</span> <span class="mi">2</span>
+            <span class="n">n_alpha</span> <span class="o">=</span> <span class="n">nelec</span> <span class="o">-</span> <span class="n">n_beta</span>
+
+        <span class="c1"># Create ModelOrbitals for the active space and use real orbitals only after the calculation</span>
+        <span class="n">orbitals</span> <span class="o">=</span> <span class="n">ModelOrbitals</span><span class="p">(</span><span class="n">norb</span><span class="p">,</span> <span class="kc">True</span><span class="p">)</span>
+
+        <span class="c1"># eri needs to be completely filled and then flattened to a vector for QDK</span>
+        <span class="n">eri</span> <span class="o">=</span> <span class="n">ao2mo</span><span class="o">.</span><span class="n">restore</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="n">eri</span><span class="p">,</span> <span class="n">norb</span><span class="p">)</span>
+        <span class="n">eri_qdk</span> <span class="o">=</span> <span class="n">eri</span><span class="o">.</span><span class="n">flatten</span><span class="p">()</span>
+
+        <span class="c1"># Create empty inactive Fock matrix (no inactive orbitals in active space)</span>
+        <span class="n">inactive_fock</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">zeros</span><span class="p">((</span><span class="mi">0</span><span class="p">,</span> <span class="mi">0</span><span class="p">))</span>
+
+        <span class="c1"># Create QDK Hamiltonian</span>
+        <span class="n">hamiltonian</span> <span class="o">=</span> <span class="n">Hamiltonian</span><span class="p">(</span><span class="n">h1e</span><span class="p">,</span> <span class="n">eri_qdk</span><span class="p">,</span> <span class="n">orbitals</span><span class="p">,</span> <span class="n">ecore</span><span class="p">,</span> <span class="n">inactive_fock</span><span class="p">)</span>
+
+        <span class="c1"># Run the multi-configurational calculation</span>
+        <span class="n">result</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">mc_calculator</span><span class="o">.</span><span class="n">run</span><span class="p">(</span><span class="n">hamiltonian</span><span class="p">,</span> <span class="n">n_alpha</span><span class="p">,</span> <span class="n">n_beta</span><span class="p">)</span>
+        <span class="n">energy</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">wavefunction</span> <span class="o">=</span> <span class="n">result</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="bp">self</span><span class="o">.</span><span class="n">wavefunction</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">RuntimeError</span><span class="p">(</span><span class="s2">&quot;Wavefunction not returned from MC calculator.&quot;</span><span class="p">)</span>
+
+        <span class="c1"># get coeffs</span>
+        <span class="n">coeffs</span> <span class="o">=</span> <span class="kc">None</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">wavefunction</span><span class="o">.</span><span class="n">get_container_type</span><span class="p">()</span> <span class="o">==</span> <span class="s2">&quot;cas&quot;</span> <span class="ow">or</span> <span class="bp">self</span><span class="o">.</span><span class="n">wavefunction</span><span class="o">.</span><span class="n">get_container_type</span><span class="p">()</span> <span class="o">==</span> <span class="s2">&quot;sci&quot;</span><span class="p">:</span>
+            <span class="n">coeffs</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">wavefunction</span><span class="o">.</span><span class="n">get_container</span><span class="p">()</span><span class="o">.</span><span class="n">get_coefficients</span><span class="p">()</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">RuntimeError</span><span class="p">(</span>
+                <span class="sa">f</span><span class="s2">&quot;Unsupported wavefunction type (</span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">wavefunction</span><span class="o">.</span><span class="n">get_container_type</span><span class="p">()</span><span class="si">}</span><span class="s2">) for FCI solver wrapper.&quot;</span>
+            <span class="p">)</span>
+
+        <span class="k">return</span> <span class="n">energy</span><span class="p">,</span> <span class="n">coeffs</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">make_rdm1</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span>
+        <span class="n">fcivec</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span>
+        <span class="n">norb</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span>
+        <span class="n">nelec</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span>
+        <span class="n">link_index</span><span class="p">:</span> <span class="n">Any</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>  <span class="c1"># noqa: ARG002</span>
+        <span class="o">**</span><span class="n">kwargs</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Compute 1-particle reduced density matrix.</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            fcivec: CI vector/coefficients (not used, kept for PySCF compatibility).</span>
+<span class="sd">            norb: Number of orbitals.</span>
+<span class="sd">            nelec: Number of electrons.</span>
+<span class="sd">            link_index: Link indices (PySCF internal parameter).</span>
+<span class="sd">            **kwargs: Additional keyword arguments.</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            1-particle reduced density matrix.</span>
+
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">make_rdm12</span><span class="p">(</span><span class="n">fcivec</span><span class="p">,</span> <span class="n">norb</span><span class="p">,</span> <span class="n">nelec</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)[</span><span class="mi">0</span><span class="p">]</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">make_rdm12</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span>
+        <span class="n">fcivec</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span>  <span class="c1"># noqa: ARG002</span>
+        <span class="n">ncas</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span>
+        <span class="n">nelec</span><span class="p">:</span> <span class="nb">int</span> <span class="o">|</span> <span class="nb">tuple</span><span class="p">[</span><span class="nb">int</span><span class="p">,</span> <span class="nb">int</span><span class="p">],</span>
+        <span class="n">link_index</span><span class="p">:</span> <span class="n">Any</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>  <span class="c1"># noqa: ARG002</span>
+        <span class="n">reorder</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">True</span><span class="p">,</span>  <span class="c1"># noqa: ARG002</span>
+        <span class="o">**</span><span class="n">kwargs</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span>  <span class="c1"># noqa: ARG002</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">tuple</span><span class="p">[</span><span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">,</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">]:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Compute 1-particle and 2-particle reduced density matrices.</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            fcivec: CI vector/coefficients (not used, kept for PySCF compatibility).</span>
+<span class="sd">            ncas: Number of CAS orbitals.</span>
+<span class="sd">            nelec: Number of electrons (can be total count or (alpha, beta) tuple).</span>
+<span class="sd">            link_index: Link indices (PySCF internal parameter).</span>
+<span class="sd">            reorder: Whether to reorder the density matrices.</span>
+<span class="sd">            **kwargs: Additional keyword arguments.</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            A tuple containing (rdm1, rdm2) where rdm1 is the 1-particle</span>
+<span class="sd">                reduced density matrix and rdm2 is the 2-particle reduced density matrix.</span>
+
+<span class="sd">        Raises:</span>
+<span class="sd">            ValueError: If wavefunction is not available (kernel() must be run first).</span>
+
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">wavefunction</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;Wavefunction not available. Run kernel() first.&quot;</span><span class="p">)</span>
+
+        <span class="k">if</span> <span class="ow">not</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">nelec</span><span class="p">,</span> <span class="nb">int</span><span class="p">):</span>
+            <span class="n">nelec</span> <span class="o">=</span> <span class="nb">sum</span><span class="p">(</span><span class="n">nelec</span><span class="p">)</span>  <span class="c1"># Convert (n_alpha, n_beta) to total electrons</span>
+
+        <span class="n">two_rdm</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">wavefunction</span><span class="o">.</span><span class="n">get_active_two_rdm_spin_traced</span><span class="p">()</span>
+        <span class="c1"># convert the RDM from QDK to PySCF format and scale by 2 due to convention in QDK</span>
+        <span class="n">two_rdm</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">reshape</span><span class="p">(</span><span class="n">two_rdm</span><span class="p">,</span> <span class="p">(</span><span class="n">ncas</span><span class="p">,</span> <span class="n">ncas</span><span class="p">,</span> <span class="n">ncas</span><span class="p">,</span> <span class="n">ncas</span><span class="p">))</span>
+        <span class="n">one_rdm</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">wavefunction</span><span class="o">.</span><span class="n">get_active_one_rdm_spin_traced</span><span class="p">()</span>
+        <span class="k">return</span> <span class="n">one_rdm</span><span class="p">,</span> <span class="n">two_rdm</span>
+
+
+<div class="viewcode-block" id="mcsolver_to_fcisolver">
+<a class="viewcode-back" href="../../../../api/api_autogen/qdk_chemistry.plugins.pyscf.mcscf.html#qdk_chemistry.plugins.pyscf.mcscf.mcsolver_to_fcisolver">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">mcsolver_to_fcisolver</span><span class="p">(</span><span class="n">mol</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span> <span class="n">mc_calculator</span><span class="p">:</span> <span class="n">MultiConfigurationCalculator</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">_QdkMcSolverWrapper</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Convert a QDK MultiConfigurationCalculator to a PySCF-compatible FCI solver.</span>
+
+<span class="sd">    This function creates a wrapper that adapts a QDK MultiConfigurationCalculator</span>
+<span class="sd">    to the PySCF FCI solver interface, allowing it to be used in PySCF&#39;s CASCI and</span>
+<span class="sd">    CASSCF calculations.</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">        mol: PySCF molecule object (required by PySCF interface).</span>
+<span class="sd">        mc_calculator: The QDK multi-configurational calculator to convert.</span>
+
+<span class="sd">    Returns:</span>
+<span class="sd">        A PySCF-compatible FCI solver wrapper.</span>
+
+<span class="sd">    Examples:</span>
+<span class="sd">        &gt;&gt;&gt; from qdk_chemistry import algorithms</span>
+<span class="sd">        &gt;&gt;&gt; from pyscf import gto</span>
+<span class="sd">        &gt;&gt;&gt; mol = gto.M(atom=&#39;H 0 0 0; H 0 0 1.5&#39;, basis=&#39;sto-3g&#39;)</span>
+<span class="sd">        &gt;&gt;&gt; mc_calc = algorithms.create(&quot;multi_configuration_calculator&quot;, &quot;macis_cas&quot;)</span>
+<span class="sd">        &gt;&gt;&gt; fci_solver = mcsolver_to_fcisolver(mol, mc_calc)</span>
+<span class="sd">        &gt;&gt;&gt; # Now fci_solver can be used with PySCF CASSCF</span>
+<span class="sd">        &gt;&gt;&gt; from pyscf import mcscf</span>
+<span class="sd">        &gt;&gt;&gt; casscf = mcscf.CASSCF(mf, 2, 2)</span>
+<span class="sd">        &gt;&gt;&gt; casscf.fcisolver = fci_solver</span>
+
+<span class="sd">    Note:</span>
+<span class="sd">        This is a bridge function that enables QDK MC calculators to be used within</span>
+<span class="sd">        PySCF&#39;s MCSCF framework. The wrapper handles the conversion of data formats</span>
+<span class="sd">        and calling conventions between the two libraries.</span>
+
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="k">return</span> <span class="n">_QdkMcSolverWrapper</span><span class="p">(</span><span class="n">mol</span><span class="p">,</span> <span class="n">mc_calculator</span><span class="p">)</span></div>
+
+
+
+<div class="viewcode-block" id="PyscfMcscfSettings">
+<a class="viewcode-back" href="../../../../api/api_autogen/qdk_chemistry.plugins.pyscf.mcscf.html#qdk_chemistry.plugins.pyscf.mcscf.PyscfMcscfSettings">[docs]</a>
+<span class="k">class</span><span class="w"> </span><span class="nc">PyscfMcscfSettings</span><span class="p">(</span><span class="n">Settings</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Configuration settings for PySCF MCSCF calculations.</span>
+
+<span class="sd">    This class extends the base Settings class to provide specific configuration</span>
+<span class="sd">    options for Multi-Configurational Self-Consistent Field calculations using PySCF.</span>
+<span class="sd">    It includes MCSCF-specific parameters in addition to the standard electronic</span>
+<span class="sd">    structure calculation settings.</span>
+
+<span class="sd">    &quot;&quot;&quot;</span>
+
+<div class="viewcode-block" id="PyscfMcscfSettings.__init__">
+<a class="viewcode-back" href="../../../../api/api_autogen/qdk_chemistry.plugins.pyscf.mcscf.html#qdk_chemistry.plugins.pyscf.mcscf.PyscfMcscfSettings.__init__">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Initialize the settings with default values from ElectronicStructureSettings plus MCSCF-specific defaults.&quot;&quot;&quot;</span>
+        <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">()</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_set_default</span><span class="p">(</span><span class="s2">&quot;max_cycle_macro&quot;</span><span class="p">,</span> <span class="s2">&quot;int&quot;</span><span class="p">,</span> <span class="mi">50</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_set_default</span><span class="p">(</span><span class="s2">&quot;verbose&quot;</span><span class="p">,</span> <span class="s2">&quot;int&quot;</span><span class="p">,</span> <span class="mi">0</span><span class="p">)</span></div>
+</div>
+
+
+
+<div class="viewcode-block" id="PyscfMcscfCalculator">
+<a class="viewcode-back" href="../../../../api/api_autogen/qdk_chemistry.plugins.pyscf.mcscf.html#qdk_chemistry.plugins.pyscf.mcscf.PyscfMcscfCalculator">[docs]</a>
+<span class="k">class</span><span class="w"> </span><span class="nc">PyscfMcscfCalculator</span><span class="p">(</span><span class="n">MultiConfigurationScf</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;PySCF-based MCSCF calculator for quantum chemistry calculations.</span>
+
+<span class="sd">    This class provides an interface between QDK and PySCF for performing</span>
+<span class="sd">    Multi-Configurational Self-Consistent Field calculations on molecular systems.</span>
+<span class="sd">    It handles the conversion between QDK Hamiltonian objects and PySCF</span>
+<span class="sd">    representations, performs the MCSCF calculation, and returns the results</span>
+<span class="sd">    in QDK-compatible format.</span>
+
+<span class="sd">    The calculator uses CASSCF (Complete Active Space SCF) method.</span>
+
+<span class="sd">    &quot;&quot;&quot;</span>
+
+<div class="viewcode-block" id="PyscfMcscfCalculator.__init__">
+<a class="viewcode-back" href="../../../../api/api_autogen/qdk_chemistry.plugins.pyscf.mcscf.html#qdk_chemistry.plugins.pyscf.mcscf.PyscfMcscfCalculator.__init__">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Initialize the calculator with default settings.&quot;&quot;&quot;</span>
+        <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">()</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_settings</span> <span class="o">=</span> <span class="n">PyscfMcscfSettings</span><span class="p">()</span></div>
+
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">_run_impl</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span>
+        <span class="n">orbitals</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span>
+        <span class="n">ham_ctor</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span>  <span class="c1"># noqa: ARG002</span>
+        <span class="n">mc_calculator</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span>
+        <span class="n">n_active_alpha_electrons</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span>
+        <span class="n">n_active_beta_electrons</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">tuple</span><span class="p">[</span><span class="nb">float</span><span class="p">,</span> <span class="n">Any</span><span class="p">]:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Perform a Multi-Configurational Self-Consistent Field calculation using PySCF.</span>
+
+<span class="sd">        This method takes QDK/Chemistry orbitals, converts them to the PySCF format,</span>
+<span class="sd">        performs a CASSCF calculation using the QDK MC calculator as the FCI solver,</span>
+<span class="sd">        and returns the results as a pair of energy and QDK Wavefunction object.</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            orbitals: The QDK Orbitals object containing molecular orbital information.</span>
+<span class="sd">            ham_ctor: Hamiltonian constructor (not used, kept for interface compatibility).</span>
+<span class="sd">            mc_calculator: The multi-configurational calculator for handling CI calculations.</span>
+<span class="sd">            n_active_alpha_electrons: The number of alpha electrons in the active space.</span>
+<span class="sd">            n_active_beta_electrons: The number of beta electrons in the active space.</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            A tuple containing the total MCSCF energy and a QDK Wavefunction</span>
+<span class="sd">                object containing the optimized orbitals and CI coefficients.</span>
+
+<span class="sd">        Raises:</span>
+<span class="sd">            ValueError: If the orbitals don&#39;t meet the requirements (restricted, identical active/inactive spaces).</span>
+<span class="sd">            RuntimeError: If the MCSCF calculation does not converge.</span>
+
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="c1"># check that alpha and beta active space indices are the same</span>
+        <span class="k">if</span> <span class="n">orbitals</span><span class="o">.</span><span class="n">get_active_space_indices</span><span class="p">()[</span><span class="mi">0</span><span class="p">]</span> <span class="o">!=</span> <span class="n">orbitals</span><span class="o">.</span><span class="n">get_active_space_indices</span><span class="p">()[</span><span class="mi">1</span><span class="p">]:</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;MCSCF implementation only supports identical active spaces for alpha and beta electrons.&quot;</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">orbitals</span><span class="o">.</span><span class="n">get_inactive_space_indices</span><span class="p">()[</span><span class="mi">0</span><span class="p">]</span> <span class="o">!=</span> <span class="n">orbitals</span><span class="o">.</span><span class="n">get_inactive_space_indices</span><span class="p">()[</span><span class="mi">1</span><span class="p">]:</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
+                <span class="s2">&quot;MCSCF implementation only supports identical inactive spaces for alpha and beta electrons.&quot;</span>
+            <span class="p">)</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">orbitals</span><span class="o">.</span><span class="n">is_restricted</span><span class="p">():</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;MCSCF implementation only supports restricted orbitals.&quot;</span><span class="p">)</span>
+
+        <span class="c1"># Get orbital information from hamiltonian</span>
+        <span class="n">active_indices</span> <span class="o">=</span> <span class="n">orbitals</span><span class="o">.</span><span class="n">get_active_space_indices</span><span class="p">()[</span><span class="mi">0</span><span class="p">]</span>  <span class="c1"># Get alpha indices (same for restricted)</span>
+        <span class="n">n_active_orbitals</span> <span class="o">=</span> <span class="nb">len</span><span class="p">(</span><span class="n">active_indices</span><span class="p">)</span>
+        <span class="n">n_active_electrons</span> <span class="o">=</span> <span class="n">n_active_alpha_electrons</span> <span class="o">+</span> <span class="n">n_active_beta_electrons</span>
+
+        <span class="c1"># fake alpha and beta occupations with number of electrons in active space</span>
+        <span class="c1"># occupied orbitals are doubly occupied</span>
+        <span class="n">alpha_occ</span> <span class="o">=</span> <span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="o">*</span> <span class="n">orbitals</span><span class="o">.</span><span class="n">get_num_molecular_orbitals</span><span class="p">()</span>
+        <span class="n">beta_occ</span> <span class="o">=</span> <span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="o">*</span> <span class="n">orbitals</span><span class="o">.</span><span class="n">get_num_molecular_orbitals</span><span class="p">()</span>
+        <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="n">orbitals</span><span class="o">.</span><span class="n">get_inactive_space_indices</span><span class="p">()[</span><span class="mi">0</span><span class="p">]:</span>
+            <span class="n">alpha_occ</span><span class="p">[</span><span class="n">i</span><span class="p">]</span> <span class="o">=</span> <span class="mi">1</span>
+            <span class="n">beta_occ</span><span class="p">[</span><span class="n">i</span><span class="p">]</span> <span class="o">=</span> <span class="mi">1</span>
+        <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="n">active_indices</span><span class="p">:</span>
+            <span class="k">if</span> <span class="n">n_active_alpha_electrons</span> <span class="o">&gt;</span> <span class="mi">0</span><span class="p">:</span>
+                <span class="n">alpha_occ</span><span class="p">[</span><span class="n">i</span><span class="p">]</span> <span class="o">=</span> <span class="mi">1</span>
+                <span class="n">n_active_alpha_electrons</span> <span class="o">-=</span> <span class="mi">1</span>
+            <span class="k">if</span> <span class="n">n_active_beta_electrons</span> <span class="o">&gt;</span> <span class="mi">0</span><span class="p">:</span>
+                <span class="n">beta_occ</span><span class="p">[</span><span class="n">i</span><span class="p">]</span> <span class="o">=</span> <span class="mi">1</span>
+                <span class="n">n_active_beta_electrons</span> <span class="o">-=</span> <span class="mi">1</span>
+
+        <span class="c1"># get pyscf scf object</span>
+        <span class="n">pyscf_scf</span> <span class="o">=</span> <span class="n">orbitals_to_scf</span><span class="p">(</span><span class="n">orbitals</span><span class="p">,</span> <span class="n">occ_alpha</span><span class="o">=</span><span class="n">alpha_occ</span><span class="p">,</span> <span class="n">occ_beta</span><span class="o">=</span><span class="n">beta_occ</span><span class="p">,</span> <span class="n">force_restricted</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+
+        <span class="c1"># Create CASSCF object</span>
+        <span class="n">pyscf_mcscf</span> <span class="o">=</span> <span class="n">mcscf</span><span class="o">.</span><span class="n">CASSCF</span><span class="p">(</span><span class="n">pyscf_scf</span><span class="p">,</span> <span class="n">n_active_orbitals</span><span class="p">,</span> <span class="n">n_active_electrons</span><span class="p">)</span>
+        <span class="n">mc_calculator</span><span class="o">.</span><span class="n">settings</span><span class="p">()</span><span class="o">.</span><span class="n">set</span><span class="p">(</span><span class="s2">&quot;calculate_one_rdm&quot;</span><span class="p">,</span> <span class="kc">True</span><span class="p">)</span>
+        <span class="n">mc_calculator</span><span class="o">.</span><span class="n">settings</span><span class="p">()</span><span class="o">.</span><span class="n">set</span><span class="p">(</span><span class="s2">&quot;calculate_two_rdm&quot;</span><span class="p">,</span> <span class="kc">True</span><span class="p">)</span>
+        <span class="n">pyscf_mcscf</span><span class="o">.</span><span class="n">fcisolver</span> <span class="o">=</span> <span class="n">mcsolver_to_fcisolver</span><span class="p">(</span>
+            <span class="n">pyscf_scf</span><span class="o">.</span><span class="n">mol</span><span class="p">,</span>
+            <span class="n">mc_calculator</span><span class="p">,</span>
+        <span class="p">)</span>
+
+        <span class="c1"># shuffle indices for pyscf and add 1 for one based</span>
+        <span class="n">pyscf_active_indices</span> <span class="o">=</span> <span class="p">[</span><span class="n">i</span> <span class="o">+</span> <span class="mi">1</span> <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="n">active_indices</span><span class="p">]</span>
+        <span class="n">mo</span> <span class="o">=</span> <span class="n">pyscf_mcscf</span><span class="o">.</span><span class="n">sort_mo</span><span class="p">(</span><span class="n">pyscf_active_indices</span><span class="p">)</span>
+
+        <span class="c1"># Apply settings</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_apply_settings</span><span class="p">(</span><span class="n">pyscf_mcscf</span><span class="p">)</span>
+
+        <span class="c1"># Run CASSCF calculation</span>
+        <span class="n">pyscf_mcscf</span><span class="o">.</span><span class="n">verbose</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_settings</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;verbose&quot;</span><span class="p">)</span>
+        <span class="n">energy</span> <span class="o">=</span> <span class="n">pyscf_mcscf</span><span class="o">.</span><span class="n">kernel</span><span class="p">(</span><span class="n">mo</span><span class="p">)[</span><span class="mi">0</span><span class="p">]</span>
+
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">pyscf_mcscf</span><span class="o">.</span><span class="n">converged</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">RuntimeError</span><span class="p">(</span><span class="s2">&quot;MCSCF calculation did not converge&quot;</span><span class="p">)</span>
+
+        <span class="k">return</span> <span class="n">energy</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">_make_wavefunction</span><span class="p">(</span><span class="n">pyscf_mcscf</span><span class="p">,</span> <span class="n">orbitals</span><span class="p">)</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">_make_wavefunction</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">pyscf_mcscf</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span> <span class="n">orbitals</span><span class="p">:</span> <span class="n">Orbitals</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Wavefunction</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Convert PySCF MCSCF result to QDK Wavefunction object.</span>
+
+<span class="sd">        This method extracts the optimized orbitals and CI coefficients from</span>
+<span class="sd">        the PySCF MCSCF object and constructs a QDK Wavefunction object.</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            pyscf_mcscf: The PySCF CASSCF object after the calculation.</span>
+<span class="sd">            orbitals : The QDK orbitals object</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            A QDK Wavefunction object containing the optimized orbitals and CI coefficients.</span>
+
+<span class="sd">        Raises:</span>
+<span class="sd">            RuntimeError: If the wavefunction type is not supported.</span>
+
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="c1"># Extract basis set and overlap from PySCF object</span>
+        <span class="n">_ovlp</span> <span class="o">=</span> <span class="n">pyscf_mcscf</span><span class="o">.</span><span class="n">_scf</span><span class="o">.</span><span class="n">get_ovlp</span><span class="p">()</span>  <span class="c1"># noqa: SLF001</span>
+
+        <span class="c1"># Create Orbitals with restricted arguments (coeffs, occupations, energies)</span>
+        <span class="n">wfn</span> <span class="o">=</span> <span class="n">pyscf_mcscf</span><span class="o">.</span><span class="n">fcisolver</span><span class="o">.</span><span class="n">wavefunction</span>
+
+        <span class="n">orbitals</span> <span class="o">=</span> <span class="n">Orbitals</span><span class="p">(</span>
+            <span class="n">pyscf_mcscf</span><span class="o">.</span><span class="n">mo_coeff</span><span class="p">,</span>
+            <span class="n">pyscf_mcscf</span><span class="o">.</span><span class="n">mo_energy</span><span class="p">,</span>
+            <span class="n">ao_overlap</span><span class="o">=</span><span class="n">_ovlp</span><span class="p">,</span>
+            <span class="n">basis_set</span><span class="o">=</span><span class="n">orbitals</span><span class="o">.</span><span class="n">get_basis_set</span><span class="p">(),</span>
+            <span class="n">indices</span><span class="o">=</span><span class="p">(</span><span class="n">orbitals</span><span class="o">.</span><span class="n">get_active_space_indices</span><span class="p">()[</span><span class="mi">0</span><span class="p">],</span> <span class="n">orbitals</span><span class="o">.</span><span class="n">get_inactive_space_indices</span><span class="p">()[</span><span class="mi">0</span><span class="p">]),</span>
+        <span class="p">)</span>
+
+        <span class="n">container</span> <span class="o">=</span> <span class="kc">None</span>
+
+        <span class="c1"># try to get spin-dependent RDMs, fall back to spin-traced if not available</span>
+        <span class="n">use_spin_traced</span> <span class="o">=</span> <span class="kc">False</span>
+        <span class="k">try</span><span class="p">:</span>
+            <span class="n">one_rdm_aa</span><span class="p">,</span> <span class="n">one_rdm_bb</span> <span class="o">=</span> <span class="n">wfn</span><span class="o">.</span><span class="n">get_active_one_rdm_spin_dependent</span><span class="p">()</span>
+        <span class="k">except</span> <span class="ne">RuntimeError</span><span class="p">:</span>
+            <span class="n">use_spin_traced</span> <span class="o">=</span> <span class="kc">True</span>
+        <span class="k">try</span><span class="p">:</span>
+            <span class="n">two_rdm_aabb</span><span class="p">,</span> <span class="n">two_rdm_aaaa</span><span class="p">,</span> <span class="n">two_rdm_bbbb</span> <span class="o">=</span> <span class="n">wfn</span><span class="o">.</span><span class="n">get_active_two_rdm_spin_dependent</span><span class="p">()</span>
+        <span class="k">except</span> <span class="ne">RuntimeError</span><span class="p">:</span>
+            <span class="n">use_spin_traced</span> <span class="o">=</span> <span class="kc">True</span>
+
+        <span class="k">if</span> <span class="n">wfn</span><span class="o">.</span><span class="n">get_container_type</span><span class="p">()</span> <span class="o">==</span> <span class="s2">&quot;cas&quot;</span><span class="p">:</span>
+            <span class="k">if</span> <span class="n">use_spin_traced</span><span class="p">:</span>
+                <span class="n">container</span> <span class="o">=</span> <span class="n">CasWavefunctionContainer</span><span class="p">(</span>
+                    <span class="n">wfn</span><span class="o">.</span><span class="n">get_container</span><span class="p">()</span><span class="o">.</span><span class="n">get_coefficients</span><span class="p">(),</span>
+                    <span class="n">wfn</span><span class="o">.</span><span class="n">get_active_determinants</span><span class="p">(),</span>
+                    <span class="n">orbitals</span><span class="p">,</span>
+                    <span class="n">one_rdm_spin_traced</span><span class="o">=</span><span class="n">wfn</span><span class="o">.</span><span class="n">get_active_one_rdm_spin_traced</span><span class="p">(),</span>
+                    <span class="n">two_rdm_spin_traced</span><span class="o">=</span><span class="n">wfn</span><span class="o">.</span><span class="n">get_active_two_rdm_spin_traced</span><span class="p">(),</span>
+                    <span class="nb">type</span><span class="o">=</span><span class="n">wfn</span><span class="o">.</span><span class="n">get_type</span><span class="p">(),</span>
+                <span class="p">)</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="n">container</span> <span class="o">=</span> <span class="n">CasWavefunctionContainer</span><span class="p">(</span>
+                    <span class="n">wfn</span><span class="o">.</span><span class="n">get_container</span><span class="p">()</span><span class="o">.</span><span class="n">get_coefficients</span><span class="p">(),</span>
+                    <span class="n">wfn</span><span class="o">.</span><span class="n">get_active_determinants</span><span class="p">(),</span>
+                    <span class="n">orbitals</span><span class="p">,</span>
+                    <span class="n">one_rdm_spin_traced</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
+                    <span class="n">one_rdm_aa</span><span class="o">=</span><span class="n">one_rdm_aa</span><span class="p">,</span>
+                    <span class="n">one_rdm_bb</span><span class="o">=</span><span class="n">one_rdm_bb</span><span class="p">,</span>
+                    <span class="n">two_rdm_spin_traced</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
+                    <span class="n">two_rdm_aabb</span><span class="o">=</span><span class="n">two_rdm_aabb</span><span class="p">,</span>
+                    <span class="n">two_rdm_aaaa</span><span class="o">=</span><span class="n">two_rdm_aaaa</span><span class="p">,</span>
+                    <span class="n">two_rdm_bbbb</span><span class="o">=</span><span class="n">two_rdm_bbbb</span><span class="p">,</span>
+                    <span class="nb">type</span><span class="o">=</span><span class="n">wfn</span><span class="o">.</span><span class="n">get_type</span><span class="p">(),</span>
+                <span class="p">)</span>
+        <span class="k">elif</span> <span class="n">wfn</span><span class="o">.</span><span class="n">get_container_type</span><span class="p">()</span> <span class="o">==</span> <span class="s2">&quot;sci&quot;</span><span class="p">:</span>
+            <span class="k">if</span> <span class="n">use_spin_traced</span><span class="p">:</span>
+                <span class="n">container</span> <span class="o">=</span> <span class="n">SciWavefunctionContainer</span><span class="p">(</span>
+                    <span class="n">wfn</span><span class="o">.</span><span class="n">get_container</span><span class="p">()</span><span class="o">.</span><span class="n">get_coefficients</span><span class="p">(),</span>
+                    <span class="n">wfn</span><span class="o">.</span><span class="n">get_active_determinants</span><span class="p">(),</span>
+                    <span class="n">orbitals</span><span class="p">,</span>
+                    <span class="n">one_rdm_spin_traced</span><span class="o">=</span><span class="n">wfn</span><span class="o">.</span><span class="n">get_active_one_rdm_spin_traced</span><span class="p">(),</span>
+                    <span class="n">two_rdm_spin_traced</span><span class="o">=</span><span class="n">wfn</span><span class="o">.</span><span class="n">get_active_two_rdm_spin_traced</span><span class="p">(),</span>
+                    <span class="nb">type</span><span class="o">=</span><span class="n">wfn</span><span class="o">.</span><span class="n">get_type</span><span class="p">(),</span>
+                <span class="p">)</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="n">container</span> <span class="o">=</span> <span class="n">SciWavefunctionContainer</span><span class="p">(</span>
+                    <span class="n">wfn</span><span class="o">.</span><span class="n">get_container</span><span class="p">()</span><span class="o">.</span><span class="n">get_coefficients</span><span class="p">(),</span>
+                    <span class="n">wfn</span><span class="o">.</span><span class="n">get_active_determinants</span><span class="p">(),</span>
+                    <span class="n">orbitals</span><span class="p">,</span>
+                    <span class="n">one_rdm_spin_traced</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
+                    <span class="n">one_rdm_aa</span><span class="o">=</span><span class="n">one_rdm_aa</span><span class="p">,</span>
+                    <span class="n">one_rdm_bb</span><span class="o">=</span><span class="n">one_rdm_bb</span><span class="p">,</span>
+                    <span class="n">two_rdm_spin_traced</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
+                    <span class="n">two_rdm_aabb</span><span class="o">=</span><span class="n">two_rdm_aabb</span><span class="p">,</span>
+                    <span class="n">two_rdm_aaaa</span><span class="o">=</span><span class="n">two_rdm_aaaa</span><span class="p">,</span>
+                    <span class="n">two_rdm_bbbb</span><span class="o">=</span><span class="n">two_rdm_bbbb</span><span class="p">,</span>
+                    <span class="nb">type</span><span class="o">=</span><span class="n">wfn</span><span class="o">.</span><span class="n">get_type</span><span class="p">(),</span>
+                <span class="p">)</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">RuntimeError</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Unsupported wavefunction type (</span><span class="si">{</span><span class="n">wfn</span><span class="o">.</span><span class="n">get_container_type</span><span class="p">()</span><span class="si">}</span><span class="s2">) for FCI solver wrapper.&quot;</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">Wavefunction</span><span class="p">(</span><span class="n">container</span><span class="p">)</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">_apply_settings</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">pyscf_mcscf</span><span class="p">:</span> <span class="n">Any</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Apply QDK settings to PySCF MCSCF object.&quot;&quot;&quot;</span>
+        <span class="c1"># Apply core MCSCF settings</span>
+        <span class="n">pyscf_mcscf</span><span class="o">.</span><span class="n">max_cycle_macro</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_settings</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;max_cycle_macro&quot;</span><span class="p">))</span>
+
+<div class="viewcode-block" id="PyscfMcscfCalculator.name">
+<a class="viewcode-back" href="../../../../api/api_autogen/qdk_chemistry.plugins.pyscf.mcscf.html#qdk_chemistry.plugins.pyscf.mcscf.PyscfMcscfCalculator.name">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">name</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Return the name of the MCSCF solver.&quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="s2">&quot;pyscf&quot;</span></div>
+</div>
+
+
+
+<span class="k">def</span><span class="w"> </span><span class="nf">_create_pyscf_multi_configuration_scf</span><span class="p">():</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Factory function to create a PySCF MCSCF calculator instance.</span>
+
+<span class="sd">    Returns:</span>
+<span class="sd">        PyscfMcscfCalculator: A new instance of the PySCF MCSCF calculator.</span>
+
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="k">return</span> <span class="n">PyscfMcscfCalculator</span><span class="p">()</span>
+
+
+<span class="k">def</span><span class="w"> </span><span class="nf">_register_pyscf_multi_configuration_scf</span><span class="p">():</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Register the PySCF MCSCF calculator with the QDK framework.</span>
+
+<span class="sd">    This function registers the PySCF MCSCF calculator factory with the QDK</span>
+<span class="sd">    MCSCF calculator registry, making it available for use through</span>
+<span class="sd">    the QDK plugin system.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">register</span><span class="p">(</span><span class="n">_create_pyscf_multi_configuration_scf</span><span class="p">)</span>
+
+
+<span class="c1"># Initialize the calculator on module import</span>
+<span class="n">_</span> <span class="o">=</span> <span class="n">_register_pyscf_multi_configuration_scf</span><span class="p">()</span>
+</pre></div>
+
+           </div>
+          </div>
+          <footer>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright Microsoft Corporation. All rights reserved. Licensed under the MIT License.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

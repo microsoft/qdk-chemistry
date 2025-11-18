@@ -6,17 +6,18 @@
   <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
 
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Interface System in QDK/Chemistry &mdash; QDK/Chemistry 0.0.1 documentation</title>
+  <title>Interface system in QDK/Chemistry &mdash; qdk-chemistry 1.0.0-rc1 documentation</title>
       <link rel="stylesheet" type="text/css" href="../../../_static/pygments.css?v=b86133f3" />
       <link rel="stylesheet" type="text/css" href="../../../_static/css/theme.css?v=e59714d7" />
       <link rel="stylesheet" type="text/css" href="../../../_static/tabs.css?v=4c969af8" />
       <link rel="stylesheet" type="text/css" href="../../../_static/graphviz.css?v=4ae1632d" />
       <link rel="stylesheet" type="text/css" href="../../../_static/copybutton.css?v=76b2166b" />
+      <link rel="stylesheet" type="text/css" href="../../../_static/custom.css?v=a64bac2b" />
 
   
       <script src="../../../_static/jquery.js?v=5d32c60e"></script>
       <script src="../../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
-      <script src="../../../_static/documentation_options.js?v=d45e8c67"></script>
+      <script src="../../../_static/documentation_options.js?v=81bd8d55"></script>
       <script src="../../../_static/doctools.js?v=9bcbadda"></script>
       <script src="../../../_static/sphinx_highlight.js?v=dc90522c"></script>
       <script src="../../../_static/tabs.js?v=3ee01567"></script>
@@ -38,7 +39,7 @@
           
           
           <a href="../../../index.html" class="icon icon-home">
-            QDK/Chemistry
+            qdk-chemistry
           </a>
 <div role="search">
   <form id="rtd-search-form" class="wy-form" action="../../../search.html" method="get">
@@ -50,32 +51,33 @@
         </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
               <p class="caption" role="heading"><span class="caption-text">User Documentation</span></p>
 <ul class="current">
-<li class="toctree-l1"><a class="reference internal" href="../../Quickstart.html">Quickstart</a></li>
-<li class="toctree-l1 current"><a class="reference internal" href="../index.html">In-Depth Guide</a><ul class="current">
-<li class="toctree-l2 current"><a class="reference internal" href="../design.html">Design and Architecture</a><ul class="current">
-<li class="toctree-l3"><a class="reference internal" href="design_principles.html">Design Principles of QDK/Chemistry</a></li>
-<li class="toctree-l3"><a class="reference internal" href="factory_pattern.html">Factory Pattern in QDK/Chemistry</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../quickstart.html">Quickstart</a></li>
+<li class="toctree-l1 current"><a class="reference internal" href="../index.html">In-depth user guide</a><ul class="current">
+<li class="toctree-l2 current"><a class="reference internal" href="../design.html">Design and architecture</a><ul class="current">
+<li class="toctree-l3"><a class="reference internal" href="design_principles.html">Design principles of QDK/Chemistry</a></li>
+<li class="toctree-l3"><a class="reference internal" href="factory_pattern.html">Factory pattern in QDK/Chemistry</a></li>
 <li class="toctree-l3"><a class="reference internal" href="serialization.html">Serialization in QDK/Chemistry</a></li>
-<li class="toctree-l3 current"><a class="current reference internal" href="#">Interface System in QDK/Chemistry</a><ul>
+<li class="toctree-l3 current"><a class="current reference internal" href="#">Interface system in QDK/Chemistry</a><ul>
 <li class="toctree-l4"><a class="reference internal" href="#overview">Overview</a></li>
-<li class="toctree-l4"><a class="reference internal" href="#interface-architecture">Interface Architecture</a></li>
-<li class="toctree-l4"><a class="reference internal" href="#supported-interfaces">Supported Interfaces</a></li>
-<li class="toctree-l4"><a class="reference internal" href="#using-interfaces">Using Interfaces</a></li>
-<li class="toctree-l4"><a class="reference internal" href="#listing-available-implementations">Listing Available Implementations</a></li>
-<li class="toctree-l4"><a class="reference internal" href="#adding-new-interfaces">Adding New Interfaces</a></li>
-<li class="toctree-l4"><a class="reference internal" href="#interface-specific-settings">Interface-Specific Settings</a></li>
-<li class="toctree-l4"><a class="reference internal" href="#data-conversion">Data Conversion</a></li>
-<li class="toctree-l4"><a class="reference internal" href="#performance-considerations">Performance Considerations</a></li>
-<li class="toctree-l4"><a class="reference internal" href="#available-interfaces-by-algorithm">Available Interfaces by Algorithm</a></li>
-<li class="toctree-l4"><a class="reference internal" href="#related-topics">Related Topics</a></li>
+<li class="toctree-l4"><a class="reference internal" href="#interface-architecture">Interface architecture</a></li>
+<li class="toctree-l4"><a class="reference internal" href="#supported-interfaces">Supported interfaces</a></li>
+<li class="toctree-l4"><a class="reference internal" href="#using-interfaces">Using interfaces</a></li>
+<li class="toctree-l4"><a class="reference internal" href="#listing-available-implementations">Listing available implementations</a></li>
+<li class="toctree-l4"><a class="reference internal" href="#adding-new-interfaces">Adding new interfaces</a></li>
+<li class="toctree-l4"><a class="reference internal" href="#interface-specific-settings">Interface-specific settings</a></li>
+<li class="toctree-l4"><a class="reference internal" href="#data-conversion">Data conversion</a></li>
+<li class="toctree-l4"><a class="reference internal" href="#performance-considerations">Performance considerations</a></li>
+<li class="toctree-l4"><a class="reference internal" href="#available-interfaces-by-algorithm">Available interfaces by algorithm</a></li>
+<li class="toctree-l4"><a class="reference internal" href="#related-topics">Related topics</a></li>
 </ul>
 </li>
 <li class="toctree-l3"><a class="reference internal" href="settings.html">Settings</a></li>
+<li class="toctree-l3"><a class="reference internal" href="model_hamiltonians.html">Model Hamiltonians</a></li>
 </ul>
 </li>
-<li class="toctree-l2"><a class="reference internal" href="../data.html">Data Classes</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../data.html">Data classes</a></li>
 <li class="toctree-l2"><a class="reference internal" href="../algorithms.html">Algorithms</a></li>
-<li class="toctree-l2"><a class="reference internal" href="../keywords.html">Functionals and Basis Sets</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../keywords.html">Functionals and basis sets</a></li>
 <li class="toctree-l2"><a class="reference internal" href="../plugins.html">Plugins</a></li>
 </ul>
 </li>
@@ -87,7 +89,7 @@
 </ul>
 <p class="caption" role="heading"><span class="caption-text">Supporting Information</span></p>
 <ul>
-<li class="toctree-l1"><a class="reference internal" href="../../../glossary.html">Glossary</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../glossary.html">Acronym definitions</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../../references.html">References</a></li>
 </ul>
 
@@ -97,7 +99,7 @@
 
     <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
           <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
-          <a href="../../../index.html">QDK/Chemistry</a>
+          <a href="../../../index.html">qdk-chemistry</a>
       </nav>
 
       <div class="wy-nav-content">
@@ -105,9 +107,9 @@
           <div role="navigation" aria-label="Page navigation">
   <ul class="wy-breadcrumbs">
       <li><a href="../../../index.html" class="icon icon-home" aria-label="Home"></a></li>
-          <li class="breadcrumb-item"><a href="../index.html">In-Depth Guide</a></li>
-          <li class="breadcrumb-item"><a href="../design.html">Design and Architecture</a></li>
-      <li class="breadcrumb-item active">Interface System in QDK/Chemistry</li>
+          <li class="breadcrumb-item"><a href="../index.html">In-depth user guide</a></li>
+          <li class="breadcrumb-item"><a href="../design.html">Design and architecture</a></li>
+      <li class="breadcrumb-item active">Interface system in QDK/Chemistry</li>
       <li class="wy-breadcrumbs-aside">
             <a href="../../../_sources/user/comprehensive/advanced/interfaces.rst.txt" rel="nofollow"> View page source</a>
       </li>
@@ -118,19 +120,18 @@
            <div itemprop="articleBody">
              
   <section id="interface-system-in-qdk-chemistry">
-<h1>Interface System in QDK/Chemistry<a class="headerlink" href="#interface-system-in-qdk-chemistry" title="Link to this heading"></a></h1>
+<h1>Interface system in QDK/Chemistry<a class="headerlink" href="#interface-system-in-qdk-chemistry" title="Link to this heading"></a></h1>
 <p>This document describes QDK/Chemistry’s interface system, which provides unified access to various quantum chemistry packages.
 This design allows researchers to leverage the unique strengths of various quantum chemistry programs while maintaining a consistent workflow.</p>
 <section id="overview">
 <h2>Overview<a class="headerlink" href="#overview" title="Link to this heading"></a></h2>
 <p>QDK/Chemistry is designed with an extensible plugin architecture that allows algorithms to be implemented either natively within QDK/Chemistry or as interfaces to established third-party quantum chemistry packages.
 This approach combines the benefits of a consistent API with the specialized capabilities of different software packages, following QDK/Chemistry’s core <a class="reference internal" href="design_principles.html"><span class="doc">design principles</span></a> of extensibility and interoperability.</p>
-<p>The interface system implements the <a class="reference internal" href="factory_pattern.html"><span class="doc">factory pattern</span></a>, which allows algorithms to be instantiated by
-name without the user needing to know the specific implementation details. This abstraction enables seamless switching
-between different backends without changing your code, making it easier to benchmark and compare different approaches.</p>
+<p>The interface system implements the <a class="reference internal" href="factory_pattern.html"><span class="doc">factory pattern</span></a>, which allows algorithms to be instantiated by name without the user needing to know the specific implementation details.
+This abstraction enables seamless switching between different backends without changing your code, making it easier to benchmark and compare different approaches.</p>
 </section>
 <section id="interface-architecture">
-<h2>Interface Architecture<a class="headerlink" href="#interface-architecture" title="Link to this heading"></a></h2>
+<h2>Interface architecture<a class="headerlink" href="#interface-architecture" title="Link to this heading"></a></h2>
 <p>The interface system is built on the following principles:</p>
 <ol class="arabic simple">
 <li><p><strong>Unified API</strong>: All implementations of an algorithm share the same interface, regardless of the underlying
@@ -159,8 +160,9 @@ packages</p></li>
 }" class="graphviz" /></div>
 </section>
 <section id="supported-interfaces">
-<h2>Supported Interfaces<a class="headerlink" href="#supported-interfaces" title="Link to this heading"></a></h2>
-<p>QDK/Chemistry provides interfaces to many popular quantum chemistry packages, each carefully integrated to preserve their strengths while presenting a unified API to the user. These include:</p>
+<h2>Supported interfaces<a class="headerlink" href="#supported-interfaces" title="Link to this heading"></a></h2>
+<p>QDK/Chemistry provides interfaces to many popular quantum chemistry packages, each carefully integrated to preserve their strengths while presenting a unified API to the user.
+These include:</p>
 <ul class="simple">
 <li><p><strong>PySCF</strong>: Python-based Simulations of Chemistry Framework</p></li>
 </ul>
@@ -168,15 +170,10 @@ packages</p></li>
 <code class="docutils literal notranslate"><span class="pre">ScfSolver</span></code>, <code class="docutils literal notranslate"><span class="pre">Localizer</span></code>), ensuring type safety and consistent behavior across implementations.</p>
 </section>
 <section id="using-interfaces">
-<h2>Using Interfaces<a class="headerlink" href="#using-interfaces" title="Link to this heading"></a></h2>
+<h2>Using interfaces<a class="headerlink" href="#using-interfaces" title="Link to this heading"></a></h2>
 <p>Interfaces are accessed through the standard algorithm factory pattern, which provides a consistent way to instantiate
 any algorithm regardless of its implementation.
 This pattern is implemented across all major algorithm types in QDK/Chemistry.</p>
-<div class="admonition-todo admonition" id="id1">
-<p class="admonition-title">Todo</p>
-<p>TODO (NAB):  check Interfaces code examples
-<a class="reference external" href="https://dev.azure.com/ms-azurequantum/AzureQuantum/_workitems/edit/41366">https://dev.azure.com/ms-azurequantum/AzureQuantum/_workitems/edit/41366</a></p>
-</div>
 <div class="tab-set docutils container">
 <input checked="True" class="tab-input" id="tab-set--0-input--1" name="tab-set--0" type="radio"><label class="tab-label" for="tab-set--0-input--1">C++ API</label><div class="tab-content docutils container">
 <div class="highlight-cpp notranslate"><div class="highlight"><pre><span></span><span class="cp">#include</span><span class="w"> </span><span class="cpf">&lt;qdk/chemistry.hpp&gt;</span>
@@ -194,24 +191,27 @@ This pattern is implemented across all major algorithm types in QDK/Chemistry.</
 </div>
 </div>
 <input class="tab-input" id="tab-set--0-input--2" name="tab-set--0" type="radio"><label class="tab-label" for="tab-set--0-input--2">Python API</label><div class="tab-content docutils container">
-<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">from</span><span class="w"> </span><span class="nn">qdk.chemistry.algorithms</span><span class="w"> </span><span class="kn">import</span> <span class="n">create_scf_solver</span>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="sd">&quot;&quot;&quot;Example demonstrating algorithm interface usage.&quot;&quot;&quot;</span>
 
-<span class="c1"># Create an SCF solver that uses the QDK/Chemistry library as solver</span>
-<span class="n">scf</span> <span class="o">=</span> <span class="n">create_scf_solver</span><span class="p">()</span>
+<span class="c1"># --------------------------------------------------------------------------------------------</span>
+<span class="c1"># Copyright (c) Microsoft Corporation. All rights reserved.</span>
+<span class="c1"># Licensed under the MIT License. See LICENSE.txt in the project root for license information.</span>
+<span class="c1"># --------------------------------------------------------------------------------------------</span>
 
-<span class="c1"># Configure it using the standard settings interface</span>
-<span class="n">scf</span><span class="o">.</span><span class="n">settings</span><span class="p">()</span><span class="o">.</span><span class="n">set</span><span class="p">(</span><span class="s2">&quot;basis_set&quot;</span><span class="p">,</span> <span class="s2">&quot;cc-pvdz&quot;</span><span class="p">)</span>
-<span class="n">scf</span><span class="o">.</span><span class="n">settings</span><span class="p">()</span><span class="o">.</span><span class="n">set</span><span class="p">(</span><span class="s2">&quot;method&quot;</span><span class="p">,</span> <span class="s2">&quot;hf&quot;</span><span class="p">)</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.algorithms</span><span class="w"> </span><span class="kn">import</span> <span class="n">create</span>
 
-<span class="c1"># Run calculation with the same API as native implementations</span>
-<span class="n">energy</span><span class="p">,</span> <span class="n">orbitals</span> <span class="o">=</span> <span class="n">scf</span><span class="o">.</span><span class="n">solve</span><span class="p">(</span><span class="n">structure</span><span class="p">)</span>
+<span class="c1"># All algorithms in QDK/Chemistry follow a common interface pattern</span>
+
+<span class="c1"># 1. Create algorithm instance</span>
+<span class="n">scf_solver</span> <span class="o">=</span> <span class="n">create</span><span class="p">(</span><span class="s2">&quot;scf_solver&quot;</span><span class="p">)</span>
+
 </pre></div>
 </div>
 </div>
 </div>
 </section>
 <section id="listing-available-implementations">
-<h2>Listing Available Implementations<a class="headerlink" href="#listing-available-implementations" title="Link to this heading"></a></h2>
+<h2>Listing available implementations<a class="headerlink" href="#listing-available-implementations" title="Link to this heading"></a></h2>
 <p>You can discover what implementations are available for each algorithm type:</p>
 <div class="tab-set docutils container">
 <input checked="True" class="tab-input" id="tab-set--1-input--1" name="tab-set--1" type="radio"><label class="tab-label" for="tab-set--1-input--1">C++ API</label><div class="tab-content docutils container">
@@ -230,21 +230,26 @@ This pattern is implemented across all major algorithm types in QDK/Chemistry.</
 </div>
 </div>
 <input class="tab-input" id="tab-set--1-input--2" name="tab-set--1" type="radio"><label class="tab-label" for="tab-set--1-input--2">Python API</label><div class="tab-content docutils container">
-<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">from</span><span class="w"> </span><span class="nn">qdk.chemistry.algorithms</span><span class="w"> </span><span class="kn">import</span> <span class="n">list_scf_solvers</span><span class="p">,</span> <span class="n">get_scf_solver_description</span>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="sd">&quot;&quot;&quot;Factory pattern usage examples.&quot;&quot;&quot;</span>
 
-<span class="c1"># Get a list of available SCF solver implementations</span>
-<span class="n">available_solvers</span> <span class="o">=</span> <span class="n">list_scf_solvers</span><span class="p">()</span>
-<span class="nb">print</span><span class="p">(</span><span class="n">available_solvers</span><span class="p">)</span>
+<span class="c1"># --------------------------------------------------------------------------------------------</span>
+<span class="c1"># Copyright (c) Microsoft Corporation. All rights reserved.</span>
+<span class="c1"># Licensed under the MIT License. See LICENSE.txt in the project root for license information.</span>
+<span class="c1"># --------------------------------------------------------------------------------------------</span>
 
-<span class="c1"># Get documentation for a specific implementation</span>
-<span class="nb">print</span><span class="p">(</span><span class="n">get_scf_solver_description</span><span class="p">(</span><span class="s2">&quot;default&quot;</span><span class="p">))</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">numpy</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">np</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.algorithms</span><span class="w"> </span><span class="kn">import</span> <span class="n">available</span><span class="p">,</span> <span class="n">create</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.data</span><span class="w"> </span><span class="kn">import</span> <span class="n">Structure</span>
+
+<span class="c1"># Create a simple molecule for testing</span>
+<span class="n">coords</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">([[</span><span class="mf">0.0</span><span class="p">,</span> <span class="mf">0.0</span><span class="p">,</span> <span class="mf">0.0</span><span class="p">],</span> <span class="p">[</span><span class="mf">0.0</span><span class="p">,</span> <span class="mf">0.0</span><span class="p">,</span> <span class="mf">1.4</span><span class="p">]])</span>
 </pre></div>
 </div>
 </div>
 </div>
 </section>
 <section id="adding-new-interfaces">
-<h2>Adding New Interfaces<a class="headerlink" href="#adding-new-interfaces" title="Link to this heading"></a></h2>
+<h2>Adding new interfaces<a class="headerlink" href="#adding-new-interfaces" title="Link to this heading"></a></h2>
 <p>QDK/Chemistry’s plugin architecture makes it straightforward to add interfaces to new packages.
 This extensibility is a core design principle of QDK/Chemistry, allowing the community to expand the toolkit’s capabilities.</p>
 <p>To create a new interface:</p>
@@ -303,7 +308,7 @@ This extensibility is a core design principle of QDK/Chemistry, allowing the com
 </div>
 </div>
 <input class="tab-input" id="tab-set--2-input--2" name="tab-set--2" type="radio"><label class="tab-label" for="tab-set--2-input--2">Python API</label><div class="tab-content docutils container">
-<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">from</span><span class="w"> </span><span class="nn">qdk.chemistry.algorithms</span><span class="w"> </span><span class="kn">import</span> <span class="n">register_scf_solver</span>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.algorithms</span><span class="w"> </span><span class="kn">import</span> <span class="n">register_scf_solver</span>
 <span class="kn">import</span><span class="w"> </span><span class="nn">custom_chemistry_package</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">ccp</span>
 
 <span class="k">class</span><span class="w"> </span><span class="nc">CustomScfSolver</span><span class="p">(</span><span class="n">ScfSolver</span><span class="p">):</span>
@@ -334,11 +339,10 @@ This extensibility is a core design principle of QDK/Chemistry, allowing the com
 </div>
 </div>
 </div>
-<p>For developers interested in adding new interfaces, please refer to the
-<a class="reference internal" href="factory_pattern.html"><span class="doc">Factory Pattern</span></a> documentation for more detailed guidance.</p>
+<p>For developers interested in adding new interfaces, please refer to the <a class="reference internal" href="factory_pattern.html"><span class="doc">Factory pattern</span></a> documentation for more detailed guidance.</p>
 </section>
 <section id="interface-specific-settings">
-<h2>Interface-Specific Settings<a class="headerlink" href="#interface-specific-settings" title="Link to this heading"></a></h2>
+<h2>Interface-specific settings<a class="headerlink" href="#interface-specific-settings" title="Link to this heading"></a></h2>
 <p>While QDK/Chemistry provides a unified API for all implementations, each backend may support additional options specific to that package.
 These package-specific settings are accessed through the same <a class="reference internal" href="settings.html"><span class="doc">Settings</span></a> interface but are typically prefixed with the package name to avoid namespace collisions.
 This approach leverages the flexibility of QDK/Chemistry’s <a class="reference internal" href="settings.html"><span class="doc">settings system</span></a> to accommodate package-specific options while maintaining a consistent configuration experience.</p>
@@ -362,7 +366,7 @@ This approach leverages the flexibility of QDK/Chemistry’s <a class="reference
 translated to the backend and the backend-specific settings that are passed through directly.</p>
 </section>
 <section id="data-conversion">
-<h2>Data Conversion<a class="headerlink" href="#data-conversion" title="Link to this heading"></a></h2>
+<h2>Data conversion<a class="headerlink" href="#data-conversion" title="Link to this heading"></a></h2>
 <p>QDK/Chemistry handles the conversion of data between its own format and third-party packages automatically.
 This internal conversion process is transparent to the user, allowing you to work exclusively with QDK/Chemistry data structures regardless of which backend implementation is used.
 This capability is built on QDK/Chemistry’s robust <a class="reference internal" href="serialization.html"><span class="doc">serialization</span></a> system, which provides standardized methods for data conversion between different formats.</p>
@@ -379,10 +383,9 @@ electron repulsion integrals (ERIs).
 When working with large systems, QDK/Chemistry may use direct algorithms or disk-based approaches to manage memory usage efficiently.</p>
 </section>
 <section id="performance-considerations">
-<h2>Performance Considerations<a class="headerlink" href="#performance-considerations" title="Link to this heading"></a></h2>
-<p>Using an interface to a third-party package may involve some overhead for data conversion. However, this overhead is
-typically negligible compared to the computational cost of the quantum chemical calculations themselves, especially for
-larger systems and more computationally intensive methods.</p>
+<h2>Performance considerations<a class="headerlink" href="#performance-considerations" title="Link to this heading"></a></h2>
+<p>Using an interface to a third-party package may involve some overhead for data conversion.
+However, this overhead is typically negligible compared to the computational cost of the quantum chemical calculations themselves, especially for larger systems and more computationally intensive methods.</p>
 <p>QDK/Chemistry implements several optimizations to minimize this overhead:</p>
 <ol class="arabic simple">
 <li><p><strong>Lazy evaluation</strong>: Some data conversions are only performed when actually needed</p></li>
@@ -393,12 +396,12 @@ larger systems and more computationally intensive methods.</p>
 and hardware environment.</p>
 </section>
 <section id="available-interfaces-by-algorithm">
-<h2>Available Interfaces by Algorithm<a class="headerlink" href="#available-interfaces-by-algorithm" title="Link to this heading"></a></h2>
-<div class="admonition note">
-<p class="admonition-title">Note</p>
-<p>This section requires verification. PySCF and other third-party interfaces may not be fully implemented for
-all algorithm classes mentioned. The table should be updated to reflect the actual implementation status of each
-interface.</p>
+<h2>Available interfaces by algorithm<a class="headerlink" href="#available-interfaces-by-algorithm" title="Link to this heading"></a></h2>
+<div class="admonition-todo admonition" id="id1">
+<p class="admonition-title">Todo</p>
+<p>This section of the interfaces documentation requires verification.
+PySCF and other third-party interfaces may not be fully implemented for all algorithm classes mentioned.
+The table should be updated to reflect the actual implementation status of each interface.</p>
 </div>
 <p>The following table provides an overview of the available interfaces for each algorithm class in QDK/Chemistry.
 Each algorithm class is implemented through the factory pattern, allowing you to select different implementations at runtime.</p>
@@ -406,10 +409,10 @@ Each algorithm class is implemented through the factory pattern, allowing you to
 <code class="docutils literal notranslate"><span class="pre">list_scf_solvers()</span></code> in Python or <code class="docutils literal notranslate"><span class="pre">ScfSolverFactory::available()</span></code> in C++).</p>
 </section>
 <section id="related-topics">
-<h2>Related Topics<a class="headerlink" href="#related-topics" title="Link to this heading"></a></h2>
+<h2>Related topics<a class="headerlink" href="#related-topics" title="Link to this heading"></a></h2>
 <ul class="simple">
-<li><p><a class="reference internal" href="design_principles.html"><span class="doc">Design Principles</span></a>: Core architectural principles of QDK/Chemistry</p></li>
-<li><p><a class="reference internal" href="factory_pattern.html"><span class="doc">Factory Pattern</span></a>: How to extend QDK/Chemistry with new algorithms and interfaces</p></li>
+<li><p><a class="reference internal" href="design_principles.html"><span class="doc">Design principles</span></a>: Core architectural principles of QDK/Chemistry</p></li>
+<li><p><a class="reference internal" href="factory_pattern.html"><span class="doc">Factory pattern</span></a>: How to extend QDK/Chemistry with new algorithms and interfaces</p></li>
 <li><p><a class="reference internal" href="settings.html"><span class="doc">Settings</span></a>: Configuring algorithm behavior consistently across implementations</p></li>
 <li><p><a class="reference internal" href="serialization.html"><span class="doc">Serialization</span></a>: Data persistence and conversion in QDK/Chemistry</p></li>
 </ul>
@@ -427,7 +430,7 @@ Each algorithm class is implemented through the factory pattern, allowing you to
   <hr/>
 
   <div role="contentinfo">
-    <p>&#169; Copyright Copyright (c) Microsoft Corporation. All rights reserved. Licensed under the MIT License..</p>
+    <p>&#169; Copyright Microsoft Corporation. All rights reserved. Licensed under the MIT License.</p>
   </div>
 
   Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a

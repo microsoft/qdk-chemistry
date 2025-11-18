@@ -6,17 +6,18 @@
   <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
 
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Localizer &mdash; QDK/Chemistry 0.0.1 documentation</title>
+  <title>Orbital localization &mdash; qdk-chemistry 1.0.0-rc1 documentation</title>
       <link rel="stylesheet" type="text/css" href="../../../_static/pygments.css?v=b86133f3" />
       <link rel="stylesheet" type="text/css" href="../../../_static/css/theme.css?v=e59714d7" />
       <link rel="stylesheet" type="text/css" href="../../../_static/tabs.css?v=4c969af8" />
       <link rel="stylesheet" type="text/css" href="../../../_static/graphviz.css?v=4ae1632d" />
       <link rel="stylesheet" type="text/css" href="../../../_static/copybutton.css?v=76b2166b" />
+      <link rel="stylesheet" type="text/css" href="../../../_static/custom.css?v=a64bac2b" />
 
   
       <script src="../../../_static/jquery.js?v=5d32c60e"></script>
       <script src="../../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
-      <script src="../../../_static/documentation_options.js?v=d45e8c67"></script>
+      <script src="../../../_static/documentation_options.js?v=81bd8d55"></script>
       <script src="../../../_static/doctools.js?v=9bcbadda"></script>
       <script src="../../../_static/sphinx_highlight.js?v=dc90522c"></script>
       <script src="../../../_static/tabs.js?v=3ee01567"></script>
@@ -25,8 +26,8 @@
     <script src="../../../_static/js/theme.js"></script>
     <link rel="index" title="Index" href="../../../genindex.html" />
     <link rel="search" title="Search" href="../../../search.html" />
-    <link rel="next" title="ActiveSpaceSelector" href="active_space.html" />
-    <link rel="prev" title="ScfSolver" href="scf_solver.html" /> 
+    <link rel="next" title="Multi-configuration calculations" href="mc_calculator.html" />
+    <link rel="prev" title="Classical Hamiltonian construction" href="hamiltonian_constructor.html" /> 
 </head>
 
 <body class="wy-body-for-nav"> 
@@ -38,7 +39,7 @@
           
           
           <a href="../../../index.html" class="icon icon-home">
-            QDK/Chemistry
+            qdk-chemistry
           </a>
 <div role="search">
   <form id="rtd-search-form" class="wy-form" action="../../../search.html" method="get">
@@ -50,32 +51,37 @@
         </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
               <p class="caption" role="heading"><span class="caption-text">User Documentation</span></p>
 <ul class="current">
-<li class="toctree-l1"><a class="reference internal" href="../../Quickstart.html">Quickstart</a></li>
-<li class="toctree-l1 current"><a class="reference internal" href="../index.html">In-Depth Guide</a><ul class="current">
-<li class="toctree-l2"><a class="reference internal" href="../design.html">Design and Architecture</a></li>
-<li class="toctree-l2"><a class="reference internal" href="../data.html">Data Classes</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../quickstart.html">Quickstart</a></li>
+<li class="toctree-l1 current"><a class="reference internal" href="../index.html">In-depth user guide</a><ul class="current">
+<li class="toctree-l2"><a class="reference internal" href="../design.html">Design and architecture</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../data.html">Data classes</a></li>
 <li class="toctree-l2 current"><a class="reference internal" href="../algorithms.html">Algorithms</a><ul class="current">
-<li class="toctree-l3"><a class="reference internal" href="scf_solver.html">ScfSolver</a></li>
-<li class="toctree-l3 current"><a class="current reference internal" href="#">Localizer</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="active_space.html">Active space selection</a></li>
+<li class="toctree-l3"><a class="reference internal" href="energy_estimator.html">Energy estimation</a></li>
+<li class="toctree-l3"><a class="reference internal" href="hamiltonian_constructor.html">Classical Hamiltonian construction</a></li>
+<li class="toctree-l3 current"><a class="current reference internal" href="#">Orbital localization</a><ul>
 <li class="toctree-l4"><a class="reference internal" href="#overview">Overview</a></li>
 <li class="toctree-l4"><a class="reference internal" href="#localization-methods">Localization Methods</a></li>
-<li class="toctree-l4"><a class="reference internal" href="#creating-a-localizer">Creating a Localizer</a></li>
-<li class="toctree-l4"><a class="reference internal" href="#configuring-the-localizer">Configuring the Localizer</a></li>
-<li class="toctree-l4"><a class="reference internal" href="#performing-orbital-localization">Performing Orbital Localization</a></li>
-<li class="toctree-l4"><a class="reference internal" href="#available-localization-methods">Available Localization Methods</a></li>
-<li class="toctree-l4"><a class="reference internal" href="#available-settings">Available Settings</a></li>
-<li class="toctree-l4"><a class="reference internal" href="#computational-scaling">Computational Scaling</a></li>
-<li class="toctree-l4"><a class="reference internal" href="#implemented-interface">Implemented Interface</a></li>
-<li class="toctree-l4"><a class="reference internal" href="#related-classes">Related Classes</a></li>
+<li class="toctree-l4"><a class="reference internal" href="#creating-a-localizer">Creating a localizer</a></li>
+<li class="toctree-l4"><a class="reference internal" href="#configuring-the-localizer">Configuring the localizer</a></li>
+<li class="toctree-l4"><a class="reference internal" href="#performing-orbital-localization">Performing orbital localization</a></li>
+<li class="toctree-l4"><a class="reference internal" href="#available-localization-methods">Available localization methods</a></li>
+<li class="toctree-l4"><a class="reference internal" href="#available-settings">Available settings</a></li>
+<li class="toctree-l4"><a class="reference internal" href="#computational-scaling">Computational scaling</a></li>
+<li class="toctree-l4"><a class="reference internal" href="#implemented-interface">Implemented interface</a></li>
+<li class="toctree-l4"><a class="reference internal" href="#related-classes">Related classes</a></li>
 </ul>
 </li>
-<li class="toctree-l3"><a class="reference internal" href="active_space.html">ActiveSpaceSelector</a></li>
-<li class="toctree-l3"><a class="reference internal" href="hamiltonian_constructor.html">HamiltonianConstructor</a></li>
-<li class="toctree-l3"><a class="reference internal" href="mc_calculator.html">MCCalculator</a></li>
-<li class="toctree-l3"><a class="reference internal" href="dynamical_correlation.html">DynamicalCorrelation</a></li>
+<li class="toctree-l3"><a class="reference internal" href="mc_calculator.html">Multi-configuration calculations</a></li>
+<li class="toctree-l3"><a class="reference internal" href="pmc.html">Projected multi-configuration calculations</a></li>
+<li class="toctree-l3"><a class="reference internal" href="qubit_mapper.html">Qubit mapping</a></li>
+<li class="toctree-l3"><a class="reference internal" href="reference_derived.html">Reference-derived calculations</a></li>
+<li class="toctree-l3"><a class="reference internal" href="scf_solver.html">Self-consistent field solving</a></li>
+<li class="toctree-l3"><a class="reference internal" href="stability_checker.html">SCF stability checks</a></li>
+<li class="toctree-l3"><a class="reference internal" href="state_preparation.html">State preparation</a></li>
 </ul>
 </li>
-<li class="toctree-l2"><a class="reference internal" href="../keywords.html">Functionals and Basis Sets</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../keywords.html">Functionals and basis sets</a></li>
 <li class="toctree-l2"><a class="reference internal" href="../plugins.html">Plugins</a></li>
 </ul>
 </li>
@@ -87,7 +93,7 @@
 </ul>
 <p class="caption" role="heading"><span class="caption-text">Supporting Information</span></p>
 <ul>
-<li class="toctree-l1"><a class="reference internal" href="../../../glossary.html">Glossary</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../glossary.html">Acronym definitions</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../../references.html">References</a></li>
 </ul>
 
@@ -97,7 +103,7 @@
 
     <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
           <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
-          <a href="../../../index.html">QDK/Chemistry</a>
+          <a href="../../../index.html">qdk-chemistry</a>
       </nav>
 
       <div class="wy-nav-content">
@@ -105,9 +111,9 @@
           <div role="navigation" aria-label="Page navigation">
   <ul class="wy-breadcrumbs">
       <li><a href="../../../index.html" class="icon icon-home" aria-label="Home"></a></li>
-          <li class="breadcrumb-item"><a href="../index.html">In-Depth Guide</a></li>
+          <li class="breadcrumb-item"><a href="../index.html">In-depth user guide</a></li>
           <li class="breadcrumb-item"><a href="../algorithms.html">Algorithms</a></li>
-      <li class="breadcrumb-item active">Localizer</li>
+      <li class="breadcrumb-item active">Orbital localization</li>
       <li class="wy-breadcrumbs-aside">
             <a href="../../../_sources/user/comprehensive/algorithms/localizer.rst.txt" rel="nofollow"> View page source</a>
       </li>
@@ -117,20 +123,16 @@
           <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
            <div itemprop="articleBody">
              
-  <section id="localizer">
-<h1>Localizer<a class="headerlink" href="#localizer" title="Link to this heading"></a></h1>
-<p>The <code class="docutils literal notranslate"><span class="pre">Localizer</span></code> algorithm in QDK/Chemistry performs various orbital transformations to create localized or otherwise transformed
-molecular orbitals. Following QDK/Chemistry’s <a class="reference internal" href="../advanced/design_principles.html"><span class="doc">algorithm design principles</span></a>, it takes an
-<a class="reference internal" href="../data/orbitals.html"><span class="doc">Orbitals</span></a> instance as input and produces a new <a class="reference internal" href="../data/orbitals.html"><span class="doc">Orbitals</span></a> instance as
-output. These transformations preserve the overall electronic state but provide orbitals with different properties that
-are useful for chemical analysis or subsequent calculations.</p>
+  <section id="orbital-localization">
+<h1>Orbital localization<a class="headerlink" href="#orbital-localization" title="Link to this heading"></a></h1>
+<p>The <code class="docutils literal notranslate"><span class="pre">Localizer</span></code> algorithm in QDK/Chemistry performs various orbital transformations to create localized or otherwise transformed molecular orbitals.
+Following QDK/Chemistry’s <a class="reference internal" href="../advanced/design_principles.html"><span class="doc">algorithm design principles</span></a>, it takes an <a class="reference internal" href="../data/orbitals.html"><span class="doc">Orbitals</span></a> instance as input and produces a new <a class="reference internal" href="../data/orbitals.html"><span class="doc">Orbitals</span></a> instance as output.
+These transformations preserve the overall electronic state but provide orbitals with different properties that are useful for chemical analysis or subsequent calculations.</p>
 <section id="overview">
 <h2>Overview<a class="headerlink" href="#overview" title="Link to this heading"></a></h2>
-<p>Canonical molecular orbitals from SCF calculations are often delocalized over the entire molecule, which can make
-chemical interpretation difficult and lead to slow convergence in post-HF methods. The <code class="docutils literal notranslate"><span class="pre">Localizer</span></code> algorithm applies
-unitary transformations to these orbitals to obtain alternative representations that may be more physically intuitive or
-computationally advantageous. Multiple localization methods are available through a unified interface, each optimizing
-different criteria to achieve localization.</p>
+<p>Canonical molecular orbitals from <a class="reference internal" href="../../../glossary.html#term-SCF"><span class="xref std std-term">SCF</span></a> calculations are often delocalized over the entire molecule, which can make chemical interpretation difficult and lead to slow convergence in post-<a class="reference internal" href="../../../glossary.html#term-HF"><span class="xref std std-term">HF</span></a> methods.
+The <code class="docutils literal notranslate"><span class="pre">Localizer</span></code> algorithm applies unitary transformations to these orbitals to obtain alternative representations that may be more physically intuitive or computationally advantageous.
+Multiple localization methods are available through a unified interface, each optimizing different criteria to achieve localization.</p>
 </section>
 <section id="localization-methods">
 <h2>Localization Methods<a class="headerlink" href="#localization-methods" title="Link to this heading"></a></h2>
@@ -138,24 +140,14 @@ different criteria to achieve localization.</p>
 <ul class="simple">
 <li><p><strong>Pipek-Mezey Localization</strong></p></li>
 <li><p><strong>Natural Orbitals</strong></p></li>
-<li><p><strong>MP2 Natural Orbitals</strong></p></li>
+<li><p><strong>Second-order Møller-Plesset (MP2) Natural Orbitals</strong></p></li>
 </ul>
-<div class="admonition-todo admonition" id="id1">
-<p class="admonition-title">Todo</p>
-<p>TODO (NAB):  add names for invoking localizer methods to list (e.g., “mp2_natural_orbitals”)</p>
-</div>
 </section>
 <section id="creating-a-localizer">
-<h2>Creating a Localizer<a class="headerlink" href="#creating-a-localizer" title="Link to this heading"></a></h2>
-<p>As an algorithm class in QDK/Chemistry, the <code class="docutils literal notranslate"><span class="pre">Localizer</span></code> follows the
-<a class="reference internal" href="../advanced/design_principles.html"><span class="doc">factory pattern design principle</span></a>. It is created using its corresponding factory,
-which provides a unified interface for different localization method implementations. For more information about this
-pattern, see the <a class="reference internal" href="../advanced/factory_pattern.html"><span class="doc">Factory Pattern</span></a> documentation.</p>
-<div class="admonition-todo admonition" id="id2">
-<p class="admonition-title">Todo</p>
-<p>TODO (NAB):  Check Localizer code examples after finalizing API.
-<a class="reference external" href="https://dev.azure.com/ms-azurequantum/AzureQuantum/_workitems/edit/41366">https://dev.azure.com/ms-azurequantum/AzureQuantum/_workitems/edit/41366</a></p>
-</div>
+<h2>Creating a localizer<a class="headerlink" href="#creating-a-localizer" title="Link to this heading"></a></h2>
+<p>As an algorithm class in QDK/Chemistry, the <code class="docutils literal notranslate"><span class="pre">Localizer</span></code> follows the <a class="reference internal" href="../advanced/design_principles.html"><span class="doc">factory pattern design principle</span></a>.
+It is created using its corresponding factory, which provides a unified interface for different localization method implementations.
+For more information about this pattern, see the <a class="reference internal" href="../advanced/factory_pattern.html"><span class="doc">Factory Pattern</span></a> documentation.</p>
 <div class="tab-set docutils container">
 <input checked="True" class="tab-input" id="tab-set--0-input--1" name="tab-set--0" type="radio"><label class="tab-label" for="tab-set--0-input--1">C++ API</label><div class="tab-content docutils container">
 <div class="highlight-cpp notranslate"><div class="highlight"><pre><span></span><span class="cp">#include</span><span class="w"> </span><span class="cpf">&lt;qdk/chemistry.hpp&gt;</span>
@@ -167,27 +159,18 @@ pattern, see the <a class="reference internal" href="../advanced/factory_pattern
 </div>
 </div>
 <input class="tab-input" id="tab-set--0-input--2" name="tab-set--0" type="radio"><label class="tab-label" for="tab-set--0-input--2">Python API</label><div class="tab-content docutils container">
-<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">from</span><span class="w"> </span><span class="nn">qdk.chemistry.algorithms</span><span class="w"> </span><span class="kn">import</span> <span class="n">create_localizer</span>
-
-<span class="c1"># Create an MP2 natural orbital localizer</span>
-<span class="n">mp2_localizer</span> <span class="o">=</span> <span class="n">create_localizer</span><span class="p">(</span><span class="s2">&quot;mp2_natural_orbitals&quot;</span><span class="p">)</span>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="c1"># --------------------------------------------------------------------------------------------</span>
+<span class="c1"># Copyright (c) Microsoft Corporation. All rights reserved.</span>
+<span class="c1"># Licensed under the MIT License. See LICENSE.txt in the project root for license information.</span>
+<span class="c1"># --------------------------------------------------------------------------------------------</span>
 </pre></div>
 </div>
 </div>
 </div>
 </section>
 <section id="configuring-the-localizer">
-<h2>Configuring the Localizer<a class="headerlink" href="#configuring-the-localizer" title="Link to this heading"></a></h2>
+<h2>Configuring the localizer<a class="headerlink" href="#configuring-the-localizer" title="Link to this heading"></a></h2>
 <p>The <code class="docutils literal notranslate"><span class="pre">Localizer</span></code> can be configured using the <code class="docutils literal notranslate"><span class="pre">Settings</span></code> object:</p>
-<div class="admonition note">
-<p class="admonition-title">Note</p>
-<p>🔧 <strong>TODO</strong>: Check implementational details</p>
-</div>
-<div class="admonition-todo admonition" id="id3">
-<p class="admonition-title">Todo</p>
-<p>TODO (NAB):  finish Localizer documentation
-<a class="reference external" href="https://dev.azure.com/ms-azurequantum/AzureQuantum/_workitems/edit/41380">https://dev.azure.com/ms-azurequantum/AzureQuantum/_workitems/edit/41380</a></p>
-</div>
 <div class="tab-set docutils container">
 <input checked="True" class="tab-input" id="tab-set--1-input--1" name="tab-set--1" type="radio"><label class="tab-label" for="tab-set--1-input--1">C++ API</label><div class="tab-content docutils container">
 <div class="highlight-cpp notranslate"><div class="highlight"><pre><span></span><span class="c1">// Set the convergence threshold</span>
@@ -196,20 +179,17 @@ pattern, see the <a class="reference internal" href="../advanced/factory_pattern
 </div>
 </div>
 <input class="tab-input" id="tab-set--1-input--2" name="tab-set--1" type="radio"><label class="tab-label" for="tab-set--1-input--2">Python API</label><div class="tab-content docutils container">
-<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="c1"># Set the convergence threshold</span>
-<span class="n">localizer</span><span class="o">.</span><span class="n">settings</span><span class="p">()</span><span class="o">.</span><span class="n">set</span><span class="p">(</span><span class="s2">&quot;tolerance&quot;</span><span class="p">,</span> <span class="mf">1.0e-6</span><span class="p">)</span>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="c1"># Create an MP2 natural orbital localizer</span>
 </pre></div>
 </div>
 </div>
 </div>
 </section>
 <section id="performing-orbital-localization">
-<h2>Performing Orbital Localization<a class="headerlink" href="#performing-orbital-localization" title="Link to this heading"></a></h2>
-<p>Before performing localization, you need an <a class="reference internal" href="../data/orbitals.html"><span class="doc">Orbitals</span></a> instance as input. This is typically
-obtained from an <a class="reference internal" href="scf_solver.html"><span class="doc">ScfSolver</span></a> calculation, as localization is usually applied to converged SCF orbitals.
-Following QDK/Chemistry’s <a class="reference internal" href="../advanced/design_principles.html"><span class="doc">algorithm design principles</span></a>, the <code class="docutils literal notranslate"><span class="pre">Localizer</span></code> algorithm takes an
-<code class="docutils literal notranslate"><span class="pre">Orbitals</span></code> object as input and produces a new <code class="docutils literal notranslate"><span class="pre">Orbitals</span></code> object as output, preserving the original orbitals while
-creating a transformed representation.</p>
+<h2>Performing orbital localization<a class="headerlink" href="#performing-orbital-localization" title="Link to this heading"></a></h2>
+<p>Before performing localization, you need an <a class="reference internal" href="../data/orbitals.html"><span class="doc">Orbitals</span></a> instance as input.
+This is typically obtained from an <a class="reference internal" href="scf_solver.html"><span class="doc">ScfSolver</span></a> calculation, as localization is usually applied to converged <a class="reference internal" href="../../../glossary.html#term-SCF"><span class="xref std std-term">SCF</span></a> orbitals.
+Following QDK/Chemistry’s <a class="reference internal" href="../advanced/design_principles.html"><span class="doc">algorithm design principles</span></a>, the <code class="docutils literal notranslate"><span class="pre">Localizer</span></code> algorithm takes an <code class="docutils literal notranslate"><span class="pre">Orbitals</span></code> object as input and produces a new <code class="docutils literal notranslate"><span class="pre">Orbitals</span></code> object as output, preserving the original orbitals while creating a transformed representation.</p>
 <p>The <code class="docutils literal notranslate"><span class="pre">run</span></code> method requires three parameters:</p>
 <ol class="arabic simple">
 <li><p><strong>orbitals</strong>: The input <a class="reference internal" href="../data/orbitals.html"><span class="doc">Orbitals</span></a> instance to be localized</p></li>
@@ -242,50 +222,41 @@ If empty vectors/lists are provided, no orbitals of that spin type will be local
 </div>
 </div>
 <input class="tab-input" id="tab-set--2-input--2" name="tab-set--2" type="radio"><label class="tab-label" for="tab-set--2-input--2">Python API</label><div class="tab-content docutils container">
-<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="c1"># Obtain a valid Orbitals instance</span>
-<span class="n">orbitals</span> <span class="o">=</span> <span class="n">Orbitals</span><span class="p">()</span>
-<span class="c1"># orbitals = ...</span>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>This example shows the API pattern. For complete working examples, see the test suite.</p>
+</div>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="sd">&quot;&quot;&quot;Factory pattern usage examples.&quot;&quot;&quot;</span>
 
-<span class="c1"># Configure electron counts in settings for methods that require them</span>
-<span class="n">localizer</span><span class="o">.</span><span class="n">settings</span><span class="p">()</span><span class="o">.</span><span class="n">set</span><span class="p">(</span><span class="s2">&quot;n_alpha_electrons&quot;</span><span class="p">,</span> <span class="n">n_alpha</span><span class="p">)</span>
-<span class="n">localizer</span><span class="o">.</span><span class="n">settings</span><span class="p">()</span><span class="o">.</span><span class="n">set</span><span class="p">(</span><span class="s2">&quot;n_beta_electrons&quot;</span><span class="p">,</span> <span class="n">n_beta</span><span class="p">)</span>
+<span class="c1"># --------------------------------------------------------------------------------------------</span>
+<span class="c1"># Copyright (c) Microsoft Corporation. All rights reserved.</span>
+<span class="c1"># Licensed under the MIT License. See LICENSE.txt in the project root for license information.</span>
+<span class="c1"># --------------------------------------------------------------------------------------------</span>
 
-<span class="c1"># Create indices for orbitals to localize</span>
-<span class="n">loc_indices_a</span> <span class="o">=</span> <span class="p">[</span><span class="mi">0</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="mi">2</span><span class="p">,</span> <span class="mi">3</span><span class="p">]</span>  <span class="c1"># Alpha orbital indices</span>
-<span class="n">loc_indices_b</span> <span class="o">=</span> <span class="p">[</span><span class="mi">0</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="mi">2</span><span class="p">,</span> <span class="mi">3</span><span class="p">]</span>  <span class="c1"># Beta orbital indices</span>
-
-<span class="c1"># Localize the specified orbitals</span>
-<span class="n">localized_orbitals</span> <span class="o">=</span> <span class="n">localizer</span><span class="o">.</span><span class="n">run</span><span class="p">(</span><span class="n">orbitals</span><span class="p">,</span> <span class="n">loc_indices_a</span><span class="p">,</span> <span class="n">loc_indices_b</span><span class="p">)</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">numpy</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">np</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.algorithms</span><span class="w"> </span><span class="kn">import</span> <span class="n">available</span><span class="p">,</span> <span class="n">create</span>
 </pre></div>
 </div>
 </div>
 </div>
 </section>
 <section id="available-localization-methods">
-<h2>Available Localization Methods<a class="headerlink" href="#available-localization-methods" title="Link to this heading"></a></h2>
-<div class="admonition-todo admonition" id="id4">
+<h2>Available localization methods<a class="headerlink" href="#available-localization-methods" title="Link to this heading"></a></h2>
+<div class="admonition-todo admonition" id="id1">
 <p class="admonition-title">Todo</p>
-<p>🔧 <strong>TODO</strong>: Add detailed descriptions of each localization method with theory and practical considerations</p>
-<p>TODO (NAB):  finish Localizer documentation
-<a class="reference external" href="https://dev.azure.com/ms-azurequantum/AzureQuantum/_workitems/edit/41380">https://dev.azure.com/ms-azurequantum/AzureQuantum/_workitems/edit/41380</a></p>
+<p>The detailed descriptions of each localization method are currently under construction.</p>
 </div>
 </section>
 <section id="available-settings">
-<h2>Available Settings<a class="headerlink" href="#available-settings" title="Link to this heading"></a></h2>
+<h2>Available settings<a class="headerlink" href="#available-settings" title="Link to this heading"></a></h2>
 <p>The <code class="docutils literal notranslate"><span class="pre">Localizer</span></code> accepts a range of settings to control its behavior. These settings are divided into base settings
 (common to all localization methods) and specialized settings (specific to certain localization variants).</p>
-<div class="admonition-todo admonition" id="id5">
-<p class="admonition-title">Todo</p>
-<p>🔧 <strong>TODO</strong>: Verify and complete the settings tables with accurate parameters and descriptions</p>
-<p>TODO (NAB):  finish Localizer documentation
-<a class="reference external" href="https://dev.azure.com/ms-azurequantum/AzureQuantum/_workitems/edit/41380">https://dev.azure.com/ms-azurequantum/AzureQuantum/_workitems/edit/41380</a></p>
-</div>
 <section id="base-settings">
-<h3>Base Settings<a class="headerlink" href="#base-settings" title="Link to this heading"></a></h3>
+<h3>Base settings<a class="headerlink" href="#base-settings" title="Link to this heading"></a></h3>
 <p>These settings apply to all localization methods:</p>
 </section>
 <section id="specialized-settings">
-<h3>Specialized Settings<a class="headerlink" href="#specialized-settings" title="Link to this heading"></a></h3>
+<h3>Specialized settings<a class="headerlink" href="#specialized-settings" title="Link to this heading"></a></h3>
 <p>These settings apply only to specific variants of localization:</p>
 <table class="docutils align-default">
 <colgroup>
@@ -308,31 +279,33 @@ If empty vectors/lists are provided, no orbitals of that spin type will be local
 <td><p>float</p></td>
 <td><p>1.0e-6</p></td>
 <td><p>Convergence criterion for localization iterations</p></td>
-<td><p>Pipek-Mezey, VVHV</p></td>
+<td><p>Pipek-Mezey, Valence Virtual Hard Virtual (VVHV)</p></td>
 </tr>
 <tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">max_iterations</span></code></p></td>
 <td><p>int</p></td>
 <td><p>10000</p></td>
 <td><p>Maximum number of localization iterations</p></td>
-<td><p>Pipek-Mezey, VVHV</p></td>
+<td><p>Pipek-Mezey, <a class="reference internal" href="../../../glossary.html#term-VVHV"><span class="xref std std-term">VVHV</span></a></p></td>
 </tr>
 <tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">small_rotation_tolerance</span></code></p></td>
 <td><p>float</p></td>
 <td><p>1.0e-12</p></td>
 <td><p>Threshold for small rotation detection</p></td>
-<td><p>Pipek-Mezey, VVHV</p></td>
+<td><p>Pipek-Mezey, <a class="reference internal" href="../../../glossary.html#term-VVHV"><span class="xref std std-term">VVHV</span></a></p></td>
 </tr>
 <tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">n_alpha_electrons</span></code></p></td>
 <td><p>int</p></td>
 <td><p>Required</p></td>
-<td><p>Number of alpha electrons. Orbital indices &lt; n_alpha_electrons are treated as occupied, indices &gt;= n_alpha_electrons are treated as virtual.</p></td>
-<td><p>MP2 Natural Orbitals, VVHV</p></td>
+<td><p>Number of alpha electrons.
+Orbital indices &lt; n_alpha_electrons are treated as occupied, indices &gt;= n_alpha_electrons are treated as virtual.</p></td>
+<td><p><a class="reference internal" href="../../../glossary.html#term-MP2"><span class="xref std std-term">MP2</span></a> Natural Orbitals, <a class="reference internal" href="../../../glossary.html#term-VVHV"><span class="xref std std-term">VVHV</span></a></p></td>
 </tr>
 <tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">n_beta_electrons</span></code></p></td>
 <td><p>int</p></td>
 <td><p>Required</p></td>
-<td><p>Number of beta electrons. Orbital indices &lt; n_beta_electrons are treated as occupied, indices &gt;= n_beta_electrons are treated as virtual.</p></td>
-<td><p>MP2 Natural Orbitals, VVHV</p></td>
+<td><p>Number of beta electrons.
+Orbital indices &lt; n_beta_electrons are treated as occupied, indices &gt;= n_beta_electrons are treated as virtual.</p></td>
+<td><p><a class="reference internal" href="../../../glossary.html#term-MP2"><span class="xref std std-term">MP2</span></a> Natural Orbitals, <a class="reference internal" href="../../../glossary.html#term-VVHV"><span class="xref std std-term">VVHV</span></a></p></td>
 </tr>
 <tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">method</span></code></p></td>
 <td><p>string</p></td>
@@ -356,21 +329,21 @@ If empty vectors/lists are provided, no orbitals of that spin type will be local
 <td><p>string</p></td>
 <td><p>“sto-3g”</p></td>
 <td><p>Name of the minimal basis set used for valence virtual projection</p></td>
-<td><p>VVHV</p></td>
+<td><p><a class="reference internal" href="../../../glossary.html#term-VVHV"><span class="xref std std-term">VVHV</span></a></p></td>
 </tr>
 <tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">weighted_orthogonalization</span></code></p></td>
 <td><p>bool</p></td>
 <td><p>true</p></td>
 <td><p>Whether to use weighted orthogonalization in hard virtual construction</p></td>
-<td><p>VVHV</p></td>
+<td><p><a class="reference internal" href="../../../glossary.html#term-VVHV"><span class="xref std std-term">VVHV</span></a></p></td>
 </tr>
 </tbody>
 </table>
 </section>
 </section>
 <section id="computational-scaling">
-<h2>Computational Scaling<a class="headerlink" href="#computational-scaling" title="Link to this heading"></a></h2>
-<div class="admonition-todo admonition" id="id6">
+<h2>Computational scaling<a class="headerlink" href="#computational-scaling" title="Link to this heading"></a></h2>
+<div class="admonition-todo admonition" id="id2">
 <p class="admonition-title">Todo</p>
 <p>🔧 <strong>TODO</strong>: Add computational scaling for all localization methods</p>
 </div>
@@ -388,39 +361,33 @@ If empty vectors/lists are provided, no orbitals of that spin type will be local
 </tr>
 </thead>
 <tbody>
-<tr class="row-even"><td><p>MP2 Natural Orbitals</p></td>
+<tr class="row-even"><td><p><a class="reference internal" href="../../../glossary.html#term-MP2"><span class="xref std std-term">MP2</span></a> Natural Orbitals</p></td>
 <td><p>O(N⁵)</p></td>
-<td><p>Requires MP2 density matrix construction</p></td>
+<td><p>Requires <a class="reference internal" href="../../../glossary.html#term-MP2"><span class="xref std std-term">MP2</span></a> density matrix construction</p></td>
 </tr>
 </tbody>
 </table>
 </section>
 <section id="implemented-interface">
-<h2>Implemented Interface<a class="headerlink" href="#implemented-interface" title="Link to this heading"></a></h2>
-<p>QDK/Chemistry’s <code class="docutils literal notranslate"><span class="pre">Localizer</span></code> provides a unified interface for localization methods:</p>
+<h2>Implemented interface<a class="headerlink" href="#implemented-interface" title="Link to this heading"></a></h2>
+<p>QDK/Chemistry’s <code class="docutils literal notranslate"><span class="pre">Localizer</span></code> provides a unified interface for localization methods.</p>
 <section id="qdk-chemistry-implementations">
-<h3>QDK/Chemistry Implementations<a class="headerlink" href="#qdk-chemistry-implementations" title="Link to this heading"></a></h3>
+<h3>QDK/Chemistry implementations<a class="headerlink" href="#qdk-chemistry-implementations" title="Link to this heading"></a></h3>
 <ul class="simple">
-<li><p><strong>QDK/Chemistry</strong>: Native implementation of Pipek-Mezey, and MP2 natural orbital localization</p></li>
+<li><p><strong>QDK/Chemistry</strong>: Native implementation of Pipek-Mezey, and <a class="reference internal" href="../../../glossary.html#term-MP2"><span class="xref std std-term">MP2</span></a> natural orbital localization</p></li>
 </ul>
 </section>
 <section id="third-party-interfaces">
-<h3>Third-Party Interfaces<a class="headerlink" href="#third-party-interfaces" title="Link to this heading"></a></h3>
+<h3>Third-party interfaces<a class="headerlink" href="#third-party-interfaces" title="Link to this heading"></a></h3>
 <ul class="simple">
-<li><p><strong>PySCF</strong>: Interface to PySCF’s orbital localization methods (TODO: is this true?)</p></li>
+<li><p><strong>PySCF</strong>: Interface to PySCF’s orbital localization methods</p></li>
 </ul>
-<div class="admonition-todo admonition" id="id7">
-<p class="admonition-title">Todo</p>
-<p>TODO (NAB):  correct Localizer documentation if needed and remove TODO
-<a class="reference external" href="https://dev.azure.com/ms-azurequantum/AzureQuantum/_workitems/edit/41380">https://dev.azure.com/ms-azurequantum/AzureQuantum/_workitems/edit/41380</a></p>
-</div>
 <p>The factory pattern allows seamless selection between these implementations.</p>
-<p>For more details on how QDK/Chemistry interfaces with external packages, see the <a class="reference internal" href="../advanced/interfaces.html"><span class="doc">Interfaces</span></a>
-documentation.</p>
+<p>For more details on how QDK/Chemistry interfaces with external packages, see the <a class="reference internal" href="../advanced/interfaces.html"><span class="doc">Interfaces</span></a> documentation.</p>
 </section>
 </section>
 <section id="related-classes">
-<h2>Related Classes<a class="headerlink" href="#related-classes" title="Link to this heading"></a></h2>
+<h2>Related classes<a class="headerlink" href="#related-classes" title="Link to this heading"></a></h2>
 <ul class="simple">
 <li><p><a class="reference internal" href="../data/orbitals.html"><span class="doc">Orbitals</span></a>: Input and output orbitals</p></li>
 <li><p><a class="reference internal" href="scf_solver.html"><span class="doc">ScfSolver</span></a>: Produces initial orbitals for localization</p></li>
@@ -434,14 +401,14 @@ documentation.</p>
            </div>
           </div>
           <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
-        <a href="scf_solver.html" class="btn btn-neutral float-left" title="ScfSolver" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
-        <a href="active_space.html" class="btn btn-neutral float-right" title="ActiveSpaceSelector" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+        <a href="hamiltonian_constructor.html" class="btn btn-neutral float-left" title="Classical Hamiltonian construction" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+        <a href="mc_calculator.html" class="btn btn-neutral float-right" title="Multi-configuration calculations" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
     </div>
 
   <hr/>
 
   <div role="contentinfo">
-    <p>&#169; Copyright Copyright (c) Microsoft Corporation. All rights reserved. Licensed under the MIT License..</p>
+    <p>&#169; Copyright Microsoft Corporation. All rights reserved. Licensed under the MIT License.</p>
   </div>
 
   Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a

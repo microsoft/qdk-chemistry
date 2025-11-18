@@ -1,0 +1,853 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../../">
+<head>
+  <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>qdk_chemistry.data.qpe_result module &mdash; qdk-chemistry 1.0.0-rc1 documentation</title>
+      <link rel="stylesheet" type="text/css" href="../../_static/pygments.css?v=b86133f3" />
+      <link rel="stylesheet" type="text/css" href="../../_static/css/theme.css?v=e59714d7" />
+      <link rel="stylesheet" type="text/css" href="../../_static/tabs.css?v=4c969af8" />
+      <link rel="stylesheet" type="text/css" href="../../_static/graphviz.css?v=4ae1632d" />
+      <link rel="stylesheet" type="text/css" href="../../_static/copybutton.css?v=76b2166b" />
+      <link rel="stylesheet" type="text/css" href="../../_static/custom.css?v=a64bac2b" />
+
+  
+      <script src="../../_static/jquery.js?v=5d32c60e"></script>
+      <script src="../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="../../_static/documentation_options.js?v=81bd8d55"></script>
+      <script src="../../_static/doctools.js?v=9bcbadda"></script>
+      <script src="../../_static/sphinx_highlight.js?v=dc90522c"></script>
+      <script src="../../_static/tabs.js?v=3ee01567"></script>
+      <script src="../../_static/clipboard.min.js?v=a7894cd8"></script>
+      <script src="../../_static/copybutton.js?v=f281be69"></script>
+    <script src="../../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../../genindex.html" />
+    <link rel="search" title="Search" href="../../search.html" />
+    <link rel="next" title="qdk_chemistry.data.qubit_hamiltonian module" href="qdk_chemistry.data.qubit_hamiltonian.html" />
+    <link rel="prev" title="qdk_chemistry.data.estimator_data module" href="qdk_chemistry.data.estimator_data.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="../../index.html" class="icon icon-home">
+            qdk-chemistry
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">User Documentation</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../user/quickstart.html">Quickstart</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../user/comprehensive/index.html">In-depth user guide</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">API Reference</span></p>
+<ul class="current">
+<li class="toctree-l1 current"><a class="reference internal" href="../python_api.html">Python API</a><ul class="current">
+<li class="toctree-l2 current"><a class="reference internal" href="../python_api.html#data-classes">Data Classes</a><ul class="current">
+<li class="toctree-l3 current"><a class="reference internal" href="qdk_chemistry.data.html">qdk_chemistry.data package</a><ul class="current">
+<li class="toctree-l4"><a class="reference internal" href="qdk_chemistry.data.html#qdk_chemistry.data.Ansatz"><code class="docutils literal notranslate"><span class="pre">Ansatz</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="qdk_chemistry.data.html#qdk_chemistry.data.BasisSet"><code class="docutils literal notranslate"><span class="pre">BasisSet</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="qdk_chemistry.data.html#qdk_chemistry.data.BasisType"><code class="docutils literal notranslate"><span class="pre">BasisType</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="qdk_chemistry.data.html#qdk_chemistry.data.CasWavefunctionContainer"><code class="docutils literal notranslate"><span class="pre">CasWavefunctionContainer</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="qdk_chemistry.data.html#qdk_chemistry.data.Configuration"><code class="docutils literal notranslate"><span class="pre">Configuration</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="qdk_chemistry.data.html#qdk_chemistry.data.CoupledClusterAmplitudes"><code class="docutils literal notranslate"><span class="pre">CoupledClusterAmplitudes</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="qdk_chemistry.data.html#qdk_chemistry.data.DataClass"><code class="docutils literal notranslate"><span class="pre">DataClass</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="qdk_chemistry.data.html#qdk_chemistry.data.ElectronicStructureSettings"><code class="docutils literal notranslate"><span class="pre">ElectronicStructureSettings</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="qdk_chemistry.data.html#qdk_chemistry.data.Element"><code class="docutils literal notranslate"><span class="pre">Element</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="qdk_chemistry.data.html#qdk_chemistry.data.EnergyExpectationResult"><code class="docutils literal notranslate"><span class="pre">EnergyExpectationResult</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="qdk_chemistry.data.html#qdk_chemistry.data.Hamiltonian"><code class="docutils literal notranslate"><span class="pre">Hamiltonian</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="qdk_chemistry.data.html#qdk_chemistry.data.MeasurementData"><code class="docutils literal notranslate"><span class="pre">MeasurementData</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="qdk_chemistry.data.html#qdk_chemistry.data.ModelOrbitals"><code class="docutils literal notranslate"><span class="pre">ModelOrbitals</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="qdk_chemistry.data.html#qdk_chemistry.data.OrbitalType"><code class="docutils literal notranslate"><span class="pre">OrbitalType</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="qdk_chemistry.data.html#qdk_chemistry.data.Orbitals"><code class="docutils literal notranslate"><span class="pre">Orbitals</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="qdk_chemistry.data.html#qdk_chemistry.data.QpeResult"><code class="docutils literal notranslate"><span class="pre">QpeResult</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="qdk_chemistry.data.html#qdk_chemistry.data.QubitHamiltonian"><code class="docutils literal notranslate"><span class="pre">QubitHamiltonian</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="qdk_chemistry.data.html#qdk_chemistry.data.SciWavefunctionContainer"><code class="docutils literal notranslate"><span class="pre">SciWavefunctionContainer</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="qdk_chemistry.data.html#qdk_chemistry.data.SettingNotFound"><code class="docutils literal notranslate"><span class="pre">SettingNotFound</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="qdk_chemistry.data.html#qdk_chemistry.data.SettingNotFoundError"><code class="docutils literal notranslate"><span class="pre">SettingNotFoundError</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="qdk_chemistry.data.html#qdk_chemistry.data.SettingTypeMismatch"><code class="docutils literal notranslate"><span class="pre">SettingTypeMismatch</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="qdk_chemistry.data.html#qdk_chemistry.data.SettingTypeMismatchError"><code class="docutils literal notranslate"><span class="pre">SettingTypeMismatchError</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="qdk_chemistry.data.html#qdk_chemistry.data.SettingValue"><code class="docutils literal notranslate"><span class="pre">SettingValue</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="qdk_chemistry.data.html#qdk_chemistry.data.Settings"><code class="docutils literal notranslate"><span class="pre">Settings</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="qdk_chemistry.data.html#qdk_chemistry.data.Shell"><code class="docutils literal notranslate"><span class="pre">Shell</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="qdk_chemistry.data.html#qdk_chemistry.data.SlaterDeterminantContainer"><code class="docutils literal notranslate"><span class="pre">SlaterDeterminantContainer</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="qdk_chemistry.data.html#qdk_chemistry.data.StabilityResult"><code class="docutils literal notranslate"><span class="pre">StabilityResult</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="qdk_chemistry.data.html#qdk_chemistry.data.Structure"><code class="docutils literal notranslate"><span class="pre">Structure</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="qdk_chemistry.data.html#qdk_chemistry.data.Wavefunction"><code class="docutils literal notranslate"><span class="pre">Wavefunction</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="qdk_chemistry.data.html#qdk_chemistry.data.WavefunctionContainer"><code class="docutils literal notranslate"><span class="pre">WavefunctionContainer</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="qdk_chemistry.data.html#qdk_chemistry.data.WavefunctionType"><code class="docutils literal notranslate"><span class="pre">WavefunctionType</span></code></a></li>
+<li class="toctree-l4 current"><a class="reference internal" href="qdk_chemistry.data.html#submodules">Submodules</a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="../python_api.html#algorithms">Algorithms</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../python_api.html#plugins">Plugins</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../python_api.html#utilities">Utilities</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../python_api.html#constants">Constants</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="../cpp_api.html">C++ API</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Supporting Information</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../glossary.html">Acronym definitions</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../references.html">References</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../../index.html">qdk-chemistry</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../../index.html" class="icon icon-home" aria-label="Home"></a></li>
+          <li class="breadcrumb-item"><a href="../python_api.html">Python API</a></li>
+          <li class="breadcrumb-item"><a href="qdk_chemistry.data.html">qdk_chemistry.data package</a></li>
+      <li class="breadcrumb-item active">qdk_chemistry.data.qpe_result module</li>
+      <li class="wy-breadcrumbs-aside">
+            <a href="../../_sources/api/api_autogen/qdk_chemistry.data.qpe_result.rst.txt" rel="nofollow"> View page source</a>
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <section id="module-qdk_chemistry.data.qpe_result">
+<span id="qdk-chemistry-data-qpe-result-module"></span><h1>qdk_chemistry.data.qpe_result module<a class="headerlink" href="#module-qdk_chemistry.data.qpe_result" title="Link to this heading"></a></h1>
+<p>QDK/Chemistry data class for quantum phase estimation results.</p>
+<dl class="py class">
+<dt class="sig sig-object py" id="qdk_chemistry.data.qpe_result.DataClass">
+<em class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">DataClass</span></span><a class="headerlink" href="#qdk_chemistry.data.qpe_result.DataClass" title="Link to this definition"></a></dt>
+<dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">DataClass</span></code></p>
+<p>Base class for immutable data classes with common serialization methods.</p>
+<p>This abstract base class provides:
+- Immutability after construction (__setattr__ and __delattr__ protection)
+- Common implementations of to_json_file, to_hdf5_file, and to_file
+- Filename validation to enforce naming convention (.&lt;data_type&gt;.&lt;extension&gt;)
+- Requires derived classes to implement abstract methods</p>
+<p>Derived classes MUST implement:
+1. get_summary() -&gt; str</p>
+<blockquote>
+<div><p>Return a human-readable summary string of the object</p>
+</div></blockquote>
+<ol class="arabic simple" start="2">
+<li><dl class="simple">
+<dt>to_json() -&gt; dict</dt><dd><p>Return a dictionary representation suitable for JSON serialization</p>
+</dd>
+</dl>
+</li>
+<li><dl class="simple">
+<dt>to_hdf5(group: h5py.Group) -&gt; None</dt><dd><p>Write the object’s data to an HDF5 group</p>
+</dd>
+</dl>
+</li>
+<li><dl class="simple">
+<dt>to_file(filename: str, format_type: str) -&gt; None</dt><dd><p>Save the object to a file with the specified format
+(default implementation provided, but can be overridden)</p>
+</dd>
+</dl>
+</li>
+</ol>
+<p>Derived classes should:
+- Set all attributes before calling super().__init__()
+- Call super().__init__() at the end of __init__ to enable immutability
+- Set the _data_type_name class attribute (e.g., “structure”, “wavefunction”)</p>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>These methods are pure virtual in the C++ base class and MUST be
+overridden. The C++ binding will enforce this at runtime.</p>
+<p>Filename validation enforces the convention that filenames must include
+the data type, e.g., “example.structure.json” or “data.wavefunction.h5”</p>
+</div>
+<p>Initialize the base class and mark instance as initialized.</p>
+<p>This must be called by derived classes after setting all attributes.</p>
+<dl class="field-list simple">
+</dl>
+<dl class="py method">
+<dt class="sig sig-object py" id="qdk_chemistry.data.qpe_result.DataClass.__init__">
+<span class="sig-name descname"><span class="pre">__init__</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#qdk_chemistry.data.qpe_result.DataClass.__init__" title="Link to this definition"></a></dt>
+<dd><p>Initialize the base class and mark instance as initialized.</p>
+<p>This must be called by derived classes after setting all attributes.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p>None</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="qdk_chemistry.data.qpe_result.DataClass.from_dict">
+<em class="property"><span class="k"><span class="pre">classmethod</span></span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">from_dict</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">dict_data</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#qdk_chemistry.data.qpe_result.DataClass.from_dict" title="Link to this definition"></a></dt>
+<dd><p>Create an instance from a dictionary.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p><span class="sphinx_autodoc_typehints-type"><a class="reference internal" href="qdk_chemistry.data.base.html#qdk_chemistry.data.base.DataClass" title="qdk_chemistry.data.base.DataClass"><code class="xref py py-class docutils literal notranslate"><span class="pre">DataClass</span></code></a></span></p>
+</dd>
+<dt class="field-even">Parameters<span class="colon">:</span></dt>
+<dd class="field-even"><p><strong>dict_data</strong> (<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#dict" title="(in Python v3.14)"><em>dict</em></a><em>[</em><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)"><em>str</em></a><em>, </em><a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.Any" title="(in Python v3.14)"><em>Any</em></a><em>]</em>) – Dictionary containing the serialized data</p>
+</dd>
+<dt class="field-odd">Returns<span class="colon">:</span></dt>
+<dd class="field-odd"><p>New instance of the derived class</p>
+</dd>
+<dt class="field-even">Return type<span class="colon">:</span></dt>
+<dd class="field-even"><p><a class="reference internal" href="#qdk_chemistry.data.qpe_result.DataClass" title="qdk_chemistry.data.qpe_result.DataClass">DataClass</a></p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="qdk_chemistry.data.qpe_result.DataClass.from_file">
+<em class="property"><span class="k"><span class="pre">classmethod</span></span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">from_file</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">filename</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">format_type</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#qdk_chemistry.data.qpe_result.DataClass.from_file" title="Link to this definition"></a></dt>
+<dd><p>Load an instance from a file with the specified format.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p><span class="sphinx_autodoc_typehints-type"><a class="reference internal" href="qdk_chemistry.data.base.html#qdk_chemistry.data.base.DataClass" title="qdk_chemistry.data.base.DataClass"><code class="xref py py-class docutils literal notranslate"><span class="pre">DataClass</span></code></a></span></p>
+</dd>
+<dt class="field-even">Parameters<span class="colon">:</span></dt>
+<dd class="field-even"><ul class="simple">
+<li><p><strong>filename</strong> (<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)"><em>str</em></a><em> | </em><a class="reference external" href="https://docs.python.org/3/library/pathlib.html#pathlib.Path" title="(in Python v3.14)"><em>Path</em></a>) – Path to the input file
+Must match pattern: &lt;name&gt;.&lt;data_type&gt;.&lt;extension&gt;</p></li>
+<li><p><strong>format_type</strong> (<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)"><em>str</em></a>) – Format type (“json”, “hdf5”, or “h5”)</p></li>
+</ul>
+</dd>
+<dt class="field-odd">Returns<span class="colon">:</span></dt>
+<dd class="field-odd"><p>New instance of the derived class</p>
+</dd>
+<dt class="field-even">Return type<span class="colon">:</span></dt>
+<dd class="field-even"><p><a class="reference internal" href="#qdk_chemistry.data.qpe_result.DataClass" title="qdk_chemistry.data.qpe_result.DataClass">DataClass</a></p>
+</dd>
+<dt class="field-odd">Raises<span class="colon">:</span></dt>
+<dd class="field-odd"><p><a class="reference external" href="https://docs.python.org/3/library/exceptions.html#ValueError" title="(in Python v3.14)"><strong>ValueError</strong></a> – If format_type is not supported or filename doesn’t match required pattern</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="qdk_chemistry.data.qpe_result.DataClass.from_hdf5">
+<em class="property"><span class="k"><span class="pre">classmethod</span></span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">from_hdf5</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">group</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#qdk_chemistry.data.qpe_result.DataClass.from_hdf5" title="Link to this definition"></a></dt>
+<dd><p>Load an instance from an HDF5 group.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p><span class="sphinx_autodoc_typehints-type"><a class="reference internal" href="qdk_chemistry.data.base.html#qdk_chemistry.data.base.DataClass" title="qdk_chemistry.data.base.DataClass"><code class="xref py py-class docutils literal notranslate"><span class="pre">DataClass</span></code></a></span></p>
+</dd>
+<dt class="field-even">Parameters<span class="colon">:</span></dt>
+<dd class="field-even"><p><strong>group</strong> (<em>Group</em>) – HDF5 group or file to read data from</p>
+</dd>
+<dt class="field-odd">Returns<span class="colon">:</span></dt>
+<dd class="field-odd"><p>New instance of the derived class</p>
+</dd>
+<dt class="field-even">Return type<span class="colon">:</span></dt>
+<dd class="field-even"><p><a class="reference internal" href="#qdk_chemistry.data.qpe_result.DataClass" title="qdk_chemistry.data.qpe_result.DataClass">DataClass</a></p>
+</dd>
+</dl>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>This method must be implemented by derived classes.
+Read data using group.attrs for attributes and group[key]
+for datasets. The C++ binding enforces this as a static
+method requirement.</p>
+</div>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="qdk_chemistry.data.qpe_result.DataClass.from_hdf5_file">
+<em class="property"><span class="k"><span class="pre">classmethod</span></span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">from_hdf5_file</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">filename</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#qdk_chemistry.data.qpe_result.DataClass.from_hdf5_file" title="Link to this definition"></a></dt>
+<dd><p>Load an instance from an HDF5 file.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p><span class="sphinx_autodoc_typehints-type"><a class="reference internal" href="qdk_chemistry.data.base.html#qdk_chemistry.data.base.DataClass" title="qdk_chemistry.data.base.DataClass"><code class="xref py py-class docutils literal notranslate"><span class="pre">DataClass</span></code></a></span></p>
+</dd>
+<dt class="field-even">Parameters<span class="colon">:</span></dt>
+<dd class="field-even"><p><strong>filename</strong> (<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)"><em>str</em></a><em> | </em><a class="reference external" href="https://docs.python.org/3/library/pathlib.html#pathlib.Path" title="(in Python v3.14)"><em>Path</em></a>) – Path to the input HDF5 file
+Must match pattern: &lt;name&gt;.&lt;data_type&gt;.h5 or &lt;name&gt;.&lt;data_type&gt;.hdf5</p>
+</dd>
+<dt class="field-odd">Returns<span class="colon">:</span></dt>
+<dd class="field-odd"><p>New instance of the derived class</p>
+</dd>
+<dt class="field-even">Return type<span class="colon">:</span></dt>
+<dd class="field-even"><p><a class="reference internal" href="#qdk_chemistry.data.qpe_result.DataClass" title="qdk_chemistry.data.qpe_result.DataClass">DataClass</a></p>
+</dd>
+<dt class="field-odd">Raises<span class="colon">:</span></dt>
+<dd class="field-odd"><p><a class="reference external" href="https://docs.python.org/3/library/exceptions.html#ValueError" title="(in Python v3.14)"><strong>ValueError</strong></a> – If filename doesn’t match required pattern</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="qdk_chemistry.data.qpe_result.DataClass.from_json">
+<em class="property"><span class="k"><span class="pre">classmethod</span></span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">from_json</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">json_data</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#qdk_chemistry.data.qpe_result.DataClass.from_json" title="Link to this definition"></a></dt>
+<dd><p>Create an instance from a JSON dictionary.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p><span class="sphinx_autodoc_typehints-type"><a class="reference internal" href="qdk_chemistry.data.base.html#qdk_chemistry.data.base.DataClass" title="qdk_chemistry.data.base.DataClass"><code class="xref py py-class docutils literal notranslate"><span class="pre">DataClass</span></code></a></span></p>
+</dd>
+<dt class="field-even">Parameters<span class="colon">:</span></dt>
+<dd class="field-even"><p><strong>json_data</strong> (<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#dict" title="(in Python v3.14)"><em>dict</em></a><em>[</em><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)"><em>str</em></a><em>, </em><a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.Any" title="(in Python v3.14)"><em>Any</em></a><em>]</em>) – Dictionary containing the serialized data</p>
+</dd>
+<dt class="field-odd">Returns<span class="colon">:</span></dt>
+<dd class="field-odd"><p>New instance of the derived class</p>
+</dd>
+<dt class="field-even">Return type<span class="colon">:</span></dt>
+<dd class="field-even"><p><a class="reference internal" href="#qdk_chemistry.data.qpe_result.DataClass" title="qdk_chemistry.data.qpe_result.DataClass">DataClass</a></p>
+</dd>
+</dl>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>This method must be implemented by derived classes.
+The C++ binding enforces this as a static method requirement.</p>
+</div>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="qdk_chemistry.data.qpe_result.DataClass.from_json_file">
+<em class="property"><span class="k"><span class="pre">classmethod</span></span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">from_json_file</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">filename</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#qdk_chemistry.data.qpe_result.DataClass.from_json_file" title="Link to this definition"></a></dt>
+<dd><p>Load an instance from a JSON file.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p><span class="sphinx_autodoc_typehints-type"><a class="reference internal" href="qdk_chemistry.data.base.html#qdk_chemistry.data.base.DataClass" title="qdk_chemistry.data.base.DataClass"><code class="xref py py-class docutils literal notranslate"><span class="pre">DataClass</span></code></a></span></p>
+</dd>
+<dt class="field-even">Parameters<span class="colon">:</span></dt>
+<dd class="field-even"><p><strong>filename</strong> (<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)"><em>str</em></a><em> | </em><a class="reference external" href="https://docs.python.org/3/library/pathlib.html#pathlib.Path" title="(in Python v3.14)"><em>Path</em></a>) – Path to the input JSON file
+Must match pattern: &lt;name&gt;.&lt;data_type&gt;.json</p>
+</dd>
+<dt class="field-odd">Returns<span class="colon">:</span></dt>
+<dd class="field-odd"><p>New instance of the derived class</p>
+</dd>
+<dt class="field-even">Return type<span class="colon">:</span></dt>
+<dd class="field-even"><p><a class="reference internal" href="#qdk_chemistry.data.qpe_result.DataClass" title="qdk_chemistry.data.qpe_result.DataClass">DataClass</a></p>
+</dd>
+<dt class="field-odd">Raises<span class="colon">:</span></dt>
+<dd class="field-odd"><p><a class="reference external" href="https://docs.python.org/3/library/exceptions.html#ValueError" title="(in Python v3.14)"><strong>ValueError</strong></a> – If filename doesn’t match required pattern</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="qdk_chemistry.data.qpe_result.DataClass.get_summary">
+<span class="sig-name descname"><span class="pre">get_summary</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#qdk_chemistry.data.qpe_result.DataClass.get_summary" title="Link to this definition"></a></dt>
+<dd><p>Get a human-readable summary of the object.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p><span class="sphinx_autodoc_typehints-type"><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)"><code class="xref py py-class docutils literal notranslate"><span class="pre">str</span></code></a></span></p>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>Summary string describing the object’s contents and properties</p>
+</dd>
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)">str</a></p>
+</dd>
+</dl>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>This method must be implemented by derived classes.
+The C++ binding enforces this as a pure virtual function.</p>
+</div>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="qdk_chemistry.data.qpe_result.DataClass.to_dict">
+<span class="sig-name descname"><span class="pre">to_dict</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#qdk_chemistry.data.qpe_result.DataClass.to_dict" title="Link to this definition"></a></dt>
+<dd><p>Convert the object to a dictionary.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p><span class="sphinx_autodoc_typehints-type"><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#dict" title="(in Python v3.14)"><code class="xref py py-class docutils literal notranslate"><span class="pre">dict</span></code></a>[<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)"><code class="xref py py-class docutils literal notranslate"><span class="pre">str</span></code></a>, <a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.Any" title="(in Python v3.14)"><code class="xref py py-data docutils literal notranslate"><span class="pre">Any</span></code></a>]</span></p>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>Dictionary representation of the object</p>
+</dd>
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#dict" title="(in Python v3.14)">dict</a></p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="qdk_chemistry.data.qpe_result.DataClass.to_file">
+<span class="sig-name descname"><span class="pre">to_file</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">filename</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">format_type</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#qdk_chemistry.data.qpe_result.DataClass.to_file" title="Link to this definition"></a></dt>
+<dd><p>Save the object to a file with the specified format.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p><span class="sphinx_autodoc_typehints-type"><a class="reference external" href="https://docs.python.org/3/library/constants.html#None" title="(in Python v3.14)"><code class="xref py py-obj docutils literal notranslate"><span class="pre">None</span></code></a></span></p>
+</dd>
+<dt class="field-even">Parameters<span class="colon">:</span></dt>
+<dd class="field-even"><ul class="simple">
+<li><p><strong>filename</strong> (<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)"><em>str</em></a><em> | </em><a class="reference external" href="https://docs.python.org/3/library/pathlib.html#pathlib.Path" title="(in Python v3.14)"><em>Path</em></a>) – Path to the output file
+Must match pattern: &lt;name&gt;.&lt;data_type&gt;.&lt;extension&gt;</p></li>
+<li><p><strong>format_type</strong> (<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)"><em>str</em></a>) – Format type (“json”, “hdf5”, or “h5”)</p></li>
+</ul>
+</dd>
+<dt class="field-odd">Raises<span class="colon">:</span></dt>
+<dd class="field-odd"><p><a class="reference external" href="https://docs.python.org/3/library/exceptions.html#ValueError" title="(in Python v3.14)"><strong>ValueError</strong></a> – If format_type is not supported or filename doesn’t match required pattern</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="qdk_chemistry.data.qpe_result.DataClass.to_hdf5">
+<span class="sig-name descname"><span class="pre">to_hdf5</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">group</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#qdk_chemistry.data.qpe_result.DataClass.to_hdf5" title="Link to this definition"></a></dt>
+<dd><p>Save the object to an HDF5 group.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p><span class="sphinx_autodoc_typehints-type"><a class="reference external" href="https://docs.python.org/3/library/constants.html#None" title="(in Python v3.14)"><code class="xref py py-obj docutils literal notranslate"><span class="pre">None</span></code></a></span></p>
+</dd>
+<dt class="field-even">Parameters<span class="colon">:</span></dt>
+<dd class="field-even"><p><strong>group</strong> (<em>Group</em>) – HDF5 group or file to write data to</p>
+</dd>
+</dl>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>This method must be implemented by derived classes.
+Use group.attrs for attributes and group.create_dataset()
+for array data. The C++ binding enforces this as a pure
+virtual function.</p>
+</div>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="qdk_chemistry.data.qpe_result.DataClass.to_hdf5_file">
+<span class="sig-name descname"><span class="pre">to_hdf5_file</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">filename</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#qdk_chemistry.data.qpe_result.DataClass.to_hdf5_file" title="Link to this definition"></a></dt>
+<dd><p>Save the object to an HDF5 file.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p><span class="sphinx_autodoc_typehints-type"><a class="reference external" href="https://docs.python.org/3/library/constants.html#None" title="(in Python v3.14)"><code class="xref py py-obj docutils literal notranslate"><span class="pre">None</span></code></a></span></p>
+</dd>
+<dt class="field-even">Parameters<span class="colon">:</span></dt>
+<dd class="field-even"><p><strong>filename</strong> (<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)"><em>str</em></a><em> | </em><a class="reference external" href="https://docs.python.org/3/library/pathlib.html#pathlib.Path" title="(in Python v3.14)"><em>Path</em></a>) – Path to the output HDF5 file
+Must match pattern: &lt;name&gt;.&lt;data_type&gt;.h5 or &lt;name&gt;.&lt;data_type&gt;.hdf5</p>
+</dd>
+<dt class="field-odd">Raises<span class="colon">:</span></dt>
+<dd class="field-odd"><p><a class="reference external" href="https://docs.python.org/3/library/exceptions.html#ValueError" title="(in Python v3.14)"><strong>ValueError</strong></a> – If filename doesn’t match required pattern</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="qdk_chemistry.data.qpe_result.DataClass.to_json">
+<span class="sig-name descname"><span class="pre">to_json</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#qdk_chemistry.data.qpe_result.DataClass.to_json" title="Link to this definition"></a></dt>
+<dd><p>Convert the object to a dictionary for JSON serialization.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p><span class="sphinx_autodoc_typehints-type"><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#dict" title="(in Python v3.14)"><code class="xref py py-class docutils literal notranslate"><span class="pre">dict</span></code></a></span></p>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>Dictionary representation of the object</p>
+</dd>
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#dict" title="(in Python v3.14)">dict</a></p>
+</dd>
+</dl>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>This method must be implemented by derived classes.
+The returned dictionary should contain all data needed to
+reconstruct the object. The C++ binding enforces this as
+a pure virtual function.</p>
+</div>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="qdk_chemistry.data.qpe_result.DataClass.to_json_file">
+<span class="sig-name descname"><span class="pre">to_json_file</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">filename</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#qdk_chemistry.data.qpe_result.DataClass.to_json_file" title="Link to this definition"></a></dt>
+<dd><p>Save the object to a JSON file.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p><span class="sphinx_autodoc_typehints-type"><a class="reference external" href="https://docs.python.org/3/library/constants.html#None" title="(in Python v3.14)"><code class="xref py py-obj docutils literal notranslate"><span class="pre">None</span></code></a></span></p>
+</dd>
+<dt class="field-even">Parameters<span class="colon">:</span></dt>
+<dd class="field-even"><p><strong>filename</strong> (<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)"><em>str</em></a><em> | </em><a class="reference external" href="https://docs.python.org/3/library/pathlib.html#pathlib.Path" title="(in Python v3.14)"><em>Path</em></a>) – Path to the output JSON file
+Must match pattern: &lt;name&gt;.&lt;data_type&gt;.json</p>
+</dd>
+<dt class="field-odd">Raises<span class="colon">:</span></dt>
+<dd class="field-odd"><p><a class="reference external" href="https://docs.python.org/3/library/exceptions.html#ValueError" title="(in Python v3.14)"><strong>ValueError</strong></a> – If filename doesn’t match required pattern</p>
+</dd>
+</dl>
+</dd></dl>
+
+</dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="qdk_chemistry.data.qpe_result.PhaseEstimationAlgorithm">
+<em class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">PhaseEstimationAlgorithm</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="o"><span class="pre">*</span></span><span class="n"><span class="pre">values</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#qdk_chemistry.data.qpe_result.PhaseEstimationAlgorithm" title="Link to this definition"></a></dt>
+<dd><p>Bases: <a class="reference external" href="https://docs.python.org/3/library/enum.html#enum.StrEnum" title="(in Python v3.14)"><code class="xref py py-class docutils literal notranslate"><span class="pre">StrEnum</span></code></a></p>
+<p>Enumeration of supported phase estimation routines.</p>
+<p class="rubric">References</p>
+<dl class="simple">
+<dt>Iterative QPE: Kitaev, A. (1995). “Quantum measurements and the Abelian</dt><dd><p>Stabilizer Problem.” arXiv:quant-ph/9511026.
+https://arxiv.org/abs/quant-ph/9511026</p>
+</dd>
+<dt>Traditional QPE: Nielsen, M. A., &amp; Chuang, I. L. (2010). “Quantum Computation</dt><dd><p>and Quantum Information” (10th Anniversary Edition), Ch. 5.2.</p>
+</dd>
+</dl>
+<dl class="py attribute">
+<dt class="sig sig-object py" id="qdk_chemistry.data.qpe_result.PhaseEstimationAlgorithm.ITERATIVE">
+<span class="sig-name descname"><span class="pre">ITERATIVE</span></span><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">'iterative'</span></em><a class="headerlink" href="#qdk_chemistry.data.qpe_result.PhaseEstimationAlgorithm.ITERATIVE" title="Link to this definition"></a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="qdk_chemistry.data.qpe_result.PhaseEstimationAlgorithm.TRADITIONAL">
+<span class="sig-name descname"><span class="pre">TRADITIONAL</span></span><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">'traditional'</span></em><a class="headerlink" href="#qdk_chemistry.data.qpe_result.PhaseEstimationAlgorithm.TRADITIONAL" title="Link to this definition"></a></dt>
+<dd></dd></dl>
+
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="qdk_chemistry.data.qpe_result.energy_alias_candidates">
+<span class="sig-name descname"><span class="pre">energy_alias_candidates</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">raw_energy</span></span></em>, <em class="sig-param"><span class="keyword-only-separator o"><abbr title="Keyword-only parameters separator (PEP 3102)"><span class="pre">*</span></abbr></span></em>, <em class="sig-param"><span class="n"><span class="pre">evolution_time</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">shift_range</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">range(-2,</span> <span class="pre">3)</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#qdk_chemistry.data.qpe_result.energy_alias_candidates" title="Link to this definition"></a></dt>
+<dd><p>Enumerate alias energies compatible with <code class="docutils literal notranslate"><span class="pre">raw_energy</span></code>.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p><span class="sphinx_autodoc_typehints-type"><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#list" title="(in Python v3.14)"><code class="xref py py-class docutils literal notranslate"><span class="pre">list</span></code></a>[<a class="reference external" href="https://docs.python.org/3/library/functions.html#float" title="(in Python v3.14)"><code class="xref py py-class docutils literal notranslate"><span class="pre">float</span></code></a>]</span></p>
+</dd>
+<dt class="field-even">Parameters<span class="colon">:</span></dt>
+<dd class="field-even"><ul class="simple">
+<li><p><strong>raw_energy</strong> (<a class="reference external" href="https://docs.python.org/3/library/functions.html#float" title="(in Python v3.14)"><em>float</em></a>) – Energy derived from the measured phase.</p></li>
+<li><p><strong>evolution_time</strong> (<a class="reference external" href="https://docs.python.org/3/library/functions.html#float" title="(in Python v3.14)"><em>float</em></a>) – Evolution time <code class="docutils literal notranslate"><span class="pre">t</span></code> used by the unitary.</p></li>
+<li><p><strong>shift_range</strong> (<a class="reference external" href="https://docs.python.org/3/library/collections.abc.html#collections.abc.Iterable" title="(in Python v3.14)"><em>Iterable</em></a><em>[</em><a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(in Python v3.14)"><em>int</em></a><em>]</em>) – Integer shifts (in multiples of <code class="docutils literal notranslate"><span class="pre">2π</span> <span class="pre">/</span> <span class="pre">t</span></code>) to explore. The
+default <code class="docutils literal notranslate"><span class="pre">range(-2,</span> <span class="pre">3)</span></code> checks <code class="docutils literal notranslate"><span class="pre">k</span> <span class="pre">=</span> <span class="pre">-2,</span> <span class="pre">-1,</span> <span class="pre">0,</span> <span class="pre">1,</span> <span class="pre">2</span></code>—a pragmatic
+window that typically covers chemical-energy estimates because they
+rarely deviate by more than one or two <code class="docutils literal notranslate"><span class="pre">2π</span> <span class="pre">/</span> <span class="pre">t</span></code> periods from the
+raw measurement.</p></li>
+</ul>
+</dd>
+<dt class="field-odd">Returns<span class="colon">:</span></dt>
+<dd class="field-odd"><p>Sorted list of alias energy values covering positive and negative branches.</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="qdk_chemistry.data.qpe_result.energy_from_phase">
+<span class="sig-name descname"><span class="pre">energy_from_phase</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">phase_fraction</span></span></em>, <em class="sig-param"><span class="keyword-only-separator o"><abbr title="Keyword-only parameters separator (PEP 3102)"><span class="pre">*</span></abbr></span></em>, <em class="sig-param"><span class="n"><span class="pre">evolution_time</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#qdk_chemistry.data.qpe_result.energy_from_phase" title="Link to this definition"></a></dt>
+<dd><p>Convert a measured phase fraction to energy using <code class="docutils literal notranslate"><span class="pre">E</span> <span class="pre">=</span> <span class="pre">angle</span> <span class="pre">/</span> <span class="pre">t</span></code>.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p><span class="sphinx_autodoc_typehints-type"><a class="reference external" href="https://docs.python.org/3/library/functions.html#float" title="(in Python v3.14)"><code class="xref py py-class docutils literal notranslate"><span class="pre">float</span></code></a></span></p>
+</dd>
+<dt class="field-even">Parameters<span class="colon">:</span></dt>
+<dd class="field-even"><ul class="simple">
+<li><p><strong>phase_fraction</strong> (<a class="reference external" href="https://docs.python.org/3/library/functions.html#float" title="(in Python v3.14)"><em>float</em></a>) – Fractional phase obtained from the phase register.</p></li>
+<li><p><strong>evolution_time</strong> (<a class="reference external" href="https://docs.python.org/3/library/functions.html#float" title="(in Python v3.14)"><em>float</em></a>) – Evolution time <code class="docutils literal notranslate"><span class="pre">t</span></code> used in <code class="docutils literal notranslate"><span class="pre">U</span> <span class="pre">=</span> <span class="pre">exp(-i</span> <span class="pre">H</span> <span class="pre">t)</span></code>.</p></li>
+</ul>
+</dd>
+<dt class="field-odd">Returns<span class="colon">:</span></dt>
+<dd class="field-odd"><p>Energy estimate corresponding to <code class="docutils literal notranslate"><span class="pre">phase_fraction</span></code>.</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="qdk_chemistry.data.qpe_result.resolve_energy_aliases">
+<span class="sig-name descname"><span class="pre">resolve_energy_aliases</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">raw_energy</span></span></em>, <em class="sig-param"><span class="keyword-only-separator o"><abbr title="Keyword-only parameters separator (PEP 3102)"><span class="pre">*</span></abbr></span></em>, <em class="sig-param"><span class="n"><span class="pre">evolution_time</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">reference_energy</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">shift_range</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">range(-2,</span> <span class="pre">3)</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#qdk_chemistry.data.qpe_result.resolve_energy_aliases" title="Link to this definition"></a></dt>
+<dd><p>Select the alias energy closest to a known reference value.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p><span class="sphinx_autodoc_typehints-type"><a class="reference external" href="https://docs.python.org/3/library/functions.html#float" title="(in Python v3.14)"><code class="xref py py-class docutils literal notranslate"><span class="pre">float</span></code></a></span></p>
+</dd>
+<dt class="field-even">Parameters<span class="colon">:</span></dt>
+<dd class="field-even"><ul class="simple">
+<li><p><strong>raw_energy</strong> (<a class="reference external" href="https://docs.python.org/3/library/functions.html#float" title="(in Python v3.14)"><em>float</em></a>) – Energy derived from the measured phase.</p></li>
+<li><p><strong>evolution_time</strong> (<a class="reference external" href="https://docs.python.org/3/library/functions.html#float" title="(in Python v3.14)"><em>float</em></a>) – Evolution time <code class="docutils literal notranslate"><span class="pre">t</span></code> used by the unitary.</p></li>
+<li><p><strong>reference_energy</strong> (<a class="reference external" href="https://docs.python.org/3/library/functions.html#float" title="(in Python v3.14)"><em>float</em></a>) – External reference guiding alias selection.</p></li>
+<li><p><strong>shift_range</strong> (<a class="reference external" href="https://docs.python.org/3/library/collections.abc.html#collections.abc.Iterable" title="(in Python v3.14)"><em>Iterable</em></a><em>[</em><a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(in Python v3.14)"><em>int</em></a><em>]</em>) – Integer shifts (in multiples of <code class="docutils literal notranslate"><span class="pre">2π</span> <span class="pre">/</span> <span class="pre">t</span></code>) to explore. Use
+a wider window when the true value may sit multiple periods away
+from the raw estimate.</p></li>
+</ul>
+</dd>
+<dt class="field-odd">Returns<span class="colon">:</span></dt>
+<dd class="field-odd"><p>Alias energy closest to <code class="docutils literal notranslate"><span class="pre">reference_energy</span></code>.</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="qdk_chemistry.data.qpe_result.QpeResult">
+<em class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">QpeResult</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">method</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">evolution_time</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">phase_fraction</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">phase_angle</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">canonical_phase_fraction</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">canonical_phase_angle</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">raw_energy</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">branching</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">resolved_energy</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">bits_msb_first</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">bitstring_msb_first</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">metadata</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../../_modules/qdk_chemistry/data/qpe_result.html#QpeResult"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#qdk_chemistry.data.qpe_result.QpeResult" title="Link to this definition"></a></dt>
+<dd><p>Bases: <a class="reference internal" href="qdk_chemistry.data.base.html#qdk_chemistry.data.base.DataClass" title="qdk_chemistry.data.base.DataClass"><code class="xref py py-class docutils literal notranslate"><span class="pre">DataClass</span></code></a></p>
+<p>Structured output for quantum phase estimation workflows.</p>
+<dl class="py attribute">
+<dt class="sig sig-object py" id="qdk_chemistry.data.qpe_result.QpeResult.method">
+<span class="sig-name descname"><span class="pre">method</span></span><a class="headerlink" href="#qdk_chemistry.data.qpe_result.QpeResult.method" title="Link to this definition"></a></dt>
+<dd><p>Identifier for the algorithm or workflow that produced the result.</p>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="qdk_chemistry.data.qpe_result.QpeResult.evolution_time">
+<span class="sig-name descname"><span class="pre">evolution_time</span></span><a class="headerlink" href="#qdk_chemistry.data.qpe_result.QpeResult.evolution_time" title="Link to this definition"></a></dt>
+<dd><p>Evolution time <code class="docutils literal notranslate"><span class="pre">t</span></code> used in <code class="docutils literal notranslate"><span class="pre">U</span> <span class="pre">=</span> <span class="pre">exp(-i</span> <span class="pre">H</span> <span class="pre">t)</span></code>.</p>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="qdk_chemistry.data.qpe_result.QpeResult.phase_fraction">
+<span class="sig-name descname"><span class="pre">phase_fraction</span></span><a class="headerlink" href="#qdk_chemistry.data.qpe_result.QpeResult.phase_fraction" title="Link to this definition"></a></dt>
+<dd><p>Raw measured phase fraction in <code class="docutils literal notranslate"><span class="pre">[0,</span> <span class="pre">1)</span></code>.</p>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="qdk_chemistry.data.qpe_result.QpeResult.phase_angle">
+<span class="sig-name descname"><span class="pre">phase_angle</span></span><a class="headerlink" href="#qdk_chemistry.data.qpe_result.QpeResult.phase_angle" title="Link to this definition"></a></dt>
+<dd><p>Raw measured phase angle in radians.</p>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="qdk_chemistry.data.qpe_result.QpeResult.canonical_phase_fraction">
+<span class="sig-name descname"><span class="pre">canonical_phase_fraction</span></span><a class="headerlink" href="#qdk_chemistry.data.qpe_result.QpeResult.canonical_phase_fraction" title="Link to this definition"></a></dt>
+<dd><p>Alias-resolved phase fraction consistent with the selected energy branch.</p>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="qdk_chemistry.data.qpe_result.QpeResult.canonical_phase_angle">
+<span class="sig-name descname"><span class="pre">canonical_phase_angle</span></span><a class="headerlink" href="#qdk_chemistry.data.qpe_result.QpeResult.canonical_phase_angle" title="Link to this definition"></a></dt>
+<dd><p>Alias-resolved phase angle in radians.</p>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="qdk_chemistry.data.qpe_result.QpeResult.raw_energy">
+<span class="sig-name descname"><span class="pre">raw_energy</span></span><a class="headerlink" href="#qdk_chemistry.data.qpe_result.QpeResult.raw_energy" title="Link to this definition"></a></dt>
+<dd><p>Energy computed directly from <code class="docutils literal notranslate"><span class="pre">phase_fraction</span></code>.</p>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="qdk_chemistry.data.qpe_result.QpeResult.branching">
+<span class="sig-name descname"><span class="pre">branching</span></span><a class="headerlink" href="#qdk_chemistry.data.qpe_result.QpeResult.branching" title="Link to this definition"></a></dt>
+<dd><p>Sorted tuple of all alias energy candidates considered.</p>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="qdk_chemistry.data.qpe_result.QpeResult.resolved_energy">
+<span class="sig-name descname"><span class="pre">resolved_energy</span></span><a class="headerlink" href="#qdk_chemistry.data.qpe_result.QpeResult.resolved_energy" title="Link to this definition"></a></dt>
+<dd><p>Alias energy selected with the optional reference value, if available.</p>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="qdk_chemistry.data.qpe_result.QpeResult.bits_msb_first">
+<span class="sig-name descname"><span class="pre">bits_msb_first</span></span><a class="headerlink" href="#qdk_chemistry.data.qpe_result.QpeResult.bits_msb_first" title="Link to this definition"></a></dt>
+<dd><p>Tuple of measured bits ordered from MSB to LSB, when provided.</p>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="qdk_chemistry.data.qpe_result.QpeResult.bitstring_msb_first">
+<span class="sig-name descname"><span class="pre">bitstring_msb_first</span></span><a class="headerlink" href="#qdk_chemistry.data.qpe_result.QpeResult.bitstring_msb_first" title="Link to this definition"></a></dt>
+<dd><p>Measured bitstring representation, when provided.</p>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="qdk_chemistry.data.qpe_result.QpeResult.metadata">
+<span class="sig-name descname"><span class="pre">metadata</span></span><a class="headerlink" href="#qdk_chemistry.data.qpe_result.QpeResult.metadata" title="Link to this definition"></a></dt>
+<dd><p>Optional free-form metadata copied from the caller.</p>
+</dd></dl>
+
+<p>Initialize a QPE result.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>method</strong> (<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)"><em>str</em></a>) – Identifier for the algorithm or workflow.</p></li>
+<li><p><strong>evolution_time</strong> (<a class="reference external" href="https://docs.python.org/3/library/functions.html#float" title="(in Python v3.14)"><em>float</em></a>) – Evolution time used in the simulation.</p></li>
+<li><p><strong>phase_fraction</strong> (<a class="reference external" href="https://docs.python.org/3/library/functions.html#float" title="(in Python v3.14)"><em>float</em></a>) – Raw measured phase fraction.</p></li>
+<li><p><strong>phase_angle</strong> (<a class="reference external" href="https://docs.python.org/3/library/functions.html#float" title="(in Python v3.14)"><em>float</em></a>) – Raw measured phase angle in radians.</p></li>
+<li><p><strong>canonical_phase_fraction</strong> (<a class="reference external" href="https://docs.python.org/3/library/functions.html#float" title="(in Python v3.14)"><em>float</em></a>) – Alias-resolved phase fraction.</p></li>
+<li><p><strong>canonical_phase_angle</strong> (<a class="reference external" href="https://docs.python.org/3/library/functions.html#float" title="(in Python v3.14)"><em>float</em></a>) – Alias-resolved phase angle.</p></li>
+<li><p><strong>raw_energy</strong> (<a class="reference external" href="https://docs.python.org/3/library/functions.html#float" title="(in Python v3.14)"><em>float</em></a>) – Energy computed from phase_fraction.</p></li>
+<li><p><strong>branching</strong> (<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#tuple" title="(in Python v3.14)"><em>tuple</em></a><em>[</em><a class="reference external" href="https://docs.python.org/3/library/functions.html#float" title="(in Python v3.14)"><em>float</em></a><em>, </em><em>...</em><em>]</em>) – Tuple of alias energy candidates.</p></li>
+<li><p><strong>resolved_energy</strong> (<a class="reference external" href="https://docs.python.org/3/library/functions.html#float" title="(in Python v3.14)"><em>float</em></a><em> | </em><em>None</em>) – Alias energy selected with reference.</p></li>
+<li><p><strong>bits_msb_first</strong> (<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#tuple" title="(in Python v3.14)"><em>tuple</em></a><em>[</em><a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(in Python v3.14)"><em>int</em></a><em>, </em><em>...</em><em>] </em><em>| </em><em>None</em>) – Measured bits from MSB to LSB.</p></li>
+<li><p><strong>bitstring_msb_first</strong> (<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)"><em>str</em></a><em> | </em><em>None</em>) – Bitstring representation.</p></li>
+<li><p><strong>metadata</strong> (<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#dict" title="(in Python v3.14)"><em>dict</em></a><em>[</em><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)"><em>str</em></a><em>, </em><a class="reference external" href="https://docs.python.org/3/library/functions.html#object" title="(in Python v3.14)"><em>object</em></a><em>] </em><em>| </em><em>None</em>) – Optional metadata dictionary.</p></li>
+</ul>
+</dd>
+</dl>
+<dl class="py method">
+<dt class="sig sig-object py" id="qdk_chemistry.data.qpe_result.QpeResult.__init__">
+<span class="sig-name descname"><span class="pre">__init__</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">method</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">evolution_time</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">phase_fraction</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">phase_angle</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">canonical_phase_fraction</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">canonical_phase_angle</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">raw_energy</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">branching</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">resolved_energy</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">bits_msb_first</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">bitstring_msb_first</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">metadata</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../../_modules/qdk_chemistry/data/qpe_result.html#QpeResult.__init__"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#qdk_chemistry.data.qpe_result.QpeResult.__init__" title="Link to this definition"></a></dt>
+<dd><p>Initialize a QPE result.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>method</strong> (<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)"><em>str</em></a>) – Identifier for the algorithm or workflow.</p></li>
+<li><p><strong>evolution_time</strong> (<a class="reference external" href="https://docs.python.org/3/library/functions.html#float" title="(in Python v3.14)"><em>float</em></a>) – Evolution time used in the simulation.</p></li>
+<li><p><strong>phase_fraction</strong> (<a class="reference external" href="https://docs.python.org/3/library/functions.html#float" title="(in Python v3.14)"><em>float</em></a>) – Raw measured phase fraction.</p></li>
+<li><p><strong>phase_angle</strong> (<a class="reference external" href="https://docs.python.org/3/library/functions.html#float" title="(in Python v3.14)"><em>float</em></a>) – Raw measured phase angle in radians.</p></li>
+<li><p><strong>canonical_phase_fraction</strong> (<a class="reference external" href="https://docs.python.org/3/library/functions.html#float" title="(in Python v3.14)"><em>float</em></a>) – Alias-resolved phase fraction.</p></li>
+<li><p><strong>canonical_phase_angle</strong> (<a class="reference external" href="https://docs.python.org/3/library/functions.html#float" title="(in Python v3.14)"><em>float</em></a>) – Alias-resolved phase angle.</p></li>
+<li><p><strong>raw_energy</strong> (<a class="reference external" href="https://docs.python.org/3/library/functions.html#float" title="(in Python v3.14)"><em>float</em></a>) – Energy computed from phase_fraction.</p></li>
+<li><p><strong>branching</strong> (<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#tuple" title="(in Python v3.14)"><em>tuple</em></a><em>[</em><a class="reference external" href="https://docs.python.org/3/library/functions.html#float" title="(in Python v3.14)"><em>float</em></a><em>, </em><em>...</em><em>]</em>) – Tuple of alias energy candidates.</p></li>
+<li><p><strong>resolved_energy</strong> (<a class="reference external" href="https://docs.python.org/3/library/functions.html#float" title="(in Python v3.14)"><em>float</em></a><em> | </em><em>None</em>) – Alias energy selected with reference.</p></li>
+<li><p><strong>bits_msb_first</strong> (<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#tuple" title="(in Python v3.14)"><em>tuple</em></a><em>[</em><a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(in Python v3.14)"><em>int</em></a><em>, </em><em>...</em><em>] </em><em>| </em><em>None</em>) – Measured bits from MSB to LSB.</p></li>
+<li><p><strong>bitstring_msb_first</strong> (<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)"><em>str</em></a><em> | </em><em>None</em>) – Bitstring representation.</p></li>
+<li><p><strong>metadata</strong> (<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#dict" title="(in Python v3.14)"><em>dict</em></a><em>[</em><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)"><em>str</em></a><em>, </em><a class="reference external" href="https://docs.python.org/3/library/functions.html#object" title="(in Python v3.14)"><em>object</em></a><em>] </em><em>| </em><em>None</em>) – Optional metadata dictionary.</p></li>
+</ul>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="qdk_chemistry.data.qpe_result.QpeResult.from_phase_fraction">
+<em class="property"><span class="k"><span class="pre">classmethod</span></span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">from_phase_fraction</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="keyword-only-separator o"><abbr title="Keyword-only parameters separator (PEP 3102)"><span class="pre">*</span></abbr></span></em>, <em class="sig-param"><span class="n"><span class="pre">method</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">phase_fraction</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">evolution_time</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">branch_shifts</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">range(-2,</span> <span class="pre">3)</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">bits_msb_first</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">bitstring_msb_first</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">reference_energy</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">metadata</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../../_modules/qdk_chemistry/data/qpe_result.html#QpeResult.from_phase_fraction"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#qdk_chemistry.data.qpe_result.QpeResult.from_phase_fraction" title="Link to this definition"></a></dt>
+<dd><p>Construct a <a class="reference internal" href="#qdk_chemistry.data.qpe_result.QpeResult" title="qdk_chemistry.data.qpe_result.QpeResult"><code class="xref py py-class docutils literal notranslate"><span class="pre">QpeResult</span></code></a> from a measured phase fraction.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p><span class="sphinx_autodoc_typehints-type"><a class="reference internal" href="#qdk_chemistry.data.qpe_result.QpeResult" title="qdk_chemistry.data.qpe_result.QpeResult"><code class="xref py py-class docutils literal notranslate"><span class="pre">QpeResult</span></code></a></span></p>
+</dd>
+<dt class="field-even">Parameters<span class="colon">:</span></dt>
+<dd class="field-even"><ul class="simple">
+<li><p><strong>method</strong> (<a class="reference internal" href="qdk_chemistry.phase_estimation.base.html#qdk_chemistry.phase_estimation.base.PhaseEstimationAlgorithm" title="qdk_chemistry.phase_estimation.base.PhaseEstimationAlgorithm"><em>PhaseEstimationAlgorithm</em></a><em> | </em><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)"><em>str</em></a>) – Phase estimation algorithm or workflow label.</p></li>
+<li><p><strong>phase_fraction</strong> (<a class="reference external" href="https://docs.python.org/3/library/functions.html#float" title="(in Python v3.14)"><em>float</em></a>) – Measured phase fraction in <code class="docutils literal notranslate"><span class="pre">[0,</span> <span class="pre">1)</span></code>.</p></li>
+<li><p><strong>evolution_time</strong> (<a class="reference external" href="https://docs.python.org/3/library/functions.html#float" title="(in Python v3.14)"><em>float</em></a>) – Evolution time <code class="docutils literal notranslate"><span class="pre">t</span></code> used in <code class="docutils literal notranslate"><span class="pre">U</span> <span class="pre">=</span> <span class="pre">exp(-i</span> <span class="pre">H</span> <span class="pre">t)</span></code>.</p></li>
+<li><p><strong>branch_shifts</strong> (<a class="reference external" href="https://docs.python.org/3/library/collections.abc.html#collections.abc.Iterable" title="(in Python v3.14)"><em>Iterable</em></a><em>[</em><a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(in Python v3.14)"><em>int</em></a><em>]</em>) – Integer multiples of <code class="docutils literal notranslate"><span class="pre">2π</span> <span class="pre">/</span> <span class="pre">t</span></code> examined when forming alias candidates.</p></li>
+<li><p><strong>bits_msb_first</strong> (<a class="reference external" href="https://docs.python.org/3/library/collections.abc.html#collections.abc.Sequence" title="(in Python v3.14)"><em>Sequence</em></a><em>[</em><a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(in Python v3.14)"><em>int</em></a><em>] </em><em>| </em><em>None</em>) – Optional measured bits ordered from MSB to LSB.</p></li>
+<li><p><strong>bitstring_msb_first</strong> (<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)"><em>str</em></a><em> | </em><em>None</em>) – Optional string representation of the measured bits.</p></li>
+<li><p><strong>reference_energy</strong> (<a class="reference external" href="https://docs.python.org/3/library/functions.html#float" title="(in Python v3.14)"><em>float</em></a><em> | </em><em>None</em>) – Optional target value used to select the canonical alias branch.</p></li>
+<li><p><strong>metadata</strong> (<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#dict" title="(in Python v3.14)"><em>dict</em></a><em>[</em><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)"><em>str</em></a><em>, </em><a class="reference external" href="https://docs.python.org/3/library/functions.html#object" title="(in Python v3.14)"><em>object</em></a><em>] </em><em>| </em><em>None</em>) – Optional dictionary copied into the result for caller-defined context.</p></li>
+</ul>
+</dd>
+<dt class="field-odd">Returns<span class="colon">:</span></dt>
+<dd class="field-odd"><p>Populated <a class="reference internal" href="#qdk_chemistry.data.qpe_result.QpeResult" title="qdk_chemistry.data.qpe_result.QpeResult"><code class="xref py py-class docutils literal notranslate"><span class="pre">QpeResult</span></code></a> instance reflecting the supplied data.</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py property">
+<dt class="sig sig-object py" id="qdk_chemistry.data.qpe_result.QpeResult.algorithm">
+<em class="property"><span class="k"><span class="pre">property</span></span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">algorithm</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><a class="reference internal" href="qdk_chemistry.phase_estimation.base.html#qdk_chemistry.phase_estimation.base.PhaseEstimationAlgorithm" title="qdk_chemistry.phase_estimation.base.PhaseEstimationAlgorithm"><span class="pre">PhaseEstimationAlgorithm</span></a><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/library/constants.html#None" title="(in Python v3.14)"><span class="pre">None</span></a></em><a class="reference internal" href="../../_modules/qdk_chemistry/data/qpe_result.html#QpeResult.algorithm"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#qdk_chemistry.data.qpe_result.QpeResult.algorithm" title="Link to this definition"></a></dt>
+<dd><p>Return the enumerated algorithm, if recognized.</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="qdk_chemistry.data.qpe_result.QpeResult.get_summary">
+<span class="sig-name descname"><span class="pre">get_summary</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="../../_modules/qdk_chemistry/data/qpe_result.html#QpeResult.get_summary"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#qdk_chemistry.data.qpe_result.QpeResult.get_summary" title="Link to this definition"></a></dt>
+<dd><p>Get a human-readable summary of the QPE result.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p><span class="sphinx_autodoc_typehints-type"><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)"><code class="xref py py-class docutils literal notranslate"><span class="pre">str</span></code></a></span></p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="qdk_chemistry.data.qpe_result.QpeResult.to_json">
+<span class="sig-name descname"><span class="pre">to_json</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="../../_modules/qdk_chemistry/data/qpe_result.html#QpeResult.to_json"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#qdk_chemistry.data.qpe_result.QpeResult.to_json" title="Link to this definition"></a></dt>
+<dd><p>Convert the QPE result to a dictionary for JSON serialization.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p><span class="sphinx_autodoc_typehints-type"><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#dict" title="(in Python v3.14)"><code class="xref py py-class docutils literal notranslate"><span class="pre">dict</span></code></a></span></p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="qdk_chemistry.data.qpe_result.QpeResult.to_hdf5">
+<span class="sig-name descname"><span class="pre">to_hdf5</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">group</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../../_modules/qdk_chemistry/data/qpe_result.html#QpeResult.to_hdf5"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#qdk_chemistry.data.qpe_result.QpeResult.to_hdf5" title="Link to this definition"></a></dt>
+<dd><p>Save the QPE result to an HDF5 group.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p><span class="sphinx_autodoc_typehints-type"><a class="reference external" href="https://docs.python.org/3/library/constants.html#None" title="(in Python v3.14)"><code class="xref py py-obj docutils literal notranslate"><span class="pre">None</span></code></a></span></p>
+</dd>
+<dt class="field-even">Parameters<span class="colon">:</span></dt>
+<dd class="field-even"><p><strong>group</strong> (<em>Group</em>)</p>
+</dd>
+</dl>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>This method is used internally when saving to HDF5 files.
+Python users should call to_hdf5_file() directly.</p>
+</div>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="qdk_chemistry.data.qpe_result.QpeResult.from_json">
+<em class="property"><span class="k"><span class="pre">classmethod</span></span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">from_json</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">json_data</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../../_modules/qdk_chemistry/data/qpe_result.html#QpeResult.from_json"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#qdk_chemistry.data.qpe_result.QpeResult.from_json" title="Link to this definition"></a></dt>
+<dd><p>Create a QPE result from a JSON dictionary.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p><span class="sphinx_autodoc_typehints-type"><a class="reference internal" href="#qdk_chemistry.data.qpe_result.QpeResult" title="qdk_chemistry.data.qpe_result.QpeResult"><code class="xref py py-class docutils literal notranslate"><span class="pre">QpeResult</span></code></a></span></p>
+</dd>
+<dt class="field-even">Parameters<span class="colon">:</span></dt>
+<dd class="field-even"><p><strong>json_data</strong> (<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#dict" title="(in Python v3.14)"><em>dict</em></a>) – Dictionary containing the serialized QPE result data</p>
+</dd>
+<dt class="field-odd">Returns<span class="colon">:</span></dt>
+<dd class="field-odd"><p>New instance reconstructed from the JSON data</p>
+</dd>
+<dt class="field-even">Return type<span class="colon">:</span></dt>
+<dd class="field-even"><p><a class="reference internal" href="#qdk_chemistry.data.qpe_result.QpeResult" title="qdk_chemistry.data.qpe_result.QpeResult">QpeResult</a></p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="qdk_chemistry.data.qpe_result.QpeResult.from_hdf5">
+<em class="property"><span class="k"><span class="pre">classmethod</span></span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">from_hdf5</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">group</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../../_modules/qdk_chemistry/data/qpe_result.html#QpeResult.from_hdf5"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#qdk_chemistry.data.qpe_result.QpeResult.from_hdf5" title="Link to this definition"></a></dt>
+<dd><p>Load a QPE result from an HDF5 group.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p><span class="sphinx_autodoc_typehints-type"><a class="reference internal" href="#qdk_chemistry.data.qpe_result.QpeResult" title="qdk_chemistry.data.qpe_result.QpeResult"><code class="xref py py-class docutils literal notranslate"><span class="pre">QpeResult</span></code></a></span></p>
+</dd>
+<dt class="field-even">Parameters<span class="colon">:</span></dt>
+<dd class="field-even"><p><strong>group</strong> (<em>Group</em>) – HDF5 group or file containing the QPE result data</p>
+</dd>
+<dt class="field-odd">Returns<span class="colon">:</span></dt>
+<dd class="field-odd"><p>New instance reconstructed from the HDF5 data</p>
+</dd>
+<dt class="field-even">Return type<span class="colon">:</span></dt>
+<dd class="field-even"><p><a class="reference internal" href="#qdk_chemistry.data.qpe_result.QpeResult" title="qdk_chemistry.data.qpe_result.QpeResult">QpeResult</a></p>
+</dd>
+</dl>
+</dd></dl>
+
+</dd></dl>
+
+</section>
+
+
+           </div>
+          </div>
+          <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
+        <a href="qdk_chemistry.data.estimator_data.html" class="btn btn-neutral float-left" title="qdk_chemistry.data.estimator_data module" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+        <a href="qdk_chemistry.data.qubit_hamiltonian.html" class="btn btn-neutral float-right" title="qdk_chemistry.data.qubit_hamiltonian module" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright Microsoft Corporation. All rights reserved. Licensed under the MIT License.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

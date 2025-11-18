@@ -1,0 +1,8 @@
+qdk\_chemistry.plugins.qiskit.\_interop.transpiler module
+=========================================================
+
+.. automodule:: qdk_chemistry.plugins.qiskit._interop.transpiler
+   :members:
+   :private-members:
+   :show-inheritance:
+   :undoc-members:

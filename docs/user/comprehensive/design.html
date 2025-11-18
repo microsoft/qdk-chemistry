@@ -6,17 +6,18 @@
   <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
 
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Design and Architecture &mdash; QDK/Chemistry 0.0.1 documentation</title>
+  <title>Design and architecture &mdash; qdk-chemistry 1.0.0-rc1 documentation</title>
       <link rel="stylesheet" type="text/css" href="../../_static/pygments.css?v=b86133f3" />
       <link rel="stylesheet" type="text/css" href="../../_static/css/theme.css?v=e59714d7" />
       <link rel="stylesheet" type="text/css" href="../../_static/tabs.css?v=4c969af8" />
       <link rel="stylesheet" type="text/css" href="../../_static/graphviz.css?v=4ae1632d" />
       <link rel="stylesheet" type="text/css" href="../../_static/copybutton.css?v=76b2166b" />
+      <link rel="stylesheet" type="text/css" href="../../_static/custom.css?v=a64bac2b" />
 
   
       <script src="../../_static/jquery.js?v=5d32c60e"></script>
       <script src="../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
-      <script src="../../_static/documentation_options.js?v=d45e8c67"></script>
+      <script src="../../_static/documentation_options.js?v=81bd8d55"></script>
       <script src="../../_static/doctools.js?v=9bcbadda"></script>
       <script src="../../_static/sphinx_highlight.js?v=dc90522c"></script>
       <script src="../../_static/tabs.js?v=3ee01567"></script>
@@ -25,8 +26,8 @@
     <script src="../../_static/js/theme.js"></script>
     <link rel="index" title="Index" href="../../genindex.html" />
     <link rel="search" title="Search" href="../../search.html" />
-    <link rel="next" title="Design Principles of QDK/Chemistry" href="advanced/design_principles.html" />
-    <link rel="prev" title="In-Depth Guide" href="index.html" /> 
+    <link rel="next" title="Design principles of QDK/Chemistry" href="advanced/design_principles.html" />
+    <link rel="prev" title="In-depth user guide" href="index.html" /> 
 </head>
 
 <body class="wy-body-for-nav"> 
@@ -38,7 +39,7 @@
           
           
           <a href="../../index.html" class="icon icon-home">
-            QDK/Chemistry
+            qdk-chemistry
           </a>
 <div role="search">
   <form id="rtd-search-form" class="wy-form" action="../../search.html" method="get">
@@ -50,19 +51,20 @@
         </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
               <p class="caption" role="heading"><span class="caption-text">User Documentation</span></p>
 <ul class="current">
-<li class="toctree-l1"><a class="reference internal" href="../Quickstart.html">Quickstart</a></li>
-<li class="toctree-l1 current"><a class="reference internal" href="index.html">In-Depth Guide</a><ul class="current">
-<li class="toctree-l2 current"><a class="current reference internal" href="#">Design and Architecture</a><ul>
-<li class="toctree-l3"><a class="reference internal" href="advanced/design_principles.html">Design Principles of QDK/Chemistry</a></li>
-<li class="toctree-l3"><a class="reference internal" href="advanced/factory_pattern.html">Factory Pattern in QDK/Chemistry</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../quickstart.html">Quickstart</a></li>
+<li class="toctree-l1 current"><a class="reference internal" href="index.html">In-depth user guide</a><ul class="current">
+<li class="toctree-l2 current"><a class="current reference internal" href="#">Design and architecture</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="advanced/design_principles.html">Design principles of QDK/Chemistry</a></li>
+<li class="toctree-l3"><a class="reference internal" href="advanced/factory_pattern.html">Factory pattern in QDK/Chemistry</a></li>
 <li class="toctree-l3"><a class="reference internal" href="advanced/serialization.html">Serialization in QDK/Chemistry</a></li>
-<li class="toctree-l3"><a class="reference internal" href="advanced/interfaces.html">Interface System in QDK/Chemistry</a></li>
+<li class="toctree-l3"><a class="reference internal" href="advanced/interfaces.html">Interface system in QDK/Chemistry</a></li>
 <li class="toctree-l3"><a class="reference internal" href="advanced/settings.html">Settings</a></li>
+<li class="toctree-l3"><a class="reference internal" href="advanced/model_hamiltonians.html">Model Hamiltonians</a></li>
 </ul>
 </li>
-<li class="toctree-l2"><a class="reference internal" href="data.html">Data Classes</a></li>
+<li class="toctree-l2"><a class="reference internal" href="data.html">Data classes</a></li>
 <li class="toctree-l2"><a class="reference internal" href="algorithms.html">Algorithms</a></li>
-<li class="toctree-l2"><a class="reference internal" href="keywords.html">Functionals and Basis Sets</a></li>
+<li class="toctree-l2"><a class="reference internal" href="keywords.html">Functionals and basis sets</a></li>
 <li class="toctree-l2"><a class="reference internal" href="plugins.html">Plugins</a></li>
 </ul>
 </li>
@@ -74,7 +76,7 @@
 </ul>
 <p class="caption" role="heading"><span class="caption-text">Supporting Information</span></p>
 <ul>
-<li class="toctree-l1"><a class="reference internal" href="../../glossary.html">Glossary</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../glossary.html">Acronym definitions</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../references.html">References</a></li>
 </ul>
 
@@ -84,7 +86,7 @@
 
     <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
           <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
-          <a href="../../index.html">QDK/Chemistry</a>
+          <a href="../../index.html">qdk-chemistry</a>
       </nav>
 
       <div class="wy-nav-content">
@@ -92,8 +94,8 @@
           <div role="navigation" aria-label="Page navigation">
   <ul class="wy-breadcrumbs">
       <li><a href="../../index.html" class="icon icon-home" aria-label="Home"></a></li>
-          <li class="breadcrumb-item"><a href="index.html">In-Depth Guide</a></li>
-      <li class="breadcrumb-item active">Design and Architecture</li>
+          <li class="breadcrumb-item"><a href="index.html">In-depth user guide</a></li>
+      <li class="breadcrumb-item active">Design and architecture</li>
       <li class="wy-breadcrumbs-aside">
             <a href="../../_sources/user/comprehensive/design.rst.txt" rel="nofollow"> View page source</a>
       </li>
@@ -104,15 +106,16 @@
            <div itemprop="articleBody">
              
   <section id="design-and-architecture">
-<h1>Design and Architecture<a class="headerlink" href="#design-and-architecture" title="Link to this heading"></a></h1>
+<h1>Design and architecture<a class="headerlink" href="#design-and-architecture" title="Link to this heading"></a></h1>
 <div class="toctree-wrapper compound">
-<p class="caption" role="heading"><span class="caption-text">Design and Architecture</span></p>
+<p class="caption" role="heading"><span class="caption-text">Contents</span></p>
 <ul>
-<li class="toctree-l1"><a class="reference internal" href="advanced/design_principles.html">Design Principles of QDK/Chemistry</a></li>
-<li class="toctree-l1"><a class="reference internal" href="advanced/factory_pattern.html">Factory Pattern in QDK/Chemistry</a></li>
+<li class="toctree-l1"><a class="reference internal" href="advanced/design_principles.html">Design principles of QDK/Chemistry</a></li>
+<li class="toctree-l1"><a class="reference internal" href="advanced/factory_pattern.html">Factory pattern in QDK/Chemistry</a></li>
 <li class="toctree-l1"><a class="reference internal" href="advanced/serialization.html">Serialization in QDK/Chemistry</a></li>
-<li class="toctree-l1"><a class="reference internal" href="advanced/interfaces.html">Interface System in QDK/Chemistry</a></li>
+<li class="toctree-l1"><a class="reference internal" href="advanced/interfaces.html">Interface system in QDK/Chemistry</a></li>
 <li class="toctree-l1"><a class="reference internal" href="advanced/settings.html">Settings</a></li>
+<li class="toctree-l1"><a class="reference internal" href="advanced/model_hamiltonians.html">Model Hamiltonians</a></li>
 </ul>
 </div>
 </section>
@@ -121,14 +124,14 @@
            </div>
           </div>
           <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
-        <a href="index.html" class="btn btn-neutral float-left" title="In-Depth Guide" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
-        <a href="advanced/design_principles.html" class="btn btn-neutral float-right" title="Design Principles of QDK/Chemistry" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+        <a href="index.html" class="btn btn-neutral float-left" title="In-depth user guide" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+        <a href="advanced/design_principles.html" class="btn btn-neutral float-right" title="Design principles of QDK/Chemistry" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
     </div>
 
   <hr/>
 
   <div role="contentinfo">
-    <p>&#169; Copyright Copyright (c) Microsoft Corporation. All rights reserved. Licensed under the MIT License..</p>
+    <p>&#169; Copyright Microsoft Corporation. All rights reserved. Licensed under the MIT License.</p>
   </div>
 
   Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a

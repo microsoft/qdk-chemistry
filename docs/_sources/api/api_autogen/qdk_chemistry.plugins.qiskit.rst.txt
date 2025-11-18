@@ -1,0 +1,26 @@
+qdk\_chemistry.plugins.qiskit package
+=====================================
+
+.. automodule:: qdk_chemistry.plugins.qiskit
+   :members:
+   :private-members:
+   :show-inheritance:
+   :undoc-members:
+
+Subpackages
+-----------
+
+.. toctree::
+   :maxdepth: 4
+
+   qdk_chemistry.plugins.qiskit._interop
+
+Submodules
+----------
+
+.. toctree::
+   :maxdepth: 4
+
+   qdk_chemistry.plugins.qiskit.energy_estimator
+   qdk_chemistry.plugins.qiskit.qubit_mapper
+   qdk_chemistry.plugins.qiskit.regular_isometry

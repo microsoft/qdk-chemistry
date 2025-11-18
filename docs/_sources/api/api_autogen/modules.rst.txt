@@ -4,4 +4,4 @@ QDK/Chemistry Python API
 .. toctree::
    :maxdepth: 4
 
-   qdk
+   qdk_chemistry

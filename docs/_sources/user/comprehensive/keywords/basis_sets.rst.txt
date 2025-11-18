@@ -1,7 +1,5 @@
-Available Basis Sets
+Available basis sets
 ====================
 
 .. todo::
-🔧 **TODO:**
-   TODO (NAB):  finish documentation
-   https://dev.azure.com/ms-azurequantum/AzureQuantum/_workitems/edit/41383
+   🔧 The basis sets list is currently under construction.

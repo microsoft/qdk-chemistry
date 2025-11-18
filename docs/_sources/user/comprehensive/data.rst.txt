@@ -1,12 +1,17 @@
-Data Classes
+Data classes
 ============
 
 .. toctree::
    :maxdepth: 1
-   :caption: Data Classes
+   :caption: Contents
 
-   data/structure
-   data/orbitals
-   data/hamiltonian
-   data/wavefunction
+   data/ansatz
    data/basis_set
+   data/energy_expectation
+   data/hamiltonian
+   data/orbitals
+   data/qpe_results
+   data/qubit_hamiltonian
+   data/stability_results
+   data/structure
+   data/wavefunction

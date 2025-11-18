@@ -1,0 +1,13 @@
+digraph DataFlow {
+    rankdir=LR;
+    bgcolor="#FAFAFA";
+    node [shape=box, style="rounded,filled", fontname="Arial", margin=0.3];
+    edge [color="#1976D2", penwidth=2];
+
+    Input [label="Input Data", fillcolor="#E8EAF6", color="#5C6BC0", penwidth=2, fontcolor="#3949AB"];
+    Algorithm [label="Algorithm", fillcolor="#E3F2FD", color="#42A5F5", penwidth=2, fontcolor="#1976D2"];
+    Output [label="Output Data", fillcolor="#E0F2F1", color="#26A69A", penwidth=2, fontcolor="#00796B"];
+
+    Input -> Algorithm;
+    Algorithm -> Output;
+}

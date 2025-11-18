@@ -1,0 +1,483 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../../../../">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>qdk_chemistry.plugins.pyscf.stability &mdash; qdk-chemistry 1.0.0-rc1 documentation</title>
+      <link rel="stylesheet" type="text/css" href="../../../../_static/pygments.css?v=b86133f3" />
+      <link rel="stylesheet" type="text/css" href="../../../../_static/css/theme.css?v=e59714d7" />
+      <link rel="stylesheet" type="text/css" href="../../../../_static/tabs.css?v=4c969af8" />
+      <link rel="stylesheet" type="text/css" href="../../../../_static/graphviz.css?v=4ae1632d" />
+      <link rel="stylesheet" type="text/css" href="../../../../_static/copybutton.css?v=76b2166b" />
+      <link rel="stylesheet" type="text/css" href="../../../../_static/custom.css?v=a64bac2b" />
+
+  
+      <script src="../../../../_static/jquery.js?v=5d32c60e"></script>
+      <script src="../../../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="../../../../_static/documentation_options.js?v=81bd8d55"></script>
+      <script src="../../../../_static/doctools.js?v=9bcbadda"></script>
+      <script src="../../../../_static/sphinx_highlight.js?v=dc90522c"></script>
+      <script src="../../../../_static/tabs.js?v=3ee01567"></script>
+      <script src="../../../../_static/clipboard.min.js?v=a7894cd8"></script>
+      <script src="../../../../_static/copybutton.js?v=f281be69"></script>
+    <script src="../../../../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../../../../genindex.html" />
+    <link rel="search" title="Search" href="../../../../search.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="../../../../index.html" class="icon icon-home">
+            qdk-chemistry
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../../../../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">User Documentation</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../../user/quickstart.html">Quickstart</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../../user/comprehensive/index.html">In-depth user guide</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">API Reference</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../../api/python_api.html">Python API</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../../api/cpp_api.html">C++ API</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Supporting Information</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../../glossary.html">Acronym definitions</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../../references.html">References</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../../../../index.html">qdk-chemistry</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../../../../index.html" class="icon icon-home" aria-label="Home"></a></li>
+          <li class="breadcrumb-item"><a href="../../../index.html">Module code</a></li>
+      <li class="breadcrumb-item active">qdk_chemistry.plugins.pyscf.stability</li>
+      <li class="wy-breadcrumbs-aside">
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <h1>Source code for qdk_chemistry.plugins.pyscf.stability</h1><div class="highlight"><pre>
+<span></span><span class="sd">&quot;&quot;&quot;PySCF stability analysis module for QDK.</span>
+
+<span class="sd">This module provides wavefunction stability analysis capabilities using the PySCF library</span>
+<span class="sd">and integrates PySCF stability algorithms into the QDK framework.</span>
+
+<span class="sd">The implementation supports both restricted (RHF, ROHF) and unrestricted (UHF)</span>
+<span class="sd">wavefunction stability analysis including:</span>
+<span class="sd">- Internal stability analysis (within the same wavefunction type)</span>
+<span class="sd">- RHF external stability analysis (RHF -&gt; UHF instabilities)</span>
+
+<span class="sd">This module registers a `pyscf` stability checker with the QDK stability checker registry at</span>
+<span class="sd">import time, making the functionality available via</span>
+<span class="sd">`qdk_chemistry.algorithms.create(&#39;stability_checker&#39;, &#39;pyscf&#39;)`.</span>
+
+<span class="sd">Requires: PySCF (the code uses `pyscf.lib`, `pyscf.scf`, `pyscf.soscf`,</span>
+<span class="sd">          and `pyscf.scf.stability` routines).</span>
+<span class="sd">&quot;&quot;&quot;</span>
+
+<span class="c1"># --------------------------------------------------------------------------------------------</span>
+<span class="c1"># Copyright (c) Microsoft Corporation. All rights reserved.</span>
+<span class="c1"># Licensed under the MIT License. See LICENSE.txt in the project root for license information.</span>
+<span class="c1"># --------------------------------------------------------------------------------------------</span>
+
+<span class="kn">import</span><span class="w"> </span><span class="nn">numpy</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">np</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">pyscf</span><span class="w"> </span><span class="kn">import</span> <span class="n">lib</span><span class="p">,</span> <span class="n">scf</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">pyscf.scf.stability</span><span class="w"> </span><span class="kn">import</span> <span class="n">_gen_hop_rhf_external</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">pyscf.soscf</span><span class="w"> </span><span class="kn">import</span> <span class="n">newton_ah</span>
+
+<span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.algorithms</span><span class="w"> </span><span class="kn">import</span> <span class="n">StabilityChecker</span><span class="p">,</span> <span class="n">register</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.data</span><span class="w"> </span><span class="kn">import</span> <span class="n">Settings</span><span class="p">,</span> <span class="n">StabilityResult</span><span class="p">,</span> <span class="n">Wavefunction</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.plugins.pyscf.utils</span><span class="w"> </span><span class="kn">import</span> <span class="n">orbitals_to_scf</span>
+
+
+<span class="k">def</span><span class="w"> </span><span class="nf">_stability_preconditioner</span><span class="p">(</span><span class="n">dx</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">,</span> <span class="n">e</span><span class="p">:</span> <span class="nb">float</span><span class="p">,</span> <span class="n">hdiag</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Preconditioner for stability analysis eigenvalue problems.</span>
+
+<span class="sd">    Directly from PySCF implementation.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">hdiagd</span> <span class="o">=</span> <span class="n">hdiag</span> <span class="o">-</span> <span class="n">e</span>
+    <span class="n">hdiagd</span><span class="p">[</span><span class="nb">abs</span><span class="p">(</span><span class="n">hdiagd</span><span class="p">)</span> <span class="o">&lt;</span> <span class="mf">1e-8</span><span class="p">]</span> <span class="o">=</span> <span class="mf">1e-8</span>
+    <span class="k">return</span> <span class="n">dx</span> <span class="o">/</span> <span class="n">hdiagd</span>
+
+
+<span class="k">def</span><span class="w"> </span><span class="nf">_stability_hessian</span><span class="p">(</span><span class="n">hop</span><span class="p">,</span> <span class="n">x</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Stability analysis Hessian function.</span>
+
+<span class="sd">    Directly from PySCF implementation.</span>
+
+<span class="sd">    The result of hop(x) corresponds to a displacement that reduces</span>
+<span class="sd">    gradients g. It is the vir-occ block of the matrix vector product</span>
+<span class="sd">    (Hessian*x). The occ-vir block equals x2.T.conj(). The overall</span>
+<span class="sd">    Hessian for internal rotation is x2 + x2.T.conj(). This is</span>
+<span class="sd">    the reason we apply (.real * 2) below.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="k">return</span> <span class="n">hop</span><span class="p">(</span><span class="n">x</span><span class="p">)</span><span class="o">.</span><span class="n">real</span> <span class="o">*</span> <span class="mi">2</span>
+
+
+<span class="k">def</span><span class="w"> </span><span class="nf">_rhf_internal</span><span class="p">(</span>
+    <span class="n">mf</span><span class="p">:</span> <span class="n">scf</span><span class="o">.</span><span class="n">hf</span><span class="o">.</span><span class="n">SCF</span><span class="p">,</span> <span class="n">with_symmetry</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">True</span><span class="p">,</span> <span class="n">nroots</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">3</span><span class="p">,</span> <span class="n">tol</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="mf">1e-4</span>
+<span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">tuple</span><span class="p">[</span><span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">,</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">]:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;RHF internal stability analysis.</span>
+
+<span class="sd">    Modified from PySCF implementation.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">g</span><span class="p">,</span> <span class="n">hop</span><span class="p">,</span> <span class="n">hdiag</span> <span class="o">=</span> <span class="n">newton_ah</span><span class="o">.</span><span class="n">gen_g_hop_rhf</span><span class="p">(</span><span class="n">mf</span><span class="p">,</span> <span class="n">mf</span><span class="o">.</span><span class="n">mo_coeff</span><span class="p">,</span> <span class="n">mf</span><span class="o">.</span><span class="n">mo_occ</span><span class="p">,</span> <span class="n">with_symmetry</span><span class="o">=</span><span class="n">with_symmetry</span><span class="p">)</span>
+    <span class="n">hdiag</span> <span class="o">*=</span> <span class="mi">2</span>
+
+    <span class="n">x0</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">zeros_like</span><span class="p">(</span><span class="n">g</span><span class="p">)</span>
+    <span class="n">x0</span><span class="p">[</span><span class="n">g</span> <span class="o">!=</span> <span class="mi">0</span><span class="p">]</span> <span class="o">=</span> <span class="mf">1.0</span> <span class="o">/</span> <span class="n">hdiag</span><span class="p">[</span><span class="n">g</span> <span class="o">!=</span> <span class="mi">0</span><span class="p">]</span>
+    <span class="k">if</span> <span class="ow">not</span> <span class="n">with_symmetry</span><span class="p">:</span>  <span class="c1"># allow to break point group symmetry</span>
+        <span class="n">x0</span><span class="p">[</span><span class="n">np</span><span class="o">.</span><span class="n">argmin</span><span class="p">(</span><span class="n">hdiag</span><span class="p">)]</span> <span class="o">=</span> <span class="mi">1</span>
+    <span class="n">e</span><span class="p">,</span> <span class="n">v</span> <span class="o">=</span> <span class="n">lib</span><span class="o">.</span><span class="n">davidson</span><span class="p">(</span>
+        <span class="k">lambda</span> <span class="n">x</span><span class="p">:</span> <span class="n">_stability_hessian</span><span class="p">(</span><span class="n">hop</span><span class="p">,</span> <span class="n">x</span><span class="p">),</span>
+        <span class="n">x0</span><span class="p">,</span>
+        <span class="k">lambda</span> <span class="n">dx</span><span class="p">,</span> <span class="n">e</span><span class="p">,</span> <span class="n">_x0</span><span class="p">:</span> <span class="n">_stability_preconditioner</span><span class="p">(</span><span class="n">dx</span><span class="p">,</span> <span class="n">e</span><span class="p">,</span> <span class="n">hdiag</span><span class="p">),</span>
+        <span class="n">tol</span><span class="o">=</span><span class="n">tol</span><span class="p">,</span>
+        <span class="n">nroots</span><span class="o">=</span><span class="n">nroots</span><span class="p">,</span>
+    <span class="p">)</span>
+    <span class="k">return</span> <span class="n">e</span><span class="p">,</span> <span class="n">v</span>
+
+
+<span class="k">def</span><span class="w"> </span><span class="nf">_rhf_external</span><span class="p">(</span>
+    <span class="n">mf</span><span class="p">:</span> <span class="n">scf</span><span class="o">.</span><span class="n">hf</span><span class="o">.</span><span class="n">SCF</span><span class="p">,</span> <span class="n">with_symmetry</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">True</span><span class="p">,</span> <span class="n">nroots</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">3</span><span class="p">,</span> <span class="n">tol</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="mf">1e-4</span>
+<span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">tuple</span><span class="p">[</span><span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">,</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">]:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;RHF external stability analysis (RHF -&gt; UHF).</span>
+
+<span class="sd">    Modified from PySCF implementation.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="c1"># Do not consider real -&gt; complex instability</span>
+    <span class="n">_</span><span class="p">,</span> <span class="n">_</span><span class="p">,</span> <span class="n">hop2</span><span class="p">,</span> <span class="n">hdiag2</span> <span class="o">=</span> <span class="n">_gen_hop_rhf_external</span><span class="p">(</span><span class="n">mf</span><span class="p">,</span> <span class="n">with_symmetry</span><span class="p">)</span>
+
+    <span class="n">x0</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">zeros_like</span><span class="p">(</span><span class="n">hdiag2</span><span class="p">)</span>
+    <span class="n">x0</span><span class="p">[</span><span class="n">hdiag2</span> <span class="o">&gt;</span> <span class="mf">1e-5</span><span class="p">]</span> <span class="o">=</span> <span class="mf">1.0</span> <span class="o">/</span> <span class="n">hdiag2</span><span class="p">[</span><span class="n">hdiag2</span> <span class="o">&gt;</span> <span class="mf">1e-5</span><span class="p">]</span>
+    <span class="n">e</span><span class="p">,</span> <span class="n">v</span> <span class="o">=</span> <span class="n">lib</span><span class="o">.</span><span class="n">davidson</span><span class="p">(</span><span class="n">hop2</span><span class="p">,</span> <span class="n">x0</span><span class="p">,</span> <span class="k">lambda</span> <span class="n">dx</span><span class="p">,</span> <span class="n">e</span><span class="p">,</span> <span class="n">_x0</span><span class="p">:</span> <span class="n">_stability_preconditioner</span><span class="p">(</span><span class="n">dx</span><span class="p">,</span> <span class="n">e</span><span class="p">,</span> <span class="n">hdiag2</span><span class="p">),</span> <span class="n">tol</span><span class="o">=</span><span class="n">tol</span><span class="p">,</span> <span class="n">nroots</span><span class="o">=</span><span class="n">nroots</span><span class="p">)</span>
+    <span class="k">return</span> <span class="n">e</span><span class="p">,</span> <span class="n">v</span>
+
+
+<span class="k">def</span><span class="w"> </span><span class="nf">_rohf_internal</span><span class="p">(</span>
+    <span class="n">mf</span><span class="p">:</span> <span class="n">scf</span><span class="o">.</span><span class="n">rohf</span><span class="o">.</span><span class="n">ROHF</span><span class="p">,</span> <span class="n">with_symmetry</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">True</span><span class="p">,</span> <span class="n">nroots</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">3</span><span class="p">,</span> <span class="n">tol</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="mf">1e-4</span>
+<span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">tuple</span><span class="p">[</span><span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">,</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">]:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;ROHF internal stability analysis.</span>
+
+<span class="sd">    Modified from PySCF implementation.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">g</span><span class="p">,</span> <span class="n">hop</span><span class="p">,</span> <span class="n">hdiag</span> <span class="o">=</span> <span class="n">newton_ah</span><span class="o">.</span><span class="n">gen_g_hop_rohf</span><span class="p">(</span><span class="n">mf</span><span class="p">,</span> <span class="n">mf</span><span class="o">.</span><span class="n">mo_coeff</span><span class="p">,</span> <span class="n">mf</span><span class="o">.</span><span class="n">mo_occ</span><span class="p">,</span> <span class="n">with_symmetry</span><span class="o">=</span><span class="n">with_symmetry</span><span class="p">)</span>
+    <span class="n">hdiag</span> <span class="o">*=</span> <span class="mi">2</span>
+
+    <span class="n">x0</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">zeros_like</span><span class="p">(</span><span class="n">g</span><span class="p">)</span>
+    <span class="n">x0</span><span class="p">[</span><span class="n">g</span> <span class="o">!=</span> <span class="mi">0</span><span class="p">]</span> <span class="o">=</span> <span class="mf">1.0</span> <span class="o">/</span> <span class="n">hdiag</span><span class="p">[</span><span class="n">g</span> <span class="o">!=</span> <span class="mi">0</span><span class="p">]</span>
+    <span class="k">if</span> <span class="ow">not</span> <span class="n">with_symmetry</span><span class="p">:</span>  <span class="c1"># allow to break point group symmetry</span>
+        <span class="n">x0</span><span class="p">[</span><span class="n">np</span><span class="o">.</span><span class="n">argmin</span><span class="p">(</span><span class="n">hdiag</span><span class="p">)]</span> <span class="o">=</span> <span class="mi">1</span>
+    <span class="n">e</span><span class="p">,</span> <span class="n">v</span> <span class="o">=</span> <span class="n">lib</span><span class="o">.</span><span class="n">davidson</span><span class="p">(</span>
+        <span class="k">lambda</span> <span class="n">x</span><span class="p">:</span> <span class="n">_stability_hessian</span><span class="p">(</span><span class="n">hop</span><span class="p">,</span> <span class="n">x</span><span class="p">),</span>
+        <span class="n">x0</span><span class="p">,</span>
+        <span class="k">lambda</span> <span class="n">dx</span><span class="p">,</span> <span class="n">e</span><span class="p">,</span> <span class="n">_x0</span><span class="p">:</span> <span class="n">_stability_preconditioner</span><span class="p">(</span><span class="n">dx</span><span class="p">,</span> <span class="n">e</span><span class="p">,</span> <span class="n">hdiag</span><span class="p">),</span>
+        <span class="n">tol</span><span class="o">=</span><span class="n">tol</span><span class="p">,</span>
+        <span class="n">nroots</span><span class="o">=</span><span class="n">nroots</span><span class="p">,</span>
+    <span class="p">)</span>
+    <span class="k">return</span> <span class="n">e</span><span class="p">,</span> <span class="n">v</span>
+
+
+<span class="k">def</span><span class="w"> </span><span class="nf">_rohf_external</span><span class="p">(</span><span class="n">mf</span><span class="p">:</span> <span class="n">scf</span><span class="o">.</span><span class="n">rohf</span><span class="o">.</span><span class="n">ROHF</span><span class="p">,</span> <span class="n">with_symmetry</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">True</span><span class="p">,</span> <span class="n">nroots</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">3</span><span class="p">,</span> <span class="n">tol</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="mf">1e-4</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;ROHF external stability analysis (not implemented).&quot;&quot;&quot;</span>
+    <span class="k">raise</span> <span class="ne">NotImplementedError</span>
+
+
+<span class="k">def</span><span class="w"> </span><span class="nf">_uhf_internal</span><span class="p">(</span>
+    <span class="n">mf</span><span class="p">:</span> <span class="n">scf</span><span class="o">.</span><span class="n">uhf</span><span class="o">.</span><span class="n">UHF</span><span class="p">,</span> <span class="n">with_symmetry</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">True</span><span class="p">,</span> <span class="n">nroots</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">3</span><span class="p">,</span> <span class="n">tol</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="mf">1e-4</span>
+<span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">tuple</span><span class="p">[</span><span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">,</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">]:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;UHF internal stability analysis.</span>
+
+<span class="sd">    Modified from PySCF implementation.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">g</span><span class="p">,</span> <span class="n">hop</span><span class="p">,</span> <span class="n">hdiag</span> <span class="o">=</span> <span class="n">newton_ah</span><span class="o">.</span><span class="n">gen_g_hop_uhf</span><span class="p">(</span><span class="n">mf</span><span class="p">,</span> <span class="n">mf</span><span class="o">.</span><span class="n">mo_coeff</span><span class="p">,</span> <span class="n">mf</span><span class="o">.</span><span class="n">mo_occ</span><span class="p">,</span> <span class="n">with_symmetry</span><span class="o">=</span><span class="n">with_symmetry</span><span class="p">)</span>
+    <span class="n">hdiag</span> <span class="o">*=</span> <span class="mi">2</span>
+
+    <span class="n">x0</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">zeros_like</span><span class="p">(</span><span class="n">g</span><span class="p">)</span>
+    <span class="n">x0</span><span class="p">[</span><span class="n">g</span> <span class="o">!=</span> <span class="mi">0</span><span class="p">]</span> <span class="o">=</span> <span class="mf">1.0</span> <span class="o">/</span> <span class="n">hdiag</span><span class="p">[</span><span class="n">g</span> <span class="o">!=</span> <span class="mi">0</span><span class="p">]</span>
+    <span class="k">if</span> <span class="ow">not</span> <span class="n">with_symmetry</span><span class="p">:</span>  <span class="c1"># allow to break point group symmetry</span>
+        <span class="n">x0</span><span class="p">[</span><span class="n">np</span><span class="o">.</span><span class="n">argmin</span><span class="p">(</span><span class="n">hdiag</span><span class="p">)]</span> <span class="o">=</span> <span class="mi">1</span>
+    <span class="n">e</span><span class="p">,</span> <span class="n">v</span> <span class="o">=</span> <span class="n">lib</span><span class="o">.</span><span class="n">davidson</span><span class="p">(</span>
+        <span class="k">lambda</span> <span class="n">x</span><span class="p">:</span> <span class="n">_stability_hessian</span><span class="p">(</span><span class="n">hop</span><span class="p">,</span> <span class="n">x</span><span class="p">),</span>
+        <span class="n">x0</span><span class="p">,</span>
+        <span class="k">lambda</span> <span class="n">dx</span><span class="p">,</span> <span class="n">e</span><span class="p">,</span> <span class="n">_x0</span><span class="p">:</span> <span class="n">_stability_preconditioner</span><span class="p">(</span><span class="n">dx</span><span class="p">,</span> <span class="n">e</span><span class="p">,</span> <span class="n">hdiag</span><span class="p">),</span>
+        <span class="n">tol</span><span class="o">=</span><span class="n">tol</span><span class="p">,</span>
+        <span class="n">nroots</span><span class="o">=</span><span class="n">nroots</span><span class="p">,</span>
+    <span class="p">)</span>
+    <span class="k">return</span> <span class="n">e</span><span class="p">,</span> <span class="n">v</span>
+
+
+<div class="viewcode-block" id="PyscfStabilitySettings">
+<a class="viewcode-back" href="../../../../api/api_autogen/qdk_chemistry.plugins.pyscf.stability.html#qdk_chemistry.plugins.pyscf.stability.PyscfStabilitySettings">[docs]</a>
+<span class="k">class</span><span class="w"> </span><span class="nc">PyscfStabilitySettings</span><span class="p">(</span><span class="n">Settings</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Configuration settings for PySCF stability analysis.</span>
+
+<span class="sd">    This class manages settings for wavefunction stability analysis procedures using</span>
+<span class="sd">    PySCF. It inherits from the Settings base class and exposes the</span>
+<span class="sd">    configurable options used by :class:`PyscfStabilityChecker`.</span>
+
+<span class="sd">    Available settings:</span>
+<span class="sd">        internal: Whether to perform internal stability analysis (within the same wavefunction type).</span>
+<span class="sd">        external: Whether to perform external stability analysis (RHF -&gt; UHF instabilities).</span>
+<span class="sd">            Only supported for RHF wavefunctions. Will raise an error if enabled for ROHF or UHF.</span>
+<span class="sd">        with_symmetry: Whether to respect point group symmetry during stability analysis.</span>
+<span class="sd">        nroots: Number of eigenvalue roots to compute in the Davidson solver.</span>
+<span class="sd">        tolerance: Convergence threshold for the Davidson eigenvalue solver.</span>
+
+<span class="sd">    Examples:</span>
+<span class="sd">        &gt;&gt;&gt; settings = PyscfStabilitySettings()</span>
+<span class="sd">        &gt;&gt;&gt; settings.get(&quot;nroots&quot;)</span>
+<span class="sd">        3</span>
+<span class="sd">        &gt;&gt;&gt; settings.set(&quot;nroots&quot;, 5)</span>
+<span class="sd">        &gt;&gt;&gt; settings.set(&quot;external&quot;, False)  # Only internal stability</span>
+
+<span class="sd">    &quot;&quot;&quot;</span>
+
+<div class="viewcode-block" id="PyscfStabilitySettings.__init__">
+<a class="viewcode-back" href="../../../../api/api_autogen/qdk_chemistry.plugins.pyscf.stability.html#qdk_chemistry.plugins.pyscf.stability.PyscfStabilitySettings.__init__">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Initialize the stability checker with default parameters.&quot;&quot;&quot;</span>
+        <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">()</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_set_default</span><span class="p">(</span><span class="s2">&quot;internal&quot;</span><span class="p">,</span> <span class="s2">&quot;bool&quot;</span><span class="p">,</span> <span class="kc">True</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_set_default</span><span class="p">(</span><span class="s2">&quot;external&quot;</span><span class="p">,</span> <span class="s2">&quot;bool&quot;</span><span class="p">,</span> <span class="kc">True</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_set_default</span><span class="p">(</span><span class="s2">&quot;with_symmetry&quot;</span><span class="p">,</span> <span class="s2">&quot;bool&quot;</span><span class="p">,</span> <span class="kc">True</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_set_default</span><span class="p">(</span><span class="s2">&quot;nroots&quot;</span><span class="p">,</span> <span class="s2">&quot;int&quot;</span><span class="p">,</span> <span class="mi">3</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_set_default</span><span class="p">(</span><span class="s2">&quot;davidson_tolerance&quot;</span><span class="p">,</span> <span class="s2">&quot;double&quot;</span><span class="p">,</span> <span class="mf">1e-4</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_set_default</span><span class="p">(</span><span class="s2">&quot;stability_tolerance&quot;</span><span class="p">,</span> <span class="s2">&quot;double&quot;</span><span class="p">,</span> <span class="o">-</span><span class="mf">1e-4</span><span class="p">)</span></div>
+</div>
+
+
+
+<div class="viewcode-block" id="PyscfStabilityChecker">
+<a class="viewcode-back" href="../../../../api/api_autogen/qdk_chemistry.plugins.pyscf.stability.html#qdk_chemistry.plugins.pyscf.stability.PyscfStabilityChecker">[docs]</a>
+<span class="k">class</span><span class="w"> </span><span class="nc">PyscfStabilityChecker</span><span class="p">(</span><span class="n">StabilityChecker</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;PySCF-based stability checker for quantum chemistry wavefunctions.</span>
+
+<span class="sd">    This class implements wavefunction stability analysis using routines from PySCF.</span>
+<span class="sd">    It supports multiple wavefunction types and can perform internal stability analysis of</span>
+<span class="sd">    RHF, ROHF, UHF and external stability analysis (RHF -&gt; UHF instability).</span>
+
+<span class="sd">    Key behavior:</span>
+<span class="sd">    - Automatically detects wavefunction type (RHF, ROHF, UHF) and applies appropriate analysis</span>
+<span class="sd">    - Internal stability analysis is performed within the same wavefunction type</span>
+<span class="sd">    - External stability analysis (RHF -&gt; UHF) only supported for RHF wavefunctions</span>
+<span class="sd">    - Raises an error for ROHF or UHF when external analysis is requested</span>
+<span class="sd">    - Returns StabilityResult with separate internal and external stability information</span>
+
+<span class="sd">    Raises:</span>
+<span class="sd">        ValueError: If wavefunction is not a SlaterDeterminantContainer (container type &quot;sd&quot;).</span>
+
+<span class="sd">    Examples:</span>
+<span class="sd">        &gt;&gt;&gt; checker = PyscfStabilityChecker()</span>
+<span class="sd">        &gt;&gt;&gt; is_stable, result = checker.run(wavefunction)</span>
+<span class="sd">        &gt;&gt;&gt; print(f&quot;Overall stable: {is_stable}&quot;)</span>
+<span class="sd">        &gt;&gt;&gt; print(f&quot;Internal stable: {result.is_internal_stable()}&quot;)</span>
+<span class="sd">        &gt;&gt;&gt; print(f&quot;External stable: {result.is_external_stable()}&quot;)</span>
+
+<span class="sd">    &quot;&quot;&quot;</span>
+
+<div class="viewcode-block" id="PyscfStabilityChecker.__init__">
+<a class="viewcode-back" href="../../../../api/api_autogen/qdk_chemistry.plugins.pyscf.stability.html#qdk_chemistry.plugins.pyscf.stability.PyscfStabilityChecker.__init__">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Initialize the PySCF stability checker with default settings.&quot;&quot;&quot;</span>
+        <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">()</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_settings</span> <span class="o">=</span> <span class="n">PyscfStabilitySettings</span><span class="p">()</span></div>
+
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">_run_impl</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">wavefunction</span><span class="p">:</span> <span class="n">Wavefunction</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">tuple</span><span class="p">[</span><span class="nb">bool</span><span class="p">,</span> <span class="n">StabilityResult</span><span class="p">]:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Perform wavefunction stability analysis using PySCF.</span>
+
+<span class="sd">        This method analyzes the stability of the input wavefunction by computing</span>
+<span class="sd">        eigenvalues of the electronic Hessian matrix. The analysis type (internal/rhf_external)</span>
+<span class="sd">        and method (RHF/ROHF/UHF) are automatically determined from the wavefunction</span>
+<span class="sd">        and settings.</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            wavefunction: The wavefunction to analyze for stability.</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            A tuple containing a boolean indicating overall stability and a StabilityResult object</span>
+<span class="sd">            with detailed analysis results.</span>
+
+<span class="sd">        Raises:</span>
+<span class="sd">            ValueError: If wavefunction is not a SlaterDeterminantContainer or if external</span>
+<span class="sd">                stability analysis is requested for ROHF/UHF wavefunctions.</span>
+
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="c1"># Verify wavefunction compatibility: Only SlaterDeterminantContainer currently supported</span>
+        <span class="k">if</span> <span class="n">wavefunction</span><span class="o">.</span><span class="n">get_container_type</span><span class="p">()</span> <span class="o">!=</span> <span class="s2">&quot;sd&quot;</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;Stability analysis currently only supports SlaterDeterminantContainer wavefunctions&quot;</span><span class="p">)</span>
+
+        <span class="c1"># Extract settings</span>
+        <span class="n">do_internal</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_settings</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;internal&quot;</span><span class="p">)</span>
+        <span class="n">do_external</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_settings</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;external&quot;</span><span class="p">)</span>
+        <span class="n">with_symmetry</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_settings</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;with_symmetry&quot;</span><span class="p">)</span>
+        <span class="n">nroots</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_settings</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;nroots&quot;</span><span class="p">)</span>
+        <span class="n">alg_tol</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_settings</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;davidson_tolerance&quot;</span><span class="p">)</span>
+        <span class="n">stability_tol</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_settings</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;stability_tolerance&quot;</span><span class="p">)</span>
+
+        <span class="c1"># Get orbitals from wavefunction</span>
+        <span class="n">orbitals</span> <span class="o">=</span> <span class="n">wavefunction</span><span class="o">.</span><span class="n">get_orbitals</span><span class="p">()</span>
+        <span class="k">if</span> <span class="n">orbitals</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;Wavefunction must contain orbital information for stability analysis&quot;</span><span class="p">)</span>
+
+        <span class="c1"># Get electron counts from the wavefunction</span>
+        <span class="n">nalpha</span><span class="p">,</span> <span class="n">nbeta</span> <span class="o">=</span> <span class="n">wavefunction</span><span class="o">.</span><span class="n">get_total_num_electrons</span><span class="p">()</span>
+
+        <span class="c1"># Create occupation arrays (assumes aufbau filling)</span>
+        <span class="n">num_molecular_orbitalss</span> <span class="o">=</span> <span class="n">orbitals</span><span class="o">.</span><span class="n">get_num_molecular_orbitals</span><span class="p">()</span>
+        <span class="n">occ_alpha</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">zeros</span><span class="p">(</span><span class="n">num_molecular_orbitalss</span><span class="p">)</span>
+        <span class="n">occ_beta</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">zeros</span><span class="p">(</span><span class="n">num_molecular_orbitalss</span><span class="p">)</span>
+        <span class="n">occ_alpha</span><span class="p">[:</span><span class="n">nalpha</span><span class="p">]</span> <span class="o">=</span> <span class="mf">1.0</span>
+        <span class="n">occ_beta</span><span class="p">[:</span><span class="n">nbeta</span><span class="p">]</span> <span class="o">=</span> <span class="mf">1.0</span>
+
+        <span class="c1"># Convert to PySCF SCF object</span>
+        <span class="n">mf</span> <span class="o">=</span> <span class="n">orbitals_to_scf</span><span class="p">(</span><span class="n">orbitals</span><span class="p">,</span> <span class="n">occ_alpha</span><span class="p">,</span> <span class="n">occ_beta</span><span class="p">)</span>
+
+        <span class="c1"># Determine wavefunction type and perform appropriate stability analysis</span>
+        <span class="n">internal_eigenvalues_list</span> <span class="o">=</span> <span class="p">[]</span>
+        <span class="n">internal_eigenvectors_list</span> <span class="o">=</span> <span class="p">[]</span>
+        <span class="n">external_eigenvalues_list</span> <span class="o">=</span> <span class="p">[]</span>
+        <span class="n">external_eigenvectors_list</span> <span class="o">=</span> <span class="p">[]</span>
+
+        <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">mf</span><span class="p">,</span> <span class="n">scf</span><span class="o">.</span><span class="n">rohf</span><span class="o">.</span><span class="n">ROHF</span><span class="p">):</span>
+            <span class="c1"># ROHF stability analysis</span>
+            <span class="k">if</span> <span class="n">do_internal</span><span class="p">:</span>
+                <span class="n">e</span><span class="p">,</span> <span class="n">v</span> <span class="o">=</span> <span class="n">_rohf_internal</span><span class="p">(</span><span class="n">mf</span><span class="p">,</span> <span class="n">with_symmetry</span><span class="o">=</span><span class="n">with_symmetry</span><span class="p">,</span> <span class="n">nroots</span><span class="o">=</span><span class="n">nroots</span><span class="p">,</span> <span class="n">tol</span><span class="o">=</span><span class="n">alg_tol</span><span class="p">)</span>
+                <span class="n">internal_eigenvalues_list</span><span class="o">.</span><span class="n">extend</span><span class="p">(</span><span class="n">e</span> <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">e</span><span class="p">,</span> <span class="p">(</span><span class="nb">list</span><span class="p">,</span> <span class="nb">tuple</span><span class="p">,</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">))</span> <span class="k">else</span> <span class="p">[</span><span class="n">e</span><span class="p">])</span>
+                <span class="n">internal_eigenvectors_list</span><span class="o">.</span><span class="n">extend</span><span class="p">(</span><span class="n">v</span> <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">v</span><span class="p">,</span> <span class="p">(</span><span class="nb">list</span><span class="p">,</span> <span class="nb">tuple</span><span class="p">,</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">))</span> <span class="k">else</span> <span class="p">[</span><span class="n">v</span><span class="p">])</span>
+            <span class="c1"># Raise error if external stability is requested for ROHF</span>
+            <span class="k">if</span> <span class="n">do_external</span><span class="p">:</span>
+                <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
+                    <span class="s2">&quot;External stability analysis (RHF -&gt; UHF) is not supported for ROHF wavefunctions. &quot;</span>
+                    <span class="s2">&quot;Only internal stability analysis is supported.&quot;</span>
+                <span class="p">)</span>
+
+        <span class="k">elif</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">mf</span><span class="p">,</span> <span class="n">scf</span><span class="o">.</span><span class="n">uhf</span><span class="o">.</span><span class="n">UHF</span><span class="p">):</span>
+            <span class="c1"># UHF stability analysis</span>
+            <span class="k">if</span> <span class="n">do_internal</span><span class="p">:</span>
+                <span class="n">e</span><span class="p">,</span> <span class="n">v</span> <span class="o">=</span> <span class="n">_uhf_internal</span><span class="p">(</span><span class="n">mf</span><span class="p">,</span> <span class="n">with_symmetry</span><span class="o">=</span><span class="n">with_symmetry</span><span class="p">,</span> <span class="n">nroots</span><span class="o">=</span><span class="n">nroots</span><span class="p">,</span> <span class="n">tol</span><span class="o">=</span><span class="n">alg_tol</span><span class="p">)</span>
+                <span class="n">internal_eigenvalues_list</span><span class="o">.</span><span class="n">extend</span><span class="p">(</span><span class="n">e</span> <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">e</span><span class="p">,</span> <span class="p">(</span><span class="nb">list</span><span class="p">,</span> <span class="nb">tuple</span><span class="p">,</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">))</span> <span class="k">else</span> <span class="p">[</span><span class="n">e</span><span class="p">])</span>
+                <span class="n">internal_eigenvectors_list</span><span class="o">.</span><span class="n">extend</span><span class="p">(</span><span class="n">v</span> <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">v</span><span class="p">,</span> <span class="p">(</span><span class="nb">list</span><span class="p">,</span> <span class="nb">tuple</span><span class="p">,</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">))</span> <span class="k">else</span> <span class="p">[</span><span class="n">v</span><span class="p">])</span>
+            <span class="c1"># Raise error if external stability is requested for UHF</span>
+            <span class="k">if</span> <span class="n">do_external</span><span class="p">:</span>
+                <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
+                    <span class="s2">&quot;External stability analysis (RHF -&gt; UHF) is not supported for UHF wavefunctions. &quot;</span>
+                    <span class="s2">&quot;Only internal stability analysis is supported.&quot;</span>
+                <span class="p">)</span>
+
+        <span class="k">else</span><span class="p">:</span>
+            <span class="c1"># RHF stability analysis (default)</span>
+            <span class="k">if</span> <span class="n">do_internal</span><span class="p">:</span>
+                <span class="n">e</span><span class="p">,</span> <span class="n">v</span> <span class="o">=</span> <span class="n">_rhf_internal</span><span class="p">(</span><span class="n">mf</span><span class="p">,</span> <span class="n">with_symmetry</span><span class="o">=</span><span class="n">with_symmetry</span><span class="p">,</span> <span class="n">nroots</span><span class="o">=</span><span class="n">nroots</span><span class="p">,</span> <span class="n">tol</span><span class="o">=</span><span class="n">alg_tol</span><span class="p">)</span>
+                <span class="n">internal_eigenvalues_list</span><span class="o">.</span><span class="n">extend</span><span class="p">(</span><span class="n">e</span> <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">e</span><span class="p">,</span> <span class="p">(</span><span class="nb">list</span><span class="p">,</span> <span class="nb">tuple</span><span class="p">,</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">))</span> <span class="k">else</span> <span class="p">[</span><span class="n">e</span><span class="p">])</span>
+                <span class="n">internal_eigenvectors_list</span><span class="o">.</span><span class="n">extend</span><span class="p">(</span><span class="n">v</span> <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">v</span><span class="p">,</span> <span class="p">(</span><span class="nb">list</span><span class="p">,</span> <span class="nb">tuple</span><span class="p">,</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">))</span> <span class="k">else</span> <span class="p">[</span><span class="n">v</span><span class="p">])</span>
+            <span class="k">if</span> <span class="n">do_external</span><span class="p">:</span>
+                <span class="n">e</span><span class="p">,</span> <span class="n">v</span> <span class="o">=</span> <span class="n">_rhf_external</span><span class="p">(</span><span class="n">mf</span><span class="p">,</span> <span class="n">with_symmetry</span><span class="o">=</span><span class="n">with_symmetry</span><span class="p">,</span> <span class="n">nroots</span><span class="o">=</span><span class="n">nroots</span><span class="p">,</span> <span class="n">tol</span><span class="o">=</span><span class="n">alg_tol</span><span class="p">)</span>
+                <span class="n">external_eigenvalues_list</span><span class="o">.</span><span class="n">extend</span><span class="p">(</span><span class="n">e</span> <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">e</span><span class="p">,</span> <span class="p">(</span><span class="nb">list</span><span class="p">,</span> <span class="nb">tuple</span><span class="p">,</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">))</span> <span class="k">else</span> <span class="p">[</span><span class="n">e</span><span class="p">])</span>
+                <span class="n">external_eigenvectors_list</span><span class="o">.</span><span class="n">extend</span><span class="p">(</span><span class="n">v</span> <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">v</span><span class="p">,</span> <span class="p">(</span><span class="nb">list</span><span class="p">,</span> <span class="nb">tuple</span><span class="p">,</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">))</span> <span class="k">else</span> <span class="p">[</span><span class="n">v</span><span class="p">])</span>
+
+        <span class="c1"># Process results and create StabilityResult</span>
+        <span class="n">internal_stable</span> <span class="o">=</span> <span class="kc">True</span>
+        <span class="n">external_stable</span> <span class="o">=</span> <span class="kc">True</span>
+
+        <span class="c1"># Convert to numpy arrays if we have results</span>
+        <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">internal_eigenvalues_list</span><span class="p">)</span> <span class="o">&gt;</span> <span class="mi">0</span><span class="p">:</span>
+            <span class="n">internal_eigenvalues</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">(</span><span class="n">internal_eigenvalues_list</span><span class="p">)</span>
+            <span class="n">internal_eigenvectors</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">(</span><span class="n">internal_eigenvectors_list</span><span class="p">)</span><span class="o">.</span><span class="n">T</span>  <span class="c1"># Transpose for proper shape</span>
+            <span class="c1"># Check internal stability: all eigenvalues should be &gt; stability_tol</span>
+            <span class="n">internal_stable</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">all</span><span class="p">(</span><span class="n">internal_eigenvalues</span> <span class="o">&gt;</span> <span class="n">stability_tol</span><span class="p">)</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">internal_eigenvalues</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">([])</span>
+            <span class="n">internal_eigenvectors</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">([])</span><span class="o">.</span><span class="n">reshape</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="mi">0</span><span class="p">)</span>
+
+        <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">external_eigenvalues_list</span><span class="p">)</span> <span class="o">&gt;</span> <span class="mi">0</span><span class="p">:</span>
+            <span class="n">external_eigenvalues</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">(</span><span class="n">external_eigenvalues_list</span><span class="p">)</span>
+            <span class="n">external_eigenvectors</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">(</span><span class="n">external_eigenvectors_list</span><span class="p">)</span><span class="o">.</span><span class="n">T</span>  <span class="c1"># Transpose for proper shape</span>
+            <span class="c1"># Check external stability: all eigenvalues should be &gt; stability_tol</span>
+            <span class="n">external_stable</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">all</span><span class="p">(</span><span class="n">external_eigenvalues</span> <span class="o">&gt;</span> <span class="n">stability_tol</span><span class="p">)</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">external_eigenvalues</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">([])</span>
+            <span class="n">external_eigenvectors</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">([])</span><span class="o">.</span><span class="n">reshape</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="mi">0</span><span class="p">)</span>
+
+        <span class="n">result</span> <span class="o">=</span> <span class="n">StabilityResult</span><span class="p">(</span>
+            <span class="n">internal_stable</span><span class="p">,</span>
+            <span class="n">external_stable</span><span class="p">,</span>
+            <span class="n">internal_eigenvalues</span><span class="p">,</span>
+            <span class="n">internal_eigenvectors</span><span class="p">,</span>
+            <span class="n">external_eigenvalues</span><span class="p">,</span>
+            <span class="n">external_eigenvectors</span><span class="p">,</span>
+        <span class="p">)</span>
+
+        <span class="k">return</span> <span class="p">(</span><span class="n">result</span><span class="o">.</span><span class="n">is_stable</span><span class="p">(),</span> <span class="n">result</span><span class="p">)</span>
+
+<div class="viewcode-block" id="PyscfStabilityChecker.name">
+<a class="viewcode-back" href="../../../../api/api_autogen/qdk_chemistry.plugins.pyscf.stability.html#qdk_chemistry.plugins.pyscf.stability.PyscfStabilityChecker.name">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">name</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Return the name for the stability checker.&quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="s2">&quot;pyscf&quot;</span></div>
+</div>
+
+
+
+<span class="n">register</span><span class="p">(</span><span class="k">lambda</span><span class="p">:</span> <span class="n">PyscfStabilityChecker</span><span class="p">())</span>
+</pre></div>
+
+           </div>
+          </div>
+          <footer>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright Microsoft Corporation. All rights reserved. Licensed under the MIT License.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

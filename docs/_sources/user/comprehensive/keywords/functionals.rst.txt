@@ -1,8 +1,5 @@
-Available DFT Functionals
+Available DFT functionals
 =========================
 
 .. todo::
-🔧 **TODO:**
-
-   TODO (NAB):  finish DFT functionals documentation
-   https://dev.azure.com/ms-azurequantum/AzureQuantum/_workitems/edit/41384
+   🔧 The functionals list is currently under construction.

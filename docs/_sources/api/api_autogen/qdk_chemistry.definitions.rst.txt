@@ -1,0 +1,8 @@
+qdk\_chemistry.definitions module
+=================================
+
+.. automodule:: qdk_chemistry.definitions
+   :members:
+   :private-members:
+   :show-inheritance:
+   :undoc-members:

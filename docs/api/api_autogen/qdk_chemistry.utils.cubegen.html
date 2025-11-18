@@ -1,0 +1,1240 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../../">
+<head>
+  <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>qdk_chemistry.utils.cubegen module &mdash; qdk-chemistry 1.0.0-rc1 documentation</title>
+      <link rel="stylesheet" type="text/css" href="../../_static/pygments.css?v=b86133f3" />
+      <link rel="stylesheet" type="text/css" href="../../_static/css/theme.css?v=e59714d7" />
+      <link rel="stylesheet" type="text/css" href="../../_static/tabs.css?v=4c969af8" />
+      <link rel="stylesheet" type="text/css" href="../../_static/graphviz.css?v=4ae1632d" />
+      <link rel="stylesheet" type="text/css" href="../../_static/copybutton.css?v=76b2166b" />
+      <link rel="stylesheet" type="text/css" href="../../_static/custom.css?v=a64bac2b" />
+
+  
+      <script src="../../_static/jquery.js?v=5d32c60e"></script>
+      <script src="../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="../../_static/documentation_options.js?v=81bd8d55"></script>
+      <script src="../../_static/doctools.js?v=9bcbadda"></script>
+      <script src="../../_static/sphinx_highlight.js?v=dc90522c"></script>
+      <script src="../../_static/tabs.js?v=3ee01567"></script>
+      <script src="../../_static/clipboard.min.js?v=a7894cd8"></script>
+      <script src="../../_static/copybutton.js?v=f281be69"></script>
+    <script src="../../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../../genindex.html" />
+    <link rel="search" title="Search" href="../../search.html" />
+    <link rel="next" title="qdk_chemistry.utils.phase module" href="qdk_chemistry.utils.phase.html" />
+    <link rel="prev" title="qdk_chemistry.utils.bitstring module" href="qdk_chemistry.utils.bitstring.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="../../index.html" class="icon icon-home">
+            qdk-chemistry
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">User Documentation</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../user/quickstart.html">Quickstart</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../user/comprehensive/index.html">In-depth user guide</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">API Reference</span></p>
+<ul class="current">
+<li class="toctree-l1 current"><a class="reference internal" href="../python_api.html">Python API</a><ul class="current">
+<li class="toctree-l2"><a class="reference internal" href="../python_api.html#data-classes">Data Classes</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../python_api.html#algorithms">Algorithms</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../python_api.html#plugins">Plugins</a></li>
+<li class="toctree-l2 current"><a class="reference internal" href="../python_api.html#utilities">Utilities</a><ul class="current">
+<li class="toctree-l3 current"><a class="reference internal" href="qdk_chemistry.utils.html">qdk_chemistry.utils package</a><ul class="current">
+<li class="toctree-l4"><a class="reference internal" href="qdk_chemistry.utils.html#qdk_chemistry.utils.compute_valence_space"><code class="docutils literal notranslate"><span class="pre">compute_valence_space()</span></code></a></li>
+<li class="toctree-l4 current"><a class="reference internal" href="qdk_chemistry.utils.html#submodules">Submodules</a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="../python_api.html#constants">Constants</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="../cpp_api.html">C++ API</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Supporting Information</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../glossary.html">Acronym definitions</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../references.html">References</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../../index.html">qdk-chemistry</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../../index.html" class="icon icon-home" aria-label="Home"></a></li>
+          <li class="breadcrumb-item"><a href="../python_api.html">Python API</a></li>
+          <li class="breadcrumb-item"><a href="qdk_chemistry.utils.html">qdk_chemistry.utils package</a></li>
+      <li class="breadcrumb-item active">qdk_chemistry.utils.cubegen module</li>
+      <li class="wy-breadcrumbs-aside">
+            <a href="../../_sources/api/api_autogen/qdk_chemistry.utils.cubegen.rst.txt" rel="nofollow"> View page source</a>
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <section id="module-qdk_chemistry.utils.cubegen">
+<span id="qdk-chemistry-utils-cubegen-module"></span><h1>qdk_chemistry.utils.cubegen module<a class="headerlink" href="#module-qdk_chemistry.utils.cubegen" title="Link to this heading"></a></h1>
+<p>Generate cube files for molecular orbitals and electron densities.</p>
+<dl class="py class">
+<dt class="sig sig-object py" id="qdk_chemistry.utils.cubegen.Orbitals">
+<em class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">Orbitals</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="o"><span class="pre">*</span></span><span class="n"><span class="pre">args</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">kwargs</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#qdk_chemistry.utils.cubegen.Orbitals" title="Link to this definition"></a></dt>
+<dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">DataClass</span></code></p>
+<blockquote>
+<div><p>Represents molecular orbitals with coefficients and energies.</p>
+</div></blockquote>
+<p>This class stores and manipulates molecular orbital data including:
+- Orbital coefficients (alpha/beta spin channels)
+- Orbital energies (alpha/beta spin channels)
+- Atomic orbital overlap matrix
+- Basis set information</p>
+<p>The class provides methods to calculate atomic orbital density matrices from
+occupation vectors or reduced density matrices (RDMs) passed as parameters.</p>
+<p>Supports both restricted (RHF/RKS) and unrestricted (UHF/UKS) orbitals.</p>
+<p>Overloaded function.</p>
+<ol class="arabic">
+<li><p>__init__(self: qdk_chemistry._core.data.Orbitals, arg0: qdk_chemistry._core.data.Orbitals) -&gt; None</p>
+<blockquote>
+<div><p>Copy constructor.</p>
+<p>Creates a deep copy of another <code class="docutils literal notranslate"><span class="pre">Orbitals</span></code> object.</p>
+<dl class="simple">
+<dt>other<span class="classifier">Orbitals</span></dt><dd><p>The Orbitals object to copy</p>
+</dd>
+</dl>
+<div class="doctest highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="n">original_orbitals</span> <span class="o">=</span> <span class="n">Orbitals</span><span class="p">(</span><span class="o">...</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">copied_orbitals</span> <span class="o">=</span> <span class="n">Orbitals</span><span class="p">(</span><span class="n">original_orbitals</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Copied </span><span class="si">{</span><span class="n">copied_orbitals</span><span class="o">.</span><span class="n">get_num_molecular_orbitals</span><span class="p">()</span><span class="si">}</span><span class="s2"> orbitals&quot;</span><span class="p">)</span>
+</pre></div>
+</div>
+</div></blockquote>
+</li>
+<li><p>__init__(self: qdk_chemistry._core.data.Orbitals, coefficients: typing.Annotated[numpy.typing.ArrayLike, numpy.float64, “[m, n]”], energies: typing.Annotated[numpy.typing.ArrayLike, numpy.float64, “[m, 1]”] | None = None, ao_overlap: typing.Annotated[numpy.typing.ArrayLike, numpy.float64, “[m, n]”] | None = None, basis_set: qdk_chemistry._core.data.BasisSet, indices: tuple[collections.abc.Sequence[typing.SupportsInt], collections.abc.Sequence[typing.SupportsInt]] | None = None) -&gt; None</p>
+<blockquote>
+<div><p>Constructor for restricted orbitals.</p>
+<p><code class="docutils literal notranslate"><span class="pre">num_atomic_orbitals</span></code> refers to the number of atomic orbitals and <code class="docutils literal notranslate"><span class="pre">num_molecular_orbitals</span></code> refers to
+the number of molecular orbitals.</p>
+<dl class="simple">
+<dt>coefficients<span class="classifier">numpy.ndarray</span></dt><dd><p>The molecular orbital coefficients matrix (<code class="docutils literal notranslate"><span class="pre">num_atomic_orbitals</span></code> × <code class="docutils literal notranslate"><span class="pre">num_molecular_orbitals</span></code>)</p>
+</dd>
+<dt>energies<span class="classifier">numpy.ndarray, optional</span></dt><dd><p>The orbital energies (<code class="docutils literal notranslate"><span class="pre">num_molecular_orbitals</span></code>), can be None</p>
+</dd>
+<dt>ao_overlap<span class="classifier">numpy.ndarray, optional</span></dt><dd><p>The atomic orbital overlap matrix (<code class="docutils literal notranslate"><span class="pre">num_atomic_orbitals</span></code> × <code class="docutils literal notranslate"><span class="pre">num_atomic_orbitals</span></code>), can be <code class="docutils literal notranslate"><span class="pre">None</span></code></p>
+</dd>
+<dt>basis_set<span class="classifier">BasisSet</span></dt><dd><p>The basis set</p>
+</dd>
+<dt>indices<span class="classifier">tuple of (list of int, list of int), optional</span></dt><dd><p>Tuple of (active_space_indices, inactive_space_indices), can be <code class="docutils literal notranslate"><span class="pre">None</span></code></p>
+</dd>
+</dl>
+<div class="doctest highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="kn">import</span><span class="w"> </span><span class="nn">numpy</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">np</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">coeffs</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">random</span><span class="o">.</span><span class="n">random</span><span class="p">((</span><span class="mi">4</span><span class="p">,</span> <span class="mi">3</span><span class="p">))</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">basis_set</span> <span class="o">=</span> <span class="n">BasisSet</span><span class="p">(</span><span class="o">...</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">orbitals</span> <span class="o">=</span> <span class="n">Orbitals</span><span class="p">(</span><span class="n">coeffs</span><span class="p">,</span> <span class="kc">None</span><span class="p">,</span> <span class="kc">None</span><span class="p">,</span> <span class="n">basis_set</span><span class="p">,</span> <span class="kc">None</span><span class="p">)</span>
+</pre></div>
+</div>
+</div></blockquote>
+</li>
+<li><p>__init__(self: qdk_chemistry._core.data.Orbitals, coefficients_alpha: typing.Annotated[numpy.typing.ArrayLike, numpy.float64, “[m, n]”], coefficients_beta: typing.Annotated[numpy.typing.ArrayLike, numpy.float64, “[m, n]”], energies_alpha: typing.Annotated[numpy.typing.ArrayLike, numpy.float64, “[m, 1]”] | None = None, energies_beta: typing.Annotated[numpy.typing.ArrayLike, numpy.float64, “[m, 1]”] | None = None, ao_overlap: typing.Annotated[numpy.typing.ArrayLike, numpy.float64, “[m, n]”] | None = None, basis_set: qdk_chemistry._core.data.BasisSet, indices: tuple[collections.abc.Sequence[typing.SupportsInt], collections.abc.Sequence[typing.SupportsInt], collections.abc.Sequence[typing.SupportsInt], collections.abc.Sequence[typing.SupportsInt]] | None = None) -&gt; None</p>
+<blockquote>
+<div><p>Constructor for unrestricted orbitals.</p>
+<p><code class="docutils literal notranslate"><span class="pre">num_atomic_orbitals</span></code> refers to the number of atomic orbitals and <code class="docutils literal notranslate"><span class="pre">num_molecular_orbitals</span></code> refers to
+the number of molecular orbitals.</p>
+<dl class="simple">
+<dt>coefficients_alpha<span class="classifier">numpy.ndarray</span></dt><dd><p>The alpha molecular orbital coefficients matrix (<code class="docutils literal notranslate"><span class="pre">num_atomic_orbitals</span></code> × <code class="docutils literal notranslate"><span class="pre">num_molecular_orbitals</span></code>)</p>
+</dd>
+<dt>coefficients_beta<span class="classifier">numpy.ndarray</span></dt><dd><p>The beta molecular orbital coefficients matrix (<code class="docutils literal notranslate"><span class="pre">num_atomic_orbitals</span></code> × <code class="docutils literal notranslate"><span class="pre">num_molecular_orbitals</span></code>)</p>
+</dd>
+<dt>energies_alpha<span class="classifier">numpy.ndarray, optional</span></dt><dd><p>The alpha orbital energies (<code class="docutils literal notranslate"><span class="pre">num_molecular_orbitals</span></code>), can be None</p>
+</dd>
+<dt>energies_beta<span class="classifier">numpy.ndarray, optional</span></dt><dd><p>The beta orbital energies (<code class="docutils literal notranslate"><span class="pre">num_molecular_orbitals</span></code>), can be None</p>
+</dd>
+<dt>ao_overlap<span class="classifier">numpy.ndarray, optional</span></dt><dd><p>The atomic orbital overlap matrix (<code class="docutils literal notranslate"><span class="pre">num_atomic_orbitals</span></code> × <code class="docutils literal notranslate"><span class="pre">num_atomic_orbitals</span></code>), can be None</p>
+</dd>
+<dt>basis_set<span class="classifier">BasisSet</span></dt><dd><p>The basis set</p>
+</dd>
+<dt>indices<span class="classifier">tuple of (list of int, list of int, list of int, list of int), optional</span></dt><dd><p>Tuple of (<code class="docutils literal notranslate"><span class="pre">active_alpha</span></code>, <code class="docutils literal notranslate"><span class="pre">active_beta</span></code>, <code class="docutils literal notranslate"><span class="pre">inactive_alpha</span></code>, <code class="docutils literal notranslate"><span class="pre">inactive_beta</span></code>),
+can be <code class="docutils literal notranslate"><span class="pre">None</span></code></p>
+</dd>
+</dl>
+<div class="doctest highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="kn">import</span><span class="w"> </span><span class="nn">numpy</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">np</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">alpha_coeffs</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">random</span><span class="o">.</span><span class="n">random</span><span class="p">((</span><span class="mi">4</span><span class="p">,</span> <span class="mi">3</span><span class="p">))</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">beta_coeffs</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">random</span><span class="o">.</span><span class="n">random</span><span class="p">((</span><span class="mi">4</span><span class="p">,</span> <span class="mi">3</span><span class="p">))</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">basis_set</span> <span class="o">=</span> <span class="n">BasisSet</span><span class="p">(</span><span class="o">...</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">orbitals</span> <span class="o">=</span> <span class="n">Orbitals</span><span class="p">(</span><span class="n">alpha_coeffs</span><span class="p">,</span> <span class="n">beta_coeffs</span><span class="p">,</span> <span class="kc">None</span><span class="p">,</span> <span class="kc">None</span><span class="p">,</span> <span class="kc">None</span><span class="p">,</span> <span class="n">basis_set</span><span class="p">,</span> <span class="kc">None</span><span class="p">)</span>
+</pre></div>
+</div>
+</div></blockquote>
+</li>
+</ol>
+<dl class="py method">
+<dt class="sig sig-object py" id="qdk_chemistry.utils.cubegen.Orbitals.__init__">
+<span class="sig-name descname"><span class="pre">__init__</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="o"><span class="pre">*</span></span><span class="n"><span class="pre">args</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">kwargs</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#qdk_chemistry.utils.cubegen.Orbitals.__init__" title="Link to this definition"></a></dt>
+<dd><p>Overloaded function.</p>
+<ol class="arabic">
+<li><p>__init__(self: qdk_chemistry._core.data.Orbitals, arg0: qdk_chemistry._core.data.Orbitals) -&gt; None</p>
+<blockquote>
+<div><p>Copy constructor.</p>
+<p>Creates a deep copy of another <code class="docutils literal notranslate"><span class="pre">Orbitals</span></code> object.</p>
+<dl class="simple">
+<dt>other<span class="classifier">Orbitals</span></dt><dd><p>The Orbitals object to copy</p>
+</dd>
+</dl>
+<div class="doctest highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="n">original_orbitals</span> <span class="o">=</span> <span class="n">Orbitals</span><span class="p">(</span><span class="o">...</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">copied_orbitals</span> <span class="o">=</span> <span class="n">Orbitals</span><span class="p">(</span><span class="n">original_orbitals</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Copied </span><span class="si">{</span><span class="n">copied_orbitals</span><span class="o">.</span><span class="n">get_num_molecular_orbitals</span><span class="p">()</span><span class="si">}</span><span class="s2"> orbitals&quot;</span><span class="p">)</span>
+</pre></div>
+</div>
+</div></blockquote>
+</li>
+<li><p>__init__(self: qdk_chemistry._core.data.Orbitals, coefficients: typing.Annotated[numpy.typing.ArrayLike, numpy.float64, “[m, n]”], energies: typing.Annotated[numpy.typing.ArrayLike, numpy.float64, “[m, 1]”] | None = None, ao_overlap: typing.Annotated[numpy.typing.ArrayLike, numpy.float64, “[m, n]”] | None = None, basis_set: qdk_chemistry._core.data.BasisSet, indices: tuple[collections.abc.Sequence[typing.SupportsInt], collections.abc.Sequence[typing.SupportsInt]] | None = None) -&gt; None</p>
+<blockquote>
+<div><p>Constructor for restricted orbitals.</p>
+<p><code class="docutils literal notranslate"><span class="pre">num_atomic_orbitals</span></code> refers to the number of atomic orbitals and <code class="docutils literal notranslate"><span class="pre">num_molecular_orbitals</span></code> refers to
+the number of molecular orbitals.</p>
+<dl class="simple">
+<dt>coefficients<span class="classifier">numpy.ndarray</span></dt><dd><p>The molecular orbital coefficients matrix (<code class="docutils literal notranslate"><span class="pre">num_atomic_orbitals</span></code> × <code class="docutils literal notranslate"><span class="pre">num_molecular_orbitals</span></code>)</p>
+</dd>
+<dt>energies<span class="classifier">numpy.ndarray, optional</span></dt><dd><p>The orbital energies (<code class="docutils literal notranslate"><span class="pre">num_molecular_orbitals</span></code>), can be None</p>
+</dd>
+<dt>ao_overlap<span class="classifier">numpy.ndarray, optional</span></dt><dd><p>The atomic orbital overlap matrix (<code class="docutils literal notranslate"><span class="pre">num_atomic_orbitals</span></code> × <code class="docutils literal notranslate"><span class="pre">num_atomic_orbitals</span></code>), can be <code class="docutils literal notranslate"><span class="pre">None</span></code></p>
+</dd>
+<dt>basis_set<span class="classifier">BasisSet</span></dt><dd><p>The basis set</p>
+</dd>
+<dt>indices<span class="classifier">tuple of (list of int, list of int), optional</span></dt><dd><p>Tuple of (active_space_indices, inactive_space_indices), can be <code class="docutils literal notranslate"><span class="pre">None</span></code></p>
+</dd>
+</dl>
+<div class="doctest highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="kn">import</span><span class="w"> </span><span class="nn">numpy</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">np</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">coeffs</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">random</span><span class="o">.</span><span class="n">random</span><span class="p">((</span><span class="mi">4</span><span class="p">,</span> <span class="mi">3</span><span class="p">))</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">basis_set</span> <span class="o">=</span> <span class="n">BasisSet</span><span class="p">(</span><span class="o">...</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">orbitals</span> <span class="o">=</span> <span class="n">Orbitals</span><span class="p">(</span><span class="n">coeffs</span><span class="p">,</span> <span class="kc">None</span><span class="p">,</span> <span class="kc">None</span><span class="p">,</span> <span class="n">basis_set</span><span class="p">,</span> <span class="kc">None</span><span class="p">)</span>
+</pre></div>
+</div>
+</div></blockquote>
+</li>
+<li><p>__init__(self: qdk_chemistry._core.data.Orbitals, coefficients_alpha: typing.Annotated[numpy.typing.ArrayLike, numpy.float64, “[m, n]”], coefficients_beta: typing.Annotated[numpy.typing.ArrayLike, numpy.float64, “[m, n]”], energies_alpha: typing.Annotated[numpy.typing.ArrayLike, numpy.float64, “[m, 1]”] | None = None, energies_beta: typing.Annotated[numpy.typing.ArrayLike, numpy.float64, “[m, 1]”] | None = None, ao_overlap: typing.Annotated[numpy.typing.ArrayLike, numpy.float64, “[m, n]”] | None = None, basis_set: qdk_chemistry._core.data.BasisSet, indices: tuple[collections.abc.Sequence[typing.SupportsInt], collections.abc.Sequence[typing.SupportsInt], collections.abc.Sequence[typing.SupportsInt], collections.abc.Sequence[typing.SupportsInt]] | None = None) -&gt; None</p>
+<blockquote>
+<div><p>Constructor for unrestricted orbitals.</p>
+<p><code class="docutils literal notranslate"><span class="pre">num_atomic_orbitals</span></code> refers to the number of atomic orbitals and <code class="docutils literal notranslate"><span class="pre">num_molecular_orbitals</span></code> refers to
+the number of molecular orbitals.</p>
+<dl class="simple">
+<dt>coefficients_alpha<span class="classifier">numpy.ndarray</span></dt><dd><p>The alpha molecular orbital coefficients matrix (<code class="docutils literal notranslate"><span class="pre">num_atomic_orbitals</span></code> × <code class="docutils literal notranslate"><span class="pre">num_molecular_orbitals</span></code>)</p>
+</dd>
+<dt>coefficients_beta<span class="classifier">numpy.ndarray</span></dt><dd><p>The beta molecular orbital coefficients matrix (<code class="docutils literal notranslate"><span class="pre">num_atomic_orbitals</span></code> × <code class="docutils literal notranslate"><span class="pre">num_molecular_orbitals</span></code>)</p>
+</dd>
+<dt>energies_alpha<span class="classifier">numpy.ndarray, optional</span></dt><dd><p>The alpha orbital energies (<code class="docutils literal notranslate"><span class="pre">num_molecular_orbitals</span></code>), can be None</p>
+</dd>
+<dt>energies_beta<span class="classifier">numpy.ndarray, optional</span></dt><dd><p>The beta orbital energies (<code class="docutils literal notranslate"><span class="pre">num_molecular_orbitals</span></code>), can be None</p>
+</dd>
+<dt>ao_overlap<span class="classifier">numpy.ndarray, optional</span></dt><dd><p>The atomic orbital overlap matrix (<code class="docutils literal notranslate"><span class="pre">num_atomic_orbitals</span></code> × <code class="docutils literal notranslate"><span class="pre">num_atomic_orbitals</span></code>), can be None</p>
+</dd>
+<dt>basis_set<span class="classifier">BasisSet</span></dt><dd><p>The basis set</p>
+</dd>
+<dt>indices<span class="classifier">tuple of (list of int, list of int, list of int, list of int), optional</span></dt><dd><p>Tuple of (<code class="docutils literal notranslate"><span class="pre">active_alpha</span></code>, <code class="docutils literal notranslate"><span class="pre">active_beta</span></code>, <code class="docutils literal notranslate"><span class="pre">inactive_alpha</span></code>, <code class="docutils literal notranslate"><span class="pre">inactive_beta</span></code>),
+can be <code class="docutils literal notranslate"><span class="pre">None</span></code></p>
+</dd>
+</dl>
+<div class="doctest highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="kn">import</span><span class="w"> </span><span class="nn">numpy</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">np</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">alpha_coeffs</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">random</span><span class="o">.</span><span class="n">random</span><span class="p">((</span><span class="mi">4</span><span class="p">,</span> <span class="mi">3</span><span class="p">))</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">beta_coeffs</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">random</span><span class="o">.</span><span class="n">random</span><span class="p">((</span><span class="mi">4</span><span class="p">,</span> <span class="mi">3</span><span class="p">))</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">basis_set</span> <span class="o">=</span> <span class="n">BasisSet</span><span class="p">(</span><span class="o">...</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">orbitals</span> <span class="o">=</span> <span class="n">Orbitals</span><span class="p">(</span><span class="n">alpha_coeffs</span><span class="p">,</span> <span class="n">beta_coeffs</span><span class="p">,</span> <span class="kc">None</span><span class="p">,</span> <span class="kc">None</span><span class="p">,</span> <span class="kc">None</span><span class="p">,</span> <span class="n">basis_set</span><span class="p">,</span> <span class="kc">None</span><span class="p">)</span>
+</pre></div>
+</div>
+</div></blockquote>
+</li>
+</ol>
+</dd></dl>
+
+<dl class="py property">
+<dt class="sig sig-object py" id="qdk_chemistry.utils.cubegen.Orbitals.basis_set">
+<em class="property"><span class="k"><span class="pre">property</span></span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">basis_set</span></span><a class="headerlink" href="#qdk_chemistry.utils.cubegen.Orbitals.basis_set" title="Link to this definition"></a></dt>
+<dd><p>Get basis set information.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Returns<span class="colon">:</span></dt>
+<dd class="field-odd"><p>The basis set associated with these orbitals</p>
+</dd>
+<dt class="field-even">Return type<span class="colon">:</span></dt>
+<dd class="field-even"><p><a class="reference internal" href="qdk_chemistry.data.html#qdk_chemistry.data.BasisSet" title="qdk_chemistry.data.BasisSet">BasisSet</a></p>
+</dd>
+<dt class="field-odd">Raises<span class="colon">:</span></dt>
+<dd class="field-odd"><p><a class="reference external" href="https://docs.python.org/3/library/exceptions.html#RuntimeError" title="(in Python v3.14)"><strong>RuntimeError</strong></a> – If basis set has not been set</p>
+</dd>
+</dl>
+<p class="rubric">Examples</p>
+<div class="doctest highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="n">basis_set</span> <span class="o">=</span> <span class="n">orbitals</span><span class="o">.</span><span class="n">get_basis_set</span><span class="p">()</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Basis set name: </span><span class="si">{</span><span class="n">basis_set</span><span class="o">.</span><span class="n">get_name</span><span class="p">()</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+</pre></div>
+</div>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="qdk_chemistry.utils.cubegen.Orbitals.calculate_ao_density_matrix">
+<span class="sig-name descname"><span class="pre">calculate_ao_density_matrix</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="o"><span class="pre">*</span></span><span class="n"><span class="pre">args</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">kwargs</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#qdk_chemistry.utils.cubegen.Orbitals.calculate_ao_density_matrix" title="Link to this definition"></a></dt>
+<dd><p>Overloaded function.</p>
+<ol class="arabic">
+<li><p>calculate_ao_density_matrix(self: qdk_chemistry._core.data.Orbitals, occupations_alpha: typing.Annotated[numpy.typing.ArrayLike, numpy.float64, “[m, 1]”], occupations_beta: typing.Annotated[numpy.typing.ArrayLike, numpy.float64, “[m, 1]”]) -&gt; tuple[typing.Annotated[numpy.typing.NDArray[numpy.float64], “[m, n]”], typing.Annotated[numpy.typing.NDArray[numpy.float64], “[m, n]”]]</p>
+<blockquote>
+<div><p>Calculate atomic orbital density matrix from occupation vectors (unrestricted).</p>
+<dl class="simple">
+<dt>occupations_alpha<span class="classifier">numpy.ndarray</span></dt><dd><p>Alpha spin occupation vector (size must match number of MOs)</p>
+</dd>
+<dt>occupations_beta<span class="classifier">numpy.ndarray</span></dt><dd><p>Beta spin occupation vector (size must match number of MOs)</p>
+</dd>
+</dl>
+<dl class="simple">
+<dt>tuple of numpy.ndarray</dt><dd><p>Pair of (alpha, beta) atomic orbital density matrices</p>
+</dd>
+</dl>
+<dl class="simple">
+<dt>RuntimeError</dt><dd><p>If occupation vector sizes don’t match number of MOs</p>
+</dd>
+</dl>
+<div class="doctest highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="n">alpha_occ</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">([</span><span class="mf">1.0</span><span class="p">,</span> <span class="mf">1.0</span><span class="p">,</span> <span class="mf">0.0</span><span class="p">])</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">beta_occ</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">([</span><span class="mf">1.0</span><span class="p">,</span> <span class="mf">0.0</span><span class="p">,</span> <span class="mf">0.0</span><span class="p">])</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">P_alpha</span><span class="p">,</span> <span class="n">P_beta</span> <span class="o">=</span> <span class="n">orbitals</span><span class="o">.</span><span class="n">calculate_ao_density_matrix</span><span class="p">(</span><span class="n">alpha_occ</span><span class="p">,</span> <span class="n">beta_occ</span><span class="p">)</span>
+</pre></div>
+</div>
+</div></blockquote>
+</li>
+<li><p>calculate_ao_density_matrix(self: qdk_chemistry._core.data.Orbitals, occupations: typing.Annotated[numpy.typing.ArrayLike, numpy.float64, “[m, 1]”]) -&gt; typing.Annotated[numpy.typing.NDArray[numpy.float64], “[m, n]”]</p>
+<blockquote>
+<div><p>Calculate atomic orbital density matrix from occupation vector (restricted).</p>
+<dl class="simple">
+<dt>occupations<span class="classifier">numpy.ndarray</span></dt><dd><p>Total occupation vector (size must match number of molecular orbitals)</p>
+</dd>
+</dl>
+<dl class="simple">
+<dt>numpy.ndarray</dt><dd><p>Atomic orbital density matrix (total alpha + beta)</p>
+</dd>
+</dl>
+<dl class="simple">
+<dt>RuntimeError</dt><dd><p>If occupation vector size doesn’t match number of MOs</p>
+</dd>
+</dl>
+<div class="doctest highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="n">occupations</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">([</span><span class="mf">2.0</span><span class="p">,</span> <span class="mf">0.0</span><span class="p">,</span> <span class="mf">0.0</span><span class="p">])</span>  <span class="c1"># 2 electrons in first MO</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">P_total</span> <span class="o">=</span> <span class="n">orbitals</span><span class="o">.</span><span class="n">calculate_ao_density_matrix</span><span class="p">(</span><span class="n">occupations</span><span class="p">)</span>
+</pre></div>
+</div>
+</div></blockquote>
+</li>
+</ol>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="qdk_chemistry.utils.cubegen.Orbitals.calculate_ao_density_matrix_from_rdm">
+<span class="sig-name descname"><span class="pre">calculate_ao_density_matrix_from_rdm</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="o"><span class="pre">*</span></span><span class="n"><span class="pre">args</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">kwargs</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#qdk_chemistry.utils.cubegen.Orbitals.calculate_ao_density_matrix_from_rdm" title="Link to this definition"></a></dt>
+<dd><p>Overloaded function.</p>
+<ol class="arabic">
+<li><p>calculate_ao_density_matrix_from_rdm(self: qdk_chemistry._core.data.Orbitals, rdm_alpha: typing.Annotated[numpy.typing.ArrayLike, numpy.float64, “[m, n]”], rdm_beta: typing.Annotated[numpy.typing.ArrayLike, numpy.float64, “[m, n]”]) -&gt; tuple[typing.Annotated[numpy.typing.NDArray[numpy.float64], “[m, n]”], typing.Annotated[numpy.typing.NDArray[numpy.float64], “[m, n]”]]</p>
+<blockquote>
+<div><p>Calculate atomic orbital density matrix from 1RDM in molecular orbital space (unrestricted).</p>
+<dl class="simple">
+<dt>rdm_alpha<span class="classifier">numpy.ndarray</span></dt><dd><p>Alpha 1RDM in MO basis (size must match number of MOs × MOs)</p>
+</dd>
+<dt>rdm_beta<span class="classifier">numpy.ndarray</span></dt><dd><p>Beta 1RDM in MO basis (size must match number of MOs × MOs)</p>
+</dd>
+</dl>
+<dl class="simple">
+<dt>tuple of numpy.ndarray</dt><dd><p>Pair of (alpha, beta) AO density matrices</p>
+</dd>
+</dl>
+<dl class="simple">
+<dt>RuntimeError</dt><dd><p>If 1RDM matrix sizes don’t match number of MOs</p>
+</dd>
+</dl>
+<div class="doctest highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="n">rdm_alpha</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">eye</span><span class="p">(</span><span class="mi">3</span><span class="p">)</span>  <span class="c1"># Simple example with identity matrix</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">rdm_beta</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">zeros</span><span class="p">((</span><span class="mi">3</span><span class="p">,</span> <span class="mi">3</span><span class="p">))</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">P_alpha</span><span class="p">,</span> <span class="n">P_beta</span> <span class="o">=</span> <span class="n">orbitals</span><span class="o">.</span><span class="n">calculate_ao_density_matrix_from_rdm</span><span class="p">(</span><span class="n">rdm_alpha</span><span class="p">,</span> <span class="n">rdm_beta</span><span class="p">)</span>
+</pre></div>
+</div>
+</div></blockquote>
+</li>
+<li><p>calculate_ao_density_matrix_from_rdm(self: qdk_chemistry._core.data.Orbitals, rdm: typing.Annotated[numpy.typing.ArrayLike, numpy.float64, “[m, n]”]) -&gt; typing.Annotated[numpy.typing.NDArray[numpy.float64], “[m, n]”]</p>
+<blockquote>
+<div><p>Calculate atomic orbital density matrix from 1RDM in molecular orbital space (restricted).</p>
+<dl class="simple">
+<dt>rdm<span class="classifier">numpy.ndarray</span></dt><dd><p>1RDM in MO basis (size must match number of MOs × MOs)</p>
+</dd>
+</dl>
+<dl class="simple">
+<dt>numpy.ndarray</dt><dd><p>AO density matrix (total alpha + beta)</p>
+</dd>
+</dl>
+<dl class="simple">
+<dt>RuntimeError</dt><dd><p>If 1RDM matrix size doesn’t match number of MOs</p>
+</dd>
+</dl>
+<div class="doctest highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="n">rdm</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">eye</span><span class="p">(</span><span class="mi">3</span><span class="p">)</span>  <span class="c1"># Simple example with identity matrix</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">P_total</span> <span class="o">=</span> <span class="n">orbitals</span><span class="o">.</span><span class="n">calculate_ao_density_matrix_from_rdm</span><span class="p">(</span><span class="n">rdm</span><span class="p">)</span>
+</pre></div>
+</div>
+</div></blockquote>
+</li>
+</ol>
+</dd></dl>
+
+<dl class="py property">
+<dt class="sig sig-object py" id="qdk_chemistry.utils.cubegen.Orbitals.coefficients_alpha">
+<em class="property"><span class="k"><span class="pre">property</span></span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">coefficients_alpha</span></span><a class="headerlink" href="#qdk_chemistry.utils.cubegen.Orbitals.coefficients_alpha" title="Link to this definition"></a></dt>
+<dd><p>Get alpha orbital coefficients matrix.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Returns<span class="colon">:</span></dt>
+<dd class="field-odd"><p>Alpha orbital coefficients with shape <code class="docutils literal notranslate"><span class="pre">(num_atomic_orbitals,</span> <span class="pre">num_molecular_orbitals)</span></code></p>
+</dd>
+<dt class="field-even">Return type<span class="colon">:</span></dt>
+<dd class="field-even"><p><a class="reference external" href="https://numpy.org/doc/stable/reference/generated/numpy.ndarray.html#numpy.ndarray" title="(in NumPy v2.3)">numpy.ndarray</a></p>
+</dd>
+</dl>
+<p class="rubric">Examples</p>
+<div class="doctest highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="n">alpha_coeffs</span> <span class="o">=</span> <span class="n">orbitals</span><span class="o">.</span><span class="n">get_coefficients_alpha</span><span class="p">()</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Alpha coefficients shape: </span><span class="si">{</span><span class="n">alpha_coeffs</span><span class="o">.</span><span class="n">shape</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+</pre></div>
+</div>
+</dd></dl>
+
+<dl class="py property">
+<dt class="sig sig-object py" id="qdk_chemistry.utils.cubegen.Orbitals.coefficients_beta">
+<em class="property"><span class="k"><span class="pre">property</span></span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">coefficients_beta</span></span><a class="headerlink" href="#qdk_chemistry.utils.cubegen.Orbitals.coefficients_beta" title="Link to this definition"></a></dt>
+<dd><p>Get beta orbital coefficients matrix.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Returns<span class="colon">:</span></dt>
+<dd class="field-odd"><p>Beta orbital coefficients with shape <code class="docutils literal notranslate"><span class="pre">(num_atomic_orbitals,</span> <span class="pre">num_molecular_orbitals)</span></code></p>
+</dd>
+<dt class="field-even">Return type<span class="colon">:</span></dt>
+<dd class="field-even"><p><a class="reference external" href="https://numpy.org/doc/stable/reference/generated/numpy.ndarray.html#numpy.ndarray" title="(in NumPy v2.3)">numpy.ndarray</a></p>
+</dd>
+</dl>
+<p class="rubric">Examples</p>
+<div class="doctest highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="n">beta_coeffs</span> <span class="o">=</span> <span class="n">orbitals</span><span class="o">.</span><span class="n">get_coefficients_beta</span><span class="p">()</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Beta coefficients shape: </span><span class="si">{</span><span class="n">beta_coeffs</span><span class="o">.</span><span class="n">shape</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+</pre></div>
+</div>
+</dd></dl>
+
+<dl class="py property">
+<dt class="sig sig-object py" id="qdk_chemistry.utils.cubegen.Orbitals.energies_alpha">
+<em class="property"><span class="k"><span class="pre">property</span></span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">energies_alpha</span></span><a class="headerlink" href="#qdk_chemistry.utils.cubegen.Orbitals.energies_alpha" title="Link to this definition"></a></dt>
+<dd><p>Get alpha orbital energies (Hartree).</p>
+<dl class="field-list simple">
+<dt class="field-odd">Returns<span class="colon">:</span></dt>
+<dd class="field-odd"><p>Alpha orbital energies with length <code class="docutils literal notranslate"><span class="pre">num_molecular_orbitals</span></code></p>
+</dd>
+<dt class="field-even">Return type<span class="colon">:</span></dt>
+<dd class="field-even"><p><a class="reference external" href="https://numpy.org/doc/stable/reference/generated/numpy.ndarray.html#numpy.ndarray" title="(in NumPy v2.3)">numpy.ndarray</a></p>
+</dd>
+</dl>
+<p class="rubric">Examples</p>
+<div class="doctest highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="n">alpha_energies</span> <span class="o">=</span> <span class="n">orbitals</span><span class="o">.</span><span class="n">get_energies_alpha</span><span class="p">()</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">homo_energy</span> <span class="o">=</span> <span class="n">alpha_energies</span><span class="p">[</span><span class="n">homo_index</span><span class="p">]</span>
+</pre></div>
+</div>
+</dd></dl>
+
+<dl class="py property">
+<dt class="sig sig-object py" id="qdk_chemistry.utils.cubegen.Orbitals.energies_beta">
+<em class="property"><span class="k"><span class="pre">property</span></span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">energies_beta</span></span><a class="headerlink" href="#qdk_chemistry.utils.cubegen.Orbitals.energies_beta" title="Link to this definition"></a></dt>
+<dd><p>Get beta orbital energies (Hartree).</p>
+<dl class="field-list simple">
+<dt class="field-odd">Returns<span class="colon">:</span></dt>
+<dd class="field-odd"><p>Beta orbital energies with length <code class="docutils literal notranslate"><span class="pre">num_molecular_orbitals</span></code></p>
+</dd>
+<dt class="field-even">Return type<span class="colon">:</span></dt>
+<dd class="field-even"><p><a class="reference external" href="https://numpy.org/doc/stable/reference/generated/numpy.ndarray.html#numpy.ndarray" title="(in NumPy v2.3)">numpy.ndarray</a></p>
+</dd>
+</dl>
+<p class="rubric">Examples</p>
+<div class="doctest highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="n">beta_energies</span> <span class="o">=</span> <span class="n">orbitals</span><span class="o">.</span><span class="n">get_energies_beta</span><span class="p">()</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">homo_energy</span> <span class="o">=</span> <span class="n">beta_energies</span><span class="p">[</span><span class="n">homo_index</span><span class="p">]</span>
+</pre></div>
+</div>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="qdk_chemistry.utils.cubegen.Orbitals.from_file">
+<em class="property"><span class="k"><span class="pre">static</span></span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">from_file</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">filename</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/library/functions.html#object" title="(in Python v3.14)"><span class="pre">object</span></a></span></em>, <em class="sig-param"><span class="n"><span class="pre">type</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)"><span class="pre">str</span></a></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><a class="reference internal" href="#qdk_chemistry.utils.cubegen.Orbitals" title="qdk_chemistry._core.data.Orbitals"><span class="pre">qdk_chemistry._core.data.Orbitals</span></a></span></span><a class="headerlink" href="#qdk_chemistry.utils.cubegen.Orbitals.from_file" title="Link to this definition"></a></dt>
+<dd><blockquote>
+<div><p>Load orbital data from file with specified format (static method).</p>
+<p>Generic method to load orbital data from a file.</p>
+</div></blockquote>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>filename</strong> (<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)"><em>str</em></a><em> or </em><a class="reference external" href="https://docs.python.org/3/library/pathlib.html#pathlib.Path" title="(in Python v3.14)"><em>pathlib.Path</em></a>) – Path to the file to read.</p></li>
+<li><p><strong>type</strong> (<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)"><em>str</em></a>) – <p>File format type (‘json’ or ‘hdf5’)</p>
+<dl class="field-list simple">
+<dt class="field-odd">returns<span class="colon">:</span></dt>
+<dd class="field-odd"><p>New <code class="docutils literal notranslate"><span class="pre">Orbitals</span></code> object loaded from the file</p>
+</dd>
+<dt class="field-even">rtype<span class="colon">:</span></dt>
+<dd class="field-even"><p>Orbitals</p>
+</dd>
+<dt class="field-odd">raises ValueError<span class="colon">:</span></dt>
+<dd class="field-odd"><p>If format_type is not supported or filename doesn’t follow naming convention</p>
+</dd>
+<dt class="field-even">raises RuntimeError<span class="colon">:</span></dt>
+<dd class="field-even"><p>If the file cannot be opened, read, or contains invalid orbital data</p>
+</dd>
+</dl>
+<p class="rubric">Examples</p>
+<div class="doctest highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="n">orbitals</span> <span class="o">=</span> <span class="n">Orbitals</span><span class="o">.</span><span class="n">from_file</span><span class="p">(</span><span class="s2">&quot;water.orbitals.json&quot;</span><span class="p">,</span> <span class="s2">&quot;json&quot;</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">orbitals</span> <span class="o">=</span> <span class="n">Orbitals</span><span class="o">.</span><span class="n">from_file</span><span class="p">(</span><span class="s2">&quot;molecule.orbitals.h5&quot;</span><span class="p">,</span> <span class="s2">&quot;hdf5&quot;</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="kn">from</span><span class="w"> </span><span class="nn">pathlib</span><span class="w"> </span><span class="kn">import</span> <span class="n">Path</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">orbitals</span> <span class="o">=</span> <span class="n">Orbitals</span><span class="o">.</span><span class="n">from_file</span><span class="p">(</span><span class="n">Path</span><span class="p">(</span><span class="s2">&quot;water.orbitals.json&quot;</span><span class="p">),</span> <span class="s2">&quot;json&quot;</span><span class="p">)</span>
+</pre></div>
+</div>
+</p></li>
+</ul>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="qdk_chemistry.utils.cubegen.Orbitals.from_hdf5_file">
+<em class="property"><span class="k"><span class="pre">static</span></span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">from_hdf5_file</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">filename</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/library/functions.html#object" title="(in Python v3.14)"><span class="pre">object</span></a></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><a class="reference internal" href="#qdk_chemistry.utils.cubegen.Orbitals" title="qdk_chemistry._core.data.Orbitals"><span class="pre">qdk_chemistry._core.data.Orbitals</span></a></span></span><a class="headerlink" href="#qdk_chemistry.utils.cubegen.Orbitals.from_hdf5_file" title="Link to this definition"></a></dt>
+<dd><p>Load orbital data from HDF5 file (static method with validation).</p>
+<p>Reads orbital data from an HDF5 file.
+The file should contain data in the format produced by <code class="docutils literal notranslate"><span class="pre">to_hdf5_file()</span></code>.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>filename</strong> (<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)"><em>str</em></a><em> or </em><a class="reference external" href="https://docs.python.org/3/library/pathlib.html#pathlib.Path" title="(in Python v3.14)"><em>pathlib.Path</em></a>) – Path to the HDF5 file to read. Must have ‘.orbitals’ before the
+file extension (e.g., <code class="docutils literal notranslate"><span class="pre">water.orbitals.h5</span></code>, <code class="docutils literal notranslate"><span class="pre">molecule.orbitals.hdf5</span></code>)</p>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>New <code class="docutils literal notranslate"><span class="pre">Orbitals</span></code> object loaded from the file</p>
+</dd>
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p><a class="reference internal" href="#qdk_chemistry.utils.cubegen.Orbitals" title="qdk_chemistry.utils.cubegen.Orbitals">Orbitals</a></p>
+</dd>
+<dt class="field-even">Raises<span class="colon">:</span></dt>
+<dd class="field-even"><ul class="simple">
+<li><p><a class="reference external" href="https://docs.python.org/3/library/exceptions.html#ValueError" title="(in Python v3.14)"><strong>ValueError</strong></a> – If filename doesn’t follow the required naming convention</p></li>
+<li><p><a class="reference external" href="https://docs.python.org/3/library/exceptions.html#RuntimeError" title="(in Python v3.14)"><strong>RuntimeError</strong></a> – If the file cannot be opened, read, or contains invalid orbital data</p></li>
+</ul>
+</dd>
+</dl>
+<p class="rubric">Examples</p>
+<div class="doctest highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="n">orbitals</span> <span class="o">=</span> <span class="n">Orbitals</span><span class="o">.</span><span class="n">from_hdf5_file</span><span class="p">(</span><span class="s2">&quot;water.orbitals.h5&quot;</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">orbitals</span> <span class="o">=</span> <span class="n">Orbitals</span><span class="o">.</span><span class="n">from_hdf5_file</span><span class="p">(</span><span class="s2">&quot;molecule.orbitals.hdf5&quot;</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="kn">from</span><span class="w"> </span><span class="nn">pathlib</span><span class="w"> </span><span class="kn">import</span> <span class="n">Path</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">orbitals</span> <span class="o">=</span> <span class="n">Orbitals</span><span class="o">.</span><span class="n">from_hdf5_file</span><span class="p">(</span><span class="n">Path</span><span class="p">(</span><span class="s2">&quot;water.orbitals.h5&quot;</span><span class="p">))</span>
+</pre></div>
+</div>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="qdk_chemistry.utils.cubegen.Orbitals.from_json">
+<em class="property"><span class="k"><span class="pre">static</span></span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">from_json</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">json_str</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)"><span class="pre">str</span></a></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><a class="reference internal" href="#qdk_chemistry.utils.cubegen.Orbitals" title="qdk_chemistry._core.data.Orbitals"><span class="pre">qdk_chemistry._core.data.Orbitals</span></a></span></span><a class="headerlink" href="#qdk_chemistry.utils.cubegen.Orbitals.from_json" title="Link to this definition"></a></dt>
+<dd><p>Load orbital data from JSON string (static method).</p>
+<p>Parses orbital data from a JSON string and creates a new Orbitals object.
+The string should contain JSON data in the format produced by <code class="docutils literal notranslate"><span class="pre">to_json()</span></code>.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>json_str</strong> (<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)"><em>str</em></a>) – JSON string containing orbital data</p>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>New Orbitals object created from JSON data</p>
+</dd>
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p><a class="reference internal" href="#qdk_chemistry.utils.cubegen.Orbitals" title="qdk_chemistry.utils.cubegen.Orbitals">Orbitals</a></p>
+</dd>
+<dt class="field-even">Raises<span class="colon">:</span></dt>
+<dd class="field-even"><p><a class="reference external" href="https://docs.python.org/3/library/exceptions.html#RuntimeError" title="(in Python v3.14)"><strong>RuntimeError</strong></a> – If the JSON string is malformed or contains invalid orbital data</p>
+</dd>
+</dl>
+<p class="rubric">Examples</p>
+<div class="doctest highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="n">orbitals</span> <span class="o">=</span> <span class="n">Orbitals</span><span class="o">.</span><span class="n">from_json</span><span class="p">(</span><span class="s1">&#39;{&quot;num_atomic_orbitals&quot;: 4, &quot;num_molecular_orbitals&quot;: 3, ...}&#39;</span><span class="p">)</span>
+</pre></div>
+</div>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="qdk_chemistry.utils.cubegen.Orbitals.from_json_file">
+<em class="property"><span class="k"><span class="pre">static</span></span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">from_json_file</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">filename</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/library/functions.html#object" title="(in Python v3.14)"><span class="pre">object</span></a></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><a class="reference internal" href="#qdk_chemistry.utils.cubegen.Orbitals" title="qdk_chemistry._core.data.Orbitals"><span class="pre">qdk_chemistry._core.data.Orbitals</span></a></span></span><a class="headerlink" href="#qdk_chemistry.utils.cubegen.Orbitals.from_json_file" title="Link to this definition"></a></dt>
+<dd><p>Load orbital data from JSON file (static method).</p>
+<p>Reads orbital data from a JSON file.
+The file should contain JSON data in the format produced by <code class="docutils literal notranslate"><span class="pre">to_json_file()</span></code>.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>filename</strong> (<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)"><em>str</em></a><em> or </em><a class="reference external" href="https://docs.python.org/3/library/pathlib.html#pathlib.Path" title="(in Python v3.14)"><em>pathlib.Path</em></a>) – Path to the JSON file to read. Must have ‘.orbitals’ before the file
+extension (e.g., <code class="docutils literal notranslate"><span class="pre">water.orbitals.json</span></code>, <code class="docutils literal notranslate"><span class="pre">molecule.orbitals.json</span></code>)</p>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>New <code class="docutils literal notranslate"><span class="pre">Orbitals</span></code> object loaded from the file</p>
+</dd>
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p><a class="reference internal" href="#qdk_chemistry.utils.cubegen.Orbitals" title="qdk_chemistry.utils.cubegen.Orbitals">Orbitals</a></p>
+</dd>
+<dt class="field-even">Raises<span class="colon">:</span></dt>
+<dd class="field-even"><ul class="simple">
+<li><p><a class="reference external" href="https://docs.python.org/3/library/exceptions.html#ValueError" title="(in Python v3.14)"><strong>ValueError</strong></a> – If filename doesn’t follow the required naming convention</p></li>
+<li><p><a class="reference external" href="https://docs.python.org/3/library/exceptions.html#RuntimeError" title="(in Python v3.14)"><strong>RuntimeError</strong></a> – If the file cannot be opened, read, or contains invalid orbital data</p></li>
+</ul>
+</dd>
+</dl>
+<p class="rubric">Examples</p>
+<div class="doctest highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="n">orbitals</span> <span class="o">=</span> <span class="n">Orbitals</span><span class="o">.</span><span class="n">from_json_file</span><span class="p">(</span><span class="s2">&quot;water.orbitals.json&quot;</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">orbitals</span> <span class="o">=</span> <span class="n">Orbitals</span><span class="o">.</span><span class="n">from_json_file</span><span class="p">(</span><span class="s2">&quot;molecule.orbitals.json&quot;</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="kn">from</span><span class="w"> </span><span class="nn">pathlib</span><span class="w"> </span><span class="kn">import</span> <span class="n">Path</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">orbitals</span> <span class="o">=</span> <span class="n">Orbitals</span><span class="o">.</span><span class="n">from_json_file</span><span class="p">(</span><span class="n">Path</span><span class="p">(</span><span class="s2">&quot;water.orbitals.json&quot;</span><span class="p">))</span>
+</pre></div>
+</div>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="qdk_chemistry.utils.cubegen.Orbitals.get_active_space_indices">
+<span class="sig-name descname"><span class="pre">get_active_space_indices</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">self</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference internal" href="#qdk_chemistry.utils.cubegen.Orbitals" title="qdk_chemistry._core.data.Orbitals"><span class="pre">qdk_chemistry._core.data.Orbitals</span></a></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#tuple" title="(in Python v3.14)"><span class="pre">tuple</span></a><span class="p"><span class="pre">[</span></span><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#list" title="(in Python v3.14)"><span class="pre">list</span></a><span class="p"><span class="pre">[</span></span><a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(in Python v3.14)"><span class="pre">int</span></a><span class="p"><span class="pre">]</span></span><span class="p"><span class="pre">,</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#list" title="(in Python v3.14)"><span class="pre">list</span></a><span class="p"><span class="pre">[</span></span><a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(in Python v3.14)"><span class="pre">int</span></a><span class="p"><span class="pre">]</span></span><span class="p"><span class="pre">]</span></span></span></span><a class="headerlink" href="#qdk_chemistry.utils.cubegen.Orbitals.get_active_space_indices" title="Link to this definition"></a></dt>
+<dd><p>Get the active space orbital indices.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Returns<span class="colon">:</span></dt>
+<dd class="field-odd"><p>Pair of <code class="docutils literal notranslate"><span class="pre">(alpha_indices,</span> <span class="pre">beta_indices)</span></code> for active space orbitals</p>
+</dd>
+<dt class="field-even">Return type<span class="colon">:</span></dt>
+<dd class="field-even"><p><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#tuple" title="(in Python v3.14)">tuple</a></p>
+</dd>
+</dl>
+<p class="rubric">Examples</p>
+<div class="doctest highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="n">alpha_active</span><span class="p">,</span> <span class="n">beta_active</span> <span class="o">=</span> <span class="n">orbitals</span><span class="o">.</span><span class="n">get_active_space_indices</span><span class="p">()</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Active space size: </span><span class="si">{</span><span class="nb">len</span><span class="p">(</span><span class="n">alpha_active</span><span class="p">)</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+</pre></div>
+</div>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="qdk_chemistry.utils.cubegen.Orbitals.get_basis_set">
+<span class="sig-name descname"><span class="pre">get_basis_set</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">self</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference internal" href="#qdk_chemistry.utils.cubegen.Orbitals" title="qdk_chemistry._core.data.Orbitals"><span class="pre">qdk_chemistry._core.data.Orbitals</span></a></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><a class="reference internal" href="qdk_chemistry.plugins.pyscf.utils.html#qdk_chemistry.plugins.pyscf.utils.BasisSet" title="qdk_chemistry._core.data.BasisSet"><span class="pre">qdk_chemistry._core.data.BasisSet</span></a></span></span><a class="headerlink" href="#qdk_chemistry.utils.cubegen.Orbitals.get_basis_set" title="Link to this definition"></a></dt>
+<dd><p>Get basis set information.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Returns<span class="colon">:</span></dt>
+<dd class="field-odd"><p>The basis set associated with these orbitals</p>
+</dd>
+<dt class="field-even">Return type<span class="colon">:</span></dt>
+<dd class="field-even"><p><a class="reference internal" href="qdk_chemistry.data.html#qdk_chemistry.data.BasisSet" title="qdk_chemistry.data.BasisSet">BasisSet</a></p>
+</dd>
+<dt class="field-odd">Raises<span class="colon">:</span></dt>
+<dd class="field-odd"><p><a class="reference external" href="https://docs.python.org/3/library/exceptions.html#RuntimeError" title="(in Python v3.14)"><strong>RuntimeError</strong></a> – If basis set has not been set</p>
+</dd>
+</dl>
+<p class="rubric">Examples</p>
+<div class="doctest highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="n">basis_set</span> <span class="o">=</span> <span class="n">orbitals</span><span class="o">.</span><span class="n">get_basis_set</span><span class="p">()</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Basis set name: </span><span class="si">{</span><span class="n">basis_set</span><span class="o">.</span><span class="n">get_name</span><span class="p">()</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+</pre></div>
+</div>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="qdk_chemistry.utils.cubegen.Orbitals.get_coefficients">
+<span class="sig-name descname"><span class="pre">get_coefficients</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">self</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference internal" href="#qdk_chemistry.utils.cubegen.Orbitals" title="qdk_chemistry._core.data.Orbitals"><span class="pre">qdk_chemistry._core.data.Orbitals</span></a></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#tuple" title="(in Python v3.14)"><span class="pre">tuple</span></a><span class="p"><span class="pre">[</span></span><a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.Annotated" title="(in Python v3.14)"><span class="pre">Annotated</span></a><span class="p"><span class="pre">[</span></span><span class="pre">numpy.typing.NDArray</span><span class="p"><span class="pre">[</span></span><span class="pre">numpy.float64</span><span class="p"><span class="pre">]</span></span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="s"><span class="pre">'[m,</span> <span class="pre">n]'</span></span><span class="p"><span class="pre">]</span></span><span class="p"><span class="pre">,</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.Annotated" title="(in Python v3.14)"><span class="pre">Annotated</span></a><span class="p"><span class="pre">[</span></span><span class="pre">numpy.typing.NDArray</span><span class="p"><span class="pre">[</span></span><span class="pre">numpy.float64</span><span class="p"><span class="pre">]</span></span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="s"><span class="pre">'[m,</span> <span class="pre">n]'</span></span><span class="p"><span class="pre">]</span></span><span class="p"><span class="pre">]</span></span></span></span><a class="headerlink" href="#qdk_chemistry.utils.cubegen.Orbitals.get_coefficients" title="Link to this definition"></a></dt>
+<dd><p>Get orbital coefficients as pair of (alpha, beta) matrices.</p>
+<p><code class="docutils literal notranslate"><span class="pre">num_atomic_orbitals</span></code> refers to the number of atomic orbitals and <code class="docutils literal notranslate"><span class="pre">num_molecular_orbitals</span></code> refers to
+the number of molecular orbitals.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Returns<span class="colon">:</span></dt>
+<dd class="field-odd"><p>Pair of <code class="docutils literal notranslate"><span class="pre">(alpha_coeffs,</span> <span class="pre">beta_coeffs)</span></code> matrices, each with shape
+<code class="docutils literal notranslate"><span class="pre">(num_atomic_orbitals,</span> <span class="pre">num_molecular_orbitals)</span></code></p>
+</dd>
+<dt class="field-even">Return type<span class="colon">:</span></dt>
+<dd class="field-even"><p><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#tuple" title="(in Python v3.14)">tuple</a> of <a class="reference external" href="https://numpy.org/doc/stable/reference/generated/numpy.ndarray.html#numpy.ndarray" title="(in NumPy v2.3)">numpy.ndarray</a></p>
+</dd>
+</dl>
+<p class="rubric">Examples</p>
+<div class="doctest highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="n">alpha_coeffs</span><span class="p">,</span> <span class="n">beta_coeffs</span> <span class="o">=</span> <span class="n">orbitals</span><span class="o">.</span><span class="n">get_coefficients</span><span class="p">()</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s1">&#39;Alpha coefficients shape: </span><span class="si">{</span><span class="n">alpha_coeffs</span><span class="o">.</span><span class="n">shape</span><span class="si">}</span><span class="s1">&#39;</span><span class="p">)</span>
+</pre></div>
+</div>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="qdk_chemistry.utils.cubegen.Orbitals.get_coefficients_alpha">
+<span class="sig-name descname"><span class="pre">get_coefficients_alpha</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">self</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference internal" href="#qdk_chemistry.utils.cubegen.Orbitals" title="qdk_chemistry._core.data.Orbitals"><span class="pre">qdk_chemistry._core.data.Orbitals</span></a></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.Annotated" title="(in Python v3.14)"><span class="pre">Annotated</span></a><span class="p"><span class="pre">[</span></span><span class="pre">numpy.typing.NDArray</span><span class="p"><span class="pre">[</span></span><span class="pre">numpy.float64</span><span class="p"><span class="pre">]</span></span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="s"><span class="pre">'[m,</span> <span class="pre">n]'</span></span><span class="p"><span class="pre">]</span></span></span></span><a class="headerlink" href="#qdk_chemistry.utils.cubegen.Orbitals.get_coefficients_alpha" title="Link to this definition"></a></dt>
+<dd><p>Get alpha orbital coefficients matrix.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Returns<span class="colon">:</span></dt>
+<dd class="field-odd"><p>Alpha orbital coefficients with shape <code class="docutils literal notranslate"><span class="pre">(num_atomic_orbitals,</span> <span class="pre">num_molecular_orbitals)</span></code></p>
+</dd>
+<dt class="field-even">Return type<span class="colon">:</span></dt>
+<dd class="field-even"><p><a class="reference external" href="https://numpy.org/doc/stable/reference/generated/numpy.ndarray.html#numpy.ndarray" title="(in NumPy v2.3)">numpy.ndarray</a></p>
+</dd>
+</dl>
+<p class="rubric">Examples</p>
+<div class="doctest highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="n">alpha_coeffs</span> <span class="o">=</span> <span class="n">orbitals</span><span class="o">.</span><span class="n">get_coefficients_alpha</span><span class="p">()</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Alpha coefficients shape: </span><span class="si">{</span><span class="n">alpha_coeffs</span><span class="o">.</span><span class="n">shape</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+</pre></div>
+</div>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="qdk_chemistry.utils.cubegen.Orbitals.get_coefficients_beta">
+<span class="sig-name descname"><span class="pre">get_coefficients_beta</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">self</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference internal" href="#qdk_chemistry.utils.cubegen.Orbitals" title="qdk_chemistry._core.data.Orbitals"><span class="pre">qdk_chemistry._core.data.Orbitals</span></a></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.Annotated" title="(in Python v3.14)"><span class="pre">Annotated</span></a><span class="p"><span class="pre">[</span></span><span class="pre">numpy.typing.NDArray</span><span class="p"><span class="pre">[</span></span><span class="pre">numpy.float64</span><span class="p"><span class="pre">]</span></span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="s"><span class="pre">'[m,</span> <span class="pre">n]'</span></span><span class="p"><span class="pre">]</span></span></span></span><a class="headerlink" href="#qdk_chemistry.utils.cubegen.Orbitals.get_coefficients_beta" title="Link to this definition"></a></dt>
+<dd><p>Get beta orbital coefficients matrix.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Returns<span class="colon">:</span></dt>
+<dd class="field-odd"><p>Beta orbital coefficients with shape <code class="docutils literal notranslate"><span class="pre">(num_atomic_orbitals,</span> <span class="pre">num_molecular_orbitals)</span></code></p>
+</dd>
+<dt class="field-even">Return type<span class="colon">:</span></dt>
+<dd class="field-even"><p><a class="reference external" href="https://numpy.org/doc/stable/reference/generated/numpy.ndarray.html#numpy.ndarray" title="(in NumPy v2.3)">numpy.ndarray</a></p>
+</dd>
+</dl>
+<p class="rubric">Examples</p>
+<div class="doctest highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="n">beta_coeffs</span> <span class="o">=</span> <span class="n">orbitals</span><span class="o">.</span><span class="n">get_coefficients_beta</span><span class="p">()</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Beta coefficients shape: </span><span class="si">{</span><span class="n">beta_coeffs</span><span class="o">.</span><span class="n">shape</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+</pre></div>
+</div>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="qdk_chemistry.utils.cubegen.Orbitals.get_energies">
+<span class="sig-name descname"><span class="pre">get_energies</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">self</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference internal" href="#qdk_chemistry.utils.cubegen.Orbitals" title="qdk_chemistry._core.data.Orbitals"><span class="pre">qdk_chemistry._core.data.Orbitals</span></a></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#tuple" title="(in Python v3.14)"><span class="pre">tuple</span></a><span class="p"><span class="pre">[</span></span><a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.Annotated" title="(in Python v3.14)"><span class="pre">Annotated</span></a><span class="p"><span class="pre">[</span></span><span class="pre">numpy.typing.NDArray</span><span class="p"><span class="pre">[</span></span><span class="pre">numpy.float64</span><span class="p"><span class="pre">]</span></span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="s"><span class="pre">'[m,</span> <span class="pre">1]'</span></span><span class="p"><span class="pre">]</span></span><span class="p"><span class="pre">,</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.Annotated" title="(in Python v3.14)"><span class="pre">Annotated</span></a><span class="p"><span class="pre">[</span></span><span class="pre">numpy.typing.NDArray</span><span class="p"><span class="pre">[</span></span><span class="pre">numpy.float64</span><span class="p"><span class="pre">]</span></span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="s"><span class="pre">'[m,</span> <span class="pre">1]'</span></span><span class="p"><span class="pre">]</span></span><span class="p"><span class="pre">]</span></span></span></span><a class="headerlink" href="#qdk_chemistry.utils.cubegen.Orbitals.get_energies" title="Link to this definition"></a></dt>
+<dd><p>Get orbital energies in Hartrees as pair of (alpha, beta) vectors.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Returns<span class="colon">:</span></dt>
+<dd class="field-odd"><p>Pair of <code class="docutils literal notranslate"><span class="pre">(alpha_energies,</span> <span class="pre">beta_energies)</span></code> vectors, each with length <code class="docutils literal notranslate"><span class="pre">num_molecular_orbitals</span></code></p>
+</dd>
+<dt class="field-even">Return type<span class="colon">:</span></dt>
+<dd class="field-even"><p><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#tuple" title="(in Python v3.14)">tuple</a> of <a class="reference external" href="https://numpy.org/doc/stable/reference/generated/numpy.ndarray.html#numpy.ndarray" title="(in NumPy v2.3)">numpy.ndarray</a></p>
+</dd>
+<dt class="field-odd">Raises<span class="colon">:</span></dt>
+<dd class="field-odd"><p><a class="reference external" href="https://docs.python.org/3/library/exceptions.html#RuntimeError" title="(in Python v3.14)"><strong>RuntimeError</strong></a> – If energies have not been set</p>
+</dd>
+</dl>
+<p class="rubric">Examples</p>
+<div class="doctest highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="n">alpha_energies</span><span class="p">,</span> <span class="n">beta_energies</span> <span class="o">=</span> <span class="n">orbitals</span><span class="o">.</span><span class="n">get_energies</span><span class="p">()</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s1">&#39;HOMO energy: </span><span class="si">{</span><span class="n">alpha_energies</span><span class="p">[</span><span class="n">homo_index</span><span class="p">]</span><span class="si">}</span><span class="s1">&#39;</span><span class="p">)</span>
+</pre></div>
+</div>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="qdk_chemistry.utils.cubegen.Orbitals.get_energies_alpha">
+<span class="sig-name descname"><span class="pre">get_energies_alpha</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">self</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference internal" href="#qdk_chemistry.utils.cubegen.Orbitals" title="qdk_chemistry._core.data.Orbitals"><span class="pre">qdk_chemistry._core.data.Orbitals</span></a></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.Annotated" title="(in Python v3.14)"><span class="pre">Annotated</span></a><span class="p"><span class="pre">[</span></span><span class="pre">numpy.typing.NDArray</span><span class="p"><span class="pre">[</span></span><span class="pre">numpy.float64</span><span class="p"><span class="pre">]</span></span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="s"><span class="pre">'[m,</span> <span class="pre">1]'</span></span><span class="p"><span class="pre">]</span></span></span></span><a class="headerlink" href="#qdk_chemistry.utils.cubegen.Orbitals.get_energies_alpha" title="Link to this definition"></a></dt>
+<dd><p>Get alpha orbital energies (Hartree).</p>
+<dl class="field-list simple">
+<dt class="field-odd">Returns<span class="colon">:</span></dt>
+<dd class="field-odd"><p>Alpha orbital energies with length <code class="docutils literal notranslate"><span class="pre">num_molecular_orbitals</span></code></p>
+</dd>
+<dt class="field-even">Return type<span class="colon">:</span></dt>
+<dd class="field-even"><p><a class="reference external" href="https://numpy.org/doc/stable/reference/generated/numpy.ndarray.html#numpy.ndarray" title="(in NumPy v2.3)">numpy.ndarray</a></p>
+</dd>
+</dl>
+<p class="rubric">Examples</p>
+<div class="doctest highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="n">alpha_energies</span> <span class="o">=</span> <span class="n">orbitals</span><span class="o">.</span><span class="n">get_energies_alpha</span><span class="p">()</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">homo_energy</span> <span class="o">=</span> <span class="n">alpha_energies</span><span class="p">[</span><span class="n">homo_index</span><span class="p">]</span>
+</pre></div>
+</div>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="qdk_chemistry.utils.cubegen.Orbitals.get_energies_beta">
+<span class="sig-name descname"><span class="pre">get_energies_beta</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">self</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference internal" href="#qdk_chemistry.utils.cubegen.Orbitals" title="qdk_chemistry._core.data.Orbitals"><span class="pre">qdk_chemistry._core.data.Orbitals</span></a></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.Annotated" title="(in Python v3.14)"><span class="pre">Annotated</span></a><span class="p"><span class="pre">[</span></span><span class="pre">numpy.typing.NDArray</span><span class="p"><span class="pre">[</span></span><span class="pre">numpy.float64</span><span class="p"><span class="pre">]</span></span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="s"><span class="pre">'[m,</span> <span class="pre">1]'</span></span><span class="p"><span class="pre">]</span></span></span></span><a class="headerlink" href="#qdk_chemistry.utils.cubegen.Orbitals.get_energies_beta" title="Link to this definition"></a></dt>
+<dd><p>Get beta orbital energies (Hartree).</p>
+<dl class="field-list simple">
+<dt class="field-odd">Returns<span class="colon">:</span></dt>
+<dd class="field-odd"><p>Beta orbital energies with length <code class="docutils literal notranslate"><span class="pre">num_molecular_orbitals</span></code></p>
+</dd>
+<dt class="field-even">Return type<span class="colon">:</span></dt>
+<dd class="field-even"><p><a class="reference external" href="https://numpy.org/doc/stable/reference/generated/numpy.ndarray.html#numpy.ndarray" title="(in NumPy v2.3)">numpy.ndarray</a></p>
+</dd>
+</dl>
+<p class="rubric">Examples</p>
+<div class="doctest highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="n">beta_energies</span> <span class="o">=</span> <span class="n">orbitals</span><span class="o">.</span><span class="n">get_energies_beta</span><span class="p">()</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">homo_energy</span> <span class="o">=</span> <span class="n">beta_energies</span><span class="p">[</span><span class="n">homo_index</span><span class="p">]</span>
+</pre></div>
+</div>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="qdk_chemistry.utils.cubegen.Orbitals.get_inactive_space_indices">
+<span class="sig-name descname"><span class="pre">get_inactive_space_indices</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="o"><span class="pre">*</span></span><span class="n"><span class="pre">args</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">kwargs</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#qdk_chemistry.utils.cubegen.Orbitals.get_inactive_space_indices" title="Link to this definition"></a></dt>
+<dd><p>Overloaded function.</p>
+<ol class="arabic">
+<li><p>get_inactive_space_indices(self: qdk_chemistry._core.data.Orbitals) -&gt; tuple[list[int], list[int]]</p>
+<blockquote>
+<div><p>Get the inactive space orbital indices.</p>
+<dl class="simple">
+<dt>tuple</dt><dd><p>Pair of <code class="docutils literal notranslate"><span class="pre">(alpha_indices,</span> <span class="pre">beta_indices)</span></code> for inactive space orbitals</p>
+</dd>
+</dl>
+<div class="doctest highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="n">alpha_inactive</span><span class="p">,</span> <span class="n">beta_inactive</span> <span class="o">=</span> <span class="n">orbitals</span><span class="o">.</span><span class="n">get_inactive_space_indices</span><span class="p">()</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Inactive space size: </span><span class="si">{</span><span class="nb">len</span><span class="p">(</span><span class="n">alpha_inactive</span><span class="p">)</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+</pre></div>
+</div>
+</div></blockquote>
+</li>
+<li><p>get_inactive_space_indices(self: qdk_chemistry._core.data.Orbitals) -&gt; tuple[list[int], list[int]]</p>
+<blockquote>
+<div><p>Get the inactive space orbital indices.</p>
+<dl class="simple">
+<dt>tuple</dt><dd><p>Pair of (alpha_indices, beta_indices) for inactive space orbitals</p>
+</dd>
+</dl>
+<div class="doctest highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="n">alpha_inactive</span><span class="p">,</span> <span class="n">beta_inactive</span> <span class="o">=</span> <span class="n">orbitals</span><span class="o">.</span><span class="n">get_inactive_space_indices</span><span class="p">()</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Inactive space size: </span><span class="si">{</span><span class="nb">len</span><span class="p">(</span><span class="n">inalpha_active</span><span class="p">)</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+</pre></div>
+</div>
+</div></blockquote>
+</li>
+</ol>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="qdk_chemistry.utils.cubegen.Orbitals.get_num_atomic_orbitals">
+<span class="sig-name descname"><span class="pre">get_num_atomic_orbitals</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">self</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference internal" href="#qdk_chemistry.utils.cubegen.Orbitals" title="qdk_chemistry._core.data.Orbitals"><span class="pre">qdk_chemistry._core.data.Orbitals</span></a></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(in Python v3.14)"><span class="pre">int</span></a></span></span><a class="headerlink" href="#qdk_chemistry.utils.cubegen.Orbitals.get_num_atomic_orbitals" title="Link to this definition"></a></dt>
+<dd><p>Get number of atomic orbitals (basis functions).</p>
+<dl class="field-list simple">
+<dt class="field-odd">Returns<span class="colon">:</span></dt>
+<dd class="field-odd"><p>Number of atomic orbitals/basis functions</p>
+</dd>
+<dt class="field-even">Return type<span class="colon">:</span></dt>
+<dd class="field-even"><p><a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(in Python v3.14)">int</a></p>
+</dd>
+</dl>
+<p class="rubric">Examples</p>
+<div class="doctest highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="n">num_atomic_orbitals</span> <span class="o">=</span> <span class="n">orbitals</span><span class="o">.</span><span class="n">get_num_atomic_orbitals</span><span class="p">()</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s1">&#39;Basis set size: </span><span class="si">{</span><span class="n">num_atomic_orbitals</span><span class="si">}</span><span class="s1">&#39;</span><span class="p">)</span>
+</pre></div>
+</div>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="qdk_chemistry.utils.cubegen.Orbitals.get_num_molecular_orbitals">
+<span class="sig-name descname"><span class="pre">get_num_molecular_orbitals</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">self</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference internal" href="#qdk_chemistry.utils.cubegen.Orbitals" title="qdk_chemistry._core.data.Orbitals"><span class="pre">qdk_chemistry._core.data.Orbitals</span></a></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(in Python v3.14)"><span class="pre">int</span></a></span></span><a class="headerlink" href="#qdk_chemistry.utils.cubegen.Orbitals.get_num_molecular_orbitals" title="Link to this definition"></a></dt>
+<dd><p>Get number of molecular orbitals.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Returns<span class="colon">:</span></dt>
+<dd class="field-odd"><p>Number of molecular orbitals</p>
+</dd>
+<dt class="field-even">Return type<span class="colon">:</span></dt>
+<dd class="field-even"><p><a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(in Python v3.14)">int</a></p>
+</dd>
+</dl>
+<p class="rubric">Examples</p>
+<div class="doctest highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="n">num_molecular_orbitals</span> <span class="o">=</span> <span class="n">orbitals</span><span class="o">.</span><span class="n">get_num_molecular_orbitals</span><span class="p">()</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s1">&#39;Number of MOs: </span><span class="si">{</span><span class="n">num_molecular_orbitals</span><span class="si">}</span><span class="s1">&#39;</span><span class="p">)</span>
+</pre></div>
+</div>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="qdk_chemistry.utils.cubegen.Orbitals.get_overlap_matrix">
+<span class="sig-name descname"><span class="pre">get_overlap_matrix</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">self</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference internal" href="#qdk_chemistry.utils.cubegen.Orbitals" title="qdk_chemistry._core.data.Orbitals"><span class="pre">qdk_chemistry._core.data.Orbitals</span></a></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.Annotated" title="(in Python v3.14)"><span class="pre">Annotated</span></a><span class="p"><span class="pre">[</span></span><span class="pre">numpy.typing.NDArray</span><span class="p"><span class="pre">[</span></span><span class="pre">numpy.float64</span><span class="p"><span class="pre">]</span></span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="s"><span class="pre">'[m,</span> <span class="pre">n]'</span></span><span class="p"><span class="pre">]</span></span></span></span><a class="headerlink" href="#qdk_chemistry.utils.cubegen.Orbitals.get_overlap_matrix" title="Link to this definition"></a></dt>
+<dd><p>Get atomic orbital overlap matrix.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Returns<span class="colon">:</span></dt>
+<dd class="field-odd"><p>Atomic orbital overlap matrix with shape <code class="docutils literal notranslate"><span class="pre">(num_atomic_orbitals,</span> <span class="pre">num_atomic_orbitals)</span></code></p>
+</dd>
+<dt class="field-even">Return type<span class="colon">:</span></dt>
+<dd class="field-even"><p><a class="reference external" href="https://numpy.org/doc/stable/reference/generated/numpy.ndarray.html#numpy.ndarray" title="(in NumPy v2.3)">numpy.ndarray</a></p>
+</dd>
+</dl>
+<p class="rubric">Examples</p>
+<div class="doctest highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="n">overlap</span> <span class="o">=</span> <span class="n">orbitals</span><span class="o">.</span><span class="n">get_overlap_matrix</span><span class="p">()</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Overlap matrix shape: </span><span class="si">{</span><span class="n">overlap</span><span class="o">.</span><span class="n">shape</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+</pre></div>
+</div>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="qdk_chemistry.utils.cubegen.Orbitals.get_summary">
+<span class="sig-name descname"><span class="pre">get_summary</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">self</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference internal" href="#qdk_chemistry.utils.cubegen.Orbitals" title="qdk_chemistry._core.data.Orbitals"><span class="pre">qdk_chemistry._core.data.Orbitals</span></a></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)"><span class="pre">str</span></a></span></span><a class="headerlink" href="#qdk_chemistry.utils.cubegen.Orbitals.get_summary" title="Link to this definition"></a></dt>
+<dd><p>Get summary string of orbital information.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Returns<span class="colon">:</span></dt>
+<dd class="field-odd"><p>Human-readable summary of orbital properties</p>
+</dd>
+<dt class="field-even">Return type<span class="colon">:</span></dt>
+<dd class="field-even"><p><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)">str</a></p>
+</dd>
+</dl>
+<p class="rubric">Examples</p>
+<div class="doctest highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="n">summary</span> <span class="o">=</span> <span class="n">orbitals</span><span class="o">.</span><span class="n">get_summary</span><span class="p">()</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="nb">print</span><span class="p">(</span><span class="n">summary</span><span class="p">)</span>
+</pre></div>
+</div>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="qdk_chemistry.utils.cubegen.Orbitals.get_virtual_space_indices">
+<span class="sig-name descname"><span class="pre">get_virtual_space_indices</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">self</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference internal" href="#qdk_chemistry.utils.cubegen.Orbitals" title="qdk_chemistry._core.data.Orbitals"><span class="pre">qdk_chemistry._core.data.Orbitals</span></a></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#tuple" title="(in Python v3.14)"><span class="pre">tuple</span></a><span class="p"><span class="pre">[</span></span><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#list" title="(in Python v3.14)"><span class="pre">list</span></a><span class="p"><span class="pre">[</span></span><a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(in Python v3.14)"><span class="pre">int</span></a><span class="p"><span class="pre">]</span></span><span class="p"><span class="pre">,</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#list" title="(in Python v3.14)"><span class="pre">list</span></a><span class="p"><span class="pre">[</span></span><a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(in Python v3.14)"><span class="pre">int</span></a><span class="p"><span class="pre">]</span></span><span class="p"><span class="pre">]</span></span></span></span><a class="headerlink" href="#qdk_chemistry.utils.cubegen.Orbitals.get_virtual_space_indices" title="Link to this definition"></a></dt>
+<dd><p>Get the virtual space orbital indices.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Returns<span class="colon">:</span></dt>
+<dd class="field-odd"><p>Pair of (alpha_indices, beta_indices) for virtual orbitals</p>
+</dd>
+<dt class="field-even">Return type<span class="colon">:</span></dt>
+<dd class="field-even"><p><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#tuple" title="(in Python v3.14)">tuple</a></p>
+</dd>
+</dl>
+<p class="rubric">Examples</p>
+<div class="doctest highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="n">alpha_virtual</span> <span class="p">,</span> <span class="n">beta_virtual</span> <span class="o">=</span> <span class="n">orbitals</span><span class="o">.</span><span class="n">get_virtual_space_indices</span><span class="p">()</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Virtual space size: </span><span class="si">{</span><span class="nb">len</span><span class="p">(</span><span class="n">virtual_active</span><span class="p">)</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+</pre></div>
+</div>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="qdk_chemistry.utils.cubegen.Orbitals.has_active_space">
+<span class="sig-name descname"><span class="pre">has_active_space</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">self</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference internal" href="#qdk_chemistry.utils.cubegen.Orbitals" title="qdk_chemistry._core.data.Orbitals"><span class="pre">qdk_chemistry._core.data.Orbitals</span></a></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><a class="reference external" href="https://docs.python.org/3/library/functions.html#bool" title="(in Python v3.14)"><span class="pre">bool</span></a></span></span><a class="headerlink" href="#qdk_chemistry.utils.cubegen.Orbitals.has_active_space" title="Link to this definition"></a></dt>
+<dd><p>Check if active space data is set.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Returns<span class="colon">:</span></dt>
+<dd class="field-odd"><p>True if active space information is available, False otherwise</p>
+</dd>
+<dt class="field-even">Return type<span class="colon">:</span></dt>
+<dd class="field-even"><p><a class="reference external" href="https://docs.python.org/3/library/functions.html#bool" title="(in Python v3.14)">bool</a></p>
+</dd>
+</dl>
+<p class="rubric">Examples</p>
+<div class="doctest highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="k">if</span> <span class="n">orbitals</span><span class="o">.</span><span class="n">has_active_space</span><span class="p">():</span>
+<span class="gp">... </span>    <span class="n">active_indices</span> <span class="o">=</span> <span class="n">orbitals</span><span class="o">.</span><span class="n">get_active_space_indices</span><span class="p">()</span>
+<span class="gp">... </span><span class="k">else</span><span class="p">:</span>
+<span class="gp">... </span>    <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;No active space defined&quot;</span><span class="p">)</span>
+</pre></div>
+</div>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="qdk_chemistry.utils.cubegen.Orbitals.has_basis_set">
+<span class="sig-name descname"><span class="pre">has_basis_set</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">self</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference internal" href="#qdk_chemistry.utils.cubegen.Orbitals" title="qdk_chemistry._core.data.Orbitals"><span class="pre">qdk_chemistry._core.data.Orbitals</span></a></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><a class="reference external" href="https://docs.python.org/3/library/functions.html#bool" title="(in Python v3.14)"><span class="pre">bool</span></a></span></span><a class="headerlink" href="#qdk_chemistry.utils.cubegen.Orbitals.has_basis_set" title="Link to this definition"></a></dt>
+<dd><p>Check if basis set information is available.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Returns<span class="colon">:</span></dt>
+<dd class="field-odd"><p>True if basis set is set, False otherwise</p>
+</dd>
+<dt class="field-even">Return type<span class="colon">:</span></dt>
+<dd class="field-even"><p><a class="reference external" href="https://docs.python.org/3/library/functions.html#bool" title="(in Python v3.14)">bool</a></p>
+</dd>
+</dl>
+<p class="rubric">Examples</p>
+<div class="doctest highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="k">if</span> <span class="n">orbitals</span><span class="o">.</span><span class="n">has_basis_set</span><span class="p">():</span>
+<span class="gp">... </span>    <span class="n">basis</span> <span class="o">=</span> <span class="n">orbitals</span><span class="o">.</span><span class="n">get_basis_set</span><span class="p">()</span>
+<span class="gp">... </span><span class="k">else</span><span class="p">:</span>
+<span class="gp">... </span>    <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;Basis set not available&quot;</span><span class="p">)</span>
+</pre></div>
+</div>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="qdk_chemistry.utils.cubegen.Orbitals.has_energies">
+<span class="sig-name descname"><span class="pre">has_energies</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">self</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference internal" href="#qdk_chemistry.utils.cubegen.Orbitals" title="qdk_chemistry._core.data.Orbitals"><span class="pre">qdk_chemistry._core.data.Orbitals</span></a></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><a class="reference external" href="https://docs.python.org/3/library/functions.html#bool" title="(in Python v3.14)"><span class="pre">bool</span></a></span></span><a class="headerlink" href="#qdk_chemistry.utils.cubegen.Orbitals.has_energies" title="Link to this definition"></a></dt>
+<dd><p>Check if orbital energies have been internally set.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Returns<span class="colon">:</span></dt>
+<dd class="field-odd"><p>True if energies have been set, false otherwise</p>
+</dd>
+<dt class="field-even">Return type<span class="colon">:</span></dt>
+<dd class="field-even"><p><a class="reference external" href="https://docs.python.org/3/library/functions.html#bool" title="(in Python v3.14)">bool</a></p>
+</dd>
+</dl>
+<p class="rubric">Examples</p>
+<div class="doctest highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="k">if</span> <span class="n">orbitals</span><span class="o">.</span><span class="n">has_energies</span><span class="p">():</span>
+<span class="gp">... </span>    <span class="n">alpha_e</span><span class="p">,</span> <span class="n">beta_e</span> <span class="o">=</span> <span class="n">orbitals</span><span class="o">.</span><span class="n">get_energies</span><span class="p">()</span>
+<span class="gp">... </span><span class="k">else</span><span class="p">:</span>
+<span class="gp">... </span>    <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;Energies not yet set&quot;</span><span class="p">)</span>
+</pre></div>
+</div>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="qdk_chemistry.utils.cubegen.Orbitals.has_overlap_matrix">
+<span class="sig-name descname"><span class="pre">has_overlap_matrix</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">self</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference internal" href="#qdk_chemistry.utils.cubegen.Orbitals" title="qdk_chemistry._core.data.Orbitals"><span class="pre">qdk_chemistry._core.data.Orbitals</span></a></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><a class="reference external" href="https://docs.python.org/3/library/functions.html#bool" title="(in Python v3.14)"><span class="pre">bool</span></a></span></span><a class="headerlink" href="#qdk_chemistry.utils.cubegen.Orbitals.has_overlap_matrix" title="Link to this definition"></a></dt>
+<dd><p>Check if atomic orbital overlap matrix is available.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Returns<span class="colon">:</span></dt>
+<dd class="field-odd"><p>True if overlap matrix is set, False otherwise</p>
+</dd>
+<dt class="field-even">Return type<span class="colon">:</span></dt>
+<dd class="field-even"><p><a class="reference external" href="https://docs.python.org/3/library/functions.html#bool" title="(in Python v3.14)">bool</a></p>
+</dd>
+</dl>
+<p class="rubric">Examples</p>
+<div class="doctest highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="k">if</span> <span class="n">orbitals</span><span class="o">.</span><span class="n">has_overlap_matrix</span><span class="p">():</span>
+<span class="gp">... </span>    <span class="n">overlap</span> <span class="o">=</span> <span class="n">orbitals</span><span class="o">.</span><span class="n">get_overlap_matrix</span><span class="p">()</span>
+<span class="gp">... </span><span class="k">else</span><span class="p">:</span>
+<span class="gp">... </span>    <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;Overlap matrix not available&quot;</span><span class="p">)</span>
+</pre></div>
+</div>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="qdk_chemistry.utils.cubegen.Orbitals.is_restricted">
+<span class="sig-name descname"><span class="pre">is_restricted</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">self</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference internal" href="#qdk_chemistry.utils.cubegen.Orbitals" title="qdk_chemistry._core.data.Orbitals"><span class="pre">qdk_chemistry._core.data.Orbitals</span></a></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><a class="reference external" href="https://docs.python.org/3/library/functions.html#bool" title="(in Python v3.14)"><span class="pre">bool</span></a></span></span><a class="headerlink" href="#qdk_chemistry.utils.cubegen.Orbitals.is_restricted" title="Link to this definition"></a></dt>
+<dd><p>Check if calculation is restricted.</p>
+<p>Restricted calculations use identical alpha and beta coefficients.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Returns<span class="colon">:</span></dt>
+<dd class="field-odd"><p>True if alpha and beta coefficients are identical, False otherwise</p>
+</dd>
+<dt class="field-even">Return type<span class="colon">:</span></dt>
+<dd class="field-even"><p><a class="reference external" href="https://docs.python.org/3/library/functions.html#bool" title="(in Python v3.14)">bool</a></p>
+</dd>
+</dl>
+<p class="rubric">Examples</p>
+<div class="doctest highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="n">is_rhf</span> <span class="o">=</span> <span class="n">orbitals</span><span class="o">.</span><span class="n">is_restricted</span><span class="p">()</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Restricted calculation: </span><span class="si">{</span><span class="n">is_rhf</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+</pre></div>
+</div>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="qdk_chemistry.utils.cubegen.Orbitals.is_unrestricted">
+<span class="sig-name descname"><span class="pre">is_unrestricted</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">self</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference internal" href="#qdk_chemistry.utils.cubegen.Orbitals" title="qdk_chemistry._core.data.Orbitals"><span class="pre">qdk_chemistry._core.data.Orbitals</span></a></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><a class="reference external" href="https://docs.python.org/3/library/functions.html#bool" title="(in Python v3.14)"><span class="pre">bool</span></a></span></span><a class="headerlink" href="#qdk_chemistry.utils.cubegen.Orbitals.is_unrestricted" title="Link to this definition"></a></dt>
+<dd><p>Check if calculation is unrestricted.</p>
+<p>Unrestricted calculations use separate alpha and beta coefficients.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Returns<span class="colon">:</span></dt>
+<dd class="field-odd"><p>True if separate alpha/beta coefficients are used, False otherwise</p>
+</dd>
+<dt class="field-even">Return type<span class="colon">:</span></dt>
+<dd class="field-even"><p><a class="reference external" href="https://docs.python.org/3/library/functions.html#bool" title="(in Python v3.14)">bool</a></p>
+</dd>
+</dl>
+<p class="rubric">Examples</p>
+<div class="doctest highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="n">is_uhf</span> <span class="o">=</span> <span class="n">orbitals</span><span class="o">.</span><span class="n">is_unrestricted</span><span class="p">()</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Unrestricted calculation: </span><span class="si">{</span><span class="n">is_uhf</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+</pre></div>
+</div>
+</dd></dl>
+
+<dl class="py property">
+<dt class="sig sig-object py" id="qdk_chemistry.utils.cubegen.Orbitals.summary">
+<em class="property"><span class="k"><span class="pre">property</span></span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">summary</span></span><a class="headerlink" href="#qdk_chemistry.utils.cubegen.Orbitals.summary" title="Link to this definition"></a></dt>
+<dd><p>Get summary string of orbital information.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Returns<span class="colon">:</span></dt>
+<dd class="field-odd"><p>Human-readable summary of orbital properties</p>
+</dd>
+<dt class="field-even">Return type<span class="colon">:</span></dt>
+<dd class="field-even"><p><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)">str</a></p>
+</dd>
+</dl>
+<p class="rubric">Examples</p>
+<div class="doctest highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="n">summary</span> <span class="o">=</span> <span class="n">orbitals</span><span class="o">.</span><span class="n">get_summary</span><span class="p">()</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="nb">print</span><span class="p">(</span><span class="n">summary</span><span class="p">)</span>
+</pre></div>
+</div>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="qdk_chemistry.utils.cubegen.Orbitals.to_file">
+<span class="sig-name descname"><span class="pre">to_file</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">self</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference internal" href="#qdk_chemistry.utils.cubegen.Orbitals" title="qdk_chemistry._core.data.Orbitals"><span class="pre">qdk_chemistry._core.data.Orbitals</span></a></span></em>, <em class="sig-param"><span class="n"><span class="pre">filename</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/library/functions.html#object" title="(in Python v3.14)"><span class="pre">object</span></a></span></em>, <em class="sig-param"><span class="n"><span class="pre">type</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)"><span class="pre">str</span></a></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><a class="reference external" href="https://docs.python.org/3/library/constants.html#None" title="(in Python v3.14)"><span class="pre">None</span></a></span></span><a class="headerlink" href="#qdk_chemistry.utils.cubegen.Orbitals.to_file" title="Link to this definition"></a></dt>
+<dd><p>Save orbital data to file with specified format.</p>
+<p>Generic method to save orbital data to a file.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>filename</strong> (<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)"><em>str</em></a><em> or </em><a class="reference external" href="https://docs.python.org/3/library/pathlib.html#pathlib.Path" title="(in Python v3.14)"><em>pathlib.Path</em></a>) – Path to the file to write.</p></li>
+<li><p><strong>type</strong> (<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)"><em>str</em></a>) – File format type (‘json’ or ‘hdf5’)</p></li>
+</ul>
+</dd>
+<dt class="field-even">Raises<span class="colon">:</span></dt>
+<dd class="field-even"><p><a class="reference external" href="https://docs.python.org/3/library/exceptions.html#RuntimeError" title="(in Python v3.14)"><strong>RuntimeError</strong></a> – If the orbital data is invalid, unsupported type, or file cannot be opened/written</p>
+</dd>
+</dl>
+<p class="rubric">Examples</p>
+<div class="doctest highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="n">orbitals</span><span class="o">.</span><span class="n">to_file</span><span class="p">(</span><span class="s2">&quot;water.orbitals.json&quot;</span><span class="p">,</span> <span class="s2">&quot;json&quot;</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">orbitals</span><span class="o">.</span><span class="n">to_file</span><span class="p">(</span><span class="s2">&quot;molecule.orbitals.h5&quot;</span><span class="p">,</span> <span class="s2">&quot;hdf5&quot;</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="kn">from</span><span class="w"> </span><span class="nn">pathlib</span><span class="w"> </span><span class="kn">import</span> <span class="n">Path</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">orbitals</span><span class="o">.</span><span class="n">to_file</span><span class="p">(</span><span class="n">Path</span><span class="p">(</span><span class="s2">&quot;water.orbitals.json&quot;</span><span class="p">),</span> <span class="s2">&quot;json&quot;</span><span class="p">)</span>
+</pre></div>
+</div>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="qdk_chemistry.utils.cubegen.Orbitals.to_hdf5_file">
+<span class="sig-name descname"><span class="pre">to_hdf5_file</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">self</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference internal" href="#qdk_chemistry.utils.cubegen.Orbitals" title="qdk_chemistry._core.data.Orbitals"><span class="pre">qdk_chemistry._core.data.Orbitals</span></a></span></em>, <em class="sig-param"><span class="n"><span class="pre">filename</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/library/functions.html#object" title="(in Python v3.14)"><span class="pre">object</span></a></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><a class="reference external" href="https://docs.python.org/3/library/constants.html#None" title="(in Python v3.14)"><span class="pre">None</span></a></span></span><a class="headerlink" href="#qdk_chemistry.utils.cubegen.Orbitals.to_hdf5_file" title="Link to this definition"></a></dt>
+<dd><p>Save orbital data to HDF5 file (with validation).</p>
+<p>Writes all orbital data to an HDF5 file, preserving numerical precision.
+HDF5 format is efficient for large datasets and supports hierarchical
+data structures, making it ideal for storing molecular orbital information.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>filename</strong> (<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)"><em>str</em></a><em> or </em><a class="reference external" href="https://docs.python.org/3/library/pathlib.html#pathlib.Path" title="(in Python v3.14)"><em>pathlib.Path</em></a>) – Path to the HDF5 file to write. Must have ‘.orbitals’ before the file
+extension (e.g., <code class="docutils literal notranslate"><span class="pre">water.orbitals.h5</span></code>, <code class="docutils literal notranslate"><span class="pre">molecule.orbitals.hdf5</span></code>)</p>
+</dd>
+<dt class="field-even">Raises<span class="colon">:</span></dt>
+<dd class="field-even"><ul class="simple">
+<li><p><a class="reference external" href="https://docs.python.org/3/library/exceptions.html#ValueError" title="(in Python v3.14)"><strong>ValueError</strong></a> – If filename doesn’t follow the required naming convention</p></li>
+<li><p><a class="reference external" href="https://docs.python.org/3/library/exceptions.html#RuntimeError" title="(in Python v3.14)"><strong>RuntimeError</strong></a> – If the orbital data is invalid or the file cannot be opened/written</p></li>
+</ul>
+</dd>
+</dl>
+<p class="rubric">Examples</p>
+<div class="doctest highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="n">orbitals</span><span class="o">.</span><span class="n">to_hdf5_file</span><span class="p">(</span><span class="s2">&quot;water.orbitals.h5&quot;</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">orbitals</span><span class="o">.</span><span class="n">to_hdf5_file</span><span class="p">(</span><span class="s2">&quot;molecule.orbitals.hdf5&quot;</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="kn">from</span><span class="w"> </span><span class="nn">pathlib</span><span class="w"> </span><span class="kn">import</span> <span class="n">Path</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">orbitals</span><span class="o">.</span><span class="n">to_hdf5_file</span><span class="p">(</span><span class="n">Path</span><span class="p">(</span><span class="s2">&quot;water.orbitals.h5&quot;</span><span class="p">))</span>
+</pre></div>
+</div>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="qdk_chemistry.utils.cubegen.Orbitals.to_json">
+<span class="sig-name descname"><span class="pre">to_json</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">self</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference internal" href="#qdk_chemistry.utils.cubegen.Orbitals" title="qdk_chemistry._core.data.Orbitals"><span class="pre">qdk_chemistry._core.data.Orbitals</span></a></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)"><span class="pre">str</span></a></span></span><a class="headerlink" href="#qdk_chemistry.utils.cubegen.Orbitals.to_json" title="Link to this definition"></a></dt>
+<dd><p>Convert orbital data to JSON string.</p>
+<p>Serializes all orbital information to a JSON string format.
+JSON is human-readable and suitable for debugging or data exchange.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Returns<span class="colon">:</span></dt>
+<dd class="field-odd"><p>JSON string representation of the orbital data</p>
+</dd>
+<dt class="field-even">Return type<span class="colon">:</span></dt>
+<dd class="field-even"><p><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)">str</a></p>
+</dd>
+<dt class="field-odd">Raises<span class="colon">:</span></dt>
+<dd class="field-odd"><p><a class="reference external" href="https://docs.python.org/3/library/exceptions.html#RuntimeError" title="(in Python v3.14)"><strong>RuntimeError</strong></a> – If the orbital data is invalid</p>
+</dd>
+</dl>
+<p class="rubric">Examples</p>
+<div class="doctest highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="n">json_str</span> <span class="o">=</span> <span class="n">orbitals</span><span class="o">.</span><span class="n">to_json</span><span class="p">()</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="nb">print</span><span class="p">(</span><span class="n">json_str</span><span class="p">)</span>  <span class="c1"># Pretty-printed JSON</span>
+</pre></div>
+</div>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="qdk_chemistry.utils.cubegen.Orbitals.to_json_file">
+<span class="sig-name descname"><span class="pre">to_json_file</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">self</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference internal" href="#qdk_chemistry.utils.cubegen.Orbitals" title="qdk_chemistry._core.data.Orbitals"><span class="pre">qdk_chemistry._core.data.Orbitals</span></a></span></em>, <em class="sig-param"><span class="n"><span class="pre">filename</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/library/functions.html#object" title="(in Python v3.14)"><span class="pre">object</span></a></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><a class="reference external" href="https://docs.python.org/3/library/constants.html#None" title="(in Python v3.14)"><span class="pre">None</span></a></span></span><a class="headerlink" href="#qdk_chemistry.utils.cubegen.Orbitals.to_json_file" title="Link to this definition"></a></dt>
+<dd><p>Save orbital data to JSON file.</p>
+<p>Writes all orbital data to a JSON file with pretty formatting.
+The file will be created or overwritten if it already exists.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>filename</strong> (<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)"><em>str</em></a><em> or </em><a class="reference external" href="https://docs.python.org/3/library/pathlib.html#pathlib.Path" title="(in Python v3.14)"><em>pathlib.Path</em></a>) – Path to the JSON file to write. Must have ‘.orbitals’ before the file
+extension (e.g., <code class="docutils literal notranslate"><span class="pre">water.orbitals.json</span></code>, <code class="docutils literal notranslate"><span class="pre">molecule.orbitals.json</span></code>)</p>
+</dd>
+<dt class="field-even">Raises<span class="colon">:</span></dt>
+<dd class="field-even"><ul class="simple">
+<li><p><a class="reference external" href="https://docs.python.org/3/library/exceptions.html#ValueError" title="(in Python v3.14)"><strong>ValueError</strong></a> – If filename doesn’t follow the required naming convention</p></li>
+<li><p><a class="reference external" href="https://docs.python.org/3/library/exceptions.html#RuntimeError" title="(in Python v3.14)"><strong>RuntimeError</strong></a> – If the orbital data is invalid or the file cannot be opened/written</p></li>
+</ul>
+</dd>
+</dl>
+<p class="rubric">Examples</p>
+<div class="doctest highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="n">orbitals</span><span class="o">.</span><span class="n">to_json_file</span><span class="p">(</span><span class="s2">&quot;water.orbitals.json&quot;</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">orbitals</span><span class="o">.</span><span class="n">to_json_file</span><span class="p">(</span><span class="s2">&quot;molecule.orbitals.json&quot;</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="kn">from</span><span class="w"> </span><span class="nn">pathlib</span><span class="w"> </span><span class="kn">import</span> <span class="n">Path</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">orbitals</span><span class="o">.</span><span class="n">to_json_file</span><span class="p">(</span><span class="n">Path</span><span class="p">(</span><span class="s2">&quot;water.orbitals.json&quot;</span><span class="p">))</span>
+</pre></div>
+</div>
+</dd></dl>
+
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="qdk_chemistry.utils.cubegen.basis_to_pyscf_mol">
+<span class="sig-name descname"><span class="pre">basis_to_pyscf_mol</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">basis</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#qdk_chemistry.utils.cubegen.basis_to_pyscf_mol" title="Link to this definition"></a></dt>
+<dd><p>Convert QDK/Chemistry BasisSet instance to PySCF Mole object.</p>
+<p>This function extracts the structure and basis information from the QDK/Chemistry
+BasisSet instance and uses it to initialize a PySCF Mole object.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p><span class="sphinx_autodoc_typehints-type"><code class="xref py py-class docutils literal notranslate"><span class="pre">Mole</span></code></span></p>
+</dd>
+<dt class="field-even">Parameters<span class="colon">:</span></dt>
+<dd class="field-even"><p><strong>basis</strong> (<a class="reference internal" href="qdk_chemistry.plugins.pyscf.utils.html#qdk_chemistry.plugins.pyscf.utils.BasisSet" title="qdk_chemistry._core.data.BasisSet"><em>BasisSet</em></a>) – QDK/Chemistry BasisSet instance with populated basis set.</p>
+</dd>
+<dt class="field-odd">Returns<span class="colon">:</span></dt>
+<dd class="field-odd"><p>PySCF Mole object initialized with the QDK/Chemistry basis set data.</p>
+</dd>
+</dl>
+<p class="rubric">Examples</p>
+<div class="doctest highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="n">pyscf_mol</span> <span class="o">=</span> <span class="n">basis_to_pyscf_mol</span><span class="p">(</span><span class="n">basis</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="nb">print</span><span class="p">(</span><span class="n">pyscf_mol</span><span class="o">.</span><span class="n">atom</span><span class="p">)</span>
+</pre></div>
+</div>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="qdk_chemistry.utils.cubegen.generate_cubefiles_from_orbitals">
+<span class="sig-name descname"><span class="pre">generate_cubefiles_from_orbitals</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">orbitals</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">output_folder</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">indices</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">grid_size</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">(40,</span> <span class="pre">40,</span> <span class="pre">40)</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">margin</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">3.0</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">label_maker</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../../_modules/qdk_chemistry/utils/cubegen.html#generate_cubefiles_from_orbitals"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#qdk_chemistry.utils.cubegen.generate_cubefiles_from_orbitals" title="Link to this definition"></a></dt>
+<dd><p>Generate volumetric cube data for molecular orbitals.</p>
+<p>This method creates cube files containing the spatial distribution of molecular
+orbitals on a 3D grid. It supports both canonical and localized orbitals.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p><span class="sphinx_autodoc_typehints-type"><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#list" title="(in Python v3.14)"><code class="xref py py-class docutils literal notranslate"><span class="pre">list</span></code></a>[<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)"><code class="xref py py-class docutils literal notranslate"><span class="pre">str</span></code></a>] | <a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#dict" title="(in Python v3.14)"><code class="xref py py-class docutils literal notranslate"><span class="pre">dict</span></code></a>[<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)"><code class="xref py py-class docutils literal notranslate"><span class="pre">str</span></code></a>, <a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)"><code class="xref py py-class docutils literal notranslate"><span class="pre">str</span></code></a>]</span></p>
+</dd>
+<dt class="field-even">Parameters<span class="colon">:</span></dt>
+<dd class="field-even"><ul class="simple">
+<li><p><strong>orbitals</strong> (<a class="reference internal" href="#qdk_chemistry.utils.cubegen.Orbitals" title="qdk_chemistry.utils.cubegen.Orbitals"><em>Orbitals</em></a>) – The orbitals object containing the molecular orbital coefficients and basis set</p></li>
+<li><p><strong>output_folder</strong> (<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)"><em>str</em></a><em> or </em><em>Path</em><em>, </em><em>optional</em>) – The folder where the cube files will be saved. If None, files are not saved to temporary storage.</p></li>
+<li><p><strong>indices</strong> (<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#list" title="(in Python v3.14)"><em>list</em></a><em>[</em><a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(in Python v3.14)"><em>int</em></a><em>] </em><em>| </em><em>None = None</em><em>, </em><em>optional</em>) – Specific molecular orbital indices to generate cube files for. If None, all orbitals are processed.</p></li>
+<li><p><strong>grid_size</strong> (<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#tuple" title="(in Python v3.14)"><em>tuple</em></a><em>, </em><em>optional</em>) – The size of the grid in each dimension (nx, ny, nz). Default is (40, 40, 40).</p></li>
+<li><p><strong>margin</strong> (<a class="reference external" href="https://docs.python.org/3/library/functions.html#float" title="(in Python v3.14)"><em>float</em></a><em>, </em><em>optional</em>) – The margin (in Bohr radii) to extend around molecule. Default is 3.</p></li>
+<li><p><strong>label_maker</strong> (<em>Callable</em><em>[</em><em>[</em><a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(in Python v3.14)"><em>int</em></a><em>]</em><em>, </em><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)"><em>str</em></a><em>]</em><em>, </em><em>optional</em>) – A function that takes an orbital index and returns a string label for the cube file. If None, a default
+labeling scheme is used.</p></li>
+</ul>
+</dd>
+<dt class="field-odd">Returns<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>cubefile_paths</strong> – A list of file paths to the generated cube files.</p>
+</dd>
+<dt class="field-even">Return type<span class="colon">:</span></dt>
+<dd class="field-even"><p><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#list" title="(in Python v3.14)">list</a> of <a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)">str</a></p>
+</dd>
+</dl>
+</dd></dl>
+
+</section>
+
+
+           </div>
+          </div>
+          <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
+        <a href="qdk_chemistry.utils.bitstring.html" class="btn btn-neutral float-left" title="qdk_chemistry.utils.bitstring module" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+        <a href="qdk_chemistry.utils.phase.html" class="btn btn-neutral float-right" title="qdk_chemistry.utils.phase module" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright Microsoft Corporation. All rights reserved. Licensed under the MIT License.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

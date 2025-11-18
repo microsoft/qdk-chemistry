@@ -1,0 +1,17 @@
+qdk\_chemistry.plugins package
+==============================
+
+.. automodule:: qdk_chemistry.plugins
+   :members:
+   :private-members:
+   :show-inheritance:
+   :undoc-members:
+
+Subpackages
+-----------
+
+.. toctree::
+   :maxdepth: 4
+
+   qdk_chemistry.plugins.pyscf
+   qdk_chemistry.plugins.qiskit

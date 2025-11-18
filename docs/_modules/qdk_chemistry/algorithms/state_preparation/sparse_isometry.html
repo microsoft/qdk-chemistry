@@ -1,0 +1,986 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../../../../">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>qdk_chemistry.algorithms.state_preparation.sparse_isometry &mdash; qdk-chemistry 1.0.0-rc1 documentation</title>
+      <link rel="stylesheet" type="text/css" href="../../../../_static/pygments.css?v=b86133f3" />
+      <link rel="stylesheet" type="text/css" href="../../../../_static/css/theme.css?v=e59714d7" />
+      <link rel="stylesheet" type="text/css" href="../../../../_static/tabs.css?v=4c969af8" />
+      <link rel="stylesheet" type="text/css" href="../../../../_static/graphviz.css?v=4ae1632d" />
+      <link rel="stylesheet" type="text/css" href="../../../../_static/copybutton.css?v=76b2166b" />
+      <link rel="stylesheet" type="text/css" href="../../../../_static/custom.css?v=a64bac2b" />
+
+  
+      <script src="../../../../_static/jquery.js?v=5d32c60e"></script>
+      <script src="../../../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="../../../../_static/documentation_options.js?v=81bd8d55"></script>
+      <script src="../../../../_static/doctools.js?v=9bcbadda"></script>
+      <script src="../../../../_static/sphinx_highlight.js?v=dc90522c"></script>
+      <script src="../../../../_static/tabs.js?v=3ee01567"></script>
+      <script src="../../../../_static/clipboard.min.js?v=a7894cd8"></script>
+      <script src="../../../../_static/copybutton.js?v=f281be69"></script>
+    <script src="../../../../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../../../../genindex.html" />
+    <link rel="search" title="Search" href="../../../../search.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="../../../../index.html" class="icon icon-home">
+            qdk-chemistry
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../../../../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">User Documentation</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../../user/quickstart.html">Quickstart</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../../user/comprehensive/index.html">In-depth user guide</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">API Reference</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../../api/python_api.html">Python API</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../../api/cpp_api.html">C++ API</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Supporting Information</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../../glossary.html">Acronym definitions</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../../references.html">References</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../../../../index.html">qdk-chemistry</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../../../../index.html" class="icon icon-home" aria-label="Home"></a></li>
+          <li class="breadcrumb-item"><a href="../../../index.html">Module code</a></li>
+      <li class="breadcrumb-item active">qdk_chemistry.algorithms.state_preparation.sparse_isometry</li>
+      <li class="wy-breadcrumbs-aside">
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <h1>Source code for qdk_chemistry.algorithms.state_preparation.sparse_isometry</h1><div class="highlight"><pre>
+<span></span><span class="sd">&quot;&quot;&quot;Sparse isometry module for quantum state preparation.</span>
+
+<span class="sd">This module implements sparse isometry algorithms for efficient quantum circuit</span>
+<span class="sd">generation from electronic structure wavefunctions. Sparse isometry methods</span>
+<span class="sd">leverage the sparsity of quantum states to create optimized circuits that</span>
+<span class="sd">prepare only the non-zero amplitude components, significantly reducing circuit</span>
+<span class="sd">depth and gate count compared to dense state preparation methods.</span>
+
+<span class="sd">**SparseIsometryGF2XStatePrep**: Enhanced sparse isometry using GF2+X elimination.</span>
+<span class="sd">This method performs duplicate row removal, all-ones row removal, and diagonal</span>
+<span class="sd">matrix rank reduction besides standard GF2 Gaussian elimination. It tracks both</span>
+<span class="sd">CNOT and X operations for optimal circuit reconstruction and can be more</span>
+<span class="sd">efficient than standard GF2 for matrices with specific structural patterns.</span>
+
+<span class="sd">The sparse isometry algorithms are particularly well-suited for quantum chemistry</span>
+<span class="sd">applications where electronic structure wavefunctions often have a small number of</span>
+<span class="sd">dominant determinants.</span>
+
+<span class="sd">The implementations prepare the same quantum state with much more efficient</span>
+<span class="sd">circuits, featuring significantly reduced gate counts and circuit depths</span>
+<span class="sd">compared to traditional isometry methods.</span>
+
+<span class="sd">Algorithm Details:</span>
+
+<span class="sd">* SparseIsometryGF2X: Applies enhanced GF2+X elimination (preprocessing + GF2</span>
+<span class="sd">  + postprocessing), performs dense state preparation on the reduced space,</span>
+<span class="sd">  then applies recorded operations (CNOT and X) in reverse to expand back to</span>
+<span class="sd">  the full space.</span>
+<span class="sd">&quot;&quot;&quot;</span>
+
+<span class="c1"># --------------------------------------------------------------------------------------------</span>
+<span class="c1"># Copyright (c) Microsoft Corporation. All rights reserved.</span>
+<span class="c1"># Licensed under the MIT License. See LICENSE.txt in the project root for license information.</span>
+<span class="c1"># --------------------------------------------------------------------------------------------</span>
+
+<span class="kn">import</span><span class="w"> </span><span class="nn">logging</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">dataclasses</span><span class="w"> </span><span class="kn">import</span> <span class="n">dataclass</span>
+
+<span class="kn">import</span><span class="w"> </span><span class="nn">numpy</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">np</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">qiskit</span><span class="w"> </span><span class="kn">import</span> <span class="n">QuantumCircuit</span><span class="p">,</span> <span class="n">qasm3</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">qiskit.circuit.library</span><span class="w"> </span><span class="kn">import</span> <span class="n">StatePreparation</span> <span class="k">as</span> <span class="n">QiskitStatePreparation</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">qiskit.compiler</span><span class="w"> </span><span class="kn">import</span> <span class="n">transpile</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">qiskit.quantum_info</span><span class="w"> </span><span class="kn">import</span> <span class="n">Statevector</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">qiskit.transpiler</span><span class="w"> </span><span class="kn">import</span> <span class="n">PassManager</span>
+
+<span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.algorithms.state_preparation.state_preparation</span><span class="w"> </span><span class="kn">import</span> <span class="n">StatePreparation</span><span class="p">,</span> <span class="n">StatePreparationSettings</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.data</span><span class="w"> </span><span class="kn">import</span> <span class="n">Wavefunction</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.plugins.qiskit._interop.transpiler</span><span class="w"> </span><span class="kn">import</span> <span class="p">(</span>
+    <span class="n">MergeZBasisRotations</span><span class="p">,</span>
+    <span class="n">RemoveZBasisOnZeroState</span><span class="p">,</span>
+    <span class="n">SubstituteCliffordRz</span><span class="p">,</span>
+<span class="p">)</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.utils.bitstring</span><span class="w"> </span><span class="kn">import</span> <span class="n">bitstrings_to_binary_matrix</span><span class="p">,</span> <span class="n">separate_alpha_beta_to_binary_string</span>
+
+<span class="n">_LOGGER</span> <span class="o">=</span> <span class="n">logging</span><span class="o">.</span><span class="n">getLogger</span><span class="p">(</span><span class="vm">__name__</span><span class="p">)</span>
+
+
+<div class="viewcode-block" id="SparseIsometryGF2XStatePreparation">
+<a class="viewcode-back" href="../../../../api/api_autogen/qdk_chemistry.algorithms.state_preparation.sparse_isometry.html#qdk_chemistry.algorithms.state_preparation.sparse_isometry.SparseIsometryGF2XStatePreparation">[docs]</a>
+<span class="k">class</span><span class="w"> </span><span class="nc">SparseIsometryGF2XStatePreparation</span><span class="p">(</span><span class="n">StatePreparation</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;State preparation using sparse isometry with enhanced GF2+X elimination.</span>
+
+<span class="sd">    This class implements &quot;GF2+X&quot; state preparation for electronic structure problems using</span>
+<span class="sd">    the ``gf2x_with_tracking`` function which performs smart preprocessing</span>
+<span class="sd">    before GF2 Gaussian elimination. The preprocessing includes:</span>
+
+<span class="sd">        1. Removing duplicate rows using CNOT operations</span>
+<span class="sd">        2. Removing all-ones rows using X operations</span>
+<span class="sd">        3. Then performing standard GF2 Gaussian elimination</span>
+<span class="sd">        4. Apply the additional rank reduction if the reduced row-echelon matrix is diagonal</span>
+
+<span class="sd">    This enhanced approach can be more efficient than standard GF2 Gaussian elimination,</span>
+<span class="sd">    particularly for matrices with duplicate rows or all-ones rows. The algorithm</span>
+<span class="sd">    tracks both CNOT and X operations for proper circuit reconstruction.</span>
+
+<span class="sd">    The algorithm:</span>
+
+<span class="sd">        1. Reads the wavefunction to get coefficients and bitstrings</span>
+<span class="sd">        2. Converts bitstrings to a binary matrix</span>
+<span class="sd">        3. Applies enhanced GF2+X elimination (duplicate removal + all-ones removal + GF2)</span>
+<span class="sd">        4. Performs dense state preparation on the reduced space</span>
+<span class="sd">        5. Applies recorded operations (both CNOT and X) in reverse order to expand back to full space</span>
+
+<span class="sd">    Key References:</span>
+
+<span class="sd">        * Sparse isometry: Malvetti, Iten and Colbeck, `arXiv:2006.00016 &lt;https://arxiv.org/abs/2006.00016&gt;`_</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+<div class="viewcode-block" id="SparseIsometryGF2XStatePreparation.__init__">
+<a class="viewcode-back" href="../../../../api/api_autogen/qdk_chemistry.algorithms.state_preparation.sparse_isometry.html#qdk_chemistry.algorithms.state_preparation.sparse_isometry.SparseIsometryGF2XStatePreparation.__init__">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Initialize the SparseIsometryGF2XStatePreparation.&quot;&quot;&quot;</span>
+        <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">()</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_settings</span> <span class="o">=</span> <span class="n">StatePreparationSettings</span><span class="p">()</span></div>
+
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">_run_impl</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">wavefunction</span><span class="p">:</span> <span class="n">Wavefunction</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Prepare a quantum circuit that encodes the given wavefunction using sparse isometry over GF(2^x).</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            wavefunction: The target wavefunction to prepare.</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            OpenQASM3 string of the quantum circuit that prepares the wavefunction.</span>
+
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="c1"># Active Space Consistency Check</span>
+        <span class="n">alpha_indices</span><span class="p">,</span> <span class="n">beta_indices</span> <span class="o">=</span> <span class="n">wavefunction</span><span class="o">.</span><span class="n">get_orbitals</span><span class="p">()</span><span class="o">.</span><span class="n">get_active_space_indices</span><span class="p">()</span>
+        <span class="k">if</span> <span class="n">alpha_indices</span> <span class="o">!=</span> <span class="n">beta_indices</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
+                <span class="sa">f</span><span class="s2">&quot;Active space contains </span><span class="si">{</span><span class="nb">len</span><span class="p">(</span><span class="n">alpha_indices</span><span class="p">)</span><span class="si">}</span><span class="s2"> alpha orbitals and &quot;</span>
+                <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="nb">len</span><span class="p">(</span><span class="n">beta_indices</span><span class="p">)</span><span class="si">}</span><span class="s2"> beta orbitals. Asymmetric active spaces for &quot;</span>
+                <span class="s2">&quot;alpha and beta orbitals are not supported for state preparation.&quot;</span>
+            <span class="p">)</span>
+
+        <span class="n">coeffs</span> <span class="o">=</span> <span class="n">wavefunction</span><span class="o">.</span><span class="n">get_coefficients</span><span class="p">()</span>
+        <span class="n">dets</span> <span class="o">=</span> <span class="n">wavefunction</span><span class="o">.</span><span class="n">get_active_determinants</span><span class="p">()</span>
+        <span class="n">num_orbitals</span> <span class="o">=</span> <span class="nb">len</span><span class="p">(</span><span class="n">wavefunction</span><span class="o">.</span><span class="n">get_orbitals</span><span class="p">()</span><span class="o">.</span><span class="n">get_active_space_indices</span><span class="p">()[</span><span class="mi">0</span><span class="p">])</span>
+        <span class="n">bitstrings</span> <span class="o">=</span> <span class="p">[]</span>
+        <span class="k">for</span> <span class="n">det</span> <span class="ow">in</span> <span class="n">dets</span><span class="p">:</span>
+            <span class="n">alpha_str</span><span class="p">,</span> <span class="n">beta_str</span> <span class="o">=</span> <span class="n">separate_alpha_beta_to_binary_string</span><span class="p">(</span><span class="n">det</span><span class="o">.</span><span class="n">to_string</span><span class="p">()[:</span><span class="n">num_orbitals</span><span class="p">])</span>
+            <span class="n">bitstring</span> <span class="o">=</span> <span class="n">beta_str</span><span class="p">[::</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span> <span class="o">+</span> <span class="n">alpha_str</span><span class="p">[::</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span>  <span class="c1"># Qiskit uses little-endian convention</span>
+            <span class="n">bitstrings</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">bitstring</span><span class="p">)</span>
+
+        <span class="c1"># Check for single determinant case after filtering</span>
+        <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">bitstrings</span><span class="p">)</span> <span class="o">==</span> <span class="mi">1</span><span class="p">:</span>
+            <span class="n">_LOGGER</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s2">&quot;After filtering, only 1 determinant remains, using single reference state preparation&quot;</span><span class="p">)</span>
+            <span class="k">return</span> <span class="n">_prepare_single_reference_state</span><span class="p">(</span><span class="n">bitstrings</span><span class="p">[</span><span class="mi">0</span><span class="p">])</span>
+
+        <span class="n">n_qubits</span> <span class="o">=</span> <span class="nb">len</span><span class="p">(</span><span class="n">bitstrings</span><span class="p">[</span><span class="mi">0</span><span class="p">])</span>
+        <span class="n">_LOGGER</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Using </span><span class="si">{</span><span class="nb">len</span><span class="p">(</span><span class="n">bitstrings</span><span class="p">)</span><span class="si">}</span><span class="s2"> determinants for state preparation&quot;</span><span class="p">)</span>
+
+        <span class="c1"># Step 1: Convert bitstrings to binary matrix</span>
+        <span class="n">bitstring_matrix</span> <span class="o">=</span> <span class="n">bitstrings_to_binary_matrix</span><span class="p">(</span><span class="n">bitstrings</span><span class="p">)</span>
+
+        <span class="c1"># Step 2: Apply enhanced GF2+X</span>
+        <span class="c1"># (includes duplicate removal, all-ones removal, and GF2)</span>
+        <span class="n">gf2x_operation_results</span> <span class="o">=</span> <span class="n">gf2x_with_tracking</span><span class="p">(</span><span class="n">bitstring_matrix</span><span class="p">)</span>
+
+        <span class="n">_LOGGER</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Original matrix shape: </span><span class="si">{</span><span class="n">bitstring_matrix</span><span class="o">.</span><span class="n">shape</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+        <span class="n">_LOGGER</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Reduced matrix shape: </span><span class="si">{</span><span class="n">gf2x_operation_results</span><span class="o">.</span><span class="n">reduced_matrix</span><span class="o">.</span><span class="n">shape</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+        <span class="n">_LOGGER</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Matrix rank: </span><span class="si">{</span><span class="n">gf2x_operation_results</span><span class="o">.</span><span class="n">rank</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+        <span class="n">_LOGGER</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Total operations: </span><span class="si">{</span><span class="nb">len</span><span class="p">(</span><span class="n">gf2x_operation_results</span><span class="o">.</span><span class="n">operations</span><span class="p">)</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+
+        <span class="c1"># Log operations by type</span>
+        <span class="n">_LOGGER</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;CNOT operations: </span><span class="si">{</span><span class="p">[</span><span class="n">op</span><span class="w"> </span><span class="k">for</span><span class="w"> </span><span class="n">op</span><span class="w"> </span><span class="ow">in</span><span class="w"> </span><span class="n">gf2x_operation_results</span><span class="o">.</span><span class="n">operations</span><span class="w"> </span><span class="k">if</span><span class="w"> </span><span class="n">op</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="w"> </span><span class="o">==</span><span class="w"> </span><span class="s1">&#39;cnot&#39;</span><span class="p">]</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+        <span class="n">_LOGGER</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;X operations: </span><span class="si">{</span><span class="p">[</span><span class="n">op</span><span class="w"> </span><span class="k">for</span><span class="w"> </span><span class="n">op</span><span class="w"> </span><span class="ow">in</span><span class="w"> </span><span class="n">gf2x_operation_results</span><span class="o">.</span><span class="n">operations</span><span class="w"> </span><span class="k">if</span><span class="w"> </span><span class="n">op</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="w"> </span><span class="o">==</span><span class="w"> </span><span class="s1">&#39;x&#39;</span><span class="p">]</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+
+        <span class="c1"># Step 3: Create quantum circuit</span>
+        <span class="n">qc</span> <span class="o">=</span> <span class="n">QuantumCircuit</span><span class="p">(</span>
+            <span class="n">n_qubits</span><span class="p">,</span>
+            <span class="n">name</span><span class="o">=</span><span class="sa">f</span><span class="s2">&quot;sparse_isometry_gf2x_</span><span class="si">{</span><span class="nb">len</span><span class="p">(</span><span class="n">bitstrings</span><span class="p">)</span><span class="si">}</span><span class="s2">_dets&quot;</span><span class="p">,</span>
+        <span class="p">)</span>
+
+        <span class="c1"># Step 4: Create statevector for the reduced matrix</span>
+        <span class="k">if</span> <span class="n">gf2x_operation_results</span><span class="o">.</span><span class="n">rank</span> <span class="o">&gt;</span> <span class="mi">0</span><span class="p">:</span>
+            <span class="c1"># Create statevector correctly preserving coefficient-determinant correspondence.</span>
+            <span class="c1"># Each coefficient corresponds to a specific determinant (column in reduced matrix).</span>
+            <span class="c1"># We need to map each coefficient to the correct basis state in the reduced space.</span>
+
+            <span class="n">statevector_data</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">zeros</span><span class="p">(</span><span class="mi">2</span><span class="o">**</span><span class="n">gf2x_operation_results</span><span class="o">.</span><span class="n">rank</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="nb">complex</span><span class="p">)</span>
+
+            <span class="c1"># For each determinant (column in reduced matrix), map it to the correct statevector index</span>
+            <span class="k">for</span> <span class="n">det_idx</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">gf2x_operation_results</span><span class="o">.</span><span class="n">reduced_matrix</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">1</span><span class="p">]):</span>
+                <span class="c1"># Get the reduced column for this determinant</span>
+                <span class="n">reduced_column</span> <span class="o">=</span> <span class="n">gf2x_operation_results</span><span class="o">.</span><span class="n">reduced_matrix</span><span class="p">[:,</span> <span class="n">det_idx</span><span class="p">]</span>
+
+                <span class="c1"># Convert reduced column to binary string (reverse for little-endian)</span>
+                <span class="n">bitstring</span> <span class="o">=</span> <span class="s2">&quot;&quot;</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="nb">str</span><span class="p">(</span><span class="n">bit</span><span class="p">)</span> <span class="k">for</span> <span class="n">bit</span> <span class="ow">in</span> <span class="nb">reversed</span><span class="p">(</span><span class="n">reduced_column</span><span class="p">))</span>
+
+                <span class="c1"># Calculate the statevector index for this bitstring</span>
+                <span class="n">statevector_index</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="n">bitstring</span><span class="p">,</span> <span class="mi">2</span><span class="p">)</span>
+
+                <span class="c1"># Assign the coefficient to the correct statevector index</span>
+                <span class="n">statevector_data</span><span class="p">[</span><span class="n">statevector_index</span><span class="p">]</span> <span class="o">=</span> <span class="n">coeffs</span><span class="p">[</span><span class="n">det_idx</span><span class="p">]</span>
+
+                <span class="n">_LOGGER</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span>
+                    <span class="sa">f</span><span class="s2">&quot;Determinant </span><span class="si">{</span><span class="n">det_idx</span><span class="si">}</span><span class="s2">: coeff=</span><span class="si">{</span><span class="n">coeffs</span><span class="p">[</span><span class="n">det_idx</span><span class="p">]</span><span class="si">:</span><span class="s2">.6f</span><span class="si">}</span><span class="s2">, &quot;</span>
+                    <span class="sa">f</span><span class="s2">&quot;reduced_column=</span><span class="si">{</span><span class="n">reduced_column</span><span class="o">.</span><span class="n">tolist</span><span class="p">()</span><span class="si">}</span><span class="s2">, &quot;</span>
+                    <span class="sa">f</span><span class="s2">&quot;bitstring=&#39;</span><span class="si">{</span><span class="n">bitstring</span><span class="si">}</span><span class="s2">&#39;, sv_index=</span><span class="si">{</span><span class="n">statevector_index</span><span class="si">}</span><span class="s2">&quot;</span>
+                <span class="p">)</span>
+
+            <span class="c1"># Normalize the statevector</span>
+            <span class="n">norm</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">linalg</span><span class="o">.</span><span class="n">norm</span><span class="p">(</span><span class="n">statevector_data</span><span class="p">)</span>
+            <span class="k">if</span> <span class="n">norm</span> <span class="o">&gt;</span> <span class="mi">0</span><span class="p">:</span>
+                <span class="n">statevector_data</span> <span class="o">/=</span> <span class="n">norm</span>
+
+            <span class="n">_LOGGER</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Statevector created for reduced matrix with rank </span><span class="si">{</span><span class="n">gf2x_operation_results</span><span class="o">.</span><span class="n">rank</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+            <span class="n">_LOGGER</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Statevector shape: </span><span class="si">{</span><span class="nb">len</span><span class="p">(</span><span class="n">statevector_data</span><span class="p">)</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+            <span class="n">_LOGGER</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s2">&quot;Non-zero elements in statevector:&quot;</span><span class="p">)</span>
+            <span class="k">for</span> <span class="n">i</span><span class="p">,</span> <span class="n">amp</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="n">statevector_data</span><span class="p">):</span>
+                <span class="n">bitstring_repr</span> <span class="o">=</span> <span class="nb">format</span><span class="p">(</span><span class="n">i</span><span class="p">,</span> <span class="sa">f</span><span class="s2">&quot;0</span><span class="si">{</span><span class="n">gf2x_operation_results</span><span class="o">.</span><span class="n">rank</span><span class="si">}</span><span class="s2">b&quot;</span><span class="p">)</span>
+                <span class="n">_LOGGER</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;  |</span><span class="si">{</span><span class="n">bitstring_repr</span><span class="si">}</span><span class="s2">⟩: </span><span class="si">{</span><span class="n">amp</span><span class="si">:</span><span class="s2">.6f</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+
+            <span class="c1"># Create Statevector object for StatePreparation</span>
+            <span class="n">statevector</span> <span class="o">=</span> <span class="n">Statevector</span><span class="p">(</span><span class="n">statevector_data</span><span class="p">)</span>
+
+            <span class="c1"># Step 5: Apply dense state preparation on reduced space</span>
+            <span class="n">_LOGGER</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Target indices are </span><span class="si">{</span><span class="n">gf2x_operation_results</span><span class="o">.</span><span class="n">row_map</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+            <span class="n">qc</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">QiskitStatePreparation</span><span class="p">(</span><span class="n">statevector</span><span class="p">,</span> <span class="n">normalize</span><span class="o">=</span><span class="kc">False</span><span class="p">),</span> <span class="n">gf2x_operation_results</span><span class="o">.</span><span class="n">row_map</span><span class="p">)</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="c1"># If reduced matrix has zero rank, all determinants are identical</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
+                <span class="s2">&quot;Cannot perform sparse isometry on identical determinants. All determinants must be distinct. &quot;</span>
+                <span class="s2">&quot;Please check your wavefunction data - you may have duplicate determinants or &quot;</span>
+                <span class="s2">&quot;need to use a single-determinant state preparation method.&quot;</span>
+            <span class="p">)</span>
+
+        <span class="c1"># Step 6: Apply recorded operations in reverse order to expand back to full space.</span>
+        <span class="c1"># Note: GF2+X can have both CNOT and X operations</span>
+        <span class="n">qc</span><span class="o">.</span><span class="n">barrier</span><span class="p">()</span>  <span class="c1"># Add barrier before applying operations in reverse order</span>
+        <span class="k">for</span> <span class="n">operation</span> <span class="ow">in</span> <span class="nb">reversed</span><span class="p">(</span><span class="n">gf2x_operation_results</span><span class="o">.</span><span class="n">operations</span><span class="p">):</span>
+            <span class="k">if</span> <span class="n">operation</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="o">==</span> <span class="s2">&quot;cnot&quot;</span><span class="p">:</span>
+                <span class="c1"># operation[1] should be a tuple for CNOT operations</span>
+                <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">operation</span><span class="p">[</span><span class="mi">1</span><span class="p">],</span> <span class="nb">tuple</span><span class="p">):</span>
+                    <span class="n">target</span><span class="p">,</span> <span class="n">control</span> <span class="o">=</span> <span class="n">operation</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span>
+                    <span class="n">qc</span><span class="o">.</span><span class="n">cx</span><span class="p">(</span><span class="n">control</span><span class="p">,</span> <span class="n">target</span><span class="p">)</span>
+            <span class="k">elif</span> <span class="n">operation</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="o">==</span> <span class="s2">&quot;x&quot;</span> <span class="ow">and</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">operation</span><span class="p">[</span><span class="mi">1</span><span class="p">],</span> <span class="nb">int</span><span class="p">):</span>
+                <span class="c1"># operation[1] should be an int for X operations</span>
+                <span class="n">qubit</span> <span class="o">=</span> <span class="n">operation</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span>
+                <span class="n">qc</span><span class="o">.</span><span class="n">x</span><span class="p">(</span><span class="n">qubit</span><span class="p">)</span>
+
+        <span class="n">_LOGGER</span><span class="o">.</span><span class="n">info</span><span class="p">(</span>
+            <span class="sa">f</span><span class="s2">&quot;Final circuit before transpilation: </span><span class="si">{</span><span class="n">qc</span><span class="o">.</span><span class="n">num_qubits</span><span class="si">}</span><span class="s2"> qubits, depth </span><span class="si">{</span><span class="n">qc</span><span class="o">.</span><span class="n">depth</span><span class="p">()</span><span class="si">}</span><span class="s2">, </span><span class="si">{</span><span class="n">qc</span><span class="o">.</span><span class="n">size</span><span class="p">()</span><span class="si">}</span><span class="s2"> gates&quot;</span>
+        <span class="p">)</span>
+
+        <span class="c1"># Transpile the circuit if needed</span>
+        <span class="n">basis_gates</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_settings</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;basis_gates&quot;</span><span class="p">)</span>
+        <span class="n">do_transpile</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_settings</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;transpile&quot;</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">do_transpile</span> <span class="ow">and</span> <span class="n">basis_gates</span><span class="p">:</span>
+            <span class="n">opt_level</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_settings</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;transpile_optimization_level&quot;</span><span class="p">)</span>
+            <span class="n">qc</span> <span class="o">=</span> <span class="n">transpile</span><span class="p">(</span><span class="n">qc</span><span class="p">,</span> <span class="n">basis_gates</span><span class="o">=</span><span class="n">basis_gates</span><span class="p">,</span> <span class="n">optimization_level</span><span class="o">=</span><span class="n">opt_level</span><span class="p">)</span>
+            <span class="n">pass_manager</span> <span class="o">=</span> <span class="n">PassManager</span><span class="p">([</span><span class="n">MergeZBasisRotations</span><span class="p">(),</span> <span class="n">SubstituteCliffordRz</span><span class="p">(),</span> <span class="n">RemoveZBasisOnZeroState</span><span class="p">()])</span>
+            <span class="n">qc</span> <span class="o">=</span> <span class="n">pass_manager</span><span class="o">.</span><span class="n">run</span><span class="p">(</span><span class="n">qc</span><span class="p">)</span>
+
+            <span class="n">_LOGGER</span><span class="o">.</span><span class="n">info</span><span class="p">(</span>
+                <span class="sa">f</span><span class="s2">&quot;Final circuit after transpilation: </span><span class="si">{</span><span class="n">qc</span><span class="o">.</span><span class="n">num_qubits</span><span class="si">}</span><span class="s2"> qubits, depth </span><span class="si">{</span><span class="n">qc</span><span class="o">.</span><span class="n">depth</span><span class="p">()</span><span class="si">}</span><span class="s2">, </span><span class="si">{</span><span class="n">qc</span><span class="o">.</span><span class="n">size</span><span class="p">()</span><span class="si">}</span><span class="s2"> gates&quot;</span>
+            <span class="p">)</span>
+
+        <span class="k">return</span> <span class="n">qasm3</span><span class="o">.</span><span class="n">dumps</span><span class="p">(</span><span class="n">qc</span><span class="p">)</span>
+
+<div class="viewcode-block" id="SparseIsometryGF2XStatePreparation.name">
+<a class="viewcode-back" href="../../../../api/api_autogen/qdk_chemistry.algorithms.state_preparation.sparse_isometry.html#qdk_chemistry.algorithms.state_preparation.sparse_isometry.SparseIsometryGF2XStatePreparation.name">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">name</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Return the name of the state preparation method.&quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="s2">&quot;sparse_isometry_gf2x&quot;</span></div>
+</div>
+
+
+
+<span class="k">def</span><span class="w"> </span><span class="nf">_prepare_single_reference_state</span><span class="p">(</span><span class="n">bitstring</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">QuantumCircuit</span><span class="p">:</span>
+<span class="w">    </span><span class="sa">r</span><span class="sd">&quot;&quot;&quot;Prepare a single reference state on a quantum circuit based on a bitstring.</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">        bitstring: Binary string representing the occupation of qubits.</span>
+<span class="sd">                  &#39;1&#39; means apply X gate, &#39;0&#39; means leave in |0⟩ state.</span>
+
+<span class="sd">    Returns:</span>
+<span class="sd">        OpenQASM with the prepared single reference state</span>
+
+<span class="sd">    Example:</span>
+<span class="sd">        bitstring = &quot;1010&quot; creates a circuit with X gates on qubits 1 and 3:</span>
+
+<span class="sd">        * :math:`\left| 0 \right\rangle \rightarrow I \rightarrow \left| 0 \right\rangle`</span>
+<span class="sd">          (qubit 0, corresponds to rightmost bit &#39;0&#39;)</span>
+<span class="sd">        * :math:`\left| 0 \right\rangle \rightarrow X \rightarrow \left| 1 \right\rangle`</span>
+<span class="sd">          (qubit 1, corresponds to bit &#39;1&#39;)</span>
+<span class="sd">        * :math:`\left| 0 \right\rangle \rightarrow I \rightarrow \left| 0 \right\rangle`</span>
+<span class="sd">          (qubit 2, corresponds to bit &#39;0&#39;)</span>
+<span class="sd">        * :math:`\left| 0 \right\rangle \rightarrow X \rightarrow \left| 1 \right\rangle`</span>
+<span class="sd">          (qubit 3, corresponds to leftmost bit &#39;1&#39;)</span>
+
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="c1"># Input validation</span>
+    <span class="k">if</span> <span class="ow">not</span> <span class="n">bitstring</span><span class="p">:</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;Bitstring cannot be empty&quot;</span><span class="p">)</span>
+
+    <span class="k">if</span> <span class="ow">not</span> <span class="nb">all</span><span class="p">(</span><span class="n">bit</span> <span class="ow">in</span> <span class="s2">&quot;01&quot;</span> <span class="k">for</span> <span class="n">bit</span> <span class="ow">in</span> <span class="n">bitstring</span><span class="p">):</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;Bitstring must contain only &#39;0&#39; and &#39;1&#39; characters&quot;</span><span class="p">)</span>
+
+    <span class="n">num_qubits</span> <span class="o">=</span> <span class="nb">len</span><span class="p">(</span><span class="n">bitstring</span><span class="p">)</span>
+    <span class="n">circuit</span> <span class="o">=</span> <span class="n">QuantumCircuit</span><span class="p">(</span><span class="n">num_qubits</span><span class="p">,</span> <span class="n">name</span><span class="o">=</span><span class="sa">f</span><span class="s2">&quot;SingleRef_</span><span class="si">{</span><span class="n">bitstring</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+
+    <span class="c1"># Apply X gates for positions with &#39;1&#39;</span>
+    <span class="c1"># Note: bitstring is in little-endian format (rightmost bit = qubit 0)</span>
+    <span class="k">for</span> <span class="n">i</span><span class="p">,</span> <span class="n">bit</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="nb">reversed</span><span class="p">(</span><span class="n">bitstring</span><span class="p">)):</span>
+        <span class="k">if</span> <span class="n">bit</span> <span class="o">==</span> <span class="s2">&quot;1&quot;</span><span class="p">:</span>
+            <span class="n">circuit</span><span class="o">.</span><span class="n">x</span><span class="p">(</span><span class="n">i</span><span class="p">)</span>
+
+    <span class="k">return</span> <span class="n">qasm3</span><span class="o">.</span><span class="n">dumps</span><span class="p">(</span><span class="n">circuit</span><span class="p">)</span>
+
+
+<div class="viewcode-block" id="GF2XEliminationResult">
+<a class="viewcode-back" href="../../../../api/api_autogen/qdk_chemistry.algorithms.state_preparation.sparse_isometry.html#qdk_chemistry.algorithms.state_preparation.sparse_isometry.GF2XEliminationResult">[docs]</a>
+<span class="nd">@dataclass</span>
+<span class="k">class</span><span class="w"> </span><span class="nc">GF2XEliminationResult</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Data class to hold the results of GF2+X elimination.&quot;&quot;&quot;</span>
+
+    <span class="n">reduced_matrix</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Reduced row-echelon binary matrix with zero rows removed.&quot;&quot;&quot;</span>
+
+    <span class="n">row_map</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="nb">int</span><span class="p">]</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Map of reduced matrix row i to original row index.&quot;&quot;&quot;</span>
+
+    <span class="n">col_map</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="nb">int</span><span class="p">]</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Map of reduced matrix col j to original column index.&quot;&quot;&quot;</span>
+
+    <span class="n">operations</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="nb">tuple</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="nb">int</span> <span class="o">|</span> <span class="nb">tuple</span><span class="p">[</span><span class="nb">int</span><span class="p">,</span> <span class="nb">int</span><span class="p">]]]</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;List of operations in the form:</span>
+
+<span class="sd">        * (&#39;cnot&#39;, (target_row, control_row)) for CNOT operations</span>
+<span class="sd">        * (&#39;x&#39;, row_index) for X operations on entire rows</span>
+
+<span class="sd">    All indices refer to original matrix positions.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="n">rank</span><span class="p">:</span> <span class="nb">int</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Rank of the reduced matrix (number of non-zero rows).&quot;&quot;&quot;</span></div>
+
+
+
+<div class="viewcode-block" id="gf2x_with_tracking">
+<a class="viewcode-back" href="../../../../api/api_autogen/qdk_chemistry.algorithms.state_preparation.sparse_isometry.html#qdk_chemistry.algorithms.state_preparation.sparse_isometry.gf2x_with_tracking">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">gf2x_with_tracking</span><span class="p">(</span><span class="n">matrix</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">GF2XEliminationResult</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Perform enhanced GF2+X Gaussian elimination with smart preprocessing and X operations.</span>
+
+<span class="sd">    This function implements a smarter approach to GF2 Gaussian elimination by:</span>
+
+<span class="sd">        1. First removing duplicate rows using CNOT operations</span>
+<span class="sd">        2. Removing all-ones rows using X operations</span>
+<span class="sd">        3. Then performing standard Gaussian elimination</span>
+<span class="sd">        4. Performing further reduction if the resulting matrix is diagonal</span>
+
+<span class="sd">    This approach can be more efficient than standard Gaussian elimination alone,</span>
+<span class="sd">    especially for certain types of matrices.</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">        matrix (np.ndarray): shape (m, n), binary (0/1) matrix</span>
+
+<span class="sd">    Returns:</span>
+<span class="sd">        A dataclass containing GF2+X elimination results.</span>
+
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">n_rows</span><span class="p">,</span> <span class="n">n_cols</span> <span class="o">=</span> <span class="n">matrix</span><span class="o">.</span><span class="n">shape</span>
+    <span class="n">row_map</span> <span class="o">=</span> <span class="nb">list</span><span class="p">(</span><span class="nb">range</span><span class="p">(</span><span class="n">n_rows</span><span class="p">))</span>
+    <span class="n">col_map</span> <span class="o">=</span> <span class="nb">list</span><span class="p">(</span><span class="nb">range</span><span class="p">(</span><span class="n">n_cols</span><span class="p">))</span>
+    <span class="n">operations</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="nb">tuple</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="nb">int</span> <span class="o">|</span> <span class="nb">tuple</span><span class="p">[</span><span class="nb">int</span><span class="p">,</span> <span class="nb">int</span><span class="p">]]]</span> <span class="o">=</span> <span class="p">[]</span>
+
+    <span class="c1"># Handle empty matrix case early</span>
+    <span class="k">if</span> <span class="n">n_rows</span> <span class="o">==</span> <span class="mi">0</span><span class="p">:</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;Input matrix has no rows (no qubits). Please check your input data.&quot;</span><span class="p">)</span>
+    <span class="k">if</span> <span class="n">n_cols</span> <span class="o">==</span> <span class="mi">0</span><span class="p">:</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;Input matrix has no columns (no determinants). Please check your input data.&quot;</span><span class="p">)</span>
+
+    <span class="c1"># Log the original matrix rank</span>
+    <span class="n">original_rank</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">linalg</span><span class="o">.</span><span class="n">matrix_rank</span><span class="p">(</span><span class="n">matrix</span><span class="p">)</span>
+    <span class="n">_LOGGER</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Original matrix rank: </span><span class="si">{</span><span class="n">original_rank</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+
+    <span class="c1"># Check for zero rank matrix (all zero rows)</span>
+    <span class="k">if</span> <span class="n">original_rank</span> <span class="o">==</span> <span class="mi">0</span><span class="p">:</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
+            <span class="s2">&quot;Input matrix has rank 0 (all rows are zero). This indicates no valid quantum states. &quot;</span>
+            <span class="s2">&quot;Please check your wavefunction data - you may have invalid determinants or coefficients.&quot;</span>
+        <span class="p">)</span>
+
+    <span class="c1"># Work on a copy to avoid modifying the input</span>
+    <span class="n">matrix_work</span> <span class="o">=</span> <span class="n">matrix</span><span class="o">.</span><span class="n">copy</span><span class="p">()</span>
+
+    <span class="c1"># Step 1: Remove duplicate rows using CNOT operations</span>
+    <span class="n">matrix_work</span><span class="p">,</span> <span class="n">row_map</span><span class="p">,</span> <span class="n">operations</span> <span class="o">=</span> <span class="n">_remove_duplicate_rows_with_cnot</span><span class="p">(</span><span class="n">matrix_work</span><span class="p">,</span> <span class="n">row_map</span><span class="p">,</span> <span class="n">operations</span><span class="p">)</span>
+
+    <span class="c1"># Step 2: Remove all-ones rows using X operations</span>
+    <span class="n">matrix_work</span><span class="p">,</span> <span class="n">row_map</span><span class="p">,</span> <span class="n">operations</span> <span class="o">=</span> <span class="n">_remove_all_ones_rows_with_x</span><span class="p">(</span><span class="n">matrix_work</span><span class="p">,</span> <span class="n">row_map</span><span class="p">,</span> <span class="n">operations</span><span class="p">)</span>
+
+    <span class="c1"># Step 3: Perform standard Gaussian elimination on the remaining matrix</span>
+    <span class="k">if</span> <span class="n">matrix_work</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="o">&gt;</span> <span class="mi">0</span><span class="p">:</span>  <span class="c1"># Only if there are rows left</span>
+        <span class="c1"># Convert CNOT operations to the format expected by Gaussian elimination</span>
+        <span class="n">cnot_ops</span> <span class="o">=</span> <span class="p">[]</span>
+        <span class="k">for</span> <span class="n">op</span> <span class="ow">in</span> <span class="n">operations</span><span class="p">:</span>
+            <span class="k">if</span> <span class="n">op</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="o">==</span> <span class="s2">&quot;cnot&quot;</span> <span class="ow">and</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">op</span><span class="p">[</span><span class="mi">1</span><span class="p">],</span> <span class="nb">tuple</span><span class="p">):</span>
+                <span class="n">cnot_ops</span><span class="o">.</span><span class="n">append</span><span class="p">((</span><span class="n">op</span><span class="p">[</span><span class="mi">1</span><span class="p">][</span><span class="mi">0</span><span class="p">],</span> <span class="n">op</span><span class="p">[</span><span class="mi">1</span><span class="p">][</span><span class="mi">1</span><span class="p">]))</span>
+
+        <span class="c1"># Perform Gaussian elimination</span>
+        <span class="n">m_current</span><span class="p">,</span> <span class="n">n_current</span> <span class="o">=</span> <span class="n">matrix_work</span><span class="o">.</span><span class="n">shape</span>
+        <span class="n">matrix_processed</span><span class="p">,</span> <span class="n">updated_row_map</span><span class="p">,</span> <span class="n">updated_cnot_ops</span> <span class="o">=</span> <span class="n">_perform_gaussian_elimination</span><span class="p">(</span>
+            <span class="n">matrix_work</span><span class="p">,</span> <span class="n">m_current</span><span class="p">,</span> <span class="n">n_current</span><span class="p">,</span> <span class="n">row_map</span><span class="p">,</span> <span class="n">cnot_ops</span>
+        <span class="p">)</span>
+
+        <span class="c1"># Update operations list with new CNOT operations from Gaussian elimination</span>
+        <span class="k">for</span> <span class="n">target</span><span class="p">,</span> <span class="n">control</span> <span class="ow">in</span> <span class="n">updated_cnot_ops</span><span class="p">[</span><span class="nb">len</span><span class="p">(</span><span class="n">cnot_ops</span><span class="p">)</span> <span class="p">:]:</span>  <span class="c1"># Only add new operations</span>
+            <span class="n">operations</span><span class="o">.</span><span class="n">append</span><span class="p">((</span><span class="s2">&quot;cnot&quot;</span><span class="p">,</span> <span class="p">(</span><span class="n">target</span><span class="p">,</span> <span class="n">control</span><span class="p">)))</span>
+
+        <span class="c1"># Remove zero rows and update row_map accordingly</span>
+        <span class="n">matrix_reduced</span><span class="p">,</span> <span class="n">reduced_row_map</span><span class="p">,</span> <span class="n">rank</span> <span class="o">=</span> <span class="n">_remove_zero_rows</span><span class="p">(</span><span class="n">matrix_processed</span><span class="p">,</span> <span class="n">updated_row_map</span><span class="p">)</span>
+
+        <span class="n">gf2x_results</span> <span class="o">=</span> <span class="n">GF2XEliminationResult</span><span class="p">(</span>
+            <span class="n">reduced_matrix</span><span class="o">=</span><span class="n">matrix_reduced</span><span class="p">,</span> <span class="n">row_map</span><span class="o">=</span><span class="n">reduced_row_map</span><span class="p">,</span> <span class="n">col_map</span><span class="o">=</span><span class="n">col_map</span><span class="p">,</span> <span class="n">operations</span><span class="o">=</span><span class="n">operations</span><span class="p">,</span> <span class="n">rank</span><span class="o">=</span><span class="n">rank</span>
+        <span class="p">)</span>
+
+        <span class="c1"># Step 4: Check for diagonal matrix and apply further reduction if possible</span>
+        <span class="k">if</span> <span class="n">rank</span> <span class="o">&gt;</span> <span class="mi">1</span> <span class="ow">and</span> <span class="n">_is_diagonal_matrix</span><span class="p">(</span><span class="n">matrix_reduced</span><span class="p">):</span>
+            <span class="n">_LOGGER</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Detected diagonal matrix with rank </span><span class="si">{</span><span class="n">rank</span><span class="si">}</span><span class="s2">, applying further reduction&quot;</span><span class="p">)</span>
+            <span class="n">gf2x_results</span> <span class="o">=</span> <span class="n">_reduce_diagonal_matrix</span><span class="p">(</span><span class="n">matrix_reduced</span><span class="p">,</span> <span class="n">reduced_row_map</span><span class="p">,</span> <span class="n">col_map</span><span class="p">,</span> <span class="n">operations</span><span class="p">)</span>
+
+        <span class="c1"># Log the final reduced matrix rank</span>
+        <span class="n">_LOGGER</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Final reduced matrix rank: </span><span class="si">{</span><span class="n">gf2x_results</span><span class="o">.</span><span class="n">rank</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+
+        <span class="k">return</span> <span class="n">gf2x_results</span>
+
+    <span class="c1"># If no rows left after preprocessing, return empty matrix</span>
+    <span class="n">_LOGGER</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s2">&quot;Final reduced matrix rank: 0&quot;</span><span class="p">)</span>
+    <span class="k">return</span> <span class="n">GF2XEliminationResult</span><span class="p">(</span>
+        <span class="n">reduced_matrix</span><span class="o">=</span><span class="n">np</span><span class="o">.</span><span class="n">empty</span><span class="p">((</span><span class="mi">0</span><span class="p">,</span> <span class="n">n_cols</span><span class="p">),</span> <span class="n">dtype</span><span class="o">=</span><span class="n">matrix</span><span class="o">.</span><span class="n">dtype</span><span class="p">),</span>
+        <span class="n">row_map</span><span class="o">=</span><span class="n">row_map</span><span class="p">,</span>
+        <span class="n">col_map</span><span class="o">=</span><span class="n">col_map</span><span class="p">,</span>
+        <span class="n">operations</span><span class="o">=</span><span class="n">operations</span><span class="p">,</span>
+        <span class="n">rank</span><span class="o">=</span><span class="mi">0</span><span class="p">,</span>
+    <span class="p">)</span></div>
+
+
+
+<span class="k">def</span><span class="w"> </span><span class="nf">_remove_duplicate_rows_with_cnot</span><span class="p">(</span>
+    <span class="n">matrix</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">,</span>
+    <span class="n">row_map</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="nb">int</span><span class="p">],</span>
+    <span class="n">operations</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="nb">tuple</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="nb">int</span> <span class="o">|</span> <span class="nb">tuple</span><span class="p">[</span><span class="nb">int</span><span class="p">,</span> <span class="nb">int</span><span class="p">]]],</span>
+<span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">tuple</span><span class="p">[</span><span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">,</span> <span class="nb">list</span><span class="p">[</span><span class="nb">int</span><span class="p">],</span> <span class="nb">list</span><span class="p">[</span><span class="nb">tuple</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="nb">int</span> <span class="o">|</span> <span class="nb">tuple</span><span class="p">[</span><span class="nb">int</span><span class="p">,</span> <span class="nb">int</span><span class="p">]]]]:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Remove duplicate rows using CNOT operations.</span>
+
+<span class="sd">    This function identifies duplicate rows and eliminates them by applying CNOT operations.</span>
+<span class="sd">    When two rows are identical, a CNOT operation from one to the other will make the target row all zeros.</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">        matrix: Binary matrix to process</span>
+<span class="sd">        row_map: Current row mapping to original indices</span>
+<span class="sd">        operations: List to append operations to</span>
+
+<span class="sd">    Returns:</span>
+<span class="sd">        A tuple containing ``(updated_matrix, updated_row_map, updated_operations)``.</span>
+
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">matrix_work</span> <span class="o">=</span> <span class="n">matrix</span><span class="o">.</span><span class="n">copy</span><span class="p">()</span>
+    <span class="n">row_map_work</span> <span class="o">=</span> <span class="n">row_map</span><span class="o">.</span><span class="n">copy</span><span class="p">()</span>
+    <span class="n">operations_work</span> <span class="o">=</span> <span class="n">operations</span><span class="o">.</span><span class="n">copy</span><span class="p">()</span>
+
+    <span class="n">n_rows</span><span class="p">,</span> <span class="n">_</span> <span class="o">=</span> <span class="n">matrix_work</span><span class="o">.</span><span class="n">shape</span>
+    <span class="n">rows_to_eliminate</span> <span class="o">=</span> <span class="p">[]</span>
+
+    <span class="c1"># Find duplicate rows</span>
+    <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">n_rows</span><span class="p">):</span>
+        <span class="c1"># Skip rows that are already marked for elimination</span>
+        <span class="k">if</span> <span class="n">i</span> <span class="ow">in</span> <span class="n">rows_to_eliminate</span><span class="p">:</span>
+            <span class="k">continue</span>
+
+        <span class="n">row_i</span> <span class="o">=</span> <span class="n">matrix_work</span><span class="p">[</span><span class="n">i</span><span class="p">]</span>
+
+        <span class="c1"># Skip all-zero rows as they don&#39;t need CNOT operations</span>
+        <span class="k">if</span> <span class="n">np</span><span class="o">.</span><span class="n">all</span><span class="p">(</span><span class="n">row_i</span> <span class="o">==</span> <span class="mi">0</span><span class="p">):</span>
+            <span class="k">continue</span>
+
+        <span class="c1"># Look for duplicates of this row</span>
+        <span class="k">for</span> <span class="n">j</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">i</span> <span class="o">+</span> <span class="mi">1</span><span class="p">,</span> <span class="n">n_rows</span><span class="p">):</span>
+            <span class="k">if</span> <span class="n">j</span> <span class="ow">in</span> <span class="n">rows_to_eliminate</span><span class="p">:</span>
+                <span class="k">continue</span>
+
+            <span class="n">row_j</span> <span class="o">=</span> <span class="n">matrix_work</span><span class="p">[</span><span class="n">j</span><span class="p">]</span>
+
+            <span class="c1"># If rows are identical, eliminate the later one</span>
+            <span class="k">if</span> <span class="n">np</span><span class="o">.</span><span class="n">array_equal</span><span class="p">(</span><span class="n">row_i</span><span class="p">,</span> <span class="n">row_j</span><span class="p">):</span>
+                <span class="c1"># CNOT(control=i, target=j) will make row j become all zeros</span>
+                <span class="n">operations_work</span><span class="o">.</span><span class="n">append</span><span class="p">((</span><span class="s2">&quot;cnot&quot;</span><span class="p">,</span> <span class="p">(</span><span class="n">row_map_work</span><span class="p">[</span><span class="n">j</span><span class="p">],</span> <span class="n">row_map_work</span><span class="p">[</span><span class="n">i</span><span class="p">])))</span>
+                <span class="n">rows_to_eliminate</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">j</span><span class="p">)</span>
+
+                <span class="n">_LOGGER</span><span class="o">.</span><span class="n">info</span><span class="p">(</span>
+                    <span class="sa">f</span><span class="s2">&quot;Found duplicate row </span><span class="si">{</span><span class="n">j</span><span class="si">}</span><span class="s2"> identical to row </span><span class="si">{</span><span class="n">i</span><span class="si">}</span><span class="s2">, adding CNOT(</span><span class="si">{</span><span class="n">row_map_work</span><span class="p">[</span><span class="n">i</span><span class="p">]</span><span class="si">}</span><span class="s2">, </span><span class="si">{</span><span class="n">row_map_work</span><span class="p">[</span><span class="n">j</span><span class="p">]</span><span class="si">}</span><span class="s2">)&quot;</span>
+                <span class="p">)</span>
+
+    <span class="c1"># Apply CNOT operations to eliminate duplicate rows</span>
+    <span class="k">for</span> <span class="n">op</span> <span class="ow">in</span> <span class="n">operations_work</span><span class="p">:</span>
+        <span class="k">if</span> <span class="n">op</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="o">==</span> <span class="s2">&quot;cnot&quot;</span> <span class="ow">and</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">op</span><span class="p">[</span><span class="mi">1</span><span class="p">],</span> <span class="nb">tuple</span><span class="p">):</span>
+            <span class="c1"># Find the current positions of the target and control rows</span>
+            <span class="n">target_orig</span><span class="p">,</span> <span class="n">control_orig</span> <span class="o">=</span> <span class="n">op</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span>
+            <span class="n">target_current</span> <span class="o">=</span> <span class="n">row_map_work</span><span class="o">.</span><span class="n">index</span><span class="p">(</span><span class="n">target_orig</span><span class="p">)</span>
+            <span class="n">control_current</span> <span class="o">=</span> <span class="n">row_map_work</span><span class="o">.</span><span class="n">index</span><span class="p">(</span><span class="n">control_orig</span><span class="p">)</span>
+
+            <span class="c1"># Apply CNOT: target row = target row XOR control row</span>
+            <span class="n">matrix_work</span><span class="p">[</span><span class="n">target_current</span><span class="p">]</span> <span class="o">=</span> <span class="n">matrix_work</span><span class="p">[</span><span class="n">target_current</span><span class="p">]</span> <span class="o">^</span> <span class="n">matrix_work</span><span class="p">[</span><span class="n">control_current</span><span class="p">]</span>
+
+    <span class="c1"># Remove eliminated rows (which should now be all zeros)</span>
+    <span class="k">if</span> <span class="n">rows_to_eliminate</span><span class="p">:</span>
+        <span class="n">_LOGGER</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Eliminating </span><span class="si">{</span><span class="nb">len</span><span class="p">(</span><span class="n">rows_to_eliminate</span><span class="p">)</span><span class="si">}</span><span class="s2"> duplicate rows: </span><span class="si">{</span><span class="n">rows_to_eliminate</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+
+        <span class="c1"># Create mask for rows to keep</span>
+        <span class="n">rows_to_keep</span> <span class="o">=</span> <span class="p">[</span><span class="n">i</span> <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">n_rows</span><span class="p">)</span> <span class="k">if</span> <span class="n">i</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">rows_to_eliminate</span><span class="p">]</span>
+
+        <span class="c1"># Update matrix and row mapping</span>
+        <span class="n">matrix_work</span> <span class="o">=</span> <span class="n">matrix_work</span><span class="p">[</span><span class="n">rows_to_keep</span><span class="p">]</span>
+        <span class="n">row_map_work</span> <span class="o">=</span> <span class="p">[</span><span class="n">row_map_work</span><span class="p">[</span><span class="n">i</span><span class="p">]</span> <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="n">rows_to_keep</span><span class="p">]</span>
+
+    <span class="k">return</span> <span class="n">matrix_work</span><span class="p">,</span> <span class="n">row_map_work</span><span class="p">,</span> <span class="n">operations_work</span>
+
+
+<span class="k">def</span><span class="w"> </span><span class="nf">_remove_all_ones_rows_with_x</span><span class="p">(</span>
+    <span class="n">matrix</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">,</span>
+    <span class="n">row_map</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="nb">int</span><span class="p">],</span>
+    <span class="n">operations</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="nb">tuple</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="nb">int</span> <span class="o">|</span> <span class="nb">tuple</span><span class="p">[</span><span class="nb">int</span><span class="p">,</span> <span class="nb">int</span><span class="p">]]],</span>
+<span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">tuple</span><span class="p">[</span><span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">,</span> <span class="nb">list</span><span class="p">[</span><span class="nb">int</span><span class="p">],</span> <span class="nb">list</span><span class="p">[</span><span class="nb">tuple</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="nb">int</span> <span class="o">|</span> <span class="nb">tuple</span><span class="p">[</span><span class="nb">int</span><span class="p">,</span> <span class="nb">int</span><span class="p">]]]]:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Remove all-ones rows using X operations.</span>
+
+<span class="sd">    This function identifies rows that contain all ones and eliminates them</span>
+<span class="sd">    by applying X operations to flip all bits in those rows to zeros.</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">        matrix: Binary matrix to process</span>
+<span class="sd">        row_map: Current row mapping to original indices</span>
+<span class="sd">        operations: List to append operations to</span>
+
+<span class="sd">    Returns:</span>
+<span class="sd">        A tuple containing ``(updated_matrix, updated_row_map, updated_operations)``</span>
+
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">matrix_work</span> <span class="o">=</span> <span class="n">matrix</span><span class="o">.</span><span class="n">copy</span><span class="p">()</span>
+    <span class="n">row_map_work</span> <span class="o">=</span> <span class="n">row_map</span><span class="o">.</span><span class="n">copy</span><span class="p">()</span>
+    <span class="n">operations_work</span> <span class="o">=</span> <span class="n">operations</span><span class="o">.</span><span class="n">copy</span><span class="p">()</span>
+
+    <span class="n">n_rows</span><span class="p">,</span> <span class="n">n_cols</span> <span class="o">=</span> <span class="n">matrix_work</span><span class="o">.</span><span class="n">shape</span>
+    <span class="n">rows_to_eliminate</span> <span class="o">=</span> <span class="p">[]</span>
+
+    <span class="c1"># Find all-ones rows</span>
+    <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">n_rows</span><span class="p">):</span>
+        <span class="k">if</span> <span class="n">np</span><span class="o">.</span><span class="n">all</span><span class="p">(</span><span class="n">matrix_work</span><span class="p">[</span><span class="n">i</span><span class="p">]</span> <span class="o">==</span> <span class="mi">1</span><span class="p">):</span>
+            <span class="c1"># Apply X operation to flip all bits to zero</span>
+            <span class="n">operations_work</span><span class="o">.</span><span class="n">append</span><span class="p">((</span><span class="s2">&quot;x&quot;</span><span class="p">,</span> <span class="n">row_map_work</span><span class="p">[</span><span class="n">i</span><span class="p">]))</span>
+            <span class="n">rows_to_eliminate</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">i</span><span class="p">)</span>
+
+            <span class="n">_LOGGER</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Found all-ones row </span><span class="si">{</span><span class="n">i</span><span class="si">}</span><span class="s2">, adding X operation on row </span><span class="si">{</span><span class="n">row_map_work</span><span class="p">[</span><span class="n">i</span><span class="p">]</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+
+    <span class="c1"># Apply X operations to eliminate all-ones rows</span>
+    <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="n">rows_to_eliminate</span><span class="p">:</span>
+        <span class="n">matrix_work</span><span class="p">[</span><span class="n">i</span><span class="p">]</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">zeros</span><span class="p">(</span><span class="n">n_cols</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="n">matrix_work</span><span class="o">.</span><span class="n">dtype</span><span class="p">)</span>
+    <span class="c1"># Remove eliminated rows (which are now all zeros)</span>
+    <span class="k">if</span> <span class="n">rows_to_eliminate</span><span class="p">:</span>
+        <span class="n">_LOGGER</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Eliminating </span><span class="si">{</span><span class="nb">len</span><span class="p">(</span><span class="n">rows_to_eliminate</span><span class="p">)</span><span class="si">}</span><span class="s2"> all-ones rows: </span><span class="si">{</span><span class="n">rows_to_eliminate</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+
+        <span class="c1"># Create mask for rows to keep</span>
+        <span class="n">rows_to_keep</span> <span class="o">=</span> <span class="p">[</span><span class="n">i</span> <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">n_rows</span><span class="p">)</span> <span class="k">if</span> <span class="n">i</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">rows_to_eliminate</span><span class="p">]</span>
+
+        <span class="c1"># Update matrix and row mapping</span>
+        <span class="n">matrix_work</span> <span class="o">=</span> <span class="n">matrix_work</span><span class="p">[</span><span class="n">rows_to_keep</span><span class="p">]</span>
+        <span class="n">row_map_work</span> <span class="o">=</span> <span class="p">[</span><span class="n">row_map_work</span><span class="p">[</span><span class="n">i</span><span class="p">]</span> <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="n">rows_to_keep</span><span class="p">]</span>
+
+    <span class="k">return</span> <span class="n">matrix_work</span><span class="p">,</span> <span class="n">row_map_work</span><span class="p">,</span> <span class="n">operations_work</span>
+
+
+<span class="k">def</span><span class="w"> </span><span class="nf">_perform_gaussian_elimination</span><span class="p">(</span>
+    <span class="n">matrix</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">,</span>
+    <span class="n">num_rows</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span>
+    <span class="n">num_cols</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span>
+    <span class="n">row_map</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="nb">int</span><span class="p">],</span>
+    <span class="n">cnot_ops</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="nb">tuple</span><span class="p">[</span><span class="nb">int</span><span class="p">,</span> <span class="nb">int</span><span class="p">]],</span>
+<span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">tuple</span><span class="p">[</span><span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">,</span> <span class="nb">list</span><span class="p">[</span><span class="nb">int</span><span class="p">],</span> <span class="nb">list</span><span class="p">[</span><span class="nb">tuple</span><span class="p">[</span><span class="nb">int</span><span class="p">,</span> <span class="nb">int</span><span class="p">]]]:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Perform the main GF2 Gaussian elimination steps on a binary matrix.</span>
+
+<span class="sd">    This function implements the core algorithm of GF2 Gaussian elimination by iterating through columns,</span>
+<span class="sd">    finding pivot rows, swapping rows when necessary, and eliminating other entries in each column using XOR operations.</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">        matrix: Binary matrix to reduce (copied, not modified in-place)</span>
+<span class="sd">        num_rows: Number of rows in the matrix</span>
+<span class="sd">        num_cols: Number of columns in the matrix</span>
+<span class="sd">        row_map: Mapping from current to original row indices (copied, not modified)</span>
+<span class="sd">        cnot_ops: List to record CNOT operations (copied, not modified)</span>
+
+<span class="sd">    Returns:</span>
+<span class="sd">        A tuple containing ``(updated_matrix, updated_row_map, updated_operations)``</span>
+
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">matrix_work</span> <span class="o">=</span> <span class="n">matrix</span><span class="o">.</span><span class="n">copy</span><span class="p">()</span>
+    <span class="n">row_map_work</span> <span class="o">=</span> <span class="n">row_map</span><span class="o">.</span><span class="n">copy</span><span class="p">()</span>
+    <span class="n">cnot_ops_work</span> <span class="o">=</span> <span class="n">cnot_ops</span><span class="o">.</span><span class="n">copy</span><span class="p">()</span>
+
+    <span class="n">row</span> <span class="o">=</span> <span class="mi">0</span>  <span class="c1"># current row</span>
+    <span class="k">for</span> <span class="n">col</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">num_cols</span><span class="p">):</span>
+        <span class="c1"># Find the first row (row &gt;= current) with a 1 in this column</span>
+        <span class="n">sel</span> <span class="o">=</span> <span class="n">_find_pivot_row</span><span class="p">(</span><span class="n">matrix_work</span><span class="p">,</span> <span class="n">row</span><span class="p">,</span> <span class="n">num_rows</span><span class="p">,</span> <span class="n">col</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">sel</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="k">continue</span>
+
+        <span class="c1"># Swap current row and selected row if needed</span>
+        <span class="k">if</span> <span class="n">sel</span> <span class="o">!=</span> <span class="n">row</span><span class="p">:</span>
+            <span class="n">matrix_work</span><span class="p">[[</span><span class="n">row</span><span class="p">,</span> <span class="n">sel</span><span class="p">],</span> <span class="p">:]</span> <span class="o">=</span> <span class="n">matrix_work</span><span class="p">[[</span><span class="n">sel</span><span class="p">,</span> <span class="n">row</span><span class="p">],</span> <span class="p">:]</span>
+            <span class="n">row_map_work</span><span class="p">[</span><span class="n">row</span><span class="p">],</span> <span class="n">row_map_work</span><span class="p">[</span><span class="n">sel</span><span class="p">]</span> <span class="o">=</span> <span class="n">row_map_work</span><span class="p">[</span><span class="n">sel</span><span class="p">],</span> <span class="n">row_map_work</span><span class="p">[</span><span class="n">row</span><span class="p">]</span>
+
+        <span class="c1"># Eliminate all other rows (except the pivot row) in this column</span>
+        <span class="n">matrix_work</span><span class="p">,</span> <span class="n">cnot_ops_work</span> <span class="o">=</span> <span class="n">_eliminate_column</span><span class="p">(</span><span class="n">matrix_work</span><span class="p">,</span> <span class="n">num_rows</span><span class="p">,</span> <span class="n">row</span><span class="p">,</span> <span class="n">col</span><span class="p">,</span> <span class="n">row_map_work</span><span class="p">,</span> <span class="n">cnot_ops_work</span><span class="p">)</span>
+
+        <span class="c1"># Move to next row</span>
+        <span class="n">row</span> <span class="o">+=</span> <span class="mi">1</span>
+        <span class="k">if</span> <span class="n">row</span> <span class="o">==</span> <span class="n">num_rows</span><span class="p">:</span>
+            <span class="k">break</span>
+
+    <span class="k">return</span> <span class="n">matrix_work</span><span class="p">,</span> <span class="n">row_map_work</span><span class="p">,</span> <span class="n">cnot_ops_work</span>
+
+
+<span class="k">def</span><span class="w"> </span><span class="nf">_find_pivot_row</span><span class="p">(</span><span class="n">matrix</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">,</span> <span class="n">row</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span> <span class="n">num_rows</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span> <span class="n">col</span><span class="p">:</span> <span class="nb">int</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">int</span> <span class="o">|</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Find the first row with a 1 in the given column for pivot selection.</span>
+
+<span class="sd">    This function searches for a suitable pivot row starting from the current row position downward.</span>
+<span class="sd">    It looks for the first row that has a 1 in the specified column,</span>
+<span class="sd">    which can be used as a pivot for Gaussian elimination.</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">        matrix: Binary matrix to search (read-only, not modified)</span>
+<span class="sd">        row: Starting row index to search from (inclusive)</span>
+<span class="sd">        num_rows: Total number of rows in the matrix</span>
+<span class="sd">        col: Column index to check for pivot candidates</span>
+
+<span class="sd">    Returns:</span>
+<span class="sd">        Index of the first row with a 1 in the column, or None if no suitable pivot is found in the remaining rows.</span>
+
+<span class="sd">    Note:</span>
+<span class="sd">        This function only reads the matrix and does not modify any arguments.</span>
+<span class="sd">        It returns None when no pivot can be found, indicating the column should be skipped.</span>
+
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="k">for</span> <span class="n">r</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">row</span><span class="p">,</span> <span class="n">num_rows</span><span class="p">):</span>
+        <span class="k">if</span> <span class="n">matrix</span><span class="p">[</span><span class="n">r</span><span class="p">,</span> <span class="n">col</span><span class="p">]:</span>
+            <span class="k">return</span> <span class="n">r</span>
+    <span class="k">return</span> <span class="kc">None</span>
+
+
+<span class="k">def</span><span class="w"> </span><span class="nf">_eliminate_column</span><span class="p">(</span>
+    <span class="n">matrix</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">,</span>
+    <span class="n">num_rows</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span>
+    <span class="n">pivot_row</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span>
+    <span class="n">col</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span>
+    <span class="n">row_map</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="nb">int</span><span class="p">],</span>
+    <span class="n">cnot_ops</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="nb">tuple</span><span class="p">[</span><span class="nb">int</span><span class="p">,</span> <span class="nb">int</span><span class="p">]],</span>
+<span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">tuple</span><span class="p">[</span><span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">,</span> <span class="nb">list</span><span class="p">[</span><span class="nb">tuple</span><span class="p">[</span><span class="nb">int</span><span class="p">,</span> <span class="nb">int</span><span class="p">]]]:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Eliminate all other rows in the given column using XOR operations.</span>
+
+<span class="sd">    This function performs the elimination step of GF2 Gaussian elimination</span>
+<span class="sd">    by XORing the pivot row with all other rows that have a 1 in the current column.</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">        matrix: Binary matrix to modify (copied, not modified in-place)</span>
+<span class="sd">        num_rows: Number of rows in the matrix</span>
+<span class="sd">        pivot_row: Index of the pivot row (remains unchanged)</span>
+<span class="sd">        col: Column index to eliminate</span>
+<span class="sd">        row_map: Mapping from current to original row indices (read-only)</span>
+<span class="sd">        cnot_ops: List to record CNOT operations (copied, not modified)</span>
+
+<span class="sd">    Returns:</span>
+<span class="sd">        A tuple containing:</span>
+<span class="sd">            - updated_matrix: Matrix after column elimination</span>
+<span class="sd">            - updated_cnot_ops: Updated list of CNOT operations</span>
+
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">matrix_work</span> <span class="o">=</span> <span class="n">matrix</span><span class="o">.</span><span class="n">copy</span><span class="p">()</span>
+    <span class="n">cnot_ops_work</span> <span class="o">=</span> <span class="n">cnot_ops</span><span class="o">.</span><span class="n">copy</span><span class="p">()</span>
+
+    <span class="k">for</span> <span class="n">r</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">num_rows</span><span class="p">):</span>
+        <span class="k">if</span> <span class="n">r</span> <span class="o">!=</span> <span class="n">pivot_row</span> <span class="ow">and</span> <span class="n">matrix_work</span><span class="p">[</span><span class="n">r</span><span class="p">,</span> <span class="n">col</span><span class="p">]:</span>
+            <span class="n">matrix_work</span><span class="p">[</span><span class="n">r</span><span class="p">,</span> <span class="p">:]</span> <span class="o">^=</span> <span class="n">matrix_work</span><span class="p">[</span><span class="n">pivot_row</span><span class="p">,</span> <span class="p">:]</span>
+            <span class="c1"># Record CNOT operation using original matrix indices</span>
+            <span class="n">cnot_ops_work</span><span class="o">.</span><span class="n">append</span><span class="p">((</span><span class="n">row_map</span><span class="p">[</span><span class="n">r</span><span class="p">],</span> <span class="n">row_map</span><span class="p">[</span><span class="n">pivot_row</span><span class="p">]))</span>
+
+    <span class="k">return</span> <span class="n">matrix_work</span><span class="p">,</span> <span class="n">cnot_ops_work</span>
+
+
+<span class="k">def</span><span class="w"> </span><span class="nf">_remove_zero_rows</span><span class="p">(</span><span class="n">matrix</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">,</span> <span class="n">row_map</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="nb">int</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="nb">tuple</span><span class="p">[</span><span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">,</span> <span class="nb">list</span><span class="p">[</span><span class="nb">int</span><span class="p">],</span> <span class="nb">int</span><span class="p">]:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Remove zero rows from the matrix and update row mapping.</span>
+
+<span class="sd">    This function creates a new matrix containing only the non-zero rows from the input matrix,</span>
+<span class="sd">    along with an updated row mapping that tracks which original rows correspond to the rows in the reduced matrix.</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">        matrix: Binary matrix to process (read-only, not modified)</span>
+<span class="sd">        row_map: Current mapping from matrix rows to original indices (read-only)</span>
+
+<span class="sd">    Returns:</span>
+<span class="sd">        A tuple containing:</span>
+<span class="sd">            * M_reduced (np.ndarray): New matrix with only non-zero rows</span>
+<span class="sd">            * reduced_row_map (list[int]): Updated mapping from reduced matrix</span>
+<span class="sd">              rows to original row indices</span>
+<span class="sd">            * rank (int): Number of non-zero rows (matrix rank)</span>
+
+<span class="sd">    Note:</span>
+<span class="sd">        This function does not modify its input arguments. It creates and returns</span>
+<span class="sd">        new objects containing only the non-zero rows and their corresponding mappings.</span>
+
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">n_rows</span><span class="p">,</span> <span class="n">_</span> <span class="o">=</span> <span class="n">matrix</span><span class="o">.</span><span class="n">shape</span>
+    <span class="n">non_zero_rows</span> <span class="o">=</span> <span class="p">[]</span>
+    <span class="n">reduced_row_map</span> <span class="o">=</span> <span class="p">[]</span>
+
+    <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">n_rows</span><span class="p">):</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">np</span><span class="o">.</span><span class="n">all</span><span class="p">(</span><span class="n">matrix</span><span class="p">[</span><span class="n">i</span><span class="p">,</span> <span class="p">:]</span> <span class="o">==</span> <span class="mi">0</span><span class="p">):</span>  <span class="c1"># Keep non-zero rows</span>
+            <span class="n">non_zero_rows</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">i</span><span class="p">)</span>
+            <span class="n">reduced_row_map</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">row_map</span><span class="p">[</span><span class="n">i</span><span class="p">])</span>
+
+    <span class="c1"># Extract only non-zero rows</span>
+    <span class="n">matrix_reduced</span> <span class="o">=</span> <span class="n">matrix</span><span class="p">[</span><span class="n">non_zero_rows</span><span class="p">,</span> <span class="p">:]</span>
+    <span class="n">rank</span> <span class="o">=</span> <span class="nb">len</span><span class="p">(</span><span class="n">non_zero_rows</span><span class="p">)</span>
+
+    <span class="k">return</span> <span class="n">matrix_reduced</span><span class="p">,</span> <span class="n">reduced_row_map</span><span class="p">,</span> <span class="n">rank</span>
+
+
+<span class="k">def</span><span class="w"> </span><span class="nf">_reduce_diagonal_matrix</span><span class="p">(</span>
+    <span class="n">matrix</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">,</span>
+    <span class="n">row_map</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="nb">int</span><span class="p">],</span>
+    <span class="n">col_map</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="nb">int</span><span class="p">],</span>
+    <span class="n">operations</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="nb">tuple</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="nb">int</span> <span class="o">|</span> <span class="nb">tuple</span><span class="p">[</span><span class="nb">int</span><span class="p">,</span> <span class="nb">int</span><span class="p">]]],</span>
+<span class="p">)</span> <span class="o">-&gt;</span> <span class="n">GF2XEliminationResult</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Further reduce a diagonal matrix using CNOT and X operations.</span>
+
+<span class="sd">    This function handles the special case where the matrix is diagonal</span>
+<span class="sd">    (square matrix with 1s on diagonal and 0s elsewhere). It applies</span>
+<span class="sd">    sequential CNOT operations to create an all-ones row, then uses</span>
+<span class="sd">    an X operation to eliminate it, reducing the rank by 1.</span>
+
+<span class="sd">    Procedure:</span>
+
+<span class="sd">        1. Apply CNOT(i, i+1) sequentially for i = 0 to rank-2</span>
+<span class="sd">        2. This makes the last row (rank-1) become all 1s</span>
+<span class="sd">        3. Apply X on the last row to make it all 0s</span>
+<span class="sd">        4. Remove the zero row to reduce rank by 1</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">        matrix: Diagonal binary matrix to reduce</span>
+<span class="sd">        row_map: Current row mapping to original indices</span>
+<span class="sd">        col_map: Column mapping to original indices (unchanged)</span>
+<span class="sd">        operations: List of operations performed so far</span>
+
+<span class="sd">    Returns:</span>
+<span class="sd">        A tuple containing:</span>
+
+<span class="sd">            * matrix_reduced: Further reduced matrix with rank decreased by 1</span>
+<span class="sd">            * reduced_row_map: Updated row mapping (last row removed)</span>
+<span class="sd">            * col_map: Unchanged column mapping</span>
+<span class="sd">            * updated_operations: Operations list with new CNOT and X operations</span>
+<span class="sd">            * new_rank: Original rank - 1</span>
+
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">matrix_work</span> <span class="o">=</span> <span class="n">matrix</span><span class="o">.</span><span class="n">copy</span><span class="p">()</span>
+    <span class="n">row_map_work</span> <span class="o">=</span> <span class="n">row_map</span><span class="o">.</span><span class="n">copy</span><span class="p">()</span>
+    <span class="n">operations_work</span> <span class="o">=</span> <span class="n">operations</span><span class="o">.</span><span class="n">copy</span><span class="p">()</span>
+
+    <span class="n">rank</span> <span class="o">=</span> <span class="n">matrix_work</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
+
+    <span class="c1"># Verify this is actually a diagonal matrix</span>
+    <span class="k">if</span> <span class="ow">not</span> <span class="n">_is_diagonal_matrix</span><span class="p">(</span><span class="n">matrix_work</span><span class="p">):</span>
+        <span class="n">_LOGGER</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span><span class="s2">&quot;Matrix is not diagonal, skipping diagonal reduction&quot;</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">GF2XEliminationResult</span><span class="p">(</span>
+            <span class="n">reduced_matrix</span><span class="o">=</span><span class="n">matrix_work</span><span class="p">,</span> <span class="n">row_map</span><span class="o">=</span><span class="n">row_map_work</span><span class="p">,</span> <span class="n">col_map</span><span class="o">=</span><span class="n">col_map</span><span class="p">,</span> <span class="n">operations</span><span class="o">=</span><span class="n">operations_work</span><span class="p">,</span> <span class="n">rank</span><span class="o">=</span><span class="n">rank</span>
+        <span class="p">)</span>
+
+    <span class="n">_LOGGER</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Applying diagonal matrix reduction on </span><span class="si">{</span><span class="n">rank</span><span class="si">}</span><span class="s2">x</span><span class="si">{</span><span class="n">rank</span><span class="si">}</span><span class="s2"> matrix&quot;</span><span class="p">)</span>
+
+    <span class="c1"># Step 1: Apply sequential CNOT operations CNOT(i, i+1) for i = 0 to rank-2</span>
+    <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">rank</span> <span class="o">-</span> <span class="mi">1</span><span class="p">):</span>
+        <span class="n">control_idx</span> <span class="o">=</span> <span class="n">i</span>
+        <span class="n">target_idx</span> <span class="o">=</span> <span class="n">i</span> <span class="o">+</span> <span class="mi">1</span>
+
+        <span class="c1"># Record CNOT operation using original row indices</span>
+        <span class="n">operations_work</span><span class="o">.</span><span class="n">append</span><span class="p">(</span>
+            <span class="p">(</span>
+                <span class="s2">&quot;cnot&quot;</span><span class="p">,</span>
+                <span class="p">(</span><span class="n">row_map_work</span><span class="p">[</span><span class="n">target_idx</span><span class="p">],</span> <span class="n">row_map_work</span><span class="p">[</span><span class="n">control_idx</span><span class="p">]),</span>
+            <span class="p">)</span>
+        <span class="p">)</span>
+
+        <span class="c1"># Apply CNOT: target row = target row XOR control row</span>
+        <span class="n">matrix_work</span><span class="p">[</span><span class="n">target_idx</span><span class="p">]</span> <span class="o">=</span> <span class="n">matrix_work</span><span class="p">[</span><span class="n">target_idx</span><span class="p">]</span> <span class="o">^</span> <span class="n">matrix_work</span><span class="p">[</span><span class="n">control_idx</span><span class="p">]</span>
+
+        <span class="n">_LOGGER</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Applied CNOT(</span><span class="si">{</span><span class="n">row_map_work</span><span class="p">[</span><span class="n">control_idx</span><span class="p">]</span><span class="si">}</span><span class="s2">, </span><span class="si">{</span><span class="n">row_map_work</span><span class="p">[</span><span class="n">target_idx</span><span class="p">]</span><span class="si">}</span><span class="s2">)&quot;</span><span class="p">)</span>
+
+    <span class="c1"># After all CNOTs, the last row should be all 1s</span>
+    <span class="n">last_row</span> <span class="o">=</span> <span class="n">rank</span> <span class="o">-</span> <span class="mi">1</span>
+    <span class="n">_LOGGER</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Last row after CNOTs: </span><span class="si">{</span><span class="n">matrix_work</span><span class="p">[</span><span class="n">last_row</span><span class="p">]</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+
+    <span class="c1"># Step 2: Apply X operation on the last row to make it all 0s</span>
+    <span class="n">operations_work</span><span class="o">.</span><span class="n">append</span><span class="p">((</span><span class="s2">&quot;x&quot;</span><span class="p">,</span> <span class="n">row_map_work</span><span class="p">[</span><span class="n">last_row</span><span class="p">]))</span>
+    <span class="n">matrix_work</span><span class="p">[</span><span class="n">last_row</span><span class="p">]</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">zeros</span><span class="p">(</span><span class="n">matrix_work</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">1</span><span class="p">],</span> <span class="n">dtype</span><span class="o">=</span><span class="n">matrix_work</span><span class="o">.</span><span class="n">dtype</span><span class="p">)</span>
+
+    <span class="n">_LOGGER</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Applied X operation on row </span><span class="si">{</span><span class="n">row_map_work</span><span class="p">[</span><span class="n">last_row</span><span class="p">]</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+
+    <span class="c1"># Step 3: Remove the last row (which is now all zeros)</span>
+    <span class="n">matrix_reduced</span> <span class="o">=</span> <span class="n">matrix_work</span><span class="p">[:</span><span class="o">-</span><span class="mi">1</span><span class="p">,</span> <span class="p">:]</span>  <span class="c1"># Remove last row</span>
+    <span class="n">reduced_row_map</span> <span class="o">=</span> <span class="n">row_map_work</span><span class="p">[:</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span>  <span class="c1"># Remove last row mapping</span>
+    <span class="n">new_rank</span> <span class="o">=</span> <span class="n">rank</span> <span class="o">-</span> <span class="mi">1</span>
+
+    <span class="n">_LOGGER</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Diagonal reduction complete: rank reduced from </span><span class="si">{</span><span class="n">rank</span><span class="si">}</span><span class="s2"> to </span><span class="si">{</span><span class="n">new_rank</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+
+    <span class="k">return</span> <span class="n">GF2XEliminationResult</span><span class="p">(</span>
+        <span class="n">reduced_matrix</span><span class="o">=</span><span class="n">matrix_reduced</span><span class="p">,</span>
+        <span class="n">row_map</span><span class="o">=</span><span class="n">reduced_row_map</span><span class="p">,</span>
+        <span class="n">col_map</span><span class="o">=</span><span class="n">col_map</span><span class="p">,</span>
+        <span class="n">operations</span><span class="o">=</span><span class="n">operations_work</span><span class="p">,</span>
+        <span class="n">rank</span><span class="o">=</span><span class="n">new_rank</span><span class="p">,</span>
+    <span class="p">)</span>
+
+
+<span class="k">def</span><span class="w"> </span><span class="nf">_is_diagonal_matrix</span><span class="p">(</span><span class="n">matrix</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">bool</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Check if a binary matrix is diagonal and safe for a further rank reduction.</span>
+
+<span class="sd">    The diagonal reduction optimization is mathematically valid in two scenarios:</span>
+
+<span class="sd">        1. True diagonal matrix: Square matrix with 1s on diagonal, 0s elsewhere</span>
+<span class="sd">        2. Pseudo-diagonal: Rectangular matrix where:</span>
+<span class="sd">            * The square part (min(rows,cols) x min(rows,cols)) is diagonal</span>
+<span class="sd">            * ALL remaining columns are all 1s</span>
+<span class="sd">            * We have an odd number of rows</span>
+
+<span class="sd">    The rank reduction works by applying sequential CNOTs and an X operation,</span>
+<span class="sd">    which is only valid when these specific structural conditions are met.</span>
+<span class="sd">    We also require rank &gt; 1 since rank 1 matrices are already minimal.</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">        matrix: Binary matrix to check</span>
+
+<span class="sd">    Returns:</span>
+<span class="sd">        True if matrix is diagonal and safe for rank reduction, False otherwise</span>
+
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="c1"># Check basic requirements</span>
+    <span class="k">if</span> <span class="n">matrix</span><span class="o">.</span><span class="n">ndim</span> <span class="o">!=</span> <span class="mi">2</span> <span class="ow">or</span> <span class="n">matrix</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="o">&lt;=</span> <span class="mi">1</span> <span class="ow">or</span> <span class="ow">not</span> <span class="n">np</span><span class="o">.</span><span class="n">array_equal</span><span class="p">(</span><span class="n">matrix</span> <span class="o">&amp;</span> <span class="mi">1</span><span class="p">,</span> <span class="n">matrix</span><span class="p">):</span>
+        <span class="k">return</span> <span class="kc">False</span>
+
+    <span class="n">num_rows</span><span class="p">,</span> <span class="n">num_cols</span> <span class="o">=</span> <span class="n">matrix</span><span class="o">.</span><span class="n">shape</span>
+
+    <span class="c1"># Scenario 1: True diagonal matrix (square)</span>
+    <span class="k">if</span> <span class="n">num_rows</span> <span class="o">==</span> <span class="n">num_cols</span><span class="p">:</span>
+        <span class="n">is_diagonal</span> <span class="o">=</span> <span class="kc">True</span>
+        <span class="k">for</span> <span class="n">row_idx</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">num_rows</span><span class="p">):</span>
+            <span class="k">for</span> <span class="n">col_idx</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">num_rows</span><span class="p">):</span>
+                <span class="n">expected_value</span> <span class="o">=</span> <span class="mi">1</span> <span class="k">if</span> <span class="n">row_idx</span> <span class="o">==</span> <span class="n">col_idx</span> <span class="k">else</span> <span class="mi">0</span>
+                <span class="k">if</span> <span class="n">matrix</span><span class="p">[</span><span class="n">row_idx</span><span class="p">,</span> <span class="n">col_idx</span><span class="p">]</span> <span class="o">!=</span> <span class="n">expected_value</span><span class="p">:</span>
+                    <span class="n">is_diagonal</span> <span class="o">=</span> <span class="kc">False</span>
+                    <span class="k">break</span>
+            <span class="k">if</span> <span class="ow">not</span> <span class="n">is_diagonal</span><span class="p">:</span>
+                <span class="k">break</span>
+        <span class="k">if</span> <span class="n">is_diagonal</span><span class="p">:</span>
+            <span class="k">return</span> <span class="kc">True</span>
+
+    <span class="c1"># Scenario 2: Pseudo-diagonal (rectangular with more columns than rows)</span>
+    <span class="c1"># ONLY valid when: remaining columns are ALL 1s AND odd number of rows</span>
+    <span class="k">elif</span> <span class="n">num_cols</span> <span class="o">&gt;</span> <span class="n">num_rows</span> <span class="ow">and</span> <span class="n">num_rows</span> <span class="o">%</span> <span class="mi">2</span> <span class="o">==</span> <span class="mi">1</span><span class="p">:</span>
+        <span class="c1"># Check the square part is diagonal</span>
+        <span class="n">square_part</span> <span class="o">=</span> <span class="n">matrix</span><span class="p">[:</span><span class="n">num_rows</span><span class="p">,</span> <span class="p">:</span><span class="n">num_rows</span><span class="p">]</span>
+        <span class="n">is_square_diagonal</span> <span class="o">=</span> <span class="kc">True</span>
+        <span class="k">for</span> <span class="n">row_idx</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">num_rows</span><span class="p">):</span>
+            <span class="k">for</span> <span class="n">col_idx</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">num_rows</span><span class="p">):</span>
+                <span class="n">expected_value</span> <span class="o">=</span> <span class="mi">1</span> <span class="k">if</span> <span class="n">row_idx</span> <span class="o">==</span> <span class="n">col_idx</span> <span class="k">else</span> <span class="mi">0</span>
+                <span class="k">if</span> <span class="n">square_part</span><span class="p">[</span><span class="n">row_idx</span><span class="p">,</span> <span class="n">col_idx</span><span class="p">]</span> <span class="o">!=</span> <span class="n">expected_value</span><span class="p">:</span>
+                    <span class="n">is_square_diagonal</span> <span class="o">=</span> <span class="kc">False</span>
+                    <span class="k">break</span>
+            <span class="k">if</span> <span class="ow">not</span> <span class="n">is_square_diagonal</span><span class="p">:</span>
+                <span class="k">break</span>
+
+        <span class="c1"># If square part is diagonal, check remaining columns are all 1s</span>
+        <span class="k">if</span> <span class="n">is_square_diagonal</span><span class="p">:</span>
+            <span class="n">remaining_columns</span> <span class="o">=</span> <span class="n">matrix</span><span class="p">[:,</span> <span class="n">num_rows</span><span class="p">:]</span>
+            <span class="k">if</span> <span class="n">np</span><span class="o">.</span><span class="n">all</span><span class="p">(</span><span class="n">remaining_columns</span> <span class="o">==</span> <span class="mi">1</span><span class="p">):</span>
+                <span class="k">return</span> <span class="kc">True</span>
+
+    <span class="c1"># All other cases: not safe for diagonal reduction</span>
+    <span class="k">return</span> <span class="kc">False</span>
+</pre></div>
+
+           </div>
+          </div>
+          <footer>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright Microsoft Corporation. All rights reserved. Licensed under the MIT License.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>
