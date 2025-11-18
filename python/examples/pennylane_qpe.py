@@ -73,7 +73,7 @@ num_spatial_orbitals = num_spin_orbitals // 2
 
 phase_wires = list(range(M_PRECISION))
 sys_wires = [w + M_PRECISION for w in range(num_spin_orbitals)]
-wire_map = dict(zip(H_qubit_raw.wires, sys_wires, strict=False))
+wire_map = dict(zip(H_qubit_raw.wires, sys_wires, strict=True))
 H_qubit = H_qubit_raw.map_wires(wire_map)
 powers_of_two = [2**i for i in range(len(phase_wires))]
 
@@ -97,7 +97,7 @@ def qpe():
     for wire in beta_wires[:n_beta]:
         qml.PauliX(wires=wire)
 
-    for exponent, ctrl_wire in zip(powers_of_two[::-1], phase_wires, strict=False):
+    for exponent, ctrl_wire in zip(powers_of_two[::-1], phase_wires, strict=True):
         qml.ctrl(qml.evolve, control=ctrl_wire)(H_qubit, exponent * T_TIME)
 
     qml.adjoint(qml.QFT)(wires=phase_wires)

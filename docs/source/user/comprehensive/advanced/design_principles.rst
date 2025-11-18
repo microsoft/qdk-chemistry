@@ -116,14 +116,6 @@ Data flow example
 
 A typical workflow in QDK/Chemistry demonstrates the data-algorithm separation:
 
-<<<<<<< HEAD
-.. todo::
-
-   TODO (NAB):  David needs to check if these code examples are still correct
-   41366
-
-=======
->>>>>>> feature/jpu/docs
 .. tab:: C++ API
 
    .. code-block:: cpp

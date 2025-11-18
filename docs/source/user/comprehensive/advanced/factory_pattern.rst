@@ -111,13 +111,6 @@ To create a new interface to an external program in C++:
 
 1. **Inherit from the algorithm base class**:
 
-<<<<<<< HEAD
-.. todo::
-   TODO (NAB):  David to check these code examples.
-   41366
-
-=======
->>>>>>> feature/jpu/docs
 .. tab:: C++ API
 
    .. code-block:: cpp

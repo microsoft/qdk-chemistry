@@ -5,6 +5,9 @@
 # Licensed under the MIT License. See LICENSE.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
 
+import tempfile
+from pathlib import Path
+
 import numpy as np
 from qdk_chemistry.algorithms import create
 from qdk_chemistry.data import Structure
@@ -48,18 +51,22 @@ print(f"AO overlap matrix shape: {ao_overlap.shape}")
 basis_set = orbitals.get_basis_set()
 print(f"Basis set: {basis_set.get_name()}")
 
-# Generic serialization with format specification
-orbitals.to_file("molecule.orbitals.json", "json")
-orbitals_from_file = orbitals.from_file("molecule.orbitals.json", "json")
+# Use a temporary directory for any file I/O
+with tempfile.TemporaryDirectory() as tmpdir:
+    tmpdir_path = Path(tmpdir)
+    orbitals_file = tmpdir_path / "molecule.orbitals.json"
 
-# JSON serialization
-orbitals.to_json_file("molecule.orbitals.json")
-orbitals_from_json_file = orbitals.from_json_file("molecule.orbitals.json")
+    # Generic serialization with format specification
+    orbitals.to_file(str(orbitals_file), "json")
+    orbitals_from_file = orbitals.from_file(str(orbitals_file), "json")
+
+    # JSON serialization
+    orbitals.to_json_file(str(orbitals_file))
+    orbitals_from_json_file = orbitals.from_json_file(str(orbitals_file))
 
 # Direct JSON conversion
 j = orbitals.to_json()
 orbitals_from_json = orbitals.from_json(j)
-
 # HDF5 serialization (commented out - has bugs)
 # orbitals.to_hdf5_file("molecule.orbitals.h5")
 # orbitals_from_hdf5 = Orbitals.from_hdf5_file("molecule.orbitals.h5")

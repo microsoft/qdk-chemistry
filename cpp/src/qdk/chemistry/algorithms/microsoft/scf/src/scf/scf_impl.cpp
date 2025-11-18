@@ -73,10 +73,10 @@ SCFImpl::SCFImpl(std::shared_ptr<Molecule> mol_ptr, const SCFConfig& cfg,
   add_mm_charge_ = cfg.pointcharges != nullptr;
 #endif
 
-  auto ecp_cores = ctx_.basis_set->ecp_cores;
+  auto n_ecp_electrons = ctx_.basis_set->n_ecp_electrons;
   auto spin = mol.multiplicity - 1;
-  auto alpha = (mol.n_electrons - ecp_cores + spin) / 2;
-  auto beta = mol.n_electrons - ecp_cores - alpha;
+  auto alpha = (mol.n_electrons - n_ecp_electrons + spin) / 2;
+  auto beta = mol.n_electrons - n_ecp_electrons - alpha;
 
   if (cfg.mpi.world_rank == 0) {
     std::string fock_string = "";
@@ -95,10 +95,10 @@ SCFImpl::SCFImpl(std::shared_ptr<Molecule> mol_ptr, const SCFConfig& cfg,
     }
 
     spdlog::info(
-        "mol: atoms={}, electrons={}, ecp_cores={}, charge={}, "
+        "mol: atoms={}, electrons={}, n_ecp_electrons={}, charge={}, "
         "multiplicity={}, spin(2S)={}, alpha={}, beta={}",
-        mol.n_atoms, mol.n_electrons, ecp_cores, mol.charge, mol.multiplicity,
-        spin, alpha, beta);
+        mol.n_atoms, mol.n_electrons, n_ecp_electrons, mol.charge,
+        mol.multiplicity, spin, alpha, beta);
     spdlog::info(
         "restricted={}, basis={}, pure={}, num_basis_funcs={}, "
         "energy_threshold={:.2e}, "
@@ -165,23 +165,24 @@ SCFImpl::SCFImpl(std::shared_ptr<Molecule> mol_ptr, const SCFConfig& cfg,
   }
 
   // Host allocations for purely AO quantities
-  P_ = RowMajorMatrix(num_density_matrices_ * num_atomic_orbitals_,
-                      num_atomic_orbitals_);
-  J_ = RowMajorMatrix(num_density_matrices_ * num_atomic_orbitals_,
-                      num_atomic_orbitals_);
-  K_ = RowMajorMatrix(num_density_matrices_ * num_atomic_orbitals_,
-                      num_atomic_orbitals_);
+  P_ = RowMajorMatrix::Zero(num_density_matrices_ * num_atomic_orbitals_,
+                            num_atomic_orbitals_);
+  J_ = RowMajorMatrix::Zero(num_density_matrices_ * num_atomic_orbitals_,
+                            num_atomic_orbitals_);
+  K_ = RowMajorMatrix::Zero(num_density_matrices_ * num_atomic_orbitals_,
+                            num_atomic_orbitals_);
   if (cfg.mpi.world_rank == 0) {
-    F_ = RowMajorMatrix(num_density_matrices_ * num_atomic_orbitals_,
-                        num_atomic_orbitals_);
+    F_ = RowMajorMatrix::Zero(num_density_matrices_ * num_atomic_orbitals_,
+                              num_atomic_orbitals_);
     diis_ = std::make_unique<DIIS>(cfg.diis_subspace_size);
   }
 
   // MO and mixed AO/MO quantities
   // These may be resized after the orthonormality check
-  C_ = RowMajorMatrix(num_density_matrices_ * num_atomic_orbitals_,
-                      num_molecular_orbitals_);
-  eigenvalues_ = RowMajorMatrix(num_density_matrices_, num_molecular_orbitals_);
+  C_ = RowMajorMatrix::Zero(num_density_matrices_ * num_atomic_orbitals_,
+                            num_molecular_orbitals_);
+  eigenvalues_ =
+      RowMajorMatrix::Zero(num_density_matrices_, num_molecular_orbitals_);
 
 #ifdef QDK_CHEMISTRY_ENABLE_DFTD3
   ctx_.result.scf_dispersion_correction_energy = 0.0;
@@ -200,14 +201,14 @@ SCFImpl::SCFImpl(std::shared_ptr<Molecule> mol_ptr, const SCFConfig& cfg,
 
   if (cfg.require_polarizability) {
     // Host allocations for CPSCF/TDDFT quantities
-    tP_ = RowMajorMatrix(num_density_matrices_ * num_atomic_orbitals_,
-                         num_atomic_orbitals_);
-    tJ_ = RowMajorMatrix(num_density_matrices_ * num_atomic_orbitals_,
-                         num_atomic_orbitals_);
-    tK_ = RowMajorMatrix(num_density_matrices_ * num_atomic_orbitals_,
-                         num_atomic_orbitals_);
-    tFock_ = RowMajorMatrix(num_density_matrices_ * num_atomic_orbitals_,
-                            num_atomic_orbitals_);
+    tP_ = RowMajorMatrix::Zero(num_density_matrices_ * num_atomic_orbitals_,
+                               num_atomic_orbitals_);
+    tJ_ = RowMajorMatrix::Zero(num_density_matrices_ * num_atomic_orbitals_,
+                               num_atomic_orbitals_);
+    tK_ = RowMajorMatrix::Zero(num_density_matrices_ * num_atomic_orbitals_,
+                               num_atomic_orbitals_);
+    tFock_ = RowMajorMatrix::Zero(num_density_matrices_ * num_atomic_orbitals_,
+                                  num_atomic_orbitals_);
   }
 }
 
@@ -471,15 +472,14 @@ void SCFImpl::iterate_() {
   Timer::start_timing("SCF::iterate");
 
   double energy_last = 0;
-  RowMajorMatrix F_diis;
-  RowMajorMatrix P_diff;
+  RowMajorMatrix F_diis = RowMajorMatrix::Zero(
+      num_density_matrices_ * num_atomic_orbitals_, num_atomic_orbitals_);
+  RowMajorMatrix P_diff = RowMajorMatrix::Zero(
+      num_density_matrices_ * num_atomic_orbitals_, num_atomic_orbitals_);
   RowMajorMatrix P_last = RowMajorMatrix::Zero(
       num_density_matrices_ * num_atomic_orbitals_, num_atomic_orbitals_);
-  RowMajorMatrix F_ls;
-  if (cfg->level_shift > 0.0) {
-    F_ls = RowMajorMatrix::Zero(num_density_matrices_ * num_atomic_orbitals_,
-                                num_atomic_orbitals_);
-  }
+  RowMajorMatrix F_ls = RowMajorMatrix::Zero(
+      num_density_matrices_ * num_atomic_orbitals_, num_atomic_orbitals_);
 
   for (auto step = 0; step < cfg->max_iteration; ++step) {
 #ifdef ENABLE_NVTX3
@@ -541,7 +541,8 @@ void SCFImpl::iterate_() {
             sizeof(double) * num_atomic_orbitals_ * num_atomic_orbitals_,
             cudaMemcpyHostToDevice));
 #else
-        RowMajorMatrix FP(num_atomic_orbitals_, num_atomic_orbitals_);
+        RowMajorMatrix FP =
+            RowMajorMatrix::Zero(num_atomic_orbitals_, num_atomic_orbitals_);
 #endif
 
         RowMajorMatrix error = RowMajorMatrix::Zero(
@@ -1090,7 +1091,7 @@ void SCFImpl::build_one_electron_integrals_() {
 #endif
   Timer::start_timing("SCF::int1e");
 
-  S_ = RowMajorMatrix(num_atomic_orbitals_, num_atomic_orbitals_);
+  S_ = RowMajorMatrix::Zero(num_atomic_orbitals_, num_atomic_orbitals_);
   TIMEIT(int1e_->overlap_integral(S_.data()),
          "SCFImpl::build_one_electron_integrals->overlap_integral");
   if (ctx_.cfg->mpi.world_rank == 0) {
@@ -1103,13 +1104,15 @@ void SCFImpl::build_one_electron_integrals_() {
         num_molecular_orbitals_;  // Update the context to ensure proper
                                   // serialization
     // Resize MO quantities
-    C_ = RowMajorMatrix(num_density_matrices_ * num_atomic_orbitals_,
-                        num_molecular_orbitals_);
+    C_ = RowMajorMatrix::Zero(num_density_matrices_ * num_atomic_orbitals_,
+                              num_molecular_orbitals_);
     eigenvalues_ =
-        RowMajorMatrix(num_density_matrices_, num_molecular_orbitals_);
+        RowMajorMatrix::Zero(num_density_matrices_, num_molecular_orbitals_);
   }
-  auto T = RowMajorMatrix(num_atomic_orbitals_, num_atomic_orbitals_);
-  auto V = RowMajorMatrix(num_atomic_orbitals_, num_atomic_orbitals_);
+  RowMajorMatrix T =
+      RowMajorMatrix::Zero(num_atomic_orbitals_, num_atomic_orbitals_);
+  RowMajorMatrix V =
+      RowMajorMatrix::Zero(num_atomic_orbitals_, num_atomic_orbitals_);
   TIMEIT(int1e_->kinetic_integral(T.data()),
          "SCFImpl::build_one_electron_integrals->kinetic_integral");
   TIMEIT(int1e_->nuclear_integral(V.data()),

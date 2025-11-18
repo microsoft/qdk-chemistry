@@ -221,10 +221,10 @@ def test_basis_function_queries():
     assert basis.get_atom_index_for_basis_function(4) == 1  # s orbital on atom 1
 
     # Test basis function indices for atom
-    atom0_indices = basis.get_basis_fuction_indices_for_atom(0)
+    atom0_indices = basis.get_basis_function_indices_for_atom(0)
     assert atom0_indices == [0, 1, 2, 3]  # 1s + 3p
 
-    atom1_indices = basis.get_basis_fuction_indices_for_atom(1)
+    atom1_indices = basis.get_basis_function_indices_for_atom(1)
     assert atom1_indices == [4]  # 1s
 
 
@@ -617,7 +617,7 @@ def test_basis_set_hdf5_specific():
         shells_loaded = basis2.get_shells()
 
         assert len(shells_orig) == len(shells_loaded)
-        for orig, loaded in zip(shells_orig, shells_loaded, strict=False):
+        for orig, loaded in zip(shells_orig, shells_loaded, strict=True):
             assert orig.atom_index == loaded.atom_index
             assert orig.orbital_type == loaded.orbital_type
             assert np.allclose(
@@ -674,7 +674,7 @@ def test_basis_set_json_specific():
         shells_loaded = basis2.get_shells()
 
         assert len(shells_orig) == len(shells_loaded)
-        for orig, loaded in zip(shells_orig, shells_loaded, strict=False):
+        for orig, loaded in zip(shells_orig, shells_loaded, strict=True):
             assert orig.atom_index == loaded.atom_index
             assert orig.orbital_type == loaded.orbital_type
             assert np.allclose(
@@ -773,7 +773,7 @@ def test_basis_set_file_io_round_trip():
         shells_json = basis_json.get_shells()
 
         assert len(shells_orig) == len(shells_json)
-        for orig, loaded in zip(shells_orig, shells_json, strict=False):
+        for orig, loaded in zip(shells_orig, shells_json, strict=True):
             assert orig.atom_index == loaded.atom_index
             assert orig.orbital_type == loaded.orbital_type
             assert np.allclose(
@@ -807,7 +807,7 @@ def test_basis_set_file_io_round_trip():
         shells_hdf5 = basis_hdf5.get_shells()
 
         assert len(shells_orig) == len(shells_hdf5)
-        for orig, loaded in zip(shells_orig, shells_hdf5, strict=False):
+        for orig, loaded in zip(shells_orig, shells_hdf5, strict=True):
             assert orig.atom_index == loaded.atom_index
             assert orig.orbital_type == loaded.orbital_type
             assert np.allclose(
@@ -1038,7 +1038,7 @@ def test_basis_set_pickling_and_repr():
     unpickled_shells = unpickled.get_shells()
     assert len(original_shells) == len(unpickled_shells)
 
-    for orig_shell, unpick_shell in zip(original_shells, unpickled_shells, strict=False):
+    for orig_shell, unpick_shell in zip(original_shells, unpickled_shells, strict=True):
         assert orig_shell.atom_index == unpick_shell.atom_index
         assert orig_shell.orbital_type == unpick_shell.orbital_type
         assert orig_shell.get_num_primitives() == unpick_shell.get_num_primitives()
@@ -1089,3 +1089,238 @@ def test_basis_set_pickling_and_repr():
     unpickled_repr = repr(unpickled)
 
     assert original_repr == unpickled_repr
+
+
+def test_basis_set_ecp_functionality():
+    """Test basis set ECP (Effective Core Potential) functionality."""
+    # Create a structure with multiple atoms
+    positions = np.array([[0.0, 0.0, 0.0], [1.0, 0.0, 0.0], [2.0, 0.0, 0.0]])
+    elements = ["Cu", "O", "H"]
+    structure = Structure(elements, positions)
+
+    # Create shells for each atom
+    shells = [
+        Shell(0, OrbitalType.S, [1.0], [1.0]),
+        Shell(1, OrbitalType.S, [1.0], [1.0]),
+        Shell(2, OrbitalType.S, [1.0], [1.0]),
+    ]
+
+    # Create the basis set
+    basis = BasisSet("test-basis", shells, structure)
+
+    # Test default ECP state
+    assert not basis.has_ecp_electrons()
+    assert basis.get_ecp_name() == "none"
+    assert basis.get_ecp_electrons() == [0, 0, 0]
+
+    # Test creating ECP with constructor
+    ecp_name = "cc-pVDZ-PP"
+    ecp_electrons = [10, 2, 0]
+    # Create ECP shells for Cu (atom 0) and O (atom 1)
+    ecp_shells = [
+        Shell(0, OrbitalType.S, [2.0, 1.5], [0.5, 0.5]),  # Cu ECP S-shell
+        Shell(0, OrbitalType.P, [2.0, 1.5], [0.5, 0.5]),  # Cu ECP P-shell
+        Shell(1, OrbitalType.S, [1.0], [1.0]),  # O ECP S-shell
+    ]
+    basis_with_ecp = BasisSet("test-basis", shells, ecp_name, ecp_shells, ecp_electrons, structure)
+
+    # Test getting ECP
+    assert basis_with_ecp.has_ecp_electrons()
+    assert basis_with_ecp.get_ecp_name() == ecp_name
+    assert list(basis_with_ecp.get_ecp_electrons()) == ecp_electrons
+
+    # Test ECP validation (wrong vector size should raise a ValueError)
+    with pytest.raises(ValueError, match=r"ECP electrons vector size must match number of atoms"):
+        BasisSet("test-basis", shells, "test-basis", ecp_shells, [10], structure)  # Only 1 element, but we have 3 atoms
+
+    # Test ECP with JSON serialization
+    with tempfile.TemporaryDirectory() as tmpdir:
+        json_file = str(Path(tmpdir) / "test_ecp.basis_set.json")
+        basis_with_ecp.to_json_file(json_file)
+
+        # Load and verify
+        loaded_basis = BasisSet.from_json_file(json_file)
+        assert loaded_basis.has_ecp_electrons()
+        assert loaded_basis.get_ecp_name() == ecp_name
+        assert list(loaded_basis.get_ecp_electrons()) == ecp_electrons
+
+    # Test ECP with HDF5 serialization
+    with tempfile.TemporaryDirectory() as tmpdir:
+        hdf5_file = str(Path(tmpdir) / "test_ecp.basis_set.h5")
+        basis_with_ecp.to_hdf5_file(hdf5_file)
+
+        # Load and verify
+        loaded_basis = BasisSet.from_hdf5_file(hdf5_file)
+        assert loaded_basis.has_ecp_electrons()
+        assert loaded_basis.get_ecp_name() == ecp_name
+        assert list(loaded_basis.get_ecp_electrons()) == ecp_electrons
+
+    # Test ECP with copy constructor
+    basis_copy = BasisSet(basis_with_ecp)
+    assert basis_copy.has_ecp_electrons()
+    assert basis_copy.get_ecp_name() == ecp_name
+    assert list(basis_copy.get_ecp_electrons()) == ecp_electrons
+
+
+def test_basis_set_ecp_shells():
+    """Test basis set ECP shells with radial powers."""
+    # Create a structure with an atom that uses ECP
+    positions = np.array([[0.0, 0.0, 0.0]])
+    elements = ["Ag"]
+    structure = Structure(elements, positions)
+
+    # Create regular shells
+    shells = [Shell(0, OrbitalType.S, [1.0], [1.0])]
+
+    # Create ECP shells with radial powers
+    ecp_exponents = np.array([10.0, 5.0, 2.0])
+    ecp_coefficients = np.array([50.0, 20.0, 10.0])
+    ecp_rpowers = np.array([0, 1, 2], dtype=np.int32)
+
+    ecp_shell_s = Shell(0, OrbitalType.S, ecp_exponents, ecp_coefficients, ecp_rpowers)
+
+    ecp_shell_p = Shell(0, OrbitalType.P, [8.0], [30.0], [1])
+
+    ecp_shells = [ecp_shell_s, ecp_shell_p]
+
+    # Create basis set with ECP shells
+    basis = BasisSet("test-basis", shells, ecp_shells, structure)
+
+    # Test ECP shell queries
+    assert basis.has_ecp_shells()
+    assert basis.get_num_ecp_shells() == 2
+
+    # Test retrieving all ECP shells
+    all_ecp_shells = basis.get_ecp_shells()
+    assert len(all_ecp_shells) == 2
+
+    # Test retrieving ECP shells for specific atom
+    ecp_shells_atom0 = basis.get_ecp_shells_for_atom(0)
+    assert len(ecp_shells_atom0) == 2
+    assert ecp_shells_atom0[0].orbital_type == OrbitalType.S
+    assert ecp_shells_atom0[1].orbital_type == OrbitalType.P
+
+    # Test ECP shell properties
+    shell_s = basis.get_ecp_shell(0)
+    assert shell_s.atom_index == 0
+    assert shell_s.orbital_type == OrbitalType.S
+    assert shell_s.has_radial_powers()
+    assert len(shell_s.rpowers) == 3
+    assert np.array_equal(shell_s.rpowers, [0, 1, 2])
+    assert np.allclose(shell_s.exponents, [10.0, 5.0, 2.0])
+    assert np.allclose(shell_s.coefficients, [50.0, 20.0, 10.0])
+
+    # Test ECP shell without radial powers (regular shell)
+    regular_shell = shells[0]
+    assert not regular_shell.has_radial_powers()
+
+
+def test_basis_set_ecp_shells_serialization():
+    """Test ECP shells serialization and deserialization."""
+    # Create structure
+    positions = np.array([[0.0, 0.0, 0.0]])
+    elements = ["Ag"]
+    structure = Structure(elements, positions)
+
+    # Create shells and ECP shells
+    shells = [Shell(0, OrbitalType.S, [1.0], [1.0])]
+    ecp_shells = [Shell(0, OrbitalType.S, [10.0, 5.0], [50.0, 20.0], [0, 2])]
+
+    # Create basis set with ECP shells and ECP metadata
+    basis = BasisSet("test-basis", shells, "test-ecp", ecp_shells, [28], structure)
+
+    # Test JSON serialization
+    with tempfile.TemporaryDirectory() as tmpdir:
+        json_file = str(Path(tmpdir) / "test_ecp_shells.basis_set.json")
+        basis.to_json_file(json_file)
+
+        # Load and verify
+        loaded_basis = BasisSet.from_json_file(json_file)
+        assert loaded_basis.has_ecp_shells()
+        assert loaded_basis.get_num_ecp_shells() == 1
+
+        loaded_shell = loaded_basis.get_ecp_shell(0)
+        assert loaded_shell.has_radial_powers()
+        assert np.array_equal(loaded_shell.rpowers, [0, 2])
+        assert np.allclose(loaded_shell.exponents, [10.0, 5.0])
+        assert np.allclose(loaded_shell.coefficients, [50.0, 20.0])
+
+    # Test HDF5 serialization
+    with tempfile.TemporaryDirectory() as tmpdir:
+        hdf5_file = str(Path(tmpdir) / "test_ecp_shells.basis_set.h5")
+        basis.to_hdf5_file(hdf5_file)
+
+        # Load and verify
+        loaded_basis = BasisSet.from_hdf5_file(hdf5_file)
+        assert loaded_basis.has_ecp_shells()
+        assert loaded_basis.get_num_ecp_shells() == 1
+
+        loaded_shell = loaded_basis.get_ecp_shell(0)
+        assert loaded_shell.has_radial_powers()
+        assert np.array_equal(loaded_shell.rpowers, [0, 2])
+
+
+def test_basis_set_ecp_shells_copy():
+    """Test that ECP shells are properly copied."""
+    # Create structure and shells
+    positions = np.array([[0.0, 0.0, 0.0]])
+    elements = ["Ag"]
+    structure = Structure(elements, positions)
+
+    shells = [Shell(0, OrbitalType.S, [1.0], [1.0])]
+    ecp_shells = [Shell(0, OrbitalType.S, [10.0, 5.0], [50.0, 20.0], [0, 2])]
+
+    basis = BasisSet("test-basis", shells, "test-ecp", ecp_shells, [28], structure)
+
+    # Test copy constructor
+    basis_copy = BasisSet(basis)
+    assert basis_copy.has_ecp_shells()
+    assert basis_copy.get_num_ecp_shells() == basis.get_num_ecp_shells()
+
+    # Verify ECP shell data is copied
+    orig_shell = basis.get_ecp_shell(0)
+    copy_shell = basis_copy.get_ecp_shell(0)
+    assert copy_shell.has_radial_powers() == orig_shell.has_radial_powers()
+    assert np.array_equal(copy_shell.rpowers, orig_shell.rpowers)
+    assert np.allclose(copy_shell.exponents, orig_shell.exponents)
+    assert np.allclose(copy_shell.coefficients, orig_shell.coefficients)
+
+
+def test_basis_set_ecp_shells_multi_atom():
+    """Test ECP shells in multi-atom systems."""
+    # Create structure with multiple atoms
+    positions = np.array([[0.0, 0.0, 0.0], [2.0, 0.0, 0.0], [4.0, 0.0, 0.0]])
+    elements = ["Ag", "Au", "H"]
+    structure = Structure(elements, positions)
+
+    # Create regular shells for all atoms
+    shells = [
+        Shell(0, OrbitalType.S, [1.0], [1.0]),
+        Shell(1, OrbitalType.S, [1.0], [1.0]),
+        Shell(2, OrbitalType.S, [1.0], [1.0]),
+    ]
+
+    # Create ECP shells for Ag (atom 0) and Au (atom 1), but not H (atom 2)
+    ecp_shells = [
+        Shell(0, OrbitalType.S, [10.0], [50.0], [0]),
+        Shell(0, OrbitalType.P, [8.0], [30.0], [1]),
+        Shell(1, OrbitalType.D, [12.0], [40.0], [2]),
+    ]
+
+    basis = BasisSet("test-basis", shells, ecp_shells, structure)
+
+    # Test total ECP shells
+    assert basis.get_num_ecp_shells() == 3
+
+    # Test ECP shells per atom
+    ecp_shells_ag = basis.get_ecp_shells_for_atom(0)
+    assert len(ecp_shells_ag) == 2
+    assert ecp_shells_ag[0].orbital_type == OrbitalType.S
+    assert ecp_shells_ag[1].orbital_type == OrbitalType.P
+
+    ecp_shells_au = basis.get_ecp_shells_for_atom(1)
+    assert len(ecp_shells_au) == 1
+    assert ecp_shells_au[0].orbital_type == OrbitalType.D
+
+    ecp_shells_h = basis.get_ecp_shells_for_atom(2)
+    assert len(ecp_shells_h) == 0

@@ -175,7 +175,7 @@ def compute_energy_expectation_from_bitstrings(
     total_var = 0.0
     expvals_list, vars_list = [], []
 
-    for counts, group in zip(bitstring_counts_list, hamiltonians, strict=False):
+    for counts, group in zip(bitstring_counts_list, hamiltonians, strict=True):
         if counts is None:
             continue
         paulis = group.pauli_ops.paulis

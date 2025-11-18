@@ -113,9 +113,14 @@ Once configured, the localization can be performed on a set of orbitals:
 Available localization methods
 ------------------------------
 
-.. todo::
-   The detailed descriptions of each localization method are currently under construction.
+qdk_mp2_natural_orbitals
+   :term:`MP2` Natural Orbitals
 
+qdk_pipek_mezey
+   Pipek-Mezey Localized Orbitals
+
+qdk_vvhv
+   Valence Virtual Hard Virtual (:term:`VVHV`) Orbitals
 
 Available settings
 ------------------
@@ -204,32 +209,13 @@ These settings apply only to specific variants of localization:
      - Whether to use weighted orthogonalization in hard virtual construction
      - :term:`VVHV`
 
-Computational scaling
----------------------
-
-.. todo::
-   🔧 **TODO**: Add computational scaling for all localization methods
-
-The computational cost of orbital localization methods scales with the size of the system:
-
-.. list-table::
-   :header-rows: 1
-   :widths: 25 25 50
-
-   * - Method
-     - Scaling
-     - Notes
-   * - :term:`MP2` Natural Orbitals
-     - O(N⁵)
-     - Requires :term:`MP2` density matrix construction
-
 Implemented interface
 ---------------------
 
 QDK/Chemistry's ``Localizer`` provides a unified interface for localization methods.
 
 QDK/Chemistry implementations
-~~~~~~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 - **QDK/Chemistry**: Native implementation of Pipek-Mezey, and :term:`MP2` natural orbital localization
 

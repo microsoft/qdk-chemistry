@@ -115,12 +115,49 @@ void bind_basis_set(py::module& m) {
         )",
            py::arg("atom_index"), py::arg("orbital_type"), py::arg("exponents"),
            py::arg("coefficients"))
+      .def(py::init<size_t, OrbitalType, const Eigen::VectorXd&,
+                    const Eigen::VectorXd&, const Eigen::VectorXi&>(),
+           R"(
+        Constructor with primitive data and radial powers for ECP shells.
+
+        Creates an ECP (Effective Core Potential) shell with radial powers.
+
+        Parameters
+        ----------
+        atom_index : int
+            Index of the atom this shell belongs to
+        orbital_type : OrbitalType
+            Type of orbital (S, P, D, F, etc.)
+        exponents : numpy.ndarray
+            Vector of Gaussian exponent coefficients (alpha values)
+        coefficients : numpy.ndarray
+            Vector of contraction coefficients (must be same length as exponents)
+        rpowers : numpy.ndarray (int)
+            Vector of radial powers (r^n terms) for ECP shells
+
+        Raises
+        ------
+        ValueError
+            If exponents, coefficients, and rpowers have different lengths
+
+        Examples
+        --------
+        >>> import numpy as np
+        >>> exponents = np.array([1.0, 0.5, 0.1])
+        >>> coefficients = np.array([0.444, 0.555, 0.222])
+        >>> rpowers = np.array([2, 1, 0], dtype=np.int32)
+        >>> ecp_shell = Shell(0, OrbitalType.S, exponents, coefficients, rpowers)
+        )",
+           py::arg("atom_index"), py::arg("orbital_type"), py::arg("exponents"),
+           py::arg("coefficients"), py::arg("rpowers"))
       .def_readwrite("atom_index", &Shell::atom_index, "Index of the atom")
       .def_readwrite("orbital_type", &Shell::orbital_type, "Type of orbital")
       .def_readwrite("exponents", &Shell::exponents,
                      "Vector of orbital exponents")
       .def_readwrite("coefficients", &Shell::coefficients,
                      "Vector of contraction coefficients")
+      .def_readwrite("rpowers", &Shell::rpowers,
+                     "Vector of radial powers for ECP shells (r^n terms)")
       .def("get_num_primitives", &Shell::get_num_primitives,
            R"(
             Get the number of primitive Gaussians in this shell.
@@ -171,6 +208,20 @@ void bind_basis_set(py::module& m) {
             --------
             >>> l = shell.get_angular_momentum()
             >>> print(f"Angular momentum l = {l}")
+            )")
+      .def("has_radial_powers", &Shell::has_radial_powers,
+           R"(
+            Check if this shell has radial powers (i.e., is an ECP shell).
+
+            Returns
+            -------
+            bool
+                True if this shell has radial powers defined
+
+            Examples
+            --------
+            >>> if shell.has_radial_powers():
+            ...     print("This is an ECP shell")
             )");
 
   py::class_<BasisSet, DataClass, py::smart_holder>(m, "BasisSet",
@@ -268,6 +319,77 @@ void bind_basis_set(py::module& m) {
         )",
            py::arg("name"), py::arg("shells"), py::arg("structure"),
            py::arg("basis_type") = BasisType::Spherical)
+      .def(py::init<const std::string&, const std::vector<Shell>&,
+                    const std::vector<Shell>&, const Structure&, BasisType>(),
+           R"(
+        Constructor with basis set name, shells, ECP shells, structure, and basis type.
+
+        Creates a complete basis set with regular shells, ECP shells, and molecular structure.
+
+        Parameters
+        ----------
+        name : str
+            Name of the basis set
+        shells : list of Shell
+            Vector of shell objects defining the basis functions
+        ecp_shells : list of Shell
+            Vector of ECP shell objects
+        structure : Structure
+            Molecular structure to associate with this basis set
+        basis_type : BasisType, optional
+            Whether to use spherical or Cartesian basis functions
+            Default is Spherical
+
+        Examples
+        --------
+        >>> from qdk_chemistry.data import Structure
+        >>> structure = Structure.from_xyz_file("water.xyz")
+        >>> shells = [Shell(0, OrbitalType.S), Shell(1, OrbitalType.S)]
+        >>> ecp_shells = [Shell(0, OrbitalType.S, exp, coeff, rpow)]
+        >>> basis = BasisSet("custom-ecp", shells, ecp_shells, structure)
+        >>> print(f"Basis with {len(shells)} shells and {len(ecp_shells)} ECP shells")
+        )",
+           py::arg("name"), py::arg("shells"), py::arg("ecp_shells"),
+           py::arg("structure"), py::arg("basis_type") = BasisType::Spherical)
+      .def(py::init<const std::string&, const std::vector<Shell>&,
+                    const std::string&, const std::vector<Shell>&,
+                    const std::vector<size_t>&, const Structure&, BasisType>(),
+           R"(
+        Constructor with basis set name, shells, ECP name, ECP shells, ECP electrons, structure, and basis type.
+
+        Creates a complete basis set with regular shells, ECP shells, ECP metadata, and molecular structure.
+
+        Parameters
+        ----------
+        name : str
+            Name of the basis set
+        shells : list of Shell
+            Vector of shell objects defining the basis functions
+        ecp_name : str
+            Name of the ECP (basis set)
+        ecp_shells : list of Shell
+            Vector of ECP shell objects
+        ecp_electrons : list of int
+            Number of ECP electrons for each atom
+        structure : Structure
+            Molecular structure to associate with this basis set
+        basis_type : BasisType, optional
+            Whether to use spherical or Cartesian basis functions
+            Default is Spherical
+
+        Examples
+        --------
+        >>> from qdk_chemistry.data import Structure
+        >>> structure = Structure.from_xyz_file("water.xyz")
+        >>> shells = [Shell(0, OrbitalType.S), Shell(1, OrbitalType.S)]
+        >>> ecp_shells = [Shell(0, OrbitalType.S, exp, coeff, rpow)]
+        >>> ecp_electrons = [10, 10, 0]
+        >>> basis = BasisSet("custom-ecp", shells, "custom-ecp", ecp_shells, ecp_electrons, structure)
+        >>> print(f"Basis with {len(shells)} shells, {len(ecp_shells)} ECP shells, ECP: {basis.get_ecp_name()}")
+        )",
+           py::arg("name"), py::arg("shells"), py::arg("ecp_name"),
+           py::arg("ecp_shells"), py::arg("ecp_electrons"),
+           py::arg("structure"), py::arg("basis_type") = BasisType::Spherical)
       .def(py::init<const BasisSet&>(),
            R"(
         Copy constructor.
@@ -395,6 +517,99 @@ void bind_basis_set(py::module& m) {
         >>> print(f"Atoms with basis functions: {n_atoms}")
         )")
 
+      // ECP shell access
+      .def("get_ecp_shells", &BasisSet::get_ecp_shells,
+           R"(
+        Get all ECP shells (flattened from per-atom storage).
+
+        Returns
+        -------
+        list of Shell
+            Vector of all ECP shells in the basis set
+
+        Examples
+        --------
+        >>> ecp_shells = basis_set.get_ecp_shells()
+        >>> print(f"Total ECP shells: {len(ecp_shells)}")
+        )")
+
+      .def("get_ecp_shells_for_atom", &BasisSet::get_ecp_shells_for_atom,
+           R"(
+        Get ECP shells for a specific atom.
+
+        Parameters
+        ----------
+        atom_index : int
+            Index of the atom
+
+        Returns
+        -------
+        list of Shell
+            Vector of ECP shells for the specified atom
+
+        Examples
+        --------
+        >>> ecp_atom_shells = basis_set.get_ecp_shells_for_atom(0)
+        >>> print(f"Atom 0 has {len(ecp_atom_shells)} ECP shells")
+        )",
+           py::arg("atom_index"), py::return_value_policy::reference_internal)
+
+      .def("get_ecp_shell", &BasisSet::get_ecp_shell,
+           R"(
+        Get a specific ECP shell by global index.
+
+        Parameters
+        ----------
+        shell_index : int
+            Global index of the ECP shell
+
+        Returns
+        -------
+        Shell
+            Reference to the specified ECP shell
+
+        Raises
+        ------
+        IndexError
+            If ECP shell index is out of range
+
+        Examples
+        --------
+        >>> ecp_shell = basis_set.get_ecp_shell(0)
+        >>> print(f"First ECP shell has {ecp_shell.get_num_primitives()} primitives")
+        )",
+           py::arg("shell_index"), py::return_value_policy::reference_internal)
+
+      .def("get_num_ecp_shells", &BasisSet::get_num_ecp_shells,
+           R"(
+        Get total number of ECP shells across all atoms.
+
+        Returns
+        -------
+        int
+            Total number of ECP shells
+
+        Examples
+        --------
+        >>> n_ecp_shells = basis_set.get_num_ecp_shells()
+        >>> print(f"Total ECP shells: {n_ecp_shells}")
+        )")
+
+      .def("has_ecp_shells", &BasisSet::has_ecp_shells,
+           R"(
+        Check if this basis set has ECP shells.
+
+        Returns
+        -------
+        bool
+            True if there are any ECP shells
+
+        Examples
+        --------
+        >>> if basis_set.has_ecp_shells():
+        ...     print("This basis set includes ECP shells")
+        )")
+
       // Basis function management
       .def("get_basis_function_info", &BasisSet::get_basis_function_info,
            R"(
@@ -453,8 +668,8 @@ void bind_basis_set(py::module& m) {
         >>> print(f"Basis function 3 belongs to atom {atom_idx}")
         )",
            py::arg("basis_index"))
-      .def("get_basis_fuction_indices_for_atom",
-           &BasisSet::get_basis_fuction_indices_for_atom,
+      .def("get_basis_function_indices_for_atom",
+           &BasisSet::get_basis_function_indices_for_atom,
            R"(
         Get all basis function indices for a specific atom.
 
@@ -470,7 +685,7 @@ void bind_basis_set(py::module& m) {
 
         Examples
         --------
-        >>> basis_indices = basis_set.get_basis_fuction_indices_for_atom(0)
+        >>> basis_indices = basis_set.get_basis_function_indices_for_atom(0)
         >>> print(f"Atom 0 has basis functions: {basis_indices}")
         )",
            py::arg("atom_index"))
@@ -585,6 +800,75 @@ void bind_basis_set(py::module& m) {
         )",
            py::arg("atom_index"), py::arg("orbital_type"))
 
+      // ECP shell index queries
+      .def("get_ecp_shell_indices_for_atom",
+           &BasisSet::get_ecp_shell_indices_for_atom,
+           R"(
+        Get ECP shell indices for a specific atom.
+
+        Parameters
+        ----------
+        atom_index : int
+            Index of the atom
+
+        Returns
+        -------
+        list of int
+            Vector of ECP shell indices for this atom
+
+        Examples
+        --------
+        >>> ecp_indices = basis_set.get_ecp_shell_indices_for_atom(0)
+        >>> print(f"Atom 0 ECP shell indices: {ecp_indices}")
+        )",
+           py::arg("atom_index"))
+
+      .def("get_ecp_shell_indices_for_orbital_type",
+           &BasisSet::get_ecp_shell_indices_for_orbital_type,
+           R"(
+        Get ECP shell indices for a specific orbital type.
+
+        Parameters
+        ----------
+        orbital_type : OrbitalType
+            Type of orbital (S, P, D, F, etc.)
+
+        Returns
+        -------
+        list of int
+            Vector of ECP shell indices of this type
+
+        Examples
+        --------
+        >>> s_ecp_indices = basis_set.get_ecp_shell_indices_for_orbital_type(OrbitalType.S)
+        >>> print(f"S-type ECP shell indices: {s_ecp_indices}")
+        )",
+           py::arg("orbital_type"))
+
+      .def("get_ecp_shell_indices_for_atom_and_orbital_type",
+           &BasisSet::get_ecp_shell_indices_for_atom_and_orbital_type,
+           R"(
+        Get ECP shell indices for a specific atom and orbital type.
+
+        Parameters
+        ----------
+        atom_index : int
+            Index of the atom
+        orbital_type : OrbitalType
+            Type of orbital (S, P, D, F, etc.)
+
+        Returns
+        -------
+        list of int
+            Vector of ECP shell indices matching both criteria
+
+        Examples
+        --------
+        >>> p_ecp_indices = basis_set.get_ecp_shell_indices_for_atom_and_orbital_type(0, OrbitalType.P)
+        >>> print(f"P-type ECP shells on atom 0: {p_ecp_indices}")
+        )",
+           py::arg("atom_index"), py::arg("orbital_type"))
+
       // Basis set metadata
       .def("get_name", &BasisSet::get_name,
            R"(
@@ -637,6 +921,52 @@ void bind_basis_set(py::module& m) {
         ...     structure = basis_set.get_structure()
         ... else:
         ...     print("No structure associated with basis set")
+        )")
+
+      .def("get_ecp_name", &BasisSet::get_ecp_name,
+           R"(
+        Get the ECP (Effective Core Potential) name.
+
+        Returns
+        -------
+        str
+            Name of the ECP (basis set)
+
+        Examples
+        --------
+        >>> ecp_name = basis_set.get_ecp_name()
+        >>> print(f"ECP: {ecp_name}")
+        )")
+
+      .def("get_ecp_electrons", &BasisSet::get_ecp_electrons,
+           R"(
+        Get the ECP (Effective Core Potential) electrons vector.
+
+        Returns
+        -------
+        list of int
+            Number of ECP electrons for each atom
+
+        Examples
+        --------
+        >>> ecp_electrons = basis_set.get_ecp_electrons()
+        >>> print(f"ECP electrons per atom: {ecp_electrons}")
+        )")
+
+      .def("has_ecp_electrons", &BasisSet::has_ecp_electrons,
+           R"(
+        Check if ECP (Effective Core Potential) electrons are present.
+
+        Returns
+        -------
+        bool
+            True if ECP electrons are present, False otherwise
+
+        Examples
+        --------
+        >>> if basis_set.has_ecp_electrons():
+        ...     ecp_electrons = basis_set.get_ecp_electrons()
+        ...     print(f"ECP electrons per atom: {ecp_electrons}")
         )")
 
       .def("get_summary", &BasisSet::get_summary,

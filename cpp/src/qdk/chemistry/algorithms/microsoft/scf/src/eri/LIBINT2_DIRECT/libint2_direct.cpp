@@ -271,6 +271,11 @@ class ERI {
     const auto P_shnrm = compute_shellblock_norm(obs_, P, num_basis_funcs);
     const auto P_shmax = P_shnrm.maxCoeff();
 
+    // Check for NaN/Inf values
+    if (!std::isfinite(P_shmax)) {
+      throw std::runtime_error("Density matrix contains NaN/Inf values.");
+    }
+
     // Setup required precision
     const auto engine_precision = precision / P_shmax;
 

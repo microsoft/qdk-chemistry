@@ -34,8 +34,14 @@ void DIIS::extrapolate(const RowMajorMatrix& x, const RowMajorMatrix& error,
     Eigen::VectorXd rhs = Eigen::VectorXd::Zero(rank);
     rhs[0] = -1.0;
 
+    double b_max = B_.maxCoeff();
+    if (b_max == 0.0) {
+      // Fallback: just return the input x without extrapolation
+      *x_diis = x;
+      return;
+    }
     A.block(1, 1, rank - 1, rank - 1) =
-        B_.block(0, 0, rank - 1, rank - 1) / B_.maxCoeff();
+        B_.block(0, 0, rank - 1, rank - 1) / b_max;
 
     Eigen::ColPivHouseholderQR<RowMajorMatrix> qr = A.colPivHouseholderQr();
     Eigen::VectorXd c = qr.solve(rhs);

@@ -30,13 +30,14 @@ inline static constexpr size_t MAX_ORBITAL_ANGULAR_MOMENTUM =
  * @brief Enumeration for different types of atomic orbitals
  */
 enum class OrbitalType {
-  S = 0,  ///< S orbital (angular momentum l=0)
-  P = 1,  ///< P orbital (angular momentum l=1)
-  D = 2,  ///< D orbital (angular momentum l=2)
-  F = 3,  ///< F orbital (angular momentum l=3)
-  G = 4,  ///< G orbital (angular momentum l=4)
-  H = 5,  ///< H orbital (angular momentum l=5)
-  I = 6   ///< I orbital (angular momentum l=6)
+  UL = -1,  ///< ECP local potential (l=-1)
+  S = 0,    ///< S orbital (angular momentum l=0)
+  P = 1,    ///< P orbital (angular momentum l=1)
+  D = 2,    ///< D orbital (angular momentum l=2)
+  F = 3,    ///< F orbital (angular momentum l=3)
+  G = 4,    ///< G orbital (angular momentum l=4)
+  H = 5,    ///< H orbital (angular momentum l=5)
+  I = 6     ///< I orbital (angular momentum l=6)
 };
 
 /**
@@ -73,6 +74,7 @@ struct Shell {
       OrbitalType::S;            ///< Type of orbital (s, p, d, f, etc.)
   Eigen::VectorXd exponents;     ///< Orbital exponents for primitive Gaussians
   Eigen::VectorXd coefficients;  ///< Contraction coefficients for primitives
+  Eigen::VectorXi rpowers;       ///< Radial powers for ECP shells (r^n terms)
 
   /**
    * @brief Constructor with primitive data
@@ -82,10 +84,32 @@ struct Shell {
       : atom_index(atom_idx),
         orbital_type(orb_type),
         exponents(exp),
-        coefficients(coeff) {
+        coefficients(coeff),
+        rpowers(Eigen::VectorXi::Zero(0)) {
     if (exponents.size() != coefficients.size()) {
       throw std::invalid_argument(
           "Exponents and coefficients must have the same size");
+    }
+  }
+
+  /**
+   * @brief Constructor with primitive data and radial powers (for ECP shells)
+   */
+  Shell(size_t atom_idx, OrbitalType orb_type, const Eigen::VectorXd& exp,
+        const Eigen::VectorXd& coeff, const Eigen::VectorXi& rpow)
+      : atom_index(atom_idx),
+        orbital_type(orb_type),
+        exponents(exp),
+        coefficients(coeff),
+        rpowers(rpow) {
+    if (exponents.size() != coefficients.size()) {
+      throw std::invalid_argument(
+          "Exponents and coefficients must have the same size");
+    }
+    if (rpowers.size() > 0 && rpowers.size() != exponents.size()) {
+      throw std::invalid_argument(
+          "Radial powers must have the same size as exponents and "
+          "coefficients");
     }
   }
 
@@ -97,9 +121,23 @@ struct Shell {
         const std::vector<double>& coeff_list);
 
   /**
+   * @brief Constructor with vectors for primitives and radial powers (for ECP
+   * shells)
+   */
+  Shell(size_t atom_idx, OrbitalType orb_type,
+        const std::vector<double>& exp_list,
+        const std::vector<double>& coeff_list,
+        const std::vector<int>& rpow_list);
+
+  /**
    * @brief Get number of primitives in this shell
    */
   size_t get_num_primitives() const { return exponents.size(); }
+
+  /**
+   * @brief Check if this shell has radial powers (i.e., is an ECP shell)
+   */
+  bool has_radial_powers() const { return rpowers.size() > 0; }
 
   /**
    * @brief Get number of basis functions in this shell
@@ -197,6 +235,66 @@ class BasisSet : public DataClass,
            BasisType basis_type = BasisType::Spherical);
 
   /**
+   * @brief Constructor with shells, ECP shells, and structure
+   * @param name Name of the basis set
+   * @param shells Vector of shells to initialize the basis set with
+   * @param ecp_shells Vector of ECP shells to initialize the basis set with
+   * @param structure The molecular structure
+   * @param basis_type Whether to use spherical or cartesian basis functions
+   */
+  BasisSet(const std::string& name, const std::vector<Shell>& shells,
+           const std::vector<Shell>& ecp_shells, const Structure& structure,
+           BasisType basis_type = BasisType::Spherical);
+
+  /**
+   * @brief Constructor with shells, ECP shells, and structure shared pointer
+   * @param name Name of the basis set
+   * @param shells Vector of shells to initialize the basis set with
+   * @param ecp_shells Vector of ECP shells to initialize the basis set with
+   * @param structure Shared pointer to the molecular structure
+   * @param basis_type Whether to use spherical or cartesian basis functions
+   */
+  BasisSet(const std::string& name, const std::vector<Shell>& shells,
+           const std::vector<Shell>& ecp_shells,
+           std::shared_ptr<Structure> structure,
+           BasisType basis_type = BasisType::Spherical);
+
+  /**
+   * @brief Constructor with shells, ECP shells, ECP name, ECP electrons, and
+   * structure
+   * @param name Name of the basis set
+   * @param shells Vector of shells to initialize the basis set with
+   * @param ecp_name Name of the ECP basis set
+   * @param ecp_shells Vector of ECP shells to initialize the basis set with
+   * @param ecp_electrons Vector containing numbers of ECP electrons for each
+   * atom
+   * @param structure The molecular structure
+   * @param basis_type Whether to use spherical or cartesian basis functions
+   */
+  BasisSet(const std::string& name, const std::vector<Shell>& shells,
+           const std::string& ecp_name, const std::vector<Shell>& ecp_shells,
+           const std::vector<size_t>& ecp_electrons, const Structure& structure,
+           BasisType basis_type = BasisType::Spherical);
+
+  /**
+   * @brief Constructor with shells, ECP shells, ECP name, ECP electrons, and
+   * structure shared pointer
+   * @param name Name of the basis set
+   * @param shells Vector of shells to initialize the basis set with
+   * @param ecp_shells Vector of ECP shells to initialize the basis set with
+   * @param ecp_name Name of the ECP basis set
+   * @param ecp_electrons Vector containing numbers of ECP electrons for each
+   * atom
+   * @param structure Shared pointer to the molecular structure
+   * @param basis_type Whether to use spherical or cartesian basis functions
+   */
+  BasisSet(const std::string& name, const std::vector<Shell>& shells,
+           const std::string& ecp_name, const std::vector<Shell>& ecp_shells,
+           const std::vector<size_t>& ecp_electrons,
+           std::shared_ptr<Structure> structure,
+           BasisType basis_type = BasisType::Spherical);
+
+  /**
    * @brief Default destructor
    */
   virtual ~BasisSet() = default;
@@ -265,6 +363,39 @@ class BasisSet : public DataClass,
   size_t get_num_atoms() const;
 
   /**
+   * @brief Get all ECP shells (flattened from per-atom storage)
+   * @return Vector of all ECP shells
+   */
+  std::vector<Shell> get_ecp_shells() const;
+
+  /**
+   * @brief Get ECP shells for a specific atom
+   * @param atom_index Index of the atom
+   * @return Vector of ECP shells for this atom
+   */
+  const std::vector<Shell>& get_ecp_shells_for_atom(size_t atom_index) const;
+
+  /**
+   * @brief Get a specific ECP shell by global index
+   * @param shell_index Global index of the ECP shell
+   * @return Reference to the ECP shell
+   * @throws std::out_of_range if index is invalid
+   */
+  const Shell& get_ecp_shell(size_t shell_index) const;
+
+  /**
+   * @brief Get total number of ECP shells across all atoms
+   * @return Total number of ECP shells
+   */
+  size_t get_num_ecp_shells() const;
+
+  /**
+   * @brief Check if this basis set has ECP shells
+   * @return True if there are any ECP shells
+   */
+  bool has_ecp_shells() const;
+
+  /**
    * @brief Get the shell index and magnetic quantum number for a basis function
    * index
    * @param basis_index Index of the basis function
@@ -293,7 +424,7 @@ class BasisSet : public DataClass,
    * @param atom_index Index of the atom
    * @return Vector of basis function indices for this atom
    */
-  std::vector<size_t> get_basis_fuction_indices_for_atom(
+  std::vector<size_t> get_basis_function_indices_for_atom(
       size_t atom_index) const;
 
   /**
@@ -336,6 +467,30 @@ class BasisSet : public DataClass,
       size_t atom_index, OrbitalType orbital_type) const;
 
   /**
+   * @brief Get ECP shell indices for a specific atom
+   * @param atom_index Index of the atom
+   * @return Vector of ECP shell indices for this atom
+   */
+  std::vector<size_t> get_ecp_shell_indices_for_atom(size_t atom_index) const;
+
+  /**
+   * @brief Get ECP shell indices for a specific orbital type
+   * @param orbital_type Type of orbital
+   * @return Vector of ECP shell indices of this type
+   */
+  std::vector<size_t> get_ecp_shell_indices_for_orbital_type(
+      OrbitalType orbital_type) const;
+
+  /**
+   * @brief Get ECP shell indices for a specific atom and orbital type
+   * @param atom_index Index of the atom
+   * @param orbital_type Type of orbital
+   * @return Vector of ECP shell indices matching both criteria
+   */
+  std::vector<size_t> get_ecp_shell_indices_for_atom_and_orbital_type(
+      size_t atom_index, OrbitalType orbital_type) const;
+
+  /**
    * @brief Get the basis set name
    * @return Name of the basis set
    */
@@ -354,6 +509,24 @@ class BasisSet : public DataClass,
    * @return True if structure is set
    */
   bool has_structure() const;
+
+  /**
+   * @brief Get the ECP name
+   * @return Name of the ECP
+   */
+  const std::string& get_ecp_name() const;
+
+  /**
+   * @brief Get the ECP electrons vector
+   * @return Vector containing numbers of ECP electrons for each atom
+   */
+  const std::vector<size_t>& get_ecp_electrons() const;
+
+  /**
+   * @brief Check if ECP electrons are present
+   * @return True if ECP electrons are present
+   */
+  bool has_ecp_electrons() const;
 
   /**
    * @brief Get summary string of basis set information
@@ -520,6 +693,15 @@ class BasisSet : public DataClass,
 
   /// Shells organized by atom index - each atom has a vector of shells
   std::vector<std::vector<Shell>> _shells_per_atom;
+
+  /// ECP shells organized by atom index - each atom has a vector of ECP shells
+  std::vector<std::vector<Shell>> _ecp_shells_per_atom;
+
+  /// Effective Core Potential (ECP) name (basis set name)
+  std::string _ecp_name;
+
+  /// Number of ECP electrons replaced for each atom
+  std::vector<size_t> _ecp_electrons;
 
   /// Lazily computed cache for basis function to atom mapping
   mutable std::vector<size_t> _basis_to_atom_map;

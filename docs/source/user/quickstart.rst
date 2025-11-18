@@ -1,6 +1,9 @@
 Quickstart
 ==========
 
+These quickstart instructions provide a high-level overview of the typical workflow when using the QDK/Chemistry library.
+They assume that you have installed the QDK/Chemistry package per the `installation instructions <https://github.com/microsoft/qdk-chemistry/blob/main/INSTALL.md>`_.
+
 This document is intended to provide a brief introduction to the QDK/Chemistry library by walking through a minimal end-to-end example for ground state energy estimation with state preparation and measurement.
 The emphasis of this example is optimization:  reducing the resources required for the quantum computer.
 The example starts with a molecular structure and ends with a simulated calculation using quantum algorithms.

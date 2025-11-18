@@ -255,9 +255,9 @@ class PyscfStabilityChecker(StabilityChecker):
         nalpha, nbeta = wavefunction.get_total_num_electrons()
 
         # Create occupation arrays (assumes aufbau filling)
-        num_molecular_orbitalss = orbitals.get_num_molecular_orbitals()
-        occ_alpha = np.zeros(num_molecular_orbitalss)
-        occ_beta = np.zeros(num_molecular_orbitalss)
+        num_molecular_orbitals = orbitals.get_num_molecular_orbitals()
+        occ_alpha = np.zeros(num_molecular_orbitals)
+        occ_beta = np.zeros(num_molecular_orbitals)
         occ_alpha[:nalpha] = 1.0
         occ_beta[:nbeta] = 1.0
 

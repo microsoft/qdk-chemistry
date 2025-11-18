@@ -34,6 +34,7 @@ except ImportError:
 if PYSCF_AVAILABLE:
     import qdk_chemistry.plugins.pyscf
     from qdk_chemistry.constants import ANGSTROM_TO_BOHR
+    from qdk_chemistry.data import BasisSet, BasisType, OrbitalType, Shell
     from qdk_chemistry.plugins.pyscf.mcscf import mcsolver_to_fcisolver
     from qdk_chemistry.plugins.pyscf.utils import (
         basis_to_pyscf_mol,
@@ -1750,7 +1751,7 @@ class TestQDKChemistryPySCFBasisConversion:
         orig_shells = original_basis.get_shells()
         conv_shells = converted_basis.get_shells()
 
-        for i, (orig_shell, conv_shell) in enumerate(zip(orig_shells, conv_shells, strict=False)):
+        for i, (orig_shell, conv_shell) in enumerate(zip(orig_shells, conv_shells, strict=True)):
             assert orig_shell.atom_index == conv_shell.atom_index, f"Shell {i}: atom index mismatch"
             assert orig_shell.orbital_type == conv_shell.orbital_type, f"Shell {i}: orbital type mismatch"
             assert orig_shell.get_num_primitives() == conv_shell.get_num_primitives(), (
@@ -1872,3 +1873,188 @@ class TestQDKChemistryPySCFBasisConversion:
         # Name should be preserved
         converted_name = converted_basis.get_name()
         assert original_name == converted_name
+
+    def test_ecp_extraction_and_metadata(self):
+        """Test that ECP shells and metadata are properly extracted from PySCF."""
+        # Create a structure with heavy atoms that use ECPs
+        ag_structure = Structure(["Ag"], np.array([[0.0, 0.0, 0.0]]))
+
+        # Create PySCF molecule with ECP
+        pyscf_mol = pyscf.gto.M(atom="Ag 0 0 0", spin=1, basis="lanl2dz", ecp="lanl2dz", verbose=0)
+
+        # Convert to QDK/Chemistry basis
+        qdk_basis = pyscf_mol_to_qdk_basis(pyscf_mol, ag_structure)
+
+        # Verify ECP shells were extracted with radial powers
+        assert qdk_basis.has_ecp_shells()
+        assert qdk_basis.get_num_ecp_shells() > 0
+
+        ecp_shells = qdk_basis.get_ecp_shells()
+        for shell in ecp_shells:
+            assert shell.has_radial_powers()
+            assert len(shell.rpowers) > 0
+            assert len(shell.rpowers) == len(shell.exponents) == len(shell.coefficients)
+
+        # Verify ECP metadata
+        assert qdk_basis.has_ecp_electrons()
+        assert qdk_basis.get_ecp_name() == "lanl2dz"
+
+        # Check ECP electron counts
+        ecp_electrons = qdk_basis.get_ecp_electrons()
+        assert len(ecp_electrons) == 1
+        assert ecp_electrons[0] == 28  # LANL2DZ ECP for Ag removes 28 core electrons
+
+    def test_ecp_roundtrip_conversion(self):
+        """Test round-trip conversion of ECP shells and metadata: QDK -> PySCF -> QDK."""
+        ag_structure = Structure(["Ag"], np.array([[0.0, 0.0, 0.0]]))
+
+        # Create PySCF molecule with ECP
+        pyscf_mol_orig = pyscf.gto.M(atom="Ag 0 0 0", spin=1, basis="lanl2dz", ecp="lanl2dz", verbose=0)
+        qdk_basis_orig = pyscf_mol_to_qdk_basis(pyscf_mol_orig, ag_structure)
+
+        # Store original data
+        orig_ecp_shells = qdk_basis_orig.get_ecp_shells()
+        orig_ecp_name = qdk_basis_orig.get_ecp_name()
+
+        # Convert to PySCF (need to preserve charge and multiplicity)
+        pyscf_mol_converted = basis_to_pyscf_mol(qdk_basis_orig, charge=0, multiplicity=2)
+
+        # Verify qdk_ecp_name attribute was stored
+        assert hasattr(pyscf_mol_converted, "qdk_ecp_name")
+        assert pyscf_mol_converted.qdk_ecp_name == orig_ecp_name
+
+        # Convert back to QDK/Chemistry
+        qdk_basis_roundtrip = pyscf_mol_to_qdk_basis(pyscf_mol_converted, ag_structure)
+
+        # Verify ECP name preserved
+        assert qdk_basis_roundtrip.get_ecp_name() == orig_ecp_name
+
+        # Verify ECP shells preserved with high precision
+        assert qdk_basis_roundtrip.has_ecp_shells()
+        assert qdk_basis_roundtrip.get_num_ecp_shells() == len(orig_ecp_shells)
+
+        roundtrip_ecp_shells = qdk_basis_roundtrip.get_ecp_shells()
+        for orig_shell, rt_shell in zip(orig_ecp_shells, roundtrip_ecp_shells, strict=True):
+            assert orig_shell.atom_index == rt_shell.atom_index
+            assert orig_shell.orbital_type == rt_shell.orbital_type
+            assert orig_shell.has_radial_powers() == rt_shell.has_radial_powers()
+            assert np.allclose(
+                orig_shell.exponents,
+                rt_shell.exponents,
+                rtol=float_comparison_relative_tolerance,
+                atol=float_comparison_absolute_tolerance,
+            )
+            assert np.allclose(
+                orig_shell.coefficients,
+                rt_shell.coefficients,
+                rtol=float_comparison_relative_tolerance,
+                atol=float_comparison_absolute_tolerance,
+            )
+            assert np.array_equal(orig_shell.rpowers, rt_shell.rpowers)
+
+    def test_ecp_multi_atom_and_formats(self):
+        """Test ECP handling in multi-atom systems and different PySCF ECP formats."""
+        # Test 1: Multi-atom system with mixed ECP/no-ECP atoms
+        agh_structure = Structure(["Ag", "H"], np.array([[0.0, 0.0, 0.0], [2.0, 0.0, 0.0]]))
+        pyscf_mol_mixed = pyscf.gto.M(
+            atom="Ag 0 0 0; H 2 0 0", basis={"Ag": "lanl2dz", "H": "sto-3g"}, ecp={"Ag": "lanl2dz"}, verbose=0
+        )
+        qdk_basis_mixed = pyscf_mol_to_qdk_basis(pyscf_mol_mixed, agh_structure)
+
+        assert qdk_basis_mixed.has_ecp_electrons()
+        assert qdk_basis_mixed.has_ecp_shells()
+        ecp_electrons = qdk_basis_mixed.get_ecp_electrons()
+        assert ecp_electrons == [28, 0]  # Ag with ECP, H without
+        assert len(qdk_basis_mixed.get_ecp_shells_for_atom(0)) > 0  # Ag has ECP shells
+        assert len(qdk_basis_mixed.get_ecp_shells_for_atom(1)) == 0  # H has no ECP shells
+
+        # Test 2: Different ECP specification formats (string vs dict)
+        ag_structure = Structure(["Ag"], np.array([[0.0, 0.0, 0.0]]))
+        pyscf_mol_str = pyscf.gto.M(atom="Ag 0 0 0", spin=1, basis="lanl2dz", ecp="lanl2dz", verbose=0)
+        pyscf_mol_dict = pyscf.gto.M(atom="Ag 0 0 0", spin=1, basis="lanl2dz", ecp={"Ag": "lanl2dz"}, verbose=0)
+
+        qdk_basis_str = pyscf_mol_to_qdk_basis(pyscf_mol_str, ag_structure)
+        qdk_basis_dict = pyscf_mol_to_qdk_basis(pyscf_mol_dict, ag_structure)
+
+        # Both formats should give identical results
+        assert qdk_basis_str.get_ecp_name() == qdk_basis_dict.get_ecp_name() == "lanl2dz"
+        assert qdk_basis_str.get_ecp_electrons() == qdk_basis_dict.get_ecp_electrons()
+        assert qdk_basis_str.get_num_ecp_shells() == qdk_basis_dict.get_num_ecp_shells()
+
+    def test_ecp_edge_cases(self):
+        """Test ECP edge cases: shells without metadata and full structure format."""
+        ag_structure = Structure(["Ag"], np.array([[0.0, 0.0, 0.0]]))
+
+        # Edge case 1: ECP shells exist without ECP metadata
+        shells = [Shell(0, OrbitalType.S, [1.0], [1.0])]
+        ecp_shells = [Shell(0, OrbitalType.S, [10.0, 5.0], [50.0, 20.0], [0, 2])]
+        qdk_basis_no_meta = BasisSet("test-basis", shells, ecp_shells, ag_structure, BasisType.Spherical)
+
+        assert qdk_basis_no_meta.has_ecp_shells()
+        assert qdk_basis_no_meta.get_num_ecp_shells() == 1
+        assert not qdk_basis_no_meta.has_ecp_electrons()  # No metadata set
+        assert qdk_basis_no_meta.get_ecp_name() == "none"
+
+        # Edge case 2: Full ECP structure format roundtrip
+        pyscf_mol_orig = pyscf.gto.M(atom="Ag 0 0 0", spin=1, basis="lanl2dz", ecp="lanl2dz", verbose=0)
+        qdk_basis_1 = pyscf_mol_to_qdk_basis(pyscf_mol_orig, ag_structure)
+
+        # Convert to PySCF (creates full ECP structure dict, need to preserve charge and multiplicity)
+        pyscf_mol_1 = basis_to_pyscf_mol(qdk_basis_1, charge=0, multiplicity=2)
+
+        # Verify full structure format: [ncore, [[l, terms], ...]]
+        assert isinstance(pyscf_mol_1.ecp, dict)
+        assert "Ag" in pyscf_mol_1.ecp
+        ecp_data = pyscf_mol_1.ecp["Ag"]
+        assert isinstance(ecp_data, list)
+        assert len(ecp_data) >= 2
+        assert isinstance(ecp_data[0], int)  # ncore
+        assert isinstance(ecp_data[1], list)  # [[l, terms], ...]
+
+        # Convert back (should handle full structure format)
+        qdk_basis_2 = pyscf_mol_to_qdk_basis(pyscf_mol_1, ag_structure)
+
+        # Verify complete preservation
+        assert qdk_basis_2.has_ecp_electrons()
+        assert qdk_basis_2.has_ecp_shells()
+        assert qdk_basis_2.get_ecp_name() == qdk_basis_1.get_ecp_name()
+        assert qdk_basis_2.get_ecp_electrons() == qdk_basis_1.get_ecp_electrons()
+        assert qdk_basis_2.get_num_ecp_shells() == qdk_basis_1.get_num_ecp_shells()
+
+    def test_agh_def2svp_roundtrip(self):
+        """Test AgH with def2-svp and ECP round-trip conversion."""
+        # Setup AgH molecule with PySCF
+        mol1 = pyscf.gto.Mole()
+        mol1.atom = "Ag 0.0 0.0 0.0; H 0.0 0.0 1.617"
+        mol1.basis = "def2-svp"
+        mol1.ecp = "def2-svp"
+        mol1.unit = "Angstrom"
+        mol1.build()
+
+        # Run SCF calculation
+        scf1 = pyscf.scf.RHF(mol1)
+        scf1.verbose = 0
+        energy1 = scf1.kernel()
+        assert hasattr(mol1, "_ecp")
+        assert mol1._ecp
+
+        # Create QDK Structure
+        structure = Structure(symbols=["Ag", "H"], coordinates=mol1.atom_coords())
+
+        # Convert PySCF Mole to QDK BasisSet
+        qdk_basis = pyscf_mol_to_qdk_basis(mol1, structure, basis_name="def2-svp")
+
+        # Convert QDK BasisSet back to PySCF Mole
+        mol2 = basis_to_pyscf_mol(qdk_basis)
+        assert hasattr(mol2, "_ecp")
+        assert mol2._ecp
+
+        # Run SCF calculation with converted basis
+        scf2 = pyscf.scf.RHF(mol2)
+        scf2.verbose = 0
+        energy2 = scf2.kernel()
+
+        # Verify round-trip conversion
+        assert mol1.nao == mol2.nao
+        assert mol1.nelectron == mol2.nelectron
+        assert np.isclose(energy1, energy2, rtol=float_comparison_relative_tolerance, atol=scf_energy_tolerance)

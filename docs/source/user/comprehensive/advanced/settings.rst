@@ -207,12 +207,7 @@ The ``Settings`` class provides methods to serialize and deserialize settings to
 This allows you to save algorithm configurations, share them with colleagues, or use them in future runs to ensure consistent results.
 
 JSON is a human-readable format ideal for manual editing and inspection, while HDF5 offers better performance and type preservation for large datasets.
-For more information on serialization throughout QDK/Chemistry, see the :doc:`Serialization <serialization>` documentation:
-
-.. todo::
-   **TODO**: Note that the HDF5 serialization function is named ``to_hdf5()`` while other classes use ``to_hdf5_file()``.
-   This naming inconsistency should be addressed for API uniformity by renaming the function to match other classes in
-   the toolkit.
+For more information on serialization throughout QDK/Chemistry, see the :doc:`Serialization <serialization>` documentation.
 
 .. tab:: C++ API
 

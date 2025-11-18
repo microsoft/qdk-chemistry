@@ -1,6 +1,7 @@
 Multi-configuration :term:`SCF`
 ===============================
 
-.. todo::
+.. note::
 
-   The multi-configuration SCF documentation is currently under construction.
+   The multi-configuration :term:`SCF` documentation is currently under construction.
+   In the meantime, please see :class:`qdk_chemistry.algorithms.MultiConfigurationScf` for details.
