@@ -1,0 +1,83 @@
+name: Build and Test
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - '**'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  cpp-python:
+    name: Build C++ and Python packages
+    runs-on: ubuntu-latest
+    env:
+      BUILD_DIR: cpp/build
+      INSTALL_PREFIX: ${{ github.workspace }}/cpp/install
+      CMAKE_BUILD_PARALLEL_LEVEL: 4
+      QDK_UARCH: x86-64-v3
+      CTEST_OUTPUT_ON_FAILURE: 1
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Set up Python 3.13
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+          cache: pip
+
+      - name: Install system packages
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            build-essential \
+            ninja-build \
+            cmake \
+            libeigen3-dev \
+            libboost-all-dev \
+            libhdf5-dev \
+            liblapack-dev \
+            libopenblas-dev \
+            libgfortran5 \
+            pkg-config
+
+      - name: Configure C++ build
+        run: |
+          cmake -S cpp -B "$BUILD_DIR" \
+            -DCMAKE_BUILD_TYPE=RelWithDebInfo \
+            -DQDK_UARCH="$QDK_UARCH" \
+            -DCMAKE_INSTALL_PREFIX="$INSTALL_PREFIX"
+
+      - name: Build C++ library
+        run: cmake --build "$BUILD_DIR"
+
+      - name: Run C++ tests
+        run: ctest --test-dir "$BUILD_DIR"
+
+      - name: Install C++ library
+        run: cmake --install "$BUILD_DIR" --prefix "$INSTALL_PREFIX"
+
+      - name: Install Python package
+        env:
+          CMAKE_PREFIX_PATH: ${{ env.INSTALL_PREFIX }}
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install "python[dev,docs]"
+
+      - name: Run Python tests
+        working-directory: python
+        env:
+          CMAKE_PREFIX_PATH: ${{ env.INSTALL_PREFIX }}
+        run: pytest -vv
+
+      - name: Build documentation
+        working-directory: docs
+        run: make clean all
