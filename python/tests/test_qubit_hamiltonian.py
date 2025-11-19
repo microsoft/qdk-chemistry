@@ -48,10 +48,17 @@ class TestQubitHamiltonian:
         # Create a simple 2-qubit Hamiltonian
         qubit_hamiltonian = QubitHamiltonian(["ZZ", "XX"], [1.0, 0.5])
 
-        # Should return a float energy value
-        energy = qubit_hamiltonian.exact_energy
-        assert isinstance(energy, float)
-        assert energy is not None
+        energy, state = qubit_hamiltonian.exact_ground_state()
+        assert np.isclose(
+            energy, -1.5, atol=float_comparison_absolute_tolerance, rtol=float_comparison_relative_tolerance
+        )
+        assert state.shape == (4,)
+        assert np.allclose(
+            state,
+            [0, 1 / np.sqrt(2), -1 / np.sqrt(2), 0],
+            atol=float_comparison_absolute_tolerance,
+            rtol=float_comparison_relative_tolerance,
+        )
 
     def test_group_commuting(self):
         """Test group_commuting."""

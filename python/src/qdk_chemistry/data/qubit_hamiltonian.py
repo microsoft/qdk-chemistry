@@ -17,6 +17,7 @@ import h5py
 import numpy as np
 from qiskit.quantum_info import SparsePauliOp
 
+from qdk_chemistry._core.utils import davidson_solver
 from qdk_chemistry.data import Wavefunction
 from qdk_chemistry.data.base import DataClass
 from qdk_chemistry.utils.statevector import create_statevector_from_wavefunction
@@ -96,15 +97,21 @@ class QubitHamiltonian(DataClass):
             for group in sparse_pauli_ops
         ]
 
-    @property
-    def exact_energy(self) -> float | None:
-        """Compute the exact ground state energy via matrix diagonalization.
+    def exact_ground_state(self, tol: float = 1e-8, max_m: int = 20) -> tuple[float, np.ndarray] | None:
+        """Compute the exact ground state energy and eigenstate via matrix diagonalization.
+
+        Args:
+            tol: Tolerance for the Davidson solver. Default is 1e-8.
+            max_m: Maximum subspace size for the Davidson solver. Default is 20.
 
         Returns:
-            float | None: The minimum eigenvalue if qubit count is small enough, else None.
+            A tuple of (ground state energy, ground state eigenvector) if successful, else None
 
         """
-        return np.linalg.eigvalsh(self.pauli_ops.to_matrix()).min()
+        sparse_matrix = self.pauli_ops.to_matrix(sparse=True)
+        sparse_matrix_real = sparse_matrix.real.copy()
+        result = davidson_solver(sparse_matrix_real, tol=tol, max_m=max_m)
+        return result["eigenvalue"], result["eigenvector"] if result else None
 
     # DataClass interface implementation
     def get_summary(self) -> str:
