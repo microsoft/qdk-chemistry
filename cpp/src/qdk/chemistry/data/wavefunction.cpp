@@ -104,6 +104,7 @@ WavefunctionContainer::WavefunctionContainer(WavefunctionType type)
                             std::nullopt,  // two_rdm_bbbb
                             type) {}
 
+// \cond DOXYGEN_SUPPRESS (suppress warnings for declaration with "using")
 WavefunctionContainer::WavefunctionContainer(
     const std::optional<ContainerTypes::MatrixVariant>& one_rdm_spin_traced,
     const std::optional<ContainerTypes::VectorVariant>& two_rdm_spin_traced,
@@ -116,7 +117,9 @@ WavefunctionContainer::WavefunctionContainer(
                             std::nullopt,  // two_rdm_aaaa
                             std::nullopt,  // two_rdm_bbbb
                             type) {}
+// \endcond
 
+// \cond DOXYGEN_SUPPRESS (suppress warnings for declaration with "using")
 WavefunctionContainer::WavefunctionContainer(
     const std::optional<ContainerTypes::MatrixVariant>& one_rdm_spin_traced,
     const std::optional<ContainerTypes::MatrixVariant>& one_rdm_aa,
@@ -170,6 +173,7 @@ WavefunctionContainer::WavefunctionContainer(
     _two_rdm_spin_dependent_bbbb = nullptr;
   }
 }
+// \endcond
 
 // RDM handling
 std::tuple<const ContainerTypes::MatrixVariant&,
