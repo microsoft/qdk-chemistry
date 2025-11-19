@@ -20,6 +20,7 @@ option(QDK_ALLOW_DEPENDENCY_FETCH "Allow fetching of dependencies"     ON)
 option(QDK_CHEMISTRY_ENABLE_MPI "Enable MPI Bindings for QDK Chemistry"  OFF)
 option(QDK_EMBED_RESOURCE_LOCATION "Point to embedded (permanent) resource location" ON)
 option(QDK_ENABLE_OPENMP "Enable OpenMP support" ON)
+option(QDK_BUILD_DOC_EXAMPLES "Build documentation examples for validation" OFF)
 
 list(APPEND CMAKE_MODULE_PATH ${PROJECT_SOURCE_DIR}/cmake/modules)
 
@@ -238,4 +239,10 @@ export(EXPORT chemistryTargets
 include(CTest) # BUILD_TESTING variable
 if(BUILD_TESTING)
     add_subdirectory(tests)
+endif()
+
+# Documentation examples (optional build for validation)
+if(QDK_BUILD_DOC_EXAMPLES)
+    add_subdirectory(../docs/examples/cpp ${CMAKE_CURRENT_BINARY_DIR}/doc_examples)
+    message(STATUS "Building documentation examples for validation")
 endif()
