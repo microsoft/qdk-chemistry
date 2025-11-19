@@ -36,8 +36,7 @@ class MacisAsciSettings : public MultiConfigurationSettings {
     macis::ASCISettings macis_defaults;
 
     // TODO (NAB):  are these parameters documented somewhere?
-    // Can we provide a pointer to that file here?
-    // 41318
+    // Can we provide a pointer to that file here? Workitem: 41318
 
     // ASCI determinant control parameters
     set_default<size_t>("ntdets_max", macis_defaults.ntdets_max);

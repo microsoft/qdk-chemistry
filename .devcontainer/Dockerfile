@@ -1,5 +1,3 @@
-ARG HOST_ARCH
-ARG CUDA_ARCH
 FROM ubuntu:24.04:latest
 
 # Create a non-root user with sudo privileges
