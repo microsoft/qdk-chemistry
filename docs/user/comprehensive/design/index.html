@@ -117,7 +117,7 @@ This fundamental design choice enables flexibility, extensibility, and maintaina
 </ol>
 <p>This separation follows the principle of single responsibility and creates a clear flow of data through computational
 workflows.</p>
-digraph DataFlow {
+<div class="graphviz"><img src="../../../_images/graphviz-81cb93437fff91546debeb5cb5e3d380016e084e.png" alt="digraph DataFlow {
     rankdir=LR;
     bgcolor=&quot;#FAFAFA&quot;;
     node [shape=box, style=&quot;rounded,filled&quot;, fontname=&quot;Arial&quot;, margin=0.3];
@@ -129,7 +129,7 @@ digraph DataFlow {
 
     Input -&gt; Algorithm;
     Algorithm -&gt; Output;
-}
+}" class="graphviz" /></div>
 <p class="rubric">Data classes</p>
 <p>Data classes in QDK/Chemistry are designed to be:</p>
 <ul class="simple">
@@ -256,7 +256,7 @@ This design allows users to benefit from specialized capabilities of external so
 </div>
 <p class="rubric">Interface architecture</p>
 <p>QDK/Chemistry is designed with a plugin architecture that allows for consistent <a class="reference internal" href="interfaces.html"><span class="doc">interfaces</span></a> to various external packages:</p>
-digraph PluginArchitecture {
+<div class="graphviz"><img src="../../../_images/graphviz-425f73d86fb873b40e9ee4489a05e57b826832b4.png" alt="digraph PluginArchitecture {
     rankdir=LR;
     bgcolor=&quot;#FAFAFA&quot;;
     node [shape=box, style=&quot;rounded,filled&quot;, fontname=&quot;Arial&quot;, margin=0.3];
@@ -268,7 +268,7 @@ digraph PluginArchitecture {
 
     Interface -&gt; QDK;
     Interface -&gt; ThirdParty;
-}
+}" class="graphviz" /></div>
 <p>This design provides several advantages:</p>
 <ol class="arabic simple">
 <li><p><strong>Unified API</strong>: Users interact with a consistent interface regardless of the underlying implementation</p></li>
