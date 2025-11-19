@@ -42,7 +42,7 @@ Most algorithms validate their settings only at execution time, so you can adjus
 
 .. tab:: Python API
 
-   .. literalinclude:: ../../../../examples/settings.py
+   .. literalinclude:: ../../../../examples/python/settings.py
       :language: python
       :lines: 8-15
 
@@ -69,7 +69,7 @@ The ``set`` method is overloaded to handle various types including C-style strin
 
 .. tab:: Python API
 
-   .. literalinclude:: ../../../../examples/settings.py
+   .. literalinclude:: ../../../../examples/python/settings.py
       :language: python
       :lines: 19-29
 
@@ -89,7 +89,7 @@ For cases where you want to provide a fallback value if the key doesn't exist, u
 
 .. tab:: Python API
 
-   .. literalinclude:: ../../../../examples/settings.py
+   .. literalinclude:: ../../../../examples/python/settings.py
       :language: python
       :lines: 31-44
 
@@ -109,7 +109,7 @@ Additionally, the ``try_get`` method returns an ``std::optional`` that contains 
 
 .. tab:: Python API
 
-   .. literalinclude:: ../../../../examples/settings.py
+   .. literalinclude:: ../../../../examples/python/settings.py
       :language: python
       :lines: 49-65
 
@@ -152,7 +152,7 @@ For more information on serialization throughout QDK/Chemistry, see the :doc:`Se
 
 .. tab:: Python API
 
-   .. literalinclude:: ../../../../examples/settings.py
+   .. literalinclude:: ../../../../examples/python/settings.py
       :language: python
       :lines: 110-130
 
@@ -208,7 +208,7 @@ Here's how to extend the ``Settings`` class for a custom algorithm:
 
 .. tab:: Python API
 
-   .. literalinclude:: ../../../../examples/settings.py
+   .. literalinclude:: ../../../../examples/python/settings.py
       :language: python
       :lines: 134-140
 
@@ -259,7 +259,7 @@ These exceptions can be caught and handled to provide graceful error recovery:
 
 .. tab:: Python API
 
-   .. literalinclude:: ../../../../examples/settings.py
+   .. literalinclude:: ../../../../examples/python/settings.py
       :language: python
       :lines: 144-147
 

@@ -63,7 +63,7 @@ However, for advanced use cases, you can create and populate orbitals directly:
    .. note::
       This example shows the API pattern. For complete working examples, see the test suite.
 
-   .. literalinclude:: ../../../../examples/orbitals.py
+   .. literalinclude:: ../../../../examples/python/orbitals.py
       :language: python
       :lines: 7-15
 
@@ -86,7 +86,7 @@ For spin-dependent properties, methods return pairs of (alpha, beta) data.
    .. note::
       This example shows the API pattern. For complete working examples, see the test suite.
 
-   .. literalinclude:: ../../../../examples/orbitals.py
+   .. literalinclude:: ../../../../examples/python/orbitals.py
       :language: python
       :lines: 30-43
 
@@ -180,7 +180,7 @@ HDF5 representation of an ``Orbitals`` object has the following structure (showi
    .. note::
       This example shows the API pattern. For complete working examples, see the test suite.
 
-   .. literalinclude:: ../../../../examples/orbitals.py
+   .. literalinclude:: ../../../../examples/python/orbitals.py
       :language: python
       :lines: 45-56
 

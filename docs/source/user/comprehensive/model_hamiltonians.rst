@@ -21,7 +21,7 @@ The following example demonstrates how to create a simple Hubbard model Hamilton
 
 .. tab:: Python API
 
-   .. literalinclude:: ../../../examples/model_hamiltonian.py
+   .. literalinclude:: ../../../examples/python/model_hamiltonian.py
       :language: python
       :start-after: # start-cell-1
       :end-before: # end-cell-1
@@ -40,7 +40,7 @@ Example with multi-configuration calculator:
 
 .. tab:: Python API
 
-   .. literalinclude:: ../../../examples/model_hamiltonian.py
+   .. literalinclude:: ../../../examples/python/model_hamiltonian.py
       :language: python
       :start-after: # start-cell-2
       :end-before: # end-cell-2

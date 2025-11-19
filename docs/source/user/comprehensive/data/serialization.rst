@@ -46,7 +46,7 @@ JSON serialization
 
 .. tab:: Python API
 
-   .. literalinclude:: ../../../../examples/serialization.py
+   .. literalinclude:: ../../../../examples/python/serialization.py
       :language: python
       :lines: 14-20,26-32
 
@@ -62,7 +62,7 @@ HDF5 serialization
 
 .. tab:: Python API
 
-   .. literalinclude:: ../../../../examples/serialization.py
+   .. literalinclude:: ../../../../examples/python/serialization.py
       :language: python
       :lines: 35-41
 

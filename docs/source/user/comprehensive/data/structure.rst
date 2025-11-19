@@ -43,7 +43,7 @@ A :class:`~qdk_chemistry.data.Structure` object can be created manually by addin
 
 .. tab:: Python API
 
-   .. literalinclude:: ../../../../examples/structure.py
+   .. literalinclude:: ../../../../examples/python/structure.py
       :language: python
       :lines: 1-11
 
@@ -69,7 +69,7 @@ For detailed format specifications, see the `File Formats`_ section below.
    .. note::
       These examples show the API pattern. For complete working examples, see the test suite.
 
-   .. literalinclude:: ../../../../examples/structure.py
+   .. literalinclude:: ../../../../examples/python/structure.py
       :language: python
       :lines: 13-17
 
@@ -92,7 +92,7 @@ The :class:`~qdk_chemistry.data.Structure` class provides methods to access atom
 
 .. tab:: Python API
 
-   .. literalinclude:: ../../../../examples/structure.py
+   .. literalinclude:: ../../../../examples/python/structure.py
       :language: python
       :lines: 13-23
 
@@ -153,7 +153,7 @@ XYZ format
 
 .. tab:: Python API
 
-   .. literalinclude:: ../../../../examples/serialization.py
+   .. literalinclude:: ../../../../examples/python/serialization.py
       :language: python
       :lines: 1-18
 
@@ -174,7 +174,7 @@ The :class:`~qdk_chemistry.data.Structure` class provides methods for basic mole
    .. note::
       This example shows the API pattern. For complete working examples, see the test suite.
 
-   .. literalinclude:: ../../../../examples/structure.py
+   .. literalinclude:: ../../../../examples/python/structure.py
       :language: python
       :lines: 19-24
 

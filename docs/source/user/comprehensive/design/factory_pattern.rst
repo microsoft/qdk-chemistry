@@ -74,7 +74,7 @@ These factory methods allow users to create default implementations or specific 
 
 .. tab:: Python API
 
-   .. literalinclude:: ../../../../examples/factory_pattern.py
+   .. literalinclude:: ../../../../examples/python/factory_pattern.py
       :language: python
       :lines: 4,19-29
 

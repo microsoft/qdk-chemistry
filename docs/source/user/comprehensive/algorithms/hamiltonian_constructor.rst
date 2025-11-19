@@ -41,7 +41,7 @@ The orbitals provide the necessary information about the molecular system includ
 
 .. tab:: Python API
 
-   .. literalinclude:: ../../../../examples/hamiltonian_constructor.py
+   .. literalinclude:: ../../../../examples/python/hamiltonian_constructor.py
       :language: python
       :lines: 3-
 
@@ -69,7 +69,7 @@ The ``HamiltonianConstructor`` can be configured using the ``Settings`` object w
 
 .. tab:: Python API
 
-   .. literalinclude:: ../../../../examples/settings.py
+   .. literalinclude:: ../../../../examples/python/settings.py
       :language: python
       :lines: 4-12
 
@@ -91,7 +91,7 @@ Once configured, the Hamiltonian can be constructed from a set of orbitals:
       This example shows the API pattern.
       For complete working examples, see the test suite.
 
-   .. literalinclude:: ../../../../examples/factory_pattern.py
+   .. literalinclude:: ../../../../examples/python/factory_pattern.py
       :language: python
       :lines: 1-9
 

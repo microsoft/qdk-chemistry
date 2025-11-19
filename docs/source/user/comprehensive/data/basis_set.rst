@@ -82,7 +82,7 @@ Creating a basis set
    .. note::
       This example shows the API pattern. For complete working examples, see the test suite.
 
-   .. literalinclude:: ../../../../examples/basis_set.py
+   .. literalinclude:: ../../../../examples/python/basis_set.py
       :language: python
       :lines: 7-20
 
@@ -108,7 +108,7 @@ This ensures that the basis set data remains consistent and prevents accidental 
    .. note::
       This example shows the API pattern. For complete working examples, see the test suite.
 
-   .. literalinclude:: ../../../../examples/basis_set.py
+   .. literalinclude:: ../../../../examples/python/basis_set.py
       :language: python
       :lines: 22-45
 
@@ -129,7 +129,7 @@ The ``Shell`` structure contains information about a group of atomic orbitals:
    .. note::
       This example shows the API pattern. For complete working examples, see the test suite.
 
-   .. literalinclude:: ../../../../examples/basis_set.py
+   .. literalinclude:: ../../../../examples/python/basis_set.py
       :language: python
       :lines: 47-61
 
@@ -213,7 +213,7 @@ HDF5 representation of a ``BasisSet`` has the following structure (showing group
    .. note::
       This example shows the API pattern. For complete working examples, see the test suite.
 
-   .. literalinclude:: ../../../../examples/basis_set.py
+   .. literalinclude:: ../../../../examples/python/basis_set.py
       :language: python
       :lines: 63-79
 
@@ -234,7 +234,7 @@ The ``BasisSet`` class provides several static utility functions:
    .. note::
       This example shows the API pattern. For complete working examples, see the test suite.
 
-   .. literalinclude:: ../../../../examples/basis_set.py
+   .. literalinclude:: ../../../../examples/python/basis_set.py
       :language: python
       :lines: 88-95
 
@@ -257,7 +257,7 @@ For a complete list of available basis sets and their specifications, see the :d
    .. note::
       This example shows the API pattern. For complete working examples, see the test suite.
 
-   .. literalinclude:: ../../../../examples/basis_set.py
+   .. literalinclude:: ../../../../examples/python/basis_set.py
       :language: python
       :lines: 81-90
 

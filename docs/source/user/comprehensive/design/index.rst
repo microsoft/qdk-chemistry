@@ -71,7 +71,7 @@ QDK/Chemistry implements the :doc:`factory pattern <factory_pattern>` for algori
 
 .. tab:: Python API
 
-   .. literalinclude:: ../../../../examples/factory_pattern.py
+   .. literalinclude:: ../../../../examples/python/factory_pattern.py
       :language: python
       :lines: 6
 
@@ -96,7 +96,7 @@ Algorithm configuration is managed through a consistent :doc:`Settings <settings
 
 .. tab:: Python API
 
-   .. literalinclude:: ../../../../examples/settings.py
+   .. literalinclude:: ../../../../examples/python/settings.py
       :language: python
       :lines: 8-12
 
@@ -122,7 +122,7 @@ A typical workflow in QDK/Chemistry demonstrates the data-algorithm separation:
 
 .. tab:: Python API
 
-   .. literalinclude:: ../../../../examples/complete_workflow.py
+   .. literalinclude:: ../../../../examples/python/complete_workflow.py
       :language: python
       :lines: 3-
 

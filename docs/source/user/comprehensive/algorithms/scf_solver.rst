@@ -105,7 +105,7 @@ QDK/Chemistry currently provides the following registered solvers:
 
 .. tab:: Python API
 
-   .. literalinclude:: ../../../../examples/factory_pattern.py
+   .. literalinclude:: ../../../../examples/python/factory_pattern.py
       :language: python
 
 Configuring the :term:`SCF` calculation
@@ -130,7 +130,7 @@ See the `Available Settings`_ section below for a complete list of configuration
 
 .. tab:: Python API
 
-   .. literalinclude:: ../../../../examples/settings.py
+   .. literalinclude:: ../../../../examples/python/settings.py
       :language: python
       :lines: 4-12
 
@@ -152,7 +152,7 @@ The ``solve`` method returns two values:
 
 .. tab:: Python API
 
-   .. literalinclude:: ../../../../examples/scf_solver.py
+   .. literalinclude:: ../../../../examples/python/scf_solver.py
       :language: python
       :lines: 1-17
 

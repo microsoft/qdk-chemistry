@@ -38,7 +38,7 @@ See below for language specific examples of creating and serializing :doc:`compr
 
 .. tab:: Python API
 
-   .. literalinclude:: ../../examples/quickstart.py
+   .. literalinclude:: ../../examples/python/quickstart.py
       :language: python
       :start-after: # start-cell-1
       :end-before: # end-cell-1
@@ -65,7 +65,7 @@ See below for language-specific examples.
 
 .. tab:: Python API
 
-   .. literalinclude:: ../../examples/quickstart.py
+   .. literalinclude:: ../../examples/python/quickstart.py
       :language: python
       :start-after: # start-cell-2
       :end-before: # end-cell-2
@@ -94,7 +94,7 @@ The following are language-specific examples of how to select a so-called "valen
    .. note::
       This example shows the API pattern. For complete working examples, see :doc:`comprehensive/algorithms/active_space`.
 
-   .. literalinclude:: ../../examples/quickstart.py
+   .. literalinclude:: ../../examples/python/quickstart.py
       :language: python
       :start-after: # start-cell-3
       :end-before: # end-cell-3
@@ -119,7 +119,7 @@ The Hamiltonian constructor can generate the one- and two-electron integrals nee
    .. note::
       This example shows the API pattern. For complete working examples, see :doc:`comprehensive/algorithms/hamiltonian_constructor`.
 
-   .. literalinclude:: ../../examples/quickstart.py
+   .. literalinclude:: ../../examples/python/quickstart.py
       :language: python
       :start-after: # start-cell-4
       :end-before: # end-cell-4
@@ -145,7 +145,7 @@ Configuration Interaction (CI) and selected :term:`CI` approaches.
    .. note::
       This example shows the API pattern. For complete working examples, see :doc:`comprehensive/algorithms/mc_calculator`.
 
-   .. literalinclude:: ../../examples/quickstart.py
+   .. literalinclude:: ../../examples/python/quickstart.py
       :language: python
       :start-after: # start-cell-5
       :end-before: # end-cell-5
@@ -167,7 +167,7 @@ This truncation is characterized by computing the overlap between the truncated 
 
 .. tab:: Python API
 
-   .. literalinclude:: ../../examples/quickstart.py
+   .. literalinclude:: ../../examples/python/quickstart.py
       :language: python
       :start-after: # start-cell-6
       :end-before: # end-cell-6
@@ -192,7 +192,7 @@ Second, by grouping the remaining Pauli operators into commuting sets that can b
 .. tab:: Python API
 
 
-   .. literalinclude:: ../../examples/quickstart.py
+   .. literalinclude:: ../../examples/python/quickstart.py
       :language: python
       :start-after: # start-cell-7
       :end-before: # end-cell-7
@@ -215,7 +215,7 @@ The statistical nature of quantum measurements introduces variance in the energy
 
 .. tab:: Python API
 
-   .. literalinclude:: ../../examples/quickstart.py
+   .. literalinclude:: ../../examples/python/quickstart.py
       :language: python
       :start-after: # start-cell-8
       :end-before: # end-cell-8

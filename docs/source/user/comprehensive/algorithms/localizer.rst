@@ -37,7 +37,7 @@ For more information about this pattern, see the :doc:`Factory Pattern <../desig
 
 .. tab:: Python API
 
-   .. literalinclude:: ../../../../examples/localizer.py
+   .. literalinclude:: ../../../../examples/python/localizer.py
       :language: python
       :lines: 3-6
 
@@ -56,7 +56,7 @@ The :class:`~qdk_chemistry.algorithms.Localizer` can be configured using the :do
 
 .. tab:: Python API
 
-   .. literalinclude:: ../../../../examples/localizer.py
+   .. literalinclude:: ../../../../examples/python/localizer.py
       :language: python
       :lines: 10-10
 
@@ -91,7 +91,7 @@ Once configured, the localization can be performed on a set of orbitals:
    .. note::
       This example shows the API pattern. For complete working examples, see the test suite.
 
-   .. literalinclude:: ../../../../examples/factory_pattern.py
+   .. literalinclude:: ../../../../examples/python/factory_pattern.py
       :language: python
       :lines: 1-9
 

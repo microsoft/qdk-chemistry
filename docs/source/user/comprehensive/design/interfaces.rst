@@ -54,7 +54,7 @@ This pattern is implemented across all major algorithm types in QDK/Chemistry.
 
 .. tab:: Python API
 
-   .. literalinclude:: ../../../../examples/interfaces.py
+   .. literalinclude:: ../../../../examples/python/interfaces.py
       :language: python
       :lines: 1-14
 
@@ -72,7 +72,7 @@ You can discover what implementations are available for each algorithm type:
 
 .. tab:: Python API
 
-   .. literalinclude:: ../../../../examples/factory_pattern.py
+   .. literalinclude:: ../../../../examples/python/factory_pattern.py
       :language: python
       :lines: 1-13
 

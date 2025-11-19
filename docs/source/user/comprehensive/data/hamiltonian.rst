@@ -54,7 +54,7 @@ Hamiltonian object should be considered constant and not modified:
    .. note::
       This example shows the API pattern. For complete working examples, see the test suite.
 
-   .. literalinclude:: ../../../../examples/hamiltonian.py
+   .. literalinclude:: ../../../../examples/python/hamiltonian.py
       :language: python
       :lines: 3-16
 
@@ -106,7 +106,7 @@ When accessing specific elements with ``get_two_body_element(i, j, k, l)``, the 
    .. note::
       This example shows the API pattern. For complete working examples, see the test suite.
 
-   .. literalinclude:: ../../../../examples/hamiltonian.py
+   .. literalinclude:: ../../../../examples/python/hamiltonian.py
       :language: python
       :lines: 18-32
 
@@ -194,7 +194,7 @@ HDF5 representation of a ``Hamiltonian`` object has the following structure (sho
       This example shows the API pattern.
       For complete working examples, see the test suite.
 
-   .. literalinclude:: ../../../../examples/hamiltonian.py
+   .. literalinclude:: ../../../../examples/python/hamiltonian.py
       :language: python
       :lines: 34-49
 
@@ -228,7 +228,7 @@ The ``Hamiltonian`` class provides methods to check the validity and consistency
    .. note::
       This example shows the API pattern. For complete working examples, see the test suite.
 
-   .. literalinclude:: ../../../../examples/hamiltonian.py
+   .. literalinclude:: ../../../../examples/python/hamiltonian.py
       :language: python
       :lines: 51-58
 
