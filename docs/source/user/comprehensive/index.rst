@@ -1,7 +1,7 @@
 In-depth user guide
 ===================
 
-Welcome to the comprehensive documentation for the Quantum Development Kit (QDK) Chemistry library.
+Welcome to the in-depth documentation for the Quantum Development Kit (QDK) Chemistry library.
 This documentation provides detailed information about QDK/Chemistry's structure, components, and usage patterns.
 
 The QDK/Chemistry library is designed to facilitate quantum chemistry calculations and simulations.
@@ -18,7 +18,7 @@ This enables users to leverage specialized capabilities across different package
 
 .. rubric:: Overview
 
-This comprehensive documentation is organized into the following sections:
+This documentation is organized into the following sections:
 
 .. toctree::
    :maxdepth: 2
