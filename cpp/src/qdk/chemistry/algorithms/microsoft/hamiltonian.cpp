@@ -102,7 +102,6 @@ std::shared_ptr<data::Hamiltonian> HamiltonianConstructor::_run_impl(
   scf_config->unrestricted = false;
   // TODO: Handle unrestricted, workitems: 41317
 
-
   // Set ERI method based on settings
   std::string method_name = _settings->get<std::string>("eri_method");
   if (!method_name.compare("incore")) {
