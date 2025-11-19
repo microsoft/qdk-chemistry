@@ -134,13 +134,6 @@
 <span class="sd">    &gt;&gt;&gt; from qdk_chemistry.constants import list_constants</span>
 <span class="sd">    &gt;&gt;&gt; list_constants()</span>
 
-<span class="sd">Todo:</span>
-<span class="sd">    * TODO (NAB): convert `print` statements throughout this module to use logging.</span>
-<span class="sd">      Decide whether the functions should return strings instead of printing/logging directly.</span>
-<span class="sd">      https://dev.azure.com/ms-azurequantum/AzureQuantum/_workitems/edit/41417</span>
-<span class="sd">    * TODO (NAB):  add typing information for the functions in this module</span>
-<span class="sd">      https://dev.azure.com/ms-azurequantum/AzureQuantum/_workitems/edit/41419</span>
-
 <span class="sd">&quot;&quot;&quot;</span>
 
 <span class="c1"># --------------------------------------------------------------------------------------------</span>
@@ -193,8 +186,7 @@
     <span class="n">constants_info</span> <span class="o">=</span> <span class="n">get_constants_info</span><span class="p">()</span>
 
     <span class="c1"># TODO (NAB):  change output to logger rather than print() here and elsewhere</span>
-    <span class="c1"># or just return strings</span>
-    <span class="c1"># https://dev.azure.com/ms-azurequantum/AzureQuantum/_workitems/edit/41417</span>
+    <span class="c1"># or just return strings workitem 41417</span>
     <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;QDK/Chemistry Physical Constants (CODATA 2018)&quot;</span><span class="p">)</span>
     <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;=&quot;</span> <span class="o">*</span> <span class="mi">50</span><span class="p">)</span>
 

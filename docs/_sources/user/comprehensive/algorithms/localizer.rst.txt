@@ -215,7 +215,7 @@ Implemented interface
 QDK/Chemistry's ``Localizer`` provides a unified interface for localization methods.
 
 QDK/Chemistry implementations
-~~~~~~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 - **QDK/Chemistry**: Native implementation of Pipek-Mezey, and :term:`MP2` natural orbital localization
 

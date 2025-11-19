@@ -231,9 +231,7 @@
             <span class="n">atom_basis</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">gto</span><span class="o">.</span><span class="n">parse</span><span class="p">(</span><span class="n">shell_rec</span><span class="p">))</span>
         <span class="n">basis_dict</span><span class="p">[</span><span class="n">pyscf_symbols</span><span class="p">[</span><span class="n">i</span><span class="p">]]</span> <span class="o">=</span> <span class="n">atom_basis</span>
 
-    <span class="c1"># TODO Handle Cartesian basis sets</span>
-    <span class="c1"># https://dev.azure.com/ms-azurequantum/AzureQuantum/_workitems/edit/41406</span>
-
+    <span class="c1"># TODO Handle Cartesian basis sets, workitem: 41406</span>
     <span class="n">mol</span> <span class="o">=</span> <span class="n">gto</span><span class="o">.</span><span class="n">Mole</span><span class="p">(</span><span class="n">atom</span><span class="o">=</span><span class="n">atoms</span><span class="p">,</span> <span class="n">basis</span><span class="o">=</span><span class="n">basis_dict</span><span class="p">,</span> <span class="n">unit</span><span class="o">=</span><span class="s2">&quot;Bohr&quot;</span><span class="p">,</span> <span class="n">charge</span><span class="o">=</span><span class="n">charge</span><span class="p">,</span> <span class="n">spin</span><span class="o">=</span><span class="n">multiplicity</span> <span class="o">-</span> <span class="mi">1</span><span class="p">)</span>
 
     <span class="c1"># Store the original QDK/Chemistry basis name as an attribute for round-trip conversion</span>
@@ -344,10 +342,9 @@
     <span class="n">shells</span> <span class="o">=</span> <span class="p">[]</span>
     <span class="c1"># TODO: This should deduce the structure from the PySCF Mole object</span>
     <span class="c1"># For now, we&#39;ll collect the shells and pass structure to constructor</span>
-    <span class="c1"># https://dev.azure.com/ms-azurequantum/AzureQuantum/_workitems/edit/41407</span>
+    <span class="c1"># workitem 41407</span>
 
-    <span class="c1"># TODO Handle Cartesian</span>
-    <span class="c1"># https://dev.azure.com/ms-azurequantum/AzureQuantum/_workitems/edit/41406</span>
+    <span class="c1"># TODO Handle Cartesian, workitem 41406</span>
     <span class="n">atom_symbols</span> <span class="o">=</span> <span class="p">[</span><span class="n">pyscf_mol</span><span class="o">.</span><span class="n">atom_symbol</span><span class="p">(</span><span class="n">i</span><span class="p">)</span> <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">pyscf_mol</span><span class="o">.</span><span class="n">natm</span><span class="p">)]</span>
     <span class="k">for</span> <span class="n">iatm</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">pyscf_mol</span><span class="o">.</span><span class="n">natm</span><span class="p">):</span>
         <span class="n">atom_symbol</span> <span class="o">=</span> <span class="n">atom_symbols</span><span class="p">[</span><span class="n">iatm</span><span class="p">]</span>
