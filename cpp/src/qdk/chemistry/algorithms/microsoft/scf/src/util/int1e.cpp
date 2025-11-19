@@ -59,7 +59,7 @@ class Libint2Engine : public OneBodyIntegralEngine {
    * @param op Libint2 operator type (overlap, kinetic, nuclear, etc.)
    * @param obs Basis set in libint2 format
    * @param deriv Derivative order (0=integrals, 1=gradients, 2=hessians)
-   * @param basis_mode Spherical or Cartesian basis function mode
+   * @param basis_mode Spherical or Cartesian atomic orbital mode
    */
   Libint2Engine(libint2::Operator op, const libint2::BasisSet& obs, int deriv,
                 BasisMode basis_mode)
@@ -90,7 +90,7 @@ class Libint2Engine : public OneBodyIntegralEngine {
   /**
    * @brief Compute integrals between two shells
    *
-   * Evaluates integrals between basis function shells i and j using
+   * Evaluates integrals between atomic orbital shells i and j using
    * the configured libint2 engine and operator.
    *
    * @param i Index of first shell
@@ -124,7 +124,7 @@ class Libint2Engine : public OneBodyIntegralEngine {
  * provides derivatives for geometry optimization.
  *
  * @note Requires libecpint library for ECP integral computation
- * @note Pure vs. Cartesian basis function conventions are handled automatically
+ * @note Pure vs. Cartesian atomic orbital conventions are handled automatically
  */
 class ECPIntEngine : public OneBodyIntegralEngine {
   using EigenVector = Eigen::Matrix<double, Eigen::Dynamic, 1>;
@@ -144,7 +144,7 @@ class ECPIntEngine : public OneBodyIntegralEngine {
    * @param natom Total number of atoms in system
    * @param deriv Derivative order (0=integrals, 1=gradients, 2=hessians)
    * @param pure True for spherical harmonics, false for Cartesian
-   * @param basis_mode Basis function convention (spherical/Cartesian)
+   * @param basis_mode atomic orbital convention (spherical/Cartesian)
    */
   ECPIntEngine(const std::vector<libecpint::GaussianShell>& shells,
                const std::vector<libecpint::ECP>& ecps, int maxLB, int maxLU,
@@ -319,7 +319,7 @@ class ECPIntEngine : public OneBodyIntegralEngine {
   const std::vector<libecpint::ECP>&
       ecps_;              ///< Reference to ECP definitions for relevant atoms
   bool pure_;             ///< True for spherical harmonics, false for Cartesian
-  BasisMode basis_mode_;  ///< Basis function convention (spherical/Cartesian)
+  BasisMode basis_mode_;  ///< atomic orbital convention (spherical/Cartesian)
 
   std::vector<EigenVector>
       buf_;  ///< Buffers for storing computed integrals/derivatives

@@ -71,16 +71,16 @@ void bind_basis_set(py::module& m) {
       .value("I", OrbitalType::I, "i orbital (l=6)")
       .export_values();
 
-  // Bind BasisType enum
-  py::enum_<BasisType>(m, "BasisType", "Enumeration of basis function types")
-      .value("Spherical", BasisType::Spherical,
+  // Bind AOType enum
+  py::enum_<AOType>(m, "AOType", "Enumeration of atomic orbital types")
+      .value("Spherical", AOType::Spherical,
              "Spherical harmonics (2l+1 functions per shell)")
-      .value("Cartesian", BasisType::Cartesian,
+      .value("Cartesian", AOType::Cartesian,
              "Cartesian coordinates (more functions for l>=2)")
       .export_values();
 
   // Bind Shell struct
-  py::class_<Shell>(m, "Shell", "Shell of basis functions")
+  py::class_<Shell>(m, "Shell", "Shell of atomic orbitals")
       // TODO (NAB):  Is there a class-level docstring for this? Workitem 41395
       .def(py::init<size_t, OrbitalType, const Eigen::VectorXd&,
                     const Eigen::VectorXd&>(),
@@ -171,29 +171,29 @@ void bind_basis_set(py::module& m) {
             >>> n_prim = shell.get_num_primitives()
             >>> print(f"Shell has {n_prim} primitives")
             )")
-      .def("get_num_basis_functions", &Shell::get_num_basis_functions,
+      .def("get_num_atomic_orbitals", &Shell::get_num_atomic_orbitals,
            R"(
-            Get number of basis functions this shell contributes.
+            Get number of atomic orbitals this shell contributes.
 
             Parameters
             ----------
-            basis_type : BasisType, optional
+            atomic_orbital_type : AOType, optional
                 Whether to use spherical (2l+1) or Cartesian functions
                 Default is Spherical
 
             Returns
             -------
             int
-                Number of basis functions
+                Number of atomic orbitals
 
             Examples
             --------
             >>> # For p-shell: 3 spherical, 3 Cartesian
-            >>> n_sph = shell.get_num_basis_functions(BasisType.Spherical)
-            >>> n_cart = shell.get_num_basis_functions(BasisType.Cartesian)
+            >>> n_sph = shell.get_num_atomic_orbitals(AOType.Spherical)
+            >>> n_cart = shell.get_num_atomic_orbitals(AOType.Cartesian)
             >>> print(f"Spherical: {n_sph}, Cartesian: {n_cart}")
             )",
-           py::arg("basis_type") = BasisType::Spherical)
+           py::arg("atomic_orbital_type") = AOType::Spherical)
       .def("get_angular_momentum", &Shell::get_angular_momentum,
            R"(
             Get the angular momentum quantum number (l) for this shell.
@@ -229,7 +229,7 @@ void bind_basis_set(py::module& m) {
 
     This class stores and manages atomic orbital basis set information using
     shells as the primary organizational unit. A shell represents a group of
-    basis functions with the same atom, angular momentum, and primitives.
+    atomic orbitals with the same atom, angular momentum, and primitives.
 
     Examples
     --------
@@ -238,9 +238,9 @@ void bind_basis_set(py::module& m) {
     >>> from qdk_chemistry.data import BasisSet, OrbitalType
     >>> basis = BasisSet("STO-3G")
     >>> basis.add_shell(0, OrbitalType.S, 1.0, 1.0)  # s orbital on atom 0
-    >>> print(f"Number of basis functions: {basis.get_num_basis_functions()}")
+    >>> print(f"Number of atomic orbitals: {basis.get_num_atomic_orbitals()}")
     )")
-      .def(py::init<const std::string&, const Structure&, BasisType>(),
+      .def(py::init<const std::string&, const Structure&, AOType>(),
            R"(
         Constructor with basis set name, structure, and basis type.
 
@@ -252,20 +252,20 @@ void bind_basis_set(py::module& m) {
             Name of the basis set
         structure : Structure
             Molecular structure to associate with this basis set
-        basis_type : BasisType, optional
-            Whether to use spherical or Cartesian basis functions
+        atomic_orbital_type : AOType, optional
+            Whether to use spherical or Cartesian atomic orbitals
             Default is Spherical
 
         Examples
         --------
         >>> from qdk_chemistry.data import Structure
         >>> structure = Structure.from_xyz_file("water.xyz")
-        >>> basis = BasisSet("cc-pVDZ", structure, BasisType.Spherical)
+        >>> basis = BasisSet("cc-pVDZ", structure, AOType.Spherical)
         >>> print(f"Basis set for {structure.get_num_atoms()} atoms")
         )",
            py::arg("name"), py::arg("structure"),
-           py::arg("basis_type") = BasisType::Spherical)
-      .def(py::init<const std::string&, const std::vector<Shell>&, BasisType>(),
+           py::arg("atomic_orbital_type") = AOType::Spherical)
+      .def(py::init<const std::string&, const std::vector<Shell>&, AOType>(),
            R"(
         Constructor with basis set name, shells, and basis type.
 
@@ -276,9 +276,9 @@ void bind_basis_set(py::module& m) {
         name : str
             Name of the basis set
         shells : list of Shell
-            Vector of shell objects defining the basis functions
-        basis_type : BasisType, optional
-            Whether to use spherical or Cartesian basis functions.
+            Vector of shell objects defining the atomic orbitals
+        atomic_orbital_type : AOType, optional
+            Whether to use spherical or Cartesian atomic orbitals.
             Default is Spherical.
 
         Examples
@@ -288,9 +288,9 @@ void bind_basis_set(py::module& m) {
         >>> print(f"Created basis with {len(shells)} shells")
         )",
            py::arg("name"), py::arg("shells"),
-           py::arg("basis_type") = BasisType::Spherical)
+           py::arg("atomic_orbital_type") = AOType::Spherical)
       .def(py::init<const std::string&, const std::vector<Shell>&,
-                    const Structure&, BasisType>(),
+                    const Structure&, AOType>(),
            R"(
         Constructor with basis set name, shells, structure, and basis type.
 
@@ -301,11 +301,11 @@ void bind_basis_set(py::module& m) {
         name : str
             Name of the basis set
         shells : list of Shell
-            Vector of shell objects defining the basis functions
+            Vector of shell objects defining the atomic orbitals
         structure : Structure
             Molecular structure to associate with this basis set
-        basis_type : BasisType, optional
-            Whether to use spherical or Cartesian basis functions
+        atomic_orbital_type : AOType, optional
+            Whether to use spherical or Cartesian atomic orbitals
             Default is Spherical
 
         Examples
@@ -317,9 +317,9 @@ void bind_basis_set(py::module& m) {
         >>> print(f"Complete basis set with {len(shells)} shells")
         )",
            py::arg("name"), py::arg("shells"), py::arg("structure"),
-           py::arg("basis_type") = BasisType::Spherical)
+           py::arg("atomic_orbital_type") = AOType::Spherical)
       .def(py::init<const std::string&, const std::vector<Shell>&,
-                    const std::vector<Shell>&, const Structure&, BasisType>(),
+                    const std::vector<Shell>&, const Structure&, AOType>(),
            R"(
         Constructor with basis set name, shells, ECP shells, structure, and basis type.
 
@@ -335,7 +335,7 @@ void bind_basis_set(py::module& m) {
             Vector of ECP shell objects
         structure : Structure
             Molecular structure to associate with this basis set
-        basis_type : BasisType, optional
+        atomic_orbital_type : AOType, optional
             Whether to use spherical or Cartesian basis functions
             Default is Spherical
 
@@ -349,10 +349,11 @@ void bind_basis_set(py::module& m) {
         >>> print(f"Basis with {len(shells)} shells and {len(ecp_shells)} ECP shells")
         )",
            py::arg("name"), py::arg("shells"), py::arg("ecp_shells"),
-           py::arg("structure"), py::arg("basis_type") = BasisType::Spherical)
+           py::arg("structure"),
+           py::arg("atomic_orbital_type") = AOType::Spherical)
       .def(py::init<const std::string&, const std::vector<Shell>&,
                     const std::string&, const std::vector<Shell>&,
-                    const std::vector<size_t>&, const Structure&, BasisType>(),
+                    const std::vector<size_t>&, const Structure&, AOType>(),
            R"(
         Constructor with basis set name, shells, ECP name, ECP shells, ECP electrons, structure, and basis type.
 
@@ -372,7 +373,7 @@ void bind_basis_set(py::module& m) {
             Number of ECP electrons for each atom
         structure : Structure
             Molecular structure to associate with this basis set
-        basis_type : BasisType, optional
+        atomic_orbital_type : AOType, optional
             Whether to use spherical or Cartesian basis functions
             Default is Spherical
 
@@ -388,7 +389,8 @@ void bind_basis_set(py::module& m) {
         )",
            py::arg("name"), py::arg("shells"), py::arg("ecp_name"),
            py::arg("ecp_shells"), py::arg("ecp_electrons"),
-           py::arg("structure"), py::arg("basis_type") = BasisType::Spherical)
+           py::arg("structure"),
+           py::arg("atomic_orbital_type") = AOType::Spherical)
       .def(py::init<const BasisSet&>(),
            R"(
         Copy constructor.
@@ -408,19 +410,19 @@ void bind_basis_set(py::module& m) {
         )")
 
       // Basis type management
-      .def("get_basis_type", &BasisSet::get_basis_type,
+      .def("get_atomic_orbital_type", &BasisSet::get_atomic_orbital_type,
            R"(
         Get the basis type.
 
         Returns
         -------
-        BasisType
+        AOType
             Current basis type (Spherical or Cartesian)
 
         Examples
         --------
-        >>> basis_type = basis_set.get_basis_type()
-        >>> print(f"Basis type: {basis_type}")
+        >>> atomic_orbital_type = basis_set.get_atomic_orbital_type()
+        >>> print(f"Basis type: {atomic_orbital_type}")
         )")
 
       // Shell access (read-only)
@@ -513,7 +515,7 @@ void bind_basis_set(py::module& m) {
         Examples
         --------
         >>> n_atoms = basis_set.get_num_atoms()
-        >>> print(f"Atoms with basis functions: {n_atoms}")
+        >>> print(f"Atoms with atomic orbitals: {n_atoms}")
         )")
 
       // ECP shell access
@@ -610,67 +612,67 @@ void bind_basis_set(py::module& m) {
         )")
 
       // Basis function management
-      .def("get_basis_function_info", &BasisSet::get_basis_function_info,
+      .def("get_atomic_orbital_info", &BasisSet::get_atomic_orbital_info,
            R"(
-        Get shell index and magnetic quantum number for a basis function.
+        Get shell index and magnetic quantum number for a atomic orbital.
 
         Parameters
         ----------
-        basis_index : int
-            Global index of the basis function
+        atomic_orbital_index : int
+            Global index of the atomic orbital
 
         Returns
         -------
         tuple of (int, int)
-            Shell index and magnetic quantum number (m_l) for the basis function
+            Shell index and magnetic quantum number (m_l) for the atomic orbital
 
         Examples
         --------
-        >>> shell_idx, m_l = basis_set.get_basis_function_info(5)
-        >>> print(f"Basis function 5: shell {shell_idx}, m_l = {m_l}")
+        >>> shell_idx, m_l = basis_set.get_atomic_orbital_info(5)
+        >>> print(f"atomic orbital 5: shell {shell_idx}, m_l = {m_l}")
         )",
-           py::arg("basis_index"))
-      .def("get_num_basis_functions", &BasisSet::get_num_basis_functions,
+           py::arg("atomic_orbital_index"))
+      .def("get_num_atomic_orbitals", &BasisSet::get_num_atomic_orbitals,
            R"(
-        Get total number of basis functions in the basis set.
+        Get total number of atomic orbitals in the basis set.
 
         Returns
         -------
         int
-            Total number of basis functions from all shells
+            Total number of atomic orbitals from all shells
 
         Examples
         --------
-        >>> n_basis = basis_set.get_num_basis_functions()
-        >>> print(f"Total basis functions: {n_basis}")
+        >>> n_basis = basis_set.get_num_atomic_orbitals()
+        >>> print(f"Total atomic orbitals: {n_basis}")
         )")
 
       // Atom mapping
-      .def("get_atom_index_for_basis_function",
-           &BasisSet::get_atom_index_for_basis_function,
+      .def("get_atom_index_for_atomic_orbital",
+           &BasisSet::get_atom_index_for_atomic_orbital,
            R"(
-        Get the atom index for a given basis function.
+        Get the atom index for a given atomic orbital.
 
         Parameters
         ----------
-        basis_index : int
-            Global index of the basis function
+        atomic_orbital_index : int
+            Global index of the atomic orbital
 
         Returns
         -------
         int
-            Index of the atom to which this basis function belongs
+            Index of the atom to which this atomic orbital belongs
 
         Examples
         --------
-        >>> atom_idx = basis_set.get_atom_index_for_basis_function(3)
-        >>> print(f"Basis function 3 belongs to atom {atom_idx}")
+        >>> atom_idx = basis_set.get_atom_index_for_atomic_orbital(3)
+        >>> print(f"atomic orbital 3 belongs to atom {atom_idx}")
         )",
-           py::arg("basis_index"))
-      .def("get_basis_function_indices_for_atom",
-           &BasisSet::get_basis_function_indices_for_atom,
+           py::arg("atomic_orbital_index"))
+      .def("get_atomic_orbital_indices_for_atom",
+           &BasisSet::get_atomic_orbital_indices_for_atom,
            R"(
-        Get all basis function indices for a specific atom.
+        Get all atomic orbital indices for a specific atom.
 
         Parameters
         ----------
@@ -680,12 +682,12 @@ void bind_basis_set(py::module& m) {
         Returns
         -------
         list of int
-            Vector of global basis function indices for the atom
+            Vector of global atomic orbital indices for the atom
 
         Examples
         --------
-        >>> basis_indices = basis_set.get_basis_function_indices_for_atom(0)
-        >>> print(f"Atom 0 has basis functions: {basis_indices}")
+        >>> atomic_orbital_indices = basis_set.get_atomic_orbital_indices_for_atom(0)
+        >>> print(f"Atom 0 has basis functions: {atomic_orbital_indices}")
         )",
            py::arg("atom_index"))
       .def("get_shell_indices_for_atom", &BasisSet::get_shell_indices_for_atom,
@@ -708,10 +710,10 @@ void bind_basis_set(py::module& m) {
         >>> print(f"Atom 0 has shells: {shell_indices}")
         )",
            py::arg("atom_index"))
-      .def("get_num_basis_functions_for_atom",
-           &BasisSet::get_num_basis_functions_for_atom,
+      .def("get_num_atomic_orbitals_for_atom",
+           &BasisSet::get_num_atomic_orbitals_for_atom,
            R"(
-        Get number of basis functions for a specific atom.
+        Get number of atomic orbitals for a specific atom.
 
         Parameters
         ----------
@@ -721,12 +723,12 @@ void bind_basis_set(py::module& m) {
         Returns
         -------
         int
-            Number of basis functions on the specified atom
+            Number of atomic orbitals on the specified atom
 
         Examples
         --------
-        >>> n_funcs = basis_set.get_num_basis_functions_for_atom(0)
-        >>> print(f"Atom 0 has {n_funcs} basis functions")
+        >>> n_funcs = basis_set.get_num_atomic_orbitals_for_atom(0)
+        >>> print(f"Atom 0 has {n_funcs} atomic orbitals")
         )",
            py::arg("atom_index"))
 
@@ -752,10 +754,10 @@ void bind_basis_set(py::module& m) {
         >>> print(f"P-shell indices: {p_shells}")
         )",
            py::arg("orbital_type"))
-      .def("get_num_basis_functions_for_orbital_type",
-           &BasisSet::get_num_basis_functions_for_orbital_type,
+      .def("get_num_atomic_orbitals_for_orbital_type",
+           &BasisSet::get_num_atomic_orbitals_for_orbital_type,
            R"(
-        Get total number of basis functions for a specific orbital type.
+        Get total number of atomic orbitals for a specific orbital type.
 
         Parameters
         ----------
@@ -765,12 +767,12 @@ void bind_basis_set(py::module& m) {
         Returns
         -------
         int
-            Total number of basis functions of the specified type
+            Total number of atomic orbitals of the specified type
 
         Examples
         --------
-        >>> n_p_funcs = basis_set.get_num_basis_functions_for_orbital_type(OrbitalType.P)
-        >>> print(f"Total P-type basis functions: {n_p_funcs}")
+        >>> n_p_funcs = basis_set.get_num_atomic_orbitals_for_orbital_type(OrbitalType.P)
+        >>> print(f"Total P-type atomic orbitals: {n_p_funcs}")
         )",
            py::arg("orbital_type"))
 
@@ -1319,7 +1321,7 @@ void bind_basis_set(py::module& m) {
         ----------
         l : int
             Angular momentum quantum number
-        basis_type : BasisType, optional
+        atomic_orbital_type : AOType, optional
             Whether to use spherical (2l+1) or Cartesian functions
             Default is Spherical
 
@@ -1331,18 +1333,20 @@ void bind_basis_set(py::module& m) {
         Examples
         --------
         >>> # For d orbitals (l=2)
-        >>> n_sph = BasisSet.get_num_orbitals_for_l(2, BasisType.Spherical)  # 5
-        >>> n_cart = BasisSet.get_num_orbitals_for_l(2, BasisType.Cartesian)  # 6
+        >>> n_sph = BasisSet.get_num_orbitals_for_l(2, AOType.Spherical)  # 5
+        >>> n_cart = BasisSet.get_num_orbitals_for_l(2, AOType.Cartesian)  # 6
         >>> print(f"d orbitals: {n_sph} spherical, {n_cart} Cartesian")
         )",
-                  py::arg("l"), py::arg("basis_type") = BasisType::Spherical)
-      .def_static("basis_type_to_string", &BasisSet::basis_type_to_string,
+                  py::arg("l"),
+                  py::arg("atomic_orbital_type") = AOType::Spherical)
+      .def_static("atomic_orbital_type_to_string",
+                  &BasisSet::atomic_orbital_type_to_string,
                   R"(
         Convert basis type enum to string representation.
 
         Parameters
         ----------
-        basis_type : BasisType
+        atomic_orbital_type : AOType
             The basis type enum value
 
         Returns
@@ -1352,11 +1356,12 @@ void bind_basis_set(py::module& m) {
 
         Examples
         --------
-        >>> basis_str = BasisSet.basis_type_to_string(BasisType.Spherical)
+        >>> basis_str = BasisSet.atomic_orbital_type_to_string(AOType.Spherical)
         >>> print(f"Basis type: {basis_str}")  # Prints "Spherical"
         )",
-                  py::arg("basis_type"))
-      .def_static("string_to_basis_type", &BasisSet::string_to_basis_type,
+                  py::arg("atomic_orbital_type"))
+      .def_static("string_to_atomic_orbital_type",
+                  &BasisSet::string_to_atomic_orbital_type,
                   R"(
         Convert string to basis type enum.
 
@@ -1367,7 +1372,7 @@ void bind_basis_set(py::module& m) {
 
         Returns
         -------
-        BasisType
+        AOType
             Corresponding basis type enum
 
         Raises
@@ -1377,20 +1382,20 @@ void bind_basis_set(py::module& m) {
 
         Examples
         --------
-        >>> basis_type = BasisSet.string_to_basis_type("Cartesian")
-        >>> print(basis_type)  # BasisType.Cartesian
+        >>> atomic_orbital_type = BasisSet.string_to_atomic_orbital_type("Cartesian")
+        >>> print(atomic_orbital_type)  # AOType.Cartesian
         )",
                   py::arg("basis_string"))
 
       // Index conversion utilities
       .def("basis_to_shell_index", &BasisSet::basis_to_shell_index,
            R"(
-        Convert basis function index to shell index and local function index.
+        Convert atomic orbital index to shell index and local function index.
 
         Parameters
         ----------
-        basis_index : int
-            Global basis function index
+        atomic_orbital_index : int
+            Global atomic orbital index
 
         Returns
         -------
@@ -1400,9 +1405,9 @@ void bind_basis_set(py::module& m) {
         Examples
         --------
         >>> shell_idx, local_idx = basis_set.basis_to_shell_index(7)
-        >>> print(f"Basis function 7: shell {shell_idx}, local index {local_idx}")
+        >>> print(f"atomic orbital 7: shell {shell_idx}, local index {local_idx}")
         )",
-           py::arg("basis_index"))
+           py::arg("atomic_orbital_index"))
 
       // String representation - bind summary to __repr__
       .def("__repr__", [](const BasisSet& b) { return b.get_summary(); })

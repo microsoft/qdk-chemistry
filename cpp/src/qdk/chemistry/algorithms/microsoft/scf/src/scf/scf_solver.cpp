@@ -55,8 +55,8 @@ std::vector<int> SCF::get_num_electrons() const {
   return impl_->get_num_electrons();
 }
 
-int SCF::get_num_basis_functions() const {
-  return impl_->get_num_basis_functions();
+int SCF::get_num_atomic_orbitals() const {
+  return impl_->get_num_atomic_orbitals();
 }
 
 int SCF::get_num_molecular_orbitals() const {

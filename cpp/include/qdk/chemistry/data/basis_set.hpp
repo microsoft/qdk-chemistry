@@ -20,7 +20,7 @@ namespace qdk::chemistry::data {
 // Forward declaration
 class Structure;
 
-/// @brief Maximum angular momentum for basis functions supported in
+/// @brief Maximum angular momentum for atomic orbitals supported in
 /// QDK/Chemistry
 inline static constexpr size_t MAX_ORBITAL_ANGULAR_MOMENTUM =
     6;  // Up to i-orbitals
@@ -41,19 +41,19 @@ enum class OrbitalType {
 };
 
 /**
- * @enum BasisType
- * @brief Enumeration for basis function types (spherical vs cartesian)
+ * @enum AOType
+ * @brief Enumeration for atomic orbital types (spherical vs cartesian)
  */
-enum class BasisType {
+enum class AOType {
   Spherical,  ///< Spherical harmonics (2l+1 functions per shell)
   Cartesian   ///< Cartesian coordinates (more functions for l>=2)
 };
 
 /**
  * @struct Shell
- * @brief Information about a shell of basis functions
+ * @brief Information about a shell of atomic orbitals
  *
- * A shell represents a group of basis functions that share the same atom,
+ * A shell represents a group of atomic orbitals that share the same atom,
  * angular momentum, and primitive functions, but differ in magnetic quantum
  * numbers. For example, a p-shell contains px, py, pz functions.
  *
@@ -140,13 +140,13 @@ struct Shell {
   bool has_radial_powers() const { return rpowers.size() > 0; }
 
   /**
-   * @brief Get number of basis functions in this shell
-   * @param basis_type Whether to use spherical or cartesian basis functions
+   * @brief Get number of atomic orbitals in this shell
+   * @param atomic_orbital_type Whether to use spherical or cartesian atomic
    */
-  size_t get_num_basis_functions(
-      BasisType basis_type = BasisType::Spherical) const {
+  size_t get_num_atomic_orbitals(
+      AOType atomic_orbital_type = AOType::Spherical) const {
     int l = static_cast<int>(orbital_type);
-    if (basis_type == BasisType::Spherical) {
+    if (atomic_orbital_type == AOType::Spherical) {
       return 2 * l + 1;  // Spherical harmonics: 2l+1
     } else {
       // Cartesian: (l+1)(l+2)/2
@@ -166,18 +166,18 @@ struct Shell {
  *
  * This class stores and manages atomic orbital basis set information using
  * shells as the primary organizational unit. A shell represents a group of
- * basis functions with the same atom, angular momentum, and primitives.
+ * atomic orbitals with the same atom, angular momentum, and primitives.
  * The class is designed to be immutable after construction, ensuring data
  * integrity.
  *
  * Features:
  * - Shell-based storage for memory efficiency
- * - Support for spherical or cartesian basis functions
- * - Mapping between shells/basis functions and atoms
- * - Mapping between shells/basis functions and orbital types
+ * - Support for spherical or cartesian atomic orbitals
+ * - Mapping between shells/atomic orbitals and atoms
+ * - Mapping between shells/atomic orbitals and orbital types
  * - Basis set metadata (name, parameters, references)
  * - Integration with molecular structure information
- * - On-demand expansion of shells to individual basis functions
+ * - On-demand expansion of shells to individual atomic orbitals
  *
  * The shell-based approach matches standard quantum chemistry practices
  * and provides efficient storage and computation.
@@ -189,50 +189,55 @@ class BasisSet : public DataClass,
    * @brief Constructor with basis set name and structure
    * @param name Name of the basis set (e.g., "6-31G", "cc-pVDZ")
    * @param structure The molecular structure
-   * @param basis_type Whether to use spherical or cartesian basis functions
+   * @param atomic_orbital_type Whether to use spherical or cartesian atomic
+   * orbitals
    */
   BasisSet(const std::string& name, const Structure& structure,
-           BasisType basis_type = BasisType::Spherical);
+           AOType atomic_orbital_type = AOType::Spherical);
 
   /**
    * @brief Constructor with shells
    * @param name Name of the basis set
    * @param shells Vector of shells to initialize the basis set with
-   * @param basis_type Whether to use spherical or cartesian basis functions
+   * @param atomic_orbital_type Whether to use spherical or cartesian atomic
+   * orbitals
    */
   BasisSet(const std::string& name, const std::vector<Shell>& shells,
-           BasisType basis_type = BasisType::Spherical);
+           AOType atomic_orbital_type = AOType::Spherical);
 
   /**
    * @brief Constructor with shells and structure
    * @param name Name of the basis set
    * @param shells Vector of shells to initialize the basis set with
    * @param structure The molecular structure
-   * @param basis_type Whether to use spherical or cartesian basis functions
+   * @param atomic_orbital_type Whether to use spherical or cartesian atomic
+   * orbitals
    */
   BasisSet(const std::string& name, const std::vector<Shell>& shells,
            const Structure& structure,
-           BasisType basis_type = BasisType::Spherical);
+           AOType atomic_orbital_type = AOType::Spherical);
 
   /**
    * @brief Constructor with basis set name and structure shared pointer
    * @param name Name of the basis set (e.g., "6-31G", "cc-pVDZ")
    * @param structure Shared pointer to the molecular structure
-   * @param basis_type Whether to use spherical or cartesian basis functions
+   * @param atomic_orbital_type Whether to use spherical or cartesian atomic
+   * orbitals
    */
   BasisSet(const std::string& name, std::shared_ptr<Structure> structure,
-           BasisType basis_type = BasisType::Spherical);
+           AOType atomic_orbital_type = AOType::Spherical);
 
   /**
    * @brief Constructor with shells and structure shared pointer
    * @param name Name of the basis set
    * @param shells Vector of shells to initialize the basis set with
    * @param structure Shared pointer to the molecular structure
-   * @param basis_type Whether to use spherical or cartesian basis functions
+   * @param atomic_orbital_type Whether to use spherical or cartesian atomic
+   * orbitals
    */
   BasisSet(const std::string& name, const std::vector<Shell>& shells,
            std::shared_ptr<Structure> structure,
-           BasisType basis_type = BasisType::Spherical);
+           AOType atomic_orbital_type = AOType::Spherical);
 
   /**
    * @brief Constructor with shells, ECP shells, and structure
@@ -244,7 +249,7 @@ class BasisSet : public DataClass,
    */
   BasisSet(const std::string& name, const std::vector<Shell>& shells,
            const std::vector<Shell>& ecp_shells, const Structure& structure,
-           BasisType basis_type = BasisType::Spherical);
+           AOType basis_type = AOType::Spherical);
 
   /**
    * @brief Constructor with shells, ECP shells, and structure shared pointer
@@ -257,7 +262,7 @@ class BasisSet : public DataClass,
   BasisSet(const std::string& name, const std::vector<Shell>& shells,
            const std::vector<Shell>& ecp_shells,
            std::shared_ptr<Structure> structure,
-           BasisType basis_type = BasisType::Spherical);
+           AOType basis_type = AOType::Spherical);
 
   /**
    * @brief Constructor with shells, ECP shells, ECP name, ECP electrons, and
@@ -274,7 +279,7 @@ class BasisSet : public DataClass,
   BasisSet(const std::string& name, const std::vector<Shell>& shells,
            const std::string& ecp_name, const std::vector<Shell>& ecp_shells,
            const std::vector<size_t>& ecp_electrons, const Structure& structure,
-           BasisType basis_type = BasisType::Spherical);
+           AOType basis_type = AOType::Spherical);
 
   /**
    * @brief Constructor with shells, ECP shells, ECP name, ECP electrons, and
@@ -292,7 +297,7 @@ class BasisSet : public DataClass,
            const std::string& ecp_name, const std::vector<Shell>& ecp_shells,
            const std::vector<size_t>& ecp_electrons,
            std::shared_ptr<Structure> structure,
-           BasisType basis_type = BasisType::Spherical);
+           AOType basis_type = AOType::Spherical);
 
   /**
    * @brief Default destructor
@@ -327,7 +332,7 @@ class BasisSet : public DataClass,
    * @brief Get the basis type
    * @return Current basis type (spherical or cartesian)
    */
-  BasisType get_basis_type() const;
+  AOType get_atomic_orbital_type() const;
 
   /**
    * @brief Get all shells (flattened from per-atom storage)
@@ -396,35 +401,36 @@ class BasisSet : public DataClass,
   bool has_ecp_shells() const;
 
   /**
-   * @brief Get the shell index and magnetic quantum number for a basis function
+   * @brief Get the shell index and magnetic quantum number for a atomic orbital
    * index
-   * @param basis_index Index of the basis function
+   * @param atomic_orbiral_index Index of the atomic orbital
    * @return Pair containing (shell_index, magnetic_quantum_number)
    * @throws std::out_of_range if index is invalid
    */
-  std::pair<size_t, int> get_basis_function_info(size_t basis_index) const;
+  std::pair<size_t, int> get_atomic_orbital_info(
+      size_t atomic_orbiral_index) const;
 
   /**
-   * @brief Get number of basis functions (total from all shells)
-   * @return Total number of basis functions
+   * @brief Get number of atomic orbitals (total from all shells)
+   * @return Total number of atomic orbitals
    */
-  size_t get_num_basis_functions() const;
+  size_t get_num_atomic_orbitals() const;
 
   /**
-   * @brief Get the atom index for a basis function
-   * @param contracted_basis_function_index Index of the basis function
-   * @return Index of the atom this basis function belongs to
-   * @throws std::out_of_range if basis_index is invalid
+   * @brief Get the atom index for a atomic orbital
+   * @param contracted_atomic_orbital_index Index of the atomic orbital
+   * @return Index of the atom this atomic orbital belongs to
+   * @throws std::out_of_range if atomic_orbiral_index is invalid
    */
-  size_t get_atom_index_for_basis_function(
-      size_t contracted_basis_function_index) const;
+  size_t get_atom_index_for_atomic_orbital(
+      size_t contracted_atomic_orbital_index) const;
 
   /**
-   * @brief Get all basis function indices for a specific atom
+   * @brief Get all atomic orbital indices for a specific atom
    * @param atom_index Index of the atom
-   * @return Vector of basis function indices for this atom
+   * @return Vector of atomic orbital indices for this atom
    */
-  std::vector<size_t> get_basis_function_indices_for_atom(
+  std::vector<size_t> get_atomic_orbital_indices_for_atom(
       size_t atom_index) const;
 
   /**
@@ -435,11 +441,11 @@ class BasisSet : public DataClass,
   std::vector<size_t> get_shell_indices_for_atom(size_t atom_index) const;
 
   /**
-   * @brief Get number of basis functions for a specific atom
+   * @brief Get number of atomic orbitals for a specific atom
    * @param atom_index Index of the atom
-   * @return Number of basis functions for this atom
+   * @return Number of atomic orbitals for this atom
    */
-  size_t get_num_basis_functions_for_atom(size_t atom_index) const;
+  size_t get_num_atomic_orbitals_for_atom(size_t atom_index) const;
 
   /**
    * @brief Get shell indices for a specific orbital type
@@ -450,11 +456,11 @@ class BasisSet : public DataClass,
       OrbitalType orbital_type) const;
 
   /**
-   * @brief Get number of basis functions for a specific orbital type
+   * @brief Get number of atomic orbitals for a specific orbital type
    * @param orbital_type Type of orbital
-   * @return Number of basis functions of this type
+   * @return Number of atomic orbitals of this type
    */
-  size_t get_num_basis_functions_for_orbital_type(
+  size_t get_num_atomic_orbitals_for_orbital_type(
       OrbitalType orbital_type) const;
 
   /**
@@ -648,30 +654,32 @@ class BasisSet : public DataClass,
   /**
    * @brief Get number of orbitals for given angular momentum
    * @param l Angular momentum quantum number
-   * @param basis_type Whether to use spherical or cartesian basis functions
+   * @param atomic_orbital_type Whether to use spherical or cartesian atomic
+   * orbitals
    * @return Number of orbitals
    */
   static int get_num_orbitals_for_l(
-      int l, BasisType basis_type = BasisType::Spherical);
+      int l, AOType atomic_orbital_type = AOType::Spherical);
 
   inline static int get_orbital_size(OrbitalType orbital_type) {
     return get_num_orbitals_for_l(static_cast<int>(orbital_type));
   }
 
   /**
-   * @brief Convert basis function index to shell index and magnetic quantum
+   * @brief Convert atomic orbital index to shell index and magnetic quantum
    * number
-   * @param basis_index Global basis function index
+   * @param atomic_orbiral_index Global atomic orbital index
    * @return Pair of (shell_index, magnetic_quantum_number)
    */
-  std::pair<size_t, int> basis_to_shell_index(size_t basis_index) const;
+  std::pair<size_t, int> basis_to_shell_index(
+      size_t atomic_orbiral_index) const;
 
   /**
    * @brief Convert basis type to string
-   * @param basis_type The basis type to convert
+   * @param atomic_orbital_type The basis type to convert
    * @return String representation ("spherical" or "cartesian")
    */
-  static std::string basis_type_to_string(BasisType basis_type);
+  static std::string atomic_orbital_type_to_string(AOType atomic_orbital_type);
 
   /**
    * @brief Convert string to basis type
@@ -679,14 +687,14 @@ class BasisSet : public DataClass,
    * @return Basis type enumeration
    * @throws std::invalid_argument if string is invalid
    */
-  static BasisType string_to_basis_type(const std::string& basis_string);
+  static AOType string_to_atomic_orbital_type(const std::string& basis_string);
 
  private:
   /// Basis set name (e.g., "6-31G", "cc-pVDZ")
   std::string _name;
 
   /// Basis type (spherical or cartesian)
-  BasisType _basis_type;
+  AOType _atomic_orbital_type;
 
   /// Molecular structure associated with this basis set
   std::shared_ptr<Structure> _structure;
@@ -703,14 +711,14 @@ class BasisSet : public DataClass,
   /// Number of ECP electrons replaced for each atom
   std::vector<size_t> _ecp_electrons;
 
-  /// Lazily computed cache for basis function to atom mapping
+  /// Lazily computed cache for atomic orbital to atom mapping
   mutable std::vector<size_t> _basis_to_atom_map;
 
-  /// Lazily computed cache for basis function to shell mapping
+  /// Lazily computed cache for atomic orbital to shell mapping
   mutable std::vector<size_t> _basis_to_shell_map;
 
-  /// Lazily computed cache for the total number of basis functions
-  mutable size_t _cached_num_basis_functions = 0;
+  /// Lazily computed cache for the total number of atomic orbitals
+  mutable size_t _cached_num_atomic_orbitals = 0;
 
   /// Lazily computed cache for the total number of shells
   mutable size_t _cached_num_shells = 0;
@@ -744,11 +752,11 @@ class BasisSet : public DataClass,
   void _compute_mappings() const;
 
   /**
-   * @brief Validate basis function index
-   * @param basis_index Index to validate
+   * @brief Validate atomic orbital index
+   * @param atomic_orbiral_index Index to validate
    * @throws std::out_of_range if index is invalid
    */
-  void _validate_basis_index(size_t basis_index) const;
+  void _validate_atomic_orbiral_index(size_t atomic_orbiral_index) const;
 
   /**
    * @brief Validate shell index

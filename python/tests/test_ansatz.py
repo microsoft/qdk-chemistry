@@ -195,7 +195,7 @@ class TestAnsatzSerialization:
         wf_basis = recon_wf_orbitals.get_basis_set()
         ham_basis = recon_ham_orbitals.get_basis_set()
 
-        assert wf_basis.get_num_basis_functions() == ham_basis.get_num_basis_functions()
+        assert wf_basis.get_num_atomic_orbitals() == ham_basis.get_num_atomic_orbitals()
         assert wf_basis.get_name() == ham_basis.get_name()
 
     def test_repr_method(self, test_ansatz):

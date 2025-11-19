@@ -38,7 +38,7 @@ class ERI {
   bool unrestricted_;  ///< Whether to use unrestricted (UKS) formalism
   std::string
       xc_name_;  ///< Functional name (used for GauXC grid configuration)
-  size_t num_basis_funcs_;  ///< Number of basis functions
+  size_t num_atomic_orbitals_;  ///< Number of atomic orbitals
 
  public:
   /**
@@ -58,7 +58,7 @@ class ERI {
     unrestricted_ = unr;
     gauxc_input_ = gauxc_input;
     xc_name_ = xc_name == "HF" ? "PBE0" : xc_name;  // does not matter
-    num_basis_funcs_ = basis_set.num_basis_funcs;
+    num_atomic_orbitals_ = basis_set.num_atomic_orbitals;
 
     // Get or create the GAUXC implementation from the registry
     util::GAUXCRegistry::get_or_create(const_cast<BasisSet&>(basis_set),
@@ -93,7 +93,7 @@ class ERI {
                 double beta, double omega) {
     AutoTimer t("ERI::build_JK");
     const size_t mat_size =
-        (unrestricted_ ? 2 : 1) * num_basis_funcs_ * num_basis_funcs_;
+        (unrestricted_ ? 2 : 1) * num_atomic_orbitals_ * num_atomic_orbitals_;
 
     // RSH check
     const bool is_rsx = std::abs(omega) > 1e-12;

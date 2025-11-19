@@ -27,7 +27,7 @@ class ERI {
   /// Whether this is an unrestricted (UHF/UKS) spin calculation
   bool unrestricted_;
 
-  /// Basis function normalization convention (PSI4 vs. default)
+  /// atomic orbital normalization convention (PSI4 vs. default)
   BasisMode basis_mode_;
 
   /// MPI parallelization configuration for distributed integral storage

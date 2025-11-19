@@ -118,7 +118,7 @@ struct SCFConfig {
       BasisMode::PSI4;  ///< Basis set normalization mode for calculations
   BasisMode output_basis_mode =
       BasisMode::RAW;             ///< Basis set normalization mode for output
-  bool cartesian = false;         ///< Use Cartesian basis functions (true) or
+  bool cartesian = false;         ///< Use Cartesian atomic orbitals (true) or
                                   ///< spherical harmonics (false)
   bool require_gradient = false;  ///< Calculate analytical energy gradient
   bool require_polarizability = false;  ///< Calculate polarizability tensor

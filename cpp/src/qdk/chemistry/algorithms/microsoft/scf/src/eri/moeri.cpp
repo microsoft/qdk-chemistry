@@ -23,40 +23,40 @@ MOERI::MOERI(std::shared_ptr<ERI> eri)
 }
 MOERI::~MOERI() noexcept = default;
 
-void MOERI::compute(size_t nb, size_t nt, const double* C, double* out) {
-  if (nt > nb)
+void MOERI::compute(size_t nao, size_t nt, const double* C, double* out) {
+  if (nt > nao)
     throw std::runtime_error(
         "MOERI does not support num_molecular_orbitals > num_atomic_orbitals");
   const size_t nt2 = nt * nt;
   const size_t nt3 = nt2 * nt;
-  const size_t nb2 = nb * nb;
-  const size_t nb3 = nb2 * nb;
-  std::vector<double> tmp1(std::max(nt * nb3, nb * nt3)), tmp2(nt2 * nb2);
+  const size_t nao2 = nao * nao;
+  const size_t nao3 = nao2 * nao;
+  std::vector<double> tmp1(std::max(nt * nao3, nao * nt3)), tmp2(nt2 * nao2);
 
 #ifdef QDK_CHEMISTRY_ENABLE_GPU
 
   // Compute first quarter transformation via some "good" technique
   eri_->quarter_trans(nt, C, tmp1.data());
 
-  auto tmp1_d = cuda::alloc<double>(nt * nb * nb * nb);
-  auto tmp2_d = cuda::alloc<double>(nt * nt * nb * nb);
-  auto C_d = cuda::alloc<double>(nb * nt);
-  CUDA_CHECK(cudaMemcpy(C_d->data(), C, nb * nt * sizeof(double),
+  auto tmp1_d = cuda::alloc<double>(nt * nao * nao * nao);
+  auto tmp2_d = cuda::alloc<double>(nt * nt * nao * nao);
+  auto C_d = cuda::alloc<double>(nao * nt);
+  CUDA_CHECK(cudaMemcpy(C_d->data(), C, nao * nt * sizeof(double),
                         cudaMemcpyHostToDevice));
 
   CUDA_CHECK(cudaMemcpy(tmp1_d->data(), tmp1.data(),
                         tmp1.size() * sizeof(double), cudaMemcpyHostToDevice));
 
   // Compute remaining transformations via cuTensor
-  std::vector<int64_t> extents_q1 = {(long int)nb, (long int)nb, (long int)nb,
+  std::vector<int64_t> extents_q1 = {(long int)nao, (long int)nao,
+                                     (long int)nao, (long int)nt},
+                       extents_q2 = {(long int)nao, (long int)nao, (long int)nt,
                                      (long int)nt},
-                       extents_q2 = {(long int)nb, (long int)nb, (long int)nt,
-                                     (long int)nt},
-                       extents_q3 = {(long int)nb, (long int)nt, (long int)nt,
+                       extents_q3 = {(long int)nao, (long int)nt, (long int)nt,
                                      (long int)nt},
                        extents_q4 = {(long int)nt, (long int)nt, (long int)nt,
                                      (long int)nt},
-                       extents_mat = {(long int)nb, (long int)nt};
+                       extents_mat = {(long int)nao, (long int)nt};
 
   auto q1desc = std::make_shared<cutensor::TensorDesc>(
       *handle_, 4, extents_q1.data(), CUTENSOR_R_64F);
@@ -92,7 +92,7 @@ void MOERI::compute(size_t nb, size_t nt, const double* C, double* out) {
                         cudaMemcpyDeviceToHost));
 #else  // QDK_CHEMISTRY_ENABLE_GPU
 
-  Eigen::Map<const RowMajorMatrix> C_rm(C, nb, nt);
+  Eigen::Map<const RowMajorMatrix> C_rm(C, nao, nt);
   // Compute first quarter transformation via some "good" technique
   eri_->quarter_trans(nt, C_rm.data(), tmp1.data());
 
@@ -102,28 +102,28 @@ void MOERI::compute(size_t nb, size_t nt, const double* C, double* out) {
   // 2nd Quarter
   // TMP2(p,q,k,l) = C(j,q) * TMP1(p,j,k,l)
   // TMP2_kl(p,q)  = TMP1_kl(p,j) * C(j,q)
-  for (size_t kl = 0; kl < nb2; ++kl) {
-    auto TMP1_kl = tmp1.data() + kl * nb * nt;
+  for (size_t kl = 0; kl < nao2; ++kl) {
+    auto TMP1_kl = tmp1.data() + kl * nao * nt;
     auto TMP2_kl = tmp2.data() + kl * nt2;
-    blas::gemm("N", "N", nt, nt, nb, 1.0, TMP1_kl, nt, C_cm.data(), nb, 0.0,
+    blas::gemm("N", "N", nt, nt, nao, 1.0, TMP1_kl, nt, C_cm.data(), nao, 0.0,
                TMP2_kl, nt);
   }
 
   // 3rd Quarter
   // TMP1(p,q,r,l) = C(k,r) * TMP2(p,q,k,l)
   // TMP1_l(pq,r)  = TMP2_l(pq,k) * C(k,r)
-  for (size_t l = 0; l < nb; ++l) {
-    auto TMP2_l = tmp2.data() + l * nt2 * nb;
+  for (size_t l = 0; l < nao; ++l) {
+    auto TMP2_l = tmp2.data() + l * nt2 * nao;
     auto TMP1_l = tmp1.data() + l * nt3;
-    blas::gemm("N", "N", nt2, nt, nb, 1.0, TMP2_l, nt2, C_cm.data(), nb, 0.0,
+    blas::gemm("N", "N", nt2, nt, nao, 1.0, TMP2_l, nt2, C_cm.data(), nao, 0.0,
                TMP1_l, nt2);
   }
 
   // 4th Quarter
   // Y(p,q,r,s) = C(l,s) * TMP1(p,q,r,l)
   // Y(pqr,s) = V(pqr,l) * C(l,s)
-  blas::gemm("N", "N", nt3, nt, nb, 1.0, tmp1.data(), nt3, C_cm.data(), nb, 0.0,
-             out, nt3);
+  blas::gemm("N", "N", nt3, nt, nao, 1.0, tmp1.data(), nt3, C_cm.data(), nao,
+             0.0, out, nt3);
 
 #endif  // QDK_CHEMISTRY_ENABLE_GPU
 }

@@ -35,7 +35,7 @@ std::shared_ptr<data::Hamiltonian> HamiltonianConstructor::_run_impl(
 
   auto basis_set = orbitals->get_basis_set();
   const auto& [Ca, Cb] = orbitals->get_coefficients();
-  const size_t num_basis_funcs = basis_set->get_num_basis_functions();
+  const size_t num_atomic_orbitals = basis_set->get_num_atomic_orbitals();
   const size_t num_molecular_orbitals = orbitals->get_num_molecular_orbitals();
 
   // Determine whether we're doing an active space calculation
@@ -122,18 +122,18 @@ std::shared_ptr<data::Hamiltonian> HamiltonianConstructor::_run_impl(
       internal_basis_set.get(), mol.get(), scf_config->mpi);
 
   // Compute Core Hamiltonian in AO basis
-  Eigen::MatrixXd T_full(num_basis_funcs, num_basis_funcs),
-      V_full(num_basis_funcs, num_basis_funcs);
+  Eigen::MatrixXd T_full(num_atomic_orbitals, num_atomic_orbitals),
+      V_full(num_atomic_orbitals, num_atomic_orbitals);
   int1e->kinetic_integral(T_full.data());
   int1e->nuclear_integral(V_full.data());
   Eigen::MatrixXd H_full = T_full + V_full;
 
-  Eigen::MatrixXd C_active(num_basis_funcs, nactive);
+  Eigen::MatrixXd C_active(num_atomic_orbitals, nactive);
   if (indices.empty()) {
     // If no active orbitals are specified, use all orbitals
     C_active = Ca;
   } else if (active_space_is_contiguous) {
-    C_active = Ca.block(0, indices.front(), num_basis_funcs, nactive);
+    C_active = Ca.block(0, indices.front(), num_atomic_orbitals, nactive);
   } else {
     for (auto i = 0; i < nactive; i++) {
       C_active.col(i) = Ca.col(indices[i]);
@@ -144,7 +144,8 @@ std::shared_ptr<data::Hamiltonian> HamiltonianConstructor::_run_impl(
       C_active;
   Eigen::VectorXd moeri_active(nactive * nactive * nactive * nactive);
   qcs::MOERI moeri_c(eri);
-  moeri_c.compute(num_basis_funcs, nactive, C_rm.data(), moeri_active.data());
+  moeri_c.compute(num_atomic_orbitals, nactive, C_rm.data(),
+                  moeri_active.data());
 
   // Early exit
   if (indices.empty()) {
@@ -186,9 +187,9 @@ std::shared_ptr<data::Hamiltonian> HamiltonianConstructor::_run_impl(
 
   // Compute the inactive density matrix
   Eigen::MatrixXd D_inactive =
-      Eigen::MatrixXd::Zero(num_basis_funcs, num_basis_funcs);
+      Eigen::MatrixXd::Zero(num_atomic_orbitals, num_atomic_orbitals);
   if (inactive_space_is_contiguous) {
-    auto C_inactive = Ca.block(0, inactive_indices.front(), num_basis_funcs,
+    auto C_inactive = Ca.block(0, inactive_indices.front(), num_atomic_orbitals,
                                inactive_indices.size());
     D_inactive = C_inactive * C_inactive.transpose();
   } else {
@@ -198,8 +199,8 @@ std::shared_ptr<data::Hamiltonian> HamiltonianConstructor::_run_impl(
   }
 
   // Compute the two electron part of the inactive fock matrix
-  Eigen::MatrixXd J_inactive_ao(num_basis_funcs, num_basis_funcs),
-      K_inactive_ao(num_basis_funcs, num_basis_funcs);
+  Eigen::MatrixXd J_inactive_ao(num_atomic_orbitals, num_atomic_orbitals),
+      K_inactive_ao(num_atomic_orbitals, num_atomic_orbitals);
   eri->build_JK(D_inactive.data(), J_inactive_ao.data(), K_inactive_ao.data(),
                 1.0, 0.0, 0.0);
   Eigen::MatrixXd G_inactive_ao = 2 * J_inactive_ao - K_inactive_ao;

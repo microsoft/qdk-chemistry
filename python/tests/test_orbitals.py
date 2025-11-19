@@ -142,8 +142,8 @@ def test_basis_info():
     retrieved_basis = orb.get_basis_set()
     assert retrieved_basis.get_name() == "6-31G"
     assert retrieved_basis.get_num_shells() > 0
-    # Number of basis functions should match what we requested
-    assert retrieved_basis.get_num_basis_functions() == 2
+    # Number of atomic orbitals should match what we requested
+    assert retrieved_basis.get_num_atomic_orbitals() == 2
 
 
 def test_calculation_restriction_query():

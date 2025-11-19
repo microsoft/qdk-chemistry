@@ -66,7 +66,7 @@ class _TestSettingsContainer(Settings):
         self._set_default("verbose", "bool", False)
         self._set_default("parameters", "vector<double>", [])
         self._set_default("coefficients", "vector<double>", [])
-        self._set_default("basis_functions", "vector<string>", [])
+        self._set_default("atomic_orbitals", "vector<string>", [])
         self._set_default("list_int", "vector<int>", [])
         self._set_default("list_float", "vector<double>", [])
         self._set_default("list_str", "vector<string>", [])
@@ -838,7 +838,7 @@ class TestSettings:
         settings["use_symmetry"] = True
         settings["active_orbitals"] = [1, 2, 3, 4, 5]
         settings["coefficients"] = [0.1, 0.2, 0.3, 0.4]
-        settings["basis_functions"] = ["s", "p", "d", "f"]
+        settings["atomic_orbitals"] = ["s", "p", "d", "f"]
 
         with tempfile.TemporaryDirectory() as tmpdir:
             tmpdir_path = Path(tmpdir)
@@ -855,7 +855,7 @@ class TestSettings:
             assert new_settings["use_symmetry"] is True
             assert new_settings["active_orbitals"] == [1, 2, 3, 4, 5]
             assert new_settings["coefficients"] == [0.1, 0.2, 0.3, 0.4]
-            assert new_settings["basis_functions"] == ["s", "p", "d", "f"]
+            assert new_settings["atomic_orbitals"] == ["s", "p", "d", "f"]
 
             # Test HDF5 with complex data (if available)
             try:
@@ -871,7 +871,7 @@ class TestSettings:
                 assert new_settings_hdf5["use_symmetry"] is True
                 assert new_settings_hdf5["active_orbitals"] == [1, 2, 3, 4, 5]
                 assert new_settings_hdf5["coefficients"] == [0.1, 0.2, 0.3, 0.4]
-                assert new_settings_hdf5["basis_functions"] == ["s", "p", "d", "f"]
+                assert new_settings_hdf5["atomic_orbitals"] == ["s", "p", "d", "f"]
             except (ImportError, OSError, RuntimeError):
                 pass  # Skip if HDF5 not available
 
