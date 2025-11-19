@@ -1,0 +1,30 @@
+/*
+ * Copyright (c) Microsoft Corporation
+ */
+
+#include <qdk/chemistry/scf/config.h>
+
+#cmakedefine RESOURCES_DIR "@RESOURCES_DIR@"
+
+namespace qdk::chemistry::scf {
+
+// Static member definition
+#ifdef RESOURCES_DIR
+std::filesystem::path QDKChemistryConfig::resources_dir_ = RESOURCES_DIR;
+#else
+std::filesystem::path QDKChemistryConfig::resources_dir_ =
+    std::filesystem::path();
+#endif
+
+std::filesystem::path QDKChemistryConfig::get_resources_dir() {
+  if(resources_dir_.empty()) {
+    throw std::runtime_error("The runtime resources directory for QDK/Chemistry is currently empty. Please set an appropriate resource directory using QDKChemistryConfig:set_resources_dir");
+  }
+  return resources_dir_;
+}
+
+void QDKChemistryConfig::set_resources_dir(const std::filesystem::path& path) {
+  resources_dir_ = path;
+}
+
+}  // namespace qdk::chemistry::scf

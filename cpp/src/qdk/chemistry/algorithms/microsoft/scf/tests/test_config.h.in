@@ -1,0 +1,9 @@
+#ifndef TEST_CONFIG_H_
+#define TEST_CONFIG_H_
+
+#cmakedefine TEST_DATA_DIR "@TEST_DATA_DIR@"
+#cmakedefine TEST_XYZ_DIR "@TEST_XYZ_DIR@"
+
+#cmakedefine QDK_CHEMISTRY_RUN_LONG_TESTS
+
+#endif  // TEST_CONFIG_H_

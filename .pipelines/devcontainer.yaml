@@ -1,0 +1,723 @@
+trigger:
+  branches:
+    include:
+    - main
+
+# Trigger this pipeline on PRs targeting any branch
+pr:
+  branches:
+    include:
+    - '*'
+  drafts: true
+
+parameters:
+- name: matrix_arch
+  type: object
+  default:
+  - name: linux_x86_64
+    poolName: aqe-1es-HB120-pool
+    os: linux
+    arch: x86_64
+    march: x86-64-v3
+  - name: linux_aarch64
+    poolName: qd-1es-arm-d48ps
+    os: linux
+    arch: aarch64
+    march: armv8-a
+- name: forcePublishing
+  displayName: Force the publishing of resulting artifacts
+  default: false
+  type: boolean
+- name: publishingRegistryServiceConnection
+  displayName: Registry Service Connection
+  default: discovery-quantumapps-sc
+  type: string
+- name: publishingRegistry
+  displayName: Registry URL
+  default: quantumapps.azurecr.io
+  type: string
+# Version parameters for repositories
+- name: spdlogRef
+  displayName: spdlog Reference
+  default: refs/tags/v1.10.0
+  type: string
+- name: exchCXXRef
+  displayName: ExchCXX Reference
+  default: master
+  type: string
+- name: gauXCRef
+  displayName: GauXC Reference
+  default: refs/tags/v1.0
+  type: string
+- name: hgpRef
+  displayName: HGP Reference
+  default: cuda_arch/sm90
+  type: string
+- name: cmakeRef
+  displayName: CMake Reference
+  default: refs/tags/v3.28.3
+  type: string
+- name: gitRef
+  displayName: Git Reference
+  default: refs/tags/v2.51.0
+  type: string
+- name: libintVersion
+  displayName: libint Version
+  default: 2.9.0
+  type: string
+- name: hdf5Version
+  displayName: HDF5 Version
+  default: 1.13.0
+  type: string
+# Azure Artifacts parameters
+- name: artifactOrganization
+  displayName: Azure DevOps Organization URL
+  default: https://dev.azure.com/ms-azurequantum/
+  type: string
+- name: artifactProject
+  displayName: Azure DevOps Project ID
+  default: 37e07de7-e7fd-4be8-8379-dc164a4401f3
+  type: string
+- name: artifactFeed
+  displayName: Azure Artifacts Feed Name
+  default: quantum-apps-dependencies
+  type: string
+- name: hgpSm90ArtifactVersion
+  displayName: HGP SM90 Artifact Version
+  default: 2025.0.0
+  type: string
+- name: hgpSm80ArtifactVersion
+  displayName: HGP SM80 Artifact Version
+  default: 2025.127.8
+  type: string
+- name: buildShared
+  displayName: Build Shared Libraries
+  default: ON
+  type: string
+
+resources:
+  repositories:
+  - repository: self
+  # Public repositories
+    endpoint: github
+  - repository: spdlog
+    type: github
+    name: gabime/spdlog
+    ref: ${{ parameters.spdlogRef }}
+    endpoint: github
+  - repository: ExchCXX
+    type: github
+    name: wavefunction91/ExchCXX
+    ref: ${{ parameters.exchCXXRef }}
+    endpoint: github
+  - repository: GauXC
+    type: github
+    name: wavefunction91/GauXC
+    ref: ${{ parameters.gauXCRef }}
+    endpoint: github
+  - repository: cmake
+    type: github
+    name: Kitware/CMake
+    ref: ${{ parameters.cmakeRef }}
+    endpoint: github
+  - repository: git
+    type: github
+    name: git/git
+    ref: ${{ parameters.gitRef }}
+    endpoint: github
+
+variables:
+  # Container registry service connection established during pipeline creation
+  developmentRegistryServiceConnection: discovery-quantumapps-sc
+  developmentRegistry: quantumapps.azurecr.io
+  date: $[format('{0:yyyy}.{0:MM}.{0:dd}', pipeline.startTime)]
+  baseImageName: qatk-base
+  devImageName: qatk-dev
+  runtimeImageName: qdk-chemistry
+stages:
+
+# STAGE: Create a hash from the git commit UUID, to be used as a tag for docker images
+- template: templates/generate-hash-stage.yml
+
+- stage: BuildBaseImage
+  displayName: Build Base Docker Image
+  dependsOn: Hash
+  jobs:
+  - ${{ each arch in parameters.matrix_arch }}:
+    - job: BuildBaseImage_${{ arch.name }}
+      strategy:
+        ${{ if eq(arch.arch, 'aarch64') }}:
+          matrix:
+            cpu:
+              march: ${{ arch.march }}
+              cuda_arch: none
+              targetarch: ${{ arch.arch }}
+        ${{ if eq(arch.arch, 'x86_64') }}:
+          matrix:
+            cpu:
+              march: ${{ arch.march }}
+              cuda_arch: none
+              targetarch: ${{ arch.arch }}
+            #h100:
+            #  march: ${{ arch.march }}
+            #  cuda_arch: '90'
+            #  targetarch: ${{ arch.arch }}
+            #a100:
+            #  march: ${{ arch.march }}
+            #  cuda_arch: '80'
+            #  targetarch: ${{ arch.arch }}
+        maxParallel: 3
+      displayName: Build Base Docker Image (${{ arch.name }})
+      pool: ${{ arch.poolName }}
+      timeoutInMinutes: 1800
+      variables:
+        gitHash: $[stageDependencies.Hash.GenerateTagHashs.outputs['hashingStep.gitHash']]
+      steps:
+      - checkout: self
+        persistCredentials: true
+        path: qatk
+      - checkout: spdlog
+        persistCredentials: true
+        path: spdlog
+      - checkout: ExchCXX
+        persistCredentials: true
+        path: ExchCXX
+      - checkout: GauXC
+        persistCredentials: true
+        path: GauXC
+      - checkout: cmake
+        persistCredentials: true
+        path: cmake
+      - checkout: git
+        persistCredentials: true
+        path: git
+
+      - template: templates/reset-docker-directory.yml
+
+      # Download HGP artifact based on CUDA architecture
+      - task: UniversalPackages@0
+        displayName: Download HGP SM90 artifact
+        condition: eq(variables['cuda_arch'], '90')
+        inputs:
+          command: download
+          downloadDirectory: $(Agent.BuildDirectory)/hgp
+          feedsToUse: internal
+          vstsFeed: ${{ parameters.artifactProject }}/${{ parameters.artifactFeed }}
+          vstsFeedPackage: hgp_sm90
+          vstsPackageVersion: ${{ parameters.hgpSm90ArtifactVersion }}
+
+      - task: UniversalPackages@0
+        displayName: Download HGP SM80 artifact
+        condition: eq(variables['cuda_arch'], '80')
+        inputs:
+          command: download
+          downloadDirectory: $(Agent.BuildDirectory)/hgp
+          feedsToUse: internal
+          vstsFeed: ${{ parameters.artifactProject }}/${{ parameters.artifactFeed }}
+          vstsFeedPackage: hgp_sm80
+          vstsPackageVersion: ${{ parameters.hgpSm80ArtifactVersion }}
+
+      # Create empty HGP directory for CPU builds
+      - script: |
+          mkdir -p $(Agent.BuildDirectory)/hgp
+          echo "Created empty HGP directory for CPU build (cuda_arch=none)"
+        displayName: Create empty HGP directory for CPU builds
+        condition: eq(variables['cuda_arch'], 'none')
+
+      - task: PipAuthenticate@1
+        displayName: Pip Authenticate
+        inputs:
+          artifactFeeds: AzureQuantum/AQE
+
+      # Download and prepare external dependencies
+      - script: |
+          cd $(Agent.BuildDirectory)
+          echo "Downloading libint2 tarball..."
+          wget https://github.com/evaleev/libint/releases/download/v${{ parameters.libintVersion }}/libint-${{ parameters.libintVersion }}-mpqc4.tgz
+          tar -xzf libint-${{ parameters.libintVersion }}-mpqc4.tgz
+          rm libint-${{ parameters.libintVersion }}-mpqc4.tgz
+          mv libint-${{ parameters.libintVersion }} libint2
+          echo "libint2 ${{ parameters.libintVersion }} downloaded and extracted successfully"
+
+          echo "Downloading HDF5 ${{ parameters.hdf5Version }}..."
+          wget -q -nc --no-check-certificate https://support.hdfgroup.org/ftp/HDF5/releases/hdf5-1.13/hdf5-${{ parameters.hdf5Version }}/src/hdf5-${{ parameters.hdf5Version }}.tar.bz2
+          tar -xjf hdf5-${{ parameters.hdf5Version }}.tar.bz2
+          rm hdf5-${{ parameters.hdf5Version }}.tar.bz2
+          mv hdf5-${{ parameters.hdf5Version }} hdf5
+          echo "HDF5 ${{ parameters.hdf5Version }} downloaded and extracted successfully"
+
+          echo "Build directory contents:"
+          ls -la
+        displayName: Download external dependencies
+
+      # Check system resources before build
+      - script: |
+          echo "=== System Resource Information ==="
+          echo "Memory information:"
+          free -h
+          echo "CPU information:"
+          nproc
+          lscpu | grep "Model name"
+          echo "Docker info:"
+          docker system df
+        displayName: Check System Resources
+
+      - task: Docker@2
+        displayName: Container repo login
+        inputs:
+          command: login
+          containerRegistry: $(developmentRegistryServiceConnection)
+
+      - task: Docker@2
+        displayName: Build Base Docker Image
+        inputs:
+          command: build
+          dockerfile: $(Agent.BuildDirectory)/qatk/.pipelines/base.Dockerfile
+          buildContext: $(Agent.BuildDirectory)
+          repository: $(baseImageName)-$(march)-$(cuda_arch)
+          containerRegistry: $(developmentRegistryServiceConnection)
+          arguments: |
+            --build-arg cuda_arch=$(cuda_arch)
+            --build-arg march=$(march)
+            --build-arg build_shared=${{ parameters.buildShared }}
+            --build-arg TARGETARCH=$(targetarch)
+            --build-arg SPDLOG_SOURCE_DIR=/ext/spdlog
+            --build-arg EXCHCXX_SOURCE_DIR=/ext/ExchCXX
+            --build-arg GAUXC_SOURCE_DIR=/ext/GauXC
+          tags: |
+            $(gitHash)
+
+      - task: Docker@2
+        displayName: Push Base Docker Image (Hash Tag Only)
+        inputs:
+          command: push
+          repository: $(baseImageName)-$(march)-$(cuda_arch)
+          containerRegistry: $(developmentRegistryServiceConnection)
+          tags: |
+            $(gitHash)
+
+      # Test the built base image
+      - script: |
+          echo "Testing the built Base Docker image..."
+          docker run --rm $(developmentRegistry)/$(baseImageName)-$(march)-$(cuda_arch):$(gitHash) /bin/bash -c "
+            echo 'Testing Python 3.13 installation...' &&
+            python3 --version &&
+            pip list | grep -E '(pyscf)' &&
+            echo 'Testing Git 2.51.0 installation...' &&
+            /usr/local/bin/git --version &&
+            echo 'Testing C++ tools...' &&
+            cmake --version &&
+            ninja --version &&
+            g++ --version &&
+            echo 'Testing scientific libraries...' &&
+            ls -la /usr/local/lib/ | grep -E '(libint|hdf5)' || true &&
+            echo 'Base Docker image test completed successfully!'
+          "
+        displayName: Test Base Docker Image
+        condition: succeeded()
+
+      # Output image information
+      - script: |
+          echo "Base Docker image built successfully!"
+          echo "Registry: $(developmentRegistry)"
+          echo "Image: $(baseImageName)-$(march)-$(cuda_arch)"
+          echo "Hash Tag: $(gitHash)"
+          echo "Full image name: $(developmentRegistry)/$(baseImageName)-$(march)-$(cuda_arch):$(gitHash)"
+          echo ""
+          echo "NOTE: Base image is only tagged with git hash, no 'latest' tag for base images"
+        displayName: Output Base Image Information
+
+- stage: BuildDevImage
+  displayName: Build Developer Docker Image
+  dependsOn:
+  - Hash
+  - BuildBaseImage
+  jobs:
+  - ${{ each arch in parameters.matrix_arch }}:
+    - job: BuildDevImage_${{ arch.name }}
+      strategy:
+        ${{ if eq(arch.arch, 'aarch64') }}:
+          matrix:
+            cpu:
+              march: ${{ arch.march }}
+              cuda_arch: none
+        ${{ if eq(arch.arch, 'x86_64') }}:
+          matrix:
+            cpu:
+              march: ${{ arch.march }}
+              cuda_arch: none
+            #h100:
+            #  march: ${{ arch.march }}
+            #  cuda_arch: '90'
+            #a100:
+            #  march: ${{ arch.march }}
+            #  cuda_arch: '80'
+        maxParallel: 3
+      displayName: Build Developer Docker Image (${{ arch.name }})
+      pool: ${{ arch.poolName }}
+      timeoutInMinutes: 600
+      variables:
+        gitHash: $[stageDependencies.Hash.GenerateTagHashs.outputs['hashingStep.gitHash']]
+      steps:
+      - checkout: self
+        persistCredentials: true
+        path: qatk
+
+      - template: templates/reset-docker-directory.yml
+
+      - task: Docker@2
+        displayName: Container repo login
+        inputs:
+          command: login
+          containerRegistry: $(developmentRegistryServiceConnection)
+
+      - task: Docker@2
+        displayName: Build Developer Docker Image
+        inputs:
+          command: build
+          dockerfile: $(Agent.BuildDirectory)/qatk/.pipelines/devcontainer.Dockerfile
+          buildContext: $(Agent.BuildDirectory)
+          repository: $(devImageName)-$(march)-$(cuda_arch)
+          containerRegistry: $(developmentRegistryServiceConnection)
+          arguments: |
+            --build-arg developmentRegistry=$(developmentRegistry)
+            --build-arg baseImageName=$(baseImageName)
+            --build-arg march=$(march)
+            --build-arg cuda_arch=$(cuda_arch)
+            --build-arg gitHash=$(gitHash)
+          tags: |
+            $(gitHash)
+
+      - task: Docker@2
+        displayName: Push Developer Docker Image (Hash Tag)
+        inputs:
+          command: push
+          repository: $(devImageName)-$(march)-$(cuda_arch)
+          containerRegistry: $(developmentRegistryServiceConnection)
+          tags: |
+            $(gitHash)
+
+      # Test the built dev image
+      - script: |
+          echo "Testing the built Developer Docker image..."
+          docker run --rm $(developmentRegistry)/$(devImageName)-$(march)-$(cuda_arch):$(gitHash) /bin/bash -c "
+            echo 'Testing Python 3.13 installation...' &&
+            python3 --version &&
+            pip list | grep -E '(pytest|coverage|azure-cli|sphinx)' &&
+            echo 'Testing development tools...' &&
+            code --version &&
+            git-credential-manager --version &&
+            echo 'Testing Git 2.51.0...' &&
+            /usr/local/bin/git --version &&
+            echo 'Testing base functionality...' &&
+            python3 -c 'import pyscf; print(\"PySCF available\")' &&
+            cmake --version &&
+            echo 'Developer Docker image test completed successfully!'
+          "
+        displayName: Test Developer Docker Image
+        condition: succeeded()
+
+      # Output image information
+      - script: |
+          echo "Developer Docker image built successfully!"
+          echo "Registry: $(developmentRegistry)"
+          echo "Image: $(devImageName)-$(march)-$(cuda_arch)"
+          echo "Hash Tag: $(gitHash)"
+          echo "Full image name: $(developmentRegistry)/$(devImageName)-$(march)-$(cuda_arch):$(gitHash)"
+          echo ""
+          echo "To use this image locally:"
+          echo "docker pull $(developmentRegistry)/$(devImageName)-$(march)-$(cuda_arch):$(gitHash)"
+          echo ""
+          echo "To run the development container:"
+          echo "docker run -it --rm -v \$(pwd):/workspace/qatk $(developmentRegistry)/$(devImageName)-$(march)-$(cuda_arch):$(gitHash)"
+        displayName: Output Developer Image Information
+
+- stage: BuildQDKChemistryRuntime
+  displayName: Build QDK/Chemistry Runtime Docker Image
+  dependsOn:
+  - Hash
+  - BuildBaseImage
+  jobs:
+  # ARM64 CPU builds
+  - ${{ each arch in parameters.matrix_arch }}:
+    - ${{ if eq(arch.arch, 'aarch64') }}:
+      - job: BuildQDKChemistryRuntimeImage_${{ arch.name }}
+        displayName: Build QDK/Chemistry Runtime Docker Image (${{ arch.name }})
+        pool: ${{ arch.poolName }}
+        timeoutInMinutes: 1800
+        variables:
+          gitHash: $[stageDependencies.Hash.GenerateTagHashs.outputs['hashingStep.gitHash']]
+          march: ${{ arch.march }}
+          cuda_arch: none
+        steps:
+        - checkout: self
+          persistCredentials: true
+          path: qatk
+
+        - template: templates/reset-docker-directory.yml
+
+        - task: Docker@2
+          displayName: Container repo login
+          inputs:
+            command: login
+            containerRegistry: $(developmentRegistryServiceConnection)
+
+        - task: Docker@2
+          displayName: Build QDK/Chemistry Runtime Docker Image
+          inputs:
+            command: build
+            dockerfile: $(Agent.BuildDirectory)/qatk/.pipelines/runtimecontainer.Dockerfile
+            buildContext: $(Agent.BuildDirectory)
+            repository: $(runtimeImageName)-$(march)-$(cuda_arch)
+            containerRegistry: $(developmentRegistryServiceConnection)
+            arguments: |
+              --build-arg developmentRegistry=$(developmentRegistry)
+              --build-arg baseImageName=$(baseImageName)
+              --build-arg march=$(march)
+              --build-arg cuda_arch=$(cuda_arch)
+              --build-arg gitHash=$(gitHash)
+            tags: |
+              $(gitHash)
+
+        - task: Docker@2
+          displayName: Push QDK/Chemistry Runtime Docker Image (Hash Tag)
+          inputs:
+            command: push
+            repository: $(runtimeImageName)-$(march)-$(cuda_arch)
+            containerRegistry: $(developmentRegistryServiceConnection)
+            tags: |
+              $(gitHash)
+
+        - script: |
+            echo "Testing the QDK/Chemistry Runtime Docker image..."
+            docker run --rm $(developmentRegistry)/$(runtimeImageName)-$(march)-$(cuda_arch):$(gitHash) /bin/bash -c "
+              echo 'Testing QDK/Chemistry installation...' &&
+              python3 -c 'import qdk_chemistry; print(\"QDK/Chemistry version:\", qdk_chemistry.__version__)'
+            "
+          displayName: Test QDK/Chemistry Runtime Docker Image
+          condition: succeeded()
+
+        - script: |
+            echo "QDK/Chemistry Runtime Docker image built successfully!"
+            echo "Registry: $(developmentRegistry)"
+            echo "Image: $(runtimeImageName)-$(march)-$(cuda_arch)"
+            echo "Hash Tag: $(gitHash)"
+            echo "Full image name: $(developmentRegistry)/$(runtimeImageName)-$(march)-$(cuda_arch):$(gitHash)"
+            echo ""
+            echo "To use this image locally:"
+            echo "docker pull $(developmentRegistry)/$(runtimeImageName)-$(march)-$(cuda_arch):$(gitHash)"
+            echo ""
+            echo "To run the QDK/Chemistry Runtime container:"
+            echo "docker run -it --rm -v \$(pwd):/workspace/qatk $(developmentRegistry)/$(runtimeImageName)-$(march)-$(cuda_arch):$(gitHash)"
+          displayName: Output QDK/Chemistry Runtime Image Information
+
+  # x86_64 CPU builds (uses CPU pool)
+  - ${{ each arch in parameters.matrix_arch }}:
+    - ${{ if eq(arch.arch, 'x86_64') }}:
+      - job: BuildQDKChemistryRuntimeImage_${{ arch.name }}_cpu
+        displayName: Build QDK/Chemistry Runtime Docker Image (${{ arch.name }} CPU)
+        pool: aqe-1es-HB120-pool
+        timeoutInMinutes: 1800
+        variables:
+          gitHash: $[stageDependencies.Hash.GenerateTagHashs.outputs['hashingStep.gitHash']]
+          march: ${{ arch.march }}
+          cuda_arch: none
+        steps:
+        - checkout: self
+          persistCredentials: true
+          path: qatk
+
+        - template: templates/reset-docker-directory.yml
+
+        - task: Docker@2
+          displayName: Container repo login
+          inputs:
+            command: login
+            containerRegistry: $(developmentRegistryServiceConnection)
+
+        - task: Docker@2
+          displayName: Build QDK/Chemistry Runtime Docker Image
+          inputs:
+            command: build
+            dockerfile: $(Agent.BuildDirectory)/qatk/.pipelines/runtimecontainer.Dockerfile
+            buildContext: $(Agent.BuildDirectory)
+            repository: $(runtimeImageName)-$(march)-$(cuda_arch)
+            containerRegistry: $(developmentRegistryServiceConnection)
+            arguments: |
+              --build-arg developmentRegistry=$(developmentRegistry)
+              --build-arg baseImageName=$(baseImageName)
+              --build-arg march=$(march)
+              --build-arg cuda_arch=$(cuda_arch)
+              --build-arg gitHash=$(gitHash)
+            tags: |
+              $(gitHash)
+
+        - task: Docker@2
+          displayName: Push QDK/Chemistry Runtime Docker Image (Hash Tag)
+          inputs:
+            command: push
+            repository: $(runtimeImageName)-$(march)-$(cuda_arch)
+            containerRegistry: $(developmentRegistryServiceConnection)
+            tags: |
+              $(gitHash)
+
+        - script: |
+            echo "Testing the QDK/Chemistry Runtime Docker image..."
+            docker run --rm $(developmentRegistry)/$(runtimeImageName)-$(march)-$(cuda_arch):$(gitHash) /bin/bash -c "
+              echo 'Testing QDK/Chemistry installation...' &&
+              python3 -c 'import qdk_chemistry; print(\"QDK/Chemistry version:\", qdk_chemistry.__version__)'
+            "
+          displayName: Test QDK/Chemistry Runtime Docker Image
+          condition: succeeded()
+
+        - script: |
+            echo "QDK/Chemistry Runtime Docker image built successfully!"
+            echo "Registry: $(developmentRegistry)"
+            echo "Image: $(runtimeImageName)-$(march)-$(cuda_arch)"
+            echo "Hash Tag: $(gitHash)"
+            echo "Full image name: $(developmentRegistry)/$(runtimeImageName)-$(march)-$(cuda_arch):$(gitHash)"
+            echo ""
+            echo "To use this image locally:"
+            echo "docker pull $(developmentRegistry)/$(runtimeImageName)-$(march)-$(cuda_arch):$(gitHash)"
+            echo ""
+            echo "To run the QDK/Chemistry Runtime container:"
+            echo "docker run -it --rm -v \$(pwd):/workspace/qatk $(developmentRegistry)/$(runtimeImageName)-$(march)-$(cuda_arch):$(gitHash)"
+          displayName: Output QDK/Chemistry Runtime Image Information
+
+- stage: PublishLatest
+  displayName: Publish Latest Tag
+  dependsOn:
+  - Hash
+  - BuildDevImage
+  - BuildQDKChemistryRuntime
+  condition: and(succeeded(), or(eq(variables['build.sourceBranch'], 'refs/heads/main'), eq(${{parameters.forcePublishing}}, 'true')))
+  jobs:
+  - ${{ each arch in parameters.matrix_arch }}:
+    - job: PublishLatest_${{ arch.name }}
+      strategy:
+        ${{ if eq(arch.arch, 'aarch64') }}:
+          matrix:
+            cpu:
+              march: ${{ arch.march }}
+              cuda_arch: none
+        ${{ if eq(arch.arch, 'x86_64') }}:
+          matrix:
+            cpu:
+              march: ${{ arch.march }}
+              cuda_arch: none
+            #h100:
+            #  march: ${{ arch.march }}
+            #  cuda_arch: '90'
+            #a100:
+            #  march: ${{ arch.march }}
+            #  cuda_arch: '80'
+        maxParallel: 3
+      displayName: Publish Latest Tag (${{ arch.name }})
+      pool: ${{ arch.poolName }}
+      timeoutInMinutes: 60
+      variables:
+        gitHash: $[stageDependencies.Hash.GenerateTagHashs.outputs['hashingStep.gitHash']]
+      steps:
+      - template: templates/reset-docker-directory.yml
+
+      - task: Docker@2
+        displayName: Container repo login (development)
+        inputs:
+          command: login
+          containerRegistry: $(developmentRegistryServiceConnection)
+
+      - task: Docker@2
+        displayName: Container repo login (publishing)
+        inputs:
+          command: login
+          containerRegistry: ${{ parameters.publishingRegistryServiceConnection }}
+
+      # Pull the hash-tagged image
+      - script: |
+          docker pull $(developmentRegistry)/$(devImageName)-$(march)-$(cuda_arch):$(gitHash)
+        displayName: Pull Hash-Tagged Image
+
+      # Tag and push as latest to development registry
+      - script: |
+          docker tag $(developmentRegistry)/$(devImageName)-$(march)-$(cuda_arch):$(gitHash) $(developmentRegistry)/$(devImageName)-$(march)-$(cuda_arch):latest
+          docker push $(developmentRegistry)/$(devImageName)-$(march)-$(cuda_arch):latest
+        displayName: Push Latest Tag to Development Registry
+
+      # Tag and push to publishing registry if different
+      - script: |
+          if [ "$(developmentRegistry)" != "${{ parameters.publishingRegistry }}" ]; then
+            echo "Publishing to external registry: ${{ parameters.publishingRegistry }}"
+            docker tag $(developmentRegistry)/$(devImageName)-$(march)-$(cuda_arch):$(gitHash) ${{ parameters.publishingRegistry }}/$(devImageName)-$(march)-$(cuda_arch):$(gitHash)
+            docker tag $(developmentRegistry)/$(devImageName)-$(march)-$(cuda_arch):$(gitHash) ${{ parameters.publishingRegistry }}/$(devImageName)-$(march)-$(cuda_arch):latest
+            docker push ${{ parameters.publishingRegistry }}/$(devImageName)-$(march)-$(cuda_arch):$(gitHash)
+            docker push ${{ parameters.publishingRegistry }}/$(devImageName)-$(march)-$(cuda_arch):latest
+          else
+            echo "Development and publishing registries are the same, skipping duplicate push"
+          fi
+        displayName: Push to Publishing Registry
+        condition: ne('${{ parameters.publishingRegistry }}', '')
+
+      - script: |
+          echo "Latest tag published successfully!"
+          echo "Development Registry: $(developmentRegistry)/$(devImageName)-$(march)-$(cuda_arch):latest"
+          if [ "$(developmentRegistry)" != "${{ parameters.publishingRegistry }}" ]; then
+            echo "Publishing Registry: ${{ parameters.publishingRegistry }}/$(devImageName)-$(march)-$(cuda_arch):latest"
+          fi
+        displayName: Output Publishing Information
+
+    - job: PublishQDKChemistryRuntimeLatest_${{ arch.name }}
+      displayName: Publish QDK/Chemistry Runtime Latest Tag (${{ arch.name }})
+      pool: ${{ arch.poolName }}
+      timeoutInMinutes: 60
+      variables:
+        gitHash: $[stageDependencies.Hash.GenerateTagHashs.outputs['hashingStep.gitHash']]
+        qatkruntimeImageName: qatk-runtime
+        march: ${{ arch.march }}
+        cuda_arch: none
+      steps:
+      - template: templates/reset-docker-directory.yml
+
+      - task: Docker@2
+        displayName: Container repo login (development)
+        inputs:
+          command: login
+          containerRegistry: $(developmentRegistryServiceConnection)
+
+      - task: Docker@2
+        displayName: Container repo login (publishing)
+        inputs:
+          command: login
+          containerRegistry: ${{ parameters.publishingRegistryServiceConnection }}
+
+      # Pull the hash-tagged QDK/Chemistry Runtime image
+      - script: |
+          docker pull $(developmentRegistry)/$(runtimeImageName)-$(march)-$(cuda_arch):$(gitHash)
+        displayName: Pull QDK/Chemistry Runtime Hash-Tagged Image
+
+      # Tag and push as latest to development registry
+      - script: |
+          docker tag $(developmentRegistry)/$(runtimeImageName)-$(march)-$(cuda_arch):$(gitHash) $(developmentRegistry)/$(runtimeImageName)-$(march)-$(cuda_arch):latest
+          docker push $(developmentRegistry)/$(runtimeImageName)-$(march)-$(cuda_arch):latest
+        displayName: Push QDK/Chemistry Runtime Latest Tag to Development Registry
+
+      # Tag and push to publishing registry if different
+      - script: |
+          if [ "$(developmentRegistry)" != "${{ parameters.publishingRegistry }}" ]; then
+            echo "Publishing QDK/Chemistry Runtime to external registry: ${{ parameters.publishingRegistry }}"
+            docker tag $(developmentRegistry)/$(runtimeImageName)-$(march)-$(cuda_arch):$(gitHash) ${{ parameters.publishingRegistry }}/$(runtimeImageName)-$(march)-$(cuda_arch):$(gitHash)
+            docker tag $(developmentRegistry)/$(runtimeImageName)-$(march)-$(cuda_arch):$(gitHash) ${{ parameters.publishingRegistry }}/$(runtimeImageName)-$(march)-$(cuda_arch):latest
+            docker push ${{ parameters.publishingRegistry }}/$(runtimeImageName)-$(march)-$(cuda_arch):$(gitHash)
+            docker push ${{ parameters.publishingRegistry }}/$(runtimeImageName)-$(march)-$(cuda_arch):latest
+          else
+            echo "Development and publishing registries are the same, skipping duplicate push"
+          fi
+        displayName: Push QDK/Chemistry Runtime to Publishing Registry
+        condition: ne('${{ parameters.publishingRegistry }}', '')
+
+      - script: |
+          echo "QDK/Chemistry Runtime latest tag published successfully!"
+          echo "Development Registry: $(developmentRegistry)/$(runtimeImageName)-$(march)-$(cuda_arch):latest"
+          if [ "$(developmentRegistry)" != "${{ parameters.publishingRegistry }}" ]; then
+            echo "Publishing Registry: ${{ parameters.publishingRegistry }}/$(runtimeImageName)-$(march)-$(cuda_arch):latest"
+          fi
+        displayName: Output QDK/Chemistry Runtime Publishing Information

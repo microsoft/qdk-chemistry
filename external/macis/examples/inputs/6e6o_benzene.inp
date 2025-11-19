@@ -1,0 +1,12 @@
+[CI]
+NALPHA = 3
+NBETA  = 3
+REF_DATA_FORMAT = FCIDUMP
+REF_DATA_FILE   = ../../../data/electronic/6e6o_benzene/6e6o_benzene.fcidump
+JOB = CI
+EXPANSION = CAS
+
+[PRINT]
+CI = TRUE
+DAVIDSON = TRUE
+DETERMINANTS = TRUE

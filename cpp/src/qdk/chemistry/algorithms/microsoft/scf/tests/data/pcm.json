@@ -1,0 +1,90 @@
+{
+    "RHF/HF/def2-svp/c2h4/water": {
+        "mol": "c2h4",
+        "pcm": true,
+        "cart": false,
+        "solver_type": "iefpcm",
+        "solvent": "water",
+        "basis": "def2-svp",
+        "functional": "HF",
+        "method": "RHF",
+        "energy": -77.979299920991
+    },
+    "UHF/HF/def2-svp/c2h4/water": {
+        "mol": "c2h4",
+        "pcm": true,
+        "cart": false,
+        "solver_type": "iefpcm",
+        "solvent": "water",
+        "basis": "def2-svp",
+        "functional": "HF",
+        "method": "UHF",
+        "energy": -77.979299920987
+    },
+    "RKS/m06/def2-svp/c2h4/water": {
+        "mol": "c2h4",
+        "pcm": true,
+        "cart": false,
+        "solver_type": "iefpcm",
+        "solvent": "water",
+        "basis": "def2-svp",
+        "functional": "m06",
+        "method": "RKS",
+        "energy": -78.45652929226723
+    },
+    "UKS/m06/def2-svp/c2h4/water": {
+        "mol": "c2h4",
+        "pcm": true,
+        "cart": false,
+        "solver_type": "iefpcm",
+        "solvent": "water",
+        "basis": "def2-svp",
+        "functional": "m06",
+        "method": "UKS",
+        "energy": -78.45652929226723
+    },
+    "RKS/m06/6-31g*/benzene/ethanol": {
+        "mol": "benzene",
+        "pcm": true,
+        "cart": false,
+        "solver_type": "iefpcm",
+        "solvent": "ethanol",
+        "basis": "def2-tzvpp",
+        "functional": "m06",
+        "method": "RKS",
+        "energy": -232.1447457872631
+    },
+    "RKS/m06/6-31g*/benzene/ethanol_cpcm": {
+        "mol": "benzene",
+        "pcm": true,
+        "cart": false,
+        "solver_type": "cpcm",
+        "solvent": "ethanol",
+        "basis": "def2-tzvpp",
+        "functional": "m06",
+        "method": "RKS",
+        "energy": -232.14474578726288
+    },
+    "RKS/m06/def2-svp/acetylene/acetone": {
+        "mol": "acetylene",
+        "pcm": true,
+        "cart": false,
+        "solver_type": "iefpcm",
+        "solvent": "acetone",
+        "basis": "def2-tzvpp",
+        "functional": "m06",
+        "method": "RKS",
+        "energy": -77.30301452547255
+    },
+    "RKS/m06/def2-svp/acetylene/acetone_cpcm": {
+        "mol": "acetylene",
+        "pcm": true,
+        "cart": false,
+        "solver_type": "cpcm",
+        "solvent": "acetone",
+        "basis": "def2-tzvpp",
+        "functional": "m06",
+        "method": "RKS",
+        "energy": -77.30301452547236
+    }
+}

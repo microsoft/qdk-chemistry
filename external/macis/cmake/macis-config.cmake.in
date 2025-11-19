@@ -1,0 +1,44 @@
+# MACIS Copyright (c) 2023, The Regents of the University of California,
+# through Lawrence Berkeley National Laboratory (subject to receipt of
+# any required approvals from the U.S. Dept. of Energy). All rights reserved.
+# Portions Copyright (c) Microsoft Corporation.
+#
+# See LICENSE.txt for details
+
+cmake_minimum_required( VERSION 3.14 FATAL_ERROR )
+
+get_filename_component( macis_CMAKE_DIR "${CMAKE_CURRENT_LIST_FILE}" PATH )
+
+#list( APPEND CMAKE_MODULE_PATH ${macis_CMAKE_DIR} )
+
+set( MACIS_ENABLE_BOOST  @MACIS_ENABLE_BOOST@  CACHE BOOL "Enable Boost bindings in MACIS" FORCE)
+set( MACIS_ENABLE_MPI    @MACIS_ENABLE_MPI@    CACHE BOOL "Enable MPI bindings in MACIS" FORCE)
+set( MACIS_ENABLE_OPENMP @MACIS_ENABLE_OPENMP@ CACHE BOOL "Enable OpenMP bindings in MAICS" FORCE)
+set( MACIS_UARCH         @MACIS_UARCH_USED@    CACHE STRING "User-defined microarchitecture for optimization" FORCE)
+
+include( CMakeFindDependencyMacro )
+if( MACIS_ENABLE_MPI )
+  find_dependency( MPI )
+endif()
+if( MACIS_ENABLE_OPENMP )
+  find_dependency( OpenMP )
+endif()
+find_dependency( Threads )
+find_dependency( Eigen3 )
+find_dependency( lapackpp )
+find_dependency( lobpcgxx )
+find_dependency( sparsexx )
+find_dependency( mdspan )
+find_dependency( spdlog )
+if(MACIS_ENABLE_BOOST)
+  find_dependency(Boost)
+endif()
+
+
+#list(REMOVE_AT CMAKE_MODULE_PATH -1)
+
+if(NOT TARGET macis::macis)
+    include("${macis_CMAKE_DIR}/macis-targets.cmake")
+endif()
+
+set(macis_LIBRARIES macis::macis)

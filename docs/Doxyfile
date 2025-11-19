@@ -1,0 +1,55 @@
+# Project information
+PROJECT_NAME           = "QDK/Chemistry"
+PROJECT_BRIEF          = "A quantum development kit for chemistry applications."
+OUTPUT_DIRECTORY       = source/api/doxygen
+
+# Input files and directories
+INPUT                  = ../cpp/include ../cpp/src
+FILE_PATTERNS          = *.hpp *.cpp *.h
+RECURSIVE              = YES
+
+# Output formats
+GENERATE_HTML          = NO
+GENERATE_LATEX         = NO
+GENERATE_XML           = YES
+
+# Extraction settings
+EXTRACT_ALL            = YES
+EXTRACT_PRIVATE        = NO
+EXTRACT_STATIC         = YES
+
+# Code display
+SOURCE_BROWSER         = YES
+REFERENCED_BY_RELATION = YES
+REFERENCES_RELATION    = YES
+
+# Preprocessing
+ENABLE_PREPROCESSING   = YES
+MACRO_EXPANSION        = YES
+INCLUDE_PATH           = ../cpp/include
+INCLUDE_FILE_PATTERNS  = *.hpp
+
+# Dot tool settings for diagrams
+HAVE_DOT               = YES
+TEMPLATE_RELATIONS     = YES
+INCLUDE_GRAPH          = YES
+INCLUDED_BY_GRAPH      = YES
+CALL_GRAPH             = NO
+CALLER_GRAPH           = NO
+
+# Output formatting
+GENERATE_TREEVIEW      = NO
+SORT_BRIEF_DOCS        = YES
+SORT_MEMBERS_CTORS_1ST = YES
+
+# Documentation style
+JAVADOC_AUTOBRIEF      = YES
+BUILTIN_STL_SUPPORT    = NO
+
+# Path settings
+STRIP_FROM_PATH        = ../cpp/include
+STRIP_FROM_INC_PATH    = ../cpp/include
+
+# Exclude settings
+EXCLUDE_SYMBOLS        = std
+EXCLUDE = ../cpp/src/qdk/chemistry/algorithms/microsoft/scf

@@ -1,0 +1,13 @@
+steps:
+- script: |
+    echo "Stopping Docker"
+    sudo systemctl stop docker.service
+    sudo systemctl stop docker.socket
+    echo "Changing Docker storage directory to /mnt/data/docker"
+    sudo sed -i -e 's@ExecStart=/usr/bin/dockerd@ExecStart=/usr/bin/dockerd --data-root /mnt/data/docker@g' /lib/systemd/system/docker.service
+    sudo mkdir -p /mnt/data/docker
+    echo "Restarting Docker"
+    sudo systemctl daemon-reload
+    sudo systemctl start docker
+    sudo chmod 666 /var/run/docker.sock
+  displayName: Reset docker storage directory

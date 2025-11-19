@@ -1,0 +1,30 @@
+{
+    "RKS/B3LYP/def2-svp/Rd": {
+        "mol": "c2h4",
+	"charge": 0,
+	"multiplicity": 1,
+        "basis": "def2-svp",
+        "cart": false,
+        "functional": "B3LYP",
+        "method": "RKS",
+        "density-init-method": 4,
+        "density-init-file": "c2h4_rks_b3lyp_P.dat",
+        "energy": -78.531554866359414,
+        "gradient": [
+        ]
+    },
+    "UKS/B3LYP/def2-svp/Rd": {
+    	"mol": "o_clean",
+	"charge": 0,
+	"multiplicity": 3,
+        "basis": "def2-svp",
+        "cart": false,
+        "functional": "B3LYP",
+        "method": "UKS",
+	"density-init-method": 4,
+	"density-init-file": "o_uks_b3lyp_P.dat",
+        "energy": -75.000758327455,
+        "gradient": [
+        ]
+    }
+}

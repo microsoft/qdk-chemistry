@@ -1,0 +1,64 @@
+@PACKAGE_INIT@
+
+get_filename_component(QDK_CMAKE_DIR "${CMAKE_CURRENT_LIST_FILE}" PATH)
+list(PREPEND CMAKE_MODULE_PATH ${QDK_CMAKE_DIR})
+
+set(QDK_CHEMISTRY_ENABLE_GPU "@QDK_CHEMISTRY_ENABLE_GPU@" CACHE BOOL "Enable QDK GPU Bindings" FORCE)
+set(QDK_CHEMISTRY_ENABLE_HGP "@QDK_CHEMISTRY_ENABLE_HGP@" CACHE BOOL "Enable HGP Bindings" FORCE)
+set(QDK_CHEMISTRY_ENABLE_LIBINTX "@QDK_CHEMISTRY_ENABLE_LIBINTX@" CACHE BOOL "Enable LIBINTX Bindings" FORCE)
+set(QDK_CHEMISTRY_ENABLE_MPI "@QDK_CHEMISTRY_ENABLE_MPI@" CACHE BOOL "Enable MPI Bindings" FORCE)
+set(QDK_CHEMISTRY_ENABLE_PCM "@QDK_CHEMISTRY_ENABLE_PCM@" CACHE BOOL "Enable PCM Bindings" FORCE)
+set(QDK_CHEMISTRY_ENABLE_DFTD3 "@QDK_CHEMISTRY_ENABLE_DFTD3@" CACHE BOOL "Enable DFTD3 Bindings" FORCE)
+
+# Always Required Dependencies
+include(CMakeFindDependencyMacro)
+
+# Make sure C / CXX / CUDA are enabled (former for BLAS discovery)
+enable_language(C)
+enable_language(CXX)
+if(QDK_CHEMISTRY_ENABLE_GPU)
+  enable_language(CUDA)
+endif()
+
+if(QDK_CHEMISTRY_ENABLE_GPU)
+  find_dependency(CUDAToolkit REQUIRED)
+endif()
+if(QDK_CHEMISTRY_ENABLE_HGP)
+  find_dependency(HGP REQUIRED)
+endif()
+if(QDK_CHEMISTRY_ENABLE_LIBINTX)
+  find_dependency(libintx REQUIRED)
+endif()
+
+if(QDK_CHEMISTRY_ENABLE_MPI)
+  find_dependency(MPI REQUIRED)
+endif()
+
+find_dependency(macis REQUIRED)
+
+find_dependency(OpenMP REQUIRED)
+find_dependency(Eigen3 REQUIRED)
+find_dependency(HDF5 REQUIRED COMPONENTS CXX)
+find_dependency(nlohmann_json REQUIRED)
+find_dependency(Libint2 REQUIRED)
+find_dependency(ecpint REQUIRED)
+find_dependency(LAPACK REQUIRED)
+find_dependency(gauxc REQUIRED)
+find_dependency(Threads REQUIRED)
+
+if(QDK_CHEMISTRY_ENABLE_DFTD3)
+  find_dependency(s-dftd3 REQUIRED)
+endif()
+
+if(QDK_CHEMISTRY_ENABLE_PCM)
+  find_dependency(PCMSolver REQUIRED)
+  find_dependency(ddX REQUIRED)
+endif()
+
+list(REMOVE_AT CMAKE_MODULE_PATH 0)
+
+if(NOT TARGET qdk::chemistry)
+  include("${CMAKE_CURRENT_LIST_DIR}/chemistryTargets.cmake")
+endif()
+
+check_required_components(chemistry)

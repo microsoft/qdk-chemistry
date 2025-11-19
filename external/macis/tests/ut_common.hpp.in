@@ -1,0 +1,53 @@
+/*
+ * MACIS Copyright (c) 2023, The Regents of the University of California,
+ * through Lawrence Berkeley National Laboratory (subject to receipt of
+ * any required approvals from the U.S. Dept. of Energy). All rights reserved.
+ * Portions Copyright (c) Microsoft Corporation.
+ *
+ * See LICENSE.txt for details
+ */
+
+#pragma once
+// Catch3 headers - minimal includes
+#include <catch2/catch_test_macros.hpp>
+#include <catch2/matchers/catch_matchers.hpp>
+#include <catch2/matchers/catch_matchers_floating_point.hpp>
+#include <catch2/matchers/catch_matchers_string.hpp>
+#include <catch2/matchers/catch_matchers_vector.hpp>
+#include <macis/util/mpi.hpp>
+#ifdef MACIS_ENABLE_MPI
+
+#define ROOT_ONLY(comm)           \
+  int mpi_rank;                   \
+  MPI_Comm_rank(comm, &mpi_rank); \
+  if (mpi_rank > 0) return;
+
+#else
+
+#define ROOT_ONLY(comm)
+
+#endif
+
+#cmakedefine REF_DATA_PREFIX "@REF_DATA_PREFIX@"
+const std::string water_ccpvdz_fcidump = REF_DATA_PREFIX "/h2o.ccpvdz.fci.dat";
+const std::string water_ccpvdz_rdms_fname =
+    REF_DATA_PREFIX "/h2o.ccpvdz.cas88.rdms.bin";
+const std::string water_ccpvdz_rowptr_fname =
+    REF_DATA_PREFIX "/h2o.ccpvdz.cisd.rowptr.bin";
+const std::string water_ccpvdz_colind_fname =
+    REF_DATA_PREFIX "/h2o.ccpvdz.cisd.colind.bin";
+const std::string water_ccpvdz_nzval_fname =
+    REF_DATA_PREFIX "/h2o.ccpvdz.cisd.nzval.bin";
+const std::string ch4_wfn_fname = REF_DATA_PREFIX "/ch4.wfn.dat";
+const std::string o2_wfn_fname = REF_DATA_PREFIX "/o2.wfn.dat";
+
+namespace testing {
+/// Tolerance for comparing results resuling from Davidson diagonalization
+inline static constexpr double davidson_tolerance = 1e-8;
+
+/// Tolerance for comparing results that should not have numerical noise
+inline static constexpr double numerical_zero_tolerance = 1e-12;
+
+/// Tolerance for comparing results that are derived from ASCII text files.
+inline static constexpr double ascii_text_tolerance = 1e-6;
+}  // namespace testing

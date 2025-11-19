@@ -1,0 +1,13 @@
+digraph PluginArchitecture {
+    rankdir=LR;
+    bgcolor="#FAFAFA";
+    node [shape=box, style="rounded,filled", fontname="Arial", margin=0.3];
+    edge [color="#1976D2", penwidth=2];
+
+    Interface [label="QDK/Chemistry Interface\n(ScfSolver, Localizer,\nMCCalculator, etc.)", fillcolor="#E3F2FD", color="#42A5F5", penwidth=2, fontcolor="#1976D2"];
+    QDK [label="QDK Implementation\n(AutoCAS, etc.)", fillcolor="#E0F2F1", color="#26A69A", penwidth=2, fontcolor="#00796B"];
+    ThirdParty [label="Third-Party Interfaces\n(PySCF, etc.)", fillcolor="#F3E5F5", color="#AB47BC", penwidth=2, fontcolor="#7B1FA2"];
+
+    Interface -> QDK;
+    Interface -> ThirdParty;
+}

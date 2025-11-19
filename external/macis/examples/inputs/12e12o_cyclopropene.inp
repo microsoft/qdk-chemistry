@@ -1,0 +1,12 @@
+[CI]
+NALPHA = 6
+NBETA  = 6
+REF_DATA_FORMAT = FCIDUMP
+REF_DATA_FILE   = ../../../data/electronic/12e12o_cyclopropene/12e12o_cyclopropene.fcidump
+JOB = CI
+EXPANSION = CAS
+
+[PRINT]
+CI = TRUE
+DAVIDSON = TRUE
+DETERMINANTS = TRUE

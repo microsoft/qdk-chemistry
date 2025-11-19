@@ -1,0 +1,100 @@
+{
+    "$schema": "https://json.schemastore.org/component-detection-manifest.json",
+    "version": 1,
+    "registrations": [
+        {
+            "component": {
+                "type": "git",
+                "git": {
+                    "repositoryUrl": "https://gitlab.com/libeigen/eigen",
+                    "commitHash": "3147391d946bb4b6c68edd901f2add6ac1f31f8c",
+                    "tag": "3.4.0"
+                }
+            },
+            "developmentDependency": false
+        },
+        {
+            "component": {
+                "type": "other",
+                "other": {
+                    "name": "Boost",
+                    "version": "1.86.0",
+                    "downloadUrl": "https://archives.boost.io/release/1.86.0/source/boost_1_86_0.tar.bz2"
+                }
+            },
+            "developmentDependency": false
+        },
+        {
+            "component": {
+                "type": "git",
+                "git": {
+                    "repositoryUrl": "https://github.com/gabime/spdlog",
+                    "commitHash": "7e635fca68d014934b4af8a1cf874f63989352b7",
+                    "tag": "v1.10.0"
+                }
+            },
+            "developmentDependency": false
+        },
+        {
+        "component": {
+            "type": "git",
+            "git": {
+            "repositoryUrl": "https://github.com/wavefunction91/linalg-cmake-modules.git",
+            "commitHash": "28ceaa9738f14935aa544289fa2fe4c4cc955d0e"
+            }
+        },
+        "developmentDependency": false
+        },
+        {
+            "component": {
+                "type": "other",
+                "other": {
+                    "downloadUrl": "https://src.fedoraproject.org/lookaside/pkgs/metis/metis-5.1.0.tar.gz/5465e67079419a69e0116de24fce58fe/metis-5.1.0.tar.gz",
+                    "name": "metis",
+                    "version": "5.1.0",
+                    "hash": "deea47749d13bd06fbeaf98a53c6c0b61603ddc17a43dae81d72c8015576f6495fd83c11b0ef68d024879ed5415c14ebdbd87ce49c181bdac680573bea8bdb25"
+                }
+            },
+            "developmentDependency": false
+        },
+        {
+            "component": {
+                "type": "git",
+                "git": {
+                    "repositoryUrl": "https://github.com/catchorg/Catch2.git",
+                    "tag": "v2.13.2"
+                }
+            },
+            "developmentDependency": true
+        },
+        {
+            "component": {
+                "type": "git",
+                "git": {
+                    "repositoryUrl": "https://github.com/ericniebler/range-v3.git"
+                }
+            },
+            "developmentDependency": true
+        },
+        {
+            "component": {
+                "type": "git",
+                "git": {
+                    "repositoryUrl": "https://github.com/icl-utk-edu/blaspp.git",
+                    "commitHash": "13622021629f5fd27591bb7da60bae5b19561f01"
+                }
+            },
+            "developmentDependency": false
+        },
+        {
+            "component": {
+                "type": "git",
+                "git": {
+                    "repositoryUrl": "https://github.com/icl-utk-edu/lapackpp.git",
+                    "commitHash": "5bc9c85201ace48213df5ac7d1ef026c9668dfbd"
+                }
+            },
+            "developmentDependency": false
+        }
+    ]
+}

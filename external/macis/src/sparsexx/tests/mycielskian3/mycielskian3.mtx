@@ -1,0 +1,42 @@
+%%MatrixMarket matrix coordinate pattern symmetric
+%-------------------------------------------------------------------------------
+% SuiteSparse Matrix Collection, Tim Davis
+% https://sparse.tamu.edu/Mycielski/mycielskian3
+% name: Mycielski/mycielskian3
+% [Mycielskian graph M3]
+% id: 2759
+% date: 2018
+% author: J. Mycielski
+% ed: S. Kolodziej
+% fields: title A name id date author ed kind notes
+% kind: undirected graph
+%-------------------------------------------------------------------------------
+% notes:
+% Mycielskian graph M3.
+%
+% The Mycielskian graph sequence generates graphs that are triangle-free
+% and with a known chromatic number (i.e. the minimum number of colors
+% required to color the vertices of the graph).
+%
+% Known properties of this graph (M3) include the following:
+%
+%  * M3 has a minimum chromatic number of 3.
+%  * M3 is triangle-free (i.e. no cycles of length 3 exist).
+%  * M3 has a Hamiltonian cycle.
+%  * M3 has a clique number of 2.
+%  * M3 is factor-critical, meaning every subgraph of |V|-1 vertices has
+%    a perfect matching.
+%
+% Mycielski graphs were first described by Jan Mycielski in the following
+% publication:
+%
+%     Mycielski, J., 1955. Sur le coloriage des graphes. Colloq. Math.,
+%     3: 161-162.
+%
+%-------------------------------------------------------------------------------
+5 5 5
+2 1
+4 1
+3 2
+5 3
+5 4

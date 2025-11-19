@@ -1,0 +1,36 @@
+# Check environment variable first, then CMake variable
+if(NOT DEFINED QDK_UARCH AND DEFINED ENV{QDK_UARCH})
+  set(QDK_UARCH $ENV{QDK_UARCH})
+endif()
+
+if(DEFINED QDK_UARCH)
+  message(STATUS "Using user-defined uarch: ${QDK_UARCH}")
+  # If compiler ID is not GNU or Clang, we cannot use -march flag, so we will not set QDK_UARCH_FLAGS
+  if(NOT (CMAKE_CXX_COMPILER_ID STREQUAL "GNU" OR CMAKE_CXX_COMPILER_ID STREQUAL "Clang"))
+    message(WARNING "Compiler ${CMAKE_CXX_COMPILER_ID} does not support -march flag. QDK_UARCH_FLAGS will not be set.")
+    set(QDK_UARCH_USED "NONE" CACHE STRING "User-defined microarchitecture for optimization")
+  else()
+    set(QDK_UARCH_USED ${QDK_UARCH} CACHE STRING "User-defined microarchitecture for optimization")
+    set(QDK_UARCH_FLAGS "-march=${QDK_UARCH}" CACHE STRING "Compiler flags for user-defined microarchitecture")
+  endif()
+else()
+  # Set architecture-specific defaults based on the target platform
+  if(CMAKE_SYSTEM_PROCESSOR MATCHES "x86_64|AMD64")
+    set(QDK_UARCH "x86-64" CACHE STRING "Target microarchitecture")
+    message(STATUS "Auto-detected x86_64 architecture, using: ${QDK_UARCH}")
+  elseif(CMAKE_SYSTEM_PROCESSOR MATCHES "aarch64|arm64")
+    set(QDK_UARCH "armv8-a" CACHE STRING "Target microarchitecture")
+    message(STATUS "Auto-detected ARM64 architecture, using: ${QDK_UARCH}")
+  else()
+    message(WARNING "Unknown architecture ${CMAKE_SYSTEM_PROCESSOR}. QDK_UARCH not set. This may degrade performance")
+    return()
+  endif()
+
+  # Set the used arch and flags
+  set(QDK_UARCH_USED ${QDK_UARCH} CACHE STRING "User-defined microarchitecture for optimization")
+  if(CMAKE_CXX_COMPILER_ID STREQUAL "GNU" OR CMAKE_CXX_COMPILER_ID STREQUAL "Clang")
+    set(QDK_UARCH_FLAGS "-march=${QDK_UARCH}" CACHE STRING "Compiler flags for user-defined microarchitecture")
+  else()
+    message(WARNING "Compiler syntax for ISA flags is unknown, defaulting to the system default generic ISA")
+  endif()
+endif()

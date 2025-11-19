@@ -1,0 +1,17 @@
+steps:
+- script: |
+    short_hash=`git rev-parse --short=7 HEAD`
+    echo ""
+    echo "Full git hash:  $(Build.SourceVersion)"
+    echo "Short git hash: $short_hash"
+    echo ""
+    ## Fail step if full hash does not start with short hash
+    if [[ $(Build.SourceVersion) != $short_hash* ]]; then
+      echo "--> Hashes do not match! Aborting."
+      exit 1
+    fi
+    echo "--> Hashes match. Storing short hash for subsequent steps."
+    ## Store variable for subsequent steps
+    echo "##vso[task.setvariable variable=gitHash;isOutput=true]$short_hash"
+  name: hashingStep
+  displayName: Get short git hash
