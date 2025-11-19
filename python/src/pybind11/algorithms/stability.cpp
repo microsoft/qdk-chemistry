@@ -89,7 +89,7 @@ void bind_stability(py::module &m) {
         --------
         >>> checker = alg.StabilityChecker()
         >>> checker.settings().set("nroots", 5)
-        >>> checker.settings().set("tolerance", 1e-6)
+        >>> checker.settings().set("convergence_threshold", 1e-6)
         )");
 
   stability_checker.def("run", &StabilityChecker::run,

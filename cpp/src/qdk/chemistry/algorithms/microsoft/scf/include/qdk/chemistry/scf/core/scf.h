@@ -91,6 +91,55 @@ struct ERIConfig {
 };
 
 /**
+ * @brief GDM (Geometric Direct Minimization) configuration
+ *
+ * Settings specific to GDM algorithm and DIIS-GDM hybrid method.
+ */
+struct GDMConfig {
+  double energy_thresh_diis_switch =
+      1e-3;                         ///< Energy threshold to switch from DIIS
+                                    ///< to GDM (for DIIS_GDM method)
+  int gdm_max_diis_iteration = 50;  ///< Maximum DIIS iterations before
+                                    ///< switching to GDM (for DIIS_GDM method)
+  int gdm_bfgs_history_size_limit = 40;  ///< history size limit for BFGS in GDM
+                                         ///< (number of stored steps)
+};
+
+/**
+ * @brief SCF algorithm and convergence configuration
+ *
+ * Settings that control the SCF iteration algorithm, convergence criteria,
+ * and convergence acceleration methods (DIIS, GDM, damping, level shifting).
+ */
+struct SCFAlgorithmConfig {
+  int max_iteration = 100;          ///< Maximum number of SCF iterations
+  double density_threshold = 1e-6;  ///< Density matrix convergence threshold
+  double og_threshold = 1e-6;       ///< Orbital gradient convergence threshold
+
+  // Algorithm method selection
+  SCFAlgorithmName method = SCFAlgorithmName::DIIS;  ///< SCF algorithm method
+
+  // DIIS (Direct Inversion in Iterative Subspace) settings
+  uint64_t diis_subspace_size =
+      8;  ///< Size of DIIS subspace for convergence acceleration
+
+  // Fock matrix damping settings
+  bool enable_damping = false;  ///< Enable Fock matrix damping
+  double damping_factor =
+      0.75;  ///< Damping factor α: F_new = α*F_old + (1-α)*F_current
+  double damping_threshold =
+      0.01;  ///< Density change threshold below which damping is disabled
+
+  // Level shifting settings
+  double level_shift = -1.0;  ///< Level shift for virtual orbitals (negative =
+                              ///< no shift, smoothens convergence)
+
+  // Geometric Direct Minimization (GDM) settings (only used when method
+  // includes GDM)
+  GDMConfig gdm_config;  ///< GDM-specific configuration parameters
+};
+
+/**
  * @brief Coupled-perturbed SCF input configuration
  *
  * Settings for solving the CPSCF equations (needed for polarizabilities
@@ -125,10 +174,6 @@ struct SCFConfig {
   bool do_dfj = false;  ///< Use density fitting for Coulomb (J) integrals
   bool unrestricted =
       false;  ///< Use unrestricted (UHF/UKS) rather than restricted (RHF/RKS)
-  int max_iteration = 100;           ///< Maximum number of SCF iterations
-  double converge_threshold = 1e-8;  ///< Energy convergence threshold (Hartree)
-  double density_threshold = 1e-4;   ///< Density matrix convergence threshold
-  double og_threshold = 1e-3;        ///< Orbital gradient convergence threshold
   double lindep_threshold =
       1e-6;  ///< Linear dependency threshold for basis set orthogonalization
   DensityInitializationMethod density_init_method =
@@ -137,18 +182,12 @@ struct SCFConfig {
   std::string density_init_file =
       "";  ///< File path for reading initial density (empty = use
            ///< density_init_method)
-  uint64_t diis_subspace_size =
-      8;  ///< Size of DIIS subspace for convergence acceleration
   uint64_t incremental_fock_start_step =
       3;  ///< SCF iteration to start incremental Fock matrix updates
   uint64_t fock_reset_steps =
       1073741824;  ///< Number of steps between full Fock matrix rebuilds
                    ///< (default: 2^30 = effectively never)
-  bool enable_damping = false;  ///< Enable Fock matrix damping
-  double damping_factor =
-      0.75;  ///< Damping factor α: F_new = α*F_old + (1-α)*F_current
-  double damping_threshold =
-      0.01;  ///< Density change threshold below which damping is disabled
+
 #ifdef QDK_CHEMISTRY_ENABLE_DFTD3
   DispersionType disp = DispersionType::None;
 #endif
@@ -174,10 +213,9 @@ struct SCFConfig {
   GAUXCInput xc_input;     ///< GauXC configuration for XC functional evaluation
   GAUXCInput snk_input;    ///< Semi-numerical K (exchange) configuration
   CPSCFInput cpscf_input;  ///< Coupled-perturbed SCF configuration
-  double level_shift = -1.0;  ///< Level shift for virtual orbitals (negative =
-                              ///< no shift, smoothens convergence)
-  int verbose = 4;            ///< Verbosity level (0=quiet, higher=more output)
-#ifdef QDK_CHEMISTRY_ENABLE_QMMM
+  SCFAlgorithmConfig scf_algorithm;  ///< SCF algorithm and convergence settings
+  int verbose = 4;  ///< Verbosity level (0=quiet, higher=more output)
+#ifdef QATK_ENABLE_QMMM
   std::shared_ptr<PointCharges> pointcharges;
 #endif
 };

@@ -611,15 +611,15 @@ void bind_settings(pybind11::module &data) {
     ...         super().__init__()
     ...         self._set_default("method", "string", "default")
     ...         self._set_default("max_iterations", "int", 100)
-    ...         self._set_default("tolerance", "double", 1e-6)
+    ...         self._set_default("convergence_threshold", "double", 1e-6)
     ...
     >>> settings = MySettings()
     >>> settings["method"] = "hf"
     >>> settings.method = "hf"     # Alternative access
     >>> settings["max_iterations"] = 200
-    >>> settings["tolerance"] = 1e-8
+    >>> settings["convergence_threshold"] = 1e-8
     >>> value = settings["method"]
-    >>> print("tolerance" in settings)
+    >>> print("convergence_threshold" in settings)
     >>> print(len(settings))
     >>>
     >>> # Iterator functionality
@@ -694,7 +694,7 @@ void bind_settings(pybind11::module &data) {
         --------
         >>> settings.set("method", "hf")
         >>> settings.set("max_iterations", 100)
-        >>> settings.set("tolerance", 1e-6)
+        >>> settings.set("convergence_threshold", 1e-6)
         >>> settings.set("parameters", [1.0, 2.0, 3.0])
         )",
       py::arg("key"), py::arg("value"));
@@ -753,7 +753,7 @@ void bind_settings(pybind11::module &data) {
         --------
         >>> method = settings.get("method")
         >>> max_iter = settings.get("max_iterations")
-        >>> tolerance = settings.get("tolerance")
+        >>> tolerance = settings.get("convergence_threshold")
         )",
       py::arg("key"));
 
@@ -938,7 +938,7 @@ void bind_settings(pybind11::module &data) {
 
         Examples
         --------
-        >>> str_val = settings.get_as_string("tolerance")  # "1e-06"
+        >>> str_val = settings.get_as_string("convergence_threshold")  # "1e-06"
         >>> str_val = settings.get_as_string("max_iterations")  # "100"
         )",
                py::arg("key"));
@@ -1007,7 +1007,7 @@ void bind_settings(pybind11::module &data) {
         {
             "method": "hf",
             "max_iterations": 100,
-            "tolerance": 1e-06
+            "convergence_threshold": 1e-06
         }
         )");
 
@@ -1320,7 +1320,7 @@ void bind_settings(pybind11::module &data) {
         Examples
         --------
         >>> type_name = settings.get_type_name("max_iterations")  # "int"
-        >>> type_name = settings.get_type_name("tolerance")       # "double"
+        >>> type_name = settings.get_type_name("convergence_threshold")       # "double"
         )",
                py::arg("key"));
 
@@ -1386,7 +1386,7 @@ void bind_settings(pybind11::module &data) {
         --------
         >>> expected = settings.get_expected_python_type("max_iterations")
         >>> print(expected)  # "int"
-        >>> expected = settings.get_expected_python_type("tolerance")
+        >>> expected = settings.get_expected_python_type("convergence_threshold")
         >>> print(expected)  # "float"
         >>> expected = settings.get_expected_python_type("basis_set")
         >>> print(expected)  # "str"
@@ -1431,7 +1431,7 @@ void bind_settings(pybind11::module &data) {
         ...         super().__init__()
         ...         self._set_default("method", "string", "default")
         ...         self._set_default("max_iter", "int", 1000)
-        ...         self._set_default("tolerance", "double", 1e-6)
+        ...         self._set_default("convergence_threshold", "double", 1e-6)
         )",
       py::arg("key"), py::arg("expected_type"), py::arg("value"));
 
@@ -1464,7 +1464,7 @@ void bind_settings(pybind11::module &data) {
         Examples
         --------
         >>> method = settings["method"]
-        >>> tolerance = settings["tolerance"]
+        >>> tolerance = settings["convergence_threshold"]
         )",
       py::arg("key"));
 
@@ -2062,7 +2062,7 @@ void bind_settings(pybind11::module &data) {
         Examples
         --------
         >>> type_name = settings.get_type_name("max_iterations")  # "int"
-        >>> type_name = settings.get_type_name("tolerance")       # "double"
+        >>> type_name = settings.get_type_name("convergence_threshold")       # "double"
         )",
                py::arg("key"));
 
@@ -2102,7 +2102,7 @@ void bind_settings(pybind11::module &data) {
         ...         super().__init__()
         ...         self._set_default("method", "string", "default")
         ...         self._set_default("max_iter", "int", 1000)
-        ...         self._set_default("tolerance", "double", 1e-6)
+        ...         self._set_default("convergence_threshold", "double", 1e-6)
         )",
       py::arg("key"), py::arg("expected_type"), py::arg("value"));
 
@@ -2135,7 +2135,7 @@ void bind_settings(pybind11::module &data) {
         Examples
         --------
         >>> method = settings["method"]
-        >>> tolerance = settings["tolerance"]
+        >>> tolerance = settings["convergence_threshold"]
         )",
       py::arg("key"));
 

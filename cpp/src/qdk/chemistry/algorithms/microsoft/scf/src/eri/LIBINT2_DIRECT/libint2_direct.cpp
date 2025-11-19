@@ -291,11 +291,29 @@ class ERI {
     if (J) std::memset(J, 0, mat_size * sizeof(double));
     if (K) std::memset(K, 0, mat_size * sizeof(double));
 
+    // Thread-local accumulation buffers for reproducibility
+    std::vector<std::vector<double>> J_local(nthreads);
+    std::vector<std::vector<double>> K_local(nthreads);
+    if (J) {
+      for (int t = 0; t < nthreads; ++t) {
+        J_local[t].resize(mat_size, 0.0);
+      }
+    }
+    if (K) {
+      for (int t = 0; t < nthreads; ++t) {
+        K_local[t].resize(mat_size, 0.0);
+      }
+    }
+
 #pragma omp parallel
     {
       const auto thread_id = omp_get_thread_num();
       auto& engine = engines_coulomb[thread_id];
       const auto& buf = engine.results();
+
+      // Get pointers to thread-local buffers
+      double* J_thread = J ? J_local[thread_id].data() : nullptr;
+      double* K_thread = K ? K_local[thread_id].data() : nullptr;
 
       for (size_t s1 = 0ul, s1234 = 0ul; s1 < nsh; ++s1) {
         const auto bf1_st = shell2bf_[s1];
@@ -446,6 +464,22 @@ class ERI {
 
     }  // End parallel region
 
+    // Deterministic reduction: combine thread-local buffers in order
+    if (J) {
+      for (int t = 0; t < nthreads; ++t) {
+        for (size_t i = 0; i < mat_size; ++i) {
+          J[i] += J_local[t][i];
+        }
+      }
+    }
+    if (K) {
+      for (int t = 0; t < nthreads; ++t) {
+        for (size_t i = 0; i < mat_size; ++i) {
+          K[i] += K_local[t][i];
+        }
+      }
+    }
+
     // Symmetrize J
     if (J)
       for (size_t idm = 0; idm < num_density_matrices; ++idm)
@@ -552,11 +586,20 @@ class ERI {
     engines_coulomb[0].set_precision(engine_precision);
     for (int i = 1; i < nthreads; ++i) engines_coulomb[i] = engines_coulomb[0];
 
+    // Thread-local accumulation buffers for reproducibility
+    std::vector<std::vector<double>> out_local(nthreads);
+    for (int t = 0; t < nthreads; ++t) {
+      out_local[t].resize(out_size, 0.0);
+    }
+
 #pragma omp parallel
     {
       const auto thread_id = omp_get_thread_num();
       auto& engine = engines_coulomb[thread_id];
       const auto& buf = engine.results();
+
+      // Get pointer to thread-local buffer
+      double* out_thread = out_local[thread_id].data();
 
       for (size_t s1 = 0ul, s1234 = 0ul; s1 < nsh; ++s1) {
         const auto bf1_st = shell2bf_[s1];
@@ -661,6 +704,13 @@ class ERI {
           }  // s3
         }  // s2
       }  // s1
+    }
+
+    // Deterministic reduction: combine thread-local buffers in order
+    for (int t = 0; t < nthreads; ++t) {
+      for (size_t i = 0; i < out_size; ++i) {
+        out[i] += out_local[t][i];
+      }
     }
 
 // Symmetrize the first and second index: (ij|kp) = 0.5 * ( (ji|kp) + (ij|kp) ),

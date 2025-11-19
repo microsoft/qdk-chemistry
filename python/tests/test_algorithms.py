@@ -63,7 +63,7 @@ class MockStabilityChecker(StabilityChecker):
         super().__init__()
         self._settings = Settings()
         # Define default settings for stability checking
-        self._settings._set_default("tolerance", "double", 1e-6)
+        self._settings._set_default("convergence_threshold", "double", 1e-6)
         self._settings._set_default("max_iterations", "int", 100)
 
     def _run_impl(self, wavefunction: Wavefunction) -> tuple[bool, StabilityResult]:  # noqa: ARG002

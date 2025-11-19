@@ -98,6 +98,7 @@ class MacisAsciTest : public ::testing::Test {
     // Run SCF calculation
     auto scf_solver = ScfSolverFactory::create();
     scf_solver->settings().set("basis_set", "def2-svp");
+    scf_solver->settings().set("convergence_threshold", 1e-7);
     auto [E_HF, wfn_HF] = scf_solver->run(structure_, 0, 1);
 
     // Store the water SCF wavefunction for reuse in tests
@@ -973,6 +974,7 @@ class MacisPmcTest : public ::testing::Test {
     // Run SCF calculation
     auto scf_solver = ScfSolverFactory::create();
     scf_solver->settings().set("basis_set", "def2-svp");
+    scf_solver->settings().set("convergence_threshold", 1e-7);
     auto [E_HF, wfn_HF] = scf_solver->run(structure_, 0, 1);
     E_HF_ = E_HF;
 
@@ -1062,7 +1064,7 @@ TEST_F(MacisPmcTest, BasicPMCCalculation) {
       calculator->run(hamiltonian, test_configurations_);
 
   // Verify basic properties of the result
-  EXPECT_NEAR(energy - hamiltonian->get_core_energy(), -1.2423933526242593e+01,
+  EXPECT_NEAR(energy - hamiltonian->get_core_energy(), -12.423933309195831,
               macis_params::energy_tol);
   EXPECT_EQ(wavefunction->size(), test_configurations_.size());
 

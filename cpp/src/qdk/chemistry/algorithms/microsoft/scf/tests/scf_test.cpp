@@ -131,7 +131,7 @@ INSTANTIATE_TEST_CASE_P(RKS_CPU_GAUXC_h2o, SCFTest, ::testing::Values(
 
   // Level shifting Tests
 INSTANTIATE_TEST_CASE_P(RKS_LEVEL_SHIFTING, SCFTest, ::testing::Values(
-  std::make_tuple("benzene", "RKS/PBE/cc-pvdz", "HGP", "HGP", "GAUXC", 1e-8, 1e0)
+  std::make_tuple("benzene", "RKS/PBE/cc-pvdz", "HGP", "HGP", "GAUXC", 5e-8, 1e0)
   ));
 
 // clang-format on

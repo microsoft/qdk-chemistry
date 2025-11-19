@@ -47,6 +47,7 @@ target_sources(chemistry PRIVATE
   util/int1e.cpp
   util/lapack.cpp
   util/libint2_util.cpp
+  util/matrix_exp.cpp
 )
 if(QDK_CHEMISTRY_ENABLE_MPI)
   target_sources(chemistry PRIVATE util/mpi_util.cpp)
@@ -68,13 +69,18 @@ add_subdirectory(eri)
 add_subdirectory(exc)
 
 ###############################################################################
+# Configure scf algorithm library
+###############################################################################
+
+add_subdirectory(scf_algorithm)
+
+###############################################################################
 # Configure scf library
 ###############################################################################
 
 target_sources(chemistry PRIVATE
   scf/soad.cpp
   scf/cpscf.cpp
-  scf/diis.cpp
   scf/guess.cpp
   scf/scf_impl.cpp
   scf/ks_impl.cpp

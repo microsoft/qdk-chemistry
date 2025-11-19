@@ -181,7 +181,7 @@ class TestSettings : public Settings {
   TestSettings() {
     // Set some default values for testing
     set_default("max_iterations", 100);
-    set_default("tolerance", 1e-6);
+    set_default("convergence_threshold", 1e-6);
     set_default("method", std::string("default"));
     set_default("enable_logging", true);
     set_default("coefficients", std::vector<double>{1.0, 2.0, 3.0});
@@ -190,7 +190,9 @@ class TestSettings : public Settings {
 
   // Convenience getters (optional)
   int get_max_iterations() const { return get<int>("max_iterations"); }
-  double get_tolerance() const { return get<double>("tolerance"); }
+  double get_convergence_threshold() const {
+    return get<double>("convergence_threshold");
+  }
   std::string get_method() const { return get<std::string>("method"); }
   bool get_enable_logging() const { return get<bool>("enable_logging"); }
   std::vector<double> get_coefficients() const {
@@ -857,11 +859,11 @@ TEST_F(SettingsTest, FromJsonIgnoresUnknownKeys) {
 
   // Create JSON
   nlohmann::json j;
-  j["version"] = "0.1.0";       // Required version field
-  j["unknown_key1"] = 123;      // Should be ignored
-  j["unknown_key2"] = "hello";  // Should be ignored
-  j["max_iterations"] = 500;    // Should be loaded (registered key)
-  j["tolerance"] = 1e-8;        // Should be loaded (registered key)
+  j["version"] = "0.1.0";             // Required version field
+  j["unknown_key1"] = 123;            // Should be ignored
+  j["unknown_key2"] = "hello";        // Should be ignored
+  j["max_iterations"] = 500;          // Should be loaded (registered key)
+  j["convergence_threshold"] = 1e-8;  // Should be loaded (registered key)
 
   // Load from JSON
   auto loaded_settings = Settings::from_json(j);
@@ -875,7 +877,7 @@ TEST_F(SettingsTest, FromJsonIgnoresUnknownKeys) {
 
   // Known keys should be loaded
   EXPECT_EQ(test_settings.get<int>("max_iterations"), 500);
-  EXPECT_NEAR(test_settings.get<double>("tolerance"), 1e-8,
+  EXPECT_NEAR(test_settings.get<double>("convergence_threshold"), 1e-8,
               testing::numerical_zero_tolerance);
 
   // Unknown keys should not exist in our test_settings (should throw
@@ -887,7 +889,7 @@ TEST_F(SettingsTest, FromJsonIgnoresUnknownKeys) {
 TEST_F(SettingsTest, FromHdf5IgnoresUnknownKeys) {
   TestSettings test_settings;
   test_settings.set("max_iterations", 500);
-  test_settings.set("tolerance", 1e-8);
+  test_settings.set("convergence_threshold", 1e-6);
 
   // Save to HDF5
   test_settings.to_hdf5_file("test_known_keys.settings.h5");
@@ -907,7 +909,7 @@ TEST_F(SettingsTest, FromHdf5IgnoresUnknownKeys) {
   }
 
   EXPECT_EQ(new_test_settings.get<int>("max_iterations"), 500);
-  EXPECT_NEAR(new_test_settings.get<double>("tolerance"), 1e-8,
+  EXPECT_NEAR(new_test_settings.get<double>("convergence_threshold"), 1e-6,
               testing::numerical_zero_tolerance);
 
   // Clean up

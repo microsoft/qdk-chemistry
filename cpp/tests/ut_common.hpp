@@ -259,6 +259,16 @@ inline std::shared_ptr<Structure> create_stretched_n2_structure() {
 }
 
 /**
+ * @brief Create a single O structure
+ */
+inline std::shared_ptr<Structure> create_oxygen_structure() {
+  std::vector<Eigen::Vector3d> coords = {
+      {0.00000000000, 0.00000000000, 0.00000000000}};
+  std::vector<Element> elements = {qdk::chemistry::data::Element::O};
+  return std::make_shared<Structure>(coords, elements);
+}
+
+/**
  * @brief Creates an AgH (silver hydride) structure
  */
 inline std::shared_ptr<Structure> create_agh_structure() {

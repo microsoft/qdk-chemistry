@@ -293,7 +293,7 @@ Here's how to extend the ``Settings`` class for a custom algorithm:
           MySettings() {
               // Can only call set_default during construction
               set_default("max_iterations", 100);
-              set_default("tolerance", 1e-6);
+              set_default("convergence_threshold", 1e-6);
               set_default("method", std::string("default"));
           }
       };
@@ -304,6 +304,13 @@ Here's how to extend the ``Settings`` class for a custom algorithm:
       :language: python
       :lines: 134-140
 
+      class MySettings(qdk.chemistry.Settings):
+          def __init__(self):
+              super().__init__()
+              # Set default values during initialization
+              self.set_default("max_iterations", 100)
+              self.set_default("convergence_threshold", 1e-6)
+              self.set_default("method", "default")
 
 Supported types
 ---------------

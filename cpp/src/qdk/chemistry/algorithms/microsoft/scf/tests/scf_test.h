@@ -127,14 +127,14 @@ class SCFTest
     }
     cfg.cartesian = json.value("cart", true);
     cfg.unrestricted = scf_type == "uhf" || scf_type == "uks";
-    cfg.max_iteration = 100;
-    cfg.converge_threshold = json.value("converge_threshold", 1e-6);
-    cfg.density_threshold = json.value("density_threshold", 1e-3);
-    cfg.og_threshold = json.value("og_threshold", 1e-2);
+    cfg.scf_algorithm.max_iteration = 100;
+    cfg.scf_algorithm.og_threshold = json.value("og_threshold", 1e-6);
+    cfg.scf_algorithm.density_threshold = json.value("density_threshold", 1e-5);
+    cfg.scf_algorithm.og_threshold = json.value("og_threshold", 1e-6);
     cfg.lindep_threshold = json.value("lindep_threshold", 1e-6);
     cfg.fock_reset_steps = 9999;
     cfg.incremental_fock_start_step = 3;
-    cfg.enable_damping = false;
+    cfg.scf_algorithm.enable_damping = false;
     cfg.mpi = ParallelConfig{1, 0, 1, 0};
     cfg.verbose = 5;
 #if defined(QDK_CHEMISTRY_ENABLE_HGP) && defined(QDK_CHEMISTRY_ENABLE_RYS) && \
@@ -163,7 +163,7 @@ class SCFTest
 #endif
     cfg.exc.method = EXCMethod::GauXC;
     cfg.basis_mode = BasisMode::PSI4;
-    cfg.diis_subspace_size = 8;
+    cfg.scf_algorithm.diis_subspace_size = 8;
     cfg.exc.xc_name = json.value("functional", "HF");
 #ifdef QDK_CHEMISTRY_ENABLE_DFTD3
     cfg.disp = dispersion_from_string(json.value("disp", "none"));
@@ -181,7 +181,7 @@ class SCFTest
       }
     }
 
-    cfg.level_shift = json.value("level_shift", -1.0);
+    cfg.scf_algorithm.level_shift = json.value("level_shift", -1.0);
     // For polarizability (CPSCF)
     ref_polarizability = json.value(
         "polarizability",
