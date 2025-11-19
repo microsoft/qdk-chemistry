@@ -67,7 +67,7 @@ class VVHVLocalizer : public qdk::chemistry::algorithms::Localizer {
    * @param loc_indices_b Indices of beta orbitals (must cover all orbitals,
    * must be sorted)
    * \endcond
-   * 
+   *
    * @return The localized molecular orbitals
    * @throws std::invalid_argument If loc_indices_a or loc_indices_b are not
    * sorted
