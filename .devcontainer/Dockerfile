@@ -22,6 +22,7 @@ RUN apt-get update && \
     sudo \
     ca-certificates \
     curl \
+    vim \
     wget \
     git \
     gnupg \
@@ -51,20 +52,20 @@ RUN apt-get update && \
 
 # Create/align the non-root user and group (safe for repeated builds)
 RUN if getent group "$USER_GID" >/dev/null; then \
-        EXISTING_GROUP=$(getent group "$USER_GID" | cut -d: -f1); \
-        if [ "$EXISTING_GROUP" != "$USERNAME" ]; then \
-            groupmod --new-name "$USERNAME" "$EXISTING_GROUP"; \
-        fi; \
+    EXISTING_GROUP=$(getent group "$USER_GID" | cut -d: -f1); \
+    if [ "$EXISTING_GROUP" != "$USERNAME" ]; then \
+    groupmod --new-name "$USERNAME" "$EXISTING_GROUP"; \
+    fi; \
     else \
-        groupadd --gid "$USER_GID" "$USERNAME"; \
+    groupadd --gid "$USER_GID" "$USERNAME"; \
     fi \
     && if id -u "$USERNAME" >/dev/null 2>&1; then \
-        usermod --gid "$USER_GID" --home /home/$USERNAME --shell /bin/bash "$USERNAME"; \
+    usermod --gid "$USER_GID" --home /home/$USERNAME --shell /bin/bash "$USERNAME"; \
     elif getent passwd "$USER_UID" >/dev/null; then \
-        EXISTING_USER=$(getent passwd "$USER_UID" | cut -d: -f1); \
-        usermod --login "$USERNAME" --uid "$USER_UID" --gid "$USER_GID" --home /home/$USERNAME --move-home --shell /bin/bash "$EXISTING_USER"; \
+    EXISTING_USER=$(getent passwd "$USER_UID" | cut -d: -f1); \
+    usermod --login "$USERNAME" --uid "$USER_UID" --gid "$USER_GID" --home /home/$USERNAME --move-home --shell /bin/bash "$EXISTING_USER"; \
     else \
-        useradd --uid "$USER_UID" --gid "$USER_GID" -m -s /bin/bash "$USERNAME"; \
+    useradd --uid "$USER_UID" --gid "$USER_GID" -m -s /bin/bash "$USERNAME"; \
     fi \
     && echo "$USERNAME ALL=(root) NOPASSWD:ALL" > /etc/sudoers.d/$USERNAME \
     && chmod 0440 /etc/sudoers.d/$USERNAME

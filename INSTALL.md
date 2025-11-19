@@ -14,6 +14,7 @@ For now, please build the package from source using the instructions below.
 The easiest way to get started with QDK/Chemistry development is to use the provided VS Code Dev Container. The container definition and VSCode files provided in the Git repository will build a development environment (Docker container with Python virtual environment) from scratch.
 
 To get started:
+
 1. Open the repository folder in VS Code
 2. When prompted, click "Reopen in Container" (or use the Command Palette: `Ctrl+Shift+P` / `Cmd+Shift+P` and select "Dev Containers: Reopen in Container")
 3. VS Code will build and start the development container automatically
