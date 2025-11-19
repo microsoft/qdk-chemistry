@@ -56,11 +56,13 @@ class Localizer
    * @brief Localize the given molecular orbitals
    *
    *
+   * \cond DOXYGEN_SUPRESS (Doxygen warning suppression for argument packs)
    * @param orbitals The orbitals to localize
    * @param loc_indices_a Indices of alpha orbitals to localize (must be sorted,
    * if empty, no alpha orbitals are localized)
    * @param loc_indices_b Indices of beta orbitals to localize (must be sorted,
    * if empty, no beta orbitals are localized)
+   * \endcond
    *
    * @return The localized molecular orbitals with updated coefficients.
    *
@@ -111,9 +113,11 @@ class Localizer
    * This method contains the actual localization logic. It is automatically
    * called by run() after settings have been locked.
    *
+   * \cond DOXYGEN_SUPRESS (Doxygen warning suppression for argument packs)
    * @param orbitals The orbitals to localize
    * @param loc_indices_a Indices of alpha orbitals to localize (must be sorted)
    * @param loc_indices_b Indices of beta orbitals to localize (must be sorted)
+   * \endcond
    * @return The localized orbitals
    */
   virtual std::shared_ptr<data::Wavefunction> _run_impl(

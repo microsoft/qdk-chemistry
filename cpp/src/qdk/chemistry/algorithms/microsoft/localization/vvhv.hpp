@@ -60,11 +60,14 @@ class VVHVLocalizer : public qdk::chemistry::algorithms::Localizer {
    * It requires that all orbital indices are covered (loc_indices_a and
    * loc_indices_b must span all orbitals).
    *
+   * \cond DOXYGEN_SUPRESS (Doxygen warning suppression for argument packs)
    * @param orbitals The orbitals to localize
    * @param loc_indices_a Indices of alpha orbitals (must cover all orbitals,
    * must be sorted)
    * @param loc_indices_b Indices of beta orbitals (must cover all orbitals,
    * must be sorted)
+   * \endcond
+   * 
    * @return The localized molecular orbitals
    * @throws std::invalid_argument If loc_indices_a or loc_indices_b are not
    * sorted
@@ -216,7 +219,8 @@ class VVHVLocalization : public IterativeOrbitalLocalizationScheme {
    *
    * @param orbitals Matrix of orbital coefficients (num_basis_funcs x
    * num_orbitals)
-   * @param spreads Output vector of orbital spreads (<r²> - |<r>|²)
+   * @param spreads Output vector of orbital spreads
+   * :math:`\left( \langle r^2 \rangle -\lvert\langle r \rangle\rvert^2 \right)`
    */
   void calculate_orbital_spreads(const Eigen::MatrixXd& orbitals,
                                  Eigen::VectorXd& spreads) const;

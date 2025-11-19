@@ -49,6 +49,7 @@ macis::ASCISettings get_asci_settings_(const data::Settings& settings_);
  * @tparam Func Helper struct exposing `template <size_t N> static return_type
  * impl(...)`.
  * @tparam Args Forwarded argument pack to underlying implementation.
+ * @param args Argument pack to forward.
  * @param norb Number of active orbitals.
  * @return Return value of the selected `Func::impl<N>`.
  * @throws std::runtime_error if `norb >= 128` (unsupported size).

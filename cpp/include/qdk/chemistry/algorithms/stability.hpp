@@ -73,7 +73,9 @@ class StabilityChecker
    * The specific algorithm (PySCF-based, etc.) is determined by the
    * concrete implementation.
    *
+   * \cond DOXYGEN_SUPRESS (Doxygen warning suppression for argument packs)
    * @param wavefunction The wavefunction to analyze for stability
+   * \endcond
    *
    * @return A pair containing:
    * - bool: Overall stability status (true if stable, false if
