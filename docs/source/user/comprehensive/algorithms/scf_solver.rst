@@ -98,16 +98,10 @@ QDK/Chemistry currently provides the following registered solvers:
 
 .. tab:: C++ API
 
-   .. code-block:: cpp
-
-      #include <qdk/chemistry.hpp>
-      using namespace qdk::chemistry::algorithms;
-
-      // Create the default ScfSolver instance
-      auto scf_solver = ScfSolverFactory::create();
-
-      // Or specify a particular solver implementation
-      auto pyscf_solver = ScfSolverFactory::create("pyscf");
+   .. literalinclude:: ../../../../examples/cpp/scf_solver.cpp
+      :language: cpp
+      :start-after: // start-cell-1
+      :end-before: // end-cell-1
 
 .. tab:: Python API
 
@@ -129,16 +123,10 @@ See the `Available Settings`_ section below for a complete list of configuration
 
 .. tab:: C++ API
 
-   .. code-block:: cpp
-
-      // Standard settings that work with all solvers
-      // Set the method
-      scf_solver.settings().set("method", "dft")
-      // Set the basis set
-      scf_solver->settings().set("basis_set", "def2-tzvpp");
-
-      // For DFT calculations, set the exchange-correlation functional
-      scf_solver->settings().set("functional", "B3LYP");
+   .. literalinclude:: ../../../../examples/cpp/scf_solver.cpp
+      :language: cpp
+      :start-after: // start-cell-2
+      :end-before: // end-cell-2
 
 .. tab:: Python API
 
@@ -157,16 +145,10 @@ The ``solve`` method returns two values:
 
 .. tab:: C++ API
 
-   .. code-block:: cpp
-
-      // Create a structure (or load from a file)
-      Structure structure;
-      // configuring structure ...
-
-      // Run the SCF calculation
-      // Return types are: std::tuple<double, Orbitals>
-      auto [E_scf, scf_orbitals] = scf_solver->solve(structure);
-      std::cout << "SCF Energy: " << E_scf << " Hartree" << std::endl;
+   .. literalinclude:: ../../../../examples/cpp/scf_solver.cpp
+      :language: cpp
+      :start-after: // start-cell-3
+      :end-before: // end-cell-3
 
 .. tab:: Python API
 

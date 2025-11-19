@@ -34,13 +34,10 @@ The orbitals provide the necessary information about the molecular system includ
 
 .. tab:: C++ API
 
-   .. code-block:: cpp
-
-      #include <qdk/chemistry.hpp>
-      using namespace qdk::chemistry::algorithms;
-
-      // Create the default HamiltonianConstructor instance
-      auto hamiltonian_constructor = HamiltonianConstructorFactory::create();
+   .. literalinclude:: ../../../../examples/cpp/hamiltonian_constructor.cpp
+      :language: cpp
+      :start-after: // start-cell-1
+      :end-before: // end-cell-1
 
 .. tab:: Python API
 
@@ -65,11 +62,10 @@ The ``HamiltonianConstructor`` can be configured using the ``Settings`` object w
 
 .. tab:: C++ API
 
-   .. code-block:: cpp
-
-      // Specify active orbitals for active space Hamiltonian
-      std::vector<int> active_orbitals = {4, 5, 6, 7}; // Example indices (0-based)
-      hamiltonian_constructor->settings().set("active_orbitals", active_orbitals);
+   .. literalinclude:: ../../../../examples/cpp/hamiltonian_constructor.cpp
+      :language: cpp
+      :start-after: // start-cell-2
+      :end-before: // end-cell-2
 
 .. tab:: Python API
 
@@ -84,18 +80,10 @@ Once configured, the Hamiltonian can be constructed from a set of orbitals:
 
 .. tab:: C++ API
 
-   .. code-block:: cpp
-
-      // Obtain a valid Orbitals instance
-      Orbitals orbitals;
-      /* orbitals = ... */
-
-      // Construct the Hamiltonian
-      auto hamiltonian = hamiltonian_constructor->run(orbitals);
-
-      // Access the resulting integrals
-      auto h1 = hamiltonian.get_one_body_integrals();
-      auto h2 = hamiltonian.get_two_body_integrals();
+   .. literalinclude:: ../../../../examples/cpp/hamiltonian_constructor.cpp
+      :language: cpp
+      :start-after: // start-cell-3
+      :end-before: // end-cell-3
 
 .. tab:: Python API
 

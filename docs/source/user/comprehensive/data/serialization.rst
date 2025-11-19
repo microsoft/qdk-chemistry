@@ -39,19 +39,10 @@ JSON serialization
 
 .. tab:: C++ API
 
-   .. code-block:: cpp
-
-      // Serialize to JSON object
-      auto json_data = object.to_json();
-
-      // Deserialize from JSON object
-      auto object_from_json = ObjectType::from_json(json_data);
-
-      // Serialize to JSON file
-      object.to_json_file("filename.ext.json"); // Extension depends on object type
-
-      // Deserialize from JSON file
-      auto object_from_json_file = ObjectType::from_json_file("filename.ext.json");
+   .. literalinclude:: ../../../../examples/cpp/serialization.cpp
+      :language: cpp
+      :start-after: // start-cell-1
+      :end-before: // end-cell-1
 
 .. tab:: Python API
 
@@ -64,13 +55,10 @@ HDF5 serialization
 
 .. tab:: C++ API
 
-   .. code-block:: cpp
-
-      // Serialize to HDF5 file
-      object.to_hdf5_file("filename.ext.h5"); // Extension depends on object type
-
-      // Deserialize from HDF5 file
-      auto object_from_hdf5_file = ObjectType::from_hdf5_file("filename.ext.h5");
+   .. literalinclude:: ../../../../examples/cpp/serialization.cpp
+      :language: cpp
+      :start-after: // start-cell-2
+      :end-before: // end-cell-2
 
 .. tab:: Python API
 

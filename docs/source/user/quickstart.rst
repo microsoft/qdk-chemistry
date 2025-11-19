@@ -31,7 +31,7 @@ See below for language specific examples of creating and serializing :doc:`compr
 
 .. tab:: C++ API
 
-   .. literalinclude:: ../../examples/quickstart.cpp
+   .. literalinclude:: ../../examples/cpp/quickstart.cpp
       :language: cpp
       :start-after: // start-cell-1
       :end-before: // end-cell-1
@@ -58,7 +58,7 @@ See below for language-specific examples.
 
 .. tab:: C++ API
 
-   .. literalinclude:: ../../examples/quickstart.cpp
+   .. literalinclude:: ../../examples/cpp/quickstart.cpp
       :language: cpp
       :start-after: // start-cell-2
       :end-before: // end-cell-2
@@ -84,7 +84,7 @@ The following are language-specific examples of how to select a so-called "valen
 
 .. tab:: C++ API
 
-   .. literalinclude:: ../../examples/quickstart.cpp
+   .. literalinclude:: ../../examples/cpp/quickstart.cpp
       :language: cpp
       :start-after: // start-cell-3
       :end-before: // end-cell-3
@@ -109,7 +109,7 @@ The Hamiltonian constructor can generate the one- and two-electron integrals nee
 
 .. tab:: C++ API
 
-   .. literalinclude:: ../../examples/quickstart.cpp
+   .. literalinclude:: ../../examples/cpp/quickstart.cpp
       :language: cpp
       :start-after: // start-cell-4
       :end-before: // end-cell-4
@@ -135,7 +135,7 @@ Configuration Interaction (CI) and selected :term:`CI` approaches.
 
 .. tab:: C++ API
 
-   .. literalinclude:: ../../examples/quickstart.cpp
+   .. literalinclude:: ../../examples/cpp/quickstart.cpp
       :language: cpp
       :start-after: // start-cell-5
       :end-before: // end-cell-5
@@ -160,7 +160,7 @@ This truncation is characterized by computing the overlap between the truncated 
 .. tab:: C++ API
 
 
-   .. literalinclude:: ../../examples/quickstart.cpp
+   .. literalinclude:: ../../examples/cpp/quickstart.cpp
       :language: cpp
       :start-after: // start-cell-6-fn
       :end-before: // end-cell-6-fn
