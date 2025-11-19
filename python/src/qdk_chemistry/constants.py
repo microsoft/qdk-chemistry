@@ -45,13 +45,6 @@ Examples:
     >>> from qdk_chemistry.constants import list_constants
     >>> list_constants()
 
-Todo:
-    * TODO (NAB): convert `print` statements throughout this module to use logging.
-      Decide whether the functions should return strings instead of printing/logging directly.
-      41417
-    * TODO (NAB):  add typing information for the functions in this module
-      41419
-
 """
 
 # --------------------------------------------------------------------------------------------

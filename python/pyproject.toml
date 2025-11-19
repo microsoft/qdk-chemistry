@@ -168,7 +168,8 @@ ignore = [
   'PLR0913',  # Too many argumentsS
   'PLR0915',  # too-many-statements
   'PLR2004',  # magic-value-comparison
-  'UP038'     # Deprecated 'non-pep604-isinstance' check
+  'UP038',     # Deprecated 'non-pep604-isinstance' check
+  'INP001'  # Allow __init__.py files without PEP 420 compliance
 ]
 select = [
   'ARG',  # flake8-unused-argument

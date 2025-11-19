@@ -154,7 +154,7 @@ XYZ format
 `XYZ representation <https://en.wikipedia.org/wiki/XYZ_file_format>`_ of the same ``Structure``:
 
 .. note::
-   QDK/Chemistry utilizes the comment field (second line) of the XYZ format to store the charge and spin multiplicity information, as this data is not part of the standard XYZ specification.
+   QDK/Chemistry uses the comment field (second line) of the XYZ format to store the charge and spin multiplicity information, as this data is not part of the standard XYZ specification.
 
 .. code-block:: text
 
@@ -221,32 +221,7 @@ Units
 All internal coordinates in the ``Structure`` class are in Bohr by default.
 This applies to all methods that return or accept coordinates.
 
-.. todo::
-   Check the Structure code below -- do these functions exist?
-   If not, they need to be fixed.
-
-.. tab:: C++ API
-
-   .. code-block:: cpp
-
-      // Create a structure with coordinates in Bohr (default)
-      Structure structure_angstrom(coords_matrix, elements_vector);
-
-      // Explicitly specify units as Angstrom
-      Structure structure_angstrom_explicit(coords_matrix, elements_vector, "angstrom");
-
-.. tab:: Python API
-
-   .. note::
-      This example shows the API pattern.
-      For complete working examples, see the test suite.
-
-   .. literalinclude:: ../../../../examples/structure.py
-      :language: python
-      :lines: 26-30
-
-.. todo::
-   🔧 **TODO** Add functions to Structure documentation for getting coordinates in Bohr units, such as ``get_coordinates_bohr()`` and ``get_atom_coordinates_bohr(index)``, for cases where atomic units are needed for calculations.
+.. TODO:  restore the code snippets with working examples.
 
 Related classes
 ---------------

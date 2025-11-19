@@ -27,12 +27,8 @@ Properties
 - **Core energy**: Constant energy term combining nuclear repulsion and inactive orbital contributions
 - **Inactive Fock matrix**: Matrix representing interactions between active and inactive orbitals
 - **Orbitals**: Molecular orbital information for the system (see the :doc:`Orbitals <orbitals>` documentation for detailed information about orbital properties and representations)
-- **Selected orbital indices**: Indices defining the active space orbitals (TODO this should move to the orbitals section)
+- **Selected orbital indices**: Indices defining the active space orbitals
 - **Number of electrons**: Count of electrons in the active space
-
-.. todo::
-   TODO (NAB):  finish Hamiltonian documentation with suggested move above
-   https://dev.azure.com/ms-azurequantum/AzureQuantum/_workitems/edit/41385
 
 Usage
 -----

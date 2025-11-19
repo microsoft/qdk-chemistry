@@ -1,7 +1,8 @@
 # Quantum Applications Toolkit (QDK/Chemistry)
 
-A high-performance quantum computing toolkit with a C++ core and Python bindings for quantum algorithms and molecular
-simulations.
+QDK/Chemistry is an open-source C++ and Python package within the [Azure Quantum Development Kit (QDK)](https://github.com/microsoft/qdk).
+It provides an end-to-end toolkit for quantum chemistry:  from molecular setup and Hamiltonian generation to quantum algorithm execution and results analysis.
+Designed for seamless integration with existing Python and chemistry workflows, QDK Chemistry enables researchers to simulate and run problems on near-term quantum hardware, explore strongly correlated systems, and advance toward practical quantum chemistry applications.
 
 ## Overview
 
@@ -11,11 +12,11 @@ QDK/Chemistry provides a comprehensive suite of tools for:
 - Molecular orbital calculations and analysis
 - Basis set management
 - Configuration and settings management
-- High-performance quantum chemistry algorithms
+- High-performance quantum algorithms
 
 ## Documentation
 
-- **Website**: The static documentation is hosted at [microsoft.github.io/qdk-cheistry](https://microsoft.github.io/qdk-cheistry/index.html)
+- **Website**: The static documentation is hosted at [microsoft.github.io/qdk-chemistry](https://microsoft.github.io/qdk-chemistry/index.html)
 - **C++ API**: Headers in `cpp/include/` contain comprehensive Doxygen documentation
 - **Python API**: All methods include detailed docstrings with Parameters, Returns, Raises, and Examples sections
 - **Examples**: See below, or the `python/examples/` and `docs/examples` directories for usage examples
@@ -29,6 +30,7 @@ qdk-chemistry/
 │   ├── src/            # Implementation files
 │   └── tests/          # C++ unit tests
 ├── docs/               # Static documentation
+├── examples/           # Example scripts showing usage and language interoperability
 ├── external/           # External libraries and scripts
 └── python/             # Python bindings
     ├── src/            # pybind11 wrapper and python code

@@ -134,7 +134,7 @@ TEST_CASES: tuple[WorkflowCase, ...] = (
         script="sample_sci_workflow.py",
         args=[
             "--xyz",
-            "structure/water.structure.xyz",
+            "data/water.structure.xyz",
             "--num-active-electrons",
             "6",
             "--num-active-orbitals",
@@ -142,17 +142,17 @@ TEST_CASES: tuple[WorkflowCase, ...] = (
             "--initial-active-space-solver",
             "macis_cas",
         ],
-        cwd_relative=Path("python/examples"),
+        cwd_relative=Path("examples"),
         expected_energy=-76.03203471,
         expected_det_count=13,
         summary_det_count=13,
     ),
     WorkflowCase(
         identifier="valence_defaults",
-        script="python/examples/sample_sci_workflow.py",
+        script="examples/sample_sci_workflow.py",
         args=[
             "--xyz",
-            "python/examples/structure/water.structure.xyz",
+            "examples/data/water.structure.xyz",
             "--initial-active-space-solver",
             "macis_cas",
         ],
@@ -162,10 +162,10 @@ TEST_CASES: tuple[WorkflowCase, ...] = (
     ),
     WorkflowCase(
         identifier="valence_autocas_fallback",
-        script="python/examples/sample_sci_workflow.py",
+        script="examples/sample_sci_workflow.py",
         args=[
             "--xyz",
-            "python/examples/structure/water.structure.xyz",
+            "examples/data/water.structure.xyz",
             "--autocas",
             "--initial-active-space-solver",
             "macis_cas",
@@ -176,10 +176,10 @@ TEST_CASES: tuple[WorkflowCase, ...] = (
     ),
     WorkflowCase(
         identifier="valence_autocas_threshold",
-        script="python/examples/sample_sci_workflow.py",
+        script="examples/sample_sci_workflow.py",
         args=[
             "--xyz",
-            "python/examples/structure/water.structure.xyz",
+            "examples/data/water.structure.xyz",
             "--initial-active-space-solver",
             "macis_cas",
             "--autocas",
@@ -226,13 +226,13 @@ def test_sample_sci_workflow_scenarios(case: WorkflowCase) -> None:
 def test_sample_non_commuting_qpe_outputs_expected_values():
     """Execute the non-commuting IQPE sample and validate reported results."""
     repo_root = Path(__file__).resolve().parents[2]
-    cmd = [sys.executable, "python/examples/sample_non_commuting_qpe.py"]
+    cmd = [sys.executable, "examples/qiskit/qpe_model_hamiltonian.py"]
 
     result = _run_workflow(cmd, repo_root)
     if result.returncode != 0:
         _skip_for_mpi_failure(result)
         pytest.fail(
-            "sample_non_commuting_qpe.py exited with "
+            "qpe_model_hamiltonian.py exited with "
             f"{result.returncode}.\nSTDOUT:\n{result.stdout}\nSTDERR:\n{result.stderr}"
         )
 
@@ -246,13 +246,13 @@ def test_sample_non_commuting_qpe_outputs_expected_values():
 def test_qiskit_qpe_direct_outputs_consistency():
     """Execute the exact-evolution IQPE sample and validate reported energies."""
     repo_root = Path(__file__).resolve().parents[2]
-    cmd = [sys.executable, "python/examples/qiskit_qpe_direct.py"]
+    cmd = [sys.executable, "examples/qiskit/qpe_no_trotter.py"]
 
     result = _run_workflow(cmd, repo_root)
     if result.returncode != 0:
         _skip_for_mpi_failure(result)
         pytest.fail(
-            f"qiskit_qpe_direct.py exited with {result.returncode}.\nSTDOUT:\n{result.stdout}\nSTDERR:\n{result.stderr}"
+            f"qpe_no_trotter.py exited with {result.returncode}.\nSTDOUT:\n{result.stdout}\nSTDERR:\n{result.stderr}"
         )
 
     phase_fraction = _extract_float(r"Phase fraction φ \(measured\): ([0-9.+-eE]+)", result.stdout)
@@ -283,14 +283,13 @@ def test_qiskit_qpe_direct_outputs_consistency():
 def test_sample_e2e_qpe_trotter_outputs_consistency():
     """Execute the Trotterized IQPE sample and validate reported energies."""
     repo_root = Path(__file__).resolve().parents[2]
-    cmd = [sys.executable, "python/examples/sample_e2e_qpe_trotter.py"]
+    cmd = [sys.executable, "examples/qiskit/qpe_trotter.py"]
 
     result = _run_workflow(cmd, repo_root)
     if result.returncode != 0:
         _skip_for_mpi_failure(result)
         pytest.fail(
-            "sample_e2e_qpe_trotter.py exited with "
-            f"{result.returncode}.\nSTDOUT:\n{result.stdout}\nSTDERR:\n{result.stderr}"
+            f"qpe_trotter.py exited with {result.returncode}.\nSTDOUT:\n{result.stdout}\nSTDERR:\n{result.stderr}"
         )
 
     phase_fraction = _extract_float(r"Phase fraction φ \(measured\): ([0-9.+-eE]+)", result.stdout)
@@ -327,9 +326,9 @@ def test_sample_sci_workflow_macis_asci_autocas_with_limits():
     repo_root = Path(__file__).resolve().parents[2]
     cmd = [
         sys.executable,
-        "python/examples/sample_sci_workflow.py",
+        "examples/sample_sci_workflow.py",
         "--xyz",
-        "python/examples/structure/water.structure.xyz",
+        "examples/data/water.structure.xyz",
         "--num-active-electrons",
         "10",
         "--num-active-orbitals",

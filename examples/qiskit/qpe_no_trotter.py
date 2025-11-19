@@ -5,7 +5,7 @@
 
 r"""Iterative QPE demo that swaps Trotterization for exact matrix exponentials.
 
-This script walks through the QDK\Chemistry's SCF → CASCI → IQPE pipeline, in IQPE, it uses
+This script walks through the QDK/Chemistry's SCF → CASCI → IQPE pipeline, in IQPE, it uses
 Qiskit's ``PauliEvolutionGate`` with a ``MatrixExponential`` synthesizer so each
 controlled time evolution is exact. The resulting phase estimate is therefore
 free of Trotter error, making it a reference point for benchmarking the
@@ -17,10 +17,23 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 
 import numpy as np
-from qiskit import ClassicalRegister, QuantumCircuit, QuantumRegister, qasm3, transpile
-from qiskit.circuit.library import PauliEvolutionGate
-from qiskit.synthesis import MatrixExponential
-from qiskit_aer import AerSimulator
+
+try:
+    from qiskit import (
+        ClassicalRegister,
+        QuantumCircuit,
+        QuantumRegister,
+        qasm3,
+        transpile,
+    )
+    from qiskit.circuit.library import PauliEvolutionGate
+    from qiskit.synthesis import MatrixExponential
+    from qiskit_aer import AerSimulator
+except ImportError as ex:
+    raise ImportError(
+        "Qiskit and Qiskit-Aer must be installed to run this example. "
+        "Please install via 'pip install qiskit qiskit-aer'.",
+    ) from ex
 
 from qdk_chemistry.algorithms import (
     IterativePhaseEstimation,
@@ -163,24 +176,26 @@ def run_iterative_exact_qpe(
     return bits, phase_fraction
 
 
-# ------------------------------------------------------------------
-# qdk-chemistry calculation for H₂ (0.76 Å, STO-3G)
-# ------------------------------------------------------------------
+########################################################################################
+# 1. QDK/Chemistry calculation for H₂ (0.76 Å, STO-3G)
+########################################################################################
 structure = Structure(
-    np.array([[0.0, 0.0, -0.72], [0.0, 0.0, 0.72]], dtype=float),
-    ["H", "H"],
-)  # Geometry in bohr (0.76 Å bond length)
-nuclear_repulsion = structure.calculate_nuclear_repulsion_energy()
+    np.array([[0.0, 0.0, -0.72], [0.0, 0.0, 0.72]], dtype=float), ["H", "H"]
+)  # Geometry in bohr
 
-scf_solver = create("scf_solver")
-scf_settings = scf_solver.settings()
-scf_settings.set("basis_set", "sto-3g")
+scf_solver = create("scf_solver", basis_set="sto-3g")
 scf_energy, scf_wavefunction = scf_solver.run(structure, charge=0, spin_multiplicity=1)
 
-selector = create("active_space_selector", "qdk_valence")
-selector_settings = selector.settings()
-selector_settings.set("num_active_electrons", ACTIVE_ELECTRONS)
-selector_settings.set("num_active_orbitals", ACTIVE_ORBITALS)
+
+########################################################################################
+# 2. Find active-space Hamiltonian and CASCI energy
+########################################################################################
+selector = create(
+    "active_space_selector",
+    "qdk_valence",
+    num_active_electrons=ACTIVE_ELECTRONS,
+    num_active_orbitals=ACTIVE_ORBITALS,
+)
 selected_wavefunction = selector.run(scf_wavefunction)
 
 constructor = create("hamiltonian_constructor")
@@ -188,32 +203,32 @@ active_hamiltonian = constructor.run(selected_wavefunction.get_orbitals())
 
 n_alpha = n_beta = ACTIVE_ELECTRONS // 2
 mc_calculator = create("multi_configuration_calculator")
-casci_energy, casci_wavefunction = mc_calculator.run(active_hamiltonian, n_alpha, n_beta)
+casci_energy, casci_wavefunction = mc_calculator.run(
+    active_hamiltonian, n_alpha, n_beta
+)
 
 core_energy = active_hamiltonian.get_core_energy()
 
-print("=== Generating qdk-chemistry artifacts for H2 (0.76 Å, STO-3G) ===")
+print("=== Generating QDK/Chemistry artifacts for H2 (0.76 Å, STO-3G) ===")
 print(f"  SCF total energy:   {scf_energy: .8f} Hartree")
 print(f"  CASCI total energy: {casci_energy: .8f} Hartree")
 
+
+########################################################################################
+# 3. Preparing the qubit Hamiltonian and sparse-isometry trial state
+########################################################################################
 qubit_mapper = create("qubit_mapper", "qiskit", encoding="jordan-wigner")
 qubit_hamiltonian = qubit_mapper.run(active_hamiltonian)
-
 qubit_pauli_op = qubit_hamiltonian.pauli_ops
 num_spin_orbitals = qubit_hamiltonian.num_qubits
 
-# ------------------------------------------------------------------
-# Down select top 2 determinants from the CASCI wavefunction
-# ------------------------------------------------------------------
 top_configurations = get_top_determinants(casci_wavefunction, max_determinants=2)
 pmc = create("projected_multi_configuration_calculator")
-E_sparse, sparse_wavefunction = pmc.run(active_hamiltonian, list(top_configurations.keys()))
+E_sparse, sparse_wavefunction = pmc.run(
+    active_hamiltonian, list(top_configurations.keys())
+)
 
-# ------------------------------------------------------------------
-# Sparse-isometry state preparation from the leading 2 CASCI determinants.
-# ------------------------------------------------------------------
 sparse_state_prep = create("state_prep", algorithm_name="sparse_isometry_gf2x")
-
 state_prep = qasm3.loads(sparse_state_prep.run(sparse_wavefunction))
 state_prep = transpile(
     state_prep,
@@ -226,9 +241,10 @@ state_prep.name = "casci_sparse_isometry"
 print("\nSparse-isometry state preparation circuit:")
 print(state_prep.draw(output="text"))
 
-# ------------------------------------------------------------------
-# Iterative QPE using the sparse isometry trial state
-# ------------------------------------------------------------------
+
+########################################################################################
+# 4. Build and run the Qiskit iterative QPE circuit
+########################################################################################
 iqpe = IterativePhaseEstimation(qubit_hamiltonian, T_TIME)
 matrix_exp = MatrixExponential()
 
@@ -246,6 +262,10 @@ bits, phase_fraction = run_iterative_exact_qpe(
     synthesis=matrix_exp,
 )
 
+
+########################################################################################
+# 5. Process and display results
+########################################################################################
 result = QpeResult.from_phase_fraction(
     method=IterativePhaseEstimation.algorithm,
     phase_fraction=phase_fraction,
@@ -258,11 +278,15 @@ phase_angle_measured = result.phase_angle
 phase_angle_canonical = result.canonical_phase_angle
 raw_energy = result.raw_energy
 candidate_energies = result.branching
-estimated_electronic_energy = result.resolved_energy if result.resolved_energy is not None else raw_energy
+estimated_electronic_energy = (
+    result.resolved_energy if result.resolved_energy is not None else raw_energy
+)
 estimated_total_energy = estimated_electronic_energy + core_energy
 
 print(f"Measured bits (MSB → LSB): {list(result.bits_msb_first or [])}")
-print(f"Phase fraction φ (measured): {result.phase_fraction:.6f} (angle = {phase_angle_measured:.6f} rad)")
+print(
+    f"Phase fraction φ (measured): {result.phase_fraction:.6f} (angle = {phase_angle_measured:.6f} rad)"
+)
 if not np.isclose(result.phase_fraction, result.canonical_phase_fraction):
     print(
         f"Canonical phase fraction φ: {result.canonical_phase_fraction:.6f} (angle = {phase_angle_canonical:.6f} rad)",
@@ -276,4 +300,6 @@ print(f"Estimated total energy: {estimated_total_energy:.8f} Hartree")
 print(f"Reference total energy (CASCI): {casci_energy:.8f} Hartree")
 iterative_energy_error = estimated_total_energy - casci_energy
 print(f"Energy difference (QPE - CASCI): {iterative_energy_error:+.8e} Hartree")
-print("Residual error is now dominated by the finite phase-register resolution because the time evolution is exact.")
+print(
+    "Residual error is now dominated by the finite phase-register resolution because the time evolution is exact."
+)

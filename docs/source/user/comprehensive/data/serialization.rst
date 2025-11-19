@@ -1,5 +1,5 @@
-Serialization in QDK/Chemistry
-==============================
+Serialization
+=============
 
 QDK/Chemistry provides comprehensive serialization capabilities for all its data classes, allowing you to save and load
 computational results in various formats.
