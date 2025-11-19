@@ -20,7 +20,7 @@ sys.path.insert(
 # -----------------------------------------------------------------------------
 if shutil.which("dot") is None:
     sys.stderr.write("ERROR: Graphviz 'dot' executable not found.\n")
-    sys.exit(1) 
+    sys.exit(1)
 
 # -----------------------------------------------------------------------------
 # Project information
