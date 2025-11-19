@@ -138,7 +138,7 @@ This ensures that the basis set data remains consistent and prevents accidental 
 
       // Get indices for specific atoms or orbital types
       // Returns std::vector<size_t>
-      auto basis_indices = basis_set.get_basis_fuction_indices_for_atom(1);
+      auto basis_indices = basis_set.get_basis_function_indices_for_atom(1);
       // Returns std::vector<size_t>
       auto shell_indices = basis_set.get_shell_indices_for_orbital_type(OrbitalType::P);
       // Returns std::vector<size_t>

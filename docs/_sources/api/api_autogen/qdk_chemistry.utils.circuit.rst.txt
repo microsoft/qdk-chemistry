@@ -1,0 +1,8 @@
+qdk\_chemistry.utils.circuit module
+===================================
+
+.. automodule:: qdk_chemistry.utils.circuit
+   :members:
+   :private-members:
+   :show-inheritance:
+   :undoc-members:

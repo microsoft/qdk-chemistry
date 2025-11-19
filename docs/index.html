@@ -107,24 +107,23 @@ It features a unified interface for vast community of quantum chemistry packages
 <p class="caption" role="heading"><span class="caption-text">User Documentation</span></p>
 <ul>
 <li class="toctree-l1"><a class="reference internal" href="user/quickstart.html">Quickstart</a><ul>
-<li class="toctree-l2"><a class="reference internal" href="user/quickstart.html#the-qdk-chemistry-workflow">The QDK/Chemistry workflow</a></li>
-<li class="toctree-l2"><a class="reference internal" href="user/quickstart.html#classical-data-preparation">Classical data preparation</a></li>
-<li class="toctree-l2"><a class="reference internal" href="user/quickstart.html#building-the-quantum-circuit">Building the quantum circuit</a></li>
-<li class="toctree-l2"><a class="reference internal" href="user/quickstart.html#simulation-and-execution-on-a-quantum-simulator">Simulation and execution on a quantum simulator</a></li>
+<li class="toctree-l2"><a class="reference internal" href="user/quickstart.html#installation">Installation</a></li>
+<li class="toctree-l2"><a class="reference internal" href="user/quickstart.html#end-to-end-example">End-to-end example</a></li>
 <li class="toctree-l2"><a class="reference internal" href="user/quickstart.html#additional-examples">Additional examples</a></li>
 </ul>
 </li>
 <li class="toctree-l1"><a class="reference internal" href="user/comprehensive/index.html">In-depth user guide</a><ul>
-<li class="toctree-l2"><a class="reference internal" href="user/comprehensive/design.html">Design and architecture</a></li>
-<li class="toctree-l2"><a class="reference internal" href="user/comprehensive/data.html">Data classes</a></li>
-<li class="toctree-l2"><a class="reference internal" href="user/comprehensive/algorithms.html">Algorithms</a></li>
+<li class="toctree-l2"><a class="reference internal" href="user/comprehensive/design/index.html">Design principles of QDK/Chemistry</a></li>
+<li class="toctree-l2"><a class="reference internal" href="user/comprehensive/data/index.html">Data Management</a></li>
+<li class="toctree-l2"><a class="reference internal" href="user/comprehensive/algorithms/index.html">Available algorithms</a></li>
 <li class="toctree-l2"><a class="reference internal" href="user/comprehensive/keywords.html">Functionals and basis sets</a></li>
+<li class="toctree-l2"><a class="reference internal" href="user/comprehensive/model_hamiltonians.html">Model Hamiltonians</a></li>
 <li class="toctree-l2"><a class="reference internal" href="user/comprehensive/plugins.html">Plugins</a></li>
 </ul>
 </li>
 </ul>
 </div>
-<div class="toctree-wrapper compound">
+<div class="toctree-wrapper compound" id="apidocs">
 <p class="caption" role="heading"><span class="caption-text">API Reference</span></p>
 <ul>
 <li class="toctree-l1"><a class="reference internal" href="api/python_api.html">Python API</a><ul>
@@ -162,134 +161,6 @@ Decide whether the functions should return strings instead of printing/logging d
 </ul>
 </div>
 <p class="todo-source"><a class="reference internal" href="api/api_autogen/qdk_chemistry.constants.html#id1"><em>original entry</em></a></p>
-<div class="admonition-todo admonition">
-<p class="admonition-title">Todo</p>
-<p>This section of the interfaces documentation requires verification.
-PySCF and other third-party interfaces may not be fully implemented for all algorithm classes mentioned.
-The table should be updated to reflect the actual implementation status of each interface.</p>
-</div>
-<p class="todo-source"><a class="reference internal" href="user/comprehensive/advanced/interfaces.html#id1"><em>original entry</em></a></p>
-<div class="admonition-todo admonition">
-<p class="admonition-title">Todo</p>
-<p><strong>TODO</strong>: Note that the HDF5 serialization function is named <code class="docutils literal notranslate"><span class="pre">to_hdf5()</span></code> while other classes use <code class="docutils literal notranslate"><span class="pre">to_hdf5_file()</span></code>.
-This naming inconsistency should be addressed for API uniformity by renaming the function to match other classes in
-the toolkit.</p>
-</div>
-<p class="todo-source"><a class="reference internal" href="user/comprehensive/advanced/settings.html#id1"><em>original entry</em></a></p>
-<div class="admonition-todo admonition">
-<p class="admonition-title">Todo</p>
-<p>The active space selection documentation is currently under construction.</p>
-</div>
-<p class="todo-source"><a class="reference internal" href="user/comprehensive/algorithms/active_space.html#id1"><em>original entry</em></a></p>
-<div class="admonition-todo admonition">
-<p class="admonition-title">Todo</p>
-<p>The detailed descriptions of each localization method are currently under construction.</p>
-</div>
-<p class="todo-source"><a class="reference internal" href="user/comprehensive/algorithms/localizer.html#id1"><em>original entry</em></a></p>
-<div class="admonition-todo admonition">
-<p class="admonition-title">Todo</p>
-<p>🔧 <strong>TODO</strong>: Add computational scaling for all localization methods</p>
-</div>
-<p class="todo-source"><a class="reference internal" href="user/comprehensive/algorithms/localizer.html#id2"><em>original entry</em></a></p>
-<div class="admonition-todo admonition">
-<p class="admonition-title">Todo</p>
-<p>The specialized <a class="reference internal" href="glossary.html#term-MC"><span class="xref std std-term">MC</span></a> calculator settings documentation is currently under construction.</p>
-</div>
-<p class="todo-source"><a class="reference internal" href="user/comprehensive/algorithms/mc_calculator.html#id1"><em>original entry</em></a></p>
-<div class="admonition-todo admonition">
-<p class="admonition-title">Todo</p>
-<p>The multi-configuration SCF documentation is currently under construction.</p>
-</div>
-<p class="todo-source"><a class="reference internal" href="user/comprehensive/algorithms/mscscf.html#id1"><em>original entry</em></a></p>
-<div class="admonition-todo admonition">
-<p class="admonition-title">Todo</p>
-<p>The projected multi-configuration calculations documentation is currently under construction.</p>
-</div>
-<p class="todo-source"><a class="reference internal" href="user/comprehensive/algorithms/pmc.html#id1"><em>original entry</em></a></p>
-<div class="admonition-todo admonition">
-<p class="admonition-title">Todo</p>
-<p>The qubit mapping documentation is currently under construction.
-In the meantime, please refer to <a class="reference internal" href="api/api_autogen/qdk_chemistry.algorithms.html#qdk_chemistry.algorithms.QubitMapper" title="qdk_chemistry.algorithms.QubitMapper"><code class="xref py py-class docutils literal notranslate"><span class="pre">qdk_chemistry.algorithms.QubitMapper</span></code></a> for class information.</p>
-</div>
-<p class="todo-source"><a class="reference internal" href="user/comprehensive/algorithms/qubit_mapper.html#id1"><em>original entry</em></a></p>
-<div class="admonition-todo admonition">
-<p class="admonition-title">Todo</p>
-<p>The reference-derived calculations documentation is currently under construction.</p>
-</div>
-<p class="todo-source"><a class="reference internal" href="user/comprehensive/algorithms/reference_derived.html#id1"><em>original entry</em></a></p>
-<div class="admonition-todo admonition">
-<p class="admonition-title">Todo</p>
-<p>The Python available SCF solvers code example is empty.</p>
-</div>
-<p class="todo-source"><a class="reference internal" href="user/comprehensive/algorithms/scf_solver.html#id1"><em>original entry</em></a></p>
-<div class="admonition-todo admonition">
-<p class="admonition-title">Todo</p>
-<p>🔧 <strong>TODO:</strong> Add comprehensive list of all actual base settings used by ScfSolver implementations</p>
-<p>TODO (NAB):  finish SCF Solver base settings table
-<a class="reference external" href="https://dev.azure.com/ms-azurequantum/AzureQuantum/_workitems/edit/41382">https://dev.azure.com/ms-azurequantum/AzureQuantum/_workitems/edit/41382</a></p>
-</div>
-<p class="todo-source"><a class="reference internal" href="user/comprehensive/algorithms/scf_solver.html#id2"><em>original entry</em></a></p>
-<div class="admonition-todo admonition">
-<p class="admonition-title">Todo</p>
-<p>🔧 <strong>TODO:</strong> Add comprehensive list of all actual specialized settings used by ScfSolver implementations</p>
-<p>TODO (NAB):  finish SCF Solver specialized settings table
-<a class="reference external" href="https://dev.azure.com/ms-azurequantum/AzureQuantum/_workitems/edit/41382">https://dev.azure.com/ms-azurequantum/AzureQuantum/_workitems/edit/41382</a></p>
-</div>
-<p class="todo-source"><a class="reference internal" href="user/comprehensive/algorithms/scf_solver.html#id3"><em>original entry</em></a></p>
-<div class="admonition-todo admonition">
-<p class="admonition-title">Todo</p>
-<p>The <a class="reference internal" href="glossary.html#term-SCF"><span class="xref std std-term">SCF</span></a> stability checks documentation is currently under construction.</p>
-</div>
-<p class="todo-source"><a class="reference internal" href="user/comprehensive/algorithms/stability_checker.html#id1"><em>original entry</em></a></p>
-<div class="admonition-todo admonition">
-<p class="admonition-title">Todo</p>
-<p>TODO (NAB):  finish Hamiltonian documentation with suggested move above
-<a class="reference external" href="https://dev.azure.com/ms-azurequantum/AzureQuantum/_workitems/edit/41385">https://dev.azure.com/ms-azurequantum/AzureQuantum/_workitems/edit/41385</a></p>
-</div>
-<p class="todo-source"><a class="reference internal" href="user/comprehensive/data/hamiltonian.html#id1"><em>original entry</em></a></p>
-<div class="admonition-todo admonition">
-<p class="admonition-title">Todo</p>
-<p>🔧 <strong>TODO</strong>: The exact structure of the basis set group in HDF5 format needs verification.
-See the “TODO” in the code block below.</p>
-</div>
-<p class="todo-source"><a class="reference internal" href="user/comprehensive/data/orbitals.html#id1"><em>original entry</em></a></p>
-<div class="admonition-todo admonition">
-<p class="admonition-title">Todo</p>
-<p>🔧 <strong>TODO</strong>: Verify if this basis set HDF5 serialization structure is complete and accurate.
-Are basis set details properly included?</p>
-</div>
-<p class="todo-source"><a class="reference internal" href="user/comprehensive/data/orbitals.html#id2"><em>original entry</em></a></p>
-<div class="admonition-todo admonition">
-<p class="admonition-title">Todo</p>
-<p>The stability results documentation is currently under construction.</p>
-</div>
-<p class="todo-source"><a class="reference internal" href="user/comprehensive/data/stability_results.html#id1"><em>original entry</em></a></p>
-<div class="admonition-todo admonition">
-<p class="admonition-title">Todo</p>
-<p>Check the Structure code below – do these functions exist?
-If not, they need to be fixed.</p>
-</div>
-<p class="todo-source"><a class="reference internal" href="user/comprehensive/data/structure.html#id1"><em>original entry</em></a></p>
-<div class="admonition-todo admonition">
-<p class="admonition-title">Todo</p>
-<p>🔧 <strong>TODO</strong> Add functions to Structure documentation for getting coordinates in Bohr units, such as <code class="docutils literal notranslate"><span class="pre">get_coordinates_bohr()</span></code> and <code class="docutils literal notranslate"><span class="pre">get_atom_coordinates_bohr(index)</span></code>, for cases where atomic units are needed for calculations.</p>
-</div>
-<p class="todo-source"><a class="reference internal" href="user/comprehensive/data/structure.html#id2"><em>original entry</em></a></p>
-<div class="admonition-todo admonition">
-<p class="admonition-title">Todo</p>
-<p>The wavefunction documentation is currently under construction.</p>
-</div>
-<p class="todo-source"><a class="reference internal" href="user/comprehensive/data/wavefunction.html#id1"><em>original entry</em></a></p>
-<div class="admonition-todo admonition">
-<p class="admonition-title">Todo</p>
-<p>🔧 The basis sets list is currently under construction.</p>
-</div>
-<p class="todo-source"><a class="reference internal" href="user/comprehensive/keywords/basis_sets.html#id1"><em>original entry</em></a></p>
-<div class="admonition-todo admonition">
-<p class="admonition-title">Todo</p>
-<p>🔧 The functionals list is currently under construction.</p>
-</div>
-<p class="todo-source"><a class="reference internal" href="user/comprehensive/keywords/functionals.html#id1"><em>original entry</em></a></p>
 </section>
 </section>
 

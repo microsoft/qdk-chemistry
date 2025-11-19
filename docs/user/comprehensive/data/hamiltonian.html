@@ -28,7 +28,7 @@
     <link rel="index" title="Index" href="../../../genindex.html" />
     <link rel="search" title="Search" href="../../../search.html" />
     <link rel="next" title="Orbitals" href="orbitals.html" />
-    <link rel="prev" title="Energy expectation and measurement data" href="energy_expectation.html" /> 
+    <link rel="prev" title="Basis set" href="basis_set.html" /> 
 </head>
 
 <body class="wy-body-for-nav"> 
@@ -54,11 +54,10 @@
 <ul class="current">
 <li class="toctree-l1"><a class="reference internal" href="../../quickstart.html">Quickstart</a></li>
 <li class="toctree-l1 current"><a class="reference internal" href="../index.html">In-depth user guide</a><ul class="current">
-<li class="toctree-l2"><a class="reference internal" href="../design.html">Design and architecture</a></li>
-<li class="toctree-l2 current"><a class="reference internal" href="../data.html">Data classes</a><ul class="current">
-<li class="toctree-l3"><a class="reference internal" href="ansatz.html">Ansatz</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../design/index.html">Design principles of QDK/Chemistry</a></li>
+<li class="toctree-l2 current"><a class="reference internal" href="index.html">Data Management</a><ul class="current">
+<li class="toctree-l3"><a class="reference internal" href="serialization.html">Serialization</a></li>
 <li class="toctree-l3"><a class="reference internal" href="basis_set.html">Basis set</a></li>
-<li class="toctree-l3"><a class="reference internal" href="energy_expectation.html">Energy expectation and measurement data</a></li>
 <li class="toctree-l3 current"><a class="current reference internal" href="#">Hamiltonian</a><ul>
 <li class="toctree-l4"><a class="reference internal" href="#overview">Overview</a></li>
 <li class="toctree-l4"><a class="reference internal" href="#properties">Properties</a></li>
@@ -73,15 +72,12 @@
 </ul>
 </li>
 <li class="toctree-l3"><a class="reference internal" href="orbitals.html">Orbitals</a></li>
-<li class="toctree-l3"><a class="reference internal" href="qpe_results.html">Quantum phase estimation results</a></li>
-<li class="toctree-l3"><a class="reference internal" href="qubit_hamiltonian.html">Qubit Hamiltonian</a></li>
-<li class="toctree-l3"><a class="reference internal" href="stability_results.html">Stability results</a></li>
 <li class="toctree-l3"><a class="reference internal" href="structure.html">Structure</a></li>
-<li class="toctree-l3"><a class="reference internal" href="wavefunction.html">Wavefunction</a></li>
 </ul>
 </li>
-<li class="toctree-l2"><a class="reference internal" href="../algorithms.html">Algorithms</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../algorithms/index.html">Available algorithms</a></li>
 <li class="toctree-l2"><a class="reference internal" href="../keywords.html">Functionals and basis sets</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../model_hamiltonians.html">Model Hamiltonians</a></li>
 <li class="toctree-l2"><a class="reference internal" href="../plugins.html">Plugins</a></li>
 </ul>
 </li>
@@ -112,7 +108,7 @@
   <ul class="wy-breadcrumbs">
       <li><a href="../../../index.html" class="icon icon-home" aria-label="Home"></a></li>
           <li class="breadcrumb-item"><a href="../index.html">In-depth user guide</a></li>
-          <li class="breadcrumb-item"><a href="../data.html">Data classes</a></li>
+          <li class="breadcrumb-item"><a href="index.html">Data Management</a></li>
       <li class="breadcrumb-item active">Hamiltonian</li>
       <li class="wy-breadcrumbs-aside">
             <a href="../../../_sources/user/comprehensive/data/hamiltonian.rst.txt" rel="nofollow"> View page source</a>
@@ -134,7 +130,7 @@ The <code class="docutils literal notranslate"><span class="pre">Hamiltonian</sp
 These matrix elements consist of one-electron integrals (representing kinetic energy and electron-nucleus interactions) and two-electron integrals (representing electron-electron repulsion).</p>
 <section id="design-principles">
 <h3>Design principles<a class="headerlink" href="#design-principles" title="Link to this heading"></a></h3>
-<p>The <code class="docutils literal notranslate"><span class="pre">Hamiltonian</span></code> class follows an immutable data model design principle as described in the <a class="reference internal" href="../advanced/design_principles.html"><span class="doc">QDK/Chemistry Design Principles</span></a> document.
+<p>The <code class="docutils literal notranslate"><span class="pre">Hamiltonian</span></code> class follows an immutable data model design principle as described in the <span class="xref std std-doc">QDK/Chemistry Design Principles</span> document.
 Once properly constructed, the Hamiltonian data is typically not modified during calculations.
 This const-correctness approach ensures data integrity throughout computational workflows and prevents accidental modifications of the core quantum system representation.
 While setter methods are available for construction and initialization purposes, in normal operation the Hamiltonian object should be treated as immutable after it has been fully populated.</p>
@@ -148,14 +144,9 @@ While setter methods are available for construction and initialization purposes,
 <li><p><strong>Core energy</strong>: Constant energy term combining nuclear repulsion and inactive orbital contributions</p></li>
 <li><p><strong>Inactive Fock matrix</strong>: Matrix representing interactions between active and inactive orbitals</p></li>
 <li><p><strong>Orbitals</strong>: Molecular orbital information for the system (see the <a class="reference internal" href="orbitals.html"><span class="doc">Orbitals</span></a> documentation for detailed information about orbital properties and representations)</p></li>
-<li><p><strong>Selected orbital indices</strong>: Indices defining the active space orbitals (TODO this should move to the orbitals section)</p></li>
+<li><p><strong>Selected orbital indices</strong>: Indices defining the active space orbitals</p></li>
 <li><p><strong>Number of electrons</strong>: Count of electrons in the active space</p></li>
 </ul>
-<div class="admonition-todo admonition" id="id1">
-<p class="admonition-title">Todo</p>
-<p>TODO (NAB):  finish Hamiltonian documentation with suggested move above
-<a class="reference external" href="https://dev.azure.com/ms-azurequantum/AzureQuantum/_workitems/edit/41385">https://dev.azure.com/ms-azurequantum/AzureQuantum/_workitems/edit/41385</a></p>
-</div>
 </section>
 <section id="usage">
 <h2>Usage<a class="headerlink" href="#usage" title="Link to this heading"></a></h2>
@@ -278,7 +269,7 @@ When accessing specific elements with <code class="docutils literal notranslate"
 <section id="serialization">
 <h2>Serialization<a class="headerlink" href="#serialization" title="Link to this heading"></a></h2>
 <p>The <code class="docutils literal notranslate"><span class="pre">Hamiltonian</span></code> class supports serialization to and from JSON and HDF5 formats.
-For detailed information about serialization in QDK/Chemistry, see the <a class="reference internal" href="../advanced/serialization.html"><span class="doc">Serialization</span></a> documentation.</p>
+For detailed information about serialization in QDK/Chemistry, see the <span class="xref std std-doc">Serialization</span> documentation.</p>
 <div class="admonition note">
 <p class="admonition-title">Note</p>
 <p>All Hamiltonian-related files should follow a consistent naming convention, such as
@@ -419,16 +410,16 @@ The <a class="reference internal" href="../algorithms/hamiltonian_constructor.ht
 <li><p><a class="reference internal" href="../algorithms/hamiltonian_constructor.html"><span class="doc">HamiltonianConstructor</span></a>: Algorithm for constructing Hamiltonians -
 <strong>primary tool</strong> for generating Hamiltonian objects from molecular data</p></li>
 <li><p><a class="reference internal" href="../algorithms/mc_calculator.html"><span class="doc">MCCalculator</span></a>: Uses the Hamiltonian for correlation calculations</p></li>
-<li><p><a class="reference internal" href="wavefunction.html"><span class="doc">Wavefunction</span></a>: Represents the solution of the Hamiltonian eigenvalue problem</p></li>
+<li><p><span class="xref std std-doc">Wavefunction</span>: Represents the solution of the Hamiltonian eigenvalue problem</p></li>
 <li><p><a class="reference internal" href="../algorithms/active_space.html"><span class="doc">Active space methods</span></a>: Selection and use of active spaces with the Hamiltonian</p></li>
 </ul>
 </section>
 <section id="related-topics">
 <h2>Related topics<a class="headerlink" href="#related-topics" title="Link to this heading"></a></h2>
 <ul class="simple">
-<li><p><a class="reference internal" href="../advanced/serialization.html"><span class="doc">Serialization</span></a>: Data serialization and deserialization in QDK/Chemistry</p></li>
-<li><p><a class="reference internal" href="../advanced/design_principles.html"><span class="doc">Design principles</span></a>: Design principles for data classes in QDK/Chemistry</p></li>
-<li><p><a class="reference internal" href="../advanced/settings.html"><span class="doc">Settings</span></a>: Configuration options for algorithms operating on Hamiltonians</p></li>
+<li><p><span class="xref std std-doc">Serialization</span>: Data serialization and deserialization in QDK/Chemistry</p></li>
+<li><p><span class="xref std std-doc">Design principles</span>: Design principles for data classes in QDK/Chemistry</p></li>
+<li><p><span class="xref std std-doc">Settings</span>: Configuration options for algorithms operating on Hamiltonians</p></li>
 </ul>
 </section>
 </section>
@@ -437,7 +428,7 @@ The <a class="reference internal" href="../algorithms/hamiltonian_constructor.ht
            </div>
           </div>
           <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
-        <a href="energy_expectation.html" class="btn btn-neutral float-left" title="Energy expectation and measurement data" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+        <a href="basis_set.html" class="btn btn-neutral float-left" title="Basis set" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
         <a href="orbitals.html" class="btn btn-neutral float-right" title="Orbitals" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
     </div>
 

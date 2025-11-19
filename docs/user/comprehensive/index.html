@@ -26,7 +26,7 @@
     <script src="../../_static/js/theme.js"></script>
     <link rel="index" title="Index" href="../../genindex.html" />
     <link rel="search" title="Search" href="../../search.html" />
-    <link rel="next" title="Design and architecture" href="design.html" />
+    <link rel="next" title="Design principles of QDK/Chemistry" href="design/index.html" />
     <link rel="prev" title="Quickstart" href="../quickstart.html" /> 
 </head>
 
@@ -53,10 +53,11 @@
 <ul class="current">
 <li class="toctree-l1"><a class="reference internal" href="../quickstart.html">Quickstart</a></li>
 <li class="toctree-l1 current"><a class="current reference internal" href="#">In-depth user guide</a><ul>
-<li class="toctree-l2"><a class="reference internal" href="design.html">Design and architecture</a></li>
-<li class="toctree-l2"><a class="reference internal" href="data.html">Data classes</a></li>
-<li class="toctree-l2"><a class="reference internal" href="algorithms.html">Algorithms</a></li>
+<li class="toctree-l2"><a class="reference internal" href="design/index.html">Design principles of QDK/Chemistry</a></li>
+<li class="toctree-l2"><a class="reference internal" href="data/index.html">Data Management</a></li>
+<li class="toctree-l2"><a class="reference internal" href="algorithms/index.html">Available algorithms</a></li>
 <li class="toctree-l2"><a class="reference internal" href="keywords.html">Functionals and basis sets</a></li>
+<li class="toctree-l2"><a class="reference internal" href="model_hamiltonians.html">Model Hamiltonians</a></li>
 <li class="toctree-l2"><a class="reference internal" href="plugins.html">Plugins</a></li>
 </ul>
 </li>
@@ -104,33 +105,23 @@ This documentation provides detailed information about QDK/Chemistry’s structu
 It provides a set of tools and libraries for working with molecular structures, performing electronic structure calculations, analyzing quantum many-body systems, and running calculations on quantum hardware or simulators.</p>
 <p>QDK/Chemistry features a unified interface for communitry quantum chemistry software packages, allowing seamless interoperability with established software while maintaining a consistent API.
 This enables users to leverage specialized capabilities across different packages without changing their workflow.</p>
+<p class="rubric">The QDK/Chemistry workflow</p>
+<div align="center" class="align-center"><div class="graphviz"><img src="../../_images/graphviz-e3c32890d6d261b8b51e21433dfb2cf592d8eb7b.png" alt="QDK/Chemistry Workflow" class="graphviz" /></div>
+</div>
+<p class="rubric">Overview</p>
 <p>This comprehensive documentation is organized into the following sections:</p>
 <div class="toctree-wrapper compound">
-<p class="caption" role="heading"><span class="caption-text">Overview</span></p>
 <ul>
-<li class="toctree-l1"><a class="reference internal" href="design.html">Design and architecture</a><ul>
-<li class="toctree-l2"><a class="reference internal" href="advanced/design_principles.html">Design principles of QDK/Chemistry</a></li>
-<li class="toctree-l2"><a class="reference internal" href="advanced/factory_pattern.html">Factory pattern in QDK/Chemistry</a></li>
-<li class="toctree-l2"><a class="reference internal" href="advanced/serialization.html">Serialization in QDK/Chemistry</a></li>
-<li class="toctree-l2"><a class="reference internal" href="advanced/interfaces.html">Interface system in QDK/Chemistry</a></li>
-<li class="toctree-l2"><a class="reference internal" href="advanced/settings.html">Settings</a></li>
-<li class="toctree-l2"><a class="reference internal" href="advanced/model_hamiltonians.html">Model Hamiltonians</a></li>
-</ul>
-</li>
-<li class="toctree-l1"><a class="reference internal" href="data.html">Data classes</a><ul>
-<li class="toctree-l2"><a class="reference internal" href="data/ansatz.html">Ansatz</a></li>
+<li class="toctree-l1"><a class="reference internal" href="design/index.html">Design principles of QDK/Chemistry</a></li>
+<li class="toctree-l1"><a class="reference internal" href="data/index.html">Data Management</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="data/serialization.html">Serialization</a></li>
 <li class="toctree-l2"><a class="reference internal" href="data/basis_set.html">Basis set</a></li>
-<li class="toctree-l2"><a class="reference internal" href="data/energy_expectation.html">Energy expectation and measurement data</a></li>
 <li class="toctree-l2"><a class="reference internal" href="data/hamiltonian.html">Hamiltonian</a></li>
 <li class="toctree-l2"><a class="reference internal" href="data/orbitals.html">Orbitals</a></li>
-<li class="toctree-l2"><a class="reference internal" href="data/qpe_results.html">Quantum phase estimation results</a></li>
-<li class="toctree-l2"><a class="reference internal" href="data/qubit_hamiltonian.html">Qubit Hamiltonian</a></li>
-<li class="toctree-l2"><a class="reference internal" href="data/stability_results.html">Stability results</a></li>
 <li class="toctree-l2"><a class="reference internal" href="data/structure.html">Structure</a></li>
-<li class="toctree-l2"><a class="reference internal" href="data/wavefunction.html">Wavefunction</a></li>
 </ul>
 </li>
-<li class="toctree-l1"><a class="reference internal" href="algorithms.html">Algorithms</a><ul>
+<li class="toctree-l1"><a class="reference internal" href="algorithms/index.html">Available algorithms</a><ul>
 <li class="toctree-l2"><a class="reference internal" href="algorithms/active_space.html">Active space selection</a></li>
 <li class="toctree-l2"><a class="reference internal" href="algorithms/energy_estimator.html">Energy estimation</a></li>
 <li class="toctree-l2"><a class="reference internal" href="algorithms/hamiltonian_constructor.html">Classical Hamiltonian construction</a></li>
@@ -140,13 +131,19 @@ This enables users to leverage specialized capabilities across different package
 <li class="toctree-l2"><a class="reference internal" href="algorithms/qubit_mapper.html">Qubit mapping</a></li>
 <li class="toctree-l2"><a class="reference internal" href="algorithms/reference_derived.html">Reference-derived calculations</a></li>
 <li class="toctree-l2"><a class="reference internal" href="algorithms/scf_solver.html">Self-consistent field solving</a></li>
-<li class="toctree-l2"><a class="reference internal" href="algorithms/stability_checker.html">SCF stability checks</a></li>
+<li class="toctree-l2"><a class="reference internal" href="algorithms/stability_checker.html">Self-consistent field stability checks</a></li>
 <li class="toctree-l2"><a class="reference internal" href="algorithms/state_preparation.html">State preparation</a></li>
 </ul>
 </li>
 <li class="toctree-l1"><a class="reference internal" href="keywords.html">Functionals and basis sets</a><ul>
-<li class="toctree-l2"><a class="reference internal" href="keywords/basis_sets.html">Available basis sets</a></li>
-<li class="toctree-l2"><a class="reference internal" href="keywords/functionals.html">Available DFT functionals</a></li>
+<li class="toctree-l2"><a class="reference internal" href="keywords.html#available-basis-sets">Available basis sets</a></li>
+<li class="toctree-l2"><a class="reference internal" href="keywords.html#available-dft-functionals">Available DFT functionals</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="model_hamiltonians.html">Model Hamiltonians</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="model_hamiltonians.html#creating-model-hamiltonians">Creating model Hamiltonians</a></li>
+<li class="toctree-l2"><a class="reference internal" href="model_hamiltonians.html#using-model-hamiltonians-with-algorithms">Using model Hamiltonians with algorithms</a></li>
+<li class="toctree-l2"><a class="reference internal" href="model_hamiltonians.html#see-also">See also</a></li>
 </ul>
 </li>
 <li class="toctree-l1"><a class="reference internal" href="plugins.html">Plugins</a><ul>
@@ -164,7 +161,7 @@ This enables users to leverage specialized capabilities across different package
           </div>
           <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
         <a href="../quickstart.html" class="btn btn-neutral float-left" title="Quickstart" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
-        <a href="design.html" class="btn btn-neutral float-right" title="Design and architecture" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+        <a href="design/index.html" class="btn btn-neutral float-right" title="Design principles of QDK/Chemistry" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
     </div>
 
   <hr/>

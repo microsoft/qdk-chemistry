@@ -6,7 +6,7 @@
   <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
 
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Interface system in QDK/Chemistry &mdash; qdk-chemistry 1.0.0-rc1 documentation</title>
+  <title>Interface system &mdash; qdk-chemistry 1.0.0-rc1 documentation</title>
       <link rel="stylesheet" type="text/css" href="../../../_static/pygments.css?v=b86133f3" />
       <link rel="stylesheet" type="text/css" href="../../../_static/css/theme.css?v=e59714d7" />
       <link rel="stylesheet" type="text/css" href="../../../_static/tabs.css?v=4c969af8" />
@@ -27,7 +27,7 @@
     <link rel="index" title="Index" href="../../../genindex.html" />
     <link rel="search" title="Search" href="../../../search.html" />
     <link rel="next" title="Settings" href="settings.html" />
-    <link rel="prev" title="Serialization in QDK/Chemistry" href="serialization.html" /> 
+    <link rel="prev" title="Factory pattern" href="factory_pattern.html" /> 
 </head>
 
 <body class="wy-body-for-nav"> 
@@ -53,11 +53,9 @@
 <ul class="current">
 <li class="toctree-l1"><a class="reference internal" href="../../quickstart.html">Quickstart</a></li>
 <li class="toctree-l1 current"><a class="reference internal" href="../index.html">In-depth user guide</a><ul class="current">
-<li class="toctree-l2 current"><a class="reference internal" href="../design.html">Design and architecture</a><ul class="current">
-<li class="toctree-l3"><a class="reference internal" href="design_principles.html">Design principles of QDK/Chemistry</a></li>
-<li class="toctree-l3"><a class="reference internal" href="factory_pattern.html">Factory pattern in QDK/Chemistry</a></li>
-<li class="toctree-l3"><a class="reference internal" href="serialization.html">Serialization in QDK/Chemistry</a></li>
-<li class="toctree-l3 current"><a class="current reference internal" href="#">Interface system in QDK/Chemistry</a><ul>
+<li class="toctree-l2 current"><a class="reference internal" href="index.html">Design principles of QDK/Chemistry</a><ul class="current">
+<li class="toctree-l3"><a class="reference internal" href="factory_pattern.html">Factory pattern</a></li>
+<li class="toctree-l3 current"><a class="current reference internal" href="#">Interface system</a><ul>
 <li class="toctree-l4"><a class="reference internal" href="#overview">Overview</a></li>
 <li class="toctree-l4"><a class="reference internal" href="#interface-architecture">Interface architecture</a></li>
 <li class="toctree-l4"><a class="reference internal" href="#supported-interfaces">Supported interfaces</a></li>
@@ -72,12 +70,12 @@
 </ul>
 </li>
 <li class="toctree-l3"><a class="reference internal" href="settings.html">Settings</a></li>
-<li class="toctree-l3"><a class="reference internal" href="model_hamiltonians.html">Model Hamiltonians</a></li>
 </ul>
 </li>
-<li class="toctree-l2"><a class="reference internal" href="../data.html">Data classes</a></li>
-<li class="toctree-l2"><a class="reference internal" href="../algorithms.html">Algorithms</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../data/index.html">Data Management</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../algorithms/index.html">Available algorithms</a></li>
 <li class="toctree-l2"><a class="reference internal" href="../keywords.html">Functionals and basis sets</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../model_hamiltonians.html">Model Hamiltonians</a></li>
 <li class="toctree-l2"><a class="reference internal" href="../plugins.html">Plugins</a></li>
 </ul>
 </li>
@@ -108,10 +106,10 @@
   <ul class="wy-breadcrumbs">
       <li><a href="../../../index.html" class="icon icon-home" aria-label="Home"></a></li>
           <li class="breadcrumb-item"><a href="../index.html">In-depth user guide</a></li>
-          <li class="breadcrumb-item"><a href="../design.html">Design and architecture</a></li>
-      <li class="breadcrumb-item active">Interface system in QDK/Chemistry</li>
+          <li class="breadcrumb-item"><a href="index.html">Design principles of QDK/Chemistry</a></li>
+      <li class="breadcrumb-item active">Interface system</li>
       <li class="wy-breadcrumbs-aside">
-            <a href="../../../_sources/user/comprehensive/advanced/interfaces.rst.txt" rel="nofollow"> View page source</a>
+            <a href="../../../_sources/user/comprehensive/design/interfaces.rst.txt" rel="nofollow"> View page source</a>
       </li>
   </ul>
   <hr/>
@@ -119,14 +117,14 @@
           <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
            <div itemprop="articleBody">
              
-  <section id="interface-system-in-qdk-chemistry">
-<h1>Interface system in QDK/Chemistry<a class="headerlink" href="#interface-system-in-qdk-chemistry" title="Link to this heading"></a></h1>
+  <section id="interface-system">
+<h1>Interface system<a class="headerlink" href="#interface-system" title="Link to this heading"></a></h1>
 <p>This document describes QDK/Chemistry’s interface system, which provides unified access to various quantum chemistry packages.
 This design allows researchers to leverage the unique strengths of various quantum chemistry programs while maintaining a consistent workflow.</p>
 <section id="overview">
 <h2>Overview<a class="headerlink" href="#overview" title="Link to this heading"></a></h2>
 <p>QDK/Chemistry is designed with an extensible plugin architecture that allows algorithms to be implemented either natively within QDK/Chemistry or as interfaces to established third-party quantum chemistry packages.
-This approach combines the benefits of a consistent API with the specialized capabilities of different software packages, following QDK/Chemistry’s core <a class="reference internal" href="design_principles.html"><span class="doc">design principles</span></a> of extensibility and interoperability.</p>
+This approach combines the benefits of a consistent API with the specialized capabilities of different software packages, following QDK/Chemistry’s core <span class="xref std std-doc">design principles</span> of extensibility and interoperability.</p>
 <p>The interface system implements the <a class="reference internal" href="factory_pattern.html"><span class="doc">factory pattern</span></a>, which allows algorithms to be instantiated by name without the user needing to know the specific implementation details.
 This abstraction enables seamless switching between different backends without changing your code, making it easier to benchmark and compare different approaches.</p>
 </section>
@@ -141,7 +139,7 @@ implementation</p></li>
 packages</p></li>
 <li><p><strong>Consistent Configuration</strong>: All implementations are configured through the same <a class="reference internal" href="settings.html"><span class="doc">Settings</span></a> interface</p></li>
 </ol>
-<div class="graphviz"><img src="../../../_images/graphviz-3ca4fb017a4c2b22cb345492370a08dab1907979.png" alt="digraph InterfaceArchitecture {
+<div class="graphviz"><img src="../../../_images/graphviz-e91d4ade25c46a8ac1e1ed8a7718f491d3ddbfa2.png" alt="digraph InterfaceArchitecture {
     rankdir=TB;
     bgcolor=&quot;#FAFAFA&quot;;
     node [shape=box, style=&quot;rounded,filled&quot;, fontname=&quot;Arial&quot;, margin=0.3];
@@ -369,7 +367,7 @@ translated to the backend and the backend-specific settings that are passed thro
 <h2>Data conversion<a class="headerlink" href="#data-conversion" title="Link to this heading"></a></h2>
 <p>QDK/Chemistry handles the conversion of data between its own format and third-party packages automatically.
 This internal conversion process is transparent to the user, allowing you to work exclusively with QDK/Chemistry data structures regardless of which backend implementation is used.
-This capability is built on QDK/Chemistry’s robust <a class="reference internal" href="serialization.html"><span class="doc">serialization</span></a> system, which provides standardized methods for data conversion between different formats.</p>
+This capability is built on QDK/Chemistry’s robust <span class="xref std std-doc">serialization</span> system, which provides standardized methods for data conversion between different formats.</p>
 <p>The data types that are automatically converted include:</p>
 <ul class="simple">
 <li><p><strong>:doc:`Molecular structures &lt;../data/structure&gt;`</strong>: Atoms, coordinates, charges, and multiplicity</p></li>
@@ -397,11 +395,9 @@ and hardware environment.</p>
 </section>
 <section id="available-interfaces-by-algorithm">
 <h2>Available interfaces by algorithm<a class="headerlink" href="#available-interfaces-by-algorithm" title="Link to this heading"></a></h2>
-<div class="admonition-todo admonition" id="id1">
-<p class="admonition-title">Todo</p>
-<p>This section of the interfaces documentation requires verification.
-PySCF and other third-party interfaces may not be fully implemented for all algorithm classes mentioned.
-The table should be updated to reflect the actual implementation status of each interface.</p>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>PySCF and other third-party interfaces may not be fully implemented for all algorithm classes mentioned.</p>
 </div>
 <p>The following table provides an overview of the available interfaces for each algorithm class in QDK/Chemistry.
 Each algorithm class is implemented through the factory pattern, allowing you to select different implementations at runtime.</p>
@@ -411,10 +407,10 @@ Each algorithm class is implemented through the factory pattern, allowing you to
 <section id="related-topics">
 <h2>Related topics<a class="headerlink" href="#related-topics" title="Link to this heading"></a></h2>
 <ul class="simple">
-<li><p><a class="reference internal" href="design_principles.html"><span class="doc">Design principles</span></a>: Core architectural principles of QDK/Chemistry</p></li>
+<li><p><span class="xref std std-doc">Design principles</span>: Core architectural principles of QDK/Chemistry</p></li>
 <li><p><a class="reference internal" href="factory_pattern.html"><span class="doc">Factory pattern</span></a>: How to extend QDK/Chemistry with new algorithms and interfaces</p></li>
 <li><p><a class="reference internal" href="settings.html"><span class="doc">Settings</span></a>: Configuring algorithm behavior consistently across implementations</p></li>
-<li><p><a class="reference internal" href="serialization.html"><span class="doc">Serialization</span></a>: Data persistence and conversion in QDK/Chemistry</p></li>
+<li><p><span class="xref std std-doc">Serialization</span>: Data persistence and conversion in QDK/Chemistry</p></li>
 </ul>
 </section>
 </section>
@@ -423,7 +419,7 @@ Each algorithm class is implemented through the factory pattern, allowing you to
            </div>
           </div>
           <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
-        <a href="serialization.html" class="btn btn-neutral float-left" title="Serialization in QDK/Chemistry" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+        <a href="factory_pattern.html" class="btn btn-neutral float-left" title="Factory pattern" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
         <a href="settings.html" class="btn btn-neutral float-right" title="Settings" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
     </div>
 

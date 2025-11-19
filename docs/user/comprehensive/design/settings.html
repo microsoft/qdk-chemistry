@@ -26,8 +26,8 @@
     <script src="../../../_static/js/theme.js"></script>
     <link rel="index" title="Index" href="../../../genindex.html" />
     <link rel="search" title="Search" href="../../../search.html" />
-    <link rel="next" title="Model Hamiltonians" href="model_hamiltonians.html" />
-    <link rel="prev" title="Interface system in QDK/Chemistry" href="interfaces.html" /> 
+    <link rel="next" title="Data Management" href="../data/index.html" />
+    <link rel="prev" title="Interface system" href="interfaces.html" /> 
 </head>
 
 <body class="wy-body-for-nav"> 
@@ -53,11 +53,9 @@
 <ul class="current">
 <li class="toctree-l1"><a class="reference internal" href="../../quickstart.html">Quickstart</a></li>
 <li class="toctree-l1 current"><a class="reference internal" href="../index.html">In-depth user guide</a><ul class="current">
-<li class="toctree-l2 current"><a class="reference internal" href="../design.html">Design and architecture</a><ul class="current">
-<li class="toctree-l3"><a class="reference internal" href="design_principles.html">Design principles of QDK/Chemistry</a></li>
-<li class="toctree-l3"><a class="reference internal" href="factory_pattern.html">Factory pattern in QDK/Chemistry</a></li>
-<li class="toctree-l3"><a class="reference internal" href="serialization.html">Serialization in QDK/Chemistry</a></li>
-<li class="toctree-l3"><a class="reference internal" href="interfaces.html">Interface system in QDK/Chemistry</a></li>
+<li class="toctree-l2 current"><a class="reference internal" href="index.html">Design principles of QDK/Chemistry</a><ul class="current">
+<li class="toctree-l3"><a class="reference internal" href="factory_pattern.html">Factory pattern</a></li>
+<li class="toctree-l3"><a class="reference internal" href="interfaces.html">Interface system</a></li>
 <li class="toctree-l3 current"><a class="current reference internal" href="#">Settings</a><ul>
 <li class="toctree-l4"><a class="reference internal" href="#overview">Overview</a></li>
 <li class="toctree-l4"><a class="reference internal" href="#accessing-settings">Accessing settings</a></li>
@@ -69,12 +67,12 @@
 <li class="toctree-l4"><a class="reference internal" href="#related-topics">Related topics</a></li>
 </ul>
 </li>
-<li class="toctree-l3"><a class="reference internal" href="model_hamiltonians.html">Model Hamiltonians</a></li>
 </ul>
 </li>
-<li class="toctree-l2"><a class="reference internal" href="../data.html">Data classes</a></li>
-<li class="toctree-l2"><a class="reference internal" href="../algorithms.html">Algorithms</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../data/index.html">Data Management</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../algorithms/index.html">Available algorithms</a></li>
 <li class="toctree-l2"><a class="reference internal" href="../keywords.html">Functionals and basis sets</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../model_hamiltonians.html">Model Hamiltonians</a></li>
 <li class="toctree-l2"><a class="reference internal" href="../plugins.html">Plugins</a></li>
 </ul>
 </li>
@@ -105,10 +103,10 @@
   <ul class="wy-breadcrumbs">
       <li><a href="../../../index.html" class="icon icon-home" aria-label="Home"></a></li>
           <li class="breadcrumb-item"><a href="../index.html">In-depth user guide</a></li>
-          <li class="breadcrumb-item"><a href="../design.html">Design and architecture</a></li>
+          <li class="breadcrumb-item"><a href="index.html">Design principles of QDK/Chemistry</a></li>
       <li class="breadcrumb-item active">Settings</li>
       <li class="wy-breadcrumbs-aside">
-            <a href="../../../_sources/user/comprehensive/advanced/settings.rst.txt" rel="nofollow"> View page source</a>
+            <a href="../../../_sources/user/comprehensive/design/settings.rst.txt" rel="nofollow"> View page source</a>
       </li>
   </ul>
   <hr/>
@@ -127,14 +125,14 @@ This unified settings system ensures consistency across the toolkit and makes it
 Each algorithm type (such as <code class="docutils literal notranslate"><span class="pre">ScfSolver</span></code>, <code class="docutils literal notranslate"><span class="pre">Localizer</span></code>, etc.) extends the base <code class="docutils literal notranslate"><span class="pre">Settings</span></code> class to
 create its own specialized settings with appropriate default values.
 The class follows a design philosophy where default settings are established during class initialization.
-This approach aligns with QDK/Chemistry’s broader <a class="reference internal" href="design_principles.html"><span class="doc">design principles</span></a> of type safety and flexibility.</p>
+This approach aligns with QDK/Chemistry’s broader <span class="xref std std-doc">design principles</span> of type safety and flexibility.</p>
 <p>The class supports:</p>
 <ul class="simple">
 <li><p><strong>Type-safe storage</strong>: Stores different value types (bool, int, long, size_t, float, double, string, and vectors) in a
 type-safe variant system</p></li>
 <li><p><strong>Convenient accessor methods</strong>: Get values with or without default fallbacks, check existence, and validate types</p></li>
 <li><p><strong>Multiple serialization formats</strong>: Save and load from JSON and HDF5 files for interoperability (see
-<a class="reference internal" href="serialization.html"><span class="doc">Serialization</span></a> for more details)</p></li>
+<span class="xref std std-doc">Serialization</span> for more details)</p></li>
 <li><p><strong>Default settings protection</strong>: Default settings are defined during initialization through the protected
 <code class="docutils literal notranslate"><span class="pre">set_default</span></code> method, values can be alterd before algorithm execution but are locked afterwasrds to ensure consistency</p></li>
 </ul>
@@ -385,13 +383,7 @@ present), manipulation (merging with other settings objects), and more.</p>
 The <code class="docutils literal notranslate"><span class="pre">Settings</span></code> class provides methods to serialize and deserialize settings to both JSON and HDF5 formats.
 This allows you to save algorithm configurations, share them with colleagues, or use them in future runs to ensure consistent results.</p>
 <p>JSON is a human-readable format ideal for manual editing and inspection, while HDF5 offers better performance and type preservation for large datasets.
-For more information on serialization throughout QDK/Chemistry, see the <a class="reference internal" href="serialization.html"><span class="doc">Serialization</span></a> documentation:</p>
-<div class="admonition-todo admonition" id="id1">
-<p class="admonition-title">Todo</p>
-<p><strong>TODO</strong>: Note that the HDF5 serialization function is named <code class="docutils literal notranslate"><span class="pre">to_hdf5()</span></code> while other classes use <code class="docutils literal notranslate"><span class="pre">to_hdf5_file()</span></code>.
-This naming inconsistency should be addressed for API uniformity by renaming the function to match other classes in
-the toolkit.</p>
-</div>
+For more information on serialization throughout QDK/Chemistry, see the <span class="xref std std-doc">Serialization</span> documentation.</p>
 <div class="tab-set docutils container">
 <input checked="True" class="tab-input" id="tab-set--5-input--1" name="tab-set--5" type="radio"><label class="tab-label" for="tab-set--5-input--1">C++ API</label><div class="tab-content docutils container">
 <div class="highlight-cpp notranslate"><div class="highlight"><pre><span></span><span class="c1">// Save settings to JSON file</span>
@@ -569,10 +561,10 @@ The exception message includes both the key and the expected type.</p></li>
 <section id="related-topics">
 <h2>Related topics<a class="headerlink" href="#related-topics" title="Link to this heading"></a></h2>
 <ul class="simple">
-<li><p><a class="reference internal" href="design_principles.html"><span class="doc">Design Principles</span></a>: Core architectural principles of QDK/Chemistry</p></li>
+<li><p><span class="xref std std-doc">Design Principles</span>: Core architectural principles of QDK/Chemistry</p></li>
 <li><p><a class="reference internal" href="factory_pattern.html"><span class="doc">Factory Pattern</span></a>: Understanding the factory pattern and extending QDK/Chemistry</p></li>
 <li><p><a class="reference internal" href="interfaces.html"><span class="doc">Interfaces</span></a>: QDK/Chemistry’s interface system to external packages</p></li>
-<li><p><a class="reference internal" href="serialization.html"><span class="doc">Serialization</span></a>: Data persistence in QDK/Chemistry</p></li>
+<li><p><span class="xref std std-doc">Serialization</span>: Data persistence in QDK/Chemistry</p></li>
 </ul>
 </section>
 </section>
@@ -581,8 +573,8 @@ The exception message includes both the key and the expected type.</p></li>
            </div>
           </div>
           <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
-        <a href="interfaces.html" class="btn btn-neutral float-left" title="Interface system in QDK/Chemistry" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
-        <a href="model_hamiltonians.html" class="btn btn-neutral float-right" title="Model Hamiltonians" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+        <a href="interfaces.html" class="btn btn-neutral float-left" title="Interface system" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+        <a href="../data/index.html" class="btn btn-neutral float-right" title="Data Management" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
     </div>
 
   <hr/>

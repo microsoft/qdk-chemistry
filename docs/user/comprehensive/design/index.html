@@ -26,8 +26,8 @@
     <script src="../../../_static/js/theme.js"></script>
     <link rel="index" title="Index" href="../../../genindex.html" />
     <link rel="search" title="Search" href="../../../search.html" />
-    <link rel="next" title="Factory pattern in QDK/Chemistry" href="factory_pattern.html" />
-    <link rel="prev" title="Design and architecture" href="../design.html" /> 
+    <link rel="next" title="Factory pattern" href="factory_pattern.html" />
+    <link rel="prev" title="In-depth user guide" href="../index.html" /> 
 </head>
 
 <body class="wy-body-for-nav"> 
@@ -53,26 +53,16 @@
 <ul class="current">
 <li class="toctree-l1"><a class="reference internal" href="../../quickstart.html">Quickstart</a></li>
 <li class="toctree-l1 current"><a class="reference internal" href="../index.html">In-depth user guide</a><ul class="current">
-<li class="toctree-l2 current"><a class="reference internal" href="../design.html">Design and architecture</a><ul class="current">
-<li class="toctree-l3 current"><a class="current reference internal" href="#">Design principles of QDK/Chemistry</a><ul>
-<li class="toctree-l4"><a class="reference internal" href="#core-design-principles">Core design principles</a></li>
-<li class="toctree-l4"><a class="reference internal" href="#factory-pattern">Factory pattern</a></li>
-<li class="toctree-l4"><a class="reference internal" href="#settings-pattern">Settings pattern</a></li>
-<li class="toctree-l4"><a class="reference internal" href="#data-flow-example">Data flow example</a></li>
-<li class="toctree-l4"><a class="reference internal" href="#interface-architecture">Interface architecture</a></li>
-<li class="toctree-l4"><a class="reference internal" href="#related-topics">Related topics</a></li>
-</ul>
-</li>
-<li class="toctree-l3"><a class="reference internal" href="factory_pattern.html">Factory pattern in QDK/Chemistry</a></li>
-<li class="toctree-l3"><a class="reference internal" href="serialization.html">Serialization in QDK/Chemistry</a></li>
-<li class="toctree-l3"><a class="reference internal" href="interfaces.html">Interface system in QDK/Chemistry</a></li>
+<li class="toctree-l2 current"><a class="current reference internal" href="#">Design principles of QDK/Chemistry</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="factory_pattern.html">Factory pattern</a></li>
+<li class="toctree-l3"><a class="reference internal" href="interfaces.html">Interface system</a></li>
 <li class="toctree-l3"><a class="reference internal" href="settings.html">Settings</a></li>
-<li class="toctree-l3"><a class="reference internal" href="model_hamiltonians.html">Model Hamiltonians</a></li>
 </ul>
 </li>
-<li class="toctree-l2"><a class="reference internal" href="../data.html">Data classes</a></li>
-<li class="toctree-l2"><a class="reference internal" href="../algorithms.html">Algorithms</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../data/index.html">Data Management</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../algorithms/index.html">Available algorithms</a></li>
 <li class="toctree-l2"><a class="reference internal" href="../keywords.html">Functionals and basis sets</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../model_hamiltonians.html">Model Hamiltonians</a></li>
 <li class="toctree-l2"><a class="reference internal" href="../plugins.html">Plugins</a></li>
 </ul>
 </li>
@@ -103,10 +93,9 @@
   <ul class="wy-breadcrumbs">
       <li><a href="../../../index.html" class="icon icon-home" aria-label="Home"></a></li>
           <li class="breadcrumb-item"><a href="../index.html">In-depth user guide</a></li>
-          <li class="breadcrumb-item"><a href="../design.html">Design and architecture</a></li>
       <li class="breadcrumb-item active">Design principles of QDK/Chemistry</li>
       <li class="wy-breadcrumbs-aside">
-            <a href="../../../_sources/user/comprehensive/advanced/design_principles.rst.txt" rel="nofollow"> View page source</a>
+            <a href="../../../_sources/user/comprehensive/design/index.rst.txt" rel="nofollow"> View page source</a>
       </li>
   </ul>
   <hr/>
@@ -120,10 +109,7 @@
 For a complete overview of QDK/Chemistry’s documentation, see the <a class="reference internal" href="../index.html"><span class="doc">comprehensive documentation index</span></a>.</p>
 <p>QDK/Chemistry is designed with a clear separation between <strong>data containers</strong> and <strong>algorithms</strong>.
 This fundamental design choice enables flexibility, extensibility, and maintainability of the codebase, while providing users with a consistent and intuitive API.</p>
-<section id="core-design-principles">
-<h2>Core design principles<a class="headerlink" href="#core-design-principles" title="Link to this heading"></a></h2>
-<section id="separation-of-data-and-algorithms">
-<h3>Separation of data and algorithms<a class="headerlink" href="#separation-of-data-and-algorithms" title="Link to this heading"></a></h3>
+<p class="rubric">Separation of data and algorithms</p>
 <p>QDK/Chemistry follows a design pattern that strictly separates:</p>
 <ol class="arabic simple">
 <li><p><strong>Data Classes</strong>: Immutable containers that store and manage quantum chemical data</p></li>
@@ -131,7 +117,7 @@ This fundamental design choice enables flexibility, extensibility, and maintaina
 </ol>
 <p>This separation follows the principle of single responsibility and creates a clear flow of data through computational
 workflows.</p>
-<div class="graphviz"><img src="../../../_images/graphviz-ce2214b456563022414f92f7102f10752fb7a201.png" alt="digraph DataFlow {
+<div class="graphviz"><img src="../../../_images/graphviz-81cb93437fff91546debeb5cb5e3d380016e084e.png" alt="digraph DataFlow {
     rankdir=LR;
     bgcolor=&quot;#FAFAFA&quot;;
     node [shape=box, style=&quot;rounded,filled&quot;, fontname=&quot;Arial&quot;, margin=0.3];
@@ -144,14 +130,12 @@ workflows.</p>
     Input -&gt; Algorithm;
     Algorithm -&gt; Output;
 }" class="graphviz" /></div>
-</section>
-<section id="data-classes">
-<h3>Data classes<a class="headerlink" href="#data-classes" title="Link to this heading"></a></h3>
+<p class="rubric">Data classes</p>
 <p>Data classes in QDK/Chemistry are designed to be:</p>
 <ul class="simple">
 <li><p>Immutable: Once created, the core data cannot be modified</p></li>
 <li><p>Self-contained: Include all information necessary to represent the concept</p></li>
-<li><p><a class="reference internal" href="serialization.html"><span class="doc">Serializable</span></a>: Can be easily saved to and loaded from files</p></li>
+<li><p><span class="xref std std-doc">Serializable</span>: Can be easily saved to and loaded from files</p></li>
 <li><p>Language-agnostic: Accessible through identical APIs in both C++ and Python</p></li>
 </ul>
 <p>QDK/Chemistry includes the following data classes:</p>
@@ -160,11 +144,9 @@ workflows.</p>
 <li><p><a class="reference internal" href="../data/basis_set.html"><span class="doc">BasisSet</span></a>: Quantum chemistry basis set definitions</p></li>
 <li><p><a class="reference internal" href="../data/orbitals.html"><span class="doc">Orbitals</span></a>: Molecular orbital coefficients and energies</p></li>
 <li><p><a class="reference internal" href="../data/hamiltonian.html"><span class="doc">Hamiltonian</span></a>: Molecular Hamiltonian</p></li>
-<li><p><a class="reference internal" href="../data/wavefunction.html"><span class="doc">Wavefunction</span></a>: Wavefunction representation</p></li>
+<li><p><span class="xref std std-doc">Wavefunction</span>: Wavefunction representation</p></li>
 </ul>
-</section>
-<section id="algorithm-classes">
-<h3>Algorithm classes<a class="headerlink" href="#algorithm-classes" title="Link to this heading"></a></h3>
+<p class="rubric">Algorithm classes</p>
 <p>Algorithm classes in QDK/Chemistry are designed to be:</p>
 <ul class="simple">
 <li><p><strong>Stateless</strong>: Their behavior depends only on their input data and configuration</p></li>
@@ -183,10 +165,7 @@ workflows.</p>
 </ul>
 <p>Each algorithm class can leverage both Microsoft-developed implementations (developed within QDK/Chemistry) and <a class="reference internal" href="interfaces.html"><span class="doc">interfaces</span></a> to established third-party electronic structure packages.
 This design allows users to benefit from specialized capabilities of external software while maintaining a consistent API.</p>
-</section>
-</section>
-<section id="factory-pattern">
-<h2>Factory pattern<a class="headerlink" href="#factory-pattern" title="Link to this heading"></a></h2>
+<p class="rubric">Factory pattern</p>
 <p>QDK/Chemistry implements the <a class="reference internal" href="factory_pattern.html"><span class="doc">factory pattern</span></a> for algorithm creation:</p>
 <div class="tab-set docutils container">
 <input checked="True" class="tab-input" id="tab-set--0-input--1" name="tab-set--0" type="radio"><label class="tab-label" for="tab-set--0-input--1">C++ API</label><div class="tab-content docutils container">
@@ -206,9 +185,8 @@ This design allows users to benefit from specialized capabilities of external so
 <li><p>Extension with new implementations without changing client code</p></li>
 <li><p>Centralized management of dependencies and resources</p></li>
 </ul>
-</section>
-<section id="settings-pattern">
-<h2>Settings pattern<a class="headerlink" href="#settings-pattern" title="Link to this heading"></a></h2>
+<p>Read more in the <a class="reference internal" href="factory_pattern.html"><span class="doc">Factory Pattern</span></a> documentation.</p>
+<p class="rubric">Settings pattern</p>
 <p>Algorithm configuration is managed through a consistent <a class="reference internal" href="settings.html"><span class="doc">Settings</span></a> interface:</p>
 <div class="tab-set docutils container">
 <input checked="True" class="tab-input" id="tab-set--1-input--1" name="tab-set--1" type="radio"><label class="tab-label" for="tab-set--1-input--1">C++ API</label><div class="tab-content docutils container">
@@ -233,9 +211,8 @@ This design allows users to benefit from specialized capabilities of external so
 <li><p>Default values with explicit overrides</p></li>
 <li><p>Documentation of available options</p></li>
 </ul>
-</section>
-<section id="data-flow-example">
-<h2>Data flow example<a class="headerlink" href="#data-flow-example" title="Link to this heading"></a></h2>
+<p>Read more in the <a class="reference internal" href="settings.html"><span class="doc">Settings</span></a> documentation.</p>
+<p class="rubric">Data flow example</p>
 <p>A typical workflow in QDK/Chemistry demonstrates the data-algorithm separation:</p>
 <div class="tab-set docutils container">
 <input checked="True" class="tab-input" id="tab-set--2-input--1" name="tab-set--2" type="radio"><label class="tab-label" for="tab-set--2-input--1">C++ API</label><div class="tab-content docutils container">
@@ -277,11 +254,9 @@ This design allows users to benefit from specialized capabilities of external so
 <input class="tab-input" id="tab-set--2-input--2" name="tab-set--2" type="radio"><label class="tab-label" for="tab-set--2-input--2">Python API</label><div class="tab-content docutils container">
 </div>
 </div>
-</section>
-<section id="interface-architecture">
-<h2>Interface architecture<a class="headerlink" href="#interface-architecture" title="Link to this heading"></a></h2>
+<p class="rubric">Interface architecture</p>
 <p>QDK/Chemistry is designed with a plugin architecture that allows for consistent <a class="reference internal" href="interfaces.html"><span class="doc">interfaces</span></a> to various external packages:</p>
-<div class="graphviz"><img src="../../../_images/graphviz-b5c8e1726208bb988b9dae65d23df3fe6e698f95.png" alt="digraph PluginArchitecture {
+<div class="graphviz"><img src="../../../_images/graphviz-425f73d86fb873b40e9ee4489a05e57b826832b4.png" alt="digraph PluginArchitecture {
     rankdir=LR;
     bgcolor=&quot;#FAFAFA&quot;;
     node [shape=box, style=&quot;rounded,filled&quot;, fontname=&quot;Arial&quot;, margin=0.3];
@@ -301,24 +276,22 @@ This design allows users to benefit from specialized capabilities of external so
 <li><p><strong>Best-of-Breed Approach</strong>: Leverage strengths of different packages while maintaining consistent data structures</p></li>
 <li><p><strong>Future-Proofing</strong>: New implementations can be added without changing the user-facing API</p></li>
 </ol>
-</section>
-<section id="related-topics">
-<h2>Related topics<a class="headerlink" href="#related-topics" title="Link to this heading"></a></h2>
+<p class="rubric">Related topics</p>
 <ul class="simple">
 <li><p><a class="reference internal" href="factory_pattern.html"><span class="doc">Factory Pattern</span></a>: Details on QDK/Chemistry’s implementation of the factory pattern</p></li>
 <li><p><a class="reference internal" href="settings.html"><span class="doc">Settings</span></a>: How to configure algorithms through the Settings interface</p></li>
-<li><p><a class="reference internal" href="serialization.html"><span class="doc">Serialization</span></a>: Data serialization and deserialization</p></li>
 <li><p><a class="reference internal" href="interfaces.html"><span class="doc">Interfaces</span></a>: QDK/Chemistry’s interface system to external packages</p></li>
 </ul>
-</section>
+<div class="toctree-wrapper compound">
+</div>
 </section>
 
 
            </div>
           </div>
           <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
-        <a href="../design.html" class="btn btn-neutral float-left" title="Design and architecture" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
-        <a href="factory_pattern.html" class="btn btn-neutral float-right" title="Factory pattern in QDK/Chemistry" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+        <a href="../index.html" class="btn btn-neutral float-left" title="In-depth user guide" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+        <a href="factory_pattern.html" class="btn btn-neutral float-right" title="Factory pattern" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
     </div>
 
   <hr/>

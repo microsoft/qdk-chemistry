@@ -158,23 +158,12 @@ These settings apply to all :term:`MC` calculation methods:
      - true
      - Whether to calculate one-electron reduced density matrix
 
-Specialized settings
-~~~~~~~~~~~~~~~~~~~~
+.. Specialized settings
+.. ~~~~~~~~~~~~~~~~~~~~
 
-.. todo::
-   The specialized :term:`MC` calculator settings documentation is currently under construction.
+.. TODO:  The specialized :term:`MC` calculator settings documentation is currently under construction.
 
-These settings apply only to specific variants of :term:`MC` calculations:
-
-.. list-table::
-   :header-rows: 1
-   :widths: 20 15 15 30 20
-
-   * - Setting
-     - Type
-     - Default
-     - Description
-     - Applicable To
+.. These settings apply only to specific variants of :term:`MC` calculations.
 
 Implemented interface
 ---------------------

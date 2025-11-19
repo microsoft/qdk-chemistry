@@ -53,21 +53,15 @@
               <p class="caption" role="heading"><span class="caption-text">User Documentation</span></p>
 <ul class="current">
 <li class="toctree-l1 current"><a class="current reference internal" href="#">Quickstart</a><ul>
-<li class="toctree-l2"><a class="reference internal" href="#the-qdk-chemistry-workflow">The QDK/Chemistry workflow</a></li>
-<li class="toctree-l2"><a class="reference internal" href="#classical-data-preparation">Classical data preparation</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="#installation">Installation</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#end-to-end-example">End-to-end example</a><ul>
 <li class="toctree-l3"><a class="reference internal" href="#create-a-structure-object">Create a <code class="docutils literal notranslate"><span class="pre">Structure</span></code> object</a></li>
 <li class="toctree-l3"><a class="reference internal" href="#run-a-self-consistent-field-scf-calculation">Run a self-consistent field (SCF) calculation</a></li>
 <li class="toctree-l3"><a class="reference internal" href="#select-an-active-space">Select an active space</a></li>
 <li class="toctree-l3"><a class="reference internal" href="#calculate-the-hamiltonian">Calculate the Hamiltonian</a></li>
 <li class="toctree-l3"><a class="reference internal" href="#compute-a-multi-configuration-wavefunction-for-the-active-space">Compute a multi-configuration wavefunction for the active space</a></li>
 <li class="toctree-l3"><a class="reference internal" href="#select-important-configurations">Select important configurations</a></li>
-</ul>
-</li>
-<li class="toctree-l2"><a class="reference internal" href="#building-the-quantum-circuit">Building the quantum circuit</a><ul>
 <li class="toctree-l3"><a class="reference internal" href="#preparing-a-qubit-representation-of-the-hamiltonian">Preparing a qubit representation of the Hamiltonian</a></li>
-</ul>
-</li>
-<li class="toctree-l2"><a class="reference internal" href="#simulation-and-execution-on-a-quantum-simulator">Simulation and execution on a quantum simulator</a><ul>
 <li class="toctree-l3"><a class="reference internal" href="#estimate-the-ground-state-energy-using-a-quantum-algorithm">Estimate the ground state energy using a quantum algorithm</a></li>
 </ul>
 </li>
@@ -113,113 +107,23 @@
              
   <section id="quickstart">
 <h1>Quickstart<a class="headerlink" href="#quickstart" title="Link to this heading"></a></h1>
+<p>These quickstart instructions provide a high-level overview of the typical workflow when using the QDK/Chemistry library.
+More comprehensive documentation can be found in the <a class="reference internal" href="comprehensive/index.html"><span class="doc">In-depth user guide</span></a>.</p>
+<section id="installation">
+<h2>Installation<a class="headerlink" href="#installation" title="Link to this heading"></a></h2>
+<p>To install QDK/Chemistry, please see the <a class="reference external" href="https://github.com/microsoft/qdk-chemistry/blob/main/INSTALL.md">installation instructions</a>.</p>
+</section>
+<section id="end-to-end-example">
+<h2>End-to-end example<a class="headerlink" href="#end-to-end-example" title="Link to this heading"></a></h2>
 <p>This document is intended to provide a brief introduction to the QDK/Chemistry library by walking through a minimal end-to-end example for ground state energy estimation with state preparation and measurement.
 The emphasis of this example is optimization:  reducing the resources required for the quantum computer.
 The example starts with a molecular structure and ends with a simulated calculation using quantum algorithms.
-The focus of this example is on high-level concepts and common coding patterns.
-More comprehensive documentation can be found in the <a class="reference internal" href="comprehensive/index.html"><span class="doc">In-depth user guide</span></a>.</p>
-<section id="the-qdk-chemistry-workflow">
-<h2>The QDK/Chemistry workflow<a class="headerlink" href="#the-qdk-chemistry-workflow" title="Link to this heading"></a></h2>
-<div class="graphviz"><img src="../_images/graphviz-4a4a9e16e60b5b698e2e59e144e218bc1286fc00.png" alt="digraph QuantumWorkflow {
-    // Graph settings for vertical layout
-    rankdir=TB;
-    ranksep=1.8;
-    nodesep=1.0;
-    newrank=true;
-    compound=true;
-    overlap=false;
-    sep=&quot;+0.5&quot;;
-    bgcolor=&quot;#FAFAFA&quot;;
-
-    // Default node style
-    node [shape=box, style=&quot;rounded,filled&quot;, fontname=&quot;Arial&quot;, width=3.2, height=1.0, fixedsize=true, margin=0.2];
-
-    // Input subgraph
-    subgraph cluster_0 {
-        label=&quot;Input chemical structure&quot;;
-        style=&quot;filled,rounded&quot;;
-        fillcolor=&quot;#E8EAF6&quot;;
-        color=&quot;#5C6BC0&quot;;
-        penwidth=2.5;
-        fontsize=14;
-        fontname=&quot;Arial Bold&quot;;
-        fontcolor=&quot;#3949AB&quot;;
-
-        Start [label=&lt;&lt;B&gt;Input Structure&lt;/B&gt;&lt;BR/&gt;&lt;BR/&gt;&lt;FONT POINT-SIZE=&quot;12&quot; COLOR=&quot;#666666&quot;&gt;2D, 3D (xyz format)&lt;/FONT&gt;&gt;, fillcolor=&quot;#FFFFFF&quot;, color=&quot;#5C6BC0&quot;, penwidth=2.5, group=g1];
-    }
-
-    // Classical Data Preparation subgraph
-    subgraph cluster_1 {
-        label=&quot;Classical Data Preparation&quot;;
-        style=&quot;filled,rounded&quot;;
-        fillcolor=&quot;#E3F2FD&quot;;
-        color=&quot;#42A5F5&quot;;
-        penwidth=2.5;
-        fontsize=14;
-        fontname=&quot;Arial Bold&quot;;
-        fontcolor=&quot;#1976D2&quot;;
-        rank=same;
-
-        GeomOpt [label=&lt;&lt;B&gt;Geometry Optimization&lt;/B&gt;&lt;BR/&gt;&lt;BR/&gt;&lt;FONT POINT-SIZE=&quot;12&quot; COLOR=&quot;#E3F2FD&quot;&gt;Energy-optimized input structure&lt;/FONT&gt;&gt;, fillcolor=&quot;#1976D2&quot;, fontcolor=white, color=&quot;#0D47A1&quot;, penwidth=2.5, group=g1];
-        SCF [label=&lt;&lt;B&gt;Self-Consistent Field&lt;/B&gt;&lt;BR/&gt;&lt;BR/&gt;&lt;FONT POINT-SIZE=&quot;12&quot; COLOR=&quot;#E3F2FD&quot;&gt;Initial electronic structure guess&lt;/FONT&gt;&gt;, fillcolor=&quot;#1976D2&quot;, fontcolor=white, color=&quot;#0D47A1&quot;, penwidth=2.5];
-        ActiveSpace [label=&lt;&lt;B&gt;Active Space Engineering&lt;/B&gt;&lt;BR/&gt;&lt;BR/&gt;&lt;FONT POINT-SIZE=&quot;12&quot; COLOR=&quot;#E3F2FD&quot;&gt;Select orbitals and electrons&lt;/FONT&gt;&gt;, fillcolor=&quot;#1976D2&quot;, fontcolor=white, color=&quot;#0D47A1&quot;, penwidth=2.5];
-        Hamilton [label=&lt;&lt;B&gt;Hamiltonian Formation&lt;/B&gt;&lt;BR/&gt;&lt;BR/&gt;&lt;FONT POINT-SIZE=&quot;12&quot; COLOR=&quot;#E3F2FD&quot;&gt;Generate energy terms&lt;/FONT&gt;&gt;, fillcolor=&quot;#1976D2&quot;, fontcolor=white, color=&quot;#0D47A1&quot;, penwidth=2.5];
-        ApproxCI [label=&lt;&lt;B&gt;Approximate CI Wavefunction&lt;/B&gt;&lt;BR/&gt;&lt;BR/&gt;&lt;FONT POINT-SIZE=&quot;12&quot; COLOR=&quot;#E3F2FD&quot;&gt;Electronic configuration description&lt;/FONT&gt;&gt;, fillcolor=&quot;#1976D2&quot;, fontcolor=white, color=&quot;#0D47A1&quot;, penwidth=2.5];
-
-        GeomOpt -&gt; SCF -&gt; ActiveSpace -&gt; Hamilton -&gt; ApproxCI;
-    }
-
-    // Building Quantum Circuit subgraph
-    subgraph cluster_2 {
-        label=&quot;Building the Quantum Circuit&quot;;
-        style=&quot;filled,rounded&quot;;
-        fillcolor=&quot;#E0F2F1&quot;;
-        color=&quot;#26A69A&quot;;
-        penwidth=2.5;
-        fontsize=14;
-        fontname=&quot;Arial Bold&quot;;
-        fontcolor=&quot;#00796B&quot;;
-        rank=same;
-
-        HamEncode [label=&lt;&lt;B&gt;Hamiltonian Encoding&lt;/B&gt;&lt;BR/&gt;&lt;BR/&gt;&lt;FONT POINT-SIZE=&quot;12&quot; COLOR=&quot;#E0F2F1&quot;&gt;Map fermionic operators to qubit operators&lt;/FONT&gt;&gt;, fillcolor=&quot;#00796B&quot;, fontcolor=white, color=&quot;#004D40&quot;, penwidth=2.5, group=g1];
-        PauliOpt [label=&lt;&lt;B&gt;Pauli Operators Optimization&lt;/B&gt;&lt;BR/&gt;&lt;BR/&gt;&lt;FONT POINT-SIZE=&quot;12&quot; COLOR=&quot;#E0F2F1&quot;&gt;Reduce measurement circuit complexity&lt;/FONT&gt;&gt;, fillcolor=&quot;#00796B&quot;, fontcolor=white, color=&quot;#004D40&quot;, penwidth=2.5];
-        StatePrep [label=&lt;&lt;B&gt;State Prep&lt;/B&gt;&lt;BR/&gt;&lt;BR/&gt;&lt;FONT POINT-SIZE=&quot;12&quot; COLOR=&quot;#E0F2F1&quot;&gt;Load chemically relevant states to QC&lt;/FONT&gt;&gt;, fillcolor=&quot;#00796B&quot;, fontcolor=white, color=&quot;#004D40&quot;, penwidth=2.5];
-        Transpilation [label=&lt;&lt;B&gt;Transpilation&lt;/B&gt;&lt;BR/&gt;&lt;BR/&gt;&lt;FONT POINT-SIZE=&quot;12&quot; COLOR=&quot;#E0F2F1&quot;&gt;Convert abstract circuit into native gates&lt;/FONT&gt;&gt;, fillcolor=&quot;#00796B&quot;, fontcolor=white, color=&quot;#004D40&quot;, penwidth=2.5];
-
-        HamEncode -&gt; PauliOpt -&gt; StatePrep -&gt; Transpilation;
-    }
-
-    // Simulation and Execution subgraph
-    subgraph cluster_3 {
-        label=&quot;Simulation and Execution&quot;;
-        style=&quot;filled,rounded&quot;;
-        fillcolor=&quot;#F3E5F5&quot;;
-        color=&quot;#AB47BC&quot;;
-        penwidth=2.5;
-        fontsize=14;
-        fontname=&quot;Arial Bold&quot;;
-        fontcolor=&quot;#7B1FA2&quot;;
-        rank=same;
-
-        Debug [label=&lt;&lt;B&gt;Debugging in QDK&lt;/B&gt;&lt;BR/&gt;&lt;BR/&gt;&lt;FONT POINT-SIZE=&quot;12&quot; COLOR=&quot;#F3E5F5&quot;&gt;Test and validate circuit logic&lt;/FONT&gt;&gt;, fillcolor=&quot;#7B1FA2&quot;, fontcolor=white, color=&quot;#4A148C&quot;, penwidth=2.5, group=g1];
-        Simulator [label=&lt;&lt;B&gt;Simulator in QDK&lt;/B&gt;&lt;BR/&gt;&lt;BR/&gt;&lt;FONT POINT-SIZE=&quot;12&quot; COLOR=&quot;#F3E5F5&quot;&gt;Incorporate noise models&lt;/FONT&gt;&gt;, fillcolor=&quot;#7B1FA2&quot;, fontcolor=white, color=&quot;#4A148C&quot;, penwidth=2.5];
-        Execute [label=&lt;&lt;B&gt;Execution on Quantum Hardware&lt;/B&gt;&lt;BR/&gt;&lt;BR/&gt;&lt;FONT POINT-SIZE=&quot;12&quot; COLOR=&quot;#F3E5F5&quot;&gt;Run on quantum processors&lt;/FONT&gt;&gt;, fillcolor=&quot;#7B1FA2&quot;, fontcolor=white, color=&quot;#4A148C&quot;, penwidth=2.5];
-
-        Debug -&gt; Simulator -&gt; Execute;
-    }
-
-    // Workflow connections between subgraphs
-    Start:s -&gt; GeomOpt:n [color=&quot;#1976D2&quot;, penwidth=2.5, weight=0, arrowsize=1.2];
-    ApproxCI:s -&gt; HamEncode:n [color=&quot;#00796B&quot;, penwidth=2.5, weight=0, arrowsize=1.2];
-    Transpilation:s -&gt; Debug:n [color=&quot;#7B1FA2&quot;, penwidth=2.5, weight=0, arrowsize=1.2];
-}" class="graphviz" /></div>
-</section>
-<section id="classical-data-preparation">
-<h2>Classical data preparation<a class="headerlink" href="#classical-data-preparation" title="Link to this heading"></a></h2>
+The focus of this example is on high-level concepts and common coding patterns.</p>
+<p>You can also view a related code sample in a Jupyter notebook format, along with several other examples, in the <a class="reference external" href="https://github.com/microsoft/qdk-chemistry/blob/main/examples/">examples folder</a> of the GitHub repository.</p>
 <section id="create-a-structure-object">
 <h3>Create a <code class="docutils literal notranslate"><span class="pre">Structure</span></code> object<a class="headerlink" href="#create-a-structure-object" title="Link to this heading"></a></h3>
-<p>The <code class="docutils literal notranslate"><span class="pre">Structure</span></code> class represents a molecular structure, i.e. the coordinates of its atoms.</p>
-<p><code class="docutils literal notranslate"><span class="pre">Structure</span></code> objects can be constructed manually, or via deserialization from a file.
+<p>The <code class="docutils literal notranslate"><span class="pre">Structure</span></code> class represents a molecular structure, i.e. the coordinates of its atoms.
+<code class="docutils literal notranslate"><span class="pre">Structure</span></code> objects can be constructed manually, or via deserialization from a file.
 QDK/Chemistry supports multiple serialization formats for <code class="docutils literal notranslate"><span class="pre">Structure</span></code> objects, including the standard <a class="reference external" href="https://en.wikipedia.org/wiki/XYZ_file_format">XYZ file format</a>, as well as QDK/Chemistry-specific JSON and HDF5 serialization schemes.
 Internally to QDK/Chemistry, coordinates are always stored in Bohr/atomic units; however, when reading or writing to files, the units follow the file format convention (XYZ) or can be specified (JSON, HDF5).
 See below for language specific examples of creating and serializing <code class="docutils literal notranslate"><span class="pre">Structure</span></code> objects.</p>
@@ -291,7 +195,7 @@ See below for language specific examples of creating and serializing <code class
 <p>Once a <code class="docutils literal notranslate"><span class="pre">Structure</span></code> is created, an <a class="reference internal" href="../glossary.html#term-SCF"><span class="xref std std-term">SCF</span></a> calculation can be performed to produce an initial <code class="docutils literal notranslate"><span class="pre">Wavefunction</span></code> as well as an <a class="reference internal" href="../glossary.html#term-SCF"><span class="xref std std-term">SCF</span></a> energy.
 QDK/Chemistry performs <a class="reference internal" href="../glossary.html#term-SCF"><span class="xref std std-term">SCF</span></a> calculations via instantiations of the <code class="docutils literal notranslate"><span class="pre">ScfSolver</span></code> algorithm.
 Instantiations of the <code class="docutils literal notranslate"><span class="pre">ScfSolver</span></code> algorithm (and all other <code class="docutils literal notranslate"><span class="pre">Algorithm</span></code> classes for that matter) are managed by a factory.
-See the <a class="reference internal" href="comprehensive/advanced/factory_pattern.html"><span class="doc">Factory pattern in QDK/Chemistry</span></a> documentation for more information on how it is used in the QDK/Chemistry.</p>
+See the <span class="xref std std-doc">comprehensive/advanced/factory_pattern</span> documentation for more information on how it is used in the QDK/Chemistry.</p>
 <p>The inputs for an <a class="reference internal" href="../glossary.html#term-SCF"><span class="xref std std-term">SCF</span></a> calculation are a <code class="docutils literal notranslate"><span class="pre">Structure</span></code> object, the charge and multiplicity of the molecular system, and information about the single-particle basis to be used.
 Optionally, <code class="docutils literal notranslate"><span class="pre">Settings</span></code> specific to the particular <code class="docutils literal notranslate"><span class="pre">ScfSolver</span></code> can be configured by accessing the <code class="docutils literal notranslate"><span class="pre">settings()</span></code> method.
 The basis for the <a class="reference internal" href="../glossary.html#term-SCF"><span class="xref std std-term">SCF</span></a> calculation can be set via a string input, a custom basis set or initial orbitals can also be provided.
@@ -439,7 +343,7 @@ Configuration Interaction (CI) and selected <a class="reference internal" href="
 </section>
 <section id="select-important-configurations">
 <h3>Select important configurations<a class="headerlink" href="#select-important-configurations" title="Link to this heading"></a></h3>
-<p>For large active spaces, the multi-configuration <a class="reference internal" href="comprehensive/data/wavefunction.html"><span class="doc">Wavefunction</span></a> may contain thousands or millions of configurations, but often only a small subset contributes significantly to the overall state.
+<p>For large active spaces, the multi-configuration <span class="xref std std-doc">Wavefunction</span> may contain thousands or millions of configurations, but often only a small subset contributes significantly to the overall state.
 By identifying and retaining only the dominant configurations (those with the largest amplitudes), we can create a sparse wavefunction that maintains high fidelity with the original while dramatically reducing computational requirements for quantum state preparation.
 This truncation is characterized by computing the overlap between the truncated state and the full wavefunction, and by recalculating the energy of the reduced wavefunction using the <code class="docutils literal notranslate"><span class="pre">ProjectedMultiConfigurationCalculator</span></code>.</p>
 <div class="tab-set docutils container">
@@ -503,16 +407,13 @@ This truncation is characterized by computing the overlap between the truncated 
 </div>
 </div>
 </section>
-</section>
-<section id="building-the-quantum-circuit">
-<h2>Building the quantum circuit<a class="headerlink" href="#building-the-quantum-circuit" title="Link to this heading"></a></h2>
 <section id="preparing-a-qubit-representation-of-the-hamiltonian">
 <h3>Preparing a qubit representation of the Hamiltonian<a class="headerlink" href="#preparing-a-qubit-representation-of-the-hamiltonian" title="Link to this heading"></a></h3>
 <p>To execute quantum algorithms on actual quantum hardware, the Fermionic <a class="reference internal" href="comprehensive/data/hamiltonian.html"><span class="doc">Hamiltonian</span></a> must be mapped to a qubit Hamiltonian composed of Pauli operators.
 QDK/Chemistry supports multiple encoding schemes including the Jordan-Wigner and Bravyi-Kitaev transformations.
 The resulting qubit Hamiltonian is represented as a sum of Pauli strings (tensor products of Pauli <span class="math notranslate nohighlight">\(X, Y, Z\)</span>, and identity operators), each with an associated coefficient.</p>
 <p>For efficient energy estimation, the qubit Hamiltonian can be optimized in two ways.
-First, by filtering out terms that have negligible expectation values given the sparse <a class="reference internal" href="comprehensive/data/wavefunction.html"><span class="doc">wavefunction</span></a>, pre-computing their classical contributions.
+First, by filtering out terms that have negligible expectation values given the sparse <span class="xref std std-doc">wavefunction</span>, pre-computing their classical contributions.
 Second, by grouping the remaining Pauli operators into commuting sets that can be measured simultaneously, significantly reducing the number of measurement circuits required on the quantum device.</p>
 <div class="tab-set docutils container">
 <input checked="True" class="tab-input" id="tab-set--6-input--1" name="tab-set--6" type="radio"><label class="tab-label" for="tab-set--6-input--1">C++ API</label><div class="tab-content docutils container">
@@ -545,9 +446,6 @@ Second, by grouping the remaining Pauli operators into commuting sets that can b
 </div>
 </div>
 </section>
-</section>
-<section id="simulation-and-execution-on-a-quantum-simulator">
-<h2>Simulation and execution on a quantum simulator<a class="headerlink" href="#simulation-and-execution-on-a-quantum-simulator" title="Link to this heading"></a></h2>
 <section id="estimate-the-ground-state-energy-using-a-quantum-algorithm">
 <h3>Estimate the ground state energy using a quantum algorithm<a class="headerlink" href="#estimate-the-ground-state-energy-using-a-quantum-algorithm" title="Link to this heading"></a></h3>
 <p>The final step combines the state preparation circuit with the measurement circuits derived from the grouped qubit <a class="reference internal" href="comprehensive/data/hamiltonian.html"><span class="doc">Hamiltonian</span></a> to estimate the ground state energy.
@@ -593,7 +491,7 @@ The statistical nature of quantum measurements introduces variance in the energy
 </section>
 <section id="additional-examples">
 <h2>Additional examples<a class="headerlink" href="#additional-examples" title="Link to this heading"></a></h2>
-<p>Additional examples of workflows using QDK/Chemistry can be found in the examples directory of the source repository.
+<p>Additional examples of workflows using QDK/Chemistry can be found in the <code class="docutils literal notranslate"><span class="pre">examples</span></code> directory of the source repository.
 See the <a class="reference internal" href="comprehensive/index.html"><span class="doc">In-depth user guide</span></a> for links to more detailed documentation on specific components of QDK/Chemistry.</p>
 </section>
 </section>

@@ -225,6 +225,65 @@ Default is Spherical</p>
 </div>
 </div></blockquote>
 </li>
+<li><p>__init__(self: qdk_chemistry._core.data.BasisSet, name: str, shells: collections.abc.Sequence[qdk_chemistry._core.data.Shell], ecp_shells: collections.abc.Sequence[qdk_chemistry._core.data.Shell], structure: qdk_chemistry._core.data.Structure, basis_type: qdk_chemistry._core.data.BasisType = &lt;BasisType.Spherical: 0&gt;) -&gt; None</p>
+<blockquote>
+<div><p>Constructor with basis set name, shells, ECP shells, structure, and basis type.</p>
+<p>Creates a complete basis set with regular shells, ECP shells, and molecular structure.</p>
+<dl class="simple">
+<dt>name<span class="classifier">str</span></dt><dd><p>Name of the basis set</p>
+</dd>
+<dt>shells<span class="classifier">list of Shell</span></dt><dd><p>Vector of shell objects defining the basis functions</p>
+</dd>
+<dt>ecp_shells<span class="classifier">list of Shell</span></dt><dd><p>Vector of ECP shell objects</p>
+</dd>
+<dt>structure<span class="classifier">Structure</span></dt><dd><p>Molecular structure to associate with this basis set</p>
+</dd>
+<dt>basis_type<span class="classifier">BasisType, optional</span></dt><dd><p>Whether to use spherical or Cartesian basis functions
+Default is Spherical</p>
+</dd>
+</dl>
+<div class="doctest highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.data</span><span class="w"> </span><span class="kn">import</span> <span class="n">Structure</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">structure</span> <span class="o">=</span> <span class="n">Structure</span><span class="o">.</span><span class="n">from_xyz_file</span><span class="p">(</span><span class="s2">&quot;water.xyz&quot;</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">shells</span> <span class="o">=</span> <span class="p">[</span><span class="n">Shell</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="n">OrbitalType</span><span class="o">.</span><span class="n">S</span><span class="p">),</span> <span class="n">Shell</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="n">OrbitalType</span><span class="o">.</span><span class="n">S</span><span class="p">)]</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">ecp_shells</span> <span class="o">=</span> <span class="p">[</span><span class="n">Shell</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="n">OrbitalType</span><span class="o">.</span><span class="n">S</span><span class="p">,</span> <span class="n">exp</span><span class="p">,</span> <span class="n">coeff</span><span class="p">,</span> <span class="n">rpow</span><span class="p">)]</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">basis</span> <span class="o">=</span> <span class="n">BasisSet</span><span class="p">(</span><span class="s2">&quot;custom-ecp&quot;</span><span class="p">,</span> <span class="n">shells</span><span class="p">,</span> <span class="n">ecp_shells</span><span class="p">,</span> <span class="n">structure</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Basis with </span><span class="si">{</span><span class="nb">len</span><span class="p">(</span><span class="n">shells</span><span class="p">)</span><span class="si">}</span><span class="s2"> shells and </span><span class="si">{</span><span class="nb">len</span><span class="p">(</span><span class="n">ecp_shells</span><span class="p">)</span><span class="si">}</span><span class="s2"> ECP shells&quot;</span><span class="p">)</span>
+</pre></div>
+</div>
+</div></blockquote>
+</li>
+<li><p>__init__(self: qdk_chemistry._core.data.BasisSet, name: str, shells: collections.abc.Sequence[qdk_chemistry._core.data.Shell], ecp_name: str, ecp_shells: collections.abc.Sequence[qdk_chemistry._core.data.Shell], ecp_electrons: collections.abc.Sequence[typing.SupportsInt], structure: qdk_chemistry._core.data.Structure, basis_type: qdk_chemistry._core.data.BasisType = &lt;BasisType.Spherical: 0&gt;) -&gt; None</p>
+<blockquote>
+<div><p>Constructor with basis set name, shells, ECP name, ECP shells, ECP electrons, structure, and basis type.</p>
+<p>Creates a complete basis set with regular shells, ECP shells, ECP metadata, and molecular structure.</p>
+<dl class="simple">
+<dt>name<span class="classifier">str</span></dt><dd><p>Name of the basis set</p>
+</dd>
+<dt>shells<span class="classifier">list of Shell</span></dt><dd><p>Vector of shell objects defining the basis functions</p>
+</dd>
+<dt>ecp_name<span class="classifier">str</span></dt><dd><p>Name of the ECP (basis set)</p>
+</dd>
+<dt>ecp_shells<span class="classifier">list of Shell</span></dt><dd><p>Vector of ECP shell objects</p>
+</dd>
+<dt>ecp_electrons<span class="classifier">list of int</span></dt><dd><p>Number of ECP electrons for each atom</p>
+</dd>
+<dt>structure<span class="classifier">Structure</span></dt><dd><p>Molecular structure to associate with this basis set</p>
+</dd>
+<dt>basis_type<span class="classifier">BasisType, optional</span></dt><dd><p>Whether to use spherical or Cartesian basis functions
+Default is Spherical</p>
+</dd>
+</dl>
+<div class="doctest highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.data</span><span class="w"> </span><span class="kn">import</span> <span class="n">Structure</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">structure</span> <span class="o">=</span> <span class="n">Structure</span><span class="o">.</span><span class="n">from_xyz_file</span><span class="p">(</span><span class="s2">&quot;water.xyz&quot;</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">shells</span> <span class="o">=</span> <span class="p">[</span><span class="n">Shell</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="n">OrbitalType</span><span class="o">.</span><span class="n">S</span><span class="p">),</span> <span class="n">Shell</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="n">OrbitalType</span><span class="o">.</span><span class="n">S</span><span class="p">)]</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">ecp_shells</span> <span class="o">=</span> <span class="p">[</span><span class="n">Shell</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="n">OrbitalType</span><span class="o">.</span><span class="n">S</span><span class="p">,</span> <span class="n">exp</span><span class="p">,</span> <span class="n">coeff</span><span class="p">,</span> <span class="n">rpow</span><span class="p">)]</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">ecp_electrons</span> <span class="o">=</span> <span class="p">[</span><span class="mi">10</span><span class="p">,</span> <span class="mi">10</span><span class="p">,</span> <span class="mi">0</span><span class="p">]</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">basis</span> <span class="o">=</span> <span class="n">BasisSet</span><span class="p">(</span><span class="s2">&quot;custom-ecp&quot;</span><span class="p">,</span> <span class="n">shells</span><span class="p">,</span> <span class="s2">&quot;custom-ecp&quot;</span><span class="p">,</span> <span class="n">ecp_shells</span><span class="p">,</span> <span class="n">ecp_electrons</span><span class="p">,</span> <span class="n">structure</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Basis with </span><span class="si">{</span><span class="nb">len</span><span class="p">(</span><span class="n">shells</span><span class="p">)</span><span class="si">}</span><span class="s2"> shells, </span><span class="si">{</span><span class="nb">len</span><span class="p">(</span><span class="n">ecp_shells</span><span class="p">)</span><span class="si">}</span><span class="s2"> ECP shells, ECP: </span><span class="si">{</span><span class="n">basis</span><span class="o">.</span><span class="n">get_ecp_name</span><span class="p">()</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+</pre></div>
+</div>
+</div></blockquote>
+</li>
 <li><p>__init__(self: qdk_chemistry._core.data.BasisSet, arg0: qdk_chemistry._core.data.BasisSet) -&gt; None</p>
 <blockquote>
 <div><p>Copy constructor.</p>
@@ -307,6 +366,65 @@ Default is Spherical</p>
 <span class="gp">&gt;&gt;&gt; </span><span class="n">shells</span> <span class="o">=</span> <span class="p">[</span><span class="n">Shell</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="n">OrbitalType</span><span class="o">.</span><span class="n">S</span><span class="p">),</span> <span class="n">Shell</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="n">OrbitalType</span><span class="o">.</span><span class="n">S</span><span class="p">)]</span>
 <span class="gp">&gt;&gt;&gt; </span><span class="n">basis</span> <span class="o">=</span> <span class="n">BasisSet</span><span class="p">(</span><span class="s2">&quot;custom&quot;</span><span class="p">,</span> <span class="n">shells</span><span class="p">,</span> <span class="n">structure</span><span class="p">)</span>
 <span class="gp">&gt;&gt;&gt; </span><span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Complete basis set with </span><span class="si">{</span><span class="nb">len</span><span class="p">(</span><span class="n">shells</span><span class="p">)</span><span class="si">}</span><span class="s2"> shells&quot;</span><span class="p">)</span>
+</pre></div>
+</div>
+</div></blockquote>
+</li>
+<li><p>__init__(self: qdk_chemistry._core.data.BasisSet, name: str, shells: collections.abc.Sequence[qdk_chemistry._core.data.Shell], ecp_shells: collections.abc.Sequence[qdk_chemistry._core.data.Shell], structure: qdk_chemistry._core.data.Structure, basis_type: qdk_chemistry._core.data.BasisType = &lt;BasisType.Spherical: 0&gt;) -&gt; None</p>
+<blockquote>
+<div><p>Constructor with basis set name, shells, ECP shells, structure, and basis type.</p>
+<p>Creates a complete basis set with regular shells, ECP shells, and molecular structure.</p>
+<dl class="simple">
+<dt>name<span class="classifier">str</span></dt><dd><p>Name of the basis set</p>
+</dd>
+<dt>shells<span class="classifier">list of Shell</span></dt><dd><p>Vector of shell objects defining the basis functions</p>
+</dd>
+<dt>ecp_shells<span class="classifier">list of Shell</span></dt><dd><p>Vector of ECP shell objects</p>
+</dd>
+<dt>structure<span class="classifier">Structure</span></dt><dd><p>Molecular structure to associate with this basis set</p>
+</dd>
+<dt>basis_type<span class="classifier">BasisType, optional</span></dt><dd><p>Whether to use spherical or Cartesian basis functions
+Default is Spherical</p>
+</dd>
+</dl>
+<div class="doctest highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.data</span><span class="w"> </span><span class="kn">import</span> <span class="n">Structure</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">structure</span> <span class="o">=</span> <span class="n">Structure</span><span class="o">.</span><span class="n">from_xyz_file</span><span class="p">(</span><span class="s2">&quot;water.xyz&quot;</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">shells</span> <span class="o">=</span> <span class="p">[</span><span class="n">Shell</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="n">OrbitalType</span><span class="o">.</span><span class="n">S</span><span class="p">),</span> <span class="n">Shell</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="n">OrbitalType</span><span class="o">.</span><span class="n">S</span><span class="p">)]</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">ecp_shells</span> <span class="o">=</span> <span class="p">[</span><span class="n">Shell</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="n">OrbitalType</span><span class="o">.</span><span class="n">S</span><span class="p">,</span> <span class="n">exp</span><span class="p">,</span> <span class="n">coeff</span><span class="p">,</span> <span class="n">rpow</span><span class="p">)]</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">basis</span> <span class="o">=</span> <span class="n">BasisSet</span><span class="p">(</span><span class="s2">&quot;custom-ecp&quot;</span><span class="p">,</span> <span class="n">shells</span><span class="p">,</span> <span class="n">ecp_shells</span><span class="p">,</span> <span class="n">structure</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Basis with </span><span class="si">{</span><span class="nb">len</span><span class="p">(</span><span class="n">shells</span><span class="p">)</span><span class="si">}</span><span class="s2"> shells and </span><span class="si">{</span><span class="nb">len</span><span class="p">(</span><span class="n">ecp_shells</span><span class="p">)</span><span class="si">}</span><span class="s2"> ECP shells&quot;</span><span class="p">)</span>
+</pre></div>
+</div>
+</div></blockquote>
+</li>
+<li><p>__init__(self: qdk_chemistry._core.data.BasisSet, name: str, shells: collections.abc.Sequence[qdk_chemistry._core.data.Shell], ecp_name: str, ecp_shells: collections.abc.Sequence[qdk_chemistry._core.data.Shell], ecp_electrons: collections.abc.Sequence[typing.SupportsInt], structure: qdk_chemistry._core.data.Structure, basis_type: qdk_chemistry._core.data.BasisType = &lt;BasisType.Spherical: 0&gt;) -&gt; None</p>
+<blockquote>
+<div><p>Constructor with basis set name, shells, ECP name, ECP shells, ECP electrons, structure, and basis type.</p>
+<p>Creates a complete basis set with regular shells, ECP shells, ECP metadata, and molecular structure.</p>
+<dl class="simple">
+<dt>name<span class="classifier">str</span></dt><dd><p>Name of the basis set</p>
+</dd>
+<dt>shells<span class="classifier">list of Shell</span></dt><dd><p>Vector of shell objects defining the basis functions</p>
+</dd>
+<dt>ecp_name<span class="classifier">str</span></dt><dd><p>Name of the ECP (basis set)</p>
+</dd>
+<dt>ecp_shells<span class="classifier">list of Shell</span></dt><dd><p>Vector of ECP shell objects</p>
+</dd>
+<dt>ecp_electrons<span class="classifier">list of int</span></dt><dd><p>Number of ECP electrons for each atom</p>
+</dd>
+<dt>structure<span class="classifier">Structure</span></dt><dd><p>Molecular structure to associate with this basis set</p>
+</dd>
+<dt>basis_type<span class="classifier">BasisType, optional</span></dt><dd><p>Whether to use spherical or Cartesian basis functions
+Default is Spherical</p>
+</dd>
+</dl>
+<div class="doctest highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.data</span><span class="w"> </span><span class="kn">import</span> <span class="n">Structure</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">structure</span> <span class="o">=</span> <span class="n">Structure</span><span class="o">.</span><span class="n">from_xyz_file</span><span class="p">(</span><span class="s2">&quot;water.xyz&quot;</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">shells</span> <span class="o">=</span> <span class="p">[</span><span class="n">Shell</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="n">OrbitalType</span><span class="o">.</span><span class="n">S</span><span class="p">),</span> <span class="n">Shell</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="n">OrbitalType</span><span class="o">.</span><span class="n">S</span><span class="p">)]</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">ecp_shells</span> <span class="o">=</span> <span class="p">[</span><span class="n">Shell</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="n">OrbitalType</span><span class="o">.</span><span class="n">S</span><span class="p">,</span> <span class="n">exp</span><span class="p">,</span> <span class="n">coeff</span><span class="p">,</span> <span class="n">rpow</span><span class="p">)]</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">ecp_electrons</span> <span class="o">=</span> <span class="p">[</span><span class="mi">10</span><span class="p">,</span> <span class="mi">10</span><span class="p">,</span> <span class="mi">0</span><span class="p">]</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">basis</span> <span class="o">=</span> <span class="n">BasisSet</span><span class="p">(</span><span class="s2">&quot;custom-ecp&quot;</span><span class="p">,</span> <span class="n">shells</span><span class="p">,</span> <span class="s2">&quot;custom-ecp&quot;</span><span class="p">,</span> <span class="n">ecp_shells</span><span class="p">,</span> <span class="n">ecp_electrons</span><span class="p">,</span> <span class="n">structure</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Basis with </span><span class="si">{</span><span class="nb">len</span><span class="p">(</span><span class="n">shells</span><span class="p">)</span><span class="si">}</span><span class="s2"> shells, </span><span class="si">{</span><span class="nb">len</span><span class="p">(</span><span class="n">ecp_shells</span><span class="p">)</span><span class="si">}</span><span class="s2"> ECP shells, ECP: </span><span class="si">{</span><span class="n">basis</span><span class="o">.</span><span class="n">get_ecp_name</span><span class="p">()</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
 </pre></div>
 </div>
 </div></blockquote>
@@ -537,8 +655,8 @@ extension (e.g., <code class="docutils literal notranslate"><span class="pre">st
 </dd></dl>
 
 <dl class="py method">
-<dt class="sig sig-object py" id="qdk_chemistry.plugins.pyscf.utils.BasisSet.get_basis_fuction_indices_for_atom">
-<span class="sig-name descname"><span class="pre">get_basis_fuction_indices_for_atom</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">self</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference internal" href="#qdk_chemistry.plugins.pyscf.utils.BasisSet" title="qdk_chemistry._core.data.BasisSet"><span class="pre">qdk_chemistry._core.data.BasisSet</span></a></span></em>, <em class="sig-param"><span class="n"><span class="pre">atom_index</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.SupportsInt" title="(in Python v3.14)"><span class="pre">SupportsInt</span></a></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#list" title="(in Python v3.14)"><span class="pre">list</span></a><span class="p"><span class="pre">[</span></span><a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(in Python v3.14)"><span class="pre">int</span></a><span class="p"><span class="pre">]</span></span></span></span><a class="headerlink" href="#qdk_chemistry.plugins.pyscf.utils.BasisSet.get_basis_fuction_indices_for_atom" title="Link to this definition"></a></dt>
+<dt class="sig sig-object py" id="qdk_chemistry.plugins.pyscf.utils.BasisSet.get_basis_function_indices_for_atom">
+<span class="sig-name descname"><span class="pre">get_basis_function_indices_for_atom</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">self</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference internal" href="#qdk_chemistry.plugins.pyscf.utils.BasisSet" title="qdk_chemistry._core.data.BasisSet"><span class="pre">qdk_chemistry._core.data.BasisSet</span></a></span></em>, <em class="sig-param"><span class="n"><span class="pre">atom_index</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.SupportsInt" title="(in Python v3.14)"><span class="pre">SupportsInt</span></a></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#list" title="(in Python v3.14)"><span class="pre">list</span></a><span class="p"><span class="pre">[</span></span><a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(in Python v3.14)"><span class="pre">int</span></a><span class="p"><span class="pre">]</span></span></span></span><a class="headerlink" href="#qdk_chemistry.plugins.pyscf.utils.BasisSet.get_basis_function_indices_for_atom" title="Link to this definition"></a></dt>
 <dd><p>Get all basis function indices for a specific atom.</p>
 <dl class="field-list simple">
 <dt class="field-odd">Parameters<span class="colon">:</span></dt>
@@ -552,7 +670,7 @@ extension (e.g., <code class="docutils literal notranslate"><span class="pre">st
 </dd>
 </dl>
 <p class="rubric">Examples</p>
-<div class="doctest highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="n">basis_indices</span> <span class="o">=</span> <span class="n">basis_set</span><span class="o">.</span><span class="n">get_basis_fuction_indices_for_atom</span><span class="p">(</span><span class="mi">0</span><span class="p">)</span>
+<div class="doctest highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="n">basis_indices</span> <span class="o">=</span> <span class="n">basis_set</span><span class="o">.</span><span class="n">get_basis_function_indices_for_atom</span><span class="p">(</span><span class="mi">0</span><span class="p">)</span>
 <span class="gp">&gt;&gt;&gt; </span><span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Atom 0 has basis functions: </span><span class="si">{</span><span class="n">basis_indices</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
 </pre></div>
 </div>
@@ -595,6 +713,179 @@ extension (e.g., <code class="docutils literal notranslate"><span class="pre">st
 <p class="rubric">Examples</p>
 <div class="doctest highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="n">basis_type</span> <span class="o">=</span> <span class="n">basis_set</span><span class="o">.</span><span class="n">get_basis_type</span><span class="p">()</span>
 <span class="gp">&gt;&gt;&gt; </span><span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Basis type: </span><span class="si">{</span><span class="n">basis_type</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+</pre></div>
+</div>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="qdk_chemistry.plugins.pyscf.utils.BasisSet.get_ecp_electrons">
+<span class="sig-name descname"><span class="pre">get_ecp_electrons</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">self</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference internal" href="#qdk_chemistry.plugins.pyscf.utils.BasisSet" title="qdk_chemistry._core.data.BasisSet"><span class="pre">qdk_chemistry._core.data.BasisSet</span></a></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#list" title="(in Python v3.14)"><span class="pre">list</span></a><span class="p"><span class="pre">[</span></span><a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(in Python v3.14)"><span class="pre">int</span></a><span class="p"><span class="pre">]</span></span></span></span><a class="headerlink" href="#qdk_chemistry.plugins.pyscf.utils.BasisSet.get_ecp_electrons" title="Link to this definition"></a></dt>
+<dd><p>Get the ECP (Effective Core Potential) electrons vector.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Returns<span class="colon">:</span></dt>
+<dd class="field-odd"><p>Number of ECP electrons for each atom</p>
+</dd>
+<dt class="field-even">Return type<span class="colon">:</span></dt>
+<dd class="field-even"><p><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#list" title="(in Python v3.14)">list</a> of <a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(in Python v3.14)">int</a></p>
+</dd>
+</dl>
+<p class="rubric">Examples</p>
+<div class="doctest highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="n">ecp_electrons</span> <span class="o">=</span> <span class="n">basis_set</span><span class="o">.</span><span class="n">get_ecp_electrons</span><span class="p">()</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;ECP electrons per atom: </span><span class="si">{</span><span class="n">ecp_electrons</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+</pre></div>
+</div>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="qdk_chemistry.plugins.pyscf.utils.BasisSet.get_ecp_name">
+<span class="sig-name descname"><span class="pre">get_ecp_name</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">self</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference internal" href="#qdk_chemistry.plugins.pyscf.utils.BasisSet" title="qdk_chemistry._core.data.BasisSet"><span class="pre">qdk_chemistry._core.data.BasisSet</span></a></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)"><span class="pre">str</span></a></span></span><a class="headerlink" href="#qdk_chemistry.plugins.pyscf.utils.BasisSet.get_ecp_name" title="Link to this definition"></a></dt>
+<dd><p>Get the ECP (Effective Core Potential) name.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Returns<span class="colon">:</span></dt>
+<dd class="field-odd"><p>Name of the ECP (basis set)</p>
+</dd>
+<dt class="field-even">Return type<span class="colon">:</span></dt>
+<dd class="field-even"><p><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)">str</a></p>
+</dd>
+</dl>
+<p class="rubric">Examples</p>
+<div class="doctest highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="n">ecp_name</span> <span class="o">=</span> <span class="n">basis_set</span><span class="o">.</span><span class="n">get_ecp_name</span><span class="p">()</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;ECP: </span><span class="si">{</span><span class="n">ecp_name</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+</pre></div>
+</div>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="qdk_chemistry.plugins.pyscf.utils.BasisSet.get_ecp_shell">
+<span class="sig-name descname"><span class="pre">get_ecp_shell</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">self</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference internal" href="#qdk_chemistry.plugins.pyscf.utils.BasisSet" title="qdk_chemistry._core.data.BasisSet"><span class="pre">qdk_chemistry._core.data.BasisSet</span></a></span></em>, <em class="sig-param"><span class="n"><span class="pre">shell_index</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.SupportsInt" title="(in Python v3.14)"><span class="pre">SupportsInt</span></a></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><a class="reference internal" href="#qdk_chemistry.plugins.pyscf.utils.Shell" title="qdk_chemistry._core.data.Shell"><span class="pre">qdk_chemistry._core.data.Shell</span></a></span></span><a class="headerlink" href="#qdk_chemistry.plugins.pyscf.utils.BasisSet.get_ecp_shell" title="Link to this definition"></a></dt>
+<dd><p>Get a specific ECP shell by global index.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>shell_index</strong> (<a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(in Python v3.14)"><em>int</em></a>) – Global index of the ECP shell</p>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>Reference to the specified ECP shell</p>
+</dd>
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p><a class="reference internal" href="#qdk_chemistry.plugins.pyscf.utils.Shell" title="qdk_chemistry.plugins.pyscf.utils.Shell">Shell</a></p>
+</dd>
+<dt class="field-even">Raises<span class="colon">:</span></dt>
+<dd class="field-even"><p><a class="reference external" href="https://docs.python.org/3/library/exceptions.html#IndexError" title="(in Python v3.14)"><strong>IndexError</strong></a> – If ECP shell index is out of range</p>
+</dd>
+</dl>
+<p class="rubric">Examples</p>
+<div class="doctest highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="n">ecp_shell</span> <span class="o">=</span> <span class="n">basis_set</span><span class="o">.</span><span class="n">get_ecp_shell</span><span class="p">(</span><span class="mi">0</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;First ECP shell has </span><span class="si">{</span><span class="n">ecp_shell</span><span class="o">.</span><span class="n">get_num_primitives</span><span class="p">()</span><span class="si">}</span><span class="s2"> primitives&quot;</span><span class="p">)</span>
+</pre></div>
+</div>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="qdk_chemistry.plugins.pyscf.utils.BasisSet.get_ecp_shell_indices_for_atom">
+<span class="sig-name descname"><span class="pre">get_ecp_shell_indices_for_atom</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">self</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference internal" href="#qdk_chemistry.plugins.pyscf.utils.BasisSet" title="qdk_chemistry._core.data.BasisSet"><span class="pre">qdk_chemistry._core.data.BasisSet</span></a></span></em>, <em class="sig-param"><span class="n"><span class="pre">atom_index</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.SupportsInt" title="(in Python v3.14)"><span class="pre">SupportsInt</span></a></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#list" title="(in Python v3.14)"><span class="pre">list</span></a><span class="p"><span class="pre">[</span></span><a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(in Python v3.14)"><span class="pre">int</span></a><span class="p"><span class="pre">]</span></span></span></span><a class="headerlink" href="#qdk_chemistry.plugins.pyscf.utils.BasisSet.get_ecp_shell_indices_for_atom" title="Link to this definition"></a></dt>
+<dd><p>Get ECP shell indices for a specific atom.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>atom_index</strong> (<a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(in Python v3.14)"><em>int</em></a>) – Index of the atom</p>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>Vector of ECP shell indices for this atom</p>
+</dd>
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#list" title="(in Python v3.14)">list</a> of <a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(in Python v3.14)">int</a></p>
+</dd>
+</dl>
+<p class="rubric">Examples</p>
+<div class="doctest highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="n">ecp_indices</span> <span class="o">=</span> <span class="n">basis_set</span><span class="o">.</span><span class="n">get_ecp_shell_indices_for_atom</span><span class="p">(</span><span class="mi">0</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Atom 0 ECP shell indices: </span><span class="si">{</span><span class="n">ecp_indices</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+</pre></div>
+</div>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="qdk_chemistry.plugins.pyscf.utils.BasisSet.get_ecp_shell_indices_for_atom_and_orbital_type">
+<span class="sig-name descname"><span class="pre">get_ecp_shell_indices_for_atom_and_orbital_type</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">self</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference internal" href="#qdk_chemistry.plugins.pyscf.utils.BasisSet" title="qdk_chemistry._core.data.BasisSet"><span class="pre">qdk_chemistry._core.data.BasisSet</span></a></span></em>, <em class="sig-param"><span class="n"><span class="pre">atom_index</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.SupportsInt" title="(in Python v3.14)"><span class="pre">SupportsInt</span></a></span></em>, <em class="sig-param"><span class="n"><span class="pre">orbital_type</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference internal" href="qdk_chemistry.data.html#qdk_chemistry.data.OrbitalType" title="qdk_chemistry._core.data.OrbitalType"><span class="pre">qdk_chemistry._core.data.OrbitalType</span></a></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#list" title="(in Python v3.14)"><span class="pre">list</span></a><span class="p"><span class="pre">[</span></span><a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(in Python v3.14)"><span class="pre">int</span></a><span class="p"><span class="pre">]</span></span></span></span><a class="headerlink" href="#qdk_chemistry.plugins.pyscf.utils.BasisSet.get_ecp_shell_indices_for_atom_and_orbital_type" title="Link to this definition"></a></dt>
+<dd><p>Get ECP shell indices for a specific atom and orbital type.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>atom_index</strong> (<a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(in Python v3.14)"><em>int</em></a>) – Index of the atom</p></li>
+<li><p><strong>orbital_type</strong> (<a class="reference internal" href="qdk_chemistry.data.html#qdk_chemistry.data.OrbitalType" title="qdk_chemistry.data.OrbitalType"><em>OrbitalType</em></a>) – Type of orbital (S, P, D, F, etc.)</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>Vector of ECP shell indices matching both criteria</p>
+</dd>
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#list" title="(in Python v3.14)">list</a> of <a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(in Python v3.14)">int</a></p>
+</dd>
+</dl>
+<p class="rubric">Examples</p>
+<div class="doctest highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="n">p_ecp_indices</span> <span class="o">=</span> <span class="n">basis_set</span><span class="o">.</span><span class="n">get_ecp_shell_indices_for_atom_and_orbital_type</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="n">OrbitalType</span><span class="o">.</span><span class="n">P</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;P-type ECP shells on atom 0: </span><span class="si">{</span><span class="n">p_ecp_indices</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+</pre></div>
+</div>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="qdk_chemistry.plugins.pyscf.utils.BasisSet.get_ecp_shell_indices_for_orbital_type">
+<span class="sig-name descname"><span class="pre">get_ecp_shell_indices_for_orbital_type</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">self</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference internal" href="#qdk_chemistry.plugins.pyscf.utils.BasisSet" title="qdk_chemistry._core.data.BasisSet"><span class="pre">qdk_chemistry._core.data.BasisSet</span></a></span></em>, <em class="sig-param"><span class="n"><span class="pre">orbital_type</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference internal" href="qdk_chemistry.data.html#qdk_chemistry.data.OrbitalType" title="qdk_chemistry._core.data.OrbitalType"><span class="pre">qdk_chemistry._core.data.OrbitalType</span></a></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#list" title="(in Python v3.14)"><span class="pre">list</span></a><span class="p"><span class="pre">[</span></span><a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(in Python v3.14)"><span class="pre">int</span></a><span class="p"><span class="pre">]</span></span></span></span><a class="headerlink" href="#qdk_chemistry.plugins.pyscf.utils.BasisSet.get_ecp_shell_indices_for_orbital_type" title="Link to this definition"></a></dt>
+<dd><p>Get ECP shell indices for a specific orbital type.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>orbital_type</strong> (<a class="reference internal" href="qdk_chemistry.data.html#qdk_chemistry.data.OrbitalType" title="qdk_chemistry.data.OrbitalType"><em>OrbitalType</em></a>) – Type of orbital (S, P, D, F, etc.)</p>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>Vector of ECP shell indices of this type</p>
+</dd>
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#list" title="(in Python v3.14)">list</a> of <a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(in Python v3.14)">int</a></p>
+</dd>
+</dl>
+<p class="rubric">Examples</p>
+<div class="doctest highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="n">s_ecp_indices</span> <span class="o">=</span> <span class="n">basis_set</span><span class="o">.</span><span class="n">get_ecp_shell_indices_for_orbital_type</span><span class="p">(</span><span class="n">OrbitalType</span><span class="o">.</span><span class="n">S</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;S-type ECP shell indices: </span><span class="si">{</span><span class="n">s_ecp_indices</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+</pre></div>
+</div>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="qdk_chemistry.plugins.pyscf.utils.BasisSet.get_ecp_shells">
+<span class="sig-name descname"><span class="pre">get_ecp_shells</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">self</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference internal" href="#qdk_chemistry.plugins.pyscf.utils.BasisSet" title="qdk_chemistry._core.data.BasisSet"><span class="pre">qdk_chemistry._core.data.BasisSet</span></a></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#list" title="(in Python v3.14)"><span class="pre">list</span></a><span class="p"><span class="pre">[</span></span><a class="reference internal" href="#qdk_chemistry.plugins.pyscf.utils.Shell" title="qdk_chemistry._core.data.Shell"><span class="pre">qdk_chemistry._core.data.Shell</span></a><span class="p"><span class="pre">]</span></span></span></span><a class="headerlink" href="#qdk_chemistry.plugins.pyscf.utils.BasisSet.get_ecp_shells" title="Link to this definition"></a></dt>
+<dd><p>Get all ECP shells (flattened from per-atom storage).</p>
+<dl class="field-list simple">
+<dt class="field-odd">Returns<span class="colon">:</span></dt>
+<dd class="field-odd"><p>Vector of all ECP shells in the basis set</p>
+</dd>
+<dt class="field-even">Return type<span class="colon">:</span></dt>
+<dd class="field-even"><p><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#list" title="(in Python v3.14)">list</a> of <a class="reference internal" href="#qdk_chemistry.plugins.pyscf.utils.Shell" title="qdk_chemistry.plugins.pyscf.utils.Shell">Shell</a></p>
+</dd>
+</dl>
+<p class="rubric">Examples</p>
+<div class="doctest highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="n">ecp_shells</span> <span class="o">=</span> <span class="n">basis_set</span><span class="o">.</span><span class="n">get_ecp_shells</span><span class="p">()</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Total ECP shells: </span><span class="si">{</span><span class="nb">len</span><span class="p">(</span><span class="n">ecp_shells</span><span class="p">)</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+</pre></div>
+</div>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="qdk_chemistry.plugins.pyscf.utils.BasisSet.get_ecp_shells_for_atom">
+<span class="sig-name descname"><span class="pre">get_ecp_shells_for_atom</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">self</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference internal" href="#qdk_chemistry.plugins.pyscf.utils.BasisSet" title="qdk_chemistry._core.data.BasisSet"><span class="pre">qdk_chemistry._core.data.BasisSet</span></a></span></em>, <em class="sig-param"><span class="n"><span class="pre">atom_index</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.SupportsInt" title="(in Python v3.14)"><span class="pre">SupportsInt</span></a></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#list" title="(in Python v3.14)"><span class="pre">list</span></a><span class="p"><span class="pre">[</span></span><a class="reference internal" href="#qdk_chemistry.plugins.pyscf.utils.Shell" title="qdk_chemistry._core.data.Shell"><span class="pre">qdk_chemistry._core.data.Shell</span></a><span class="p"><span class="pre">]</span></span></span></span><a class="headerlink" href="#qdk_chemistry.plugins.pyscf.utils.BasisSet.get_ecp_shells_for_atom" title="Link to this definition"></a></dt>
+<dd><p>Get ECP shells for a specific atom.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>atom_index</strong> (<a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(in Python v3.14)"><em>int</em></a>) – Index of the atom</p>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>Vector of ECP shells for the specified atom</p>
+</dd>
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#list" title="(in Python v3.14)">list</a> of <a class="reference internal" href="#qdk_chemistry.plugins.pyscf.utils.Shell" title="qdk_chemistry.plugins.pyscf.utils.Shell">Shell</a></p>
+</dd>
+</dl>
+<p class="rubric">Examples</p>
+<div class="doctest highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="n">ecp_atom_shells</span> <span class="o">=</span> <span class="n">basis_set</span><span class="o">.</span><span class="n">get_ecp_shells_for_atom</span><span class="p">(</span><span class="mi">0</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Atom 0 has </span><span class="si">{</span><span class="nb">len</span><span class="p">(</span><span class="n">ecp_atom_shells</span><span class="p">)</span><span class="si">}</span><span class="s2"> ECP shells&quot;</span><span class="p">)</span>
 </pre></div>
 </div>
 </dd></dl>
@@ -696,6 +987,25 @@ extension (e.g., <code class="docutils literal notranslate"><span class="pre">st
 <p class="rubric">Examples</p>
 <div class="doctest highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="n">n_p_funcs</span> <span class="o">=</span> <span class="n">basis_set</span><span class="o">.</span><span class="n">get_num_basis_functions_for_orbital_type</span><span class="p">(</span><span class="n">OrbitalType</span><span class="o">.</span><span class="n">P</span><span class="p">)</span>
 <span class="gp">&gt;&gt;&gt; </span><span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Total P-type basis functions: </span><span class="si">{</span><span class="n">n_p_funcs</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+</pre></div>
+</div>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="qdk_chemistry.plugins.pyscf.utils.BasisSet.get_num_ecp_shells">
+<span class="sig-name descname"><span class="pre">get_num_ecp_shells</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">self</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference internal" href="#qdk_chemistry.plugins.pyscf.utils.BasisSet" title="qdk_chemistry._core.data.BasisSet"><span class="pre">qdk_chemistry._core.data.BasisSet</span></a></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(in Python v3.14)"><span class="pre">int</span></a></span></span><a class="headerlink" href="#qdk_chemistry.plugins.pyscf.utils.BasisSet.get_num_ecp_shells" title="Link to this definition"></a></dt>
+<dd><p>Get total number of ECP shells across all atoms.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Returns<span class="colon">:</span></dt>
+<dd class="field-odd"><p>Total number of ECP shells</p>
+</dd>
+<dt class="field-even">Return type<span class="colon">:</span></dt>
+<dd class="field-even"><p><a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(in Python v3.14)">int</a></p>
+</dd>
+</dl>
+<p class="rubric">Examples</p>
+<div class="doctest highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="n">n_ecp_shells</span> <span class="o">=</span> <span class="n">basis_set</span><span class="o">.</span><span class="n">get_num_ecp_shells</span><span class="p">()</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Total ECP shells: </span><span class="si">{</span><span class="n">n_ecp_shells</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
 </pre></div>
 </div>
 </dd></dl>
@@ -919,6 +1229,45 @@ Default is Spherical</p></li>
 <p class="rubric">Examples</p>
 <div class="doctest highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="n">summary</span> <span class="o">=</span> <span class="n">basis_set</span><span class="o">.</span><span class="n">get_summary</span><span class="p">()</span>
 <span class="gp">&gt;&gt;&gt; </span><span class="nb">print</span><span class="p">(</span><span class="n">summary</span><span class="p">)</span>
+</pre></div>
+</div>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="qdk_chemistry.plugins.pyscf.utils.BasisSet.has_ecp_electrons">
+<span class="sig-name descname"><span class="pre">has_ecp_electrons</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">self</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference internal" href="#qdk_chemistry.plugins.pyscf.utils.BasisSet" title="qdk_chemistry._core.data.BasisSet"><span class="pre">qdk_chemistry._core.data.BasisSet</span></a></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><a class="reference external" href="https://docs.python.org/3/library/functions.html#bool" title="(in Python v3.14)"><span class="pre">bool</span></a></span></span><a class="headerlink" href="#qdk_chemistry.plugins.pyscf.utils.BasisSet.has_ecp_electrons" title="Link to this definition"></a></dt>
+<dd><p>Check if ECP (Effective Core Potential) electrons are present.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Returns<span class="colon">:</span></dt>
+<dd class="field-odd"><p>True if ECP electrons are present, False otherwise</p>
+</dd>
+<dt class="field-even">Return type<span class="colon">:</span></dt>
+<dd class="field-even"><p><a class="reference external" href="https://docs.python.org/3/library/functions.html#bool" title="(in Python v3.14)">bool</a></p>
+</dd>
+</dl>
+<p class="rubric">Examples</p>
+<div class="doctest highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="k">if</span> <span class="n">basis_set</span><span class="o">.</span><span class="n">has_ecp_electrons</span><span class="p">():</span>
+<span class="gp">... </span>    <span class="n">ecp_electrons</span> <span class="o">=</span> <span class="n">basis_set</span><span class="o">.</span><span class="n">get_ecp_electrons</span><span class="p">()</span>
+<span class="gp">... </span>    <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;ECP electrons per atom: </span><span class="si">{</span><span class="n">ecp_electrons</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+</pre></div>
+</div>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="qdk_chemistry.plugins.pyscf.utils.BasisSet.has_ecp_shells">
+<span class="sig-name descname"><span class="pre">has_ecp_shells</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">self</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference internal" href="#qdk_chemistry.plugins.pyscf.utils.BasisSet" title="qdk_chemistry._core.data.BasisSet"><span class="pre">qdk_chemistry._core.data.BasisSet</span></a></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><a class="reference external" href="https://docs.python.org/3/library/functions.html#bool" title="(in Python v3.14)"><span class="pre">bool</span></a></span></span><a class="headerlink" href="#qdk_chemistry.plugins.pyscf.utils.BasisSet.has_ecp_shells" title="Link to this definition"></a></dt>
+<dd><p>Check if this basis set has ECP shells.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Returns<span class="colon">:</span></dt>
+<dd class="field-odd"><p>True if there are any ECP shells</p>
+</dd>
+<dt class="field-even">Return type<span class="colon">:</span></dt>
+<dd class="field-even"><p><a class="reference external" href="https://docs.python.org/3/library/functions.html#bool" title="(in Python v3.14)">bool</a></p>
+</dd>
+</dl>
+<p class="rubric">Examples</p>
+<div class="doctest highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="k">if</span> <span class="n">basis_set</span><span class="o">.</span><span class="n">has_ecp_shells</span><span class="p">():</span>
+<span class="gp">... </span>    <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;This basis set includes ECP shells&quot;</span><span class="p">)</span>
 </pre></div>
 </div>
 </dd></dl>
@@ -2948,56 +3297,128 @@ extension (e.g., <code class="docutils literal notranslate"><span class="pre">wa
 
 <dl class="py class">
 <dt class="sig sig-object py" id="qdk_chemistry.plugins.pyscf.utils.Shell">
-<em class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">Shell</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">self</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference internal" href="#qdk_chemistry.plugins.pyscf.utils.Shell" title="qdk_chemistry._core.data.Shell"><span class="pre">qdk_chemistry._core.data.Shell</span></a></span></em>, <em class="sig-param"><span class="n"><span class="pre">atom_index</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.SupportsInt" title="(in Python v3.14)"><span class="pre">SupportsInt</span></a></span></em>, <em class="sig-param"><span class="n"><span class="pre">orbital_type</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference internal" href="qdk_chemistry.data.html#qdk_chemistry.data.OrbitalType" title="qdk_chemistry._core.data.OrbitalType"><span class="pre">qdk_chemistry._core.data.OrbitalType</span></a></span></em>, <em class="sig-param"><span class="n"><span class="pre">exponents</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.Annotated" title="(in Python v3.14)"><span class="pre">Annotated</span></a><span class="p"><span class="pre">[</span></span><span class="pre">numpy.typing.ArrayLike</span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">numpy.float64</span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="s"><span class="pre">'[m,</span> <span class="pre">1]'</span></span><span class="p"><span class="pre">]</span></span></span></em>, <em class="sig-param"><span class="n"><span class="pre">coefficients</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.Annotated" title="(in Python v3.14)"><span class="pre">Annotated</span></a><span class="p"><span class="pre">[</span></span><span class="pre">numpy.typing.ArrayLike</span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">numpy.float64</span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="s"><span class="pre">'[m,</span> <span class="pre">1]'</span></span><span class="p"><span class="pre">]</span></span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#qdk_chemistry.plugins.pyscf.utils.Shell" title="Link to this definition"></a></dt>
+<em class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">Shell</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="o"><span class="pre">*</span></span><span class="n"><span class="pre">args</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">kwargs</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#qdk_chemistry.plugins.pyscf.utils.Shell" title="Link to this definition"></a></dt>
 <dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">pybind11_object</span></code></p>
 <p>Shell of basis functions</p>
-<p>Constructor with complete primitive data.</p>
+<p>Overloaded function.</p>
+<ol class="arabic">
+<li><p>__init__(self: qdk_chemistry._core.data.Shell, atom_index: typing.SupportsInt, orbital_type: qdk_chemistry._core.data.OrbitalType, exponents: typing.Annotated[numpy.typing.ArrayLike, numpy.float64, “[m, 1]”], coefficients: typing.Annotated[numpy.typing.ArrayLike, numpy.float64, “[m, 1]”]) -&gt; None</p>
+<blockquote>
+<div><p>Constructor with complete primitive data.</p>
 <p>Creates a shell with all primitive functions specified.</p>
-<dl class="field-list simple">
-<dt class="field-odd">Parameters<span class="colon">:</span></dt>
-<dd class="field-odd"><ul class="simple">
-<li><p><strong>atom_index</strong> (<a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(in Python v3.14)"><em>int</em></a>) – Index of the atom this shell belongs to</p></li>
-<li><p><strong>orbital_type</strong> (<a class="reference internal" href="qdk_chemistry.data.html#qdk_chemistry.data.OrbitalType" title="qdk_chemistry.data.OrbitalType"><em>OrbitalType</em></a>) – Type of orbital (S, P, D, F, etc.)</p></li>
-<li><p><strong>exponents</strong> (<a class="reference external" href="https://numpy.org/doc/stable/reference/generated/numpy.ndarray.html#numpy.ndarray" title="(in NumPy v2.3)"><em>numpy.ndarray</em></a>) – Vector of Gaussian exponent coefficients (alpha values)</p></li>
-<li><p><strong>coefficients</strong> (<a class="reference external" href="https://numpy.org/doc/stable/reference/generated/numpy.ndarray.html#numpy.ndarray" title="(in NumPy v2.3)"><em>numpy.ndarray</em></a>) – Vector of contraction coefficients (must be same length as exponents)</p></li>
-</ul>
+<dl class="simple">
+<dt>atom_index<span class="classifier">int</span></dt><dd><p>Index of the atom this shell belongs to</p>
 </dd>
-<dt class="field-even">Raises<span class="colon">:</span></dt>
-<dd class="field-even"><p><a class="reference external" href="https://docs.python.org/3/library/exceptions.html#ValueError" title="(in Python v3.14)"><strong>ValueError</strong></a> – If exponents and coefficients have different lengths</p>
+<dt>orbital_type<span class="classifier">OrbitalType</span></dt><dd><p>Type of orbital (S, P, D, F, etc.)</p>
+</dd>
+<dt>exponents<span class="classifier">numpy.ndarray</span></dt><dd><p>Vector of Gaussian exponent coefficients (alpha values)</p>
+</dd>
+<dt>coefficients<span class="classifier">numpy.ndarray</span></dt><dd><p>Vector of contraction coefficients (must be same length as exponents)</p>
 </dd>
 </dl>
-<p class="rubric">Examples</p>
+<dl class="simple">
+<dt>ValueError</dt><dd><p>If exponents and coefficients have different lengths</p>
+</dd>
+</dl>
 <div class="doctest highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="kn">import</span><span class="w"> </span><span class="nn">numpy</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">np</span>
 <span class="gp">&gt;&gt;&gt; </span><span class="n">exponents</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">([</span><span class="mf">1.0</span><span class="p">,</span> <span class="mf">0.5</span><span class="p">,</span> <span class="mf">0.1</span><span class="p">])</span>
 <span class="gp">&gt;&gt;&gt; </span><span class="n">coefficients</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">([</span><span class="mf">0.444</span><span class="p">,</span> <span class="mf">0.555</span><span class="p">,</span> <span class="mf">0.222</span><span class="p">])</span>
 <span class="gp">&gt;&gt;&gt; </span><span class="n">shell</span> <span class="o">=</span> <span class="n">Shell</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="n">OrbitalType</span><span class="o">.</span><span class="n">S</span><span class="p">,</span> <span class="n">exponents</span><span class="p">,</span> <span class="n">coefficients</span><span class="p">)</span>
 </pre></div>
 </div>
+</div></blockquote>
+</li>
+<li><p>__init__(self: qdk_chemistry._core.data.Shell, atom_index: typing.SupportsInt, orbital_type: qdk_chemistry._core.data.OrbitalType, exponents: typing.Annotated[numpy.typing.ArrayLike, numpy.float64, “[m, 1]”], coefficients: typing.Annotated[numpy.typing.ArrayLike, numpy.float64, “[m, 1]”], rpowers: typing.Annotated[numpy.typing.ArrayLike, numpy.int32, “[m, 1]”]) -&gt; None</p>
+<blockquote>
+<div><p>Constructor with primitive data and radial powers for ECP shells.</p>
+<p>Creates an ECP (Effective Core Potential) shell with radial powers.</p>
+<dl class="simple">
+<dt>atom_index<span class="classifier">int</span></dt><dd><p>Index of the atom this shell belongs to</p>
+</dd>
+<dt>orbital_type<span class="classifier">OrbitalType</span></dt><dd><p>Type of orbital (S, P, D, F, etc.)</p>
+</dd>
+<dt>exponents<span class="classifier">numpy.ndarray</span></dt><dd><p>Vector of Gaussian exponent coefficients (alpha values)</p>
+</dd>
+<dt>coefficients<span class="classifier">numpy.ndarray</span></dt><dd><p>Vector of contraction coefficients (must be same length as exponents)</p>
+</dd>
+<dt>rpowers<span class="classifier">numpy.ndarray (int)</span></dt><dd><p>Vector of radial powers (r^n terms) for ECP shells</p>
+</dd>
+</dl>
+<dl class="simple">
+<dt>ValueError</dt><dd><p>If exponents, coefficients, and rpowers have different lengths</p>
+</dd>
+</dl>
+<div class="doctest highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="kn">import</span><span class="w"> </span><span class="nn">numpy</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">np</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">exponents</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">([</span><span class="mf">1.0</span><span class="p">,</span> <span class="mf">0.5</span><span class="p">,</span> <span class="mf">0.1</span><span class="p">])</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">coefficients</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">([</span><span class="mf">0.444</span><span class="p">,</span> <span class="mf">0.555</span><span class="p">,</span> <span class="mf">0.222</span><span class="p">])</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">rpowers</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">([</span><span class="mi">2</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="mi">0</span><span class="p">],</span> <span class="n">dtype</span><span class="o">=</span><span class="n">np</span><span class="o">.</span><span class="n">int32</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">ecp_shell</span> <span class="o">=</span> <span class="n">Shell</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="n">OrbitalType</span><span class="o">.</span><span class="n">S</span><span class="p">,</span> <span class="n">exponents</span><span class="p">,</span> <span class="n">coefficients</span><span class="p">,</span> <span class="n">rpowers</span><span class="p">)</span>
+</pre></div>
+</div>
+</div></blockquote>
+</li>
+</ol>
 <dl class="py method">
 <dt class="sig sig-object py" id="qdk_chemistry.plugins.pyscf.utils.Shell.__init__">
-<span class="sig-name descname"><span class="pre">__init__</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">self</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference internal" href="#qdk_chemistry.plugins.pyscf.utils.Shell" title="qdk_chemistry._core.data.Shell"><span class="pre">qdk_chemistry._core.data.Shell</span></a></span></em>, <em class="sig-param"><span class="n"><span class="pre">atom_index</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.SupportsInt" title="(in Python v3.14)"><span class="pre">SupportsInt</span></a></span></em>, <em class="sig-param"><span class="n"><span class="pre">orbital_type</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference internal" href="qdk_chemistry.data.html#qdk_chemistry.data.OrbitalType" title="qdk_chemistry._core.data.OrbitalType"><span class="pre">qdk_chemistry._core.data.OrbitalType</span></a></span></em>, <em class="sig-param"><span class="n"><span class="pre">exponents</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.Annotated" title="(in Python v3.14)"><span class="pre">Annotated</span></a><span class="p"><span class="pre">[</span></span><span class="pre">numpy.typing.ArrayLike</span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">numpy.float64</span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="s"><span class="pre">'[m,</span> <span class="pre">1]'</span></span><span class="p"><span class="pre">]</span></span></span></em>, <em class="sig-param"><span class="n"><span class="pre">coefficients</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.Annotated" title="(in Python v3.14)"><span class="pre">Annotated</span></a><span class="p"><span class="pre">[</span></span><span class="pre">numpy.typing.ArrayLike</span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">numpy.float64</span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="s"><span class="pre">'[m,</span> <span class="pre">1]'</span></span><span class="p"><span class="pre">]</span></span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><a class="reference external" href="https://docs.python.org/3/library/constants.html#None" title="(in Python v3.14)"><span class="pre">None</span></a></span></span><a class="headerlink" href="#qdk_chemistry.plugins.pyscf.utils.Shell.__init__" title="Link to this definition"></a></dt>
-<dd><p>Constructor with complete primitive data.</p>
+<span class="sig-name descname"><span class="pre">__init__</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="o"><span class="pre">*</span></span><span class="n"><span class="pre">args</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">kwargs</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#qdk_chemistry.plugins.pyscf.utils.Shell.__init__" title="Link to this definition"></a></dt>
+<dd><p>Overloaded function.</p>
+<ol class="arabic">
+<li><p>__init__(self: qdk_chemistry._core.data.Shell, atom_index: typing.SupportsInt, orbital_type: qdk_chemistry._core.data.OrbitalType, exponents: typing.Annotated[numpy.typing.ArrayLike, numpy.float64, “[m, 1]”], coefficients: typing.Annotated[numpy.typing.ArrayLike, numpy.float64, “[m, 1]”]) -&gt; None</p>
+<blockquote>
+<div><p>Constructor with complete primitive data.</p>
 <p>Creates a shell with all primitive functions specified.</p>
-<dl class="field-list simple">
-<dt class="field-odd">Parameters<span class="colon">:</span></dt>
-<dd class="field-odd"><ul class="simple">
-<li><p><strong>atom_index</strong> (<a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(in Python v3.14)"><em>int</em></a>) – Index of the atom this shell belongs to</p></li>
-<li><p><strong>orbital_type</strong> (<a class="reference internal" href="qdk_chemistry.data.html#qdk_chemistry.data.OrbitalType" title="qdk_chemistry.data.OrbitalType"><em>OrbitalType</em></a>) – Type of orbital (S, P, D, F, etc.)</p></li>
-<li><p><strong>exponents</strong> (<a class="reference external" href="https://numpy.org/doc/stable/reference/generated/numpy.ndarray.html#numpy.ndarray" title="(in NumPy v2.3)"><em>numpy.ndarray</em></a>) – Vector of Gaussian exponent coefficients (alpha values)</p></li>
-<li><p><strong>coefficients</strong> (<a class="reference external" href="https://numpy.org/doc/stable/reference/generated/numpy.ndarray.html#numpy.ndarray" title="(in NumPy v2.3)"><em>numpy.ndarray</em></a>) – Vector of contraction coefficients (must be same length as exponents)</p></li>
-</ul>
+<dl class="simple">
+<dt>atom_index<span class="classifier">int</span></dt><dd><p>Index of the atom this shell belongs to</p>
 </dd>
-<dt class="field-even">Raises<span class="colon">:</span></dt>
-<dd class="field-even"><p><a class="reference external" href="https://docs.python.org/3/library/exceptions.html#ValueError" title="(in Python v3.14)"><strong>ValueError</strong></a> – If exponents and coefficients have different lengths</p>
+<dt>orbital_type<span class="classifier">OrbitalType</span></dt><dd><p>Type of orbital (S, P, D, F, etc.)</p>
+</dd>
+<dt>exponents<span class="classifier">numpy.ndarray</span></dt><dd><p>Vector of Gaussian exponent coefficients (alpha values)</p>
+</dd>
+<dt>coefficients<span class="classifier">numpy.ndarray</span></dt><dd><p>Vector of contraction coefficients (must be same length as exponents)</p>
 </dd>
 </dl>
-<p class="rubric">Examples</p>
+<dl class="simple">
+<dt>ValueError</dt><dd><p>If exponents and coefficients have different lengths</p>
+</dd>
+</dl>
 <div class="doctest highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="kn">import</span><span class="w"> </span><span class="nn">numpy</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">np</span>
 <span class="gp">&gt;&gt;&gt; </span><span class="n">exponents</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">([</span><span class="mf">1.0</span><span class="p">,</span> <span class="mf">0.5</span><span class="p">,</span> <span class="mf">0.1</span><span class="p">])</span>
 <span class="gp">&gt;&gt;&gt; </span><span class="n">coefficients</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">([</span><span class="mf">0.444</span><span class="p">,</span> <span class="mf">0.555</span><span class="p">,</span> <span class="mf">0.222</span><span class="p">])</span>
 <span class="gp">&gt;&gt;&gt; </span><span class="n">shell</span> <span class="o">=</span> <span class="n">Shell</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="n">OrbitalType</span><span class="o">.</span><span class="n">S</span><span class="p">,</span> <span class="n">exponents</span><span class="p">,</span> <span class="n">coefficients</span><span class="p">)</span>
 </pre></div>
 </div>
+</div></blockquote>
+</li>
+<li><p>__init__(self: qdk_chemistry._core.data.Shell, atom_index: typing.SupportsInt, orbital_type: qdk_chemistry._core.data.OrbitalType, exponents: typing.Annotated[numpy.typing.ArrayLike, numpy.float64, “[m, 1]”], coefficients: typing.Annotated[numpy.typing.ArrayLike, numpy.float64, “[m, 1]”], rpowers: typing.Annotated[numpy.typing.ArrayLike, numpy.int32, “[m, 1]”]) -&gt; None</p>
+<blockquote>
+<div><p>Constructor with primitive data and radial powers for ECP shells.</p>
+<p>Creates an ECP (Effective Core Potential) shell with radial powers.</p>
+<dl class="simple">
+<dt>atom_index<span class="classifier">int</span></dt><dd><p>Index of the atom this shell belongs to</p>
+</dd>
+<dt>orbital_type<span class="classifier">OrbitalType</span></dt><dd><p>Type of orbital (S, P, D, F, etc.)</p>
+</dd>
+<dt>exponents<span class="classifier">numpy.ndarray</span></dt><dd><p>Vector of Gaussian exponent coefficients (alpha values)</p>
+</dd>
+<dt>coefficients<span class="classifier">numpy.ndarray</span></dt><dd><p>Vector of contraction coefficients (must be same length as exponents)</p>
+</dd>
+<dt>rpowers<span class="classifier">numpy.ndarray (int)</span></dt><dd><p>Vector of radial powers (r^n terms) for ECP shells</p>
+</dd>
+</dl>
+<dl class="simple">
+<dt>ValueError</dt><dd><p>If exponents, coefficients, and rpowers have different lengths</p>
+</dd>
+</dl>
+<div class="doctest highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="kn">import</span><span class="w"> </span><span class="nn">numpy</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">np</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">exponents</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">([</span><span class="mf">1.0</span><span class="p">,</span> <span class="mf">0.5</span><span class="p">,</span> <span class="mf">0.1</span><span class="p">])</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">coefficients</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">([</span><span class="mf">0.444</span><span class="p">,</span> <span class="mf">0.555</span><span class="p">,</span> <span class="mf">0.222</span><span class="p">])</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">rpowers</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">([</span><span class="mi">2</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="mi">0</span><span class="p">],</span> <span class="n">dtype</span><span class="o">=</span><span class="n">np</span><span class="o">.</span><span class="n">int32</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">ecp_shell</span> <span class="o">=</span> <span class="n">Shell</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="n">OrbitalType</span><span class="o">.</span><span class="n">S</span><span class="p">,</span> <span class="n">exponents</span><span class="p">,</span> <span class="n">coefficients</span><span class="p">,</span> <span class="n">rpowers</span><span class="p">)</span>
+</pre></div>
+</div>
+</div></blockquote>
+</li>
+</ol>
 </dd></dl>
 
 <dl class="py property">
@@ -3081,10 +3502,35 @@ Default is Spherical</p>
 </div>
 </dd></dl>
 
+<dl class="py method">
+<dt class="sig sig-object py" id="qdk_chemistry.plugins.pyscf.utils.Shell.has_radial_powers">
+<span class="sig-name descname"><span class="pre">has_radial_powers</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">self</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference internal" href="#qdk_chemistry.plugins.pyscf.utils.Shell" title="qdk_chemistry._core.data.Shell"><span class="pre">qdk_chemistry._core.data.Shell</span></a></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><a class="reference external" href="https://docs.python.org/3/library/functions.html#bool" title="(in Python v3.14)"><span class="pre">bool</span></a></span></span><a class="headerlink" href="#qdk_chemistry.plugins.pyscf.utils.Shell.has_radial_powers" title="Link to this definition"></a></dt>
+<dd><p>Check if this shell has radial powers (i.e., is an ECP shell).</p>
+<dl class="field-list simple">
+<dt class="field-odd">Returns<span class="colon">:</span></dt>
+<dd class="field-odd"><p>True if this shell has radial powers defined</p>
+</dd>
+<dt class="field-even">Return type<span class="colon">:</span></dt>
+<dd class="field-even"><p><a class="reference external" href="https://docs.python.org/3/library/functions.html#bool" title="(in Python v3.14)">bool</a></p>
+</dd>
+</dl>
+<p class="rubric">Examples</p>
+<div class="doctest highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="k">if</span> <span class="n">shell</span><span class="o">.</span><span class="n">has_radial_powers</span><span class="p">():</span>
+<span class="gp">... </span>    <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;This is an ECP shell&quot;</span><span class="p">)</span>
+</pre></div>
+</div>
+</dd></dl>
+
 <dl class="py property">
 <dt class="sig sig-object py" id="qdk_chemistry.plugins.pyscf.utils.Shell.orbital_type">
 <em class="property"><span class="k"><span class="pre">property</span></span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">orbital_type</span></span><a class="headerlink" href="#qdk_chemistry.plugins.pyscf.utils.Shell.orbital_type" title="Link to this definition"></a></dt>
 <dd><p>Type of orbital</p>
+</dd></dl>
+
+<dl class="py property">
+<dt class="sig sig-object py" id="qdk_chemistry.plugins.pyscf.utils.Shell.rpowers">
+<em class="property"><span class="k"><span class="pre">property</span></span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">rpowers</span></span><a class="headerlink" href="#qdk_chemistry.plugins.pyscf.utils.Shell.rpowers" title="Link to this definition"></a></dt>
+<dd><p>Vector of radial powers for ECP shells (r^n terms)</p>
 </dd></dl>
 
 </dd></dl>
@@ -4267,23 +4713,35 @@ element symbols from the structure (e.g., <code class="docutils literal notransl
 
 <dl class="py function">
 <dt class="sig sig-object py" id="qdk_chemistry.plugins.pyscf.utils.basis_to_pyscf_mol">
-<span class="sig-name descname"><span class="pre">basis_to_pyscf_mol</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">basis</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../../_modules/qdk_chemistry/plugins/pyscf/utils.html#basis_to_pyscf_mol"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#qdk_chemistry.plugins.pyscf.utils.basis_to_pyscf_mol" title="Link to this definition"></a></dt>
+<span class="sig-name descname"><span class="pre">basis_to_pyscf_mol</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">basis</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">charge</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">0</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">multiplicity</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">1</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../../_modules/qdk_chemistry/plugins/pyscf/utils.html#basis_to_pyscf_mol"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#qdk_chemistry.plugins.pyscf.utils.basis_to_pyscf_mol" title="Link to this definition"></a></dt>
 <dd><p>Convert QDK/Chemistry BasisSet instance to PySCF Mole object.</p>
 <p>This function extracts the structure and basis information from the QDK/Chemistry
-BasisSet instance and uses it to initialize a PySCF Mole object.</p>
+BasisSet instance and uses it to initialize a PySCF Mole object. If the BasisSet
+contains ECP shells, they are converted to PySCF’s ECP format.</p>
 <dl class="field-list simple">
 <dt class="field-odd">Return type<span class="colon">:</span></dt>
 <dd class="field-odd"><p><span class="sphinx_autodoc_typehints-type"><code class="xref py py-class docutils literal notranslate"><span class="pre">Mole</span></code></span></p>
 </dd>
 <dt class="field-even">Parameters<span class="colon">:</span></dt>
-<dd class="field-even"><p><strong>basis</strong> (<a class="reference internal" href="#qdk_chemistry.plugins.pyscf.utils.BasisSet" title="qdk_chemistry._core.data.BasisSet"><em>BasisSet</em></a>) – QDK/Chemistry BasisSet instance with populated basis set.</p>
+<dd class="field-even"><ul class="simple">
+<li><p><strong>basis</strong> (<a class="reference internal" href="#qdk_chemistry.plugins.pyscf.utils.BasisSet" title="qdk_chemistry._core.data.BasisSet"><em>BasisSet</em></a>) – QDK/Chemistry BasisSet instance with populated basis set.</p></li>
+<li><p><strong>charge</strong> (<a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(in Python v3.14)"><em>int</em></a>) – Total charge of the molecule (default: 0).</p></li>
+<li><p><strong>multiplicity</strong> (<a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(in Python v3.14)"><em>int</em></a>) – Spin multiplicity (2S + 1) of the molecule (default: 1).</p></li>
+</ul>
 </dd>
 <dt class="field-odd">Returns<span class="colon">:</span></dt>
-<dd class="field-odd"><p>PySCF Mole object initialized with the QDK/Chemistry basis set data.</p>
+<dd class="field-odd"><p>PySCF Mole object initialized with the QDK/Chemistry basis set data,
+including ECP shells if present.</p>
 </dd>
 </dl>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>When ECP shells are present, the function reconstructs the full PySCF ECP
+structure from QDK’s ECP shells with radial powers, preserving all
+exponents, coefficients, and r^n terms for each angular momentum channel.</p>
+</div>
 <p class="rubric">Examples</p>
-<div class="doctest highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="n">pyscf_mol</span> <span class="o">=</span> <span class="n">basis_to_pyscf_mol</span><span class="p">(</span><span class="n">basis</span><span class="p">)</span>
+<div class="doctest highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="n">pyscf_mol</span> <span class="o">=</span> <span class="n">basis_to_pyscf_mol</span><span class="p">(</span><span class="n">basis</span><span class="p">,</span> <span class="n">charge</span><span class="o">=</span><span class="mi">0</span><span class="p">,</span> <span class="n">multiplicity</span><span class="o">=</span><span class="mi">1</span><span class="p">)</span>
 <span class="gp">&gt;&gt;&gt; </span><span class="nb">print</span><span class="p">(</span><span class="n">pyscf_mol</span><span class="o">.</span><span class="n">atom</span><span class="p">)</span>
 </pre></div>
 </div>
@@ -4294,7 +4752,9 @@ BasisSet instance and uses it to initialize a PySCF Mole object.</p>
 <span class="sig-name descname"><span class="pre">pyscf_mol_to_qdk_basis</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">pyscf_mol</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">structure</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">basis_name</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../../_modules/qdk_chemistry/plugins/pyscf/utils.html#pyscf_mol_to_qdk_basis"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#qdk_chemistry.plugins.pyscf.utils.pyscf_mol_to_qdk_basis" title="Link to this definition"></a></dt>
 <dd><p>Convert PySCF Mole object to QDK/Chemistry BasisSet instance.</p>
 <p>This function extracts the basis set information from a PySCF Mole object
-and returns a corresponding QDK/Chemistry BasisSet instance.</p>
+and returns a corresponding QDK/Chemistry BasisSet instance. Both regular
+basis shells and ECP (Effective Core Potential) shells are extracted and
+converted.</p>
 <dl class="field-list simple">
 <dt class="field-odd">Return type<span class="colon">:</span></dt>
 <dd class="field-odd"><p><span class="sphinx_autodoc_typehints-type"><a class="reference internal" href="#qdk_chemistry.plugins.pyscf.utils.BasisSet" title="qdk_chemistry._core.data.BasisSet"><code class="xref py py-class docutils literal notranslate"><span class="pre">BasisSet</span></code></a></span></p>
@@ -4308,9 +4768,16 @@ molecule’s basis set or defaults to “pyscf_basis”.</p></li>
 </ul>
 </dd>
 <dt class="field-odd">Returns<span class="colon">:</span></dt>
-<dd class="field-odd"><p>QDK/Chemistry BasisSet instance initialized with the PySCF basis set data.</p>
+<dd class="field-odd"><p>QDK/Chemistry BasisSet instance initialized with the PySCF basis set data,
+including both regular shells and ECP shells.</p>
 </dd>
 </dl>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>ECP shells are extracted with their radial powers (r^n terms) preserved.
+Each combination of (atom, angular momentum, radial power) with non-empty
+primitives creates a separate ECP shell.</p>
+</div>
 </dd></dl>
 
 <dl class="py function">

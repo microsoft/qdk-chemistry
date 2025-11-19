@@ -6,7 +6,7 @@
   <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
 
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Design and architecture &mdash; qdk-chemistry 1.0.0-rc1 documentation</title>
+  <title>qdk_chemistry.utils.circuit module &mdash; qdk-chemistry 1.0.0-rc1 documentation</title>
       <link rel="stylesheet" type="text/css" href="../../_static/pygments.css?v=b86133f3" />
       <link rel="stylesheet" type="text/css" href="../../_static/css/theme.css?v=e59714d7" />
       <link rel="stylesheet" type="text/css" href="../../_static/tabs.css?v=4c969af8" />
@@ -26,8 +26,8 @@
     <script src="../../_static/js/theme.js"></script>
     <link rel="index" title="Index" href="../../genindex.html" />
     <link rel="search" title="Search" href="../../search.html" />
-    <link rel="next" title="Design principles of QDK/Chemistry" href="advanced/design_principles.html" />
-    <link rel="prev" title="In-depth user guide" href="index.html" /> 
+    <link rel="next" title="qdk_chemistry.utils.cubegen module" href="qdk_chemistry.utils.cubegen.html" />
+    <link rel="prev" title="qdk_chemistry.utils.bitstring module" href="qdk_chemistry.utils.bitstring.html" /> 
 </head>
 
 <body class="wy-body-for-nav"> 
@@ -50,29 +50,28 @@
 </div>
         </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
               <p class="caption" role="heading"><span class="caption-text">User Documentation</span></p>
-<ul class="current">
-<li class="toctree-l1"><a class="reference internal" href="../quickstart.html">Quickstart</a></li>
-<li class="toctree-l1 current"><a class="reference internal" href="index.html">In-depth user guide</a><ul class="current">
-<li class="toctree-l2 current"><a class="current reference internal" href="#">Design and architecture</a><ul>
-<li class="toctree-l3"><a class="reference internal" href="advanced/design_principles.html">Design principles of QDK/Chemistry</a></li>
-<li class="toctree-l3"><a class="reference internal" href="advanced/factory_pattern.html">Factory pattern in QDK/Chemistry</a></li>
-<li class="toctree-l3"><a class="reference internal" href="advanced/serialization.html">Serialization in QDK/Chemistry</a></li>
-<li class="toctree-l3"><a class="reference internal" href="advanced/interfaces.html">Interface system in QDK/Chemistry</a></li>
-<li class="toctree-l3"><a class="reference internal" href="advanced/settings.html">Settings</a></li>
-<li class="toctree-l3"><a class="reference internal" href="advanced/model_hamiltonians.html">Model Hamiltonians</a></li>
-</ul>
-</li>
-<li class="toctree-l2"><a class="reference internal" href="data.html">Data classes</a></li>
-<li class="toctree-l2"><a class="reference internal" href="algorithms.html">Algorithms</a></li>
-<li class="toctree-l2"><a class="reference internal" href="keywords.html">Functionals and basis sets</a></li>
-<li class="toctree-l2"><a class="reference internal" href="plugins.html">Plugins</a></li>
-</ul>
-</li>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../user/quickstart.html">Quickstart</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../user/comprehensive/index.html">In-depth user guide</a></li>
 </ul>
 <p class="caption" role="heading"><span class="caption-text">API Reference</span></p>
-<ul>
-<li class="toctree-l1"><a class="reference internal" href="../../api/python_api.html">Python API</a></li>
-<li class="toctree-l1"><a class="reference internal" href="../../api/cpp_api.html">C++ API</a></li>
+<ul class="current">
+<li class="toctree-l1 current"><a class="reference internal" href="../python_api.html">Python API</a><ul class="current">
+<li class="toctree-l2"><a class="reference internal" href="../python_api.html#data-classes">Data Classes</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../python_api.html#algorithms">Algorithms</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../python_api.html#plugins">Plugins</a></li>
+<li class="toctree-l2 current"><a class="reference internal" href="../python_api.html#utilities">Utilities</a><ul class="current">
+<li class="toctree-l3 current"><a class="reference internal" href="qdk_chemistry.utils.html">qdk_chemistry.utils package</a><ul class="current">
+<li class="toctree-l4"><a class="reference internal" href="qdk_chemistry.utils.html#qdk_chemistry.utils.compute_valence_space"><code class="docutils literal notranslate"><span class="pre">compute_valence_space()</span></code></a></li>
+<li class="toctree-l4 current"><a class="reference internal" href="qdk_chemistry.utils.html#submodules">Submodules</a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="../python_api.html#constants">Constants</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="../cpp_api.html">C++ API</a></li>
 </ul>
 <p class="caption" role="heading"><span class="caption-text">Supporting Information</span></p>
 <ul>
@@ -94,10 +93,11 @@
           <div role="navigation" aria-label="Page navigation">
   <ul class="wy-breadcrumbs">
       <li><a href="../../index.html" class="icon icon-home" aria-label="Home"></a></li>
-          <li class="breadcrumb-item"><a href="index.html">In-depth user guide</a></li>
-      <li class="breadcrumb-item active">Design and architecture</li>
+          <li class="breadcrumb-item"><a href="../python_api.html">Python API</a></li>
+          <li class="breadcrumb-item"><a href="qdk_chemistry.utils.html">qdk_chemistry.utils package</a></li>
+      <li class="breadcrumb-item active">qdk_chemistry.utils.circuit module</li>
       <li class="wy-breadcrumbs-aside">
-            <a href="../../_sources/user/comprehensive/design.rst.txt" rel="nofollow"> View page source</a>
+            <a href="../../_sources/api/api_autogen/qdk_chemistry.utils.circuit.rst.txt" rel="nofollow"> View page source</a>
       </li>
   </ul>
   <hr/>
@@ -105,27 +105,16 @@
           <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
            <div itemprop="articleBody">
              
-  <section id="design-and-architecture">
-<h1>Design and architecture<a class="headerlink" href="#design-and-architecture" title="Link to this heading"></a></h1>
-<div class="toctree-wrapper compound">
-<p class="caption" role="heading"><span class="caption-text">Contents</span></p>
-<ul>
-<li class="toctree-l1"><a class="reference internal" href="advanced/design_principles.html">Design principles of QDK/Chemistry</a></li>
-<li class="toctree-l1"><a class="reference internal" href="advanced/factory_pattern.html">Factory pattern in QDK/Chemistry</a></li>
-<li class="toctree-l1"><a class="reference internal" href="advanced/serialization.html">Serialization in QDK/Chemistry</a></li>
-<li class="toctree-l1"><a class="reference internal" href="advanced/interfaces.html">Interface system in QDK/Chemistry</a></li>
-<li class="toctree-l1"><a class="reference internal" href="advanced/settings.html">Settings</a></li>
-<li class="toctree-l1"><a class="reference internal" href="advanced/model_hamiltonians.html">Model Hamiltonians</a></li>
-</ul>
-</div>
+  <section id="qdk-chemistry-utils-circuit-module">
+<h1>qdk_chemistry.utils.circuit module<a class="headerlink" href="#qdk-chemistry-utils-circuit-module" title="Link to this heading"></a></h1>
 </section>
 
 
            </div>
           </div>
           <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
-        <a href="index.html" class="btn btn-neutral float-left" title="In-depth user guide" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
-        <a href="advanced/design_principles.html" class="btn btn-neutral float-right" title="Design principles of QDK/Chemistry" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+        <a href="qdk_chemistry.utils.bitstring.html" class="btn btn-neutral float-left" title="qdk_chemistry.utils.bitstring module" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+        <a href="qdk_chemistry.utils.cubegen.html" class="btn btn-neutral float-right" title="qdk_chemistry.utils.cubegen module" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
     </div>
 
   <hr/>

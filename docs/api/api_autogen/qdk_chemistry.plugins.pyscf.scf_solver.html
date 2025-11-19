@@ -3521,7 +3521,9 @@ the orbitals are restricted/unrestricted and closed-shell/open-shell.</p>
 <span class="sig-name descname"><span class="pre">pyscf_mol_to_qdk_basis</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">pyscf_mol</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">structure</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">basis_name</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#qdk_chemistry.plugins.pyscf.scf_solver.pyscf_mol_to_qdk_basis" title="Link to this definition"></a></dt>
 <dd><p>Convert PySCF Mole object to QDK/Chemistry BasisSet instance.</p>
 <p>This function extracts the basis set information from a PySCF Mole object
-and returns a corresponding QDK/Chemistry BasisSet instance.</p>
+and returns a corresponding QDK/Chemistry BasisSet instance. Both regular
+basis shells and ECP (Effective Core Potential) shells are extracted and
+converted.</p>
 <dl class="field-list simple">
 <dt class="field-odd">Return type<span class="colon">:</span></dt>
 <dd class="field-odd"><p><span class="sphinx_autodoc_typehints-type"><a class="reference internal" href="qdk_chemistry.plugins.pyscf.utils.html#qdk_chemistry.plugins.pyscf.utils.BasisSet" title="qdk_chemistry._core.data.BasisSet"><code class="xref py py-class docutils literal notranslate"><span class="pre">BasisSet</span></code></a></span></p>
@@ -3535,9 +3537,16 @@ molecule’s basis set or defaults to “pyscf_basis”.</p></li>
 </ul>
 </dd>
 <dt class="field-odd">Returns<span class="colon">:</span></dt>
-<dd class="field-odd"><p>QDK/Chemistry BasisSet instance initialized with the PySCF basis set data.</p>
+<dd class="field-odd"><p>QDK/Chemistry BasisSet instance initialized with the PySCF basis set data,
+including both regular shells and ECP shells.</p>
 </dd>
 </dl>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>ECP shells are extracted with their radial powers (r^n terms) preserved.
+Each combination of (atom, angular momentum, radial power) with non-empty
+primitives creates a separate ECP shell.</p>
+</div>
 </dd></dl>
 
 <dl class="py function">

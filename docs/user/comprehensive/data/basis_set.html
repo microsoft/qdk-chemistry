@@ -27,8 +27,8 @@
     <script src="../../../_static/js/theme.js"></script>
     <link rel="index" title="Index" href="../../../genindex.html" />
     <link rel="search" title="Search" href="../../../search.html" />
-    <link rel="next" title="Energy expectation and measurement data" href="energy_expectation.html" />
-    <link rel="prev" title="Ansatz" href="ansatz.html" /> 
+    <link rel="next" title="Hamiltonian" href="hamiltonian.html" />
+    <link rel="prev" title="Serialization" href="serialization.html" /> 
 </head>
 
 <body class="wy-body-for-nav"> 
@@ -54,9 +54,9 @@
 <ul class="current">
 <li class="toctree-l1"><a class="reference internal" href="../../quickstart.html">Quickstart</a></li>
 <li class="toctree-l1 current"><a class="reference internal" href="../index.html">In-depth user guide</a><ul class="current">
-<li class="toctree-l2"><a class="reference internal" href="../design.html">Design and architecture</a></li>
-<li class="toctree-l2 current"><a class="reference internal" href="../data.html">Data classes</a><ul class="current">
-<li class="toctree-l3"><a class="reference internal" href="ansatz.html">Ansatz</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../design/index.html">Design principles of QDK/Chemistry</a></li>
+<li class="toctree-l2 current"><a class="reference internal" href="index.html">Data Management</a><ul class="current">
+<li class="toctree-l3"><a class="reference internal" href="serialization.html">Serialization</a></li>
 <li class="toctree-l3 current"><a class="current reference internal" href="#">Basis set</a><ul>
 <li class="toctree-l4"><a class="reference internal" href="#overview">Overview</a></li>
 <li class="toctree-l4"><a class="reference internal" href="#usage">Usage</a></li>
@@ -71,18 +71,14 @@
 <li class="toctree-l4"><a class="reference internal" href="#related-topics">Related topics</a></li>
 </ul>
 </li>
-<li class="toctree-l3"><a class="reference internal" href="energy_expectation.html">Energy expectation and measurement data</a></li>
 <li class="toctree-l3"><a class="reference internal" href="hamiltonian.html">Hamiltonian</a></li>
 <li class="toctree-l3"><a class="reference internal" href="orbitals.html">Orbitals</a></li>
-<li class="toctree-l3"><a class="reference internal" href="qpe_results.html">Quantum phase estimation results</a></li>
-<li class="toctree-l3"><a class="reference internal" href="qubit_hamiltonian.html">Qubit Hamiltonian</a></li>
-<li class="toctree-l3"><a class="reference internal" href="stability_results.html">Stability results</a></li>
 <li class="toctree-l3"><a class="reference internal" href="structure.html">Structure</a></li>
-<li class="toctree-l3"><a class="reference internal" href="wavefunction.html">Wavefunction</a></li>
 </ul>
 </li>
-<li class="toctree-l2"><a class="reference internal" href="../algorithms.html">Algorithms</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../algorithms/index.html">Available algorithms</a></li>
 <li class="toctree-l2"><a class="reference internal" href="../keywords.html">Functionals and basis sets</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../model_hamiltonians.html">Model Hamiltonians</a></li>
 <li class="toctree-l2"><a class="reference internal" href="../plugins.html">Plugins</a></li>
 </ul>
 </li>
@@ -113,7 +109,7 @@
   <ul class="wy-breadcrumbs">
       <li><a href="../../../index.html" class="icon icon-home" aria-label="Home"></a></li>
           <li class="breadcrumb-item"><a href="../index.html">In-depth user guide</a></li>
-          <li class="breadcrumb-item"><a href="../data.html">Data classes</a></li>
+          <li class="breadcrumb-item"><a href="index.html">Data Management</a></li>
       <li class="breadcrumb-item active">Basis set</li>
       <li class="wy-breadcrumbs-aside">
             <a href="../../../_sources/user/comprehensive/data/basis_set.rst.txt" rel="nofollow"> View page source</a>
@@ -240,7 +236,7 @@ Manual creation is primarily for advanced use cases or when working with custom 
 </section>
 <section id="accessing-basis-set-data">
 <h2>Accessing basis set data<a class="headerlink" href="#accessing-basis-set-data" title="Link to this heading"></a></h2>
-<p>Following the <a class="reference internal" href="../advanced/design_principles.html"><span class="doc">immutable design principle</span></a> used throughout QDK/Chemistry, all getter methods return const references or copies of the data.
+<p>Following the <span class="xref std std-doc">immutable design principle</span> used throughout QDK/Chemistry, all getter methods return const references or copies of the data.
 This ensures that the basis set data remains consistent and prevents accidental modifications that could lead to inconsistent states.</p>
 <div class="admonition note">
 <p class="admonition-title">Note</p>
@@ -272,7 +268,7 @@ changes rather than trying to modify an existing one.</p>
 
 <span class="c1">// Get indices for specific atoms or orbital types</span>
 <span class="c1">// Returns std::vector&lt;size_t&gt;</span>
-<span class="k">auto</span><span class="w"> </span><span class="n">basis_indices</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">basis_set</span><span class="p">.</span><span class="n">get_basis_fuction_indices_for_atom</span><span class="p">(</span><span class="mi">1</span><span class="p">);</span>
+<span class="k">auto</span><span class="w"> </span><span class="n">basis_indices</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">basis_set</span><span class="p">.</span><span class="n">get_basis_function_indices_for_atom</span><span class="p">(</span><span class="mi">1</span><span class="p">);</span>
 <span class="c1">// Returns std::vector&lt;size_t&gt;</span>
 <span class="k">auto</span><span class="w"> </span><span class="n">shell_indices</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">basis_set</span><span class="p">.</span><span class="n">get_shell_indices_for_orbital_type</span><span class="p">(</span><span class="n">OrbitalType</span><span class="o">::</span><span class="n">P</span><span class="p">);</span>
 <span class="c1">// Returns std::vector&lt;size_t&gt;</span>
@@ -345,7 +341,7 @@ changes rather than trying to modify an existing one.</p>
 <p>This example shows the API pattern. For complete working examples, see the test suite.</p>
 </div>
 <div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="c1"># # Get indices for specific atoms/orbitals</span>
-<span class="c1"># basis_indices = basis_set.get_basis_fuction_indices_for_atom(0)</span>
+<span class="c1"># basis_indices = basis_set.get_basis_function_indices_for_atom(0)</span>
 <span class="c1"># shell_indices = basis_set.get_shell_indices_for_orbital_type(OrbitalType.P)</span>
 
 <span class="c1"># # Check validity</span>
@@ -367,7 +363,7 @@ changes rather than trying to modify an existing one.</p>
 <section id="serialization">
 <h2>Serialization<a class="headerlink" href="#serialization" title="Link to this heading"></a></h2>
 <p>The <code class="docutils literal notranslate"><span class="pre">BasisSet</span></code> class supports serialization to and from JSON and HDF5 formats.
-For detailed information about serialization in QDK/Chemistry, see the <a class="reference internal" href="../advanced/serialization.html"><span class="doc">Serialization</span></a> documentation.</p>
+For detailed information about serialization in QDK/Chemistry, see the <span class="xref std std-doc">Serialization</span> documentation.</p>
 <div class="admonition note">
 <p class="admonition-title">Note</p>
 <p>All basis set-related files require the <code class="docutils literal notranslate"><span class="pre">.basis_set</span></code> suffix before the file type extension, for example <code class="docutils literal notranslate"><span class="pre">molecule.basis_set.json</span></code> and <code class="docutils literal notranslate"><span class="pre">h2.basis_set.h5</span></code> for JSON and HDF5 files respectively.
@@ -567,8 +563,8 @@ The availability may depend on your QDK/Chemistry installation.</p>
 <section id="related-topics">
 <h2>Related topics<a class="headerlink" href="#related-topics" title="Link to this heading"></a></h2>
 <ul class="simple">
-<li><p><a class="reference internal" href="../advanced/serialization.html"><span class="doc">Serialization</span></a>: Data serialization and deserialization</p></li>
-<li><p><a class="reference internal" href="../advanced/settings.html"><span class="doc">Settings</span></a>: Configuration settings for algorithms</p></li>
+<li><p><span class="xref std std-doc">Serialization</span>: Data serialization and deserialization</p></li>
+<li><p><span class="xref std std-doc">Settings</span>: Configuration settings for algorithms</p></li>
 <li><p><span class="xref std std-doc">Supported basis sets</span>: List of pre-defined basis sets available in QDK/Chemistry</p></li>
 </ul>
 </section>
@@ -578,8 +574,8 @@ The availability may depend on your QDK/Chemistry installation.</p>
            </div>
           </div>
           <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
-        <a href="ansatz.html" class="btn btn-neutral float-left" title="Ansatz" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
-        <a href="energy_expectation.html" class="btn btn-neutral float-right" title="Energy expectation and measurement data" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+        <a href="serialization.html" class="btn btn-neutral float-left" title="Serialization" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+        <a href="hamiltonian.html" class="btn btn-neutral float-right" title="Hamiltonian" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
     </div>
 
   <hr/>

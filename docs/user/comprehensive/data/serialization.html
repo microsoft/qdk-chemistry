@@ -6,7 +6,7 @@
   <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
 
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Serialization in QDK/Chemistry &mdash; qdk-chemistry 1.0.0-rc1 documentation</title>
+  <title>Serialization &mdash; qdk-chemistry 1.0.0-rc1 documentation</title>
       <link rel="stylesheet" type="text/css" href="../../../_static/pygments.css?v=b86133f3" />
       <link rel="stylesheet" type="text/css" href="../../../_static/css/theme.css?v=e59714d7" />
       <link rel="stylesheet" type="text/css" href="../../../_static/tabs.css?v=4c969af8" />
@@ -26,8 +26,8 @@
     <script src="../../../_static/js/theme.js"></script>
     <link rel="index" title="Index" href="../../../genindex.html" />
     <link rel="search" title="Search" href="../../../search.html" />
-    <link rel="next" title="Interface system in QDK/Chemistry" href="interfaces.html" />
-    <link rel="prev" title="Factory pattern in QDK/Chemistry" href="factory_pattern.html" /> 
+    <link rel="next" title="Basis set" href="basis_set.html" />
+    <link rel="prev" title="Data Management" href="index.html" /> 
 </head>
 
 <body class="wy-body-for-nav"> 
@@ -53,10 +53,9 @@
 <ul class="current">
 <li class="toctree-l1"><a class="reference internal" href="../../quickstart.html">Quickstart</a></li>
 <li class="toctree-l1 current"><a class="reference internal" href="../index.html">In-depth user guide</a><ul class="current">
-<li class="toctree-l2 current"><a class="reference internal" href="../design.html">Design and architecture</a><ul class="current">
-<li class="toctree-l3"><a class="reference internal" href="design_principles.html">Design principles of QDK/Chemistry</a></li>
-<li class="toctree-l3"><a class="reference internal" href="factory_pattern.html">Factory pattern in QDK/Chemistry</a></li>
-<li class="toctree-l3 current"><a class="current reference internal" href="#">Serialization in QDK/Chemistry</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="../design/index.html">Design principles of QDK/Chemistry</a></li>
+<li class="toctree-l2 current"><a class="reference internal" href="index.html">Data Management</a><ul class="current">
+<li class="toctree-l3 current"><a class="current reference internal" href="#">Serialization</a><ul>
 <li class="toctree-l4"><a class="reference internal" href="#overview">Overview</a></li>
 <li class="toctree-l4"><a class="reference internal" href="#supported-formats">Supported formats</a></li>
 <li class="toctree-l4"><a class="reference internal" href="#common-serialization-interface">Common serialization interface</a></li>
@@ -64,14 +63,15 @@
 <li class="toctree-l4"><a class="reference internal" href="#related-topics">Related topics</a></li>
 </ul>
 </li>
-<li class="toctree-l3"><a class="reference internal" href="interfaces.html">Interface system in QDK/Chemistry</a></li>
-<li class="toctree-l3"><a class="reference internal" href="settings.html">Settings</a></li>
-<li class="toctree-l3"><a class="reference internal" href="model_hamiltonians.html">Model Hamiltonians</a></li>
+<li class="toctree-l3"><a class="reference internal" href="basis_set.html">Basis set</a></li>
+<li class="toctree-l3"><a class="reference internal" href="hamiltonian.html">Hamiltonian</a></li>
+<li class="toctree-l3"><a class="reference internal" href="orbitals.html">Orbitals</a></li>
+<li class="toctree-l3"><a class="reference internal" href="structure.html">Structure</a></li>
 </ul>
 </li>
-<li class="toctree-l2"><a class="reference internal" href="../data.html">Data classes</a></li>
-<li class="toctree-l2"><a class="reference internal" href="../algorithms.html">Algorithms</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../algorithms/index.html">Available algorithms</a></li>
 <li class="toctree-l2"><a class="reference internal" href="../keywords.html">Functionals and basis sets</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../model_hamiltonians.html">Model Hamiltonians</a></li>
 <li class="toctree-l2"><a class="reference internal" href="../plugins.html">Plugins</a></li>
 </ul>
 </li>
@@ -102,10 +102,10 @@
   <ul class="wy-breadcrumbs">
       <li><a href="../../../index.html" class="icon icon-home" aria-label="Home"></a></li>
           <li class="breadcrumb-item"><a href="../index.html">In-depth user guide</a></li>
-          <li class="breadcrumb-item"><a href="../design.html">Design and architecture</a></li>
-      <li class="breadcrumb-item active">Serialization in QDK/Chemistry</li>
+          <li class="breadcrumb-item"><a href="index.html">Data Management</a></li>
+      <li class="breadcrumb-item active">Serialization</li>
       <li class="wy-breadcrumbs-aside">
-            <a href="../../../_sources/user/comprehensive/advanced/serialization.rst.txt" rel="nofollow"> View page source</a>
+            <a href="../../../_sources/user/comprehensive/data/serialization.rst.txt" rel="nofollow"> View page source</a>
       </li>
   </ul>
   <hr/>
@@ -113,8 +113,8 @@
           <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
            <div itemprop="articleBody">
              
-  <section id="serialization-in-qdk-chemistry">
-<h1>Serialization in QDK/Chemistry<a class="headerlink" href="#serialization-in-qdk-chemistry" title="Link to this heading"></a></h1>
+  <section id="serialization">
+<h1>Serialization<a class="headerlink" href="#serialization" title="Link to this heading"></a></h1>
 <p>QDK/Chemistry provides comprehensive serialization capabilities for all its data classes, allowing you to save and load
 computational results in various formats.
 This document explains the serialization mechanisms and formats supported by QDK/Chemistry.</p>
@@ -229,12 +229,12 @@ Each data class page includes examples of the JSON and HDF5 schema used for seri
 </tr>
 </thead>
 <tbody>
-<tr class="row-even"><td><p><a class="reference internal" href="../data/structure.html"><span class="doc">Structure</span></a></p></td>
+<tr class="row-even"><td><p><a class="reference internal" href="structure.html"><span class="doc">Structure</span></a></p></td>
 <td><p><code class="docutils literal notranslate"><span class="pre">.structure.json</span></code></p></td>
 <td><p><code class="docutils literal notranslate"><span class="pre">.structure.h5</span></code></p></td>
 <td><p><code class="docutils literal notranslate"><span class="pre">.structure.xyz</span></code></p></td>
 </tr>
-<tr class="row-odd"><td><p><a class="reference internal" href="../data/basis_set.html"><span class="doc">BasisSet</span></a></p></td>
+<tr class="row-odd"><td><p><a class="reference internal" href="basis_set.html"><span class="doc">BasisSet</span></a></p></td>
 <td><p><code class="docutils literal notranslate"><span class="pre">.basis_set.json</span></code></p></td>
 <td><p><code class="docutils literal notranslate"><span class="pre">.basis_set.h5</span></code></p></td>
 <td><ul class="simple">
@@ -242,7 +242,7 @@ Each data class page includes examples of the JSON and HDF5 schema used for seri
 </ul>
 </td>
 </tr>
-<tr class="row-even"><td><p><a class="reference internal" href="../data/orbitals.html"><span class="doc">Orbitals</span></a></p></td>
+<tr class="row-even"><td><p><a class="reference internal" href="orbitals.html"><span class="doc">Orbitals</span></a></p></td>
 <td><p><code class="docutils literal notranslate"><span class="pre">.orbitals.json</span></code></p></td>
 <td><p><code class="docutils literal notranslate"><span class="pre">.orbitals.h5</span></code></p></td>
 <td><ul class="simple">
@@ -250,12 +250,12 @@ Each data class page includes examples of the JSON and HDF5 schema used for seri
 </ul>
 </td>
 </tr>
-<tr class="row-odd"><td><p><a class="reference internal" href="../data/hamiltonian.html"><span class="doc">Hamiltonian</span></a></p></td>
+<tr class="row-odd"><td><p><a class="reference internal" href="hamiltonian.html"><span class="doc">Hamiltonian</span></a></p></td>
 <td><p><code class="docutils literal notranslate"><span class="pre">.hamiltonian.json</span></code></p></td>
 <td><p><code class="docutils literal notranslate"><span class="pre">.hamiltonian.h5</span></code></p></td>
 <td><p><code class="docutils literal notranslate"><span class="pre">hamiltonian.fcidump</span></code></p></td>
 </tr>
-<tr class="row-even"><td><p><a class="reference internal" href="../data/wavefunction.html"><span class="doc">Wavefunction</span></a></p></td>
+<tr class="row-even"><td><p><span class="xref std std-doc">Wavefunction</span></p></td>
 <td><p><code class="docutils literal notranslate"><span class="pre">.wavefunction.json</span></code></p></td>
 <td><p><code class="docutils literal notranslate"><span class="pre">.wavefunction.h5</span></code></p></td>
 <td><ul class="simple">
@@ -269,11 +269,11 @@ Each data class page includes examples of the JSON and HDF5 schema used for seri
 <section id="related-topics">
 <h2>Related topics<a class="headerlink" href="#related-topics" title="Link to this heading"></a></h2>
 <ul class="simple">
-<li><p><a class="reference internal" href="../data/structure.html"><span class="doc">Structure</span></a>: Molecular geometry and atomic information</p></li>
-<li><p><a class="reference internal" href="../data/basis_set.html"><span class="doc">BasisSet</span></a>: Quantum chemistry basis set definitions</p></li>
-<li><p><a class="reference internal" href="../data/orbitals.html"><span class="doc">Orbitals</span></a>: Molecular orbital coefficients and properties</p></li>
-<li><p><a class="reference internal" href="../data/hamiltonian.html"><span class="doc">Hamiltonian</span></a>: Electronic Hamiltonian operator</p></li>
-<li><p><a class="reference internal" href="../data/wavefunction.html"><span class="doc">Wavefunction</span></a>: Quantum mechanical wavefunction data</p></li>
+<li><p><a class="reference internal" href="structure.html"><span class="doc">Structure</span></a>: Molecular geometry and atomic information</p></li>
+<li><p><a class="reference internal" href="basis_set.html"><span class="doc">BasisSet</span></a>: Quantum chemistry basis set definitions</p></li>
+<li><p><a class="reference internal" href="orbitals.html"><span class="doc">Orbitals</span></a>: Molecular orbital coefficients and properties</p></li>
+<li><p><a class="reference internal" href="hamiltonian.html"><span class="doc">Hamiltonian</span></a>: Electronic Hamiltonian operator</p></li>
+<li><p><span class="xref std std-doc">Wavefunction</span>: Quantum mechanical wavefunction data</p></li>
 </ul>
 </section>
 </section>
@@ -282,8 +282,8 @@ Each data class page includes examples of the JSON and HDF5 schema used for seri
            </div>
           </div>
           <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
-        <a href="factory_pattern.html" class="btn btn-neutral float-left" title="Factory pattern in QDK/Chemistry" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
-        <a href="interfaces.html" class="btn btn-neutral float-right" title="Interface system in QDK/Chemistry" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+        <a href="index.html" class="btn btn-neutral float-left" title="Data Management" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+        <a href="basis_set.html" class="btn btn-neutral float-right" title="Basis set" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
     </div>
 
   <hr/>

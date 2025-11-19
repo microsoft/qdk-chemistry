@@ -26,7 +26,7 @@
     <script src="../../../_static/js/theme.js"></script>
     <link rel="index" title="Index" href="../../../genindex.html" />
     <link rel="search" title="Search" href="../../../search.html" />
-    <link rel="next" title="Quantum phase estimation results" href="qpe_results.html" />
+    <link rel="next" title="Structure" href="structure.html" />
     <link rel="prev" title="Hamiltonian" href="hamiltonian.html" /> 
 </head>
 
@@ -53,11 +53,10 @@
 <ul class="current">
 <li class="toctree-l1"><a class="reference internal" href="../../quickstart.html">Quickstart</a></li>
 <li class="toctree-l1 current"><a class="reference internal" href="../index.html">In-depth user guide</a><ul class="current">
-<li class="toctree-l2"><a class="reference internal" href="../design.html">Design and architecture</a></li>
-<li class="toctree-l2 current"><a class="reference internal" href="../data.html">Data classes</a><ul class="current">
-<li class="toctree-l3"><a class="reference internal" href="ansatz.html">Ansatz</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../design/index.html">Design principles of QDK/Chemistry</a></li>
+<li class="toctree-l2 current"><a class="reference internal" href="index.html">Data Management</a><ul class="current">
+<li class="toctree-l3"><a class="reference internal" href="serialization.html">Serialization</a></li>
 <li class="toctree-l3"><a class="reference internal" href="basis_set.html">Basis set</a></li>
-<li class="toctree-l3"><a class="reference internal" href="energy_expectation.html">Energy expectation and measurement data</a></li>
 <li class="toctree-l3"><a class="reference internal" href="hamiltonian.html">Hamiltonian</a></li>
 <li class="toctree-l3 current"><a class="current reference internal" href="#">Orbitals</a><ul>
 <li class="toctree-l4"><a class="reference internal" href="#overview">Overview</a></li>
@@ -71,15 +70,12 @@
 <li class="toctree-l4"><a class="reference internal" href="#related-topics">Related topics</a></li>
 </ul>
 </li>
-<li class="toctree-l3"><a class="reference internal" href="qpe_results.html">Quantum phase estimation results</a></li>
-<li class="toctree-l3"><a class="reference internal" href="qubit_hamiltonian.html">Qubit Hamiltonian</a></li>
-<li class="toctree-l3"><a class="reference internal" href="stability_results.html">Stability results</a></li>
 <li class="toctree-l3"><a class="reference internal" href="structure.html">Structure</a></li>
-<li class="toctree-l3"><a class="reference internal" href="wavefunction.html">Wavefunction</a></li>
 </ul>
 </li>
-<li class="toctree-l2"><a class="reference internal" href="../algorithms.html">Algorithms</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../algorithms/index.html">Available algorithms</a></li>
 <li class="toctree-l2"><a class="reference internal" href="../keywords.html">Functionals and basis sets</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../model_hamiltonians.html">Model Hamiltonians</a></li>
 <li class="toctree-l2"><a class="reference internal" href="../plugins.html">Plugins</a></li>
 </ul>
 </li>
@@ -110,7 +106,7 @@
   <ul class="wy-breadcrumbs">
       <li><a href="../../../index.html" class="icon icon-home" aria-label="Home"></a></li>
           <li class="breadcrumb-item"><a href="../index.html">In-depth user guide</a></li>
-          <li class="breadcrumb-item"><a href="../data.html">Data classes</a></li>
+          <li class="breadcrumb-item"><a href="index.html">Data Management</a></li>
       <li class="breadcrumb-item active">Orbitals</li>
       <li class="wy-breadcrumbs-aside">
             <a href="../../../_sources/user/comprehensive/data/orbitals.rst.txt" rel="nofollow"> View page source</a>
@@ -195,14 +191,14 @@ The single-argument versions (restricted setters) set the same values for both a
 <p>This example shows the API pattern. For complete working examples, see the test suite.</p>
 </div>
 <div class="highlight-python notranslate"><div class="highlight"><pre><span></span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">tempfile</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">pathlib</span><span class="w"> </span><span class="kn">import</span> <span class="n">Path</span>
+
 <span class="kn">import</span><span class="w"> </span><span class="nn">numpy</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">np</span>
 <span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.algorithms</span><span class="w"> </span><span class="kn">import</span> <span class="n">create</span>
 <span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.data</span><span class="w"> </span><span class="kn">import</span> <span class="n">Structure</span>
 
 <span class="c1"># Create H2 molecule</span>
-<span class="n">coords</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">([[</span><span class="mf">0.0</span><span class="p">,</span> <span class="mf">0.0</span><span class="p">,</span> <span class="mf">0.0</span><span class="p">],</span> <span class="p">[</span><span class="mf">0.0</span><span class="p">,</span> <span class="mf">0.0</span><span class="p">,</span> <span class="mf">1.4</span><span class="p">]])</span>
-<span class="n">structure</span> <span class="o">=</span> <span class="n">Structure</span><span class="p">(</span><span class="n">coords</span><span class="p">,</span> <span class="p">[</span><span class="s2">&quot;H&quot;</span><span class="p">,</span> <span class="s2">&quot;H&quot;</span><span class="p">])</span>
-
 </pre></div>
 </div>
 </div>
@@ -211,7 +207,7 @@ The single-argument versions (restricted setters) set the same values for both a
 <section id="accessing-orbital-data">
 <h2>Accessing Orbital Data<a class="headerlink" href="#accessing-orbital-data" title="Link to this heading"></a></h2>
 <p>The <code class="docutils literal notranslate"><span class="pre">Orbitals</span></code> class provides methods to access orbital coefficients, energies, and other properties.
-Following the <a class="reference internal" href="../advanced/design_principles.html"><span class="doc">immutable design principle</span></a> used throughout QDK/Chemistry, all getter methods return const references or copies of the data.
+Following the <span class="xref std std-doc">immutable design principle</span> used throughout QDK/Chemistry, all getter methods return const references or copies of the data.
 For spin-dependent properties, methods return pairs of (alpha, beta) data.</p>
 <div class="tab-set docutils container">
 <input checked="True" class="tab-input" id="tab-set--1-input--1" name="tab-set--1" type="radio"><label class="tab-label" for="tab-set--1-input--1">C++ API</label><div class="tab-content docutils container">
@@ -249,7 +245,10 @@ For spin-dependent properties, methods return pairs of (alpha, beta) data.</p>
 <p class="admonition-title">Note</p>
 <p>This example shows the API pattern. For complete working examples, see the test suite.</p>
 </div>
-<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="c1"># orbs_unrestricted = Orbitals()</span>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="c1"># orbs_manual.set_coefficients(coeffs)            # Same for alpha and beta</span>
+
+<span class="c1"># set coefficients manually example (unrestricted)</span>
+<span class="c1"># orbs_unrestricted = Orbitals()</span>
 <span class="c1"># coeffs_alpha = # alpha coefficients</span>
 <span class="c1"># coeffs_beta = # beta coefficients</span>
 <span class="c1"># orbs_unrestricted.set_coefficients(coeffs_alpha, coeffs_beta)</span>
@@ -260,9 +259,6 @@ For spin-dependent properties, methods return pairs of (alpha, beta) data.</p>
 
 <span class="c1"># Access orbital energies (returns tuple of alpha/beta vectors)</span>
 <span class="n">energies_alpha</span><span class="p">,</span> <span class="n">energies_beta</span> <span class="o">=</span> <span class="n">orbitals</span><span class="o">.</span><span class="n">get_energies</span><span class="p">()</span>
-<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Orbital energies: </span><span class="si">{</span><span class="n">energies_alpha</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
-
-<span class="c1"># Access atomic orbital overlap matrix</span>
 </pre></div>
 </div>
 </div>
@@ -271,7 +267,7 @@ For spin-dependent properties, methods return pairs of (alpha, beta) data.</p>
 <section id="serialization">
 <h2>Serialization<a class="headerlink" href="#serialization" title="Link to this heading"></a></h2>
 <p>The <code class="docutils literal notranslate"><span class="pre">Orbitals</span></code> class supports serialization to and from JSON and HDF5 formats.
-For detailed information about serialization in QDK/Chemistry, see the <a class="reference internal" href="../advanced/serialization.html"><span class="doc">Serialization</span></a> documentation.</p>
+For detailed information about serialization in QDK/Chemistry, see the <span class="xref std std-doc">Serialization</span> documentation.</p>
 <div class="admonition note">
 <p class="admonition-title">Note</p>
 <p>All orbitals-related files require the <code class="docutils literal notranslate"><span class="pre">.orbitals</span></code> suffix before the file type extension, for example <code class="docutils literal notranslate"><span class="pre">molecule.orbitals.json</span></code> and <code class="docutils literal notranslate"><span class="pre">h2.orbitals.h5</span></code> for JSON and HDF5 files respectively.
@@ -319,11 +315,6 @@ For details on how basis sets are serialized, see the <span class="xref std std-
 <p>The <code class="docutils literal notranslate"><span class="pre">basis_set/</span></code> group in the HDF5 representation contains a complete serialization of the <code class="docutils literal notranslate"><span class="pre">BasisSet</span></code> object.
 For details on the HDF5 structure of basis sets, see the <span class="xref std std-ref">HDF5 Format section in the Basis Set documentation</span>.</p>
 </div>
-<div class="admonition-todo admonition" id="id1">
-<p class="admonition-title">Todo</p>
-<p>🔧 <strong>TODO</strong>: The exact structure of the basis set group in HDF5 format needs verification.
-See the “TODO” in the code block below.</p>
-</div>
 <p>HDF5 representation of an <code class="docutils literal notranslate"><span class="pre">Orbitals</span></code> object has the following structure (showing groups and datasets):</p>
 <div class="highlight-text notranslate"><div class="highlight"><pre><span></span>/
 ├── ao_overlap          # Dataset: 2D array of AO overlap matrix
@@ -344,11 +335,6 @@ See the “TODO” in the code block below.</p>
     ├── num_electrons_beta   # Dataset: uint32, number of beta electrons
     └── num_molecular_orbitals              # Dataset: uint32, number of molecular orbital coefficients
 </pre></div>
-</div>
-<div class="admonition-todo admonition" id="id2">
-<p class="admonition-title">Todo</p>
-<p>🔧 <strong>TODO</strong>: Verify if this basis set HDF5 serialization structure is complete and accurate.
-Are basis set details properly included?</p>
 </div>
 <div class="tab-set docutils container">
 <input checked="True" class="tab-input" id="tab-set--2-input--1" name="tab-set--2" type="radio"><label class="tab-label" for="tab-set--2-input--1">C++ API</label><div class="tab-content docutils container">
@@ -375,18 +361,18 @@ Are basis set details properly included?</p>
 <p class="admonition-title">Note</p>
 <p>This example shows the API pattern. For complete working examples, see the test suite.</p>
 </div>
-<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;AO overlap matrix shape: </span><span class="si">{</span><span class="n">ao_overlap</span><span class="o">.</span><span class="n">shape</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span>
+<span class="c1"># Access atomic orbital overlap matrix</span>
+<span class="n">ao_overlap</span> <span class="o">=</span> <span class="n">orbitals</span><span class="o">.</span><span class="n">get_overlap_matrix</span><span class="p">()</span>
+<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;AO overlap matrix shape: </span><span class="si">{</span><span class="n">ao_overlap</span><span class="o">.</span><span class="n">shape</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
 
 <span class="c1"># Access basis set information</span>
 <span class="n">basis_set</span> <span class="o">=</span> <span class="n">orbitals</span><span class="o">.</span><span class="n">get_basis_set</span><span class="p">()</span>
 <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Basis set: </span><span class="si">{</span><span class="n">basis_set</span><span class="o">.</span><span class="n">get_name</span><span class="p">()</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
 
-<span class="c1"># Generic serialization with format specification</span>
-<span class="n">orbitals</span><span class="o">.</span><span class="n">to_file</span><span class="p">(</span><span class="s2">&quot;molecule.orbitals.json&quot;</span><span class="p">,</span> <span class="s2">&quot;json&quot;</span><span class="p">)</span>
-<span class="n">orbitals_from_file</span> <span class="o">=</span> <span class="n">orbitals</span><span class="o">.</span><span class="n">from_file</span><span class="p">(</span><span class="s2">&quot;molecule.orbitals.json&quot;</span><span class="p">,</span> <span class="s2">&quot;json&quot;</span><span class="p">)</span>
-
-<span class="c1"># JSON serialization</span>
-<span class="n">orbitals</span><span class="o">.</span><span class="n">to_json_file</span><span class="p">(</span><span class="s2">&quot;molecule.orbitals.json&quot;</span><span class="p">)</span>
+<span class="c1"># Use a temporary directory for any file I/O</span>
+<span class="k">with</span> <span class="n">tempfile</span><span class="o">.</span><span class="n">TemporaryDirectory</span><span class="p">()</span> <span class="k">as</span> <span class="n">tmpdir</span><span class="p">:</span>
+    <span class="n">tmpdir_path</span> <span class="o">=</span> <span class="n">Path</span><span class="p">(</span><span class="n">tmpdir</span><span class="p">)</span>
 </pre></div>
 </div>
 </div>
@@ -421,8 +407,8 @@ See <a class="reference internal" href="../algorithms/hamiltonian_constructor.ht
 <section id="related-topics">
 <h2>Related topics<a class="headerlink" href="#related-topics" title="Link to this heading"></a></h2>
 <ul class="simple">
-<li><p><a class="reference internal" href="../advanced/serialization.html"><span class="doc">Serialization</span></a>: Data serialization and deserialization</p></li>
-<li><p><a class="reference internal" href="../advanced/settings.html"><span class="doc">Settings</span></a>: Configuration settings for algorithms</p></li>
+<li><p><span class="xref std std-doc">Serialization</span>: Data serialization and deserialization</p></li>
+<li><p><span class="xref std std-doc">Settings</span>: Configuration settings for algorithms</p></li>
 </ul>
 </section>
 </section>
@@ -432,7 +418,7 @@ See <a class="reference internal" href="../algorithms/hamiltonian_constructor.ht
           </div>
           <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
         <a href="hamiltonian.html" class="btn btn-neutral float-left" title="Hamiltonian" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
-        <a href="qpe_results.html" class="btn btn-neutral float-right" title="Quantum phase estimation results" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+        <a href="structure.html" class="btn btn-neutral float-right" title="Structure" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
     </div>
 
   <hr/>

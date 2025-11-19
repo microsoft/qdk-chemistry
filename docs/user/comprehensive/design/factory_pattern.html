@@ -6,7 +6,7 @@
   <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
 
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Factory pattern in QDK/Chemistry &mdash; qdk-chemistry 1.0.0-rc1 documentation</title>
+  <title>Factory pattern &mdash; qdk-chemistry 1.0.0-rc1 documentation</title>
       <link rel="stylesheet" type="text/css" href="../../../_static/pygments.css?v=b86133f3" />
       <link rel="stylesheet" type="text/css" href="../../../_static/css/theme.css?v=e59714d7" />
       <link rel="stylesheet" type="text/css" href="../../../_static/tabs.css?v=4c969af8" />
@@ -26,8 +26,8 @@
     <script src="../../../_static/js/theme.js"></script>
     <link rel="index" title="Index" href="../../../genindex.html" />
     <link rel="search" title="Search" href="../../../search.html" />
-    <link rel="next" title="Serialization in QDK/Chemistry" href="serialization.html" />
-    <link rel="prev" title="Design principles of QDK/Chemistry" href="design_principles.html" /> 
+    <link rel="next" title="Interface system" href="interfaces.html" />
+    <link rel="prev" title="Design principles of QDK/Chemistry" href="index.html" /> 
 </head>
 
 <body class="wy-body-for-nav"> 
@@ -53,11 +53,10 @@
 <ul class="current">
 <li class="toctree-l1"><a class="reference internal" href="../../quickstart.html">Quickstart</a></li>
 <li class="toctree-l1 current"><a class="reference internal" href="../index.html">In-depth user guide</a><ul class="current">
-<li class="toctree-l2 current"><a class="reference internal" href="../design.html">Design and architecture</a><ul class="current">
-<li class="toctree-l3"><a class="reference internal" href="design_principles.html">Design principles of QDK/Chemistry</a></li>
-<li class="toctree-l3 current"><a class="current reference internal" href="#">Factory pattern in QDK/Chemistry</a><ul>
+<li class="toctree-l2 current"><a class="reference internal" href="index.html">Design principles of QDK/Chemistry</a><ul class="current">
+<li class="toctree-l3 current"><a class="current reference internal" href="#">Factory pattern</a><ul>
 <li class="toctree-l4"><a class="reference internal" href="#overview-of-the-factory-pattern">Overview of the factory pattern</a></li>
-<li class="toctree-l4"><a class="reference internal" href="#id1">Factory pattern in QDK/Chemistry</a></li>
+<li class="toctree-l4"><a class="reference internal" href="#factory-pattern-in-qdk-chemistry">Factory pattern in QDK/Chemistry</a></li>
 <li class="toctree-l4"><a class="reference internal" href="#factory-classes-in-qdk-chemistry">Factory classes in QDK/Chemistry</a></li>
 <li class="toctree-l4"><a class="reference internal" href="#using-factories">Using factories</a></li>
 <li class="toctree-l4"><a class="reference internal" href="#extending-qdk-chemistry">Extending QDK/Chemistry</a></li>
@@ -65,15 +64,14 @@
 <li class="toctree-l4"><a class="reference internal" href="#related-topics">Related topics</a></li>
 </ul>
 </li>
-<li class="toctree-l3"><a class="reference internal" href="serialization.html">Serialization in QDK/Chemistry</a></li>
-<li class="toctree-l3"><a class="reference internal" href="interfaces.html">Interface system in QDK/Chemistry</a></li>
+<li class="toctree-l3"><a class="reference internal" href="interfaces.html">Interface system</a></li>
 <li class="toctree-l3"><a class="reference internal" href="settings.html">Settings</a></li>
-<li class="toctree-l3"><a class="reference internal" href="model_hamiltonians.html">Model Hamiltonians</a></li>
 </ul>
 </li>
-<li class="toctree-l2"><a class="reference internal" href="../data.html">Data classes</a></li>
-<li class="toctree-l2"><a class="reference internal" href="../algorithms.html">Algorithms</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../data/index.html">Data Management</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../algorithms/index.html">Available algorithms</a></li>
 <li class="toctree-l2"><a class="reference internal" href="../keywords.html">Functionals and basis sets</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../model_hamiltonians.html">Model Hamiltonians</a></li>
 <li class="toctree-l2"><a class="reference internal" href="../plugins.html">Plugins</a></li>
 </ul>
 </li>
@@ -104,10 +102,10 @@
   <ul class="wy-breadcrumbs">
       <li><a href="../../../index.html" class="icon icon-home" aria-label="Home"></a></li>
           <li class="breadcrumb-item"><a href="../index.html">In-depth user guide</a></li>
-          <li class="breadcrumb-item"><a href="../design.html">Design and architecture</a></li>
-      <li class="breadcrumb-item active">Factory pattern in QDK/Chemistry</li>
+          <li class="breadcrumb-item"><a href="index.html">Design principles of QDK/Chemistry</a></li>
+      <li class="breadcrumb-item active">Factory pattern</li>
       <li class="wy-breadcrumbs-aside">
-            <a href="../../../_sources/user/comprehensive/advanced/factory_pattern.rst.txt" rel="nofollow"> View page source</a>
+            <a href="../../../_sources/user/comprehensive/design/factory_pattern.rst.txt" rel="nofollow"> View page source</a>
       </li>
   </ul>
   <hr/>
@@ -115,8 +113,8 @@
           <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
            <div itemprop="articleBody">
              
-  <section id="factory-pattern-in-qdk-chemistry">
-<h1>Factory pattern in QDK/Chemistry<a class="headerlink" href="#factory-pattern-in-qdk-chemistry" title="Link to this heading"></a></h1>
+  <section id="factory-pattern">
+<h1>Factory pattern<a class="headerlink" href="#factory-pattern" title="Link to this heading"></a></h1>
 <p>QDK/Chemistry extensively uses the Factory pattern, a creational design pattern that provides an interface for creating objects without specifying their concrete classes.
 This document explains how and why QDK/Chemistry uses this pattern for algorithm instantiation.</p>
 <section id="overview-of-the-factory-pattern">
@@ -131,8 +129,8 @@ This approach has several advantages:</p>
 <li><p><strong>Extension</strong>: New implementations can be added without modifying existing code</p></li>
 </ol>
 </section>
-<section id="id1">
-<h2>Factory pattern in QDK/Chemistry<a class="headerlink" href="#id1" title="Link to this heading"></a></h2>
+<section id="factory-pattern-in-qdk-chemistry">
+<h2>Factory pattern in QDK/Chemistry<a class="headerlink" href="#factory-pattern-in-qdk-chemistry" title="Link to this heading"></a></h2>
 <p>In QDK/Chemistry, algorithm classes like <code class="docutils literal notranslate"><span class="pre">ScfSolver</span></code>, <code class="docutils literal notranslate"><span class="pre">Localizer</span></code>, and <code class="docutils literal notranslate"><span class="pre">MCCalculator</span></code> are instantiated through factory classes rather than direct constructors.
 This design allows QDK/Chemistry to:</p>
 <ul class="simple">
@@ -145,8 +143,8 @@ This design allows QDK/Chemistry to:</p>
 <section id="factory-classes-in-qdk-chemistry">
 <h2>Factory classes in QDK/Chemistry<a class="headerlink" href="#factory-classes-in-qdk-chemistry" title="Link to this heading"></a></h2>
 <p>QDK/Chemistry provides factory classes for each algorithm type:</p>
-<table class="docutils align-default" id="id2">
-<caption><span class="caption-text">QDK/Chemistry Algorithm Factories</span><a class="headerlink" href="#id2" title="Link to this table"></a></caption>
+<table class="docutils align-default" id="id1">
+<caption><span class="caption-text">QDK/Chemistry Algorithm Factories</span><a class="headerlink" href="#id1" title="Link to this table"></a></caption>
 <thead>
 <tr class="row-odd"><th class="head"><p>Algorithm</p></th>
 <th class="head"><p>Factory Class</p></th>
@@ -389,8 +387,8 @@ When a client requests an implementation by name, the factory looks up the appro
            </div>
           </div>
           <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
-        <a href="design_principles.html" class="btn btn-neutral float-left" title="Design principles of QDK/Chemistry" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
-        <a href="serialization.html" class="btn btn-neutral float-right" title="Serialization in QDK/Chemistry" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+        <a href="index.html" class="btn btn-neutral float-left" title="Design principles of QDK/Chemistry" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+        <a href="interfaces.html" class="btn btn-neutral float-right" title="Interface system" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
     </div>
 
   <hr/>

@@ -26,8 +26,8 @@
     <script src="../../../_static/js/theme.js"></script>
     <link rel="index" title="Index" href="../../../genindex.html" />
     <link rel="search" title="Search" href="../../../search.html" />
-    <link rel="next" title="Wavefunction" href="wavefunction.html" />
-    <link rel="prev" title="Stability results" href="stability_results.html" /> 
+    <link rel="next" title="Available algorithms" href="../algorithms/index.html" />
+    <link rel="prev" title="Orbitals" href="orbitals.html" /> 
 </head>
 
 <body class="wy-body-for-nav"> 
@@ -53,16 +53,12 @@
 <ul class="current">
 <li class="toctree-l1"><a class="reference internal" href="../../quickstart.html">Quickstart</a></li>
 <li class="toctree-l1 current"><a class="reference internal" href="../index.html">In-depth user guide</a><ul class="current">
-<li class="toctree-l2"><a class="reference internal" href="../design.html">Design and architecture</a></li>
-<li class="toctree-l2 current"><a class="reference internal" href="../data.html">Data classes</a><ul class="current">
-<li class="toctree-l3"><a class="reference internal" href="ansatz.html">Ansatz</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../design/index.html">Design principles of QDK/Chemistry</a></li>
+<li class="toctree-l2 current"><a class="reference internal" href="index.html">Data Management</a><ul class="current">
+<li class="toctree-l3"><a class="reference internal" href="serialization.html">Serialization</a></li>
 <li class="toctree-l3"><a class="reference internal" href="basis_set.html">Basis set</a></li>
-<li class="toctree-l3"><a class="reference internal" href="energy_expectation.html">Energy expectation and measurement data</a></li>
 <li class="toctree-l3"><a class="reference internal" href="hamiltonian.html">Hamiltonian</a></li>
 <li class="toctree-l3"><a class="reference internal" href="orbitals.html">Orbitals</a></li>
-<li class="toctree-l3"><a class="reference internal" href="qpe_results.html">Quantum phase estimation results</a></li>
-<li class="toctree-l3"><a class="reference internal" href="qubit_hamiltonian.html">Qubit Hamiltonian</a></li>
-<li class="toctree-l3"><a class="reference internal" href="stability_results.html">Stability results</a></li>
 <li class="toctree-l3 current"><a class="current reference internal" href="#">Structure</a><ul>
 <li class="toctree-l4"><a class="reference internal" href="#overview">Overview</a></li>
 <li class="toctree-l4"><a class="reference internal" href="#usage">Usage</a></li>
@@ -76,11 +72,11 @@
 <li class="toctree-l4"><a class="reference internal" href="#related-topics">Related topics</a></li>
 </ul>
 </li>
-<li class="toctree-l3"><a class="reference internal" href="wavefunction.html">Wavefunction</a></li>
 </ul>
 </li>
-<li class="toctree-l2"><a class="reference internal" href="../algorithms.html">Algorithms</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../algorithms/index.html">Available algorithms</a></li>
 <li class="toctree-l2"><a class="reference internal" href="../keywords.html">Functionals and basis sets</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../model_hamiltonians.html">Model Hamiltonians</a></li>
 <li class="toctree-l2"><a class="reference internal" href="../plugins.html">Plugins</a></li>
 </ul>
 </li>
@@ -111,7 +107,7 @@
   <ul class="wy-breadcrumbs">
       <li><a href="../../../index.html" class="icon icon-home" aria-label="Home"></a></li>
           <li class="breadcrumb-item"><a href="../index.html">In-depth user guide</a></li>
-          <li class="breadcrumb-item"><a href="../data.html">Data classes</a></li>
+          <li class="breadcrumb-item"><a href="index.html">Data Management</a></li>
       <li class="breadcrumb-item active">Structure</li>
       <li class="wy-breadcrumbs-aside">
             <a href="../../../_sources/user/comprehensive/data/structure.rst.txt" rel="nofollow"> View page source</a>
@@ -125,7 +121,7 @@
   <section id="structure">
 <h1>Structure<a class="headerlink" href="#structure" title="Link to this heading"></a></h1>
 <p>The <code class="docutils literal notranslate"><span class="pre">Structure</span></code> class in QDK/Chemistry represents a molecular structure, storing information about atomic positions, elements, and related properties for chemical systems of interest.
-As a core <a class="reference internal" href="../advanced/design_principles.html"><span class="doc">data class</span></a>, it follows QDK/Chemistry’s immutable data pattern.</p>
+As a core <span class="xref std std-doc">data class</span>, it follows QDK/Chemistry’s immutable data pattern.</p>
 <section id="overview">
 <h2>Overview<a class="headerlink" href="#overview" title="Link to this heading"></a></h2>
 <p>The <code class="docutils literal notranslate"><span class="pre">Structure</span></code> class is a fundamental data container in QDK/Chemistry that represents the geometric arrangement of atoms in a molecular system.
@@ -226,7 +222,7 @@ For detailed format specifications, see the <a class="reference internal" href="
 <div class="admonition note">
 <p class="admonition-title">Note</p>
 <p>Functions that deal with specific atoms include the word “atom” in their name (e.g., <code class="docutils literal notranslate"><span class="pre">get_atom_coordinates</span></code>), while functions that return properties for all atoms omit this word (e.g., <code class="docutils literal notranslate"><span class="pre">get_coordinates</span></code>).
-All atomic data is const and immutable once set, following QDK/Chemistry’s <a class="reference internal" href="../advanced/design_principles.html"><span class="doc">immutable data pattern</span></a>.
+All atomic data is const and immutable once set, following QDK/Chemistry’s <span class="xref std std-doc">immutable data pattern</span>.
 If you need to modify coordinates or other properties, you must create a new Structure object with the desired changes.</p>
 </div>
 <div class="tab-set docutils container">
@@ -265,7 +261,7 @@ If you need to modify coordinates or other properties, you must create a new Str
 <section id="serialization">
 <h2>Serialization<a class="headerlink" href="#serialization" title="Link to this heading"></a></h2>
 <p>The <code class="docutils literal notranslate"><span class="pre">Structure</span></code> class supports serialization to and from various formats.
-For detailed information about serialization in QDK/Chemistry, see the <a class="reference internal" href="../advanced/serialization.html"><span class="doc">Serialization</span></a> documentation.</p>
+For detailed information about serialization in QDK/Chemistry, see the <span class="xref std std-doc">Serialization</span> documentation.</p>
 <div class="admonition note">
 <p class="admonition-title">Note</p>
 <p>All structure-related files require the <code class="docutils literal notranslate"><span class="pre">.structure</span></code> suffix before the file type extension, for example <code class="docutils literal notranslate"><span class="pre">molecule.structure.xyz</span></code> and <code class="docutils literal notranslate"><span class="pre">h2.structure.json</span></code> for XYZ and JSON files respectively.
@@ -295,7 +291,7 @@ This naming convention is enforced to maintain consistency across the QDK/Chemis
 <p><a class="reference external" href="https://en.wikipedia.org/wiki/XYZ_file_format">XYZ representation</a> of the same <code class="docutils literal notranslate"><span class="pre">Structure</span></code>:</p>
 <div class="admonition note">
 <p class="admonition-title">Note</p>
-<p>QDK/Chemistry utilizes the comment field (second line) of the XYZ format to store the charge and spin multiplicity information, as this data is not part of the standard XYZ specification.</p>
+<p>QDK/Chemistry uses the comment field (second line) of the XYZ format to store the charge and spin multiplicity information, as this data is not part of the standard XYZ specification.</p>
 </div>
 <div class="highlight-text notranslate"><div class="highlight"><pre><span></span>2
 charge = 0, spin_multiplicity = 1  (TODO)
@@ -384,40 +380,6 @@ H      0.000000    0.000000    1.400000
 <h2>Units<a class="headerlink" href="#units" title="Link to this heading"></a></h2>
 <p>All internal coordinates in the <code class="docutils literal notranslate"><span class="pre">Structure</span></code> class are in Bohr by default.
 This applies to all methods that return or accept coordinates.</p>
-<div class="admonition-todo admonition" id="id1">
-<p class="admonition-title">Todo</p>
-<p>Check the Structure code below – do these functions exist?
-If not, they need to be fixed.</p>
-</div>
-<div class="tab-set docutils container">
-<input checked="True" class="tab-input" id="tab-set--5-input--1" name="tab-set--5" type="radio"><label class="tab-label" for="tab-set--5-input--1">C++ API</label><div class="tab-content docutils container">
-<div class="highlight-cpp notranslate"><div class="highlight"><pre><span></span><span class="c1">// Create a structure with coordinates in Bohr (default)</span>
-<span class="n">Structure</span><span class="w"> </span><span class="nf">structure_angstrom</span><span class="p">(</span><span class="n">coords_matrix</span><span class="p">,</span><span class="w"> </span><span class="n">elements_vector</span><span class="p">);</span>
-
-<span class="c1">// Explicitly specify units as Angstrom</span>
-<span class="n">Structure</span><span class="w"> </span><span class="n">structure_angstrom_explicit</span><span class="p">(</span><span class="n">coords_matrix</span><span class="p">,</span><span class="w"> </span><span class="n">elements_vector</span><span class="p">,</span><span class="w"> </span><span class="s">&quot;angstrom&quot;</span><span class="p">);</span>
-</pre></div>
-</div>
-</div>
-<input class="tab-input" id="tab-set--5-input--2" name="tab-set--5" type="radio"><label class="tab-label" for="tab-set--5-input--2">Python API</label><div class="tab-content docutils container">
-<div class="admonition note">
-<p class="admonition-title">Note</p>
-<p>This example shows the API pattern.
-For complete working examples, see the test suite.</p>
-</div>
-<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="c1"># structure.add_atom([1.0, 0.0, 0.0], &quot;O&quot;)  # Add an oxygen atom</span>
-
-<span class="c1"># Remove an atom</span>
-<span class="c1"># structure.remove_atom(2)  # Remove the third atom</span>
-
-</pre></div>
-</div>
-</div>
-</div>
-<div class="admonition-todo admonition" id="id2">
-<p class="admonition-title">Todo</p>
-<p>🔧 <strong>TODO</strong> Add functions to Structure documentation for getting coordinates in Bohr units, such as <code class="docutils literal notranslate"><span class="pre">get_coordinates_bohr()</span></code> and <code class="docutils literal notranslate"><span class="pre">get_atom_coordinates_bohr(index)</span></code>, for cases where atomic units are needed for calculations.</p>
-</div>
 </section>
 <section id="related-classes">
 <h2>Related classes<a class="headerlink" href="#related-classes" title="Link to this heading"></a></h2>
@@ -429,7 +391,7 @@ For complete working examples, see the test suite.</p>
 <section id="related-topics">
 <h2>Related topics<a class="headerlink" href="#related-topics" title="Link to this heading"></a></h2>
 <ul class="simple">
-<li><p><a class="reference internal" href="../advanced/serialization.html"><span class="doc">Serialization</span></a>: Data serialization and deserialization</p></li>
+<li><p><span class="xref std std-doc">Serialization</span>: Data serialization and deserialization</p></li>
 </ul>
 </section>
 </section>
@@ -438,8 +400,8 @@ For complete working examples, see the test suite.</p>
            </div>
           </div>
           <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
-        <a href="stability_results.html" class="btn btn-neutral float-left" title="Stability results" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
-        <a href="wavefunction.html" class="btn btn-neutral float-right" title="Wavefunction" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+        <a href="orbitals.html" class="btn btn-neutral float-left" title="Orbitals" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+        <a href="../algorithms/index.html" class="btn btn-neutral float-right" title="Available algorithms" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
     </div>
 
   <hr/>

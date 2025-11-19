@@ -355,9 +355,9 @@
         <span class="n">nalpha</span><span class="p">,</span> <span class="n">nbeta</span> <span class="o">=</span> <span class="n">wavefunction</span><span class="o">.</span><span class="n">get_total_num_electrons</span><span class="p">()</span>
 
         <span class="c1"># Create occupation arrays (assumes aufbau filling)</span>
-        <span class="n">num_molecular_orbitalss</span> <span class="o">=</span> <span class="n">orbitals</span><span class="o">.</span><span class="n">get_num_molecular_orbitals</span><span class="p">()</span>
-        <span class="n">occ_alpha</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">zeros</span><span class="p">(</span><span class="n">num_molecular_orbitalss</span><span class="p">)</span>
-        <span class="n">occ_beta</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">zeros</span><span class="p">(</span><span class="n">num_molecular_orbitalss</span><span class="p">)</span>
+        <span class="n">num_molecular_orbitals</span> <span class="o">=</span> <span class="n">orbitals</span><span class="o">.</span><span class="n">get_num_molecular_orbitals</span><span class="p">()</span>
+        <span class="n">occ_alpha</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">zeros</span><span class="p">(</span><span class="n">num_molecular_orbitals</span><span class="p">)</span>
+        <span class="n">occ_beta</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">zeros</span><span class="p">(</span><span class="n">num_molecular_orbitals</span><span class="p">)</span>
         <span class="n">occ_alpha</span><span class="p">[:</span><span class="n">nalpha</span><span class="p">]</span> <span class="o">=</span> <span class="mf">1.0</span>
         <span class="n">occ_beta</span><span class="p">[:</span><span class="n">nbeta</span><span class="p">]</span> <span class="o">=</span> <span class="mf">1.0</span>
 

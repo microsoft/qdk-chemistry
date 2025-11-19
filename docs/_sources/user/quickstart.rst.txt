@@ -1,27 +1,28 @@
 Quickstart
 ==========
 
+These quickstart instructions provide a high-level overview of the typical workflow when using the QDK/Chemistry library.
+More comprehensive documentation can be found in the :doc:`comprehensive/index`.
+
+Installation
+------------
+
+To install QDK/Chemistry, please see the `installation instructions <https://github.com/microsoft/qdk-chemistry/blob/main/INSTALL.md>`_.
+
+End-to-end example
+------------------
+
 This document is intended to provide a brief introduction to the QDK/Chemistry library by walking through a minimal end-to-end example for ground state energy estimation with state preparation and measurement.
 The emphasis of this example is optimization:  reducing the resources required for the quantum computer.
 The example starts with a molecular structure and ends with a simulated calculation using quantum algorithms.
 The focus of this example is on high-level concepts and common coding patterns.
-More comprehensive documentation can be found in the :doc:`comprehensive/index`.
 
-
-The QDK/Chemistry workflow
---------------------------
-
-.. graphviz:: /_static/diagrams/workflow.dot
-
-
-Classical data preparation
---------------------------
+You can also view a related code sample in a Jupyter notebook format, along with several other examples, in the `examples folder <https://github.com/microsoft/qdk-chemistry/blob/main/examples/>`_ of the GitHub repository.
 
 Create a ``Structure`` object
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 The ``Structure`` class represents a molecular structure, i.e. the coordinates of its atoms.
-
 ``Structure`` objects can be constructed manually, or via deserialization from a file.
 QDK/Chemistry supports multiple serialization formats for ``Structure`` objects, including the standard `XYZ file format <https://en.wikipedia.org/wiki/XYZ_file_format>`_, as well as QDK/Chemistry-specific JSON and HDF5 serialization schemes.
 Internally to QDK/Chemistry, coordinates are always stored in Bohr/atomic units; however, when reading or writing to files, the units follow the file format convention (XYZ) or can be specified (JSON, HDF5).
@@ -171,9 +172,6 @@ This truncation is characterized by computing the overlap between the truncated 
       :start-after: # start-cell-6
       :end-before: # end-cell-6
 
-Building the quantum circuit
-----------------------------
-
 Preparing a qubit representation of the Hamiltonian
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
@@ -198,9 +196,6 @@ Second, by grouping the remaining Pauli operators into commuting sets that can b
       :language: python
       :start-after: # start-cell-7
       :end-before: # end-cell-7
-
-Simulation and execution on a quantum simulator
------------------------------------------------
 
 Estimate the ground state energy using a quantum algorithm
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
@@ -228,5 +223,5 @@ The statistical nature of quantum measurements introduces variance in the energy
 Additional examples
 -------------------
 
-Additional examples of workflows using QDK/Chemistry can be found in the examples directory of the source repository.
+Additional examples of workflows using QDK/Chemistry can be found in the ``examples`` directory of the source repository.
 See the :doc:`comprehensive/index` for links to more detailed documentation on specific components of QDK/Chemistry.

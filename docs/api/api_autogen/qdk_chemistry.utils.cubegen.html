@@ -27,7 +27,7 @@
     <link rel="index" title="Index" href="../../genindex.html" />
     <link rel="search" title="Search" href="../../search.html" />
     <link rel="next" title="qdk_chemistry.utils.phase module" href="qdk_chemistry.utils.phase.html" />
-    <link rel="prev" title="qdk_chemistry.utils.bitstring module" href="qdk_chemistry.utils.bitstring.html" /> 
+    <link rel="prev" title="qdk_chemistry.utils.circuit module" href="qdk_chemistry.utils.circuit.html" /> 
 </head>
 
 <body class="wy-body-for-nav"> 
@@ -1152,23 +1152,35 @@ extension (e.g., <code class="docutils literal notranslate"><span class="pre">wa
 
 <dl class="py function">
 <dt class="sig sig-object py" id="qdk_chemistry.utils.cubegen.basis_to_pyscf_mol">
-<span class="sig-name descname"><span class="pre">basis_to_pyscf_mol</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">basis</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#qdk_chemistry.utils.cubegen.basis_to_pyscf_mol" title="Link to this definition"></a></dt>
+<span class="sig-name descname"><span class="pre">basis_to_pyscf_mol</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">basis</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">charge</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">0</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">multiplicity</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">1</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#qdk_chemistry.utils.cubegen.basis_to_pyscf_mol" title="Link to this definition"></a></dt>
 <dd><p>Convert QDK/Chemistry BasisSet instance to PySCF Mole object.</p>
 <p>This function extracts the structure and basis information from the QDK/Chemistry
-BasisSet instance and uses it to initialize a PySCF Mole object.</p>
+BasisSet instance and uses it to initialize a PySCF Mole object. If the BasisSet
+contains ECP shells, they are converted to PySCF’s ECP format.</p>
 <dl class="field-list simple">
 <dt class="field-odd">Return type<span class="colon">:</span></dt>
 <dd class="field-odd"><p><span class="sphinx_autodoc_typehints-type"><code class="xref py py-class docutils literal notranslate"><span class="pre">Mole</span></code></span></p>
 </dd>
 <dt class="field-even">Parameters<span class="colon">:</span></dt>
-<dd class="field-even"><p><strong>basis</strong> (<a class="reference internal" href="qdk_chemistry.plugins.pyscf.utils.html#qdk_chemistry.plugins.pyscf.utils.BasisSet" title="qdk_chemistry._core.data.BasisSet"><em>BasisSet</em></a>) – QDK/Chemistry BasisSet instance with populated basis set.</p>
+<dd class="field-even"><ul class="simple">
+<li><p><strong>basis</strong> (<a class="reference internal" href="qdk_chemistry.plugins.pyscf.utils.html#qdk_chemistry.plugins.pyscf.utils.BasisSet" title="qdk_chemistry._core.data.BasisSet"><em>BasisSet</em></a>) – QDK/Chemistry BasisSet instance with populated basis set.</p></li>
+<li><p><strong>charge</strong> (<a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(in Python v3.14)"><em>int</em></a>) – Total charge of the molecule (default: 0).</p></li>
+<li><p><strong>multiplicity</strong> (<a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(in Python v3.14)"><em>int</em></a>) – Spin multiplicity (2S + 1) of the molecule (default: 1).</p></li>
+</ul>
 </dd>
 <dt class="field-odd">Returns<span class="colon">:</span></dt>
-<dd class="field-odd"><p>PySCF Mole object initialized with the QDK/Chemistry basis set data.</p>
+<dd class="field-odd"><p>PySCF Mole object initialized with the QDK/Chemistry basis set data,
+including ECP shells if present.</p>
 </dd>
 </dl>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>When ECP shells are present, the function reconstructs the full PySCF ECP
+structure from QDK’s ECP shells with radial powers, preserving all
+exponents, coefficients, and r^n terms for each angular momentum channel.</p>
+</div>
 <p class="rubric">Examples</p>
-<div class="doctest highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="n">pyscf_mol</span> <span class="o">=</span> <span class="n">basis_to_pyscf_mol</span><span class="p">(</span><span class="n">basis</span><span class="p">)</span>
+<div class="doctest highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="n">pyscf_mol</span> <span class="o">=</span> <span class="n">basis_to_pyscf_mol</span><span class="p">(</span><span class="n">basis</span><span class="p">,</span> <span class="n">charge</span><span class="o">=</span><span class="mi">0</span><span class="p">,</span> <span class="n">multiplicity</span><span class="o">=</span><span class="mi">1</span><span class="p">)</span>
 <span class="gp">&gt;&gt;&gt; </span><span class="nb">print</span><span class="p">(</span><span class="n">pyscf_mol</span><span class="o">.</span><span class="n">atom</span><span class="p">)</span>
 </pre></div>
 </div>
@@ -1210,7 +1222,7 @@ labeling scheme is used.</p></li>
            </div>
           </div>
           <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
-        <a href="qdk_chemistry.utils.bitstring.html" class="btn btn-neutral float-left" title="qdk_chemistry.utils.bitstring module" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+        <a href="qdk_chemistry.utils.circuit.html" class="btn btn-neutral float-left" title="qdk_chemistry.utils.circuit module" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
         <a href="qdk_chemistry.utils.phase.html" class="btn btn-neutral float-right" title="qdk_chemistry.utils.phase module" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
     </div>
 
