@@ -14,7 +14,7 @@
 #include <qdk/chemistry/scf/util/libint2_util.h>
 #include <spdlog/spdlog.h>
 
-#include <qdk/chemistry/omp_utils.hpp>
+#include <qdk/chemistry/utils/omp_utils.hpp>
 
 #include "util/blas.h"
 

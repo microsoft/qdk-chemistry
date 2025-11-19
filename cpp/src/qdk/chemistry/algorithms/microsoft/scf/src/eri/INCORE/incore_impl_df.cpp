@@ -9,7 +9,7 @@
 #include <spdlog/spdlog.h>
 
 #include <libint2.hpp>
-#include <qdk/chemistry/omp_utils.hpp>
+#include <qdk/chemistry/utils/omp_utils.hpp>
 #include <stdexcept>
 
 #include "incore_impl.h"

@@ -12,7 +12,7 @@
 #include <spdlog/spdlog.h>
 
 #include <qdk/chemistry/data/wavefunction_containers/sd.hpp>
-#include <qdk/chemistry/omp_utils.hpp>
+#include <qdk/chemistry/utils/omp_utils.hpp>
 
 // Local implementation details
 #include "utils.hpp"

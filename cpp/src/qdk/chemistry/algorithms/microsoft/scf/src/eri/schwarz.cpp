@@ -14,7 +14,7 @@
 
 #include <algorithm>
 #include <cassert>
-#include <qdk/chemistry/omp_utils.hpp>
+#include <qdk/chemistry/utils/omp_utils.hpp>
 #include <vector>
 
 #include "util/timer.h"

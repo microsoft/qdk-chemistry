@@ -10,7 +10,7 @@
 #include <array>
 #include <functional>
 #include <iostream>
-#include <qdk/chemistry/omp_utils.hpp>
+#include <qdk/chemistry/utils/omp_utils.hpp>
 #ifdef ENABLE_NVTX3
 #include <nvtx3/nvtx3.hpp>
 #endif
