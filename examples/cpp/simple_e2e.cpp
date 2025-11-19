@@ -84,7 +84,8 @@ int main(int argc, char** argv) {
     auto localized_hf_wfn = localizer->run(wfn_hf, n_alpha, n_beta);
   }
 
-  // TODO (NAB):  we need an end-to-end C++ example for active space selection: 41302
+  // TODO (NAB):  we need an end-to-end C++ example for active space selection:
+  // 41302
 
   // Compute the Hamiltonian
   auto hamiltonian_constructor =
