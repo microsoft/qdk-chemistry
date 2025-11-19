@@ -47,6 +47,7 @@ RUN apt-get update && \
     gcovr \
     patchelf \
     doxygen \
+    graphviz \
     && apt-get clean \
     && rm -rf /var/lib/apt/lists/*
 
