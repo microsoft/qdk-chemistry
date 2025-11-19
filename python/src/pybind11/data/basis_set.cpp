@@ -81,8 +81,7 @@ void bind_basis_set(py::module& m) {
 
   // Bind Shell struct
   py::class_<Shell>(m, "Shell", "Shell of basis functions")
-      // TODO (NAB):  Is there a class-level docstring for this?
-      // 41395
+      // TODO (NAB):  Is there a class-level docstring for this? Workitem 41395
       .def(py::init<size_t, OrbitalType, const Eigen::VectorXd&,
                     const Eigen::VectorXd&>(),
            R"(

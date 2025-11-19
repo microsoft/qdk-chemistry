@@ -9,8 +9,6 @@ jobs:
       versionSpec: '3.13'
     displayName: Use Python 3.13
 
-  # The PipAuthenticate@1 task is required to mitigate the 'Index url error - WARNING: The index url "Please visit https://aka.ms/cfs/pypi to fix this index." seems invalid, please provide a scheme'
-  # For more details, please refer to: https://eng.ms/docs/cloud-ai-platform/devdiv/one-engineering-system-1es/1es-docs/secure-supply-chain/secure-supply-chain-analysis-task/cfs-detectors/pypi/cfs-pypi
   - task: PipAuthenticate@1
     displayName: Pip Authenticate
     inputs:

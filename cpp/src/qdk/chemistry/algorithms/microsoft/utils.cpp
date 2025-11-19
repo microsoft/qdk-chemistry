@@ -173,8 +173,7 @@ qdk::chemistry::data::BasisSet convert_basis_set_to_qdk(
   // Check if we're encountering edge cases
   if (not basis_set.pure) {
     // TODO (NAB):  is basis_set.pure always false for cartesian basis sets?
-    // Does it mean anything else?
-    // 41332
+    // Does it mean anything else? Work item: 41332
     throw std::runtime_error("QDK Does Not Support Cartesian Basis Functions");
   }
 
