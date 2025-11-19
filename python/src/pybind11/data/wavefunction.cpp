@@ -567,7 +567,6 @@ void bind_wavefunction(pybind11::module& data) {
   // orbitals are active.  Same comment applies to other methods that refer to
   // "active orbitals". Workitem: 41398
 
-
   wavefunction.def("get_single_orbital_entropies",
                    &Wavefunction::get_single_orbital_entropies,
                    R"(
