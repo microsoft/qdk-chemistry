@@ -11,9 +11,10 @@
 #include <cuda_runtime.h>
 #include <qdk/chemistry/scf/util/gpu/cuda_helper.h>
 #endif
-#include <omp.h>
 #include <qdk/chemistry/scf/util/libint2_util.h>
 #include <spdlog/spdlog.h>
+
+#include <qdk/chemistry/omp_utils.hpp>
 
 #include "util/blas.h"
 

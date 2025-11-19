@@ -4,7 +4,6 @@
 
 #include "scf/ks_impl.h"
 
-#include <omp.h>
 #include <qdk/chemistry/scf/config.h>
 #include <qdk/chemistry/scf/eri/eri_multiplexer.h>
 #include <qdk/chemistry/scf/scf/scf_solver.h>
@@ -17,6 +16,7 @@
 #include <iostream>
 #include <nlohmann/json.hpp>
 #include <numeric>
+#include <qdk/chemistry/omp_utils.hpp>
 #include <sstream>
 #include <thread>
 

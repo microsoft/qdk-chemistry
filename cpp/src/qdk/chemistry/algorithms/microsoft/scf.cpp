@@ -4,7 +4,6 @@
 
 #include "scf.hpp"
 
-#include <omp.h>
 #include <qdk/chemistry/scf/core/molecule.h>
 #include <qdk/chemistry/scf/core/scf.h>
 #include <qdk/chemistry/scf/scf/scf_solver.h>
@@ -13,6 +12,7 @@
 #include <spdlog/spdlog.h>
 
 #include <qdk/chemistry/data/wavefunction_containers/sd.hpp>
+#include <qdk/chemistry/omp_utils.hpp>
 
 // Local implementation details
 #include "utils.hpp"

@@ -4,10 +4,10 @@
 
 #include "libint2_direct.h"
 
-#include <omp.h>
 #include <qdk/chemistry/scf/core/types.h>
 #include <qdk/chemistry/scf/util/libint2_util.h>
 
+#include <qdk/chemistry/omp_utils.hpp>
 #include <stdexcept>
 
 #include "util/timer.h"

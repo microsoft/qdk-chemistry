@@ -20,10 +20,10 @@
 #include <utility>
 #include <vector>
 
+#include "#include <qdk/chemistry/omp_utils.hpp>"
 #include "Eigen/Dense"
 #include "libecpint.hpp"
 #include "libint2.hpp"
-#include "omp.h"
 #include "spdlog/spdlog.h"
 #include "util/macros.h"
 #include "util/mpi_vars.h"

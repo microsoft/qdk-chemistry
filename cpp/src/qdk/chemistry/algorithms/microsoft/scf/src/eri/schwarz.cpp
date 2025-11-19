@@ -10,11 +10,11 @@
 #ifdef QDK_CHEMISTRY_ENABLE_MPI
 #include <mpi.h>
 #endif
-#include <omp.h>
 #include <spdlog/spdlog.h>
 
 #include <algorithm>
 #include <cassert>
+#include <qdk/chemistry/omp_utils.hpp>
 #include <vector>
 
 #include "util/timer.h"
