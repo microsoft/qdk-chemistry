@@ -424,8 +424,7 @@ class TestPyscfPlugin:
 
         # Check that we get reasonable results
         assert isinstance(energy, float)
-        # TODO (NAB):  change output to logger rather than print() here and elsewhere
-        # 40460
+        # TODO (NAB):  change output to logger rather than print() here and elsewhere, workitem:40460
         assert abs(energy - (-149.49029917454197)) < scf_energy_tolerance
         assert orbitals is not None
         assert orbitals.has_basis_set()

@@ -565,8 +565,8 @@ void bind_wavefunction(pybind11::module& data) {
 
   // TODO (NAB):  it would be helpful to explain how to mark or check whether
   // orbitals are active.  Same comment applies to other methods that refer to
-  // "active orbitals".
-  // 41398
+  // "active orbitals". Workitem: 41398
+
 
   wavefunction.def("get_single_orbital_entropies",
                    &Wavefunction::get_single_orbital_entropies,
@@ -1026,8 +1026,8 @@ void bind_wavefunction(pybind11::module& data) {
 
   // Bind CasWavefunctionContainer
   // TODO (NAB): explain what makes this different from the generic wavefunction
-  // class
-  // 41400
+  // class 41400
+
   py::class_<CasWavefunctionContainer, WavefunctionContainer, py::smart_holder>(
       data, "CasWavefunctionContainer",
       R"(

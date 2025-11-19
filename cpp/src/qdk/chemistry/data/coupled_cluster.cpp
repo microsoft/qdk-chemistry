@@ -27,8 +27,7 @@ CoupledClusterAmplitudes::CoupledClusterAmplitudes(
                   num_molecular_orbitals - _num_occupied.second};
 
   // Validate dimension of input tensors
-  // TODO: This is incorrect for Unrestricted.
-  // 41348
+  // TODO: This is incorrect for Unrestricted. Workitem: 41348
   if (not orbitals->is_restricted()) {
     throw std::runtime_error(
         "CoupledClusterAmplitudes + Unrestricted Not Yet Implemented");

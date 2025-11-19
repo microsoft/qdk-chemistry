@@ -83,8 +83,7 @@ plugins = [
   "pyscf>=2.9.0"
 ]
 
-# TODO (NAB): update these URLs with final ones
-# 41430
+# TODO (NAB): update these URLs with final ones, workitem: 41430
 [project.urls]
 Documentation = "https://qdk-chemistry.readthedocs.io"
 Homepage = "https://github.com/example/qdk-chemistry"
