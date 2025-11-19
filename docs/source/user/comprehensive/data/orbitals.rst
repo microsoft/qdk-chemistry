@@ -181,10 +181,6 @@ HDF5 format
    The ``basis_set/`` group in the HDF5 representation contains a complete serialization of the ``BasisSet`` object.
    For details on the HDF5 structure of basis sets, see the :ref:`HDF5 Format section in the Basis Set documentation <hdf5-format>`.
 
-.. todo::
-   🔧 **TODO**: The exact structure of the basis set group in HDF5 format needs verification.
-   See the "TODO" in the code block below.
-
 HDF5 representation of an ``Orbitals`` object has the following structure (showing groups and datasets):
 
 .. code-block:: text
@@ -207,10 +203,6 @@ HDF5 representation of an ``Orbitals`` object has the following structure (showi
        ├── num_electrons_alpha  # Dataset: uint32, number of alpha electrons
        ├── num_electrons_beta   # Dataset: uint32, number of beta electrons
        └── num_molecular_orbitals              # Dataset: uint32, number of molecular orbital coefficients
-
-.. todo::
-   🔧 **TODO**: Verify if this basis set HDF5 serialization structure is complete and accurate.
-   Are basis set details properly included?
 
 .. tab:: C++ API
 

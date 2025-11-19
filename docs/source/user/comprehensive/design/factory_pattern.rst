@@ -1,5 +1,5 @@
-Factory pattern in QDK/Chemistry
-================================
+Factory pattern
+===============
 
 QDK/Chemistry extensively uses the Factory pattern, a creational design pattern that provides an interface for creating objects without specifying their concrete classes.
 This document explains how and why QDK/Chemistry uses this pattern for algorithm instantiation.

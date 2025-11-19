@@ -23,6 +23,8 @@ Key Features
    user/quickstart
    user/comprehensive/index
 
+.. _apidocs:
+
 .. toctree::
    :maxdepth: 2
    :caption:  API Reference

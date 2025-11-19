@@ -39,15 +39,22 @@ def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
     parser.add_argument(
         "--xyz",
         type=Path,
-        help="Path to an XYZ geometry file. Defaults to examples/structure/water.structure.xyz.",
+        help="Path to an XYZ geometry file. Defaults to examples/data/water.structure.xyz.",
     )
     parser.add_argument(
         "--basis",
         default="cc-pvdz",
         help="Basis set applied to the SCF solver (default: cc-pvdz).",
     )
-    parser.add_argument("--charge", type=int, default=0, help="Total molecular charge (default: 0).")
-    parser.add_argument("--spin", type=int, default=1, help="Spin multiplicity (2S+1). Default assumes a singlet (1).")
+    parser.add_argument(
+        "--charge", type=int, default=0, help="Total molecular charge (default: 0)."
+    )
+    parser.add_argument(
+        "--spin",
+        type=int,
+        default=1,
+        help="Spin multiplicity (2S+1). Default assumes a singlet (1).",
+    )
     parser.add_argument(
         "--num-active-electrons",
         type=int,
@@ -103,7 +110,7 @@ def main(argv: Sequence[str] | None = None) -> None:
     ########################################################################################
     # 1. Load the target structure (fallback to the water example bundled with these demos).
     ########################################################################################
-    default_structure = Path(__file__).resolve().parent / "structure" / "water.structure.xyz"
+    default_structure = Path(__file__).resolve().parent / "data" / "water.structure.xyz"
     structure_path = args.xyz or default_structure
     if not structure_path.is_file():
         raise FileNotFoundError(f"XYZ file {structure_path} not found.")
@@ -124,8 +131,16 @@ def main(argv: Sequence[str] | None = None) -> None:
     # 3. Select the valence active space (heuristic or user overrides).
     ########################################################################################
     inferred_e, inferred_orb = compute_valence_space(scf_wavefunction, args.charge)
-    electrons = args.num_active_electrons if args.num_active_electrons is not None else inferred_e
-    orbitals = args.num_active_orbitals if args.num_active_orbitals is not None else inferred_orb
+    electrons = (
+        args.num_active_electrons
+        if args.num_active_electrons is not None
+        else inferred_e
+    )
+    orbitals = (
+        args.num_active_orbitals
+        if args.num_active_orbitals is not None
+        else inferred_orb
+    )
 
     selector = create("active_space_selector", "qdk_valence")
     settings = selector.settings()
@@ -147,10 +162,14 @@ def main(argv: Sequence[str] | None = None) -> None:
     ########################################################################################
     # 5. Run the initial CASCI calculation.
     ########################################################################################
-    casci_calculator = create("multi_configuration_calculator", args.initial_active_space_solver)
+    casci_calculator = create(
+        "multi_configuration_calculator", args.initial_active_space_solver
+    )
     casci_calculator.settings().set("calculate_one_rdm", True)
     casci_calculator.settings().set("calculate_two_rdm", True)
-    e_cas, wfn_cas = casci_calculator.run(active_hamiltonian, *active_orbital_wavefunction.get_active_num_electrons())
+    e_cas, wfn_cas = casci_calculator.run(
+        active_hamiltonian, *active_orbital_wavefunction.get_active_num_electrons()
+    )
     total_casci_energy = e_cas + core_energy
     LOGGER.info("CASCI energy = %.8f Hartree", total_casci_energy)
 
@@ -167,11 +186,15 @@ def main(argv: Sequence[str] | None = None) -> None:
         indices, _ = refined_wfn.get_orbitals().get_active_space_indices()
         LOGGER.info("AutoCAS selected active space with indices: %s", indices)
         if len(indices) == 0:
-            LOGGER.warning("AutoCAS did not identify correlated orbitals; retaining the initial space.")
+            LOGGER.warning(
+                "AutoCAS did not identify correlated orbitals; retaining the initial space."
+            )
         else:
             refined_orbitals = refined_wfn.get_orbitals()
             active_hamiltonian = hamiltonian_constructor.run(refined_orbitals)
-            e_cas, wfn_cas = casci_calculator.run(active_hamiltonian, *refined_wfn.get_active_num_electrons())
+            e_cas, wfn_cas = casci_calculator.run(
+                active_hamiltonian, *refined_wfn.get_active_num_electrons()
+            )
             core_energy = active_hamiltonian.get_core_energy()
             total_casci_energy = e_cas + core_energy
             LOGGER.info(active_hamiltonian.get_summary())
