@@ -10,7 +10,8 @@ RUN apt-get update && apt-get install -y locales && \
 
 ENV LANG=en_US.UTF-8 \
     LANGUAGE=en_US:en \
-    LC_ALL=en_US.UTF-8
+    LC_ALL=en_US.UTF-8 \
+    QDK_UARCH=native
 
 # Create a non-root user with sudo privileges
 ARG USERNAME=vscode
