@@ -21,9 +21,11 @@ To get started:
 
 Alternatively, you can click the green button in the bottom-left corner of VS Code and select "Reopen in Container" from the menu.
 
-**NOTE:** Building the development environment can take some time, on slower systems this can be up to two hours.
+**NOTES:**
 
-**NOTE:** Using a VS Code Dev Container may require elevated permissions on the current system to allow for Docker usage.
+- Building the development environment can take some time, on slower systems this can be up to two hours.
+- Using a VS Code Dev Container may require elevated permissions on the current system to allow for Docker usage.
+- You will likely need to restart VS Code and the Dev Container (reopening in the container) before running examples.  The restart will load the Python virtual environment into the continer.
 
 ## Building from Source
 
