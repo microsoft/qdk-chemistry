@@ -15,11 +15,11 @@ permissions:
 jobs:
   cpp-python:
     name: Build C++ and Python packages
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-22.04-16core
     env:
       BUILD_DIR: cpp/build
       INSTALL_PREFIX: ${{ github.workspace }}/cpp/install
-      CMAKE_BUILD_PARALLEL_LEVEL: 4
+      CMAKE_BUILD_PARALLEL_LEVEL: 16
       QDK_UARCH: x86-64-v3
       CTEST_OUTPUT_ON_FAILURE: 1
     steps:
