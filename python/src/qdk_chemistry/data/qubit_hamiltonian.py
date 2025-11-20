@@ -117,10 +117,7 @@ class QubitHamiltonian(DataClass):
     def get_summary(self) -> str:
         """Get a human-readable summary of the Hamiltonian."""
         return (
-            f"Qubit Hamiltonian\n"
-            f"  Number of qubits: {self.num_qubits}\n"
-            f"  Number of terms: {len(self.pauli_strings)}\n"
-            f"  Exact energy: {self.exact_energy:.6f}"
+            f"Qubit Hamiltonian\n  Number of qubits: {self.num_qubits}\n  Number of terms: {len(self.pauli_strings)}\n"
         )
 
     def to_json(self) -> dict[str, Any]:
