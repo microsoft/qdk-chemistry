@@ -18,7 +18,6 @@ apt-get install -y \
     libffi-dev liblzma-dev \
     libeigen3-dev \
     nlohmann-json3-dev \
-    libhdf5-dev \
     libopenblas-dev \
     libboost-all-dev \
     libgtest-dev \
@@ -38,17 +37,27 @@ apt-get install -y \
 # Upgrade cmake as Ubuntu 22.04 only has up to v3.22 in apt
 apt-get purge -y cmake
 if [[ ${MARCH} == 'armv8-a' ]]; then
-    wget https://github.com/Kitware/CMake/releases/download/v3.28.3/cmake-3.28.3-linux-aarch64.sh
+    wget -q https://github.com/Kitware/CMake/releases/download/v3.28.3/cmake-3.28.3-linux-aarch64.sh
     chmod +x cmake-3.28.3-linux-aarch64.sh
     /bin/sh cmake-3.28.3-linux-aarch64.sh --skip-license --prefix=/usr/local
     rm cmake-3.28.3-linux-aarch64.sh
 elif [[ ${MARCH} == 'x86-64-v3' ]]; then
-    wget https://github.com/Kitware/CMake/releases/download/v3.28.3/cmake-3.28.3-linux-x86_64.sh
+    wget -q https://github.com/Kitware/CMake/releases/download/v3.28.3/cmake-3.28.3-linux-x86_64.sh
     chmod +x cmake-3.28.3-linux-x86_64.sh
     /bin/sh cmake-3.28.3-linux-x86_64.sh --skip-license --prefix=/usr/local
     rm cmake-3.28.3-linux-x86_64.sh
 fi
 cmake --version
+
+echo "Downloading HDF5 $HDF5_VERSION..."
+wget -q -nc --no-check-certificate https://support.hdfgroup.org/ftp/HDF5/releases/hdf5-1.13/hdf5-${HDF5_VERSION}/src/hdf5-${HDF5_VERSION}.tar.bz2
+tar -xjf hdf5-${HDF5_VERSION}.tar.bz2
+rm hdf5-${HDF5_VERSION}.tar.bz2
+mv hdf5-${HDF5_VERSION} hdf5
+echo "HDF5 $HDF5_VERSION downloaded and extracted successfully"
+
+echo "Installing HDF5..."
+bash .pipelines/install-scripts/install-hdf5.sh /usr/local ${BUILD_TYPE} ${PWD}
 
 # Install pyenv to use non-system python3 versions
 export PYENV_ROOT="/workspace/.pyenv" && \
@@ -75,16 +84,14 @@ cmake -S cpp -B build_cpp -G Ninja \
   -DCMAKE_CXX_FLAGS=-march=${MARCH} \
   -DCMAKE_C_FLAGS=-march=${MARCH} \
   -DQDK_UARCH=${MARCH} \
-  -DCMAKE_INSTALL_PREFIX=/workspace/qdk-chemistry/install
+  -DCMAKE_INSTALL_PREFIX=/workspace/qdk-chemistry/install \
+  -DQDK_ENABLE_OPENMP=OFF
 cmake -S cpp -B build_cpp -G Ninja $CMAKE_FLAGS
 cmake --build build_cpp --target all
 cmake --build build_cpp --target install
 
-# Install Python package
+# Install Python package and build wheel
 cd python
-python3 -m pip install -e .[plugins] --verbose
-
-# Build wheel
 python3 -m build --wheel
 
 # Repair wheel
