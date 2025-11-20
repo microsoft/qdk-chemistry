@@ -15,7 +15,7 @@ permissions:
 jobs:
   coverage:
     name: Build, Test, and Coverage Analysis
-    runs-on: [self-hosted, 1ES.Pool=1es-gh-hb120-pool, 'JobId=qdk-chemistry-unittests-${{ github.run_id }}-${{ github.run_number }}-${{ github.run_attempt }}']
+    runs-on: [self-hosted, 1ES.Pool=1es-gh-hb120-pool]
     env:
       BUILD_DIR: cpp/build
       INSTALL_PREFIX: ${{ github.workspace }}/cpp/install
