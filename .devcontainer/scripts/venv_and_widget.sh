@@ -19,16 +19,6 @@ which rustc
 # Install ipykernel
 pip install ipykernel ipywidgets pandas
 
-# Build and install C++ dependencies first
-echo "Building C++ dependencies..."
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-REPO_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
-mkdir -p /tmp/qdk_cpp_build
-cd /tmp/qdk_cpp_build
-cmake "$REPO_ROOT/cpp" -DCMAKE_BUILD_TYPE=Release
-make install-dependencies -j4
-rm -rf /tmp/qdk_cpp_build
-
 # Install QDK Chemistry package
 cd "$REPO_ROOT/python"
 export CMAKE_BUILD_PARALLEL_LEVEL=4
