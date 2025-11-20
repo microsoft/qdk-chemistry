@@ -33,7 +33,6 @@
 // One can also include <qdk/chemistry.hpp> to get all QDK/Chemistry components
 #include <qdk/chemistry/algorithms/active_space.hpp>
 #include <qdk/chemistry/algorithms/hamiltonian.hpp>
-#include <qdk/chemistry/algorithms/localization.hpp>
 #include <qdk/chemistry/algorithms/mc.hpp>
 #include <qdk/chemistry/algorithms/scf.hpp>
 #include <qdk/chemistry/constants.hpp>
