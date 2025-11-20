@@ -714,7 +714,7 @@ def test_basis_set_file_io_validation():
         basis = BasisSet.from_hdf5_file("test.h5")
 
     # Test non-existent file
-    with pytest.raises(RuntimeError, match="Cannot open file for reading"):
+    with pytest.raises(RuntimeError, match="Unable to open BasisSet JSON file"):
         basis = BasisSet.from_json_file("nonexistent.basis_set.json")
 
     with pytest.raises(RuntimeError):
