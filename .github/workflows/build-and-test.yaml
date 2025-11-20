@@ -15,7 +15,7 @@ permissions:
 jobs:
   cpp-python:
     name: Build C++ and Python packages
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, 1ES.Pool=1es-gh-hb120-pool, 'JobId=qdk-chemistry-unittests-${{ github.run_id }}-${{ github.run_number }}-${{ github.run_attempt }}']
     env:
       BUILD_DIR: cpp/build
       INSTALL_PREFIX: ${{ github.workspace }}/cpp/install
