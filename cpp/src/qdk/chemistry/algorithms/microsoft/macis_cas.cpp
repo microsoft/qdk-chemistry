@@ -48,7 +48,7 @@ struct cas_helper {
     const size_t num_molecular_orbitals = active_indices.size();
 
     const auto& T = hamiltonian.get_one_body_integrals();
-    const auto& V = hamiltonian.get_two_body_integrals();
+    const auto& [V, V_aabb, V_bbbb] = hamiltonian.get_two_body_integrals();
 
     // get settings
     macis::MCSCFSettings mcscf_settings = get_mcscf_settings_(settings_);

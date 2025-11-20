@@ -149,11 +149,14 @@ class Hamiltonian : public DataClass,
   const Eigen::MatrixXd& get_one_body_integrals_beta() const;
 
   /**
-   * @brief Get two-electron integrals in MO basis
-   * @return Reference to two-electron integrals vector
+   * @brief Get two-electron integrals in MO basis for all spin channels
+   * @return Tuple of references to (aaaa, aabb, bbbb) two-electron integrals
+   * vectors
    * @throws std::runtime_error if integrals are not set
    */
-  const Eigen::VectorXd& get_two_body_integrals() const;
+  std::tuple<const Eigen::VectorXd&, const Eigen::VectorXd&,
+             const Eigen::VectorXd&>
+  get_two_body_integrals() const;
 
   /**
    * @brief Get specific two-electron integral element
@@ -174,27 +177,6 @@ class Hamiltonian : public DataClass,
    * @return True if two-body integrals are set
    */
   bool has_two_body_integrals() const;
-
-  /**
-   * @brief Get alpha-alpha two-electron integrals in MO basis
-   * @return Reference to alpha-alpha two-electron integrals vector
-   * @throws std::runtime_error if integrals are not set
-   */
-  const Eigen::VectorXd& get_two_body_integrals_aaaa() const;
-
-  /**
-   * @brief Get alpha-beta two-electron integrals in MO basis
-   * @return Reference to alpha-beta two-electron integrals vector
-   * @throws std::runtime_error if integrals are not set
-   */
-  const Eigen::VectorXd& get_two_body_integrals_aabb() const;
-
-  /**
-   * @brief Get beta-beta two-electron integrals in MO basis
-   * @return Reference to beta-beta two-electron integrals vector
-   * @throws std::runtime_error if integrals are not set
-   */
-  const Eigen::VectorXd& get_two_body_integrals_bbbb() const;
 
   /**
    * @brief Get inactive Fock matrix for the selected active space

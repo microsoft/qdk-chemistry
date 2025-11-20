@@ -46,8 +46,6 @@ class Orbitals : public DataClass,
    * @param ao_overlap The atomic orbital overlap matrix (optional)
    * @param basis_set The basis set as shared pointer
    * @param indices Orbital indices (shared for alpha/beta)
-   * @todo TODO (NAB):  need to clarify the purpose/scope of these indices
-   * 41469
    */
   Orbitals(const Eigen::MatrixXd& coefficients,
            const std::optional<Eigen::VectorXd>& energies,
@@ -65,8 +63,6 @@ class Orbitals : public DataClass,
    * @param ao_overlap The atomic orbital overlap matrix (optional)
    * @param basis_set The basis set as shared pointer
    * @param indices Orbital indices (shared for alpha/beta)
-   * @todo TODO (NAB):  need to clarify the purpose/scope of these indices
-   * 41469
    */
   Orbitals(const Eigen::MatrixXd& coefficients_alpha,
            const Eigen::MatrixXd& coefficients_beta,
@@ -547,8 +543,6 @@ class ModelOrbitals : public Orbitals {
    * @brief Constructor with active and inactive space indices (restricted)
    * @param basis_size Number of basis functions (and molecular orbitals)
    * @param indices Orbital indices (shared for alpha/beta)
-   * @todo TODO (NAB):  need to clarify the purpose/scope of these indices
-   * 41469
    */
   ModelOrbitals(
       size_t basis_size,
@@ -558,8 +552,6 @@ class ModelOrbitals : public Orbitals {
    * @brief Constructor with active and inactive space indices (unrestricted)
    * @param basis_size Number of basis functions (and molecular orbitals)
    * @param indices Orbital indices (shared for alpha/beta)
-   * @todo TODO (NAB):  need to clarify the purpose/scope of these indices
-   * 41469
    */
   ModelOrbitals(
       size_t basis_size,

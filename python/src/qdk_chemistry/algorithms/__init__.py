@@ -9,17 +9,14 @@ custom algorithms that can be registered and used within the QDK/Chemistry frame
 # Licensed under the MIT License. See LICENSE.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
 
-# TODO (NAB):  Need to add copyright here and elsewhere.
-# 41401
-
 from qdk_chemistry._core._algorithms import (
     ActiveSpaceSelector,
-    CoupledClusterCalculator,
     HamiltonianConstructor,
     Localizer,
     MultiConfigurationCalculator,
     MultiConfigurationScf,
     ProjectedMultiConfigurationCalculator,
+    ReferenceDerivedCalculator,
     ScfSolver,
     StabilityChecker,
 )
@@ -45,7 +42,6 @@ from qdk_chemistry.phase_estimation import (
 __all__ = [
     # Classes
     "ActiveSpaceSelector",
-    "CoupledClusterCalculator",
     "EnergyEstimator",
     "HamiltonianConstructor",
     "IterativePhaseEstimation",
@@ -57,6 +53,7 @@ __all__ = [
     "PhaseEstimationAlgorithm",
     "ProjectedMultiConfigurationCalculator",
     "QubitMapper",
+    "ReferenceDerivedCalculator",
     "ScfSolver",
     "StabilityChecker",
     "StatePreparation",

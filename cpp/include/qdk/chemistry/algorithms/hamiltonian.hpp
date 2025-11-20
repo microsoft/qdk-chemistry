@@ -86,7 +86,7 @@ class HamiltonianConstructor
 
  protected:
   /**
-   * @brief Implementation of Hamiltonian construction
+   * @brief Implementation of Hamiltonian construction.
    *
    * This method contains the actual construction logic. It is automatically
    * called by run() after settings have been locked.

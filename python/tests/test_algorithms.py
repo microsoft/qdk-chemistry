@@ -11,12 +11,12 @@ import pytest
 from qdk_chemistry import algorithms
 from qdk_chemistry.algorithms import (
     ActiveSpaceSelector,
-    CoupledClusterCalculator,
     HamiltonianConstructor,
     Localizer,
     MultiConfigurationCalculator,
     MultiConfigurationScf,
     ProjectedMultiConfigurationCalculator,
+    ReferenceDerivedCalculator,
     ScfSolver,
     StabilityChecker,
     StatePreparation,
@@ -25,7 +25,7 @@ from qdk_chemistry.data import (
     Ansatz,
     CasWavefunctionContainer,
     Configuration,
-    CoupledClusterAmplitudes,
+    CoupledClusterContainer,
     Hamiltonian,
     Orbitals,
     Settings,
@@ -305,7 +305,7 @@ class MockMultiConfigurationScf(MultiConfigurationScf):
         return "mock_mcscf_solver"
 
 
-class MockCoupledClusterCalculator(CoupledClusterCalculator):
+class MockCoupledClusterCalculator(ReferenceDerivedCalculator):
     """A test calculator for coupled cluster methods."""
 
     def __init__(self):
@@ -317,6 +317,10 @@ class MockCoupledClusterCalculator(CoupledClusterCalculator):
         self._settings._set_default("numeric_param", "double", 0.0)
         self._settings._set_default("list_param", "vector<int>", [])
 
+    def name(self):
+        """Return the algorithm name."""
+        return "mock_coupled_cluster_calculator"
+
     def _run_impl(self, ansatz):
         """Implement the calculate method."""
         # Create a properly set up orbital object with canonical and restricted characteristics
@@ -324,7 +328,7 @@ class MockCoupledClusterCalculator(CoupledClusterCalculator):
         coeffs = np.array([[1.0, 0.0], [0.0, 1.0]])
         # Set orbital energies (important for canonical orbitals)
         # The occupied orbital should have lower energy than the virtual
-        energies = np.array([-1.0, 0.5])  # First orbital has lower energy
+        energies = np.array([-1.0, 0.5])
         # Set occupations for restricted case (2.0 = doubly occupied, 0.0 = unoccupied)
         # This makes it both restricted (same alpha/beta) and canonical (integer occupations)
         orbs = Orbitals(coeffs, energies, None, create_test_basis_set(2))
@@ -337,17 +341,16 @@ class MockCoupledClusterCalculator(CoupledClusterCalculator):
         # T2 size = (num_occupied * num_virtual)^2 = (1 * 1)^2 = 1
         t2 = np.array([0.005])
 
-        num_alpha, num_beta = ansatz.get_wavefunction().get_total_num_electrons()
+        # Get reference determinants from the original wavefunction
+        original_wavefunction = ansatz.get_wavefunction()
+        references = original_wavefunction.get_active_determinants()
 
-        # Create a dummy coupled cluster result
-        cc = CoupledClusterAmplitudes(orbs, t1, t2, num_alpha, num_beta)
+        # Create CoupledClusterContainer with T1 and T2 amplitudes
+        cc_container = CoupledClusterContainer(orbs, references, t1, t2)
 
-        # Return energy and coupled cluster amplitudes object
-        return -10.0, cc
+        updated_wavefunction = Wavefunction(cc_container)
 
-    def name(self) -> str:
-        """Return the algorithm name."""
-        return "mock_coupled_cluster_calculator"
+        return -10.0, updated_wavefunction
 
 
 class TestAlgorithmClasses:
@@ -567,10 +570,10 @@ class TestAlgorithmClasses:
         assert isinstance(wavefunction, Wavefunction)
 
     def test_coupled_cluster_calculator_inheritance(self, test_ansatz):
-        """Test that CoupledClusterCalculator can be inherited from Python."""
+        """Test that MockCoupledClusterCalculator can be used as a ReferenceDerivedCalculator."""
         # Create instance
         coupled_cluster_calculator = MockCoupledClusterCalculator()
-        assert isinstance(coupled_cluster_calculator, CoupledClusterCalculator)
+        assert isinstance(coupled_cluster_calculator, ReferenceDerivedCalculator)
 
         # Test settings method
         settings = coupled_cluster_calculator.settings()
@@ -581,34 +584,38 @@ class TestAlgorithmClasses:
         assert settings["cc_type"] == "CCSD(T)"
 
         # Test calculate method with basic hamiltonian
-        energy, cc_result = coupled_cluster_calculator.run(test_ansatz)
+        energy, updated_wavefunction = coupled_cluster_calculator.run(test_ansatz)
 
         # Check results
         assert isinstance(energy, float)
-        assert isinstance(cc_result, CoupledClusterAmplitudes)
-        assert cc_result.has_t1_amplitudes()
-        assert cc_result.has_t2_amplitudes()
+        assert isinstance(updated_wavefunction, Wavefunction)
 
-        # Check orbital counts to verify restricted orbitals setup
-        alpha_occ, beta_occ = cc_result.get_num_occupied()
-        alpha_virt, beta_virt = cc_result.get_num_virtual()
+        # Get amplitudes from the wavefunction container
+        cc_container = updated_wavefunction.get_container()
+        assert cc_container.has_t1_amplitudes()
+        assert cc_container.has_t2_amplitudes()
 
-        # For restricted orbitals, alpha and beta counts should match
-        assert alpha_occ == beta_occ
-        assert alpha_virt == beta_virt
+        # Verify T1 and T2 amplitudes can be retrieved
+        # get_t1_amplitudes returns (t1_alpha, t1_beta) for spin-separated amplitudes
+        t1_alpha, t1_beta = cc_container.get_t1_amplitudes()
+        t2_amplitudes = cc_container.get_t2_amplitudes()
 
-        # Check that we have 1 occupied and 1 virtual orbital as set in the mock
-        assert alpha_occ == 1
-        assert alpha_virt == 1
+        # Check that amplitudes are not None and have correct values
+        assert t1_alpha is not None
+        assert t1_beta is not None
 
-        # Verify the orbitals are properly set
-        orbs_pair = cc_result.get_num_occupied()
-        assert orbs_pair[0] == 1  # One alpha occupied
-        assert orbs_pair[1] == 1  # One beta occupied
+        # For restricted case with 1 occupied and 1 virtual orbital
+        # T1 should be a 1D array with shape (1,) containing 0.01
+        assert t1_alpha.shape == (1,)
+        assert np.isclose(t1_alpha[0], 0.01)
+        assert t1_beta.shape == (1,)
+        assert np.isclose(t1_beta[0], 0.01)
 
-        virtual_pair = cc_result.get_num_virtual()
-        assert virtual_pair[0] == 1  # One alpha virtual
-        assert virtual_pair[1] == 1  # One beta virtual
+        # T2 should contain 0.005
+        t2_ab = t2_amplitudes[0] if len(t2_amplitudes) > 0 else None
+        assert t2_ab is not None
+        assert t2_ab.shape == (1,)
+        assert np.isclose(t2_ab[0], 0.005)
 
     def test_scf_solver_registration(self):
         """Test that SCF solver can be registered and used."""
@@ -762,7 +769,7 @@ class TestAlgorithmClasses:
         assert isinstance(mcscf_solver, MockMultiConfigurationScf)
 
     def test_coupled_cluster_calculator_registration(self):
-        """Test that CoupledClusterCalculator can be registered and used."""
+        """Test that MockCoupledClusterCalculator can be registered and used as a ReferenceDerivedCalculator."""
 
         def _test_register_coupled_cluster_calculator():
             """Dummy function to simulate registration."""
@@ -770,16 +777,16 @@ class TestAlgorithmClasses:
 
         # Register the calculator
         key = "mock_coupled_cluster_calculator"
-        if key in algorithms.available("coupled_cluster_calculator"):
-            algorithms.unregister("coupled_cluster_calculator", key)  # Ensure clean state
-        assert key not in algorithms.available("coupled_cluster_calculator")
+        if key in algorithms.available("reference_derived_calculator"):
+            algorithms.unregister("reference_derived_calculator", key)  # Ensure clean state
+        assert key not in algorithms.available("reference_derived_calculator")
         algorithms.register(_test_register_coupled_cluster_calculator)
 
         # Verify registration worked
-        assert key in algorithms.available("coupled_cluster_calculator")
+        assert key in algorithms.available("reference_derived_calculator")
 
         # Test that the correct instance is created
-        coupled_cluster_calculator = algorithms.create("coupled_cluster_calculator", key)
+        coupled_cluster_calculator = algorithms.create("reference_derived_calculator", key)
         assert isinstance(coupled_cluster_calculator, MockCoupledClusterCalculator)
 
     def test_algorithm_repr(self):
@@ -792,13 +799,12 @@ class TestAlgorithmClasses:
         cc = MockCoupledClusterCalculator()
         sp = MockStatePreparation()
 
-        # Test that repr works (exact string may vary)
         assert "MultiConfigurationCalculator" in repr(mc)
         assert "HamiltonianConstructor" in repr(ham_constructor)
         assert "ScfSolver" in repr(scf)
         assert "ActiveSpaceSelector" in repr(selector)
         assert "MultiConfigurationScf" in repr(mcscf)
-        assert "CoupledClusterCalculator" in repr(cc)
+        assert "ReferenceDerivedCalculator" in repr(cc)
         assert "StatePreparation" in repr(sp)
 
     def test_settings_interface(self):

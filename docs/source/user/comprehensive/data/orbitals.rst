@@ -246,7 +246,9 @@ The ``Orbitals`` class serves as a foundation for several important quantum chem
   See :doc:`ActiveSpaceSelector <../algorithms/active_space>` for details.
 
 - **Hamiltonian Construction**: Build electronic Hamiltonians for post-HF methods using the orbital information.
-  See :doc:`HamiltonianConstructor <../algorithms/hamiltonian_constructor>` for details.
+  Both restricted and unrestricted Hamiltonians are automatically constructed based on the matching orbital type (restricted or unrestricted).
+  See :doc:`HamiltonianConstructor <../algorithms/hamiltonian_constructor>` and :doc:`Hamiltonian <hamiltonian>` (including the :ref:`Unrestricted Hamiltonians <hamiltonian:unrestricted hamiltonians>` section) for details.
+
 
 Related classes
 ---------------

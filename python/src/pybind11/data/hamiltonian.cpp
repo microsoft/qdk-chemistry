@@ -242,6 +242,54 @@ void bind_hamiltonian(pybind11::module& data) {
         ...     print("One-body integrals not available")
         )");
 
+  hamiltonian.def("get_one_body_integrals_alpha",
+                  &Hamiltonian::get_one_body_integrals_alpha,
+                  R"(
+        Get alpha one-electron integrals in MO basis
+
+        Returns
+        -------
+        numpy.ndarray
+            Alpha one electron integrals matrix
+
+        Raises
+        ------
+        RuntimeError
+            If one-body integrals have not been set
+
+        Examples
+        --------
+        >>> if hamiltonian.has_one_body_integrals():
+        ...     integrals_alpha = hamiltonian.get_one_body_integrals_alpha()
+        ... else:
+        ...     print("One-body integrals not available")
+        )",
+                  py::return_value_policy::reference_internal);
+
+  hamiltonian.def("get_one_body_integrals_beta",
+                  &Hamiltonian::get_one_body_integrals_beta,
+                  R"(
+        Get beta one-electron integrals in MO basis
+
+        Returns
+        -------
+        numpy.ndarray
+            Beta one electron integrals matrix
+
+        Raises
+        ------
+        RuntimeError
+            If one-body integrals have not been set
+
+        Examples
+        --------
+        >>> if hamiltonian.has_one_body_integrals():
+        ...     integrals_beta = hamiltonian.get_one_body_integrals_beta()
+        ... else:
+        ...     print("One-body integrals not available")
+        )",
+                  py::return_value_policy::reference_internal);
+
   // Two-body integral access
   bind_getter_as_property(hamiltonian, "get_two_body_integrals",
                           &Hamiltonian::get_two_body_integrals,
@@ -250,9 +298,9 @@ void bind_hamiltonian(pybind11::module& data) {
 
         Returns
         -------
-        numpy.ndarray
-            Two-electron integral vector [norb^4] containing
-            electron-electron repulsion integrals stored in chemist notation
+        tuple[numpy.ndarray, numpy.ndarray, numpy.ndarray]
+            Tuple of two-electron integral vectors [norb^4] containing
+            electron-electron repulsion integrals aaaa, aabb and bbbb
 
         Raises
         ------
@@ -261,12 +309,12 @@ void bind_hamiltonian(pybind11::module& data) {
 
         Notes
         -----
-        The integrals are stored as a flattened vector in chemist notation
+        Each of the integrals are stored as a flattened vector in chemist notation
         <ij|kl> where the indices are ordered as i + j*norb + k*norb^2 + l*norb^3
 
         Examples
         --------
-        >>> h2 = hamiltonian.get_two_body_integrals()
+        >>> (h2, _, _) = hamiltonian.get_two_body_integrals()
         >>> print(f"Two-body vector length: {len(h2)}")
         >>> norb = hamiltonian.get_num_orbitals()
         >>> print(f"Expected length: {norb**4}")
@@ -307,7 +355,7 @@ void bind_hamiltonian(pybind11::module& data) {
         Examples
         --------
         >>> if hamiltonian.has_two_body_integrals():
-        ...     integrals = hamiltonian.get_two_body_integrals()
+        ...     integrals_tuple = hamiltonian.get_two_body_integrals()
         ... else:
         ...     print("Two-body integrals not available")
         )");
@@ -368,8 +416,41 @@ void bind_hamiltonian(pybind11::module& data) {
         >>> print(f"Core energy: {e_core} hartree")
         )");
 
-  bind_getter_as_property(hamiltonian, "get_summary", &Hamiltonian::get_summary,
-                          R"(
+  hamiltonian.def("is_restricted", &Hamiltonian::is_restricted,
+                  R"(
+        Check if Hamiltonian is restricted by checking if alpha
+        and beta components are the same.
+
+        Returns
+        -------
+        bool
+            Whether or not the hamiltonian is restricted
+
+        Examples
+        --------
+        >>> restricted = hamiltonian.is_restricted()
+        >>> print(f"Hamiltonian is restricted: {restricted}")
+        )");
+
+  hamiltonian.def("is_unrestricted", &Hamiltonian::is_unrestricted,
+                  R"(
+        Check if Hamiltonian is unrestricted by checking if alpha
+        and beta components are different.
+
+        Returns
+        -------
+        bool
+            Whether or not the hamiltonian is unrestricted
+
+        Examples
+        --------
+        >>> unrestricted = hamiltonian.is_unrestricted()
+        >>> print(f"Hamiltonian is unrestricted: {unrestricted}")
+        )");
+
+  // === Summary ===
+  hamiltonian.def("get_summary", &Hamiltonian::get_summary,
+                  R"(
         Get a human-readable summary of the Hamiltonian data.
 
         Returns

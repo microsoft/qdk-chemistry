@@ -13,18 +13,12 @@ from pathlib import Path
 import numpy as np
 import pytest
 
+from qdk_chemistry.data import Hamiltonian, ModelOrbitals, Orbitals
+
 from .reference_tolerances import float_comparison_absolute_tolerance, float_comparison_relative_tolerance
 from .test_helpers import create_test_basis_set, create_test_hamiltonian, create_test_orbitals
 
-try:
-    from qdk_chemistry.data import Hamiltonian, Orbitals
 
-    HAMILTONIAN_AVAILABLE = True
-except ImportError:
-    HAMILTONIAN_AVAILABLE = False
-
-
-@pytest.mark.skipif(not HAMILTONIAN_AVAILABLE, reason="Hamiltonian class not available")
 class TestHamiltonian:
     def test_default_constructor(self):
         h = create_test_hamiltonian(2)
@@ -52,7 +46,12 @@ class TestHamiltonian:
         assert h.get_orbitals().get_num_molecular_orbitals() == 2
         assert h.get_core_energy() == 1.5
         np.testing.assert_array_equal(h.get_one_body_integrals(), one_body)
-        np.testing.assert_array_equal(h.get_two_body_integrals(), two_body)
+        # get_two_body_integrals returns (aaaa, aabb, bbbb) tuple
+        aaaa, aabb, bbbb = h.get_two_body_integrals()
+        # For restricted case, all should be the same and equal to two_body
+        np.testing.assert_array_equal(aaaa, two_body)
+        np.testing.assert_array_equal(aabb, two_body)
+        np.testing.assert_array_equal(bbbb, two_body)
 
     def test_one_body_integrals(self):
         one_body = np.array([[1.0, 0.2], [0.2, 1.5]])
@@ -69,7 +68,12 @@ class TestHamiltonian:
         orbitals = create_test_orbitals(2)
         h = Hamiltonian(one_body, two_body, orbitals, 0.0, np.array([]))
         assert h.has_two_body_integrals()
-        np.testing.assert_array_equal(h.get_two_body_integrals(), two_body)
+        # get_two_body_integrals returns (aaaa, aabb, bbbb) tuple
+        aaaa, aabb, bbbb = h.get_two_body_integrals()
+        # For restricted case, all should be the same and equal to two_body
+        np.testing.assert_array_equal(aaaa, two_body)
+        np.testing.assert_array_equal(aabb, two_body)
+        np.testing.assert_array_equal(bbbb, two_body)
 
     def test_two_body_element_access(self):
         h = create_test_hamiltonian(2)
@@ -110,9 +114,24 @@ class TestHamiltonian:
             rtol=float_comparison_relative_tolerance,
             atol=float_comparison_absolute_tolerance,
         )
+        # Compare each component of the two-body integrals tuple
+        h_aaaa, h_aabb, h_bbbb = h.get_two_body_integrals()
+        h2_aaaa, h2_aabb, h2_bbbb = h2.get_two_body_integrals()
         assert np.allclose(
-            h.get_two_body_integrals(),
-            h2.get_two_body_integrals(),
+            h_aaaa,
+            h2_aaaa,
+            rtol=float_comparison_relative_tolerance,
+            atol=float_comparison_absolute_tolerance,
+        )
+        assert np.allclose(
+            h_aabb,
+            h2_aabb,
+            rtol=float_comparison_relative_tolerance,
+            atol=float_comparison_absolute_tolerance,
+        )
+        assert np.allclose(
+            h_bbbb,
+            h2_bbbb,
             rtol=float_comparison_relative_tolerance,
             atol=float_comparison_absolute_tolerance,
         )
@@ -142,9 +161,24 @@ class TestHamiltonian:
                 rtol=float_comparison_relative_tolerance,
                 atol=float_comparison_absolute_tolerance,
             )
+            # Compare each component of the two-body integrals tuple
+            h_aaaa, h_aabb, h_bbbb = h.get_two_body_integrals()
+            h2_aaaa, h2_aabb, h2_bbbb = h2.get_two_body_integrals()
             assert np.allclose(
-                h.get_two_body_integrals(),
-                h2.get_two_body_integrals(),
+                h_aaaa,
+                h2_aaaa,
+                rtol=float_comparison_relative_tolerance,
+                atol=float_comparison_absolute_tolerance,
+            )
+            assert np.allclose(
+                h_aabb,
+                h2_aabb,
+                rtol=float_comparison_relative_tolerance,
+                atol=float_comparison_absolute_tolerance,
+            )
+            assert np.allclose(
+                h_bbbb,
+                h2_bbbb,
                 rtol=float_comparison_relative_tolerance,
                 atol=float_comparison_absolute_tolerance,
             )
@@ -176,9 +210,24 @@ class TestHamiltonian:
                 rtol=float_comparison_relative_tolerance,
                 atol=float_comparison_absolute_tolerance,
             )
+            # Compare each component of the two-body integrals tuple
+            h_aaaa, h_aabb, h_bbbb = h.get_two_body_integrals()
+            h2_aaaa, h2_aabb, h2_bbbb = h2.get_two_body_integrals()
             assert np.allclose(
-                h.get_two_body_integrals(),
-                h2.get_two_body_integrals(),
+                h_aaaa,
+                h2_aaaa,
+                rtol=float_comparison_relative_tolerance,
+                atol=float_comparison_absolute_tolerance,
+            )
+            assert np.allclose(
+                h_aabb,
+                h2_aabb,
+                rtol=float_comparison_relative_tolerance,
+                atol=float_comparison_absolute_tolerance,
+            )
+            assert np.allclose(
+                h_bbbb,
+                h2_bbbb,
                 rtol=float_comparison_relative_tolerance,
                 atol=float_comparison_absolute_tolerance,
             )
@@ -302,7 +351,11 @@ class TestHamiltonian:
             np.testing.assert_array_equal(h_restored.get_one_body_integrals(), h.get_one_body_integrals())
 
         if h.has_two_body_integrals():
-            np.testing.assert_array_equal(h_restored.get_two_body_integrals(), h.get_two_body_integrals())
+            h_aaaa, h_aabb, h_bbbb = h.get_two_body_integrals()
+            h_restored_aaaa, h_restored_aabb, h_restored_bbbb = h_restored.get_two_body_integrals()
+            np.testing.assert_array_equal(h_restored_aaaa, h_aaaa)
+            np.testing.assert_array_equal(h_restored_aabb, h_aabb)
+            np.testing.assert_array_equal(h_restored_bbbb, h_bbbb)
 
         # Verify orbital consistency
         if h.has_orbitals():
@@ -310,3 +363,189 @@ class TestHamiltonian:
             restored_orbs = h_restored.get_orbitals()
             assert orig_orbs.get_num_molecular_orbitals() == restored_orbs.get_num_molecular_orbitals()
             np.testing.assert_array_equal(orig_orbs.get_coefficients(), restored_orbs.get_coefficients())
+
+    def test_restricted_hamiltonian_construction(self):
+        """Test restricted Hamiltonian construction and properties."""
+        # Create restricted orbitals (default behavior)
+        coeffs = np.eye(3)
+        basis_set = create_test_basis_set(3, "test-restricted")
+        orbitals = Orbitals(coeffs, None, None, basis_set)
+
+        assert orbitals.is_restricted()
+        assert not orbitals.is_unrestricted()
+
+        # Create restricted Hamiltonian
+        rng = np.random.default_rng(42)
+        one_body = rng.random((3, 3))
+        one_body = 0.5 * (one_body + one_body.T)  # Make symmetric
+        two_body = rng.random(3**4)
+        inactive_fock = rng.random((3, 3))
+
+        h = Hamiltonian(one_body, two_body, orbitals, 1.0, inactive_fock)
+
+        # Verify Hamiltonian properties
+        assert h.is_restricted()
+        assert not h.is_unrestricted()
+        assert h.has_one_body_integrals()
+        assert h.has_two_body_integrals()
+        assert h.has_orbitals()
+        assert h.get_core_energy() == 1.0
+
+        # Verify integral access
+        np.testing.assert_array_equal(h.get_one_body_integrals(), one_body)
+        # For restricted case, all components should be the same
+        aaaa, aabb, bbbb = h.get_two_body_integrals()
+        np.testing.assert_array_equal(aaaa, two_body)
+        np.testing.assert_array_equal(aabb, two_body)
+        np.testing.assert_array_equal(bbbb, two_body)
+
+    def test_unrestricted_hamiltonian_construction(self):
+        """Test unrestricted Hamiltonian construction and properties."""
+        # Create unrestricted orbitals with different alpha/beta coefficients
+        coeffs_alpha = np.eye(2)
+        coeffs_beta = np.array([[0.8, 0.6], [0.6, -0.8]])
+        basis_set = create_test_basis_set(2, "test-unrestricted")
+        orbitals = Orbitals(coeffs_alpha, coeffs_beta, None, None, None, basis_set)
+
+        # Verify orbitals are unrestricted
+        assert not orbitals.is_restricted()
+        assert orbitals.is_unrestricted()
+
+        # Create unrestricted Hamiltonian with different alpha/beta integrals
+        rng = np.random.default_rng(123)
+        one_body_alpha = np.array([[1.0, 0.2], [0.2, 1.5]])
+        one_body_beta = np.array([[1.1, 0.3], [0.3, 1.6]])
+        two_body_aaaa = rng.random(2**4)
+        two_body_aabb = rng.random(2**4)
+        two_body_bbbb = rng.random(2**4)
+        inactive_fock_alpha = np.array([[0.5, 0.1], [0.1, 0.7]])
+        inactive_fock_beta = np.array([[0.6, 0.2], [0.2, 0.8]])
+
+        h = Hamiltonian(
+            one_body_alpha,
+            one_body_beta,
+            two_body_aaaa,
+            two_body_aabb,
+            two_body_bbbb,
+            orbitals,
+            2.0,
+            inactive_fock_alpha,
+            inactive_fock_beta,
+        )
+
+        # Verify Hamiltonian properties
+        assert not h.is_restricted()
+        assert h.is_unrestricted()
+        assert h.has_one_body_integrals()
+        assert h.has_two_body_integrals()
+        assert h.has_orbitals()
+        assert h.get_core_energy() == 2.0
+
+        # Verify separate alpha/beta integral access
+        np.testing.assert_array_equal(h.get_one_body_integrals_alpha(), one_body_alpha)
+        np.testing.assert_array_equal(h.get_one_body_integrals_beta(), one_body_beta)
+        # get_two_body_integrals returns (aaaa, aabb, bbbb) tuple
+        aaaa, aabb, bbbb = h.get_two_body_integrals()
+        np.testing.assert_array_equal(aaaa, two_body_aaaa)
+        np.testing.assert_array_equal(aabb, two_body_aabb)
+        np.testing.assert_array_equal(bbbb, two_body_bbbb)
+
+    def test_unrestricted_vs_restricted_serialization(self):
+        """Test that restricted/unrestricted nature is preserved in serialization."""
+        # Test restricted Hamiltonian
+        coeffs = np.eye(2)
+        basis_set = create_test_basis_set(2, "test-serialization-restricted")
+        orbitals_restricted = Orbitals(coeffs, None, None, basis_set)
+
+        one_body = np.array([[1.0, 0.1], [0.1, 1.0]])
+        two_body = np.ones(16) * 0.5
+        h_restricted = Hamiltonian(one_body, two_body, orbitals_restricted, 1.0, np.eye(2))
+
+        # Test unrestricted Hamiltonian
+        coeffs_alpha = np.eye(2)
+        coeffs_beta = np.array([[0.9, 0.1], [0.1, 0.9]])
+        orbitals_unrestricted = Orbitals(coeffs_alpha, coeffs_beta, None, None, None, basis_set)
+
+        one_body_alpha = np.array([[1.0, 0.1], [0.1, 1.0]])
+        one_body_beta = np.array([[1.1, 0.2], [0.2, 1.1]])
+        two_body_aaaa = np.ones(16) * 1.0
+        two_body_aabb = np.ones(16) * 2.0
+        two_body_bbbb = np.ones(16) * 3.0
+        h_unrestricted = Hamiltonian(
+            one_body_alpha,
+            one_body_beta,
+            two_body_aaaa,
+            two_body_aabb,
+            two_body_bbbb,
+            orbitals_unrestricted,
+            2.0,
+            np.eye(2),
+            np.eye(2),
+        )
+
+        # Test JSON serialization preserves restricted/unrestricted nature
+        h_restricted_json = Hamiltonian.from_json(h_restricted.to_json())
+        assert h_restricted_json.is_restricted()
+        assert not h_restricted_json.is_unrestricted()
+
+        h_unrestricted_json = Hamiltonian.from_json(h_unrestricted.to_json())
+        assert not h_unrestricted_json.is_restricted()
+        assert h_unrestricted_json.is_unrestricted()
+
+        # Verify integral values are preserved
+        np.testing.assert_array_equal(h_restricted.get_one_body_integrals(), h_restricted_json.get_one_body_integrals())
+        np.testing.assert_array_equal(
+            h_unrestricted.get_one_body_integrals_alpha(), h_unrestricted_json.get_one_body_integrals_alpha()
+        )
+        np.testing.assert_array_equal(
+            h_unrestricted.get_one_body_integrals_beta(), h_unrestricted_json.get_one_body_integrals_beta()
+        )
+
+    def test_active_space_consistency(self):
+        """Test that active space handling works correctly for both restricted and unrestricted."""
+        # Test restricted case with active space
+        model_orbitals_restricted = ModelOrbitals(4, True)
+        assert model_orbitals_restricted.is_restricted()
+        assert model_orbitals_restricted.has_active_space()
+
+        # Create restricted Hamiltonian
+        one_body = np.eye(4)
+        two_body = np.zeros(4**4)
+        h_restricted = Hamiltonian(one_body, two_body, model_orbitals_restricted, 0.0, np.eye(4))
+        assert h_restricted.is_restricted()
+
+        # Test unrestricted case with active space
+        model_orbitals_unrestricted = ModelOrbitals(4, False)
+        assert not model_orbitals_unrestricted.is_restricted()
+        assert model_orbitals_unrestricted.is_unrestricted()
+        assert model_orbitals_unrestricted.has_active_space()
+
+        # Create unrestricted Hamiltonian
+        one_body_alpha = np.eye(4)
+        one_body_beta = np.eye(4) * 1.1
+        two_body_aaaa = np.zeros(4**4)
+        two_body_aabb = np.zeros(4**4)
+        two_body_bbbb = np.zeros(4**4)
+        h_unrestricted = Hamiltonian(
+            one_body_alpha,
+            one_body_beta,
+            two_body_aaaa,
+            two_body_aabb,
+            two_body_bbbb,
+            model_orbitals_unrestricted,
+            0.0,
+            np.eye(4),
+            np.eye(4),
+        )
+        assert h_unrestricted.is_unrestricted()
+
+        # Verify active space information is accessible
+        alpha_indices, beta_indices = model_orbitals_restricted.get_active_space_indices()
+        assert len(alpha_indices) == 4  # All orbitals active by default
+        assert len(beta_indices) == 4
+        assert alpha_indices == beta_indices
+
+        alpha_indices_unres, beta_indices_unres = model_orbitals_unrestricted.get_active_space_indices()
+        assert len(alpha_indices_unres) == 4  # All orbitals active by default
+        assert len(beta_indices_unres) == 4
+        # For ModelOrbitals constructor, alpha and beta indices are the same by default

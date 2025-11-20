@@ -15,6 +15,8 @@
 #include <qdk/chemistry.hpp>
 #include <qdk/chemistry/data/wavefunction.hpp>
 #include <qdk/chemistry/data/wavefunction_containers/cas.hpp>
+#include <qdk/chemistry/data/wavefunction_containers/cc.hpp>
+#include <qdk/chemistry/data/wavefunction_containers/mp2.hpp>
 #include <qdk/chemistry/data/wavefunction_containers/sci.hpp>
 #include <qdk/chemistry/data/wavefunction_containers/sd.hpp>
 
@@ -128,10 +130,12 @@ void bind_wavefunction(pybind11::module& data) {
     This class encapsulates wavefunction data including:
 
     * Configuration interaction coefficients
+    * Coupled cluster amplitudes
     * Reduced density matrices (RDMs) in spin-dependent and spin-traced forms
     * Methods for computing properties
 
-    Supports both restricted and unrestricted wavefunctions with real or complex coefficients.
+    Supports both restricted and unrestricted wavefunctions with real or
+    complex coefficients.
     )");
 
   // Constructor with container
@@ -181,12 +185,16 @@ void bind_wavefunction(pybind11::module& data) {
           return self.get_container<CasWavefunctionContainer>();
         } else if (self.has_container_type<SlaterDeterminantContainer>()) {
           return self.get_container<SlaterDeterminantContainer>();
+        } else if (self.has_container_type<MP2Container>()) {
+          return self.get_container<MP2Container>();
+        } else if (self.has_container_type<CoupledClusterContainer>()) {
+          return self.get_container<CoupledClusterContainer>();
         } else {
           throw std::runtime_error("Unknown container type.");
         }
       },
       R"(
-      Get the underlying wavefunciton container.
+      Get the underlying wavefunction container.
 
       Returns
       -------
@@ -1162,6 +1170,361 @@ void bind_wavefunction(pybind11::module& data) {
       .def("get_coefficients", &CasWavefunctionContainer::get_coefficients,
            "Get the coefficients of the wavefunction",
            py::return_value_policy::reference_internal);
+
+  // Bind CoupledClusterContainer
+  py::class_<CoupledClusterContainer, WavefunctionContainer, py::smart_holder>(
+      data, "CoupledClusterContainer",
+      R"(
+    Coupled cluster wavefunction container implementation.
+
+    This container represents a coupled cluster wavefunction with T1 and T2 amplitudes.
+    It supports both restricted and unrestricted coupled cluster methods, optionally storing
+    spin-separated amplitudes as well as reduced density matrices (RDMs).
+
+    Note that the default behavior is to NOT store the amplitudes. This can be switched on,
+    using a keyword argument.
+    )")
+      .def(
+          py::init<std::shared_ptr<Orbitals>, const std::vector<Configuration>&,
+                   const std::optional<CoupledClusterContainer::VectorVariant>&,
+                   const std::optional<CoupledClusterContainer::VectorVariant>&,
+                   WavefunctionType>(),
+          R"(
+        Constructs a coupled cluster wavefunction container with restricted-like interface.
+
+        Parameters
+        ----------
+        orbitals : Orbitals
+            Shared pointer to orbital basis set
+        references : list of Configuration
+            Reference determinant(s) for the CC wavefunction
+        t1_amplitudes : numpy.ndarray, optional
+            T1 amplitudes (will be used for both alpha and beta in restricted case)
+        t2_amplitudes : numpy.ndarray, optional
+            T2 amplitudes (will be used for alpha-beta coupling)
+        type : WavefunctionType, optional
+            Type of wavefunction (default: NotSelfDual)
+
+        Examples
+        --------
+        >>> ref = qdk.chemistry.Configuration("33221100")
+        >>> t1 = np.array([...])
+        >>> t2 = np.array([...])
+        >>> container = qdk.chemistry.CoupledClusterContainer(
+        ...     orbitals, [ref], t1, t2)
+        )",
+          py::arg("orbitals"), py::arg("references"),
+          py::arg("t1_amplitudes") = std::nullopt,
+          py::arg("t2_amplitudes") = std::nullopt,
+          py::arg("type") = WavefunctionType::NotSelfDual)
+      .def(
+          py::init<std::shared_ptr<Orbitals>, const std::vector<Configuration>&,
+                   const std::optional<CoupledClusterContainer::VectorVariant>&,
+                   const std::optional<CoupledClusterContainer::VectorVariant>&,
+                   const std::optional<CoupledClusterContainer::VectorVariant>&,
+                   const std::optional<CoupledClusterContainer::VectorVariant>&,
+                   const std::optional<CoupledClusterContainer::VectorVariant>&,
+                   WavefunctionType>(),
+          R"(
+        Constructs a coupled cluster wavefunction container with spin-separated amplitudes.
+
+        Parameters
+        ----------
+        orbitals : Orbitals
+            Shared pointer to orbital basis set
+        references : list of Configuration
+            Reference determinant(s) for the CC wavefunction
+        t1_amplitudes_aa : numpy.ndarray, optional
+            Alpha T1 amplitudes
+        t1_amplitudes_bb : numpy.ndarray, optional
+            Beta T1 amplitudes
+        t2_amplitudes_abab : numpy.ndarray, optional
+            Alpha-beta T2 amplitudes
+        t2_amplitudes_aaaa : numpy.ndarray, optional
+            Alpha-alpha T2 amplitudes
+        t2_amplitudes_bbbb : numpy.ndarray, optional
+            Beta-beta T2 amplitudes
+        type : WavefunctionType, optional
+            Type of wavefunction (default: NotSelfDual)
+
+        Examples
+        --------
+        >>> ref = qdk.chemistry.Configuration("33221100")
+        >>> t1_aa = np.array([...])
+        >>> t1_bb = np.array([...])
+        >>> t2_abab = np.array([...])
+        >>> container = qdk.chemistry.CoupledClusterContainer(
+        ...     orbitals, [ref], t1_aa, t1_bb, t2_abab, None, None)
+        )",
+          py::arg("orbitals"), py::arg("references"),
+          py::arg("t1_amplitudes_aa") = std::nullopt,
+          py::arg("t1_amplitudes_bb") = std::nullopt,
+          py::arg("t2_amplitudes_abab") = std::nullopt,
+          py::arg("t2_amplitudes_aaaa") = std::nullopt,
+          py::arg("t2_amplitudes_bbbb") = std::nullopt,
+          py::arg("type") = WavefunctionType::NotSelfDual)
+      .def(
+          py::init<std::shared_ptr<Orbitals>, const std::vector<Configuration>&,
+                   const std::optional<CoupledClusterContainer::VectorVariant>&,
+                   const std::optional<CoupledClusterContainer::VectorVariant>&,
+                   const std::optional<CoupledClusterContainer::VectorVariant>&,
+                   const std::optional<CoupledClusterContainer::VectorVariant>&,
+                   const std::optional<CoupledClusterContainer::VectorVariant>&,
+                   const std::optional<CoupledClusterContainer::MatrixVariant>&,
+                   const std::optional<CoupledClusterContainer::VectorVariant>&,
+                   WavefunctionType>(),
+          R"(
+        Constructs a coupled cluster wavefunction container with amplitudes and RDMs.
+
+        Parameters
+        ----------
+        orbitals : Orbitals
+            Shared pointer to orbital basis set
+        references : list of Configuration
+            Reference determinant(s) for the CC wavefunction
+        t1_amplitudes_aa : numpy.ndarray, optional
+            Alpha T1 amplitudes
+        t1_amplitudes_bb : numpy.ndarray, optional
+            Beta T1 amplitudes
+        t2_amplitudes_abab : numpy.ndarray, optional
+            Alpha-beta T2 amplitudes
+        t2_amplitudes_aaaa : numpy.ndarray, optional
+            Alpha-alpha T2 amplitudes
+        t2_amplitudes_bbbb : numpy.ndarray, optional
+            Beta-beta T2 amplitudes
+        one_rdm_spin_traced : numpy.ndarray, optional
+            Spin-traced one-particle RDM
+        two_rdm_spin_traced : numpy.ndarray, optional
+            Spin-traced two-particle RDM
+        type : WavefunctionType, optional
+            Type of wavefunction (default: NotSelfDual)
+
+        Examples
+        --------
+        >>> ref = qdk.chemistry.Configuration("33221100")
+        >>> t1_aa = np.array([...])
+        >>> t2_abab = np.array([...])
+        >>> one_rdm = np.array([...])
+        >>> container = qdk.chemistry.CoupledClusterContainer(
+        ...     orbitals, [ref], t1_aa, None, t2_abab, None, None, one_rdm, None)
+        )",
+          py::arg("orbitals"), py::arg("references"),
+          py::arg("t1_amplitudes_aa") = std::nullopt,
+          py::arg("t1_amplitudes_bb") = std::nullopt,
+          py::arg("t2_amplitudes_abab") = std::nullopt,
+          py::arg("t2_amplitudes_aaaa") = std::nullopt,
+          py::arg("t2_amplitudes_bbbb") = std::nullopt,
+          py::arg("one_rdm_spin_traced") = std::nullopt,
+          py::arg("two_rdm_spin_traced") = std::nullopt,
+          py::arg("type") = WavefunctionType::NotSelfDual)
+      .def("get_references", &CoupledClusterContainer::get_references,
+           R"(
+        Get all reference determinants.
+
+        Returns
+        -------
+        list of Configuration
+            Vector of all reference determinants
+
+        Examples
+        --------
+        >>> dets = wf.get_references()
+        )",
+           py::return_value_policy::reference_internal)
+      .def(
+          "get_t1_amplitudes",
+          [](const CoupledClusterContainer& self) {
+            const auto& [t1_aa, t1_bb] = self.get_t1_amplitudes();
+            return py::make_tuple(variant_to_python(t1_aa),
+                                  variant_to_python(t1_bb));
+          },
+          R"(
+        Get T1 amplitudes. In restricted CC, both T1 amplitudes will be identical.
+
+        Returns
+        -------
+        tuple
+            Pair of (alpha, beta) T1 amplitudes
+
+        Examples
+        --------
+        >>> t1_aa, t1_bb = cc_container.get_t1_amplitudes()
+        )")
+      .def(
+          "get_t2_amplitudes",
+          [](const CoupledClusterContainer& self) {
+            const auto& [t2_abab, t2_aaaa, t2_bbbb] = self.get_t2_amplitudes();
+            return py::make_tuple(variant_to_python(t2_abab),
+                                  variant_to_python(t2_aaaa),
+                                  variant_to_python(t2_bbbb));
+          },
+          R"(
+        Get T2 amplitudes. In restricted CC, only the alpha-beta T2 amplitudes will be used.
+
+        Returns
+        -------
+        tuple
+            Tuple of (alpha-beta, alpha-alpha, beta-beta) T2 amplitudes
+
+
+        Examples
+        --------
+        >>> t2_abab, t2_aaaa, t2_bbbb = cc_container.get_t2_amplitudes()
+        )")
+      .def("has_t1_amplitudes", &CoupledClusterContainer::has_t1_amplitudes,
+           R"(
+        Check if T1 amplitudes are available.
+
+        Returns
+        -------
+        bool
+            True if T1 amplitudes are available
+
+        Examples
+        --------
+        >>> if cc_container.has_t1_amplitudes():
+        ...     t1_aa, t1_bb = cc_container.get_t1_amplitudes()
+        )")
+      .def("has_t2_amplitudes", &CoupledClusterContainer::has_t2_amplitudes,
+           R"(
+        Check if T2 amplitudes are available.
+
+        Returns
+        -------
+        bool
+            True if T2 amplitudes are available
+
+        Examples
+        --------
+        >>> if cc_container.has_t2_amplitudes():
+        ...     t2 = cc_container.get_t2_amplitudes()
+        )");
+
+  // Bind MP2Container
+  py::class_<MP2Container, WavefunctionContainer, py::smart_holder>(
+      data, "MP2Container",
+      R"(
+    MP2 wavefunction container implementation.
+    )")
+      .def(py::init<std::shared_ptr<Hamiltonian>,
+                    const std::vector<Configuration>&, WavefunctionType>(),
+           R"(
+        Constructs an MP2 wavefunction container.
+
+        Parameters
+        ----------
+        hamiltonian : Hamiltonian
+            Shared pointer to the Hamiltonian
+        references : list of Configuration
+            Reference determinant(s) for the MP2 wavefunction
+        type : WavefunctionType, optional
+            Type of wavefunction (default: NotSelfDual)
+
+        Examples
+        --------
+        >>> ref = qdk.chemistry.Configuration("33221100")
+        >>> container = qdk.chemistry.MP2Container(
+        ...     hamiltonian, [ref])
+        )",
+           py::arg("hamiltonian"), py::arg("references"),
+           py::arg("type") = WavefunctionType::NotSelfDual)
+      .def("get_references", &MP2Container::get_references,
+           R"(
+        Get all reference determinants.
+
+        Returns
+        -------
+        list of Configuration
+            Vector of all reference determinants
+
+        Examples
+        --------
+        >>> dets = mp2_container.get_references()
+        )",
+           py::return_value_policy::reference_internal)
+      .def("get_hamiltonian", &MP2Container::get_hamiltonian,
+           R"(
+        Get reference to Hamiltonian.
+
+        Returns
+        -------
+        Hamiltonian
+            Shared pointer to Hamiltonian
+
+        Examples
+        --------
+        >>> ham = mp2_container.get_hamiltonian()
+        )",
+           py::return_value_policy::reference_internal)
+      .def(
+          "get_t1_amplitudes",
+          [](const MP2Container& self) {
+            const auto& [t1_aa, t1_bb] = self.get_t1_amplitudes();
+            return py::make_tuple(variant_to_python(t1_aa),
+                                  variant_to_python(t1_bb));
+          },
+          R"(
+        Get T1 amplitudes.
+
+        Returns
+        -------
+        tuple
+            Pair of (alpha, beta) T1 amplitudes (zeros for MP2)
+
+        Examples
+        --------
+        >>> if mp2_container.has_t1_amplitudes():
+        ...     t1_aa, t1_bb = mp2_container.get_t1_amplitudes()
+        )")
+      .def(
+          "get_t2_amplitudes",
+          [](const MP2Container& self) {
+            const auto& [t2_abab, t2_aaaa, t2_bbbb] = self.get_t2_amplitudes();
+            return py::make_tuple(variant_to_python(t2_abab),
+                                  variant_to_python(t2_aaaa),
+                                  variant_to_python(t2_bbbb));
+          },
+          R"(
+        Get T2 amplitudes.
+
+        Returns
+        -------
+        tuple
+            Tuple of (alpha-beta, alpha-alpha, beta-beta) T2 amplitudes
+
+        Examples
+        --------
+        >>> if mp2_container.has_t2_amplitudes():
+        ...     t2_abab, t2_aaaa, t2_bbbb = mp2_container.get_t2_amplitudes()
+        )")
+      .def("has_t1_amplitudes", &MP2Container::has_t1_amplitudes,
+           R"(
+        Check if T1 amplitudes are available.
+
+        Returns
+        -------
+        bool
+            Whether t1 amplitudes are available.
+
+        Examples
+        --------
+        >>> if mp2_container.has_t1_amplitudes():
+        ...     t1_aa, t1_bb = mp2_container.get_t1_amplitudes()
+        )")
+      .def("has_t2_amplitudes", &MP2Container::has_t2_amplitudes,
+           R"(
+        Check if T2 amplitudes are available.
+
+        Returns
+        -------
+        bool
+            Whether T2 amplitudes are available.
+
+        Examples
+        --------
+        >>> if mp2_container.has_t2_amplitudes():
+        ...     t2 = mp2_container.get_t2_amplitudes()
+        )");
 
   // Bind SlaterDeterminantContainer
   py::class_<SlaterDeterminantContainer, WavefunctionContainer,

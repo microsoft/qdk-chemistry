@@ -19,6 +19,19 @@ Once properly constructed, the Hamiltonian data is typically not modified during
 This const-correctness approach ensures data integrity throughout computational workflows and prevents accidental modifications of the core quantum system representation.
 While setter methods are available for construction and initialization purposes, in normal operation the Hamiltonian object should be treated as immutable after it has been fully populated.
 
+Restricted vs. unrestricted Hamiltonians
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+The ``Hamiltonian`` class supports both restricted and unrestricted representations:
+
+- **Restricted**: Uses the same spatial orbitals for alpha and beta electrons. Suitable for closed-shell systems where alpha and beta electrons occupy the same spatial orbitals with opposite spins.
+- **Unrestricted**: Allows different spatial orbitals for alpha and beta electrons.
+
+For unrestricted Hamiltonians, the one-electron and two-electron integrals are stored separately for each spin channel:
+
+- One-electron integrals: :math:`h_{\alpha}` and :math:`h_{\beta}`
+- Two-electron integrals: :math:`h_{\alpha\alpha\alpha\alpha}`, :math:`h_{\alpha\beta\alpha\beta}`, and :math:`h_{\beta\beta\beta\beta}`
+
 Properties
 ----------
 
@@ -155,6 +168,115 @@ When accessing specific elements with ``get_two_body_element(i, j, k, l)``, the 
       num_electrons = hamiltonian.get_num_electrons()
       num_orbitals = hamiltonian.get_num_orbitals()
 
+Unrestricted Hamiltonians
+-------------------------
+
+For systems requiring unrestricted treatment, the ``Hamiltonian`` class provides specialized constructors and accessors for spin-separated integrals.
+
+Creating an unrestricted Hamiltonian
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Unrestricted Hamiltonians can be created using a specialized constructor that accepts separate integral tensors for each spin channel:
+
+.. tab:: C++ API
+
+   .. code-block:: cpp
+
+      // Create unrestricted Hamiltonian with spin-separated integrals
+      Hamiltonian unrestricted_hamiltonian(
+          one_body_integrals_alpha,      // Alpha one-electron integrals
+          one_body_integrals_beta,       // Beta one-electron integrals
+          two_body_integrals_aaaa,       // Alpha-alpha two-electron integrals
+          two_body_integrals_aabb,       // Alpha-beta two-electron integrals
+          two_body_integrals_bbbb,       // Beta-beta two-electron integrals
+          orbitals,                      // Orbitals object (should be unrestricted, will throw otherwise)
+          core_energy,                   // Core energy
+          inactive_fock_matrix_alpha,    // Alpha inactive Fock matrix
+          inactive_fock_matrix_beta      // Beta inactive Fock matrix
+      );
+
+      // Check if Hamiltonian is unrestricted
+      bool is_unrestricted = unrestricted_hamiltonian.is_unrestricted();
+      bool is_restricted = unrestricted_hamiltonian.is_restricted();
+
+.. tab:: Python API
+
+   .. code-block:: python
+
+      import numpy as np
+      from qdk_chemistry.data import Hamiltonian, Orbitals
+
+      # Create unrestricted Hamiltonian with spin-separated integrals
+      h_unrestricted = Hamiltonian(
+          one_body_integrals_alpha,      # Alpha one-electron integrals
+          one_body_integrals_beta,       # Beta one-electron integrals
+          two_body_integrals_aaaa,       # Alpha-alpha two-electron integrals
+          two_body_integrals_aabb,       # Alpha-beta two-electron integrals
+          two_body_integrals_bbbb,       # Beta-beta two-electron integrals
+          orbitals,                      # Orbitals object (should be unrestricted, will throw otherwise)
+          core_energy,                   # Core energy
+          inactive_fock_alpha,           # Alpha inactive Fock matrix
+          inactive_fock_beta             # Beta inactive Fock matrix
+      )
+
+      # Check if Hamiltonian is unrestricted
+      is_unrestricted = h_unrestricted.is_unrestricted()
+      is_restricted = h_unrestricted.is_restricted()
+
+Accessing spin-separated integrals
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+You can access the spin-separated integral tensors like:
+
+.. tab:: C++ API
+
+   .. code-block:: cpp
+
+      // Access alpha one-electron integrals, returns const Eigen::MatrixXd&
+      auto h1_alpha = hamiltonian.get_one_body_integrals_alpha();
+
+      // Access beta one-electron integrals, returns const Eigen::MatrixXd&
+      auto h1_beta = hamiltonian.get_one_body_integrals_beta();
+
+      // Access all two-electron integrals as tuple (aaaa, aabb, bbbb)
+      auto [h2_aaaa, h2_aabb, h2_bbbb] = hamiltonian.get_two_body_integrals();
+
+      // Access specific two-electron integral channels
+      double integral_aaaa = hamiltonian.get_two_body_element(i, j, k, l, SpinChannel::aaaa);
+      double integral_aabb = hamiltonian.get_two_body_element(i, j, k, l, SpinChannel::aabb);
+      double integral_bbbb = hamiltonian.get_two_body_element(i, j, k, l, SpinChannel::bbbb);
+
+      // Access inactive Fock matrices
+      auto fock_alpha = hamiltonian.get_inactive_fock_matrix_alpha();
+      auto fock_beta = hamiltonian.get_inactive_fock_matrix_beta();
+
+.. tab:: Python API
+
+   .. code-block:: python
+
+      # Access alpha one-electron integrals
+      h1_alpha = h_unrestricted.get_one_body_integrals_alpha()
+
+      # Access beta one-electron integrals
+      h1_beta = h_unrestricted.get_one_body_integrals_beta()
+
+      # Access all two-electron integrals as tuple (aaaa, aabb, bbbb)
+      h2_aaaa, h2_aabb, h2_bbbb = h_unrestricted.get_two_body_integrals()
+
+      # Access specific two-electron integral channels
+      integral_aaaa = hamiltonian.get_two_body_element(i, j, k, l, SpinChannel.aaaa)
+      integral_aabb = hamiltonian.get_two_body_element(i, j, k, l, SpinChannel.aabb)
+      integral_bbbb = hamiltonian.get_two_body_element(i, j, k, l, SpinChannel.bbbb)
+
+      # Access inactive Fock matrices
+      fock_alpha = h_unrestricted.get_inactive_fock_matrix_alpha()
+      fock_beta = h_unrestricted.get_inactive_fock_matrix_beta()
+
+.. note::
+   For restricted Hamiltonians, the spin-separated accessors return the same data for both alpha and beta channels.
+   The ``get_two_body_integrals()`` method always returns a tuple of three components (aaaa, aabb, bbbb),
+   which are identical for restricted cases.
+
 Serialization
 -------------
 
@@ -189,6 +311,7 @@ JSON representation of a ``Hamiltonian`` object has the following structure (sho
     "orbitals":{"..."},
     "selected_orbital_indices":[0,1],
     "two_body_integrals":["..."],
+    "is_restricted":true,
   }
 
 .. note::
@@ -201,17 +324,17 @@ HDF5 format
 HDF5 representation of a ``Hamiltonian`` object has the following structure (showing groups and datasets):
 
 .. code-block:: text
-
-  /
-  ├── selected_orbital_indices  # Dataset: uint32, 1D array active space orbital indices
-  ├── one_body_integrals        # Dataset: float64, 1D array of one-electron integrals
-  ├── two_body_integrals        # Dataset: float64, 2D array of one-electron integrals
-  ├── metadata/                     # Group
-  │   ├── core_energy           # Attribute: float64, core energy
-  │   ├── has_orbitals          # Attribute: uint8, 0 if false, 1 if true
-  │   ├── num_electrons         # Attribute: uint32, number of electrons (in the active space)
-  │   └── num_orbitals          # Attribute: uint32, number of orbitals (in the active space)
-  └── orbitals/                     # Group
+/
+├── selected_orbital_indices  # Dataset: uint32, 1D array active space orbital indices
+├── one_body_integrals        # Dataset: float64, 1D array of one-electron integrals
+├── two_body_integrals        # Dataset: float64, 2D array of one-electron integrals
+├── metadata/                     # Group
+│   ├── core_energy           # Attribute: float64, core energy
+│   ├── has_orbitals          # Attribute: uint8, 0 if false, 1 if true
+│   ├── is_restricted         # Attribute: uint8, 0 if false, 1 if true
+│   ├── num_electrons         # Attribute: uint32, number of electrons (in the active space)
+│   └── num_orbitals          # Attribute: uint32, number of orbitals (in the active space)
+└── orbitals/                     # Group
       └── json_data             # Dataset: (), binary representation of the json orbital data
 
 .. note::

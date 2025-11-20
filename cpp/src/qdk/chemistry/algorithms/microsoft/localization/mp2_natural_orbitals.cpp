@@ -129,7 +129,9 @@ std::shared_ptr<data::Wavefunction> MP2NaturalOrbitalLocalizer::_run_impl(
 
   // Compute MP2 Natural Orbitals for selected subspace
   const auto& one_body_int = H->get_one_body_integrals();
-  const auto& two_body_int = H->get_two_body_integrals();
+  // we will use the aaaa spin channel - all the same for restricted anyway
+  const auto& [two_body_int, two_body_aabb, two_body_bbbb] =
+      H->get_two_body_integrals();
 
   Eigen::MatrixXd mp2_natural_orbitals(num_orbitals, num_orbitals);
   mp2_natural_orbitals.setZero();

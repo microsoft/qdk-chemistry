@@ -15,8 +15,8 @@ Classes:
         Complete Active Space (CAS) wavefunction with CI coefficients and determinants.
     Configuration
         Electronic configuration state information.
-    CoupledClusterAmplitudes
-        Amplitudes for coupled cluster calculations.
+    CoupledClusterContainer
+        Container for coupled cluster wavefunction amplitudes and determinants.
     DataClass
         Base data class.
     ElectronicStructureSettings
@@ -31,6 +31,8 @@ Classes:
         Measurement bitstring data and metadata for QubitHamiltonian objects.
     ModelOrbitals
         Simple orbital representation for model systems without full basis set information.
+    MP2Container
+        Container for MP2 wavefunction with Hamiltonian reference and optional amplitudes.
     Orbitals
         Molecular orbital information and properties.
     OrbitalType
@@ -79,11 +81,12 @@ from qdk_chemistry._core.data import (
     BasisType,
     CasWavefunctionContainer,
     Configuration,
-    CoupledClusterAmplitudes,
+    CoupledClusterContainer,
     ElectronicStructureSettings,
     Element,
     Hamiltonian,
     ModelOrbitals,
+    MP2Container,
     Orbitals,
     OrbitalType,
     SciWavefunctionContainer,
@@ -115,12 +118,13 @@ __all__ = [
     "BasisType",
     "CasWavefunctionContainer",
     "Configuration",
-    "CoupledClusterAmplitudes",
+    "CoupledClusterContainer",
     "DataClass",
     "ElectronicStructureSettings",
     "Element",
     "EnergyExpectationResult",
     "Hamiltonian",
+    "MP2Container",
     "MeasurementData",
     "ModelOrbitals",
     "OrbitalType",

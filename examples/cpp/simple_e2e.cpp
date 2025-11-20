@@ -101,7 +101,7 @@ int main(int argc, char** argv) {
     const size_t num_virtual_orbitals =
         num_molecular_orbitals - num_occupied_orbitals;
 
-    const auto& moeri = ham->get_two_body_integrals();
+    const auto& [moeri, _, _] = ham->get_two_body_integrals();
     double EMP2 = 0.0;
     for (size_t i = 0; i < num_occupied_orbitals; ++i)
       for (size_t j = 0; j < num_occupied_orbitals; ++j)

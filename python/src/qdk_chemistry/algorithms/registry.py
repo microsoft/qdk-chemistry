@@ -32,12 +32,12 @@ from typing import Any
 
 from qdk_chemistry._core._algorithms import (
     ActiveSpaceSelectorFactory,
-    CoupledClusterCalculatorFactory,
     HamiltonianConstructorFactory,
     LocalizerFactory,
     MultiConfigurationCalculatorFactory,
     MultiConfigurationScfFactory,
     ProjectedMultiConfigurationCalculatorFactory,
+    ReferenceDerivedCalculatorFactory,
     ScfSolverFactory,
     StabilityCheckerFactory,
 )
@@ -71,7 +71,7 @@ def create(algorithm_type: str, algorithm_name: str | None = None, **kwargs) -> 
 
     Args:
         algorithm_type (str): The type of algorithm to create (e.g., "scf_solver",
-            "active_space_selector", "coupled_cluster_calculator").
+            "active_space_selector", "reference_derived_calculator").
         algorithm_name (Optional[str]): The specific name of the algorithm implementation
             to create. If None or empty string, creates the default algorithm for that type.
         **kwargs: Optional keyword arguments to configure the algorithm's settings.
@@ -93,6 +93,10 @@ def create(algorithm_type: str, algorithm_name: str | None = None, **kwargs) -> 
         >>> pyscf_solver = registry.create("scf_solver", "pyscf")
         >>> # Create an SCF solver with custom settings
         >>> scf = registry.create("scf_solver", "pyscf", max_iterations=100, convergence_threshold=1e-8)
+        >>> # Create an MP2 calculator
+        >>> mp2_calc = registry.create("reference_derived_calculator", "microsoft_mp2_calculator")
+        >>> # Create the default reference-derived calculator (MP2)
+        >>> default_calc = registry.create("reference_derived_calculator")
 
     """
     if algorithm_name is None:
@@ -134,7 +138,7 @@ def show_settings(algorithm_type: str, algorithm_name: str) -> list[tuple[str, s
 
     Args:
         algorithm_type (str): The type of algorithm (e.g., "scf_solver",
-            "active_space_selector", "coupled_cluster_calculator").
+            "active_space_selector", "reference_derived_calculator").
         algorithm_name (str): The specific name of the algorithm implementation.
 
     Returns:
@@ -159,7 +163,6 @@ def show_settings(algorithm_type: str, algorithm_name: str) -> list[tuple[str, s
         spin_multiplicity: int = 1
         tolerance: float = 1e-06
         max_iterations: int = 50
-        force_restricted: bool = False
 
     """
     for factory in __factories:
@@ -340,12 +343,12 @@ def unregister_factory(algorithm_type: str) -> None:
 
 def _register_cpp_factories():
     register_factory(ActiveSpaceSelectorFactory)
-    register_factory(CoupledClusterCalculatorFactory)
     register_factory(HamiltonianConstructorFactory)
     register_factory(LocalizerFactory)
     register_factory(MultiConfigurationCalculatorFactory)
     register_factory(MultiConfigurationScfFactory)
     register_factory(ProjectedMultiConfigurationCalculatorFactory)
+    register_factory(ReferenceDerivedCalculatorFactory)
     register_factory(ScfSolverFactory)
     register_factory(StabilityCheckerFactory)
 

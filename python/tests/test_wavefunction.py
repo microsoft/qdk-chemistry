@@ -11,10 +11,13 @@ import pickle
 import numpy as np
 import pytest
 
-import qdk_chemistry.algorithms
+import qdk_chemistry
 from qdk_chemistry.data import (
     CasWavefunctionContainer,
     Configuration,
+    CoupledClusterContainer,
+    Hamiltonian,
+    MP2Container,
     Orbitals,
     SlaterDeterminantContainer,
     Structure,
@@ -675,8 +678,8 @@ class TestWavefunctionSerialization:
             Wavefunction.from_hdf5_file("non_existent.h5")
 
 
-class TestWavefunctionRdmIntegraion:
-    """Test integration of RDMs within the Wavefunction class."""
+class TestMP2Container:
+    """Test the MP2Container wavefunction container."""
 
     def test_rdm_n2_singlet_6_6(self):
         """Test RDM properties for N2 singlet 6e 6o wavefunction."""
@@ -745,7 +748,7 @@ class TestWavefunctionRdmIntegraion:
         mol = Structure(["O", "O"], [[0.0, 0.0, 2.0], [0.0, 0.0, 0.0]])
         scf_solver = qdk_chemistry.algorithms.create("scf_solver", "pyscf")
         scf_solver.settings().set("basis_set", "def2-svp")
-        scf_solver.settings().set("force_restricted", True)
+        scf_solver.settings().set("scf_type", "restricted")
         sd_wf = scf_solver.run(mol, 0, np.abs(nelec_alpha - nelec_beta) + 1)[1]
 
         active_space_selector = qdk_chemistry.algorithms.create("active_space_selector", "qdk_valence")
@@ -786,3 +789,137 @@ class TestWavefunctionRdmIntegraion:
         assert np.allclose(
             s1_entropy, np.array([0.11641596, 0.11641596, 0.03304609, 0.11492634, 0.11492634, 0.03494613]), atol=1e-6
         )
+
+    @pytest.fixture
+    def basic_orbitals(self):
+        """Create basic orbitals for testing."""
+        coeffs = np.array([[1.0, 0.0, 0.0], [0.0, 1.0, 0.0], [0.0, 0.0, 1.0]])
+        energies = np.array([-1.0, -0.5, 0.5])  # Two occupied, one virtual
+        basis_set = create_test_basis_set(3, "test-mp2")
+        return Orbitals(coeffs, energies, None, basis_set)
+
+    @pytest.fixture
+    def basic_hamiltonian(self, basic_orbitals):
+        """Create a basic Hamiltonian for testing."""
+        # Create simple 1e and 2e integrals for 3 orbitals
+        h1e = np.array([[-1.0, 0.0, 0.0], [0.0, -0.5, 0.0], [0.0, 0.0, 0.5]])
+        h2e = np.zeros((3, 3, 3, 3))
+        # Add some simple repulsion integrals
+        h2e[0, 0, 0, 0] = 0.5
+        h2e[1, 1, 1, 1] = 0.3
+        h2e[0, 1, 0, 1] = 0.2
+        h2e[1, 0, 1, 0] = 0.2
+
+        core_energy = 0.0
+        inactive_fock = np.eye(0)  # Empty inactive Fock matrix
+        return Hamiltonian(h1e, h2e.flatten(), basic_orbitals, core_energy, inactive_fock)
+
+    def test_mp2_container_construction(self, basic_hamiltonian):
+        """Test MP2Container construction with lazy evaluation."""
+        ref = Configuration("220")  # Two electrons in first two orbitals
+        references = [ref]
+
+        mp2_container = MP2Container(basic_hamiltonian, references)
+
+        assert mp2_container is not None
+
+        # Amplitudes should not be computed initially
+        assert not mp2_container.has_t1_amplitudes(), (
+            "T1 amplitudes should NOT be computed until requested (lazy evaluation)"
+        )
+        assert not mp2_container.has_t2_amplitudes(), (
+            "T2 amplitudes should NOT be computed until requested (lazy evaluation)"
+        )
+
+        # Trigger computations
+        t1_aa, t1_bb = mp2_container.get_t1_amplitudes()
+        t2_abab, t2_aaaa, t2_bbbb = mp2_container.get_t2_amplitudes()
+
+        # amplitudes should now be available
+        assert mp2_container.has_t1_amplitudes(), "T1 amplitudes should be cached after first access"
+        assert mp2_container.has_t2_amplitudes(), "T2 amplitudes should be cached after first access"
+
+        # Verify T1 amplitudes are zero for MP2
+        assert np.allclose(t1_aa, 0.0), "T1 alpha amplitudes should be zero for MP2"
+        assert np.allclose(t1_bb, 0.0), "T1 beta amplitudes should be zero for MP2"
+
+        # Verify T2 amplitudes exist (non-zero)
+        assert t2_abab is not None
+        assert t2_aaaa is not None
+        assert t2_bbbb is not None
+
+
+class TestCCContainer:
+    """Test the CoupledClusterContainer wavefunction container."""
+
+    @pytest.fixture
+    def basic_orbitals(self):
+        """Create basic orbitals for testing."""
+        coeffs = np.array([[1.0, 0.0, 0.0], [0.0, 1.0, 0.0], [0.0, 0.0, 1.0]])
+        energies = np.array([-1.0, -0.5, 0.5])  # Two occupied, one virtual
+        basis_set = create_test_basis_set(3, "test-cc")
+        return Orbitals(coeffs, energies, None, basis_set)
+
+    def test_cc_container_construction(self, basic_orbitals):
+        """Test CoupledClusterContainer construction."""
+        ref = Configuration("220")
+        references = [ref]
+
+        # Create dummy amplitudes for 2 occupied, 1 virtual orbital
+        t1 = np.array([[0.01], [0.02]])
+        t2 = np.array([0.001])
+
+        # Enable amplitude storage
+        cc_container = CoupledClusterContainer(basic_orbitals, references, t1, t2)
+
+        assert cc_container is not None
+        assert cc_container.has_t1_amplitudes()
+        assert cc_container.has_t2_amplitudes()
+
+    def test_cc_container_get_references(self, basic_orbitals):
+        """Test getting reference determinants from CoupledClusterContainer."""
+        ref = Configuration("220")
+        references = [ref]
+
+        cc_container = CoupledClusterContainer(basic_orbitals, references)
+        retrieved_refs = cc_container.get_references()
+
+        assert len(retrieved_refs) == 1
+        assert retrieved_refs[0].to_string() == ref.to_string()
+
+    def test_cc_container_in_wavefunction(self, basic_orbitals):
+        """Test CoupledClusterContainer within a Wavefunction wrapper."""
+        ref = Configuration("220")
+        references = [ref]
+
+        # Create dummy amplitudes
+        t1 = np.array([[0.01], [0.02]])
+        t2 = np.array([0.001])
+
+        cc_container = CoupledClusterContainer(basic_orbitals, references, t1, t2)
+        wf = Wavefunction(cc_container)
+
+        # Test container type checking
+        assert wf.get_container_type() == "cc"
+
+        # Test getting the container back
+        retrieved_container = wf.get_container()
+        assert retrieved_container is not None
+        assert retrieved_container.has_t1_amplitudes()
+        assert retrieved_container.has_t2_amplitudes()
+
+    def test_cc_container_electron_counts(self, basic_orbitals):
+        """Test getting electron counts from CoupledClusterContainer."""
+        ref = Configuration("220")  # 2 alpha, 2 beta electrons
+        references = [ref]
+
+        cc_container = CoupledClusterContainer(basic_orbitals, references)
+        wf = Wavefunction(cc_container)
+
+        n_alpha, n_beta = wf.get_active_num_electrons()
+        assert n_alpha == 2
+        assert n_beta == 2
+
+        n_alpha_total, n_beta_total = wf.get_total_num_electrons()
+        assert n_alpha_total == 2
+        assert n_beta_total == 2

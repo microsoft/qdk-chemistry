@@ -55,7 +55,7 @@ struct pmc_helper {
     const size_t num_molecular_orbitals = active_indices.size();
 
     const auto& T = hamiltonian.get_one_body_integrals();
-    const auto& V = hamiltonian.get_two_body_integrals();
+    const auto& [V, V_aabb, V_bbbb] = hamiltonian.get_two_body_integrals();
 
     // Check that the orbitals are consistent with the Hamiltonian
     if (!configurations.empty()) {

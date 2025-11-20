@@ -16,12 +16,12 @@ namespace qdk::chemistry::scf {
  *  @brief A class to handle the evaluation of MO integrals given an
  *  AO ERI implementation.
  *
- *  (pn|lk) = C(p,m) * (mn|lk) [first quarter - customization point]
- *  (pq|lk) = C(q,n) * (pn|lk) [second quarter]
- *  (pq|rk) = C(r,l) * (pq|lk) [third quarter]
- *  (pq|rs) = C(s,k) * (pq|rk) [fourth quarter - final result]
+ *  (pn|lk) = Ci(p,m) * (mn|lk) [first quarter - customization point]
+ *  (pq|lk) = Cj(q,n) * (pn|lk) [second quarter]
+ *  (pq|rk) = Ck(r,l) * (pq|lk) [third quarter]
+ *  (pq|rs) = Cl(s,k) * (pq|rk) [fourth quarter - final result]
  *
- *  Leverages the ERI::quater_trans to perform the first quarter transformation
+ *  Leverages the ERI::quarter_trans to perform the first quarter transformation
  *  and performs the remainder transformations via cuTensor.
  */
 class MOERI {
@@ -37,14 +37,33 @@ class MOERI {
   MOERI(std::shared_ptr<ERI> eri);
 
   /**
-   *  @brief Compute MO ERIs incore
+   *  @brief Compute MO ERIs incore with a single transformation matrix
    *
-   *  @param[in]  nb Number of basis functions
-   *  @param[in]  nt Number of vectors in the MO space
-   *  @param[in]  C  Transformation coefficients (row major)
+   *  @param[in]  nb  Number of basis functions
+   *  @param[in]  nt  Number of vectors in the MO space
+   *  @param[in]  C  First quarter transformation coefficients (row major)
    *  @param[out] out Output MO ERIs (row major)
    */
-  void compute(size_t nb, size_t nt, const double* C, double* out);
+  void compute(size_t nb, size_t nt, const double* C, double* out) {
+    compute(nb, nt, C, C, C, C, out);
+  }
+
+  /**
+   *  @brief Compute MO ERIs incore with four different transformation matrices.
+   *
+   *  Note that mixed-spin integrals are accessed like, ββ|αα rather than αα|ββ.
+   *  I.e. we would call moeri(b, b, a, a).
+   *
+   *  @param[in]  nb  Number of basis functions
+   *  @param[in]  nt  Number of vectors in the MO space
+   *  @param[in]  Ca  First quarter transformation coefficients (row major)
+   *  @param[in]  Cb  Second quarter transformation coefficients (row major)
+   *  @param[in]  Cc  Third quarter transformation coefficients (row major)
+   *  @param[in]  Cd  Fourth quarter transformation coefficients (row major)
+   *  @param[out] out Output MO ERIs (row major)
+   */
+  void compute(size_t nb, size_t nt, const double* Ca, const double* Cb,
+               const double* Cc, const double* Cd, double* out);
 
  private:
   std::shared_ptr<ERI> eri_;  ///< ERI instance
