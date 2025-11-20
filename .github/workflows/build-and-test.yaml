@@ -18,7 +18,6 @@ jobs:
     runs-on: [self-hosted, 1ES.Pool=1es-gh-hb120-pool]
     env:
       BUILD_DIR: cpp/build
-      INSTALL_PREFIX: ${{ github.workspace }}/cpp/install
       CMAKE_BUILD_PARALLEL_LEVEL: 120
       QDK_UARCH: x86-64-v3
       CTEST_OUTPUT_ON_FAILURE: 1
@@ -62,7 +61,6 @@ jobs:
         cmake -S cpp -B "$BUILD_DIR" \
           -DCMAKE_BUILD_TYPE=Debug \
           -DQDK_UARCH="$QDK_UARCH" \
-          -DCMAKE_INSTALL_PREFIX="$INSTALL_PREFIX" \
           -DENABLE_COVERAGE=ON \
           -DBUILD_TESTING=ON
 
@@ -71,7 +69,7 @@ jobs:
 
     - name: Run C++ tests with coverage
       run: |
-        mkdir -p test-results coverage-reports
+        mkdir -p test-results ${{ github.workspace }}/coverage-reports
         cd "$BUILD_DIR/tests"
 
         FAILED_TESTS=()
@@ -119,8 +117,16 @@ jobs:
         echo "Looking for .gcno files in $BUILD_DIR"
         find "$BUILD_DIR" -name "*.gcno" | head -20
         
+        echo "=== Current directory ==="
+        pwd
+        echo "=== BUILD_DIR contents ==="
+        ls -la "$BUILD_DIR" || true
+        
+        # Use absolute path for BUILD_DIR
+        ABS_BUILD_DIR="${{ github.workspace }}/${BUILD_DIR}"
+        
         gcovr --root ${{ github.workspace }}/cpp \
-          --object-directory ${{ github.workspace }}/"$BUILD_DIR" \
+          --object-directory "$ABS_BUILD_DIR" \
           --filter '${{ github.workspace }}/cpp/src/.*' \
           --filter '${{ github.workspace }}/cpp/include/.*' \
           --exclude '.*/tests/.*' \
@@ -128,33 +134,27 @@ jobs:
           --exclude '.*gtest.*' \
           --exclude '.*gmock.*' \
           --exclude '.*/external/.*' \
-          --html-details coverage-reports/cpp_coverage.html \
-          --xml coverage-reports/cpp_coverage.xml \
-          --txt coverage-reports/cpp_coverage.txt \
+          --html-details ${{ github.workspace }}/coverage-reports/cpp_coverage.html \
+          --xml ${{ github.workspace }}/coverage-reports/cpp_coverage.xml \
+          --txt ${{ github.workspace }}/coverage-reports/cpp_coverage.txt \
           --verbose
 
         echo "C++ Coverage Summary:"
-        cat coverage-reports/cpp_coverage.txt
-
+        cat ${{ github.workspace }}/coverage-reports/cpp_coverage.txt
         if [ ${#FAILED_TESTS[@]} -gt 0 ]; then
           exit 1
         fi
 
     - name: Install C++ library
-      run: cmake --install "$BUILD_DIR" --prefix "$INSTALL_PREFIX"
+      run: cmake --install "$BUILD_DIR"
 
     - name: Install Python package
-      env:
-        CMAKE_PREFIX_PATH: ${{ env.INSTALL_PREFIX }}
+      working-directory: python
       run: |
-        cd python
-        python -m pip install --upgrade pip
         python -m pip install .[dev,plugins]
 
     - name: Run Python tests
       working-directory: python
-      env:
-        CMAKE_PREFIX_PATH: ${{ env.INSTALL_PREFIX }}
       run: |
         mkdir -p ../test-results ../coverage-reports
 
