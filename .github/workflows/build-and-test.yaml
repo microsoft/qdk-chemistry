@@ -47,7 +47,9 @@ jobs:
           liblapack-dev \
           libopenblas-dev \
           libgfortran5 \
-          pkg-config
+          pkg-config \
+          doxygen \
+          graphviz
 
     - name: Configure C++ build
       run: |
