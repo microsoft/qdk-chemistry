@@ -227,10 +227,6 @@ install(FILES
     DESTINATION lib/cmake/qdk
 )
 
-# Install Custom Find Modules
-include( ${linalg-cmake-modules_SOURCE_DIR}/LinAlgModulesMacros.cmake )
-install_linalg_modules( lib/cmake/qdk )
-
 # Export targets for build tree
 export(EXPORT chemistryTargets
     FILE "${CMAKE_CURRENT_BINARY_DIR}/chemistryTargets.cmake"
