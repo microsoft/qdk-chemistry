@@ -15,8 +15,7 @@
 #include <spdlog/spdlog.h>
 
 #include <qdk/chemistry/utils/omp_utils.hpp>
-
-#include "util/blas.h"
+#include <blas.hh>
 
 #define INCORE_ERI_GEN_DEBUG 0xF00
 #define INCORE_ERI_CON_HOST 0x0F0
@@ -151,9 +150,10 @@ void ERI::build_JK(const double* P, double* J, double* K, double alpha,
 
   if (J)
     for (size_t idm = 0; idm < (unrestricted_ ? 2 : 1); ++idm) {
-      blas::gemv("T", num_basis_funcs2, num_basis_funcs2, 1.0, h_eri_ptr,
-                 num_basis_funcs2, P + idm * num_basis_funcs2, 1, 0.0,
-                 J + idm * num_basis_funcs2, 1);
+      blas::gemv(blas::Layout::ColMajor, blas::Op::Trans, num_basis_funcs2,
+                 num_basis_funcs2, 1.0, h_eri_ptr, num_basis_funcs2,
+                 P + idm * num_basis_funcs2, 1, 0.0, J + idm * num_basis_funcs2,
+                 1);
     }
 
   if (K)
@@ -270,11 +270,13 @@ void ERI::quarter_trans(size_t nt, const double* C, double* out) {
 #else
 
   if (omega_ > 1e-12) {
-    blas::gemm("N", "N", nt, num_basis_funcs3, num_basis_funcs, 1.0, C, nt,
-               h_eri_erf_.get(), num_basis_funcs, 0.0, out, nt);
+    blas::gemm(blas::Layout::ColMajor, blas::Op::NoTrans, blas::Op::NoTrans, nt,
+               num_basis_funcs3, num_basis_funcs, 1.0, C, nt, h_eri_erf_.get(),
+               num_basis_funcs, 0.0, out, nt);
   } else {
-    blas::gemm("N", "N", nt, num_basis_funcs3, num_basis_funcs, 1.0, C, nt,
-               h_eri_.get(), num_basis_funcs, 0.0, out, nt);
+    blas::gemm(blas::Layout::ColMajor, blas::Op::NoTrans, blas::Op::NoTrans, nt,
+               num_basis_funcs3, num_basis_funcs, 1.0, C, nt, h_eri_.get(),
+               num_basis_funcs, 0.0, out, nt);
   }
 
 #endif  // QDK_CHEMISTRY_ENABLE_GPU

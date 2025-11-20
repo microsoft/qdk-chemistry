@@ -9,8 +9,7 @@
 #include <qdk/chemistry/scf/util/gpu/cuda_helper.h>
 #endif
 #include <Eigen/Core>
-
-#include "util/blas.h"
+#include <blas.hh>
 
 namespace qdk::chemistry::scf {
 MOERI::MOERI(std::shared_ptr<ERI> eri)
@@ -105,8 +104,8 @@ void MOERI::compute(size_t nb, size_t nt, const double* C, double* out) {
   for (size_t kl = 0; kl < nb2; ++kl) {
     auto TMP1_kl = tmp1.data() + kl * nb * nt;
     auto TMP2_kl = tmp2.data() + kl * nt2;
-    blas::gemm("N", "N", nt, nt, nb, 1.0, TMP1_kl, nt, C_cm.data(), nb, 0.0,
-               TMP2_kl, nt);
+    blas::gemm(blas::Layout::ColMajor, blas::Op::NoTrans, blas::Op::NoTrans, nt,
+               nt, nb, 1.0, TMP1_kl, nt, C_cm.data(), nb, 0.0, TMP2_kl, nt);
   }
 
   // 3rd Quarter
@@ -115,15 +114,16 @@ void MOERI::compute(size_t nb, size_t nt, const double* C, double* out) {
   for (size_t l = 0; l < nb; ++l) {
     auto TMP2_l = tmp2.data() + l * nt2 * nb;
     auto TMP1_l = tmp1.data() + l * nt3;
-    blas::gemm("N", "N", nt2, nt, nb, 1.0, TMP2_l, nt2, C_cm.data(), nb, 0.0,
-               TMP1_l, nt2);
+    blas::gemm(blas::Layout::ColMajor, blas::Op::NoTrans, blas::Op::NoTrans,
+               nt2, nt, nb, 1.0, TMP2_l, nt2, C_cm.data(), nb, 0.0, TMP1_l,
+               nt2);
   }
 
   // 4th Quarter
   // Y(p,q,r,s) = C(l,s) * TMP1(p,q,r,l)
   // Y(pqr,s) = V(pqr,l) * C(l,s)
-  blas::gemm("N", "N", nt3, nt, nb, 1.0, tmp1.data(), nt3, C_cm.data(), nb, 0.0,
-             out, nt3);
+  blas::gemm(blas::Layout::ColMajor, blas::Op::NoTrans, blas::Op::NoTrans, nt3,
+             nt, nb, 1.0, tmp1.data(), nt3, C_cm.data(), nb, 0.0, out, nt3);
 
 #endif  // QDK_CHEMISTRY_ENABLE_GPU
 }

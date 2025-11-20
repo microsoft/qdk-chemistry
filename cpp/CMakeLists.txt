@@ -79,12 +79,24 @@ target_include_directories(chemistry PUBLIC
     $<INSTALL_INTERFACE:include>
 )
 target_link_libraries(chemistry PUBLIC
-    OpenMP::OpenMP_CXX
     Eigen3::Eigen
     ${HDF5_CXX_LIBRARIES}
     nlohmann_json::nlohmann_json
     macis::macis
 )
+
+# Conditionally link OpenMP
+if(QDK_ENABLE_OPENMP)
+    if(TARGET OpenMP::OpenMP_CXX)
+        target_link_libraries(chemistry PUBLIC OpenMP::OpenMP_CXX)
+        message(STATUS "OpenMP support enabled")
+    else()
+        message(WARNING "QDK_ENABLE_OPENMP is ON but OpenMP was not found")
+    endif()
+else()
+    message(STATUS "OpenMP support disabled")
+endif()
+
 target_include_directories(chemistry PUBLIC ${HDF5_INCLUDE_DIRS})
 target_compile_definitions(chemistry PUBLIC ${HDF5_DEFINITIONS})
 target_compile_features(chemistry PUBLIC cxx_std_20)
