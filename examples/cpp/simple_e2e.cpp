@@ -216,10 +216,11 @@ int main(int argc, char** argv) {
 
   // Create a multi-configuration calculator
   // ASCI (Adaptive Sampling Configuration Interaction), provided by the MACIS
-  // library, is an efficient method for selecting important configurations in the active space,
-  // rather than considering the full configuration space. QDK/Chemistry
-  // provides several multi-configuration calculator implementations, which
-  // can be listed via `MultiConfigurationCalculatorFactory::available()`.
+  // library, is an efficient method for selecting important configurations in
+  // the active space, rather than considering the full configuration space.
+  // QDK/Chemistry provides several multi-configuration calculator
+  // implementations, which can be listed via
+  // `MultiConfigurationCalculatorFactory::available()`.
   auto mc =
       algorithms::MultiConfigurationCalculatorFactory::create("macis_asci");
 
