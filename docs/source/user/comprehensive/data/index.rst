@@ -1,4 +1,4 @@
-Data Management
+Data management
 ===============
 
 Individual data classes are described in detail in the :ref:`API documentation <apidocs>`.

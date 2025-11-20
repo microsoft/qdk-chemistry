@@ -3,10 +3,9 @@
 # Licensed under the MIT License. See LICENSE.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
 
+import shutil
 import sys
 from pathlib import Path
-
-# from warnings import warn
 
 # -----------------------------------------------------------------------------
 # Path setup
@@ -15,6 +14,13 @@ from pathlib import Path
 sys.path.insert(
     0, str(Path(__file__).parent.parent.joinpath("python", "src").absolute())
 )
+
+# -----------------------------------------------------------------------------
+# Check if Graphviz 'dot' executable is available
+# -----------------------------------------------------------------------------
+if shutil.which("dot") is None:
+    sys.stderr.write("ERROR: Graphviz 'dot' executable not found.\n")
+    sys.exit(1)
 
 # -----------------------------------------------------------------------------
 # Project information

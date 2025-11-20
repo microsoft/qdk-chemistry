@@ -79,27 +79,27 @@ class DataClass {
    * @brief Copy constructor
    * @param other The DataClass object to copy from
    */
-  DataClass(const DataClass&) = default;
+  DataClass(const DataClass& other) = default;
 
   /**
    * @brief Copy assignment operator
    * @param other The DataClass object to copy from
    * @return Reference to this object
    */
-  DataClass& operator=(const DataClass&) = default;
+  DataClass& operator=(const DataClass& other) = default;
 
   /**
    * @brief Move constructor
    * @param other The DataClass object to move from
    */
-  DataClass(DataClass&&) = default;
+  DataClass(DataClass&& other) = default;
 
   /**
    * @brief Move assignment operator
    * @param other The DataClass object to move from
    * @return Reference to this object
    */
-  DataClass& operator=(DataClass&&) = default;
+  DataClass& operator=(DataClass&& other) = default;
 };
 
 /**

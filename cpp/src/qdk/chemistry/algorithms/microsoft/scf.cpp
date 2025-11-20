@@ -60,7 +60,8 @@ std::pair<double, std::shared_ptr<data::Wavefunction>> ScfSolver::_run_impl(
   if (multiplicity < 0) {
     // Default to singlet for closed shell, doublet for open-shell
     multiplicity = ((nuclear_charge - charge) % 2 == 0) ? 1 : 2;
-    // TODO (NAB): should the user be warned about a default being used? Workitem: 41322
+    // TODO (NAB): should the user be warned about a default being used?
+    // Workitem: 41322
   }
 
   const bool unrestricted = (multiplicity != 1);

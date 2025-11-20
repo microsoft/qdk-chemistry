@@ -95,11 +95,13 @@ class MultiConfigurationCalculator
    * automatically locks settings before execution, then delegates to
    * _run_impl().
    *
+   * \cond DOXYGEN_SUPRESS (Doxygen warning suppression for argument packs)
    * @param hamiltonian The Hamiltonian operator describing the quantum system
    * @param n_active_alpha_electrons The number of alpha electrons in the
    * active space, inactive orbitals are assumed to be fully occupied.
    * @param n_active_beta_electrons The number of beta electrons in the
    * active space, inactive orbitals are assumed to be fully occupied.
+   * \endcond
    *
    * @return A pair containing the calculated energy (first) and the resulting
    *         multi-configurational wavefunction (second)
