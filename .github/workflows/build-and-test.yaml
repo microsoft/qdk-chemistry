@@ -19,7 +19,7 @@ jobs:
     env:
       BUILD_DIR: cpp/build
       INSTALL_PREFIX: ${{ github.workspace }}/cpp/install
-      CMAKE_BUILD_PARALLEL_LEVEL: 1
+      CMAKE_BUILD_PARALLEL_LEVEL: 120
       QDK_UARCH: x86-64-v3
       CTEST_OUTPUT_ON_FAILURE: 1
     steps:
