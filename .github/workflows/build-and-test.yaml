@@ -68,7 +68,7 @@ jobs:
         cmake -S cpp -B "$BUILD_DIR" \
           -DCMAKE_BUILD_TYPE=Debug \
           -DQDK_UARCH="$QDK_UARCH" \
-          -DENABLE_COVERAGE=ON \
+          -DQDK_CHEMISTRY_ENABLE_COVERAGE=ON \
           -DBUILD_TESTING=ON
 
     - name: Build C++ library
@@ -129,11 +129,8 @@ jobs:
         echo "=== BUILD_DIR contents ==="
         ls -la "$BUILD_DIR" || true
         
-        # Use absolute path for BUILD_DIR
-        ABS_BUILD_DIR="${{ github.workspace }}/${BUILD_DIR}"
-        
         gcovr --root ${{ github.workspace }}/cpp \
-          --object-directory "$ABS_BUILD_DIR" \
+          --object-directory "${{ github.workspace }}/${BUILD_DIR}" \
           --filter '${{ github.workspace }}/cpp/src/.*' \
           --filter '${{ github.workspace }}/cpp/include/.*' \
           --exclude '.*/tests/.*' \
