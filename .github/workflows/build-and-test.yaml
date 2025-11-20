@@ -13,6 +13,7 @@ permissions:
   contents: read
   pull-requests: write
   checks: write
+  statuses: write
 
 jobs:
   coverage:
@@ -356,6 +357,8 @@ jobs:
       with:
         files: test-results/*.xml
         check_name: Test Results
+        github_token: ${{ secrets.GITHUB_TOKEN }}
+        compare_to_earlier_commit: false
 
     - name: Install documentation dependencies
       working-directory: python
