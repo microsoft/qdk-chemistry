@@ -22,14 +22,17 @@ jobs:
       CMAKE_INSTALL_PREFIX: ${{ github.workspace }}/install
       QDK_UARCH: x86-64-v3
       CTEST_OUTPUT_ON_FAILURE: 1
-      PATH: ${{ github.workspace }}/install/bin:${{ github.workspace }}/install/lib:$PATH
-      PYTHONPATH: ${{ github.workspace }}/install/lib/python3.13/site-packages:${{ github.workspace }}/install/lib:$PYTHONPATH
-      LD_LIBRARY_PATH: ${{ github.workspace }}/install/lib:$LD_LIBRARY_PATH
     steps:
     - name: Checkout repository
       uses: actions/checkout@v4
       with:
         submodules: recursive
+
+    - name: Set up environment paths
+      run: |
+        echo "PATH=${{ github.workspace }}/install/bin:${{ github.workspace }}/install/lib:$PATH" >> $GITHUB_ENV
+        echo "PYTHONPATH=${{ github.workspace }}/install/lib/python3.13/site-packages:${{ github.workspace }}/install/lib:$PYTHONPATH" >> $GITHUB_ENV
+        echo "LD_LIBRARY_PATH=${{ github.workspace }}/install/lib:$LD_LIBRARY_PATH" >> $GITHUB_ENV
 
     - name: Set up Python 3.13
       uses: actions/setup-python@v5
