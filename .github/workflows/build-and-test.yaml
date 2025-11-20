@@ -188,6 +188,8 @@ jobs:
 
     - name: Generate Pybind11 coverage report
       if: success() || failure()
+      env:
+        QDK_CHEMISTRY_COVERAGE_BUILD: 1
       working-directory: python
       run: |
         PYBIND_BUILD_DIR=$(find . -wholename "./build/cp*/CMakeFiles/_core.dir" | head -1)
@@ -211,7 +213,6 @@ jobs:
               --exclude '.*external.*' \
               --gcov-ignore-errors=no_working_dir_found \
               --gcov-ignore-errors=source_not_found \
-              --verbose \
               --xml "../coverage-reports/pybind11_coverage.xml" \
               --txt "../coverage-reports/pybind11_coverage.txt" \
               --html-details "../coverage-reports/pybind11_coverage.html"
