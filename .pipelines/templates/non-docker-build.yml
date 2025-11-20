@@ -82,7 +82,7 @@ steps:
 
 - script: |
     cd ${{ parameters.agentBuildDirectory }}/qdk-chemistry/python
-    export QDK_COVERAGE_BUILD=ON
+    export QDK_CHEMISTRY_COVERAGE_BUILD=ON
     export CMAKE_BUILD_TYPE=Debug
     echo "Building Python package with coverage configuration..."
     # Install in development mode to preserve source code links for coverage
