@@ -19,8 +19,12 @@ jobs:
     env:
       BUILD_DIR: cpp/build
       CMAKE_BUILD_PARALLEL_LEVEL: 120
+      CMAKE_INSTALL_PREFIX: ${{ github.workspace }}/install
       QDK_UARCH: x86-64-v3
       CTEST_OUTPUT_ON_FAILURE: 1
+      PATH: ${{ github.workspace }}/install/bin:${{ github.workspace }}/install/lib:$PATH
+      PYTHONPATH: ${{ github.workspace }}/install/lib/python3.13/site-packages:${{ github.workspace }}/install/lib:$PYTHONPATH
+      LD_LIBRARY_PATH: ${{ github.workspace }}/install/lib:$LD_LIBRARY_PATH
     steps:
     - name: Checkout repository
       uses: actions/checkout@v4
@@ -54,7 +58,7 @@ jobs:
     - name: Install Python dependencies
       run: |
         python -m pip install --upgrade pip
-        python -m pip install coverage pytest pytest-cov
+        python -m pip install --prefix=${{ github.workspace }}/install coverage pytest pytest-cov
 
     - name: Configure C++ build
       run: |
@@ -151,7 +155,7 @@ jobs:
     - name: Install Python package
       working-directory: python
       run: |
-        python -m pip install .[dev,plugins]
+        python -m pip install --prefix=${{ github.workspace }}/install .[dev,plugins]
 
     - name: Run Python tests
       working-directory: python
@@ -258,7 +262,7 @@ jobs:
     - name: Install documentation dependencies
       run: |
         cd python
-        pip install .[docs,plugins] --verbose
+        pip install --prefix=${{ github.workspace }}/install .[docs,plugins] --verbose
         python3 -c "import qdk_chemistry; print('qdk_chemistry version:', qdk_chemistry.__version__)"
 
     - name: Build documentation
