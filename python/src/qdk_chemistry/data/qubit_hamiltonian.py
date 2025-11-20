@@ -110,8 +110,11 @@ class QubitHamiltonian(DataClass):
         """
         sparse_matrix = self.pauli_ops.to_matrix(sparse=True)
         sparse_matrix_real = sparse_matrix.real.copy()
-        result = davidson_solver(sparse_matrix_real, tol=tol, max_m=max_m)
-        return result["eigenvalue"], result["eigenvector"] if result else None
+        try:
+            eigenvalue, eigenvector = davidson_solver(sparse_matrix_real, tol=tol, max_m=max_m)
+            return eigenvalue, eigenvector
+        except RuntimeError:
+            return None
 
     # DataClass interface implementation
     def get_summary(self) -> str:

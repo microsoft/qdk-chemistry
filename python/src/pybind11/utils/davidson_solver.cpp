@@ -73,10 +73,7 @@ void bind_davidson_utils(py::module& m) {
         // Create a copy of the eigenvector data for Python
         py::array_t<double> eigvec = py::cast(X);
 
-        py::dict result;
-        result["iterations"] = iters;
-        result["eigenvalue"] = eigval;
-        result["eigenvector"] = eigvec;
+        py::tuple result = py::make_tuple(eigval, eigvec);
         return result;
       },
       R"(
@@ -96,12 +93,9 @@ void bind_davidson_utils(py::module& m) {
 
             Returns
             -------
-            dict
-                Dictionary containing:
-                  - 'eigenvalue': float, the lowest eigenvalue found
-                  - 'eigenvector': numpy.ndarray, corresponding eigenvector
-                  - 'iterations': int, number of Davidson iterations performed
-
+            tuple of (eigenvalue, eigenvector)
+                - eigenvalue: float, the lowest eigenvalue found
+                - eigenvector: numpy.ndarray, corresponding eigenvector
             Raises
             ------
             RuntimeError

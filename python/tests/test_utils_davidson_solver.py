@@ -69,9 +69,8 @@ def test_davidson_solver_model_hamiltonian():
     )
     # Check eigenvector
     assert eigvec.shape == (4,)
-    assert np.allclose(
-        eigvec, expected_eigvec, atol=float_comparison_absolute_tolerance, rtol=float_comparison_relative_tolerance
-    )
+    dot = float(np.dot(eigvec, expected_eigvec))
+    assert np.isclose(abs(dot), 1.0, atol=float_comparison_absolute_tolerance, rtol=float_comparison_relative_tolerance)
 
 
 def test_davidson_solver_hamiltonian(hamiltonian_10e6o):

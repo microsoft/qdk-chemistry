@@ -53,11 +53,10 @@ class TestQubitHamiltonian:
             energy, -1.5, atol=float_comparison_absolute_tolerance, rtol=float_comparison_relative_tolerance
         )
         assert state.shape == (4,)
-        assert np.allclose(
-            state,
-            [0, 1 / np.sqrt(2), -1 / np.sqrt(2), 0],
-            atol=float_comparison_absolute_tolerance,
-            rtol=float_comparison_relative_tolerance,
+        expected_state = np.array([0, 1 / np.sqrt(2), -1 / np.sqrt(2), 0])
+        dot = float(np.dot(state, expected_state))
+        assert np.isclose(
+            abs(dot), 1.0, atol=float_comparison_absolute_tolerance, rtol=float_comparison_relative_tolerance
         )
 
     def test_group_commuting(self):
