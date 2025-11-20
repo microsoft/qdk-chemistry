@@ -47,10 +47,6 @@ class ScfSettings
    *
    */
   ScfSettings() : qdk::chemistry::algorithms::ElectronicStructureSettings() {
-    // TODO enable these
-    // set_default("diis_enabled", true);
-    // set_default("diis_start", 2);
-    // set_default("level_shift", 0.0);
     set_default("max_scf_steps", 100);
     set_default("level_shift", -1.0);
     set_default("enable_gdm", false);

@@ -36,7 +36,7 @@ DIIS_GDM::DIIS_GDM(const SCFContext& ctx, const size_t subspace_size,
     spdlog::info("max_diis_step was < 2, set to 2");
   }
 
-  // Initialize GDM algorithm (now supports unrestricted and open shell systems)
+  // Initialize GDM algorithm
   gdm_algorithm_ = std::make_unique<GDM>(ctx, gdm_config_);
 
   // Log initialization parameters

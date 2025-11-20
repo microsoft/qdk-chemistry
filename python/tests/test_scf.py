@@ -119,6 +119,7 @@ class TestScfSolver:
         assert abs(energy - (-76.0205776518)) < scf_energy_tolerance
 
     def test_scf_solver_settings_edge_cases(self):
+        """Test SCF solver with various invalid settings."""
         water = create_water_structure()
 
         # Test invalid basis set - should throw during solve
