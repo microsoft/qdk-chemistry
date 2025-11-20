@@ -4,10 +4,10 @@
 
 #include "matrix_exp.h"
 
-#include <math.h>
 #include <spdlog/spdlog.h>
 
 #include <algorithm>
+#include <cmath>
 #include <iostream>
 #include <memory>
 #include <stdexcept>
@@ -23,7 +23,8 @@ void matrix_exp(const double *m, double *exp_m, int size) {
   for (int row = 0; row < size; row++) {
     double abssum_row = 0.0;
     for (int col = 0; col < size; col++) {
-      double abs_entry = fabs(m[row * size + col]);  // input m is row-major
+      double abs_entry =
+          std::fabs(m[row * size + col]);  // input m is row-major
       abssum_row += abs_entry;
     }
     if (abssum_row > first_norm) first_norm = abssum_row;
@@ -33,17 +34,12 @@ void matrix_exp(const double *m, double *exp_m, int size) {
                             // Padé approximation, reference
                             // DOI. 10.1137/04061101X
   int s = first_norm > theta13
-              ? std::max(0, (int)(log2(first_norm / theta13)) + 1)
+              ? std::max(0, (int)(std::log2(first_norm / theta13)) + 1)
               : 0;
   spdlog::debug("computing exp(m), first norm of m {}, scaling factor s {}",
                 first_norm, s);
-  if (s > 62) {
-    throw std::runtime_error(
-        "Matrix norm too large, cannot compute exponential");
-  }
   // scale the matrix by 2^s
-  long long inv_scale = 1LL << s;
-  double scale = 1.0 / (double)inv_scale;
+  double scale = 1.0 / std::pow(2.0, s);
   std::unique_ptr<double[]> scaled_m(new double[size * size]);
   for (int i = 0; i < size * size; i++) {
     scaled_m[i] = m[i] * scale;
