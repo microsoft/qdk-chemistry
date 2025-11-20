@@ -13,9 +13,9 @@ permissions:
   contents: read
 
 jobs:
-  cpp-python:
-    name: Build C++ and Python packages
-    runs-on: [self-hosted, 1ES.Pool=1es-gh-hb120-pool, 'JobId=qdk-chemistry-unittests-${{ github.run_id }}-${{ github.run_number }}-${{ github.run_attempt }}']
+  coverage:
+    name: Build, Test, and Coverage Analysis
+    runs-on: [self-hosted, 1ES.Pool=1es-gh-hb120-pool, 'JobId=qdk-chemistry-coverage-${{ github.run_id }}-${{ github.run_number }}-${{ github.run_attempt }}']
     env:
       BUILD_DIR: cpp/build
       INSTALL_PREFIX: ${{ github.workspace }}/cpp/install
@@ -49,20 +49,85 @@ jobs:
           libgfortran5 \
           pkg-config \
           doxygen \
-          graphviz
+          graphviz \
+          gcovr
+
+    - name: Install Python dependencies
+      run: |
+        python -m pip install --upgrade pip
+        python -m pip install coverage pytest pytest-cov
 
     - name: Configure C++ build
       run: |
         cmake -S cpp -B "$BUILD_DIR" \
-          -DCMAKE_BUILD_TYPE=RelWithDebInfo \
+          -DCMAKE_BUILD_TYPE=Debug \
           -DQDK_UARCH="$QDK_UARCH" \
-          -DCMAKE_INSTALL_PREFIX="$INSTALL_PREFIX"
+          -DCMAKE_INSTALL_PREFIX="$INSTALL_PREFIX" \
+          -DENABLE_COVERAGE=ON \
+          -DBUILD_TESTING=ON
 
     - name: Build C++ library
       run: cmake --build "$BUILD_DIR"
 
-    - name: Run C++ tests
-      run: ctest --test-dir "$BUILD_DIR"
+    - name: Run C++ tests with coverage
+      run: |
+        mkdir -p test-results coverage-reports
+        cd "$BUILD_DIR/tests"
+        
+        FAILED_TESTS=()
+        TOTAL_TESTS=0
+        PASSED_TESTS=0
+        
+        echo "=== Running C++ Tests ==="
+        for test_exe in test_*; do
+          if [ -x "$test_exe" ] && [ -f "$test_exe" ]; then
+            TOTAL_TESTS=$((TOTAL_TESTS + 1))
+            echo "Running $test_exe..."
+            
+            set +e
+            timeout 300 ./"$test_exe" --gtest_output=xml:${{ github.workspace }}/test-results/"$test_exe"_results.xml
+            EXIT_CODE=$?
+            set -e
+            
+            if [ $EXIT_CODE -ne 0 ]; then
+              echo "ERROR: Test $test_exe failed with exit code $EXIT_CODE"
+              FAILED_TESTS+=("$test_exe (exit code: $EXIT_CODE)")
+            else
+              echo "SUCCESS: Test $test_exe passed"
+              PASSED_TESTS=$((PASSED_TESTS + 1))
+            fi
+          fi
+        done
+        
+        echo "=== C++ Test Summary ==="
+        echo "Total tests: $TOTAL_TESTS"
+        echo "Passed tests: $PASSED_TESTS"
+        echo "Failed tests: ${#FAILED_TESTS[@]}"
+        
+        if [ ${#FAILED_TESTS[@]} -gt 0 ]; then
+          echo "=== FAILED TESTS ==="
+          for failed_test in "${FAILED_TESTS[@]}"; do
+            echo "  - $failed_test"
+          done
+        fi
+        
+        cd ${{ github.workspace }}
+        gcovr --root cpp \
+          --object-directory "$BUILD_DIR" \
+          --exclude '.*/tests/.*' \
+          --exclude '.*test.*\.cpp' \
+          --exclude '.*gtest.*' \
+          --exclude '.*gmock.*' \
+          --html-details coverage-reports/cpp_coverage.html \
+          --xml coverage-reports/cpp_coverage.xml \
+          --txt coverage-reports/cpp_coverage.txt
+        
+        echo "C++ Coverage Summary:"
+        cat coverage-reports/cpp_coverage.txt
+        
+        if [ ${#FAILED_TESTS[@]} -gt 0 ]; then
+          exit 1
+        fi
 
     - name: Install C++ library
       run: cmake --install "$BUILD_DIR" --prefix "$INSTALL_PREFIX"
@@ -78,8 +143,113 @@ jobs:
       working-directory: python
       env:
         CMAKE_PREFIX_PATH: ${{ env.INSTALL_PREFIX }}
-      run: pytest -vv
+      run: |
+        mkdir -p ../test-results ../coverage-reports
+        
+        BUILD_TEMP=$(find . -type d -path "./build/cp*" | head -1)
+        echo "Found build directory: $BUILD_TEMP"
+        echo "$BUILD_TEMP" > build_temp_path.txt
+        
+        set +e
+        pytest \
+          --cov=qdk_chemistry \
+          --cov-report=xml:../coverage-reports/python_coverage.xml \
+          --cov-report=html:../coverage-reports/python_coverage_html \
+          --cov-report=term \
+          --junitxml=../test-results/pytest_report.xml \
+          -v \
+          --tb=short \
+          > ../coverage-reports/python_coverage.txt 2>&1
+        
+        PYTEST_EXIT_CODE=$?
+        set -e
+        
+        echo "=== Python Test Output ==="
+        cat ../coverage-reports/python_coverage.txt
+        
+        if [ $PYTEST_EXIT_CODE -ne 0 ]; then
+          echo "ERROR: Python tests failed with exit code $PYTEST_EXIT_CODE"
+        fi
+        
+        if [ -n "$BUILD_TEMP" ] && [ -d "$BUILD_TEMP" ]; then
+          find "$BUILD_TEMP" -name "*.gcda" -exec cp {} coverage_build/ \; 2>/dev/null || true
+        fi
+        
+        if [ $PYTEST_EXIT_CODE -ne 0 ]; then
+          exit 1
+        fi
+
+    - name: Generate Pybind11 coverage report
+      if: success() || failure()
+      working-directory: python
+      run: |
+        PYBIND_BUILD_DIR=$(find . -wholename "./build/cp*/CMakeFiles/_core.dir" | head -1)
+        if [ -n "$PYBIND_BUILD_DIR" ]; then
+          echo "Found pybind11 build directory: $PYBIND_BUILD_DIR"
+          GCNO_COUNT=$(find "$PYBIND_BUILD_DIR" -name "*.gcno" | wc -l)
+          GCDA_COUNT=$(find "$PYBIND_BUILD_DIR" -name "*.gcda" | wc -l)
+          echo "Found $GCNO_COUNT .gcno files and $GCDA_COUNT .gcda files"
+          
+          if [ "$GCNO_COUNT" -gt 0 ]; then
+            PYTHON_ROOT="$(pwd)"
+            CLEAN_BUILD_DIR="${PYBIND_BUILD_DIR#./}"
+            OBJECT_DIR="$(pwd)/${CLEAN_BUILD_DIR}"
+            
+            gcovr \
+              --root "$PYTHON_ROOT" \
+              --object-directory "$OBJECT_DIR" \
+              --filter '.*src/pybind11.*' \
+              --filter '.*src/cpp.*' \
+              --exclude '.*test.*' \
+              --exclude '.*external.*' \
+              --gcov-ignore-errors=no_working_dir_found \
+              --gcov-ignore-errors=source_not_found \
+              --verbose \
+              --xml "../coverage-reports/pybind11_coverage.xml" \
+              --txt "../coverage-reports/pybind11_coverage.txt" \
+              --html-details "../coverage-reports/pybind11_coverage.html"
+            
+            echo "Pybind11 Coverage Summary:"
+            cat ../coverage-reports/pybind11_coverage.txt
+          else
+            echo "ERROR: No .gcno files found - coverage was not enabled during build"
+          fi
+        else
+          echo "ERROR: Could not find pybind11 build directory"
+        fi
+
+    - name: Upload coverage reports to Codecov
+      if: success() || failure()
+      uses: codecov/codecov-action@v4
+      with:
+        files: ./coverage-reports/cpp_coverage.xml,./coverage-reports/python_coverage.xml,./coverage-reports/pybind11_coverage.xml
+        flags: coverage
+        name: codecov-coverage
+        fail_ci_if_error: false
+
+    - name: Upload coverage artifacts
+      if: success() || failure()
+      uses: actions/upload-artifact@v4
+      with:
+        name: coverage-reports
+        path: |
+          coverage-reports/
+          test-results/
+
+    - name: Publish test results
+      if: success() || failure()
+      uses: EnricoMi/publish-unit-test-result-action@v2
+      with:
+        files: test-results/*.xml
+        check_name: Test Results
+
+    - name: Install documentation dependencies
+      run: |
+        cd python
+        pip install .[docs,plugins] --verbose
+        python3 -c "import qdk_chemistry; print('qdk_chemistry version:', qdk_chemistry.__version__)"
 
     - name: Build documentation
       working-directory: docs
       run: make clean all
+
