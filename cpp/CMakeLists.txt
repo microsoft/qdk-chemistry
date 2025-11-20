@@ -28,6 +28,47 @@ include(cmake/qdk-uarch.cmake)
 # Handle TPL dependencies
 include(cmake/third_party.cmake)
 
+# Add a custom target to only build and install fetched dependencies
+add_custom_target(install-dependencies
+    COMMENT "Building and installing fetched dependencies (skipping system-provided ones)"
+)
+
+# Only add build commands for dependencies that were fetched (not found on system)
+if(TARGET nlohmann_json AND NOT nlohmann_json_FOUND)
+    add_custom_command(TARGET install-dependencies POST_BUILD
+        COMMAND ${CMAKE_COMMAND} --build ${CMAKE_BINARY_DIR} --target nlohmann_json
+        COMMENT "Building nlohmann_json"
+    )
+endif()
+
+if(TARGET Libint2::cxx AND NOT libint2_FOUND)
+    add_custom_command(TARGET install-dependencies POST_BUILD
+        COMMAND ${CMAKE_COMMAND} --build ${CMAKE_BINARY_DIR} --target Libint2::cxx
+        COMMENT "Building libint2"
+    )
+endif()
+
+if(TARGET ECPINT::ecpint AND NOT ecpint_FOUND)
+    add_custom_command(TARGET install-dependencies POST_BUILD
+        COMMAND ${CMAKE_COMMAND} --build ${CMAKE_BINARY_DIR} --target ECPINT::ecpint
+        COMMENT "Building ecpint"
+    )
+endif()
+
+if(TARGET gauxc::gauxc AND NOT gauxc_FOUND)
+    add_custom_command(TARGET install-dependencies POST_BUILD
+        COMMAND ${CMAKE_COMMAND} --build ${CMAKE_BINARY_DIR} --target gauxc::gauxc
+        COMMENT "Building gauxc"
+    )
+endif()
+
+if(TARGET macis::macis AND NOT macis_FOUND)
+    add_custom_command(TARGET install-dependencies POST_BUILD
+        COMMAND ${CMAKE_COMMAND} --build ${CMAKE_BINARY_DIR} --target macis::macis
+        COMMENT "Building macis"
+    )
+endif()
+
 # Handle GPU dependencies
 if(QDK_CHEMISTRY_ENABLE_GPU)
   include(${CMAKE_CURRENT_LIST_DIR}/cmake/cuda.cmake)
