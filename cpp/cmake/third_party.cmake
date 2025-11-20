@@ -79,21 +79,3 @@ handle_dependency(gauxc
 # Restore previous settings
 set(CMAKE_WARN_DEPRECATED ${_old_warn_deprecated} CACHE BOOL "" FORCE)
 set(CMAKE_SUPPRESS_DEVELOPER_WARNINGS ${_old_suppress_dev} CACHE BOOL "" FORCE)
-
-# Custom CMake Find* modules for linear algebra dependencies
-include( FetchContent )
-FetchContent_Declare( linalg-cmake-modules
-  GIT_REPOSITORY https://github.com/wavefunction91/linalg-cmake-modules.git
-  GIT_TAG        main
-)
-FetchContent_GetProperties( linalg-cmake-modules )
-if( NOT linalg-cmake-modules_POPULATED )
-  FetchContent_Populate( linalg-cmake-modules )
-endif()
-
-list( APPEND CMAKE_MODULE_PATH ${linalg-cmake-modules_SOURCE_DIR} )
-
-
-# Install Custom Find Modules
-include( ${linalg-cmake-modules_SOURCE_DIR}/LinAlgModulesMacros.cmake )
-install_linalg_modules( INSTALL_CONFIGDIR )

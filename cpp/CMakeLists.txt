@@ -1,4 +1,3 @@
-
 cmake_minimum_required(VERSION 3.15)
 project(qdk VERSION 1.0.0.1 LANGUAGES CXX C)
 set(CMAKE_CXX_STANDARD 20)
@@ -22,6 +21,19 @@ option(QDK_EMBED_RESOURCE_LOCATION "Point to embedded (permanent) resource locat
 option(QDK_ENABLE_OPENMP "Enable OpenMP support" ON)
 
 list(APPEND CMAKE_MODULE_PATH ${PROJECT_SOURCE_DIR}/cmake/modules)
+
+# Custom CMake Find* modules for linear algebra dependencies
+include( FetchContent )
+FetchContent_Declare( linalg-cmake-modules
+  GIT_REPOSITORY https://github.com/wavefunction91/linalg-cmake-modules.git
+  GIT_TAG        main
+)
+FetchContent_GetProperties( linalg-cmake-modules )
+if( NOT linalg-cmake-modules_POPULATED )
+  FetchContent_Populate( linalg-cmake-modules )
+endif()
+
+list( APPEND CMAKE_MODULE_PATH ${linalg-cmake-modules_SOURCE_DIR} )
 
 # Microarchitecture handling
 include(cmake/qdk-uarch.cmake)
@@ -214,6 +226,10 @@ install(FILES
     "${CMAKE_CURRENT_BINARY_DIR}/qdkConfigVersion.cmake"
     DESTINATION lib/cmake/qdk
 )
+
+# Install Custom Find Modules
+include( ${linalg-cmake-modules_SOURCE_DIR}/LinAlgModulesMacros.cmake )
+install_linalg_modules( lib/cmake/qdk )
 
 # Export targets for build tree
 export(EXPORT chemistryTargets
