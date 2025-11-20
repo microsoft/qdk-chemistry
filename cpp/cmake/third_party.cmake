@@ -65,11 +65,8 @@ set(GAUXC_ENABLE_MAGMA   OFF CACHE BOOL "Enable gauxc MAGMA Support"   FORCE)
 set(GAUXC_ENABLE_CUTLASS ON  CACHE BOOL "Enable gauxc CUTLASS Support" FORCE)
 set(GAUXC_ENABLE_CUDA ${QDK_CHEMISTRY_ENABLE_GPU} CACHE BOOL "Enable gauxc CUDA Support" FORCE)
 set(GAUXC_ENABLE_MPI  ${QDK_CHEMISTRY_ENABLE_MPI} CACHE BOOL "Enable gauxc MPI Support"  FORCE)
-if (QDK_ENABLE_OPENMP)
-    set(GAUXC_ENABLE_OPENMP ON CACHE BOOL "Enable gauxc OpenMP Support" FORCE)
-else()
-    set(GAUXC_ENABLE_OPENMP OFF CACHE BOOL "Enable gauxc OpenMP Support" FORCE)
-endif()
+set(GAUXC_ENABLE_OPENMP ${QDK_ENABLE_OPENMP} CACHE BOOL "Enable gauxc OpenMP Support" FORCE)
+
 handle_dependency(gauxc
   GIT_REPOSITORY https://github.com/wavefunction91/gauxc.git
   GIT_TAG v1.0
