@@ -112,15 +112,26 @@ jobs:
         fi
 
         cd ${{ github.workspace }}
-        gcovr --root cpp \
-          --object-directory "$BUILD_DIR" \
+        
+        echo "=== Checking for coverage files ==="
+        echo "Looking for .gcda files in $BUILD_DIR"
+        find "$BUILD_DIR" -name "*.gcda" | head -20
+        echo "Looking for .gcno files in $BUILD_DIR"
+        find "$BUILD_DIR" -name "*.gcno" | head -20
+        
+        gcovr --root ${{ github.workspace }}/cpp \
+          --object-directory ${{ github.workspace }}/"$BUILD_DIR" \
+          --filter '${{ github.workspace }}/cpp/src/.*' \
+          --filter '${{ github.workspace }}/cpp/include/.*' \
           --exclude '.*/tests/.*' \
           --exclude '.*test.*\.cpp' \
           --exclude '.*gtest.*' \
           --exclude '.*gmock.*' \
+          --exclude '.*/external/.*' \
           --html-details coverage-reports/cpp_coverage.html \
           --xml coverage-reports/cpp_coverage.xml \
-          --txt coverage-reports/cpp_coverage.txt
+          --txt coverage-reports/cpp_coverage.txt \
+          --verbose
 
         echo "C++ Coverage Summary:"
         cat coverage-reports/cpp_coverage.txt
@@ -136,8 +147,9 @@ jobs:
       env:
         CMAKE_PREFIX_PATH: ${{ env.INSTALL_PREFIX }}
       run: |
+        cd python
         python -m pip install --upgrade pip
-        python -m pip install "python[dev,docs]"
+        python -m pip install .[dev,plugins]
 
     - name: Run Python tests
       working-directory: python
