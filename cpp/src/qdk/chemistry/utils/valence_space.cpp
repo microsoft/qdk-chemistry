@@ -104,4 +104,4 @@ std::pair<size_t, size_t> compute_valence_space_parameters(
   return {num_active_valence_electrons, num_active_valence_orbitals};
 }
 
-}
+}  // namespace qdk::chemistry::utils

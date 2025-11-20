@@ -32,4 +32,4 @@ std::pair<size_t, size_t> compute_valence_space_parameters(
     std::shared_ptr<qdk::chemistry::data::Wavefunction> wavefunction,
     int charge);
 
-}
+}  // namespace qdk::chemistry::utils
