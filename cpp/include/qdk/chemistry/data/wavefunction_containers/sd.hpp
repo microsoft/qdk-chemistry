@@ -131,11 +131,6 @@ class SlaterDeterminantContainer : public WavefunctionContainer {
   const VectorVariant& get_active_two_rdm_spin_traced() const override;
 
   /**
-   * @brief Calculate single orbital entropies for active orbitals only
-   */
-  Eigen::VectorXd get_single_orbital_entropies() const override;
-
-  /**
    * @brief Get total number of alpha and beta electrons (active + inactive)
    * @return Pair of (n_alpha_total, n_beta_total) electrons
    */

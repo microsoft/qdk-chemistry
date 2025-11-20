@@ -271,3 +271,146 @@ TEST_F(SlaterdeterminantTest, Hdf5Serialization) {
 
   std::remove(filename.c_str());
 }
+
+// Test 1- and 2-RDM for closed-shell system
+TEST_F(SlaterdeterminantTest, ClosedShellReducedDensityMatrices) {
+  // get slater determinant
+  size_t norb = 4;
+  auto orbitals = testing::create_test_orbitals(norb, norb, true);
+  Configuration det("2200");
+  SlaterDeterminantContainer sd(det, orbitals);
+
+  // get RDMs
+  auto one_rdm = std::get<Eigen::MatrixXd>(sd.get_active_one_rdm_spin_traced());
+  auto two_rdm = std::get<Eigen::VectorXd>(sd.get_active_two_rdm_spin_traced());
+  auto [one_rdm_aa, one_rdm_bb] = sd.get_active_one_rdm_spin_dependent();
+  auto [two_rdm_aabb, two_rdm_aaaa, two_rdm_bbbb] =
+      sd.get_active_two_rdm_spin_dependent();
+
+  // get bbaa from transposed aabb
+  auto two_rdm_bbaa =
+      detail::transpose_ijkl_klij_vector_variant(two_rdm_aabb, norb);
+
+  // Expected 1-RDM
+  Eigen::MatrixXd expected_one_rdm = Eigen::MatrixXd::Zero(norb, norb);
+  expected_one_rdm(0, 0) = 2.0;
+  expected_one_rdm(1, 1) = 2.0;
+  EXPECT_TRUE(
+      one_rdm.isApprox(expected_one_rdm, testing::numerical_zero_tolerance));
+
+  // spin traced 1-RDM is the sum of spin dependent 1-RDMs
+  Eigen::MatrixXd one_rdm_sum = std::get<Eigen::MatrixXd>(one_rdm_aa) +
+                                std::get<Eigen::MatrixXd>(one_rdm_bb);
+  EXPECT_TRUE(one_rdm_sum.isApprox(expected_one_rdm,
+                                   testing::numerical_zero_tolerance));
+
+  // check spin dependent 2-RDM
+  auto sum_two_rdm = std::get<Eigen::VectorXd>(two_rdm_aabb) +
+                     std::get<Eigen::VectorXd>(*two_rdm_bbaa) +
+                     std::get<Eigen::VectorXd>(two_rdm_aaaa) +
+                     std::get<Eigen::VectorXd>(two_rdm_bbbb);
+
+  for (size_t i = 0; i < two_rdm.size(); ++i) {
+    EXPECT_NEAR(two_rdm(i), sum_two_rdm(i), testing::numerical_zero_tolerance);
+  }
+}
+
+// Test 1- and 2-RDM for open-shell system
+TEST_F(SlaterdeterminantTest, OpenShellReducedDensityMatrices) {
+  // get slater determinant
+  size_t norb = 4;
+  auto orbitals = testing::create_test_orbitals(norb, norb, true);
+  Configuration det("2uu0");
+  SlaterDeterminantContainer sd(det, orbitals);
+
+  // get RDMs
+  auto one_rdm = std::get<Eigen::MatrixXd>(sd.get_active_one_rdm_spin_traced());
+  auto two_rdm = std::get<Eigen::VectorXd>(sd.get_active_two_rdm_spin_traced());
+  auto [one_rdm_aa, one_rdm_bb] = sd.get_active_one_rdm_spin_dependent();
+  auto [two_rdm_aabb, two_rdm_aaaa, two_rdm_bbbb] =
+      sd.get_active_two_rdm_spin_dependent();
+
+  // get bbaa from transposed aabb
+  auto two_rdm_bbaa =
+      detail::transpose_ijkl_klij_vector_variant(two_rdm_aabb, norb);
+
+  // Expected 1-RDM
+  Eigen::MatrixXd expected_one_rdm = Eigen::MatrixXd::Zero(norb, norb);
+  expected_one_rdm(0, 0) = 2.0;
+  expected_one_rdm(1, 1) = 1.0;
+  expected_one_rdm(2, 2) = 1.0;
+  EXPECT_TRUE(
+      one_rdm.isApprox(expected_one_rdm, testing::numerical_zero_tolerance));
+
+  // spin traced 1-RDM is the sum of spin dependent 1-RDMs
+  Eigen::MatrixXd one_rdm_sum = std::get<Eigen::MatrixXd>(one_rdm_aa) +
+                                std::get<Eigen::MatrixXd>(one_rdm_bb);
+  EXPECT_TRUE(one_rdm_sum.isApprox(expected_one_rdm,
+                                   testing::numerical_zero_tolerance));
+
+  // check spin dependent 2-RDM
+  auto sum_two_rdm = std::get<Eigen::VectorXd>(two_rdm_aabb) +
+                     std::get<Eigen::VectorXd>(*two_rdm_bbaa) +
+                     std::get<Eigen::VectorXd>(two_rdm_aaaa) +
+                     std::get<Eigen::VectorXd>(two_rdm_bbbb);
+
+  for (size_t i = 0; i < two_rdm.size(); ++i) {
+    EXPECT_NEAR(two_rdm(i), sum_two_rdm(i), testing::numerical_zero_tolerance);
+  }
+}
+
+// Test 1- and 2-RDM for non Aufbau determinants
+TEST_F(SlaterdeterminantTest, NonContinuosDeterminantReducedDensityMatrices) {
+  // get slater determinant
+  size_t norb = 12;
+  auto orbitals = testing::create_test_orbitals(norb, norb, true);
+  Configuration det("2ud0200u0u2d");
+  SlaterDeterminantContainer sd(det, orbitals);
+
+  // get RDMs
+  auto one_rdm = std::get<Eigen::MatrixXd>(sd.get_active_one_rdm_spin_traced());
+  auto two_rdm = std::get<Eigen::VectorXd>(sd.get_active_two_rdm_spin_traced());
+  auto [one_rdm_aa, one_rdm_bb] = sd.get_active_one_rdm_spin_dependent();
+  auto [two_rdm_aabb, two_rdm_aaaa, two_rdm_bbbb] =
+      sd.get_active_two_rdm_spin_dependent();
+
+  // get bbaa from transposed aabb
+  auto two_rdm_bbaa =
+      detail::transpose_ijkl_klij_vector_variant(two_rdm_aabb, norb);
+
+  // Expected 1-RDM
+  Eigen::MatrixXd expected_one_rdm_aa = Eigen::MatrixXd::Zero(norb, norb);
+  Eigen::MatrixXd expected_one_rdm_bb = Eigen::MatrixXd::Zero(norb, norb);
+  expected_one_rdm_aa(0, 0) = 1.0;
+  expected_one_rdm_aa(1, 1) = 1.0;
+  expected_one_rdm_aa(4, 4) = 1.0;
+  expected_one_rdm_aa(7, 7) = 1.0;
+  expected_one_rdm_aa(9, 9) = 1.0;
+  expected_one_rdm_aa(10, 10) = 1.0;
+  expected_one_rdm_bb(0, 0) = 1.0;
+  expected_one_rdm_bb(2, 2) = 1.0;
+  expected_one_rdm_bb(4, 4) = 1.0;
+  expected_one_rdm_bb(10, 10) = 1.0;
+  expected_one_rdm_bb(11, 11) = 1.0;
+
+  // spin traced 1-RDM is the sum of spin dependent 1-RDMs
+  EXPECT_TRUE(
+      std::get<Eigen::MatrixXd>(one_rdm_aa)
+          .isApprox(expected_one_rdm_aa, testing::numerical_zero_tolerance));
+  EXPECT_TRUE(
+      std::get<Eigen::MatrixXd>(one_rdm_bb)
+          .isApprox(expected_one_rdm_bb, testing::numerical_zero_tolerance));
+  Eigen::MatrixXd one_rdm_sum = std::get<Eigen::MatrixXd>(one_rdm_aa) +
+                                std::get<Eigen::MatrixXd>(one_rdm_bb);
+  EXPECT_TRUE(one_rdm_sum.isApprox(one_rdm, testing::numerical_zero_tolerance));
+
+  // check spin dependent 2-RDM
+  auto sum_two_rdm = std::get<Eigen::VectorXd>(two_rdm_aabb) +
+                     std::get<Eigen::VectorXd>(*two_rdm_bbaa) +
+                     std::get<Eigen::VectorXd>(two_rdm_aaaa) +
+                     std::get<Eigen::VectorXd>(two_rdm_bbbb);
+
+  for (size_t i = 0; i < two_rdm.size(); ++i) {
+    EXPECT_NEAR(two_rdm(i), sum_two_rdm(i), testing::numerical_zero_tolerance);
+  }
+}

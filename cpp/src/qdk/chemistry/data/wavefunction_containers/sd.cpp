@@ -122,37 +122,155 @@ void SlaterDeterminantContainer::clear_caches() const {
 std::tuple<const ContainerTypes::MatrixVariant&,
            const ContainerTypes::MatrixVariant&>
 SlaterDeterminantContainer::get_active_one_rdm_spin_dependent() const {
-  // TODO: Implement RDM calculation for single determinant
-  throw std::runtime_error(
-      "get_active_one_rdm_spin_dependent not yet implemented for "
-      "SlaterDeterminantContainer");
+  if (_one_rdm_spin_dependent_aa == nullptr ||
+      _one_rdm_spin_dependent_bb == nullptr) {
+    auto [alpha_occupations, beta_occupations] =
+        get_active_orbital_occupations();
+    if (_orbitals->get_active_space_indices().first.size() !=
+        _orbitals->get_active_space_indices().second.size()) {
+      throw std::runtime_error(
+          "Spin dependent 1-RDMs not implemented for different alpha and beta "
+          "active space sizes");
+    }
+    if (alpha_occupations.size() != beta_occupations.size()) {
+      throw std::runtime_error(
+          "Mismatched sizes in active orbital occupations for alpha and beta");
+    }
+    size_t n_orbs = _orbitals->get_active_space_indices().first.size();
+    Eigen::MatrixXd tmp_one_rdm_aa = Eigen::MatrixXd::Zero(n_orbs, n_orbs);
+    Eigen::MatrixXd tmp_one_rdm_bb = Eigen::MatrixXd::Zero(n_orbs, n_orbs);
+
+    // alpha
+    for (size_t i = 0; i < alpha_occupations.size(); ++i) {
+      if (alpha_occupations(i) != 1.0) continue;
+      tmp_one_rdm_aa(i, i) = 1.0;
+    }
+
+    // beta
+    for (size_t i = 0; i < beta_occupations.size(); ++i) {
+      if (beta_occupations(i) != 1.0) continue;
+      tmp_one_rdm_bb(i, i) += 1.0;
+    }
+
+    _one_rdm_spin_dependent_aa =
+        std::make_shared<ContainerTypes::MatrixVariant>(
+            std::move(tmp_one_rdm_aa));
+    _one_rdm_spin_dependent_bb =
+        std::make_shared<ContainerTypes::MatrixVariant>(
+            std::move(tmp_one_rdm_bb));
+  }
+  return std::make_tuple(std::cref(*_one_rdm_spin_dependent_aa),
+                         std::cref(*_one_rdm_spin_dependent_bb));
 }
 
 std::tuple<const ContainerTypes::VectorVariant&,
            const ContainerTypes::VectorVariant&,
            const ContainerTypes::VectorVariant&>
 SlaterDeterminantContainer::get_active_two_rdm_spin_dependent() const {
-  // TODO: Implement RDM calculation for single determinant
-  throw std::runtime_error(
-      "get_active_two_rdm_spin_dependent not yet implemented for "
-      "SlaterDeterminantContainer");
+  if (!_two_rdm_spin_dependent_aaaa || !_two_rdm_spin_dependent_bbbb ||
+      !_two_rdm_spin_dependent_aabb) {
+    auto [alpha_occupations, beta_occupations] =
+        get_active_orbital_occupations();
+    if (_orbitals->get_active_space_indices().first.size() !=
+        _orbitals->get_active_space_indices().second.size()) {
+      throw std::runtime_error(
+          "Spin dependent 2-RDMs not implemented for different alpha and beta "
+          "active space sizes");
+    }
+    if (alpha_occupations.size() != beta_occupations.size()) {
+      throw std::runtime_error(
+          "Mismatched sizes in active orbital occupations for alpha and beta");
+    }
+
+    size_t norbs = alpha_occupations.size();
+    size_t norb2 = norbs * norbs;
+    size_t norb3 = norbs * norb2;
+    Eigen::VectorXd tmp_two_rdm_aabb = Eigen::VectorXd::Zero(norb2 * norb2);
+    Eigen::VectorXd tmp_two_rdm_aaaa = Eigen::VectorXd::Zero(norb2 * norb2);
+    Eigen::VectorXd tmp_two_rdm_bbbb = Eigen::VectorXd::Zero(norb2 * norb2);
+
+    // build same spin rdm, i.e. aaaa and bbbb
+    /// @param occupations: orbital occupations
+    /// @param target: target vector to fill
+    auto build_same_spin_block = [&](const Eigen::VectorXd& occupations,
+                                     Eigen::VectorXd& target) {
+      for (size_t i = 0; i < norbs; ++i) {
+        if (occupations(i) != 1.0) continue;
+        for (size_t j = i + 1; j < norbs; ++j) {
+          if (occupations(j) != 1.0) continue;
+          size_t index_iijj = i * norb3 + i * norb2 + j * norbs + j;
+          size_t index_jjii = j * norb3 + j * norb2 + i * norbs + i;
+          target(index_iijj) = 1.0;
+          target(index_jjii) = 1.0;
+          size_t index_ijji = i * norb3 + j * norb2 + j * norbs + i;
+          size_t index_jiij = j * norb3 + i * norb2 + i * norbs + j;
+          target(index_ijji) = -1.0;
+          target(index_jiij) = -1.0;
+        }
+      }
+    };
+
+    // Build aaaa and bbbb using the lambda
+    build_same_spin_block(alpha_occupations, tmp_two_rdm_aaaa);
+    build_same_spin_block(beta_occupations, tmp_two_rdm_bbbb);
+
+    // aabb
+    for (size_t i = 0; i < norbs; ++i) {
+      for (size_t j = 0; j < norbs; ++j) {
+        if (alpha_occupations(i) == 1.0 && beta_occupations(j) == 1.0) {
+          size_t index_iijj = i * norb3 + i * norb2 + j * norbs + j;
+          tmp_two_rdm_aabb(index_iijj) = 1.0;
+        }
+        if (alpha_occupations(j) == 1.0 && beta_occupations(i) == 1.0) {
+          size_t index_jjii = j * norb3 + j * norb2 + i * norbs + i;
+          tmp_two_rdm_aabb(index_jjii) = 1.0;
+        }
+      }
+    }
+    _two_rdm_spin_dependent_aabb =
+        std::make_shared<ContainerTypes::VectorVariant>(
+            std::move(tmp_two_rdm_aabb));
+    _two_rdm_spin_dependent_aaaa =
+        std::make_shared<ContainerTypes::VectorVariant>(
+            std::move(tmp_two_rdm_aaaa));
+    _two_rdm_spin_dependent_bbbb =
+        std::make_shared<ContainerTypes::VectorVariant>(
+            std::move(tmp_two_rdm_bbbb));
+  }
+  return std::make_tuple(std::cref(*_two_rdm_spin_dependent_aabb),
+                         std::cref(*_two_rdm_spin_dependent_aaaa),
+                         std::cref(*_two_rdm_spin_dependent_bbbb));
 }
 
 const ContainerTypes::MatrixVariant&
 SlaterDeterminantContainer::get_active_one_rdm_spin_traced() const {
   if (!_one_rdm_spin_traced) {
-    auto [alpha_occupations, beta_occupations] =
-        get_active_orbital_occupations();
-    size_t n_orbs = _orbitals->get_active_space_indices().first.size();
-    Eigen::MatrixXd tmp_one_rdm = Eigen::MatrixXd::Zero(n_orbs, n_orbs);
-    for (size_t i = 0; i < alpha_occupations.size(); ++i) {
-      tmp_one_rdm(i, i) += alpha_occupations(i);
+    if (_orbitals->get_active_space_indices().first.size() !=
+        _orbitals->get_active_space_indices().second.size()) {
+      throw std::runtime_error(
+          "Spin traced 1-RDM not implemented for different alpha and beta "
+          "active space sizes");
     }
-    for (size_t i = 0; i < beta_occupations.size(); ++i) {
-      tmp_one_rdm(i, i) += beta_occupations(i);
+    if (_one_rdm_spin_dependent_aa != nullptr &&
+        _one_rdm_spin_dependent_bb != nullptr) {
+      _one_rdm_spin_traced = detail::add_matrix_variants(
+          *_one_rdm_spin_dependent_aa, *_one_rdm_spin_dependent_bb);
+    } else {
+      auto [alpha_occupations, beta_occupations] =
+          get_active_orbital_occupations();
+      size_t n_orbs = _orbitals->get_active_space_indices().first.size();
+      Eigen::MatrixXd tmp_one_rdm = Eigen::MatrixXd::Zero(n_orbs, n_orbs);
+      for (size_t i = 0; i < alpha_occupations.size(); ++i) {
+        if (alpha_occupations(i) != 1.0) continue;
+        tmp_one_rdm(i, i) += 1.0;
+      }
+      for (size_t i = 0; i < beta_occupations.size(); ++i) {
+        if (beta_occupations(i) != 1.0) continue;
+        tmp_one_rdm(i, i) += 1.0;
+      }
+      _one_rdm_spin_traced = std::make_shared<ContainerTypes::MatrixVariant>(
+          std::move(tmp_one_rdm));
     }
-    _one_rdm_spin_traced =
-        std::make_unique<ContainerTypes::MatrixVariant>(std::move(tmp_one_rdm));
   }
   return *_one_rdm_spin_traced;
 }
@@ -162,41 +280,59 @@ SlaterDeterminantContainer::get_active_two_rdm_spin_traced() const {
   if (!_two_rdm_spin_traced) {
     auto [alpha_occupations, beta_occupations] =
         get_active_orbital_occupations();
-    const auto& one_rdm_var = get_active_one_rdm_spin_traced();
-    const Eigen::MatrixXd& one_rdm = std::get<Eigen::MatrixXd>(one_rdm_var);
-    size_t norbs = one_rdm.rows();
-    Eigen::VectorXd tmp_two_rdm =
-        Eigen::VectorXd::Zero(norbs * norbs * norbs * norbs);
+    if (_orbitals->get_active_space_indices().first.size() !=
+        _orbitals->get_active_space_indices().second.size()) {
+      throw std::runtime_error(
+          "Spin-traced 2-RDM not implemented for different alpha and beta "
+          "active space sizes");
+    }
+    if (alpha_occupations.size() != beta_occupations.size()) {
+      throw std::runtime_error(
+          "Mismatched sizes in active orbital occupations for alpha and "
+          "beta");
+    }
+    size_t norbs = alpha_occupations.size();
     size_t norb2 = norbs * norbs;
     size_t norb3 = norbs * norb2;
-    for (size_t i = 0; i < alpha_occupations.size(); ++i) {
-      if (alpha_occupations(i) != 1.0) continue;
-      for (size_t j = 0; j < beta_occupations.size(); ++j) {
-        if (beta_occupations(j) != 1.0 || i == j) continue;
-        size_t index1 = i * norb3 + j * norb2 + j * norbs + i;
-        tmp_two_rdm(index1) = -2.0;
-        size_t index2 = j * norb3 + i * norb2 + i * norbs + j;
-        tmp_two_rdm(index2) = -2.0;
-        size_t index3 = i * norb3 + i * norb2 + j * norbs + j;
-        tmp_two_rdm(index3) = 4.0;
-        size_t index4 = j * norb3 + j * norb2 + i * norbs + i;
-        tmp_two_rdm(index4) = 4.0;
+    Eigen::VectorXd tmp_two_rdm = Eigen::VectorXd::Zero(norb2 * norb2);
+
+    for (size_t i = 0; i < norbs; ++i) {
+      double occ_alpha_i = alpha_occupations(i);
+      double occ_beta_i = beta_occupations(i);
+      double occ_sum_i = occ_alpha_i + occ_beta_i;
+
+      // diagonal
+      if (occ_alpha_i == 1.0 && occ_beta_i == 1.0) {
+        size_t index_iiii = i * norb3 + i * norb2 + i * norbs + i;
+        tmp_two_rdm(index_iiii) = 2.0;
       }
-      size_t index_diag = i * norb3 + i * norb2 + i * norbs + i;
-      tmp_two_rdm(index_diag) = 2.0;
+
+      for (size_t j = i + 1; j < norbs; ++j) {
+        double occ_alpha_j = alpha_occupations(j);
+        double occ_beta_j = beta_occupations(j);
+        double occ_sum_j = occ_alpha_j + occ_beta_j;
+        // skip if both orbitals are unoccupied
+        if (occ_sum_j == 0.0 || occ_sum_i == 0.0) continue;
+
+        // Can be 4, 2, 1
+        size_t index_iijj = i * norb3 + i * norb2 + j * norbs + j;
+        size_t index_jjii = j * norb3 + j * norb2 + i * norbs + i;
+        tmp_two_rdm(index_iijj) = occ_sum_i * occ_sum_j;
+        tmp_two_rdm(index_jjii) = occ_sum_i * occ_sum_j;
+
+        // Can be -2, -1, 0
+        size_t index_ijji = i * norb3 + j * norb2 + j * norbs + i;
+        size_t index_jiij = j * norb3 + i * norb2 + i * norbs + j;
+        tmp_two_rdm(index_ijji) =
+            -(occ_alpha_i * occ_alpha_j + occ_beta_i * occ_beta_j);
+        tmp_two_rdm(index_jiij) =
+            -(occ_alpha_i * occ_alpha_j + occ_beta_i * occ_beta_j);
+      }
     }
     _two_rdm_spin_traced =
-        std::make_unique<ContainerTypes::VectorVariant>(std::move(tmp_two_rdm));
+        std::make_shared<ContainerTypes::VectorVariant>(std::move(tmp_two_rdm));
   }
   return *_two_rdm_spin_traced;
-}
-
-Eigen::VectorXd SlaterDeterminantContainer::get_single_orbital_entropies()
-    const {
-  // TODO: Implement entropy calculation for single determinant
-  throw std::runtime_error(
-      "get_single_orbital_entropies not yet implemented for "
-      "SlaterDeterminantContainer");
 }
 
 std::pair<size_t, size_t> SlaterDeterminantContainer::get_total_num_electrons()
