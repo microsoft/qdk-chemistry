@@ -7,11 +7,11 @@
 #include <spdlog/spdlog.h>
 
 #include <algorithm>
+#include <blas.hh>
 #include <iostream>
 #include <qdk/chemistry/algorithms/active_space.hpp>
 
 #include "../utils.hpp"
-#include "blas.hh"
 
 namespace qdk::chemistry::algorithms::microsoft {
 
