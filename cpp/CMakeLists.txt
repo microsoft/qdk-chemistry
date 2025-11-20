@@ -34,38 +34,37 @@ add_custom_target(install-dependencies
 )
 
 # Only add build commands for dependencies that were fetched (not found on system)
-if(TARGET nlohmann_json AND NOT nlohmann_json_FOUND)
+# Note: nlohmann_json is skipped as it's a header-only library with no build target
+
+if(TARGET ecpint AND NOT ecpint_FOUND)
     add_custom_command(TARGET install-dependencies POST_BUILD
-        COMMAND ${CMAKE_COMMAND} --build ${CMAKE_BINARY_DIR} --target nlohmann_json
-        COMMENT "Building nlohmann_json"
+        COMMAND ${CMAKE_COMMAND} --build ${CMAKE_BINARY_DIR} --target ecpint
+        COMMAND ${CMAKE_COMMAND} --install ${CMAKE_BINARY_DIR} --component ecpint
+        COMMENT "Building and installing ecpint"
     )
 endif()
 
-if(TARGET Libint2::cxx AND NOT libint2_FOUND)
+if(TARGET libint2 AND NOT libint2_FOUND)
     add_custom_command(TARGET install-dependencies POST_BUILD
-        COMMAND ${CMAKE_COMMAND} --build ${CMAKE_BINARY_DIR} --target Libint2::cxx
-        COMMENT "Building libint2"
+        COMMAND ${CMAKE_COMMAND} --build ${CMAKE_BINARY_DIR} --target libint2
+        COMMAND ${CMAKE_COMMAND} --install ${CMAKE_BINARY_DIR} --component libint2
+        COMMENT "Building and installing libint2"
     )
 endif()
 
-if(TARGET ECPINT::ecpint AND NOT ecpint_FOUND)
+if(TARGET gauxc AND NOT gauxc_FOUND)
     add_custom_command(TARGET install-dependencies POST_BUILD
-        COMMAND ${CMAKE_COMMAND} --build ${CMAKE_BINARY_DIR} --target ECPINT::ecpint
-        COMMENT "Building ecpint"
+        COMMAND ${CMAKE_COMMAND} --build ${CMAKE_BINARY_DIR} --target gauxc
+        COMMAND ${CMAKE_COMMAND} --install ${CMAKE_BINARY_DIR} --component gauxc
+        COMMENT "Building and installing gauxc"
     )
 endif()
 
-if(TARGET gauxc::gauxc AND NOT gauxc_FOUND)
+if(TARGET macis AND NOT macis_FOUND)
     add_custom_command(TARGET install-dependencies POST_BUILD
-        COMMAND ${CMAKE_COMMAND} --build ${CMAKE_BINARY_DIR} --target gauxc::gauxc
-        COMMENT "Building gauxc"
-    )
-endif()
-
-if(TARGET macis::macis AND NOT macis_FOUND)
-    add_custom_command(TARGET install-dependencies POST_BUILD
-        COMMAND ${CMAKE_COMMAND} --build ${CMAKE_BINARY_DIR} --target macis::macis
-        COMMENT "Building macis"
+        COMMAND ${CMAKE_COMMAND} --build ${CMAKE_BINARY_DIR} --target macis
+        COMMAND ${CMAKE_COMMAND} --install ${CMAKE_BINARY_DIR} --component macis
+        COMMENT "Building and installing macis"
     )
 endif()
 
