@@ -87,9 +87,11 @@ class ProjectedMultiConfigurationCalculator
    * @brief Perform projected multi-configurational calculation
    *
    *
+   * \cond DOXYGEN_SUPRESS (Doxygen warning suppression for argument packs)
    * @param hamiltonian The Hamiltonian operator describing the quantum system
    * @param configurations The set of configurations/determinants to project
    * the Hamiltonian onto
+   * \endcond
    *
    * @return A pair containing the calculated energy (first) and the resulting
    *         multi-configurational wavefunction (second)

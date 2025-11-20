@@ -141,8 +141,10 @@ class ActiveSpaceSelector
    * @brief Selects the active space from the given orbitals.
    *
    *
+   * \cond DOXYGEN_SUPRESS (Doxygen warning suppression for argument packs)
    * @param wavefunction The input wavefunction from which to select the
    * active space.
+   * \endcond
    * @return Orbitals with active space data populated. Depending on the
    *         implementation, the returned orbitals may be a copy with only
    *         metadata added (e.g., occupation/valence selectors), or they may

@@ -81,6 +81,7 @@ class ScfSolver
    * The specific algorithm (HF, DFT, etc.) is determined by the
    * concrete implementation.
    *
+   * \cond DOXYGEN_SUPRESS (Doxygen warning suppression for argument packs)
    * @param structure The molecular structure containing atomic positions,
    *                  nuclear charges, and other structural information
    * @param charge The molecular charge
@@ -90,6 +91,7 @@ class ScfSolver
    *        the initial guess should be generated using the same basis set and
    *        either the same molecular structure or a similar structure (e.g.,
    *        from a previous step in a geometry optimization)
+   * \endcond
    *
    * @return A pair containing:
    *         - double: The converged total energy in Hartree
