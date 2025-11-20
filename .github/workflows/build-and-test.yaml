@@ -11,6 +11,8 @@ on:
 
 permissions:
   contents: read
+  pull-requests: write
+  checks: write
 
 jobs:
   coverage:
@@ -233,6 +235,118 @@ jobs:
         files: ./coverage-reports/cpp_coverage.xml,./coverage-reports/python_coverage.xml,./coverage-reports/pybind11_coverage.xml
         flags: coverage
         name: codecov-coverage
+
+    - name: Generate coverage summary for PR
+      if: github.event_name == 'pull_request'
+      run: |
+        echo "## Coverage Report" > coverage-summary.md
+        echo "" >> coverage-summary.md
+        
+        # Add diff coverage first if available
+        git fetch origin ${{ github.base_ref }}
+        
+        # Generate diff coverage for C++
+        gcovr --root ${{ github.workspace }}/cpp \
+          --object-directory "${{ github.workspace }}/${BUILD_DIR}" \
+          --filter '${{ github.workspace }}/cpp/src/.*' \
+          --filter '${{ github.workspace }}/cpp/include/.*' \
+          --exclude '.*/tests/.*' \
+          --exclude '.*test.*\.cpp' \
+          --exclude '.*gtest.*' \
+          --exclude '.*gmock.*' \
+          --exclude '.*/external/.*' \
+          --diff-filter=ACDMRTUXB \
+          --json coverage-reports/cpp_coverage_diff.json \
+          --cobertura coverage-reports/cpp_coverage_diff.xml \
+          origin/${{ github.base_ref }} || true
+        
+        if [ -f coverage-reports/cpp_coverage_diff.json ]; then
+          gcovr --add-tracefile coverage-reports/cpp_coverage_diff.json \
+            --txt coverage-reports/cpp_coverage_diff.txt || true
+          
+          if [ -f coverage-reports/cpp_coverage_diff.txt ]; then
+            echo "### 📊 Diff Coverage (Changed Lines Only)" >> coverage-summary.md
+            echo '```' >> coverage-summary.md
+            cat coverage-reports/cpp_coverage_diff.txt >> coverage-summary.md
+            echo '```' >> coverage-summary.md
+            echo "" >> coverage-summary.md
+          fi
+        fi
+        
+        echo "### C++ Coverage" >> coverage-summary.md
+        echo '```' >> coverage-summary.md
+        cat coverage-reports/cpp_coverage.txt >> coverage-summary.md
+        echo '```' >> coverage-summary.md
+        echo "" >> coverage-summary.md
+        
+        if [ -f coverage-reports/python_coverage.txt ]; then
+          echo "### Python Coverage" >> coverage-summary.md
+          echo '```' >> coverage-summary.md
+          tail -20 coverage-reports/python_coverage.txt >> coverage-summary.md
+          echo '```' >> coverage-summary.md
+          echo "" >> coverage-summary.md
+        fi
+        
+        if [ -f coverage-reports/pybind11_coverage.txt ]; then
+          echo "### Pybind11 Coverage" >> coverage-summary.md
+          echo '```' >> coverage-summary.md
+          cat coverage-reports/pybind11_coverage.txt >> coverage-summary.md
+          echo '```' >> coverage-summary.md
+        fi
+
+    - name: Annotate diff with coverage
+      if: github.event_name == 'pull_request'
+      uses: 5monkeys/cobertura-action@master
+      with:
+        path: coverage-reports/cpp_coverage_diff.xml
+        repo_token: ${{ secrets.GITHUB_TOKEN }}
+        minimum_coverage: 0
+        skip_covered: false
+        show_line: true
+        show_branch: true
+        only_changed_files: true
+
+    - name: Comment PR with coverage
+      if: github.event_name == 'pull_request'
+      uses: thollander/actions-comment-pull-request@v2
+      with:
+        filePath: coverage-summary.md
+        comment_tag: coverage-report
+
+    - name: Generate coverage summary for job summary
+      if: success() || failure()
+      run: |
+        echo "# Coverage Report" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        
+        if [ -f coverage-reports/cpp_coverage_diff.txt ]; then
+          echo "## Diff Coverage (Changed Lines Only)" >> $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY
+          cat coverage-reports/cpp_coverage_diff.txt >> $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+        fi
+        
+        echo "## C++ Coverage" >> $GITHUB_STEP_SUMMARY
+        echo '```' >> $GITHUB_STEP_SUMMARY
+        cat coverage-reports/cpp_coverage.txt >> $GITHUB_STEP_SUMMARY
+        echo '```' >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        
+        if [ -f coverage-reports/python_coverage.txt ]; then
+          echo "## Python Coverage" >> $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY
+          tail -30 coverage-reports/python_coverage.txt >> $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+        fi
+        
+        if [ -f coverage-reports/pybind11_coverage.txt ]; then
+          echo "## Pybind11 Coverage" >> $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY
+          cat coverage-reports/pybind11_coverage.txt >> $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY
+        fi
 
     - name: Publish test results
       if: success() || failure()
