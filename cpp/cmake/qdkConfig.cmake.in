@@ -29,14 +29,15 @@ endif()
 if(QDK_CHEMISTRY_ENABLE_LIBINTX)
   find_dependency(libintx REQUIRED)
 endif()
-
 if(QDK_CHEMISTRY_ENABLE_MPI)
   find_dependency(MPI REQUIRED)
+endif()
+if (QDK_ENABLE_OPENMP)
+  find_dependency(OpenMP REQUIRED)
 endif()
 
 find_dependency(macis REQUIRED)
 
-find_dependency(OpenMP REQUIRED)
 find_dependency(Eigen3 REQUIRED)
 find_dependency(HDF5 REQUIRED COMPONENTS CXX)
 find_dependency(nlohmann_json REQUIRED)

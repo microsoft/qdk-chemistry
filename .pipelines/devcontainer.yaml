@@ -1,14 +1,16 @@
-trigger:
-  branches:
-    include:
-    - '*'
-
-# Trigger this pipeline on PRs targeting any branch
-pr:
-  branches:
-    include:
-    - '*'
-  drafts: true
+# trigger:
+#   branches:
+#     include:
+#     - '*'
+# # Trigger this pipeline on PRs targeting any branch
+# pr:
+#   branches:
+#     include:
+#     - '*'
+#   drafts: true
+# TODO DISABLED TEMPORARILY
+trigger: none
+pr: none
 
 parameters:
 - name: matrix_arch

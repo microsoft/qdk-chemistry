@@ -9,6 +9,24 @@ We are currently in the process of preparing pre-built wheels for QDK/Chemistry.
 Once these are available, the preferred installation method will be via `pip`.
 For now, please build the package from source using the instructions below.
 
+## Using the VSCode Dev Container
+
+The easiest way to get started with QDK/Chemistry development is to use the provided VS Code Dev Container. The container definition and VSCode files provided in the Git repository will build a development environment (Docker container with Python virtual environment) from scratch.
+
+To get started:
+
+1. Open the repository folder in VS Code
+2. When prompted, click "Reopen in Container" (or use the Command Palette: `Ctrl+Shift+P` / `Cmd+Shift+P` and select "Dev Containers: Reopen in Container")
+3. VS Code will build and start the development container automatically
+
+Alternatively, you can click the green button in the bottom-left corner of VS Code and select "Reopen in Container" from the menu.
+
+**NOTES:**
+
+- Building the development environment can take some time, on slower systems this can be up to two hours.
+- Using a VS Code Dev Container may require elevated permissions on the current system to allow for Docker usage.
+- You will likely need to restart VS Code and the Dev Container (reopening in the container) before running examples.  The restart will load the Python virtual environment into the continer.
+
 ## Building from Source
 
 ### Building the Python Package
@@ -107,10 +125,10 @@ cmake [...] -DCMAKE_PREFIX_PATH="/opt/openblas;/opt/hdf5"
 
 ```txt
 TODO (DBWY): Link the CGManifest when available
-Work Item: https://dev.azure.com/ms-azurequantum/AzureQuantum/_workitems/edit/41466
+Work Item: 41466
 
 TODO (DBWY): Flesh out DNF Installation instructions
-Work Item: https://dev.azure.com/ms-azurequantum/AzureQuantum/_workitems/edit/41432
+Work Item: 41432
 ```
 
 ### System Dependencies
@@ -129,7 +147,7 @@ QDK/Chemistry requires both a C and a C++ compiler to be installed. Additionally
 
 ```txt
 TODO (DBWY): Add compiler support documentation
-Work Item: https://dev.azure.com/ms-azurequantum/AzureQuantum/_workitems/edit/41432
+Work Item: 41432
 ```
 
 Additionally, QDK/Chemistry requires the following software dependencies:

@@ -1,17 +1,23 @@
 # Test the build the wheels on all PRs
 # Only deploy to Azure Artifacts on tag push
-trigger:
-  branches:
-    include:
-    - '*'
-  tags:
-    include:
-    - v*
-pr:
-  branches:
-    include:
-    - '*'
-  drafts: true
+
+# TODO : Enable triggers when pipeline works as expected
+# trigger:
+#   branches:
+#     include:
+#     - '*'
+#   tags:
+#     include:
+#     - v*
+# pr:
+#   branches:
+#     include:
+#     - '*'
+#   drafts: true
+
+# TODO DISABLED TEMPORARILY
+trigger: none
+pr: none
 
 parameters:
 - name: matrix
@@ -99,9 +105,6 @@ stages:
             buildMarch: ${{ target.march }}
           Python3.13:
             pythonVersion: '3.13'
-            buildMarch: ${{ target.march }}
-          Python3.14:
-            pythonVersion: '3.14'
             buildMarch: ${{ target.march }}
         maxParallel: 1 # There are only 2 nodes in the ARM nodepool, limit to 1 job at a time
 

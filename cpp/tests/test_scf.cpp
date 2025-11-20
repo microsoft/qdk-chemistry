@@ -7,9 +7,7 @@
 #include <filesystem>
 #include <qdk/chemistry/algorithms/scf.hpp>
 #include <qdk/chemistry/data/wavefunction_containers/sd.hpp>
-#ifdef _OPENMP
-#include <omp.h>
-#endif
+#include <qdk/chemistry/utils/omp_utils.hpp>
 
 #include "../src/qdk/chemistry/algorithms/microsoft/utils.hpp"
 #include "ut_common.hpp"
