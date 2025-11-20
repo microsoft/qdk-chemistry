@@ -567,13 +567,13 @@ GDM::~GDM() noexcept = default;
 
 void GDM::iterate(SCFImpl& scf_impl) {
   // Extract needed parameters from SCFImpl
-  auto& P = scf_impl.P_;
-  auto& F = scf_impl.F_;
-  auto& C = scf_impl.C_;
-  double energy = scf_impl.total_energy_();
+  auto& P = scf_impl.density_matrix();
+  const auto& F = scf_impl.get_fock_matrix();
+  auto& C = scf_impl.orbitals_matrix();
+  auto& res = ctx_.result;
 
   // Call impl with minimal parameters
-  gdm_impl_->iterate(F, P, C, energy);
+  gdm_impl_->iterate(F, P, C, res.scf_total_energy);
 }
 
 void GDM::set_delta_energy_diis(const double delta_energy_diis) {

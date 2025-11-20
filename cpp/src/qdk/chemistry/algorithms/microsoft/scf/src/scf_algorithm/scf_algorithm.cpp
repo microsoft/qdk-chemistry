@@ -196,18 +196,21 @@ bool SCFAlgorithm::check_convergence(const SCFImpl& scf_impl) {
   const auto* cfg = ctx_.cfg;
   auto& res = ctx_.result;
 
-  int num_atomic_orbitals = static_cast<int>(scf_impl.num_atomic_orbitals_);
+  int num_atomic_orbitals = scf_impl.get_num_basis_functions();
 
   // Calculate energy using SCFImpl method
   double energy = res.scf_total_energy;
   delta_energy_ = energy - last_energy_;
-  density_rms_ = (P_last_ - scf_impl.P_).norm() / num_atomic_orbitals;
+  density_rms_ =
+      (P_last_ - scf_impl.get_density_matrix()).norm() / num_atomic_orbitals;
 
   // Calculate orbital gradient error
   RowMajorMatrix error_matrix;
-  double og_error = calculate_og_error_(scf_impl.F_, scf_impl.P_, scf_impl.S_,
-                                        error_matrix, cfg->unrestricted) /
-                    num_atomic_orbitals;
+  double og_error =
+      calculate_og_error_(scf_impl.get_fock_matrix(),
+                          scf_impl.get_density_matrix(), scf_impl.overlap(),
+                          error_matrix, cfg->unrestricted) /
+      num_atomic_orbitals;
 
   bool converged = density_rms_ < cfg->scf_algorithm.density_threshold &&
                    og_error < cfg->scf_algorithm.og_threshold;
@@ -220,7 +223,7 @@ bool SCFAlgorithm::check_convergence(const SCFImpl& scf_impl) {
   step_count_++;
 
   // Store current values before iteration
-  P_last_ = scf_impl.P_;
+  P_last_ = scf_impl.get_density_matrix();
   last_energy_ = res.scf_total_energy;
   return converged;
 }

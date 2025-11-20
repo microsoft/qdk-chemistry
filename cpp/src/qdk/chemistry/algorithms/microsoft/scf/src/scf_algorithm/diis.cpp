@@ -273,23 +273,23 @@ void DIIS::iterate(SCFImpl& scf_impl) {
   const auto* cfg = ctx_.cfg;
 
   // Get references to matrices from SCFImpl
-  auto& P = scf_impl.P_;
-  auto& C = scf_impl.C_;
-  const auto& F = scf_impl.F_;
-  const auto& S = scf_impl.S_;
-  const auto& X = scf_impl.X_;
-  auto& eigenvalues = scf_impl.eigenvalues_;
+  auto& P = scf_impl.density_matrix();
+  auto& C = scf_impl.orbitals_matrix();
+  const auto& F = scf_impl.get_fock_matrix();
+  const auto& S = scf_impl.overlap();
+  const auto& X = scf_impl.get_orthogonalization_matrix();
+  auto& eigenvalues = scf_impl.eigenvalues();
 
   // Call DIIS implementation with individual parameters
   diis_impl_->iterate(P, F, S);
   // Update density matrices using the extrapolated Fock matrix
   const RowMajorMatrix& F_extrapolated = diis_impl_->get_extrapolated_fock();
 
-  int num_atomic_orbitals = static_cast<int>(scf_impl.num_atomic_orbitals_);
-  int num_molecular_orbitals =
-      static_cast<int>(scf_impl.num_molecular_orbitals_);
-  int num_density_matrices = scf_impl.num_density_matrices_;
-  const int* nelec = scf_impl.nelec_;
+  int num_atomic_orbitals = scf_impl.get_num_basis_functions();
+  int num_molecular_orbitals = scf_impl.get_num_molecular_orbitals();
+  int num_density_matrices = scf_impl.get_num_density_matrices();
+  std::vector<int> nelec_vec = scf_impl.get_num_electrons();
+  const int nelec[2] = {nelec_vec[0], nelec_vec[1]};
 
   for (auto i = 0; i < num_density_matrices; ++i) {
     // Use extrapolated Fock matrix for density matrix update
