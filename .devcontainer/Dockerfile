@@ -54,7 +54,7 @@ RUN apt-get update && \
 
 # Install C++ dependencies
 COPY scripts/install_cpp_dependencies.sh /tmp/install_cpp_dependencies.sh
-RUN sudo bash /tmp/install_cpp_dependencies.sh && sudo rm /tmp/install_cpp_dependencies.sh
+RUN bash /tmp/install_cpp_dependencies.sh && rm /tmp/install_cpp_dependencies.sh
 
 # Create/align the non-root user and group (safe for repeated builds)
 RUN if getent group "$USER_GID" >/dev/null; then \
