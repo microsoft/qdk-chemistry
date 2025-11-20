@@ -65,6 +65,7 @@ class MultiConfigurationScf
    * multi-configurational wavefunction, including both optimized orbital
    * coefficients and CI coefficients.
    *
+   * \cond DOXYGEN_SUPRESS (Doxygen warning suppression for argument packs)
    * @param orbitals The initial molecular orbitals for the calculation
    * @param hamiltonian_ctor The Hamiltonian constructor for building the
    * Hamiltonian
@@ -74,6 +75,7 @@ class MultiConfigurationScf
    * active space, inactive orbitals are assumed to be fully occupied.
    * @param n_active_beta_electrons The number of beta electrons in the
    * active space, inactive orbitals are assumed to be fully occupied.
+   * \endcond
    *
    * @return A pair containing the calculated energy (first) and the resulting
    *         multi-configurational wavefunction (second)

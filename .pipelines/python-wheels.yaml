@@ -1,9 +1,22 @@
-# Build and test wheels after merges to main
-# Only deploy to Azure Artifacts from main (non-PR) pipelines
-trigger:
-  branches:
-    include:
-    - main
+# Test the build the wheels on all PRs
+# Only deploy to Azure Artifacts on tag push
+
+# TODO : Enable triggers when pipeline works as expected
+# trigger:
+#   branches:
+#     include:
+#     - '*'
+#   tags:
+#     include:
+#     - v*
+# pr:
+#   branches:
+#     include:
+#     - '*'
+#   drafts: true
+
+# TODO DISABLED TEMPORARILY
+trigger: none
 pr: none
 
 parameters:

@@ -100,8 +100,7 @@ std::shared_ptr<data::Hamiltonian> HamiltonianConstructor::_run_impl(
   scf_config->basis = internal_basis_set->name;
   scf_config->cartesian = !internal_basis_set->pure;
   scf_config->unrestricted = false;
-  // TODO: Handle unrestricted
-  // 41317
+  // TODO: Handle unrestricted, workitems: 41317
 
   // Set ERI method based on settings
   std::string method_name = _settings->get<std::string>("eri_method");

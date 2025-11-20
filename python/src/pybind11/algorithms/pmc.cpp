@@ -48,8 +48,7 @@ class ProjectedMultiConfigurationCalculatorBase
 void bind_pmc(py::module &m) {
   // ProjectedMultiConfigurationCalculator abstract base class
   // TODO (NAB):  I don't understand the wording in the docstring about
-  // "This contracts the..."
-  // 41394
+  // "This contracts the..." 41394
   py::class_<ProjectedMultiConfigurationCalculator,
              ProjectedMultiConfigurationCalculatorBase, py::smart_holder>
       pmc_calculator(m, "ProjectedMultiConfigurationCalculator",

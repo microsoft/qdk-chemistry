@@ -58,8 +58,7 @@ def extract_snippets(text: str) -> list[tuple[str, int]]:
         code = match.group(1).strip()
         start_line = text[: match.start(1)].count("\n") + 1
         snippets.append((code, start_line))
-        # TODO (NAB):  change output to logger rather than print() here and elsewhere
-        # 41426
+        # TODO (NAB):  change output to logger rather than print() here and elsewhere, workitem: 41426
         print(f"Extracted snippet starting at line {start_line}:\n{code}\n")
     return snippets
 

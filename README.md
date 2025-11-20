@@ -1,7 +1,8 @@
 # Quantum Applications Toolkit (QDK/Chemistry)
 
-A high-performance quantum computing toolkit with a C++ core and Python bindings for quantum algorithms and molecular
-simulations.
+QDK/Chemistry is an open-source C++ and Python package within the [Azure Quantum Development Kit (QDK)](https://github.com/microsoft/qdk).
+It provides an end-to-end toolkit for quantum chemistry:  from molecular setup and Hamiltonian generation to quantum algorithm execution and results analysis.
+Designed for seamless integration with existing Python and chemistry workflows, QDK Chemistry enables researchers to simulate and run problems on near-term quantum hardware, explore strongly correlated systems, and advance toward practical quantum chemistry applications.
 
 ## Overview
 
@@ -11,14 +12,14 @@ QDK/Chemistry provides a comprehensive suite of tools for:
 - Molecular orbital calculations and analysis
 - Basis set management
 - Configuration and settings management
-- High-performance quantum chemistry algorithms
+- High-performance quantum algorithms
 
 ## Documentation
 
-- **Website**: The static documentation is hosted at [microsoft.github.io/qdk-cheistry](https://microsoft.github.io/qdk-cheistry/index.html)
+- **Website**: The full documentation is hosted [online](https://microsoft.github.io/qdk-chemistry/index.html)
 - **C++ API**: Headers in `cpp/include/` contain comprehensive Doxygen documentation
 - **Python API**: All methods include detailed docstrings with Parameters, Returns, Raises, and Examples sections
-- **Examples**: See below, or the `python/examples/` and `docs/examples` directories for usage examples
+- **Examples**: See the `examples/` directory and [documentation](https://microsoft.github.io/qdk-chemistry/index.html) for usage examples
 
 ## Project Structure
 
@@ -29,6 +30,7 @@ qdk-chemistry/
 │   ├── src/            # Implementation files
 │   └── tests/          # C++ unit tests
 ├── docs/               # Static documentation
+├── examples/           # Example scripts showing usage and language interoperability
 ├── external/           # External libraries and scripts
 └── python/             # Python bindings
     ├── src/            # pybind11 wrapper and python code
@@ -38,92 +40,6 @@ qdk-chemistry/
 ## Installing
 
 Detailed instructions for installing QDK/Chemistry can be found in [INSTALL.md](./INSTALL.md)
-
-## Example Usage
-
-```cpp
-#include <Eigen/Dense>
-#include <iostream>
-#include <nlohmann/json.hpp>
-#include <qdk/chemistry/constants.hpp>
-#include <qdk/chemistry/data/basis_set.hpp>
-#include <qdk/chemistry/data/orbitals.hpp>
-#include <qdk/chemistry/data/settings.hpp>
-#include <qdk/chemistry/data/structure.hpp>
-#include <vector>
-
-// C++ API
-std::vector<Eigen::Vector3d> coords = {
-    {0.000000000, -0.0757918436, 0.000000000000},
-    {0.866811829, 0.6014357793, -0.000000000000},
-    {-0.866811829, 0.6014357793, -0.000000000000}
-};
-
-// Convert to Bohr
-for (auto& coord : coords) {
-    coord *= qdk::chemistry::constants::angstrom_to_bohr;
-}
-
-std::vector<qdk::chemistry::data::Element> elements = {
-    qdk::chemistry::data::Element::O,
-    qdk::chemistry::data::Element::H,
-    qdk::chemistry::data::Element::H
-};
-
-qdk::chemistry::data::Structure water(coords, elements);
-
-// JSON serialization - note the required naming convention
-nlohmann::json json_data = water.to_json();
-water.to_json_file("water.structure.json");  // Required: .structure before .json
-
-// HDF5 serialization
-qdk::chemistry::data::Orbitals orbitals;
-orbitals.to_hdf5_file("molecule.orbitals.h5");  // Required: .orbitals before .h5
-
-// Loading - using static deserialization methods (returns shared_ptr)
-auto loaded = qdk::chemistry::data::Structure::from_json(json_data);
-auto loaded_from_file = qdk::chemistry::data::Structure::from_json_file("water.structure.json");
-auto loaded_orbitals = qdk::chemistry::data::Orbitals::from_hdf5_file("molecule.orbitals.h5");
-
-// All other data types follow the same pattern
-auto basis_set = qdk::chemistry::data::BasisSet::from_json_file("molecule.basis_set.json");
-auto settings = qdk::chemistry::data::Settings::from_hdf5_file("config.settings.h5");
-```
-
-```python
-# Python API
-import numpy as np
-from qdk_chemistry.algorithms import create
-from qdk_chemistry.data import Structure, Settings, Orbitals
-
-# Create water structure
-coords = np.array([[0.0, 0.0, 0.0], [1.431, 1.107, 0.0], [-1.431, 1.107, 0.0]])  # Bohr
-water = Structure(coords, ["O", "H", "H"])
-
-# Serialization - note the required naming convention
-json_str = water.to_json()
-water.to_json_file("water.structure.json")
-water.to_xyz_file("water.structure.xyz")
-
-# Setup and use the SCF (Hartree-Fock) solver
-scf_solver = create("scf_solver")
-scf_settings = scf_solver.settings() # Access settings object with default parameters
-scf_settings.set("basis_set", "def2-tzvp")  # change some settings parameters
-charge = 0
-multiplicity = 1
-e_scf, wavefunction = scf_solver.run(water, charge, multiplicity) # Run SCF calculation
-print(f"SCF Energy: {e_scf} Hartree")
-
-# Store the settings and orbitals for later use
-orbitals = wavefunction.get_orbitals()
-orbitals.to_hdf5_file("molecule.orbitals.h5")
-scf_settings.to_hdf5_file("config.settings.h5")
-
-# Loading - using static deserialization methods (returns objects directly in Python)
-loaded_structure = Structure.from_json_file("water.structure.json")
-loaded_orbitals = Orbitals.from_hdf5_file("molecule.orbitals.h5")
-loaded_settings = Settings.from_hdf5_file("config.settings.h5")
-```
 
 ## Contributing
 

@@ -45,13 +45,6 @@ Examples:
     >>> from qdk_chemistry.constants import list_constants
     >>> list_constants()
 
-Todo:
-    * TODO (NAB): convert `print` statements throughout this module to use logging.
-      Decide whether the functions should return strings instead of printing/logging directly.
-      41417
-    * TODO (NAB):  add typing information for the functions in this module
-      41419
-
 """
 
 # --------------------------------------------------------------------------------------------
@@ -102,8 +95,7 @@ def list_constants(show_values: bool = True, show_units: bool = True):
     constants_info = get_constants_info()
 
     # TODO (NAB):  change output to logger rather than print() here and elsewhere
-    # or just return strings
-    # 41417
+    # or just return strings workitem 41417
     print("QDK/Chemistry Physical Constants (CODATA 2018)")
     print("=" * 50)
 

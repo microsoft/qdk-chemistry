@@ -51,7 +51,9 @@ class HamiltonianConstructor
    * @brief Construct Hamiltonian operator from orbital data
    *
    *
+   * \cond DOXYGEN_SUPRESS (Doxygen warning suppression for argument packs)
    * @param orbitals The orbital data from which to construct the Hamiltonian
+   * \endcond
    * @return The constructed Hamiltonian operator ready for use in quantum
    *         chemistry calculations
    *

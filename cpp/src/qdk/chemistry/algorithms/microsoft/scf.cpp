@@ -61,7 +61,7 @@ std::pair<double, std::shared_ptr<data::Wavefunction>> ScfSolver::_run_impl(
     // Default to singlet for closed shell, doublet for open-shell
     multiplicity = ((nuclear_charge - charge) % 2 == 0) ? 1 : 2;
     // TODO (NAB): should the user be warned about a default being used?
-    // 41322
+    // Workitem: 41322
   }
 
   const bool unrestricted = (multiplicity != 1);
@@ -113,8 +113,7 @@ std::pair<double, std::shared_ptr<data::Wavefunction>> ScfSolver::_run_impl(
   }
 
   // FP scales poorly with threads
-  // TODO: Make this configurable
-  // 41325
+  // TODO: Make this configurable, workitem: 41325
   auto old_max_threads = omp_get_max_threads();
   // omp_set_num_threads(1);
 

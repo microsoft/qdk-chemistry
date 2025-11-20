@@ -113,10 +113,6 @@ QDK/Chemistry currently provides the following registered solvers:
 
    .. literalinclude:: ../../../../examples/factory_pattern.py
       :language: python
-      :lines: 1-7
-
-.. todo::
-   The Python available SCF solvers code example is empty.
 
 Configuring the :term:`SCF` calculation
 ---------------------------------------
@@ -184,14 +180,11 @@ Available settings
 The ``ScfSolver`` accepts a range of settings to control its behavior.
 These settings are divided into base settings (common to all :term:`SCF` calculations) and specialized settings (specific to certain :term:`SCF` variants).
 
-Base Settings
+Base settings
 ~~~~~~~~~~~~~
 
-.. todo::
-   🔧 **TODO:** Add comprehensive list of all actual base settings used by ScfSolver implementations
-
-   TODO (NAB):  finish SCF Solver base settings table
-   https://dev.azure.com/ms-azurequantum/AzureQuantum/_workitems/edit/41382
+.. note::
+   This table is under construction.
 
 These settings apply to all :term:`SCF` calculations:
 
@@ -231,11 +224,8 @@ These settings apply to all :term:`SCF` calculations:
 Specialized settings
 ~~~~~~~~~~~~~~~~~~~~
 
-.. todo::
-   🔧 **TODO:** Add comprehensive list of all actual specialized settings used by ScfSolver implementations
-
-   TODO (NAB):  finish SCF Solver specialized settings table
-   https://dev.azure.com/ms-azurequantum/AzureQuantum/_workitems/edit/41382
+.. note::
+   This table is under construction.
 
 These settings apply only to specific variants of SCF calculations:
 

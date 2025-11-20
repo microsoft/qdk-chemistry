@@ -245,10 +245,9 @@ def pyscf_mol_to_qdk_basis(pyscf_mol: gto.Mole, structure: Structure, basis_name
     shells = []
     # TODO: This should deduce the structure from the PySCF Mole object
     # For now, we'll collect the shells and pass structure to constructor
-    # 41407
+    # workitem 41407
 
-    # TODO Handle Cartesian
-    # 41406
+    # TODO Handle Cartesian, workitem 41406
     atom_symbols = [pyscf_mol.atom_symbol(i) for i in range(pyscf_mol.natm)]
     for iatm in range(pyscf_mol.natm):
         atom_symbol = atom_symbols[iatm]

@@ -1,8 +1,15 @@
-trigger:
-  branches:
-    include:
-    - main
-
+# trigger:
+#   branches:
+#     include:
+#     - '*'
+# # Trigger this pipeline on PRs targeting any branch
+# pr:
+#   branches:
+#     include:
+#     - '*'
+#   drafts: true
+# TODO DISABLED TEMPORARILY
+trigger: none
 pr: none
 
 parameters:

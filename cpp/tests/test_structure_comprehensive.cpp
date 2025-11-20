@@ -995,8 +995,7 @@ TEST_F(StructureTest, HDF5GroupFunctionality) {
   std::filesystem::remove("test_group_functionality.h5");
 }
 
-// TODO (NAB):  why does this test file have a main() function?
-// 41363
+// TODO (NAB):  why does this test file have a main() function? Workitem: 41363
 int main(int argc, char** argv) {
   ::testing::InitGoogleTest(&argc, argv);
   return RUN_ALL_TESTS();

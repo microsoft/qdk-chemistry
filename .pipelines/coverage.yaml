@@ -331,7 +331,9 @@ stages:
     # Documentation tasks
     - script: |
         cd $(Agent.BuildDirectory)/qdk-chemistry/python
-        pip install -e .[docs,plugins] --verbose
+        pip install .[docs,plugins] --verbose
+        python3 -c "import qdk_chemistry; print('qdk_chemistry version:', qdk_chemistry.__version__)"
+        sudo apt-get update && sudo apt-get install -y doxygen graphviz
       displayName: Install Documentation Dependencies
 
     - script: |

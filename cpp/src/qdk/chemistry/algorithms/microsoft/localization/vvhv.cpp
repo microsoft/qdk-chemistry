@@ -117,8 +117,7 @@ std::shared_ptr<data::Wavefunction> VVHVLocalizer::_run_impl(
   auto ao_overlap = orbitals->get_overlap_matrix();
 
   // TODO (DBWY): Adding configurable inner localizer
-  // Work Item:
-  // 41816
+  // Work Item: 41816
   // Create reusable Pipek-Mezey localizer for inner localization
   const size_t num_atoms = basis_set->get_structure()->get_num_atoms();
   const size_t num_basis_funcs = basis_set->get_num_basis_functions();

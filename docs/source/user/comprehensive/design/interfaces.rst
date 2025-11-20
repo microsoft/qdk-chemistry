@@ -1,5 +1,5 @@
-Interface system in QDK/Chemistry
-=================================
+Interface system
+================
 
 This document describes QDK/Chemistry's interface system, which provides unified access to various quantum chemistry packages.
 This design allows researchers to leverage the unique strengths of various quantum chemistry programs while maintaining a consistent workflow.
@@ -252,10 +252,8 @@ and hardware environment.
 Available interfaces by algorithm
 ---------------------------------
 
-.. todo::
-   This section of the interfaces documentation requires verification.
+.. note::
    PySCF and other third-party interfaces may not be fully implemented for all algorithm classes mentioned.
-   The table should be updated to reflect the actual implementation status of each interface.
 
 The following table provides an overview of the available interfaces for each algorithm class in QDK/Chemistry.
 Each algorithm class is implemented through the factory pattern, allowing you to select different implementations at runtime.

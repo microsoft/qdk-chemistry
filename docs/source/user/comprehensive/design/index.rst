@@ -7,11 +7,7 @@ For a complete overview of QDK/Chemistry's documentation, see the :doc:`comprehe
 QDK/Chemistry is designed with a clear separation between **data containers** and **algorithms**.
 This fundamental design choice enables flexibility, extensibility, and maintainability of the codebase, while providing users with a consistent and intuitive API.
 
-Core design principles
-----------------------
-
-Separation of data and algorithms
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+.. rubric:: Separation of data and algorithms
 
 QDK/Chemistry follows a design pattern that strictly separates:
 
@@ -23,8 +19,7 @@ workflows.
 
 .. graphviz:: /_static/diagrams/data_flow.dot
 
-Data classes
-~~~~~~~~~~~~
+.. rubric:: Data classes
 
 Data classes in QDK/Chemistry are designed to be:
 
@@ -41,8 +36,7 @@ QDK/Chemistry includes the following data classes:
 - :doc:`Hamiltonian <../data/hamiltonian>`: Molecular Hamiltonian
 - :doc:`Wavefunction <../data/wavefunction>`: Wavefunction representation
 
-Algorithm classes
-~~~~~~~~~~~~~~~~~
+.. rubric:: Algorithm classes
 
 Algorithm classes in QDK/Chemistry are designed to be:
 
@@ -64,8 +58,7 @@ QDK/Chemistry includes the following algorithm classes:
 Each algorithm class can leverage both Microsoft-developed implementations (developed within QDK/Chemistry) and :doc:`interfaces <interfaces>` to established third-party electronic structure packages.
 This design allows users to benefit from specialized capabilities of external software while maintaining a consistent API.
 
-Factory pattern
----------------
+.. rubric:: Factory pattern
 
 QDK/Chemistry implements the :doc:`factory pattern <factory_pattern>` for algorithm creation:
 
@@ -87,8 +80,9 @@ This pattern allows:
 - Extension with new implementations without changing client code
 - Centralized management of dependencies and resources
 
-Settings pattern
-----------------
+Read more in the :doc:`Factory Pattern <factory_pattern>` documentation.
+
+.. rubric:: Settings pattern
 
 Algorithm configuration is managed through a consistent :doc:`Settings <settings>` interface:
 
@@ -111,8 +105,9 @@ This approach provides:
 - Default values with explicit overrides
 - Documentation of available options
 
-Data flow example
------------------
+Read more in the :doc:`Settings <settings>` documentation.
+
+.. rubric:: Data flow example
 
 A typical workflow in QDK/Chemistry demonstrates the data-algorithm separation:
 
@@ -159,8 +154,7 @@ A typical workflow in QDK/Chemistry demonstrates the data-algorithm separation:
       :language: python
       :lines: 3-
 
-Interface architecture
-----------------------
+.. rubric:: Interface architecture
 
 QDK/Chemistry is designed with a plugin architecture that allows for consistent :doc:`interfaces <interfaces>` to various external packages:
 
@@ -173,10 +167,16 @@ This design provides several advantages:
 3. **Best-of-Breed Approach**: Leverage strengths of different packages while maintaining consistent data structures
 4. **Future-Proofing**: New implementations can be added without changing the user-facing API
 
-Related topics
---------------
+.. rubric:: Related topics
 
 - :doc:`Factory Pattern <factory_pattern>`: Details on QDK/Chemistry's implementation of the factory pattern
 - :doc:`Settings <settings>`: How to configure algorithms through the Settings interface
-- :doc:`Serialization <serialization>`: Data serialization and deserialization
 - :doc:`Interfaces <interfaces>`: QDK/Chemistry's interface system to external packages
+
+.. toctree::
+   :maxdepth: 1
+   :hidden:
+
+   factory_pattern
+   interfaces
+   settings
