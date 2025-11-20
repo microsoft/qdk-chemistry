@@ -118,17 +118,6 @@ jobs:
 
         cd ${{ github.workspace }}
         
-        echo "=== Checking for coverage files ==="
-        echo "Looking for .gcda files in $BUILD_DIR"
-        find "$BUILD_DIR" -name "*.gcda" | head -20
-        echo "Looking for .gcno files in $BUILD_DIR"
-        find "$BUILD_DIR" -name "*.gcno" | head -20
-        
-        echo "=== Current directory ==="
-        pwd
-        echo "=== BUILD_DIR contents ==="
-        ls -la "$BUILD_DIR" || true
-        
         gcovr --root ${{ github.workspace }}/cpp \
           --object-directory "${{ github.workspace }}/${BUILD_DIR}" \
           --filter '${{ github.workspace }}/cpp/src/.*' \
@@ -140,8 +129,7 @@ jobs:
           --exclude '.*/external/.*' \
           --html-details ${{ github.workspace }}/coverage-reports/cpp_coverage.html \
           --xml ${{ github.workspace }}/coverage-reports/cpp_coverage.xml \
-          --txt ${{ github.workspace }}/coverage-reports/cpp_coverage.txt \
-          --verbose
+          --txt ${{ github.workspace }}/coverage-reports/cpp_coverage.txt
 
         echo "C++ Coverage Summary:"
         cat ${{ github.workspace }}/coverage-reports/cpp_coverage.txt
@@ -150,7 +138,10 @@ jobs:
         fi
 
     - name: Install C++ library
-      run: cmake --install "$BUILD_DIR"
+      run: |
+        cmake --install "$BUILD_DIR"
+        # Remove CMake files to build Python package without qdk library in path
+        rm -r ${{ github.workspace }}/install/lib/cmake/qdk
 
     - name: Install Python package
       working-directory: python
@@ -241,27 +232,19 @@ jobs:
         files: ./coverage-reports/cpp_coverage.xml,./coverage-reports/python_coverage.xml,./coverage-reports/pybind11_coverage.xml
         flags: coverage
         name: codecov-coverage
-        fail_ci_if_error: false
-
-    - name: Upload coverage artifacts
-      if: success() || failure()
-      uses: actions/upload-artifact@v4
-      with:
-        name: coverage-reports
-        path: |
-          coverage-reports/
-          test-results/
 
     - name: Publish test results
       if: success() || failure()
+      env:
+        PYTHONPATH: ""
       uses: EnricoMi/publish-unit-test-result-action@v2
       with:
         files: test-results/*.xml
         check_name: Test Results
 
     - name: Install documentation dependencies
+      working-directory: python
       run: |
-        cd python
         pip install --prefix=${{ github.workspace }}/install .[docs,plugins] --verbose
         python3 -c "import qdk_chemistry; print('qdk_chemistry version:', qdk_chemistry.__version__)"
 
