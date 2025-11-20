@@ -44,7 +44,8 @@ Most algorithms validate their settings only at execution time, so you can adjus
 
    .. literalinclude:: ../../../../examples/python/settings.py
       :language: python
-      :lines: 8-15
+      :start-after: # start-cell-1
+      :end-before: # end-cell-1
 
 Common settings operations
 --------------------------
@@ -71,7 +72,8 @@ The ``set`` method is overloaded to handle various types including C-style strin
 
    .. literalinclude:: ../../../../examples/python/settings.py
       :language: python
-      :lines: 19-29
+      :start-after: # start-cell-2
+      :end-before: # end-cell-2
 
 Getting values
 ~~~~~~~~~~~~~~
@@ -91,7 +93,8 @@ For cases where you want to provide a fallback value if the key doesn't exist, u
 
    .. literalinclude:: ../../../../examples/python/settings.py
       :language: python
-      :lines: 31-44
+      :start-after: # start-cell-3
+      :end-before: # end-cell-3
 
 Checking for settings
 ~~~~~~~~~~~~~~~~~~~~~
@@ -111,7 +114,8 @@ Additionally, the ``try_get`` method returns an ``std::optional`` that contains 
 
    .. literalinclude:: ../../../../examples/python/settings.py
       :language: python
-      :lines: 49-65
+      :start-after: # start-cell-4
+      :end-before: # end-cell-4
 
 Other operations
 ~~~~~~~~~~~~~~~~
@@ -129,9 +133,10 @@ present), manipulation (merging with other settings objects), and more.
 
 .. tab:: Python API
 
-   .. Literalinclude:: ../../../../examples/settings.py
+   .. Literalinclude:: ../../../../examples/python/settings.py
       :language: python
-      :lines: 75-101
+      :start-after: # start-cell-5
+      :end-before: # end-cell-5
 
 Serialization
 -------------
@@ -154,7 +159,8 @@ For more information on serialization throughout QDK/Chemistry, see the :doc:`Se
 
    .. literalinclude:: ../../../../examples/python/settings.py
       :language: python
-      :lines: 110-130
+      :start-after: # start-cell-6
+      :end-before: # end-cell-6
 
 Serialization format
 ~~~~~~~~~~~~~~~~~~~~
@@ -210,7 +216,8 @@ Here's how to extend the ``Settings`` class for a custom algorithm:
 
    .. literalinclude:: ../../../../examples/python/settings.py
       :language: python
-      :lines: 134-140
+      :start-after: # start-cell-7
+      :end-before: # end-cell-7
 
 
 Supported types
@@ -261,7 +268,8 @@ These exceptions can be caught and handled to provide graceful error recovery:
 
    .. literalinclude:: ../../../../examples/python/settings.py
       :language: python
-      :lines: 144-147
+      :start-after: # start-cell-8
+      :end-before: # end-cell-8
 
 Related topics
 --------------

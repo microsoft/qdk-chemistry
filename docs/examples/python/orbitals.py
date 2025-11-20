@@ -12,6 +12,7 @@ import numpy as np
 from qdk_chemistry.algorithms import create
 from qdk_chemistry.data import Structure
 
+# start-cell-1
 # Create H2 molecule
 coords = np.array([[0.0, 0.0, 0.0], [0.0, 0.0, 1.4]])
 structure = Structure(coords, ["H", "H"])
@@ -23,6 +24,7 @@ E_scf, wfn = scf_solver.run(structure, charge=0, spin_multiplicity=1)
 orbitals = wfn.get_orbitals()
 
 print(f"SCF Energy: {E_scf:.6f} Hartree")
+# end-cell-1
 
 # set coefficients manually example (restricted)
 # orbs_manual = Orbitals()
@@ -35,6 +37,7 @@ print(f"SCF Energy: {E_scf:.6f} Hartree")
 # coeffs_beta = # beta coefficients
 # orbs_unrestricted.set_coefficients(coeffs_alpha, coeffs_beta)
 
+# start-cell-2
 # Access orbital coefficients (returns tuple of alpha/beta matrices)
 coeffs_alpha, coeffs_beta = orbitals.get_coefficients()
 print(f"Orbital coefficients shape: {coeffs_alpha.shape}")
@@ -50,6 +53,7 @@ print(f"AO overlap matrix shape: {ao_overlap.shape}")
 # Access basis set information
 basis_set = orbitals.get_basis_set()
 print(f"Basis set: {basis_set.get_name()}")
+# end-cell-2
 
 # Use a temporary directory for any file I/O
 with tempfile.TemporaryDirectory() as tmpdir:

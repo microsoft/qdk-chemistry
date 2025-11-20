@@ -45,7 +45,8 @@ A :class:`~qdk_chemistry.data.Structure` object can be created manually by addin
 
    .. literalinclude:: ../../../../examples/python/structure.py
       :language: python
-      :lines: 1-11
+      :start-after: # start-cell-1
+      :end-before: # end-cell-1
 
 Loading from files
 ------------------
@@ -71,7 +72,8 @@ For detailed format specifications, see the `File Formats`_ section below.
 
    .. literalinclude:: ../../../../examples/python/structure.py
       :language: python
-      :lines: 13-17
+      :start-after: # start-cell-2
+      :end-before: # end-cell-2
 
 Accessing structure data
 ------------------------
@@ -94,7 +96,8 @@ The :class:`~qdk_chemistry.data.Structure` class provides methods to access atom
 
    .. literalinclude:: ../../../../examples/python/structure.py
       :language: python
-      :lines: 13-23
+      :start-after: # start-cell-3
+      :end-before: # end-cell-3
 
 Serialization
 -------------
@@ -155,7 +158,8 @@ XYZ format
 
    .. literalinclude:: ../../../../examples/python/serialization.py
       :language: python
-      :lines: 1-18
+      :start-after: # start-cell-1
+      :end-before: # end-cell-1
 
 Molecular manipulation
 ----------------------
@@ -176,7 +180,8 @@ The :class:`~qdk_chemistry.data.Structure` class provides methods for basic mole
 
    .. literalinclude:: ../../../../examples/python/structure.py
       :language: python
-      :lines: 19-24
+      :start-after: # start-cell-5
+      :end-before: # end-cell-5
 
 Units
 -----

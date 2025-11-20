@@ -7,8 +7,10 @@
 
 from qdk_chemistry.algorithms import create
 
+# start-cell-1
 # Create the default MCCalculator instance (MACIS implementation)
 mc_calculator = create("multi_configuration_calculator")
 
 # Create a specific type of CI calculator
 selected_ci = create("multi_configuration_calculator", "macis_cas")
+# end-cell-1

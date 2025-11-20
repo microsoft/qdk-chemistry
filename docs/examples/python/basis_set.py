@@ -5,6 +5,7 @@
 # Licensed under the MIT License. See LICENSE.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
 
+# start-cell-1
 # import numpy as np
 # from qdk_chemistry.data import BasisSet, AOType, OrbitalType, Structure
 
@@ -25,7 +26,9 @@
 # coords = np.array([[0.0, 0.0, 0.0], [0.0, 0.0, 1.4]])
 # structure = Structure(coords, ["H", "H"])
 # basis_set.set_structure(structure)
+# end-cell-1
 
+# start-cell-2
 # # Access basic properties
 # basis_type = basis_set.get_basis_type()
 # name = basis_set.get_name()
@@ -50,7 +53,9 @@
 
 # # Check validity
 # is_valid = basis_set.is_valid()
+# end-cell-2
 
+# start-cell-3
 # # Access individual shell properties
 # shell = basis_set.get_shell(0)
 # shell_atom_idx = shell.get_atom_index()
@@ -64,7 +69,9 @@
 # shell_coefficients = shell.get_coefficients()
 # single_exponent = shell.get_exponent(0)
 # single_coeff = shell.get_coefficient(0)
+# end-cell-3
 
+# start-cell-4
 # # Serialize to JSON
 # json_str = basis_set.to_json()
 # basis_set.to_json_file("molecule.basis.json")
@@ -79,13 +86,17 @@
 # # HDF5 serialization (commented out - has bugs)
 # # basis_set.to_hdf5_file("molecule.basis.h5")
 # # basis_set.from_hdf5_file("molecule.basis.h5")
+# end-cell-4
 
+# start-cell-6
 # # Create a basis set from a predefined library
 # basis_set_from_lib = BasisSet.create("6-31G")
 
 # # List all available basis sets
 # available_basis_sets = BasisSet.get_available_basis_sets()
+# end-cell-6
 
+# start-cell-5
 # # Static utility functions for type conversions
 # orbital_str = BasisSet.orbital_type_to_string(OrbitalType.D)  # "d"
 # orbital_type = BasisSet.string_to_orbital_type("f")  # OrbitalType.F
@@ -95,3 +106,4 @@
 
 # basis_str = BasisSet.basis_type_to_string(AOType.CARTESIAN)  # "cartesian"
 # basis_type = BasisSet.string_to_basis_type("spherical")  # AOType.SPHERICAL
+# end-cell-5

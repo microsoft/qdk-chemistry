@@ -56,7 +56,8 @@ This pattern is implemented across all major algorithm types in QDK/Chemistry.
 
    .. literalinclude:: ../../../../examples/python/interfaces.py
       :language: python
-      :lines: 1-14
+      :start-after: # start-cell-1
+      :end-before: # end-cell-1
 
 Listing available implementations
 ---------------------------------
@@ -72,9 +73,10 @@ You can discover what implementations are available for each algorithm type:
 
 .. tab:: Python API
 
-   .. literalinclude:: ../../../../examples/python/factory_pattern.py
+   .. literalinclude:: ../../../../examples/python/interfaces.py
       :language: python
-      :lines: 1-13
+      :start-after: # start-cell-2
+      :end-before: # end-cell-2
 
 Adding new interfaces
 ---------------------
@@ -145,11 +147,11 @@ This approach leverages the flexibility of QDK/Chemistry's :doc:`settings system
 
 .. tab:: Python API
 
-   .. code-block:: python
+   .. literalinclude:: ../../../../examples/python/interfaces.py
+      :language: python
+      :start-after: # start-cell-4
+      :end-before: # end-cell-4
 
-      # Set general options that work across all backends
-      scf.settings().set("basis_set", "cc-pvdz")
-      scf.settings().set("max_iterations", 100)
 
 Each interface implementation typically documents its specific settings, including both the common settings that are
 translated to the backend and the backend-specific settings that are passed through directly.
@@ -163,11 +165,11 @@ This capability is built on QDK/Chemistry's robust :doc:`serialization <serializ
 
 The data types that are automatically converted include:
 
-- **:doc:`Molecular structures <../data/structure>`**: Atoms, coordinates, charges, and multiplicity
-- **:doc:`Basis sets <../data/basis_set>`**: Basis set specifications, primitive and contracted functions
-- **:doc:`Orbitals and wavefunctions <../data/orbitals>`**: Coefficients, occupations, and energies
-- **:doc:`Hamiltonians <../data/hamiltonian>`**: One and two-electron integrals, core Hamiltonians
-- **:doc:`Calculation results <../data/wavefunction>`**: Energies, gradients, properties
+- **Molecular structures**: Atoms, coordinates, charges, and multiplicity
+- **Basis sets**: Basis set specifications, primitive and contracted functions
+- **Orbitals and wavefunctions**: Coefficients, occupations, and energies
+- **Hamiltonians**: One and two-electron integrals, core Hamiltonians
+- **Calculation results**: Energies, gradients, properties
 
 The conversion process is optimized to minimize data copying when possible, especially for large data structures like
 electron repulsion integrals (ERIs).

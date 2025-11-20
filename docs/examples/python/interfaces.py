@@ -5,20 +5,34 @@
 # Licensed under the MIT License. See LICENSE.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
 
+import numpy as np
+from qdk_chemistry.data import Structure
+
+coords = np.array([[0.0, 0.0, 0.0], [0.0, 0.0, 1.4]])
+structure = Structure(coords, ["H", "H"])
+
+# start-cell-1
 from qdk_chemistry.algorithms import create
 
-# All algorithms in QDK/Chemistry follow a common interface pattern
-
-# 1. Create algorithm instance
+# Create an SCF solver that uses the QDK/Chemistry library as solver
 scf_solver = create("scf_solver")
 
-# 2. Access settings
+# Configure it using the standard settings interface
 settings = scf_solver.settings()
-print(f"Algorithm type: {scf_solver.type_name()}")
-print(f"Settings available: {settings.has('max_iterations')}")
+settings.set("basis_set", "cc-pvdz")
+settings.set("method", "hf")
 
-# 3. Configure via settings
-settings.set("max_iterations", 50)
+# Run calculation
+scf_solver.run(structure, charge=0, spin_multiplicity=1)
+# end-cell-1
 
-# The run() method executes the algorithm
-# (requires appropriate input data, not shown here for interface demo)
+
+# start-cell-2
+from qdk_chemistry.algorithms import available
+
+# Get a list of available SCF solver implementations
+available_solvers = available("scf_solver")
+print(f"Available SCF solvers: {available_solvers}")
+# end-cell-2
+
+

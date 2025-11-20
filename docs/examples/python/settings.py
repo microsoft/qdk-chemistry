@@ -12,6 +12,7 @@ import qdk_chemistry
 from qdk_chemistry._core.data import Settings
 from qdk_chemistry.algorithms import create
 
+# start-cell-1
 # Create an algorithm
 scf_solver = create("scf_solver")
 
@@ -23,7 +24,9 @@ settings.set("max_iterations", 100)
 
 # Get a parameter
 max_iter = settings.get("max_iterations")
+# end-cell-1
 
+# start-cell-2
 # Set various parameter types
 # Set a string value
 settings.set("basis_set", "def2-tzvp")
@@ -31,12 +34,14 @@ settings.set("basis_set", "def2-tzvp")
 # Set a numeric value
 settings.set("tolerance", 1.0e-8)
 
-# Set a boolean value
+# Set a boolean value (TODO: density_fitting not available in current settings)
 # settings.set("density_fitting", True)
 
-# Set an array value
+# Set an array value (TODO: active_orbitals not available in current settings)
 # settings.set("active_orbitals", [4, 5, 6, 7])
+# end-cell-2
 
+# start-cell-3
 # Get various parameter types
 # Get a string value
 basis = settings.get("basis_set")
@@ -44,18 +49,20 @@ basis = settings.get("basis_set")
 # Get a numeric value
 threshold = settings.get("tolerance")
 
-# Get a boolean value
+# Get a boolean value (TODO: density_fitting not available)
 # use_df = settings.get("density_fitting")
 
-# Get an array value
+# Get an array value (TODO: active_orbitals not available)
 # active_orbitals = settings.get("active_orbitals")
 
 # Get a value with default fallback
 max_iter_with_default = settings.get_or_default("max_iterations", 100)
+# end-cell-3
 
 
 print(f"Max iterations: {max_iter}")
 
+# start-cell-4
 # Check if a setting exists
 if settings.has("basis_set"):
     # Use the setting
@@ -73,7 +80,9 @@ try:
     print(f"Got convergence threshold: {value}")
 except KeyError:
     print("tolerance not found")
+# end-cell-4
 
+# start-cell-5
 # Check if settings exist
 if settings.has("max_iterations"):
     print("max_iterations setting exists")
@@ -105,7 +114,9 @@ settings.update("tolerance", 1.0e-9)
 
 # Get the type name of a setting
 type_name = settings.get_type_name("tolerance")
+# end-cell-5
 
+# start-cell-6
 # Serialization
 tmpdir = tempfile.mkdtemp()
 os.chdir(tmpdir)
@@ -128,8 +139,10 @@ json_data = settings.to_json()
 
 # Load from JSON object
 settings_from_json = settings.from_json(json_data)
+# end-cell-6
 
 
+# start-cell-7
 ## Extending Settings class
 class MySettings(Settings):
     def __init__(self):
@@ -140,6 +153,10 @@ class MySettings(Settings):
         self.set_default("method", "default")
 
 
+# end-cell-7
+
+
+# start-cell-8
 # Error handling example
 try:
     value = settings.get("non_existent_setting")
@@ -147,3 +164,4 @@ except qdk_chemistry._core.data.SettingNotFound as e:
     print(e)  # "Setting not found: non_existent_setting"
     # Don't exit; use a fallback and continue execution
     value = settings.get_or_default("non_existent_setting", None)
+# end-cell-8

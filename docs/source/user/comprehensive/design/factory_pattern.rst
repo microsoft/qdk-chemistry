@@ -76,7 +76,8 @@ These factory methods allow users to create default implementations or specific 
 
    .. literalinclude:: ../../../../examples/python/factory_pattern.py
       :language: python
-      :lines: 4,19-29
+      :start-after: # start-cell-1
+      :end-before: # end-cell-1
 
 Extending QDK/Chemistry
 -----------------------

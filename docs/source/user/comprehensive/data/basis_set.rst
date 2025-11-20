@@ -84,7 +84,8 @@ Creating a basis set
 
    .. literalinclude:: ../../../../examples/python/basis_set.py
       :language: python
-      :lines: 7-20
+      :start-after: # start-cell-1
+      :end-before: # end-cell-1
 
 Accessing basis set data
 ------------------------
@@ -110,7 +111,8 @@ This ensures that the basis set data remains consistent and prevents accidental 
 
    .. literalinclude:: ../../../../examples/python/basis_set.py
       :language: python
-      :lines: 22-45
+      :start-after: # start-cell-2
+      :end-before: # end-cell-2
 
 Working with shells
 -------------------
@@ -131,7 +133,8 @@ The ``Shell`` structure contains information about a group of atomic orbitals:
 
    .. literalinclude:: ../../../../examples/python/basis_set.py
       :language: python
-      :lines: 47-61
+      :start-after: # start-cell-3
+      :end-before: # end-cell-3
 
 Serialization
 -------------
@@ -215,7 +218,8 @@ HDF5 representation of a ``BasisSet`` has the following structure (showing group
 
    .. literalinclude:: ../../../../examples/python/basis_set.py
       :language: python
-      :lines: 63-79
+      :start-after: # start-cell-4
+      :end-before: # end-cell-4
 
 Utility functions
 -----------------
@@ -236,7 +240,8 @@ The ``BasisSet`` class provides several static utility functions:
 
    .. literalinclude:: ../../../../examples/python/basis_set.py
       :language: python
-      :lines: 88-95
+      :start-after: # start-cell-5
+      :end-before: # end-cell-5
 
 Predefined basis sets
 ---------------------
@@ -259,7 +264,8 @@ For a complete list of available basis sets and their specifications, see the :d
 
    .. literalinclude:: ../../../../examples/python/basis_set.py
       :language: python
-      :lines: 81-90
+      :start-after: # start-cell-6
+      :end-before: # end-cell-6
 
 .. note::
    The basis set library includes popular basis sets such as STO-nG, Pople basis sets (3-21G, 6-31G, etc.), correlation-consistent basis sets (cc-pVDZ, cc-pVTZ, etc.), and more.

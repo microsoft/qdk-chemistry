@@ -65,7 +65,8 @@ However, for advanced use cases, you can create and populate orbitals directly:
 
    .. literalinclude:: ../../../../examples/python/orbitals.py
       :language: python
-      :lines: 7-15
+      :start-after: # start-cell-1
+      :end-before: # end-cell-1
 
 Accessing Orbital Data
 ----------------------
@@ -88,7 +89,8 @@ For spin-dependent properties, methods return pairs of (alpha, beta) data.
 
    .. literalinclude:: ../../../../examples/python/orbitals.py
       :language: python
-      :lines: 30-43
+      :start-after: # start-cell-2
+      :end-before: # end-cell-2
 
 Serialization
 -------------
@@ -182,7 +184,8 @@ HDF5 representation of an ``Orbitals`` object has the following structure (showi
 
    .. literalinclude:: ../../../../examples/python/orbitals.py
       :language: python
-      :lines: 45-56
+      :start-after: # start-cell-3
+      :end-before: # end-cell-3
 
 Orbital transformations and applications
 ----------------------------------------

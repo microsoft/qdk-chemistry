@@ -130,9 +130,10 @@ See the `Available Settings`_ section below for a complete list of configuration
 
 .. tab:: Python API
 
-   .. literalinclude:: ../../../../examples/python/settings.py
+   .. literalinclude:: ../../../../examples/python/scf_solver.py
       :language: python
-      :lines: 4-12
+      :start-after: # start-cell-2
+      :end-before: # end-cell-2
 
 Running an :term:`SCF` calculation
 --------------------------
@@ -154,7 +155,9 @@ The ``solve`` method returns two values:
 
    .. literalinclude:: ../../../../examples/python/scf_solver.py
       :language: python
-      :lines: 1-17
+      :start-after: # start-cell-3
+      :end-before: # end-cell-3: # start-cell-2
+      :end-before: # end-cell-2
 
 Available settings
 ------------------

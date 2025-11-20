@@ -7,5 +7,7 @@
 
 from qdk_chemistry.algorithms import create
 
+# start-cell-1
 # Create the default HamiltonianConstructor instance
 hamiltonian_constructor = create("hamiltonian_constructor")
+# end-cell-1

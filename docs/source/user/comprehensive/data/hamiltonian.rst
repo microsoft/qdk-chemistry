@@ -51,12 +51,10 @@ Hamiltonian object should be considered constant and not modified:
 
 .. tab:: Python API
 
-   .. note::
-      This example shows the API pattern. For complete working examples, see the test suite.
-
    .. literalinclude:: ../../../../examples/python/hamiltonian.py
       :language: python
-      :lines: 3-16
+      :start-after: # start-cell-2
+      :end-before: # end-cell-2
 
 Accessing Hamiltonian data
 --------------------------
@@ -103,12 +101,10 @@ When accessing specific elements with ``get_two_body_element(i, j, k, l)``, the 
 
 .. tab:: Python API
 
-   .. note::
-      This example shows the API pattern. For complete working examples, see the test suite.
-
    .. literalinclude:: ../../../../examples/python/hamiltonian.py
       :language: python
-      :lines: 18-32
+      :start-after: # start-cell-2
+      :end-before: # end-cell-2
 
       # Get orbital data
       orbitals = hamiltonian.get_orbitals()
@@ -190,19 +186,10 @@ HDF5 representation of a ``Hamiltonian`` object has the following structure (sho
 
 .. tab:: Python API
 
-   .. note::
-      This example shows the API pattern.
-      For complete working examples, see the test suite.
-
    .. literalinclude:: ../../../../examples/python/hamiltonian.py
       :language: python
-      :lines: 34-49
-
-      # Convert to/from JSON in Python
-      import json
-      j = hamiltonian.to_json()
-      j_str = json.dumps(j)
-      hamiltonian_from_json = Hamiltonian.from_json(json.loads(j_str))
+      :start-after: # start-cell-3
+      :end-before: # end-cell-3
 
 Active space Hamiltonian
 ------------------------
@@ -225,12 +212,10 @@ The ``Hamiltonian`` class provides methods to check the validity and consistency
 
 .. tab:: Python API
 
-   .. note::
-      This example shows the API pattern. For complete working examples, see the test suite.
-
    .. literalinclude:: ../../../../examples/python/hamiltonian.py
       :language: python
-      :lines: 51-58
+      :start-after: # start-cell-4
+      :end-before: # end-cell-4
 
 Related classes
 ---------------

@@ -88,11 +88,11 @@ pmc_calculator = create("projected_multi_configuration_calculator")
 E_sparse, wfn_sparse = pmc_calculator.run(hamiltonian, list(top_configurations.keys()))
 
 print(f"Reference energy for top 2 determinants is {E_sparse:.6f} Hartree")
+# end-cell-6
 
 # Generate state preparation circuit for the sparse state via sparse isometry (GF2 + X)
 state_prep = create("state_prep", "sparse_isometry_gf2x")
 sparse_isometry_circuit = state_prep.run(wfn_sparse)
-# end-cell-6
 # start-cell-7
 # Prepare qubit Hamiltonian
 qubit_mapper = create("qubit_mapper", algorithm_name="qiskit", encoding="jordan-wigner")

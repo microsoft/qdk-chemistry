@@ -48,7 +48,8 @@ JSON serialization
 
    .. literalinclude:: ../../../../examples/python/serialization.py
       :language: python
-      :lines: 14-20,26-32
+      :start-after: # start-cell-1
+      :end-before: # end-cell-1
 
 HDF5 serialization
 ~~~~~~~~~~~~~~~~~~
@@ -64,7 +65,8 @@ HDF5 serialization
 
    .. literalinclude:: ../../../../examples/python/serialization.py
       :language: python
-      :lines: 35-41
+      :start-after: # start-cell-2
+      :end-before: # end-cell-2
 
 File extensions
 ---------------
