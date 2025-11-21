@@ -4,6 +4,7 @@
 
 #include <spdlog/spdlog.h>
 
+#include <blas.hh>
 #include <qdk/chemistry/algorithms/scf.hpp>
 #include <qdk/chemistry/algorithms/stability.hpp>
 #include <qdk/chemistry/utils/orbital_rotation.hpp>
@@ -74,7 +75,7 @@ Eigen::MatrixXd unpack_rotation_vector(const Eigen::VectorXd& rotation_vector,
   }
 
   // Make anti-Hermitian: dr = dr - dr^T
-  dr = dr - dr.transpose();
+  dr = (dr - dr.transpose()).eval();
 
   return dr;
 }
@@ -89,8 +90,12 @@ Eigen::MatrixXd rotate_mo(const Eigen::MatrixXd& mo_coeff,
   // Compute unitary rotation matrix via matrix exponential
   Eigen::MatrixXd u = dr.exp();
 
-  // Apply rotation to MO coefficients
-  Eigen::MatrixXd rotated_coeff = mo_coeff * u;
+  // Apply rotation to MO coefficients using BLAS
+  Eigen::MatrixXd rotated_coeff(mo_coeff.rows(), u.cols());
+  blas::gemm(blas::Layout::ColMajor, blas::Op::NoTrans, blas::Op::NoTrans,
+             mo_coeff.rows(), u.cols(), mo_coeff.cols(), 1.0, mo_coeff.data(),
+             mo_coeff.rows(), u.data(), u.rows(), 0.0, rotated_coeff.data(),
+             rotated_coeff.rows());
 
   return rotated_coeff;
 }
