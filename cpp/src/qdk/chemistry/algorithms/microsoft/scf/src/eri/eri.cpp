@@ -57,7 +57,7 @@ std::shared_ptr<ERI> ERI::create(BasisSet& basis_set, const SCFConfig& cfg,
                                    cfg.exc.xc_name, cfg.mpi);
     case ERIMethod::Libint2Direct:
       return std::make_shared<LIBINT2_DIRECT>(cfg.unrestricted, basis_set,
-                                              cfg.mpi);
+                                              cfg.mpi, cfg.eri.deterministic_addition);
     default:
       throw std::runtime_error("Invalid ERI Method");
   }

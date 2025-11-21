@@ -191,8 +191,10 @@ RowMajorMatrix compute_schwarz_ints(const ::libint2::BasisSet& obs,
  * @note This class requires Libint2 library for integral evaluation
  */
 class ERI {
-  bool unrestricted_;        ///< Whether to use unrestricted formalism
-  ::libint2::BasisSet obs_;  ///< Libint2 orbital basis set representation
+  bool unrestricted_;              ///< Whether to use unrestricted formalism
+  bool use_thread_local_buffers_;  ///< Use thread-local buffers (true) or
+                                   ///< atomic ops (false)
+  ::libint2::BasisSet obs_;        ///< Libint2 orbital basis set representation
   std::vector<size_t>
       shell2bf_;  ///< Mapping from shell index to first basis function
   shellpair_list_t splist_;   ///< Pre-computed shell pair list for screening
@@ -214,8 +216,10 @@ class ERI {
    * @note Construction involves significant overhead due to screening setup
    * @note Shell pair and Schwarz data is computed using OpenMP parallelization
    */
-  ERI(bool unr, qdk::chemistry::scf::BasisSet& basis_set)
+  ERI(bool unr, qdk::chemistry::scf::BasisSet& basis_set,
+      bool deterministic_addition)
       : unrestricted_(unr),
+        use_thread_local_buffers_(deterministic_addition),
         obs_(libint2_util::convert_to_libint_basisset(basis_set)) {
     shell2bf_ = obs_.shell2bf();
 
@@ -383,7 +387,10 @@ class ERI {
               // Contract shell quartet (J)
               if (J)
                 for (size_t idm = 0; idm < num_density_matrices; ++idm) {
-                  auto* J_cur = J + idm * num_basis_funcs * num_basis_funcs;
+                  auto* J_cur =
+                      use_thread_local_buffers_
+                          ? J_thread + idm * num_basis_funcs * num_basis_funcs
+                          : J + idm * num_basis_funcs * num_basis_funcs;
                   auto* P_cur = P + idm * num_basis_funcs * num_basis_funcs;
                   for (size_t i = 0, ijkl = 0; i < n1; ++i) {
                     const size_t bf1 = bf1_st + i;
@@ -400,15 +407,23 @@ class ERI {
 
                           // J contractions
                           J_ij += P_cur[bf3 * num_basis_funcs + bf4] * value;
-#pragma omp atomic update relaxed
-                          J_cur[bf3 * num_basis_funcs + bf4] += P_ij * value;
+                          if (use_thread_local_buffers_) {
+                            J_cur[bf3 * num_basis_funcs + bf4] += P_ij * value;
+                          } else {
+#pragma omp atomic update
+                            J_cur[bf3 * num_basis_funcs + bf4] += P_ij * value;
+                          }
 
                         }  // l
                       }  // k
 
-// Update J
-#pragma omp atomic update relaxed
-                      J_cur[bf1 * num_basis_funcs + bf2] += J_ij;
+                      // Update J
+                      if (use_thread_local_buffers_) {
+                        J_cur[bf1 * num_basis_funcs + bf2] += J_ij;
+                      } else {
+#pragma omp atomic update
+                        J_cur[bf1 * num_basis_funcs + bf2] += J_ij;
+                      }
                     }  // j
                   }  // i
                 }  // idm
@@ -416,7 +431,10 @@ class ERI {
               // Contract shell quartet (K)
               if (K)
                 for (size_t idm = 0; idm < num_density_matrices; ++idm) {
-                  auto* K_cur = K + idm * num_basis_funcs * num_basis_funcs;
+                  auto* K_cur =
+                      use_thread_local_buffers_
+                          ? K_thread + idm * num_basis_funcs * num_basis_funcs
+                          : K + idm * num_basis_funcs * num_basis_funcs;
                   auto* P_cur = P + idm * num_basis_funcs * num_basis_funcs;
                   for (size_t i = 0, ijkl = 0; i < n1; ++i) {
                     const size_t bf1 = bf1_st + i;
@@ -440,18 +458,28 @@ class ERI {
                               0.25 * P_cur[bf2 * num_basis_funcs + bf4] * value;
                           K_jk +=
                               0.25 * P_cur[bf1 * num_basis_funcs + bf4] * value;
-#pragma omp atomic update relaxed
-                          K_cur[bf1 * num_basis_funcs + bf4] += P_jk * value;
-#pragma omp atomic update relaxed
-                          K_cur[bf2 * num_basis_funcs + bf4] += P_ik * value;
+                          if (use_thread_local_buffers_) {
+                            K_cur[bf1 * num_basis_funcs + bf4] += P_jk * value;
+                            K_cur[bf2 * num_basis_funcs + bf4] += P_ik * value;
+                          } else {
+#pragma omp atomic update
+                            K_cur[bf1 * num_basis_funcs + bf4] += P_jk * value;
+#pragma omp atomic update
+                            K_cur[bf2 * num_basis_funcs + bf4] += P_ik * value;
+                          }
 
                         }  // l
 
-// Update K
-#pragma omp atomic update relaxed
-                        K_cur[bf1 * num_basis_funcs + bf3] += K_ik;
-#pragma omp atomic update relaxed
-                        K_cur[bf2 * num_basis_funcs + bf3] += K_jk;
+                        // Update K
+                        if (use_thread_local_buffers_) {
+                          K_cur[bf1 * num_basis_funcs + bf3] += K_ik;
+                          K_cur[bf2 * num_basis_funcs + bf3] += K_jk;
+                        } else {
+#pragma omp atomic update
+                          K_cur[bf1 * num_basis_funcs + bf3] += K_ik;
+#pragma omp atomic update
+                          K_cur[bf2 * num_basis_funcs + bf3] += K_jk;
+                        }
                       }  // k
                     }  // j
                   }  // i
@@ -465,17 +493,19 @@ class ERI {
     }  // End parallel region
 
     // Deterministic reduction: combine thread-local buffers in order
-    if (J) {
-      for (int t = 0; t < nthreads; ++t) {
-        for (size_t i = 0; i < mat_size; ++i) {
-          J[i] += J_local[t][i];
+    if (use_thread_local_buffers_) {
+      if (J) {
+        for (int t = 0; t < nthreads; ++t) {
+          for (size_t i = 0; i < mat_size; ++i) {
+            J[i] += J_local[t][i];
+          }
         }
       }
-    }
-    if (K) {
-      for (int t = 0; t < nthreads; ++t) {
-        for (size_t i = 0; i < mat_size; ++i) {
-          K[i] += K_local[t][i];
+      if (K) {
+        for (int t = 0; t < nthreads; ++t) {
+          for (size_t i = 0; i < mat_size; ++i) {
+            K[i] += K_local[t][i];
+          }
         }
       }
     }
@@ -668,31 +698,55 @@ class ERI {
                       const auto value = buf_1234[ijkl] * s12_34_deg;
                       // p and l are fast indices separately
                       for (size_t p = 0; p < nt; ++p) {
-// (ij|kp) = \sum_l (ij|kl) * C(l,p)
-#pragma omp atomic update relaxed
-                        out[(bf1 * num_basis_funcs + bf2) * inner_size +
-                            bf3 * nt + p] += C[bf4 * nt + p] * value * s12_deg;
+                        // (ij|kp) = \sum_l (ij|kl) * C(l,p)
+                        const size_t idx1 =
+                            (bf1 * num_basis_funcs + bf2) * inner_size +
+                            bf3 * nt + p;
+                        if (use_thread_local_buffers_) {
+                          out_thread[idx1] += C[bf4 * nt + p] * value * s12_deg;
+                        } else {
+#pragma omp atomic update
+                          out[idx1] += C[bf4 * nt + p] * value * s12_deg;
+                        }
 
                         // (ij|lp) = \sum_k (ij|lk) * C(k,p) = \sum_l (ij|kl) *
                         // C(k,p)
                         if (s3 != s4) {
-#pragma omp atomic update relaxed
-                          out[(bf1 * num_basis_funcs + bf2) * inner_size +
-                              bf4 * nt + p] +=
-                              C[bf3 * nt + p] * value * s12_deg;
+                          const size_t idx2 =
+                              (bf1 * num_basis_funcs + bf2) * inner_size +
+                              bf4 * nt + p;
+                          if (use_thread_local_buffers_) {
+                            out_thread[idx2] +=
+                                C[bf3 * nt + p] * value * s12_deg;
+                          } else {
+#pragma omp atomic update
+                            out[idx2] += C[bf3 * nt + p] * value * s12_deg;
+                          }
                         }
 
-// (kl|ip) = \sum_j (kl|ij) * C(j,p)
-#pragma omp atomic update relaxed
-                        out[(bf3 * num_basis_funcs + bf4) * inner_size +
-                            bf1 * nt + p] += C[bf2 * nt + p] * value * s34_deg;
+                        // (kl|ip) = \sum_j (kl|ij) * C(j,p)
+                        const size_t idx3 =
+                            (bf3 * num_basis_funcs + bf4) * inner_size +
+                            bf1 * nt + p;
+                        if (use_thread_local_buffers_) {
+                          out_thread[idx3] += C[bf2 * nt + p] * value * s34_deg;
+                        } else {
+#pragma omp atomic update
+                          out[idx3] += C[bf2 * nt + p] * value * s34_deg;
+                        }
 
                         // (kl|jp) = \sum_i (kl|ji) * C(i,p)
                         if (s1 != s2) {
-#pragma omp atomic update relaxed
-                          out[(bf3 * num_basis_funcs + bf4) * inner_size +
-                              bf2 * nt + p] +=
-                              C[bf1 * nt + p] * value * s34_deg;
+                          const size_t idx4 =
+                              (bf3 * num_basis_funcs + bf4) * inner_size +
+                              bf2 * nt + p;
+                          if (use_thread_local_buffers_) {
+                            out_thread[idx4] +=
+                                C[bf1 * nt + p] * value * s34_deg;
+                          } else {
+#pragma omp atomic update
+                            out[idx4] += C[bf1 * nt + p] * value * s34_deg;
+                          }
                         }
                       }
                     }  // l (bf4)
@@ -707,9 +761,11 @@ class ERI {
     }
 
     // Deterministic reduction: combine thread-local buffers in order
-    for (int t = 0; t < nthreads; ++t) {
-      for (size_t i = 0; i < out_size; ++i) {
-        out[i] += out_local[t][i];
+    if (use_thread_local_buffers_) {
+      for (int t = 0; t < nthreads; ++t) {
+        for (size_t i = 0; i < out_size; ++i) {
+          out[i] += out_local[t][i];
+        }
       }
     }
 
@@ -755,9 +811,10 @@ class ERI {
 }  // namespace libint2::direct
 
 LIBINT2_DIRECT::LIBINT2_DIRECT(bool unr, BasisSet& basis_set,
-                               ParallelConfig _mpi)
+                               ParallelConfig _mpi, bool deterministic_addition)
     : ERI(unr, 0.0, basis_set, _mpi),
-      eri_impl_(libint2::direct::ERI::make_libint2_direct_eri(unr, basis_set)) {
+      eri_impl_(libint2::direct::ERI::make_libint2_direct_eri(
+          unr, basis_set, deterministic_addition)) {
   if (_mpi.world_size > 1) throw std::runtime_error("LIBINT2_DIRECT + MPI NYI");
 }
 

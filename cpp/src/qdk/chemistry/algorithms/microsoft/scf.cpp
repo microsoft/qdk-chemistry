@@ -108,7 +108,9 @@ std::pair<double, std::shared_ptr<data::Wavefunction>> ScfSolver::_run_impl(
   ms_scf_config->eri.method =
       qcs::ERIMethod::Libint2Direct;  // TODO: Make this configurable
   ms_scf_config->eri.eri_threshold = convergence_threshold * 1e-5;
-  ms_scf_config->k_eri.eri_threshold = convergence_threshold * 1e-5;
+  ms_scf_config->eri.deterministic_addition =
+      _settings->get<bool>("eri_deterministic_addition");
+  ms_scf_config->k_eri = ms_scf_config->eri;
   ms_scf_config->grad_eri = ms_scf_config->eri;
 
   ms_scf_config->fock_reset_steps = _settings->get<int>("fock_reset_steps");
