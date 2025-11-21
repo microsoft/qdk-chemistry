@@ -101,7 +101,7 @@ sphinx-api:
 		-o $(SPHINX_API_DIR) $(PYTHON_SRC_DIR)/qdk_chemistry | tee $(SPHINX_API_DEBUG) 2>&1
 	@echo "** Sphinx API documentation generated."
 	@echo "** Saved output to $(SPHINX_API_DEBUG)."
-	@count=$$(egrep "WARNING|ERROR" $(SPHINX_API_DEBUG) | wc -l); \
+	@count=$$(grep -E "WARNING|ERROR" $(SPHINX_API_DEBUG) | wc -l); \
 	echo "** Found $$count warnings/errors in the Sphinx API output."
 	@echo
 
