@@ -346,25 +346,22 @@ void GDM::gdm_iteration_step_(const RowMajorMatrix& F, RowMajorMatrix& C,
         "next step",
         scf_total_energy - last_accepted_energy_, last_accepted_energy_,
         rescale_kappa_denergy_threshold_);
+
+    // if energy increase is too large, shorten kappa more; scale factor is
+    // inverse of energy increase
     kappa_scale_factor_ =
-        1.0 /
-        std::max(scf_total_energy - last_accepted_energy_,
-                 2.0);  // if energy increase is too large, shorten kappa more;
-                        // scale factor is inverse of energy increase
+        1.0 / std::max(scf_total_energy - last_accepted_energy_, 2.0);
 
-    // Restore orbitals and set shorter kappa
-    history_size_[spin_index]--;  // remove the last dgrad and kappa from
-                                  // history
-    kappa_[spin_index] = history_kappa_[spin_index].row(
-        history_size_[spin_index]);  // the index is correct here: at present
-                                     // history_kappa_ has
-                                     // history_size_[spin_index] + 1 rows, one
-                                     // more than history_dgrad_
+    // Restore orbitals
+    history_size_[spin_index]--;
+    // At present history_kappa_ has history_size_[spin_index] + 1 rows, one
+    // more than history_dgrad_
+    kappa_[spin_index] =
+        history_kappa_[spin_index].row(history_size_[spin_index]);
     const Eigen::VectorXd negative_kappa = -kappa_[spin_index];
-
-    // restore the orbitals
     apply_orbital_rotation_(C, spin_index, negative_kappa);
 
+    // Scale kappa for this step
     kappa_[spin_index] *= kappa_scale_factor_;
     history_kappa_[spin_index].row(history_size_[spin_index]) =
         kappa_[spin_index];  // update the history_kappa_
@@ -377,14 +374,11 @@ void GDM::gdm_iteration_step_(const RowMajorMatrix& F, RowMajorMatrix& C,
     kappa_scale_factor_ = 0.0;
 
     {  // Obtain pseudo-canonical orbitals
-      Uoo_ = F_MO.block(
-          0, 0, num_occupied_orbitals,
-          num_occupied_orbitals);  // Occupied-occupied block. Foo is symmetric,
-                                   // fine to input to syev directly
+      // Occupied-occupied block. Foo is symmetric
+      Uoo_ = F_MO.block(0, 0, num_occupied_orbitals, num_occupied_orbitals);
+      // Virtual-virtual block. Fvv is also symmetric
       Uvv_ = F_MO.block(num_occupied_orbitals, num_occupied_orbitals,
-                        num_virtual_orbitals,
-                        num_virtual_orbitals);  // Virtual-virtual block. Fvv is
-                                                // also symmetric
+                        num_virtual_orbitals, num_virtual_orbitals);
 
       lapack::syev("V", "L", num_occupied_orbitals, Uoo_.data(),
                    num_occupied_orbitals, pseudo_canonical_eigenvalues_.data());
@@ -513,7 +507,7 @@ void GDM::gdm_iteration_step_(const RowMajorMatrix& F, RowMajorMatrix& C,
         scaled_kappa_vector = -r;
       }
 
-      // rescale kappa vector back
+      // scale kappa vector back
       for (int index = 0; index < rotation_size; index++) {
         kappa_[spin_index](index) =
             scaled_kappa_vector(index) / sqrt_initial_hessian(index);
@@ -527,9 +521,8 @@ void GDM::gdm_iteration_step_(const RowMajorMatrix& F, RowMajorMatrix& C,
 
       history_kappa_[spin_index].row(history_size_[spin_index]) =
           kappa_[spin_index];
-      previous_gradient_[spin_index] =
-          current_gradient_[spin_index];  // Update previous gradient
-      // Note: history_size_ is incremented when dgrad is added to history above
+      // Update previous gradient
+      previous_gradient_[spin_index] = current_gradient_[spin_index];
     }
   }
 
