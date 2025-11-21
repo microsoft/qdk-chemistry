@@ -9,6 +9,7 @@
 #include <stdexcept>
 #include <variant>
 
+#include "../hdf5_serialization.hpp"
 #include "../json_serialization.hpp"
 
 namespace qdk::chemistry::data {
@@ -721,47 +722,6 @@ std::unique_ptr<CoupledClusterContainer> CoupledClusterContainer::from_hdf5(
       is_complex = (is_complex_flag != 0);
     }
 
-    // lambda to read amplitudes
-    auto read_vector_from_hdf5 = [&](H5::Group& grp, const std::string& name,
-                                     bool is_complex = false) {
-      VectorVariant vec_var;
-      if (grp.nameExists(name)) {
-        if (is_complex) {
-          H5::DataSet dataset = grp.openDataSet(name);
-          H5::DataSpace dataspace = dataset.getSpace();
-          hsize_t dim = dataspace.getSimpleExtentNpoints();
-
-          H5::DataType datatype = dataset.getDataType();
-          if (datatype.getClass() != H5T_COMPOUND) {
-            throw std::runtime_error(
-                "Expected complex compound type in HDF5 coefficients "
-                "dataset. Error reading dataset: " +
-                name);
-          }
-
-          H5::CompType complex_type(sizeof(std::complex<double>));
-          complex_type.insertMember("real", 0, H5::PredType::NATIVE_DOUBLE);
-          complex_type.insertMember("imag", sizeof(double),
-                                    H5::PredType::NATIVE_DOUBLE);
-
-          Eigen::VectorXcd vec_c(dim);
-          dataset.read(vec_c.data(), complex_type);
-          vec_var = vec_c;
-        } else {
-          H5::DataSet dataset = grp.openDataSet(name);
-          H5::DataSpace dataspace = dataset.getSpace();
-          hsize_t dim = dataspace.getSimpleExtentNpoints();
-
-          Eigen::VectorXd vec_r(dim);
-          dataset.read(vec_r.data(), H5::PredType::NATIVE_DOUBLE);
-          vec_var = vec_r;
-        }
-      } else {
-        throw std::runtime_error("Dataset not found in HDF5 group: " + name);
-      }
-      return vec_var;
-    };
-
     // Load configuration set (delegates to ConfigurationSet deserialization)
     // ConfigurationSet now deserializes orbitals internally
     if (!group.nameExists("reference_configurations")) {
@@ -775,26 +735,31 @@ std::unique_ptr<CoupledClusterContainer> CoupledClusterContainer::from_hdf5(
     const auto& determinants = reference_configs.get_configurations();
     auto orbitals = reference_configs.get_orbitals();
 
-    auto t1_aa = group.nameExists("t1_amplitudes_aa")
-                     ? std::optional<VectorVariant>(read_vector_from_hdf5(
-                           group, "t1_amplitudes_aa", is_complex))
-                     : std::nullopt;
-    auto t1_bb = group.nameExists("t1_amplitudes_bb")
-                     ? std::optional<VectorVariant>(read_vector_from_hdf5(
-                           group, "t1_amplitudes_bb", is_complex))
-                     : std::nullopt;
-    auto t2_abab = group.nameExists("t2_amplitudes_abab")
-                       ? std::optional<VectorVariant>(read_vector_from_hdf5(
-                             group, "t2_amplitudes_abab", is_complex))
-                       : std::nullopt;
-    auto t2_aaaa = group.nameExists("t2_amplitudes_aaaa")
-                       ? std::optional<VectorVariant>(read_vector_from_hdf5(
-                             group, "t2_amplitudes_aaaa", is_complex))
-                       : std::nullopt;
-    auto t2_bbbb = group.nameExists("t2_amplitudes_bbbb")
-                       ? std::optional<VectorVariant>(read_vector_from_hdf5(
-                             group, "t2_amplitudes_bbbb", is_complex))
-                       : std::nullopt;
+    auto t1_aa =
+        group.nameExists("t1_amplitudes_aa")
+            ? std::optional<VectorVariant>(load_vector_variant_from_group(
+                  group, "t1_amplitudes_aa", is_complex))
+            : std::nullopt;
+    auto t1_bb =
+        group.nameExists("t1_amplitudes_bb")
+            ? std::optional<VectorVariant>(load_vector_variant_from_group(
+                  group, "t1_amplitudes_bb", is_complex))
+            : std::nullopt;
+    auto t2_abab =
+        group.nameExists("t2_amplitudes_abab")
+            ? std::optional<VectorVariant>(load_vector_variant_from_group(
+                  group, "t2_amplitudes_abab", is_complex))
+            : std::nullopt;
+    auto t2_aaaa =
+        group.nameExists("t2_amplitudes_aaaa")
+            ? std::optional<VectorVariant>(load_vector_variant_from_group(
+                  group, "t2_amplitudes_aaaa", is_complex))
+            : std::nullopt;
+    auto t2_bbbb =
+        group.nameExists("t2_amplitudes_bbbb")
+            ? std::optional<VectorVariant>(load_vector_variant_from_group(
+                  group, "t2_amplitudes_bbbb", is_complex))
+            : std::nullopt;
 
     return std::make_unique<CoupledClusterContainer>(orbitals, determinants,
                                                      t1_aa, t1_bb, t2_abab,

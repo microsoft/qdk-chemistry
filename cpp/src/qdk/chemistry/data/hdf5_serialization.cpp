@@ -4,6 +4,9 @@
 
 #include "hdf5_serialization.hpp"
 
+#include <complex>
+#include <variant>
+
 namespace qdk::chemistry::data {
 
 void save_matrix_to_hdf5(H5::H5File& file, const std::string& dataset_name,
@@ -45,6 +48,47 @@ Eigen::VectorXd load_vector_from_hdf5(H5::H5File& file,
   Eigen::VectorXd vector(dims[0]);
   dataset.read(vector.data(), H5::PredType::NATIVE_DOUBLE);
   return vector;
+}
+
+VectorVariant load_vector_variant_from_group(H5::Group& grp,
+                                             const std::string& name,
+                                             bool is_complex) {
+  VectorVariant vec_var;
+  if (grp.nameExists(name)) {
+    if (is_complex) {
+      H5::DataSet dataset = grp.openDataSet(name);
+      H5::DataSpace dataspace = dataset.getSpace();
+      hsize_t dim = dataspace.getSimpleExtentNpoints();
+
+      H5::DataType datatype = dataset.getDataType();
+      if (datatype.getClass() != H5T_COMPOUND) {
+        throw std::runtime_error(
+            "Expected complex compound type in HDF5 coefficients "
+            "dataset. Error reading dataset: " +
+            name);
+      }
+
+      H5::CompType complex_type(sizeof(std::complex<double>));
+      complex_type.insertMember("real", 0, H5::PredType::NATIVE_DOUBLE);
+      complex_type.insertMember("imag", sizeof(double),
+                                H5::PredType::NATIVE_DOUBLE);
+
+      Eigen::VectorXcd vec_c(dim);
+      dataset.read(vec_c.data(), complex_type);
+      vec_var = vec_c;
+    } else {
+      H5::DataSet dataset = grp.openDataSet(name);
+      H5::DataSpace dataspace = dataset.getSpace();
+      hsize_t dim = dataspace.getSimpleExtentNpoints();
+
+      Eigen::VectorXd vec_r(dim);
+      dataset.read(vec_r.data(), H5::PredType::NATIVE_DOUBLE);
+      vec_var = vec_r;
+    }
+  } else {
+    throw std::runtime_error("Dataset not found in HDF5 group: " + name);
+  }
+  return vec_var;
 }
 
 bool dataset_exists(H5::H5File& file, const std::string& dataset_name) {
