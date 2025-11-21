@@ -79,7 +79,6 @@ target_include_directories(chemistry PUBLIC
     $<INSTALL_INTERFACE:include>
 )
 target_link_libraries(chemistry PUBLIC
-    OpenMP::OpenMP_CXX
     Eigen3::Eigen
     ${HDF5_CXX_LIBRARIES}
     nlohmann_json::nlohmann_json

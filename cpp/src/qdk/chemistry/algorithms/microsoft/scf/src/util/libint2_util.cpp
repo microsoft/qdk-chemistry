@@ -4,6 +4,8 @@
 
 #include <qdk/chemistry/scf/util/libint2_util.h>
 
+#include <qdk/chemistry/utils/omp_utils.hpp>
+
 namespace qdk::chemistry::scf::libint2_util {
 
 libint2::Shell convert_to_libint_shell(const Shell& o, bool pure) {
