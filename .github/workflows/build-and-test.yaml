@@ -65,6 +65,13 @@ jobs:
           graphviz \
           gcovr
 
+    - name: Install C++ dependencies
+      env:
+        INSTALL_PREFIX: ${{ github.workspace }}/install
+        BUILD_DIR: ${{ github.workspace }}/cpp_deps_build
+      run: |
+        bash ${{ github.workspace }}/.devcontainer/scripts/install_cpp_dependencies.sh
+
     - name: Install Python dependencies
       run: |
         python -m pip install --upgrade pip
@@ -84,43 +91,17 @@ jobs:
     - name: Run C++ tests with coverage
       run: |
         mkdir -p test-results ${{ github.workspace }}/coverage-reports
-        cd "$BUILD_DIR/tests"
+        cd "$BUILD_DIR"
 
-        FAILED_TESTS=()
-        TOTAL_TESTS=0
-        PASSED_TESTS=0
+        echo "=== Running C++ Tests with CTest ==="
+        set +e
+        ctest --output-on-failure --verbose --timeout 300 --output-junit ${{ github.workspace }}/test-results/ctest_results.xml
+        CTEST_EXIT_CODE=$?
+        set -e
 
-        echo "=== Running C++ Tests ==="
-        for test_exe in test_*; do
-          if [ -x "$test_exe" ] && [ -f "$test_exe" ]; then
-            TOTAL_TESTS=$((TOTAL_TESTS + 1))
-            echo "Running $test_exe..."
-
-            set +e
-            timeout 300 ./"$test_exe" --gtest_output=xml:${{ github.workspace }}/test-results/"$test_exe"_results.xml
-            EXIT_CODE=$?
-            set -e
-
-            if [ $EXIT_CODE -ne 0 ]; then
-              echo "ERROR: Test $test_exe failed with exit code $EXIT_CODE"
-              FAILED_TESTS+=("$test_exe (exit code: $EXIT_CODE)")
-            else
-              echo "SUCCESS: Test $test_exe passed"
-              PASSED_TESTS=$((PASSED_TESTS + 1))
-            fi
-          fi
-        done
-
-        echo "=== C++ Test Summary ==="
-        echo "Total tests: $TOTAL_TESTS"
-        echo "Passed tests: $PASSED_TESTS"
-        echo "Failed tests: ${#FAILED_TESTS[@]}"
-
-        if [ ${#FAILED_TESTS[@]} -gt 0 ]; then
-          echo "=== FAILED TESTS ==="
-          for failed_test in "${FAILED_TESTS[@]}"; do
-            echo "  - $failed_test"
-          done
+        if [ $CTEST_EXIT_CODE -ne 0 ]; then
+          echo "=== Some tests failed ==="
+          echo "Exit code: $CTEST_EXIT_CODE"
         fi
 
         cd ${{ github.workspace }}
@@ -140,8 +121,9 @@ jobs:
 
         echo "C++ Coverage Summary:"
         cat ${{ github.workspace }}/coverage-reports/cpp_coverage.txt
-        if [ ${#FAILED_TESTS[@]} -gt 0 ]; then
-          exit 1
+
+        if [ $CTEST_EXIT_CODE -ne 0 ]; then
+          exit $CTEST_EXIT_CODE
         fi
 
     - name: Install C++ library
