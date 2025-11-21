@@ -89,6 +89,8 @@ jobs:
       run: cmake --build "$BUILD_DIR"
 
     - name: Run C++ tests with coverage
+      env:
+        OMP_NUM_THREADS: 64 # Do not exceed precompiled blas limit
       run: |
         mkdir -p test-results ${{ github.workspace }}/coverage-reports
         cd "$BUILD_DIR"
@@ -141,6 +143,8 @@ jobs:
         python -m pip install --prefix=${{ github.workspace }}/install .[dev,plugins]
 
     - name: Run Python tests
+      env:
+        OMP_NUM_THREADS: 64 # Do not exceed precompiled blas limit
       working-directory: python
       run: |
         mkdir -p ../test-results ../coverage-reports
