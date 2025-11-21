@@ -93,7 +93,7 @@ rm -rf ecpint
 
 # Install gauxc
 echo "=== Installing gauxc ==="
-git clone --depth 1 --branch v1.0 https://github.com/wavefunction91/gauxc.git gauxc
+git clone --depth 1 --branch v1.1 https://github.com/wavefunction91/gauxc.git gauxc
 cd gauxc
 mkdir -p build
 cd build

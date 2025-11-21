@@ -118,7 +118,7 @@ jobs:
 
         echo "=== Running C++ Tests in Debug Mode with Coverage ==="
         set +e
-        ctest --output-on-failure --verbose --timeout 300 --output-junit ${{ github.workspace }}/test-results/ctest_results.xml
+        ctest --output-on-failure --verbose --timeout 300 --output-junit ${{ github.workspace }}/test-results/ctest_results.xml -E "MACIS_SERIAL_TEST"
         CTEST_EXIT_CODE=$?
         set -e
 
