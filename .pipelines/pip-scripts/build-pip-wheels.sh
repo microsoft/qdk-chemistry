@@ -38,7 +38,6 @@ apt-get install -y \
     libpugixml-dev
 
 # Upgrade cmake as Ubuntu 22.04 only has up to v3.22 in apt
-apt-get purge -y cmake
 if [[ ${MARCH} == 'armv8-a' ]]; then
     wget -q https://github.com/Kitware/CMake/releases/download/v${CMAKE_VERSION}/cmake-${CMAKE_VERSION}-linux-aarch64.sh
     chmod +x cmake-${CMAKE_VERSION}-linux-aarch64.sh
