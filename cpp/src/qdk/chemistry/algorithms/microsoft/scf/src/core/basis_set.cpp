@@ -235,7 +235,7 @@ void norm_psi4_mode(std::vector<Shell>& shells) {
     double_factorial[i] = double_factorial[i - 2] * (i - 1);
   }
 
-  constexpr double sqrt_PI_cubed = std::sqrt(std::pow(std::acos(-1), 3));
+  const double sqrt_PI_cubed = std::sqrt(std::pow(std::acos(-1.0), 3.0));
 
   for (auto& shell : shells) {
     int am = shell.angular_momentum;

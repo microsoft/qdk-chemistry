@@ -7,15 +7,13 @@
 #include <spdlog/spdlog.h>
 
 #include <algorithm>
+#include <blas.hh>
 #include <iostream>
 #include <qdk/chemistry/algorithms/active_space.hpp>
 
-#include "../scf/src/util/blas.h"
 #include "../utils.hpp"
 
 namespace qdk::chemistry::algorithms::microsoft {
-
-using qdk::chemistry::scf::blas::gemm;
 
 std::shared_ptr<data::Wavefunction> PipekMezeyLocalizer::_run_impl(
     std::shared_ptr<data::Wavefunction> wavefunction,
@@ -63,20 +61,19 @@ std::shared_ptr<data::Wavefunction> PipekMezeyLocalizer::_run_impl(
 
   IterativeOrbitalLocalizationSettings settings;
 
-  // Generate map from atomic orbital index to atom index
+  // Generate map from basis function index to atom index
   const auto& basis_set = orbitals->get_basis_set();
-  const size_t num_atomic_orbitals = basis_set->get_num_atomic_orbitals();
+  const size_t num_basis_funcs = basis_set->get_num_atomic_orbitals();
   const size_t num_atoms = basis_set->get_structure()->get_num_atoms();
-  std::vector<int> atomic_orbital_to_atom_map(num_atomic_orbitals);
-  for (size_t i = 0; i < num_atomic_orbitals; ++i) {
-    atomic_orbital_to_atom_map[i] =
-        basis_set->get_atom_index_for_atomic_orbital(i);
+  std::vector<int> basis_func_to_atom_map(num_basis_funcs);
+  for (size_t i = 0; i < num_basis_funcs; ++i) {
+    basis_func_to_atom_map[i] = basis_set->get_atom_index_for_basis_function(i);
   }
 
   // Create localizer outside do_loc for reuse
   const auto& ao_overlap = orbitals->get_overlap_matrix();
   PipekMezeyLocalization localizer(settings, ao_overlap, num_atoms,
-                                   atomic_orbital_to_atom_map);
+                                   basis_func_to_atom_map);
 
   auto do_loc = [&](const auto& coeffs, const auto& ind) {
     Eigen::MatrixXd target_coeffs = coeffs;  // Start with original coefficients
@@ -158,10 +155,10 @@ auto compute_jacobi_AB(long double A, long double B) {
 PipekMezeyLocalization::PipekMezeyLocalization(
     IterativeOrbitalLocalizationSettings settings,
     const Eigen::MatrixXd& overlap_matrix, size_t num_atoms,
-    std::vector<int> ao_to_atom_map)
+    std::vector<int> bf_to_atom_map)
     : IterativeOrbitalLocalizationScheme(settings),
       overlap_matrix_(overlap_matrix),
-      ao_to_atom_map_(std::move(ao_to_atom_map)),
+      bf_to_atom_map_(std::move(bf_to_atom_map)),
       num_atoms_(num_atoms) {}
 
 Eigen::MatrixXd PipekMezeyLocalization::localize(
@@ -175,13 +172,13 @@ Eigen::MatrixXd PipekMezeyLocalization::localize(
   this->converged_ = false;
   this->obj_fun_ = 0.0;
 
-  const auto num_atomic_orbitals = orbitals.rows();
+  const auto num_basis_funcs = orbitals.rows();
   const auto num_orbitals = orbitals.cols();
   MatrixType orbital_coeffs = orbitals;
   MatrixType overlap_matrix = this->overlap_matrix_;
 
   MatrixType overlap_times_coeffs =
-      MatrixType::Zero(num_atomic_orbitals, num_orbitals);
+      MatrixType::Zero(num_basis_funcs, num_orbitals);
   MatrixType Xi = MatrixType::Zero(num_atoms_, num_orbitals);
   MatrixType gamma = MatrixType::Zero(num_orbitals, num_orbitals);
   MatrixType increase_sos = MatrixType::Zero(num_orbitals, num_orbitals);
@@ -189,10 +186,11 @@ Eigen::MatrixXd PipekMezeyLocalization::localize(
   double old_metric = std::numeric_limits<double>::infinity();
 
   // Initial overlap_matrix*orbital_coeffs - updated via Jacobi rotations
-  gemm("N", "N", num_atomic_orbitals, num_orbitals, num_atomic_orbitals, 1.0,
-       overlap_matrix.data(), num_atomic_orbitals, orbital_coeffs.data(),
-       num_atomic_orbitals, 0.0, overlap_times_coeffs.data(),
-       num_atomic_orbitals);
+  blas::gemm(blas::Layout::ColMajor, blas::Op::NoTrans, blas::Op::NoTrans,
+             num_basis_funcs, num_orbitals, num_basis_funcs, 1.0,
+             overlap_matrix.data(), num_basis_funcs, orbital_coeffs.data(),
+             num_basis_funcs, 0.0, overlap_times_coeffs.data(),
+             num_basis_funcs);
 
   const auto max_sweeps = this->settings_.get<size_t>("max_iterations");
   const auto tol = this->settings_.get<double>("tolerance");
@@ -202,8 +200,8 @@ Eigen::MatrixXd PipekMezeyLocalization::localize(
     // Compute Xi
     Xi.setZero();
     for (auto p = 0; p < num_orbitals; ++p)
-      for (auto mu = 0; mu < num_atomic_orbitals; ++mu) {
-        Xi(ao_to_atom_map_[mu], p) +=
+      for (auto mu = 0; mu < num_basis_funcs; ++mu) {
+        Xi(bf_to_atom_map_[mu], p) +=
             orbital_coeffs(mu, p) * overlap_times_coeffs(mu, p);
       }
 
@@ -226,8 +224,8 @@ Eigen::MatrixXd PipekMezeyLocalization::localize(
       for (auto t = 0; t < s; ++t) {
         // Compute Q
         Eigen::VectorXd Q = Eigen::VectorXd::Zero(num_atoms_);
-        for (auto mu = 0; mu < num_atomic_orbitals; mu++) {
-          Q[ao_to_atom_map_[mu]] +=
+        for (auto mu = 0; mu < num_basis_funcs; mu++) {
+          Q[bf_to_atom_map_[mu]] +=
               orbital_coeffs(mu, s) * overlap_times_coeffs(mu, t) +
               overlap_times_coeffs(mu, s) * orbital_coeffs(mu, t);
         }
@@ -285,8 +283,8 @@ Eigen::MatrixXd PipekMezeyLocalization::localize(
   // Compute final metric
   Xi.setZero();
   for (auto p = 0; p < num_orbitals; ++p)
-    for (auto mu = 0; mu < num_atomic_orbitals; ++mu) {
-      Xi(ao_to_atom_map_[mu], p) +=
+    for (auto mu = 0; mu < num_basis_funcs; ++mu) {
+      Xi(bf_to_atom_map_[mu], p) +=
           orbital_coeffs(mu, p) * overlap_times_coeffs(mu, p);
     }
   this->obj_fun_ = Xi.cwiseProduct(Xi).sum();

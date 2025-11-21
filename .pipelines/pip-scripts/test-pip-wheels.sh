@@ -4,6 +4,12 @@ PYTHON_VERSION=${1:-3.11}
 
 export DEBIAN_FRONTEND=noninteractive
 
+# Try to prevent stochastic segfault from libc-bin
+rm /var/lib/dpkg/info/libc-bin.*
+apt-get clean
+apt-get update
+apt install libc-bin
+
 # Update and install dependencies needed for testing
 apt-get update
 apt-get install -y \
@@ -11,7 +17,6 @@ apt-get install -y \
     libssl-dev zlib1g-dev libbz2-dev libreadline-dev libsqlite3-dev \
     libncurses5-dev xz-utils tk-dev libxml2-dev libxmlsec1-dev \
     libffi-dev liblzma-dev \
-    libhdf5-dev \
     libopenblas-dev \
     libboost-all-dev \
     wget \

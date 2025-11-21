@@ -5,6 +5,7 @@
 #include "mp2_natural_orbitals.hpp"
 
 #include <algorithm>
+#include <blas.hh>
 #include <macis/mcscf/orbital_energies.hpp>
 #include <macis/util/moller_plesset.hpp>
 #include <qdk/chemistry/algorithms/active_space.hpp>
@@ -12,12 +13,7 @@
 #include <qdk/chemistry/data/structure.hpp>
 #include <stdexcept>
 
-#include "../scf/src/util/blas.h"
-
 namespace qdk::chemistry::algorithms::microsoft {
-
-// Bring BLAS wrapper into scope
-using qdk::chemistry::scf::blas::gemm;
 
 std::shared_ptr<data::Wavefunction> MP2NaturalOrbitalLocalizer::_run_impl(
     std::shared_ptr<data::Wavefunction> wavefunction,
@@ -146,9 +142,11 @@ std::shared_ptr<data::Wavefunction> MP2NaturalOrbitalLocalizer::_run_impl(
   const size_t num_atomic_orbitals = selected_coeffs.rows();
   Eigen::MatrixXd selected_no_coeffs =
       Eigen::MatrixXd::Zero(num_atomic_orbitals, num_orbitals);
-  gemm("N", "N", num_atomic_orbitals, num_orbitals, num_orbitals, 1.0,
-       selected_coeffs.data(), num_atomic_orbitals, mp2_natural_orbitals.data(),
-       num_orbitals, 0.0, selected_no_coeffs.data(), num_atomic_orbitals);
+  blas::gemm(blas::Layout::ColMajor, blas::Op::NoTrans, blas::Op::NoTrans,
+             num_atomic_orbitals, num_orbitals, num_orbitals, 1.0,
+             selected_coeffs.data(), num_atomic_orbitals,
+             mp2_natural_orbitals.data(), num_orbitals, 0.0,
+             selected_no_coeffs.data(), num_atomic_orbitals);
 
   // Form final orbitals by updating only the selected orbitals
   Eigen::MatrixXd coeffs = full_coeffs;  // Start with original coefficients

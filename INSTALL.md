@@ -125,10 +125,10 @@ cmake [...] -DCMAKE_PREFIX_PATH="/opt/openblas;/opt/hdf5"
 
 ```txt
 TODO (DBWY): Link the CGManifest when available
-Work Item: https://dev.azure.com/ms-azurequantum/AzureQuantum/_workitems/edit/41466
+Work Item: 41466
 
 TODO (DBWY): Flesh out DNF Installation instructions
-Work Item: https://dev.azure.com/ms-azurequantum/AzureQuantum/_workitems/edit/41432
+Work Item: 41432
 ```
 
 ### System Dependencies
@@ -147,7 +147,7 @@ QDK/Chemistry requires both a C and a C++ compiler to be installed. Additionally
 
 ```txt
 TODO (DBWY): Add compiler support documentation
-Work Item: https://dev.azure.com/ms-azurequantum/AzureQuantum/_workitems/edit/41432
+Work Item: 41432
 ```
 
 Additionally, QDK/Chemistry requires the following software dependencies:

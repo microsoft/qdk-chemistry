@@ -11,11 +11,11 @@
 #include <cuda_runtime.h>
 #include <qdk/chemistry/scf/util/gpu/cuda_helper.h>
 #endif
-#include <omp.h>
 #include <qdk/chemistry/scf/util/libint2_util.h>
 #include <spdlog/spdlog.h>
 
-#include "util/blas.h"
+#include <blas.hh>
+#include <qdk/chemistry/utils/omp_utils.hpp>
 
 #define INCORE_ERI_GEN_DEBUG 0xF00
 #define INCORE_ERI_CON_HOST 0x0F0
@@ -154,8 +154,8 @@ void ERI::build_JK(const double* P, double* J, double* K, double alpha,
 
   if (J)
     for (size_t idm = 0; idm < (unrestricted_ ? 2 : 1); ++idm) {
-      blas::gemv("T", num_atomic_orbitals2, num_atomic_orbitals2, 1.0,
-                 h_eri_ptr, num_atomic_orbitals2,
+      blas::gemv(blas::Layout::ColMajor, blas::Op::Trans, num_atomic_orbitals2,
+                 num_atomic_orbitals2, 1.0, h_eri_ptr, num_atomic_orbitals2,
                  P + idm * num_atomic_orbitals2, 1, 0.0,
                  J + idm * num_atomic_orbitals2, 1);
     }
@@ -277,11 +277,13 @@ void ERI::quarter_trans(size_t nt, const double* C, double* out) {
 #else
 
   if (omega_ > 1e-12) {
-    blas::gemm("N", "N", nt, num_atomic_orbitals3, num_atomic_orbitals, 1.0, C,
-               nt, h_eri_erf_.get(), num_atomic_orbitals, 0.0, out, nt);
+    blas::gemm(blas::Layout::ColMajor, blas::Op::NoTrans, blas::Op::NoTrans, nt,
+               num_atomic_orbitals3, num_atomic_orbitals, 1.0, C, nt,
+               h_eri_erf_.get(), num_atomic_orbitals, 0.0, out, nt);
   } else {
-    blas::gemm("N", "N", nt, num_atomic_orbitals3, num_atomic_orbitals, 1.0, C,
-               nt, h_eri_.get(), num_atomic_orbitals, 0.0, out, nt);
+    blas::gemm(blas::Layout::ColMajor, blas::Op::NoTrans, blas::Op::NoTrans, nt,
+               num_atomic_orbitals3, num_atomic_orbitals, 1.0, C, nt,
+               h_eri_.get(), num_atomic_orbitals, 0.0, out, nt);
   }
 
 #endif  // QDK_CHEMISTRY_ENABLE_GPU
