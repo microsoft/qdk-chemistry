@@ -185,9 +185,9 @@ double Ansatz::calculate_energy() const {
     for (int p = 0; p < norb; ++p) {
       for (int q = 0; q < norb; ++q) {
         // Alpha contribution
-        energy += h1_alpha(p, q) * h1_alpha(q, p);
+        energy += h1_alpha(p, q) * rdm1_aa(q, p);
         // Beta contribution
-        energy += h1_beta(p, q) * h1_beta(q, p);
+        energy += h1_beta(p, q) * rdm1_bb(q, p);
       }
     }
 
@@ -202,20 +202,22 @@ double Ansatz::calculate_energy() const {
           for (int s = 0; s < norb; ++s) {
             size_t index_co = p * norb3 + q * norb2 + r * norb + s;
             size_t index_dm = r * norb3 + s * norb2 + p * norb + q;
-            energy += 0.5 * h2_aaaa(index_co) * h2_aaaa(index_dm);
+            energy += 0.5 * h2_aaaa(index_co) * rdm2_aaaa(index_dm);
           }
         }
       }
     }
 
     // Alpha-beta contribution (h2_aabb)
+    // Note: h2_aabb is stored as (ββ|αα), so indices are swapped
     for (int p = 0; p < norb; ++p) {
       for (int q = 0; q < norb; ++q) {
         for (int r = 0; r < norb; ++r) {
           for (int s = 0; s < norb; ++s) {
-            size_t index_co = p * norb3 + q * norb2 + r * norb + s;
+            // h2_aabb is (ββ|αα) so access as (r,s,p,q) not (p,q,r,s)
+            size_t index_co = r * norb3 + s * norb2 + p * norb + q;
             size_t index_dm = r * norb3 + s * norb2 + p * norb + q;
-            energy += h2_aabb(index_co) * h2_aabb(index_dm);
+            energy += h2_aabb(index_co) * rdm2_aabb(index_dm);
           }
         }
       }
@@ -228,7 +230,7 @@ double Ansatz::calculate_energy() const {
           for (int s = 0; s < norb; ++s) {
             size_t index_co = p * norb3 + q * norb2 + r * norb + s;
             size_t index_dm = r * norb3 + s * norb2 + p * norb + q;
-            energy += 0.5 * h2_bbbb(index_co) * h2_bbbb(index_dm);
+            energy += 0.5 * h2_bbbb(index_co) * rdm2_bbbb(index_dm);
           }
         }
       }
