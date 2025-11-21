@@ -392,8 +392,7 @@ void GDM::gdm_iteration_step_(const RowMajorMatrix& F, RowMajorMatrix& C,
           C.block(num_molecular_orbitals * spin_index, 0,
                   num_molecular_orbitals, num_occupied_orbitals);
       RowMajorMatrix C_occ_pseudo_canonical =
-          C.block(num_molecular_orbitals * spin_index, 0,
-                  num_molecular_orbitals, num_occupied_orbitals);
+          RowMajorMatrix::Zero(num_molecular_orbitals, num_occupied_orbitals);
       blas::gemm("N", "N", num_occupied_orbitals, num_molecular_orbitals,
                  num_occupied_orbitals, 1.0, Uoo_.data(), num_occupied_orbitals,
                  C_occ.data(), num_occupied_orbitals, 0.0,
@@ -403,8 +402,7 @@ void GDM::gdm_iteration_step_(const RowMajorMatrix& F, RowMajorMatrix& C,
           C.block(num_molecular_orbitals * spin_index, num_occupied_orbitals,
                   num_molecular_orbitals, num_virtual_orbitals);
       RowMajorMatrix C_virt_pseudo_canonical =
-          C.block(num_molecular_orbitals * spin_index, num_occupied_orbitals,
-                  num_molecular_orbitals, num_virtual_orbitals);
+          RowMajorMatrix::Zero(num_molecular_orbitals, num_virtual_orbitals);
       blas::gemm("N", "N", num_virtual_orbitals, num_molecular_orbitals,
                  num_virtual_orbitals, 1.0, Uvv_.data(), num_virtual_orbitals,
                  C_virt.data(), num_virtual_orbitals, 0.0,
