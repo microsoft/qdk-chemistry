@@ -8,13 +8,12 @@
 
 #include <Eigen/Dense>
 #include <algorithm>
+#include <blas.hh>
 #include <cmath>
 #include <iostream>
+#include <lapack.hh>
 #include <memory>
 #include <stdexcept>
-
-#include <blas.hh>
-#include <lapack.hh>
 
 namespace qdk::chemistry::scf {
 
@@ -55,8 +54,8 @@ void matrix_exp(const double *m, double *exp_m, int size) {
   auto temp = std::make_unique<double[]>(size * size);
   for (int order = 0; order < s; order++) {
     blas::gemm(blas::Layout::ColMajor, blas::Op::NoTrans, blas::Op::NoTrans,
-               size, size, size, 1.0, exp_scaled_m.get(),
-               size, exp_scaled_m.get(), size, 0.0, temp.get(), size);
+               size, size, size, 1.0, exp_scaled_m.get(), size,
+               exp_scaled_m.get(), size, 0.0, temp.get(), size);
     std::copy(temp.get(), temp.get() + size * size, exp_scaled_m.get());
   }
   std::copy(exp_scaled_m.get(), exp_scaled_m.get() + size * size, exp_m);
@@ -92,8 +91,8 @@ void pade_approximation(const double *x, double *exp_x, int size) {
   Eigen::MatrixXd temp(size, size);
   for (int order = 1; order < 14; order++) {
     blas::gemm(blas::Layout::ColMajor, blas::Op::NoTrans, blas::Op::NoTrans,
-               size, size, size, 1.0, x_matrix.data(), size,
-               x_power.data(), size, 0.0, temp.data(), size);
+               size, size, size, 1.0, x_matrix.data(), size, x_power.data(),
+               size, 0.0, temp.data(), size);
     x_power = temp;
     if (order % 2 == 1) {       // odd order, add to u
       u += b[order] * x_power;  // u += b[order] * x^order

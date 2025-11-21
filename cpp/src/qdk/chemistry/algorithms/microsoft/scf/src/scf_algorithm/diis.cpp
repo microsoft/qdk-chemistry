@@ -21,6 +21,7 @@
 #endif
 
 #include <lapack.hh>
+
 #include "util/macros.h"
 #include "util/timer.h"
 
