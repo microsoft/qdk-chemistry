@@ -371,7 +371,10 @@ CoupledClusterAmplitudes::from_json_file(const std::string& filename) {
   try {
     std::ifstream file(filename);
     if (!file.is_open()) {
-      throw std::runtime_error("Cannot open file for reading: " + filename);
+      throw std::runtime_error(
+          "Unable to open CoupledClusterAmplitudes JSON file '" + filename +
+          "'. Please check that the file exists and you have read "
+          "permissions.");
     }
 
     nlohmann::json j;
@@ -463,16 +466,27 @@ std::shared_ptr<CoupledClusterAmplitudes> CoupledClusterAmplitudes::from_hdf5(
 
 std::shared_ptr<CoupledClusterAmplitudes>
 CoupledClusterAmplitudes::from_hdf5_file(const std::string& filename) {
+  H5::H5File file;
   try {
-    H5::H5File file(filename, H5F_ACC_RDONLY);
+    file.openFile(filename, H5F_ACC_RDONLY);
+  } catch (const H5::Exception& e) {
+    throw std::runtime_error(
+        "Unable to open CoupledClusterAmplitudes HDF5 file '" + filename +
+        "'. " +
+        "Please check that the file exists, is a valid HDF5 file, and you have "
+        "read permissions.");
+  }
+
+  try {
     H5::Group root_group = file.openGroup("/");
     auto result = from_hdf5(root_group);
     root_group.close();
     file.close();
     return result;
   } catch (const H5::Exception& e) {
-    throw std::runtime_error("HDF5 error reading file '" + filename +
-                             "': " + std::string(e.getCDetailMsg()));
+    throw std::runtime_error(
+        "Unable to read CoupledClusterAmplitudes data from HDF5 file '" +
+        filename + "'. " + "HDF5 error: " + std::string(e.getCDetailMsg()));
   }
 }
 
