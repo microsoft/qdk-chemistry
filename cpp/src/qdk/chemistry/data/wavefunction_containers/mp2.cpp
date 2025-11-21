@@ -63,7 +63,7 @@ const MP2Container::DeterminantVector& MP2Container::get_active_determinants()
       "get_active_determinants() is not implemented for MP2 wavefunctions.");
 }
 
-void MP2Container::compute_t1_amplitudes() const {
+void MP2Container::_compute_t1_amplitudes() const {
   // Check if T1 amplitudes are already computed
   if (_t1_amplitudes_aa && _t1_amplitudes_bb) {
     return;
@@ -91,7 +91,7 @@ void MP2Container::compute_t1_amplitudes() const {
   _t1_amplitudes_bb = std::make_shared<VectorVariant>(t1_bb_vec);
 }
 
-void MP2Container::compute_t2_amplitudes() const {
+void MP2Container::_compute_t2_amplitudes() const {
   // Check if amplitudes are already computed
   if (_t2_amplitudes_abab && _t2_amplitudes_aaaa && _t2_amplitudes_bbbb) {
     return;
@@ -203,7 +203,7 @@ std::pair<const MP2Container::VectorVariant&,
           const MP2Container::VectorVariant&>
 MP2Container::get_t1_amplitudes() const {
   if (!_t1_amplitudes_aa) {
-    compute_t1_amplitudes();
+    _compute_t1_amplitudes();
   }
 
   return std::make_pair(std::cref(*_t1_amplitudes_aa),
@@ -215,7 +215,7 @@ std::tuple<const MP2Container::VectorVariant&,
            const MP2Container::VectorVariant&>
 MP2Container::get_t2_amplitudes() const {
   if (!_t2_amplitudes_abab) {
-    compute_t2_amplitudes();
+    _compute_t2_amplitudes();
   }
 
   return std::make_tuple(std::cref(*_t2_amplitudes_abab),

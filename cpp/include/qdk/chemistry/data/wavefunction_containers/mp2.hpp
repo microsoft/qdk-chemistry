@@ -244,11 +244,11 @@ class MP2Container : public WavefunctionContainer {
   /**
    * @brief Compute T1 amplitudes from Hamiltonian
    */
-  void compute_t1_amplitudes() const;
+  void _compute_t1_amplitudes() const;
 
   /**
    * @brief Compute T2 amplitudes from Hamiltonian
    */
-  void compute_t2_amplitudes() const;
+  void _compute_t2_amplitudes() const;
 };
 }  // namespace qdk::chemistry::data

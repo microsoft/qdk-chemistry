@@ -25,13 +25,11 @@ namespace qdk::chemistry::algorithms {
  * wavefunction that contains information like amplitudes and RDMs, if
  * requested. Note that the default behavior is to NOT store the amplitudes and
  * RDMs since they are memory-heavy. In this case, the wavefunction is a minimal
- * object. For more details, @see MP2Calculator and @see
- * CoupledClusterCalculator.
+ * object. For more details, @see MP2Calculator.
  *
  * @see data::Ansatz
  * @see data::Wavefunction
  * @see MP2Calculator
- * @see CoupledClusterCalculator
  */
 class ReferenceDerivedCalculator
     : public Algorithm<ReferenceDerivedCalculator,
