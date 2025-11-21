@@ -27,8 +27,9 @@ namespace qdk::chemistry::data {
  * @brief Type-safe variant for storing different setting value types
  *
  * This variant can hold common types used in settings configurations.
- * Note: All integer types are stored internally as int64_t (signed) or uint64_t (unsigned)
- * for simplicity. Other integer types can be requested via get() with automatic conversion.
+ * Note: All integer types are stored internally as int64_t (signed) or uint64_t
+ * (unsigned) for simplicity. Other integer types can be requested via get()
+ * with automatic conversion.
  */
 using SettingValue =
     std::variant<bool, int64_t, uint64_t, float, double, std::string,
@@ -91,9 +92,10 @@ class SettingTypeMismatch : public std::runtime_error {
  *     }
  *
  *     // Convenience getters with validation (optional)
- *     int32_t get_max_iterations() const { return get<int32_t>("max_iterations"); }
- *     double get_tolerance() const { return get<double>("tolerance"); }
- *     std::string get_method() const { return get<std::string>("method"); }
+ *     int32_t get_max_iterations() const { return
+ * get<int32_t>("max_iterations"); } double get_tolerance() const { return
+ * get<double>("tolerance"); } std::string get_method() const { return
+ * get<std::string>("method"); }
  *
  *     // After construction, only existing settings can be modified
  *     void set_max_iterations(int32_t value) { set("max_iterations", value); }
@@ -162,11 +164,11 @@ class Settings : public DataClass,
     if (it == settings_.end()) {
       throw SettingNotFound(key);
     }
-    
+
     // If the type is directly in the variant, use it as-is
     if constexpr (is_variant_member<T, SettingValue>::value) {
       settings_[key] = value;
-    } 
+    }
     // Handle integral types - store as int64_t (signed) or uint64_t (unsigned)
     else if constexpr (std::is_integral_v<T> && !std::is_same_v<T, bool>) {
       if constexpr (std::is_signed_v<T>) {
@@ -175,7 +177,8 @@ class Settings : public DataClass,
         settings_[key] = static_cast<uint64_t>(value);
       }
     }
-    // Handle integer vector types - convert to appropriate signed/unsigned vector
+    // Handle integer vector types - convert to appropriate signed/unsigned
+    // vector
     else if constexpr (std::is_same_v<T, std::vector<int>> ||
                        std::is_same_v<T, std::vector<int32_t>> ||
                        std::is_same_v<T, std::vector<long>> ||
@@ -187,12 +190,11 @@ class Settings : public DataClass,
         int64_vec.push_back(static_cast<int64_t>(v));
       }
       settings_[key] = int64_vec;
-    }
-    else if constexpr (std::is_same_v<T, std::vector<uint32_t>> ||
-                       std::is_same_v<T, std::vector<unsigned int>> ||
-                       std::is_same_v<T, std::vector<unsigned long>> ||
-                       std::is_same_v<T, std::vector<unsigned long long>> ||
-                       std::is_same_v<T, std::vector<size_t>>) {
+    } else if constexpr (std::is_same_v<T, std::vector<uint32_t>> ||
+                         std::is_same_v<T, std::vector<unsigned int>> ||
+                         std::is_same_v<T, std::vector<unsigned long>> ||
+                         std::is_same_v<T, std::vector<unsigned long long>> ||
+                         std::is_same_v<T, std::vector<size_t>>) {
       // Unsigned integer vectors -> vector<uint64_t>
       std::vector<uint64_t> uint64_vec;
       uint64_vec.reserve(value.size());
@@ -200,8 +202,7 @@ class Settings : public DataClass,
         uint64_vec.push_back(static_cast<uint64_t>(v));
       }
       settings_[key] = uint64_vec;
-    }
-    else {
+    } else {
       settings_[key] = value;
     }
   }
@@ -264,7 +265,8 @@ class Settings : public DataClass,
     // Handle vector<int> and other integer vector conversions
     else if constexpr (is_vector<T>::value) {
       using ElementType = typename T::value_type;
-      if constexpr (std::is_integral_v<ElementType> && !std::is_same_v<ElementType, bool>) {
+      if constexpr (std::is_integral_v<ElementType> &&
+                    !std::is_same_v<ElementType, bool>) {
         // Try signed vector first (vector<int64_t>)
         if (std::holds_alternative<std::vector<int64_t>>(it->second)) {
           const auto& vec64 = std::get<std::vector<int64_t>>(it->second);
@@ -295,8 +297,7 @@ class Settings : public DataClass,
         }
       }
       throw SettingTypeMismatch(key, typeid(T).name());
-    }
-    else {
+    } else {
       throw SettingTypeMismatch(key, typeid(T).name());
     }
   }
@@ -344,8 +345,7 @@ class Settings : public DataClass,
         // Conversion failed or would lose data
       }
       return default_value;
-    }
-    else {
+    } else {
       return default_value;
     }
   }
@@ -634,8 +634,9 @@ class Settings : public DataClass,
       // If the type is directly in the variant, use it as-is
       if constexpr (is_variant_member<T, SettingValue>::value) {
         settings_[key] = value;
-      } 
-      // Handle integral types - store as int64_t (signed) or uint64_t (unsigned)
+      }
+      // Handle integral types - store as int64_t (signed) or uint64_t
+      // (unsigned)
       else if constexpr (std::is_integral_v<T> && !std::is_same_v<T, bool>) {
         if constexpr (std::is_signed_v<T>) {
           settings_[key] = static_cast<int64_t>(value);
@@ -643,7 +644,8 @@ class Settings : public DataClass,
           settings_[key] = static_cast<uint64_t>(value);
         }
       }
-      // Handle integer vector types - convert to appropriate signed/unsigned vector
+      // Handle integer vector types - convert to appropriate signed/unsigned
+      // vector
       else if constexpr (std::is_same_v<T, std::vector<int>> ||
                          std::is_same_v<T, std::vector<int32_t>> ||
                          std::is_same_v<T, std::vector<long>> ||
@@ -655,12 +657,11 @@ class Settings : public DataClass,
           int64_vec.push_back(static_cast<int64_t>(v));
         }
         settings_[key] = int64_vec;
-      }
-      else if constexpr (std::is_same_v<T, std::vector<uint32_t>> ||
-                         std::is_same_v<T, std::vector<unsigned int>> ||
-                         std::is_same_v<T, std::vector<unsigned long>> ||
-                         std::is_same_v<T, std::vector<unsigned long long>> ||
-                         std::is_same_v<T, std::vector<size_t>>) {
+      } else if constexpr (std::is_same_v<T, std::vector<uint32_t>> ||
+                           std::is_same_v<T, std::vector<unsigned int>> ||
+                           std::is_same_v<T, std::vector<unsigned long>> ||
+                           std::is_same_v<T, std::vector<unsigned long long>> ||
+                           std::is_same_v<T, std::vector<size_t>>) {
         // Unsigned integer vectors -> vector<uint64_t>
         std::vector<uint64_t> uint64_vec;
         uint64_vec.reserve(value.size());
@@ -668,8 +669,7 @@ class Settings : public DataClass,
           uint64_vec.push_back(static_cast<uint64_t>(v));
         }
         settings_[key] = uint64_vec;
-      }
-      else {
+      } else {
         settings_[key] = value;
       }
     }
@@ -772,7 +772,8 @@ class Settings : public DataClass,
     if constexpr (is_variant_member<T, SettingValue>::value) {
       return true;
     } else if constexpr (std::is_integral_v<T> && !std::is_same_v<T, bool>) {
-      // Allow other integral types that can be safely converted to int64_t/uint64_t
+      // Allow other integral types that can be safely converted to
+      // int64_t/uint64_t
       return true;
     } else if constexpr (std::is_same_v<T, std::vector<int>> ||
                          std::is_same_v<T, std::vector<int32_t>> ||
@@ -783,7 +784,8 @@ class Settings : public DataClass,
                          std::is_same_v<T, std::vector<unsigned long>> ||
                          std::is_same_v<T, std::vector<unsigned long long>> ||
                          std::is_same_v<T, std::vector<size_t>>) {
-      // Allow integer vector types that can be converted to vector<int64_t> or vector<uint64_t>
+      // Allow integer vector types that can be converted to vector<int64_t> or
+      // vector<uint64_t>
       return true;
     } else {
       return false;

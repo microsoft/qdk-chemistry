@@ -360,7 +360,8 @@ SettingValue Settings::convert_json_to_setting_value(
     return json_obj.get<std::string>();
   } else if (json_obj.is_array()) {
     if (json_obj.empty()) {
-      return std::vector<int64_t>();  // Default to int64_t vector for empty arrays
+      return std::vector<int64_t>();  // Default to int64_t vector for empty
+                                      // arrays
     }
 
     // Check the type of the first element to determine vector type
@@ -477,30 +478,30 @@ void Settings::save_setting_value_to_hdf5(H5::Group& group,
           if (!variant_value.empty()) {
             hsize_t dims[1] = {variant_value.size()};
             H5::DataSpace dataspace(1, dims);
-            H5::DataSet dataset =
-                group.createDataSet(name, H5::PredType::NATIVE_INT64, dataspace);
+            H5::DataSet dataset = group.createDataSet(
+                name, H5::PredType::NATIVE_INT64, dataspace);
             dataset.write(variant_value.data(), H5::PredType::NATIVE_INT64);
           } else {
             // Handle empty vector
             hsize_t dims[1] = {0};
             H5::DataSpace dataspace(1, dims);
-            H5::DataSet dataset =
-                group.createDataSet(name, H5::PredType::NATIVE_INT64, dataspace);
+            H5::DataSet dataset = group.createDataSet(
+                name, H5::PredType::NATIVE_INT64, dataspace);
           }
 
         } else if constexpr (std::is_same_v<ValueType, std::vector<uint64_t>>) {
           if (!variant_value.empty()) {
             hsize_t dims[1] = {variant_value.size()};
             H5::DataSpace dataspace(1, dims);
-            H5::DataSet dataset =
-                group.createDataSet(name, H5::PredType::NATIVE_UINT64, dataspace);
+            H5::DataSet dataset = group.createDataSet(
+                name, H5::PredType::NATIVE_UINT64, dataspace);
             dataset.write(variant_value.data(), H5::PredType::NATIVE_UINT64);
           } else {
             // Handle empty vector
             hsize_t dims[1] = {0};
             H5::DataSpace dataspace(1, dims);
-            H5::DataSet dataset =
-                group.createDataSet(name, H5::PredType::NATIVE_UINT64, dataspace);
+            H5::DataSet dataset = group.createDataSet(
+                name, H5::PredType::NATIVE_UINT64, dataspace);
           }
 
         } else if constexpr (std::is_same_v<ValueType, std::vector<double>>) {
@@ -841,7 +842,8 @@ SettingValue Settings::load_setting_value_from_hdf5(H5::Group& group,
         return uint64_value;
       }
     } else {
-      // Vector of integers - return signed or unsigned vector based on signedness
+      // Vector of integers - return signed or unsigned vector based on
+      // signedness
       if (is_signed) {
         std::vector<int64_t> int_vector(dims[0]);
         if (dims[0] > 0) {

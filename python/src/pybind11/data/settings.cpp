@@ -114,8 +114,7 @@ SettingValue python_to_setting_value_with_type(const py::object &obj,
     } else if (expected_type == "int") {
       if (!py::isinstance<py::int_>(obj) || py::isinstance<py::bool_>(obj)) {
         throw SettingTypeMismatch(
-            key,
-            "int (got " + std::string(py::str(py::type::of(obj))) + ")");
+            key, "int (got " + std::string(py::str(py::type::of(obj))) + ")");
       }
       long long value = obj.cast<long long>();
       if (value < INT_MIN || value > INT_MAX) {
@@ -138,8 +137,8 @@ SettingValue python_to_setting_value_with_type(const py::object &obj,
       }
       int64_t value = obj.cast<long long>();
       if (value < 0) {
-        throw SettingTypeMismatch(key, "uint64_t (cannot be negative, got " + 
-                                     std::to_string(value) + ")");
+        throw SettingTypeMismatch(key, "uint64_t (cannot be negative, got " +
+                                           std::to_string(value) + ")");
       }
       return static_cast<uint64_t>(value);
     } else if (expected_type == "float") {
