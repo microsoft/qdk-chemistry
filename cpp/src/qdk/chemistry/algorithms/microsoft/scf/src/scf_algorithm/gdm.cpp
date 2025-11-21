@@ -117,17 +117,13 @@ class GDM {
                            RowMajorMatrix& P, const int spin_index,
                            const double scf_total_energy,
                            const double occupation_factor);
-
-  /// Numerical tolerance for avoiding division by zero
-  static constexpr double EPSILON = 1.0e-8;
-
   /// Reference to SCFContext
   const SCFContext& ctx_;  ///< Reference to SCFContext
   /// Energy change from the last step
   double delta_energy_ = std::numeric_limits<double>::infinity();
 
   /// Energy increase threshold for GDM step size rescaling
-  static constexpr double rescale_kappa_denergy_threshold_ = 5e-4;
+  double rescale_kappa_denergy_threshold_ = 5e-4;
 
   /// Number of electrons for alpha (0) and beta (1) spins
   std::vector<int> num_electrons_;
@@ -290,6 +286,8 @@ void GDM::gdm_iteration_step_(const RowMajorMatrix& F, RowMajorMatrix& C,
                               RowMajorMatrix& P, const int spin_index,
                               const double scf_total_energy,
                               const double occupation_factor) {
+  // Numerical tolerance for avoiding division by zero
+  static constexpr double denominator_min_limit = 1.0e-14;
   // Compute gradient vector
   const int num_molecular_orbitals = C.cols();
   const int num_occupied_orbitals = num_electrons_[spin_index];
@@ -423,14 +421,14 @@ void GDM::gdm_iteration_step_(const RowMajorMatrix& F, RowMajorMatrix& C,
         // Hessian index is iv = i * (num_molecular_orbitals -
         // num_occupied_orbitals) + v
         for (int v = 0; v < num_virtual_orbitals; v++) {
-          const double pseudo_canonical_energy_diff = std::max(
+          double pseudo_canonical_energy_diff = std::max(
               pseudo_canonical_eigenvalues_(num_occupied_orbitals + v) -
                   pseudo_canonical_eigenvalues_(i),
-              GDM::EPSILON);
-          const double sqrt_initial_hessian_diag_entry = std::sqrt(
-              2.0 * (pseudo_canonical_energy_diff + std::abs(delta_energy_)));
+              0.0);
+          double sqrt_initial_hessian_diag_entry = sqrt(
+              2.0 * (std::abs(delta_energy_) + pseudo_canonical_energy_diff));
           sqrt_initial_hessian(i * num_virtual_orbitals + v) =
-              sqrt_initial_hessian_diag_entry;
+              std::max(sqrt_initial_hessian_diag_entry, denominator_min_limit);
         }
       }
 
@@ -480,8 +478,9 @@ void GDM::gdm_iteration_step_(const RowMajorMatrix& F, RowMajorMatrix& C,
           const auto& s_k = scaled_history_kappa.row(i);
           const auto& y_k = scaled_history_dgrad.row(i);
 
-          double sy_dot =
-              s_k.dot(y_k) > GDM::EPSILON ? s_k.dot(y_k) : GDM::EPSILON;
+          double sy_dot = s_k.dot(y_k) > denominator_min_limit
+                              ? s_k.dot(y_k)
+                              : denominator_min_limit;
           rho_values.push_back(1.0 / sy_dot);
         }
 
@@ -512,11 +511,12 @@ void GDM::gdm_iteration_step_(const RowMajorMatrix& F, RowMajorMatrix& C,
         kappa_[spin_index](index) =
             scaled_kappa_vector(index) / sqrt_initial_hessian(index);
       }
-      const double kappa_norm = kappa_[spin_index].norm();
-      if (kappa_norm > 10.0) {
-        spdlog::warn("Kappa norm is too large ({}), scaling down to 10.0",
-                     kappa_norm);
-        kappa_[spin_index] = kappa_[spin_index] / kappa_norm * 10.0;
+      double kappa_norm = kappa_[spin_index].norm();
+      double kappa_norm_limit = 10.0;
+      if (kappa_norm > kappa_norm_limit) {
+        spdlog::warn("Kappa norm is too large ({}), scaling down to {}",
+                     kappa_norm, kappa_norm_limit);
+        kappa_[spin_index] = kappa_[spin_index] / kappa_norm * kappa_norm_limit;
       }
 
       history_kappa_[spin_index].row(history_size_[spin_index]) =
