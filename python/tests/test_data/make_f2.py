@@ -15,7 +15,9 @@ if __name__ == "__main__":
     hf = create("scf_solver", "qdk", method="hf", basis_set="def2-svp")
     hf_energy, hf_wfn = hf.run(f2, 0, 1)
 
-    print("HF energy and determinant:", hf_energy, hf_wfn.get_active_num_electrons(), hf_wfn.get_determinants()[0])
+    print(
+        "HF energy and determinant:", hf_energy, hf_wfn.get_active_num_electrons(), hf_wfn.get_active_determinants()[0]
+    )
 
     active_space_orbitals = Orbitals(
         hf_wfn.get_orbitals().get_coefficients()[0],
@@ -45,6 +47,6 @@ if __name__ == "__main__":
     print("PMC energy:", pmc_energy)
     print("PMC correction:", pmc_energy - active_space_h.get_core_energy())
     print("Leading configurations and coefficients:")
-    for det, coeff in zip(pmc_wfn.get_determinants(), pmc_wfn.get_coefficients(), strict=True):
+    for det, coeff in zip(pmc_wfn.get_active_determinants(), pmc_wfn.get_coefficients(), strict=True):
         if abs(coeff) > 0.001:
             print(det, coeff)

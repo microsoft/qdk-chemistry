@@ -288,7 +288,7 @@ class TestAnsatzSerialization:
         mol = Structure([[0.0, 0.0, 0.0], [0.0, 0.0, 4.0]], ["O", "O"])
         # get scf energy and wfn
         scf = algorithms.create("scf_solver", "pyscf")
-        scf.settings().set("force_restricted", True)
+        scf.settings().set("scf_type", "restricted")
         scf.settings().set("basis_set", "cc-pvdz")
         e_scf, hf_wfn = scf.run(mol, 0, 3)
         # get hamiltonian
