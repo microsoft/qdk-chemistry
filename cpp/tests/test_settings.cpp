@@ -253,7 +253,7 @@ TEST_F(SettingsTest, SetAndGetVariantTypes) {
   auto string_variant = settings.get("string_val");
 
   EXPECT_TRUE(std::get<bool>(bool_variant));
-  EXPECT_EQ(std::get<int>(int_variant), 42);
+  EXPECT_EQ(std::get<int64_t>(int_variant), 42);
   EXPECT_EQ(std::get<std::string>(string_variant), "hello");
 
   // Test template interface still works
@@ -319,8 +319,8 @@ TEST_F(SettingsTest, GetOrDefaultVariant) {
   auto result1 = settings.get_or_default("existing_key", SettingValue(999));
   auto result2 = settings.get_or_default("nonexistent_key", SettingValue(999));
 
-  EXPECT_EQ(std::get<int>(result1), 42);
-  EXPECT_EQ(std::get<int>(result2), 999);
+  EXPECT_EQ(std::get<int64_t>(result1), 42);
+  EXPECT_EQ(std::get<int64_t>(result2), 999);
 
   // Test template interface still works
   EXPECT_EQ(settings.get_or_default("existing_key", 999), 42);

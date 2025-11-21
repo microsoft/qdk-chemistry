@@ -3,6 +3,7 @@
 // license information.
 
 #include <qdk/chemistry/scf/util/libint2_util.h>
+#include <qdk/chemistry/utils/omp_utils.hpp>
 
 namespace qdk::chemistry::scf::libint2_util {
 

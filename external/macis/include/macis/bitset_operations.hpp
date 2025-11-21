@@ -193,25 +193,30 @@ std::bitset<N> full_mask(size_t i) {
  *  @returns FFS for `bits`
  */
 template <size_t N>
-uint32_t ffs(std::bitset<N> bits) {
+uint32_t ffs(const std::bitset<N>& bits) {
   if constexpr (N <= 32)
     return ffsl(fast_to_ulong(bits));
   else if constexpr (N <= 64)
     return ffsll(fast_to_ullong(bits));
-  else if constexpr (N % 64 == 0) {
-    auto as_words = reinterpret_cast<uint64_t*>(&bits);
-    constexpr int n_words = N / 64;
-    int off = 0;
-    for (int i = 0; i < n_words; ++i) {
-      if (as_words[i]) return ffsll(as_words[i]) + off;
-      off += 64;
+  else if constexpr (N <= 128) {
+    // For 128-bit, check low 64 bits then high 64 bits
+    std::bitset<64> low_bits;
+    std::bitset<64> high_bits;
+    for (size_t i = 0; i < 64; ++i) {
+      low_bits[i] = bits[i];
+      if (i < N - 64) high_bits[i] = bits[i + 64];
     }
+    auto low_result = ffsll(fast_to_ullong(low_bits));
+    if (low_result) return low_result;
+    auto high_result = ffsll(fast_to_ullong(high_bits));
+    if (high_result) return high_result + 64;
     return 0;
   } else {
+    // For N > 128, use bit-by-bit search
     uint32_t ind = 0;
     for (ind = 0; ind < N; ++ind)
       if (bits[ind]) return (ind + 1);
-    return ind;
+    return 0;
   }
   abort();
 }
