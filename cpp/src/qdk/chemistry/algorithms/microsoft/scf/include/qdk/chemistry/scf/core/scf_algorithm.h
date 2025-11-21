@@ -104,7 +104,7 @@ class SCFAlgorithm {
   /**
    * @brief Calculate orbital gradient (OG) error for convergence checking
    *
-   * This static method calculates the orbital gradient error in the atomic
+   * This method calculates the orbital gradient error in the atomic
    * orbital basis using the formula: error = FPS - SPF, where F is the Fock
    * matrix, P is the density matrix, and S is the overlap matrix.
    *

@@ -117,8 +117,7 @@ std::pair<double, std::shared_ptr<data::Wavefunction>> ScfSolver::_run_impl(
     ms_scf_config->eri.eri_threshold =
         convergence_threshold * eri_threshold_multiplier;
   }
-  ms_scf_config->eri.deterministic_addition =
-      _settings->get<bool>("eri_deterministic_addition");
+  ms_scf_config->eri.use_atomics = _settings->get<bool>("eri_use_atomics");
   ms_scf_config->k_eri = ms_scf_config->eri;
   ms_scf_config->grad_eri = ms_scf_config->eri;
 

@@ -216,10 +216,9 @@ class ERI {
    * @note Construction involves significant overhead due to screening setup
    * @note Shell pair and Schwarz data is computed using OpenMP parallelization
    */
-  ERI(bool unr, qdk::chemistry::scf::BasisSet& basis_set,
-      bool deterministic_addition)
+  ERI(bool unr, qdk::chemistry::scf::BasisSet& basis_set, bool use_atomics)
       : unrestricted_(unr),
-        use_thread_local_buffers_(deterministic_addition),
+        use_thread_local_buffers_(!use_atomics),
         obs_(libint2_util::convert_to_libint_basisset(basis_set)) {
     shell2bf_ = obs_.shell2bf();
 
@@ -410,7 +409,7 @@ class ERI {
                           if (use_thread_local_buffers_) {
                             J_cur[bf3 * num_basis_funcs + bf4] += P_ij * value;
                           } else {
-#pragma omp atomic update
+#pragma omp atomic update relaxed
                             J_cur[bf3 * num_basis_funcs + bf4] += P_ij * value;
                           }
 
@@ -421,7 +420,7 @@ class ERI {
                       if (use_thread_local_buffers_) {
                         J_cur[bf1 * num_basis_funcs + bf2] += J_ij;
                       } else {
-#pragma omp atomic update
+#pragma omp atomic update relaxed
                         J_cur[bf1 * num_basis_funcs + bf2] += J_ij;
                       }
                     }  // j
@@ -462,9 +461,9 @@ class ERI {
                             K_cur[bf1 * num_basis_funcs + bf4] += P_jk * value;
                             K_cur[bf2 * num_basis_funcs + bf4] += P_ik * value;
                           } else {
-#pragma omp atomic update
+#pragma omp atomic update relaxed
                             K_cur[bf1 * num_basis_funcs + bf4] += P_jk * value;
-#pragma omp atomic update
+#pragma omp atomic update relaxed
                             K_cur[bf2 * num_basis_funcs + bf4] += P_ik * value;
                           }
 
@@ -475,9 +474,9 @@ class ERI {
                           K_cur[bf1 * num_basis_funcs + bf3] += K_ik;
                           K_cur[bf2 * num_basis_funcs + bf3] += K_jk;
                         } else {
-#pragma omp atomic update
+#pragma omp atomic update relaxed
                           K_cur[bf1 * num_basis_funcs + bf3] += K_ik;
-#pragma omp atomic update
+#pragma omp atomic update relaxed
                           K_cur[bf2 * num_basis_funcs + bf3] += K_jk;
                         }
                       }  // k
@@ -705,7 +704,7 @@ class ERI {
                         if (use_thread_local_buffers_) {
                           out_thread[idx1] += C[bf4 * nt + p] * value * s12_deg;
                         } else {
-#pragma omp atomic update
+#pragma omp atomic update relaxed
                           out[idx1] += C[bf4 * nt + p] * value * s12_deg;
                         }
 
@@ -719,7 +718,7 @@ class ERI {
                             out_thread[idx2] +=
                                 C[bf3 * nt + p] * value * s12_deg;
                           } else {
-#pragma omp atomic update
+#pragma omp atomic update relaxed
                             out[idx2] += C[bf3 * nt + p] * value * s12_deg;
                           }
                         }
@@ -731,7 +730,7 @@ class ERI {
                         if (use_thread_local_buffers_) {
                           out_thread[idx3] += C[bf2 * nt + p] * value * s34_deg;
                         } else {
-#pragma omp atomic update
+#pragma omp atomic update relaxed
                           out[idx3] += C[bf2 * nt + p] * value * s34_deg;
                         }
 
@@ -744,7 +743,7 @@ class ERI {
                             out_thread[idx4] +=
                                 C[bf1 * nt + p] * value * s34_deg;
                           } else {
-#pragma omp atomic update
+#pragma omp atomic update relaxed
                             out[idx4] += C[bf1 * nt + p] * value * s34_deg;
                           }
                         }
@@ -811,10 +810,10 @@ class ERI {
 }  // namespace libint2::direct
 
 LIBINT2_DIRECT::LIBINT2_DIRECT(bool unr, BasisSet& basis_set,
-                               ParallelConfig _mpi, bool deterministic_addition)
+                               ParallelConfig _mpi, bool use_atomics)
     : ERI(unr, 0.0, basis_set, _mpi),
-      eri_impl_(libint2::direct::ERI::make_libint2_direct_eri(
-          unr, basis_set, deterministic_addition)) {
+      eri_impl_(libint2::direct::ERI::make_libint2_direct_eri(unr, basis_set,
+                                                              use_atomics)) {
   if (_mpi.world_size > 1) throw std::runtime_error("LIBINT2_DIRECT + MPI NYI");
 }
 
