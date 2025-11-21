@@ -326,7 +326,7 @@ jobs:
         make clean all
         MAKE_EXIT_CODE=$?
         set -e
-        
+
         if [ $MAKE_EXIT_CODE -ne 0 ]; then
           echo "=== Documentation build failed ==="
           echo "=== Contents of all .txt output files ==="
