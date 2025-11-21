@@ -360,7 +360,7 @@ TEST_F(SlaterdeterminantTest, OpenShellReducedDensityMatrices) {
 }
 
 // Test 1- and 2-RDM for non Aufbau determinants
-TEST_F(SlaterdeterminantTest, NonContinuosDeterminantReducedDensityMatrices) {
+TEST_F(SlaterdeterminantTest, NonContinuousDeterminantReducedDensityMatrices) {
   // get slater determinant
   size_t norb = 12;
   auto orbitals = testing::create_test_orbitals(norb, norb, true);
@@ -413,4 +413,22 @@ TEST_F(SlaterdeterminantTest, NonContinuosDeterminantReducedDensityMatrices) {
   for (size_t i = 0; i < two_rdm.size(); ++i) {
     EXPECT_NEAR(two_rdm(i), sum_two_rdm(i), testing::numerical_zero_tolerance);
   }
+}
+
+// Test entropies
+TEST_F(SlaterdeterminantTest, EntropiesTest) {
+  // get slater determinant
+  size_t norb = 12;
+  auto orbitals = testing::create_test_orbitals(norb, norb, true);
+  Configuration det("2ud0200u0u2d");
+  SlaterDeterminantContainer sd(det, orbitals);
+  sd.get_active_one_rdm_spin_dependent();
+  auto [aabb, aaaa, bbbb] = sd.get_active_two_rdm_spin_dependent();
+
+  // get entropies
+  auto s1 = sd.get_single_orbital_entropies();
+
+  // Expected entropies are all zero for single determinant
+  Eigen::VectorXd expected_s1 = Eigen::VectorXd::Zero(norb);
+  EXPECT_TRUE(s1.isApprox(expected_s1, testing::numerical_zero_tolerance));
 }
