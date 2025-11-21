@@ -403,12 +403,12 @@ class BasisSet : public DataClass,
   /**
    * @brief Get the shell index and magnetic quantum number for a atomic orbital
    * index
-   * @param atomic_orbiral_index Index of the atomic orbital
+   * @param atomic_orbital_index Index of the atomic orbital
    * @return Pair containing (shell_index, magnetic_quantum_number)
    * @throws std::out_of_range if index is invalid
    */
   std::pair<size_t, int> get_atomic_orbital_info(
-      size_t atomic_orbiral_index) const;
+      size_t atomic_orbital_index) const;
 
   /**
    * @brief Get number of atomic orbitals (total from all shells)
@@ -420,7 +420,7 @@ class BasisSet : public DataClass,
    * @brief Get the atom index for a atomic orbital
    * @param contracted_atomic_orbital_index Index of the atomic orbital
    * @return Index of the atom this atomic orbital belongs to
-   * @throws std::out_of_range if atomic_orbiral_index is invalid
+   * @throws std::out_of_range if atomic_orbital_index is invalid
    */
   size_t get_atom_index_for_atomic_orbital(
       size_t contracted_atomic_orbital_index) const;
@@ -668,11 +668,11 @@ class BasisSet : public DataClass,
   /**
    * @brief Convert atomic orbital index to shell index and magnetic quantum
    * number
-   * @param atomic_orbiral_index Global atomic orbital index
+   * @param atomic_orbital_index Global atomic orbital index
    * @return Pair of (shell_index, magnetic_quantum_number)
    */
   std::pair<size_t, int> basis_to_shell_index(
-      size_t atomic_orbiral_index) const;
+      size_t atomic_orbital_index) const;
 
   /**
    * @brief Convert basis type to string
@@ -753,10 +753,10 @@ class BasisSet : public DataClass,
 
   /**
    * @brief Validate atomic orbital index
-   * @param atomic_orbiral_index Index to validate
+   * @param atomic_orbital_index Index to validate
    * @throws std::out_of_range if index is invalid
    */
-  void _validate_atomic_orbiral_index(size_t atomic_orbiral_index) const;
+  void _validate_atomic_orbital_index(size_t atomic_orbital_index) const;
 
   /**
    * @brief Validate shell index

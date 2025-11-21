@@ -96,7 +96,7 @@ std::shared_ptr<data::Wavefunction> VVHVLocalizer::_run_impl(
         "identical");
   }
   const auto& basis_set = orbitals->get_basis_set();
-  const size_t num_atomic_orbitals = orbitals->get_num_atomic_orbitals();
+  const size_t num_atomic_orbitals = basis_set->get_num_atomic_orbitals();
   if (num_atomic_orbitals != num_molecular_orbitals) {
     throw std::runtime_error(
         "Current VVHVLocalizer can not handle basis set linear dependence");
@@ -116,7 +116,6 @@ std::shared_ptr<data::Wavefunction> VVHVLocalizer::_run_impl(
   // Work Item: 41816
   // Create reusable Pipek-Mezey localizer for inner localization
   const size_t num_atoms = basis_set->get_structure()->get_num_atoms();
-  const size_t num_atomic_orbitals = basis_set->get_num_atomic_orbitals();
   std::vector<int> bf_to_atom(num_atomic_orbitals);
   for (size_t i = 0; i < num_atomic_orbitals; ++i) {
     bf_to_atom[i] = basis_set->get_atom_index_for_basis_function(i);

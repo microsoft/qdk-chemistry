@@ -380,9 +380,9 @@ size_t BasisSet::get_num_ecp_shells() const {
 bool BasisSet::has_ecp_shells() const { return get_num_ecp_shells() > 0; }
 
 std::pair<size_t, int> BasisSet::get_atomic_orbital_info(
-    size_t atomic_orbiral_index) const {
-  _validate_atomic_orbiral_index(atomic_orbiral_index);
-  return basis_to_shell_index(atomic_orbiral_index);
+    size_t atomic_orbital_index) const {
+  _validate_atomic_orbital_index(atomic_orbital_index);
+  return basis_to_shell_index(atomic_orbital_index);
 }
 
 size_t BasisSet::get_num_atomic_orbitals() const {
@@ -393,13 +393,13 @@ size_t BasisSet::get_num_atomic_orbitals() const {
 }
 
 size_t BasisSet::get_atom_index_for_atomic_orbital(
-    size_t atomic_orbiral_index) const {
+    size_t atomic_orbital_index) const {
   if (!_cache_valid) {
     _compute_mappings();
   }
 
-  _validate_atomic_orbiral_index(atomic_orbiral_index);
-  return _basis_to_atom_map[atomic_orbiral_index];
+  _validate_atomic_orbital_index(atomic_orbital_index);
+  return _basis_to_atom_map[atomic_orbital_index];
 }
 
 std::vector<size_t> BasisSet::get_atomic_orbital_indices_for_atom(
@@ -1736,11 +1736,11 @@ void BasisSet::_compute_mappings() const {
   _cache_valid = true;
 }
 
-void BasisSet::_validate_atomic_orbiral_index(
-    size_t atomic_orbiral_index) const {
-  if (atomic_orbiral_index >= get_num_atomic_orbitals()) {
+void BasisSet::_validate_atomic_orbital_index(
+    size_t atomic_orbital_index) const {
+  if (atomic_orbital_index >= get_num_atomic_orbitals()) {
     throw std::out_of_range("atomic orbital index " +
-                            std::to_string(atomic_orbiral_index) +
+                            std::to_string(atomic_orbital_index) +
                             " is out of range. Maximum index: " +
                             std::to_string(get_num_atomic_orbitals() - 1));
   }
@@ -1763,14 +1763,14 @@ void BasisSet::_validate_atom_index(size_t atom_index) const {
 }
 
 std::pair<size_t, int> BasisSet::basis_to_shell_index(
-    size_t atomic_orbiral_index) const {
+    size_t atomic_orbital_index) const {
   if (!_cache_valid) {
     _compute_mappings();
   }
 
-  _validate_atomic_orbiral_index(atomic_orbiral_index);
+  _validate_atomic_orbital_index(atomic_orbital_index);
 
-  size_t shell_index = _basis_to_shell_map[atomic_orbiral_index];
+  size_t shell_index = _basis_to_shell_map[atomic_orbital_index];
 
   // Find the offset within the shell to compute magnetic quantum number
   size_t basis_offset_in_shell = 0;
@@ -1783,7 +1783,7 @@ std::pair<size_t, int> BasisSet::basis_to_shell_index(
 
       if (current_shell_idx == shell_index) {
         // Found the shell, compute the offset
-        basis_offset_in_shell = atomic_orbiral_index - current_basis_idx;
+        basis_offset_in_shell = atomic_orbital_index - current_basis_idx;
         int l = shell.get_angular_momentum();
         int m_l = static_cast<int>(basis_offset_in_shell) - l;
         return std::make_pair(shell_index, m_l);
