@@ -241,7 +241,7 @@ install-dir = "qdk_chemistry"
 
 [tool.scikit-build.cmake.define]
 BUILD_SHARED_LIBS = "OFF"
-QDK_CHEMISTRY_COVERAGE_BUILD = {env="QDK_CHEMISTRY_COVERAGE_BUILD", default="OFF"}
+QDK_CHEMISTRY_ENABLE_COVERAGE = {env="QDK_CHEMISTRY_ENABLE_COVERAGE", default="OFF"}
 QDK_UARCH = {env="QDK_UARCH", default="x86-64"}
 
 [[tool.scikit-build.overrides]]

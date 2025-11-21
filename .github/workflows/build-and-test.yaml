@@ -153,7 +153,6 @@ jobs:
     - name: Install Python package
       working-directory: python
       env:
-        QDK_CHEMISTRY_COVERAGE_BUILD: 1
         QDK_CHEMISTRY_ENABLE_COVERAGE: 1
         CMAKE_BUILD_TYPE: Debug
       run: |
