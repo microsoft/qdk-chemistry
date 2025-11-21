@@ -13,8 +13,8 @@
 #include <memory>
 #include <stdexcept>
 
-#include "util/blas.h"
-#include "util/lapack.h"
+#include <blas.hh>
+#include <lapack.hh>
 
 namespace qdk::chemistry::scf {
 
@@ -53,9 +53,9 @@ void matrix_exp(const double *m, double *exp_m, int size) {
   // square exp_scaled_m matrix s times. (x*x)^T = x^T * x^T,  so it is fine to
   // call gemm to compute (x*x)^T
   auto temp = std::make_unique<double[]>(size * size);
-  const char NORMAL = 'N';
   for (int order = 0; order < s; order++) {
-    blas::gemm(&NORMAL, &NORMAL, size, size, size, 1.0, exp_scaled_m.get(),
+    blas::gemm(blas::Layout::ColMajor, blas::Op::NoTrans, blas::Op::NoTrans,
+               size, size, size, 1.0, exp_scaled_m.get(),
                size, exp_scaled_m.get(), size, 0.0, temp.get(), size);
     std::copy(temp.get(), temp.get() + size * size, exp_scaled_m.get());
   }
@@ -89,10 +89,10 @@ void pade_approximation(const double *x, double *exp_x, int size) {
   Eigen::MatrixXd v = Eigen::MatrixXd::Identity(size, size);
 
   Eigen::MatrixXd x_power = Eigen::MatrixXd::Identity(size, size);  // x^0 = I
-  const char NORMAL = 'N';
   Eigen::MatrixXd temp(size, size);
   for (int order = 1; order < 14; order++) {
-    blas::gemm(&NORMAL, &NORMAL, size, size, size, 1.0, x_matrix.data(), size,
+    blas::gemm(blas::Layout::ColMajor, blas::Op::NoTrans, blas::Op::NoTrans,
+               size, size, size, 1.0, x_matrix.data(), size,
                x_power.data(), size, 0.0, temp.data(), size);
     x_power = temp;
     if (order % 2 == 1) {       // odd order, add to u
@@ -111,11 +111,11 @@ void pade_approximation(const double *x, double *exp_x, int size) {
   exp_x_matrix = v + u;
   v = v - u;
 
-  auto ipiv = std::make_unique<int[]>(size);  // pivot indices for lapack
+  auto ipiv = std::make_unique<int64_t[]>(size);  // pivot indices for lapack
   // LU factorization of v, v = L * U
   lapack::getrf(size, size, v.data(), size, ipiv.get());
   // solve the linear equation v * exp_x = u, so exp_x = v^{-1} * u
-  lapack::getrs(&NORMAL, size, size, v.data(), size, ipiv.get(),
+  lapack::getrs(lapack::Op::NoTrans, size, size, v.data(), size, ipiv.get(),
                 exp_x_matrix.data(), size);
 
   // transpose exp_x to be row-major

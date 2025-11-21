@@ -7,7 +7,9 @@
 #include <math.h>
 
 #include <algorithm>
+#include <blas.hh>
 #include <iostream>
+#include <lapack.hh>
 #include <limits>
 #include <vector>
 
@@ -15,8 +17,6 @@
 #include "qdk/chemistry/scf/core/scf.h"
 #include "qdk/chemistry/scf/core/types.h"
 #include "spdlog/spdlog.h"
-#include "util/blas.h"
-#include "util/lapack.h"
 #include "util/matrix_exp.h"
 
 #ifdef QDK_CHEMISTRY_ENABLE_GPU
@@ -123,7 +123,7 @@ class GDM {
   double delta_energy_ = std::numeric_limits<double>::infinity();
 
   /// Energy increase threshold for GDM step size rescaling
-  double rescale_kappa_denergy_threshold_ = 5e-4;
+  const double rescale_kappa_denergy_threshold_ = 5e-4;
 
   /// Number of electrons for alpha (0) and beta (1) spins
   std::vector<int> num_electrons_;
@@ -233,13 +233,15 @@ void GDM::transform_history_(RowMajorMatrix& history, const int history_size,
     double* history_line_ptr = history.row(line).data();
 
     // First step: temp = K_ov * Uvv (in row-major view)
-    blas::gemm("N", "N", num_virtual_orbitals, num_occupied_orbitals,
+    blas::gemm(blas::Layout::ColMajor, blas::Op::NoTrans, blas::Op::NoTrans,
+               num_virtual_orbitals, num_occupied_orbitals,
                num_virtual_orbitals, 1.0, Uvv_.data(), num_virtual_orbitals,
                history_line_ptr, num_virtual_orbitals, 0.0, temp.data(),
                num_virtual_orbitals);
 
     // Second step: result = Uoo^T * temp (in row-major view)
-    blas::gemm("N", "T", num_virtual_orbitals, num_occupied_orbitals,
+    blas::gemm(blas::Layout::ColMajor, blas::Op::NoTrans, blas::Op::Trans,
+               num_virtual_orbitals, num_occupied_orbitals,
                num_occupied_orbitals, 1.0, temp.data(), num_virtual_orbitals,
                Uoo_.data(), num_occupied_orbitals, 0.0, history_line_ptr,
                num_virtual_orbitals);
@@ -272,7 +274,8 @@ void GDM::apply_orbital_rotation_(RowMajorMatrix& C, const int spin_index,
   RowMajorMatrix C_before_rotate =
       C.block(num_molecular_orbitals * spin_index, 0, num_molecular_orbitals,
               num_molecular_orbitals);
-  blas::gemm("N", "N", num_molecular_orbitals, num_molecular_orbitals,
+  blas::gemm(blas::Layout::ColMajor, blas::Op::NoTrans, blas::Op::NoTrans,
+             num_molecular_orbitals, num_molecular_orbitals,
              num_molecular_orbitals, 1.0, exp_kappa.data(),
              num_molecular_orbitals, C_before_rotate.data(),
              num_molecular_orbitals, 0.0,
@@ -378,10 +381,13 @@ void GDM::gdm_iteration_step_(const RowMajorMatrix& F, RowMajorMatrix& C,
       Uvv_ = F_MO.block(num_occupied_orbitals, num_occupied_orbitals,
                         num_virtual_orbitals, num_virtual_orbitals);
 
-      lapack::syev("V", "L", num_occupied_orbitals, Uoo_.data(),
-                   num_occupied_orbitals, pseudo_canonical_eigenvalues_.data());
+      lapack::syev(lapack::Job::Vec, lapack::Uplo::Lower, num_occupied_orbitals,
+                   Uoo_.data(), num_occupied_orbitals,
+                   pseudo_canonical_eigenvalues_.data());
+
       lapack::syev(
-          "V", "L", num_virtual_orbitals, Uvv_.data(), num_virtual_orbitals,
+          lapack::Job::Vec, lapack::Uplo::Lower, num_virtual_orbitals,
+          Uvv_.data(), num_virtual_orbitals,
           pseudo_canonical_eigenvalues_.data() + num_occupied_orbitals);
 
       // Transpose to convert column-major eigenvectors to row-major format
@@ -393,7 +399,8 @@ void GDM::gdm_iteration_step_(const RowMajorMatrix& F, RowMajorMatrix& C,
                   num_molecular_orbitals, num_occupied_orbitals);
       RowMajorMatrix C_occ_pseudo_canonical =
           RowMajorMatrix::Zero(num_molecular_orbitals, num_occupied_orbitals);
-      blas::gemm("N", "N", num_occupied_orbitals, num_molecular_orbitals,
+      blas::gemm(blas::Layout::ColMajor, blas::Op::NoTrans, blas::Op::NoTrans,
+                 num_occupied_orbitals, num_molecular_orbitals,
                  num_occupied_orbitals, 1.0, Uoo_.data(), num_occupied_orbitals,
                  C_occ.data(), num_occupied_orbitals, 0.0,
                  C_occ_pseudo_canonical.data(), num_occupied_orbitals);
@@ -403,7 +410,8 @@ void GDM::gdm_iteration_step_(const RowMajorMatrix& F, RowMajorMatrix& C,
                   num_molecular_orbitals, num_virtual_orbitals);
       RowMajorMatrix C_virt_pseudo_canonical =
           RowMajorMatrix::Zero(num_molecular_orbitals, num_virtual_orbitals);
-      blas::gemm("N", "N", num_virtual_orbitals, num_molecular_orbitals,
+      blas::gemm(blas::Layout::ColMajor, blas::Op::NoTrans, blas::Op::NoTrans,
+                 num_virtual_orbitals, num_molecular_orbitals,
                  num_virtual_orbitals, 1.0, Uvv_.data(), num_virtual_orbitals,
                  C_virt.data(), num_virtual_orbitals, 0.0,
                  C_virt_pseudo_canonical.data(), num_virtual_orbitals);

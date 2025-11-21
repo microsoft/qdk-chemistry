@@ -20,7 +20,7 @@
 #include "util/gpu/matrix_op.h"
 #endif
 
-#include "util/lapack.h"
+#include <lapack.hh>
 #include "util/macros.h"
 #include "util/timer.h"
 

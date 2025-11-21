@@ -22,7 +22,7 @@
 #include "diis.h"
 #include "diis_gdm.h"
 #include "gdm.h"
-#include "util/lapack.h"
+#include <lapack.hh>
 
 #ifdef ENABLE_NVTX3
 #include <nvtx3/nvtx3.hpp>
