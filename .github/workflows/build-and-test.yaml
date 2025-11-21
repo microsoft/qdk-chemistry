@@ -252,6 +252,7 @@ jobs:
         skip_covered: false
         show_line: true
         show_branch: true
+        minimum_coverage: 50
 
     - name: Comment PR with coverage
       if: github.event_name == 'pull_request'
