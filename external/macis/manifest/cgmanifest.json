@@ -36,14 +36,14 @@
             "developmentDependency": false
         },
         {
-        "component": {
-            "type": "git",
-            "git": {
-            "repositoryUrl": "https://github.com/wavefunction91/linalg-cmake-modules.git",
-            "commitHash": "28ceaa9738f14935aa544289fa2fe4c4cc955d0e"
-            }
-        },
-        "developmentDependency": false
+            "component": {
+                "type": "git",
+                "git": {
+                    "repositoryUrl": "https://github.com/wavefunction91/linalg-cmake-modules.git",
+                    "commitHash": "28ceaa9738f14935aa544289fa2fe4c4cc955d0e"
+                }
+            },
+            "developmentDependency": false
         },
         {
             "component": {
@@ -81,7 +81,7 @@
                 "type": "git",
                 "git": {
                     "repositoryUrl": "https://github.com/icl-utk-edu/blaspp.git",
-                    "commitHash": "13622021629f5fd27591bb7da60bae5b19561f01"
+                    "commitHash": "37b744ed72997d190a9cff651c464a71330aeec0"
                 }
             },
             "developmentDependency": false
@@ -91,7 +91,7 @@
                 "type": "git",
                 "git": {
                     "repositoryUrl": "https://github.com/icl-utk-edu/lapackpp.git",
-                    "commitHash": "5bc9c85201ace48213df5ac7d1ef026c9668dfbd"
+                    "commitHash": "b7991ec3cf3e404083d9ac09f146a5ac86397cc8"
                 }
             },
             "developmentDependency": false
