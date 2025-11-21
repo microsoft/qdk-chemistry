@@ -37,7 +37,6 @@ if (QDK_ENABLE_OPENMP)
 endif()
 
 find_dependency(macis REQUIRED)
-
 find_dependency(Eigen3 REQUIRED)
 find_dependency(HDF5 REQUIRED COMPONENTS CXX)
 find_dependency(nlohmann_json REQUIRED)

@@ -10,15 +10,15 @@
 #include <spdlog/spdlog.h>
 
 #include <algorithm>
+#include <blas.hh>
 #include <cmath>
 #include <iostream>
+#include <lapack.hh>
 #include <memory>
 #include <qdk/chemistry/algorithms/active_space.hpp>
 #include <qdk/chemistry/data/basis_set.hpp>
 #include <stdexcept>
 
-#include "../scf/src/util/blas.h"
-#include "../scf/src/util/lapack.h"
 #include "../utils.hpp"
 #include "iterative_localizer_base.hpp"
 #include "pipek_mezey.hpp"
@@ -26,10 +26,6 @@
 namespace qdk::chemistry::algorithms::microsoft {
 
 namespace qcs = qdk::chemistry::scf;
-
-using qdk::chemistry::scf::blas::gemm;
-using qdk::chemistry::scf::lapack::dgelss;
-using qdk::chemistry::scf::lapack::syev;
 
 std::shared_ptr<data::Wavefunction> VVHVLocalizer::_run_impl(
     std::shared_ptr<data::Wavefunction> wavefunction,
@@ -384,12 +380,14 @@ Eigen::MatrixXd VVHVLocalization::calculate_valence_virtual(
   // according to new tutorial
   Eigen::MatrixXd T(num_basis_funcs_ori, num_basis_funcs_min);
   {
-    temp = this->overlap_ori_;   // dgelss overwrites input
+    temp = this->overlap_ori_;   // lapack::gelss overwrites input
     temp2 = this->overlap_mix_;  // the unnormalized T
     std::vector<double> W11(num_basis_funcs_ori);
-    int RANK11 = dgelss(num_basis_funcs_ori, num_basis_funcs_ori,
-                        num_basis_funcs_min, temp.data(), num_basis_funcs_ori,
-                        temp2.data(), num_basis_funcs_ori, W11.data(), -1);
+    double _rcond = -1;
+    int64_t RANK11;
+    lapack::gelss(num_basis_funcs_ori, num_basis_funcs_ori, num_basis_funcs_min,
+                  temp.data(), num_basis_funcs_ori, temp2.data(),
+                  num_basis_funcs_ori, W11.data(), _rcond, &RANK11);
     this->orthonormalization(num_basis_funcs_ori, num_basis_funcs_min,
                              this->overlap_ori_.data(), temp2.data(), T.data(),
                              1e-6, 0,
@@ -401,16 +399,19 @@ Eigen::MatrixXd VVHVLocalization::calculate_valence_virtual(
   // Now we want to project out all components of the occupied space from the
   // virtual space C_v' = (I - C_o * C_o**H * S_11) * T
   Eigen::MatrixXd C_mp_wo_occ = T;  //
-  gemm("N", "N", num_basis_funcs_ori, num_basis_funcs_min, num_basis_funcs_ori,
-       1.0, this->overlap_ori_.data(), num_basis_funcs_ori, T.data(),
-       num_basis_funcs_ori, 0.0, temp.data(), num_basis_funcs_ori);
-  gemm("T", "N", num_occupied_orbitals, num_basis_funcs_min,
-       num_basis_funcs_ori, 1.0, C_occ_ptr, num_basis_funcs_ori, temp.data(),
-       num_basis_funcs_ori, 0.0, temp2.data(), num_occupied_orbitals);
-  gemm("N", "N", num_basis_funcs_ori, num_basis_funcs_min,
-       num_occupied_orbitals, -1.0, C_occ_ptr, num_basis_funcs_ori,
-       temp2.data(), num_occupied_orbitals, 1.0, C_mp_wo_occ.data(),
-       num_basis_funcs_ori);
+  blas::gemm(blas::Layout::ColMajor, blas::Op::NoTrans, blas::Op::NoTrans,
+             num_basis_funcs_ori, num_basis_funcs_min, num_basis_funcs_ori, 1.0,
+             this->overlap_ori_.data(), num_basis_funcs_ori, T.data(),
+             num_basis_funcs_ori, 0.0, temp.data(), num_basis_funcs_ori);
+  blas::gemm(blas::Layout::ColMajor, blas::Op::Trans, blas::Op::NoTrans,
+             num_occupied_orbitals, num_basis_funcs_min, num_basis_funcs_ori,
+             1.0, C_occ_ptr, num_basis_funcs_ori, temp.data(),
+             num_basis_funcs_ori, 0.0, temp2.data(), num_occupied_orbitals);
+  blas::gemm(blas::Layout::ColMajor, blas::Op::NoTrans, blas::Op::NoTrans,
+             num_basis_funcs_ori, num_basis_funcs_min, num_occupied_orbitals,
+             -1.0, C_occ_ptr, num_basis_funcs_ori, temp2.data(),
+             num_occupied_orbitals, 1.0, C_mp_wo_occ.data(),
+             num_basis_funcs_ori);
 
   // Then form the new overlap matrix, S_ij = \sim_uv C_{ui} S_11_{uv} C_{vj}, C
   // =C_mp_wo_occ here
@@ -478,45 +479,52 @@ void VVHVLocalization::proto_hv(const Eigen::MatrixXd& overlap_ori_al,
     Eigen::MatrixXd T_al = overlap_mix_al;
     {
       Eigen::MatrixXd overlap_ori_copy =
-          overlap_ori_al;  // dgelss overwrites input
+          overlap_ori_al;  // lapack::gelss overwrites input
       std::vector<double> W11(num_basis_funcs_al_ori);
-      int _tmp_rank = dgelss(num_basis_funcs_al_ori, num_basis_funcs_al_ori,
-                             num_basis_funcs_al_min, overlap_ori_copy.data(),
-                             num_basis_funcs_al_ori, T_al.data(),
-                             num_basis_funcs_al_ori, W11.data(), -1);
+      double _rcond = -1.;
+      int64_t _tmp_rank;
+      lapack::gelss(num_basis_funcs_al_ori, num_basis_funcs_al_ori,
+                    num_basis_funcs_al_min, overlap_ori_copy.data(),
+                    num_basis_funcs_al_ori, T_al.data(), num_basis_funcs_al_ori,
+                    W11.data(), _rcond, &_tmp_rank);
     }
 
     // Get overlap of xi, S = T_al^T * overlap_ori_al * T_al = overlap_mix_al^T
     // * overlap_ori_al**-1 * overlap_mix_al = overlap_mix_al^T * T_al
     Eigen::MatrixXd S_xi =
         Eigen::MatrixXd::Zero(num_basis_funcs_al_min, num_basis_funcs_al_min);
-    gemm("T", "N", num_basis_funcs_al_min, num_basis_funcs_al_min,
-         num_basis_funcs_al_ori, 1.0, overlap_mix_al.data(),
-         num_basis_funcs_al_ori, T_al.data(), num_basis_funcs_al_ori, 0.0,
-         S_xi.data(), num_basis_funcs_al_min);
+    blas::gemm(blas::Layout::ColMajor, blas::Op::Trans, blas::Op::NoTrans,
+               num_basis_funcs_al_min, num_basis_funcs_al_min,
+               num_basis_funcs_al_ori, 1.0, overlap_mix_al.data(),
+               num_basis_funcs_al_ori, T_al.data(), num_basis_funcs_al_ori, 0.0,
+               S_xi.data(), num_basis_funcs_al_min);
 
-    // Compute S_xi^-1 * overlap_mix^T using dgelss_solver
+    // Compute S_xi^-1 * overlap_mix^T using lapack::gelss
     // Transformation matrix for proto hard virtual construction
     // C_psi = (I - T S_xi^-1 overlap_mix^T) C_psi,
     {
       // Solve S_xi * X = overlap_mix^T * C_psi for X, storing result in RHS
       Eigen::MatrixXd RHS =
           Eigen::MatrixXd::Zero(num_basis_funcs_al_min, num_basis_funcs_al_ori);
-      gemm("T", "N", num_basis_funcs_al_min, num_basis_funcs_al_ori,
-           num_basis_funcs_al_ori, 1.0, overlap_mix_al.data(),
-           num_basis_funcs_al_ori, C_psi.data(), num_basis_funcs_al_ori, 0.0,
-           RHS.data(), num_basis_funcs_al_min);
+      blas::gemm(blas::Layout::ColMajor, blas::Op::Trans, blas::Op::NoTrans,
+                 num_basis_funcs_al_min, num_basis_funcs_al_ori,
+                 num_basis_funcs_al_ori, 1.0, overlap_mix_al.data(),
+                 num_basis_funcs_al_ori, C_psi.data(), num_basis_funcs_al_ori,
+                 0.0, RHS.data(), num_basis_funcs_al_min);
       std::vector<double> W_xi(num_basis_funcs_al_min);
-      int _tmp_rank =
-          dgelss(num_basis_funcs_al_min, num_basis_funcs_al_min,
-                 num_basis_funcs_al_ori, S_xi.data(), num_basis_funcs_al_min,
-                 RHS.data(), num_basis_funcs_al_min, W_xi.data(), -1);
+      double _rcond = -1.0;
+      int64_t _tmp_rank;
+      lapack::gelss(num_basis_funcs_al_min, num_basis_funcs_al_min,
+                    num_basis_funcs_al_ori, S_xi.data(), num_basis_funcs_al_min,
+                    RHS.data(), num_basis_funcs_al_min, W_xi.data(), _rcond,
+                    &_tmp_rank);
       // Compute C_psi - = T * RHS (where RHS now contains S_xi^-1 *
       // overlap_mix^T)
-      gemm("N", "N", num_basis_funcs_al_ori, num_basis_funcs_al_ori,
-           num_basis_funcs_al_min, -1.0, T_al.data(), num_basis_funcs_al_ori,
-           RHS.data(), num_basis_funcs_al_min, 1.0, C_psi.data(),
-           num_basis_funcs_al_ori);
+      blas::gemm(blas::Layout::ColMajor, blas::Op::NoTrans, blas::Op::NoTrans,
+                 num_basis_funcs_al_ori, num_basis_funcs_al_ori,
+                 num_basis_funcs_al_min, -1.0, T_al.data(),
+                 num_basis_funcs_al_ori, RHS.data(), num_basis_funcs_al_min,
+                 1.0, C_psi.data(), num_basis_funcs_al_ori);
     }
   }
 
@@ -726,18 +734,19 @@ Eigen::MatrixXd VVHVLocalization::localize_hard_virtuals(
     // Now we want to project out all components of the minimal space from the
     // orbitals on A C_eta_A = (I - C_minimal_unloc * C_minimal_unloc^T *
     // overlap_ori) * C_normal_A
-    gemm("N", "N", num_basis_funcs_ori, num_basis_funcs_a_ori,
-         num_basis_funcs_ori, 1.0, this->overlap_ori_.data(),
-         num_basis_funcs_ori, C_normal_a.data(), num_basis_funcs_ori, 0.0,
-         C_eta_a.data(), num_basis_funcs_ori);
-    gemm("T", "N", num_basis_funcs_min, num_basis_funcs_a_ori,
-         num_basis_funcs_ori, 1.0, C_minimal_unloc.data(), num_basis_funcs_ori,
-         C_eta_a.data(), num_basis_funcs_ori, 0.0, temp.data(),
-         num_basis_funcs_min);
-    gemm("N", "N", num_basis_funcs_ori, num_basis_funcs_a_ori,
-         num_basis_funcs_min, -1.0, C_minimal_unloc.data(), num_basis_funcs_ori,
-         temp.data(), num_basis_funcs_min, 0.0, C_eta_a.data(),
-         num_basis_funcs_ori);
+    blas::gemm(blas::Layout::ColMajor, blas::Op::NoTrans, blas::Op::NoTrans,
+               num_basis_funcs_ori, num_basis_funcs_a_ori, num_basis_funcs_ori,
+               1.0, this->overlap_ori_.data(), num_basis_funcs_ori,
+               C_normal_a.data(), num_basis_funcs_ori, 0.0, C_eta_a.data(),
+               num_basis_funcs_ori);
+    blas::gemm(blas::Layout::ColMajor, blas::Op::Trans, blas::Op::NoTrans,
+               num_basis_funcs_min, num_basis_funcs_a_ori, num_basis_funcs_ori,
+               1.0, C_minimal_unloc.data(), num_basis_funcs_ori, C_eta_a.data(),
+               num_basis_funcs_ori, 0.0, temp.data(), num_basis_funcs_min);
+    blas::gemm(blas::Layout::ColMajor, blas::Op::NoTrans, blas::Op::NoTrans,
+               num_basis_funcs_ori, num_basis_funcs_a_ori, num_basis_funcs_min,
+               -1.0, C_minimal_unloc.data(), num_basis_funcs_ori, temp.data(),
+               num_basis_funcs_min, 0.0, C_eta_a.data(), num_basis_funcs_ori);
     C_eta_a += C_normal_a;
 
     // Form normalized hard unmatched hard virtuals on atom A (xi in the paper
@@ -753,11 +762,13 @@ Eigen::MatrixXd VVHVLocalization::localize_hard_virtuals(
 
     // Form T = C_hv_A^T * overlap_ori * proto_hv
     Eigen::MatrixXd T = Eigen::MatrixXd::Zero(nhv_a, nhv_a);
-    gemm("T", "N", nhv_a, num_basis_funcs_ori, num_basis_funcs_ori, 1.0,
-         C_hv_a.data(), num_basis_funcs_ori, this->overlap_ori_.data(),
-         num_basis_funcs_ori, 0.0, temp.data(), nhv_a);
-    gemm("N", "N", nhv_a, nhv_a, num_basis_funcs_ori, 1.0, temp.data(), nhv_a,
-         proto_hv.data(), num_basis_funcs_ori, 0.0, T.data(), nhv_a);
+    blas::gemm(blas::Layout::ColMajor, blas::Op::Trans, blas::Op::NoTrans,
+               nhv_a, num_basis_funcs_ori, num_basis_funcs_ori, 1.0,
+               C_hv_a.data(), num_basis_funcs_ori, this->overlap_ori_.data(),
+               num_basis_funcs_ori, 0.0, temp.data(), nhv_a);
+    blas::gemm(blas::Layout::ColMajor, blas::Op::NoTrans, blas::Op::NoTrans,
+               nhv_a, nhv_a, num_basis_funcs_ori, 1.0, temp.data(), nhv_a,
+               proto_hv.data(), num_basis_funcs_ori, 0.0, T.data(), nhv_a);
     // Now to form Z, Z is just orthonormalized T in our case
     Eigen::MatrixXd Z = Eigen::MatrixXd::Zero(nhv_a, nhv_a);
     Eigen::MatrixXd Iden = Eigen::MatrixXd::Identity(nhv_a, nhv_a);
@@ -768,9 +779,10 @@ Eigen::MatrixXd VVHVLocalization::localize_hard_virtuals(
     // representation of the original basis
     Eigen::MatrixXd C_hv_final =
         Eigen::MatrixXd::Zero(num_basis_funcs_ori, nhv_a);
-    gemm("N", "N", num_basis_funcs_ori, nhv_a, nhv_a, 1.0, C_hv_a.data(),
-         num_basis_funcs_ori, Z.data(), nhv_a, 0.0, C_hv_final.data(),
-         num_basis_funcs_ori);
+    blas::gemm(blas::Layout::ColMajor, blas::Op::NoTrans, blas::Op::NoTrans,
+               num_basis_funcs_ori, nhv_a, nhv_a, 1.0, C_hv_a.data(),
+               num_basis_funcs_ori, Z.data(), nhv_a, 0.0, C_hv_final.data(),
+               num_basis_funcs_ori);
 
     // Place C_hv_final into the right place in this->C_hard_virtuals
     if (idx_hv + nhv_a > nhv) {
@@ -917,18 +929,20 @@ void VVHVLocalization::orthonormalization(int num_basis_funcs, int num_orbitals,
   Eigen::MatrixXd S = Eigen::MatrixXd::Zero(num_orbitals, num_orbitals);
   {
     Eigen::MatrixXd temp = Eigen::MatrixXd::Zero(num_orbitals, num_basis_funcs);
-    gemm("T", "N", num_orbitals, num_basis_funcs, num_basis_funcs, 1.0, C,
-         num_basis_funcs, overlap_inp, num_basis_funcs, 0.0, temp.data(),
-         num_orbitals);
-    gemm("N", "N", num_orbitals, num_orbitals, num_basis_funcs, 1.0,
-         temp.data(), num_orbitals, C, num_basis_funcs, 0.0, S.data(),
-         num_orbitals);
+    blas::gemm(blas::Layout::ColMajor, blas::Op::Trans, blas::Op::NoTrans,
+               num_orbitals, num_basis_funcs, num_basis_funcs, 1.0, C,
+               num_basis_funcs, overlap_inp, num_basis_funcs, 0.0, temp.data(),
+               num_orbitals);
+    blas::gemm(blas::Layout::ColMajor, blas::Op::NoTrans, blas::Op::NoTrans,
+               num_orbitals, num_orbitals, num_basis_funcs, 1.0, temp.data(),
+               num_orbitals, C, num_basis_funcs, 0.0, S.data(), num_orbitals);
   }
 
   // Diagonalize S = U * Lambda * U^T
   Eigen::VectorXd eigenvalues = Eigen::VectorXd::Zero(num_orbitals);
-  syev("V", "L", num_orbitals, S.data(), num_orbitals,
-       eigenvalues.data());  // S now contains eigenvectors U
+  lapack::syev(lapack::Job::Vec, lapack::Uplo::Lower, num_orbitals, S.data(),
+               num_orbitals,
+               eigenvalues.data());  // S now contains eigenvectors U
 
   if (expected_near_zero > 0) {
     // Check eigenvalue structure if selection needed
@@ -944,10 +958,11 @@ void VVHVLocalization::orthonormalization(int num_basis_funcs, int num_orbitals,
       for (int j = 0; j < num_orbitals; ++j) temp_col_i[j] *= lambda_inv_sqrt;
     }
     // Compute C_out = C * W
-    gemm("N", "N", num_basis_funcs, num_orbitals - expected_near_zero,
-         num_orbitals, 1.0, C, num_basis_funcs,
-         S.data() + expected_near_zero * num_orbitals, num_orbitals, 0.0, C_out,
-         num_basis_funcs);
+    blas::gemm(blas::Layout::ColMajor, blas::Op::NoTrans, blas::Op::NoTrans,
+               num_basis_funcs, num_orbitals - expected_near_zero, num_orbitals,
+               1.0, C, num_basis_funcs,
+               S.data() + expected_near_zero * num_orbitals, num_orbitals, 0.0,
+               C_out, num_basis_funcs);
   } else {
     // If no selection needed,
     // compute C_out = C *  U * Lambda^(-1/2) * U^T for symmetric
@@ -966,13 +981,15 @@ void VVHVLocalization::orthonormalization(int num_basis_funcs, int num_orbitals,
     // Compute orthonorm_transform = U_scaled * U^T using temporary storage
     Eigen::MatrixXd orthonorm_transform =
         Eigen::MatrixXd::Zero(num_orbitals, num_orbitals);
-    gemm("N", "T", num_orbitals, num_orbitals, num_orbitals, 1.0, temp.data(),
-         num_orbitals, S.data(), num_orbitals, 0.0, orthonorm_transform.data(),
-         num_orbitals);
+    blas::gemm(blas::Layout::ColMajor, blas::Op::NoTrans, blas::Op::Trans,
+               num_orbitals, num_orbitals, num_orbitals, 1.0, temp.data(),
+               num_orbitals, S.data(), num_orbitals, 0.0,
+               orthonorm_transform.data(), num_orbitals);
     // Compute C_out = C * orthonorm_transform
-    gemm("N", "N", num_basis_funcs, num_orbitals, num_orbitals, 1.0, C,
-         num_basis_funcs, orthonorm_transform.data(), num_orbitals, 0.0, C_out,
-         num_basis_funcs);
+    blas::gemm(blas::Layout::ColMajor, blas::Op::NoTrans, blas::Op::NoTrans,
+               num_basis_funcs, num_orbitals, num_orbitals, 1.0, C,
+               num_basis_funcs, orthonorm_transform.data(), num_orbitals, 0.0,
+               C_out, num_basis_funcs);
   }
 }
 
