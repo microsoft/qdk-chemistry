@@ -107,7 +107,16 @@ std::pair<double, std::shared_ptr<data::Wavefunction>> ScfSolver::_run_impl(
                               : qcs::DensityInitializationMethod::Atom;
   ms_scf_config->eri.method =
       qcs::ERIMethod::Libint2Direct;  // TODO: Make this configurable
-  ms_scf_config->eri.eri_threshold = convergence_threshold * 1e-5;
+
+  double eri_threshold = _settings->get<double>("eri_threshold");
+  if (eri_threshold > 0.0) {
+    ms_scf_config->eri.eri_threshold = eri_threshold;
+  } else {
+    // use the appropriate default according to convergence threshold
+    double eri_threshold_multiplier = 1.0e-5;
+    ms_scf_config->eri.eri_threshold =
+        convergence_threshold * eri_threshold_multiplier;
+  }
   ms_scf_config->eri.deterministic_addition =
       _settings->get<bool>("eri_deterministic_addition");
   ms_scf_config->k_eri = ms_scf_config->eri;

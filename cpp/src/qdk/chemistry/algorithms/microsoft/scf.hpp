@@ -55,6 +55,7 @@ class ScfSettings
     set_default("gdm_bfgs_history_size_limit", 40);
     set_default("fock_reset_steps", 1073741824);
     set_default("eri_deterministic_addition", true);
+    set_default("eri_threshold", -1.0)
   }
 };
 
