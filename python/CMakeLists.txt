@@ -8,6 +8,7 @@ if(CCACHE_EXECUTABLE AND NOT CMAKE_CXX_COMPILER_LAUNCHER)
 endif()
 
 set(CMAKE_POSITION_INDEPENDENT_CODE ON CACHE BOOL "Enable PIC for all targets" FORCE)
+set(CMAKE_MACOSX_RPATH ON CACHE BOOL "Enable RPATH on macOS" FORCE)
 
 # Custom CMake Find* modules for linear algebra dependencies
 include( FetchContent )
