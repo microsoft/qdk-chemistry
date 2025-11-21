@@ -35,11 +35,13 @@ class ScfSolverBase : public ScfSolver,
   }
 
  protected:
-  ReturnType _run_impl(
-      std::shared_ptr<Structure> structure, int charge, int spin_multiplicity,
-      std::optional<std::shared_ptr<Orbitals>> initial_guess) const override {
+  ReturnType _run_impl(std::shared_ptr<Structure> structure, int charge,
+                       int spin_multiplicity,
+                       std::variant<std::shared_ptr<Orbitals>,
+                                    std::shared_ptr<BasisSet>, std::string>
+                           basis_information) const override {
     PYBIND11_OVERRIDE_PURE(ReturnType, ScfSolver, _run_impl, structure, charge,
-                           spin_multiplicity, initial_guess);
+                           spin_multiplicity, basis_information);
   }
 };
 
@@ -87,9 +89,11 @@ void bind_scf(py::module &m) {
       [](const ScfSolver &solver,
          std::shared_ptr<qdk::chemistry::data::Structure> structure, int charge,
          int spin_multiplicity,
-         std::optional<std::shared_ptr<qdk::chemistry::data::Orbitals>>
-             initial_guess) {
-        return solver.run(structure, charge, spin_multiplicity, initial_guess);
+         std::variant<std::shared_ptr<Orbitals>, std::shared_ptr<BasisSet>,
+                      std::string>
+             basis_information) {
+        return solver.run(structure, charge, spin_multiplicity,
+                          basis_information);
       },
       R"(
         Perform SCF calculation on the given molecular structure.
@@ -104,8 +108,11 @@ void bind_scf(py::module &m) {
             The molecular charge
         spin_multiplicity : int
             The spin multiplicity of the molecular system
-        initial_guess : qdk_chemistry.data.Orbitals, optional
-            Initial orbital guess for the SCF calculation (optional, defaults to no guess)
+        basis_information : Union[qdk_chemistry.data.Orbitals, qdk_chemistry.data.BasisSet, str]
+            Basis set information, which can be provided as:
+            - A ``qdk_chemistry.data.BasisSet`` object
+            - A string specifying the name of a standard basis set (e.g., "sto-3g")
+            - A ``qdk_chemistry.data.Orbitals`` object to be used as an initial guess
 
         Returns
         -------
@@ -113,35 +120,7 @@ void bind_scf(py::module &m) {
             A tuple containing the converged total energy (nuclear + electronic) and wavefunction
         )",
       py::arg("structure"), py::arg("charge"), py::arg("spin_multiplicity"),
-      py::arg("initial_guess") = std::nullopt);
-
-  scf_solver.def(
-      "run",
-      [](const ScfSolver &solver,
-         std::shared_ptr<qdk::chemistry::data::Structure> structure, int charge,
-         int spin_multiplicity) {
-        return solver.run(structure, charge, spin_multiplicity);
-      },
-      R"(
-        Perform SCF calculation on the given molecular structure (without initial guess).
-
-        This method automatically locks settings before execution.
-
-        Parameters
-        ----------
-        structure : qdk_chemistry.data.Structure
-            The molecular structure to solve
-        charge : int
-            The molecular charge
-        spin_multiplicity : int
-            The spin multiplicity of the molecular system
-
-        Returns
-        -------
-        tuple[float, qdk_chemistry.data.Wavefunction]
-            A tuple containing the converged total energy (nuclear + electronic) and wavefunction
-        )",
-      py::arg("structure"), py::arg("charge"), py::arg("spin_multiplicity"));
+      py::arg("basis_information"));
 
   scf_solver.def("settings", &ScfSolver::settings,
                  R"(

@@ -183,15 +183,15 @@ class TestPyscfPlugin:
         # Test that settings object exists
         assert settings is not None
 
-        assert settings.get("basis_set") == "def2-svp"
+        assert settings.get("max_iterations") == 50
 
         # Test setting basis set
-        settings.set("basis_set", "STO-3G")
-        assert settings.get("basis_set") == "STO-3G"
+        settings.set("max_iterations", 100)
+        assert settings.get("max_iterations") == 100
 
         # Test setting other parameters
-        settings.set("basis_set", "def2-svp")
-        assert settings.get("basis_set") == "def2-svp"
+        settings.set("force_restricted", True)
+        assert settings.get("force_restricted")
 
     def test_pyscf_localizer_settings(self):
         """Test PySCF localizer settings interface."""
@@ -278,9 +278,8 @@ class TestPyscfPlugin:
         """Test PySCF SCF solver on water molecule with def2-svp basis."""
         water = create_water_structure()
         scf_solver = algorithms.create("scf_solver", "pyscf")
-        scf_solver.settings().set("basis_set", "def2-svp")
 
-        energy, wavefunction = scf_solver.run(water, 0, 1)
+        energy, wavefunction = scf_solver.run(water, 0, 1, "def2-svp")
         orbitals = wavefunction.get_orbitals()
 
         # Check that we get reasonable results
@@ -308,9 +307,8 @@ class TestPyscfPlugin:
         """Test PySCF SCF solver on water molecule with def2-tzvp basis."""
         water = create_water_structure()
         scf_solver = algorithms.create("scf_solver", "pyscf")
-        scf_solver.settings().set("basis_set", "def2-tzvp")
 
-        energy, wavefunction = scf_solver.run(water, 0, 1)
+        energy, wavefunction = scf_solver.run(water, 0, 1, "def2-tzvp")
         orbitals = wavefunction.get_orbitals()
 
         # Check that we get reasonable results
@@ -338,9 +336,8 @@ class TestPyscfPlugin:
         """Test PySCF SCF solver on lithium atom with def2-svp basis."""
         lithium = create_li_structure()
         scf_solver = algorithms.create("scf_solver", "pyscf")
-        scf_solver.settings().set("basis_set", "def2-svp")
 
-        energy, wavefunction = scf_solver.run(lithium, 0, 2)
+        energy, wavefunction = scf_solver.run(lithium, 0, 2, "def2-svp")
         orbitals = wavefunction.get_orbitals()
 
         # Check that we get reasonable results
@@ -364,10 +361,9 @@ class TestPyscfPlugin:
         """Test PySCF SCF solver on lithium atom with ROHF/def2-svp basis."""
         lithium = create_li_structure()
         scf_solver = algorithms.create("scf_solver", "pyscf")
-        scf_solver.settings().set("basis_set", "def2-svp")
         scf_solver.settings().set("force_restricted", True)
 
-        energy, wavefunction = scf_solver.run(lithium, 0, 2)
+        energy, wavefunction = scf_solver.run(lithium, 0, 2, "def2-svp")
         orbitals = wavefunction.get_orbitals()
 
         # Check that we get reasonable results
@@ -391,9 +387,8 @@ class TestPyscfPlugin:
         """Test PySCF SCF solver on lithium ion (Li+) with def2-svp basis."""
         lithium = create_li_structure()
         scf_solver = algorithms.create("scf_solver", "pyscf")
-        scf_solver.settings().set("basis_set", "def2-svp")
 
-        energy, wavefunction = scf_solver.run(lithium, 1, 1)
+        energy, wavefunction = scf_solver.run(lithium, 1, 1, "def2-svp")
         orbitals = wavefunction.get_orbitals()
 
         # Check that we get reasonable results
@@ -417,9 +412,8 @@ class TestPyscfPlugin:
         """Test PySCF SCF solver on O2 triplet state with def2-svp basis."""
         o2 = create_o2_structure()
         scf_solver = algorithms.create("scf_solver", "pyscf")
-        scf_solver.settings().set("basis_set", "def2-svp")
 
-        energy, wavefunction = scf_solver.run(o2, 0, 3)
+        energy, wavefunction = scf_solver.run(o2, 0, 3, "def2-svp")
         orbitals = wavefunction.get_orbitals()
 
         # Check that we get reasonable results
@@ -444,10 +438,9 @@ class TestPyscfPlugin:
         """Test PySCF DFT solver on water molecule with B3LYP/def2-svp."""
         water = create_water_structure()
         scf_solver = algorithms.create("scf_solver", "pyscf")
-        scf_solver.settings().set("basis_set", "def2-svp")
         scf_solver.settings().set("method", "b3lyp")
 
-        energy, wavefunction = scf_solver.run(water, 0, 1)
+        energy, wavefunction = scf_solver.run(water, 0, 1, "def2-svp")
         orbitals = wavefunction.get_orbitals()
 
         # Check that we get reasonable DFT results
@@ -472,10 +465,9 @@ class TestPyscfPlugin:
         """Test PySCF DFT solver on water molecule with PBE/def2-svp."""
         water = create_water_structure()
         scf_solver = algorithms.create("scf_solver", "pyscf")
-        scf_solver.settings().set("basis_set", "def2-svp")
         scf_solver.settings().set("method", "pbe")
 
-        energy, wavefunction = scf_solver.run(water, 0, 1)
+        energy, wavefunction = scf_solver.run(water, 0, 1, "def2-svp")
         orbitals = wavefunction.get_orbitals()
 
         # Check that we get reasonable DFT results
@@ -492,10 +484,9 @@ class TestPyscfPlugin:
         """Test PySCF DFT solver on lithium atom with B3LYP/def2-svp (UKS)."""
         lithium = create_li_structure()
         scf_solver = algorithms.create("scf_solver", "pyscf")
-        scf_solver.settings().set("basis_set", "def2-svp")
         scf_solver.settings().set("method", "b3lyp")
 
-        energy, wavefunction = scf_solver.run(lithium, 0, 2)
+        energy, wavefunction = scf_solver.run(lithium, 0, 2, "def2-svp")
         orbitals = wavefunction.get_orbitals()
 
         # Check that we get reasonable DFT results
@@ -520,11 +511,10 @@ class TestPyscfPlugin:
         """Test PySCF DFT solver on lithium atom with ROKS B3LYP/def2-svp."""
         lithium = create_li_structure()
         scf_solver = algorithms.create("scf_solver", "pyscf")
-        scf_solver.settings().set("basis_set", "def2-svp")
         scf_solver.settings().set("method", "b3lyp")
         scf_solver.settings().set("force_restricted", True)
 
-        energy, wavefunction = scf_solver.run(lithium, 0, 2)
+        energy, wavefunction = scf_solver.run(lithium, 0, 2, "def2-svp")
         orbitals = wavefunction.get_orbitals()
 
         # Check that we get reasonable ROKS DFT results
@@ -549,10 +539,9 @@ class TestPyscfPlugin:
         """Test PySCF DFT solver on O2 triplet state with B3LYP/def2-svp."""
         o2 = create_o2_structure()
         scf_solver = algorithms.create("scf_solver", "pyscf")
-        scf_solver.settings().set("basis_set", "def2-svp")
         scf_solver.settings().set("method", "b3lyp")
 
-        energy, wavefunction = scf_solver.run(o2, 0, 3)
+        energy, wavefunction = scf_solver.run(o2, 0, 3, "def2-svp")
         orbitals = wavefunction.get_orbitals()
 
         # Check that we get reasonable DFT results
@@ -578,17 +567,15 @@ class TestPyscfPlugin:
         """Test that DFT method names are case insensitive."""
         water = create_water_structure()
         scf_solver = algorithms.create("scf_solver", "pyscf")
-        scf_solver.settings().set("basis_set", "sto-3g")
 
         # Test uppercase
         scf_solver.settings().set("method", "B3LYP")
-        energy_upper, _ = scf_solver.run(water, 0, 1)
+        energy_upper, _ = scf_solver.run(water, 0, 1, "sto-3g")
 
         # Test lowercase
         scf_solver = algorithms.create("scf_solver", "pyscf")
-        scf_solver.settings().set("basis_set", "sto-3g")
         scf_solver.settings().set("method", "b3lyp")
-        energy_lower, _ = scf_solver.run(water, 0, 1)
+        energy_lower, _ = scf_solver.run(water, 0, 1, "sto-3g")
 
         # Should give the same result
         assert abs(energy_upper - energy_lower) < scf_energy_tolerance
@@ -597,9 +584,8 @@ class TestPyscfPlugin:
         """Test PySCF SCF solver on UO2 with LANL2DZ basis and ECP."""
         uo2 = create_uo2_structure()
         scf_solver = algorithms.create("scf_solver", "pyscf")
-        scf_solver.settings().set("basis_set", "lanl2dz")
 
-        energy, _ = scf_solver.run(uo2, 0, 1)
+        energy, _ = scf_solver.run(uo2, 0, 1, "lanl2dz")
         ref_energy = -200.29749139183
         assert abs(energy - ref_energy) < scf_energy_tolerance
 
@@ -608,11 +594,10 @@ class TestPyscfPlugin:
         # ===== Water as restricted test =====
         water = create_water_structure()
         scf_solver = algorithms.create("scf_solver", "pyscf")
-        scf_solver.settings().set("basis_set", "def2-tzvp")
         scf_solver.settings().set("method", "hf")
 
         # First calculation - let it converge normally
-        energy_first, wfn_first = scf_solver.run(water, 0, 1)
+        energy_first, wfn_first = scf_solver.run(water, 0, 1, "def2-tzvp")
         orbitals_first = wfn_first.get_orbitals()
 
         # Verify we get the expected energy for HF/def2-tzvp
@@ -621,7 +606,6 @@ class TestPyscfPlugin:
         # Now restart with the converged orbitals as initial guess
         # Create a new solver instance since settings are locked after run
         scf_solver2 = algorithms.create("scf_solver", "pyscf")
-        scf_solver2.settings().set("basis_set", "def2-tzvp")
         scf_solver2.settings().set("method", "hf")
         scf_solver2.settings().set("max_iterations", 2)  # 2 is minimum as need to check energy difference
 
@@ -634,11 +618,10 @@ class TestPyscfPlugin:
         # ===== Oxygen Triplet Initial Guess Test =====
         o2 = create_o2_structure()
         scf_solver3 = algorithms.create("scf_solver", "pyscf")
-        scf_solver3.settings().set("basis_set", "sto-3g")
         scf_solver3.settings().set("method", "hf")
 
         # First calculation - let triplet converge normally
-        energy_o2_first, wfn_o2_first = scf_solver3.run(o2, 0, 3)
+        energy_o2_first, wfn_o2_first = scf_solver3.run(o2, 0, 3, "sto-3g")
         orbitals_o2_first = wfn_o2_first.get_orbitals()
 
         # Verify we get the expected energy for HF/STO-3G triplet
@@ -647,7 +630,6 @@ class TestPyscfPlugin:
         # Now restart with the converged orbitals as initial guess
         # Create a new solver instance since settings are locked after run
         scf_solver4 = algorithms.create("scf_solver", "pyscf")
-        scf_solver4.settings().set("basis_set", "sto-3g")
         scf_solver4.settings().set("method", "hf")
         scf_solver4.settings().set("max_iterations", 2)  # 2 is minimum as need to check energy difference
 
@@ -661,9 +643,8 @@ class TestPyscfPlugin:
         """Test PySCF Pipek-Mezey localization on water molecule with def2-svp basis."""
         water = create_water_structure()
         scf_solver = algorithms.create("scf_solver", "pyscf")
-        scf_solver.settings().set("basis_set", "def2-svp")
 
-        _, wavefunction = scf_solver.run(water, 0, 1)
+        _, wavefunction = scf_solver.run(water, 0, 1, "def2-svp")
         orbitals = wavefunction.get_orbitals()
 
         # Compute the objective function for the canonical orbitals
@@ -726,9 +707,8 @@ class TestPyscfPlugin:
         """Test PySCF Foster-Boys localization on water molecule with def2-svp basis."""
         water = create_water_structure()
         scf_solver = algorithms.create("scf_solver", "pyscf")
-        scf_solver.settings().set("basis_set", "def2-svp")
 
-        _, wavefunction = scf_solver.run(water, 0, 1)
+        _, wavefunction = scf_solver.run(water, 0, 1, "def2-svp")
         orbitals = wavefunction.get_orbitals()
 
         # Compute the objective function for the canonical orbitals
@@ -792,9 +772,8 @@ class TestPyscfPlugin:
         """Test PySCF Edmiston-Ruedenberg localization on water molecule with def2-svp basis."""
         water = create_water_structure()
         scf_solver = algorithms.create("scf_solver", "pyscf")
-        scf_solver.settings().set("basis_set", "def2-svp")
 
-        _, wavefunction = scf_solver.run(water, 0, 1)
+        _, wavefunction = scf_solver.run(water, 0, 1, "def2-svp")
         orbitals = wavefunction.get_orbitals()
         ca_can, _ = orbitals.get_coefficients()
         # Compute the objective function for the canonical orbitals
@@ -855,9 +834,8 @@ class TestPyscfPlugin:
         """Test PySCF Pipek-Mezey localization on O2 molecule with UHF/def2-svp."""
         o2 = create_o2_structure()
         scf_solver = algorithms.create("scf_solver", "pyscf")
-        scf_solver.settings().set("basis_set", "def2-svp")
 
-        _, wavefunction = scf_solver.run(o2, 0, 3)
+        _, wavefunction = scf_solver.run(o2, 0, 3, "def2-svp")
         orbitals = wavefunction.get_orbitals()
 
         [can_a, can_b] = orbitals.get_coefficients()
@@ -943,9 +921,8 @@ class TestPyscfPlugin:
         """Test PySCF Foster-Boys localization on O2 molecule with UHF/def2-svp."""
         o2 = create_o2_structure()
         scf_solver = algorithms.create("scf_solver", "pyscf")
-        scf_solver.settings().set("basis_set", "def2-svp")
 
-        _, wavefunction = scf_solver.run(o2, 0, 3)
+        _, wavefunction = scf_solver.run(o2, 0, 3, "def2-svp")
         orbitals = wavefunction.get_orbitals()
 
         # Compute the objective function for the canonical orbitals
@@ -1039,9 +1016,8 @@ class TestPyscfPlugin:
         """Test PySCF Edmiston-Ruedenberg localization on O2 molecule with UHF/def2-svp."""
         o2 = create_o2_structure()
         scf_solver = algorithms.create("scf_solver", "pyscf")
-        scf_solver.settings().set("basis_set", "def2-svp")
 
-        _, wavefunction = scf_solver.run(o2, 0, 3)
+        _, wavefunction = scf_solver.run(o2, 0, 3, "def2-svp")
         orbitals = wavefunction.get_orbitals()
 
         # Compute the objective function for the canonical orbitals
@@ -1129,10 +1105,9 @@ class TestPyscfPlugin:
         """Test PySCF Pipek-Mezey localization on O2 molecule with ROHF/def2-svp."""
         o2 = create_o2_structure()
         scf_solver = algorithms.create("scf_solver", "pyscf")
-        scf_solver.settings().set("basis_set", "def2-svp")
         scf_solver.settings().set("force_restricted", True)
 
-        _, wavefunction = scf_solver.run(o2, 0, 3)
+        _, wavefunction = scf_solver.run(o2, 0, 3, "def2-svp")
         orbitals = wavefunction.get_orbitals()
 
         # Compute the objective function for the canonical orbitals
@@ -1195,10 +1170,9 @@ class TestPyscfPlugin:
         """Test PySCF Foster-Boys localization on O2 molecule with ROHF/def2-svp."""
         o2 = create_o2_structure()
         scf_solver = algorithms.create("scf_solver", "pyscf")
-        scf_solver.settings().set("basis_set", "def2-svp")
         scf_solver.settings().set("force_restricted", True)
 
-        _, wavefunction = scf_solver.run(o2, 0, 3)
+        _, wavefunction = scf_solver.run(o2, 0, 3, "def2-svp")
         orbitals = wavefunction.get_orbitals()
 
         # Compute the objective function for the canonical orbitals
@@ -1267,10 +1241,9 @@ class TestPyscfPlugin:
         """Test PySCF Edmiston-Ruedenberg localization on O2 molecule with ROHF/def2-svp."""
         o2 = create_o2_structure()
         scf_solver = algorithms.create("scf_solver", "pyscf")
-        scf_solver.settings().set("basis_set", "def2-svp")
         scf_solver.settings().set("force_restricted", True)
 
-        _, wavefunction = scf_solver.run(o2, 0, 3)
+        _, wavefunction = scf_solver.run(o2, 0, 3, "def2-svp")
         orbitals = wavefunction.get_orbitals()
 
         # Compute the objective function for the canonical orbitals
@@ -1334,9 +1307,8 @@ class TestPyscfPlugin:
         """Test PySCF AVAS selector on water molecule with def2-svp basis."""
         water = create_water_structure()
         scf_solver = algorithms.create("scf_solver", "pyscf")
-        scf_solver.settings().set("basis_set", "def2-svp")
 
-        _, wavefunction = scf_solver.run(water, 0, 1)
+        _, wavefunction = scf_solver.run(water, 0, 1, "def2-svp")
 
         # Select active space using AVAS
         avas_selector = algorithms.create("active_space_selector", "pyscf_avas")
@@ -1357,10 +1329,9 @@ class TestPyscfPlugin:
         """Test PySCF AVAS selector on O2 molecule (triplet ROHF) with def2-svp basis."""
         o2 = create_o2_structure()
         scf_solver = algorithms.create("scf_solver", "pyscf")
-        scf_solver.settings().set("basis_set", "def2-svp")
         scf_solver.settings().set("force_restricted", True)
 
-        _, wavefunction = scf_solver.run(o2, 0, 3)
+        _, wavefunction = scf_solver.run(o2, 0, 3, "def2-svp")
 
         # Select active space using AVAS
         avas_selector = algorithms.create("active_space_selector", "pyscf_avas")
@@ -1376,8 +1347,7 @@ class TestPyscfPlugin:
         """Test PySCF CCSD on water with def2-svp basis."""
         water = create_water_structure()
         scf_solver = algorithms.create("scf_solver", "pyscf")
-        scf_solver.settings().set("basis_set", "def2-svp")
-        _, wavefunction = scf_solver.run(water, 0, 1)
+        _, wavefunction = scf_solver.run(water, 0, 1, "def2-svp")
 
         ham_calculator = algorithms.create("hamiltonian_constructor", "qdk")
         hamiltonian = ham_calculator.run(wavefunction.get_orbitals())
@@ -1397,8 +1367,7 @@ class TestPyscfPlugin:
 
         # Perform SCF calculation with qdk-chemistry
         scf_solver = algorithms.create("scf_solver")
-        scf_solver.settings().set("basis_set", "cc-pvdz")
-        _, wavefunction = scf_solver.run(n2, 0, 1)
+        _, wavefunction = scf_solver.run(n2, 0, 1, "cc-pvdz")
 
         # Construct qdk-chemistry Hamiltonian for active space
         ham_calculator = algorithms.create("hamiltonian_constructor")
@@ -1427,9 +1396,8 @@ class TestPyscfPlugin:
 
         # Perform SCF calculation with qdk-chemistry
         scf_solver = algorithms.create("scf_solver", "pyscf")
-        scf_solver.settings().set("basis_set", "cc-pvdz")
         scf_solver.settings().set("force_restricted", True)
-        _, wavefunction = scf_solver.run(o2, 0, 3)
+        _, wavefunction = scf_solver.run(o2, 0, 3, "cc-pvdz")
 
         # Construct qdk-chemistry Hamiltonian for active space
         ham_calculator = algorithms.create("hamiltonian_constructor")
@@ -1462,8 +1430,7 @@ class TestPyscfPlugin:
 
         # Perform SCF calculation with qdk-chemistry
         scf_solver = algorithms.create("scf_solver")
-        scf_solver.settings().set("basis_set", "cc-pvdz")
-        _, wavefunction = scf_solver.run(n2, 0, 1)
+        _, wavefunction = scf_solver.run(n2, 0, 1, "cc-pvdz")
 
         # Get pyscf object from hf orbitals
         occ_a, occ_b = wavefunction.get_total_orbital_occupations()
@@ -1490,8 +1457,7 @@ class TestPyscfPlugin:
 
         # Perform SCF calculation with qdk-chemistry
         scf_solver = algorithms.create("scf_solver", "pyscf")
-        scf_solver.settings().set("basis_set", "cc-pvdz")
-        _, wavefunction = scf_solver.run(o2, 0, 3)
+        _, wavefunction = scf_solver.run(o2, 0, 3, "cc-pvdz")
 
         # Get pyscf object from hf orbitals
         occ_a, occ_b = wavefunction.get_total_orbital_occupations()
@@ -1520,8 +1486,7 @@ class TestPyscfPlugin:
 
         # Perform SCF calculation with qdk-chemistry
         scf_solver = algorithms.create("scf_solver")
-        scf_solver.settings().set("basis_set", "cc-pvdz")
-        _, wavefunction = scf_solver.run(n2, 0, 1)
+        _, wavefunction = scf_solver.run(n2, 0, 1, "cc-pvdz")
 
         # Get pyscf object from hf orbitals
         occ_a, occ_b = wavefunction.get_total_orbital_occupations()
@@ -1548,9 +1513,8 @@ class TestPyscfPlugin:
 
         # Perform SCF calculation with qdk-chemistry
         scf_solver = algorithms.create("scf_solver", "pyscf")
-        scf_solver.settings().set("basis_set", "cc-pvdz")
         scf_solver.settings().set("force_restricted", True)
-        _, wavefunction = scf_solver.run(o2, 0, 3)
+        _, wavefunction = scf_solver.run(o2, 0, 3, "cc-pvdz")
 
         # Get pyscf object from hf orbitals
         occ_a, occ_b = wavefunction.get_total_orbital_occupations()
@@ -1575,8 +1539,7 @@ class TestPyscfPlugin:
         # Get orbitals and Hamiltonian
         water = create_water_structure()
         scf_solver = algorithms.create("scf_solver", "pyscf")
-        scf_solver.settings().set("basis_set", "def2-svp")
-        _, wavefunction = scf_solver.run(water, 0, 1)
+        _, wavefunction = scf_solver.run(water, 0, 1, "def2-svp")
         orbitals = wavefunction.get_orbitals()
         hamiltonian_calculator = algorithms.create("hamiltonian_constructor")
         hamiltonian = hamiltonian_calculator.run(orbitals)
@@ -1639,8 +1602,7 @@ class TestQDKChemistryPySCFBasisConversion:
     def create_simple_basis_set(self, structure, basis_name="STO-3G"):
         """Create a simple basis set for testing."""
         scf_solver = qdk_chemistry.algorithms.create("scf_solver")
-        scf_solver.settings().set("basis_set", basis_name.lower())
-        _, wavefunction = scf_solver.run(structure, 0, 1)
+        _, wavefunction = scf_solver.run(structure, 0, 1, basis_name.lower())
         return wavefunction.get_orbitals().get_basis_set()
 
     def test_qdk_to_pyscf_conversion_helium(self):
@@ -1832,8 +1794,7 @@ class TestQDKChemistryPySCFBasisConversion:
         """Test that molecular orbitals remain consistent after basis conversion."""
         # Get QDK/Chemistry solution
         scf_solver = qdk_chemistry.algorithms.create("scf_solver", "pyscf")
-        scf_solver.settings().set("basis_set", "sto-3g")
-        qdk_energy, qdk_wavefunction = scf_solver.run(self.he_structure, 0, 1)
+        qdk_energy, qdk_wavefunction = scf_solver.run(self.he_structure, 0, 1, "sto-3g")
         qdk_orbitals = qdk_wavefunction.get_orbitals()
         qdk_mos = qdk_orbitals.get_coefficients()[0]
 

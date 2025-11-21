@@ -64,13 +64,9 @@ int main(int argc, char** argv) {
 
   // Create an SCF solver instance
   auto scf_solver = qdk::chemistry::algorithms::ScfSolverFactory::create();
-  {
-    auto& settings = scf_solver->settings();
-    settings.set("basis_set", basis_set);
-  }
 
   // Perform SCF Optimization
-  auto [E_hf, wfn_hf] = scf_solver->run(structure, 0, 1);
+  auto [E_hf, wfn_hf] = scf_solver->run(structure, 0, 1, basis_set);
   auto orbitals_hf = wfn_hf->get_orbitals();
   auto [n_alpha, n_beta] = wfn_hf->get_total_num_electrons();
 

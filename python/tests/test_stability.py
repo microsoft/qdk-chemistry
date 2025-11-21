@@ -371,8 +371,7 @@ class TestPyscfStabilityChecker:
         """Test PySCF stability checker on stable RHF water molecule."""
         water = create_water_structure()
         scf_solver = algorithms.create("scf_solver", "pyscf")
-        scf_solver.settings().set("basis_set", "def2-svp")
-        _, wavefunction = scf_solver.run(water, 0, 1)
+        _, wavefunction = scf_solver.run(water, 0, 1, "def2-svp")
 
         # Perform stability analysis
         stability_checker = algorithms.create("stability_checker", "pyscf")
@@ -454,8 +453,7 @@ class TestPyscfStabilityChecker:
         """Test PySCF stability checker on UHF oxygen molecule."""
         o2 = create_o2_structure()
         scf_solver = algorithms.create("scf_solver", "pyscf")
-        scf_solver.settings().set("basis_set", "def2-svp")
-        _, wavefunction = scf_solver.run(o2, 0, 3)
+        _, wavefunction = scf_solver.run(o2, 0, 3, "def2-svp")
 
         # Perform stability analysis (only internal, since external not supported for UHF)
         stability_checker = algorithms.create("stability_checker", "pyscf")
@@ -500,9 +498,8 @@ class TestPyscfStabilityChecker:
         """Test PySCF stability checker on ROHF oxygen molecule."""
         o2 = create_o2_structure()
         scf_solver = algorithms.create("scf_solver", "pyscf")
-        scf_solver.settings().set("basis_set", "def2-svp")
         scf_solver.settings().set("force_restricted", True)
-        _, wavefunction = scf_solver.run(o2, 0, 3)
+        _, wavefunction = scf_solver.run(o2, 0, 3, "def2-svp")
 
         # Perform stability analysis (only internal, since external not supported for ROHF)
         stability_checker = algorithms.create("stability_checker", "pyscf")
@@ -547,8 +544,7 @@ class TestPyscfStabilityChecker:
         """Test stability checker when no analysis is requested."""
         water = create_water_structure()
         scf_solver = algorithms.create("scf_solver", "pyscf")
-        scf_solver.settings().set("basis_set", "sto-3g")
-        _, wavefunction = scf_solver.run(water, 0, 1)
+        _, wavefunction = scf_solver.run(water, 0, 1, "sto-3g")
 
         stability_checker = algorithms.create("stability_checker", "pyscf")
         settings = stability_checker.settings()
@@ -574,8 +570,7 @@ class TestPyscfStabilityChecker:
         """Test PySCF stability checker on N2 at 1.2 Å with RHF - no internal, one external instability."""
         n2 = create_stretched_n2_structure(distance_angstrom=1.2)
         scf_solver = algorithms.create("scf_solver", "pyscf")
-        scf_solver.settings().set("basis_set", "def2-svp")
-        _, wavefunction = scf_solver.run(n2, 0, 1)
+        _, wavefunction = scf_solver.run(n2, 0, 1, "def2-svp")
 
         # Perform stability analysis
         stability_checker = algorithms.create("stability_checker", "pyscf")
@@ -620,8 +615,7 @@ class TestPyscfStabilityChecker:
         """Test PySCF stability checker on N2 molecule at 1.6 Å with RHF - should have one internal instability."""
         n2 = create_stretched_n2_structure(distance_angstrom=1.6)
         scf_solver = algorithms.create("scf_solver", "pyscf")
-        scf_solver.settings().set("basis_set", "def2-svp")
-        _, wavefunction = scf_solver.run(n2, 0, 1)
+        _, wavefunction = scf_solver.run(n2, 0, 1, "def2-svp")
 
         # Perform stability analysis
         stability_checker = algorithms.create("stability_checker", "pyscf")
@@ -661,8 +655,7 @@ class TestPyscfStabilityChecker:
         """Test PySCF stability checker on BN+ cation with UHF."""
         bn_plus = create_bn_plus_structure()
         scf_solver = algorithms.create("scf_solver", "pyscf")
-        scf_solver.settings().set("basis_set", "def2-svp")
-        _, wavefunction = scf_solver.run(bn_plus, 1, 2)  # charge=1, multiplicity=2
+        _, wavefunction = scf_solver.run(bn_plus, 1, 2, "def2-svp")  # charge=1, multiplicity=2
 
         # Perform stability analysis (only internal for UHF)
         stability_checker = algorithms.create("stability_checker", "pyscf")
@@ -709,9 +702,8 @@ class TestPyscfStabilityChecker:
         """Test PySCF stability checker on C2+ cation with ROHF."""
         c2_plus = create_c2_plus_structure()
         scf_solver = algorithms.create("scf_solver", "pyscf")
-        scf_solver.settings().set("basis_set", "def2-svp")
         scf_solver.settings().set("force_restricted", True)  # Force ROHF
-        _, wavefunction = scf_solver.run(c2_plus, 1, 2)  # charge=1, multiplicity=2
+        _, wavefunction = scf_solver.run(c2_plus, 1, 2, "def2-svp")  # charge=1, multiplicity=2
 
         # Perform stability analysis (only internal for ROHF)
         stability_checker = algorithms.create("stability_checker", "pyscf")

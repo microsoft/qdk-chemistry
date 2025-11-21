@@ -41,8 +41,10 @@ print(f"Elements: {structure.get_elements()}")
 # end-cell-1
 # start-cell-2
 # Perform an SCF calculation, returning the energy and wavefunction
-scf_solver = create("scf_solver", basis_set="cc-pvdz")
-E_hf, wfn_hf = scf_solver.run(structure, charge=0, spin_multiplicity=1)
+scf_solver = create("scf_solver")
+E_hf, wfn_hf = scf_solver.run(
+    structure, charge=0, spin_multiplicity=1, basis_information="cc-pvdz"
+)
 print(f"SCF energy is {E_hf:.3f} Hartree")
 
 # Display a summary of the molecular orbitals obtained from the SCF calculation

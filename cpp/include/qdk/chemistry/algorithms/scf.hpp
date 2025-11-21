@@ -24,7 +24,6 @@ class ElectronicStructureSettings : public data::Settings {
  public:
   ElectronicStructureSettings() {
     set_default("method", "hf");
-    set_default("basis_set", "def2-svp");
     set_default("tolerance", 1e-8);
     set_default("max_iterations", 50);
   }
@@ -48,7 +47,7 @@ class ElectronicStructureSettings : public data::Settings {
  * auto scf_solver = qdk::chemistry::ScfSolver::create("default");
  *
  * // Configure solver settings
- * scf_solver->settings().set("basis_set", "6-31G*");
+ * scf_solver->settings().set("max_iterations", 100);
  *
  * // Perform SCF calculation
  * auto [energy, wavefunction] = scf_solver->run(molecular_structure, 0, 1);
@@ -57,10 +56,11 @@ class ElectronicStructureSettings : public data::Settings {
  * @endcode
  */
 class ScfSolver
-    : public Algorithm<ScfSolver,
-                       std::pair<double, std::shared_ptr<data::Wavefunction>>,
-                       std::shared_ptr<data::Structure>, int, int,
-                       std::optional<std::shared_ptr<data::Orbitals>>> {
+    : public Algorithm<
+          ScfSolver, std::pair<double, std::shared_ptr<data::Wavefunction>>,
+          std::shared_ptr<data::Structure>, int, int,
+          std::variant<std::shared_ptr<data::Orbitals>,
+                       std::shared_ptr<data::BasisSet>, std::string>> {
  public:
   /**
    * @brief Default constructor
@@ -86,11 +86,12 @@ class ScfSolver
    *                  nuclear charges, and other structural information
    * @param charge The molecular charge
    * @param spin_multiplicity The spin multiplicity of the molecular system
-   * @param initial_guess Initial orbital guess for the SCF calculation
-   *        (optional, defaults to a standard configurable guess). If provided,
-   *        the initial guess should be generated using the same basis set and
-   *        either the same molecular structure or a similar structure (e.g.,
-   *        from a previous step in a geometry optimization)
+   * @param basis_information Basis set information, which can be provided as:
+   *         - A shared pointer to a `data::BasisSet` object
+   *         - A string specifying the name of a standard basis set (e.g.,
+   * "sto-3g")
+   *         - A shared pointer to a `data::Orbitals` object to be used as an
+   * initial guess
    * \endcond
    *
    * @return A pair containing:
@@ -110,23 +111,6 @@ class ScfSolver
    * documentation for the specific SCF solver being used.
    */
   using Algorithm::run;
-
-  /**
-   * @brief Overloaded run method with default initial_guess
-   *
-   * This convenience method allows calling run() without providing an
-   * initial_guess parameter.
-   *
-   * @param structure The molecular structure
-   * @param charge The molecular charge
-   * @param spin_multiplicity The spin multiplicity
-   * @return A pair containing the energy and wavefunction
-   */
-  virtual std::pair<double, std::shared_ptr<data::Wavefunction>> run(
-      std::shared_ptr<data::Structure> structure, int charge,
-      int spin_multiplicity) const {
-    return Algorithm::run(structure, charge, spin_multiplicity, std::nullopt);
-  }
 
   /**
    * @brief Access the algorithm's name
@@ -158,7 +142,9 @@ class ScfSolver
   virtual std::pair<double, std::shared_ptr<data::Wavefunction>> _run_impl(
       std::shared_ptr<data::Structure> structure, int charge,
       int spin_multiplicity,
-      std::optional<std::shared_ptr<data::Orbitals>> initial_guess) const = 0;
+      std::variant<std::shared_ptr<data::Orbitals>,
+                   std::shared_ptr<data::BasisSet>, std::string>
+          basis_information) const = 0;
 };
 
 /**

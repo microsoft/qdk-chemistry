@@ -1388,7 +1388,7 @@ void bind_settings(pybind11::module &data) {
         >>> print(expected)  # "int"
         >>> expected = settings.get_expected_python_type("tolerance")
         >>> print(expected)  # "float"
-        >>> expected = settings.get_expected_python_type("basis_set")
+        >>> expected = settings.get_expected_python_type("method")
         >>> print(expected)  # "str"
         >>> expected = settings.get_expected_python_type("active_orbitals")
         >>> print(expected)  # "list[int]"

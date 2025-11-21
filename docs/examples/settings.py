@@ -26,7 +26,7 @@ max_iter = settings.get("max_iterations")
 
 # Set various parameter types
 # Set a string value
-settings.set("basis_set", "def2-tzvp")
+settings.set("method", "B3LYP")
 
 # Set a numeric value
 settings.set("tolerance", 1.0e-8)
@@ -39,7 +39,7 @@ settings.set("tolerance", 1.0e-8)
 
 # Get various parameter types
 # Get a string value
-basis = settings.get("basis_set")
+basis = settings.get("method")
 
 # Get a numeric value
 threshold = settings.get("tolerance")
@@ -57,9 +57,9 @@ max_iter_with_default = settings.get_or_default("max_iterations", 100)
 print(f"Max iterations: {max_iter}")
 
 # Check if a setting exists
-if settings.has("basis_set"):
+if settings.has("method"):
     # Use the setting
-    print(f"Basis set is configured: {settings.get('basis_set')}")
+    print(f"Method is selected: {settings.get('method')}")
 
 # Check if a setting exists (Python duck typing, no type check needed)
 if settings.has("tolerance"):
@@ -95,7 +95,7 @@ is_empty = settings.empty()
 settings = scf_solver.settings()  # Re-initialize to clear
 
 # Validate that required settings exist
-settings.validate_required(["basis_set", "tolerance"])
+settings.validate_required(["method", "tolerance"])
 
 # Get a setting as a string representation
 value_str = settings.get_as_string("tolerance")

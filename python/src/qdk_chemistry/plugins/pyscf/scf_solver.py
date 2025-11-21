@@ -22,7 +22,7 @@ SCF solver registry under the name "pyscf".
 >>> from qdk_chemistry.plugins.pyscf.scf_solver import PyscfScfSolver
 >>> solver = PyscfScfSolver()
 >>> solver.settings()["method"] = "b3lyp"  # Use B3LYP DFT
->>> energy, orbitals = solver.run(molecule)
+>>> energy, orbitals = solver.run(molecule, 0, 1, "sto-3g")
 
 This module requires both QDK/Chemistry and PySCF to be installed. The solver supports both
 restricted and unrestricted variants for both HF and DFT calculations.
@@ -36,9 +36,11 @@ restricted and unrestricted variants for both HF and DFT calculations.
 import numpy as np
 from pyscf import gto, scf
 from pyscf.gto.mole import bse_predefined_ecp
+from pyscf.lib.exceptions import BasisNotFoundError
 
 from qdk_chemistry.algorithms import ScfSolver, register
 from qdk_chemistry.data import (
+    BasisSet,
     Configuration,
     ElectronicStructureSettings,
     Orbitals,
@@ -58,8 +60,6 @@ class PyscfScfSettings(ElectronicStructureSettings):
 
     Inherits from ElectronicStructureSettings:
         method (str, default="hf"): The electronic structure method (Hartree-Fock).
-        basis_set (str, default="def2-svp"): The basis set used for quantum chemistry calculations.
-            Common options include "def2-svp", "def2-tzvp", "cc-pvdz", etc.
         tolerance (float, default=1e-6): Convergence tolerance.
         max_iterations (int, default=50): Maximum number of iterations.
 
@@ -68,11 +68,11 @@ class PyscfScfSettings(ElectronicStructureSettings):
 
     Examples:
         >>> settings = PyscfScfSettings()
-        >>> settings.get("basis_set")
-        'def2-svp'
-        >>> settings.set("basis_set", "cc-pvdz")
-        >>> settings.get("basis_set")
-        'cc-pvdz'
+        >>> settings.get("max_iterations")
+        50
+        >>> settings.set("max_iterations", 100)
+        >>> settings.get("max_iterations")
+        100
 
     Notes:
         The PySCF SCF solver is used for performing self-consistent field calculations in quantum chemistry, which
@@ -106,9 +106,8 @@ class PyscfScfSolver(ScfSolver):
 
     Examples:
         >>> solver = PyscfScfSolver()
-        >>> solver.settings()["basis_set"] = "6-31G*"
         >>> solver.settings()["method"] = "b3lyp"  # Use B3LYP DFT
-        >>> energy, orbitals = solver.run(molecule_structure, charge=0, spin_multiplicity=1)
+        >>> energy, orbitals = solver.run(molecule_structure, charge=0, spin_multiplicity=1, "6-31G*")
         >>> print(f"Electronic energy: {energy} Hartree")
 
     See Also:
@@ -123,7 +122,7 @@ class PyscfScfSolver(ScfSolver):
         self._settings = PyscfScfSettings()
 
     def _run_impl(
-        self, structure: Structure, charge: int, spin_multiplicity: int, initial_guess: Orbitals | None = None
+        self, structure: Structure, charge: int, spin_multiplicity: int, basis_information: Orbitals | BasisSet | str
     ) -> tuple[float, Wavefunction]:
         """Perform a self-consistent field (SCF) calculation using PySCF.
 
@@ -143,9 +142,10 @@ class PyscfScfSolver(ScfSolver):
             spin_multiplicity: The spin multiplicity :math:`(2S+1)` of the system, where :math:`S` is the total spin.
                 Note: This parameter is not used directly; the spin_multiplicity from ``self._settings`` is used
                 instead.
-            initial_guess: Initial orbital guess for the SCF calculation. If provided, the
-                molecular orbital coefficients will be used as the starting point
-                for the SCF iteration. If None, PySCF's default initial guess will be used.
+            basis_information: Basis set information, which can be provided as:
+                - A ``qdk_chemistry.data.BasisSet`` object
+                - A string specifying the name of a standard basis set (e.g., "sto-3g")
+                - A ``qdk_chemistry.data.Orbitals`` object to be used as an initial guess
 
         Returns:
             * The electronic energy of the system in atomic units (Hartree), excluding nuclear repulsion energy
@@ -158,7 +158,20 @@ class PyscfScfSolver(ScfSolver):
 
         """
         atoms, _, _ = structure_to_pyscf_atom_labels(structure)
-        basis_name = self._settings["basis_set"]
+
+        # Determine basis set name and initial guess
+        basis_name = None
+        initial_guess = None
+        if isinstance(basis_information, Orbitals):
+            basis_name = basis_information.get_basis_set().get_name()
+            initial_guess = basis_information
+        elif isinstance(basis_information, BasisSet):
+            basis_name = basis_information.get_name()
+            raise NotImplementedError("Custom BasisSet input not yet implemented in PyscfScfSolver.")
+        elif isinstance(basis_information, str):
+            basis_name = basis_information
+
+        # settings
         method = self._settings["method"].lower()
         tolerance = self._settings["tolerance"]
         max_iterations = self._settings["max_iterations"]
@@ -172,6 +185,7 @@ class PyscfScfSolver(ScfSolver):
         if ecp_atoms:
             ecp_dict = dict.fromkeys(ecp_atoms, ecp)
 
+        # build pyscf molecule
         mol = gto.Mole(
             atom=atoms,
             basis=basis_name,
@@ -180,7 +194,10 @@ class PyscfScfSolver(ScfSolver):
             unit="Bohr",
             ecp=ecp_dict if ecp_atoms else None,
         )
-        mol.build()
+        try:
+            mol.build()
+        except BasisNotFoundError as e:
+            raise ValueError(f"Basis set '{basis_name}' not found in PySCF.") from e
 
         force_restricted = self._settings["force_restricted"]
 

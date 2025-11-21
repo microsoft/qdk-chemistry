@@ -69,8 +69,7 @@ class TestPMCCalculator:
         as_selector = algorithms.create("active_space_selector", "qdk_valence")
 
         # Perform SCF calculation
-        scf_solver.settings().set("basis_set", "def2-svp")
-        e_hf, wfn_hf = scf_solver.run(water, 0, 1)
+        e_hf, wfn_hf = scf_solver.run(water, 0, 1, "def2-svp")
 
         # Select active space
         as_selector.settings().set("num_active_electrons", 6)
@@ -104,8 +103,7 @@ class TestPMCCalculator:
         as_selector = algorithms.create("active_space_selector", "qdk_valence")
 
         # Perform SCF calculation
-        scf_solver.settings().set("basis_set", "def2-svp")
-        e_hf, wfn_hf = scf_solver.run(water, 0, 1)
+        e_hf, wfn_hf = scf_solver.run(water, 0, 1, "def2-svp")
 
         # Select active space
         as_selector.settings().set("num_active_electrons", 6)

@@ -38,8 +38,7 @@ class TestMCSCF:
 
         # Perform SCF calculation with QDK
         scf_solver = alg.create("scf_solver")
-        scf_solver.settings().set("basis_set", "cc-pvdz")
-        _, wavefunction = scf_solver.run(n2, 0, 1)
+        _, wavefunction = scf_solver.run(n2, 0, 1, "cc-pvdz")
 
         # Construct QDK Hamiltonian for active space
         ham_calculator = alg.create("hamiltonian_constructor")
@@ -68,9 +67,8 @@ class TestMCSCF:
 
         # Perform SCF calculation with PySCF
         scf_solver = alg.create("scf_solver", "pyscf")
-        scf_solver.settings().set("basis_set", "cc-pvdz")
         scf_solver.settings().set("force_restricted", True)
-        _, wavefunction = scf_solver.run(o2, 0, 3)
+        _, wavefunction = scf_solver.run(o2, 0, 3, "cc-pvdz")
 
         # Construct QDK Hamiltonian for active space
         ham_calculator = alg.create("hamiltonian_constructor")

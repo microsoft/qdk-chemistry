@@ -16,11 +16,10 @@ structure = Structure(coords, ["H", "H"])
 # Create the default ScfSolver instance
 scf_solver = create("scf_solver")
 
-# Set the basis set
-scf_solver.settings().set("basis_set", "sto-3g")
-
 # Run the SCF calculation
-E_scf, wfn = scf_solver.run(structure, charge=0, spin_multiplicity=1)
+E_scf, wfn = scf_solver.run(
+    structure, charge=0, spin_multiplicity=1, basis_information="sto-3g"
+)
 scf_orbitals = wfn.get_orbitals()
 
 print(f"SCF Energy: {E_scf}")

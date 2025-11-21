@@ -26,9 +26,8 @@ print("Available orbital localizers:", available("orbital_localizer"))
 # Example of creating with custom settings
 scf_solver = create("scf_solver")
 scf_solver.settings().set("max_iterations", 100)
-scf_solver.settings().set("basis_set", "sto-3g")
 print(f"Set max_iterations to: {scf_solver.settings().get('max_iterations')}")
 
 # Run the SCF solver with the molecule (requires resources directory)
-# E_scf, wfn = scf_solver.run(molecule, charge=0, spin_multiplicity=1)
+# E_scf, wfn = scf_solver.run(molecule, charge=0, spin_multiplicity=1, basis_information="sto-3g")
 # print(f"SCF Energy: {E_scf}")
