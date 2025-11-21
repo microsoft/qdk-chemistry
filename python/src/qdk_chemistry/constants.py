@@ -80,7 +80,7 @@ from qdk_chemistry._core.constants import (
 )
 
 
-def list_constants(show_values: bool = True, show_units: bool = True):
+def list_constants(show_values: bool = True, show_units: bool = True) -> None:
     """List all available constants with their documentation.
 
     Args:

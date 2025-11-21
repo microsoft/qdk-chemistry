@@ -8,3 +8,4 @@
 import qdk_chemistry.plugins.qiskit.energy_estimator
 import qdk_chemistry.plugins.qiskit.qubit_mapper
 import qdk_chemistry.plugins.qiskit.regular_isometry
+import qdk_chemistry.plugins.qiskit.sparse_isometry

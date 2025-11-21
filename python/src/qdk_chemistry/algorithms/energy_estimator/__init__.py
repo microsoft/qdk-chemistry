@@ -23,4 +23,6 @@ __all__ = [
     "EnergyEstimator",
     "EnergyEstimatorFactory",
     "QDKEnergyEstimator",
+    "compute_energy_expectation_from_bitstrings",
+    "create_measurement_circuits",
 ]

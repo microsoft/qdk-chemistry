@@ -263,7 +263,7 @@ def test_compute_expval_mixed_bitstring_formats():
     )
 
 
-def test_compute_expval_empty_counts():
+def test_compute_expval_empty_counts() -> None:
     """Test _compute_expval_and_variance with empty bitstring counts."""
     counts: dict = {}
     paulis = PauliList(["Z"])

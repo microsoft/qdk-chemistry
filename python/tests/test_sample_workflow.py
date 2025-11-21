@@ -19,9 +19,15 @@ from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
 
+import numpy as np
 import pytest
 
-ENERGY_TOL = 1.0e-6  # Hartree
+from .reference_tolerances import (
+    estimator_energy_tolerance,
+    float_comparison_relative_tolerance,
+    qpe_energy_tolerance,
+    sci_energy_tolerance,
+)
 
 
 def _truthy_env(name: str) -> bool:
@@ -33,13 +39,6 @@ _RUNNING_IN_CI = _truthy_env("TF_BUILD")
 _RUN_MACIS_WORKFLOW = _truthy_env("QDK_CHEMISTRY_RUN_MACIS_WORKFLOW")
 
 
-def _workflow_env() -> dict[str, str]:
-    """Return environment for workflow subprocess execution with controlled threading."""
-    env = os.environ.copy()
-    env["OMP_NUM_THREADS"] = "1"
-    return env
-
-
 def _run_workflow(cmd, cwd: Path) -> subprocess.CompletedProcess[str]:
     """Execute the workflow CLI with coverage-friendly defaults."""
     return subprocess.run(
@@ -48,7 +47,7 @@ def _run_workflow(cmd, cwd: Path) -> subprocess.CompletedProcess[str]:
         capture_output=True,
         text=True,
         check=False,
-        env=_workflow_env(),
+        env=os.environ.copy(),
     )
 
 
@@ -212,7 +211,7 @@ def test_sample_sci_workflow_scenarios(case: WorkflowCase) -> None:
     lines = _collect_output_lines(result)
 
     det_count, energy, _ = _extract_sparse_ci_summary(lines)
-    assert abs(energy - case.expected_energy) <= ENERGY_TOL
+    assert np.isclose(energy, case.expected_energy, rtol=float_comparison_relative_tolerance, atol=sci_energy_tolerance)
     if case.expected_det_count is not None:
         assert det_count == case.expected_det_count
 
@@ -240,7 +239,9 @@ def test_sample_non_commuting_qpe_outputs_expected_values():
     assert phases == ["0.140625", "0.988770"], f"Unexpected phase fractions: {phases}"
 
     energies = [float(val) for val in re.findall(r"Estimated energy: ([+\-0-9.]+) Hartree", result.stdout)]
-    assert energies == pytest.approx([1.12500000, -0.08984375], abs=1e-8)
+    assert np.allclose(
+        energies, [1.12500000, -0.08984375], rtol=float_comparison_relative_tolerance, atol=qpe_energy_tolerance
+    )
 
 
 def test_qiskit_qpe_direct_outputs_consistency():
@@ -277,7 +278,12 @@ def test_qiskit_qpe_direct_outputs_consistency():
 
     assert math.isfinite(estimated_electronic_energy)
     assert math.isfinite(estimated_total_energy)
-    assert estimated_total_energy - reference_total_energy == pytest.approx(reported_difference, abs=1e-3)
+    assert np.isclose(
+        estimated_total_energy - reference_total_energy,
+        reported_difference,
+        rtol=float_comparison_relative_tolerance,
+        atol=estimator_energy_tolerance,
+    )
 
 
 def test_sample_e2e_qpe_trotter_outputs_consistency():
@@ -314,7 +320,12 @@ def test_sample_e2e_qpe_trotter_outputs_consistency():
 
     assert math.isfinite(estimated_electronic_energy)
     assert math.isfinite(estimated_total_energy)
-    assert estimated_total_energy - reference_total_energy == pytest.approx(reported_difference, abs=1e-3)
+    assert np.isclose(
+        estimated_total_energy - reference_total_energy,
+        reported_difference,
+        rtol=float_comparison_relative_tolerance,
+        atol=estimator_energy_tolerance,
+    )
 
 
 @pytest.mark.skipif(

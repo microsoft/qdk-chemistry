@@ -21,6 +21,10 @@ from qdk_chemistry.data import (
     Wavefunction,
 )
 
+from .reference_tolerances import (
+    float_comparison_absolute_tolerance,
+    float_comparison_relative_tolerance,
+)
 from .test_helpers import create_test_basis_set
 
 
@@ -91,7 +95,12 @@ class TestAnsatzSerialization:
         orig_wf = test_ansatz.get_wavefunction()
         recon_wf = ansatz_reconstructed.get_wavefunction()
         assert recon_wf.size() == orig_wf.size()
-        assert abs(recon_wf.norm() - orig_wf.norm()) < 1e-10
+        assert np.isclose(
+            recon_wf.norm(),
+            orig_wf.norm(),
+            rtol=float_comparison_relative_tolerance,
+            atol=float_comparison_absolute_tolerance,
+        )
 
         # Verify hamiltonian properties
         orig_ham = test_ansatz.get_hamiltonian()
@@ -118,7 +127,12 @@ class TestAnsatzSerialization:
         orig_wf = test_ansatz.get_wavefunction()
         recon_wf = ansatz_reconstructed.get_wavefunction()
         assert recon_wf.size() == orig_wf.size()
-        assert abs(recon_wf.norm() - orig_wf.norm()) < 1e-10
+        assert np.isclose(
+            recon_wf.norm(),
+            orig_wf.norm(),
+            rtol=float_comparison_relative_tolerance,
+            atol=float_comparison_absolute_tolerance,
+        )
 
         # Verify hamiltonian properties
         orig_ham = test_ansatz.get_hamiltonian()
@@ -237,7 +251,12 @@ class TestAnsatzSerialization:
             orig_wf = test_ansatz.get_wavefunction()
             restored_wf = ansatz_restored.get_wavefunction()
             assert orig_wf.size() == restored_wf.size()
-            assert abs(orig_wf.norm() - restored_wf.norm()) < 1e-10
+            assert np.isclose(
+                orig_wf.norm(),
+                restored_wf.norm(),
+                rtol=float_comparison_relative_tolerance,
+                atol=float_comparison_absolute_tolerance,
+            )
 
             # Verify determinants
             orig_dets = orig_wf.get_active_determinants()
@@ -249,9 +268,19 @@ class TestAnsatzSerialization:
                 orig_coeff = orig_wf.get_coefficient(det)
                 restored_coeff = restored_wf.get_coefficient(det)
                 if isinstance(orig_coeff, complex):
-                    assert abs(orig_coeff - restored_coeff) < 1e-10
+                    assert np.isclose(
+                        orig_coeff,
+                        restored_coeff,
+                        rtol=float_comparison_relative_tolerance,
+                        atol=float_comparison_absolute_tolerance,
+                    )
                 else:
-                    assert abs(orig_coeff - restored_coeff) < 1e-10
+                    assert np.isclose(
+                        orig_coeff,
+                        restored_coeff,
+                        rtol=float_comparison_relative_tolerance,
+                        atol=float_comparison_absolute_tolerance,
+                    )
 
         # Verify orbital consistency
         if test_ansatz.has_orbitals():

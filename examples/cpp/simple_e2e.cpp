@@ -38,9 +38,10 @@
 #include <qdk/chemistry/algorithms/scf.hpp>
 #include <qdk/chemistry/data/structure.hpp>
 
-// TODO (NAB):  this is one of our only end-to-end examples in C++.  We should
+// TODO (NAB): this is one of our only end-to-end examples in C++. We should
 // make it more pedagogical, explaining the role of each step, writing out
-// acronyms, making the variable names clearer, etc. Workitem 41302
+// acronyms, making the variable names clearer, etc.
+// 41302
 
 int main(int argc, char** argv) {
   std::shared_ptr<qdk::chemistry::data::Structure> structure;
@@ -80,11 +81,13 @@ int main(int argc, char** argv) {
   // Localize orbitals
   {
     auto localizer = qdk::chemistry::algorithms::LocalizerFactory::create();
-    // TODO (NAB):  describe localizer: 41291/41302
+    // TODO (NAB): describe localizer
+    // 41291
+    // 41302
     auto localized_hf_wfn = localizer->run(wfn_hf, n_alpha, n_beta);
   }
 
-  // TODO (NAB):  we need an end-to-end C++ example for active space selection:
+  // TODO (NAB): we need an end-to-end C++ example for active space selection
   // 41302
 
   // Compute the Hamiltonian

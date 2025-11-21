@@ -47,8 +47,6 @@ class MockLocalizationPy(Localizer):
 
     def _run_impl(self, orbitals, loc_indices_a, loc_indices_b):  # noqa: ARG002
         """Fake localize orbitals in Python."""
-        # TODO (NAB):  change output to logger rather than print() here and elsewhere, workitem: 41426
-        print("MockLocalization: Localizing orbitals in python...")
         return orbitals
 
     def name(self) -> str:
@@ -801,7 +799,7 @@ class TestAlgorithmClasses:
         assert "CoupledClusterCalculator" in repr(cc)
         assert "StatePreparation" in repr(sp)
 
-    def test_settings_interface(self):
+    def test_settings_interface(self) -> None:
         """Test that all algorithms provide settings interface."""
         # Test all algorithm types have settings
         algorithms: list[

@@ -14,7 +14,7 @@ from qiskit_aer import AerSimulator
 from qiskit_aer.primitives import Estimator as AerEstimator
 
 from qdk_chemistry.algorithms import create
-from qdk_chemistry.algorithms.state_preparation.sparse_isometry import _prepare_single_reference_state
+from qdk_chemistry.plugins.qiskit.sparse_isometry import _prepare_single_reference_state
 
 from .reference_tolerances import float_comparison_absolute_tolerance, float_comparison_relative_tolerance
 
@@ -117,15 +117,6 @@ def test_sparse_isometry_gf2x_circuit_efficiency(wavefunction_4e4o):
     assert sparse_size <= regular_size, (
         f"Sparse isometry size ({sparse_size}) should be <= regular isometry size ({regular_size})"
     )
-
-    # Log the efficiency gains for information
-    if regular_depth > 0:
-        depth_ratio = sparse_depth / regular_depth
-        print(f"Depth efficiency: {depth_ratio:.2f} (sparse/regular)")
-
-    if regular_size > 0:
-        size_ratio = sparse_size / regular_size
-        print(f"Size efficiency: {size_ratio:.2f} (sparse/regular)")
 
 
 def get_bitstring(circuit: QuantumCircuit) -> str:

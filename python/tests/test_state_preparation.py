@@ -19,7 +19,8 @@ import numpy as np
 import pytest
 
 from qdk_chemistry.algorithms import available, create
-from qdk_chemistry.algorithms.state_preparation.sparse_isometry import (
+from qdk_chemistry.data import CasWavefunctionContainer, Configuration, Wavefunction
+from qdk_chemistry.plugins.qiskit.sparse_isometry import (
     GF2XEliminationResult,
     _eliminate_column,
     _find_pivot_row,
@@ -32,7 +33,6 @@ from qdk_chemistry.algorithms.state_preparation.sparse_isometry import (
     _remove_zero_rows,
     gf2x_with_tracking,
 )
-from qdk_chemistry.data import CasWavefunctionContainer, Configuration, Wavefunction
 
 from .test_helpers import create_test_orbitals
 
@@ -161,7 +161,7 @@ def test_find_pivot_row():
     assert pivot is None  # No 1 found in column 0 starting from row 3
 
 
-def test_eliminate_column():
+def test_eliminate_column() -> None:
     """Test the _eliminate_column helper function."""
     # Setup test matrix
     matrix = np.array([[1, 1, 0], [1, 0, 1], [0, 1, 1], [1, 1, 0]], dtype=np.int8)
@@ -195,7 +195,7 @@ def test_eliminate_column():
     np.testing.assert_array_equal(matrix, original_expected)
 
 
-def test_perform_gaussian_elimination():
+def test_perform_gaussian_elimination() -> None:
     """Test the _perform_gaussian_elimination helper function."""
     # Test matrix for Gaussian elimination
     matrix = np.array([[1, 1, 0], [0, 1, 1], [1, 0, 1]], dtype=np.int8)
@@ -507,7 +507,7 @@ def test_gf2x_with_tracking_reconstruction():
             np.testing.assert_array_equal(original_matrix, reconstructed, f"Matrix {i + 1} reconstruction failed")
 
 
-def test_remove_duplicate_rows_with_cnot():
+def test_remove_duplicate_rows_with_cnot() -> None:
     """Test the _remove_duplicate_rows_with_cnot helper function."""
     # Matrix with duplicate rows
     matrix = np.array(
@@ -536,7 +536,7 @@ def test_remove_duplicate_rows_with_cnot():
     assert len(row_map_result) == m_result.shape[0]
 
 
-def test_remove_all_ones_rows_with_x():
+def test_remove_all_ones_rows_with_x() -> None:
     """Test the _remove_all_ones_rows_with_x helper function."""
     # Matrix with all-ones rows
     matrix = np.array(
@@ -628,7 +628,7 @@ def test_is_diagonal_matrix():
         assert not _is_diagonal_matrix(matrix), f"Matrix should not be diagonal:\n{matrix}"
 
 
-def test_reduce_diagonal_matrix():
+def test_reduce_diagonal_matrix() -> None:
     """Test the _reduce_diagonal_matrix helper function."""
     # 3x3 diagonal matrix
     matrix = np.array([[1, 0, 0], [0, 1, 0], [0, 0, 1]], dtype=np.int8)
