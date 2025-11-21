@@ -224,6 +224,10 @@ def autodoc_skip_imports(app, what, name, obj, skip, options):
 
 def setup(app):
     """Setup function to connect autodoc-skip-member and viewcode filters."""
+    import typing
+    import sys
+
+    sys.modules["typing"] = typing  # Ensure typing module is available to pybind
     app.connect("autodoc-skip-member", autodoc_skip_imports)
     # app.connect("viewcode-find-source", viewcode_find_source)
 
