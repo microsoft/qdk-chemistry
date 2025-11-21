@@ -31,7 +31,6 @@ def _setup_resources() -> None:
     # Fallback standard location within the installed package
     package_dir = Path(__file__).parent
 
-
     # Check if the user has specified a resources path via environment variable
     env_resources_path = os.getenv("QDK_CHEMISTRY_RESOURCES_PATH")
     if env_resources_path:
