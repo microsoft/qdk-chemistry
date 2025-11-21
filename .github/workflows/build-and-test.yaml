@@ -329,11 +329,13 @@ jobs:
         
         if [ $MAKE_EXIT_CODE -ne 0 ]; then
           echo "=== Documentation build failed ==="
-          echo "=== Contents of all .txt files in build directory ==="
-          find build -name "*.txt" -type f 2>/dev/null | while read -r txtfile; do
-            echo ""
-            echo "==== File: $txtfile ===="
-            cat "$txtfile"
+          echo "=== Contents of all .txt output files ==="
+          for txtfile in *-output.txt *-warnings.txt; do
+            if [ -f "$txtfile" ]; then
+              echo ""
+              echo "==== File: $txtfile ===="
+              cat "$txtfile"
+            fi
           done
           exit $MAKE_EXIT_CODE
         fi
