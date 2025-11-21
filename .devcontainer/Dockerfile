@@ -53,7 +53,7 @@ RUN apt-get update && \
     && rm -rf /var/lib/apt/lists/*
 
 # Install C++ dependencies
-COPY scripts/install_cpp_dependencies.sh /tmp/install_cpp_dependencies.sh
+COPY .devcontainer/scripts/install_cpp_dependencies.sh /tmp/install_cpp_dependencies.sh
 RUN bash /tmp/install_cpp_dependencies.sh && rm /tmp/install_cpp_dependencies.sh
 
 # Create/align the non-root user and group (safe for repeated builds)
