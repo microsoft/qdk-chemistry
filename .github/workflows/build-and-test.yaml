@@ -77,7 +77,28 @@ jobs:
         python -m pip install --upgrade pip
         python -m pip install --prefix=${{ github.workspace }}/install coverage pytest pytest-cov
 
-    - name: Configure C++ build
+    - name: Configure C++ Release build
+      run: |
+        cmake -S cpp -B "$BUILD_DIR" \
+          -DCMAKE_BUILD_TYPE=Release \
+          -DQDK_UARCH="$QDK_UARCH" \
+          -DBUILD_TESTING=ON
+
+    - name: Build C++ Release library
+      run: cmake --build "$BUILD_DIR"
+
+    - name: Run C++ tests in Release mode
+      env:
+        OMP_NUM_THREADS: 8
+      run: |
+        cd "$BUILD_DIR"
+        echo "=== Running C++ Tests in Release Mode ==="
+        ctest --output-on-failure --verbose --timeout 300
+
+    - name: Clean build directory for Debug build
+      run: rm -rf "$BUILD_DIR"
+
+    - name: Configure C++ Debug build
       run: |
         cmake -S cpp -B "$BUILD_DIR" \
           -DCMAKE_BUILD_TYPE=Debug \
@@ -85,17 +106,17 @@ jobs:
           -DQDK_CHEMISTRY_ENABLE_COVERAGE=ON \
           -DBUILD_TESTING=ON
 
-    - name: Build C++ library
+    - name: Build C++ Debug library
       run: cmake --build "$BUILD_DIR"
 
-    - name: Run C++ tests with coverage
+    - name: Run C++ tests in Debug mode with coverage
       env:
-        OMP_NUM_THREADS: 1
+        OMP_NUM_THREADS: 8
       run: |
         mkdir -p test-results ${{ github.workspace }}/coverage-reports
         cd "$BUILD_DIR"
 
-        echo "=== Running C++ Tests with CTest ==="
+        echo "=== Running C++ Tests in Debug Mode with Coverage ==="
         set +e
         ctest --output-on-failure --verbose --timeout 300 --output-junit ${{ github.workspace }}/test-results/ctest_results.xml
         CTEST_EXIT_CODE=$?
