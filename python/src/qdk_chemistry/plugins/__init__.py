@@ -63,3 +63,19 @@ See Also:
 # Copyright (c) Microsoft Corporation. All rights reserved.
 # Licensed under the MIT License. See LICENSE.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
+
+# Import submodules to make them visible in dir() output.
+# This allows users to discover available plugins via dir(qdk_chemistry.plugins).
+# We use contextlib.suppress to handle cases where plugin dependencies are not installed.
+import contextlib
+
+with contextlib.suppress(ImportError):
+    from . import pyscf
+
+with contextlib.suppress(ImportError):
+    from . import qiskit
+
+# Clean up the contextlib import to keep dir() output clean
+del contextlib
+
+__all__ = ["pyscf", "qiskit"]
