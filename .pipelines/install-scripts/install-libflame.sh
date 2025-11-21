@@ -7,7 +7,7 @@ LIBFLAME_VERSION=${3:-5.2.0}
 if [[ ${MARCH} == 'armv8-a' ]]; then
     # Compile for armsve, firestorm, thunderx2, cortexa57, cortexa53, and generic architectures
     export LIBFLAME_ARCH=arm64
-    export LIBFLAME_BUILD=aarch64-unknown-linux-gnu
+    export LIBFLAME_BUILD=arm64-unknown-linux-gnu
 elif [[ ${MARCH} == 'x86-64-v3' ]]; then
     # Compile for intel64, amd64, and amd64_legacy architectures
     export LIBFLAME_BUILD=x86_64-unknown-linux-gnu
