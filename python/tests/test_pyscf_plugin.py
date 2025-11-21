@@ -365,7 +365,7 @@ class TestPyscfPlugin:
         lithium = create_li_structure()
         scf_solver = algorithms.create("scf_solver", "pyscf")
         scf_solver.settings().set("basis_set", "def2-svp")
-        scf_solver.settings().set("force_restricted", True)
+        scf_solver.settings().set("reference_type", "restricted")
 
         energy, wavefunction = scf_solver.run(lithium, 0, 2)
         orbitals = wavefunction.get_orbitals()
@@ -522,7 +522,7 @@ class TestPyscfPlugin:
         scf_solver = algorithms.create("scf_solver", "pyscf")
         scf_solver.settings().set("basis_set", "def2-svp")
         scf_solver.settings().set("method", "b3lyp")
-        scf_solver.settings().set("force_restricted", True)
+        scf_solver.settings().set("reference_type", "restricted")
 
         energy, wavefunction = scf_solver.run(lithium, 0, 2)
         orbitals = wavefunction.get_orbitals()
@@ -1130,7 +1130,7 @@ class TestPyscfPlugin:
         o2 = create_o2_structure()
         scf_solver = algorithms.create("scf_solver", "pyscf")
         scf_solver.settings().set("basis_set", "def2-svp")
-        scf_solver.settings().set("force_restricted", True)
+        scf_solver.settings().set("reference_type", "restricted")
 
         _, wavefunction = scf_solver.run(o2, 0, 3)
         orbitals = wavefunction.get_orbitals()
@@ -1196,7 +1196,7 @@ class TestPyscfPlugin:
         o2 = create_o2_structure()
         scf_solver = algorithms.create("scf_solver", "pyscf")
         scf_solver.settings().set("basis_set", "def2-svp")
-        scf_solver.settings().set("force_restricted", True)
+        scf_solver.settings().set("reference_type", "restricted")
 
         _, wavefunction = scf_solver.run(o2, 0, 3)
         orbitals = wavefunction.get_orbitals()
@@ -1268,7 +1268,7 @@ class TestPyscfPlugin:
         o2 = create_o2_structure()
         scf_solver = algorithms.create("scf_solver", "pyscf")
         scf_solver.settings().set("basis_set", "def2-svp")
-        scf_solver.settings().set("force_restricted", True)
+        scf_solver.settings().set("reference_type", "restricted")
 
         _, wavefunction = scf_solver.run(o2, 0, 3)
         orbitals = wavefunction.get_orbitals()
@@ -1358,7 +1358,7 @@ class TestPyscfPlugin:
         o2 = create_o2_structure()
         scf_solver = algorithms.create("scf_solver", "pyscf")
         scf_solver.settings().set("basis_set", "def2-svp")
-        scf_solver.settings().set("force_restricted", True)
+        scf_solver.settings().set("reference_type", "restricted")
 
         _, wavefunction = scf_solver.run(o2, 0, 3)
 
@@ -1428,7 +1428,7 @@ class TestPyscfPlugin:
         # Perform SCF calculation with qdk-chemistry
         scf_solver = algorithms.create("scf_solver", "pyscf")
         scf_solver.settings().set("basis_set", "cc-pvdz")
-        scf_solver.settings().set("force_restricted", True)
+        scf_solver.settings().set("reference_type", "restricted")
         _, wavefunction = scf_solver.run(o2, 0, 3)
 
         # Construct qdk-chemistry Hamiltonian for active space
@@ -1549,7 +1549,7 @@ class TestPyscfPlugin:
         # Perform SCF calculation with qdk-chemistry
         scf_solver = algorithms.create("scf_solver", "pyscf")
         scf_solver.settings().set("basis_set", "cc-pvdz")
-        scf_solver.settings().set("force_restricted", True)
+        scf_solver.settings().set("reference_type", "restricted")
         _, wavefunction = scf_solver.run(o2, 0, 3)
 
         # Get pyscf object from hf orbitals

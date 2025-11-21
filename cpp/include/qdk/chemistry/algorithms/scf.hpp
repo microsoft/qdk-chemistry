@@ -27,6 +27,7 @@ class ElectronicStructureSettings : public data::Settings {
     set_default("basis_set", "def2-svp");
     set_default("tolerance", 1e-8);
     set_default("max_iterations", 50);
+    set_default("reference_type", "auto");
   }
 };
 

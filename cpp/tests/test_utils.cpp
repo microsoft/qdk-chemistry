@@ -14,6 +14,7 @@
 #include <qdk/chemistry/data/structure.hpp>
 #include <qdk/chemistry/data/wavefunction.hpp>
 #include <qdk/chemistry/data/wavefunction_containers/sd.hpp>
+#include <qdk/chemistry/utils/orbital_rotation.hpp>
 #include <qdk/chemistry/utils/valence_space.hpp>
 #include <vector>
 
@@ -188,4 +189,110 @@ TEST_F(ValenceActiveParametersTest, OxygenHydrogenMoleculeNegativeChargeTest) {
 
   EXPECT_EQ(num_active_electrons, 8);
   EXPECT_EQ(num_active_orbitals, 5);
+}
+
+// Test fixture for orbital rotation
+class OrbitalRotationTest : public ::testing::Test {
+ protected:
+  void SetUp() override {
+    // Use a real molecular system - Water
+    auto water = testing::create_water_structure();
+    auto scf_solver = ScfSolverFactory::create();
+    scf_solver->settings().set("basis_set", "STO-3G");
+
+    auto [water_e, water_wf] = scf_solver->run(water, 0, 1);
+
+    test_orbitals_restricted = water_wf->get_orbitals();
+    // Water has 10 electrons (8 from O, 1 from each H)
+    num_alpha_occupied_orbitals = 5;  // 10 electrons / 2 = 5 alpha, 5 beta
+    num_beta_occupied_orbitals = 5;
+    num_molecular_orbitals =
+        test_orbitals_restricted->get_num_molecular_orbitals();
+    num_atomic_orbitals = test_orbitals_restricted->get_num_atomic_orbitals();
+  }
+
+  size_t num_atomic_orbitals;
+  size_t num_molecular_orbitals;
+  size_t num_alpha_occupied_orbitals;
+  size_t num_beta_occupied_orbitals;
+  std::shared_ptr<Orbitals> test_orbitals_restricted;
+};  // Test basic orbital rotation functionality
+TEST_F(OrbitalRotationTest, BasicRotationTest) {
+  using namespace qdk::chemistry::utils;
+
+  // Create a small rotation vector
+  // For n_occ occupied and n_vir virtual orbitals: rotation size = n_occ *
+  // n_vir
+  size_t num_virtual_orbitals =
+      num_molecular_orbitals - num_alpha_occupied_orbitals;
+  size_t rotation_size = num_alpha_occupied_orbitals * num_virtual_orbitals;
+  Eigen::VectorXd rotation_vector =
+      Eigen::VectorXd::Constant(rotation_size, 0.01);
+
+  auto rotated_orbitals =
+      rotate_orbitals(test_orbitals_restricted, rotation_vector,
+                      num_alpha_occupied_orbitals, num_beta_occupied_orbitals);
+
+  // Check that we got a valid Orbitals object
+  ASSERT_NE(rotated_orbitals, nullptr);
+  EXPECT_EQ(rotated_orbitals->get_num_molecular_orbitals(),
+            num_molecular_orbitals);
+  EXPECT_EQ(rotated_orbitals->get_num_atomic_orbitals(), num_atomic_orbitals);
+  EXPECT_TRUE(rotated_orbitals->is_restricted());
+
+  // Check that energies are invalidated (should be nullopt)
+  EXPECT_FALSE(rotated_orbitals->has_energies());
+}
+
+// Test that identity rotation returns similar orbitals
+TEST_F(OrbitalRotationTest, IdentityRotationTest) {
+  using namespace qdk::chemistry::utils;
+
+  // Zero rotation should leave orbitals essentially unchanged
+  size_t num_virtual_orbitals =
+      num_molecular_orbitals - num_alpha_occupied_orbitals;
+  size_t rotation_size = num_alpha_occupied_orbitals * num_virtual_orbitals;
+  Eigen::VectorXd rotation_vector = Eigen::VectorXd::Zero(rotation_size);
+
+  auto rotated_orbitals =
+      rotate_orbitals(test_orbitals_restricted, rotation_vector,
+                      num_alpha_occupied_orbitals, num_beta_occupied_orbitals);
+
+  const auto& original_coeffs =
+      test_orbitals_restricted->get_coefficients_alpha();
+  const auto& rotated_coeffs = rotated_orbitals->get_coefficients_alpha();
+
+  // With zero rotation, coefficients should be very close to original
+  EXPECT_TRUE(original_coeffs.isApprox(rotated_coeffs, 1e-10));
+}
+
+// Test that the rotation produces unitary transformation
+TEST_F(OrbitalRotationTest, UnitaryRotationTest) {
+  using namespace qdk::chemistry::utils;
+
+  // Create a small rotation vector
+  size_t num_virtual_orbitals =
+      num_molecular_orbitals - num_alpha_occupied_orbitals;
+  size_t rotation_size = num_alpha_occupied_orbitals * num_virtual_orbitals;
+  Eigen::VectorXd rotation_vector = Eigen::VectorXd::Constant(
+      rotation_size, 0.1);  // Larger rotation for clear test
+
+  auto rotated_orbitals =
+      rotate_orbitals(test_orbitals_restricted, rotation_vector,
+                      num_alpha_occupied_orbitals, num_beta_occupied_orbitals);
+
+  const auto& S = test_orbitals_restricted->get_overlap_matrix();
+  const auto& original_coeffs =
+      test_orbitals_restricted->get_coefficients_alpha();
+  const auto& rotated_coeffs = rotated_orbitals->get_coefficients_alpha();
+
+  // Compute the transformation matrix U = C_original^T * S * C_rotated
+  Eigen::MatrixXd U = original_coeffs.transpose() * S * rotated_coeffs;
+
+  // Check that the transformation matrix is unitary (U^T * U = I)
+  Eigen::MatrixXd should_be_identity = U.transpose() * U;
+  Eigen::MatrixXd identity = Eigen::MatrixXd::Identity(U.cols(), U.cols());
+
+  EXPECT_NEAR(0.0, (should_be_identity - identity).norm(),
+              testing::numerical_zero_tolerance * 10);
 }

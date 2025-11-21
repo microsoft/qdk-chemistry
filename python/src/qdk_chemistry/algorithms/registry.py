@@ -159,7 +159,7 @@ def show_settings(algorithm_type: str, algorithm_name: str) -> list[tuple[str, s
         spin_multiplicity: int = 1
         tolerance: float = 1e-06
         max_iterations: int = 50
-        force_restricted: bool = False
+        reference_type: str = auto
 
     """
     for factory in __factories:

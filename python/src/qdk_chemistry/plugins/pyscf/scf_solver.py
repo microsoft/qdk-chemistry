@@ -33,6 +33,8 @@ restricted and unrestricted variants for both HF and DFT calculations.
 # Licensed under the MIT License. See LICENSE.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
 
+import warnings
+
 import numpy as np
 from pyscf import gto, scf
 from pyscf.gto.mole import bse_predefined_ecp
@@ -62,9 +64,10 @@ class PyscfScfSettings(ElectronicStructureSettings):
             Common options include "def2-svp", "def2-tzvp", "cc-pvdz", etc.
         tolerance (float, default=1e-6): Convergence tolerance.
         max_iterations (int, default=50): Maximum number of iterations.
-
-    PySCF-specific settings:
-        force_restricted (bool, default=False): If True, enforce restricted orbitals, even if open shell (e.g. ROHF).
+        reference_type (str, default="auto"): Reference type selection - "auto", "restricted", or "unrestricted".
+            "auto" uses restricted for closed-shell and unrestricted for open-shell systems.
+            "restricted" uses ROHF/ROKS (restricted open-shell Hartree-Fock/Kohn-Sham) for open-shell systems.
+            "unrestricted" always uses UHF/UKS.
 
     Examples:
         >>> settings = PyscfScfSettings()
@@ -83,8 +86,6 @@ class PyscfScfSettings(ElectronicStructureSettings):
     def __init__(self):
         """Initialize the settings with default values from ElectronicStructureSettingsplus PySCF-specific defaults."""
         super().__init__()  # This sets up all the base class defaults
-        # Add PySCF-specific settings
-        self._set_default("force_restricted", "bool", False)
 
 
 class PyscfScfSolver(ScfSolver):
@@ -100,8 +101,8 @@ class PyscfScfSolver(ScfSolver):
     * Hartree-Fock (HF): method="hf" uses RHF/UHF/ROHF
     * DFT methods: any other method string is treated as an XC functional (e.g., "b3lyp", "pbe", "m06")
 
-    The solver automatically selects restricted/unrestricted variants based on spin
-    and the force_restricted setting, returning electronic energy (excluding nuclear
+    The solver automatically selects restricted/unrestricted variants based on the
+    reference_type setting, returning electronic energy (excluding nuclear
     repulsion) along with molecular orbitals information.
 
     Examples:
@@ -166,6 +167,27 @@ class PyscfScfSolver(ScfSolver):
         # The PySCF convention is 2S not 2S+1
         multiplicity = spin_multiplicity
         spin = (multiplicity - 1) if multiplicity > 0 else None
+        open_shell = multiplicity != 1
+
+        # Determine reference type and unrestricted flag
+        reference_type = self._settings["reference_type"].lower()
+
+        if reference_type == "auto":
+            unrestricted = open_shell
+        elif reference_type == "unrestricted":
+            unrestricted = True
+            if not open_shell and initial_guess is None:
+                warnings.warn(
+                    "Unrestricted reference requested for closed-shell system. "
+                    "Automatic spin symmetry breaking is not supported. "
+                    "Consider providing a spin-broken initial guess if desired.",
+                    stacklevel=2,
+                )
+        elif reference_type == "restricted":
+            unrestricted = False
+            # Note: For open-shell with restricted, we'll use ROHF/ROKS which PySCF supports
+        else:
+            raise ValueError("reference_type must be one of: auto, restricted, unrestricted")
 
         # Check effective core potentials (ECPs)
         ecp, ecp_atoms = bse_predefined_ecp(basis_name, atoms)
@@ -182,26 +204,26 @@ class PyscfScfSolver(ScfSolver):
         )
         mol.build()
 
-        force_restricted = self._settings["force_restricted"]
-
-        # Select the appropriate SCF method based on the method setting
+        # Select the appropriate SCF method based on the method setting and reference type
         if method == "hf":
             # Hartree-Fock methods
-            if mol.spin == 0:
-                mf = scf.RHF(mol)
-            elif force_restricted:
-                mf = scf.ROHF(mol)
-            else:
+            if unrestricted:
                 mf = scf.UHF(mol)
+            elif not open_shell:
+                mf = scf.RHF(mol)
+            else:
+                # Restricted open-shell Hartree-Fock
+                mf = scf.ROHF(mol)
         # DFT methods (Kohn-Sham)
-        elif mol.spin == 0:
+        elif unrestricted:
+            mf = scf.UKS(mol)
+            mf.xc = method  # Set the exchange-correlation functional
+        elif not open_shell:
             mf = scf.RKS(mol)
             mf.xc = method  # Set the exchange-correlation functional
-        elif force_restricted:
-            mf = scf.ROKS(mol)
-            mf.xc = method
         else:
-            mf = scf.UKS(mol)
+            # Restricted open-shell Kohn-Sham
+            mf = scf.ROKS(mol)
             mf.xc = method
 
         # Configure convergence settings
@@ -210,6 +232,16 @@ class PyscfScfSolver(ScfSolver):
 
         # Set initial guess if provided
         if initial_guess is not None and hasattr(initial_guess, "get_coefficients"):
+            # Validate initial guess compatibility with reference type
+            initial_guess_is_unrestricted = initial_guess.is_unrestricted()
+            if unrestricted and not initial_guess_is_unrestricted:
+                warnings.warn(
+                    "Unrestricted calculation requested but restricted initial guess provided. ",
+                    stacklevel=2,
+                )
+            if not unrestricted and initial_guess_is_unrestricted:
+                raise ValueError("Restricted calculation requested but unrestricted initial guess provided. ")
+
             # Create occupation arrays based on electron configuration
             norb = initial_guess.get_num_molecular_orbitals()
             num_alpha = mol.nelec[0]  # Number of alpha electrons
@@ -219,7 +251,7 @@ class PyscfScfSolver(ScfSolver):
             occ_beta = np.array([1.0 if i < num_beta else 0.0 for i in range(norb)])
 
             # Use utility function to convert qdk-chemistry orbitals to PySCF format
-            temp_mf = orbitals_to_scf(initial_guess, occ_alpha, occ_beta, force_restricted)
+            temp_mf = orbitals_to_scf(initial_guess, occ_alpha, occ_beta, not unrestricted)
 
             # Extract density matrix from the temporary SCF object
             dm0 = temp_mf.make_rdm1()
@@ -233,15 +265,15 @@ class PyscfScfSolver(ScfSolver):
         basis_set = pyscf_mol_to_qdk_basis(mf.mol, structure, basis_name)
         _ovlp = mf.get_ovlp()
 
-        if mol.spin == 0:
+        if not unrestricted and mol.spin == 0:
             orbitals = Orbitals(
                 mf.mo_coeff,
                 mf.mo_energy,
                 ao_overlap=_ovlp,
                 basis_set=basis_set,
             )
-        elif force_restricted:
-            # Create unrestricted-style orbitals but with same coefficients
+        elif not unrestricted:
+            # Restricted open-shell (ROHF/ROKS) - create unrestricted-style orbitals with same coefficients
             orbitals = Orbitals(
                 mf.mo_coeff,  # Same coefficients for alpha and beta
                 mf.mo_coeff,
@@ -250,7 +282,7 @@ class PyscfScfSolver(ScfSolver):
                 ao_overlap=_ovlp,
                 basis_set=basis_set,
             )
-        elif not force_restricted:
+        elif unrestricted:
             energy_a, energy_b = mf.mo_energy
             coeff_a, coeff_b = mf.mo_coeff
 
