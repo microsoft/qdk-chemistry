@@ -657,163 +657,133 @@ Examples:
       .def("get_ecp_shell_indices_for_orbital_type",
            &BasisSet::get_ecp_shell_indices_for_orbital_type,
            R"(
-        Get ECP shell indices for a specific orbital type.
+Get ECP shell indices for a specific orbital type.
 
-        Parameters
-        ----------
-        orbital_type : OrbitalType
-            Type of orbital (S, P, D, F, etc.)
+Args:
+    orbital_type (OrbitalType): Type of orbital (S, P, D, F, etc.)
 
-        Returns
-        -------
-        list[int]
-            Vector of ECP shell indices of this type
+Returns:
+    list[int]: Vector of ECP shell indices of this type
 
-        Examples
-        --------
-        >>> s_ecp_indices = basis_set.get_ecp_shell_indices_for_orbital_type(OrbitalType.S)
-        >>> print(f"S-type ECP shell indices: {s_ecp_indices}")
-        )",
+Examples:
+    >>> s_ecp_indices = basis_set.get_ecp_shell_indices_for_orbital_type(OrbitalType.S)
+    >>> print(f"S-type ECP shell indices: {s_ecp_indices}")
+)",
            py::arg("orbital_type"))
 
       .def("get_ecp_shell_indices_for_atom_and_orbital_type",
            &BasisSet::get_ecp_shell_indices_for_atom_and_orbital_type,
            R"(
-        Get ECP shell indices for a specific atom and orbital type.
+Get ECP shell indices for a specific atom and orbital type.
 
-        Parameters
-        ----------
-        atom_index : int
-            Index of the atom
-        orbital_type : OrbitalType
-            Type of orbital (S, P, D, F, etc.)
+Args:
 
-        Returns
-        -------
-        list[int]
-            Vector of ECP shell indices matching both criteria
+atom_index : int
+    Index of the atom
+orbital_type : OrbitalType
+    Type of orbital (S, P, D, F, etc.)
 
-        Examples
-        --------
-        >>> p_ecp_indices = basis_set.get_ecp_shell_indices_for_atom_and_orbital_type(0, OrbitalType.P)
-        >>> print(f"P-type ECP shells on atom 0: {p_ecp_indices}")
-        )",
+Returns:
+list[int]
+    Vector of ECP shell indices matching both criteria
+
+Examples:
+>>> p_ecp_indices = basis_set.get_ecp_shell_indices_for_atom_and_orbital_type(0, OrbitalType.P)
+>>> print(f"P-type ECP shells on atom 0: {p_ecp_indices}")
+)",
            py::arg("atom_index"), py::arg("orbital_type"))
 
       // Basis set metadata
       .def("get_name", &BasisSet::get_name,
            R"(
-        Get the basis set name.
+Get the basis set name.
 
-        Returns
-        -------
-        str
-            Name of the basis set (e.g., "6-31G", "cc-pVDZ")
+Returns:
+    str: Name of the basis set (e.g., "6-31G", "cc-pVDZ")
 
-        Examples
-        --------
-        >>> name = basis_set.get_name()
-        >>> print(f"Using basis set: {name}")
-        )")
+Examples:
+    >>> name = basis_set.get_name()
+    >>> print(f"Using basis set: {name}")
+)")
 
       .def("get_structure", &BasisSet::get_structure,
            R"(
-        Get the molecular structure.
+Get the molecular structure.
 
-        Returns
-        -------
-        Structure
-            The molecular structure associated with this basis set
+Returns:
+    Structure: The molecular structure associated with this basis set
 
-        Raises
-        ------
-        RuntimeError
-            If no structure is associated with this basis set
+Raises:
+    RuntimeError: If no structure is associated with this basis set
 
-        Examples
-        --------
-        >>> structure = basis_set.get_structure()
-        >>> print(f"Number of atoms: {structure.get_num_atoms()}")
-        )",
+Examples:
+    >>> structure = basis_set.get_structure()
+    >>> print(f"Number of atoms: {structure.get_num_atoms()}")
+)",
            py::return_value_policy::reference_internal)
 
       .def("has_structure", &BasisSet::has_structure,
            R"(
-        Check if a structure is associated with this basis set.
+Check if a structure is associated with this basis set.
 
-        Returns
-        -------
-        bool
-            True if a molecular structure is set, False otherwise
+Returns:
+    bool: True if a molecular structure is set, False otherwise
 
-        Examples
-        --------
-        >>> if basis_set.has_structure():
-        ...     structure = basis_set.get_structure()
-        ... else:
-        ...     print("No structure associated with basis set")
-        )")
+Examples:
+    >>> if basis_set.has_structure():
+    ...     structure = basis_set.get_structure()
+    ... else:
+    ...     print("No structure associated with basis set")
+)")
 
       .def("get_ecp_name", &BasisSet::get_ecp_name,
            R"(
-        Get the ECP (Effective Core Potential) name.
+Get the ECP (Effective Core Potential) name.
 
-        Returns
-        -------
-        str
-            Name of the ECP (basis set)
+Returns:
+    str: Name of the ECP (basis set)
 
-        Examples
-        --------
-        >>> ecp_name = basis_set.get_ecp_name()
-        >>> print(f"ECP: {ecp_name}")
-        )")
+Examples:
+    >>> ecp_name = basis_set.get_ecp_name()
+    >>> print(f"ECP: {ecp_name}")
+)")
 
       .def("get_ecp_electrons", &BasisSet::get_ecp_electrons,
            R"(
-        Get the ECP (Effective Core Potential) electrons vector.
+Get the ECP (Effective Core Potential) electrons vector.
 
-        Returns
-        -------
-        list[int]
-            Number of ECP electrons for each atom
+Returns:
+    list[int]: Number of ECP electrons for each atom
 
-        Examples
-        --------
-        >>> ecp_electrons = basis_set.get_ecp_electrons()
-        >>> print(f"ECP electrons per atom: {ecp_electrons}")
-        )")
+Examples:
+    >>> ecp_electrons = basis_set.get_ecp_electrons()
+    >>> print(f"ECP electrons per atom: {ecp_electrons}")
+)")
 
       .def("has_ecp_electrons", &BasisSet::has_ecp_electrons,
            R"(
-        Check if ECP (Effective Core Potential) electrons are present.
+Check if ECP (Effective Core Potential) electrons are present.
 
-        Returns
-        -------
-        bool
-            True if ECP electrons are present, False otherwise
+Returns:
+    bool: True if ECP electrons are present, False otherwise
 
-        Examples
-        --------
-        >>> if basis_set.has_ecp_electrons():
-        ...     ecp_electrons = basis_set.get_ecp_electrons()
-        ...     print(f"ECP electrons per atom: {ecp_electrons}")
-        )")
+Examples:
+    >>> if basis_set.has_ecp_electrons():
+    ...     ecp_electrons = basis_set.get_ecp_electrons()
+    ...     print(f"ECP electrons per atom: {ecp_electrons}")
+)")
 
       .def("get_summary", &BasisSet::get_summary,
            R"(
-        Get summary string of basis set information.
+Get summary string of basis set information.
 
-        Returns
-        -------
-        str
-            Human-readable summary of basis set properties
+Returns:
+    str: Human-readable summary of basis set properties
 
-        Examples
-        --------
-        >>> summary = basis_set.get_summary()
-        >>> print(summary)
-        )")
+Examples:
+    >>> summary = basis_set.get_summary()
+    >>> print(summary)
+)")
 
       // Serialization
       .def(
@@ -822,418 +792,317 @@ Examples:
             return self.to_json().dump();
           },
           R"(
-        Convert basis set to JSON string.
+Convert basis set to JSON string.
 
-        Serializes all basis set information to a JSON string format.
-        JSON is human-readable and suitable for debugging or data exchange.
+Serializes all basis set information to a JSON string format.
+JSON is human-readable and suitable for debugging or data exchange.
 
-        Returns
-        -------
-        str
-            JSON string representation of the basis set data
+Returns:
+    str: JSON string representation of the basis set data
 
-        Raises
-        ------
-        RuntimeError
-            If the basis set data is invalid
+Raises:
+    RuntimeError: If the basis set data is invalid
 
-        Examples
-        --------
-        >>> json_str = basis_set.to_json()
-        >>> print(json_str)  # Pretty-printed JSON
-        )")
+Examples:
+    >>> json_str = basis_set.to_json()
+    >>> print(json_str)  # Pretty-printed JSON
+)")
       .def_static(
           "from_json",
           [](const std::string& json_str) -> BasisSet {
             return *BasisSet::from_json(nlohmann::json::parse(json_str));
           },
           R"(
-        Load basis set from JSON string.
+Load basis set from JSON string.
 
-        Parses basis set data from a JSON string and returns a new BasisSet instance.
-        The string should contain JSON data in the format produced by ``to_json()``.
+Parses basis set data from a JSON string and returns a new BasisSet instance.
+The string should contain JSON data in the format produced by ``to_json()``.
 
-        Parameters
-        ----------
-        json_str : str
-            JSON string containing basis set data
+Args:
+    json_str (str): JSON string containing basis set data
 
-        Returns
-        -------
-        BasisSet
-            New BasisSet instance loaded from JSON
+Returns:
+    BasisSet: New BasisSet instance loaded from JSON
 
-        Raises
-        ------
-        RuntimeError
-            If the JSON string is malformed or contains invalid basis set data
+Raises:
+        RuntimeError: If the JSON string is malformed or contains invalid basis set data
 
-        Examples
-        --------
-        >>> basis_set = BasisSet.from_json('{"name": "STO-3G", "shells": [...]}')
-        )",
+Examples:
+    >>> basis_set = BasisSet.from_json('{"name": "STO-3G", "shells": [...]}')
+)",
           py::arg("json_str"))
       // Serialization
       .def("to_file", basis_set_to_file_wrapper,
            R"(
-        Save basis set to file with specified format.
+Save basis set to file with specified format.
 
-        Generic method to save basis set data to a file. The format is determined by
-        the 'type' parameter.
+Generic method to save basis set data to a file. The format is determined by
+the 'type' parameter.
 
-        Parameters
-        ----------
-        filename : str or pathlib.Path
-            Path to the file to write. Must have '.basis_set' before the file
-            extension (e.g., ``sto-3g.basis_set.json``, ``cc-pvdz.basis_set.h5``)
-        type : str
-            File format type ("json" or "hdf5")
+Args:
+    filename (str | pathlib.Path): Path to the file to write.
+        Must have '.basis_set' before the file extension (e.g., ``sto-3g.basis_set.json``, ``cc-pvdz.basis_set.h5``)
+    type (str): File format type ("json" or "hdf5")
 
-        Raises
-        ------
-        RuntimeError
-            If the basis set data is invalid, unsupported type, or file cannot be opened/written
+Raises:
+    RuntimeError: If the basis set data is invalid, unsupported type, or file cannot be opened/written
 
-        Examples
-        --------
-        >>> basis_set.to_file("sto-3g.basis_set.json", "json")
-        >>> basis_set.to_file("cc-pvdz.basis_set.h5", "hdf5")
-        >>> from pathlib import Path
-        >>> basis_set.to_file(Path("sto-3g.basis_set.json"), "json")
-        )",
+Examples:
+    >>> basis_set.to_file("sto-3g.basis_set.json", "json")
+    >>> basis_set.to_file("cc-pvdz.basis_set.h5", "hdf5")
+    >>> from pathlib import Path
+    >>> basis_set.to_file(Path("sto-3g.basis_set.json"), "json")
+)",
            py::arg("filename"), py::arg("type"))
       .def_static("from_file", basis_set_from_file_wrapper,
                   R"(
-        Load basis set from file with specified format.
+Load basis set from file with specified format.
 
-        Generic method to load basis set data from a file. The format is determined by
-        the 'type' parameter.
+Generic method to load basis set data from a file. The format is determined by
+the 'type' parameter.
 
-        Parameters
-        ----------
-        filename : str or pathlib.Path
-            Path to the file to read. Must have '.basis_set' before the file
-            extension (e.g., ``sto-3g.basis_set.json``, ``cc-pvdz.basis_set.h5``)
-        type : str
-            File format type ("json" or "hdf5")
+Args:
+    filename (str | pathlib.Path): Path to the file to read.
+        Must have '.basis_set' before the file extension (e.g., ``sto-3g.basis_set.json``, ``cc-pvdz.basis_set.h5``)
+    type (str): File format type ("json" or "hdf5")
 
-        Returns
-        -------
-        BasisSet
-            New BasisSet instance loaded from file
+Returns:
+    BasisSet: New BasisSet instance loaded from file
 
-        Raises
-        ------
-        RuntimeError
-            If the file cannot be opened/read, invalid data format, or unsupported type
+Raises:
+    RuntimeError: If the file cannot be opened/read, invalid data format, or unsupported type
 
-        Examples
-        --------
-        >>> basis_set = BasisSet.from_file("sto-3g.basis_set.json", "json")
-        >>> basis_set = BasisSet.from_file("cc-pvdz.basis_set.h5", "hdf5")
-        )",
+Examples:
+    >>> basis_set = BasisSet.from_file("sto-3g.basis_set.json", "json")
+    >>> basis_set = BasisSet.from_file("cc-pvdz.basis_set.h5", "hdf5")
+)",
                   py::arg("filename"), py::arg("type"))
       .def("to_hdf5_file", basis_set_to_hdf5_file_wrapper,
            R"(
-        Save basis set to HDF5 file (with validation).
+Save basis set to HDF5 file (with validation).
 
-        Writes all basis set data to an HDF5 file, preserving numerical precision.
-        HDF5 format is efficient for large datasets and supports hierarchical
-        data structures, making it ideal for storing basis set information.
+Writes all basis set data to an HDF5 file, preserving numerical precision.
+HDF5 format is efficient for large datasets and supports hierarchical
+data structures, making it ideal for storing basis set information.
 
-        Parameters
-        ----------
-        filename : str or pathlib.Path
-            Path to the HDF5 file to write. Must have '.basis_set' before the file
-            extension (e.g., ``sto-3g.basis_set.h5``, ``cc-pvdz.basis_set.hdf5``)
+Args:
+    filename (str | pathlib.Path): Path to the HDF5 file to write.
+        Must have '.basis_set' before the file extension (e.g., ``sto-3g.basis_set.h5``, ``cc-pvdz.basis_set.hdf5``)
 
-        Raises
-        ------
-        ValueError
-            If filename doesn't follow the required naming convention
-        RuntimeError
-            If the basis set data is invalid or the file cannot be opened/written
+Raises:
+    ValueError: If filename doesn't follow the required naming convention
+    RuntimeError: If the basis set data is invalid or the file cannot be opened/written
 
-        Examples
-        --------
-        >>> basis_set.to_hdf5_file("sto-3g.basis_set.h5")
-        >>> basis_set.to_hdf5_file("cc-pvdz.basis_set.hdf5")
-        >>> from pathlib import Path
-        >>> basis_set.to_hdf5_file(Path("sto-3g.basis_set.h5"))
-        )",
+Examples:
+    >>> basis_set.to_hdf5_file("sto-3g.basis_set.h5")
+    >>> basis_set.to_hdf5_file("cc-pvdz.basis_set.hdf5")
+    >>> from pathlib import Path
+    >>> basis_set.to_hdf5_file(Path("sto-3g.basis_set.h5"))
+)",
            py::arg("filename"))
       .def_static("from_hdf5_file", basis_set_from_hdf5_file_wrapper,
                   R"(
-        Load basis set from HDF5 file (with validation).
+Load basis set from HDF5 file (with validation).
 
-        Reads basis set data from an HDF5 file and returns a new BasisSet instance.
-        The file should contain data in the format produced by ``to_hdf5_file()``.
+Reads basis set data from an HDF5 file and returns a new BasisSet instance.
+The file should contain data in the format produced by ``to_hdf5_file()``.
 
-        Parameters
-        ----------
-        filename : str or pathlib.Path
-            Path to the HDF5 file to read. Must have '.basis_set' before the file
-            extension (e.g., ``sto-3g.basis_set.h5``, ``cc-pvdz.basis_set.hdf5``)
+Args:
+    filename (str | pathlib.Path): Path to the HDF5 file to read.
+        Must have '.basis_set' before the file extension (e.g., ``sto-3g.basis_set.h5``, ``cc-pvdz.basis_set.hdf5``)
 
-        Returns
-        -------
-        BasisSet
-            New ``BasisSet`` instance loaded from file
+Returns:
+    BasisSet: New ``BasisSet`` instance loaded from file
 
-        Raises
-        ------
-        ValueError
-            If filename doesn't follow the required naming convention
-        RuntimeError
-            If the file cannot be opened, read, or contains invalid basis set data
+Raises:
+    ValueError: If filename doesn't follow the required naming convention
+    RuntimeError: If the file cannot be opened, read, or contains invalid basis set data
 
-        Examples
-        --------
-        >>> basis_set = BasisSet.from_hdf5_file("sto-3g.basis_set.h5")
-        >>> basis_set = BasisSet.from_hdf5_file("cc-pvdz.basis_set.hdf5")
-        )",
+Examples:
+    >>> basis_set = BasisSet.from_hdf5_file("sto-3g.basis_set.h5")
+    >>> basis_set = BasisSet.from_hdf5_file("cc-pvdz.basis_set.hdf5")
+)",
                   py::arg("filename"))
       .def("to_json_file", basis_set_to_json_file_wrapper,
            R"(
-        Save basis set to JSON file (with validation).
+Save basis set to JSON file (with validation).
 
-        Writes all basis set data to a JSON file with pretty formatting.
-        The file will be created or overwritten if it already exists.
+Writes all basis set data to a JSON file with pretty formatting.
+The file will be created or overwritten if it already exists.
 
-        Parameters
-        ----------
-        filename : str
-            Path to the JSON file to write. Must have '.basis_set' before the file
-            extension (e.g., ``sto-3g.basis_set.json``, ``cc-pvdz.basis_set.json``)
+Args:
+    filename (str): Path to the JSON file to write.
+        Must have '.basis_set' before the file extension (e.g., ``sto-3g.basis_set.json``, ``cc-pvdz.basis_set.json``)
 
-        Raises
-        ------
-        ValueError
-            If filename doesn't follow the required naming convention
-        RuntimeError
-            If the basis set data is invalid or the file cannot be opened/written
+Raises:
+    ValueError: If filename doesn't follow the required naming convention
+    RuntimeError: If the basis set data is invalid or the file cannot be opened/written
 
-        Examples
-        --------
-        >>> basis_set.to_json_file("sto-3g.basis_set.json")
-        >>> basis_set.to_json_file("my_basis.basis_set.json")
-        )",
+Examples:
+    >>> basis_set.to_json_file("sto-3g.basis_set.json")
+    >>> basis_set.to_json_file("my_basis.basis_set.json")
+)",
            py::arg("filename"))
 
       .def_static("from_json_file", basis_set_from_json_file_wrapper,
                   R"(
-        Load basis set from JSON file (with validation).
+Load basis set from JSON file (with validation).
 
-        Reads basis set data from a JSON file and returns a new BasisSet instance.
-        The file should contain JSON data in the format produced by ``to_json_file()``.
+Reads basis set data from a JSON file and returns a new BasisSet instance.
+The file should contain JSON data in the format produced by ``to_json_file()``.
 
-        Parameters
-        ----------
-        filename : str
-            Path to the JSON file to read. Must have '.basis_set' before the file
-            extension (e.g., ``sto-3g.basis_set.json``, ``cc-pvdz.basis_set.json``)
+Args:
+    filename (str): Path to the JSON file to read.
+        Must have '.basis_set' before the file extension (e.g., ``sto-3g.basis_set.json``, ``cc-pvdz.basis_set.json``)
 
-        Returns
-        -------
-        BasisSet
-            New ``BasisSet`` instance loaded from file
+Returns:
+    BasisSet: New ``BasisSet`` instance loaded from file
 
-        Raises
-        ------
-        ValueError
-            If filename doesn't follow the required naming convention
-        RuntimeError
-            If the file cannot be opened, read, or contains invalid basis set data
+Raises:
+    ValueError: If filename doesn't follow the required naming convention
+    RuntimeError: If the file cannot be opened, read, or contains invalid basis set data
 
-        Examples
-        --------
-        >>> basis_set = BasisSet.from_json_file("sto-3g.basis_set.json")
-        >>> basis_set = BasisSet.from_json_file("my_basis.basis_set.json")
-        )",
+Examples:
+    >>> basis_set = BasisSet.from_json_file("sto-3g.basis_set.json")
+    >>> basis_set = BasisSet.from_json_file("my_basis.basis_set.json")
+)",
                   py::arg("filename"))
 
       // Utility functions (static methods)
       .def_static("orbital_type_to_string", &BasisSet::orbital_type_to_string,
                   R"(
-        Convert orbital type enum to string representation.
+Convert orbital type enum to string representation.
 
-        Parameters
-        ----------
-        orbital_type : OrbitalType
-            The orbital type enum value
+Args:
+    orbital_type (OrbitalType): The orbital type enum value
 
-        Returns
-        -------
-        str
-            String representation (e.g., "S", "P", "D", "F")
+Returns:
+    str: String representation (e.g., "S", "P", "D", "F")
 
-        Examples
-        --------
-        >>> orbital_str = BasisSet.orbital_type_to_string(OrbitalType.P)
-        >>> print(f"Orbital type: {orbital_str}")  # Prints "P"
-        )",
+Examples:
+    >>> orbital_str = BasisSet.orbital_type_to_string(OrbitalType.P)
+    >>> print(f"Orbital type: {orbital_str}")  # Prints "P"
+)",
                   py::arg("orbital_type"))
       .def_static("string_to_orbital_type", &BasisSet::string_to_orbital_type,
                   R"(
-        Convert string to orbital type enum.
+Convert string to orbital type enum.
 
-        Parameters
-        ----------
-        orbital_string : str
-            String representation of orbital type (e.g., "S", "P", "D")
+Args:
+    orbital_string (str): String representation of orbital type (e.g., "S", "P", "D")
 
-        Returns
-        -------
-        OrbitalType
-            Corresponding orbital type enum
+Returns:
+    OrbitalType: Corresponding orbital type enum
 
-        Raises
-        ------
-        ValueError
-            If the string does not correspond to a valid orbital type
+Raises:
+    ValueError: If the string does not correspond to a valid orbital type
 
-        Examples
-        --------
-        >>> orbital_type = BasisSet.string_to_orbital_type("P")
-        >>> print(orbital_type)  # OrbitalType.P
-                  )",
+Examples:
+    >>> orbital_type = BasisSet.string_to_orbital_type("P")
+    >>> print(orbital_type)  # OrbitalType.P
+)",
                   py::arg("orbital_string"))
       .def_static("l_to_orbital_type", &BasisSet::l_to_orbital_type,
                   R"(
-        Get orbital type for angular momentum quantum number.
+Get orbital type for angular momentum quantum number.
 
-        Parameters
-        ----------
-        l : int
-            Angular momentum quantum number
+Args:
+    l (int): Angular momentum quantum number
 
-        Returns
-        -------
-        OrbitalType
-            Corresponding orbital type (S, P, D, etc.)
+Returns:
+    OrbitalType: Corresponding orbital type (S, P, D, etc.)
 
-        Raises
-        ------
-        ValueError
-            If l is negative or exceeds supported range
+Raises:
+    ValueError: If l is negative or exceeds supported range
 
-        Examples
-        --------
-        >>> orbital_type = BasisSet.l_to_orbital_type(2)
-        >>> print(f"l=2 corresponds to orbital type: {orbital_type}")  # D
-        )",
+Examples:
+    >>> orbital_type = BasisSet.l_to_orbital_type(2)
+    >>> print(f"l=2 corresponds to orbital type: {orbital_type}")  # D
+)",
                   py::arg("l"))
       .def_static("get_angular_momentum", &BasisSet::get_angular_momentum,
                   R"(
-        Get angular momentum quantum number for orbital type.
+Get angular momentum quantum number for orbital type.
 
-        Parameters
-        ----------
-        orbital_type : OrbitalType
-            The orbital type
+Args:
+    orbital_type (OrbitalType): The orbital type
 
-        Returns
-        -------
-        int
-            Angular momentum quantum number l (0=s, 1=p, 2=d, etc.)
+Returns:
+    int: Angular momentum quantum number l (0=s, 1=p, 2=d, etc.)
 
-        Examples
-        --------
-        >>> l = BasisSet.get_angular_momentum(OrbitalType.D)
-        >>> print(f"D orbital has l = {l}")  # l = 2
-        )",
+Examples:
+    >>> l = BasisSet.get_angular_momentum(OrbitalType.D)
+    >>> print(f"D orbital has l = {l}")  # l = 2
+)",
                   py::arg("orbital_type"))
       .def_static("get_num_orbitals_for_l", &BasisSet::get_num_orbitals_for_l,
                   R"(
-        Get number of orbitals for given angular momentum.
+Get number of orbitals for given angular momentum.
 
-        Parameters
-        ----------
-        l : int
-            Angular momentum quantum number
-        basis_type : Optional[BasisType]
-            Whether to use spherical (2l+1) or Cartesian functions
-            Default is Spherical
+Args:
+    l (int): Angular momentum quantum number
+    basis_type (Optional[BasisType]): Whether to use spherical (2l+1) or Cartesian functions.
+        Default is Spherical.
 
-        Returns
-        -------
-        int
-            Number of orbital functions
+Returns:
+    int: Number of orbital functions
 
-        Examples
-        --------
-        >>> # For d orbitals (l=2)
-        >>> n_sph = BasisSet.get_num_orbitals_for_l(2, BasisType.Spherical)  # 5
-        >>> n_cart = BasisSet.get_num_orbitals_for_l(2, BasisType.Cartesian)  # 6
-        >>> print(f"d orbitals: {n_sph} spherical, {n_cart} Cartesian")
-        )",
+Examples:
+    >>> # For d orbitals (l=2)
+    >>> n_sph = BasisSet.get_num_orbitals_for_l(2, BasisType.Spherical)  # 5
+    >>> n_cart = BasisSet.get_num_orbitals_for_l(2, BasisType.Cartesian)  # 6
+    >>> print(f"d orbitals: {n_sph} spherical, {n_cart} Cartesian")
+)",
                   py::arg("l"), py::arg("basis_type") = BasisType::Spherical)
       .def_static("basis_type_to_string", &BasisSet::basis_type_to_string,
                   R"(
-        Convert basis type enum to string representation.
+Convert basis type enum to string representation.
 
-        Parameters
-        ----------
-        basis_type : BasisType
-            The basis type enum value
+Args:
+    basis_type (BasisType): The basis type enum value
 
-        Returns
-        -------
-        str
-            String representation ("Spherical" or "Cartesian")
+Returns:
+    str: String representation ("Spherical" or "Cartesian")
 
-        Examples
-        --------
-        >>> basis_str = BasisSet.basis_type_to_string(BasisType.Spherical)
-        >>> print(f"Basis type: {basis_str}")  # Prints "Spherical"
-        )",
+Examples:
+    >>> basis_str = BasisSet.basis_type_to_string(BasisType.Spherical)
+    >>> print(f"Basis type: {basis_str}")  # Prints "Spherical"
+)",
                   py::arg("basis_type"))
       .def_static("string_to_basis_type", &BasisSet::string_to_basis_type,
                   R"(
-        Convert string to basis type enum.
+Convert string to basis type enum.
 
-        Parameters
-        ----------
-        basis_string : str
-            String representation ("Spherical" or "Cartesian")
+Args:
+    basis_string (str): String representation ("Spherical" or "Cartesian")
 
-        Returns
-        -------
-        BasisType
-            Corresponding basis type enum
+Returns:
+    BasisType: Corresponding basis type enum
 
-        Raises
-        ------
-        ValueError
-            If the string does not correspond to a valid basis type
+Raises:
+    ValueError: If the string does not correspond to a valid basis type
 
-        Examples
-        --------
-        >>> basis_type = BasisSet.string_to_basis_type("Cartesian")
-        >>> print(basis_type)  # BasisType.Cartesian
-        )",
+Examples:
+    >>> basis_type = BasisSet.string_to_basis_type("Cartesian")
+    >>> print(basis_type)  # BasisType.Cartesian
+)",
                   py::arg("basis_string"))
 
       // Index conversion utilities
       .def("basis_to_shell_index", &BasisSet::basis_to_shell_index,
            R"(
-        Convert basis function index to shell index and local function index.
+Convert basis function index to shell index and local function index.
 
-        Parameters
-        ----------
-        basis_index : int
-            Global basis function index
+Args:
+    basis_index (int): Global basis function index
 
-        Returns
-        -------
-        tuple of (int, int)
-            Shell index and local function index within that shell
+Returns:
+    tuple[int, int]: Shell index and local function index within that shell
 
-        Examples
-        --------
-        >>> shell_idx, local_idx = basis_set.basis_to_shell_index(7)
-        >>> print(f"Basis function 7: shell {shell_idx}, local index {local_idx}")
-        )",
+Examples:
+    >>> shell_idx, local_idx = basis_set.basis_to_shell_index(7)
+    >>> print(f"Basis function 7: shell {shell_idx}, local index {local_idx}")
+)",
            py::arg("basis_index"))
 
       // String representation - bind summary to __repr__
