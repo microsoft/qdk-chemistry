@@ -90,7 +90,7 @@ jobs:
 
     - name: Run C++ tests with coverage
       env:
-        OMP_NUM_THREADS: 64 # Do not exceed precompiled blas limit
+        OMP_NUM_THREADS: 8
       run: |
         mkdir -p test-results ${{ github.workspace }}/coverage-reports
         cd "$BUILD_DIR"
@@ -144,7 +144,7 @@ jobs:
 
     - name: Run Python tests
       env:
-        OMP_NUM_THREADS: 64 # Do not exceed precompiled blas limit
+        OMP_NUM_THREADS: 8
       working-directory: python
       run: |
         mkdir -p ../test-results ../coverage-reports
