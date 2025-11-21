@@ -9,6 +9,10 @@ on:
     - '**'
   workflow_dispatch:
 
+concurrency:
+  group: ${{ github.ref }}
+  cancel-in-progress: true
+
 permissions:
   contents: read
   pull-requests: write
@@ -316,4 +320,19 @@ jobs:
 
     - name: Build documentation
       working-directory: docs
-      run: make clean all
+      run: |
+        set +e
+        make clean all
+        MAKE_EXIT_CODE=$?
+        set -e
+        
+        if [ $MAKE_EXIT_CODE -ne 0 ]; then
+          echo "=== Documentation build failed ==="
+          echo "=== Contents of all .txt files in build directory ==="
+          find build -name "*.txt" -type f 2>/dev/null | while read -r txtfile; do
+            echo ""
+            echo "==== File: $txtfile ===="
+            cat "$txtfile"
+          done
+          exit $MAKE_EXIT_CODE
+        fi
