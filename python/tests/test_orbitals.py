@@ -465,7 +465,7 @@ def test_orbitals_file_io_validation():
         Orbitals.from_hdf5_file("test.h5")
 
     # Test non-existent file
-    with pytest.raises(RuntimeError, match="Cannot open file for reading"):
+    with pytest.raises(RuntimeError, match="Unable to open Orbitals JSON file"):
         Orbitals.from_json_file("nonexistent.orbitals.json")
 
     with pytest.raises(RuntimeError):

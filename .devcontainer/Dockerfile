@@ -11,7 +11,9 @@ RUN apt-get update && apt-get install -y locales && \
 ENV LANG=en_US.UTF-8 \
     LANGUAGE=en_US:en \
     LC_ALL=en_US.UTF-8 \
-    QDK_UARCH=native
+    QDK_UARCH=native \
+    LD_LIBRARY_PATH=/usr/local/lib:${LD_LIBRARY_PATH} \
+    PATH=/usr/local/bin:${PATH}
 
 # Create a non-root user with sudo privileges
 ARG USERNAME=vscode
@@ -52,6 +54,10 @@ RUN apt-get update && \
     && apt-get clean \
     && rm -rf /var/lib/apt/lists/*
 
+# Install C++ dependencies
+COPY .devcontainer/scripts/install_cpp_dependencies.sh /tmp/install_cpp_dependencies.sh
+RUN bash /tmp/install_cpp_dependencies.sh && rm /tmp/install_cpp_dependencies.sh
+
 # Create/align the non-root user and group (safe for repeated builds)
 RUN if getent group "$USER_GID" >/dev/null; then \
     EXISTING_GROUP=$(getent group "$USER_GID" | cut -d: -f1); \
@@ -75,5 +81,7 @@ RUN if getent group "$USER_GID" >/dev/null; then \
 # Switch to non-root user for subsequent commands
 USER $USERNAME
 
+
+
 # Setup bash prompt
-RUN echo 'export PS1="\[\033[1;34m\]\u@prepq-dev:\w$ \[\033[0m\]"' >> ~/.bashrc
+RUN echo 'export PS1="\[\033[1;34m\]\u@qdk-dev:\w$ \[\033[0m\]"' >> ~/.bashrc

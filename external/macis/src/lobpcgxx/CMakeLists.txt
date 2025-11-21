@@ -38,6 +38,7 @@ endif()
 add_library( lobpcgxx INTERFACE )
 target_link_libraries( lobpcgxx INTERFACE blaspp lapackpp )
 target_compile_features( lobpcgxx INTERFACE cxx_std_20 )
+target_compile_definitions( lobpcgxx INTERFACE LAPACK_COMPLEX_CPP )
 
 target_include_directories( lobpcgxx INTERFACE
   $<BUILD_INTERFACE:${PROJECT_SOURCE_DIR}/include>
