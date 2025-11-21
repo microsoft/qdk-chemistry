@@ -12,7 +12,6 @@
 #ifdef QDK_CHEMISTRY_ENABLE_MPI
 #include <mpi.h>
 #endif
-#include <omp.h>
 #include <qdk/chemistry/scf/util/env_helper.h>
 #include <spdlog/spdlog.h>
 
@@ -21,6 +20,7 @@
 #include <iostream>
 #include <nlohmann/json.hpp>
 #include <numeric>
+#include <qdk/chemistry/utils/omp_utils.hpp>
 #include <sstream>
 #include <thread>
 

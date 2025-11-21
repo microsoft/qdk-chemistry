@@ -3,11 +3,12 @@ set -e
 
 INSTALL_PREFIX=${1:-/usr/local}
 BUILD_TYPE=${2:-Release}
+HDF5_PARENT_DIR=${3:-/ext}
 
 echo "Installing HDF5 to ${INSTALL_PREFIX}..."
 
-# Work from /ext directory
-cd /ext
+# Work from HDF5 parent directory
+cd ${HDF5_PARENT_DIR}
 
 # Check if HDF5 is already installed
 if [ -d "${INSTALL_PREFIX}/hdf5" ]; then
@@ -26,18 +27,19 @@ fi
 # Build and install HDF5 from extracted source
 cd hdf5
 echo "Configuring HDF5..."
-./configure --prefix=${INSTALL_PREFIX} \
+CXXFLAGS="-fPIC" ./configure --prefix=${INSTALL_PREFIX} \
     --enable-cxx \
-    --enable-fortran \
-    --enable-shared \
-    --disable-static
+    --enable-fortran=no \
+    --enable-static \
+    --enable-shared=no \
+    --with-pic
 
 make -j${nproc}
 
 echo "Installing HDF5..."
 make install
 
-# Cleanup (return to /ext but leave source for potential reuse)
-cd /ext
+# Cleanup (return to HDF5 parent directory but leave source for potential reuse)
+cd ${HDF5_PARENT_DIR}
 
 echo "HDF5 1.13.0 installation completed."
