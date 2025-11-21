@@ -44,7 +44,7 @@ class TestQubitHamiltonian:
             QubitHamiltonian(pauli_strings=["X", "ZY"], coefficients=np.array([1.0, 2.0]))
 
     def test_qubit_hamiltonian_exact_energy_small_system(self):
-        """Test that exact_energy works for small qubit systems."""
+        """Test that exact_ground_state works for small qubit systems."""
         # Create a simple 2-qubit Hamiltonian
         qubit_hamiltonian = QubitHamiltonian(["ZZ", "XX"], [1.0, 0.5])
 
@@ -54,6 +54,30 @@ class TestQubitHamiltonian:
         )
         assert state.shape == (4,)
         expected_state = np.array([0, 1 / np.sqrt(2), -1 / np.sqrt(2), 0])
+        dot = float(np.dot(state, expected_state))
+        assert np.isclose(
+            abs(dot), 1.0, atol=float_comparison_absolute_tolerance, rtol=float_comparison_relative_tolerance
+        )
+
+    def test_qubit_hamiltonian_exact_energy_sparse_matrix_solver(self):
+        """Test that exact_ground_state works with sparse matrix solver."""
+        # Create a 4-qubit Hamiltonian
+        qubit_hamiltonian = QubitHamiltonian(
+            ["ZZII", "YYII", "XXII", "IIZZ", "IIYY", "IIXX"], [1.0, 0.5, 0.5, 1.0, 0.5, 0.5]
+        )
+
+        energy, state = qubit_hamiltonian.exact_ground_state(use_dense_matrix=False)
+        assert np.isclose(
+            energy, -4, atol=float_comparison_absolute_tolerance, rtol=float_comparison_relative_tolerance
+        )
+        assert state.shape == (16,)
+        expected_state = np.zeros(16, dtype=float)
+        expected_state[10] = 0.5
+        expected_state[6] = -0.5
+        expected_state[9] = -0.5
+        expected_state[5] = 0.5
+        expected_state /= np.linalg.norm(expected_state)
+
         dot = float(np.dot(state, expected_state))
         assert np.isclose(
             abs(dot), 1.0, atol=float_comparison_absolute_tolerance, rtol=float_comparison_relative_tolerance

@@ -29,9 +29,7 @@ def test_davidson_solver_matrix():
     test_matrix_csr = sp.csr_matrix(test_matrix)
 
     # Run Davidson
-    result = davidson_solver(test_matrix_csr)
-    eigval = float(result["eigenvalue"])
-    eigvec = np.array(result["eigenvector"], dtype=float)
+    eigval, eigvec = davidson_solver(test_matrix_csr)
 
     # Expected analytical ground state:
     expected_energy = 2 - 2 * np.cos(np.pi / 7)
@@ -56,9 +54,7 @@ def test_davidson_solver_model_hamiltonian():
     heisenberg_model = QubitHamiltonian(pauli_strings=["XX", "YY", "ZZ"], coefficients=[1.0, 1.0, 1.0])
     csr_matrix = heisenberg_model.pauli_ops.to_matrix(sparse=True).real.copy()
 
-    result = davidson_solver(csr_matrix)
-    eigval = result["eigenvalue"]
-    eigvec = np.array(result["eigenvector"])
+    eigval, eigvec = davidson_solver(csr_matrix)
 
     expected_energy = -3.0
     expected_eigvec = np.array([0.0, 1 / np.sqrt(2), -1 / np.sqrt(2), 0.0])
@@ -76,9 +72,7 @@ def test_davidson_solver_model_hamiltonian():
 def test_davidson_solver_hamiltonian(hamiltonian_10e6o):
     """Test Davidson solver on a larger Hamiltonian (10 electrons in 6 orbitals)."""
     hamiltonian_csr = hamiltonian_10e6o.pauli_ops.to_matrix(sparse=True).real.copy()
-    result = davidson_solver(hamiltonian_csr)
-    eigval = result["eigenvalue"]
-    eigvec = np.array(result["eigenvector"])
+    eigval, eigvec = davidson_solver(hamiltonian_csr)
 
     # Reference values obtained from SCI calculation (test_data/make_f2.py)
     expected_energy = -33.34889127359048

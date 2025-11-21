@@ -55,7 +55,7 @@ sparse_csr from_scipy_csr(const py::object& py_csr) {
 void bind_davidson_utils(py::module& m) {
   m.def(
       "davidson_solver",
-      [](const py::object& csr_matrix, double tol, int max_m) -> py::dict {
+      [](const py::object& csr_matrix, double tol, int max_m) -> py::tuple {
         // Convert input CSR matrix and set up SparseMatrixOperator
         sparse_csr H = from_scipy_csr(csr_matrix);
         macis::SparseMatrixOperator<sparse_csr> op(H);
@@ -72,9 +72,7 @@ void bind_davidson_utils(py::module& m) {
 
         // Create a copy of the eigenvector data for Python
         py::array_t<double> eigvec = py::cast(X);
-
-        py::tuple result = py::make_tuple(eigval, eigvec);
-        return result;
+        return py::make_tuple(eigval, eigvec);
       },
       R"(
             Diagonalize a sparse matrix using the Davidson eigensolver.
