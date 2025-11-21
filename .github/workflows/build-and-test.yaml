@@ -164,8 +164,6 @@ jobs:
         python -m pip install --prefix=${{ github.workspace }}/install .[dev,plugins]
 
     - name: Run Python tests
-      env:
-        OMP_NUM_THREADS: 8
       working-directory: python
       run: |
         mkdir -p ../test-results ../coverage-reports
