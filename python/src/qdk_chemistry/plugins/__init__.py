@@ -2,8 +2,8 @@
 
 Plugins are bridge modules that connect QDK/Chemistry with external quantum chemistry
 software packages. They implement QDK/Chemistry's algorithm interfaces (such as
-:class:`~qdk_chemistry.algorithms.ScfSolver`, etc.) while internally using the external library 
-to perform the actual calculations. This allows users to leverage specialized capabilities 
+:class:`~qdk_chemistry.algorithms.ScfSolver`, etc.) while internally using the external library
+to perform the actual calculations. This allows users to leverage specialized capabilities
 from established quantum chemistry packages while maintaining a consistent QDK/Chemistry API.
 
 Purpose and Benefits

@@ -70,7 +70,7 @@ class MP2Calculator : public ReferenceDerivedCalculator {
    * case)
    * @return MP2 correlation energy
    */
-  double calculate_restricted_mp2_energy(
+  double _calculate_restricted_mp2_energy(
       std::shared_ptr<qdk::chemistry::data::Hamiltonian> ham,
       std::shared_ptr<qdk::chemistry::data::Orbitals> orbitals,
       size_t n_occ) const;
@@ -84,7 +84,7 @@ class MP2Calculator : public ReferenceDerivedCalculator {
    * @param n_beta Number of beta electrons
    * @return Total MP2 correlation energy
    */
-  double calculate_unrestricted_mp2_energy(
+  double _calculate_unrestricted_mp2_energy(
       std::shared_ptr<qdk::chemistry::data::Hamiltonian> ham,
       std::shared_ptr<qdk::chemistry::data::Orbitals> orbitals, size_t n_alpha,
       size_t n_beta) const;

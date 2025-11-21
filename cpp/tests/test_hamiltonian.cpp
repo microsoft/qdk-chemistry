@@ -79,7 +79,7 @@ class TestHamiltonianConstructor : public HamiltonianConstructor {
   }
 };
 
-double calculate_restricted_mp2_energy_algorithm(
+double _calculate_restricted_mp2_energy_algorithm(
     std::shared_ptr<Hamiltonian> ham,
     std::shared_ptr<Wavefunction> wavefunction, double reference_energy) {
   // Create ansatz from Hamiltonian and wavefunction
@@ -92,7 +92,7 @@ double calculate_restricted_mp2_energy_algorithm(
   return rmp2_total_energy;
 }
 
-double calculate_unrestricted_mp2_energy_algorithm(
+double _calculate_unrestricted_mp2_energy_algorithm(
     std::shared_ptr<Hamiltonian> ham,
     std::shared_ptr<Wavefunction> wavefunction, double reference_energy) {
   // Create ansatz from Hamiltonian and wavefunction
@@ -1165,7 +1165,7 @@ TEST_F(HamiltonianTest, IntegralSymmetriesEnergiesO2Singlet) {
   // Calculate restricted MP2 energy using algorithms
   auto [n_alpha_active, n_beta_active] =
       rhf_wavefunction->get_active_num_electrons();
-  double rmp2_energy = calculate_restricted_mp2_energy_algorithm(
+  double rmp2_energy = _calculate_restricted_mp2_energy_algorithm(
       rhf_hamiltonian, rhf_wavefunction, rhf_energy);
 
   // Create unrestricted orbitals from restricted ones
@@ -1203,7 +1203,7 @@ TEST_F(HamiltonianTest, IntegralSymmetriesEnergiesO2Singlet) {
   auto uhf_wavefunction =
       std::make_shared<Wavefunction>(std::move(uhf_container));
 
-  double ump2_energy = calculate_unrestricted_mp2_energy_algorithm(
+  double ump2_energy = _calculate_unrestricted_mp2_energy_algorithm(
       uhf_hamiltonian, uhf_wavefunction, rhf_energy);
 
   // MP2 energies should be identical for RMP2/UMP2
