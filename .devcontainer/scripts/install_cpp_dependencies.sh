@@ -10,14 +10,6 @@ BUILD_TYPE="${BUILD_TYPE:-Release}"
 JOBS="${JOBS:-$(nproc)}"
 BUILD_SHARED_LIBS="${BUILD_SHARED_LIBS:-OFF}"  # Default to static libraries
 
-if [ "$BUILD_SHARED_LIBS" = "ON" ] || [ "$BUILD_SHARED_LIBS" = "1" ] || [ "$BUILD_SHARED_LIBS" = "true" ]; then
-    echo "Building SHARED libraries"
-    BUILD_SHARED_LIBS="ON"
-else
-    echo "Building STATIC libraries"
-    BUILD_SHARED_LIBS="OFF"
-fi
-
 mkdir -p "$BUILD_DIR"
 cd "$BUILD_DIR"
 
@@ -107,7 +99,7 @@ rm -rf ecpint
 
 # Install gauxc
 echo "=== Installing gauxc ==="
-git clone --depth 1 --branch v1.0 https://github.com/wavefunction91/gauxc.git gauxc
+git clone --depth 1 --branch v1.1 https://github.com/wavefunction91/gauxc.git gauxc
 cd gauxc
 mkdir -p build
 cd build
