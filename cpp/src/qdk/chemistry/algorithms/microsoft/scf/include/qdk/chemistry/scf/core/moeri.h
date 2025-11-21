@@ -51,8 +51,11 @@ class MOERI {
   /**
    *  @brief Compute MO ERIs incore with four different transformation matrices.
    *
-   *  Note that mixed-spin integrals are accessed like, ββ|αα rather than αα|ββ.
-   *  I.e. we would call moeri(b, b, a, a).
+   *  Note that the resulting vector is sorted column major, meaning that access
+   *  to MO integrals (i,j,k,l) happens as i + j*n + k*n*n + l*n*n*n.
+   *
+   *  If desired, a row major result can be obtained by handing in matrices in
+   *  reverse order (l,k,j,i).
    *
    *  @param[in]  nb  Number of basis functions
    *  @param[in]  nt  Number of vectors in the MO space

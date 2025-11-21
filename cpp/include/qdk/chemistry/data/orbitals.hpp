@@ -45,7 +45,9 @@ class Orbitals : public DataClass,
    * @param energies The orbital energies (optional)
    * @param ao_overlap The atomic orbital overlap matrix (optional)
    * @param basis_set The basis set as shared pointer
-   * @param indices Orbital indices (shared for alpha/beta)
+   * @param indices Orbital indices as tuple of (active, inactive) space
+   * indices. For restricted calculations, the same indices are used for both
+   * alpha and beta spin channels.
    */
   Orbitals(const Eigen::MatrixXd& coefficients,
            const std::optional<Eigen::VectorXd>& energies,
@@ -62,7 +64,9 @@ class Orbitals : public DataClass,
    * @param energies_beta The beta orbital energies (optional)
    * @param ao_overlap The atomic orbital overlap matrix (optional)
    * @param basis_set The basis set as shared pointer
-   * @param indices Orbital indices (shared for alpha/beta)
+   * @param indices Orbital indices as tuple of (active_alpha, inactive_alpha,
+   * active_beta, inactive_beta) space indices. For unrestricted calculations,
+   * separate indices can be specified for alpha and beta spin channels.
    */
   Orbitals(const Eigen::MatrixXd& coefficients_alpha,
            const Eigen::MatrixXd& coefficients_beta,
@@ -542,7 +546,9 @@ class ModelOrbitals : public Orbitals {
   /**
    * @brief Constructor with active and inactive space indices (restricted)
    * @param basis_size Number of basis functions (and molecular orbitals)
-   * @param indices Orbital indices (shared for alpha/beta)
+   * @param indices Orbital indices as tuple of (active, inactive) space
+   * indices. For restricted calculations, the same indices are used for both
+   * alpha and beta spin channels.
    */
   ModelOrbitals(
       size_t basis_size,
@@ -551,7 +557,9 @@ class ModelOrbitals : public Orbitals {
   /**
    * @brief Constructor with active and inactive space indices (unrestricted)
    * @param basis_size Number of basis functions (and molecular orbitals)
-   * @param indices Orbital indices (shared for alpha/beta)
+   * @param indices Orbital indices as tuple of (active_alpha, inactive_alpha,
+   * active_beta, inactive_beta) space indices. For unrestricted calculations,
+   * separate indices can be specified for alpha and beta spin channels.
    */
   ModelOrbitals(
       size_t basis_size,
