@@ -120,7 +120,7 @@ jobs:
         fi
 
         cd ${{ github.workspace }}
-        
+
         gcovr --root ${{ github.workspace }}/cpp \
           --object-directory "${{ github.workspace }}/${BUILD_DIR}" \
           --filter '${{ github.workspace }}/cpp/src/.*' \
@@ -223,11 +223,11 @@ jobs:
         CPP_COVERAGE=$(grep -oP 'TOTAL.*?\K[0-9.]+(?=%)' coverage-reports/cpp_coverage.txt | tail -1 || echo "0")
         PYTHON_COVERAGE=$(grep -oP 'TOTAL.*?\K[0-9]+(?=%)' coverage-reports/python_coverage.txt | tail -1 || echo "0")
         PYBIND11_COVERAGE=$(grep -oP 'TOTAL.*?\K[0-9.]+(?=%)' coverage-reports/pybind11_coverage.txt | tail -1 || echo "0")
-        
+
         echo "CPP_COVERAGE=$CPP_COVERAGE" >> $GITHUB_ENV
         echo "PYTHON_COVERAGE=$PYTHON_COVERAGE" >> $GITHUB_ENV
         echo "PYBIND11_COVERAGE=$PYBIND11_COVERAGE" >> $GITHUB_ENV
-        
+
         # Create simple PR comment with just statistics
         echo "## 📊 Coverage Summary" > pr-comment.md
         echo "" >> pr-comment.md
@@ -272,7 +272,7 @@ jobs:
         echo "" >> coverage-summary.md
         echo "---" >> coverage-summary.md
         echo "" >> coverage-summary.md
-        
+
         echo "### Detailed Coverage Reports" >> coverage-summary.md
         echo "" >> coverage-summary.md
         echo "<details>" >> coverage-summary.md
@@ -283,7 +283,7 @@ jobs:
         echo '```' >> coverage-summary.md
         echo "</details>" >> coverage-summary.md
         echo "" >> coverage-summary.md
-        
+
         if [ -f coverage-reports/python_coverage.txt ]; then
           echo "<details>" >> coverage-summary.md
           echo "<summary>Python Coverage Details</summary>" >> coverage-summary.md
@@ -294,7 +294,7 @@ jobs:
           echo "</details>" >> coverage-summary.md
           echo "" >> coverage-summary.md
         fi
-        
+
         if [ -f coverage-reports/pybind11_coverage.txt ]; then
           echo "<details>" >> coverage-summary.md
           echo "<summary>Pybind11 Coverage Details</summary>" >> coverage-summary.md
@@ -304,7 +304,7 @@ jobs:
           echo '```' >> coverage-summary.md
           echo "</details>" >> coverage-summary.md
         fi
-        
+
         # Add to job summary
         cat coverage-summary.md >> $GITHUB_STEP_SUMMARY
 
