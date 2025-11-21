@@ -21,7 +21,6 @@ classifiers = [
   "Programming Language :: Python :: 3.11",
   "Programming Language :: Python :: 3.12",
   "Programming Language :: Python :: 3.13",
-  "Programming Language :: Python :: 3.14",
   "Programming Language :: C++",
   "Topic :: Scientific/Engineering",
   "Topic :: Scientific/Engineering :: Quantum",
@@ -243,6 +242,7 @@ install-dir = "qdk_chemistry"
 BUILD_SHARED_LIBS = "OFF"
 QDK_ENABLE_COVERAGE = {env="QDK_COVERAGE_BUILD", default="OFF"}
 QDK_UARCH = {env="QDK_UARCH", default="x86-64"}
+CMAKE_BUILD_PARALLEL_LEVEL = {env="CMAKE_BUILD_PARALLEL_LEVEL", default="4"}
 
 [[tool.scikit-build.overrides]]
 if.env.CMAKE_BUILD_TYPE = "Debug"

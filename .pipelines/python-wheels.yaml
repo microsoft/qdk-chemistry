@@ -1,23 +1,18 @@
 # Test the build the wheels on all PRs
 # Only deploy to Azure Artifacts on tag push
 
-# TODO : Enable triggers when pipeline works as expected
-# trigger:
-#   branches:
-#     include:
-#     - '*'
-#   tags:
-#     include:
-#     - v*
-# pr:
-#   branches:
-#     include:
-#     - '*'
-#   drafts: true
-
-# TODO DISABLED TEMPORARILY
-trigger: none
-pr: none
+trigger:
+  branches:
+    include:
+    - '*'
+  tags:
+    include:
+    - v*
+pr:
+  branches:
+    include:
+    - '*'
+  drafts: true
 
 parameters:
 - name: matrix
@@ -117,7 +112,7 @@ stages:
             buildTesting: OFF
             enableCoverage: OFF
             agentBuildDirectory: $(Agent.BuildDirectory)
-            dockerImage: ubuntu:22.04
+            dockerImage: mcr.microsoft.com/mirror/docker/library/ubuntu:22.04
             imageTag: linux/amd64
             pythonVersion: $(pythonVersion)
 
@@ -126,7 +121,7 @@ stages:
         - template: templates/docker-test-wheel.yml
           parameters:
             agentBuildDirectory: $(Agent.BuildDirectory)
-            dockerImage: ubuntu:22.04
+            dockerImage: mcr.microsoft.com/mirror/docker/library/ubuntu:22.04
             imageTag: linux/amd64
             pythonVersion: $(pythonVersion)
 
@@ -138,7 +133,7 @@ stages:
             buildTesting: OFF
             enableCoverage: OFF
             agentBuildDirectory: $(Agent.BuildDirectory)
-            dockerImage: ubuntu:22.04
+            dockerImage: mcr.microsoft.com/mirror/docker/library/ubuntu:22.04
             imageTag: linux/arm64/v8
             pythonVersion: $(pythonVersion)
 
@@ -147,7 +142,7 @@ stages:
         - template: templates/docker-test-wheel.yml
           parameters:
             agentBuildDirectory: $(Agent.BuildDirectory)
-            dockerImage: ubuntu:22.04
+            dockerImage: mcr.microsoft.com/mirror/docker/library/ubuntu:22.04
             imageTag: linux/arm64/v8
             pythonVersion: $(pythonVersion)
 

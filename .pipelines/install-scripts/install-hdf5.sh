@@ -27,7 +27,7 @@ fi
 # Build and install HDF5 from extracted source
 cd hdf5
 echo "Configuring HDF5..."
-CXXFLAGS="-fPIC" ./configure --prefix=${INSTALL_PREFIX} \
+CXXFLAGS="-fPIC -Os" ./configure --prefix=${INSTALL_PREFIX} \
     --enable-cxx \
     --enable-fortran=no \
     --enable-static \

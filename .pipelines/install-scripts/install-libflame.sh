@@ -1,0 +1,36 @@
+#!/bin/bash
+INSTALL_PREFIX=${1:-/usr/local}
+MARCH=${2:-x86-64-v3}
+LIBFLAME_VERSION=${3:-5.2.0}
+
+# Select architectures to build BLIS for
+if [[ ${MARCH} == 'armv8-a' ]]; then
+    # Compile for armsve, firestorm, thunderx2, cortexa57, cortexa53, and generic architectures
+    export LIBFLAME_ARCH=arm64
+elif [[ ${MARCH} == 'x86-64-v3' ]]; then
+    # Compile for intel64, amd64, and amd64_legacy architectures
+    export LIBFLAME_ARCH=x86_64
+fi
+
+# Download libflame
+echo "Downloading libflame ${LIBFLAME_VERSION}..."
+wget -q https://github.com/flame/libflame/archive/refs/tags/${LIBFLAME_VERSION}.zip -O libflame.zip
+unzip -q libflame.zip
+rm libflame.zip
+mv libflame-${LIBFLAME_VERSION} libflame
+
+# Configure and build libflame
+cd libflame
+
+CFLAGS="-fPIC -Os" ./configure \
+    --enable-static-build \
+    --prefix=/usr/local \
+    --enable-lapack2flame \
+    --enable-legacy-lapack \
+    --enable-max-arg-list-hack \
+    --target=$LIBFLAME_ARCH
+
+make -j$(nproc)
+make install
+
+cd ..
