@@ -7,15 +7,13 @@
 #include <spdlog/spdlog.h>
 
 #include <algorithm>
+#include <blas.hh>
 #include <iostream>
 #include <qdk/chemistry/algorithms/active_space.hpp>
 
-#include "../scf/src/util/blas.h"
 #include "../utils.hpp"
 
 namespace qdk::chemistry::algorithms::microsoft {
-
-using qdk::chemistry::scf::blas::gemm;
 
 std::shared_ptr<data::Wavefunction> PipekMezeyLocalizer::_run_impl(
     std::shared_ptr<data::Wavefunction> wavefunction,
@@ -188,9 +186,11 @@ Eigen::MatrixXd PipekMezeyLocalization::localize(
   double old_metric = std::numeric_limits<double>::infinity();
 
   // Initial overlap_matrix*orbital_coeffs - updated via Jacobi rotations
-  gemm("N", "N", num_basis_funcs, num_orbitals, num_basis_funcs, 1.0,
-       overlap_matrix.data(), num_basis_funcs, orbital_coeffs.data(),
-       num_basis_funcs, 0.0, overlap_times_coeffs.data(), num_basis_funcs);
+  blas::gemm(blas::Layout::ColMajor, blas::Op::NoTrans, blas::Op::NoTrans,
+             num_basis_funcs, num_orbitals, num_basis_funcs, 1.0,
+             overlap_matrix.data(), num_basis_funcs, orbital_coeffs.data(),
+             num_basis_funcs, 0.0, overlap_times_coeffs.data(),
+             num_basis_funcs);
 
   const auto max_sweeps = this->settings_.get<size_t>("max_iterations");
   const auto tol = this->settings_.get<double>("tolerance");

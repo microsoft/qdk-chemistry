@@ -1,1 +1,3 @@
 #pragma once
+
+#cmakedefine QDK_ENABLE_OPENMP

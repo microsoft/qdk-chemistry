@@ -12,19 +12,19 @@
 #ifdef QDK_CHEMISTRY_ENABLE_MPI
 #include <mpi.h>
 #endif
-#include <omp.h>
 #include <qdk/chemistry/scf/util/env_helper.h>
 #include <spdlog/spdlog.h>
 
 #include <filesystem>
 #include <fstream>
 #include <iostream>
+#include <lapack.hh>
 #include <nlohmann/json.hpp>
 #include <numeric>
+#include <qdk/chemistry/utils/omp_utils.hpp>
 #include <sstream>
 #include <thread>
 
-#include "util/lapack.h"
 #include "util/macros.h"
 #include "util/timer.h"
 
@@ -399,8 +399,8 @@ void SCFImpl::compute_orthogonalization_matrix_(const RowMajorMatrix& S_,
 #else
   std::memcpy(U_t.data(), S_.data(),
               num_atomic_orbitals_ * num_atomic_orbitals_ * sizeof(double));
-  lapack::syev("V", "L", num_atomic_orbitals_, U_t.data(), num_atomic_orbitals_,
-               s.data());
+  lapack::syev(lapack::Job::Vec, lapack::Uplo::Lower, num_atomic_orbitals_,
+               U_t.data(), num_atomic_orbitals_, s.data());
 #endif
 
   RowMajorMatrix U = U_t.transpose();
@@ -1073,8 +1073,8 @@ void SCFImpl::update_density_matrix_(const RowMajorMatrix& F_, int idx) {
       num_atomic_orbitals_, num_molecular_orbitals_);
   RowMajorMatrix tmp1 = X_.transpose() * F_dm;
   RowMajorMatrix tmp2 = tmp1 * X_;
-  lapack::syev("V", "L", num_molecular_orbitals_, tmp2.data(),
-               num_molecular_orbitals_,
+  lapack::syev(lapack::Job::Vec, lapack::Uplo::Lower, num_molecular_orbitals_,
+               tmp2.data(), num_molecular_orbitals_,
                eigenvalues_.data() + idx * num_molecular_orbitals_);
   tmp2.transposeInPlace();  // Row major
   C_dm.noalias() = X_ * tmp2;

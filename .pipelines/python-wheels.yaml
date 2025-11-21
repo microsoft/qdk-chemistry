@@ -106,9 +106,6 @@ stages:
           Python3.13:
             pythonVersion: '3.13'
             buildMarch: ${{ target.march }}
-          Python3.14:
-            pythonVersion: '3.14'
-            buildMarch: ${{ target.march }}
         maxParallel: 1 # There are only 2 nodes in the ARM nodepool, limit to 1 job at a time
 
       steps:

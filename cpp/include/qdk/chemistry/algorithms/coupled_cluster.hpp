@@ -54,8 +54,10 @@ class CoupledClusterCalculator
    * @brief Perform coupled-cluster calculation
    *
    *
+   * \cond DOXYGEN_SUPRESS (Doxygen warning suppression for argument packs)
    * @param ansatz The Ansatz (Wavefunction and Hamiltonian) describing the
    * quantum system
+   * \endcond
    * @return A pair containing the calculated total energy (first) and the
    * resulting coupled-cluster amplitudes (second)
    *
