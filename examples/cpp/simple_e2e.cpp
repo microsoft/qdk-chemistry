@@ -11,10 +11,9 @@
  * structure calculations:
  * 1. Loading molecular structures from XYZ files
  * 2. Performing Hartree-Fock (HF) self-consistent field (SCF) calculations
- * 3. Orbital localization
- * 4. Active space selection
- * 5. Hamiltonian construction in the molecular orbital basis
- * 6. Complete Active Space Configuration Interaction (CASCI)
+ * 3. Active space selection
+ * 4. Hamiltonian construction in the molecular orbital basis
+ * 5. Complete Active Space Configuration Interaction (CASCI)
  *
  * Usage:
  *   ./simple_e2e molecule.structure.xyz        # Loads XYZ file (STO-3G)
