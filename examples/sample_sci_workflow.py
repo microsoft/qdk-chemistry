@@ -22,7 +22,7 @@ from pathlib import Path
 
 from qdk_chemistry.algorithms import create
 from qdk_chemistry.data import Structure
-from qdk_chemistry.utils import compute_valence_space
+from qdk_chemistry.utils import compute_valence_space_parameters
 from qdk_chemistry.utils.wavefunction import (
     calculate_sparse_wavefunction,
     get_active_determinants_info,
@@ -130,7 +130,9 @@ def main(argv: Sequence[str] | None = None) -> None:
     ########################################################################################
     # 3. Select the valence active space (heuristic or user overrides).
     ########################################################################################
-    inferred_e, inferred_orb = compute_valence_space(scf_wavefunction, args.charge)
+    inferred_e, inferred_orb = compute_valence_space_parameters(
+        scf_wavefunction, args.charge
+    )
     electrons = (
         args.num_active_electrons
         if args.num_active_electrons is not None
