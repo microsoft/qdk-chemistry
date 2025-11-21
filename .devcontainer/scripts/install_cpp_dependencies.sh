@@ -29,8 +29,9 @@ rm -rf spdlog
 
 # Install blaspp
 echo "=== Installing blaspp ==="
-git clone --depth 1 --branch master https://github.com/icl-utk-edu/blaspp.git blaspp
+git clone https://github.com/icl-utk-edu/blaspp.git blaspp
 cd blaspp
+git checkout 13622021629f5fd27591bb7da60bae5b19561f01
 mkdir -p build
 cd build
 cmake .. -DCMAKE_BUILD_TYPE="$BUILD_TYPE" \
@@ -44,8 +45,9 @@ rm -rf blaspp
 
 # Install lapackpp
 echo "=== Installing lapackpp ==="
-git clone --depth 1 --branch master https://github.com/icl-utk-edu/lapackpp.git lapackpp
+git clone https://github.com/icl-utk-edu/lapackpp.git lapackpp
 cd lapackpp
+git checkout 5bc9c85201ace48213df5ac7d1ef026c9668dfbd
 mkdir -p build
 cd build
 cmake .. -DCMAKE_BUILD_TYPE="$BUILD_TYPE" \

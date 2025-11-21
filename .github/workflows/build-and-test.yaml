@@ -179,7 +179,6 @@ jobs:
         fi
 
     - name: Generate Pybind11 coverage report
-      if: success() || failure()
       working-directory: python
       run: |
         PYBIND_BUILD_DIR=$(find . -wholename "./build/cp*/CMakeFiles/_core.dir" | head -1)
@@ -202,7 +201,6 @@ jobs:
         cat ../coverage-reports/pybind11_coverage.txt
 
     - name: Generate coverage statistics
-      if: success() || failure()
       run: |
         # Extract coverage percentages
         CPP_COVERAGE=$(grep -oP 'TOTAL.*?\K[0-9.]+(?=%)' coverage-reports/cpp_coverage.txt | tail -1 || echo "0")
@@ -243,7 +241,6 @@ jobs:
         comment_tag: coverage-report
 
     - name: Add coverage to job summary
-      if: success() || failure()
       run: |
         # Create comprehensive summary with table and detailed reports
         echo "## 📊 Coverage Summary" > coverage-summary.md
