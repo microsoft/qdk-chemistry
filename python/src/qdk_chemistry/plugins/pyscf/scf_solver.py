@@ -60,7 +60,7 @@ class PyscfScfSettings(ElectronicStructureSettings):
         method (str, default="hf"): The electronic structure method (Hartree-Fock).
         basis_set (str, default="def2-svp"): The basis set used for quantum chemistry calculations.
             Common options include "def2-svp", "def2-tzvp", "cc-pvdz", etc.
-        convergence_threshold (float, default=1e-6): Convergence threshold for the SCF procedure.
+        convergence_threshold (float, default=1e-8): Convergence threshold for the SCF procedure.
         max_iterations (int, default=50): Maximum number of iterations.
 
     PySCF-specific settings:

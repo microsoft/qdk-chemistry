@@ -96,17 +96,17 @@ class SCFAlgorithm {
   void solve_fock_eigenproblem(const RowMajorMatrix& F, const RowMajorMatrix& S,
                                const RowMajorMatrix& X, RowMajorMatrix& C,
                                RowMajorMatrix& eigenvalues, RowMajorMatrix& P,
-                               const int nelec[2], int num_atomic_orbitals,
+                               const int num_occupied_orbitals[2],
+                               int num_atomic_orbitals,
                                int num_molecular_orbitals, int idx_spin,
                                bool unrestricted);
 
- private:
   /**
    * @brief Calculate orbital gradient (OG) error for convergence checking
    *
-   * This method calculates the orbital gradient error in the atomic orbital
-   * basis using the formula: error = FPS - SPF, where F is the Fock matrix, P
-   * is the density matrix, and S is the overlap matrix.
+   * This static method calculates the orbital gradient error in the atomic
+   * orbital basis using the formula: error = FPS - SPF, where F is the Fock
+   * matrix, P is the density matrix, and S is the overlap matrix.
    *
    * @param[in] F Fock matrix (ndm × num_atomic_orbitals ×
    * num_atomic_orbitals)
@@ -115,11 +115,14 @@ class SCFAlgorithm {
    * @param[in] S Overlap matrix (num_atomic_orbitals × num_atomic_orbitals)
    * @param[out] error_matrix Output matrix to store calculated error (will be
    * resized)
+   * @param[in] unrestricted Whether the calculation is unrestricted
    * @return Infinity norm of the error matrix
    */
-  double calculate_og_error_(const RowMajorMatrix& F, const RowMajorMatrix& P,
-                             const RowMajorMatrix& S,
-                             RowMajorMatrix& error_matrix);
+  static double calculate_og_error_(const RowMajorMatrix& F,
+                                    const RowMajorMatrix& P,
+                                    const RowMajorMatrix& S,
+                                    RowMajorMatrix& error_matrix,
+                                    bool unrestricted);
 
  protected:
   const SCFContext& ctx_;  ///< Reference to SCF context

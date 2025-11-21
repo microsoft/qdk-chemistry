@@ -67,8 +67,8 @@ std::shared_ptr<SCFAlgorithm> SCFAlgorithm::create(const SCFContext& ctx) {
 void SCFAlgorithm::solve_fock_eigenproblem(
     const RowMajorMatrix& F, const RowMajorMatrix& S, const RowMajorMatrix& X,
     RowMajorMatrix& C, RowMajorMatrix& eigenvalues, RowMajorMatrix& P,
-    const int nelec[2], int num_atomic_orbitals, int num_molecular_orbitals,
-    int idx_spin, bool unrestricted) {
+    const int num_occupied_orbitals[2], int num_atomic_orbitals,
+    int num_molecular_orbitals, int idx_spin, bool unrestricted) {
 #ifdef ENABLE_NVTX3
   nvtx3::scoped_range r{nvtx3::rgb{0, 0, 255}, "solve_eigen"};
 #endif
@@ -114,8 +114,10 @@ void SCFAlgorithm::solve_fock_eigenproblem(
   auto P_d = F_d;
   auto alpha = unrestricted ? 1.0 : 2.0;
   matrix_op::bmm_ex(
-      alpha, C_t->data(), {1, nelec[idx_spin], num_atomic_orbitals, true},
-      C_t->data(), {nelec[idx_spin], num_atomic_orbitals}, 0.0, P_d->data());
+      alpha, C_t->data(),
+      {1, num_occupied_orbitals[idx_spin], num_atomic_orbitals, true},
+      C_t->data(), {num_occupied_orbitals[idx_spin], num_atomic_orbitals}, 0.0,
+      P_d->data());
   CUDA_CHECK(cudaMemcpy(
       P.data() + idx_spin * num_atomic_orbitals * num_atomic_orbitals,
       P_d->data(), sizeof(double) * num_atomic_orbitals * num_atomic_orbitals,
@@ -147,17 +149,20 @@ void SCFAlgorithm::solve_fock_eigenproblem(
   C_dm.noalias() = X * tmp2;
   auto alpha = unrestricted ? 1.0 : 2.0;
   P_dm.noalias() =
-      alpha * C_dm.block(0, 0, num_atomic_orbitals, nelec[idx_spin]) *
-      C_dm.block(0, 0, num_atomic_orbitals, nelec[idx_spin]).transpose();
+      alpha *
+      C_dm.block(0, 0, num_atomic_orbitals, num_occupied_orbitals[idx_spin]) *
+      C_dm.block(0, 0, num_atomic_orbitals, num_occupied_orbitals[idx_spin])
+          .transpose();
 #endif
 }
 
 double SCFAlgorithm::calculate_og_error_(const RowMajorMatrix& F,
                                          const RowMajorMatrix& P,
                                          const RowMajorMatrix& S,
-                                         RowMajorMatrix& error_matrix) {
+                                         RowMajorMatrix& error_matrix,
+                                         bool unrestricted) {
   int num_atomic_orbitals = static_cast<int>(S.cols());
-  int num_density_matrices = ctx_.cfg->unrestricted ? 2 : 1;
+  int num_density_matrices = unrestricted ? 2 : 1;
 
   RowMajorMatrix FP(num_atomic_orbitals, num_atomic_orbitals);
 
@@ -191,17 +196,20 @@ bool SCFAlgorithm::check_convergence(const SCFImpl& scf_impl) {
   const auto* cfg = ctx_.cfg;
   auto& res = ctx_.result;
 
-  int num_atomic_orbitals = static_cast<int>(scf_impl.num_atomic_orbitals_);
+  int num_atomic_orbitals = scf_impl.get_num_basis_functions();
 
   // Calculate energy using SCFImpl method
   double energy = res.scf_total_energy;
   delta_energy_ = energy - last_energy_;
-  density_rms_ = (P_last_ - scf_impl.P_).norm() / num_atomic_orbitals;
+  density_rms_ =
+      (P_last_ - scf_impl.get_density_matrix()).norm() / num_atomic_orbitals;
 
   // Calculate orbital gradient error
   RowMajorMatrix error_matrix;
   double og_error =
-      calculate_og_error_(scf_impl.F_, scf_impl.P_, scf_impl.S_, error_matrix) /
+      calculate_og_error_(scf_impl.get_fock_matrix(),
+                          scf_impl.get_density_matrix(), scf_impl.overlap(),
+                          error_matrix, cfg->unrestricted) /
       num_atomic_orbitals;
 
   bool converged = density_rms_ < cfg->scf_algorithm.density_threshold &&
@@ -215,7 +223,7 @@ bool SCFAlgorithm::check_convergence(const SCFImpl& scf_impl) {
   step_count_++;
 
   // Store current values before iteration
-  P_last_ = scf_impl.P_;
+  P_last_ = scf_impl.get_density_matrix();
   last_energy_ = res.scf_total_energy;
   return converged;
 }

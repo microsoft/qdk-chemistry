@@ -114,21 +114,6 @@ class DIIS {
                           const RowMajorMatrix& S, RowMajorMatrix& F_ls,
                           const double mu) const;
 
-  /**
-   * @brief Calculate DIIS error metric (orbital gradient in the AO basis)
-   *
-   * Computes the commutator error: error = FPS - SPF
-   *
-   * @param[in] F Fock matrix
-   * @param[in] P Density matrix
-   * @param[in] S Overlap matrix
-   * @param[out] error_matrix Output error matrix (will be resized)
-   * @return Infinity norm of the error matrix
-   */
-  double calculate_diis_error_(const RowMajorMatrix& F, const RowMajorMatrix& P,
-                               const RowMajorMatrix& S,
-                               RowMajorMatrix& error_matrix) const;
-
   const SCFContext& ctx_;            ///< Reference to SCFContext
   size_t subspace_size_;             ///< Maximum number of vectors in subspace
   std::deque<RowMajorMatrix> hist_;  ///< History of Fock matrices
@@ -157,7 +142,8 @@ void DIIS::iterate(const RowMajorMatrix& P, const RowMajorMatrix& F,
   // Create error matrix for DIIS (use the base class error calculation)
   RowMajorMatrix error = RowMajorMatrix::Zero(
       num_density_matrices * num_atomic_orbitals, num_atomic_orbitals);
-  diis_error_ = calculate_diis_error_(F, P, S, error);
+  diis_error_ =
+      SCFAlgorithm::calculate_og_error_(F, P, S, error, ctx_.cfg->unrestricted);
 
   // Create extrapolated Fock matrix for density matrix update, instead of
   // modifying F in place
@@ -274,42 +260,6 @@ void DIIS::apply_level_shift_(const RowMajorMatrix& F, const RowMajorMatrix& P,
   }
 }
 
-double DIIS::calculate_diis_error_(const RowMajorMatrix& F,
-                                   const RowMajorMatrix& P,
-                                   const RowMajorMatrix& S,
-                                   RowMajorMatrix& error_matrix) const {
-  int num_atomic_orbitals = static_cast<int>(S.cols());
-  int num_density_matrices = ctx_.cfg->unrestricted ? 2 : 1;
-
-  RowMajorMatrix FP =
-      RowMajorMatrix::Zero(num_atomic_orbitals, num_atomic_orbitals);
-
-  error_matrix = RowMajorMatrix::Zero(
-      num_density_matrices * num_atomic_orbitals, num_atomic_orbitals);
-  for (auto i = 0; i < num_density_matrices; ++i) {
-    Eigen::Map<RowMajorMatrix> error_dm(
-        error_matrix.data() + i * num_atomic_orbitals * num_atomic_orbitals,
-        num_atomic_orbitals, num_atomic_orbitals);
-    FP.noalias() = Eigen::Map<const RowMajorMatrix>(
-                       F.data() + i * num_atomic_orbitals * num_atomic_orbitals,
-                       num_atomic_orbitals, num_atomic_orbitals) *
-                   Eigen::Map<const RowMajorMatrix>(
-                       P.data() + i * num_atomic_orbitals * num_atomic_orbitals,
-                       num_atomic_orbitals, num_atomic_orbitals);
-    error_dm.noalias() = FP * S;
-    for (size_t ibf = 0; ibf < num_atomic_orbitals; ibf++) {
-      error_dm(ibf, ibf) = 0.0;
-      for (size_t jbf = 0; jbf < ibf; ++jbf) {
-        auto e_ij = error_dm(ibf, jbf);
-        auto e_ji = error_dm(jbf, ibf);
-        error_dm(ibf, jbf) = e_ij - e_ji;
-        error_dm(jbf, ibf) = e_ji - e_ij;
-      }
-    }
-  }
-  return error_matrix.lpNorm<Eigen::Infinity>();
-}
-
 }  // namespace impl
 
 // Constructor for SCFAlgorithm interface
@@ -323,23 +273,23 @@ void DIIS::iterate(SCFImpl& scf_impl) {
   const auto* cfg = ctx_.cfg;
 
   // Get references to matrices from SCFImpl
-  auto& P = scf_impl.P_;
-  auto& C = scf_impl.C_;
-  const auto& F = scf_impl.F_;
-  const auto& S = scf_impl.S_;
-  const auto& X = scf_impl.X_;
-  auto& eigenvalues = scf_impl.eigenvalues_;
+  auto& P = scf_impl.density_matrix();
+  auto& C = scf_impl.orbitals_matrix();
+  const auto& F = scf_impl.get_fock_matrix();
+  const auto& S = scf_impl.overlap();
+  const auto& X = scf_impl.get_orthogonalization_matrix();
+  auto& eigenvalues = scf_impl.eigenvalues();
 
   // Call DIIS implementation with individual parameters
   diis_impl_->iterate(P, F, S);
   // Update density matrices using the extrapolated Fock matrix
   const RowMajorMatrix& F_extrapolated = diis_impl_->get_extrapolated_fock();
 
-  int num_atomic_orbitals = static_cast<int>(scf_impl.num_atomic_orbitals_);
-  int num_molecular_orbitals =
-      static_cast<int>(scf_impl.num_molecular_orbitals_);
-  int num_density_matrices = scf_impl.num_density_matrices_;
-  const int* nelec = scf_impl.nelec_;
+  int num_atomic_orbitals = scf_impl.get_num_basis_functions();
+  int num_molecular_orbitals = scf_impl.get_num_molecular_orbitals();
+  int num_density_matrices = scf_impl.get_num_density_matrices();
+  std::vector<int> nelec_vec = scf_impl.get_num_electrons();
+  const int nelec[2] = {nelec_vec[0], nelec_vec[1]};
 
   for (auto i = 0; i < num_density_matrices; ++i) {
     // Use extrapolated Fock matrix for density matrix update

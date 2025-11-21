@@ -20,9 +20,6 @@
 #include "scf/soad.h"
 
 namespace qdk::chemistry::scf {
-// Forward declaration
-class DIIS;
-class GDM;
 
 /**
  * @brief SCF implementation base class
@@ -33,10 +30,6 @@ class GDM;
  * Without extension, provides all functionality for Hartree-Fock SCF.
  */
 class SCFImpl {
-  friend class SCFAlgorithm;
-  friend class DIIS;
-  friend class GDM;
-
  public:
   /**
    * @brief Construct SCF implementation
@@ -147,6 +140,31 @@ class SCFImpl {
    * @see SCF::get_num_density_matrices() for API details
    */
   int get_num_density_matrices() const { return num_density_matrices_; }
+
+  /**
+   * @brief Get the orthogonalization matrix
+   * @return Reference to the orthogonalization matrix X
+   */
+  const RowMajorMatrix& get_orthogonalization_matrix() const { return X_; }
+
+  /**
+   * @brief Get mutable reference to density matrix for modification
+   * @return Mutable reference to density matrix P
+   */
+  RowMajorMatrix& density_matrix() { return P_; }
+
+  /**
+   * @brief Get mutable reference to molecular orbital coefficients for
+   * modification
+   * @return Mutable reference to coefficient matrix C
+   */
+  RowMajorMatrix& orbitals_matrix() { return C_; }
+
+  /**
+   * @brief Get mutable reference to orbital eigenvalues for modification
+   * @return Mutable reference to eigenvalues
+   */
+  RowMajorMatrix& eigenvalues() { return eigenvalues_; }
 
  protected:
   /**
