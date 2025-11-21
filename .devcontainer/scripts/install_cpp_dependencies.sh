@@ -8,6 +8,15 @@ BUILD_DIR="/tmp/qdk_deps_build"
 INSTALL_PREFIX="${INSTALL_PREFIX:-/usr/local}"
 BUILD_TYPE="${BUILD_TYPE:-Release}"
 JOBS="${JOBS:-$(nproc)}"
+BUILD_SHARED_LIBS="${BUILD_SHARED_LIBS:-OFF}"  # Default to static libraries
+
+if [ "$BUILD_SHARED_LIBS" = "ON" ] || [ "$BUILD_SHARED_LIBS" = "1" ] || [ "$BUILD_SHARED_LIBS" = "true" ]; then
+    echo "Building SHARED libraries"
+    BUILD_SHARED_LIBS="ON"
+else
+    echo "Building STATIC libraries"
+    BUILD_SHARED_LIBS="OFF"
+fi
 
 mkdir -p "$BUILD_DIR"
 cd "$BUILD_DIR"
@@ -21,7 +30,8 @@ cd build
 cmake .. -DCMAKE_BUILD_TYPE="$BUILD_TYPE" \
          -DCMAKE_INSTALL_PREFIX="$INSTALL_PREFIX" \
          -DCMAKE_POSITION_INDEPENDENT_CODE=ON \
-         -DCMAKE_CXX_FLAGS="-march=native -fPIC"
+         -DCMAKE_CXX_FLAGS="-march=native -fPIC" \
+         -DBUILD_SHARED_LIBS="$BUILD_SHARED_LIBS"
 make -j"$JOBS"
 make install
 cd "$BUILD_DIR"
@@ -37,7 +47,8 @@ cd build
 cmake .. -DCMAKE_BUILD_TYPE="$BUILD_TYPE" \
          -DCMAKE_INSTALL_PREFIX="$INSTALL_PREFIX" \
          -DCMAKE_POSITION_INDEPENDENT_CODE=ON \
-         -DBUILD_TESTING=OFF
+         -DBUILD_TESTING=OFF \
+         -DBUILD_SHARED_LIBS="$BUILD_SHARED_LIBS"
 make -j"$JOBS"
 make install
 cd "$BUILD_DIR"
@@ -53,7 +64,8 @@ cd build
 cmake .. -DCMAKE_BUILD_TYPE="$BUILD_TYPE" \
          -DCMAKE_INSTALL_PREFIX="$INSTALL_PREFIX" \
          -DCMAKE_POSITION_INDEPENDENT_CODE=ON \
-         -DBUILD_TESTING=OFF
+         -DBUILD_TESTING=OFF \
+         -DBUILD_SHARED_LIBS="$BUILD_SHARED_LIBS"
 make -j"$JOBS"
 make install
 cd "$BUILD_DIR"
@@ -68,7 +80,8 @@ mkdir -p build
 cd build
 cmake .. -DCMAKE_BUILD_TYPE="$BUILD_TYPE" \
          -DCMAKE_INSTALL_PREFIX="$INSTALL_PREFIX" \
-         -DCMAKE_POSITION_INDEPENDENT_CODE=ON
+         -DCMAKE_POSITION_INDEPENDENT_CODE=ON \
+         -DBUILD_SHARED_LIBS="$BUILD_SHARED_LIBS"
 make -j"$JOBS"
 make install
 cd "$BUILD_DIR"
@@ -85,7 +98,8 @@ cmake .. -DCMAKE_BUILD_TYPE="$BUILD_TYPE" \
          -DCMAKE_POSITION_INDEPENDENT_CODE=ON \
          -DBUILD_TESTING=OFF \
          -DLIBECPINT_BUILD_TESTS=OFF \
-         -DLIBECPINT_USE_PUGIXML=OFF
+         -DLIBECPINT_USE_PUGIXML=OFF \
+         -DBUILD_SHARED_LIBS="$BUILD_SHARED_LIBS"
 make -j"$JOBS"
 make install
 cd "$BUILD_DIR"
@@ -106,7 +120,8 @@ cmake .. -DCMAKE_BUILD_TYPE="$BUILD_TYPE" \
          -DGAUXC_ENABLE_MAGMA=OFF \
          -DGAUXC_ENABLE_CUTLASS=ON \
          -DGAUXC_ENABLE_CUDA=OFF \
-         -DGAUXC_ENABLE_MPI=OFF
+         -DGAUXC_ENABLE_MPI=OFF \
+         -DBUILD_SHARED_LIBS="$BUILD_SHARED_LIBS"
 make -j"$JOBS"
 make install
 cd "$BUILD_DIR"
