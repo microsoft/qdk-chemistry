@@ -35,12 +35,12 @@ class _TestSettingsContainer(Settings):
         self._set_default("keywords", "vector<string>", [])
         self._set_default("bool_val", "bool", False)
         self._set_default("int_val", "int", 0)
-        self._set_default("long_val", "int", 0)
-        self._set_default("size_t_val", "int", 0)
+        self._set_default("long_val", "int64_t", 0)
+        self._set_default("size_t_val", "uint64_t", 0)
         self._set_default("float_val", "double", 0.0)
         self._set_default("double_val", "double", 0.0)
         self._set_default("string_val", "string", "")
-        self._set_default("int_vector", "vector<int>", [])
+        self._set_default("int_vector", "vector<int64_t>", [])
         self._set_default("double_vector", "vector<double>", [])
         self._set_default("string_vector", "vector<string>", [])
         self._set_default("test_key", "int", 0)
@@ -67,14 +67,14 @@ class _TestSettingsContainer(Settings):
         self._set_default("parameters", "vector<double>", [])
         self._set_default("coefficients", "vector<double>", [])
         self._set_default("basis_functions", "vector<string>", [])
-        self._set_default("list_int", "vector<int>", [])
+        self._set_default("list_int", "vector<int64_t>", [])
         self._set_default("list_float", "vector<double>", [])
         self._set_default("list_str", "vector<string>", [])
 
         # Keys for test_update_method
         self._set_default("param1", "string", "")
         self._set_default("param2", "int", 0)
-        self._set_default("param3", "vector<int>", [])
+        self._set_default("param3", "vector<int64_t>", [])
 
         # Keys for test_dictionary_conversion
         self._set_default("old_setting", "string", "")
@@ -84,39 +84,39 @@ class _TestSettingsContainer(Settings):
         self._set_default("int_param", "int", 0)
         self._set_default("float_param", "double", 0.0)
         self._set_default("bool_param", "bool", False)
-        self._set_default("list_int_param", "vector<int>", [])
+        self._set_default("list_int_param", "vector<int64_t>", [])
         self._set_default("list_float_param", "vector<double>", [])
         self._set_default("list_str_param", "vector<string>", [])
 
         # Keys for test_advanced_type_conversions
-        self._set_default("small_int", "int", 0)
+        self._set_default("small_int", "int64_t", 0)
         self._set_default("large_int", "int64_t", 0)
-        self._set_default("very_large_int", "size_t", 0)
-        self._set_default("int_min", "int", 0)
-        self._set_default("int_max", "int", 0)
-        self._set_default("size_t_candidate", "size_t", 0)
+        self._set_default("very_large_int", "uint64_t", 0)
+        self._set_default("int_min", "int64_t", 0)
+        self._set_default("int_max", "int64_t", 0)
+        self._set_default("size_t_candidate", "uint64_t", 0)
         self._set_default("negative_large", "int64_t", 0)
         self._set_default("precise_float", "double", 0.0)
         self._set_default("simple_float", "float", 0.0)
         self._set_default("float_boundary", "float", 0.0)
         self._set_default("double_precision", "double", 0.0)
         self._set_default("bool_list", "vector<bool>", [])
-        self._set_default("empty_list", "vector<int>", [])
-        self._set_default("tuple_ints", "vector<int>", [])
+        self._set_default("empty_list", "vector<int64_t>", [])
+        self._set_default("tuple_ints", "vector<int64_t>", [])
         self._set_default("tuple_floats", "vector<double>", [])
         self._set_default("tuple_strings", "vector<string>", [])
 
         # Keys for test_numpy_array_support
-        self._set_default("numpy_int", "vector<int>", [])
+        self._set_default("numpy_int", "vector<int64_t>", [])
         self._set_default("numpy_float", "vector<double>", [])
         self._set_default("numpy_string", "vector<string>", [])
         self._set_default("numpy_float32", "vector<double>", [])
 
         # Keys for test_conversion_error_cases
-        self._set_default("bad_list", "vector<int>", [])
+        self._set_default("bad_list", "vector<int64_t>", [])
         # Keys for test_edge_case_conversions
-        self._set_default("zero", "int", 0)
-        self._set_default("negative", "int", 0)
+        self._set_default("zero", "int64_t", 0)
+        self._set_default("negative", "int64_t", 0)
         self._set_default("float_zero", "double", 0.0)
         self._set_default("small_float", "double", 0.0)
         self._set_default("large_float", "double", 0.0)
@@ -124,23 +124,23 @@ class _TestSettingsContainer(Settings):
         self._set_default("empty_string", "string", "")
         self._set_default("whitespace", "string", "")
         self._set_default("newlines", "string", "")
-        self._set_default("single_int", "vector<int>", [])
+        self._set_default("single_int", "vector<int64_t>", [])
         self._set_default("single_float", "vector<double>", [])
         self._set_default("single_string", "vector<string>", [])
 
         # Keys for test_comprehensive_edge_cases
-        self._set_default("negative_one", "int", 0)
-        self._set_default("just_over_int_max", "int", 0)
-        self._set_default("just_under_int_min", "int", 0)
+        self._set_default("negative_one", "int64_t", 0)
+        self._set_default("just_over_int_max", "int64_t", 0)
+        self._set_default("just_under_int_min", "int64_t", 0)
         self._set_default("exact_float", "double", 0.0)
         self._set_default("requires_double", "double", 0.0)
         self._set_default("very_small", "double", 0.0)
         self._set_default("very_large", "double", 0.0)
-        self._set_default("empty_int_list", "vector<int>", [])
+        self._set_default("empty_int_list", "vector<int64_t>", [])
         self._set_default("all_bool_list", "vector<bool>", [])
         self._set_default("first_bool_list", "vector<bool>", [])
-        self._set_default("first_int_list", "vector<int>", [])
-        self._set_default("first_float_list", "vector<float>", [])
+        self._set_default("first_int_list", "vector<int64_t>", [])
+        self._set_default("first_float_list", "vector<double>", [])
         self._set_default("first_str_list", "vector<string>", [])
 
 
@@ -1018,10 +1018,10 @@ class TestSettings:
         """Test advanced type conversion scenarios."""
         settings = _TestSettingsContainer()
 
-        # Test integer type selection (int vs long vs size_t)
-        settings["small_int"] = 100  # Should be int
-        settings["large_int"] = 2**31  # Should be long or size_t
-        settings["very_large_int"] = 2**63 - 1  # Should be long
+        # Test integer type selection (int64_t vs uint64_t)
+        settings["small_int"] = 100  # Should be int64_t
+        settings["large_int"] = 2**31  # Should be int64_t
+        settings["very_large_int"] = 2**63 - 1  # Should be uint64_t for very large positive values
 
         assert isinstance(settings["small_int"], int)
         assert isinstance(settings["large_int"], int)  # Python int can handle large values
@@ -1031,7 +1031,7 @@ class TestSettings:
 
         settings["int_min"] = -2147483648  # INT_MIN
         settings["int_max"] = 2147483647  # INT_MAX
-        settings["size_t_candidate"] = 4294967295  # SIZE_MAX on 32-bit
+        settings["size_t_candidate"] = 4294967295  # Large unsigned value
         settings["negative_large"] = -9223372036854775808  # Very negative
 
         assert isinstance(settings["int_min"], int)
@@ -1154,18 +1154,19 @@ class TestSettings:
         # These tests target integer type selection
         settings["zero"] = 0
         settings["negative_one"] = -1
-        settings["int_max"] = 2147483647  # INT_MAX
-        settings["int_min"] = -2147483648  # INT_MIN
-        with pytest.raises(SettingTypeMismatch):
-            settings["just_over_int_max"] = 2147483648
-        with pytest.raises(SettingTypeMismatch):
-            settings["just_under_int_min"] = -2147483649  # Just under INT_MIN
+        settings["int_max"] = 2147483647  # INT32_MAX
+        settings["int_min"] = -2147483648  # INT32_MIN
+        # These values are now acceptable since we use int64_t internally
+        settings["just_over_int_max"] = 2147483648
+        settings["just_under_int_min"] = -2147483649
 
         # Verify all are stored correctly
         assert settings["zero"] == 0
         assert settings["negative_one"] == -1
         assert settings["int_max"] == 2147483647
         assert settings["int_min"] == -2147483648
+        assert settings["just_over_int_max"] == 2147483648
+        assert settings["just_under_int_min"] == -2147483649
 
         # Test float precision edge cases
         settings["exact_float"] = 2.0  # Can be represented exactly as float

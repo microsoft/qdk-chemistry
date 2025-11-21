@@ -71,9 +71,8 @@ py::object setting_value_to_python(const SettingValue &value) {
 
         if constexpr (std::is_same_v<ValueType, bool>) {
           return py::bool_(variant_value);
-        } else if constexpr (std::is_same_v<ValueType, int> ||
-                             std::is_same_v<ValueType, long> ||
-                             std::is_same_v<ValueType, size_t>) {
+        } else if constexpr (std::is_same_v<ValueType, int64_t> ||
+                             std::is_same_v<ValueType, uint64_t>) {
           return py::int_(variant_value);
         } else if constexpr (std::is_same_v<ValueType, float> ||
                              std::is_same_v<ValueType, double>) {
@@ -82,7 +81,9 @@ py::object setting_value_to_python(const SettingValue &value) {
           return py::str(variant_value);
         } else if constexpr (std::is_same_v<ValueType, std::vector<bool>>) {
           return py::cast(variant_value);
-        } else if constexpr (std::is_same_v<ValueType, std::vector<int>>) {
+        } else if constexpr (std::is_same_v<ValueType, std::vector<int64_t>>) {
+          return py::cast(variant_value);
+        } else if constexpr (std::is_same_v<ValueType, std::vector<uint64_t>>) {
           return py::cast(variant_value);
         } else if constexpr (std::is_same_v<ValueType, std::vector<double>>) {
           return py::cast(variant_value);
@@ -113,7 +114,8 @@ SettingValue python_to_setting_value_with_type(const py::object &obj,
     } else if (expected_type == "int") {
       if (!py::isinstance<py::int_>(obj) || py::isinstance<py::bool_>(obj)) {
         throw SettingTypeMismatch(
-            key, "int (got " + std::string(py::str(py::type::of(obj))) + ")");
+            key,
+            "int (got " + std::string(py::str(py::type::of(obj))) + ")");
       }
       long long value = obj.cast<long long>();
       if (value < INT_MIN || value > INT_MAX) {
@@ -128,18 +130,18 @@ SettingValue python_to_setting_value_with_type(const py::object &obj,
                      std::string(py::str(py::type::of(obj))) + ")");
       }
       return obj.cast<int64_t>();
-    } else if (expected_type == "size_t") {
+    } else if (expected_type == "uint64_t" || expected_type == "size_t") {
       if (!py::isinstance<py::int_>(obj) || py::isinstance<py::bool_>(obj)) {
         throw SettingTypeMismatch(
             key,
-            "size_t (got " + std::string(py::str(py::type::of(obj))) + ")");
+            "uint64_t (got " + std::string(py::str(py::type::of(obj))) + ")");
       }
-      long long value = obj.cast<long long>();
+      int64_t value = obj.cast<long long>();
       if (value < 0) {
-        throw SettingTypeMismatch(key, "size_t (cannot be negative, got " +
-                                           std::to_string(value) + ")");
+        throw SettingTypeMismatch(key, "uint64_t (cannot be negative, got " + 
+                                     std::to_string(value) + ")");
       }
-      return static_cast<size_t>(value);
+      return static_cast<uint64_t>(value);
     } else if (expected_type == "float") {
       if (!py::isinstance<py::float_>(obj) && !py::isinstance<py::int_>(obj)) {
         throw SettingTypeMismatch(
@@ -160,35 +162,32 @@ SettingValue python_to_setting_value_with_type(const py::object &obj,
             "string (got " + std::string(py::str(py::type::of(obj))) + ")");
       }
       return obj.cast<std::string>();
-    } else if (expected_type == "vector<int>") {
-      std::vector<int> result;
+    } else if (expected_type == "vector<int>" ||
+               expected_type == "vector<int64_t>" ||
+               expected_type == "vector<long>") {
+      std::vector<int64_t> result;
       if (py::isinstance<py::list>(obj) || py::isinstance<py::tuple>(obj)) {
         py::sequence seq = obj.cast<py::sequence>();
         result.reserve(seq.size());
         for (size_t i = 0; i < seq.size(); ++i) {
           py::object elem = seq[i];
           if (py::isinstance<py::bool_>(elem)) {
-            throw SettingTypeMismatch(key, "vector<int> (element " +
+            throw SettingTypeMismatch(key, "vector<int64_t> (element " +
                                                std::to_string(i) +
                                                " is bool, expected int)");
           }
           if (!is_integer_like(elem)) {
             throw SettingTypeMismatch(
-                key, "vector<int> (element " + std::to_string(i) + " is " +
+                key, "vector<int64_t> (element " + std::to_string(i) + " is " +
                          std::string(py::str(py::type::of(elem))) +
                          ", expected int)");
           }
           try {
-            long long value = elem.cast<long long>();
-            if (value < INT_MIN || value > INT_MAX) {
-              throw SettingTypeMismatch(
-                  key, "vector<int> (element " + std::to_string(i) + " value " +
-                           std::to_string(value) + " out of range for int)");
-            }
-            result.push_back(static_cast<int>(value));
+            int64_t value = elem.cast<int64_t>();
+            result.push_back(value);
           } catch (const py::cast_error &e) {
             throw SettingTypeMismatch(
-                key, "vector<int> (element " + std::to_string(i) +
+                key, "vector<int64_t> (element " + std::to_string(i) +
                          " cast failed: " + std::string(e.what()) + ")");
           }
         }
@@ -199,35 +198,30 @@ SettingValue python_to_setting_value_with_type(const py::object &obj,
         for (size_t i = 0; i < arr.size(); ++i) {
           py::object elem = arr[py::int_(i)];
           if (py::isinstance<py::bool_>(elem)) {
-            throw SettingTypeMismatch(key, "vector<int> (array element " +
+            throw SettingTypeMismatch(key, "vector<int64_t> (array element " +
                                                std::to_string(i) +
                                                " is bool, expected int)");
           }
           if (!is_integer_like(elem)) {
             throw SettingTypeMismatch(
-                key, "vector<int> (array element " + std::to_string(i) +
+                key, "vector<int64_t> (array element " + std::to_string(i) +
                          " is " + std::string(py::str(py::type::of(elem))) +
                          ", expected int)");
           }
           try {
-            long long value = elem.cast<long long>();
-            if (value < INT_MIN || value > INT_MAX) {
-              throw SettingTypeMismatch(key, "vector<int> (array element " +
-                                                 std::to_string(i) + " value " +
-                                                 std::to_string(value) +
-                                                 " out of range for int)");
-            }
-            result.push_back(static_cast<int>(value));
+            int64_t value = elem.cast<int64_t>();
+            result.push_back(value);
           } catch (const py::cast_error &e) {
             throw SettingTypeMismatch(
-                key, "vector<int> (array element " + std::to_string(i) +
+                key, "vector<int64_t> (array element " + std::to_string(i) +
                          " cast failed: " + std::string(e.what()) + ")");
           }
         }
         return result;
       } else {
         throw SettingTypeMismatch(
-            key, "vector<int> (got " + std::string(py::str(py::type::of(obj))) +
+            key, "vector<int64_t> (got " +
+                     std::string(py::str(py::type::of(obj))) +
                      ", expected list, tuple, or numpy array)");
       }
     } else if (expected_type == "vector<double>") {
@@ -355,40 +349,37 @@ SettingValue python_to_setting_value_with_type(const py::object &obj,
                      std::string(py::str(py::type::of(obj))) +
                      ", expected list, tuple, or numpy array)");
       }
-    } else if (expected_type == "vector<int64_t>" ||
-               expected_type == "vector<long>" ||
+    } else if (expected_type == "vector<uint64_t>" ||
                expected_type == "vector<size_t>") {
-      // Map vector<int64_t>, vector<long>, and vector<size_t> to vector<int>
-      // Note: This may lose precision for values outside int range
-      std::vector<int> result;
+      std::vector<uint64_t> result;
       if (py::isinstance<py::list>(obj) || py::isinstance<py::tuple>(obj)) {
         py::sequence seq = obj.cast<py::sequence>();
         result.reserve(seq.size());
         for (size_t i = 0; i < seq.size(); ++i) {
           py::object elem = seq[i];
           if (py::isinstance<py::bool_>(elem)) {
-            throw SettingTypeMismatch(key, expected_type + " (element " +
+            throw SettingTypeMismatch(key, "vector<uint64_t> (element " +
                                                std::to_string(i) +
                                                " is bool, expected int)");
           }
           if (!is_integer_like(elem)) {
             throw SettingTypeMismatch(
-                key, expected_type + " (element " + std::to_string(i) + " is " +
+                key, "vector<uint64_t> (element " + std::to_string(i) + " is " +
                          std::string(py::str(py::type::of(elem))) +
                          ", expected int)");
           }
           try {
             long long value = elem.cast<long long>();
-            if (value < INT_MIN || value > INT_MAX) {
-              throw SettingTypeMismatch(
-                  key, expected_type + " (element " + std::to_string(i) +
-                           " value " + std::to_string(value) +
-                           " out of range for int storage)");
+            if (value < 0) {
+              throw SettingTypeMismatch(key, "vector<uint64_t> (element " +
+                                                 std::to_string(i) +
+                                                 " cannot be negative, got " +
+                                                 std::to_string(value) + ")");
             }
-            result.push_back(static_cast<int>(value));
+            result.push_back(static_cast<uint64_t>(value));
           } catch (const py::cast_error &e) {
             throw SettingTypeMismatch(
-                key, expected_type + " (element " + std::to_string(i) +
+                key, "vector<uint64_t> (element " + std::to_string(i) +
                          " cast failed: " + std::string(e.what()) + ")");
           }
         }
@@ -398,31 +389,36 @@ SettingValue python_to_setting_value_with_type(const py::object &obj,
         result.reserve(arr.size());
         for (size_t i = 0; i < arr.size(); ++i) {
           py::object elem = arr[py::int_(i)];
+          if (py::isinstance<py::bool_>(elem)) {
+            throw SettingTypeMismatch(key, "vector<uint64_t> (array element " +
+                                               std::to_string(i) +
+                                               " is bool, expected int)");
+          }
           if (!is_integer_like(elem)) {
             throw SettingTypeMismatch(
-                key, expected_type + " (array element " + std::to_string(i) +
+                key, "vector<uint64_t> (array element " + std::to_string(i) +
                          " is " + std::string(py::str(py::type::of(elem))) +
                          ", expected int)");
           }
           try {
             long long value = elem.cast<long long>();
-            if (value < INT_MIN || value > INT_MAX) {
+            if (value < 0) {
               throw SettingTypeMismatch(
-                  key, expected_type + " (array element " + std::to_string(i) +
-                           " value " + std::to_string(value) +
-                           " out of range for int storage)");
+                  key, "vector<uint64_t> (array element " + std::to_string(i) +
+                           " cannot be negative, got " + std::to_string(value) +
+                           ")");
             }
-            result.push_back(static_cast<int>(value));
+            result.push_back(static_cast<uint64_t>(value));
           } catch (const py::cast_error &e) {
             throw SettingTypeMismatch(
-                key, expected_type + " (array element " + std::to_string(i) +
+                key, "vector<uint64_t> (array element " + std::to_string(i) +
                          " cast failed: " + std::string(e.what()) + ")");
           }
         }
         return result;
       } else {
         throw SettingTypeMismatch(
-            key, expected_type + " (got " +
+            key, "vector<uint64_t> (got " +
                      std::string(py::str(py::type::of(obj))) +
                      ", expected list, tuple, or numpy array)");
       }
@@ -553,7 +549,7 @@ void bind_settings(pybind11::module &data) {
     Type-safe variant for storing different setting value types.
 
     This variant can hold common types used in settings configurations:
-    bool, int, long, size_t, float, double, string, vector<int>, vector<double>, vector<string>
+    bool, int64_t, uint64_t, float, double, string, vector<bool>, vector<int64_t>, vector<uint64_t>, vector<double>, vector<string>
     )");
 
   // Bind exception classes
