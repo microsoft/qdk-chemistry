@@ -118,7 +118,7 @@ std::shared_ptr<data::Wavefunction> VVHVLocalizer::_run_impl(
   const size_t num_atoms = basis_set->get_structure()->get_num_atoms();
   std::vector<int> bf_to_atom(num_atomic_orbitals);
   for (size_t i = 0; i < num_atomic_orbitals; ++i) {
-    bf_to_atom[i] = basis_set->get_atom_index_for_basis_function(i);
+    bf_to_atom[i] = basis_set->get_atom_index_for_atomic_orbital(i);
   }
   auto inner_localizer = std::make_shared<PipekMezeyLocalization>(
       *static_cast<const IterativeOrbitalLocalizationSettings*>(
@@ -361,7 +361,7 @@ Eigen::MatrixXd VVHVLocalization::calculate_valence_virtual(
       Eigen::MatrixXd::Zero(num_atomic_orbitals_ori, num_atomic_orbitals_min);
 
   // print number of occupied and valence virtual orbitals
-  spdlog::info("VVHV::now using minimal basis '{}' with {} basis functions",
+  spdlog::info("VVHV::now using minimal basis '{}' with {} atomic orbitals",
                minimal_basis_name_, num_atomic_orbitals_min);
   spdlog::debug(
       "VVHV::number of occupied orbitals: {}, valence virtual orbitals: {}",
@@ -632,7 +632,7 @@ Eigen::MatrixXd VVHVLocalization::localize_hard_virtuals(
 
   // Loop over atoms to construct hard virtuals
   for (auto atom_a = 0; atom_a < num_atoms; ++atom_a) {
-    // First collect all basis functions on atom A for both basis sets
+    // First collect all atomic orbitals on atom A for both basis sets
     std::vector<int> bf_list_ori;
     std::vector<int> bf_list_min;
     for (auto l = 0; l <= max_l_ori; ++l) {
@@ -643,10 +643,10 @@ Eigen::MatrixXd VVHVLocalization::localize_hard_virtuals(
     }
 
     const int num_atomic_orbitals_a_ori =
-        bf_list_ori.size();  // number of basis functions on
+        bf_list_ori.size();  // number of atomic orbitals on
                              // atom A in original basis set
     const int num_atomic_orbitals_a_min =
-        bf_list_min.size();  // number of basis functions on
+        bf_list_min.size();  // number of atomic orbitals on
                              // atom A in minimal basis set
     const int nhv_a =
         num_atomic_orbitals_a_ori -
@@ -654,15 +654,15 @@ Eigen::MatrixXd VVHVLocalization::localize_hard_virtuals(
     if (num_atomic_orbitals_a_min <= 0)
       throw std::runtime_error(
           "VVHVLocalization: Atom " + std::to_string(atom_a) +
-          " in the minimal basis set has no basis functions.");
+          " in the minimal basis set has no atomic orbitals.");
     if (nhv_a == 0) continue;  // no hard virtuals on this atom
 
     // Add bounds checking for bf_list_ori indices
     for (const auto& bf_idx : bf_list_ori) {
       if (bf_idx >= num_atomic_orbitals_ori) {
-        throw std::runtime_error("VVHVLocalization: Basis function index " +
+        throw std::runtime_error("VVHVLocalization: atomic orbital index " +
                                  std::to_string(bf_idx) +
-                                 " exceeds total number of basis functions " +
+                                 " exceeds total number of atomic orbitals " +
                                  std::to_string(num_atomic_orbitals_ori) +
                                  " on atom " + std::to_string(atom_a));
       }
@@ -676,15 +676,15 @@ Eigen::MatrixXd VVHVLocalization::localize_hard_virtuals(
     for (auto l = 0; l <= max_l_ori; ++l) {
       auto& bf_al_ori = al_to_bf_ori[atom_a][l];
       if (bf_al_ori.size() == 0)
-        continue;  // no basis functions with this angular momentum on this atom
+        continue;  // no atomic orbitals with this angular momentum on this atom
                    // in the original basis set
       auto& bf_al_min = al_to_bf_min[atom_a][l];
       const int num_atomic_orbitals_al_ori =
-          bf_al_ori.size();  // number of basis functions on
+          bf_al_ori.size();  // number of atomic orbitals on
                              // atom A with angular momentum
                              // l in the original basis set
       const int num_atomic_orbitals_al_min =
-          bf_al_min.size();  // number of basis functions on
+          bf_al_min.size();  // number of atomic orbitals on
                              // atom A with angular momentum
                              // l in the minimal basis set
       const int nhv_al =
@@ -693,7 +693,7 @@ Eigen::MatrixXd VVHVLocalization::localize_hard_virtuals(
                                        // with angular momentum l
       if (nhv_al < 0)
         throw std::runtime_error(
-            "VVHVLocalization: Number of basis functions on atom " +
+            "VVHVLocalization: Number of atomic orbitals on atom " +
             std::to_string(atom_a) + " with angular momentum " +
             std::to_string(l) +
             " in the original basis set is less than that in the minimal "
@@ -727,7 +727,7 @@ Eigen::MatrixXd VVHVLocalization::localize_hard_virtuals(
           ", got " + std::to_string(proto_hv_idx) + ")");
     }
 
-    // First we need to orthogonalize the original basis functions on atom A
+    // First we need to orthogonalize the original atomic orbitals on atom A
     Eigen::MatrixXd C_normal_a = Eigen::MatrixXd::Zero(
         num_atomic_orbitals_ori, num_atomic_orbitals_a_ori);
     Eigen::MatrixXd C_eta_a = Eigen::MatrixXd::Zero(num_atomic_orbitals_ori,

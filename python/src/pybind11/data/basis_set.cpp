@@ -330,13 +330,13 @@ void bind_basis_set(py::module& m) {
         name : str
             Name of the basis set
         shells : list of Shell
-            Vector of shell objects defining the basis functions
+            Vector of shell objects defining the atomic orbitals
         ecp_shells : list of Shell
             Vector of ECP shell objects
         structure : Structure
             Molecular structure to associate with this basis set
         atomic_orbital_type : AOType, optional
-            Whether to use spherical or Cartesian basis functions
+            Whether to use spherical or Cartesian atomic orbitals
             Default is Spherical
 
         Examples
@@ -364,7 +364,7 @@ void bind_basis_set(py::module& m) {
         name : str
             Name of the basis set
         shells : list of Shell
-            Vector of shell objects defining the basis functions
+            Vector of shell objects defining the atomic orbitals
         ecp_name : str
             Name of the ECP (basis set)
         ecp_shells : list of Shell
@@ -374,7 +374,7 @@ void bind_basis_set(py::module& m) {
         structure : Structure
             Molecular structure to associate with this basis set
         atomic_orbital_type : AOType, optional
-            Whether to use spherical or Cartesian basis functions
+            Whether to use spherical or Cartesian atomic orbitals
             Default is Spherical
 
         Examples
@@ -611,7 +611,7 @@ void bind_basis_set(py::module& m) {
         ...     print("This basis set includes ECP shells")
         )")
 
-      // Basis function management
+      // atomic orbital management
       .def("get_atomic_orbital_info", &BasisSet::get_atomic_orbital_info,
            R"(
         Get shell index and magnetic quantum number for a atomic orbital.
@@ -687,7 +687,7 @@ void bind_basis_set(py::module& m) {
         Examples
         --------
         >>> atomic_orbital_indices = basis_set.get_atomic_orbital_indices_for_atom(0)
-        >>> print(f"Atom 0 has basis functions: {atomic_orbital_indices}")
+        >>> print(f"Atom 0 has atomic orbitals: {atomic_orbital_indices}")
         )",
            py::arg("atom_index"))
       .def("get_shell_indices_for_atom", &BasisSet::get_shell_indices_for_atom,

@@ -245,7 +245,7 @@ class BasisSet : public DataClass,
    * @param shells Vector of shells to initialize the basis set with
    * @param ecp_shells Vector of ECP shells to initialize the basis set with
    * @param structure The molecular structure
-   * @param basis_type Whether to use spherical or cartesian basis functions
+   * @param basis_type Whether to use spherical or cartesian atomic orbitals
    */
   BasisSet(const std::string& name, const std::vector<Shell>& shells,
            const std::vector<Shell>& ecp_shells, const Structure& structure,
@@ -257,7 +257,7 @@ class BasisSet : public DataClass,
    * @param shells Vector of shells to initialize the basis set with
    * @param ecp_shells Vector of ECP shells to initialize the basis set with
    * @param structure Shared pointer to the molecular structure
-   * @param basis_type Whether to use spherical or cartesian basis functions
+   * @param basis_type Whether to use spherical or cartesian atomic orbitals
    */
   BasisSet(const std::string& name, const std::vector<Shell>& shells,
            const std::vector<Shell>& ecp_shells,
@@ -274,7 +274,7 @@ class BasisSet : public DataClass,
    * @param ecp_electrons Vector containing numbers of ECP electrons for each
    * atom
    * @param structure The molecular structure
-   * @param basis_type Whether to use spherical or cartesian basis functions
+   * @param basis_type Whether to use spherical or cartesian atomic orbitals
    */
   BasisSet(const std::string& name, const std::vector<Shell>& shells,
            const std::string& ecp_name, const std::vector<Shell>& ecp_shells,
@@ -291,7 +291,7 @@ class BasisSet : public DataClass,
    * @param ecp_electrons Vector containing numbers of ECP electrons for each
    * atom
    * @param structure Shared pointer to the molecular structure
-   * @param basis_type Whether to use spherical or cartesian basis functions
+   * @param basis_type Whether to use spherical or cartesian atomic orbitals
    */
   BasisSet(const std::string& name, const std::vector<Shell>& shells,
            const std::string& ecp_name, const std::vector<Shell>& ecp_shells,

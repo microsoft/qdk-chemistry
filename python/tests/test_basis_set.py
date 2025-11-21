@@ -220,7 +220,7 @@ def test_atomic_orbital_queries():
     assert basis.get_atom_index_for_atomic_orbital(1) == 0  # First p orbital on atom 0
     assert basis.get_atom_index_for_atomic_orbital(4) == 1  # s orbital on atom 1
 
-    # Test basis function indices for atom
+    # Test atomic orbital indices for atom
     atom0_indices = basis.get_atomic_orbital_indices_for_atom(0)
     assert atom0_indices == [0, 1, 2, 3]  # 1s + 3p
 
