@@ -7,8 +7,10 @@ LIBFLAME_VERSION=${3:-5.2.0}
 if [[ ${MARCH} == 'armv8-a' ]]; then
     # Compile for armsve, firestorm, thunderx2, cortexa57, cortexa53, and generic architectures
     export LIBFLAME_ARCH=arm64
+    export LIBFLAME_BUILD=aarch64-unknown-linux-gnu
 elif [[ ${MARCH} == 'x86-64-v3' ]]; then
     # Compile for intel64, amd64, and amd64_legacy architectures
+    export LIBFLAME_BUILD=x86_64-unknown-linux-gnu
     export LIBFLAME_ARCH=x86_64
 fi
 
@@ -21,8 +23,9 @@ mv libflame-${LIBFLAME_VERSION} libflame
 
 # Configure and build libflame
 cd libflame
-
+ln -s /usr/bin/python3 /usr/bin/python
 CFLAGS="-fPIC -Os" ./configure \
+    --build=$LIFLAME_BUILD \
     --enable-static-build \
     --prefix=/usr/local \
     --enable-lapack2flame \
