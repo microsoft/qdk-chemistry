@@ -231,9 +231,9 @@ class TestHamiltonian:
             h.to_file("test.txt", "txt")
         with pytest.raises(RuntimeError, match="Unsupported file type"):
             Hamiltonian.from_file("test.txt", "txt")
-        with pytest.raises(RuntimeError, match="Cannot open file"):
+        with pytest.raises(RuntimeError, match="Unable to open Hamiltonian JSON file"):
             Hamiltonian.from_json_file("nonexistent.hamiltonian.json")
-        with pytest.raises(RuntimeError, match="HDF5 error: H5Fopen failed"):
+        with pytest.raises(RuntimeError, match="Unable to open Hamiltonian HDF5 file"):
             Hamiltonian.from_hdf5_file("nonexistent.hamiltonian.h5")
 
     def test_minimal_hamiltonian_json_roundtrip(self):
