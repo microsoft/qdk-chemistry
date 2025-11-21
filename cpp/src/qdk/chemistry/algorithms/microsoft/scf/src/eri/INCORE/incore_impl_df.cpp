@@ -8,13 +8,13 @@
 #endif
 #include <spdlog/spdlog.h>
 
+#include <blas.hh>
+#include <lapack.hh>
 #include <libint2.hpp>
 #include <qdk/chemistry/utils/omp_utils.hpp>
 #include <stdexcept>
 
 #include "incore_impl.h"
-#include "util/blas.h"
-#include "util/lapack.h"
 #ifdef QDK_CHEMISTRY_ENABLE_GPU
 #include <cuda_runtime.h>
 #include <qdk/chemistry/scf/util/gpu/cublas_utils.h>
@@ -129,8 +129,9 @@ void ERI_DF::build_JK(const double* P, double* J, double* K, double alpha,
                              &zero, dX_loc, 1));
 #endif
   } else {
-    blas::gemv("T", num_basis_funcs2, naux_loc, 1.0, h_eri_.get(),
-               num_basis_funcs2, P_use, 1, 0.0, X_loc, 1);
+    blas::gemv(blas::Layout::ColMajor, blas::Op::Trans, num_basis_funcs2,
+               naux_loc, 1.0, h_eri_.get(), num_basis_funcs2, P_use, 1, 0.0,
+               X_loc, 1);
   }
 
 #ifdef QDK_CHEMISTRY_ENABLE_MPI
@@ -168,8 +169,9 @@ void ERI_DF::build_JK(const double* P, double* J, double* K, double alpha,
                              1, &zero, dJ, 1));
 #endif
   } else {
-    blas::gemv("N", num_basis_funcs2, naux_loc, 1.0, h_eri_.get(),
-               num_basis_funcs2, X_loc, 1, 0.0, J, 1);
+    blas::gemv(blas::Layout::ColMajor, blas::Op::NoTrans, num_basis_funcs2,
+               naux_loc, 1.0, h_eri_.get(), num_basis_funcs2, X_loc, 1, 0.0, J,
+               1);
   }
 
 #ifdef QDK_CHEMISTRY_ENABLE_GPU
@@ -250,8 +252,9 @@ void ERI_DF::get_gradients(const double* P, double* dJ, double* dK,
                              &zero, dX_loc, 1));
 #endif
   } else {
-    blas::gemv("T", num_basis_funcs2, naux_loc, 1.0, h_eri_.get(),
-               num_basis_funcs2, P_use, 1, 0.0, X_loc, 1);
+    blas::gemv(blas::Layout::ColMajor, blas::Op::Trans, num_basis_funcs2,
+               naux_loc, 1.0, h_eri_.get(), num_basis_funcs2, P_use, 1, 0.0,
+               X_loc, 1);
   }
 
 #ifdef QDK_CHEMISTRY_ENABLE_MPI

@@ -18,13 +18,13 @@
 #include <filesystem>
 #include <fstream>
 #include <iostream>
+#include <lapack.hh>
 #include <nlohmann/json.hpp>
 #include <numeric>
 #include <qdk/chemistry/utils/omp_utils.hpp>
 #include <sstream>
 #include <thread>
 
-#include "util/lapack.h"
 #include "util/macros.h"
 #include "util/timer.h"
 
@@ -397,8 +397,8 @@ void SCFImpl::compute_orthogonalization_matrix_(const RowMajorMatrix& S_,
 #else
   std::memcpy(U_t.data(), S_.data(),
               num_atomic_orbitals_ * num_atomic_orbitals_ * sizeof(double));
-  lapack::syev("V", "L", num_atomic_orbitals_, U_t.data(), num_atomic_orbitals_,
-               s.data());
+  lapack::syev(lapack::Job::Vec, lapack::Uplo::Lower, num_atomic_orbitals_,
+               U_t.data(), num_atomic_orbitals_, s.data());
 #endif
 
   RowMajorMatrix U = U_t.transpose();
