@@ -26,12 +26,8 @@ def test_plugins_visible_in_dir():
 def test_plugins_accessible_as_attributes():
     """Test that plugin modules are accessible as attributes."""
     # Plugins should be accessible as attributes
-    assert hasattr(
-        qdk_chemistry.plugins, "pyscf"
-    ), "pyscf should be accessible as qdk_chemistry.plugins.pyscf"
-    assert hasattr(
-        qdk_chemistry.plugins, "qiskit"
-    ), "qiskit should be accessible as qdk_chemistry.plugins.qiskit"
+    assert hasattr(qdk_chemistry.plugins, "pyscf"), "pyscf should be accessible as qdk_chemistry.plugins.pyscf"
+    assert hasattr(qdk_chemistry.plugins, "qiskit"), "qiskit should be accessible as qdk_chemistry.plugins.qiskit"
 
 
 def test_plugins_can_be_imported():
@@ -49,4 +45,3 @@ def test_plugins_all_export():
     # __all__ should contain both plugins
     assert "pyscf" in qdk_chemistry.plugins.__all__, "pyscf should be in __all__"
     assert "qiskit" in qdk_chemistry.plugins.__all__, "qiskit should be in __all__"
-
