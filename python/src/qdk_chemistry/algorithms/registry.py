@@ -27,6 +27,7 @@ Important Notes:
 # --------------------------------------------------------------------------------------------
 
 import atexit
+import time
 from collections.abc import Callable
 from typing import Any
 
@@ -44,6 +45,7 @@ from qdk_chemistry._core._algorithms import (
 from qdk_chemistry.algorithms.energy_estimator import EnergyEstimatorFactory, QDKEnergyEstimator
 from qdk_chemistry.algorithms.qubit_mapper import QubitMapperFactory
 from qdk_chemistry.algorithms.state_preparation import SparseIsometryGF2XStatePreparation, StatePreparationFactory
+from qdk_chemistry.utils import telemetry_events
 
 from .base import Algorithm, AlgorithmFactory
 
@@ -52,7 +54,86 @@ __cleanup_registered: bool = False
 
 __factories: list[AlgorithmFactory] = []
 
-
+class _TelemetryWrapper:
+    """
+    Transparent proxy wrapper that adds telemetry tracking to algorithm instances.
+    
+    This wrapper intercepts calls to algorithm methods, particularly the `run()` method,
+    to collect and report telemetry data including execution duration (in seconds),
+    success/failure status, and error information. The wrapper is transparent to users
+    and delegates all non-intercepted method calls to the underlying algorithm instance.
+    
+    The wrapper is applied automatically by the `create()` function and tracks:
+    - Algorithm execution time (duration in seconds)
+    - Success or failure status
+    - Exception types for failed executions
+    - Algorithm type and name metadata
+    
+    This enables centralized telemetry collection for all algorithms (both C++ and Python
+    implementations) without modifying the algorithm implementations themselves.
+    
+    Args:
+        wrapped_algorithm: The algorithm instance to wrap (can be C++ or Python)
+        algorithm_type: The type of algorithm (e.g., "scf_solver", "active_space_selector")
+        algorithm_name: The specific name of the algorithm implementation (e.g., "qdk", "pyscf")
+        
+    Examples:
+        This wrapper is transparent - users interact with it exactly like the original algorithm:
+        
+        >>> scf = create("scf_solver", "qdk")  # Returns wrapped instance
+        >>> energy, wfn = scf.run(structure, 0, 1)  # Telemetry logged automatically
+        >>> settings = scf.settings()  # Delegates to wrapped algorithm
+    """    
+    def __init__(self, wrapped_algorithm: Algorithm, algorithm_type: str, algorithm_name: str):
+        self._wrapped = wrapped_algorithm
+        self._algorithm_type = algorithm_type
+        self._algorithm_name = algorithm_name
+    
+    def run(self, *args, **kwargs):
+        """Run the wrapped algorithm with telemetry tracking."""
+        start_time = time.perf_counter()
+        try:
+            result = self._wrapped.run(*args, **kwargs)
+            duration = time.perf_counter() - start_time
+            
+            telemetry_events.on_algorithm_end(
+                algorithm_type=self._algorithm_type,
+                algorithm_name=self._algorithm_name,
+                duration_sec=duration,
+                status="success"
+            )
+            return result
+        except Exception as e:
+            duration = time.perf_counter() - start_time
+            telemetry_events.on_algorithm_end(
+                algorithm_type=self._algorithm_type,
+                algorithm_name=self._algorithm_name,
+                duration_sec=duration,
+                status="failed",
+                error_type=type(e).__name__
+            )
+            raise
+    
+    def settings(self):
+        """Delegate to wrapped algorithm."""
+        return self._wrapped.settings()
+    
+    def name(self):
+        """Delegate to wrapped algorithm."""
+        return self._wrapped.name()
+    
+    def type_name(self):
+        """Delegate to wrapped algorithm."""
+        return self._wrapped.type_name()
+    
+    def aliases(self):
+        """Delegate to wrapped algorithm."""
+        return self._wrapped.aliases()
+    
+    def __getattr__(self, name):
+        """Delegate any other attribute access to the wrapped algorithm."""
+        return getattr(self._wrapped, name)
+    
 def create(algorithm_type: str, algorithm_name: str | None = None, **kwargs) -> Algorithm:
     """Create an algorithm instance by type and name.
 
@@ -101,8 +182,19 @@ def create(algorithm_type: str, algorithm_name: str | None = None, **kwargs) -> 
         if factory.algorithm_type_name() == algorithm_type:
             try:
                 instance = factory.create(algorithm_name)
-                instance.settings().update(kwargs or {})
-                return instance
+                # Wrap the instance in a telemetry-tracking proxy
+                wrapped_instance = _TelemetryWrapper(
+                    instance, 
+                    algorithm_type, 
+                    algorithm_name
+                )
+                
+                wrapped_instance.settings().update(kwargs or {})
+                telemetry_events.on_algorithm(
+                    algorithm_type, 
+                    algorithm_name 
+                    )
+                return wrapped_instance
             except (KeyError, RuntimeError, ValueError) as e:
                 available_algorithms = factory.available()
                 if not available_algorithms:

@@ -17,6 +17,9 @@ from pathlib import Path
 
 # Import some tools for convenience
 from qdk_chemistry._core import QDKChemistryConfig
+from qdk_chemistry.utils import telemetry_events
+
+telemetry_events.on_qdk_chemistry_import()
 
 
 def _setup_resources() -> None:
