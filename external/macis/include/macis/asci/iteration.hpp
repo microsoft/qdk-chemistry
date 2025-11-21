@@ -51,8 +51,24 @@ auto asci_iter(ASCISettings asci_settings, MCSCFSettings mcscf_settings,
   // Sort wfn on coefficient weights
   if (wfn.size() > 1) reorder_ci_on_coeff(wfn, X);
 
-  // Sanity check on search determinants
-  size_t nkeep = std::min(asci_settings.ncdets_max, wfn.size());
+  size_t nkeep = 0;
+  switch (asci_settings.core_selection_strategy) {
+    case CoreSelectionStrategy::Fixed:
+      // Use fixed number of determinants
+      nkeep = std::min(asci_settings.ncdets_max, wfn.size());
+      break;
+    case CoreSelectionStrategy::Percentage:
+      // Use percentage-based selection
+      double running_percentage = 0.0;
+      for (size_t i = 0; i < wfn.size(); ++i) {
+        running_percentage += X[i] * X[i];
+        nkeep++;
+        if (running_percentage >= asci_settings.core_selection_threshold) {
+          break;
+        }
+      }
+      break;
+  }
 
   // Sort kept dets on alpha string
   if (wfn.size() > 1)

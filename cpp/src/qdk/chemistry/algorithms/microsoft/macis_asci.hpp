@@ -113,6 +113,9 @@ class MacisAsciSettings : public MultiConfigurationSettings {
                          macis_defaults.pt2_min_constraint_level);
     set_default<int64_t>("pt2_constraint_refine_force",
                          macis_defaults.pt2_constraint_refine_force);
+
+    // Core selction strategy parameter
+    set_default<std::string>("core_selection_strategy", "percentage");
   }
 
   /**
