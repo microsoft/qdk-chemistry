@@ -67,7 +67,6 @@ class GDM {
   /**
    * @brief Apply orbital rotation using kappa vector
    * @param[in,out] C Molecular orbital coefficient matrix
-   * @param[in] num_molecular_orbitals Number of molecular orbitals
    * @param[in] spin_index Spin index (0 for alpha, 1 for beta)
    * @param[in] kappa_vector The kappa vector to apply for rotation (can be
    * positive or negative)
@@ -77,15 +76,13 @@ class GDM {
    * orbital rotation C = C * exp(kappa). For restoration, pass
    * -kappa_[spin_index]; for normal rotation, pass kappa_[spin_index].
    */
-  void apply_orbital_rotation_(RowMajorMatrix& C,
-                               const int num_molecular_orbitals,
-                               const int spin_index,
+  void apply_orbital_rotation_(RowMajorMatrix& C, const int spin_index,
                                const Eigen::VectorXd& kappa_vector);
 
   /**
    * @brief Transform history matrices (either history_dgrad or history_kappa)
-   * using rotation matrices Uoo and Uvv to accommodate updated pseudo-canonical
-   * orbitals
+   * using current rotation matrices Uoo and Uvv to transform into the
+   * pseudo-canonical orbital basis
    * @param[in,out] history History matrix to be transformed (either
    * history_dgrad or history_kappa)
    * @param[in] history_size Number of history entries
@@ -107,7 +104,6 @@ class GDM {
    * @param[in] F Fock matrix in AO basis
    * @param[in,out] C Molecular orbital coefficient matrix
    * @param[in,out] P Density matrix
-   * @param[in] num_molecular_orbitals Number of molecular orbitals
    * @param[in] spin_index Spin index (0 for alpha, 1 for beta)
    * @param[in] scf_total_energy Current SCF total energy
    * @param[in] occupation_factor Occupation factor for density matrix
@@ -118,41 +114,56 @@ class GDM {
    * components into a single iteration step.
    */
   void gdm_iteration_step_(const RowMajorMatrix& F, RowMajorMatrix& C,
-                           RowMajorMatrix& P, const int num_molecular_orbitals,
-                           const int spin_index, const double scf_total_energy,
+                           RowMajorMatrix& P, const int spin_index,
+                           const double scf_total_energy,
                            const double occupation_factor);
 
   /// Numerical tolerance for avoiding division by zero
   static constexpr double EPSILON = 1.0e-8;
 
-  // Reference to SCFContext
+  /// Reference to SCFContext
   const SCFContext& ctx_;  ///< Reference to SCFContext
-
+  /// Energy change from the last step
   double delta_energy_ = std::numeric_limits<double>::infinity();
+
   /// Energy increase threshold for GDM step size rescaling
   static constexpr double rescale_kappa_denergy_threshold_ = 5e-4;
-  std::vector<int>
-      num_electrons_;  // number of electrons for alpha (0) and beta (1) spins
-  std::vector<RowMajorMatrix> history_kappa_;  // one for alpha, one for beta
+
+  /// Number of electrons for alpha (0) and beta (1) spins
+  std::vector<int> num_electrons_;
+
+  /// History of kappa rotation vectors for each spin component
+  std::vector<RowMajorMatrix> history_kappa_;
+  /// History of gradient difference vectors for each spin component
   std::vector<RowMajorMatrix> history_dgrad_;
+  /// Number of vectors saved in history
   std::vector<int> history_size_;
-  int history_size_limit_;  // maximum number of history vectors to keep for
-                            // L-BFGS
-  std::vector<Eigen::VectorXd>
-      previous_gradient_;  // last gradient (Fock_ov matrix) for alpha and beta
-  std::vector<Eigen::VectorXd> current_gradient_;  // current gradient (Fock_ov
-                                                   // matrix) for alpha and beta
-  Eigen::VectorXd
-      pseudo_canonical_eigenvalues_;  // eigenvalues of pseudo-canonical
-                                      // orbitals, used for building hessian
-  RowMajorMatrix Uoo_;  // horizontal rotation matrix of occupied orbitals
-  RowMajorMatrix Uvv_;  // horizontal rotation matrix of virtual orbitals
+  /// Maximum number of vectors saved in history_kappa_ and history_dgrad_
+  int history_size_limit_;
+
+  /// Gradient vectors from the last iteration step for spin alpha and beta
+  std::vector<Eigen::VectorXd> previous_gradient_;
+  /// Gradient vectors from the current iteration step for spin alpha and beta
+  std::vector<Eigen::VectorXd> current_gradient_;
+
+  /// Eigenvalues of pseudo-canonical orbitals, used for building Hessian
+  Eigen::VectorXd pseudo_canonical_eigenvalues_;
+
+  /// Horizontal rotation matrix of occupied orbitals
+  RowMajorMatrix Uoo_;
+  /// Horizontal rotation matrix of virtual orbitals
+  RowMajorMatrix Uvv_;
+
   std::vector<Eigen::VectorXd> kappa_;  // vertical rotation matrix of this step
-  double last_accepted_energy_;  // energy of the last accepted step, used
-                                 // to check if energy increases too much
+  /// Energy of the last accepted step, used to decide if we rescale the kappa
+  /// vector in this step
+  double last_accepted_energy_;
+  /// The scale factor applied to kappa in the current step if energy increased
+  /// too much compared to last accepted energy
   double kappa_scale_factor_;
-  int gdm_step_count_;  // GDM iteration counter`
-  int num_density_matrices_;
+  int gdm_step_count_;        // GDM iteration counter
+  int num_density_matrices_;  // Number of density matrices (1 for restricted, 2
+                              // for unrestricted)
 };
 
 GDM::GDM(const SCFContext& ctx, int history_size_limit)
@@ -239,10 +250,9 @@ void GDM::transform_history_(RowMajorMatrix& history, const int history_size,
   }
 }
 
-void GDM::apply_orbital_rotation_(RowMajorMatrix& C,
-                                  const int num_molecular_orbitals,
-                                  const int spin_index,
+void GDM::apply_orbital_rotation_(RowMajorMatrix& C, const int spin_index,
                                   const Eigen::VectorXd& kappa_vector) {
+  const int num_molecular_orbitals = C.cols();
   int num_occupied_orbitals = num_electrons_[spin_index];
   const int num_virtual_orbitals =
       num_molecular_orbitals - num_occupied_orbitals;
@@ -277,12 +287,11 @@ void GDM::apply_orbital_rotation_(RowMajorMatrix& C,
 }
 
 void GDM::gdm_iteration_step_(const RowMajorMatrix& F, RowMajorMatrix& C,
-                              RowMajorMatrix& P,
-                              const int num_molecular_orbitals,
-                              const int spin_index,
+                              RowMajorMatrix& P, const int spin_index,
                               const double scf_total_energy,
                               const double occupation_factor) {
   // Compute gradient vector
+  const int num_molecular_orbitals = C.cols();
   const int num_occupied_orbitals = num_electrons_[spin_index];
   const int num_virtual_orbitals =
       num_molecular_orbitals - num_occupied_orbitals;
@@ -352,8 +361,9 @@ void GDM::gdm_iteration_step_(const RowMajorMatrix& F, RowMajorMatrix& C,
                                      // history_size_[spin_index] + 1 rows, one
                                      // more than history_dgrad_
     const Eigen::VectorXd negative_kappa = -kappa_[spin_index];
-    apply_orbital_rotation_(C, num_molecular_orbitals, spin_index,
-                            negative_kappa);  // restore the orbitals
+
+    // restore the orbitals
+    apply_orbital_rotation_(C, spin_index, negative_kappa);
 
     kappa_[spin_index] *= kappa_scale_factor_;
     history_kappa_[spin_index].row(history_size_[spin_index]) =
@@ -524,8 +534,7 @@ void GDM::gdm_iteration_step_(const RowMajorMatrix& F, RowMajorMatrix& C,
   }
 
   // Vertical orbital rotation
-  apply_orbital_rotation_(C, num_molecular_orbitals, spin_index,
-                          kappa_[spin_index]);
+  apply_orbital_rotation_(C, spin_index, kappa_[spin_index]);
 
   // Update occupation matrix
   P.block(num_molecular_orbitals * spin_index, 0, num_molecular_orbitals,
@@ -547,8 +556,7 @@ void GDM::iterate(const RowMajorMatrix& F, RowMajorMatrix& P, RowMajorMatrix& C,
 
   // Perform GDM iteration for each spin
   for (int i = 0; i < num_density_matrices; ++i) {
-    gdm_iteration_step_(F, C, P, num_molecular_orbitals, i, energy,
-                        cfg->unrestricted ? 1.0 : 2.0);
+    gdm_iteration_step_(F, C, P, i, energy, cfg->unrestricted ? 1.0 : 2.0);
   }
 
   // Increment GDM step counter

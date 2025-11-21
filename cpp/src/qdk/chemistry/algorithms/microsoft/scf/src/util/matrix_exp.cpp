@@ -6,6 +6,7 @@
 
 #include <spdlog/spdlog.h>
 
+#include <Eigen/Dense>
 #include <algorithm>
 #include <cmath>
 #include <iostream>
@@ -29,10 +30,10 @@ void matrix_exp(const double *m, double *exp_m, int size) {
     }
     if (abssum_row > first_norm) first_norm = abssum_row;
   }
-  static constexpr double theta13 =
-      5.371920351148152e0;  // matrix 1-norm threshold for order 13
-                            // Padé approximation, reference
-                            // DOI. 10.1137/04061101X
+
+  // matrix 1-norm threshold for order 13 Padé approximation, reference
+  // DOI. 10.1137/04061101X
+  static constexpr double theta13 = 5.371920351148152e0;
   int s = first_norm > theta13
               ? std::max(0, (int)(std::log2(first_norm / theta13)) + 1)
               : 0;
@@ -40,20 +41,18 @@ void matrix_exp(const double *m, double *exp_m, int size) {
                 first_norm, s);
   // scale the matrix by 2^s
   double scale = 1.0 / std::pow(2.0, s);
-  std::unique_ptr<double[]> scaled_m(new double[size * size]);
+  auto scaled_m = std::make_unique<double[]>(size * size);
   for (int i = 0; i < size * size; i++) {
     scaled_m[i] = m[i] * scale;
   }
 
   // Pade approximation, currently const order = 13
-  std::unique_ptr<double[]> exp_scaled_m(new double[size * size]);
+  auto exp_scaled_m = std::make_unique<double[]>(size * size);
   pade_approximation(scaled_m.get(), exp_scaled_m.get(), size);
 
-  // square exp_scaled_m matrix s times
-  std::unique_ptr<double[]> temp(
-      new double[size *
-                 size]);  // although blas is column-major, (x*x)^T = x^T * x^T,
-                          // so it is fine to call gemm to compute (x*x)^T
+  // square exp_scaled_m matrix s times. (x*x)^T = x^T * x^T,  so it is fine to
+  // call gemm to compute (x*x)^T
+  auto temp = std::make_unique<double[]>(size * size);
   const char NORMAL = 'N';
   for (int order = 0; order < s; order++) {
     blas::gemm(&NORMAL, &NORMAL, size, size, size, 1.0, exp_scaled_m.get(),
@@ -81,64 +80,46 @@ void pade_approximation(const double *x, double *exp_x, int size) {
                                    2.81017055E-15,
                                    1.54404975E-17};
 
-  std::unique_ptr<double[]> u(new double[size * size]);
-  std::unique_ptr<double[]> v(new double[size * size]);
-  std::fill_n(u.get(), size * size, 0.0);  // u starts from zero matrix
-  std::fill_n(v.get(), size * size, 0.0);  // v starts from x^0 = I
-  for (int r_c = 0; r_c < size; r_c++) {   // I matrix
-    v[r_c * size + r_c] = 1.0;
-  }
+  // Map input and output arrays to Eigen matrices
+  Eigen::Map<const Eigen::MatrixXd> x_matrix(x, size, size);
+  Eigen::Map<Eigen::MatrixXd> exp_x_matrix(exp_x, size, size);
 
-  std::unique_ptr<double[]> x_power(new double[size * size]);
-  std::copy(v.get(), v.get() + size * size, x_power.get());  // x^0 = I
+  // Create matrices u and v. u starts from zero matrix, v starts from x^0 = I
+  Eigen::MatrixXd u = Eigen::MatrixXd::Zero(size, size);
+  Eigen::MatrixXd v = Eigen::MatrixXd::Identity(size, size);
+
+  Eigen::MatrixXd x_power = Eigen::MatrixXd::Identity(size, size);  // x^0 = I
   const char NORMAL = 'N';
-  std::unique_ptr<double[]> temp(new double[size * size]);
+  Eigen::MatrixXd temp(size, size);
   for (int order = 1; order < 14; order++) {
-    blas::gemm(&NORMAL, &NORMAL, size, size, size, 1.0, x, size, x_power.get(),
-               size, 0.0, temp.get(), size);
-    std::copy(temp.get(), temp.get() + size * size, x_power.get());
-    if (order % 2 == 1) {  // odd order, add to u
-      for (int i = 0; i < size * size; i++) {
-        u[i] += b[order] * x_power[i];  // u += b[order] * x^order
-      }
-    } else {  // even order, add to v
-      for (int i = 0; i < size * size; i++) {
-        v[i] += b[order] * x_power[i];  // v += b[order] * x^order
-      }
+    blas::gemm(&NORMAL, &NORMAL, size, size, size, 1.0, x_matrix.data(), size,
+               x_power.data(), size, 0.0, temp.data(), size);
+    x_power = temp;
+    if (order % 2 == 1) {       // odd order, add to u
+      u += b[order] * x_power;  // u += b[order] * x^order
+    } else {                    // even order, add to v
+      v += b[order] * x_power;  // v += b[order] * x^order
     }
   }
 
-  for (int row = 0; row < size;
-       row++) {  // transpose u and v to call lapack, since current u and v are
-                 // row-major making lapack see them as u^T and v^T
-    for (int col = 0; col < row; col++) {
-      int lentry_index = row * size + col;
-      int uentry_index = col * size + row;
-      std::swap(u[lentry_index], u[uentry_index]);
-      std::swap(v[lentry_index], v[uentry_index]);
-    }
-  }
+  // transpose u and v to call lapack, since current u and v are row-major
+  // making lapack see them as u^T and v^T
+  u.transposeInPlace();
+  v.transposeInPlace();
 
-  for (int i = 0; i < size * size;
-       i++) {  // prepare for solving (V - U) exp_x = (V + U)
-    exp_x[i] = v[i] + u[i];
-    v[i] = v[i] - u[i];
-  }
+  // prepare for solving (V - U) exp_x = (V + U)
+  exp_x_matrix = v + u;
+  v = v - u;
 
-  std::unique_ptr<int[]> ipiv(new int[size]);  // pivot indices for lapack
-  lapack::getrf(size, size, v.get(), size,
-                ipiv.get());  // LU factorization of v, v = L * U
-  lapack::getrs(
-      &NORMAL, size, size, v.get(), size, ipiv.get(), exp_x,
-      size);  // solve the linear equation v * exp_x = u, so exp_x = v^{-1} * u
+  auto ipiv = std::make_unique<int[]>(size);  // pivot indices for lapack
+  // LU factorization of v, v = L * U
+  lapack::getrf(size, size, v.data(), size, ipiv.get());
+  // solve the linear equation v * exp_x = u, so exp_x = v^{-1} * u
+  lapack::getrs(&NORMAL, size, size, v.data(), size, ipiv.get(),
+                exp_x_matrix.data(), size);
 
-  for (int row = 0; row < size; row++) {  // transpose exp_x to be row-major
-    for (int col = 0; col < row; col++) {
-      int lentry_index = row * size + col;
-      int uentry_index = col * size + row;
-      std::swap(exp_x[lentry_index], exp_x[uentry_index]);
-    }
-  }
+  // transpose exp_x to be row-major
+  exp_x_matrix.transposeInPlace();
 }
 
 }  // namespace qdk::chemistry::scf
