@@ -53,11 +53,9 @@ def _setup_resources() -> None:
     try:
         original_dir = QDKChemistryConfig.get_resources_dir()
         if original_dir and Path(original_dir).exists():
-            print("HI")
             return  # Resources directory already set and exists
     except RuntimeError:
         pass  # Not set yet, continue to set it
-    
     resources_dir = package_dir / "share" / "qdk" / "chemistry" / "scf" / "resources"
     # Fallback to the installed version with a check for invalid installations (e.g. missing resources)
     try:
