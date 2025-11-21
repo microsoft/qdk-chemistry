@@ -69,13 +69,18 @@ See Also:
 # We use contextlib.suppress to handle cases where plugin dependencies are not installed.
 import contextlib
 
+# Track successfully imported plugins
+__all__ = []
+
 with contextlib.suppress(ImportError):
     from . import pyscf
+
+    __all__.append("pyscf")
 
 with contextlib.suppress(ImportError):
     from . import qiskit
 
+    __all__.append("qiskit")
+
 # Clean up the contextlib import to keep dir() output clean
 del contextlib
-
-__all__ = ["pyscf", "qiskit"]
