@@ -188,8 +188,8 @@ SlaterDeterminantContainer::get_active_two_rdm_spin_dependent() const {
     Eigen::VectorXd tmp_two_rdm_bbbb = Eigen::VectorXd::Zero(norb2 * norb2);
 
     // build same spin rdm, i.e. aaaa and bbbb
-    /// @param occupations: orbital occupations
-    /// @param target: target vector to fill
+    // occupations: orbital occupations
+    // target: target vector to fill
     auto build_same_spin_block = [&](const Eigen::VectorXd& occupations,
                                      Eigen::VectorXd& target) {
       for (size_t i = 0; i < norbs; ++i) {
