@@ -10,7 +10,8 @@
 namespace py = pybind11;
 
 void bind_utils(py::module& m) {
-  m.def("compute_valence_space_parameters", &compute_valence_space_parameters,
+  m.def("compute_valence_space_parameters",
+        &qdk::chemistry::utils::compute_valence_space_parameters,
         R"(
             Get the default number of active electrons, active orbitals,
             which are obtained from the valence electrons and orbitals of the atomic element types in the structure.
