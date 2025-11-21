@@ -90,7 +90,7 @@ jobs:
 
     - name: Run C++ tests with coverage
       env:
-        OMP_NUM_THREADS: 8
+        OMP_NUM_THREADS: 1
       run: |
         mkdir -p test-results ${{ github.workspace }}/coverage-reports
         cd "$BUILD_DIR"
