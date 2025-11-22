@@ -20,7 +20,7 @@ which rustc
 pip install ipykernel ipywidgets pandas
 
 # Install QDK Chemistry package
-cd python
+cd "$REPO_ROOT/python"
 export CMAKE_BUILD_PARALLEL_LEVEL=4
 QDK_UARCH=native pip install -v .[all]
 rm -fr build

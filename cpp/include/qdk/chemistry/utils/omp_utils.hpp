@@ -4,17 +4,53 @@
 
 #pragma once
 
-#ifdef _OPENMP
+#include <qdk/chemistry/config.hpp>
+
+#ifdef QDK_ENABLE_OPENMP
 #include <omp.h>
 #else
-// Fallbacks for non-OpenMP environments
-#ifndef QDK_CHEMISTRY_OMP_FALLBACK_DEFINED
-#define QDK_CHEMISTRY_OMP_FALLBACK_DEFINED
-namespace {
-inline int omp_get_thread_num() { return 0; }
-inline int omp_get_num_threads() { return 1; }
-inline int omp_get_max_threads() { return 1; }
-inline void omp_set_num_threads(int) { /* no-op */ }
-}  // namespace
-#endif  // QDK_CHEMISTRY_OMP_FALLBACK_DEFINED
+
+extern "C" {
+
+/**
+ * @brief Fallback replacement for `omp_get_thread_num` for when QDK/Chemistry
+ * is built without OpenMP bindings.
+ *
+ * See https://www.openmp.org/spec-html/5.0/openmpsu113.html for details
+ *
+ * @returns 0
+ */
+int omp_get_thread_num();
+
+/**
+ * @brief Fallback replacement for `omp_get_num_threads` for when QDK/Chemistry
+ * is built without OpenMP bindings.
+ *
+ * See https://www.openmp.org/spec-html/5.0/openmpsu111.html for details
+ *
+ * @returns 1
+ */
+int omp_get_num_threads();
+
+/**
+ * @brief Fallback replacement for `omp_get_max_threads` for when QDK/Chemistry
+ * is built without OpenMP bindings.
+ *
+ * See https://www.openmp.org/spec-html/5.0/openmpsu112.html for details
+ *
+ * @returns 1
+ */
+int omp_get_max_threads();
+
+/**
+ * @brief Fallback replacement for `omp_set_num_threads` for when QDK/Chemistry
+ * is built without OpenMP bindings.
+ *
+ * See https://www.openmp.org/spec-html/5.0/openmpsu110.html for details
+ *
+ * @param[in] n Number of threads to set for the OpenMP parallel region (unused)
+ */
+void omp_set_num_threads(int n);
+}
+
 #endif  // _OPENMP
