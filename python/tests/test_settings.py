@@ -743,14 +743,14 @@ class TestSettings:
         settings = _TestSettingsContainer()
 
         # Test with non-existent file
-        with pytest.raises(RuntimeError, match="Cannot open file for reading"):
+        with pytest.raises(RuntimeError, match="Unable to open Settings JSON file"):
             Settings.from_file("/nonexistent/path/file.settings.json", "json")
-        with pytest.raises(RuntimeError, match="Cannot open file for reading"):
+        with pytest.raises(RuntimeError, match="Unable to open Settings JSON file"):
             settings.from_json_file("/nonexistent/path/file.settings.json")
 
         # Test HDF5 file not found (if HDF5 is available)
         try:
-            with pytest.raises(RuntimeError, match="HDF5 error: H5Fopen failed"):
+            with pytest.raises(RuntimeError, match="Unable to open Settings HDF5 file"):
                 settings.from_hdf5_file("/nonexistent/path/file.settings.h5")
         except (ImportError, OSError, RuntimeError):
             pass  # Skip if HDF5 not available
