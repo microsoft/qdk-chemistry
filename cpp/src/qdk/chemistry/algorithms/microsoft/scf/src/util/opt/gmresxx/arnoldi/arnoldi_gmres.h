@@ -344,8 +344,8 @@ void gmres_form_solutions(int32_t N, int32_t K, int32_t NLS, const T* Q,
 
     gesv(K, 1, H_cpy.data(), K, coeffs.data(), K);
 
-    gemm('N', 'N', N, 1, K, T(1.), QLS, LDQ_LOCAL, coeffs.data(), K, T(1.), XLS,
-         LDX);
+    blas::gemm(blas::Layout::ColMajor, blas::Op::NoTrans, blas::Op::NoTrans, N,
+               1, K, T(1.), QLS, LDQ_LOCAL, coeffs.data(), K, T(1.), XLS, LDX);
   }
 }
 

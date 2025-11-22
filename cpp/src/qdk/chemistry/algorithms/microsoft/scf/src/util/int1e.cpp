@@ -7,10 +7,10 @@
 #ifdef QDK_CHEMISTRY_ENABLE_MPI
 #include <mpi.h>
 #endif
-
 #include <array>
 #include <functional>
 #include <iostream>
+#include <qdk/chemistry/utils/omp_utils.hpp>
 #ifdef ENABLE_NVTX3
 #include <nvtx3/nvtx3.hpp>
 #endif
@@ -23,7 +23,6 @@
 #include "Eigen/Dense"
 #include "libecpint.hpp"
 #include "libint2.hpp"
-#include "omp.h"
 #include "spdlog/spdlog.h"
 #include "util/macros.h"
 #include "util/mpi_vars.h"
