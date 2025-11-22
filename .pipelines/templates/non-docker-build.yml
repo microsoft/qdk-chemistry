@@ -75,8 +75,8 @@ steps:
   displayName: Install C++ Libraries
 
 - script: |
-    cmake -S ${{ parameters.agentBuildDirectory }}/qdk-chemistry/cpp/examples -B ${{ parameters.agentBuildDirectory }}/qdk-chemistry/build_example -DCMAKE_PREFIX_PATH=${{ parameters.agentBuildDirectory }}/qdk-chemistry/install
-    cmake --build ${{ parameters.agentBuildDirectory }}/qdk-chemistry/build_example --target all
+    cmake -S ${{ parameters.agentBuildDirectory }}/qdk-chemistry/examples/cpp -B ${{ parameters.agentBuildDirectory }}/qdk-chemistry/build_example -DCMAKE_PREFIX_PATH=${{ parameters.agentBuildDirectory }}/qdk-chemistry/install && \
+    cmake --build ${{ parameters.agentBuildDirectory }}/qdk-chemistry/build_example --target all && \
     echo "C++ Example Compiled with Pre-Installed QDK/Chemistry-C++ Libraries!"
   displayName: Test Installed C++ CMake Discovery
 

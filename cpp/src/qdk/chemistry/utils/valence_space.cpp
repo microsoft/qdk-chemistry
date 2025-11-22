@@ -9,6 +9,8 @@
 
 using namespace qdk::chemistry::data;
 
+namespace qdk::chemistry::utils {
+
 // Noble gas elements and their atomic numbers
 static const std::vector<std::pair<Element, size_t>> NOBLE_GASES = {
     {Element::He, 2},  {Element::Ne, 10}, {Element::Ar, 18},
@@ -57,7 +59,7 @@ size_t calculate_valence_orbitals(Element element) {
   return VALENCE_ORBITALS_BY_PERIOD[5];                           // Period 6
 }
 
-std::pair<size_t, size_t> compute_valence_space(
+std::pair<size_t, size_t> compute_valence_space_parameters(
     std::shared_ptr<Wavefunction> wavefunction, int charge) {
   // Extract structure from wavefunction
   std::shared_ptr<Structure> structure =
@@ -101,3 +103,5 @@ std::pair<size_t, size_t> compute_valence_space(
   // Return as pair: [num_active_valence_electrons, num_active_valence_orbitals]
   return {num_active_valence_electrons, num_active_valence_orbitals};
 }
+
+}  // namespace qdk::chemistry::utils
