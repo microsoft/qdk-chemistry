@@ -57,7 +57,7 @@ auto asci_iter(ASCISettings asci_settings, MCSCFSettings mcscf_settings,
       // Use fixed number of determinants
       nkeep = std::min(asci_settings.ncdets_max, wfn.size());
       break;
-    case CoreSelectionStrategy::Percentage:
+    case CoreSelectionStrategy::Percentage: {
       // Use percentage-based selection
       double running_percentage = 0.0;
       for (size_t i = 0; i < wfn.size(); ++i) {
@@ -67,7 +67,11 @@ auto asci_iter(ASCISettings asci_settings, MCSCFSettings mcscf_settings,
           break;
         }
       }
+      nkeep = std::min(nkeep, asci_settings.ncdets_max);
       break;
+    }
+    default:
+      throw std::runtime_error("Unknown CoreSelectionStrategy");
   }
 
   // Sort kept dets on alpha string

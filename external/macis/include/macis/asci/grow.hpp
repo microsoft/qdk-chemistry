@@ -107,6 +107,7 @@ auto asci_grow(ASCISettings asci_settings, MCSCFSettings mcscf_settings,
         std::move(X), ham_gen, norb MACIS_MPI_CODE(, comm));
     auto ai_en = hrt_t::now();
     dur_t ai_dur = ai_en - ai_st;
+<<<<<<< HEAD
     logger->trace("  * ASCI_ITER_DUR = {:.2e} ms", ai_dur.count());
 
     // Check if we achieved the desired growth
@@ -132,6 +133,18 @@ auto asci_grow(ASCISettings asci_settings, MCSCFSettings mcscf_settings,
       current_grow_factor =
           std::min(asci_settings.grow_factor,
                    current_grow_factor * growth_recovery_rate);
+=======
+    if (ndets_new > wfn.size()) {
+      std::string msg =
+          "Wavefunction didn't grow enough: requested " +
+          std::to_string(ndets_new) + " determinants, but have " +
+          std::to_string(wfn.size()) + " (previous " +
+          std::to_string(prev_size) + "); iter=" + std::to_string(iter) +
+          ", grow_factor=" + std::to_string(asci_settings.grow_factor) +
+          ", ntdets_min=" + std::to_string(asci_settings.ntdets_min) +
+          ", ntdets_max=" + std::to_string(asci_settings.ntdets_max);
+      throw std::runtime_error(msg);
+>>>>>>> e48e5930 (Apply suggestions from code review)
     }
 
     prev_size = wfn.size();

@@ -37,7 +37,8 @@ namespace macis {
 enum class CoreSelectionStrategy {
   /// @brief Use a fixed number of core determinants
   Fixed,
-  /// @brief Select core determinants as a percentage of trial determinants
+  /// @brief Select core determinants to capture a target percentage of
+  /// wavefunction weight
   Percentage
 };
 
@@ -96,7 +97,8 @@ struct ASCISettings {
   /// @brief Minimum number of trial determinants required
   size_t ntdets_min = 100;
   /// @brief Strategy for selecting the number of core determinants
-  CoreSelectionStrategy core_selection_strategy = CoreSelectionStrategy::Fixed;
+  CoreSelectionStrategy core_selection_strategy =
+      CoreSelectionStrategy::Percentage;
   /// @brief Threshold for percentage-based core selection (fraction of
   /// wavefunction weight to retain, 0.0-1.0)
   double core_selection_threshold = 0.95;

@@ -701,7 +701,7 @@ TEST_CASE("CoreSelectionStrategy") {
   SECTION("Settings Defaults") {
     macis::ASCISettings settings;
     REQUIRE(settings.core_selection_strategy ==
-            macis::CoreSelectionStrategy::Fixed);
+            macis::CoreSelectionStrategy::Percentage);
     REQUIRE(settings.core_selection_threshold == 0.95);
   }
 
@@ -740,13 +740,13 @@ TEST_CASE("CoreSelectionStrategy") {
     asci_settings_high.ntdets_max = 10000;
     asci_settings_high.ncdets_max = 10000;
 
-    // Run one iteration with low threshold (50%)
+    // Run one iteration with low threshold (70%)
     auto [E0_low, dets_low, C_low] = macis::asci_iter<64, int32_t>(
         asci_settings_low, mcscf_settings, asci_settings_low.ntdets_max,
         E0_base, dets_base, C_base, ham_gen,
         norb MACIS_MPI_CODE(, MPI_COMM_WORLD));
 
-    // Run one iteration with high threshold (95%)
+    // Run one iteration with high threshold (99%)
     auto [E0_high, dets_high, C_high] = macis::asci_iter<64, int32_t>(
         asci_settings_high, mcscf_settings, asci_settings_high.ntdets_max,
         E0_base, dets_base, C_base, ham_gen,
@@ -777,25 +777,19 @@ TEST_CASE("CoreSelectionStrategy") {
         Catch::Matchers::WithinAbs(1.0, 1e-12));
 
     // Additionally verify the core weight captures the expected fraction
-    // Sort coefficients by absolute value (descending)
-    std::vector<size_t> indices_low(C_low.size());
-    std::iota(indices_low.begin(), indices_low.end(), 0);
-    std::sort(indices_low.begin(), indices_low.end(), [&](size_t i, size_t j) {
-      return std::abs(C_low[i]) > std::abs(C_low[j]);
-    });
-
-    std::vector<size_t> indices_high(C_high.size());
-    std::iota(indices_high.begin(), indices_high.end(), 0);
-    std::sort(indices_high.begin(), indices_high.end(),
+    // Sort indices based on C_base coefficients by absolute value (descending)
+    std::vector<size_t> indices_base(C_base.size());
+    std::iota(indices_base.begin(), indices_base.end(), 0);
+    std::sort(indices_base.begin(), indices_base.end(),
               [&](size_t i, size_t j) {
-                return std::abs(C_high[i]) > std::abs(C_high[j]);
+                return std::abs(C_base[i]) > std::abs(C_base[j]);
               });
 
     // Compute cumulative weight for verification
     double cumulative_sum_low = 0.0;
     size_t core_size_low = 0;
     for (size_t i = 0; i < C_base.size(); ++i) {
-      cumulative_sum_low += C_base[indices_low[i]] * C_base[indices_low[i]];
+      cumulative_sum_low += C_base[indices_base[i]] * C_base[indices_base[i]];
       if (cumulative_sum_low >= 0.7) {
         core_size_low = i + 1;
         break;
@@ -805,7 +799,7 @@ TEST_CASE("CoreSelectionStrategy") {
     double cumulative_sum_high = 0.0;
     size_t core_size_high = 0;
     for (size_t i = 0; i < C_base.size(); ++i) {
-      cumulative_sum_high += C_base[indices_high[i]] * C_base[indices_high[i]];
+      cumulative_sum_high += C_base[indices_base[i]] * C_base[indices_base[i]];
       if (cumulative_sum_high >= 0.99) {
         core_size_high = i + 1;
         break;
