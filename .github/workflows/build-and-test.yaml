@@ -244,17 +244,41 @@ jobs:
         if [ "$PYBIND11_COVERAGE" != "0" ]; then
           echo "| Pybind11 Bindings | ${PYBIND11_COVERAGE}% |" >> pr-comment.md
         fi
+        echo "" >> pr-comment.md
+        echo "---" >> pr-comment.md
+        echo "" >> pr-comment.md
 
-    - name: Annotate C++ coverage on diff
-      if: github.event_name == 'pull_request'
-      uses: 5monkeys/cobertura-action@master
-      with:
-        path: coverage-reports/*.xml
-        repo_token: ${{ secrets.GITHUB_TOKEN }}
-        skip_covered: false
-        show_line: true
-        show_branch: true
-        minimum_coverage: 50
+        echo "### Detailed Coverage Reports" >> pr-comment.md
+        echo "" >> pr-comment.md
+        echo "<details>" >> pr-comment.md
+        echo "<summary>C++ Coverage Details</summary>" >> pr-comment.md
+        echo "" >> pr-comment.md
+        echo '```' >> pr-comment.md
+        cat coverage-reports/cpp_coverage.txt >> pr-comment.md
+        echo '```' >> pr-comment.md
+        echo "</details>" >> pr-comment.md
+        echo "" >> pr-comment.md
+
+        if [ -f coverage-reports/python_coverage.txt ]; then
+          echo "<details>" >> pr-comment.md
+          echo "<summary>Python Coverage Details</summary>" >> pr-comment.md
+          echo "" >> pr-comment.md
+          echo '```' >> pr-comment.md
+          tail -50 coverage-reports/python_coverage.txt >> pr-comment.md
+          echo '```' >> pr-comment.md
+          echo "</details>" >> pr-comment.md
+          echo "" >> pr-comment.md
+        fi
+
+        if [ -f coverage-reports/pybind11_coverage.txt ]; then
+          echo "<details>" >> pr-comment.md
+          echo "<summary>Pybind11 Coverage Details</summary>" >> pr-comment.md
+          echo "" >> pr-comment.md
+          echo '```' >> pr-comment.md
+          cat coverage-reports/pybind11_coverage.txt >> pr-comment.md
+          echo '```' >> pr-comment.md
+          echo "</details>" >> pr-comment.md
+        fi
 
     - name: Comment PR with coverage
       if: github.event_name == 'pull_request'
