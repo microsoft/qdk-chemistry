@@ -1183,6 +1183,7 @@ class MacisAsciBackoffTest : public ::testing::Test {
     scf_solver_->settings().set("basis_set", std::string("sto-3g"));
 
     auto [scf_energy, wavefunction] = scf_solver_->run(structure_, 0, 1);
+    hf_energy_ = scf_energy;
     orbitals_ = wavefunction->get_orbitals();
 
     // Create Hamiltonian
@@ -1193,6 +1194,7 @@ class MacisAsciBackoffTest : public ::testing::Test {
   std::unique_ptr<ScfSolver> scf_solver_;
   std::shared_ptr<Orbitals> orbitals_;
   std::shared_ptr<HamiltonianConstructor> hamiltonian_constructor_;
+  double hf_energy_;
 };
 
 // Test that fractional grow_factor values work correctly
@@ -1209,7 +1211,7 @@ TEST_F(MacisAsciBackoffTest, FractionalGrowFactor) {
   auto [energy, wavefunction] = calculator->run(hamiltonian, 5, 5);
 
   // Should complete successfully with fractional grow_factor
-  EXPECT_LT(energy, -75.0);  // Reasonable energy for H2O
+  EXPECT_LT(energy, hf_energy_);  // Should be lower than Hartree-Fock energy
   EXPECT_GT(wavefunction->size(), 1);
 }
 
@@ -1230,7 +1232,7 @@ TEST_F(MacisAsciBackoffTest, SmallGrowFactorWithBackoff) {
 
   // Should complete without throwing even if growth is constrained
   auto [energy, wavefunction] = calculator->run(hamiltonian, 5, 5);
-  EXPECT_LT(energy, -75.0);
+  EXPECT_LT(energy, hf_energy_);
   EXPECT_GT(wavefunction->size(), 1);
 }
 
@@ -1251,7 +1253,7 @@ TEST_F(MacisAsciBackoffTest, AggressiveSettingsTriggerBackoff) {
 
   // Should gracefully handle inability to grow as fast as requested
   auto [energy, wavefunction] = calculator->run(hamiltonian, 5, 5);
-  EXPECT_LT(energy, -75.0);
+  EXPECT_LT(energy, hf_energy_);
   EXPECT_GT(wavefunction->size(), 1);
 }
 
@@ -1272,7 +1274,7 @@ TEST_F(MacisAsciBackoffTest, NormalSettingsNoBackoff) {
 
   // Should reach target size
   EXPECT_EQ(wavefunction->size(), 100);
-  EXPECT_LT(energy, -75.0);
+  EXPECT_LT(energy, hf_energy_);
 }
 
 // Test that grow_factor <= 1.0 throws an error
@@ -1303,6 +1305,6 @@ TEST_F(MacisAsciBackoffTest, MinimalGrowFactorWorks) {
 
   // Should complete successfully
   auto [energy, wavefunction] = calculator->run(hamiltonian, 5, 5);
-  EXPECT_LT(energy, -75.0);
+  EXPECT_LT(energy, hf_energy_);
   EXPECT_GT(wavefunction->size(), 1);
 }
