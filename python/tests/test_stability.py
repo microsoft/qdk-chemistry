@@ -169,7 +169,7 @@ class TestStabilityResultIO:
             StabilityResult.from_hdf5_file("test.h5")
 
         # Test non-existent file
-        with pytest.raises(RuntimeError, match="Failed to open file for reading"):
+        with pytest.raises(RuntimeError, match="Unable to open StabilityResult JSON file"):
             StabilityResult.from_json_file("nonexistent.stability_result.json")
 
         with pytest.raises(RuntimeError):
