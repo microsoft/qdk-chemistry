@@ -434,18 +434,6 @@ class SortedDoubleLoopHamiltonianGenerator
     auto duration_thresh =
         std::chrono::duration<double>(thresh_en - thresh_st).count();
 
-    if (total_nnz > 1000000) {
-      printf(
-          "Matrix construction timing (nt = %d) - Setup: %.2e s, Count: %.2e "
-          "s, Alloc: %.2e, Fill: "
-          "%.2e s, Sort: %.2e s, Thresh: %.2e Total: %.2e s, NNZ: %zu\n",
-          omp_get_max_threads(), duration_setup, duration_compute,
-          duration_alloc, duration_fill, duration_sort, duration_thresh,
-          duration_setup + duration_compute + duration_fill + duration_sort +
-              duration_alloc + duration_thresh,
-          total_nnz);
-    }
-
     return csr_mat;
   }
 
