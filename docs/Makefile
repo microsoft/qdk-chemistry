@@ -51,7 +51,7 @@ doxygen: Doxyfile
 	doxygen $(DOXYGEN_OPTIONS) Doxyfile > $(DOXYGEN_DEBUG) 2>&1
 	@echo "** Doxygen XML documentation generated."
 	@echo "** Saved output to $(DOXYGEN_DEBUG)."
-	@count=$$(egrep -i "warning|error" $(DOXYGEN_DEBUG) | wc -l); \
+	@count=$$(grep -E -i "warning|error" $(DOXYGEN_DEBUG) | wc -l); \
 	echo "** Found $$count warnings/errors in the Doxygen output."
 	@echo
 
@@ -129,7 +129,7 @@ sphinx-autosummary: breathe sphinx-api $(SOURCE_DIR)/conf.py $(SOURCE_DIR)/index
 	@echo "** Sphinx autosummary documentation generated."
 	@echo "** Saved output to $(SPHINX_SUMMARY_DEBUG)."
 	@echo "** Warnings saved to $(SPHINX_SUMMARY_WARNINGS)."
-	@count=$$(egrep "WARNING|ERROR|CRITICAL" $(SPHINX_SUMMARY_DEBUG) | wc -l); \
+	@count=$$(grep -E "WARNING|ERROR|CRITICAL" $(SPHINX_SUMMARY_DEBUG) | wc -l); \
 	echo "** Found $$count warnings/errors in the Sphinx autosummary output."
 	@echo
 
@@ -158,7 +158,7 @@ sphinx-docs: sphinx-autosummary
 	@echo "** Sphinx documentation generated."
 	@echo "** Saved output to $(SPHINX_DOCS_DEBUG)."
 	@echo "** Warnings saved to $(SPHINX_DOCS_WARNINGS)."
-	@count=$$(egrep "WARNING|ERROR|CRITICAL" $(SPHINX_DOCS_DEBUG) | wc -l); \
+	@count=$$(grep -E "WARNING|ERROR|CRITICAL" $(SPHINX_DOCS_DEBUG) | wc -l); \
 	echo "** Found $$count warnings/errors in the Sphinx documentation output."
 	@echo
 
