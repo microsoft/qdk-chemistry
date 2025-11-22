@@ -101,7 +101,7 @@ jobs:
     - name: Configure C++ Debug build
       run: |
         cmake -S cpp -B "$BUILD_DIR" \
-          -DCMAKE_BUILD_TYPE=Debug \
+          -DCMAKE_BUILD_TYPE=RelWithDebInfo \
           -DQDK_UARCH="$QDK_UARCH" \
           -DQDK_CHEMISTRY_ENABLE_COVERAGE=ON \
           -DBUILD_TESTING=ON
@@ -158,8 +158,8 @@ jobs:
     - name: Install Python package
       working-directory: python
       env:
-        QDK_CHEMISTRY_ENABLE_COVERAGE: 1
-        CMAKE_BUILD_TYPE: Debug
+        QDK_CHEMISTRY_ENABLE_COVERAGE: 8
+        CMAKE_BUILD_TYPE: RelWithDebInfo
       run: |
         python -m pip install --prefix=${{ github.workspace }}/install .[dev,plugins]
 
