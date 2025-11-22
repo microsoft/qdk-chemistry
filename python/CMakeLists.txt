@@ -10,8 +10,7 @@ endif()
 set(CMAKE_POSITION_INDEPENDENT_CODE ON CACHE BOOL "Enable PIC for all targets" FORCE)
 
 # First try to find an installed qdk library
-find_package(qdk COMPONENTS chemistry)
-set(QDK_EMBED_RESOURCE_LOCATION OFF)
+find_package(qdk QUIET COMPONENTS chemistry)
 
 if(NOT qdk_FOUND)
     message(STATUS "qdk not found in system, building from source...")
@@ -27,22 +26,6 @@ if(NOT qdk_FOUND)
     set(QDK_EMBED_RESOURCE_LOCATION OFF CACHE BOOL "Disable embedded resource location for Python builds" FORCE)
     set(BUILD_TESTING OFF CACHE BOOL "Disable building tests for Python builds" FORCE)
     set(BUILD_SHARED_LIBS OFF CACHE BOOL "Build dependencies as static libraries for Python builds" FORCE)
-
-    if(CMAKE_CXX_FLAGS)
-        set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS}" CACHE STRING "C++ flags for subdirectory" FORCE)
-    endif()
-    if(CMAKE_C_FLAGS)
-        set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS}" CACHE STRING "C flags for subdirectory" FORCE)
-    endif()
-    if (DEFINED QDK_ENABLE_OPENMP)
-        set(QDK_ENABLE_OPENMP ${QDK_ENABLE_OPENMP} CACHE BOOL "Enable OpenMP support" FORCE)
-    endif()
-    if (DEFINED QDK_CHEMISTRY_ENABLE_MPI)
-        set(QDK_CHEMISTRY_ENABLE_MPI ${QDK_CHEMISTRY_ENABLE_MPI} CACHE BOOL "Enable MPI support" FORCE)
-    endif()
-    if(DEFINED ENV{MARCH})
-        set(QDK_UARCH "$ENV{MARCH}" CACHE STRING "Target architecture" FORCE)
-    endif()
 
     # Add the cpp directory - this will create the qdk target
     add_subdirectory("${QDK_CPP_DIR}" qdk_build)

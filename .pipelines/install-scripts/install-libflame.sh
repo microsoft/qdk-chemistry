@@ -2,6 +2,7 @@
 INSTALL_PREFIX=${1:-/usr/local}
 MARCH=${2:-x86-64-v3}
 LIBFLAME_VERSION=${3:-5.2.0}
+CFLAGS=${4:-"-fPIC -O3"}
 
 # Select architectures to build BLIS for
 if [[ ${MARCH} == 'armv8-a' ]]; then
@@ -24,10 +25,10 @@ mv libflame-${LIBFLAME_VERSION} libflame
 # Configure and build libflame
 cd libflame
 ln -s /usr/bin/python3 /usr/bin/python
-CFLAGS="-fPIC -Os" ./configure \
+CFLAGS=${CFLAGS} ./configure \
     --build=$LIBFLAME_BUILD \
     --enable-static-build \
-    --prefix=/usr/local \
+    --prefix=${INSTALL_PREFIX} \
     --enable-lapack2flame \
     --enable-legacy-lapack \
     --enable-max-arg-list-hack \

@@ -2,6 +2,7 @@
 INSTALL_PREFIX=${1:-/usr/local}
 MARCH=${2:-x86-64-v3}
 BLIS_VERSION=${3:-2.0}
+CFLAGS=${4:-"-fPIC -O3"}
 
 # Select architectures to build BLIS for
 if [[ ${MARCH} == 'armv8-a' ]]; then
@@ -20,10 +21,10 @@ mv blis-${BLIS_VERSION} blis
 
 cd blis
 
-CFLAGS="-fPIC -static-libstdc++ -static-libgcc -Os" ./configure \
+CFLAGS=${CFLAGS} ./configure \
     --disable-shared \
     --enable-static \
-    --prefix=/usr/local \
+    --prefix=${INSTALL_PREFIX} \
     $BLIS_ARCH
 
 make -j$(nproc)

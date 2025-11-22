@@ -51,11 +51,12 @@ elif [[ ${MARCH} == 'x86-64-v3' ]]; then
 fi
 cmake --version
 
+export CFLAGS="-fPIC -Os"
 echo "Downloading and installing BLIS..."
-bash .pipelines/install-scripts/install-blis.sh /usr/local ${MARCH} ${BLIS_VERSION}
+bash .pipelines/install-scripts/install-blis.sh /usr/local ${MARCH} ${BLIS_VERSION} ${CFLAGS}
 
 echo "Downloading and installing libflame..."
-bash .pipelines/install-scripts/install-libflame.sh /usr/local ${MARCH} ${LIBFLAME_VERSION}
+bash .pipelines/install-scripts/install-libflame.sh /usr/local ${MARCH} ${LIBFLAME_VERSION} ${CFLAGS}
 
 echo "Downloading HDF5 $HDF5_VERSION..."
 wget -q -nc --no-check-certificate https://support.hdfgroup.org/ftp/HDF5/releases/hdf5-1.13/hdf5-${HDF5_VERSION}/src/hdf5-${HDF5_VERSION}.tar.bz2
@@ -65,7 +66,7 @@ mv hdf5-${HDF5_VERSION} hdf5
 echo "HDF5 $HDF5_VERSION downloaded and extracted successfully"
 
 echo "Installing HDF5..."
-bash .pipelines/install-scripts/install-hdf5.sh /usr/local ${BUILD_TYPE} ${PWD}
+bash .pipelines/install-scripts/install-hdf5.sh /usr/local ${BUILD_TYPE} ${PWD} ${CFLAGS}
 
 # Install pyenv to use non-system python3 versions
 export PYENV_ROOT="/workspace/.pyenv" && \
