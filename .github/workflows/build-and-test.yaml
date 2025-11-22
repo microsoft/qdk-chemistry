@@ -89,7 +89,7 @@ jobs:
 
     - name: Run C++ tests in Release mode
       env:
-        OMP_NUM_THREADS: 8
+        OMP_NUM_THREADS: 16
       run: |
         cd "$BUILD_DIR"
         echo "=== Running C++ Tests in Release Mode ==="
@@ -111,7 +111,7 @@ jobs:
 
     - name: Run C++ tests in Debug mode with coverage
       env:
-        OMP_NUM_THREADS: 1
+        OMP_NUM_THREADS: 16
       run: |
         mkdir -p test-results ${{ github.workspace }}/coverage-reports
         cd "$BUILD_DIR"
