@@ -177,21 +177,15 @@ class Settings : public DataClass,
         settings_[key] = static_cast<uint64_t>(value);
       }
     }
-    // Handle integer vector types - convert to appropriate signed/unsigned
-    // vector
-    else if constexpr (std::is_same_v<T, std::vector<int>> ||
-                       std::is_same_v<T, std::vector<int32_t>> ||
-                       std::is_same_v<T, std::vector<long>> ||
-                       std::is_same_v<T, std::vector<long long>>) {
-      // Signed integer vectors -> vector<int64_t>
-      settings_[key] = _convert_to_int64_vector(value);
-    } else if constexpr (std::is_same_v<T, std::vector<uint32_t>> ||
-                         std::is_same_v<T, std::vector<unsigned int>> ||
-                         std::is_same_v<T, std::vector<unsigned long>> ||
-                         std::is_same_v<T, std::vector<unsigned long long>> ||
-                         std::is_same_v<T, std::vector<size_t>>) {
-      // Unsigned integer vectors -> vector<uint64_t>
-      settings_[key] = _convert_to_uint64_vector(value);
+    // Handle integer vector types
+    else if constexpr (is_non_bool_integral_vector_v<T>) {
+      if constexpr (std::is_signed_v<typename T::value_type>) {
+        // Signed integer vectors -> vector<int64_t>
+        settings_[key] = _convert_to_int64_vector(value);
+      } else {
+        // Unsigned integer vectors -> vector<uint64_t>
+        settings_[key] = _convert_to_uint64_vector(value);
+      }
     } else {
       settings_[key] = value;
     }
@@ -648,21 +642,15 @@ class Settings : public DataClass,
           settings_[key] = static_cast<uint64_t>(value);
         }
       }
-      // Handle integer vector types - convert to appropriate signed/unsigned
-      // vector
-      else if constexpr (std::is_same_v<T, std::vector<int>> ||
-                         std::is_same_v<T, std::vector<int32_t>> ||
-                         std::is_same_v<T, std::vector<long>> ||
-                         std::is_same_v<T, std::vector<long long>>) {
-        // Signed integer vectors -> vector<int64_t>
-        settings_[key] = _convert_to_int64_vector(value);
-      } else if constexpr (std::is_same_v<T, std::vector<uint32_t>> ||
-                           std::is_same_v<T, std::vector<unsigned int>> ||
-                           std::is_same_v<T, std::vector<unsigned long>> ||
-                           std::is_same_v<T, std::vector<unsigned long long>> ||
-                           std::is_same_v<T, std::vector<size_t>>) {
-        // Unsigned integer vectors -> vector<uint64_t>
-        settings_[key] = _convert_to_uint64_vector(value);
+      // Handle integer vector types
+      else if constexpr (is_non_bool_integral_vector_v<T>) {
+        if constexpr (std::is_signed_v<typename T::value_type>) {
+          // Signed integer vectors -> vector<int64_t>
+          settings_[key] = _convert_to_int64_vector(value);
+        } else {
+          // Unsigned integer vectors -> vector<uint64_t>
+          settings_[key] = _convert_to_uint64_vector(value);
+        }
       } else {
         settings_[key] = value;
       }
