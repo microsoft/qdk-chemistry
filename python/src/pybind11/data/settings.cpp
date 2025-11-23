@@ -79,8 +79,6 @@ py::object setting_value_to_python(const SettingValue &value) {
           return py::float_(variant_value);
         } else if constexpr (std::is_same_v<ValueType, std::string>) {
           return py::str(variant_value);
-        } else if constexpr (std::is_same_v<ValueType, std::vector<bool>>) {
-          return py::cast(variant_value);
         } else if constexpr (std::is_same_v<ValueType, std::vector<int64_t>>) {
           return py::cast(variant_value);
         } else if constexpr (std::is_same_v<ValueType, std::vector<uint64_t>>) {
@@ -300,54 +298,6 @@ SettingValue python_to_setting_value_with_type(const py::object &obj,
                                       std::string(py::str(py::type::of(obj))) +
                                       ", expected list or tuple)");
       }
-    } else if (expected_type == "vector<bool>") {
-      std::vector<bool> result;
-      if (py::isinstance<py::list>(obj) || py::isinstance<py::tuple>(obj)) {
-        py::sequence seq = obj.cast<py::sequence>();
-        result.reserve(seq.size());
-        for (size_t i = 0; i < seq.size(); ++i) {
-          py::object elem = seq[i];
-          if (!py::isinstance<py::bool_>(elem)) {
-            throw SettingTypeMismatch(
-                key, "vector<bool> (element " + std::to_string(i) + " is " +
-                         std::string(py::str(py::type::of(elem))) +
-                         ", expected bool)");
-          }
-          try {
-            result.push_back(elem.cast<bool>());
-          } catch (const py::cast_error &e) {
-            throw SettingTypeMismatch(
-                key, "vector<bool> (element " + std::to_string(i) +
-                         " cast failed: " + std::string(e.what()) + ")");
-          }
-        }
-        return result;
-      } else if (py::isinstance<py::array>(obj)) {
-        py::array arr = obj.cast<py::array>();
-        result.reserve(arr.size());
-        for (size_t i = 0; i < arr.size(); ++i) {
-          py::object elem = arr[py::int_(i)];
-          if (!py::isinstance<py::bool_>(elem)) {
-            throw SettingTypeMismatch(
-                key, "vector<bool> (array element " + std::to_string(i) +
-                         " is " + std::string(py::str(py::type::of(elem))) +
-                         ", expected bool)");
-          }
-          try {
-            result.push_back(elem.cast<bool>());
-          } catch (const py::cast_error &e) {
-            throw SettingTypeMismatch(
-                key, "vector<bool> (array element " + std::to_string(i) +
-                         " cast failed: " + std::string(e.what()) + ")");
-          }
-        }
-        return result;
-      } else {
-        throw SettingTypeMismatch(
-            key, "vector<bool> (got " +
-                     std::string(py::str(py::type::of(obj))) +
-                     ", expected list, tuple, or numpy array)");
-      }
     } else if (expected_type == "vector<uint64_t>" ||
                expected_type == "vector<size_t>") {
       std::vector<uint64_t> result;
@@ -475,7 +425,7 @@ SettingValue python_to_setting_value_with_type(const py::object &obj,
       throw std::runtime_error(
           "Unknown expected type '" + expected_type + "' for setting '" + key +
           "'. Supported types are: bool, int, int64_t, long, size_t, float, "
-          "double, string, vector<bool>, vector<int>, vector<int64_t>, "
+          "double, string, vector<int>, vector<int64_t>, "
           "vector<long>, vector<size_t>, vector<float>, vector<double>, "
           "vector<string>");
     }
@@ -548,7 +498,7 @@ void bind_settings(pybind11::module &data) {
     Type-safe variant for storing different setting value types.
 
     This variant can hold common types used in settings configurations:
-    bool, int64_t, uint64_t, float, double, string, vector<bool>, vector<int64_t>, vector<uint64_t>, vector<double>, vector<string>
+    bool, int64_t, uint64_t, float, double, string, vector<int64_t>, vector<uint64_t>, vector<double>, vector<string>
     )");
 
   // Bind exception classes
@@ -1337,8 +1287,6 @@ void bind_settings(pybind11::module &data) {
           return "float";
         } else if (type_name == "string") {
           return "str";
-        } else if (type_name == "vector<bool>") {
-          return "list[bool]";
         } else if (type_name == "vector<int>" ||
                    type_name == "vector<int64_t>" ||
                    type_name == "vector<long>" ||

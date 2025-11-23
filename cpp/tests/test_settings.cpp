@@ -913,3 +913,108 @@ TEST_F(SettingsTest, FromHdf5IgnoresUnknownKeys) {
   // Clean up
   std::filesystem::remove("test_known_keys.settings.h5");
 }
+
+// Test integer overflow detection
+TEST_F(SettingsTest, IntegerOverflowDetection) {
+  // Store value larger than INT32_MAX as int64_t
+  settings.set("int64_val", static_cast<int64_t>(INT32_MAX) + 1);
+
+  // Should throw when trying to retrieve as int32_t (overflow)
+  EXPECT_THROW(settings.get<int32_t>("int64_val"), SettingTypeMismatch);
+
+  // Should succeed when retrieving as int64_t
+  EXPECT_NO_THROW(settings.get<int64_t>("int64_val"));
+  EXPECT_EQ(settings.get<int64_t>("int64_val"),
+            static_cast<int64_t>(INT32_MAX) + 1);
+
+  // Store value smaller than INT32_MIN as int64_t
+  settings.set("int64_val", static_cast<int64_t>(INT32_MIN) - 1);
+
+  // Should throw when trying to retrieve as int32_t (underflow)
+  EXPECT_THROW(settings.get<int32_t>("int64_val"), SettingTypeMismatch);
+}
+
+// Test unsigned integer underflow detection
+TEST_F(SettingsTest, UnsignedIntegerUnderflowDetection) {
+  // Store negative value as int64_t
+  settings.set("int64_val", static_cast<int64_t>(-1));
+
+  // Should throw when trying to retrieve as uint32_t (negative value)
+  EXPECT_THROW(settings.get<uint32_t>("int64_val"), SettingTypeMismatch);
+  EXPECT_THROW(settings.get<uint64_t>("int64_val"), SettingTypeMismatch);
+
+  // Should succeed when retrieving as signed type
+  EXPECT_NO_THROW(settings.get<int64_t>("int64_val"));
+  EXPECT_EQ(settings.get<int64_t>("int64_val"), -1);
+}
+
+// Test vector element out-of-range errors
+TEST_F(SettingsTest, VectorElementOutOfRangeErrors) {
+  // Create vector with values that exceed int32_t range
+  std::vector<int64_t> large_vec = {
+      INT32_MAX,
+      static_cast<int64_t>(INT32_MAX) + 1,  // This will overflow
+      INT32_MAX};
+
+  settings.set("int_vector", large_vec);
+
+  // Should throw when trying to convert to vector<int32_t>
+  EXPECT_THROW(
+      { auto result = settings.get<std::vector<int32_t>>("int_vector"); },
+      SettingTypeMismatch);
+
+  // Should succeed with vector<int64_t>
+  EXPECT_NO_THROW({
+    auto result = settings.get<std::vector<int64_t>>("int_vector");
+    EXPECT_EQ(result, large_vec);
+  });
+
+  // Test with unsigned overflow
+  std::vector<uint64_t> large_uint_vec = {
+      UINT32_MAX,
+      static_cast<uint64_t>(UINT32_MAX) + 1,  // This will overflow
+      UINT32_MAX};
+
+  settings.set("int_vector", large_uint_vec);
+
+  // Should throw when trying to convert to vector<uint32_t>
+  EXPECT_THROW(
+      { auto result = settings.get<std::vector<uint32_t>>("int_vector"); },
+      SettingTypeMismatch);
+}
+
+// Test cross-signedness conversion edge cases
+TEST_F(SettingsTest, CrossSignednessConversionEdgeCases) {
+  // Store uint64_t value that's too large for int64_t
+  settings.set("size_t_val", static_cast<uint64_t>(INT64_MAX) + 1);
+
+  // Should throw when trying to retrieve as int64_t
+  EXPECT_THROW(settings.get<int64_t>("size_t_val"), SettingTypeMismatch);
+
+  // Should succeed when retrieving as uint64_t
+  EXPECT_NO_THROW(settings.get<uint64_t>("size_t_val"));
+
+  // Store negative int64_t
+  settings.set("int64_val", static_cast<int64_t>(-100));
+
+  // Should throw when trying to retrieve as any unsigned type
+  EXPECT_THROW(settings.get<uint64_t>("int64_val"), SettingTypeMismatch);
+  EXPECT_THROW(settings.get<uint32_t>("int64_val"), SettingTypeMismatch);
+  EXPECT_THROW(settings.get<size_t>("int64_val"), SettingTypeMismatch);
+}
+
+// Test that vector conversion provides clear error messages
+TEST_F(SettingsTest, VectorConversionErrorMessages) {
+  std::vector<int64_t> vec_with_overflow = {1, 2, INT64_MAX};
+  settings.set("int_vector", vec_with_overflow);
+
+  try {
+    auto result = settings.get<std::vector<int32_t>>("int_vector");
+    FAIL() << "Expected SettingTypeMismatch exception";
+  } catch (const SettingTypeMismatch& e) {
+    std::string error_msg = e.what();
+    // Check that error message mentions "vector element out of range"
+    EXPECT_TRUE(error_msg.find("vector element out of range") !=
+                std::string::npos);
+  }
+}

@@ -198,8 +198,6 @@ std::string Settings::get_type_name(const std::string& key) const {
           return "double";
         else if constexpr (std::is_same_v<ValueType, std::string>)
           return "string";
-        else if constexpr (std::is_same_v<ValueType, std::vector<bool>>)
-          return "vector<bool>";
         else if constexpr (std::is_same_v<ValueType, std::vector<int64_t>>)
           return "vector<int64_t>";
         else if constexpr (std::is_same_v<ValueType, std::vector<uint64_t>>)
@@ -293,17 +291,13 @@ std::string Settings::visit_to_string(const SettingValue& value) const {
           return variant_value;
         } else if constexpr (std::is_arithmetic_v<ValueType>) {
           return std::to_string(variant_value);
-        } else if constexpr (std::is_same_v<ValueType, std::vector<bool>> ||
-                             std::is_same_v<ValueType, std::vector<int64_t>> ||
-                             std::is_same_v<ValueType, std::vector<uint64_t>> ||
-                             std::is_same_v<ValueType, std::vector<double>> ||
-                             std::is_same_v<ValueType,
-                                            std::vector<std::string>>) {
+        } else if constexpr (is_vector_v<ValueType>) {
+          using ElementType = typename ValueType::value_type;
           std::ostringstream oss;
           oss << "[";
           for (size_t idx = 0; idx < variant_value.size(); ++idx) {
             if (idx > 0) oss << ", ";
-            if constexpr (std::is_same_v<ValueType, std::vector<std::string>>) {
+            if constexpr (std::is_same_v<ElementType, std::string>) {
               oss << "\"" << variant_value[idx] << "\"";
             } else {
               oss << variant_value[idx];
@@ -324,11 +318,7 @@ nlohmann::json Settings::convert_setting_value_to_json(
       [](const auto& variant_value) -> nlohmann::json {
         using ValueType = std::decay_t<decltype(variant_value)>;
 
-        if constexpr (std::is_same_v<ValueType, std::vector<bool>> ||
-                      std::is_same_v<ValueType, std::vector<int64_t>> ||
-                      std::is_same_v<ValueType, std::vector<uint64_t>> ||
-                      std::is_same_v<ValueType, std::vector<double>> ||
-                      std::is_same_v<ValueType, std::vector<std::string>>) {
+        if constexpr (is_vector_v<ValueType>) {
           nlohmann::json json_array = nlohmann::json::array();
           for (const auto& elem : variant_value) {
             json_array.push_back(elem);
@@ -346,14 +336,7 @@ SettingValue Settings::convert_json_to_setting_value(
   if (json_obj.is_boolean()) {
     return json_obj.get<bool>();
   } else if (json_obj.is_number_integer()) {
-    // Default to int for integer values unless they're too large
-    auto integer_value = json_obj.get<long long>();
-    if (integer_value >= std::numeric_limits<int32_t>::min() &&
-        integer_value <= std::numeric_limits<int32_t>::max()) {
-      return static_cast<int32_t>(integer_value);
-    } else {
-      return static_cast<int64_t>(integer_value);
-    }
+    return json_obj.get<int64_t>();
   } else if (json_obj.is_number_float()) {
     return json_obj.get<double>();
   } else if (json_obj.is_string()) {
@@ -441,38 +424,6 @@ void Settings::save_setting_value_to_hdf5(H5::Group& group,
           H5::DataSet dataset =
               group.createDataSet(name, string_type, dataspace);
           dataset.write(variant_value.c_str(), string_type);
-
-        } else if constexpr (std::is_same_v<ValueType, std::vector<bool>>) {
-          // Store vector<bool> as vector<int> for HDF5 compatibility
-          if (!variant_value.empty()) {
-            std::vector<int> bool_as_int(variant_value.size());
-            for (size_t i = 0; i < variant_value.size(); ++i) {
-              bool_as_int[i] = variant_value[i] ? 1 : 0;
-            }
-            hsize_t dims[1] = {bool_as_int.size()};
-            H5::DataSpace dataspace(1, dims);
-            H5::DataSet dataset =
-                group.createDataSet(name, H5::PredType::NATIVE_INT, dataspace);
-            dataset.write(bool_as_int.data(), H5::PredType::NATIVE_INT);
-            // Add type attribute to indicate this is a vector<bool>
-            H5::StrType str_type(H5::PredType::C_S1, 12);
-            H5::DataSpace attr_space(H5S_SCALAR);
-            H5::Attribute attr =
-                dataset.createAttribute("type", str_type, attr_space);
-            attr.write(str_type, "vector<bool>");
-          } else {
-            // Handle empty vector
-            hsize_t dims[1] = {0};
-            H5::DataSpace dataspace(1, dims);
-            H5::DataSet dataset =
-                group.createDataSet(name, H5::PredType::NATIVE_INT, dataspace);
-            // Add type attribute
-            H5::StrType str_type(H5::PredType::C_S1, 12);
-            H5::DataSpace attr_space(H5S_SCALAR);
-            H5::Attribute attr =
-                dataset.createAttribute("type", str_type, attr_space);
-            attr.write(str_type, "vector<bool>");
-          }
 
         } else if constexpr (std::is_same_v<ValueType, std::vector<int64_t>>) {
           if (!variant_value.empty()) {
@@ -586,11 +537,7 @@ SettingValue Settings::parse_string_to_setting_value(
           try {
             nlohmann::json json_obj;
 
-            if constexpr (std::is_same_v<CurrentType, std::vector<bool>> ||
-                          std::is_same_v<CurrentType, std::vector<int64_t>> ||
-                          std::is_same_v<CurrentType, std::vector<double>> ||
-                          std::is_same_v<CurrentType,
-                                         std::vector<std::string>>) {
+            if constexpr (is_vector_v<CurrentType>) {
               // Vectors must be JSON arrays
               json_obj = nlohmann::json::parse(str_value);
               if (!json_obj.is_array()) {
@@ -811,19 +758,6 @@ SettingValue Settings::load_setting_value_from_hdf5(H5::Group& group,
         int bool_val;
         dataset.read(&bool_val, H5::PredType::NATIVE_INT);
         return static_cast<bool>(bool_val);
-      } else if (type_str == "vector<bool>") {
-        // Read as int vector and convert to bool vector
-        if (ndims == 1 && dims[0] > 0) {
-          std::vector<int> int_vector(dims[0]);
-          dataset.read(int_vector.data(), H5::PredType::NATIVE_INT);
-          std::vector<bool> bool_vector(dims[0]);
-          for (size_t i = 0; i < dims[0]; ++i) {
-            bool_vector[i] = (int_vector[i] != 0);
-          }
-          return bool_vector;
-        } else {
-          return std::vector<bool>();
-        }
       }
     } catch (const H5::Exception& hdf5_exception) {
       std::cerr << "Warning: Failed to read attribute 'type' for dataset '"
