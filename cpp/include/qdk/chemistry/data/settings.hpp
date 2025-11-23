@@ -329,6 +329,15 @@ class Settings : public DataClass,
       try {
         return std::get<T>(it->second);
       } catch (const std::bad_variant_access&) {
+        // Fall through to try conversion if T is an integral type
+        if constexpr (std::is_integral_v<T> && !std::is_same_v<T, bool>) {
+          // Type is in variant but wrong signedness - try conversion
+          if (auto result = _try_convert_from<T, int64_t>(it->second)) {
+            return *result;
+          } else if (auto result = _try_convert_from<T, uint64_t>(it->second)) {
+            return *result;
+          }
+        }
         return default_value;
       }
     }
