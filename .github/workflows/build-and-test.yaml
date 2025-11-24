@@ -1,0 +1,375 @@
+name: Build and Test
+
+on:
+  push:
+    branches:
+    - main
+  pull_request:
+    branches:
+    - '**'
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+  pull-requests: write
+  checks: write
+  statuses: write
+
+jobs:
+  coverage:
+    name: Build, Test, and Coverage Analysis
+    runs-on: [self-hosted, 1ES.Pool=1es-gh-hb120-pool]
+    env:
+      BUILD_DIR: cpp/build
+      CMAKE_BUILD_PARALLEL_LEVEL: 120
+      CMAKE_INSTALL_PREFIX: ${{ github.workspace }}/install
+      QDK_UARCH: x86-64-v3
+      CTEST_OUTPUT_ON_FAILURE: 1
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+      with:
+        submodules: recursive
+
+    - name: Set up environment paths
+      run: |
+        echo "PATH=${{ github.workspace }}/install/bin:${{ github.workspace }}/install/lib:$PATH" >> $GITHUB_ENV
+        echo "PYTHONPATH=${{ github.workspace }}/install/lib/python3.13/site-packages:${{ github.workspace }}/install/lib:$PYTHONPATH" >> $GITHUB_ENV
+        echo "LD_LIBRARY_PATH=${{ github.workspace }}/install/lib:$LD_LIBRARY_PATH" >> $GITHUB_ENV
+
+    - name: Set up Python 3.13
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.13'
+        cache: pip
+
+    - name: Install system packages
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y \
+          build-essential \
+          ninja-build \
+          cmake \
+          libeigen3-dev \
+          libboost-all-dev \
+          libhdf5-dev \
+          liblapack-dev \
+          libopenblas-dev \
+          libgfortran5 \
+          pkg-config \
+          doxygen \
+          graphviz \
+          gcovr
+
+    - name: Install C++ dependencies
+      env:
+        INSTALL_PREFIX: ${{ github.workspace }}/install
+        BUILD_DIR: ${{ github.workspace }}/cpp_deps_build
+      run: |
+        bash ${{ github.workspace }}/.devcontainer/scripts/install_cpp_dependencies.sh
+
+    - name: Install Python dependencies
+      run: |
+        python -m pip install --upgrade pip
+        python -m pip install --prefix=${{ github.workspace }}/install coverage pytest pytest-cov
+
+    - name: Configure C++ Release build
+      run: |
+        cmake -S cpp -B "$BUILD_DIR" \
+          -GNinja \
+          -DCMAKE_BUILD_TYPE=Release \
+          -DQDK_UARCH="$QDK_UARCH" \
+          -DBUILD_TESTING=ON
+
+    - name: Build C++ Release library
+      run: cmake --build "$BUILD_DIR"
+
+    - name: Run C++ tests in Release mode
+      env:
+        OMP_NUM_THREADS: 16
+      run: |
+        cd "$BUILD_DIR"
+        echo "=== Running C++ Tests in Release Mode ==="
+        ctest --output-on-failure --verbose --timeout 300
+
+    - name: Clean build directory for RelWithDebInfo/Coverage build
+      run: rm -rf "$BUILD_DIR"
+
+    - name: Configure C++ RelWithDebInfo/Coverage build
+      run: |
+        cmake -S cpp -B "$BUILD_DIR" \
+          -GNinja \
+          -DCMAKE_BUILD_TYPE=RelWithDebInfo \
+          -DQDK_UARCH="$QDK_UARCH" \
+          -DQDK_CHEMISTRY_ENABLE_COVERAGE=ON \
+          -DBUILD_TESTING=ON
+
+    - name: Build C++ RelWithDebInfo/Coverage library
+      run: cmake --build "$BUILD_DIR"
+
+    - name: Run C++ tests in RelWithDebInfo/Coverage mode with coverage
+      env:
+        OMP_NUM_THREADS: 16
+      run: |
+        mkdir -p test-results ${{ github.workspace }}/coverage-reports
+        cd "$BUILD_DIR"
+
+        echo "=== Running C++ Tests in Debug Mode with Coverage ==="
+        set +e
+        ctest --output-on-failure --verbose --timeout 300 --output-junit ${{ github.workspace }}/test-results/ctest_results.xml -E "MACIS_SERIAL_TEST"
+        CTEST_EXIT_CODE=$?
+        set -e
+
+        if [ $CTEST_EXIT_CODE -ne 0 ]; then
+          echo "=== Some tests failed ==="
+          echo "Exit code: $CTEST_EXIT_CODE"
+        fi
+
+        cd ${{ github.workspace }}
+
+        gcovr --root ${{ github.workspace }}/cpp \
+          --object-directory "${{ github.workspace }}/${BUILD_DIR}" \
+          --filter '${{ github.workspace }}/cpp/src/.*' \
+          --filter '${{ github.workspace }}/cpp/include/.*' \
+          --exclude '.*/tests/.*' \
+          --exclude '.*test.*\.cpp' \
+          --exclude '.*gtest.*' \
+          --exclude '.*gmock.*' \
+          --exclude '.*/external/.*' \
+          --html-details ${{ github.workspace }}/coverage-reports/cpp_coverage.html \
+          --xml ${{ github.workspace }}/coverage-reports/cpp_coverage.xml \
+          --txt ${{ github.workspace }}/coverage-reports/cpp_coverage.txt
+
+        echo "C++ Coverage Summary:"
+        cat ${{ github.workspace }}/coverage-reports/cpp_coverage.txt
+
+        if [ $CTEST_EXIT_CODE -ne 0 ]; then
+          exit $CTEST_EXIT_CODE
+        fi
+
+    - name: Install C++ library
+      run: |
+        cmake --install "$BUILD_DIR"
+
+    - name: Test C++ installation
+      run: |
+        cmake -S examples/cpp -B build_example -GNinja -DCMAKE_PREFIX_PATH=${{ github.workspace }}/install
+        cmake --build build_example --target all
+        echo "C++ Example Compiled with Pre-Installed QDK/Chemistry-C++ Libraries!"
+
+    - name: Install Python package
+      working-directory: python
+      env:
+        QDK_CHEMISTRY_ENABLE_COVERAGE: 1
+        CMAKE_BUILD_TYPE: RelWithDebInfo
+      run: |
+        # Remove CMake files to build Python package without picking the installed library
+        rm -r ${{ github.workspace }}/install/lib/cmake/qdk
+        python -m pip install --prefix=${{ github.workspace }}/install .[all]
+        python3 -c "import qdk_chemistry; print('qdk_chemistry version:', qdk_chemistry.__version__)"
+
+    - name: Run Python tests
+      working-directory: python
+      run: |
+        mkdir -p ../test-results ../coverage-reports
+
+        BUILD_TEMP=$(find . -type d -path "./build/cp*" | head -1)
+        echo "Found build directory: $BUILD_TEMP"
+        echo "$BUILD_TEMP" > build_temp_path.txt
+
+        set +e
+        pytest \
+          --cov=qdk_chemistry \
+          --cov-report=xml:../coverage-reports/python_coverage.xml \
+          --cov-report=html:../coverage-reports/python_coverage_html \
+          --cov-report=term \
+          --junitxml=../test-results/pytest_report.xml \
+          -v \
+          --tb=short \
+          > ../coverage-reports/python_coverage.txt 2>&1
+
+        PYTEST_EXIT_CODE=$?
+        set -e
+
+        echo "=== Python Test Output ==="
+        cat ../coverage-reports/python_coverage.txt
+
+        if [ $PYTEST_EXIT_CODE -ne 0 ]; then
+          echo "ERROR: Python tests failed with exit code $PYTEST_EXIT_CODE"
+        fi
+
+        if [ -n "$BUILD_TEMP" ] && [ -d "$BUILD_TEMP" ]; then
+          find "$BUILD_TEMP" -name "*.gcda" -exec cp {} coverage_build/ \; 2>/dev/null || true
+        fi
+
+        if [ $PYTEST_EXIT_CODE -ne 0 ]; then
+          exit 1
+        fi
+
+    - name: Generate Pybind11 coverage report
+      working-directory: python
+      run: |
+        PYBIND_BUILD_DIR=$(find . -wholename "./build/cp*/CMakeFiles/_core.dir" | head -1)
+        CLEAN_BUILD_DIR="${PYBIND_BUILD_DIR#./}"
+
+        gcovr \
+          --root ${{ github.workspace }}/python \
+          --object-directory "${{ github.workspace }}/python/$CLEAN_BUILD_DIR" \
+          --filter '.*src/pybind11.*' \
+          --filter '.*src/cpp.*' \
+          --exclude '.*test.*' \
+          --exclude '.*external.*' \
+          --gcov-ignore-errors=no_working_dir_found \
+          --gcov-ignore-errors=source_not_found \
+          --xml "../coverage-reports/pybind11_coverage.xml" \
+          --txt "../coverage-reports/pybind11_coverage.txt" \
+          --html-details "../coverage-reports/pybind11_coverage.html"
+
+        echo "Pybind11 Coverage Summary:"
+        cat ../coverage-reports/pybind11_coverage.txt
+
+    - name: Generate coverage statistics
+      run: |
+        # Extract coverage percentages
+        CPP_COVERAGE=$(grep -oP 'TOTAL.*?\K[0-9.]+(?=%)' coverage-reports/cpp_coverage.txt | tail -1 || echo "0")
+        PYTHON_COVERAGE=$(grep -oP 'TOTAL.*?\K[0-9]+(?=%)' coverage-reports/python_coverage.txt | tail -1 || echo "0")
+        PYBIND11_COVERAGE=$(grep -oP 'TOTAL.*?\K[0-9.]+(?=%)' coverage-reports/pybind11_coverage.txt | tail -1 || echo "0")
+
+        echo "CPP_COVERAGE=$CPP_COVERAGE" >> $GITHUB_ENV
+        echo "PYTHON_COVERAGE=$PYTHON_COVERAGE" >> $GITHUB_ENV
+        echo "PYBIND11_COVERAGE=$PYBIND11_COVERAGE" >> $GITHUB_ENV
+
+        # Create simple PR comment with just statistics
+        echo "## 📊 Coverage Summary" > pr-comment.md
+        echo "" >> pr-comment.md
+        echo "| Component | Coverage |" >> pr-comment.md
+        echo "|-----------|----------|" >> pr-comment.md
+        echo "| C++ Library | ${CPP_COVERAGE}% |" >> pr-comment.md
+        echo "| Python Package | ${PYTHON_COVERAGE}% |" >> pr-comment.md
+        if [ "$PYBIND11_COVERAGE" != "0" ]; then
+          echo "| Pybind11 Bindings | ${PYBIND11_COVERAGE}% |" >> pr-comment.md
+        fi
+        echo "" >> pr-comment.md
+        echo "---" >> pr-comment.md
+        echo "" >> pr-comment.md
+
+        echo "### Detailed Coverage Reports" >> pr-comment.md
+        echo "" >> pr-comment.md
+        echo "<details>" >> pr-comment.md
+        echo "<summary>C++ Coverage Details</summary>" >> pr-comment.md
+        echo "" >> pr-comment.md
+        echo '```' >> pr-comment.md
+        cat coverage-reports/cpp_coverage.txt >> pr-comment.md
+        echo '```' >> pr-comment.md
+        echo "</details>" >> pr-comment.md
+        echo "" >> pr-comment.md
+
+        if [ -f coverage-reports/python_coverage.txt ]; then
+          echo "<details>" >> pr-comment.md
+          echo "<summary>Python Coverage Details</summary>" >> pr-comment.md
+          echo "" >> pr-comment.md
+          echo '```' >> pr-comment.md
+          tail -50 coverage-reports/python_coverage.txt >> pr-comment.md
+          echo '```' >> pr-comment.md
+          echo "</details>" >> pr-comment.md
+          echo "" >> pr-comment.md
+        fi
+
+        if [ -f coverage-reports/pybind11_coverage.txt ]; then
+          echo "<details>" >> pr-comment.md
+          echo "<summary>Pybind11 Coverage Details</summary>" >> pr-comment.md
+          echo "" >> pr-comment.md
+          echo '```' >> pr-comment.md
+          cat coverage-reports/pybind11_coverage.txt >> pr-comment.md
+          echo '```' >> pr-comment.md
+          echo "</details>" >> pr-comment.md
+        fi
+
+    - name: Comment PR with coverage
+      if: github.event_name == 'pull_request'
+      uses: thollander/actions-comment-pull-request@v2
+      with:
+        filePath: pr-comment.md
+        comment_tag: coverage-report
+
+    - name: Add coverage to job summary
+      run: |
+        # Create comprehensive summary with table and detailed reports
+        echo "## 📊 Coverage Summary" > coverage-summary.md
+        echo "" >> coverage-summary.md
+        echo "| Component | Coverage |" >> coverage-summary.md
+        echo "|-----------|----------|" >> coverage-summary.md
+        echo "| C++ Library | ${CPP_COVERAGE}% |" >> coverage-summary.md
+        echo "| Python Package | ${PYTHON_COVERAGE}% |" >> coverage-summary.md
+        if [ "$PYBIND11_COVERAGE" != "0" ]; then
+          echo "| Pybind11 Bindings | ${PYBIND11_COVERAGE}% |" >> coverage-summary.md
+        fi
+        echo "" >> coverage-summary.md
+        echo "---" >> coverage-summary.md
+        echo "" >> coverage-summary.md
+
+        echo "### Detailed Coverage Reports" >> coverage-summary.md
+        echo "" >> coverage-summary.md
+        echo "<details>" >> coverage-summary.md
+        echo "<summary>C++ Coverage Details</summary>" >> coverage-summary.md
+        echo "" >> coverage-summary.md
+        echo '```' >> coverage-summary.md
+        cat coverage-reports/cpp_coverage.txt >> coverage-summary.md
+        echo '```' >> coverage-summary.md
+        echo "</details>" >> coverage-summary.md
+        echo "" >> coverage-summary.md
+
+        if [ -f coverage-reports/python_coverage.txt ]; then
+          echo "<details>" >> coverage-summary.md
+          echo "<summary>Python Coverage Details</summary>" >> coverage-summary.md
+          echo "" >> coverage-summary.md
+          echo '```' >> coverage-summary.md
+          tail -50 coverage-reports/python_coverage.txt >> coverage-summary.md
+          echo '```' >> coverage-summary.md
+          echo "</details>" >> coverage-summary.md
+          echo "" >> coverage-summary.md
+        fi
+
+        if [ -f coverage-reports/pybind11_coverage.txt ]; then
+          echo "<details>" >> coverage-summary.md
+          echo "<summary>Pybind11 Coverage Details</summary>" >> coverage-summary.md
+          echo "" >> coverage-summary.md
+          echo '```' >> coverage-summary.md
+          cat coverage-reports/pybind11_coverage.txt >> coverage-summary.md
+          echo '```' >> coverage-summary.md
+          echo "</details>" >> coverage-summary.md
+        fi
+
+        # Add to job summary
+        cat coverage-summary.md >> $GITHUB_STEP_SUMMARY
+
+    - name: Reinstall Python package to remove stubs
+      working-directory: python
+      run: |
+        # TODO, this should be removed once pybind11 docs pass thorugh sphinx cleanly
+        pip install --prefix=${{ github.workspace }}/install .[docs,plugins] --verbose
+
+    - name: Build documentation
+      working-directory: docs
+      run: |
+        set +e
+        make clean all
+        MAKE_EXIT_CODE=$?
+        set -e
+
+        if [ $MAKE_EXIT_CODE -ne 0 ]; then
+          echo "=== Documentation build failed ==="
+          echo "=== Contents of all .txt output files ==="
+          for txtfile in *-output.txt *-warnings.txt; do
+            if [ -f "$txtfile" ]; then
+              echo ""
+              echo "==== File: $txtfile ===="
+              cat "$txtfile"
+            fi
+          done
+          exit $MAKE_EXIT_CODE
+        fi

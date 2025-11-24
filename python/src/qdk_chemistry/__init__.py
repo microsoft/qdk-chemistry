@@ -74,13 +74,14 @@ def _setup_resources() -> None:
 
 _setup_resources()
 
-# Try to import pre-packaged plugins early so they're registered before stub generation
-# This happens when qdk_chemistry.algorithms is imported
-with contextlib.suppress(ImportError):
-    import qdk_chemistry.plugins.pyscf
 
-with contextlib.suppress(ImportError):
-    import qdk_chemistry.plugins.qiskit
+# Defer plugin imports until after module initialization
+def _import_plugins() -> None:
+    """Import pre-packaged plugins after module initialization."""
+    with contextlib.suppress(ImportError):
+        import qdk_chemistry.plugins.pyscf  # noqa: PLC0415
+    with contextlib.suppress(ImportError):
+        import qdk_chemistry.plugins.qiskit  # noqa: PLC0415
 
 
 def _is_placeholder_stub(stub_file: Path) -> bool:
@@ -342,3 +343,9 @@ except (ImportError, AttributeError, RuntimeError, OSError) as e:
         UserWarning,
         stacklevel=2,
     )
+
+# Import plugins last to avoid circular imports
+try:
+    _import_plugins()
+except (ImportError, AttributeError) as e:
+    warnings.warn(f"Failed to import plugins: {e}", UserWarning, stacklevel=2)
