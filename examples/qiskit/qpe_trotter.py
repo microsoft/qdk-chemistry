@@ -28,6 +28,10 @@ from qdk_chemistry.algorithms import (
 )
 from qdk_chemistry.data import QpeResult, Structure
 from qdk_chemistry.utils.wavefunction import get_top_determinants
+from qdk_chemistry.utils import Logger
+
+Logger.set_global_level("info")
+LOGGER = Logger.QDK_LOGGER(__name__)
 
 ACTIVE_ELECTRONS = 2
 ACTIVE_ORBITALS = 2

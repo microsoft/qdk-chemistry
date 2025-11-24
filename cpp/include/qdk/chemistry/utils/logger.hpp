@@ -118,6 +118,17 @@ class Logger {
    *       running in silent mode
    */
   static void disable_all();
+
+  /**
+   * @brief Get the current global log level
+   *
+   * Returns the current global logging level that is applied to all new logger
+   * instances. This uses the same mutex protection as set_global_level() to
+   * ensure thread safety.
+   *
+   * @return The current global log level
+   */
+  static spdlog::level::level_enum get_global_level();
 };
 
 /**

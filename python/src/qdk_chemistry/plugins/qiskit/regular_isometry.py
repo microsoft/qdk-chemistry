@@ -4,8 +4,6 @@
 # Licensed under the MIT License. See LICENSE.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
 
-import logging
-
 from qiskit import QuantumCircuit, qasm3
 from qiskit.circuit.library import StatePreparation as QiskitStatePreparation
 from qiskit.compiler import transpile
@@ -19,10 +17,11 @@ from qdk_chemistry.plugins.qiskit._interop.transpiler import (
     RemoveZBasisOnZeroState,
     SubstituteCliffordRz,
 )
+from qdk_chemistry.utils import Logger
 from qdk_chemistry.utils.bitstring import separate_alpha_beta_to_binary_string
 from qdk_chemistry.utils.statevector import _create_statevector_from_coeffs_and_dets_string
 
-_LOGGER = logging.getLogger(__name__)
+_LOGGER = Logger.QDK_LOGGER(__name__)
 
 __all__ = ["RegularIsometryStatePreparation"]
 

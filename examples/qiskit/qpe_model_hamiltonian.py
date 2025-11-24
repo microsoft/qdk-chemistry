@@ -31,6 +31,10 @@ except ImportError as ex:
 
 from qdk_chemistry.algorithms import IterativePhaseEstimation
 from qdk_chemistry.data import QpeResult, QubitHamiltonian
+from qdk_chemistry.utils import Logger
+
+Logger.set_global_level("info")
+LOGGER = Logger.QDK_LOGGER(__name__)
 
 TIME_STEP_1 = np.pi / 4
 PHASE_BITS_1 = 6

@@ -10,8 +10,6 @@ rotations, substituting Clifford Rz gates, and removing Z-basis operations on qu
 state. It also includes functions to create custom pass managers based on preset configurations and custom passes.
 """
 
-import logging
-
 import numpy as np
 from qiskit.circuit import ParameterExpression
 from qiskit.circuit.library import IGate, SdgGate, SGate, ZGate
@@ -21,8 +19,9 @@ from qiskit.transpiler.passes.optimization import Optimize1qGatesDecomposition
 
 from qdk_chemistry.data import Settings
 from qdk_chemistry.definitions import DIAGONAL_Z_1Q_GATES
+from qdk_chemistry.utils import Logger
 
-_LOGGER = logging.getLogger(__name__)
+_LOGGER = Logger.QDK_LOGGER(__name__)
 
 __all__ = [
     "MergeZBasisRotations",

@@ -5,7 +5,6 @@
 # Licensed under the MIT License. See LICENSE.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
 
-import logging
 from collections import Counter
 from dataclasses import dataclass, field
 from math import inf
@@ -22,8 +21,9 @@ from qdk_chemistry.definitions import (
     TWO_QUBIT_CLIFFORD_GATES,
     UNI_DIRECTIONAL_2Q_CLIFFORD_GATES,
 )
+from qdk_chemistry.utils import Logger
 
-_LOGGER = logging.getLogger(__name__)
+_LOGGER = Logger.QDK_LOGGER(__name__)
 
 __all__ = ["CircuitInfo", "analyze_qubit_status", "plot_circuit_diagram"]
 

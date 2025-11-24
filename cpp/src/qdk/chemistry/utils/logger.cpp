@@ -169,6 +169,11 @@ void Logger::disable_all() {
   spdlog::set_level(spdlog::level::off);
 }
 
+spdlog::level::level_enum Logger::get_global_level() {
+  std::lock_guard<std::mutex> lock(g_level_mutex);
+  return g_global_level;
+}
+
 void log_trace_entering(const std::source_location& location) {
   auto logger = Logger::get(location);
   logger->trace("Entering {}", extract_method_name(location.function_name()));

@@ -9,7 +9,8 @@
 # Import C++ utilities from the compiled extension
 from qdk_chemistry._core.utils import (
     compute_valence_space_parameters,
-    rotate_orbitals,
+    Logger,
+    rotate_orbitals
 )
 
-__all__ = ["compute_valence_space_parameters", "rotate_orbitals"]
+__all__ = ["compute_valence_space_parameters", "Logger", "rotate_orbitals"]

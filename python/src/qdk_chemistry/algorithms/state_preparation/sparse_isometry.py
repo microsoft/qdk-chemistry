@@ -33,7 +33,6 @@ Algorithm Details:
 # Licensed under the MIT License. See LICENSE.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
 
-import logging
 from dataclasses import dataclass
 
 import numpy as np
@@ -46,8 +45,9 @@ from qiskit.transpiler import PassManager
 from qdk_chemistry.algorithms.state_preparation.state_preparation import StatePreparation, StatePreparationSettings
 from qdk_chemistry.data import Circuit, Wavefunction
 from qdk_chemistry.utils.bitstring import bitstrings_to_binary_matrix, separate_alpha_beta_to_binary_string
+from qdk_chemistry.utils import Logger
 
-_LOGGER = logging.getLogger(__name__)
+_LOGGER = Logger.QDK_LOGGER(__name__)
 
 __all__: list[str] = []
 

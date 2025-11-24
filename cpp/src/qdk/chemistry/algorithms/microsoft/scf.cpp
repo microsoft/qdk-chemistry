@@ -197,10 +197,10 @@ std::pair<double, std::shared_ptr<data::Wavefunction>> ScfSolver::_run_impl(
   // omp_set_num_threads(1);
 #endif
 
-  // Turnoff SCF logger
-  // std::vector<spdlog::sink_ptr> sinks = {};
-  // spdlog::set_default_logger(std::make_shared<spdlog::logger>(
-  //    "QDK-Chemistry-SCF", sinks.begin(), sinks.end()));
+  // Save the current global level before disabling SCF logging
+  auto saved_global_level = spdlog::get_level();
+
+  // Disable SCF logging
   spdlog::set_level(spdlog::level::off);
 
   auto scf = (method == "hf")
@@ -408,6 +408,9 @@ std::pair<double, std::shared_ptr<data::Wavefunction>> ScfSolver::_run_impl(
 
   // Return total energy
   double total_energy = context.result.scf_total_energy;
+
+  // Restore the original global logging level
+  spdlog::set_level(saved_global_level);
 
   return std::make_pair(total_energy, std::make_shared<data::Wavefunction>(
                                           std::move(wavefunction)));

@@ -17,7 +17,6 @@ References:
 
 from __future__ import annotations
 
-import logging
 from typing import TYPE_CHECKING
 
 from qiskit import ClassicalRegister, QuantumCircuit, QuantumRegister
@@ -26,13 +25,14 @@ from qiskit.synthesis.qft.qft_decompose_full import synth_qft_full
 if TYPE_CHECKING:
     from qdk_chemistry.data.qubit_hamiltonian import QubitHamiltonian
 from qdk_chemistry.phase_estimation.base import PhaseEstimation, PhaseEstimationAlgorithm
+from qdk_chemistry.utils import Logger
 from qdk_chemistry.utils.time_evolution import (
     PauliEvolutionTerm,
     append_controlled_time_evolution,
     extract_terms_from_hamiltonian,
 )
 
-_LOGGER = logging.getLogger(__name__)
+_LOGGER = Logger.QDK_LOGGER(__name__)
 
 __all__: list[str] = []
 
@@ -58,11 +58,8 @@ class TraditionalPhaseEstimation(PhaseEstimation):
         self._terms: list[PauliEvolutionTerm] = extract_terms_from_hamiltonian(hamiltonian)
         self._qft_do_swaps = qft_do_swaps
         _LOGGER.debug(
-            "Initialized %s with %d evolution terms, evolution time %.6f, qft_do_swaps=%s.",
-            self.__class__.__name__,
-            len(self._terms),
-            evolution_time,
-            qft_do_swaps,
+            f"Initialized {self.__class__.__name__} with {len(self._terms)} evolution terms, "
+            f"evolution time {evolution_time:.6f}, qft_do_swaps={qft_do_swaps}."
         )
 
     def create_circuit(
@@ -92,9 +89,7 @@ class TraditionalPhaseEstimation(PhaseEstimation):
                 qc.add_register(measurement_register)
 
         _LOGGER.debug(
-            "Creating traditional QPE circuit with %d ancilla qubits and measurement=%s.",
-            num_bits,
-            include_measurement,
+            f"Creating traditional QPE circuit with {num_bits} ancilla qubits and measurement={include_measurement}."
         )
 
         qc.compose(state_prep, qubits=system, inplace=True)
@@ -123,9 +118,7 @@ class TraditionalPhaseEstimation(PhaseEstimation):
             qc.measure(ancilla, classical)
 
         _LOGGER.debug(
-            "Completed traditional QPE circuit with %d qubits, include_measurement=%s.",
-            qc.num_qubits,
-            include_measurement,
+            f"Completed traditional QPE circuit with {qc.num_qubits} qubits, include_measurement={include_measurement}."
         )
 
         return qc
