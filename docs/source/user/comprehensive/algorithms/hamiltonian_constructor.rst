@@ -94,8 +94,8 @@ Once configured, the Hamiltonian can be constructed from a set of orbitals:
       auto hamiltonian = hamiltonian_constructor->run(orbitals);
 
       // Access the resulting integrals
-      auto h1 = hamiltonian.get_one_body_integrals();
-      auto h2 = hamiltonian.get_two_body_integrals();
+      auto [h1_alpha, h1_beta] = hamiltonian.get_one_body_integrals();
+      auto [h2_aaaa, h2_aabb, h2_bbbb] = hamiltonian.get_two_body_integrals();
 
 .. tab:: Python API
 

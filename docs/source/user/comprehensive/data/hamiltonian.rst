@@ -125,10 +125,10 @@ When accessing specific elements with ``get_two_body_element(i, j, k, l)``, the 
    .. code-block:: cpp
 
       // Access one-electron integrals, returns const Eigen::MatrixXd&
-      auto h1 = hamiltonian.get_one_body_integrals();
+      auto [h1_alpha, h1_beta] = hamiltonian.get_one_body_integrals();
 
       // Access two-electron integrals, returns const Eigen::VectorXd&
-      auto h2 = hamiltonian.get_two_body_integrals();
+      auto [h2_aaaa, h2_aabb, h2_bbbb] = hamiltonian.get_two_body_integrals();
 
       // Access a specific two-electron integral <ij|kl>
       double element = hamiltonian.get_two_body_element(i, j, k, l);
