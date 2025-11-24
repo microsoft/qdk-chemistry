@@ -25,6 +25,9 @@ Acronym definitions
    DFT
       Density Functional Theory.
 
+   ERIs
+      Electron Repulsion Integrals.
+
    FCI
       Full Configuration Interaction.
 
