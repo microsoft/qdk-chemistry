@@ -22,7 +22,7 @@ if(NOT qdk_FOUND)
         message(FATAL_ERROR "Could not find qdk source at ${QDK_CPP_DIR}")
     endif()
 
-    # Setup C++ subbuild
+    # Setup C++ subbuild - pass through important flags
     set(QDK_EMBED_RESOURCE_LOCATION OFF CACHE BOOL "Disable embedded resource location for Python builds" FORCE)
     set(BUILD_TESTING OFF CACHE BOOL "Disable building tests for Python builds" FORCE)
     set(BUILD_SHARED_LIBS OFF CACHE BOOL "Build dependencies as static libraries for Python builds" FORCE)
