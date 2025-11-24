@@ -37,7 +37,7 @@ handle_dependency(nlohmann_json
 )
 
 # Libint2 for CPU Integral evaluation
-set(_libint2_source_subdir "SOURCE_SUBDIR libint-2.9.0")
+set(_libint2_source_subdir "SOURCE_SUBDIR;libint-2.9.0")
 if(APPLE)
     set(_libint2_source_subdir "")
 endif()
