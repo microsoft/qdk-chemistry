@@ -24,7 +24,7 @@ class GAUXC {
    * Initializes the GauXC runtime environment and XC integrator with
    * the specified functional, grid settings, and execution backend.
    *
-   * @param basis_set Basis set for evaluating basis functions on grids
+   * @param basis_set Basis set for evaluating atomic orbitals on grids
    * @param gauxc_input GauXC configuration
    * @param unrestricted If true, use spin-unrestricted (UKS) formalism
    * @param xc_name Functional name (e.g., "B3LYP", "PBE0", "wB97X")
@@ -58,9 +58,10 @@ class GAUXC {
    * where one electron is integrated numerically on a grid while the other
    * is handled analytically.
    *
-   * @param[in] D Density matrix (size: (ndm, num_basis_funcs, num_basis_funcs))
-   * @param[out] K Semi-numerical exchange matrix (size: (ndm, num_basis_funcs,
-   * num_basis_funcs))
+   * @param[in] D Density matrix (size: (ndm, num_atomic_orbitals,
+   * num_atomic_orbitals))
+   * @param[out] K Semi-numerical exchange matrix (size: (ndm,
+   * num_atomic_orbitals, num_atomic_orbitals))
    * @note ``ndm`` is the number of density matrices; 1 for restricted, 2 for
    *       unrestricted calculations.
    */
@@ -75,7 +76,7 @@ class GAUXC {
    *
    * @param[in] lmax Maximum angular momentum for multipole expansion
    * @param[in] D Density matrix (size:
-   * num_density_matrices * num_basis_funcs × num_basis_funcs)
+   * num_density_matrices * num_atomic_orbitals × num_atomic_orbitals)
    * @param[out] dd_psi Density-dependent (size: ((2*lmax+1),natoms))
    * @note ``ndm`` is the number of density matrices; 1 for restricted, 2 for
    *       unrestricted calculations.
@@ -93,7 +94,7 @@ class GAUXC {
    * @param[in] x Input multipole coefficients from external environment (size:
    * ((2*lmax+1),natoms))
    * @param[out] dd_psi_potential Potential contribution to Fock matrix (size:
-   * (num_density_matrices,num_basis_funcs,num_basis_funcs))
+   * (num_density_matrices,num_atomic_orbitals,num_atomic_orbitals))
    */
   void eval_dd_psi_potential(int lmax, const double* x,
                              double* dd_psi_potential);

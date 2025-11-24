@@ -39,12 +39,12 @@ class MOERI {
   /**
    *  @brief Compute MO ERIs incore
    *
-   *  @param[in]  nb Number of basis functions
+   *  @param[in]  nao Number of atomic orbitals
    *  @param[in]  nt Number of vectors in the MO space
    *  @param[in]  C  Transformation coefficients (row major)
    *  @param[out] out Output MO ERIs (row major)
    */
-  void compute(size_t nb, size_t nt, const double* C, double* out);
+  void compute(size_t nao, size_t nt, const double* C, double* out);
 
  private:
   std::shared_ptr<ERI> eri_;  ///< ERI instance

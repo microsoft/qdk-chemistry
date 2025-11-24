@@ -800,14 +800,15 @@ TEST_F(WavefunctionRealRDMsTest, N2_Singlet) {
   for (int i = 0; i < manual_rdm1.rows(); ++i) {
     for (int j = 0; j < manual_rdm1.cols(); ++j) {
       EXPECT_NEAR(manual_rdm1(i, j), std::get<Eigen::MatrixXd>(rdm1)(i, j),
-                  1e-6);
+                  testing::rdm_tolerance);
     }
   }
   auto manual_rdm2 =
       (std::get<Eigen::VectorXd>(aaaa) + std::get<Eigen::VectorXd>(bbbb)) +
       (std::get<Eigen::VectorXd>(aabb) + bbaa);
   for (int i = 0; i < manual_rdm2.size(); ++i) {
-    EXPECT_NEAR(manual_rdm2(i), std::get<Eigen::VectorXd>(rdm2)(i), 1e-6);
+    EXPECT_NEAR(manual_rdm2(i), std::get<Eigen::VectorXd>(rdm2)(i),
+                testing::rdm_tolerance);
   }
 
   // check that one rdm matches that extracted from two rdm
@@ -817,7 +818,7 @@ TEST_F(WavefunctionRealRDMsTest, N2_Singlet) {
   for (int i = 0; i < norb; ++i) {
     for (int j = 0; j < norb; ++j) {
       EXPECT_NEAR(one_from_two(i, j), std::get<Eigen::MatrixXd>(rdm1)(i, j),
-                  1e-6);
+                  testing::rdm_tolerance);
     }
   }
   Eigen::MatrixXd one_alpha_from_two_mixed =
@@ -826,7 +827,7 @@ TEST_F(WavefunctionRealRDMsTest, N2_Singlet) {
   for (int i = 0; i < norb; ++i) {
     for (int j = 0; j < norb; ++j) {
       EXPECT_NEAR(one_alpha_from_two_mixed(i, j),
-                  std::get<Eigen::MatrixXd>(aa)(i, j), 1e-6);
+                  std::get<Eigen::MatrixXd>(aa)(i, j), testing::rdm_tolerance);
     }
   }
   Eigen::MatrixXd one_beta_from_two_mixed =
@@ -834,7 +835,7 @@ TEST_F(WavefunctionRealRDMsTest, N2_Singlet) {
   for (int i = 0; i < norb; ++i) {
     for (int j = 0; j < norb; ++j) {
       EXPECT_NEAR(one_beta_from_two_mixed(i, j),
-                  std::get<Eigen::MatrixXd>(bb)(i, j), 1e-6);
+                  std::get<Eigen::MatrixXd>(bb)(i, j), testing::rdm_tolerance);
     }
   }
 }

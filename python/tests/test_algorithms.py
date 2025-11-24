@@ -47,8 +47,6 @@ class MockLocalizationPy(Localizer):
 
     def _run_impl(self, orbitals, loc_indices_a, loc_indices_b):  # noqa: ARG002
         """Fake localize orbitals in Python."""
-        # TODO (NAB):  change output to logger rather than print() here and elsewhere, workitem: 41426
-        print("MockLocalization: Localizing orbitals in python...")
         return orbitals
 
     def name(self) -> str:
@@ -801,7 +799,7 @@ class TestAlgorithmClasses:
         assert "CoupledClusterCalculator" in repr(cc)
         assert "StatePreparation" in repr(sp)
 
-    def test_settings_interface(self):
+    def test_settings_interface(self) -> None:
         """Test that all algorithms provide settings interface."""
         # Test all algorithm types have settings
         algorithms: list[
@@ -1037,12 +1035,12 @@ class TestAlgorithmClasses:
         # Test eigenvalue setters
         new_internal_eigenvals = np.array([0.2, 0.6, 1.2])
         unstable_result.set_internal_eigenvalues(new_internal_eigenvals)
-        np.testing.assert_array_equal(unstable_result.get_internal_eigenvalues(), new_internal_eigenvals)
+        assert np.array_equal(unstable_result.get_internal_eigenvalues(), new_internal_eigenvals)
         assert unstable_result.get_smallest_internal_eigenvalue() == 0.2
 
         new_external_eigenvals = np.array([0.4, 0.9])
         unstable_result.set_external_eigenvalues(new_external_eigenvals)
-        np.testing.assert_array_equal(unstable_result.get_external_eigenvalues(), new_external_eigenvals)
+        assert np.array_equal(unstable_result.get_external_eigenvalues(), new_external_eigenvals)
         assert unstable_result.get_smallest_external_eigenvalue() == 0.4
         assert unstable_result.get_smallest_eigenvalue() == 0.2  # Overall smallest
 
@@ -1050,11 +1048,11 @@ class TestAlgorithmClasses:
         rng = np.random.default_rng(42)
         new_internal_eigenvecs = rng.random((3, 3))
         unstable_result.set_internal_eigenvectors(new_internal_eigenvecs)
-        np.testing.assert_array_equal(unstable_result.get_internal_eigenvectors(), new_internal_eigenvecs)
+        assert np.array_equal(unstable_result.get_internal_eigenvectors(), new_internal_eigenvecs)
 
         new_external_eigenvecs = rng.random((2, 2))
         unstable_result.set_external_eigenvectors(new_external_eigenvecs)
-        np.testing.assert_array_equal(unstable_result.get_external_eigenvectors(), new_external_eigenvecs)
+        assert np.array_equal(unstable_result.get_external_eigenvectors(), new_external_eigenvecs)
 
         # Test eigenvalue-eigenvector pair methods
         internal_val, internal_vec = unstable_result.get_smallest_internal_eigenvalue_and_vector()

@@ -53,7 +53,7 @@ def test_measurement_data_serialization():
     assert data == measurement_data_dict
 
 
-def test_energy_expectation_result_structure():
+def test_energy_expectation_result_structure() -> None:
     """Test EnergyExpectationResult TypedDict structure."""
     sample_result: EnergyExpectationResult = {
         "energy_expectation_value": -1.234,

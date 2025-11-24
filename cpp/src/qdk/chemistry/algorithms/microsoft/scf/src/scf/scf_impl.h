@@ -100,10 +100,10 @@ class SCFImpl {
   std::vector<int> get_num_electrons() const { return {nelec_[0], nelec_[1]}; }
 
   /**
-   * @brief Get number of atomic orbital basis functions
-   * @see SCF::get_num_basis_functions() for API details
+   * @brief Get number of atomic orbital atomic orbitals
+   * @see SCF::get_num_atomic_orbitals() for API details
    */
-  int get_num_basis_functions() const { return num_atomic_orbitals_; }
+  int get_num_atomic_orbitals() const { return num_atomic_orbitals_; }
 
   /**
    * @brief Get number of molecular orbitals
@@ -287,7 +287,7 @@ class SCFImpl {
                                const Molecule* mol = nullptr);
 
   // Core SCF data
-  size_t num_atomic_orbitals_;     ///< Number of atomic orbital basis functions
+  size_t num_atomic_orbitals_;     ///< Number of atomic orbital atomic orbitals
   size_t num_molecular_orbitals_;  ///< Number of molecular orbitals
   int num_density_matrices_;  ///< Number of density matrices (1=restricted,
                               ///< 2=unrestricted)

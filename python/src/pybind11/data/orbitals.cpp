@@ -456,12 +456,12 @@ void bind_orbitals(py::module &data) {
 
   orbitals.def("get_num_atomic_orbitals", &Orbitals::get_num_atomic_orbitals,
                R"(
-        Get number of atomic orbitals (basis functions).
+        Get number of atomic orbitals (atomic orbitals).
 
         Returns
         -------
         int
-            Number of atomic orbitals/basis functions
+            Number of atomic orbitals/atomic orbitals
 
         Examples
         --------
@@ -972,7 +972,7 @@ void bind_model_orbitals(py::module &data) {
         Parameters
         ----------
         basis_size : int
-            Number of basis functions (and molecular orbitals)
+            Number of atomic orbitals (and molecular orbitals)
         restricted : bool
             Whether the calculation is restricted (True) or unrestricted (False)
 
@@ -1001,7 +1001,7 @@ void bind_model_orbitals(py::module &data) {
         Parameters
         ----------
         basis_size : int
-            Number of basis functions (and molecular orbitals)
+            Number of atomic orbitals (and molecular orbitals)
         indices : tuple of (list of int, list of int)
             Tuple of ``(active_space_indices, inactive_space_indices)``
 
@@ -1035,7 +1035,7 @@ void bind_model_orbitals(py::module &data) {
         Parameters
         ----------
         basis_size : int
-            Number of basis functions (and molecular orbitals)
+            Number of atomic orbitals (and molecular orbitals)
         indices : tuple of (list of int, list of int, list of int, list of int)
             Tuple of ``(active_alpha, active_beta, inactive_alpha, inactive_beta)``
 

@@ -173,7 +173,7 @@ system parameters like number of orbitals and core energy.
 **Properties:**
 
 - `norb` (int): Number of active molecular orbitals
-- `nbasis` (int): Total number of basis functions
+- `nbasis` (int): Total number of atomic orbitals
 - `core_energy` (float): Nuclear repulsion energy plus inactive orbital contributions
 - `T` (numpy.ndarray): One-electron integrals matrix (kinetic + nuclear attraction), shape (norb, norb)
 - `V` (numpy.ndarray): Two-electron integrals tensor in physicist's notation, shape (norb, norb, norb, norb)

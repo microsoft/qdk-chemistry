@@ -611,8 +611,8 @@ TEST_F(ScfTest, AgHBasisSetRoundTripSerialization) {
   // Verify the loaded basis set has the same properties as the original
   EXPECT_STREQ(basis_set2->get_name().c_str(), basis_set1->get_name().c_str());
   EXPECT_EQ(basis_set2->get_num_shells(), basis_set1->get_num_shells());
-  EXPECT_EQ(basis_set2->get_num_basis_functions(),
-            basis_set1->get_num_basis_functions());
+  EXPECT_EQ(basis_set2->get_num_atomic_orbitals(),
+            basis_set1->get_num_atomic_orbitals());
   EXPECT_EQ(basis_set2->get_num_atoms(), basis_set1->get_num_atoms());
 
   // Verify ECP data is preserved
@@ -640,8 +640,8 @@ TEST_F(ScfTest, AgHBasisSetRoundTripSerialization) {
     EXPECT_EQ(ecp_shells2[i].atom_index, ecp_shells1[i].atom_index);
     EXPECT_EQ(ecp_shells2[i].get_angular_momentum(),
               ecp_shells1[i].get_angular_momentum());
-    EXPECT_EQ(ecp_shells2[i].get_num_basis_functions(),
-              ecp_shells1[i].get_num_basis_functions());
+    EXPECT_EQ(ecp_shells2[i].get_num_atomic_orbitals(),
+              ecp_shells1[i].get_num_atomic_orbitals());
   }
 
   // Verify ECP shells for individual atoms are correctly preserved
@@ -742,7 +742,7 @@ TEST_F(ScfTest, AgHBasisSetEcpConversion) {
   // With 20 valence electrons and restricted calculation, we expect 10 occupied
   // orbitals
   auto [coeff_alpha, coeff_beta] = orbitals->get_coefficients();
-  EXPECT_EQ(coeff_alpha.rows(), basis_set->get_num_basis_functions());
+  EXPECT_EQ(coeff_alpha.rows(), basis_set->get_num_atomic_orbitals());
 }
 
 TEST_F(ScfTest, AgHBasisSetEcpJsonMapping) {
@@ -850,8 +850,8 @@ TEST_F(ScfTest, AgHBasisSetEcpJsonMapping) {
   EXPECT_TRUE(json.contains("mode"));
   EXPECT_EQ(json["mode"], "RAW");
 
-  EXPECT_TRUE(json.contains("num_basis_funcs"));
-  EXPECT_EQ(json["num_basis_funcs"], basis_set->get_num_basis_functions());
+  EXPECT_TRUE(json.contains("num_atomic_orbitals"));
+  EXPECT_EQ(json["num_atomic_orbitals"], basis_set->get_num_atomic_orbitals());
 
   EXPECT_TRUE(json.contains("electron_shells"));
   auto electron_shells_json = json["electron_shells"];

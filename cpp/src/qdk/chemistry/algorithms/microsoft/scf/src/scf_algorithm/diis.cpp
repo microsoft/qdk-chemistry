@@ -137,7 +137,7 @@ void DIIS::iterate(const RowMajorMatrix& P, const RowMajorMatrix& F,
   const auto* cfg = ctx_.cfg;
   auto& res = ctx_.result;
 
-  int num_atomic_orbitals = ctx_.basis_set->num_basis_funcs;
+  int num_atomic_orbitals = ctx_.basis_set->num_atomic_orbitals;
   int num_density_matrices = ctx_.cfg->unrestricted ? 2 : 1;
 
   // Create error matrix for DIIS (use the base class error calculation)
@@ -287,7 +287,7 @@ void DIIS::iterate(SCFImpl& scf_impl) {
   // Update density matrices using the extrapolated Fock matrix
   const RowMajorMatrix& F_extrapolated = diis_impl_->get_extrapolated_fock();
 
-  int num_atomic_orbitals = scf_impl.get_num_basis_functions();
+  int num_atomic_orbitals = scf_impl.get_num_atomic_orbitals();
   int num_molecular_orbitals = scf_impl.get_num_molecular_orbitals();
   int num_density_matrices = scf_impl.get_num_density_matrices();
   std::vector<int> nelec_vec = scf_impl.get_num_electrons();

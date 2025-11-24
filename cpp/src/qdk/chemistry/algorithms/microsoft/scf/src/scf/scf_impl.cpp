@@ -65,8 +65,8 @@ SCFImpl::SCFImpl(std::shared_ptr<Molecule> mol_ptr, const SCFConfig& cfg,
   }
   ctx_.result = {};
 
-  num_atomic_orbitals_ = ctx_.basis_set->num_basis_funcs;
-  num_molecular_orbitals_ = ctx_.basis_set->num_basis_funcs;
+  num_atomic_orbitals_ = ctx_.basis_set->num_atomic_orbitals;
+  num_molecular_orbitals_ = ctx_.basis_set->num_atomic_orbitals;
   ctx_.num_molecular_orbitals = num_molecular_orbitals_;
   num_density_matrices_ = cfg.unrestricted ? 2 : 1;
 #ifdef QDK_CHEMISTRY_ENABLE_QMMM
@@ -100,15 +100,17 @@ SCFImpl::SCFImpl(std::shared_ptr<Molecule> mol_ptr, const SCFConfig& cfg,
         mol.n_atoms, mol.n_electrons, n_ecp_electrons, mol.charge,
         mol.multiplicity, spin, alpha, beta);
     spdlog::info(
-        "restricted={}, basis={}, pure={}, num_basis_funcs={}, "
-        "density_threshold={:.2e}, orbital_gradient_threshold={:.2e}",
+        "restricted={}, basis={}, pure={}, num_atomic_orbitals={}, "
+        "energy_threshold={:.2e}, "
+        "density_threshold={:.2e}, "
+        "og_threshold={:.2e}",
         !cfg.unrestricted, ctx_.basis_set->name, ctx_.basis_set->pure,
         num_atomic_orbitals_, cfg.scf_algorithm.density_threshold,
         cfg.scf_algorithm.og_threshold);
     spdlog::info("fock_alg={}", fock_string);
     if (cfg.do_dfj) {
       spdlog::info("aux_basis={}, naux={}", ctx_.aux_basis_set->name,
-                   ctx_.aux_basis_set->num_basis_funcs);
+                   ctx_.aux_basis_set->num_atomic_orbitals);
     }
     spdlog::info("eri_tolerance={:.2e}", cfg.eri.eri_threshold);
 
@@ -615,7 +617,7 @@ void SCFImpl::properties_() {
     for (auto i = 0; i < num_atomic_orbitals_; ++i) {
       int A = 0;
       for (A = 0; A < ctx_.mol->n_atoms; ++A) {
-        if (ctx_.basis_set->get_atom2bf()[A * num_atomic_orbitals_ + i]) break;
+        if (ctx_.basis_set->get_atom2ao()[A * num_atomic_orbitals_ + i]) break;
       }
       res.mulliken_population[A] -= PS(i, i);
     }

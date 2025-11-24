@@ -65,9 +65,9 @@ class BasisSet {
   std::shared_ptr<Molecule> mol;  ///< Pointer to the molecular structure
   std::string name;           ///< Basis set name (e.g., "6-31G", "def2-TZVP")
   BasisMode mode;             ///< Normalization convention (PSI4 or RAW)
-  std::vector<Shell> shells;  ///< All orbital basis function shells
+  std::vector<Shell> shells;  ///< All orbital atomic orbital shells
   bool pure;  ///< Whether to use pure spherical harmonics or Cartesian
-  uint64_t num_basis_funcs;  ///< Total number of basis functions
+  uint64_t num_atomic_orbitals;  ///< Total number of atomic orbitals
 
   std::vector<Shell> ecp_shells;  ///< Effective core potential shells
   std::unordered_map<int, int>
@@ -112,28 +112,28 @@ class BasisSet {
       std::shared_ptr<Molecule> mol, const nlohmann::ordered_json& json);
 
   /**
-   * @brief Get atom-to-basis-function mapping (const version)
-   * @return Vector indicating which basis functions belong to which atoms
-   * @throws std::runtime_error if atom2bf data is not available
+   * @brief Get atom-to-atomic-orbital mapping (const version)
+   * @return Vector indicating which atomic orbitals belong to which atoms
+   * @throws std::runtime_error if atom2ao data is not available
    */
-  const std::vector<uint8_t>& get_atom2bf() const {
-    if (atom2bf_.empty()) {
+  const std::vector<uint8_t>& get_atom2ao() const {
+    if (atom2ao_.empty()) {
       throw std::runtime_error(
-          "atom2bf data not available. Call non-const get_atom2bf() first to "
+          "atom2ao data not available. Call non-const get_atom2ao() first to "
           "compute it.");
     }
-    return atom2bf_;
+    return atom2ao_;
   }
 
   /**
-   * @brief Get atom-to-basis-function mapping (non-const version)
-   * @return Vector indicating which basis functions belong to which atoms
+   * @brief Get atom-to-atomic-orbital mapping (non-const version)
+   * @return Vector indicating which atomic orbitals belong to which atoms
    */
-  const std::vector<uint8_t>& get_atom2bf() {
-    if (atom2bf_.empty()) {
-      calc_atom2bf();
+  const std::vector<uint8_t>& get_atom2ao() {
+    if (atom2ao_.empty()) {
+      calc_atom2ao();
     }
-    return atom2bf_;
+    return atom2ao_;
   }
 
   /**
@@ -188,12 +188,12 @@ class BasisSet {
 
   std::vector<std::pair<int, int>>
       shell_pairs_;               ///< Significant shell pairs for screening
-  std::vector<uint8_t> atom2bf_;  ///< Atom-to-basis-function mapping matrix
-                                  ///< (n_atoms × num_basis_funcs)
+  std::vector<uint8_t> atom2ao_;  ///< Atom-to-atomic-orbital mapping matrix
+                                  ///< (n_atoms × num_atomic_orbitals)
 
   /**
-   * @brief Calculate atom-to-basis-function mapping
+   * @brief Calculate atom-to-atomic-orbital mapping
    */
-  void calc_atom2bf();
+  void calc_atom2ao();
 };
 }  // namespace qdk::chemistry::scf

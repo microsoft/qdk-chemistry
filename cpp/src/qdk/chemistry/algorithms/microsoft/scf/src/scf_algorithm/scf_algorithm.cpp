@@ -37,7 +37,7 @@ SCFAlgorithm::SCFAlgorithm(const SCFContext& ctx)
       last_energy_(0.0),
       density_rms_(std::numeric_limits<double>::infinity()),
       delta_energy_(std::numeric_limits<double>::infinity()) {
-  auto num_atomic_orbitals = ctx.basis_set->num_basis_funcs;
+  auto num_atomic_orbitals = ctx.basis_set->num_atomic_orbitals;
   auto num_density_matrices = ctx.cfg->unrestricted ? 2 : 1;
   P_last_ = RowMajorMatrix::Zero(num_density_matrices * num_atomic_orbitals,
                                  num_atomic_orbitals);
@@ -197,7 +197,7 @@ bool SCFAlgorithm::check_convergence(const SCFImpl& scf_impl) {
   const auto* cfg = ctx_.cfg;
   auto& res = ctx_.result;
 
-  int num_atomic_orbitals = scf_impl.get_num_basis_functions();
+  int num_atomic_orbitals = scf_impl.get_num_atomic_orbitals();
 
   // Calculate energy using SCFImpl method
   double energy = res.scf_total_energy;
