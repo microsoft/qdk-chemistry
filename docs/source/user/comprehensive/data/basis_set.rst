@@ -324,7 +324,7 @@ Predefined basis sets
 
 QDK/Chemistry provides access to a library of standard basis sets commonly used in quantum chemistry calculations.
 These predefined basis sets can be easily loaded without having to manually specify the atomic orbitals.
-For a complete list of available basis sets and their specifications, see the :doc:`Supported Basis Sets <../../basis_functionals>` documentation.
+For a complete list of available basis sets and their specifications, see the :doc:`Supported Basis Sets <../basis_functionals>` documentation.
 
 .. tab:: C++ API
 
