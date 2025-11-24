@@ -5,6 +5,7 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 # Set default build type
 if(NOT CMAKE_BUILD_TYPE)
+    message(WARNING "CMAKE_BUILD_TYPE not specified, defaulting to Release")
     set(CMAKE_BUILD_TYPE Release)
 endif()
 

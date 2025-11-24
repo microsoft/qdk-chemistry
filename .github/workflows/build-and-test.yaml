@@ -80,6 +80,7 @@ jobs:
     - name: Configure C++ Release build
       run: |
         cmake -S cpp -B "$BUILD_DIR" \
+          -GNinja \
           -DCMAKE_BUILD_TYPE=Release \
           -DQDK_UARCH="$QDK_UARCH" \
           -DBUILD_TESTING=ON
@@ -95,21 +96,22 @@ jobs:
         echo "=== Running C++ Tests in Release Mode ==="
         ctest --output-on-failure --verbose --timeout 300
 
-    - name: Clean build directory for Debug build
+    - name: Clean build directory for RelWithDebInfo/Coverage build
       run: rm -rf "$BUILD_DIR"
 
-    - name: Configure C++ Debug build
+    - name: Configure C++ RelWithDebInfo/Coverage build
       run: |
         cmake -S cpp -B "$BUILD_DIR" \
+          -GNinja \
           -DCMAKE_BUILD_TYPE=RelWithDebInfo \
           -DQDK_UARCH="$QDK_UARCH" \
           -DQDK_CHEMISTRY_ENABLE_COVERAGE=ON \
           -DBUILD_TESTING=ON
 
-    - name: Build C++ Debug library
+    - name: Build C++ RelWithDebInfo/Coverage library
       run: cmake --build "$BUILD_DIR"
 
-    - name: Run C++ tests in Debug mode with coverage
+    - name: Run C++ tests in RelWithDebInfo/Coverage mode with coverage
       env:
         OMP_NUM_THREADS: 16
       run: |
@@ -152,16 +154,23 @@ jobs:
     - name: Install C++ library
       run: |
         cmake --install "$BUILD_DIR"
-        # Remove CMake files to build Python package without qdk library in path
-        rm -r ${{ github.workspace }}/install/lib/cmake/qdk
+
+    - name: Test C++ installation
+      run: |
+        cmake -S examples/cpp -B build_example -GNinja -DCMAKE_PREFIX_PATH=${{ github.workspace }}/install
+        cmake --build build_example --target all
+        echo "C++ Example Compiled with Pre-Installed QDK/Chemistry-C++ Libraries!"
 
     - name: Install Python package
       working-directory: python
       env:
-        QDK_CHEMISTRY_ENABLE_COVERAGE: 8
+        QDK_CHEMISTRY_ENABLE_COVERAGE: 1
         CMAKE_BUILD_TYPE: RelWithDebInfo
       run: |
-        python -m pip install --prefix=${{ github.workspace }}/install .[dev,plugins]
+        # Remove CMake files to build Python package without picking the installed library
+        rm -r ${{ github.workspace }}/install/lib/cmake/qdk
+        python -m pip install --prefix=${{ github.workspace }}/install .[all]
+        python3 -c "import qdk_chemistry; print('qdk_chemistry version:', qdk_chemistry.__version__)"
 
     - name: Run Python tests
       working-directory: python
@@ -338,12 +347,11 @@ jobs:
         # Add to job summary
         cat coverage-summary.md >> $GITHUB_STEP_SUMMARY
 
-    - name: Install documentation dependencies
+    - name: Reinstall Python package to remove stubs
       working-directory: python
       run: |
+        # TODO, this should be removed once pybind11 docs pass thorugh sphinx cleanly
         pip install --prefix=${{ github.workspace }}/install .[docs,plugins] --verbose
-        # Skip until pybind11 docs compile
-        # python3 -c "import qdk_chemistry; print('qdk_chemistry version:', qdk_chemistry.__version__)"
 
     - name: Build documentation
       working-directory: docs
