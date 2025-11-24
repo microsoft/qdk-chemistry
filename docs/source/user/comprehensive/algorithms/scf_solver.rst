@@ -1,7 +1,7 @@
-Self-consistent field solving
-=============================
+Self-consistent field solver
+============================
 
-The ``ScfSolver`` algorithm in QDK/Chemistry performs Self-Consistent Field (SCF) calculations to optimize molecular orbitals for a given molecular structure.
+The :class:`~qdk_chemistry.algorithms.ScfSolver` algorithm in QDK/Chemistry performs Self-Consistent Field (SCF) calculations to optimize molecular orbitals for a given molecular structure.
 Following QDK/Chemistry's :doc:`algorithm design principles <../advanced/design_principles>`, it takes a :doc:`Structure <../data/structure>` instance as input and produces an :doc:`Orbitals <../data/orbitals>` instance as output.
 Its primary purpose is to find the best single-particle orbitals within a mean-field approximation.
 For Hartree-Fock (HF) theory, it yields the mean field energy, which misses electron correlation and typically requires post-HF methods for accurate energetics.
@@ -46,7 +46,7 @@ The orbitals from :term:`SCF` calculations typically serve as input for post-:te
 Capabilities
 ------------
 
-The ``ScfSolver`` in QDK/Chemistry provides the following calculation types for both :term:`HF` and :term:`DFT` methods:
+The :class:`~qdk_chemistry.algorithms.ScfSolver` in QDK/Chemistry provides the following calculation types for both :term:`HF` and :term:`DFT` methods:
 
 - **Restricted calculations**: For closed-shell systems with paired electrons
 
@@ -65,11 +65,11 @@ The ``ScfSolver`` in QDK/Chemistry provides the following calculation types for 
 
 - **DFT-specific features**:
 
-  - Support for various :doc:`exchange-correlation functionals <../data/functionals>` including :term:`LDA`, :term:`GGA`, meta-:term:`GGA`, hybrid, and range-separated functionals
+  - Support for various exchange-correlation functionals including :term:`LDA`, :term:`GGA`, meta-:term:`GGA`, hybrid, and range-separated functionals
 
 - **Basis set support**:
 
-  - Extensive library of standard quantum chemistry :doc:`basis sets <../data/basis_sets>` including Pople (STO-nG, 3-21G,
+  - Extensive library of standard quantum chemistry basis sets including Pople (STO-nG, 3-21G,
     6-31G, etc.), Dunning (cc-pVDZ, cc-pVTZ, etc.), and Karlsruhe (def2-SVP, def2-TZVP, etc.) families
   - Support for custom basis sets and effective core potentials (ECPs)
 

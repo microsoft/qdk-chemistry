@@ -6,7 +6,7 @@ and MultiConfigurationScf. The user should be able to use the registration mecha
 add and remove custom algorithms at runtime.
 
 Algorithm Lifecycle Management
------------------------------
+------------------------------
 The registry system handles the lifecycle of algorithm instances to prevent memory issues. When
 Python-implemented algorithms are registered, they need special handling during Python interpreter
 shutdown to avoid "double-free" errors that can occur when C++ static deinitialization runs after

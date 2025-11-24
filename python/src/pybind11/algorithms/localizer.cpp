@@ -45,16 +45,13 @@ void bind_localizer(py::module &m) {
   // Localizer abstract base class
   py::class_<Localizer, LocalizerBase, py::smart_holder> localizer(
       m, "Localizer", R"(
-    Abstract base class for orbital localizers.
+Abstract base class for orbital localizers.
 
-    This class defines the interface for localizing molecular orbitals.
-    Localization transforms canonical molecular orbitals into localized
-    orbitals that are spatially confined to specific regions or bonds.
-    Concrete implementations should inherit from this class and implement
-    the localize method.
+This class defines the interface for localizing molecular orbitals.
+Localization transforms canonical molecular orbitals into localized orbitals that are spatially confined to specific regions or bonds.
+Concrete implementations should inherit from this class and implement the localize method.
 
-    Examples
-    --------
+Examples:
     To create a custom orbital localizer, inherit from this class:
 
         >>> import qdk_chemistry.algorithms as alg
@@ -66,61 +63,49 @@ void bind_localizer(py::module &m) {
         ...     def _run_impl(self, wavefunction: data.Wavefunction, loc_indices_a: list, loc_indices_b: list) -> data.Wavefunction:
         ...         # Custom localization implementation
         ...         return localized_wavefunction
-    )");
+)");
 
   localizer.def(py::init<>(),
                 R"(
-        Create a Localizer instance.
+Create a Localizer instance.
 
-        Default constructor for the abstract base class.
-        This should typically be called from derived class constructors.
+Default constructor for the abstract base class.
+This should typically be called from derived class constructors.
 
-        Examples
-        --------
-        >>> # In a derived class:
-        >>> class MyLocalizer(alg.Localizer):
-        ...     def __init__(self):
-        ...         super().__init__()  # Calls this constructor
-        )");
+Examples:
+    >>> # In a derived class:
+    >>> class MyLocalizer(alg.Localizer):
+    ...     def __init__(self):
+    ...         super().__init__()  # Calls this constructor
+)");
 
   localizer.def("run", &Localizer::run,
                 R"(
         Localize molecular orbitals in the given wavefunction.
 
-        Parameters
-        ----------
-        wavefunction : qdk_chemistry.data.Wavefunction
-            The canonical molecular wavefunction to localize
-        loc_indices_a : list of int
-            Indices of alpha orbitals to localize (empty for no localization)
-        loc_indices_b : list of int
-            Indices of beta orbitals to localize (empty for no localization)
-            Note: For restricted orbitals, must be identical to loc_indices_a
+Args:
+    wavefunction (qdk_chemistry.data.Wavefunction): The canonical molecular wavefunction to localize
+    loc_indices_a (list[int]): Indices of alpha orbitals to localize (empty for no localization)
+    loc_indices_b (list[int]): Indices of beta orbitals to localize (empty for no localization)
+        Note: For restricted orbitals, must be identical to loc_indices_a
 
-        Returns
-        -------
-        qdk_chemistry.data.Wavefunction
-            The localized molecular wavefunction
+Returns:
+    qdk_chemistry.data.Wavefunction: The localized molecular wavefunction
 
-        Raises
-        ------
-        ValueError
-            If orbital indices are invalid or inconsistent
-        RuntimeError
-            If localization fails due to numerical issues
-        )",
+Raises:
+    ValueError: If orbital indices are invalid or inconsistent
+    RuntimeError: If localization fails due to numerical issues
+)",
                 py::arg("wavefunction"), py::arg("loc_indices_a"),
                 py::arg("loc_indices_b"));
 
   localizer.def("settings", &Localizer::settings,
                 R"(
-        Access the localizer's configuration settings.
+Access the localizer's configuration settings.
 
-        Returns
-        -------
-        qdk_chemistry.data.Settings
-            Reference to the settings object for configuring the localizer
-        )",
+Returns:
+    qdk_chemistry.data.Settings: Reference to the settings object for configuring the localizer
+)",
                 py::return_value_policy::reference_internal);
 
   // Expose _settings as a writable property for derived classes
@@ -133,29 +118,25 @@ void bind_localizer(py::module &m) {
       },
       py::return_value_policy::reference_internal,
       R"(
-        Internal settings object property.
+Internal settings object property.
 
-        This property allows derived classes to replace the settings object with
-        a specialized Settings subclass in their constructors.
+This property allows derived classes to replace the settings object with a specialized Settings subclass in their constructors.
 
-        Examples
-        --------
-        >>> class MyLocalizer(alg.Localizer):
-        ...     def __init__(self):
-        ...         super().__init__()
-        ...         from qdk_chemistry.data import ElectronicStructureSettings
-        ...         self._settings = ElectronicStructureSettings()
-        )");
+Examples:
+    >>> class MyLocalizer(alg.Localizer):
+    ...     def __init__(self):
+    ...         super().__init__()
+    ...         from qdk_chemistry.data import ElectronicStructureSettings
+    ...         self._settings = ElectronicStructureSettings()
+)");
 
   localizer.def("type_name", &Localizer::type_name,
                 R"(
-        The algorithm's type name.
+The algorithm's type name.
 
-        Returns
-        -------
-        str
-            The type name of the algorithm
-        )");
+Returns:
+    str: The type name of the algorithm
+)");
 
   localizer.def("__repr__", [](const Localizer &) {
     return "<qdk_chemistry.algorithms.Localizer>";

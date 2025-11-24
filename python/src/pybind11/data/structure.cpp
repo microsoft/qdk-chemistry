@@ -66,8 +66,7 @@ void bind_structure(py::module &m) {
     This enum represents all chemical elements from hydrogen (1) to oganesson (118).
     Each element is represented by its atomic number.
 
-    Examples
-    --------
+Examples:
     >>> from qdk_chemistry.data import Element
     >>> Element.H  # Hydrogen
     >>> Element.C  # Carbon
@@ -201,86 +200,81 @@ void bind_structure(py::module &m) {
       .export_values();
   py::class_<Structure, DataClass, py::smart_holder> structure(m, "Structure",
                                                                R"(
-        Represents a molecular structure with atomic coordinates, elements, masses, and nuclear charges.
+Represents a molecular structure with atomic coordinates, elements, masses, and nuclear charges.
 
-    This class stores and manipulates molecular structure data including:
+This class stores and manipulates molecular structure data including:
 
-    * Atomic coordinates in 3D space
-    * Atomic element identifiers using enum
-    * Atomic masses (in atomic mass units)
-    * Nuclear charges (atomic numbers) for each atom
-    * Serialization to/from JSON and XYZ formats
-    * Basic geometric operations and validation
+* Atomic coordinates in 3D space
+* Atomic element identifiers using enum
+* Atomic masses (in atomic mass units)
+* Nuclear charges (atomic numbers) for each atom
+* Serialization to/from JSON and XYZ formats
+* Basic geometric operations and validation
 
-    The structure can be constructed from various input formats and provides
-    convenient access to atomic properties and molecular geometry.
-    Standard atomic masses and nuclear charges are used by default unless otherwise specified.
+The structure can be constructed from various input formats and provides
+convenient access to atomic properties and molecular geometry.
+Standard atomic masses and nuclear charges are used by default unless otherwise specified.
 
-    Units
-    -----
+Units:
     * Constructors and add_atom expect coordinates in Bohr (atomic units).
     * Getters/setters operate in Bohr (atomic units).
     * JSON serialization stores/loads coordinates in Bohr.
     * XYZ files are read/written in Angstrom (conversion handled at I/O boundary).
 
-    Examples
-    --------
+Examples:
     Create a water molecule from symbols and coordinates:
 
-    >>> import numpy as np
-    >>> from qdk_chemistry.data import Structure
-    >>> coords = np.array([[0.0, 0.0, 0.0],
-    ...                    [0.757, 0.586, 0.0],
-    ...                    [-0.757, 0.586, 0.0]])
-    >>> symbols = ["O", "H", "H"]
-    >>> water = Structure(coords, symbols)
-    >>> print(f"Number of atoms: {water.get_num_atoms()}")
-    >>> print(f"Total charge: {water.get_total_nuclear_charge()}")
+        >>> import numpy as np
+        >>> from qdk_chemistry.data import Structure
+        >>> coords = np.array([[0.0, 0.0, 0.0],
+        ...                    [0.757, 0.586, 0.0],
+        ...                    [-0.757, 0.586, 0.0]])
+        >>> symbols = ["O", "H", "H"]
+        >>> water = Structure(coords, symbols)
+        >>> print(f"Number of atoms: {water.get_num_atoms()}")
+        >>> print(f"Total charge: {water.get_total_nuclear_charge()}")
 
     Create from elements enum:
 
-    >>> from qdk_chemistry.data import Element
-    >>> coords = np.array([[0.0, 0.0, 0.0], [0.0, 0.0, 0.74]])
-    >>> elements = [Element.H, Element.H]
-    >>> h2 = Structure(coords, elements)
+        >>> from qdk_chemistry.data import Element
+        >>> coords = np.array([[0.0, 0.0, 0.0], [0.0, 0.0, 0.74]])
+        >>> elements = [Element.H, Element.H]
+        >>> h2 = Structure(coords, elements)
 
     Create from XYZ string:
 
-    >>> xyz_str = '''3
-    ... Water molecule
-    ... O  0.000000  0.000000  0.000000
-    ... H  0.757000  0.586000  0.000000
-    ... H -0.757000  0.586000  0.000000'''
-    >>> water = Structure()
-    >>> water.from_xyz(xyz_str)
+        >>> xyz_str = '''3
+        ... Water molecule
+        ... O  0.000000  0.000000  0.000000
+        ... H  0.757000  0.586000  0.000000
+        ... H -0.757000  0.586000  0.000000'''
+        >>> water = Structure()
+        >>> water.from_xyz(xyz_str)
 
     Save and load from files:
 
-    >>> water.to_xyz_file("water.xyz", "Water molecule")
-    >>> water.to_json_file("water.json")
-    >>> water_copy = Structure()
-    >>> water_copy.from_xyz_file("water.xyz")
-        )");
+        >>> water.to_xyz_file("water.xyz", "Water molecule")
+        >>> water.to_json_file("water.json")
+        >>> water_copy = Structure()
+        >>> water_copy.from_xyz_file("water.xyz")
+)");
 
   // Constructors
   structure.def(py::init<const Eigen::MatrixXd &, const std::vector<Element> &,
                          const Eigen::VectorXd &, const Eigen::VectorXd &>(),
                 R"(
-        Create structure from coordinates, elements, masses, and nuclear charges.
+Create structure from coordinates, elements, masses, and nuclear charges.
 
-        Parameters
-        ----------
-        coordinates : numpy.ndarray
-            Matrix of atomic coordinates (N x 3) in Angstrom
-        elements : list of Element
-            Vector of atomic elements using Element enum
-        masses : numpy.ndarray, optional
-            Vector of atomic masses in AMU (default: use standard masses)
-        nuclear_charges : numpy.ndarray, optional
-            Vector of nuclear charges (default: use standard charges)
+Args:
+    coordinates (numpy.ndarray): Matrix of atomic coordinates (N x 3) in Angstrom
+    elements (list[Element]): Vector of atomic elements using Element enum
+    masses (Optional[numpy.ndarray]): Vector of atomic masses in AMU (default: use standard masses)
+    nuclear_charges (Optional[numpy.ndarray]): Vector of nuclear charges (default: use standard charges)
 
-        Examples
-        --------
+Examples:
+
+    One way to generate a structure includes:
+
         >>> import numpy as np
         >>> from qdk_chemistry.data import Structure, Element
         >>> coords = np.array([[0.0, 0.0, 0.0], [0.0, 0.0, 0.74]])
@@ -289,13 +283,13 @@ void bind_structure(py::module &m) {
         >>> charges = np.array([1.0, 1.0])
         >>> h2 = Structure(coords, elements, masses, charges)
 
-        Or:
+    Or:
 
         >>> coords = np.array([[0.0, 0.0, 0.0], [0.0, 0.0, 0.74]])
         >>> elements = [Element.H, Element.H]
         >>> h2 = Structure(coords, elements)
 
-        Or:
+    Or:
 
         >>> coords = np.array([[0.0, 0.0, 0.0], [0.757, 0.586, 0.0], [-0.757, 0.586, 0.0]])
         >>> symbols = ["O", "H", "H"]
@@ -303,24 +297,24 @@ void bind_structure(py::module &m) {
         >>> charges = np.array([8.0, 1.0, 1.0])
         >>> water = Structure(coords, symbols, masses, charges)
 
-        Or:
+    Or:
 
         >>> coords = np.array([[0.0, 0.0, 0.0], [0.757, 0.586, 0.0], [-0.757, 0.586, 0.0]])
         >>> symbols = ["O", "H", "H"]
         >>> water = Structure(coords, symbols)
 
-        Or:
+    Or:
 
         >>> coords = np.array([[0.0, 0.0, 0.0], [0.0, 0.0, 0.74]])
         >>> charges = [1, 1]  # Hydrogen atoms
         >>> h2 = Structure(coords, charges)
 
-        Or:
+    Or:
 
         >>> symbols = ["O", "H", "H"]
         >>> coords = np.array([[0.0, 0.0, 0.0], [0.757, 0.586, 0.0], [-0.757, 0.586, 0.0]])
         >>> water = Structure(symbols, coords)
-        )",
+)",
                 py::arg("coordinates"), py::arg("elements"),
                 py::arg("masses") = Eigen::VectorXd(),
                 py::arg("nuclear_charges") = Eigen::VectorXd());
@@ -371,235 +365,186 @@ void bind_structure(py::module &m) {
   bind_getter_as_property(structure, "get_coordinates",
                           &Structure::get_coordinates,
                           R"(
-        Get the atomic coordinates matrix.
+Get the atomic coordinates matrix.
 
-        Returns
-        -------
-        numpy.ndarray
-            Matrix of coordinates (N x 3) in Bohr
+Returns:
+    numpy.ndarray: Matrix of coordinates (N x 3) in Bohr
 
-        Examples
-        --------
-        >>> coords = structure.get_coordinates()
-        >>> print(f"Shape: {coords.shape}")  # (N, 3)
-        )");
+Examples:
+    >>> coords = structure.get_coordinates()
+    >>> print(f"Shape: {coords.shape}")  # (N, 3)
+)");
 
   bind_getter_as_property(structure, "get_elements", &Structure::get_elements,
                           R"(
-        Get the atomic elements vector.
+Get the atomic elements vector.
 
-        Returns
-        -------
-        list of :class:`Element`
-            Vector of atomic elements
+Returns:
+    list[Element]: Vector of atomic elements
 
-        Examples
-        --------
-        >>> elements = structure.get_elements()
-        >>> print(f"First element: {elements[0]}")
-        )",
+Examples:
+    >>> elements = structure.get_elements()
+    >>> print(f"First element: {elements[0]}")
+)",
                           py::return_value_policy::reference_internal);
 
   bind_getter_as_property(structure, "get_masses", &Structure::get_masses,
                           R"(
-        Get the atomic masses vector.
+Get the atomic masses vector.
 
-        Returns
-        -------
-        numpy.ndarray
-            Vector of atomic masses in AMU
+Returns:
+    numpy.ndarray: Vector of atomic masses in AMU
 
-        Examples
-        --------
-        >>> masses = structure.get_masses()
-        >>> print(f"Total mass: {masses.sum()} AMU")
-        )",
+Examples:
+    >>> masses = structure.get_masses()
+    >>> print(f"Total mass: {masses.sum()} AMU")
+)",
                           py::return_value_policy::reference_internal);
 
   bind_getter_as_property(structure, "get_nuclear_charges",
                           &Structure::get_nuclear_charges,
                           R"(
-        Get the nuclear charges vector.
+Get the nuclear charges vector.
 
-        Returns
-        -------
-        numpy.ndarray
-            Vector of nuclear charges (atomic numbers)
+Returns:
+    numpy.ndarray: Vector of nuclear charges (atomic numbers)
 
-        Examples
-        --------
-        >>> charges = structure.get_nuclear_charges()
-        >>> print(f"Total charge: {charges.sum()}")
-        )",
+Examples:
+    >>> charges = structure.get_nuclear_charges()
+    >>> print(f"Total charge: {charges.sum()}")
+)",
                           py::return_value_policy::reference_internal);
 
   structure.def("get_atom_coordinates", &Structure::get_atom_coordinates,
                 R"(
-        Get coordinates for a specific atom.
+Get coordinates for a specific atom.
 
-        Parameters
-        ----------
-        atom_index : int
-            Index of the atom (0-based)
+Args:
+    atom_index (int): Index of the atom (0-based)
 
-        Returns
-        -------
-        numpy.ndarray
-            3D coordinates in Bohr as numpy array
+Returns:
+    numpy.ndarray: 3D coordinates in Bohr as numpy array
 
-        Examples
-        --------
-        >>> coords = structure.get_atom_coordinates(0)
-        >>> print(f"Atom 0 position: {coords}")
-        )",
+Examples:
+    >>> coords = structure.get_atom_coordinates(0)
+    >>> print(f"Atom 0 position: {coords}")
+)",
                 py::arg("atom_index"));
 
   structure.def("get_atom_element", &Structure::get_atom_element,
                 R"(
-        Get element for a specific atom.
+Get element for a specific atom.
 
-        Parameters
-        ----------
-        atom_index : int
-            Index of the atom (0-based)
+Args:
+    atom_index (int): Index of the atom (0-based)
 
-        Returns
-        -------
-        Element
-            Atomic element enum
+Returns:
+    Element: Atomic element enum
 
-        Examples
-        --------
-        >>> element = structure.get_atom_element(0)
-        >>> print(f"Atom 0 element: {element}")
-        )",
+Examples:
+    >>> element = structure.get_atom_element(0)
+    >>> print(f"Atom 0 element: {element}")
+)",
                 py::arg("atom_index"));
 
   structure.def("get_atom_mass", &Structure::get_atom_mass,
                 R"(
-        Get mass for a specific atom.
+Get mass for a specific atom.
 
-        Parameters
-        ----------
-        atom_index : int
-            Index of the atom (0-based)
+Args:
+    atom_index (int): Index of the atom (0-based)
 
-        Returns
-        -------
-        float
-            Atomic mass in AMU
+Returns:
+    float: Atomic mass in AMU
 
-        Examples
-        --------
-        >>> mass = structure.get_atom_mass(0)
-        >>> print(f"Atom 0 mass: {mass} AMU")
-        )",
+Examples:
+    >>> mass = structure.get_atom_mass(0)
+    >>> print(f"Atom 0 mass: {mass} AMU")
+)",
                 py::arg("atom_index"));
 
   structure.def("get_atom_nuclear_charge", &Structure::get_atom_nuclear_charge,
                 R"(
-        Get nuclear charge for a specific atom.
+Get nuclear charge for a specific atom.
 
-        Parameters
-        ----------
-        atom_index : int
-            Index of the atom (0-based)
+Args:
+    atom_index (int): Index of the atom (0-based)
 
-        Returns
-        -------
-        float
-            Nuclear charge (atomic number)
+Returns:
+    float: Nuclear charge (atomic number)
 
-        Examples
-        --------
-        >>> charge = structure.get_atom_nuclear_charge(0)
-        >>> print(f"Atom 0 charge: {charge}")
-        )",
+Examples:
+    >>> charge = structure.get_atom_nuclear_charge(0)
+    >>> print(f"Atom 0 charge: {charge}")
+)",
                 py::arg("atom_index"));
 
   structure.def("get_atom_symbol", &Structure::get_atom_symbol,
                 R"(
-        Get atomic symbol for a specific atom.
+Get atomic symbol for a specific atom.
 
-        Parameters
-        ----------
-        atom_index : int
-            Index of the atom (0-based)
+Args:
+    atom_index (int): Index of the atom (0-based)
 
-        Returns
-        -------
-        str
-            Atomic symbol (e.g., "H", "C", "O")
+Returns:
+    str: Atomic symbol (e.g., "H", "C", "O")
 
-        Examples
-        --------
-        >>> symbol = structure.get_atom_symbol(0)
-        >>> print(f"Atom 0 symbol: {symbol}")
-        )",
+Examples:
+    >>> symbol = structure.get_atom_symbol(0)
+    >>> print(f"Atom 0 symbol: {symbol}")
+)",
                 py::arg("atom_index"));
 
   bind_getter_as_property(structure, "get_atomic_symbols",
                           &Structure::get_atomic_symbols,
                           R"(
-        Get all atomic symbols.
+Get all atomic symbols.
 
-        Returns
-        -------
-        list of str
-            Vector of atomic symbols
+Returns:
+    list[str]: Vector of atomic symbols
 
-        Examples
-        --------
-        >>> symbols = structure.get_atomic_symbols()
-        >>> print(f"Molecule formula: {''.join(symbols)}")
-        )");
+Examples:
+    >>> symbols = structure.get_atomic_symbols()
+    >>> print(f"Molecule formula: {''.join(symbols)}")
+)");
 
   // Structure properties
   bind_getter_as_property(structure, "get_num_atoms", &Structure::get_num_atoms,
                           R"(
-        Get the number of atoms in the structure.
+Get the number of atoms in the structure.
 
-        Returns
-        -------
-        int
-            Number of atoms
+Returns:
+    int: Number of atoms
 
-        Examples
-        --------
-        >>> num_atoms = structure.get_num_atoms()
-        >>> print(f"Structure has {num_atoms} atoms")
-        )");
+Examples:
+    >>> num_atoms = structure.get_num_atoms()
+    >>> print(f"Structure has {num_atoms} atoms")
+)");
 
   structure.def("is_empty", &Structure::is_empty,
                 R"(
-        Check if the structure is empty.
+Check if the structure is empty.
 
-        Returns
-        -------
-        bool
-            True if structure has no atoms
+Returns:
+    bool: True if structure has no atoms
 
-        Examples
-        --------
-        >>> if structure.is_empty():
-        ...     print("Structure is empty")
-        )");
+Examples:
+    >>> if structure.is_empty():
+    ...     print("Structure is empty")
+)");
 
   bind_getter_as_property(structure, "get_total_mass",
                           &Structure::get_total_mass,
                           R"(
-        Get the total mass of all atoms.
+Get the total mass of all atoms.
 
-        Returns
-        -------
-        float
-            Total mass in AMU
+Returns:
+    float: Total mass in AMU
 
-        Examples
-        --------
-        >>> total_mass = structure.get_total_mass()
-        >>> print(f"Total mass: {total_mass} AMU")
-        )");
+Examples:
+    >>> total_mass = structure.get_total_mass()
+    >>> print(f"Total mass: {total_mass} AMU")
+)");
 
   structure.def(
       "get_total_nuclear_charge",
@@ -611,18 +556,15 @@ void bind_structure(py::module &m) {
         return total;
       },
       R"(
-        Get the total nuclear charge of all atoms.
+Get the total nuclear charge of all atoms.
 
-        Returns
-        -------
-        float
-            Sum of all nuclear charges
+Returns:
+    float: Sum of all nuclear charges
 
-        Examples
-        --------
-        >>> total_charge = structure.get_total_nuclear_charge()
-        >>> print(f"Total nuclear charge: {total_charge}")
-        )");
+Examples:
+    >>> total_charge = structure.get_total_nuclear_charge()
+    >>> print(f"Total nuclear charge: {total_charge}")
+)");
 
   // Serialization
   structure.def(
@@ -631,18 +573,15 @@ void bind_structure(py::module &m) {
         return self.to_json().dump();
       },
       R"(
-        Convert structure to JSON format (coordinates in Bohr).
+Convert structure to JSON format (coordinates in Bohr).
 
-        Returns
-        -------
-        str
-            JSON string representation
+Returns:
+    str: JSON string representation
 
-        Examples
-        --------
-        >>> json_str = structure.to_json()
-        >>> print(json_str)
-        )");
+Examples:
+    >>> json_str = structure.to_json()
+    >>> print(json_str)
+)");
 
   structure.def_static(
       "from_json",
@@ -650,464 +589,351 @@ void bind_structure(py::module &m) {
         return *Structure::from_json(nlohmann::json::parse(json_str));
       },
       R"(
-        Load structure from JSON format string (static method).
+Load structure from JSON format string (static method).
 
-        Parameters
-        ----------
-        json_data : str
-            JSON string representation with coordinates in Bohr
+Args:
+    json_data (str): JSON string representation with coordinates in Bohr
 
-        Returns
-        -------
-        Structure
-            New Structure object created from JSON data
+Returns:
+    Structure: New Structure object created from JSON data
 
-        Raises
-        ------
-        RuntimeError
-            If JSON format is invalid or contains invalid structure data
+Raises:
+    RuntimeError: If JSON format is invalid or contains invalid structure data
 
-        Examples
-        --------
-        >>> json_str = '{"num_atoms": 2, "symbols": ["H", "H"], ...}'
-        >>> h2 = Structure.from_json(json_str)
-        )",
+Examples:
+    >>> json_str = '{"num_atoms": 2, "symbols": ["H", "H"], ...}'
+    >>> h2 = Structure.from_json(json_str)
+)",
       py::arg("json_data"));
 
   structure.def("to_json_file", structure_to_json_file_wrapper,
                 R"(
-        Save structure to JSON file.
+Save structure to JSON file.
 
-        Parameters
-        ----------
-        filename : str or pathlib.Path
-            Path to output file. Must have '.structure' before the file
-            extension (e.g., "water.structure.json", "molecule.structure.json")
+Args:
+    filename (str | pathlib.Path): Path to output file.
+        Must have '.structure' before the file extension (e.g., "water.structure.json", "molecule.structure.json")
 
-        Raises
-        ------
-        ValueError
-            If filename doesn't follow the required naming convention
-        RuntimeError
-            If the file cannot be opened or written
+Raises:
+    ValueError: If filename doesn't follow the required naming convention
+    RuntimeError: If the file cannot be opened or written
 
-        Examples
-        --------
-        >>> structure.to_json_file("water.structure.json")
-        >>> structure.to_json_file("molecule.structure.json")
-        >>> from pathlib import Path
-        >>> structure.to_json_file(Path("water.structure.json"))
-        )",
+Examples:
+    >>> structure.to_json_file("water.structure.json")
+    >>> structure.to_json_file("molecule.structure.json")
+    >>> from pathlib import Path
+    >>> structure.to_json_file(Path("water.structure.json"))
+)",
                 py::arg("filename"));
 
   structure.def_static("from_json_file", structure_from_json_file_wrapper,
                        R"(
-        Load structure from JSON file (static method).
+Load structure from JSON file (static method).
 
-        Parameters
-        ----------
-        filename : str or pathlib.Path
-            Path to input file. Must have '.structure' before the file
-            extension (e.g., "water.structure.json", "molecule.structure.json")
+Args:
+    filename (str | pathlib.Path): Path to input file.
+        Must have '.structure' before the file extension (e.g., "water.structure.json", "molecule.structure.json")
 
-        Returns
-        -------
-        Structure
-            New Structure object loaded from the file
+Returns:
+    Structure: New Structure object loaded from the file
 
-        Raises
-        ------
-        ValueError
-            If filename doesn't follow the required naming convention
-        RuntimeError
-            If the file cannot be opened, read, or contains invalid structure data
+Raises:
+    ValueError: If filename doesn't follow the required naming convention
+    RuntimeError: If the file cannot be opened, read, or contains invalid structure data
 
-        Examples
-        --------
-        >>> water = Structure.from_json_file("water.structure.json")
-        >>> molecule = Structure.from_json_file("molecule.structure.json")
-        >>> from pathlib import Path
-        >>> water = Structure.from_json_file(Path("water.structure.json"))
-        )",
+Examples:
+    >>> water = Structure.from_json_file("water.structure.json")
+    >>> molecule = Structure.from_json_file("molecule.structure.json")
+    >>> from pathlib import Path
+    >>> water = Structure.from_json_file(Path("water.structure.json"))
+)",
                        py::arg("filename"));
 
   structure.def("to_xyz", &Structure::to_xyz,
                 R"(
-        Convert structure to XYZ format string (coordinates in Angstrom).
+Convert structure to XYZ format string (coordinates in Angstrom).
 
-        Parameters
-        ----------
-        comment : str, optional
-            Comment line for XYZ format
+Args:
+    comment (Optional[str]): Comment line for XYZ format
 
-        Returns
-        -------
-        str
-            XYZ format string
+Returns:
+    str: XYZ format string
 
-        Examples
-        --------
-        >>> xyz_str = structure.to_xyz("Water molecule")
-        >>> print(xyz_str)
-        )",
+Examples:
+    >>> xyz_str = structure.to_xyz("Water molecule")
+    >>> print(xyz_str)
+)",
                 py::arg("comment") = "");
 
   structure.def_static("from_xyz", &Structure::from_xyz,
                        R"(
-        Load structure from XYZ format string (static method).
+Load structure from XYZ format string (static method).
 
-        Parameters
-        ----------
-        xyz_string : str
-            XYZ format string with coordinates in Angstrom
+Args:
+    xyz_string (str): XYZ format string with coordinates in Angstrom
 
-        Returns
-        -------
-        Structure
-            New Structure object created from XYZ string
+Returns:
+    Structure: New Structure object created from XYZ string
 
-        Raises
-        ------
-        RuntimeError
-            If XYZ format is invalid
+Raises:
+    RuntimeError: If XYZ format is invalid
 
-        Examples
-        --------
-        >>> xyz_str = '''3
-        ... Water molecule
-        ... O  0.000000  0.000000  0.000000
-        ... H  0.757000  0.586000  0.000000
-        ... H -0.757000  0.586000  0.000000'''
-        >>> water = Structure.from_xyz(xyz_str)
-        )",
+Examples:
+    >>> xyz_str = '''3
+    ... Water molecule
+    ... O  0.000000  0.000000  0.000000
+    ... H  0.757000  0.586000  0.000000
+    ... H -0.757000  0.586000  0.000000'''
+    >>> water = Structure.from_xyz(xyz_str)
+)",
                        py::arg("xyz_string"));
 
   structure.def("to_xyz_file", structure_to_xyz_file_wrapper,
                 R"(
-        Save structure to XYZ file.
+Save structure to XYZ file.
 
-        Parameters
-        ----------
-        filename : str or pathlib.Path
-            Path to output file. Must have '.structure.xyz' extension
-            (e.g., "water.structure.xyz", "molecule.structure.xyz")
-        comment : str, optional
-            Comment line for XYZ format
+Args:
+    filename (str | pathlib.Path): Path to output file.
+        Must have '.structure.xyz' extension (e.g., "water.structure.xyz", "molecule.structure.xyz")
+    comment (str, optional): Comment line for XYZ format
 
-        Raises
-        ------
-        ValueError
-            If filename doesn't follow the required naming convention
-        RuntimeError
-            If the file cannot be opened or written
+Raises:
+    ValueError: If filename doesn't follow the required naming convention
+    RuntimeError: If the file cannot be opened or written
 
-        Examples
-        --------
-        >>> structure.to_xyz_file("water.structure.xyz", "Water molecule")
-        >>> from pathlib import Path
-        >>> structure.to_xyz_file(Path("water.structure.xyz"), "Water molecule")
-        )",
+Examples:
+    >>> structure.to_xyz_file("water.structure.xyz", "Water molecule")
+    >>> from pathlib import Path
+    >>> structure.to_xyz_file(Path("water.structure.xyz"), "Water molecule")
+)",
                 py::arg("filename"), py::arg("comment") = "");
 
   structure.def_static("from_xyz_file", structure_from_xyz_file_wrapper,
                        R"(
-        Load structure from XYZ file (static method).
+Load structure from XYZ file (static method).
 
-        Parameters
-        ----------
-        filename : str or pathlib.Path
-            Path to input file. Must have '.structure.xyz' extension
-            (e.g., "water.structure.xyz", "molecule.structure.xyz")
+Args:
+    filename (str | pathlib.Path): Path to input file.
+        Must have '.structure.xyz' extension (e.g., "water.structure.xyz", "molecule.structure.xyz")
 
-        Returns
-        -------
-        Structure
-            New Structure object loaded from the file
+Returns:
+    Structure: New Structure object loaded from the file
 
-        Raises
-        ------
-        ValueError
-            If filename doesn't follow the required naming convention
-        RuntimeError
-            If the file cannot be opened, read, or contains invalid structure data
+Raises:
+    ValueError: If filename doesn't follow the required naming convention
+    RuntimeError: If the file cannot be opened, read, or contains invalid structure data
 
-        Examples
-        --------
-        >>> water = Structure.from_xyz_file("water.structure.xyz")
-        >>> from pathlib import Path
-        >>> water = Structure.from_xyz_file(Path("water.structure.xyz"))
-        )",
+Examples:
+    >>> water = Structure.from_xyz_file("water.structure.xyz")
+    >>> from pathlib import Path
+    >>> water = Structure.from_xyz_file(Path("water.structure.xyz"))
+)",
                        py::arg("filename"));
 
   structure.def("to_file", structure_to_file_wrapper,
                 R"(
-        Save structure to file in specified format.
+Save structure to file in specified format.
 
-        Parameters
-        ----------
-        filename : str or pathlib.Path
-            Path to output file.
-        format_type : str
-            Format type ("json" or "xyz")
+Args:
+    filename (str | pathlib.Path): Path to output file.
+    format_type (str): Format type ("json" or "xyz")
 
-        Raises
-        ------
-        RuntimeError
-            If the file cannot be opened or written
+Raises:
+    RuntimeError: If the file cannot be opened or written
 
-        Examples
-        --------
-        >>> structure.to_file("water.structure.json", "json")
-        >>> structure.to_file("water.structure.xyz", "xyz")
-        >>> from pathlib import Path
-        >>> structure.to_file(Path("water.structure.json"), "json")
-        )",
+Examples:
+    >>> structure.to_file("water.structure.json", "json")
+    >>> structure.to_file("water.structure.xyz", "xyz")
+    >>> from pathlib import Path
+    >>> structure.to_file(Path("water.structure.json"), "json")
+)",
                 py::arg("filename"), py::arg("format_type"));
 
   structure.def_static("from_file", structure_from_file_wrapper,
                        R"(
-        Load structure from file in specified format (static method).
+Load structure from file in specified format (static method).
 
-        Parameters
-        ----------
-        filename : str or pathlib.Path
-            Path to input file.
-        format_type : str
-            Format type ("json" or "xyz")
+Args:
+    filename (str | pathlib.Path): Path to input file.
+    format_type (str): Format type ("json" or "xyz")
 
-        Returns
-        -------
-        Structure
-            New Structure object loaded from the file
+Returns:
+    Structure: New Structure object loaded from the file
 
-        Raises
-        ------
-        ValueError
-            If format_type is not supported or filename doesn't follow naming convention
-        RuntimeError
-            If the file cannot be opened, read, or contains invalid structure data
+Raises:
+    ValueError: If format_type is not supported or filename doesn't follow naming convention
+    RuntimeError: If the file cannot be opened, read, or contains invalid structure data
 
-        Examples
-        --------
-        >>> water = Structure.from_file("water.structure.json", "json")
-        >>> h2 = Structure.from_file("h2.structure.xyz", "xyz")
-        >>> from pathlib import Path
-        >>> water = Structure.from_file(Path("water.structure.json"), "json")
-        )",
+Examples:
+    >>> water = Structure.from_file("water.structure.json", "json")
+    >>> h2 = Structure.from_file("h2.structure.xyz", "xyz")
+    >>> from pathlib import Path
+    >>> water = Structure.from_file(Path("water.structure.json"), "json")
+)",
                        py::arg("filename"), py::arg("format_type"));
 
   // Utility functions
   bind_getter_as_property(structure, "get_summary", &Structure::get_summary,
                           R"(
-        Get summary string of structure information.
+Get summary string of structure information.
 
-        Returns
-        -------
-        str
-            Summary information about the structure
+Returns:
+    str: Summary information about the structure
 
-        Examples
-        --------
-        >>> summary = structure.get_summary()
-        >>> print(summary)
-        )");
+Examples:
+    >>> summary = structure.get_summary()
+    >>> print(summary)
+)");
 
   structure.def("calculate_nuclear_repulsion_energy",
                 &Structure::calculate_nuclear_repulsion_energy,
                 R"(
-        Calculate nuclear-nuclear repulsion energy.
+Calculate nuclear-nuclear repulsion energy.
 
-        Returns
-        -------
-        float
-            Nuclear repulsion energy in atomic units (Hartree)
+Returns:
+    float: Nuclear repulsion energy in atomic units (Hartree)
 
-        Notes
-        -----
-        This function calculates the Coulombic repulsion energy between all nuclei
-        in the structure using the formula:
-        :math:`E_{nn} = \sum_{i<j} Z_i \cdot Z_j / |R_i - R_j|`
-        where Z_i is the nuclear charge of atom i and R_i is its position vector.
+Notes:
+    This function calculates the Coulombic repulsion energy between all nuclei in the structure using the formula: :math:`E_{nn} = \sum_{i<j} Z_i \cdot Z_j / |R_i - R_j|` where Z_i is the nuclear charge of atom i and R_i is its position vector.
 
-        Examples
-        --------
-        >>> energy = structure.calculate_nuclear_repulsion_energy()
-        >>> print(f'Nuclear repulsion energy: {energy:.6f} hartree')
-        )");
+Examples:
+    >>> energy = structure.calculate_nuclear_repulsion_energy()
+    >>> print(f'Nuclear repulsion energy: {energy:.6f} hartree')
+)");
 
   // Static methods
   structure.def_static("symbol_to_element", &Structure::symbol_to_element,
                        R"(
-        Convert atomic symbol to element enum.
+Convert atomic symbol to element enum.
 
-        Parameters
-        ----------
-        symbol : str
-            Atomic symbol (e.g., "H", "C", "O")
+Args:
+    symbol (str): Atomic symbol (e.g., "H", "C", "O")
 
-        Returns
-        -------
-        Element
-            Element enum value
+Returns:
+    Element: Element enum value
 
-        Examples
-        --------
-        >>> element = Structure.symbol_to_element("C")
-        >>> assert element == Element.C
-      )",
+Examples:
+    >>> element = Structure.symbol_to_element("C")
+    >>> assert element == Element.C
+)",
                        py::arg("symbol"));
 
   structure.def_static("element_to_symbol", &Structure::element_to_symbol,
                        R"(
-        Convert element enum to atomic symbol.
+Convert element enum to atomic symbol.
 
-        Parameters
-        ----------
-        element : Element
-            Element enum value
+Args:
+    element (Element): Element enum value
 
-        Returns
-        -------
-        str
-            Atomic symbol
+Returns:
+    str: Atomic symbol
 
-        Examples
-        --------
-        >>> symbol = Structure.element_to_symbol(Element.C)
-        >>> assert symbol == "C"
-      )",
+Examples:
+    >>> symbol = Structure.element_to_symbol(Element.C)
+    >>> assert symbol == "C"
+)",
                        py::arg("element"));
 
   structure.def_static("symbol_to_nuclear_charge",
                        &Structure::symbol_to_nuclear_charge,
                        R"(
-        Convert atomic symbol to nuclear charge.
+Convert atomic symbol to nuclear charge.
 
-        Parameters
-        ----------
-        symbol : str
-            Atomic symbol (e.g., "H", "C", "O")
+Args:
+    symbol (str): Atomic symbol (e.g., "H", "C", "O")
 
-        Returns
-        -------
-        int
-            Nuclear charge (atomic number)
+Returns:
+    int: Nuclear charge (atomic number)
 
-        Examples
-        --------
-        >>> charge = Structure.symbol_to_nuclear_charge("C")
-        >>> assert charge == 6
-      )",
+Examples:
+    >>> charge = Structure.symbol_to_nuclear_charge("C")
+    >>> assert charge == 6
+)",
                        py::arg("symbol"));
 
   structure.def_static("nuclear_charge_to_symbol",
                        &Structure::nuclear_charge_to_symbol,
                        R"(
-        Convert nuclear charge to atomic symbol.
+Convert nuclear charge to atomic symbol.
 
-        Parameters
-        ----------
-        nuclear_charge : int
-            Nuclear charge (atomic number)
+Args:
+    nuclear_charge (int): Nuclear charge (atomic number)
 
-        Returns
-        -------
-        str
-            Atomic symbol
+Returns:
+    str: Atomic symbol
 
-        Examples
-        --------
-        >>> symbol = Structure.nuclear_charge_to_symbol(6)
-        >>> assert symbol == "C"
-      )",
+Examples:
+    >>> symbol = Structure.nuclear_charge_to_symbol(6)
+    >>> assert symbol == "C"
+)",
                        py::arg("nuclear_charge"));
 
   structure.def_static("element_to_nuclear_charge",
                        &Structure::element_to_nuclear_charge,
                        R"(
-        Convert element enum to nuclear charge.
+Convert element enum to nuclear charge.
 
-        Parameters
-        ----------
-        element : Element
-            Element enum value
+Args:
+    element (Element): Element enum value
 
-        Returns
-        -------
-        int
-            Nuclear charge (atomic number)
+Returns:
+    int: Nuclear charge (atomic number)
 
-        Examples
-        --------
-        >>> charge = Structure.element_to_nuclear_charge(Element.C)
-        >>> assert charge == 6
-      )",
+Examples:
+    >>> charge = Structure.element_to_nuclear_charge(Element.C)
+    >>> assert charge == 6
+)",
                        py::arg("element"));
 
   structure.def_static("nuclear_charge_to_element",
                        &Structure::nuclear_charge_to_element,
                        R"(
-        Convert nuclear charge to element enum.
+Convert nuclear charge to element enum.
 
-        Parameters
-        ----------
-        nuclear_charge : int
-            Nuclear charge (atomic number)
+Args:
+    nuclear_charge (int): Nuclear charge (atomic number)
 
-        Returns
-        -------
-        Element
-            Element enum value
+Returns:
+    Element: Element enum value
 
-        Examples
-        --------
-        >>> element = Structure.nuclear_charge_to_element(6)
-        >>> assert element == Element.C
-      )",
+Examples:
+    >>> element = Structure.nuclear_charge_to_element(6)
+    >>> assert element == Element.C
+)",
                        py::arg("nuclear_charge"));
 
   structure.def_static("get_standard_atomic_mass",
                        &Structure::get_standard_atomic_mass,
                        R"(
-        Get standard atomic mass for an element.
+Get standard atomic mass for an element.
 
-        Parameters
-        ----------
-        element : Element
-            Element enum value
+Args:
+    element (Element): Element enum value
 
-        Returns
-        -------
-        float
-            Standard atomic mass in AMU
+Returns:
+    float: Standard atomic mass in AMU
 
-        Examples
-        --------
-        >>> mass = Structure.get_standard_atomic_mass(Element.C)
-        >>> print(f"Carbon mass: {mass} AMU")
-      )",
+Examples:
+    >>> mass = Structure.get_standard_atomic_mass(Element.C)
+    >>> print(f"Carbon mass: {mass} AMU")
+)",
                        py::arg("element"));
 
   structure.def_static("get_standard_nuclear_charge",
                        &Structure::get_standard_nuclear_charge,
                        R"(
-        Get standard nuclear charge for an element.
+Get standard nuclear charge for an element.
 
-        Parameters
-        ----------
-        element : Element
-            Element enum value
+Args:
+    element (Element): Element enum value
 
-        Returns
-        -------
-        int
-            Nuclear charge (atomic number)
+Returns:
+    int: Nuclear charge (atomic number)
 
-        Examples
-        --------
-        >>> charge = Structure.get_standard_nuclear_charge(Element.C)
-        >>> assert charge == 6
-      )",
+Examples:
+    >>> charge = Structure.get_standard_nuclear_charge(Element.C)
+    >>> assert charge == 6
+)",
                        py::arg("element"));
   // String representation - bind summary to __repr__
   structure.def("__repr__", [](const Structure &s) {
@@ -1144,24 +970,18 @@ void bind_structure(py::module &m) {
         return atom;
       },
       R"(
-        Get atom information by index.
+Get atom information by index.
 
-        Parameters
-        ----------
-        index : int
-            Atom index (0-based)
+Args:
+    index (int): Atom index (0-based)
 
-        Returns
-        -------
-        dict
-            Dictionary containing atom information with keys:
-            'symbol', 'element', 'nuclear_charge', 'mass', 'coordinates'
+Returns:
+    dict: Dictionary containing atom information with keys 'symbol', 'element', 'nuclear_charge', 'mass', 'coordinates'
 
-        Examples
-        --------
-        >>> atom = structure[0]
-        >>> print(f"Atom 0: {atom['symbol']} at {atom['coordinates']}")
-      )");
+Examples:
+    >>> atom = structure[0]
+    >>> print(f"Atom 0: {atom['symbol']} at {atom['coordinates']}")
+)");
 
   // Iteration support
   structure.def(
@@ -1182,19 +1002,15 @@ void bind_structure(py::module &m) {
       },
       py::keep_alive<0, 1>(),
       R"(
-        Iterate over all atoms in the structure.
+Iterate over all atoms in the structure.
 
-        Yields
-        ------
-        dict
-            Dictionary containing atom information with keys:
-            'symbol', 'element', 'nuclear_charge', 'mass', 'coordinates', 'index'
+Yields:
+    dict: Dictionary containing atom information with keys 'symbol', 'element', 'nuclear_charge', 'mass', 'coordinates', 'index'
 
-        Examples
-        --------
-        >>> for atom in structure:
-        ...     print(f"Atom {atom['index']}: {atom['symbol']}")
-      )");
+Examples:
+    >>> for atom in structure:
+    ...     print(f"Atom {atom['index']}: {atom['symbol']}")
+)");
 
   // Pickling support using JSON serialization
   structure.def(py::pickle(

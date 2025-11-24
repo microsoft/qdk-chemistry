@@ -19,40 +19,31 @@ void bind_constants(py::module& m) {
 Physical constants module.
 
 This module provides access to physical constants from CODATA standards.
-The constants are sourced from the most recent CODATA recommendations
-(currently CODATA 2018 by default), but the underlying C++ implementation
-supports multiple CODATA versions for compatibility and comparison purposes.
+The constants are sourced from the most recent CODATA recommendations (currently CODATA 2018 by default), but the underlying C++ implementation supports multiple CODATA versions for compatibility and comparison purposes.
 
-All constants are provided in their original units as specified by CODATA,
-with conversion factors available for different unit systems.
+All constants are provided in their original units as specified by CODATA, with conversion factors available for different unit systems.
 
-The constants include fundamental physical constants, particle masses,
-and energy conversion factors commonly used in computational chemistry
-and quantum mechanics.
+The constants include fundamental physical constants, particle masses, and energy conversion factors commonly used in computational chemistry and quantum mechanics.
 
-Data Sources
-------------
-- CODATA 2018 recommended values (default)
-- CODATA 2014 recommended values (available via C++ preprocessor)
-https://physics.nist.gov/cuu/Constants/
+Data sources:
+    - CODATA 2018 recommended values (default)
+    - CODATA 2014 recommended values (available via C++ preprocessor) https://physics.nist.gov/cuu/Constants/
 
-The documentation automatically reflects the CODATA version currently
-in use, ensuring accurate provenance information.
+    The documentation automatically reflects the CODATA version currently in use, ensuring accurate provenance information.
 
-Examples
---------
->>> from qdk_chemistry.constants import ANGSTROM_TO_BOHR, HARTREE_TO_EV
->>> length_angstrom = 1.5
->>> length_bohr = length_angstrom * ANGSTROM_TO_BOHR
->>> energy_hartree = -0.5
->>> energy_ev = energy_hartree * HARTREE_TO_EV
+Examples:
+    >>> from qdk_chemistry.constants import ANGSTROM_TO_BOHR, HARTREE_TO_EV
+    >>> length_angstrom = 1.5
+    >>> length_bohr = length_angstrom * ANGSTROM_TO_BOHR
+    >>> energy_hartree = -0.5
+    >>> energy_ev = energy_hartree * HARTREE_TO_EV
 
->>> # Access documentation for constants (reflects current CODATA version)
->>> from qdk_chemistry.constants import get_constant_info
->>> info = get_constant_info('bohr_to_angstrom')
->>> print(f"{info.description} ({info.symbol}): {info.value} {info.units}")
->>> print(f"Source: {info.source}")
-    )";
+    >>> # Access documentation for constants (reflects current CODATA version)
+    >>> from qdk_chemistry.constants import get_constant_info
+    >>> info = get_constant_info('bohr_to_angstrom')
+    >>> print(f"{info.description} ({info.symbol}): {info.value} {info.units}")
+    >>> print(f"Source: {info.source}")
+)";
 
   // Bind the ConstantInfo struct
   py::class_<qdk::chemistry::constants::ConstantInfo>(

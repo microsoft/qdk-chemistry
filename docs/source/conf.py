@@ -89,7 +89,7 @@ autodoc_typehints_format = (
     "short"  # Use shorter type names (e.g., List instead of typing.List)
 )
 autodoc_member_order = "bysource"  # Document members in the order they appear in source
-autoclass_content = "both"  # Include both class and __init__ docstrings
+autoclass_content = "class"  # "class", "both", or "init"
 # For pybind11 bindings - setting to True helps with C++ bindings
 autodoc_docstring_signature = True  # Try to extract signatures from docstrings
 autodoc_preserve_defaults = True  # Preserve default values in function signatures
@@ -224,6 +224,10 @@ def autodoc_skip_imports(app, what, name, obj, skip, options):
 
 def setup(app):
     """Setup function to connect autodoc-skip-member and viewcode filters."""
+    import typing
+    import sys
+
+    sys.modules["typing"] = typing  # Ensure typing module is available to pybind
     app.connect("autodoc-skip-member", autodoc_skip_imports)
     # app.connect("viewcode-find-source", viewcode_find_source)
 
