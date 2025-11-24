@@ -564,94 +564,87 @@ void bind_settings(pybind11::module &data) {
   // Utility functions for conversion
   data.def("setting_value_to_python", &setting_value_to_python,
            R"(
-        Convert a SettingValue to the appropriate Python object.
+Convert a SettingValue to the appropriate Python object.
 
-        This utility function converts a C++ SettingValue variant to its
-        corresponding Python object type, preserving the original type and value.
+This utility function converts a C++ SettingValue variant to its corresponding Python object type, preserving the original type and value.
 
-        Parameters
-        ----------
-        value : SettingValue
-            The SettingValue variant to convert
+Args:
+    value (SettingValue): The SettingValue variant to convert
 
-        Returns
-        -------
-        object
-            Python object with appropriate type (bool, int, float, str, list)
+Returns:
+    object: Python object with appropriate type (bool, int, float, str, list)
 
-        Examples
-        --------
-        >>> import qdk_chemistry.data as data
-        >>> # Assuming you have a SettingValue from C++
-        >>> py_value = data.setting_value_to_python(setting_val)
-        )",
+Examples:
+    >>> import qdk_chemistry.data as data
+    >>> # Assuming you have a SettingValue from C++
+    >>> py_value = data.setting_value_to_python(setting_val)
+)",
            py::arg("value"));
 
   py::class_<Settings, DataClass, PySettings, py::smart_holder> settings(
       data, "Settings", R"(
-      Base class for extensible settings objects.
+Base class for extensible settings objects.
 
-    This class provides a flexible settings system that can:
+This class provides a flexible settings system that can:
 
-    * Store arbitrary typed values using a variant system
-    * Be easily extended by derived classes during construction only
-    * Map seamlessly to Python dictionaries via pybind11
-    * Provide type-safe access to settings with default values
-    * Support nested settings structures
-    * Prevent extension of the settings map after class initialization
+* Store arbitrary typed values using a variant system
+* Be easily extended by derived classes during construction only
+* Map seamlessly to Python dictionaries via pybind11
+* Provide type-safe access to settings with default values
+* Support nested settings structures
+* Prevent extension of the settings map after class initialization
 
-    The settings map can only be populated during construction using _set_default.
+The settings map can only be populated during construction using _set_default.
 
-    Examples
-    --------
+Examples:
 
     To create a custom settings class in Python:
-    >>> class MySettings(qdk_chemistry.data.Settings):
-    ...     def __init__(self):
-    ...         super().__init__()
-    ...         self._set_default("method", "string", "default")
-    ...         self._set_default("max_iterations", "int", 100)
-    ...         self._set_default("tolerance", "double", 1e-6)
-    ...
-    >>> settings = MySettings()
-    >>> settings["method"] = "hf"
-    >>> settings.method = "hf"     # Alternative access
-    >>> settings["max_iterations"] = 200
-    >>> settings["tolerance"] = 1e-8
-    >>> value = settings["method"]
-    >>> print("tolerance" in settings)
-    >>> print(len(settings))
-    >>>
-    >>> # Iterator functionality
-    >>> for key in settings:
-    ...     print(key, settings[key])
-    >>> for key in settings.keys():
-    ...     print(key)
-    >>> for value in settings.values():
-    ...     print(value)
-    >>> for key, value in settings.items():
-    ...     print(f"{key}: {value}")
-    >>>
-    >>> print(settings.to_dict())  # Convert to dict
+
+        >>> class MySettings(qdk_chemistry.data.Settings):
+        ...     def __init__(self):
+        ...         super().__init__()
+        ...         self._set_default("method", "string", "default")
+        ...         self._set_default("max_iterations", "int", 100)
+        ...         self._set_default("tolerance", "double", 1e-6)
+        ...
+        >>> settings = MySettings()
+        >>> settings["method"] = "hf"
+        >>> settings.method = "hf"     # Alternative access
+        >>> settings["max_iterations"] = 200
+        >>> settings["tolerance"] = 1e-8
+        >>> value = settings["method"]
+        >>> print("tolerance" in settings)
+        >>> print(len(settings))
+        >>>
+        >>> # Iterator functionality
+        >>> for key in settings:
+        ...     print(key, settings[key])
+        >>> for key in settings.keys():
+        ...     print(key)
+        >>> for value in settings.values():
+        ...     print(value)
+        >>> for key, value in settings.items():
+        ...     print(f"{key}: {value}")
+        >>>
+        >>> print(settings.to_dict())  # Convert to dict
 
     Alternative: If you have an existing Settings object
-    >>> settings = get_settings_from_somewhere()  # Already has keys defined
-    >>> settings["method"] = "hf"  # This works if "method" key exists
-    >>> settings.method = "hf"     # This also works
-    };
-    )");
+
+        >>> settings = get_settings_from_somewhere()  # Already has keys defined
+        >>> settings["method"] = "hf"  # This works if "method" key exists
+        >>> settings.method = "hf"     # This also works
+)");
 
   // Constructors
   settings.def(py::init<>(),
                R"(
-        Default constructor.
+Default constructor.
 
-        Creates an empty Settings object with no key-value pairs.
+Creates an empty Settings object with no key-value pairs.
 
-        Examples
-        --------
-        >>> settings = Settings()
-        )");
+Examples:
+    >>> settings = Settings()
+)");
 
   settings.def(
       "set",
@@ -668,35 +661,26 @@ void bind_settings(pybind11::module &data) {
         self.set(key, setting_value);
       },
       R"(
-        Set a setting value (accepts any Python object).
+Set a setting value (accepts any Python object).
 
-        This method allows setting values using any supported Python type,
-        which will be automatically converted to the appropriate SettingValue variant.
-        The value must match the expected type for the setting key.
+This method allows setting values using any supported Python type, which will be automatically converted to the appropriate SettingValue variant.
+The value must match the expected type for the setting key.
 
-        Parameters
-        ----------
-        key : str
-            The setting key name
-        value : object
-            The value to set (bool, int, float, str, list, tuple, numpy array)
+Args:
+    key (str): The setting key name
+    value (object): The value to set (bool, int, float, str, list, tuple, numpy array)
 
-        Raises
-        ------
-        SettingNotFound
-            If the key does not exist in settings
-        SettingTypeMismatch
-            If the value type does not match the expected type for this key
-        RuntimeError
-            If the value type is not supported or if the key cannot be set
+Raises:
+    SettingNotFound: If the key does not exist in settings
+    SettingTypeMismatch: If the value type does not match the expected type for this key
+    RuntimeError: If the value type is not supported or if the key cannot be set
 
-        Examples
-        --------
-        >>> settings.set("method", "hf")
-        >>> settings.set("max_iterations", 100)
-        >>> settings.set("tolerance", 1e-6)
-        >>> settings.set("parameters", [1.0, 2.0, 3.0])
-        )",
+Examples:
+    >>> settings.set("method", "hf")
+    >>> settings.set("max_iterations", 100)
+    >>> settings.set("tolerance", 1e-6)
+    >>> settings.set("parameters", [1.0, 2.0, 3.0])
+)",
       py::arg("key"), py::arg("value"));
 
   // Keep the original SettingValue version for internal use
@@ -704,23 +688,17 @@ void bind_settings(pybind11::module &data) {
                static_cast<void (Settings::*)(
                    const std::string &, const SettingValue &)>(&Settings::set),
                R"(
-        Set a setting value using a SettingValue variant.
+Set a setting value using a SettingValue variant.
 
-        This is the raw interface that accepts a SettingValue directly,
-        primarily for internal use or advanced scenarios.
+This is the raw interface that accepts a SettingValue directly, primarily for internal use or advanced scenarios.
 
-        Parameters
-        ----------
-        key : str
-            The setting key name
-        value : SettingValue
-            The SettingValue variant to set
+Args:
+    key (str): The setting key name
+    value (SettingValue): The SettingValue variant to set
 
-        Raises
-        ------
-        RuntimeError
-            If the key cannot be set
-        )",
+Raises:
+    RuntimeError: If the key cannot be set
+)",
                py::arg("key"), py::arg("value"));
 
   settings.def(
@@ -729,32 +707,24 @@ void bind_settings(pybind11::module &data) {
         return setting_value_to_python(self.get(key));
       },
       R"(
-        Get a setting value as a Python object.
+Get a setting value as a Python object.
 
-        Retrieves the value associated with the given key and converts it
-        to the appropriate Python type.
+Retrieves the value associated with the given key and converts it to the appropriate Python type.
 
-        Parameters
-        ----------
-        key : str
-            The setting key name
+Args:
+    key (str): The setting key name
 
-        Returns
-        -------
-        object
-            The setting value as a Python object (bool, int, float, str, list)
+Returns:
+    object: The setting value as a Python object (bool, int, float, str, list)
 
-        Raises
-        ------
-        SettingNotFound
-            If the key is not found in the settings
+Raises:
+    SettingNotFound: If the key is not found in the settings
 
-        Examples
-        --------
-        >>> method = settings.get("method")
-        >>> max_iter = settings.get("max_iterations")
-        >>> tolerance = settings.get("tolerance")
-        )",
+Examples:
+    >>> method = settings.get("method")
+    >>> max_iter = settings.get("max_iterations")
+    >>> tolerance = settings.get("tolerance")
+)",
       py::arg("key"));
 
   settings.def(
@@ -762,26 +732,19 @@ void bind_settings(pybind11::module &data) {
       static_cast<SettingValue (Settings::*)(const std::string &) const>(
           &Settings::get),
       R"(
-        Get a setting value as a ``SettingValue`` variant.
+Get a setting value as a ``SettingValue`` variant.
 
-        This is the raw interface that returns a ``SettingValue`` directly,
-        primarily for internal use or advanced scenarios.
+This is the raw interface that returns a ``SettingValue`` directly, primarily for internal use or advanced scenarios.
 
-        Parameters
-        ----------
-        key : str
-            The setting key name
+Args:
+    key (str): The setting key name
 
-        Returns
-        -------
-        SettingValue
-            The SettingValue variant
+Returns:
+    SettingValue: The SettingValue variant
 
-        Raises
-        ------
-        SettingNotFound
-            If the key is not found in the settings
-        )",
+Raises:
+    SettingNotFound: If the key is not found in the settings
+)",
       py::arg("key"));
 
   settings.def(
@@ -797,29 +760,22 @@ void bind_settings(pybind11::module &data) {
         }
       },
       R"(
-        Get a setting value with a default if not found (accepts any Python object).
+Get a setting value with a default if not found (accepts any Python object).
 
-        Retrieves the value for the given key if it exists, or returns the
-        default value if the key is not found.
+Retrieves the value for the given key if it exists, or returns the default value if the key is not found.
 
-        Parameters
-        ----------
-        key : str
-            The setting key name
-        default_value : object
-            Default value to return if key not found
+Args:
+    key (str): The setting key name
+    default_value (object): Default value to return if key not found
 
-        Returns
-        -------
-        object
-            The setting value or default value as a Python object
+Returns:
+    object: The setting value or default value as a Python object
 
-        Examples
-        --------
-        >>> method = settings.get_or_default("method", "default_method")
-        >>> max_iter = settings.get_or_default("max_iterations", 1000)
-        >>> params = settings.get_or_default("parameters", [])
-        )",
+Examples:
+    >>> method = settings.get_or_default("method", "default_method")
+    >>> max_iter = settings.get_or_default("max_iterations", 1000)
+    >>> params = settings.get_or_default("parameters", [])
+)",
       py::arg("key"), py::arg("default_value"));
 
   // Keep the original SettingValue version for internal use
@@ -828,158 +784,124 @@ void bind_settings(pybind11::module &data) {
                    const std::string &, const SettingValue &) const>(
                    &Settings::get_or_default),
                R"(
-        Get a setting value with a default if not found (SettingValue).
+Get a setting value with a default if not found (SettingValue).
 
-        Raw interface that works with SettingValue variants directly.
+Raw interface that works with SettingValue variants directly.
 
-        Parameters
-        ----------
-        key : str
-            The setting key name
-        default_value : SettingValue
-            Default ``SettingValue`` to return if key not found
+Args:
+    key (str): The setting key name
+    default_value (SettingValue): Default ``SettingValue`` to return if key not found
 
-        Returns
-        -------
-        SettingValue
-            The ``SettingValue`` variant or default value
-        )",
+Returns:
+    SettingValue: The ``SettingValue`` variant or default value
+)",
                py::arg("key"), py::arg("default_value"));
 
   settings.def("has", &Settings::has,
                R"(
-        Check if a setting exists.
+Check if a setting exists.
 
-        Parameters
-        ----------
-        key : str
-            The setting key name to check
+Args:
+    key (str): The setting key name to check
 
-        Returns
-        -------
-        bool
-            True if the setting exists, False otherwise
+Returns:
+    bool: True if the setting exists, False otherwise
 
-        Examples
-        --------
-        >>> if settings.has("method"):
-        ...     method = settings.get("method")
-        >>> exists = settings.has("nonexistent_key")  # False
-        )",
+Examples:
+    >>> if settings.has("method"):
+    ...     method = settings.get("method")
+    >>> exists = settings.has("nonexistent_key")  # False
+)",
                py::arg("key"));
 
   settings.def("keys", &Settings::keys,
                R"(
-        Get all setting keys.
+Get all setting keys.
 
-        Returns
-        -------
-        list of str
-            List of all setting key names
+Returns:
+    list[str]: List of all setting key names
 
-        Examples
-        --------
-        >>> all_keys = settings.keys()
-        >>> for key in all_keys:
-        ...     print(f"{key}: {settings[key]}")
-        )");
+Examples:
+    >>> all_keys = settings.keys()
+    >>> for key in all_keys:
+    ...     print(f"{key}: {settings[key]}")
+)");
 
   settings.def("size", &Settings::size,
                R"(
-        Get the number of settings.
+Get the number of settings.
 
-        Returns
-        -------
-        int
-            Number of setting key-value pairs
+Returns:
+    int: Number of setting key-value pairs
 
-        Examples
-        --------
-        >>> count = settings.size()
-        >>> print(f"Settings contain {count} entries")
-        )");
+Examples:
+    >>> count = settings.size()
+    >>> print(f"Settings contain {count} entries")
+)");
 
   settings.def("empty", &Settings::empty,
                R"(
-        Check if settings are empty.
+Check if settings are empty.
 
-        Returns
-        -------
-        bool
-            True if no settings are stored, False otherwise
+Returns:
+    bool: True if no settings are stored, False otherwise
 
-        Examples
-        --------
-        >>> if settings.empty():
-        ...     print("No settings configured")
-        )");
+Examples:
+    >>> if settings.empty():
+    ...     print("No settings configured")
+)");
 
   settings.def("get_as_string", &Settings::get_as_string,
                R"(
-        Get a setting value as a string representation.
+Get a setting value as a string representation.
 
-        Converts any setting value to its string representation,
-        regardless of the original type.
+Converts any setting value to its string representation, regardless of the original type.
 
-        Parameters
-        ----------
-        key : str
-            The setting key name
+Args:
+    key (str): The setting key name
 
-        Returns
-        -------
-        str
-            String representation of the setting value
+Returns:
+    str: String representation of the setting value
 
-        Raises
-        ------
-        SettingNotFound
-            If the key is not found
+Raises:
+    SettingNotFound: If the key is not found
 
-        Examples
-        --------
-        >>> str_val = settings.get_as_string("tolerance")  # "1e-06"
-        >>> str_val = settings.get_as_string("max_iterations")  # "100"
-        )",
+Examples:
+    >>> str_val = settings.get_as_string("tolerance")  # "1e-06"
+    >>> str_val = settings.get_as_string("max_iterations")  # "100"
+)",
                py::arg("key"));
 
   settings.def("get_all_settings", &Settings::get_all_settings,
                R"(
-        Get all settings as a map for Python interoperability.
+Get all settings as a map for Python interoperability.
 
-        Returns the internal settings map, primarily for advanced use cases
-        and internal operations.
+Returns the internal settings map, primarily for advanced use cases and internal operations.
 
-        Returns
-        -------
-        dict
-            Reference to internal settings map
+Returns:
+    dict: Reference to internal settings map
 
-        Notes
-        -----
-        This returns a reference to the internal data structure.
-        Use `to_dict()` for a safe copy of the settings.
-        )",
+Notes:
+    This returns a reference to the internal data structure.
+    Use `to_dict()` for a safe copy of the settings.
+)",
                py::return_value_policy::reference_internal);
 
   settings.def("set_from_map", &Settings::set_from_map,
                R"(
-        Set settings from a map (useful for Python dictionary conversion).
+Set settings from a map (useful for Python dictionary conversion).
 
-        Loads settings from a C++ map structure. This is primarily used
-        internally for converting from Python dictionaries.
+Loads settings from a C++ map structure.
+This is primarily used internally for converting from Python dictionaries.
 
-        Parameters
-        ----------
-        settings_map : dict
-            Map containing setting key-value pairs
+Args:
+    settings_map (dict): Map containing setting key-value pairs
 
-        Examples
-        --------
-        >>> # This is typically used internally, prefer from_dict() for Python
-        >>> internal_map = get_some_map()
-        >>> settings.set_from_map(internal_map)
-        )",
+Examples:
+    >>> # This is typically used internally, prefer from_dict() for Python
+    >>> internal_map = get_some_map()
+    >>> settings.set_from_map(internal_map)
+)",
                py::arg("settings_map"));
 
   // JSON serialization
@@ -989,27 +911,23 @@ void bind_settings(pybind11::module &data) {
         return self.to_json().dump(2);
       },
       R"(
-        Convert settings to JSON format.
+Convert settings to JSON format.
 
-        Serializes all settings to a JSON string with pretty formatting.
-        The JSON format preserves all type information and can be used
-        to reconstruct the settings later.
+Serializes all settings to a JSON string with pretty formatting.
+The JSON format preserves all type information and can be used to reconstruct the settings later.
 
-        Returns
-        -------
-        str
-            JSON string representation of all settings
+Returns:
+    str: JSON string representation of all settings
 
-        Examples
-        --------
-        >>> json_str = settings.to_json()
-        >>> print(json_str)
-        {
-            "method": "hf",
-            "max_iterations": 100,
-            "tolerance": 1e-06
-        }
-        )");
+Examples:
+    >>> json_str = settings.to_json()
+    >>> print(json_str)
+    {
+        "method": "hf",
+        "max_iterations": 100,
+        "tolerance": 1e-06
+    }
+)");
 
   settings.def_static(
       "from_json",
@@ -1017,28 +935,22 @@ void bind_settings(pybind11::module &data) {
         return Settings::from_json(nlohmann::json::parse(json_str));
       },
       R"(
-        Load settings from JSON format.
+Load settings from JSON format.
 
-        Parses a JSON string and loads all contained settings, replacing
-        any existing settings. The JSON format should match the output
-        of ``to_json()``.
+Parses a JSON string and loads all contained settings, replacing any existing settings.
+The JSON format should match the output of ``to_json()``.
 
-        Parameters
-        ----------
-        json_str : str
-            JSON string containing settings data
+Args:
+    json_str (str): JSON string containing settings data
 
-        Raises
-        ------
-        RuntimeError
-            If the JSON string is malformed or contains unsupported types
+Raises:
+    RuntimeError: If the JSON string is malformed or contains unsupported types
 
-        Examples
-        --------
-        >>> json_data = '{"method": "hf", "max_iterations": 100}'
-        >>> settings.from_json(json_data)
-        >>> assert settings["method"] == "hf"
-        )",
+Examples:
+    >>> json_data = '{"method": "hf", "max_iterations": 100}'
+    >>> settings.from_json(json_data)
+    >>> assert settings["method"] == "hf"
+)",
       py::arg("json_str"));
 
   settings.def(
@@ -1047,22 +959,19 @@ void bind_settings(pybind11::module &data) {
         return self.to_json().dump(2);
       },
       R"(
-        Convert settings to JSON string format.
+Convert settings to JSON string format.
 
-        This is an alias for ``to_json()`` provided for backward compatibility.
-        Both methods return the same JSON string representation.
+This is an alias for ``to_json()`` provided for backward compatibility.
+Both methods return the same JSON string representation.
 
-        Returns
-        -------
-        str
-            JSON string representation of all settings
+Returns:
+    str: JSON string representation of all settings
 
-        Examples
-        --------
-        >>> json_str = settings.to_json_string()
-        >>> # Equivalent to:
-        >>> json_str = settings.to_json()
-        )");
+Examples:
+    >>> json_str = settings.to_json_string()
+    >>> # Equivalent to:
+    >>> json_str = settings.to_json()
+)");
 
   settings.def_static(
       "from_json_string",
@@ -1070,86 +979,69 @@ void bind_settings(pybind11::module &data) {
         return Settings::from_json(nlohmann::json::parse(json_str));
       },
       R"(
-        Load settings from JSON string format.
+Load settings from JSON string format.
 
-        This is an alias for ``from_json()`` provided for backward compatibility.
-        Both methods accept the same JSON string format.
+This is an alias for ``from_json()`` provided for backward compatibility.
+Both methods accept the same JSON string format.
 
-        Parameters
-        ----------
-        json_str : str
-            JSON string containing settings data
+Args:
+    json_str (str): JSON string containing settings data
 
-        Raises
-        ------
-        RuntimeError
-            If the JSON string is malformed or contains unsupported types
+Raises:
+    RuntimeError: If the JSON string is malformed or contains unsupported types
 
-        Examples
-        --------
-        >>> settings.from_json_string('{"method": "hf"}')
-        >>> # Equivalent to:
-        >>> settings.from_json('{"method": "hf"}')
-        )",
+Examples:
+    >>> settings.from_json_string('{"method": "hf"}')
+    >>> # Equivalent to:
+    >>> settings.from_json('{"method": "hf"}')
+)",
       py::arg("json_str"));
 
   // JSON file serialization
   settings.def("to_json_file", settings_to_json_file_wrapper,
                R"(
-        Save settings to JSON file.
+Save settings to JSON file.
 
-        Writes all settings to a JSON file with pretty formatting.
-        The file will be created or overwritten if it already exists.
+Writes all settings to a JSON file with pretty formatting.
+The file will be created or overwritten if it already exists.
 
-        Parameters
-        ----------
-        filename : str or pathlib.Path
-            Path to the JSON file to write. Must have '.settings' before the file
-            extension (e.g., ``config.settings.json``, ``params.settings.json``)
+Args:
+    filename (str | pathlib.Path): Path to the JSON file to write.
+        Must have '.settings' before the file extension (e.g., ``config.settings.json``, ``params.settings.json``)
 
-        Raises
-        ------
-        ValueError
-            If filename doesn't follow the required naming convention
-        RuntimeError
-            If the file cannot be opened or written
+Raises:
+    ValueError: If filename doesn't follow the required naming convention
+    RuntimeError: If the file cannot be opened or written
 
-        Examples
-        --------
-        >>> settings.to_json_file("config.settings.json")
-        >>> settings.to_json_file("params.settings.json")
-        >>> from pathlib import Path
-        >>> settings.to_json_file(Path("config.settings.json"))
-        )",
+Examples:
+    >>> settings.to_json_file("config.settings.json")
+    >>> settings.to_json_file("params.settings.json")
+    >>> from pathlib import Path
+    >>> settings.to_json_file(Path("config.settings.json"))
+)",
                py::arg("filename"));
 
   settings.def_static("from_json_file", settings_from_json_file_wrapper,
                       R"(
-      Load settings from JSON file.
+Load settings from JSON file.
 
-        Reads settings from a JSON file, replacing any existing settings.
-        The file should contain JSON data in the format produced by ``to_json_file()``.
+Reads settings from a JSON file, replacing any existing settings.
+The file should contain JSON data in the format produced by ``to_json_file()``.
 
-        Parameters
-        ----------
-        filename : str or pathlib.Path
-            Path to the JSON file to read. Must have '.settings' before the file
-            extension (e.g., ``config.settings.json``, ``params.settings.json``)
+Args:
+    filename (str | pathlib.Path): Path to the JSON file to read.
+        Must have '.settings' before the file extension (e.g., ``config.settings.json``, ``params.settings.json``)
 
-        Raises
-        ------
-        ValueError
-            If filename doesn't follow the required naming convention
-        RuntimeError
-            If the file cannot be opened, read, or contains malformed JSON
+Raises:
+    ValueError: If filename doesn't follow the required naming convention
+    RuntimeError: If the file cannot be opened, read, or contains malformed JSON
 
-      Examples
-      --------
-      >>> settings.from_json_file("config.settings.json")
-      >>> settings.from_json_file("params.settings.json")
-      >>> from pathlib import Path
-      >>> settings.from_json_file(Path("config.settings.json"))
-      )",
+Examples:
+    >>> settings.from_json_file("config.settings.json")
+    >>> settings.from_json_file("params.settings.json")
+    >>> from pathlib import Path
+    >>> settings.from_json_file(Path("config.settings.json"))
+)",
                       py::arg("filename"));
 
   // Note: set_default methods are not exposed as they are protected in C++
@@ -1157,51 +1049,42 @@ void bind_settings(pybind11::module &data) {
 
   settings.def("validate_required", &Settings::validate_required,
                R"(
-        Validate that all required settings are present.
+Validate that all required settings are present.
 
-        Checks that all keys in the provided list exist in the settings.
-        This is useful for ensuring that all necessary configuration
-        parameters have been set before proceeding with computations.
+Checks that all keys in the provided list exist in the settings.
+This is useful for ensuring that all necessary configuration parameters have been set before proceeding with computations.
 
-        Parameters
-        ----------
-        required_keys : list of str
-            List of setting keys that must be present
+Args:
+    required_keys (list[str]): List of setting keys that must be present
 
-        Raises
-        ------
-        SettingNotFound
-            If any required key is missing
+Raises:
+    SettingNotFound: If any required key is missing
 
-        Examples
-        --------
-        >>> required = ["method", "max_iter"]
-        >>> settings.validate_required(required)
-        >>> # Raises SettingNotFound if any key is missing
-        )",
+Examples:
+    >>> required = ["method", "max_iter"]
+    >>> settings.validate_required(required)
+    >>> # Raises SettingNotFound if any key is missing
+)",
                py::arg("required_keys"));
 
   settings.def("lock", &Settings::lock,
                R"(
-        Lock the settings to prevent further modifications.
+Lock the settings to prevent further modifications.
 
-        Once settings are locked, any attempt to modify them will raise
-        an exception. This is useful to ensure that settings remain unchanged
-        after they have been validated or after a computation has started.
+Once settings are locked, any attempt to modify them will raise an exception.
+This is useful to ensure that settings remain unchanged after they have been validated or after a computation has started.
 
-        Note
-        ----
-        Locking is irreversible for the lifetime of the Settings object.
-        To modify settings after locking, create a copy of the Settings object.
+Notes:
+    Locking is irreversible for the lifetime of the Settings object.
+    To modify settings after locking, create a copy of the Settings object.
 
-        Examples
-        --------
-        >>> settings["method"] = "hf"
-        >>> settings["max_iterations"] = 100
-        >>> settings.lock()
-        >>> # Any further modifications will raise SettingAreLocked exception
-        >>> settings["method"] = "dft"  # Raises SettingAreLocked
-        )");
+Examples:
+    >>> settings["method"] = "hf"
+    >>> settings["max_iterations"] = 100
+    >>> settings.lock()
+    >>> # Any further modifications will raise SettingAreLocked exception
+    >>> settings["method"] = "dft"  # Raises SettingAreLocked
+)");
 
   settings.def(
       "update",
@@ -1215,32 +1098,22 @@ void bind_settings(pybind11::module &data) {
         self.update(key, setting_value);
       },
       R"(
-    Update a setting value, throwing if key doesn't exist.
+Update a setting value, throwing if key doesn't exist.
 
-    Unlike ``set()``, this method will only update existing settings and
-    will raise an exception if the key is not already present.
-    Accepts any Python object for the value, which must match the expected type.
+Unlike ``set()``, this method will only update existing settings and will raise an exception if the key is not already present.
+Accepts any Python object for the value, which must match the expected type.
 
-    Parameters
-    ----------
-    dict : dict
-        Python dictionary containing settings to update, or instead
-    key : str
-        The setting key name (must already exist)
-    value : object
-        The new value to set
+Args:
+    dict (dict): Python dictionary containing settings to update, or instead
+    key (str): The setting key name (must already exist)
+    value (object): The new value to set
 
-    Raises
-    ------
-    SettingNotFound
-        If the key doesn't exist in the settings
-    SettingTypeMismatch
-        If the value type does not match the expected type for this key
-    RuntimeError
-        If the value type is not supported
+Raises:
+    SettingNotFound: If the key doesn't exist in the settings
+    SettingTypeMismatch: If the value type does not match the expected type for this key
+    RuntimeError: If the value type is not supported
 
-    Examples
-    --------
+Examples:
     >>> settings.update("max_iterations", 200)  # OK if key exists
     >>> settings.update("new_key", "value")     # Raises SettingNotFound
 
@@ -1250,7 +1123,7 @@ void bind_settings(pybind11::module &data) {
     ... }
     >>> settings.update(updates)  # OK if both keys exist
     >>> settings.update({'new_key': 'value'})  # Raises SettingNotFound
-    )",
+)",
       py::arg("key"), py::arg("value"));
 
   // Update from dictionary
@@ -1277,51 +1150,38 @@ void bind_settings(pybind11::module &data) {
       static_cast<void (Settings::*)(const std::string &,
                                      const SettingValue &)>(&Settings::update),
       R"(
-        Update a setting value using ``SettingValue``, throwing if key doesn't exist.
+Update a setting value using ``SettingValue``, throwing if key doesn't exist.
 
-        Raw interface that works with ``SettingValue`` variants directly.
+Raw interface that works with ``SettingValue`` variants directly.
 
-        Parameters
-        ----------
-        key : str
-            The setting key name (must already exist)
-        value : SettingValue
-            The new SettingValue to set
+Args:
+    key (str): The setting key name (must already exist)
+    value (SettingValue): The new SettingValue to set
 
-        Raises
-        ------
-        SettingNotFound
-            If the key doesn't exist in the settings
-        )",
+Raises:
+    SettingNotFound: If the key doesn't exist in the settings
+)",
       py::arg("key"), py::arg("value"));
 
   settings.def("get_type_name", &Settings::get_type_name,
                R"(
-        Get the type name of a setting value.
+Get the type name of a setting value.
 
-        Returns a string describing the current type of the value
-        stored for the given key.
+Returns a string describing the current type of the value stored for the given key.
 
-        Parameters
-        ----------
-        key : str
-            The setting key name
+Args:
+    key (str): The setting key name
 
-        Returns
-        -------
-        str
-            Type name (e.g., "int", "double", "string", "vector<int>")
+Returns:
+    str: Type name (e.g., "int", "double", "string", "vector<int>")
 
-        Raises
-        ------
-        SettingNotFound
-            If the key is not found
+Raises:
+    SettingNotFound: If the key is not found
 
-        Examples
-        --------
-        >>> type_name = settings.get_type_name("max_iterations")  # "int"
-        >>> type_name = settings.get_type_name("tolerance")       # "double"
-        )",
+Examples:
+    >>> type_name = settings.get_type_name("max_iterations")  # "int"
+    >>> type_name = settings.get_type_name("tolerance")       # "double"
+)",
                py::arg("key"));
 
   settings.def(
@@ -1359,40 +1219,30 @@ void bind_settings(pybind11::module &data) {
         }
       },
       R"(
-        Get the expected Python type for a setting key.
+Get the expected Python type for a setting key.
 
-        Returns a string describing what Python type should be provided
-        when setting the value for the given key. This is useful for
-        understanding what type of value is expected before attempting
-        to set it.
+Returns a string describing what Python type should be provided when setting the value for the given key.
+This is useful for understanding what type of value is expected before attempting to set it.
 
-        Parameters
-        ----------
-        key : str
-            The setting key name
+Args:
+    key (str): The setting key name
 
-        Returns
-        -------
-        str
-            Expected Python type (e.g., "int", "float", "str", "bool",
-            "list[int]", "list[float]", "list[str]", "list[bool]")
+Returns:
+    str: Expected Python type (e.g., "int", "float", "str", "bool", "list[int]", "list[float]", "list[str]", "list[bool]")
 
-        Raises
-        ------
-        SettingNotFound
-            If the key is not found
+Raises:
+    SettingNotFound: If the key is not found
 
-        Examples
-        --------
-        >>> expected = settings.get_expected_python_type("max_iterations")
-        >>> print(expected)  # "int"
-        >>> expected = settings.get_expected_python_type("tolerance")
-        >>> print(expected)  # "float"
-        >>> expected = settings.get_expected_python_type("basis_set")
-        >>> print(expected)  # "str"
-        >>> expected = settings.get_expected_python_type("active_orbitals")
-        >>> print(expected)  # "list[int]"
-        )",
+Examples:
+    >>> expected = settings.get_expected_python_type("max_iterations")
+    >>> print(expected)  # "int"
+    >>> expected = settings.get_expected_python_type("tolerance")
+    >>> print(expected)  # "float"
+    >>> expected = settings.get_expected_python_type("basis_set")
+    >>> print(expected)  # "str"
+    >>> expected = settings.get_expected_python_type("active_orbitals")
+    >>> print(expected)  # "list[int]"
+)",
       py::arg("key"));
 
   // Expose _set_default for Python derived classes to use in __init__
@@ -1404,35 +1254,28 @@ void bind_settings(pybind11::module &data) {
         static_cast<PySettings &>(self)._set_default(key, expected_type, value);
       },
       R"(
-        Set a default value (for use in derived class __init__ only).
+Set a default value (for use in derived class __init__ only).
 
-        This method is used internally by derived classes during construction
-        to establish default values for settings. It should only be called
-        during the ``__init__`` method of derived classes.
+This method is used internally by derived classes during construction to establish default values for settings.
+It should only be called during the ``__init__`` method of derived classes.
 
-        Parameters
-        ----------
-        key : str
-            The setting key name
-        expected_type : str
-            The expected type name (e.g., "int", "double", "string", "vector<int>")
-        value : object
-            The default value to set
+Args:
+    key (str): The setting key name
+    expected_type (str): The expected type name (e.g., "int", "double", "string", "vector<int>")
+    value (object): The default value to set
 
-        Note
-        ----
-        This method is intended for internal use by derived classes only.
-        Regular users should use the ``set()`` method or dictionary-style access.
+Notes:
+    This method is intended for internal use by derived classes only.
+    Regular users should use the ``set()`` method or dictionary-style access.
 
-        Examples
-        --------
-        >>> class MySettings(qdk_chemistry.data.Settings):
-        ...     def __init__(self):
-        ...         super().__init__()
-        ...         self._set_default("method", "string", "default")
-        ...         self._set_default("max_iter", "int", 1000)
-        ...         self._set_default("tolerance", "double", 1e-6)
-        )",
+Examples:
+    >>> class MySettings(qdk_chemistry.data.Settings):
+    ...     def __init__(self):
+    ...         super().__init__()
+    ...         self._set_default("method", "string", "default")
+    ...         self._set_default("max_iter", "int", 1000)
+    ...         self._set_default("tolerance", "double", 1e-6)
+)",
       py::arg("key"), py::arg("expected_type"), py::arg("value"));
 
   // Python dictionary-like interface
@@ -1442,30 +1285,23 @@ void bind_settings(pybind11::module &data) {
         return setting_value_to_python(self.get(key));
       },
       R"(
-        Get setting using ``[]`` operator.
+Get setting using ``[]`` operator.
 
-        Provides dictionary-style access for retrieving setting values.
+Provides dictionary-style access for retrieving setting values.
 
-        Parameters
-        ----------
-        key : str
-            The setting key name
+Args:
+    key (str): The setting key name
 
-        Returns
-        -------
-        object
-            The setting value as a Python object
+Returns:
+    object: The setting value as a Python object
 
-        Raises
-        ------
-        SettingNotFound
-            If the key is not found
+Raises:
+    SettingNotFound: If the key is not found
 
-        Examples
-        --------
-        >>> method = settings["method"]
-        >>> tolerance = settings["tolerance"]
-        )",
+Examples:
+    >>> method = settings["method"]
+    >>> tolerance = settings["tolerance"]
+)",
       py::arg("key"));
 
   settings.def(
@@ -1483,31 +1319,24 @@ void bind_settings(pybind11::module &data) {
         self.set(key, setting_value);
       },
       R"(
-        Set setting using ``[]`` operator (accepts any Python object).
+Set setting using ``[]`` operator (accepts any Python object).
 
-        Provides dictionary-style access for setting values.
-        The value must match the expected type for the setting key.
+Provides dictionary-style access for setting values.
+The value must match the expected type for the setting key.
 
-        Parameters
-        ----------
-        key : str
-            The setting key name
-        value : object
-            The value to set
+Args:
+    key (str): The setting key name
+    value (object): The value to set
 
-        Raises
-        ------
-        SettingNotFound
-            If the key does not exist in settings
-        SettingTypeMismatch
-            If the value type does not match the expected type for this key
+Raises:
+    SettingNotFound: If the key does not exist in settings
+    SettingTypeMismatch: If the value type does not match the expected type for this key
 
-        Examples
-        --------
-        >>> settings["method"] = "hf"
-        >>> settings["max_iterations"] = 100
-        >>> settings["parameters"] = [1.0, 2.0, 3.0]
-        )",
+Examples:
+    >>> settings["method"] = "hf"
+    >>> settings["max_iterations"] = 100
+    >>> settings["parameters"] = [1.0, 2.0, 3.0]
+)",
       py::arg("key"), py::arg("value"));
 
   // Keep original SettingValue version for internal use
@@ -1517,48 +1346,40 @@ void bind_settings(pybind11::module &data) {
         self.set(key, value);
       },
       R"(
-        Set setting using ``[]`` operator (SettingValue).
+Set setting using ``[]`` operator (SettingValue).
 
-        Raw interface for setting values using SettingValue directly.
-        )",
+Raw interface for setting values using SettingValue directly.
+)",
       py::arg("key"), py::arg("value"));
 
   settings.def("__contains__", &Settings::has,
                R"(
-        Check if setting exists using ``in`` operator.
+Check if setting exists using ``in`` operator.
 
-        Parameters
-        ----------
-        key : str
-            The setting key name to check
+Args:
+    key (str): The setting key name to check
 
-        Returns
-        -------
-        bool
-            True if the setting exists
+Returns:
+    bool: True if the setting exists
 
-        Examples
-        --------
-        >>> if "method" in settings:
-        ...     print("Method is configured")
-        >>> exists = "nonexistent" in settings  # False
-        )",
+Examples:
+    >>> if "method" in settings:
+    ...     print("Method is configured")
+    >>> exists = "nonexistent" in settings  # False
+)",
                py::arg("key"));
 
   settings.def("__len__", &Settings::size,
                R"(
-        Get number of settings using ``len()``.
+Get number of settings using ``len()``.
 
-        Returns
-        -------
-        int
-            Number of setting key-value pairs
+Returns:
+    int: Number of setting key-value pairs
 
-        Examples
-        --------
-        >>> count = len(settings)
-        >>> print(f"Settings has {count} entries")
-        )");
+Examples:
+    >>> count = len(settings)
+    >>> print(f"Settings has {count} entries")
+)");
 
   // Attribute-style access (obj.key and obj.key = value)
   settings.def(
@@ -1572,32 +1393,25 @@ void bind_settings(pybind11::module &data) {
         }
       },
       R"(
-        Get setting using attribute access (``obj.key``).
+Get setting using attribute access (``obj.key``).
 
-        Provides object-style attribute access for retrieving setting values.
-        This is an alternative to dictionary-style access.
+Provides object-style attribute access for retrieving setting values.
+This is an alternative to dictionary-style access.
 
-        Parameters
-        ----------
-        key : str
-            The setting key name (as an attribute)
+Args:
+    key (str): The setting key name (as an attribute)
 
-        Returns
-        -------
-        object
-            The setting value as a Python object
+Returns:
+    object: The setting value as a Python object
 
-        Raises
-        ------
-        AttributeError
-            If the key is not found
+Raises:
+    AttributeError: If the key is not found
 
-        Examples
-        --------
-        >>> method = settings.method
-        >>> tolerance = settings.tolerance
-        >>> max_iter = settings.max_iterations
-        )",
+Examples:
+    >>> method = settings.method
+    >>> tolerance = settings.tolerance
+    >>> max_iter = settings.max_iterations
+)",
       py::arg("key"));
 
   settings.def(
@@ -1617,32 +1431,25 @@ void bind_settings(pybind11::module &data) {
         self.set(key, setting_value);
       },
       R"(
-        Set setting using attribute access (``obj.key = value``).
+Set setting using attribute access (``obj.key = value``).
 
-        Provides object-style attribute access for setting values.
-        This is an alternative to dictionary-style access.
-        The value must match the expected type for the setting key.
+Provides object-style attribute access for setting values.
+This is an alternative to dictionary-style access.
+The value must match the expected type for the setting key.
 
-        Parameters
-        ----------
-        key : str
-            The setting key name (as an attribute)
-        value : object
-            The value to set
+Args:
+        key (str): The setting key name (as an attribute)
+        value (object): The value to set
 
-        Raises
-        ------
-        SettingNotFound
-            If the key does not exist in settings
-        SettingTypeMismatch
-            If the value type does not match the expected type for this key
+Raises:
+    SettingNotFound: If the key does not exist in settings
+    SettingTypeMismatch: If the value type does not match the expected type for this key
 
-        Examples
-        --------
-        >>> settings.method = "hf"
-        >>> settings.tolerance = 1e-6
-        >>> settings.max_iterations = 100
-        )",
+Examples:
+    >>> settings.method = "hf"
+    >>> settings.tolerance = 1e-6
+    >>> settings.max_iterations = 100
+)",
       py::arg("key"), py::arg("value"));
 
   // Iterator support - iterate over keys by default (like Python dict)
@@ -1653,24 +1460,20 @@ void bind_settings(pybind11::module &data) {
         return py::iter(py::cast(keys));
       },
       R"(
-        Iterate over setting keys.
+Iterate over setting keys.
 
-        Enables for-loop iteration over the settings keys, similar to
-        iterating over a Python dictionary.
+Enables for-loop iteration over the settings keys, similar to iterating over a Python dictionary.
 
-        Returns
-        -------
-        iterator
-            Iterator over setting key names
+Returns:
+    iterator: Iterator over setting key names
 
-        Examples
-        --------
-        >>> for key in settings:
-        ...     print(f"{key}: {settings[key]}")
-        >>> # Equivalent to:
-        >>> for key in settings.keys():
-        ...     print(f"{key}: {settings[key]}")
-        )");
+Examples:
+    >>> for key in settings:
+    ...     print(f"{key}: {settings[key]}")
+    >>> # Equivalent to:
+    >>> for key in settings.keys():
+    ...     print(f"{key}: {settings[key]}")
+)");
 
   // Dictionary-style methods for values and items (keys already defined above)
   settings.def(
@@ -1683,22 +1486,19 @@ void bind_settings(pybind11::module &data) {
         return result;
       },
       R"(
-        Get all setting values as a list.
+Get all setting values as a list.
 
-        Returns
-        -------
-        list
-            List of all setting values
+Returns:
+    list: List of all setting values
 
-        Examples
-        --------
-        >>> all_values = settings.values()
-        >>> for value in all_values:
-        ...     print(value)
-        >>> # Or iterate directly:
-        >>> for value in settings.values():
-        ...     print(value)
-        )");
+Examples:
+    >>> all_values = settings.values()
+    >>> for value in all_values:
+    ...     print(value)
+    >>> # Or iterate directly:
+    >>> for value in settings.values():
+    ...     print(value)
+)");
 
   settings.def(
       "items",
@@ -1711,22 +1511,19 @@ void bind_settings(pybind11::module &data) {
         return result;
       },
       R"(
-        Get key-value pairs as a list of tuples.
+Get key-value pairs as a list of tuples.
 
-        Returns
-        -------
-        list of tuple
-            List of (key, value) tuples
+Returns:
+    list[tuple]: List of (key, value) tuples
 
-        Examples
-        --------
-        >>> all_items = settings.items()
-        >>> for key, value in all_items:
-        ...     print(f"{key}: {value}")
-        >>> # Or iterate directly:
-        >>> for key, value in settings.items():
-        ...     print(f"{key}: {value}")
-        )");
+Examples:
+    >>> all_items = settings.items()
+    >>> for key, value in all_items:
+    ...     print(f"{key}: {value}")
+    >>> # Or iterate directly:
+    >>> for key, value in settings.items():
+    ...     print(f"{key}: {value}")
+)");
 
   // Dictionary conversion methods
   settings.def(
@@ -1739,26 +1536,22 @@ void bind_settings(pybind11::module &data) {
         return result;
       },
       R"(
-        Convert settings to Python dictionary.
+Convert settings to Python dictionary.
 
-        Creates a Python dictionary containing all settings with keys as strings
-        and values converted to appropriate Python types.
+Creates a Python dictionary containing all settings with keys as strings and values converted to appropriate Python types.
 
-        Returns
-        -------
-        dict
-            Python dictionary with all settings
+Returns:
+    dict: Python dictionary with all settings
 
-        Examples
-        --------
-        >>> settings_dict = settings.to_dict()
-        >>> print(settings_dict)
-        {'method': 'hf', 'max_iterations': 100, 'tolerance': 1e-06}
-        >>>
-        >>> # Can be used with JSON, pickle, etc.
-        >>> import json
-        >>> json_str = json.dumps(settings_dict)
-        )");
+Examples:
+    >>> settings_dict = settings.to_dict()
+    >>> print(settings_dict)
+    {'method': 'hf', 'max_iterations': 100, 'tolerance': 1e-06}
+    >>>
+    >>> # Can be used with JSON, pickle, etc.
+    >>> import json
+    >>> json_str = json.dumps(settings_dict)
+)");
 
   settings.def(
       "from_dict",
@@ -1776,35 +1569,30 @@ void bind_settings(pybind11::module &data) {
         }
       },
       R"(
-        Load settings from Python dictionary.
+Load settings from Python dictionary.
 
-        Updates existing settings with values from the provided dictionary.
-        Keys must be strings or convertible to strings. Only predefined
-        settings keys can be updated. Values must match expected types.
+Updates existing settings with values from the provided dictionary.
+Keys must be strings or convertible to strings.
+Only predefined settings keys can be updated.
+Values must match expected types.
 
-        Parameters
-        ----------
-        dict : dict
-            Python dictionary containing settings
+Args:
+    dict (dict): Python dictionary containing settings
 
-        Raises
-        ------
-        SettingNotFound
-            If any key does not exist in settings
-        SettingTypeMismatch
-            If any value type does not match the expected type for its key
+Raises:
+    SettingNotFound: If any key does not exist in settings
+    SettingTypeMismatch: If any value type does not match the expected type for its key
 
-        Examples
-        --------
-        >>> config = {
-        ...     'method': 'hf',
-        ...     'max_iterations': 100,
-        ...     'tolerance': 1e-6,
-        ...     'parameters': [1.0, 2.0, 3.0]
-        ... }
-        >>> settings.from_dict(config)
-        >>> assert settings['method'] == 'hf'
-        )",
+Examples:
+    >>> config = {
+    ...     'method': 'hf',
+    ...     'max_iterations': 100,
+    ...     'tolerance': 1e-6,
+    ...     'parameters': [1.0, 2.0, 3.0]
+    ... }
+    >>> settings.from_dict(config)
+    >>> assert settings['method'] == 'hf'
+)",
       py::arg("dict"));
 
   // String representation
@@ -1815,20 +1603,17 @@ void bind_settings(pybind11::module &data) {
                ">";
       },
       R"(
-        Return string representation of the Settings object.
+Return string representation of the Settings object.
 
-        Returns a brief representation showing the number of settings.
+Returns a brief representation showing the number of settings.
 
-        Returns
-        -------
-        str
-            String representation
+Returns:
+    str: String representation
 
-        Examples
-        --------
-        >>> repr(settings)
-        '<qdk_chemistry.Settings size=3>'
-        )");
+Examples:
+    >>> repr(settings)
+    '<qdk_chemistry.Settings size=3>'
+)");
 
   settings.def(
       "__str__",
@@ -1841,79 +1626,64 @@ void bind_settings(pybind11::module &data) {
         return result;
       },
       R"(
-        Return human-readable string representation of all settings.
+Return human-readable string representation of all settings.
 
-        Returns a formatted string showing all key-value pairs.
+Returns a formatted string showing all key-value pairs.
 
-        Returns
-        -------
-        str
-            Formatted string with all settings
+Returns:
+    str: Formatted string with all settings
 
-        Examples
-        --------
-        >>> print(settings)
-        Settings {
-        method: hf
-        max_iterations: 100
-        tolerance: 1e-06
-        }
-        )");
+Examples:
+    >>> print(settings)
+    Settings {
+    method: hf
+    max_iterations: 100
+    tolerance: 1e-06
+    }
+)");
 
   // File I/O methods
   settings.def("to_json_file", settings_to_json_file_wrapper,
                R"(
-        Save settings to JSON file.
+Save settings to JSON file.
 
-        Parameters
-        ----------
-        filename : str or pathlib.Path
-            Path to output file. Must have '.settings.json' extension
-            (e.g., ``config.settings.json``, ``parameters.settings.json``)
+Args:
+    filename (str | pathlib.Path): Path to output file.
+        Must have '.settings.json' extension (e.g., ``config.settings.json``, ``parameters.settings.json``)
 
-        Raises
-        ------
-        ValueError
-            If filename doesn't follow the required naming convention
-        RuntimeError
-            If the file cannot be opened or written
+Raises:
+    ValueError: If filename doesn't follow the required naming convention
+    RuntimeError: If the file cannot be opened or written
 
-        Examples
-        --------
-        >>> settings.to_json_file("config.settings.json")
-        >>> settings.to_json_file("parameters.settings.json")
-        >>> from pathlib import Path
-        >>> settings.to_json_file(Path("config.settings.json"))
-        )",
+Examples:
+    >>> settings.to_json_file("config.settings.json")
+    >>> settings.to_json_file("parameters.settings.json")
+    >>> from pathlib import Path
+    >>> settings.to_json_file(Path("config.settings.json"))
+)",
                py::arg("filename"));
 
   settings.def_static("from_json_file", settings_from_json_file_wrapper,
                       R"(
-      Load settings from JSON file.
+Load settings from JSON file.
 
-        Reads settings from a JSON file, replacing any existing settings.
-        The file should contain JSON data in the format produced by ``to_json_file()``.
+Reads settings from a JSON file, replacing any existing settings.
+The file should contain JSON data in the format produced by ``to_json_file()``.
 
-        Parameters
-        ----------
-        filename : str or pathlib.Path
-            Path to the JSON file to read. Must have '.settings' before the file
-            extension (e.g., ``config.settings.json``, ``params.settings.json``)
+Args:
+    filename (str | pathlib.Path): Path to the JSON file to read.
+        Must have '.settings' before the file extension (e.g., ``config.settings.json``, ``params.settings.json``)
 
-        Raises
-        ------
-        ValueError
-            If filename doesn't follow the required naming convention
-        RuntimeError
-            If the file cannot be opened, read, or contains malformed JSON
+Raises:
+    ValueError: If filename doesn't follow the required naming convention
+    RuntimeError: If the file cannot be opened, read, or contains malformed JSON
 
-      Examples
-      --------
-      >>> settings.from_json_file("config.settings.json")
-      >>> settings.from_json_file("parameters.settings.json")
-      >>> from pathlib import Path
-      >>> settings.from_json_file(Path("config.settings.json"))
-      )",
+Examples:
+    >>> settings.from_json_file("config.settings.json")
+    >>> settings.from_json_file("parameters.settings.json")
+    >>> from pathlib import Path
+    >>> settings.from_json_file(Path("config.settings.json"))
+)",
                       py::arg("filename"));
 
   // Note: set_default methods are not exposed as they are protected in C++
@@ -1921,28 +1691,22 @@ void bind_settings(pybind11::module &data) {
 
   settings.def("validate_required", &Settings::validate_required,
                R"(
-        Validate that all required settings are present.
+Validate that all required settings are present.
 
-        Checks that all keys in the provided list exist in the settings.
-        This is useful for ensuring that all necessary configuration
-        parameters have been set before proceeding with computations.
+Checks that all keys in the provided list exist in the settings.
+This is useful for ensuring that all necessary configuration parameters have been set before proceeding with computations.
 
-        Parameters
-        ----------
-        required_keys : list of str
-            List of setting keys that must be present
+Args:
+    required_keys (list[str]): List of setting keys that must be present
 
-        Raises
-        ------
-        SettingNotFound
-            If any required key is missing
+Raises:
+    SettingNotFound: If any required key is missing
 
-        Examples
-        --------
-        >>> required = ["method", "max_iter"]
-        >>> settings.validate_required(required)
-        >>> # Raises SettingNotFound if any key is missing
-        )",
+Examples:
+    >>> required = ["method", "max_iter"]
+    >>> settings.validate_required(required)
+    >>> # Raises SettingNotFound if any key is missing
+)",
                py::arg("required_keys"));
 
   settings.def(
@@ -1957,32 +1721,22 @@ void bind_settings(pybind11::module &data) {
         self.update(key, setting_value);
       },
       R"(
-    Update a setting value, throwing if key doesn't exist.
+Update a setting value, throwing if key doesn't exist.
 
-    Unlike ``set()``, this method will only update existing settings and
-    will raise an exception if the key is not already present.
-    Accepts any Python object for the value, which must match the expected type.
+Unlike ``set()``, this method will only update existing settings and will raise an exception if the key is not already present.
+Accepts any Python object for the value, which must match the expected type.
 
-    Parameters
-    ----------
-    dict : dict
-        Python dictionary containing settings to update, or instead
-    key : str
-        The setting key name (must already exist)
-    value : object
-        The new value to set
+Args:
+    dict (dict): Python dictionary containing settings to update, or instead
+    key (str): The setting key name (must already exist)
+    value (object): The new value to set
 
-    Raises
-    ------
-    SettingNotFound
-        If the key doesn't exist in the settings
-    SettingTypeMismatch
-        If the value type does not match the expected type for this key
-    RuntimeError
-        If the value type is not supported
+Raises:
+    SettingNotFound: If the key doesn't exist in the settings
+    SettingTypeMismatch: If the value type does not match the expected type for this key
+    RuntimeError: If the value type is not supported
 
-    Examples
-    --------
+Examples:
     >>> settings.update("max_iterations", 200)  # OK if key exists
     >>> settings.update("new_key", "value")     # Raises SettingNotFound
 
@@ -1992,7 +1746,7 @@ void bind_settings(pybind11::module &data) {
     ... }
     >>> settings.update(updates)  # OK if both keys exist
     >>> settings.update({'new_key': 'value'})  # Raises SettingNotFound
-    )",
+)",
       py::arg("key"), py::arg("value"));
 
   // Update from dictionary
@@ -2019,51 +1773,38 @@ void bind_settings(pybind11::module &data) {
       static_cast<void (Settings::*)(const std::string &,
                                      const SettingValue &)>(&Settings::update),
       R"(
-        Update a setting value using ``SettingValue``, throwing if key doesn't exist.
+Update a setting value using ``SettingValue``, throwing if key doesn't exist.
 
-        Raw interface that works with ``SettingValue`` variants directly.
+Raw interface that works with ``SettingValue`` variants directly.
 
-        Parameters
-        ----------
-        key : str
-            The setting key name (must already exist)
-        value : SettingValue
-            The new SettingValue to set
+Args:
+    key (str): The setting key name (must already exist)
+    value (SettingValue): The new SettingValue to set
 
-        Raises
-        ------
-        SettingNotFound
-            If the key doesn't exist in the settings
-        )",
+Raises:
+    SettingNotFound: If the key doesn't exist in the settings
+)",
       py::arg("key"), py::arg("value"));
 
   settings.def("get_type_name", &Settings::get_type_name,
                R"(
-        Get the type name of a setting value.
+Get the type name of a setting value.
 
-        Returns a string describing the current type of the value
-        stored for the given key.
+Returns a string describing the current type of the value stored for the given key.
 
-        Parameters
-        ----------
-        key : str
-            The setting key name
+Args:
+    key (str): The setting key name
 
-        Returns
-        -------
-        str
-            Type name (e.g., "int", "double", "string", "vector<int>")
+Returns:
+    str: Type name (e.g., "int", "double", "string", "vector<int>")
 
-        Raises
-        ------
-        SettingNotFound
-            If the key is not found
+Raises:
+    SettingNotFound: If the key is not found
 
-        Examples
-        --------
-        >>> type_name = settings.get_type_name("max_iterations")  # "int"
-        >>> type_name = settings.get_type_name("tolerance")       # "double"
-        )",
+Examples:
+    >>> type_name = settings.get_type_name("max_iterations")  # "int"
+    >>> type_name = settings.get_type_name("tolerance")       # "double"
+)",
                py::arg("key"));
 
   // Expose _set_default for Python derived classes to use in __init__
@@ -2075,35 +1816,28 @@ void bind_settings(pybind11::module &data) {
         static_cast<PySettings &>(self)._set_default(key, expected_type, value);
       },
       R"(
-        Set a default value (for use in derived class __init__ only).
+Set a default value (for use in derived class __init__ only).
 
-        This method is used internally by derived classes during construction
-        to establish default values for settings. It should only be called
-        during the ``__init__`` method of derived classes.
+This method is used internally by derived classes during construction to establish default values for settings.
+It should only be called during the ``__init__`` method of derived classes.
 
-        Parameters
-        ----------
-        key : str
-            The setting key name
-        expected_type : str
-            The expected type name (e.g., "int", "double", "string", "vector<int>")
-        value : object
-            The default value to set
+Args:
+    key (str): The setting key name
+    expected_type (str): The expected type name (e.g., "int", "double", "string", "vector<int>")
+    value (object): The default value to set
 
-        Note
-        ----
-        This method is intended for internal use by derived classes only.
-        Regular users should use the ``set()`` method or dictionary-style access.
+Notes:
+    This method is intended for internal use by derived classes only.
+    Regular users should use the ``set()`` method or dictionary-style access.
 
-        Examples
-        --------
-        >>> class MySettings(qdk_chemistry.data.Settings):
-        ...     def __init__(self):
-        ...         super().__init__()
-        ...         self._set_default("method", "string", "default")
-        ...         self._set_default("max_iter", "int", 1000)
-        ...         self._set_default("tolerance", "double", 1e-6)
-        )",
+Examples:
+    >>> class MySettings(qdk_chemistry.data.Settings):
+    ...     def __init__(self):
+    ...         super().__init__()
+    ...         self._set_default("method", "string", "default")
+    ...         self._set_default("max_iter", "int", 1000)
+    ...         self._set_default("tolerance", "double", 1e-6)
+)",
       py::arg("key"), py::arg("expected_type"), py::arg("value"));
 
   // Python dictionary-like interface
@@ -2113,30 +1847,23 @@ void bind_settings(pybind11::module &data) {
         return setting_value_to_python(self.get(key));
       },
       R"(
-        Get setting using ``[]`` operator.
+Get setting using ``[]`` operator.
 
-        Provides dictionary-style access for retrieving setting values.
+Provides dictionary-style access for retrieving setting values.
 
-        Parameters
-        ----------
-        key : str
-            The setting key name
+Args:
+    key (str): The setting key name
 
-        Returns
-        -------
-        object
-            The setting value as a Python object
+Returns:
+    object: The setting value as a Python object
 
-        Raises
-        ------
-        SettingNotFound
-            If the key is not found
+Raises:
+    SettingNotFound: If the key is not found
 
-        Examples
-        --------
-        >>> method = settings["method"]
-        >>> tolerance = settings["tolerance"]
-        )",
+Examples:
+    >>> method = settings["method"]
+    >>> tolerance = settings["tolerance"]
+)",
       py::arg("key"));
 
   settings.def(
@@ -2154,31 +1881,24 @@ void bind_settings(pybind11::module &data) {
         self.set(key, setting_value);
       },
       R"(
-        Set setting using ``[]`` operator (accepts any Python object).
+Set setting using ``[]`` operator (accepts any Python object).
 
-        Provides dictionary-style access for setting values.
-        The value must match the expected type for the setting key.
+Provides dictionary-style access for setting values.
+The value must match the expected type for the setting key.
 
-        Parameters
-        ----------
-        key : str
-            The setting key name
-        value : object
-            The value to set
+Args:
+    key (str): The setting key name
+    value (object): The value to set
 
-        Raises
-        ------
-        SettingNotFound
-            If the key does not exist in settings
-        SettingTypeMismatch
-            If the value type does not match the expected type for this key
+Raises:
+    SettingNotFound: If the key does not exist in settings
+    SettingTypeMismatch: If the value type does not match the expected type for this key
 
-        Examples
-        --------
-        >>> settings["method"] = "hf"
-        >>> settings["max_iterations"] = 100
-        >>> settings["parameters"] = [1.0, 2.0, 3.0]
-        )",
+Examples:
+    >>> settings["method"] = "hf"
+    >>> settings["max_iterations"] = 100
+    >>> settings["parameters"] = [1.0, 2.0, 3.0]
+)",
       py::arg("key"), py::arg("value"));
 
   // Keep original SettingValue version for internal use
@@ -2188,48 +1908,40 @@ void bind_settings(pybind11::module &data) {
         self.set(key, value);
       },
       R"(
-        Set setting using ``[]`` operator (SettingValue).
+Set setting using ``[]`` operator (SettingValue).
 
-        Raw interface for setting values using SettingValue directly.
-        )",
+Raw interface for setting values using SettingValue directly.
+)",
       py::arg("key"), py::arg("value"));
 
   settings.def("__contains__", &Settings::has,
                R"(
-        Check if setting exists using ``in`` operator.
+Check if setting exists using ``in`` operator.
 
-        Parameters
-        ----------
-        key : str
-            The setting key name to check
+Args:
+    key (str): The setting key name to check
 
-        Returns
-        -------
-        bool
-            True if the setting exists
+Returns:
+    bool: True if the setting exists
 
-        Examples
-        --------
-        >>> if "method" in settings:
-        ...     print("Method is configured")
-        >>> exists = "nonexistent" in settings  # False
-        )",
+Examples:
+    >>> if "method" in settings:
+    ...     print("Method is configured")
+    >>> exists = "nonexistent" in settings  # False
+)",
                py::arg("key"));
 
   settings.def("__len__", &Settings::size,
                R"(
-        Get number of settings using ``len()``.
+Get number of settings using ``len()``.
 
-        Returns
-        -------
-        int
-            Number of setting key-value pairs
+Returns:
+    int: Number of setting key-value pairs
 
-        Examples
-        --------
-        >>> count = len(settings)
-        >>> print(f"Settings has {count} entries")
-        )");
+Examples:
+    >>> count = len(settings)
+    >>> print(f"Settings has {count} entries")
+)");
 
   // Attribute-style access (obj.key and obj.key = value)
   settings.def(
@@ -2243,32 +1955,25 @@ void bind_settings(pybind11::module &data) {
         }
       },
       R"(
-        Get setting using attribute access (``obj.key``).
+Get setting using attribute access (``obj.key``).
 
-        Provides object-style attribute access for retrieving setting values.
-        This is an alternative to dictionary-style access.
+Provides object-style attribute access for retrieving setting values.
+This is an alternative to dictionary-style access.
 
-        Parameters
-        ----------
-        key : str
-            The setting key name (as an attribute)
+Args:
+    key (str): The setting key name (as an attribute)
 
-        Returns
-        -------
-        object
-            The setting value as a Python object
+Returns:
+    object: The setting value as a Python object
 
-        Raises
-        ------
-        AttributeError
-            If the key is not found
+Raises:
+    AttributeError: If the key is not found
 
-        Examples
-        --------
-        >>> method = settings.method
-        >>> tolerance = settings.tolerance
-        >>> max_iter = settings.max_iterations
-        )",
+Examples:
+    >>> method = settings.method
+    >>> tolerance = settings.tolerance
+    >>> max_iter = settings.max_iterations
+)",
       py::arg("key"));
 
   settings.def(
@@ -2288,32 +1993,25 @@ void bind_settings(pybind11::module &data) {
         self.set(key, setting_value);
       },
       R"(
-        Set setting using attribute access (``obj.key = value``).
+Set setting using attribute access (``obj.key = value``).
 
-        Provides object-style attribute access for setting values.
-        This is an alternative to dictionary-style access.
-        The value must match the expected type for the setting key.
+Provides object-style attribute access for setting values.
+This is an alternative to dictionary-style access.
+The value must match the expected type for the setting key.
 
-        Parameters
-        ----------
-        key : str
-            The setting key name (as an attribute)
-        value : object
-            The value to set
+Args:
+    key (str): The setting key name (as an attribute)
+    value (object): The value to set
 
-        Raises
-        ------
-        SettingNotFound
-            If the key does not exist in settings
-        SettingTypeMismatch
-            If the value type does not match the expected type for this key
+Raises:
+    SettingNotFound: If the key does not exist in settings
+    SettingTypeMismatch: If the value type does not match the expected type for this key
 
-        Examples
-        --------
-        >>> settings.method = "hf"
-        >>> settings.tolerance = 1e-6
-        >>> settings.max_iterations = 100
-        )",
+Examples:
+    >>> settings.method = "hf"
+    >>> settings.tolerance = 1e-6
+    >>> settings.max_iterations = 100
+)",
       py::arg("key"), py::arg("value"));
 
   // Iterator support - iterate over keys by default (like Python dict)
@@ -2324,24 +2022,20 @@ void bind_settings(pybind11::module &data) {
         return py::iter(py::cast(keys));
       },
       R"(
-        Iterate over setting keys.
+Iterate over setting keys.
 
-        Enables for-loop iteration over the settings keys, similar to
-        iterating over a Python dictionary.
+Enables for-loop iteration over the settings keys, similar to iterating over a Python dictionary.
 
-        Returns
-        -------
-        iterator
-            Iterator over setting key names
+Returns:
+    iterator: Iterator over setting key names
 
-        Examples
-        --------
-        >>> for key in settings:
-        ...     print(f"{key}: {settings[key]}")
-        >>> # Equivalent to:
-        >>> for key in settings.keys():
-        ...     print(f"{key}: {settings[key]}")
-        )");
+Examples:
+    >>> for key in settings:
+    ...     print(f"{key}: {settings[key]}")
+    >>> # Equivalent to:
+    >>> for key in settings.keys():
+    ...     print(f"{key}: {settings[key]}")
+)");
 
   // Dictionary-style methods for values and items (keys already defined above)
   settings.def(
@@ -2354,22 +2048,19 @@ void bind_settings(pybind11::module &data) {
         return result;
       },
       R"(
-        Get all setting values as a list.
+Get all setting values as a list.
 
-        Returns
-        -------
-        list
-            List of all setting values
+Returns:
+    list: List of all setting values
 
-        Examples
-        --------
-        >>> all_values = settings.values()
-        >>> for value in all_values:
-        ...     print(value)
-        >>> # Or iterate directly:
-        >>> for value in settings.values():
-        ...     print(value)
-        )");
+Examples:
+    >>> all_values = settings.values()
+    >>> for value in all_values:
+    ...     print(value)
+    >>> # Or iterate directly:
+    >>> for value in settings.values():
+    ...     print(value)
+)");
 
   settings.def(
       "items",
@@ -2382,22 +2073,19 @@ void bind_settings(pybind11::module &data) {
         return result;
       },
       R"(
-        Get key-value pairs as a list of tuples.
+Get key-value pairs as a list of tuples.
 
-        Returns
-        -------
-        list of tuple
-            List of (key, value) tuples
+Returns:
+    list[tuple]: List of (key, value) tuples
 
-        Examples
-        --------
-        >>> all_items = settings.items()
-        >>> for key, value in all_items:
-        ...     print(f"{key}: {value}")
-        >>> # Or iterate directly:
-        >>> for key, value in settings.items():
-        ...     print(f"{key}: {value}")
-        )");
+Examples:
+    >>> all_items = settings.items()
+    >>> for key, value in all_items:
+    ...     print(f"{key}: {value}")
+    >>> # Or iterate directly:
+    >>> for key, value in settings.items():
+    ...     print(f"{key}: {value}")
+)");
 
   // Dictionary conversion methods
   settings.def(
@@ -2410,26 +2098,22 @@ void bind_settings(pybind11::module &data) {
         return result;
       },
       R"(
-        Convert settings to Python dictionary.
+Convert settings to Python dictionary.
 
-        Creates a Python dictionary containing all settings with keys as strings
-        and values converted to appropriate Python types.
+Creates a Python dictionary containing all settings with keys as strings and values converted to appropriate Python types.
 
-        Returns
-        -------
-        dict
-            Python dictionary with all settings
+Returns:
+    dict: Python dictionary with all settings
 
-        Examples
-        --------
-        >>> settings_dict = settings.to_dict()
-        >>> print(settings_dict)
-        {'method': 'hf', 'max_iterations': 100, 'tolerance': 1e-06}
-        >>>
-        >>> # Can be used with JSON, pickle, etc.
-        >>> import json
-        >>> json_str = json.dumps(settings_dict)
-        )");
+Examples:
+    >>> settings_dict = settings.to_dict()
+    >>> print(settings_dict)
+    {'method': 'hf', 'max_iterations': 100, 'tolerance': 1e-06}
+    >>>
+    >>> # Can be used with JSON, pickle, etc.
+    >>> import json
+    >>> json_str = json.dumps(settings_dict)
+)");
 
   settings.def(
       "from_dict",
@@ -2447,35 +2131,29 @@ void bind_settings(pybind11::module &data) {
         }
       },
       R"(
-        Load settings from Python dictionary.
+Load settings from Python dictionary.
 
-        Updates existing settings with values from the provided dictionary.
-        Keys must be strings or convertible to strings. Only predefined
-        settings keys can be updated. Values must match expected types.
+Updates existing settings with values from the provided dictionary.
+Keys must be strings or convertible to strings.
+Only predefined settings keys can be updated. Values must match expected types.
 
-        Parameters
-        ----------
-        dict : dict
-            Python dictionary containing settings
+Args:
+    dict (dict): Python dictionary containing settings
 
-        Raises
-        ------
-        SettingNotFound
-            If any key does not exist in settings
-        SettingTypeMismatch
-            If any value type does not match the expected type for its key
+Raises:
+    SettingNotFound: If any key does not exist in settings
+    SettingTypeMismatch: If any value type does not match the expected type for its key
 
-        Examples
-        --------
-        >>> config = {
-        ...     'method': 'hf',
-        ...     'max_iterations': 100,
-        ...     'tolerance': 1e-6,
-        ...     'parameters': [1.0, 2.0, 3.0]
-        ... }
-        >>> settings.from_dict(config)
-        >>> assert settings['method'] == 'hf'
-        )",
+Examples:
+    >>> config = {
+    ...     'method': 'hf',
+    ...     'max_iterations': 100,
+    ...     'tolerance': 1e-6,
+    ...     'parameters': [1.0, 2.0, 3.0]
+    ... }
+    >>> settings.from_dict(config)
+    >>> assert settings['method'] == 'hf'
+)",
       py::arg("dict"));
 
   // String representation
@@ -2486,20 +2164,17 @@ void bind_settings(pybind11::module &data) {
                ">";
       },
       R"(
-        Return string representation of the Settings object.
+Return string representation of the Settings object.
 
-        Returns a brief representation showing the number of settings.
+Returns a brief representation showing the number of settings.
 
-        Returns
-        -------
-        str
-            String representation
+Returns:
+    str: String representation
 
-        Examples
-        --------
-        >>> repr(settings)
-        '<qdk_chemistry.Settings size=3>'
-        )");
+Examples:
+    >>> repr(settings)
+    '<qdk_chemistry.Settings size=3>'
+)");
 
   settings.def(
       "__str__",
@@ -2512,24 +2187,21 @@ void bind_settings(pybind11::module &data) {
         return result;
       },
       R"(
-        Return human-readable string representation of all settings.
+Return human-readable string representation of all settings.
 
-        Returns a formatted string showing all key-value pairs.
+Returns a formatted string showing all key-value pairs.
 
-        Returns
-        -------
-        str
-            Formatted string with all settings
+Returns:
+    str: Formatted string with all settings
 
-        Examples
-        --------
-        >>> print(settings)
-        Settings {
-        method: hf
-        max_iterations: 100
-        tolerance: 1e-06
-        }
-        )");
+Examples:
+    >>> print(settings)
+    Settings {
+    method: hf
+    max_iterations: 100
+    tolerance: 1e-06
+    }
+)");
 
   // String representation
   settings.def(
@@ -2539,20 +2211,17 @@ void bind_settings(pybind11::module &data) {
                ">";
       },
       R"(
-        Return string representation of the Settings object.
+Return string representation of the Settings object.
 
-        Returns a brief representation showing the number of settings.
+Returns a brief representation showing the number of settings.
 
-        Returns
-        -------
-        str
-            String representation
+Returns:
+    str: String representation
 
-        Examples
-        --------
-        >>> repr(settings)
-        '<qdk_chemistry.Settings size=3>'
-        )");
+Examples:
+    >>> repr(settings)
+    '<qdk_chemistry.Settings size=3>'
+)");
 
   settings.def(
       "__str__",
@@ -2565,186 +2234,144 @@ void bind_settings(pybind11::module &data) {
         return result;
       },
       R"(
-        Return human-readable string representation of all settings.
+Return human-readable string representation of all settings.
 
-        Returns a formatted string showing all key-value pairs.
+Returns a formatted string showing all key-value pairs.
 
-        Returns
-        -------
-        str
-            Formatted string with all settings
+Returns:
+    str: Formatted string with all settings
 
-        Examples
-        --------
-        >>> print(settings)
-        Settings {
-        method: hf
-        max_iterations: 100
-        tolerance: 1e-06
-        }
-        )");
+Examples:
+    >>> print(settings)
+    Settings {
+    method: hf
+    max_iterations: 100
+    tolerance: 1e-06
+    }
+)");
 
   // File I/O methods
   settings.def("to_json_file", settings_to_json_file_wrapper,
                R"(
-        Save settings to JSON file.
+Save settings to JSON file.
 
-        Parameters
-        ----------
-        filename : str or pathlib.Path
-            Path to output file. Must have '.settings.json' extension
-            (e.g., ``config.settings.json``, ``parameters.settings.json``)
+Args:
+    filename (str | pathlib.Path): Path to output file.
+        Must have '.settings.json' extension (e.g., ``config.settings.json``, ``parameters.settings.json``)
 
-        Raises
-        ------
-        ValueError
-            If filename doesn't follow the required naming convention
-        RuntimeError
-            If the file cannot be opened or written
+Raises:
+    ValueError: If filename doesn't follow the required naming convention
+    RuntimeError: If the file cannot be opened or written
 
-        Examples
-        --------
-        >>> settings.to_json_file("config.settings.json")
-        >>> settings.to_json_file("parameters.settings.json")
-        >>> from pathlib import Path
-        >>> settings.to_json_file(Path("config.settings.json"))
-        )",
+Examples:
+    >>> settings.to_json_file("config.settings.json")
+    >>> settings.to_json_file("parameters.settings.json")
+    >>> from pathlib import Path
+    >>> settings.to_json_file(Path("config.settings.json"))
+)",
                py::arg("filename"));
 
   settings.def_static("from_json_file", settings_from_json_file_wrapper,
                       R"(
-               Load settings from JSON file.
+Load settings from JSON file.
 
-        Parameters
-        ----------
-        filename : str or pathlib.Path
-            Path to input file. Must have '.settings.json' extension
-            (e.g., ``config.settings.json``, ``parameters.settings.json``)
+Args:
+    filename (str | pathlib.Path): Path to input file.
+        Must have '.settings.json' extension (e.g., ``config.settings.json``, ``parameters.settings.json``)
 
-        Raises
-        ------
-        ValueError
-            If filename doesn't follow the required naming convention
-        RuntimeError
-            If the file cannot be opened, read, or contains invalid settings data
+Raises:
+    ValueError: If filename doesn't follow the required naming convention
+    RuntimeError: If the file cannot be opened, read, or contains invalid settings data
 
-               Examples
-               --------
-               >>> settings.from_json_file("config.settings.json")
-               >>> settings.from_json_file("parameters.settings.json")
-               >>> from pathlib import Path
-               >>> settings.from_json_file(Path("config.settings.json"))
-               )",
+Examples:
+    >>> settings.from_json_file("config.settings.json")
+    >>> settings.from_json_file("parameters.settings.json")
+    >>> from pathlib import Path
+    >>> settings.from_json_file(Path("config.settings.json"))
+)",
                       py::arg("filename"));
 
   settings.def("to_hdf5_file", &Settings::to_hdf5_file,
                R"(
-        Save settings to HDF5 file.
+Save settings to HDF5 file.
 
-        Parameters
-        ----------
-        filename : str
-            Path to output file. Must have '.settings.h5' extension
-            (e.g., ``config.settings.h5``, ``parameters.settings.h5``)
+Args:
+    filename (str): Path to output file. Must have '.settings.h5' extension (e.g., ``config.settings.h5``, ``parameters.settings.h5``)
 
-        Raises
-        ------
-        ValueError
-            If filename doesn't follow the required naming convention
-        RuntimeError
-            If the file cannot be opened or written
+Raises:
+    ValueError: If filename doesn't follow the required naming convention
+    RuntimeError: If the file cannot be opened or written
 
-        Examples
-        --------
-        >>> settings.to_hdf5_file("config.settings.h5")
-        >>> settings.to_hdf5_file("parameters.settings.h5")
-        )",
+Examples:
+    >>> settings.to_hdf5_file("config.settings.h5")
+    >>> settings.to_hdf5_file("parameters.settings.h5")
+)",
                py::arg("filename"));
 
   settings.def_static("from_hdf5_file", settings_from_hdf5_file_wrapper,
                       R"(
-               Load settings from HDF5 file.
+Load settings from HDF5 file.
 
-        Parameters
-        ----------
-        filename : str
-            Path to input file. Must have '.settings.h5' extension
-            (e.g., ``config.settings.h5``, ``parameters.settings.h5``)
+Args:
+    filename (str): Path to input file.
+        Must have '.settings.h5' extension (e.g., ``config.settings.h5``, ``parameters.settings.h5``)
 
-        Raises
-        ------
-        ValueError
-            If filename doesn't follow the required naming convention
-        RuntimeError
-            If the file cannot be opened, read, or contains invalid settings data
+Raises:
+    ValueError: If filename doesn't follow the required naming convention
+    RuntimeError: If the file cannot be opened, read, or contains invalid settings data
 
-               Examples
-               --------
-               >>> settings.from_hdf5_file("config.settings.h5")
-               >>> settings.from_hdf5_file("parameters.settings.h5")
-               )",
+Examples:
+    >>> settings.from_hdf5_file("config.settings.h5")
+    >>> settings.from_hdf5_file("parameters.settings.h5")
+)",
                       py::arg("filename"));
 
   settings.def("to_file", settings_to_file_wrapper,
                R"(
-        Save settings to file in specified format.
+Save settings to file in specified format.
 
-        Parameters
-        ----------
-        filename : str or pathlib.Path
-            Path to output file.
-        format_type : str
-            Format type ("json" or "hdf5")
+Args:
+    filename (str | pathlib.Path): Path to output file.
+    format_type (str): Format type ("json" or "hdf5")
 
-        Raises
-        ------
-        RuntimeError
-            If the file cannot be opened or written
+Raises:
+    RuntimeError: If the file cannot be opened or written
 
-        Examples
-        --------
-        >>> settings.to_file("config.settings.json", "json")
-        >>> settings.to_file("config.settings.h5", "hdf5")
-        >>> from pathlib import Path
-        >>> settings.to_file(Path("config.settings.json"), "json")
-        )",
+Examples:
+    >>> settings.to_file("config.settings.json", "json")
+    >>> settings.to_file("config.settings.h5", "hdf5")
+    >>> from pathlib import Path
+    >>> settings.to_file(Path("config.settings.json"), "json")
+)",
                py::arg("filename"), py::arg("format_type"));
 
   settings.def_static("from_file", settings_from_file_wrapper,
                       R"(
-               Load settings from file in specified format.
+Load settings from file in specified format.
 
-        Parameters
-        ----------
-        filename : str or pathlib.Path
-            Path to input file.
-        format_type : str
-            Format type ("json" or "hdf5")
+Args:
+    filename (str | pathlib.Path): Path to input file.
+    format_type (str): Format type ("json" or "hdf5")
 
-        Raises
-        ------
-        RuntimeError
-            If the file cannot be opened, read, or contains invalid settings data
+Raises:
+    RuntimeError: If the file cannot be opened, read, or contains invalid settings data
 
-               Examples
-               --------
-               >>> settings.from_file("config.settings.json", "json")
-               >>> settings.from_file("config.settings.h5", "hdf5")
-               >>> from pathlib import Path
-               >>> settings.from_file(Path("config.settings.json"), "json")
-               )",
+Examples:
+    >>> settings.from_file("config.settings.json", "json")
+    >>> settings.from_file("config.settings.h5", "hdf5")
+    >>> from pathlib import Path
+    >>> settings.from_file(Path("config.settings.json"), "json")
+)",
                       py::arg("filename"), py::arg("format_type"));
 
   // Bind ElectronicStructureSettings class
   py::class_<qdk::chemistry::algorithms::ElectronicStructureSettings, Settings,
              py::smart_holder>(data, "ElectronicStructureSettings", R"(
-    Base class for electronic structure algorithms settings.
+Base class for electronic structure algorithms settings.
 
-    This class extends the base Settings class with default values commonly used
-    in electronic structure calculations such as basis sets, molecular charge,
-    spin multiplicity, and convergence parameters.
+This class extends the base Settings class with default values commonly used in electronic structure calculations such as basis sets, molecular charge, spin multiplicity, and convergence parameters.
 
-    The default settings include:
+The default settings include:
 
     * method: "hf" - The electronic structure method (Hartree-Fock)
     * charge: 0 - Molecular charge
@@ -2753,10 +2380,9 @@ void bind_settings(pybind11::module &data) {
     * tolerance: 1e-6 - Convergence tolerance
     * max_iterations: 50 - Maximum number of iterations
 
-    These defaults can be overridden by setting new values after instantiation.
+These defaults can be overridden by setting new values after instantiation.
 
-    Examples
-    --------
+Examples:
     >>> import qdk_chemistry.data as data
     >>> settings = data.ElectronicStructureSettings()
     >>> print(settings.method)  # "hf"
@@ -2764,11 +2390,11 @@ void bind_settings(pybind11::module &data) {
     >>> settings.basis_set = "6-31G*"  # Override default
     >>> settings.charge = -1  # Set molecular charge
     >>> settings.max_iterations = 100  # Increase max iterations
-    )")
+)")
       .def(py::init<>(), R"(
-        Create ElectronicStructureSettings with default values.
+    Create ElectronicStructureSettings with default values.
 
-        Initializes settings with sensible defaults for electronic structure
-        calculations. All defaults can be modified after construction.
-        )");
+    Initializes settings with sensible defaults for electronic structure
+    calculations. All defaults can be modified after construction.
+)");
 }

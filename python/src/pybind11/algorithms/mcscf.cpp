@@ -53,85 +53,70 @@ void bind_mcscf(py::module& m) {
   // MultiConfigurationScf abstract base class
   py::class_<MultiConfigurationScf, MultiConfigurationScfBase, py::smart_holder>
       multi_configuration_scf(m, "MultiConfigurationScf", R"(
-    Abstract base class for multi-configurational Self-Consistent Field (MultiConfigurationScf) algorithms.
+Abstract base class for multi-configurational Self-Consistent Field (MultiConfigurationScf) algorithms.
 
-    This class defines the interface for MultiConfigurationScf calculations that simultaneously optimize
-    both molecular orbital coefficients and configuration interaction coefficients.
-    Concrete implementations should inherit from this class and implement the ``solve``
-    method.
+This class defines the interface for MultiConfigurationScf calculations that simultaneously optimize both molecular orbital coefficients and configuration interaction coefficients.
+Concrete implementations should inherit from this class and implement the ``solve`` method.
 
-    Examples
-    --------
+Examples:
     To create a custom MultiConfigurationScf solver, inherit from this class:
 
-    >>> import qdk_chemistry.algorithms as alg
-    >>> import qdk_chemistry.data as data
-    >>> class MyMCSCF(alg.MultiConfigurationScf):
-    ...     def __init__(self):
-    ...         super().__init__()  # Call the base class constructor
-    ...     def _run_impl(self,
-    ...                   orbitals : data.Orbitals,
-    ...                   ham_ctor : alg.HamiltonianConstructor,
-    ...                   mc_calculator : alg.MultiConfigurationCalculator,
-    ...                   n_active_alpha_electrons : int,
-    ...                   n_active_beta_electrons : int) ->tuple[float, data.Wavefunction] :
-    ...         # Custom MCSCF implementation
-    ...         return -1.0, data.Wavefunction()
-    )");
+        >>> import qdk_chemistry.algorithms as alg
+        >>> import qdk_chemistry.data as data
+        >>> class MyMCSCF(alg.MultiConfigurationScf):
+        ...     def __init__(self):
+        ...         super().__init__()  # Call the base class constructor
+        ...     def _run_impl(self,
+        ...                   orbitals : data.Orbitals,
+        ...                   ham_ctor : alg.HamiltonianConstructor,
+        ...                   mc_calculator : alg.MultiConfigurationCalculator,
+        ...                   n_active_alpha_electrons : int,
+        ...                   n_active_beta_electrons : int) ->tuple[float, data.Wavefunction] :
+        ...         # Custom MCSCF implementation
+        ...         return -1.0, data.Wavefunction()
+)");
 
   multi_configuration_scf.def(py::init<>(),
                               R"(
-    Create a MultiConfigurationScf instance.
+Create a MultiConfigurationScf instance.
 
-    Default constructor for the abstract base class.
-    This should typically be called from derived class constructors.
+Default constructor for the abstract base class.
+This should typically be called from derived class constructors.
 
-    Examples
-    --------
+Examples:
     >>> # In a derived class:
     >>> class MyMCSCF(alg.MultiConfigurationScf):
     ...     def __init__(self):
     ...         super().__init__()  # Calls this constructor
-    )");
+)");
 
   multi_configuration_scf.def(
       "run", &MultiConfigurationScf::run,
       R"(
-        Perform an MultiConfigurationScf calculation.
+Perform a MultiConfigurationScf calculation.
 
-        This method automatically locks settings before execution.
+This method automatically locks settings before execution.
 
-        Parameters
-        ----------
-        orbitals : qdk_chemistry.data.Orbitals
-            The initial molecular orbitals for the calculation
-        ham_ctor : qdk_chemistry.algorithms.HamiltonianConstructor
-            The Hamiltonian constructor for building and updating the Hamiltonian
-        mc_calculator : qdk_chemistry.algorithms.MultiConfigurationCalculator
-            The MC calculator to evaluate the active space
-        n_active_alpha_electrons : int
-            The number of alpha electrons in the active space
-        n_active_beta_electrons : int
-            The number of beta electrons in the active space
+Args:
+    orbitals (qdk_chemistry.data.Orbitals): The initial molecular orbitals for the calculation
+    ham_ctor (qdk_chemistry.algorithms.HamiltonianConstructor): The Hamiltonian constructor for building and updating the Hamiltonian
+    mc_calculator (qdk_chemistry.algorithms.MultiConfigurationCalculator): The MC calculator to evaluate the active space
+    n_active_alpha_electrons (int): The number of alpha electrons in the active space
+    n_active_beta_electrons (int): The number of beta electrons in the active space
 
-        Returns
-        -------
-        tuple[float, qdk_chemistry.data.Wavefunction]
-            A tuple containing the calculated energy and the resulting
-            wavefunction
-        )",
+Returns:
+    tuple[float, qdk_chemistry.data.Wavefunction]: A tuple containing the calculated energy and the resulting wavefunction
+)",
       py::arg("orbitals"), py::arg("ham_ctor"), py::arg("mc_calculator"),
       py::arg("n_active_alpha_electrons"), py::arg("n_active_beta_electrons"));
 
   multi_configuration_scf.def("settings", &MultiConfigurationScf::settings,
                               R"(
-        Access the MultiConfigurationScf calculation settings.
+Access the MultiConfigurationScf calculation settings.
 
-        Returns
-        -------
-        qdk_chemistry.data.Settings
-            Reference to the settings object for configuring the MultiConfigurationScf calculation
-        )",
+Returns:
+    qdk_chemistry.data.Settings: Reference to the settings object for configuring the MultiConfigurationScf calculation
+)",
                               py::return_value_policy::reference_internal);
 
   // Expose _settings as a writable property for derived classes
@@ -146,29 +131,25 @@ void bind_mcscf(py::module& m) {
       },
       py::return_value_policy::reference_internal,
       R"(
-        Internal settings object property.
+Internal settings object property.
 
-        This property allows derived classes to replace the settings object with
-        a specialized Settings subclass in their constructors.
+This property allows derived classes to replace the settings object with a specialized Settings subclass in their constructors.
 
-        Examples
-        --------
-        >>> class MyMCSCF(alg.MultiConfigurationScf):
-        ...     def __init__(self):
-        ...         super().__init__()
-        ...         from qdk_chemistry.data import ElectronicStructureSettings
-        ...         self._settings = ElectronicStructureSettings()
-        )");
+Examples:
+    >>> class MyMCSCF(alg.MultiConfigurationScf):
+    ...     def __init__(self):
+    ...         super().__init__()
+    ...         from qdk_chemistry.data import ElectronicStructureSettings
+    ...         self._settings = ElectronicStructureSettings()
+)");
 
   multi_configuration_scf.def("type_name", &MultiConfigurationScf::type_name,
                               R"(
-        The algorithm's type name.
+The algorithm's type name.
 
-        Returns
-        -------
-        str
-            The type name of the algorithm
-        )");
+Returns:
+    str: The type name of the algorithm
+)");
 
   multi_configuration_scf.def("__repr__", [](const MultiConfigurationScf&) {
     return "<qdk_chemistry.algorithms.MultiConfigurationScf>";
