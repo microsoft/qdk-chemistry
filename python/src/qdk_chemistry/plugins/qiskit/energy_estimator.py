@@ -19,7 +19,6 @@ Key Features:
 
 from __future__ import annotations
 
-import logging
 from typing import TYPE_CHECKING, Any
 
 from qiskit import qasm3, transpile

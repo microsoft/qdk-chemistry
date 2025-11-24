@@ -419,61 +419,6 @@ bool BasisSet::has_ecp_shells() const {
   return get_num_ecp_shells() > 0;
 }
 
-std::vector<Shell> BasisSet::get_ecp_shells() const {
-  QDK_LOG_TRACE_ENTERING();
-  std::vector<Shell> all_ecp_shells;
-
-  for (const auto& atom_ecp_shells : _ecp_shells_per_atom) {
-    for (const auto& shell : atom_ecp_shells) {
-      all_ecp_shells.push_back(shell);
-    }
-  }
-
-  return all_ecp_shells;
-}
-
-const std::vector<Shell>& BasisSet::get_ecp_shells_for_atom(
-    size_t atom_index) const {
-  QDK_LOG_TRACE_ENTERING();
-  _validate_atom_index(atom_index);
-  if (atom_index >= _ecp_shells_per_atom.size()) {
-    static const std::vector<Shell> empty_vector;
-    return empty_vector;
-  }
-  return _ecp_shells_per_atom[atom_index];
-}
-
-const Shell& BasisSet::get_ecp_shell(size_t shell_index) const {
-  QDK_LOG_TRACE_ENTERING();
-  size_t total_ecp_shells = get_num_ecp_shells();
-  if (shell_index >= total_ecp_shells) {
-    throw std::out_of_range("ECP shell index " + std::to_string(shell_index) +
-                            " out of range [0, " +
-                            std::to_string(total_ecp_shells) + ")");
-  }
-
-  size_t current_index = 0;
-  for (const auto& atom_ecp_shells : _ecp_shells_per_atom) {
-    if (shell_index < current_index + atom_ecp_shells.size()) {
-      return atom_ecp_shells[shell_index - current_index];
-    }
-    current_index += atom_ecp_shells.size();
-  }
-
-  // Should never reach here if validation worked correctly
-  throw std::out_of_range("ECP shell index not found");
-}
-
-size_t BasisSet::get_num_ecp_shells() const {
-  size_t total = 0;
-  for (const auto& atom_ecp_shells : _ecp_shells_per_atom) {
-    total += atom_ecp_shells.size();
-  }
-  return total;
-}
-
-bool BasisSet::has_ecp_shells() const { return get_num_ecp_shells() > 0; }
-
 std::pair<size_t, int> BasisSet::get_atomic_orbital_info(
     size_t atomic_orbital_index) const {
   QDK_LOG_TRACE_ENTERING();

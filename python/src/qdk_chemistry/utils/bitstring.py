@@ -30,15 +30,15 @@ The module is particularly useful for:
 
 from __future__ import annotations
 
-import logging
 from typing import TYPE_CHECKING
 
 import numpy as np
 
 if TYPE_CHECKING:
     from qdk_chemistry.data import Configuration
+from qdk_chemistry.utils import Logger
 
-_LOGGER = logging.getLogger(__name__)
+_LOGGER = Logger.QDK_LOGGER(__name__)
 
 __all__ = [
     "binary_string_to_configuration",

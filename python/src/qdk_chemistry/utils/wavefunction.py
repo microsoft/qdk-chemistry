@@ -5,14 +5,13 @@
 # Licensed under the MIT License. See LICENSE.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
 
-from logging import getLogger
-
 import numpy as np
 
 from qdk_chemistry.algorithms import create
 from qdk_chemistry.data import Configuration, Hamiltonian, SciWavefunctionContainer, Wavefunction
+from qdk_chemistry.utils import Logger
 
-LOGGER = getLogger(__name__)
+_LOGGER = Logger.QDK_LOGGER(__name__)
 
 __all__ = [
     "calculate_sparse_wavefunction",
@@ -98,7 +97,7 @@ def calculate_sparse_wavefunction(
     """
     ranked = get_top_determinants(reference_wavefunction, max_determinants)
     if not ranked:
-        LOGGER.warning("No determinants found; returning an empty wavefunction.")
+        _LOGGER.warning("No determinants found; returning an empty wavefunction.")
         return Wavefunction(SciWavefunctionContainer(np.array([]), [], reference_wavefunction.get_orbitals()))
 
     projector = create("projected_multi_configuration_calculator", pmc_calculator)
@@ -126,16 +125,12 @@ def calculate_sparse_wavefunction(
     best_count = count
 
     if count == len(ranked_items) and not found:
-        LOGGER.warning(
-            "Sparse CI tolerance not reached with %s determinants; returning the full truncated set.",
-            best_count,
+        _LOGGER.warning(
+            f"Sparse CI tolerance not reached with {best_count} determinants; returning the full truncated set."
         )
 
-    LOGGER.info(
-        "Sparse CI finder (%s dets) = %.8f Hartree (ΔE = %.4f mHartree)",
-        best_count,
-        best_energy,
-        diff * 1000.0,
+    _LOGGER.info(
+        f"Sparse CI finder ({best_count} dets) = {best_energy:.8f} Hartree (ΔE = {diff * 1000.0:.4f} mHartree)"
     )
     determinants = list(best_wavefunction.get_active_determinants())
     coeffs = [best_wavefunction.get_coefficient(det) for det in determinants]
