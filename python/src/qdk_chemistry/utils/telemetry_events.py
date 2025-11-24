@@ -16,57 +16,57 @@ def get_basis_functions_bucket(basis_functions: Union[str, int]) -> str:
     
     Args:
         basis_functions (Union[str, int]): The number of basis functions in a 
-            molecular calculation. Can be an integer count or the string "unknown"
+            calculation. Can be an integer count or the string "unknown"
             if the count is not available.
     
     Returns:
         str: A string representation of the bucket that the basis function count
              falls into. Possible return values are:
              - "unknown": When input is "unknown"
-             - "10": For 1-10 basis functions
-             - "20", "30", "40": For 11-49 basis functions (rounded down to nearest 10)
-             - "50": For 50-99 basis functions  
-             - "100": For 100-249 basis functions
-             - "250": For 250-499 basis functions
-             - "500": For 500-999 basis functions
-             - "1000": For 1000+ basis functions
+             - "10", "20", "30", "40": For <50 basis functions (intervals of 10)
+             - "50", "100", "150", "200", "250", "300", "350", "400", "450", "500": 
+               For 50-500 basis functions (intervals of 50)
+             - "600", "700", "800", "900", "1000": For >500 basis functions (intervals of 100)
+             - "1500+": For 1500+ basis functions
     
     Examples:
         >>> get_basis_functions_bucket(7)
         "10"
         >>> get_basis_functions_bucket(23)
-        "20"
+        "30"
         >>> get_basis_functions_bucket(150)
-        "100"
+        "150"
+        >>> get_basis_functions_bucket(750)
+        "800"
         >>> get_basis_functions_bucket(1500)
-        "1000"
+        "1500+"
         >>> get_basis_functions_bucket("unknown")
         "unknown"
     
     Notes:
         The bucketing scheme is designed for typical quantum chemistry calculations
-        where basis function counts typically range from ~10 for small molecules
-        to 1000+ for large systems. The buckets provide good granularity for 
-        performance analysis while avoiding excessive cardinality in telemetry data.
+        with varying granularity based on system size:
+        - Fine granularity (10s) for small molecules (<50 basis functions)
+        - Medium granularity (50s) for medium molecules (50-500 basis functions)  
+        - Coarse granularity (100s) for large molecules (>500 basis functions)
     """
     if basis_functions == "unknown":
         return "unknown"
+    
     basis_functions = int(basis_functions)
-    if basis_functions <= 10:
-        return "10"
-    elif basis_functions >= 1000:
-        return "1000"
-    elif basis_functions >= 500:
-        return "500"
-    elif basis_functions >= 250:
-        return "250"
-    elif basis_functions >= 100:
-        return "100"
-    elif basis_functions >= 50:
-        return "50"
+    
+    if basis_functions < 50:
+        # Intervals of 10 for < 50
+        return str(((basis_functions - 1) // 10 + 1) * 10)
+    elif basis_functions <= 500:
+        # Intervals of 50 for 50-500
+        return str(((basis_functions - 1) // 50 + 1) * 50)
+    elif basis_functions < 1500:
+        # Intervals of 100 for 500-1000
+        return str(((basis_functions - 1) // 100 + 1) * 100)
     else:
-        # integer divide by 10 to get nearest 10
-        return str(basis_functions // 10 * 10)
+        # 1000+ for anything >= 1000
+        return "1500+"
     
 def on_qdk_chemistry_import() -> None:
     """
