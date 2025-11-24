@@ -45,7 +45,7 @@ class TestHamiltonian:
         assert h.has_orbitals()
         assert h.get_orbitals().get_num_molecular_orbitals() == 2
         assert h.get_core_energy() == 1.5
-        assert np.array_equal(h.get_one_body_integrals(), one_body)
+        assert np.array_equal(h.get_one_body_integrals_alpha(), one_body)
 
         # get_two_body_integrals returns (aaaa, aabb, bbbb) tuple
         aaaa, aabb, bbbb = h.get_two_body_integrals()
@@ -60,7 +60,8 @@ class TestHamiltonian:
         orbitals = create_test_orbitals(2)
         h = Hamiltonian(one_body, two_body, orbitals, 0.0, np.array([]))
         assert h.has_one_body_integrals()
-        assert np.array_equal(h.get_one_body_integrals(), one_body)
+        assert np.array_equal(h.get_one_body_integrals_alpha(), one_body)
+
 
     def test_two_body_integrals(self):
         one_body = np.eye(2)
@@ -110,8 +111,14 @@ class TestHamiltonian:
         assert h2.has_two_body_integrals()
         assert h2.has_orbitals()
         assert np.allclose(
-            h.get_one_body_integrals(),
-            h2.get_one_body_integrals(),
+            h.get_one_body_integrals_alpha(),
+            h2.get_one_body_integrals_alpha(),
+            rtol=float_comparison_relative_tolerance,
+            atol=float_comparison_absolute_tolerance,
+        )
+        assert np.allclose(
+            h.get_one_body_integrals_beta(),
+            h2.get_one_body_integrals_beta(),
             rtol=float_comparison_relative_tolerance,
             atol=float_comparison_absolute_tolerance,
         )
@@ -157,8 +164,14 @@ class TestHamiltonian:
             assert h2.has_two_body_integrals()
             assert h2.has_orbitals()
             assert np.allclose(
-                h.get_one_body_integrals(),
-                h2.get_one_body_integrals(),
+                h.get_one_body_integrals_alpha(),
+                h2.get_one_body_integrals_alpha(),
+                rtol=float_comparison_relative_tolerance,
+                atol=float_comparison_absolute_tolerance,
+            )
+            assert np.allclose(
+                h.get_one_body_integrals_beta(),
+                h2.get_one_body_integrals_beta(),
                 rtol=float_comparison_relative_tolerance,
                 atol=float_comparison_absolute_tolerance,
             )
@@ -206,8 +219,14 @@ class TestHamiltonian:
             assert h2.has_two_body_integrals()
             assert h2.has_orbitals()
             assert np.allclose(
-                h.get_one_body_integrals(),
-                h2.get_one_body_integrals(),
+                h.get_one_body_integrals_alpha(),
+                h2.get_one_body_integrals_alpha(),
+                rtol=float_comparison_relative_tolerance,
+                atol=float_comparison_absolute_tolerance,
+            )
+            assert np.allclose(
+                h.get_one_body_integrals_beta(),
+                h2.get_one_body_integrals_beta(),
                 rtol=float_comparison_relative_tolerance,
                 atol=float_comparison_absolute_tolerance,
             )
@@ -251,8 +270,14 @@ class TestHamiltonian:
             h2 = Hamiltonian.from_file(json_filename, "json")
             assert h2.get_orbitals().get_num_molecular_orbitals() == 2
             assert np.allclose(
-                h.get_one_body_integrals(),
-                h2.get_one_body_integrals(),
+                h.get_one_body_integrals_alpha(),
+                h2.get_one_body_integrals_alpha(),
+                rtol=float_comparison_relative_tolerance,
+                atol=float_comparison_absolute_tolerance,
+            )
+            assert np.allclose(
+                h.get_one_body_integrals_beta(),
+                h2.get_one_body_integrals_beta(),
                 rtol=float_comparison_relative_tolerance,
                 atol=float_comparison_absolute_tolerance,
             )
@@ -267,8 +292,14 @@ class TestHamiltonian:
             h3 = Hamiltonian.from_file(hdf5_filename, "hdf5")
             assert h3.get_orbitals().get_num_molecular_orbitals() == 2
             assert np.allclose(
-                h.get_one_body_integrals(),
-                h3.get_one_body_integrals(),
+                h.get_one_body_integrals_alpha(),
+                h3.get_one_body_integrals_alpha(),
+                rtol=float_comparison_relative_tolerance,
+                atol=float_comparison_absolute_tolerance,
+            )
+            assert np.allclose(
+                h.get_one_body_integrals_beta(),
+                h3.get_one_body_integrals_beta(),
                 rtol=float_comparison_relative_tolerance,
                 atol=float_comparison_absolute_tolerance,
             )
@@ -349,7 +380,8 @@ class TestHamiltonian:
 
         # Verify integral data
         if h.has_one_body_integrals():
-            assert np.array_equal(h_restored.get_one_body_integrals(), h.get_one_body_integrals())
+            assert np.array_equal(h_restored.get_one_body_integrals_alpha(), h.get_one_body_integrals_alpha())
+            assert np.array_equal(h_restored.get_one_body_integrals_beta(), h.get_one_body_integrals_beta())
 
         if h.has_two_body_integrals():
             h_aaaa, h_aabb, h_bbbb = h.get_two_body_integrals()
@@ -393,12 +425,12 @@ class TestHamiltonian:
         assert h.get_core_energy() == 1.0
 
         # Verify integral access
-        np.testing.assert_array_equal(h.get_one_body_integrals(), one_body)
+        assert np.array_equal(h.get_one_body_integrals_alpha(), one_body)
         # For restricted case, all components should be the same
         aaaa, aabb, bbbb = h.get_two_body_integrals()
-        np.testing.assert_array_equal(aaaa, two_body)
-        np.testing.assert_array_equal(aabb, two_body)
-        np.testing.assert_array_equal(bbbb, two_body)
+        assert np.array_equal(aaaa, two_body)
+        assert np.array_equal(aabb, two_body)
+        assert np.array_equal(bbbb, two_body)
 
     def test_unrestricted_hamiltonian_construction(self):
         """Test unrestricted Hamiltonian construction and properties."""
@@ -443,13 +475,13 @@ class TestHamiltonian:
         assert h.get_core_energy() == 2.0
 
         # Verify separate alpha/beta integral access
-        np.testing.assert_array_equal(h.get_one_body_integrals_alpha(), one_body_alpha)
-        np.testing.assert_array_equal(h.get_one_body_integrals_beta(), one_body_beta)
+        assert np.array_equal(h.get_one_body_integrals_alpha(), one_body_alpha)
+        assert np.array_equal(h.get_one_body_integrals_beta(), one_body_beta)
         # get_two_body_integrals returns (aaaa, aabb, bbbb) tuple
         aaaa, aabb, bbbb = h.get_two_body_integrals()
-        np.testing.assert_array_equal(aaaa, two_body_aaaa)
-        np.testing.assert_array_equal(aabb, two_body_aabb)
-        np.testing.assert_array_equal(bbbb, two_body_bbbb)
+        assert np.array_equal(aaaa, two_body_aaaa)
+        assert np.array_equal(aabb, two_body_aabb)
+        assert np.array_equal(bbbb, two_body_bbbb)
 
     def test_unrestricted_vs_restricted_serialization(self):
         """Test that restricted/unrestricted nature is preserved in serialization."""
@@ -494,11 +526,12 @@ class TestHamiltonian:
         assert h_unrestricted_json.is_unrestricted()
 
         # Verify integral values are preserved
-        np.testing.assert_array_equal(h_restricted.get_one_body_integrals(), h_restricted_json.get_one_body_integrals())
-        np.testing.assert_array_equal(
+        assert np.array_equal(h_restricted.get_one_body_integrals()[0], h_restricted_json.get_one_body_integrals()[0])
+        assert np.array_equal(h_restricted.get_one_body_integrals()[1], h_restricted_json.get_one_body_integrals()[1])
+        assert np.array_equal(
             h_unrestricted.get_one_body_integrals_alpha(), h_unrestricted_json.get_one_body_integrals_alpha()
         )
-        np.testing.assert_array_equal(
+        assert np.array_equal(
             h_unrestricted.get_one_body_integrals_beta(), h_unrestricted_json.get_one_body_integrals_beta()
         )
 

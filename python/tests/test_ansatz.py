@@ -246,7 +246,9 @@ class TestAnsatzSerialization:
             assert orig_ham.get_core_energy() == restored_ham.get_core_energy()
 
             if orig_ham.has_one_body_integrals():
-                assert np.array_equal(orig_ham.get_one_body_integrals(), restored_ham.get_one_body_integrals())
+                assert np.array_equal(orig_ham.get_one_body_integrals()[0], restored_ham.get_one_body_integrals()[0])
+                assert np.array_equal(orig_ham.get_one_body_integrals()[1], restored_ham.get_one_body_integrals()[1])
+
 
         # Verify wavefunction data
         if test_ansatz.has_wavefunction():

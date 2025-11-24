@@ -75,7 +75,7 @@ class QiskitQubitMapper(QubitMapper):
                 f"Please use one of the following options: {self.QubitMappers.keys()}"
             )
 
-        h1_a = hamiltonian.get_one_body_integrals()
+        (h1_a, _) = hamiltonian.get_one_body_integrals() # alpha
         (h2_aa, _, _) = hamiltonian.get_two_body_integrals()  # first spin channel aaaa
         num_orbs = len(hamiltonian.get_orbitals().get_active_space_indices()[0])
         electronic_hamiltonian = ElectronicEnergy.from_raw_integrals(

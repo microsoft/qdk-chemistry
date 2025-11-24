@@ -204,13 +204,13 @@ void bind_hamiltonian(pybind11::module& data) {
   bind_getter_as_property(hamiltonian, "get_one_body_integrals",
                           &Hamiltonian::get_one_body_integrals,
                           R"(
-        Get one-electron integrals in molecular orbital basis.
+        Get tuple of one-electron integrals (alpha, beta) in molecular orbital basis.
 
         Returns
         -------
-        numpy.ndarray
-            One-electron integral matrix [norb x norb] containing
-            kinetic energy and nuclear attraction integrals
+        [numpy.ndarray, numpy.ndarray]
+            One-electron integral matrix [norb x norb] of alpha and beta respectively,
+            containing kinetic energy and nuclear attraction integrals
 
         Raises
         ------
@@ -219,9 +219,9 @@ void bind_hamiltonian(pybind11::module& data) {
 
         Examples
         --------
-        >>> h1 = hamiltonian.get_one_body_integrals()
-        >>> print(f"One-body matrix shape: {h1.shape}")
-        >>> print(f"Diagonal element h[0,0] = {h1[0,0]}")
+        >>> h1_alpha, h1_beta = hamiltonian.get_one_body_integrals()
+        >>> print(f"One-body matrix shape: {h1_alpha.shape}")
+        >>> print(f"Diagonal element h1_alpha[0,0] = {h1_alpha[0,0]}")
         )",
                           py::return_value_policy::reference_internal);
   hamiltonian.def("has_one_body_integrals",

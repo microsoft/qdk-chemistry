@@ -609,7 +609,7 @@ def hamiltonian_to_scf(hamiltonian: Hamiltonian, alpha_occ: np.ndarray, beta_occ
     # Store integrals in the SCF object
     (eri, _, _) = hamiltonian.get_two_body_integrals()
     eri = np.reshape(eri, (norb, norb, norb, norb))
-    h1e = hamiltonian.get_one_body_integrals()
+    (h1e, _) = hamiltonian.get_one_body_integrals()
     # Use _eri directly as it's the established way to access this in PySCF
     # even though it's technically a private member
     fake_scf._eri = eri  # noqa: SLF001
