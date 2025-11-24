@@ -5,7 +5,6 @@
 #include "eri_df_base.h"
 
 #include <qdk/chemistry/scf/util/libint2_util.h>
-#include <spdlog/spdlog.h>
 
 #include <blas.hh>
 #include <lapack.hh>
@@ -14,6 +13,7 @@
 #include <qdk/chemistry/scf/util/gpu/cublas_utils.h>
 #include <qdk/chemistry/scf/util/gpu/cusolver_utils.h>
 #endif
+#include <qdk/chemistry/utils/logger.hpp>
 
 #define QDK_CHEMISTRY_DF_CHOLESKY 0x0
 #define QDK_CHEMISTRY_DF_LU 0x1
@@ -23,6 +23,8 @@ namespace qdk::chemistry::scf {
 DensityFittingBase::DensityFittingBase(bool unr, const BasisSet& obs,
                                        const BasisSet& abs, ParallelConfig mpi,
                                        bool gpu) {
+  QDK_LOG_TRACE_ENTERING();
+
   if (obs.mode != abs.mode)
     throw std::runtime_error(
         "ERI_DF Cannot Mix Basis Modes Between OBS and ABS");
@@ -50,10 +52,12 @@ DensityFittingBase::DensityFittingBase(bool unr, const BasisSet& obs,
 }
 
 void DensityFittingBase::generate_metric() {
+  QDK_LOG_TRACE_ENTERING();
+
   const size_t naux = abs_.nbf();
   const size_t metric_sz = naux * naux;
 
-  if (!mpi_.world_rank) spdlog::trace("Generating DF Metric via Libint2");
+  if (!mpi_.world_rank) QDK_LOGGER()->trace("Generating DF Metric via Libint2");
   h_metric_ = libint2_util::metric_df(basis_mode_, abs_);
 #ifdef QDK_CHEMISTRY_ENABLE_GPU
   cublasHandle_ = std::make_unique<cublas::ManagedcuBlasHandle>();
@@ -62,7 +66,8 @@ void DensityFittingBase::generate_metric() {
 #ifdef QDK_CHEMISTRY_ENABLE_GPU
   if (gpu_) {
     // Allocate ERIs on the device and ship data
-    if (!mpi_.world_rank) spdlog::trace("Saving DF Metric in Device Memory");
+    if (!mpi_.world_rank)
+      QDK_LOGGER()->trace("Saving DF Metric in Device Memory");
     CUDA_CHECK(cudaMallocAsync(&d_metric_, metric_sz * sizeof(double), 0));
     CUDA_CHECK(cudaStreamSynchronize(0));
     CUDA_CHECK(cudaMemcpy(d_metric_, h_metric_.get(),
@@ -79,7 +84,8 @@ void DensityFittingBase::generate_metric() {
 #endif
   } else {
 #endif
-    if (!mpi_.world_rank) spdlog::trace("Saving DF Metric in Host Memory");
+    if (!mpi_.world_rank)
+      QDK_LOGGER()->trace("Saving DF Metric in Host Memory");
 #if QDK_CHEMISTRY_DF_INV_METHOD == QDK_CHEMISTRY_DF_CHOLESKY
     // Cholesky factorization
     lapack::potrf(lapack::Uplo::Lower, naux, h_metric_.get(), naux);
@@ -94,6 +100,7 @@ void DensityFittingBase::generate_metric() {
 
 #ifdef QDK_CHEMISTRY_ENABLE_GPU
 void DensityFittingBase::solve_metric_system_device(double* X, size_t LDX) {
+  QDK_LOG_TRACE_ENTERING();
   const size_t naux = abs_.num_atomic_orbitals();
 #if QDK_CHEMISTRY_DF_INV_METHOD == QDK_CHEMISTRY_DF_CHOLESKY
   cusolver::potrs(*cusolverHandle_, CUBLAS_FILL_MODE_LOWER, naux, 1, d_metric_,
@@ -105,6 +112,8 @@ void DensityFittingBase::solve_metric_system_device(double* X, size_t LDX) {
 #endif
 
 void DensityFittingBase::solve_metric_system_host(double* X, size_t LDX) {
+  QDK_LOG_TRACE_ENTERING();
+
   const size_t naux = abs_.nbf();
 #if QDK_CHEMISTRY_DF_INV_METHOD == QDK_CHEMISTRY_DF_CHOLESKY
   lapack::potrs(lapack::Uplo::Lower, naux, 1, h_metric_.get(), naux, X, LDX);

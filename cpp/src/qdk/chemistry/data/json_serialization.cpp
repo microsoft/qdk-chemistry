@@ -7,6 +7,7 @@
 #include <H5Cpp.h>
 
 #include <Eigen/Dense>
+#include <qdk/chemistry/utils/logger.hpp>
 #include <stdexcept>
 #include <string>
 #include <tuple>
@@ -15,6 +16,7 @@
 namespace qdk::chemistry::data {
 
 nlohmann::json matrix_to_json(const Eigen::MatrixXd& matrix) {
+  QDK_LOG_TRACE_ENTERING();
   nlohmann::json j = nlohmann::json::array();
   for (int row = 0; row < matrix.rows(); ++row) {
     nlohmann::json row_array = nlohmann::json::array();
@@ -27,6 +29,7 @@ nlohmann::json matrix_to_json(const Eigen::MatrixXd& matrix) {
 }
 
 nlohmann::json vector_to_json(const Eigen::VectorXd& vector) {
+  QDK_LOG_TRACE_ENTERING();
   nlohmann::json j = nlohmann::json::array();
   for (int i = 0; i < vector.size(); ++i) {
     j.push_back(vector(i));
@@ -83,6 +86,7 @@ VectorVariant json_to_vector_variant(const nlohmann::json& j_vec,
 }
 
 Eigen::MatrixXd json_to_matrix(const nlohmann::json& j) {
+  QDK_LOG_TRACE_ENTERING();
   if (!j.is_array() || j.empty()) {
     throw std::invalid_argument(
         "JSON must be a non-empty array for matrix conversion");
@@ -105,6 +109,7 @@ Eigen::MatrixXd json_to_matrix(const nlohmann::json& j) {
 }
 
 Eigen::VectorXd json_to_vector(const nlohmann::json& j) {
+  QDK_LOG_TRACE_ENTERING();
   if (!j.is_array()) {
     throw std::invalid_argument("JSON must be an array for vector conversion");
   }
@@ -119,6 +124,7 @@ Eigen::VectorXd json_to_vector(const nlohmann::json& j) {
 
 std::tuple<int, int, int> parse_version_string(
     const std::string& version_string) {
+  QDK_LOG_TRACE_ENTERING();
   // Expected format: "major.minor.patch"
   std::size_t first_dot = version_string.find('.');
   std::size_t second_dot = version_string.find('.', first_dot + 1);
@@ -145,6 +151,7 @@ std::tuple<int, int, int> parse_version_string(
 
 void validate_serialization_version(const std::string& expected_version,
                                     const std::string& found_version) {
+  QDK_LOG_TRACE_ENTERING();
   if (expected_version == found_version) {
     return;  // Exact match is always valid
   }

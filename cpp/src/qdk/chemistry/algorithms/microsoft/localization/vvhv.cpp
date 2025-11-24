@@ -7,7 +7,6 @@
 #include <qdk/chemistry/scf/core/types.h>
 #include <qdk/chemistry/scf/util/int1e.h>
 #include <qdk/chemistry/scf/util/libint2_util.h>
-#include <spdlog/spdlog.h>
 
 #include <algorithm>
 #include <blas.hh>
@@ -17,6 +16,7 @@
 #include <memory>
 #include <qdk/chemistry/algorithms/active_space.hpp>
 #include <qdk/chemistry/data/basis_set.hpp>
+#include <qdk/chemistry/utils/logger.hpp>
 #include <stdexcept>
 
 #include "../utils.hpp"
@@ -31,6 +31,7 @@ std::shared_ptr<data::Wavefunction> VVHVLocalizer::_run_impl(
     std::shared_ptr<data::Wavefunction> wavefunction,
     const std::vector<size_t>& loc_indices_a,
     const std::vector<size_t>& loc_indices_b) const {
+  QDK_LOG_TRACE_ENTERING();
   auto orbitals = wavefunction->get_orbitals();
   // Get electron counts from settings
   auto [n_alpha_electrons, n_beta_electrons] =
@@ -207,12 +208,16 @@ VVHVLocalization::VVHVLocalization(
       minimal_basis_name_(minimal_basis_name),
       basis_ori_fp_(utils::microsoft::convert_basis_set_from_qdk(*basis_set)),
       inner_localizer_(inner_localizer) {
+  QDK_LOG_TRACE_ENTERING();
+
   // Initialize all data structures and pre-compute integrals
   initialize();
 }
 
 Eigen::MatrixXd VVHVLocalization::localize(
     const Eigen::MatrixXd& occupied_orbitals) {
+  QDK_LOG_TRACE_ENTERING();
+
   const auto* ori_bs = this->basis_ori_fp_.get();  // Original/full basis set
   const auto* min_bs = this->minimal_basis_fp_.get();  // Minimal basis set
   const auto num_atomic_orbitals_ori = ori_bs->num_atomic_orbitals;
@@ -248,12 +253,14 @@ Eigen::MatrixXd VVHVLocalization::localize(
       hard_orbitals_loc;
 
   converged_ = true;
-  spdlog::info("VV-HV localization completed successfully");
+  QDK_LOGGER()->info("VV-HV localization completed successfully");
 
   return localized_orbitals;
 }
 
 void VVHVLocalization::initialize() {
+  QDK_LOG_TRACE_ENTERING();
+
   // Check that minimal_basis_name_ is either sto-3g or sto-3g*
   if (minimal_basis_name_ != "sto-3g" && minimal_basis_name_ != "sto-3g*") {
     throw std::runtime_error(
@@ -296,7 +303,7 @@ void VVHVLocalization::initialize() {
         6 * num_atomic_orbitals_ori, num_atomic_orbitals_ori);
     ori_bs_1ee.quadrupole_integral(quadrupole_integrals_->data());
 
-    spdlog::debug(
+    QDK_LOGGER()->debug(
         "VVHVLocalization: Pre-computed dipole and quadrupole integrals for "
         "orbital spread calculations");
   }
@@ -339,7 +346,8 @@ void VVHVLocalization::initialize() {
 
 Eigen::MatrixXd VVHVLocalization::calculate_valence_virtual(
     const Eigen::MatrixXd& occupied_orbitals) {
-  spdlog::debug("VVHV::calculate_valence_virtual()");
+  QDK_LOG_TRACE_ENTERING();
+  QDK_LOGGER()->debug("VVHV::calculate_valence_virtual()");
   const auto* ori_bs = this->basis_ori_fp_.get();  // Original/full basis set
   const auto num_atomic_orbitals_ori = ori_bs->num_atomic_orbitals;
   const auto num_atomic_orbitals_min =
@@ -361,9 +369,10 @@ Eigen::MatrixXd VVHVLocalization::calculate_valence_virtual(
       Eigen::MatrixXd::Zero(num_atomic_orbitals_ori, num_atomic_orbitals_min);
 
   // print number of occupied and valence virtual orbitals
-  spdlog::info("VVHV::now using minimal basis '{}' with {} atomic orbitals",
-               minimal_basis_name_, num_atomic_orbitals_min);
-  spdlog::debug(
+  QDK_LOGGER()->info(
+      "VVHV::now using minimal basis '{}' with {} atomic orbitals",
+      minimal_basis_name_, num_atomic_orbitals_min);
+  QDK_LOGGER()->debug(
       "VVHV::number of occupied orbitals: {}, valence virtual orbitals: {}",
       num_occupied_orbitals, n_val_virt);
 
@@ -433,16 +442,18 @@ Eigen::MatrixXd VVHVLocalization::calculate_valence_virtual(
 
 Eigen::MatrixXd VVHVLocalization::localize_valence_virtual(
     const Eigen::MatrixXd& C_valence_unloc) {
+  QDK_LOG_TRACE_ENTERING();
+
   const auto* ori_bs = this->basis_ori_fp_.get();  // Original/full basis set
   const auto num_atomic_orbitals_ori = ori_bs->num_atomic_orbitals;
   const auto n_val_virt = C_valence_unloc.cols();
 
-  spdlog::debug("VVHV::localize_valence_virtual()");
+  QDK_LOGGER()->debug("VVHV::localize_valence_virtual()");
 
   // Localize valence virtual orbitals using the inner localizer
   Eigen::MatrixXd result = C_valence_unloc;
   if (n_val_virt > 0) {
-    spdlog::info(
+    QDK_LOGGER()->info(
         "*** Localizing Valence Virtual Orbitals (VVHV Sub-scheme) ***");
     result = this->inner_localizer_->localize(C_valence_unloc);
   }
@@ -457,6 +468,7 @@ void VVHVLocalization::proto_hv(const Eigen::MatrixXd& overlap_ori_al,
                                 Eigen::MatrixXd& C_hv_al,
                                 int num_atomic_orbitals_ori, int atom_index,
                                 int l) {
+  QDK_LOG_TRACE_ENTERING();
   const int num_atomic_orbitals_al_ori = static_cast<int>(bf_al_ori.size());
   const int num_atomic_orbitals_al_min = static_cast<int>(bf_al_min.size());
   const int nhv_al = num_atomic_orbitals_al_ori - num_atomic_orbitals_al_min;
@@ -560,7 +572,9 @@ void VVHVLocalization::proto_hv(const Eigen::MatrixXd& overlap_ori_al,
 
 Eigen::MatrixXd VVHVLocalization::localize_hard_virtuals(
     const Eigen::MatrixXd& C_minimal_unloc) {
-  spdlog::debug("VVHV::localize_hard_virtuals()");
+  QDK_LOG_TRACE_ENTERING();
+
+  QDK_LOGGER()->debug("VVHV::localize_hard_virtuals()");
 
   const auto* ori_bs = this->basis_ori_fp_.get();  // Original/full basis set
   const auto* min_bs = this->minimal_basis_fp_.get();  // Minimal basis set
@@ -844,6 +858,8 @@ Eigen::MatrixXd VVHVLocalization::localize_hard_virtuals(
 
 void VVHVLocalization::calculate_orbital_spreads(
     const Eigen::MatrixXd& orbitals, Eigen::VectorXd& spreads) const {
+  QDK_LOG_TRACE_ENTERING();
+
   const auto* ori_bs = this->basis_ori_fp_.get();  // Original/full basis set
   const auto num_atomic_orbitals_ori = ori_bs->num_atomic_orbitals;
   const int num_orbitals = orbitals.cols();
@@ -867,7 +883,7 @@ void VVHVLocalization::calculate_orbital_spreads(
     // Use pre-computed integrals
     dipole = dipole_integrals_.get();
     quadrupole = quadrupole_integrals_.get();
-    spdlog::debug(
+    QDK_LOGGER()->debug(
         "VVHVLocalization: Using pre-computed dipole and quadrupole integrals "
         "for orbital spreads");
   } else {
@@ -886,7 +902,7 @@ void VVHVLocalization::calculate_orbital_spreads(
 
     dipole = local_dipole.get();
     quadrupole = local_quadrupole.get();
-    spdlog::debug(
+    QDK_LOGGER()->debug(
         "VVHVLocalization: Computed dipole and quadrupole integrals locally "
         "for orbital spreads");
   }
@@ -948,6 +964,8 @@ void VVHVLocalization::orthonormalization(int num_atomic_orbitals,
                                           unsigned int expected_near_zero,
                                           const std::string& error_label,
                                           double separation_ratio) {
+  QDK_LOG_TRACE_ENTERING();
+
   // Compute overlap matrix S = C^T * overlap_inp * C
   Eigen::MatrixXd S = Eigen::MatrixXd::Zero(num_orbitals, num_orbitals);
   {
@@ -1021,6 +1039,8 @@ void VVHVLocalization::orthonormalization(int num_atomic_orbitals,
 void VVHVLocalization::check_eigenvalue_structure(
     const double* eigenvalues, int expected_near_zero, int total_eigenvalues,
     const std::string& error_label, double separation_ratio) const {
+  QDK_LOG_TRACE_ENTERING();
+
   if (expected_near_zero < 0 || expected_near_zero > total_eigenvalues) {
     throw std::runtime_error("VVHVLocalization (" + error_label +
                              "): Invalid expected_near_zero value: " +
@@ -1053,7 +1073,7 @@ void VVHVLocalization::check_eigenvalue_structure(
         << eigenvalues[i] << ";   ";
   oss << "\n";
   if (abs(eigenvalue_M_plus_1 / eigenvalue_M) < separation_ratio)
-    spdlog::warn(oss.str());
+    QDK_LOGGER()->warn(oss.str());
 }
 
 }  // namespace qdk::chemistry::algorithms::microsoft

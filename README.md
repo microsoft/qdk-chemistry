@@ -42,6 +42,8 @@ qdk-chemistry/
 Detailed instructions for installing QDK/Chemistry can be found in [INSTALL.md](./INSTALL.md)
 
 ## Contributing
+ 
+There are many ways in which you can participate in this project, for example:
 
 There are many ways in which you can participate in this project, for example:
 

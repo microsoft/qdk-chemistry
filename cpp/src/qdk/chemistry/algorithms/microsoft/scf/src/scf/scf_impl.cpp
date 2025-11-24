@@ -9,11 +9,12 @@
 #include <qdk/chemistry/scf/scf/scf_solver.h>
 #include <qdk/chemistry/scf/util/gauxc_util.h>
 #include <qdk/chemistry/scf/util/int1e.h>
+
+#include <qdk/chemistry/utils/logger.hpp>
 #ifdef QDK_CHEMISTRY_ENABLE_MPI
 #include <mpi.h>
 #endif
 #include <qdk/chemistry/scf/util/env_helper.h>
-#include <spdlog/spdlog.h>
 
 #include <filesystem>
 #include <fstream>
@@ -48,6 +49,7 @@
 namespace qdk::chemistry::scf {
 SCFImpl::SCFImpl(std::shared_ptr<Molecule> mol_ptr, const SCFConfig& cfg,
                  bool delay_eri) {
+  QDK_LOG_TRACE_ENTERING();
   auto& mol = *mol_ptr;
   ctx_.mol = mol_ptr.get();
   ctx_.cfg = &cfg;
@@ -96,35 +98,36 @@ SCFImpl::SCFImpl(std::shared_ptr<Molecule> mol_ptr, const SCFConfig& cfg,
         fock_string += "K";
     }
 
-    spdlog::info(
+    QDK_LOGGER()->info(
         "mol: atoms={}, electrons={}, n_ecp_electrons={}, charge={}, "
         "multiplicity={}, spin(2S)={}, alpha={}, beta={}",
         mol.n_atoms, mol.n_electrons, n_ecp_electrons, mol.charge,
         mol.multiplicity, spin, alpha, beta);
-    spdlog::info(
+    QDK_LOGGER()->info(
         "restricted={}, basis={}, pure={}, num_atomic_orbitals={}, "
         "density_threshold={:.2e}, "
         "og_threshold={:.2e}",
         !cfg.unrestricted, ctx_.basis_set->name, ctx_.basis_set->pure,
         num_atomic_orbitals_, cfg.scf_algorithm.density_threshold,
         cfg.scf_algorithm.og_threshold);
-    spdlog::info("fock_alg={}", fock_string);
+    QDK_LOGGER()->info("fock_alg={}", fock_string);
     if (cfg.do_dfj) {
-      spdlog::info("aux_basis={}, naux={}", ctx_.aux_basis_set->name,
-                   ctx_.aux_basis_set->num_atomic_orbitals);
+      QDK_LOGGER()->info("aux_basis={}, naux={}", ctx_.aux_basis_set->name,
+                         ctx_.aux_basis_set->num_atomic_orbitals);
     }
-    spdlog::info("eri_tolerance={:.2e}", cfg.eri.eri_threshold);
+    QDK_LOGGER()->info("eri_tolerance={:.2e}", cfg.eri.eri_threshold);
 
 #ifdef QDK_CHEMISTRY_ENABLE_DFTD3
-    spdlog::info("disp={}", to_string(cfg.disp));
+    QDK_LOGGER()->info("disp={}", to_string(cfg.disp));
 #endif
 
 #ifdef QDK_CHEMISTRY_ENABLE_PCM
-    spdlog::info("enable_pcm={}, use_ddx={}", cfg.enable_pcm, cfg.use_ddx);
+    QDK_LOGGER()->info("enable_pcm={}, use_ddx={}", cfg.enable_pcm,
+                       cfg.use_ddx);
 #endif
 
 #ifdef QDK_CHEMISTRY_ENABLE_QMMM
-    spdlog::info("qmmm={}", add_mm_charge_);
+    QDK_LOGGER()->info("qmmm={}", add_mm_charge_);
 #endif
 
 #ifdef _OPENMP
@@ -132,12 +135,12 @@ SCFImpl::SCFImpl(std::shared_ptr<Molecule> mol_ptr, const SCFConfig& cfg,
 #else
     int nthreads = 1;
 #endif
-    spdlog::info("world_size={}, omp_get_max_threads={}", cfg.mpi.world_size,
-                 nthreads);
+    QDK_LOGGER()->info("world_size={}, omp_get_max_threads={}",
+                       cfg.mpi.world_size, nthreads);
   }
   if (cfg.verbose > 5) {
-    spdlog::info("eri_method={}, exc_method={}", to_string(cfg.eri.method),
-                 to_string(cfg.exc.method));
+    QDK_LOGGER()->info("eri_method={}, exc_method={}",
+                       to_string(cfg.eri.method), to_string(cfg.exc.method));
   }
   VERIFY_INPUT(alpha >= 0 && beta >= 0 && beta == alpha - spin,
                "Invalid spin number or charge");
@@ -221,6 +224,7 @@ SCFImpl::SCFImpl(std::shared_ptr<Molecule> mol_ptr, const SCFConfig& cfg,
 SCFImpl::SCFImpl(std::shared_ptr<Molecule> mol, const SCFConfig& cfg,
                  const RowMajorMatrix& dm, bool delay_eri)
     : SCFImpl(mol, cfg, delay_eri) {
+  QDK_LOG_TRACE_ENTERING();
   VERIFY(dm.rows() == num_density_matrices_ * num_atomic_orbitals_ &&
          dm.cols() == num_atomic_orbitals_);
   P_ = dm;
@@ -228,6 +232,7 @@ SCFImpl::SCFImpl(std::shared_ptr<Molecule> mol, const SCFConfig& cfg,
 }
 
 const SCFContext& SCFImpl::run() {
+  QDK_LOG_TRACE_ENTERING();
 #ifdef ENABLE_NVTX3
   NVTX3_FUNC_RANGE();
 #endif
@@ -281,17 +286,17 @@ const SCFContext& SCFImpl::run() {
                          ctx_.mol->atomic_nums[A], res.mulliken_population[A]);
     }
     oss << fmt::format("{:-^65}", "");
-    spdlog::info("SCF converged: steps={}, E={:.12f}\n{}", res.scf_iterations,
-                 res.scf_total_energy, oss.str());
+    QDK_LOGGER()->info("SCF converged: steps={}, E={:.12f}\n{}",
+                       res.scf_iterations, res.scf_total_energy, oss.str());
   }
 
   // Compute Gradient
   if (cfg.require_gradient) {
     if (cfg.mpi.world_rank == 0) {
-      spdlog::info("Calculating gradient");
+      QDK_LOGGER()->info("Calculating gradient");
 #ifdef QDK_CHEMISTRY_ENABLE_QMMM
       if (add_mm_charge_) {
-        spdlog::info(
+        QDK_LOGGER()->info(
             "Calculating molecules' and point charges' gradients with respect "
             "to each other");
       }
@@ -312,7 +317,7 @@ const SCFContext& SCFImpl::run() {
   // Compute polarizability
   if (cfg.require_polarizability) {
     if (cfg.mpi.world_rank == 0) {
-      spdlog::info("Calculating Static polarizability");
+      QDK_LOGGER()->info("Calculating Static polarizability");
     }
     polarizability_();
   }
@@ -321,6 +326,7 @@ const SCFContext& SCFImpl::run() {
 }
 
 void SCFImpl::update_fock_() {
+  QDK_LOG_TRACE_ENTERING();
 #ifdef QDK_CHEMISTRY_ENABLE_PCM
   if (pcm_ != nullptr) {
     if (ctx_.cfg->mpi.world_rank == 0) {
@@ -349,6 +355,7 @@ void SCFImpl::update_fock_() {
 }
 
 void SCFImpl::reset_fock_() {
+  QDK_LOG_TRACE_ENTERING();
 #ifdef QDK_CHEMISTRY_ENABLE_PCM
   F_ = H_ + Vpcm_;
 #else
@@ -357,6 +364,7 @@ void SCFImpl::reset_fock_() {
 }
 
 double SCFImpl::total_energy_() {
+  QDK_LOG_TRACE_ENTERING();
   auto& res = ctx_.result;
   res.scf_one_electron_energy = P_.cwiseProduct(H_).sum();
   res.scf_two_electron_energy = 0.5 * P_.cwiseProduct(F_ - H_).sum();
@@ -377,6 +385,7 @@ double SCFImpl::total_energy_() {
 
 void SCFImpl::compute_orthogonalization_matrix_(const RowMajorMatrix& S_,
                                                 RowMajorMatrix* ret) {
+  QDK_LOG_TRACE_ENTERING();
 #ifdef ENABLE_NVTX3
   NVTX3_FUNC_RANGE();
 #endif
@@ -420,7 +429,7 @@ void SCFImpl::compute_orthogonalization_matrix_(const RowMajorMatrix& S_,
   }
 
   if (num_atomic_orbitals_ != num_molecular_orbitals_) {
-    spdlog::warn(
+    QDK_LOGGER()->warn(
         "Orthogonalize: found linear dependency TOL={:.2e} "
         "num_atomic_orbitals_={} "
         "num_molecular_orbitals_={}",
@@ -448,6 +457,7 @@ void SCFImpl::compute_orthogonalization_matrix_(const RowMajorMatrix& S_,
 }
 
 void SCFImpl::iterate_() {
+  QDK_LOG_TRACE_ENTERING();
   auto cfg = ctx_.cfg;
   VERIFY_INPUT(cfg->incremental_fock_start_step > 0,
                "incremental_fock_start_step must be positive");
@@ -466,8 +476,8 @@ void SCFImpl::iterate_() {
       dftd3_wrapper(*ctx_.mol, ctx_.cfg->exc.xc_name, ctx_.cfg->disp,
                     false /*atm*/, &res.scf_dispersion_correction_energy,
                     disp_grad_.data());
-      spdlog::debug("Dispersion energy: {}",
-                    res.scf_dispersion_correction_energy);
+      QDK_LOGGER()->debug("Dispersion energy: {}",
+                          res.scf_dispersion_correction_energy);
     }
 #endif
   }
@@ -499,7 +509,7 @@ void SCFImpl::iterate_() {
         step % cfg->fock_reset_steps == 0) {
       P_diff = P_;
       if (cfg->mpi.world_rank == 0) {
-        spdlog::info("Reset incremental Fock matrix");
+        QDK_LOGGER()->info("Reset incremental Fock matrix");
         reset_fock_();
       }
     } else {
@@ -558,6 +568,7 @@ void SCFImpl::iterate_() {
 }
 
 void SCFImpl::properties_() {
+  QDK_LOG_TRACE_ENTERING();
   auto& res = ctx_.result;
 
   /****** Multipoles *******/
@@ -635,10 +646,12 @@ static void add_nuclear_repulsion_grad(double* dE, uint64_t n,
                                        const Molecule* mol);
 
 std::tuple<double, double, double> SCFImpl::get_hyb_coeff_() const {
+  QDK_LOG_TRACE_ENTERING();
   return std::make_tuple(1.0, 0.0, 0.0);
 }
 
 const std::vector<double>& SCFImpl::get_gradients_() {
+  QDK_LOG_TRACE_ENTERING();
 #ifdef ENABLE_NVTX3
   nvtx3::scoped_range r{nvtx3::rgb{255, 128, 0}, "SCFImpl::get_gradients"};
 #endif
@@ -728,7 +741,7 @@ const std::vector<double>& SCFImpl::get_gradients_() {
   auto [alpha, beta, omega] = get_hyb_coeff_();
   RowMajorMatrix dJ = RowMajorMatrix::Zero(3, n_atoms);
   RowMajorMatrix dK = RowMajorMatrix::Zero(3, n_atoms);
-  spdlog::trace("Calculating ERI gradients");
+  QDK_LOGGER()->trace("Calculating ERI gradients");
   eri_->get_gradients(P_.data(), dJ.data(), dK.data(), alpha, beta, omega);
   dE += dJ + dK;
 
@@ -757,6 +770,7 @@ const std::vector<double>& SCFImpl::get_gradients_() {
 }
 
 void SCFImpl::init_density_matrix_() {
+  QDK_LOG_TRACE_ENTERING();
 #ifdef ENABLE_NVTX3
   NVTX3_FUNC_RANGE();
 #endif
@@ -781,12 +795,13 @@ void SCFImpl::init_density_matrix_() {
     if (ifsDM.is_open()) {
       ifsDM.read((char*)P_.data(), P_.size() * sizeof(double));
       if (ctx_.cfg->mpi.world_rank == 0) {
-        spdlog::info("Guess read from file: {}", ctx_.cfg->density_init_file);
+        QDK_LOGGER()->info("Guess read from file: {}",
+                           ctx_.cfg->density_init_file);
       }
     } else {
       if (ctx_.cfg->mpi.world_rank == 0) {
-        spdlog::error("Failed to open dm file: {}",
-                      ctx_.cfg->density_init_file);
+        QDK_LOGGER()->error("Failed to open dm file: {}",
+                            ctx_.cfg->density_init_file);
         exit(EXIT_FAILURE);
       }
     }
@@ -806,12 +821,14 @@ void SCFImpl::init_density_matrix_() {
            sizeof(double) * num_atomic_orbitals_ * num_atomic_orbitals_);
     P_ *= 0.5;
     if (nelec_[0] == nelec_[1]) {  // spin(2S) = alpha - beta = 0
-      spdlog::warn("Breaking symmetry not implemented for spin 0 molecule");
+      QDK_LOGGER()->warn(
+          "Breaking symmetry not implemented for spin 0 molecule");
     }
   }
 }
 
 void SCFImpl::build_one_electron_integrals_() {
+  QDK_LOG_TRACE_ENTERING();
 #ifdef ENABLE_NVTX3
   NVTX3_FUNC_RANGE();
 #endif
@@ -864,6 +881,7 @@ void SCFImpl::build_one_electron_integrals_() {
 }
 
 double SCFImpl::calc_nuclear_repulsion_energy_() {
+  QDK_LOG_TRACE_ENTERING();
 #ifdef ENABLE_NVTX3
   NVTX3_FUNC_RANGE();
 #endif
@@ -892,6 +910,7 @@ double SCFImpl::calc_nuclear_repulsion_energy_() {
 }
 
 const RowMajorMatrix SCFImpl::get_vxc_grad_() const {
+  QDK_LOG_TRACE_ENTERING();
   return RowMajorMatrix::Zero(3, ctx_.mol->n_atoms);
 }
 
@@ -923,6 +942,7 @@ static void add_nuclear_repulsion_grad(double* dE, uint64_t n,
 
 void SCFImpl::write_gradients_(const std::vector<double>& gradients,
                                const Molecule* mol) {
+  QDK_LOG_TRACE_ENTERING();
   std::ostringstream oss;
   oss << fmt::format("{:-^47}\n", "");
   oss << fmt::format("{:8} {:>15} {:>15} {:>15}\n", "", "x", "y", "z");
@@ -941,9 +961,9 @@ void SCFImpl::write_gradients_(const std::vector<double>& gradients,
   }
   oss << fmt::format("{:-^47}", "");
   if (mol != nullptr) {
-    spdlog::info("Molecule gradients:\n{}", oss.str());
+    QDK_LOGGER()->info("Molecule gradients:\n{}", oss.str());
   } else {
-    spdlog::info("Point Charge gradients:\n{}", oss.str());
+    QDK_LOGGER()->info("Point Charge gradients:\n{}", oss.str());
   }
 }
 

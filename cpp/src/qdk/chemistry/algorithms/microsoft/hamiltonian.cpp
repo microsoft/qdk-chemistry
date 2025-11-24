@@ -17,6 +17,8 @@
 #include <qdk/chemistry/scf/eri/eri_multiplexer.h>
 #include <qdk/chemistry/scf/util/int1e.h>
 
+#include <qdk/chemistry/utils/logger.hpp>
+
 #include "utils.hpp"
 
 namespace qdk::chemistry::algorithms::microsoft {
@@ -34,6 +36,7 @@ namespace detail {
 bool validate_active_contiguous_indices(const std::vector<size_t>& indices,
                                         const std::string& spin_label,
                                         size_t num_molecular_orbitals) {
+  QDK_LOG_TRACE_ENTERING();
   if (indices.empty()) return true;
 
   // Cannot contain more than the total number of MOs

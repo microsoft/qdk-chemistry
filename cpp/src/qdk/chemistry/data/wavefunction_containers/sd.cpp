@@ -3,6 +3,7 @@
 // license information.
 
 #include <qdk/chemistry/data/wavefunction_containers/sd.hpp>
+#include <qdk/chemistry/utils/logger.hpp>
 #include <stdexcept>
 
 #include "../json_serialization.hpp"
@@ -20,6 +21,7 @@ SlaterDeterminantContainer::SlaterDeterminantContainer(
   // Note: Configurations only represent the active space, not the full orbital
   // space (inactive and virtual orbitals are not included in the configuration
   // representation)
+  QDK_LOG_TRACE_ENTERING();
 
   const std::string config_str = det.to_string();
 
@@ -63,26 +65,36 @@ SlaterDeterminantContainer::SlaterDeterminantContainer(
 
 std::unique_ptr<WavefunctionContainer> SlaterDeterminantContainer::clone()
     const {
+  QDK_LOG_TRACE_ENTERING();
+
   return std::make_unique<SlaterDeterminantContainer>(_determinant, _orbitals,
                                                       _type);
 }
 
 std::shared_ptr<Orbitals> SlaterDeterminantContainer::get_orbitals() const {
+  QDK_LOG_TRACE_ENTERING();
+
   return _orbitals;
 }
 
 const ContainerTypes::VectorVariant&
 SlaterDeterminantContainer::get_coefficients() const {
+  QDK_LOG_TRACE_ENTERING();
+
   return _coefficient_vector;
 }
 
 ContainerTypes::ScalarVariant SlaterDeterminantContainer::get_coefficient(
     const Configuration& det) const {
+  QDK_LOG_TRACE_ENTERING();
+
   return (_determinant == det) ? 1.0 : 0.0;
 }
 
 const ContainerTypes::DeterminantVector&
 SlaterDeterminantContainer::get_active_determinants() const {
+  QDK_LOG_TRACE_ENTERING();
+
   if (!_determinant_vector_cache) {
     _determinant_vector_cache = std::make_unique<DeterminantVector>();
     _determinant_vector_cache->push_back(_determinant);
@@ -90,10 +102,16 @@ SlaterDeterminantContainer::get_active_determinants() const {
   return *_determinant_vector_cache;
 }
 
-size_t SlaterDeterminantContainer::size() const { return 1; }
+size_t SlaterDeterminantContainer::size() const {
+  QDK_LOG_TRACE_ENTERING();
+
+  return 1;
+}
 
 ContainerTypes::ScalarVariant SlaterDeterminantContainer::overlap(
     const WavefunctionContainer& other) const {
+  QDK_LOG_TRACE_ENTERING();
+
   // For single determinant, overlap is coefficient of this determinant in other
   // wavefunction if the bases are identical
   // return other.get_coefficient(_determinant);
@@ -103,15 +121,21 @@ ContainerTypes::ScalarVariant SlaterDeterminantContainer::overlap(
 }
 
 double SlaterDeterminantContainer::norm() const {
+  QDK_LOG_TRACE_ENTERING();
+
   return 1.0;  // Single normalized determinant always has norm 1
 }
 
 bool SlaterDeterminantContainer::contains_determinant(
     const Configuration& det) const {
+  QDK_LOG_TRACE_ENTERING();
+
   return _determinant == det;
 }
 
 void SlaterDeterminantContainer::clear_caches() const {
+  QDK_LOG_TRACE_ENTERING();
+
   // Clear the cached determinant vector
   _determinant_vector_cache.reset();
 
@@ -122,6 +146,7 @@ void SlaterDeterminantContainer::clear_caches() const {
 std::tuple<const ContainerTypes::MatrixVariant&,
            const ContainerTypes::MatrixVariant&>
 SlaterDeterminantContainer::get_active_one_rdm_spin_dependent() const {
+  QDK_LOG_TRACE_ENTERING();
   if (_one_rdm_spin_dependent_aa == nullptr ||
       _one_rdm_spin_dependent_bb == nullptr) {
     auto [alpha_occupations, beta_occupations] =
@@ -165,6 +190,7 @@ std::tuple<const ContainerTypes::VectorVariant&,
            const ContainerTypes::VectorVariant&,
            const ContainerTypes::VectorVariant&>
 SlaterDeterminantContainer::get_active_two_rdm_spin_dependent() const {
+  QDK_LOG_TRACE_ENTERING();
   if (!_two_rdm_spin_dependent_aaaa || !_two_rdm_spin_dependent_bbbb ||
       !_two_rdm_spin_dependent_aabb) {
     auto [alpha_occupations, beta_occupations] =
@@ -242,6 +268,7 @@ SlaterDeterminantContainer::get_active_two_rdm_spin_dependent() const {
 
 const ContainerTypes::MatrixVariant&
 SlaterDeterminantContainer::get_active_one_rdm_spin_traced() const {
+  QDK_LOG_TRACE_ENTERING();
   if (!_one_rdm_spin_traced) {
     if (_orbitals->get_active_space_indices().first.size() !=
         _orbitals->get_active_space_indices().second.size()) {
@@ -273,6 +300,7 @@ SlaterDeterminantContainer::get_active_one_rdm_spin_traced() const {
 
 const ContainerTypes::VectorVariant&
 SlaterDeterminantContainer::get_active_two_rdm_spin_traced() const {
+  QDK_LOG_TRACE_ENTERING();
   if (!_two_rdm_spin_traced) {
     auto [alpha_occupations, beta_occupations] =
         get_active_orbital_occupations();
@@ -333,6 +361,7 @@ SlaterDeterminantContainer::get_active_two_rdm_spin_traced() const {
 
 Eigen::VectorXd SlaterDeterminantContainer::get_single_orbital_entropies()
     const {
+  QDK_LOG_TRACE_ENTERING();
   // For a single Slater determinant, all orbitals are either fully occupied
   // or unoccupied, leading to zero entropy for each orbital.
   if (_orbitals->get_active_space_indices().first.size() !=
@@ -348,6 +377,8 @@ Eigen::VectorXd SlaterDeterminantContainer::get_single_orbital_entropies()
 
 std::pair<size_t, size_t> SlaterDeterminantContainer::get_total_num_electrons()
     const {
+  QDK_LOG_TRACE_ENTERING();
+
   // Get active space electrons from the determinant
   auto [n_alpha_active, n_beta_active] = get_active_num_electrons();
 
@@ -363,12 +394,16 @@ std::pair<size_t, size_t> SlaterDeterminantContainer::get_total_num_electrons()
 
 std::pair<size_t, size_t> SlaterDeterminantContainer::get_active_num_electrons()
     const {
+  QDK_LOG_TRACE_ENTERING();
+
   auto [n_alpha, n_beta] = _determinant.get_n_electrons();
   return {n_alpha, n_beta};
 }
 
 std::pair<Eigen::VectorXd, Eigen::VectorXd>
 SlaterDeterminantContainer::get_total_orbital_occupations() const {
+  QDK_LOG_TRACE_ENTERING();
+
   // Get the total number of orbitals from the orbital basis set
   const int num_orbitals =
       static_cast<int>(_orbitals->get_num_molecular_orbitals());
@@ -421,6 +456,8 @@ SlaterDeterminantContainer::get_total_orbital_occupations() const {
 
 std::pair<Eigen::VectorXd, Eigen::VectorXd>
 SlaterDeterminantContainer::get_active_orbital_occupations() const {
+  QDK_LOG_TRACE_ENTERING();
+
   // Get the active space indices and size
   auto [alpha_active_indices, beta_active_indices] =
       _orbitals->get_active_space_indices();
@@ -458,184 +495,200 @@ SlaterDeterminantContainer::get_active_orbital_occupations() const {
 }
 
 bool SlaterDeterminantContainer::has_one_rdm_spin_dependent() const {
+  QDK_LOG_TRACE_ENTERING();
+
   // Always available for Slater determinants (can be computed on-the-fly)
   return true;
 }
 
 bool SlaterDeterminantContainer::has_one_rdm_spin_traced() const {
+  QDK_LOG_TRACE_ENTERING();
+
   // Always available for Slater determinants (can be computed on-the-fly)
   return true;
 }
 
 bool SlaterDeterminantContainer::has_two_rdm_spin_dependent() const {
-  // Always available for Slater determinants (can be computed on-the-fly)
-  return true;
-}
+  QDK_LOG_TRACE_ENTERING();
 
-bool SlaterDeterminantContainer::has_two_rdm_spin_traced() const {
-  // Always available for Slater determinants (can be computed on-the-fly)
-  return true;
-}
+  bool SlaterDeterminantContainer::has_two_rdm_spin_traced() const {
+    QDK_LOG_TRACE_ENTERING();
 
-std::string SlaterDeterminantContainer::get_container_type() const {
-  return "sd";
-}
-
-bool SlaterDeterminantContainer::is_complex() const {
-  return false;  // Slater determinants always use real coefficients (unity)
-}
-
-nlohmann::json SlaterDeterminantContainer::to_json() const {
-  nlohmann::json j;
-
-  // Store version first
-  j["version"] = SERIALIZATION_VERSION;
-
-  // Store container type
-  j["container_type"] = get_container_type();
-
-  // Store wavefunction type
-  j["wavefunction_type"] =
-      (_type == WavefunctionType::SelfDual) ? "self_dual" : "not_self_dual";
-
-  // Store orbitals
-  j["orbitals"] = _orbitals->to_json();
-
-  // Store single determinant
-  j["determinant"] = _determinant.to_json();
-
-  // SD containers are always real with coefficient 1.0
-  j["is_complex"] = false;
-
-  return j;
-}
-
-std::unique_ptr<SlaterDeterminantContainer>
-SlaterDeterminantContainer::from_json(const nlohmann::json& j) {
-  try {
-    // Validate version first
-    if (!j.contains("version")) {
-      throw std::runtime_error("Invalid JSON: missing version field");
-    }
-    validate_serialization_version(SERIALIZATION_VERSION, j["version"]);
-
-    // Load orbitals
-    if (!j.contains("orbitals")) {
-      throw std::runtime_error("JSON missing required 'orbitals' field");
-    }
-    auto orbitals = Orbitals::from_json(j["orbitals"]);
-
-    // Load wavefunction type
-    WavefunctionType type = WavefunctionType::SelfDual;
-    if (j.contains("wavefunction_type")) {
-      std::string type_str = j["wavefunction_type"];
-      type = (type_str == "self_dual") ? WavefunctionType::SelfDual
-                                       : WavefunctionType::NotSelfDual;
-    }
-
-    // Load determinant
-    if (!j.contains("determinant")) {
-      throw std::runtime_error("JSON missing required 'determinant' field");
-    }
-    Configuration determinant = Configuration::from_json(j["determinant"]);
-
-    return std::make_unique<SlaterDeterminantContainer>(determinant, orbitals,
-                                                        type);
-
-  } catch (const std::exception& e) {
-    throw std::runtime_error(
-        "Failed to parse SlaterDeterminantContainer from JSON: " +
-        std::string(e.what()));
+    // Always available for Slater determinants (can be computed on-the-fly)
+    return true;
   }
-}
 
-void SlaterDeterminantContainer::to_hdf5(H5::Group& group) const {
-  try {
-    H5::StrType string_type(H5::PredType::C_S1, H5T_VARIABLE);
+  std::string SlaterDeterminantContainer::get_container_type() const {
+    QDK_LOG_TRACE_ENTERING();
 
-    // Add version attribute
-    H5::Attribute version_attr = group.createAttribute(
-        "version", string_type, H5::DataSpace(H5S_SCALAR));
-    std::string version_str(SERIALIZATION_VERSION);
-    version_attr.write(string_type, version_str);
-    version_attr.close();
+    return "sd";
+  }
+
+  bool SlaterDeterminantContainer::is_complex() const {
+    QDK_LOG_TRACE_ENTERING();
+
+    return false;  // Slater determinants always use real coefficients (unity)
+  }
+
+  nlohmann::json SlaterDeterminantContainer::to_json() const {
+    QDK_LOG_TRACE_ENTERING();
+
+    nlohmann::json j;
+
+    // Store version first
+    j["version"] = SERIALIZATION_VERSION;
 
     // Store container type
-    std::string container_type = get_container_type();
-    H5::Attribute type_attr = group.createAttribute(
-        "container_type", string_type, H5::DataSpace(H5S_SCALAR));
-    type_attr.write(string_type, container_type);
+    j["container_type"] = get_container_type();
 
     // Store wavefunction type
-    std::string wf_type =
+    j["wavefunction_type"] =
         (_type == WavefunctionType::SelfDual) ? "self_dual" : "not_self_dual";
-    H5::Attribute wf_type_attr = group.createAttribute(
-        "wavefunction_type", string_type, H5::DataSpace(H5S_SCALAR));
-    wf_type_attr.write(string_type, wf_type);
 
     // Store orbitals
-    H5::Group orbitals_group = group.createGroup("orbitals");
-    _orbitals->to_hdf5(orbitals_group);
-
-    // Store complexity flag (always false for SD)
-    H5::Attribute complex_attr = group.createAttribute(
-        "is_complex", H5::PredType::NATIVE_HBOOL, H5::DataSpace(H5S_SCALAR));
-    hbool_t is_complex_flag = 0;  // Always false for SlaterDeterminant
-    complex_attr.write(H5::PredType::NATIVE_HBOOL, &is_complex_flag);
+    j["orbitals"] = _orbitals->to_json();
 
     // Store single determinant
-    H5::Group det_group = group.createGroup("determinant");
-    _determinant.to_hdf5(det_group);
+    j["determinant"] = _determinant.to_json();
 
-  } catch (const H5::Exception& e) {
-    throw std::runtime_error("HDF5 error: " + std::string(e.getCDetailMsg()));
+    // SD containers are always real with coefficient 1.0
+    j["is_complex"] = false;
+
+    return j;
   }
-}
 
-std::unique_ptr<SlaterDeterminantContainer>
-SlaterDeterminantContainer::from_hdf5(H5::Group& group) {
-  try {
-    // Check version first
-    H5::StrType string_type(H5::PredType::C_S1, H5T_VARIABLE);
-    H5::Attribute version_attr = group.openAttribute("version");
-    std::string version;
-    version_attr.read(string_type, version);
-    validate_serialization_version(SERIALIZATION_VERSION, version);
+  std::unique_ptr<SlaterDeterminantContainer>
+  SlaterDeterminantContainer::from_json(const nlohmann::json& j) {
+    QDK_LOG_TRACE_ENTERING();
 
-    // Load orbitals
-    if (!group.nameExists("orbitals")) {
+    try {
+      // Validate version first
+      if (!j.contains("version")) {
+        throw std::runtime_error("Invalid JSON: missing version field");
+      }
+      validate_serialization_version(SERIALIZATION_VERSION, j["version"]);
+
+      // Load orbitals
+      if (!j.contains("orbitals")) {
+        throw std::runtime_error("JSON missing required 'orbitals' field");
+      }
+      auto orbitals = Orbitals::from_json(j["orbitals"]);
+
+      // Load wavefunction type
+      WavefunctionType type = WavefunctionType::SelfDual;
+      if (j.contains("wavefunction_type")) {
+        std::string type_str = j["wavefunction_type"];
+        type = (type_str == "self_dual") ? WavefunctionType::SelfDual
+                                         : WavefunctionType::NotSelfDual;
+      }
+
+      // Load determinant
+      if (!j.contains("determinant")) {
+        throw std::runtime_error("JSON missing required 'determinant' field");
+      }
+      Configuration determinant = Configuration::from_json(j["determinant"]);
+
+      return std::make_unique<SlaterDeterminantContainer>(determinant, orbitals,
+                                                          type);
+
+    } catch (const std::exception& e) {
       throw std::runtime_error(
-          "HDF5 group missing required 'orbitals' subgroup");
+          "Failed to parse SlaterDeterminantContainer from JSON: " +
+          std::string(e.what()));
     }
-    H5::Group orbitals_group = group.openGroup("orbitals");
-    auto orbitals = Orbitals::from_hdf5(orbitals_group);
+  }
 
-    // Load wavefunction type
-    WavefunctionType type = WavefunctionType::SelfDual;
-    if (group.attrExists("wavefunction_type")) {
+  void SlaterDeterminantContainer::to_hdf5(H5::Group & group) const {
+    QDK_LOG_TRACE_ENTERING();
+
+    try {
       H5::StrType string_type(H5::PredType::C_S1, H5T_VARIABLE);
-      H5::Attribute wf_type_attr = group.openAttribute("wavefunction_type");
-      std::string type_str;
-      wf_type_attr.read(string_type, type_str);
-      type = (type_str == "self_dual") ? WavefunctionType::SelfDual
-                                       : WavefunctionType::NotSelfDual;
+
+      // Add version attribute
+      H5::Attribute version_attr = group.createAttribute(
+          "version", string_type, H5::DataSpace(H5S_SCALAR));
+      std::string version_str(SERIALIZATION_VERSION);
+      version_attr.write(string_type, version_str);
+      version_attr.close();
+
+      // Store container type
+      std::string container_type = get_container_type();
+      H5::Attribute type_attr = group.createAttribute(
+          "container_type", string_type, H5::DataSpace(H5S_SCALAR));
+      type_attr.write(string_type, container_type);
+
+      // Store wavefunction type
+      std::string wf_type =
+          (_type == WavefunctionType::SelfDual) ? "self_dual" : "not_self_dual";
+      H5::Attribute wf_type_attr = group.createAttribute(
+          "wavefunction_type", string_type, H5::DataSpace(H5S_SCALAR));
+      wf_type_attr.write(string_type, wf_type);
+
+      // Store orbitals
+      H5::Group orbitals_group = group.createGroup("orbitals");
+      _orbitals->to_hdf5(orbitals_group);
+
+      // Store complexity flag (always false for SD)
+      H5::Attribute complex_attr = group.createAttribute(
+          "is_complex", H5::PredType::NATIVE_HBOOL, H5::DataSpace(H5S_SCALAR));
+      hbool_t is_complex_flag = 0;  // Always false for SlaterDeterminant
+      complex_attr.write(H5::PredType::NATIVE_HBOOL, &is_complex_flag);
+
+      // Store single determinant
+      H5::Group det_group = group.createGroup("determinant");
+      _determinant.to_hdf5(det_group);
+
+    } catch (const H5::Exception& e) {
+      throw std::runtime_error("HDF5 error: " + std::string(e.getCDetailMsg()));
     }
-
-    // Load determinant
-    if (!group.nameExists("determinant")) {
-      throw std::runtime_error(
-          "HDF5 group missing required 'determinant' dataset");
-    }
-    H5::Group det_group = group.openGroup("determinant");
-    Configuration determinant = Configuration::from_hdf5(det_group);
-    det_group.close();
-
-    return std::make_unique<SlaterDeterminantContainer>(determinant, orbitals,
-                                                        type);
-
-  } catch (const H5::Exception& e) {
-    throw std::runtime_error("HDF5 error: " + std::string(e.getCDetailMsg()));
   }
-}
+
+  std::unique_ptr<SlaterDeterminantContainer>
+  SlaterDeterminantContainer::from_hdf5(H5::Group & group) {
+    QDK_LOG_TRACE_ENTERING();
+
+    try {
+      // Check version first
+      H5::StrType string_type(H5::PredType::C_S1, H5T_VARIABLE);
+      H5::Attribute version_attr = group.openAttribute("version");
+      std::string version;
+      version_attr.read(string_type, version);
+      validate_serialization_version(SERIALIZATION_VERSION, version);
+
+      // Load orbitals
+      if (!group.nameExists("orbitals")) {
+        throw std::runtime_error(
+            "HDF5 group missing required 'orbitals' subgroup");
+      }
+      H5::Group orbitals_group = group.openGroup("orbitals");
+      auto orbitals = Orbitals::from_hdf5(orbitals_group);
+
+      // Load wavefunction type
+      WavefunctionType type = WavefunctionType::SelfDual;
+      if (group.attrExists("wavefunction_type")) {
+        H5::StrType string_type(H5::PredType::C_S1, H5T_VARIABLE);
+        H5::Attribute wf_type_attr = group.openAttribute("wavefunction_type");
+        std::string type_str;
+        wf_type_attr.read(string_type, type_str);
+        type = (type_str == "self_dual") ? WavefunctionType::SelfDual
+                                         : WavefunctionType::NotSelfDual;
+      }
+
+      // Load determinant
+      if (!group.nameExists("determinant")) {
+        throw std::runtime_error(
+            "HDF5 group missing required 'determinant' dataset");
+      }
+      H5::Group det_group = group.openGroup("determinant");
+      Configuration determinant = Configuration::from_hdf5(det_group);
+      det_group.close();
+
+      return std::make_unique<SlaterDeterminantContainer>(determinant, orbitals,
+                                                          type);
+
+    } catch (const H5::Exception& e) {
+      throw std::runtime_error("HDF5 error: " + std::string(e.getCDetailMsg()));
+    }
+  }
 
 }  // namespace qdk::chemistry::data

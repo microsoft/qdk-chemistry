@@ -6,7 +6,6 @@
 #ifdef QDK_CHEMISTRY_ENABLE_MPI
 #include <mpi.h>
 #endif
-#include <spdlog/spdlog.h>
 
 #include <blas.hh>
 #include <lapack.hh>
@@ -22,6 +21,8 @@
 #endif
 #include <qdk/chemistry/scf/util/libint2_util.h>
 
+#include <qdk/chemistry/utils/logger.hpp>
+
 namespace qdk::chemistry::scf::incore {
 
 ERI_DF::ERI_DF(bool unr, const BasisSet& obs, const BasisSet& abs,
@@ -33,6 +34,7 @@ ERI_DF::ERI_DF(bool unr, const BasisSet& obs, const BasisSet& abs,
                          false /*gpu*/
 #endif
       ) {
+  QDK_LOG_TRACE_ENTERING();
 
   // Distribute on AUX index
   const size_t naux = abs_.nbf();
@@ -48,22 +50,23 @@ ERI_DF::ERI_DF(bool unr, const BasisSet& obs, const BasisSet& abs,
 }
 
 void ERI_DF::generate_eri_() {
+  QDK_LOG_TRACE_ENTERING();
   const size_t num_atomic_orbitals = obs_.nbf();
   const size_t naux = abs_.nbf();
   const size_t num_atomic_orbitals2 = num_atomic_orbitals * num_atomic_orbitals;
   const size_t eri_sz = num_atomic_orbitals2 * (loc_i_en_ - loc_i_st_);
 
-  if (!mpi_.world_rank) spdlog::trace("Generating DF-ERIs via Libint2");
+  if (!mpi_.world_rank) QDK_LOGGER()->trace("Generating DF-ERIs via Libint2");
   h_eri_ = libint2_util::eri_df(basis_mode_, obs_, abs_, loc_i_st_, loc_i_en_);
 
 #ifdef QDK_CHEMISTRY_ENABLE_GPU
   if (!gpu()) {
-    if (!mpi_.world_rank) spdlog::trace("Saving DF-ERIs on Host Memory");
+    if (!mpi_.world_rank) QDK_LOGGER()->trace("Saving DF-ERIs on Host Memory");
   } else {
     // Allocate ERIs on the device and ship data
     if (!mpi_.world_rank) {
-      spdlog::trace("Saving DF-ERIs in Device Memory");
-      spdlog::trace("Using cuTensor for GPU DF-ERI Contraction");
+      QDK_LOGGER()->trace("Saving DF-ERIs in Device Memory");
+      QDK_LOGGER()->trace("Using cuTensor for GPU DF-ERI Contraction");
     }
     CUDA_CHECK(cudaMallocAsync(&d_eri_, eri_sz * sizeof(double), 0));
     CUDA_CHECK(cudaStreamSynchronize(0));
@@ -76,6 +79,8 @@ void ERI_DF::generate_eri_() {
 
 void ERI_DF::build_JK(const double* P, double* J, double* K, double alpha,
                       double beta, double omega) {
+  QDK_LOG_TRACE_ENTERING();
+
   if (std::abs(omega) > 1e-12)
     throw std::runtime_error(
         "ERIINCORE_DF Does Not Support Range-Separated Hybrids");
@@ -195,6 +200,8 @@ void ERI_DF::build_JK(const double* P, double* J, double* K, double alpha,
 
 void ERI_DF::get_gradients(const double* P, double* dJ, double* dK,
                            double alpha, double beta, double omega) {
+  QDK_LOG_TRACE_ENTERING();
+
   if (std::abs(omega) > 1e-12)
     throw std::runtime_error(
         "ERIINCORE_DF gradients Does Not Support Range-Separated Hybrids");
@@ -312,10 +319,14 @@ void ERI_DF::get_gradients(const double* P, double* dJ, double* dK,
 }
 
 void ERI_DF::quarter_trans(size_t nt, const double* C, double* out) {
+  QDK_LOG_TRACE_ENTERING();
+
   throw std::runtime_error("INCORE_DF QUARTER_TRANS NYI");
 }
 
 ERI_DF::~ERI_DF() noexcept {
+  QDK_LOG_TRACE_ENTERING();
+
 #ifdef QDK_CHEMISTRY_ENABLE_GPU
   if (d_eri_) CUDA_CHECK(cudaFree(d_eri_));
   if (d_metric_) CUDA_CHECK(cudaFree(d_metric_));
@@ -325,6 +336,8 @@ ERI_DF::~ERI_DF() noexcept {
 std::unique_ptr<ERI_DF> ERI_DF::make_incore_eri(bool unr, const BasisSet& obs,
                                                 const BasisSet& abs,
                                                 ParallelConfig mpi) {
+  QDK_LOG_TRACE_ENTERING();
+
   return std::make_unique<ERI_DF>(unr, obs, abs, mpi);
 }
 

@@ -11,6 +11,7 @@
 #include <qdk/chemistry/data/wavefunction_containers/cas.hpp>
 #include <qdk/chemistry/data/wavefunction_containers/sci.hpp>
 #include <qdk/chemistry/data/wavefunction_containers/sd.hpp>
+#include <qdk/chemistry/utils/logger.hpp>
 #include <sstream>
 #include <tuple>
 #include <variant>
@@ -23,6 +24,7 @@ namespace detail {
 std::shared_ptr<ContainerTypes::MatrixVariant> add_matrix_variants(
     const ContainerTypes::MatrixVariant& mat1,
     const ContainerTypes::MatrixVariant& mat2) {
+  QDK_LOG_TRACE_ENTERING();
   return std::visit(
       [](const auto& m1,
          const auto& m2) -> std::shared_ptr<ContainerTypes::MatrixVariant> {
@@ -42,6 +44,7 @@ std::shared_ptr<ContainerTypes::MatrixVariant> add_matrix_variants(
 std::shared_ptr<ContainerTypes::VectorVariant> add_vector_variants(
     const ContainerTypes::VectorVariant& vec1,
     const ContainerTypes::VectorVariant& vec2) {
+  QDK_LOG_TRACE_ENTERING();
   return std::visit(
       [](const auto& v1,
          const auto& v2) -> std::shared_ptr<ContainerTypes::VectorVariant> {
@@ -59,16 +62,19 @@ std::shared_ptr<ContainerTypes::VectorVariant> add_vector_variants(
 }
 
 bool is_matrix_variant_complex(const ContainerTypes::MatrixVariant& variant) {
+  QDK_LOG_TRACE_ENTERING();
   return std::holds_alternative<Eigen::MatrixXcd>(variant);
 }
 
 bool is_vector_variant_complex(const ContainerTypes::VectorVariant& variant) {
+  QDK_LOG_TRACE_ENTERING();
   return std::holds_alternative<Eigen::VectorXcd>(variant);
 }
 
 std::shared_ptr<ContainerTypes::VectorVariant>
 transpose_ijkl_klij_vector_variant(const ContainerTypes::VectorVariant& variant,
                                    int norbs) {
+  QDK_LOG_TRACE_ENTERING();
   return std::visit(
       [norbs](
           const auto& vec) -> std::shared_ptr<ContainerTypes::VectorVariant> {
@@ -103,7 +109,9 @@ WavefunctionContainer::WavefunctionContainer(WavefunctionType type)
                             std::nullopt,  // two_rdm_aabb
                             std::nullopt,  // two_rdm_aaaa
                             std::nullopt,  // two_rdm_bbbb
-                            type) {}
+                            type) {
+  QDK_LOG_TRACE_ENTERING();
+}
 
 // \cond DOXYGEN_SUPPRESS (suppress warnings for declaration with "using")
 WavefunctionContainer::WavefunctionContainer(
@@ -117,7 +125,9 @@ WavefunctionContainer::WavefunctionContainer(
                             std::nullopt,  // two_rdm_aabb
                             std::nullopt,  // two_rdm_aaaa
                             std::nullopt,  // two_rdm_bbbb
-                            type) {}
+                            type) {
+  QDK_LOG_TRACE_ENTERING();
+}
 // \endcond
 
 // \cond DOXYGEN_SUPPRESS (suppress warnings for declaration with "using")
@@ -131,6 +141,7 @@ WavefunctionContainer::WavefunctionContainer(
     const std::optional<ContainerTypes::VectorVariant>& two_rdm_bbbb,
     WavefunctionType type)
     : _type(type) {
+  QDK_LOG_TRACE_ENTERING();
   if (one_rdm_spin_traced.has_value()) {
     _one_rdm_spin_traced = std::make_shared<ContainerTypes::MatrixVariant>(
         one_rdm_spin_traced.value());
@@ -180,6 +191,7 @@ WavefunctionContainer::WavefunctionContainer(
 std::tuple<const ContainerTypes::MatrixVariant&,
            const ContainerTypes::MatrixVariant&>
 WavefunctionContainer::get_active_one_rdm_spin_dependent() const {
+  QDK_LOG_TRACE_ENTERING();
   if (!has_one_rdm_spin_dependent()) {
     throw std::runtime_error("Spin-dependent one-body RDM not set");
   }
@@ -223,6 +235,7 @@ WavefunctionContainer::get_active_one_rdm_spin_dependent() const {
 
 const ContainerTypes::MatrixVariant&
 WavefunctionContainer::get_active_one_rdm_spin_traced() const {
+  QDK_LOG_TRACE_ENTERING();
   if (!has_one_rdm_spin_traced()) {
     throw std::runtime_error("Spin-traced one-body RDM not set");
   }
@@ -259,6 +272,7 @@ std::tuple<const ContainerTypes::VectorVariant&,
            const ContainerTypes::VectorVariant&,
            const ContainerTypes::VectorVariant&>
 WavefunctionContainer::get_active_two_rdm_spin_dependent() const {
+  QDK_LOG_TRACE_ENTERING();
   if (!has_two_rdm_spin_dependent()) {
     throw std::runtime_error("Spin-dependent two-body RDM not set");
   }
@@ -284,6 +298,7 @@ WavefunctionContainer::get_active_two_rdm_spin_dependent() const {
 
 const ContainerTypes::VectorVariant&
 WavefunctionContainer::get_active_two_rdm_spin_traced() const {
+  QDK_LOG_TRACE_ENTERING();
   if (!has_two_rdm_spin_traced()) {
     throw std::runtime_error("Spin-traced two-body RDM not set");
   }
@@ -326,6 +341,7 @@ WavefunctionContainer::get_active_two_rdm_spin_traced() const {
 }
 
 bool WavefunctionContainer::has_one_rdm_spin_dependent() const {
+  QDK_LOG_TRACE_ENTERING();
   bool is_singlet =
       get_active_num_electrons().first == get_active_num_electrons().second;
   return (_one_rdm_spin_dependent_aa != nullptr &&
@@ -337,10 +353,12 @@ bool WavefunctionContainer::has_one_rdm_spin_dependent() const {
 }
 
 bool WavefunctionContainer::has_one_rdm_spin_traced() const {
+  QDK_LOG_TRACE_ENTERING();
   return _one_rdm_spin_traced != nullptr || has_one_rdm_spin_dependent();
 }
 
 bool WavefunctionContainer::has_two_rdm_spin_dependent() const {
+  QDK_LOG_TRACE_ENTERING();
   bool is_singlet =
       get_active_num_electrons().first == get_active_num_electrons().second;
   return (_two_rdm_spin_dependent_aabb != nullptr &&
@@ -353,11 +371,13 @@ bool WavefunctionContainer::has_two_rdm_spin_dependent() const {
 }
 
 bool WavefunctionContainer::has_two_rdm_spin_traced() const {
+  QDK_LOG_TRACE_ENTERING();
   return _two_rdm_spin_traced != nullptr || has_two_rdm_spin_dependent();
 }
 
 // entropies
 Eigen::VectorXd WavefunctionContainer::get_single_orbital_entropies() const {
+  QDK_LOG_TRACE_ENTERING();
   if (!has_one_rdm_spin_dependent()) {
     throw std::runtime_error(
         "Spin-dependent one-body RDMs must be set to evaluate "
@@ -430,11 +450,13 @@ Eigen::VectorXd WavefunctionContainer::get_single_orbital_entropies() const {
 }
 
 bool WavefunctionContainer::has_single_orbital_entropies() const {
+  QDK_LOG_TRACE_ENTERING();
   return has_one_rdm_spin_dependent() &&
          _two_rdm_spin_dependent_aabb != nullptr;
 }
 
 void WavefunctionContainer::_clear_rdms() const {
+  QDK_LOG_TRACE_ENTERING();
   _one_rdm_spin_traced.reset();
   _one_rdm_spin_dependent_aa.reset();
   _one_rdm_spin_dependent_bb.reset();
@@ -446,6 +468,7 @@ void WavefunctionContainer::_clear_rdms() const {
 
 std::unique_ptr<WavefunctionContainer> WavefunctionContainer::from_json(
     const nlohmann::json& j) {
+  QDK_LOG_TRACE_ENTERING();
   if (!j.contains("container_type")) {
     throw std::runtime_error("JSON missing required 'container_type' field");
   }
@@ -466,6 +489,7 @@ std::unique_ptr<WavefunctionContainer> WavefunctionContainer::from_json(
 
 std::unique_ptr<WavefunctionContainer> WavefunctionContainer::from_hdf5(
     H5::Group& group) {
+  QDK_LOG_TRACE_ENTERING();
   try {
     // Read container type identifier
     if (!group.attrExists("container_type")) {
@@ -494,18 +518,26 @@ std::unique_ptr<WavefunctionContainer> WavefunctionContainer::from_hdf5(
   }
 }
 
-WavefunctionType WavefunctionContainer::get_type() const { return _type; }
+WavefunctionType WavefunctionContainer::get_type() const {
+  QDK_LOG_TRACE_ENTERING();
+  return _type;
+}
 
 // Wavefunction implementations
 Wavefunction::Wavefunction(std::unique_ptr<WavefunctionContainer> container)
-    : _container(std::move(container)) {}
+    : _container(std::move(container)) {
+  QDK_LOG_TRACE_ENTERING();
+}
 
 // Copy constructor
 Wavefunction::Wavefunction(const Wavefunction& other)
-    : _container(other._container->clone()) {}
+    : _container(other._container->clone()) {
+  QDK_LOG_TRACE_ENTERING();
+}
 
 // Copy assignment operator
 Wavefunction& Wavefunction::operator=(const Wavefunction& other) {
+  QDK_LOG_TRACE_ENTERING();
   if (this != &other) {
     _container = other._container->clone();
   }
@@ -513,42 +545,51 @@ Wavefunction& Wavefunction::operator=(const Wavefunction& other) {
 }
 
 std::shared_ptr<Orbitals> Wavefunction::get_orbitals() const {
+  QDK_LOG_TRACE_ENTERING();
   return _container->get_orbitals();
 }
 
 std::string Wavefunction::get_container_type() const {
+  QDK_LOG_TRACE_ENTERING();
   return _container->get_container_type();
 }
 
 std::pair<size_t, size_t> Wavefunction::get_total_num_electrons() const {
+  QDK_LOG_TRACE_ENTERING();
   return _container->get_total_num_electrons();
 }
 
 std::pair<size_t, size_t> Wavefunction::get_active_num_electrons() const {
+  QDK_LOG_TRACE_ENTERING();
   return _container->get_active_num_electrons();
 }
 
 std::pair<Eigen::VectorXd, Eigen::VectorXd>
 Wavefunction::get_total_orbital_occupations() const {
+  QDK_LOG_TRACE_ENTERING();
   return _container->get_total_orbital_occupations();
 }
 
 std::pair<Eigen::VectorXd, Eigen::VectorXd>
 Wavefunction::get_active_orbital_occupations() const {
+  QDK_LOG_TRACE_ENTERING();
   return _container->get_active_orbital_occupations();
 }
 
 Wavefunction::ScalarVariant Wavefunction::get_coefficient(
     const Configuration& det) const {
+  QDK_LOG_TRACE_ENTERING();
   return _container->get_coefficient(det);
 }
 
 const Wavefunction::VectorVariant& Wavefunction::get_coefficients() const {
+  QDK_LOG_TRACE_ENTERING();
   return _container->get_coefficients();
 }
 
 const Wavefunction::DeterminantVector& Wavefunction::get_active_determinants()
     const {
+  QDK_LOG_TRACE_ENTERING();
   return _container->get_active_determinants();
 }
 
@@ -637,18 +678,114 @@ Configuration Wavefunction::get_total_determinant(
   return Configuration(total_str);
 }
 
-size_t Wavefunction::size() const { return _container->size(); }
+Wavefunction::DeterminantVector Wavefunction::get_total_determinants() const {
+  QDK_LOG_TRACE_ENTERING();
+  const auto& active_dets = get_active_determinants();
+  DeterminantVector total_dets;
+  total_dets.reserve(active_dets.size());
 
-double Wavefunction::norm() const { return _container->norm(); }
+  for (const auto& active_det : active_dets) {
+    total_dets.push_back(get_total_determinant(active_det));
+  }
+
+  return total_dets;
+}
+
+Configuration Wavefunction::get_active_determinant(
+    const Configuration& total_determinant) const {
+  QDK_LOG_TRACE_ENTERING();
+  auto orbitals = get_orbitals();
+
+  if (!orbitals->has_active_space()) {
+    // If no active space is defined, return the total determinant as-is
+    return total_determinant;
+  }
+
+  auto [alpha_active, beta_active] = orbitals->get_active_space_indices();
+  const auto& active_indices = alpha_active;
+
+  if (active_indices.empty()) {
+    // Empty active space - return empty configuration
+    return Configuration("");
+  }
+
+  const std::string total_str = total_determinant.to_string();
+  std::string active_str;
+  active_str.reserve(active_indices.size());
+
+  // Extract only the active space orbitals
+  for (size_t idx : active_indices) {
+    if (idx < total_str.length()) {
+      active_str += total_str[idx];
+    } else {
+      active_str += '0';  // Pad with unoccupied if needed
+    }
+  }
+
+  return Configuration(active_str);
+}
+
+Configuration Wavefunction::get_total_determinant(
+    const Configuration& active_determinant) const {
+  QDK_LOG_TRACE_ENTERING();
+  auto orbitals = get_orbitals();
+
+  if (!orbitals->has_active_space()) {
+    // If no active space is defined, return the active determinant as-is
+    return active_determinant;
+  }
+
+  auto [alpha_inactive, beta_inactive] = orbitals->get_inactive_space_indices();
+  auto [alpha_active, beta_active] = orbitals->get_active_space_indices();
+  auto [alpha_virtual, beta_virtual] = orbitals->get_virtual_space_indices();
+
+  const auto& inactive_indices = alpha_inactive;
+  const auto& active_indices = alpha_active;
+  const auto& virtual_indices = alpha_virtual;
+
+  size_t num_molecular_orbitals = orbitals->get_num_molecular_orbitals();
+  std::string total_str(num_molecular_orbitals, '0');
+
+  // Fill inactive orbitals as doubly occupied
+  for (size_t idx : inactive_indices) {
+    if (idx < num_molecular_orbitals) {
+      total_str[idx] = '2';
+    }
+  }
+
+  // Fill active orbitals from the active determinant
+  const std::string active_str = active_determinant.to_string();
+  for (size_t i = 0; i < active_indices.size() && i < active_str.length();
+       ++i) {
+    size_t idx = active_indices[i];
+    if (idx < num_molecular_orbitals) {
+      total_str[idx] = active_str[i];
+    }
+  }
+
+  return Configuration(total_str);
+}
+
+size_t Wavefunction::size() const {
+  QDK_LOG_TRACE_ENTERING();
+  return _container->size();
+}
+
+double Wavefunction::norm() const {
+  QDK_LOG_TRACE_ENTERING();
+  return _container->norm();
+}
 
 Wavefunction::ScalarVariant Wavefunction::overlap(
     const Wavefunction& other) const {
+  QDK_LOG_TRACE_ENTERING();
   return _container->overlap(*other._container);
 }
 
 std::tuple<const Wavefunction::MatrixVariant&,
            const Wavefunction::MatrixVariant&>
 Wavefunction::get_active_one_rdm_spin_dependent() const {
+  QDK_LOG_TRACE_ENTERING();
   return _container->get_active_one_rdm_spin_dependent();
 }
 
@@ -656,54 +793,71 @@ std::tuple<const Wavefunction::VectorVariant&,
            const Wavefunction::VectorVariant&,
            const Wavefunction::VectorVariant&>
 Wavefunction::get_active_two_rdm_spin_dependent() const {
+  QDK_LOG_TRACE_ENTERING();
   return _container->get_active_two_rdm_spin_dependent();
 }
 
 const Wavefunction::MatrixVariant&
 Wavefunction::get_active_one_rdm_spin_traced() const {
+  QDK_LOG_TRACE_ENTERING();
   return _container->get_active_one_rdm_spin_traced();
 }
 
 const Wavefunction::VectorVariant&
 Wavefunction::get_active_two_rdm_spin_traced() const {
+  QDK_LOG_TRACE_ENTERING();
   return _container->get_active_two_rdm_spin_traced();
 }
 
 bool Wavefunction::has_single_orbital_entropies() const {
+  QDK_LOG_TRACE_ENTERING();
   return _container->has_single_orbital_entropies();
 }
 
 Eigen::VectorXd Wavefunction::get_single_orbital_entropies() const {
+  QDK_LOG_TRACE_ENTERING();
   return _container->get_single_orbital_entropies();
 }
 
 bool Wavefunction::has_one_rdm_spin_dependent() const {
+  QDK_LOG_TRACE_ENTERING();
   return _container->has_one_rdm_spin_dependent();
 }
 
 bool Wavefunction::has_one_rdm_spin_traced() const {
+  QDK_LOG_TRACE_ENTERING();
   return _container->has_one_rdm_spin_traced();
 }
 
 bool Wavefunction::has_two_rdm_spin_dependent() const {
+  QDK_LOG_TRACE_ENTERING();
   return _container->has_two_rdm_spin_dependent();
 }
 
 bool Wavefunction::has_two_rdm_spin_traced() const {
+  QDK_LOG_TRACE_ENTERING();
   return _container->has_two_rdm_spin_traced();
 }
 
 // Cache management
-void Wavefunction::_clear_caches() const { _container->clear_caches(); }
+void Wavefunction::_clear_caches() const {
+  QDK_LOG_TRACE_ENTERING();
+  _container->clear_caches();
+}
 
 // Type access
 WavefunctionType Wavefunction::get_type() const {
+  QDK_LOG_TRACE_ENTERING();
   return _container->get_type();
 }
 
-bool Wavefunction::is_complex() const { return _container->is_complex(); }
+bool Wavefunction::is_complex() const {
+  QDK_LOG_TRACE_ENTERING();
+  return _container->is_complex();
+}
 
 nlohmann::json Wavefunction::to_json() const {
+  QDK_LOG_TRACE_ENTERING();
   nlohmann::json j;
 
   // Store version first
@@ -720,6 +874,7 @@ nlohmann::json Wavefunction::to_json() const {
 }
 
 std::shared_ptr<Wavefunction> Wavefunction::from_json(const nlohmann::json& j) {
+  QDK_LOG_TRACE_ENTERING();
   try {
     // Validate version first
     if (!j.contains("version")) {
@@ -743,15 +898,18 @@ std::shared_ptr<Wavefunction> Wavefunction::from_json(const nlohmann::json& j) {
 }
 
 void Wavefunction::to_json_file(const std::string& filename) const {
+  QDK_LOG_TRACE_ENTERING();
   _to_json_file(filename);
 }
 
 std::shared_ptr<Wavefunction> Wavefunction::from_json_file(
     const std::string& filename) {
+  QDK_LOG_TRACE_ENTERING();
   return _from_json_file(filename);
 }
 
 void Wavefunction::to_hdf5(H5::Group& group) const {
+  QDK_LOG_TRACE_ENTERING();
   try {
     H5::StrType string_type(H5::PredType::C_S1, H5T_VARIABLE);
 
@@ -779,6 +937,7 @@ void Wavefunction::to_hdf5(H5::Group& group) const {
 }
 
 std::shared_ptr<Wavefunction> Wavefunction::from_hdf5(H5::Group& group) {
+  QDK_LOG_TRACE_ENTERING();
   try {
     // Check version first
     H5::StrType string_type(H5::PredType::C_S1, H5T_VARIABLE);
@@ -804,16 +963,19 @@ std::shared_ptr<Wavefunction> Wavefunction::from_hdf5(H5::Group& group) {
 }
 
 void Wavefunction::to_hdf5_file(const std::string& filename) const {
+  QDK_LOG_TRACE_ENTERING();
   _to_hdf5_file(filename);
 }
 
 std::shared_ptr<Wavefunction> Wavefunction::from_hdf5_file(
     const std::string& filename) {
+  QDK_LOG_TRACE_ENTERING();
   return _from_hdf5_file(filename);
 }
 
 void Wavefunction::to_file(const std::string& filename,
                            const std::string& type) const {
+  QDK_LOG_TRACE_ENTERING();
   if (type == "json") {
     to_json_file(filename);
   } else if (type == "hdf5") {
@@ -826,6 +988,7 @@ void Wavefunction::to_file(const std::string& filename,
 
 std::shared_ptr<Wavefunction> Wavefunction::from_file(
     const std::string& filename, const std::string& type) {
+  QDK_LOG_TRACE_ENTERING();
   if (type == "json") {
     return from_json_file(filename);
   } else if (type == "hdf5") {
@@ -837,6 +1000,7 @@ std::shared_ptr<Wavefunction> Wavefunction::from_file(
 }
 
 void Wavefunction::_to_json_file(const std::string& filename) const {
+  QDK_LOG_TRACE_ENTERING();
   std::ofstream file(filename);
   if (!file.is_open()) {
     throw std::runtime_error("Cannot open file for writing: " + filename);
@@ -847,6 +1011,7 @@ void Wavefunction::_to_json_file(const std::string& filename) const {
 }
 
 void Wavefunction::_to_hdf5_file(const std::string& filename) const {
+  QDK_LOG_TRACE_ENTERING();
   try {
     H5::H5File file(filename, H5F_ACC_TRUNC);
     H5::Group wavefunction_group = file.createGroup("/wavefunction");
@@ -858,6 +1023,7 @@ void Wavefunction::_to_hdf5_file(const std::string& filename) const {
 
 std::shared_ptr<Wavefunction> Wavefunction::_from_json_file(
     const std::string& filename) {
+  QDK_LOG_TRACE_ENTERING();
   std::ifstream file(filename);
   if (!file.is_open()) {
     throw std::runtime_error(
@@ -871,6 +1037,7 @@ std::shared_ptr<Wavefunction> Wavefunction::_from_json_file(
 
 std::shared_ptr<Wavefunction> Wavefunction::_from_hdf5_file(
     const std::string& filename) {
+  QDK_LOG_TRACE_ENTERING();
   // Disable HDF5 automatic error printing to stderr unless verbose mode
   if (hdf5_errors_should_be_suppressed()) {
     H5::Exception::dontPrint();
@@ -897,6 +1064,7 @@ std::shared_ptr<Wavefunction> Wavefunction::_from_hdf5_file(
 }
 
 std::string Wavefunction::get_summary() const {
+  QDK_LOG_TRACE_ENTERING();
   std::ostringstream oss;
   oss << "Wavefunction Summary:\n";
   oss << "  Container type: " << _container->get_container_type() << "\n";

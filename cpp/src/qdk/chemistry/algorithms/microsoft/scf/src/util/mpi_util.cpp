@@ -5,6 +5,7 @@
 #include "util/mpi_util.h"
 
 #include <chrono>
+#include <qdk/chemistry/utils/logger.hpp>
 #include <thread>
 
 #include "util/timer.h"
@@ -17,6 +18,7 @@ MPISharedCounter::MPISharedCounter(int rank, int init_value, int owner_rank,
       counter_(nullptr),
       stop_(false),
       buffer_size_(buffer_size) {
+  QDK_LOG_TRACE_ENTERING();
   AutoTimer timer("MPISharedCounter::create");
   if (rank_ == owner_rank_) {
     MPI_Alloc_mem(1, MPI_INFO_NULL, &counter_);
@@ -55,6 +57,7 @@ MPISharedCounter::MPISharedCounter(int rank, int init_value, int owner_rank,
 }
 
 MPISharedCounter::~MPISharedCounter() {
+  QDK_LOG_TRACE_ENTERING();
   AutoTimer timer("MPISharedCounter::destroy");
   stop_ = true;
   worker_->join();
@@ -65,6 +68,7 @@ MPISharedCounter::~MPISharedCounter() {
 }
 
 int MPISharedCounter::next() {
+  QDK_LOG_TRACE_ENTERING();
   AutoTimer timer("MPISharedCounter::next");
   std::unique_lock<std::mutex> lock(mutex_);
   not_empty_.wait(lock, [this]() { return jobs_.size() > 0; });

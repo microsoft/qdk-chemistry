@@ -12,6 +12,7 @@
 #include <spdlog/spdlog.h>
 
 #include <qdk/chemistry/data/wavefunction_containers/sd.hpp>
+#include <qdk/chemistry/utils/logger.hpp>
 
 #ifdef _OPENMP
 #include <omp.h>
@@ -27,6 +28,7 @@ namespace qcs = qdk::chemistry::scf;
 // Helper function to calculate alpha and beta electron counts
 std::pair<int, int> calculate_electron_counts(int nuclear_charge, int charge,
                                               int multiplicity) {
+  QDK_LOG_TRACE_ENTERING();
   int total_electrons = nuclear_charge - charge;
   int n_alpha = (total_electrons + multiplicity - 1) / 2;
   int n_beta = total_electrons - n_alpha;
@@ -36,6 +38,7 @@ std::pair<int, int> calculate_electron_counts(int nuclear_charge, int charge,
 std::pair<double, std::shared_ptr<data::Wavefunction>> ScfSolver::_run_impl(
     std::shared_ptr<data::Structure> structure, int charge, int multiplicity,
     std::optional<std::shared_ptr<data::Orbitals>> initial_guess) const {
+  QDK_LOG_TRACE_ENTERING();
   // Initialize the backend if not already done
   utils::microsoft::initialize_backend();
 
