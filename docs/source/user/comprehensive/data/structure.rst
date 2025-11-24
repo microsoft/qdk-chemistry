@@ -1,13 +1,13 @@
 Structure
 =========
 
-The ``Structure`` class in QDK/Chemistry represents a molecular structure, storing information about atomic positions, elements, and related properties for chemical systems of interest.
+The :class:`~qdk_chemistry.data.Structure` class in QDK/Chemistry represents a molecular structure, storing information about atomic positions, elements, and related properties for chemical systems of interest.
 As a core :doc:`data class <../advanced/design_principles>`, it follows QDK/Chemistry's immutable data pattern.
 
 Overview
 --------
 
-The ``Structure`` class is a fundamental data container in QDK/Chemistry that represents the geometric arrangement of atoms in a molecular system.
+The :class:`~qdk_chemistry.data.Structure` class is a fundamental data container in QDK/Chemistry that represents the geometric arrangement of atoms in a molecular system.
 It provides the foundation for all quantum chemistry calculations by defining the nuclear framework on which electronic structure calculations are performed.
 
 Properties
@@ -23,7 +23,7 @@ Properties
 Usage
 -----
 
-The ``Structure`` class is typically the starting point for any calculation workflow in QDK/Chemistry.
+The :class:`~qdk_chemistry.data.Structure` class is typically the starting point for any calculation workflow in QDK/Chemistry.
 It is used to define the molecular system before performing electronic structure calculations.
 
 .. note::
@@ -32,7 +32,7 @@ It is used to define the molecular system before performing electronic structure
 Creating a structure object manually
 ------------------------------------
 
-A ``Structure`` object can be created manually by adding atoms one by one:
+A :class:`~qdk_chemistry.data.Structure` object can be created manually by adding atoms one by one:
 
 .. tab:: C++ API
 
@@ -57,7 +57,7 @@ A ``Structure`` object can be created manually by adding atoms one by one:
 Loading from files
 ------------------
 
-The ``Structure`` class can load molecular structures from various file formats.
+The :class:`~qdk_chemistry.data.Structure` class can load molecular structures from various file formats.
 For detailed format specifications, see the `File Formats`_ section below.
 
 .. note::
@@ -86,7 +86,7 @@ For detailed format specifications, see the `File Formats`_ section below.
 Accessing structure data
 ------------------------
 
-The ``Structure`` class provides methods to access atomic data:
+The :class:`~qdk_chemistry.data.Structure` class provides methods to access atomic data:
 
 .. note::
    Functions that deal with specific atoms include the word "atom" in their name (e.g., ``get_atom_coordinates``), while functions that return properties for all atoms omit this word (e.g., ``get_coordinates``).
@@ -118,7 +118,7 @@ The ``Structure`` class provides methods to access atomic data:
 Serialization
 -------------
 
-The ``Structure`` class supports serialization to and from various formats.
+The :class:`~qdk_chemistry.data.Structure` class supports serialization to and from various formats.
 For detailed information about serialization in QDK/Chemistry, see the :doc:`Serialization <../advanced/serialization>` documentation.
 
 .. note::
@@ -133,7 +133,7 @@ QDK/Chemistry supports multiple serialization formats for molecular structures:
 JSON format
 ^^^^^^^^^^^
 
-JSON representation of a ``Structure`` looks like:
+JSON representation of a :class:`~qdk_chemistry.data.Structure` looks like:
 
 .. code-block:: json
 
@@ -151,7 +151,7 @@ JSON representation of a ``Structure`` looks like:
 XYZ format
 ^^^^^^^^^^
 
-`XYZ representation <https://en.wikipedia.org/wiki/XYZ_file_format>`_ of the same ``Structure``:
+`XYZ representation <https://en.wikipedia.org/wiki/XYZ_file_format>`_ of the same :class:`~qdk_chemistry.data.Structure`:
 
 .. note::
    QDK/Chemistry uses the comment field (second line) of the XYZ format to store the charge and spin multiplicity information, as this data is not part of the standard XYZ specification.
@@ -194,7 +194,7 @@ XYZ format
 Molecular manipulation
 ----------------------
 
-The ``Structure`` class provides methods for basic molecular manipulations:
+The :class:`~qdk_chemistry.data.Structure` class provides methods for basic molecular manipulations:
 
 .. tab:: C++ API
 
@@ -218,7 +218,7 @@ The ``Structure`` class provides methods for basic molecular manipulations:
 Units
 -----
 
-All internal coordinates in the ``Structure`` class are in Bohr by default.
+All internal coordinates in the :class:`~qdk_chemistry.data.Structure` class are in Bohr by default.
 This applies to all methods that return or accept coordinates.
 
 .. TODO:  restore the code snippets with working examples.
