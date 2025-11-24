@@ -9,9 +9,6 @@ custom algorithms that can be registered and used within the QDK/Chemistry frame
 # Licensed under the MIT License. See LICENSE.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
 
-# TODO (NAB):  Need to add copyright here and elsewhere.
-# 41401
-
 from qdk_chemistry._core._algorithms import (
     ActiveSpaceSelector,
     CoupledClusterCalculator,

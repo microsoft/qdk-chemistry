@@ -10,6 +10,7 @@ import warnings
 import qdk_chemistry.plugins.qiskit.energy_estimator
 import qdk_chemistry.plugins.qiskit.qubit_mapper
 import qdk_chemistry.plugins.qiskit.regular_isometry
+import qdk_chemistry.plugins.qiskit.sparse_isometry
 
 # Suppress deprecation warnings from Qiskit and Aer dependencies
 warnings.filterwarnings("ignore", category=DeprecationWarning, module="qiskit.*")

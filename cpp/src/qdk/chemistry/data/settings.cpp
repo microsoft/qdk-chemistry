@@ -291,6 +291,11 @@ std::string Settings::visit_to_string(const SettingValue& value) const {
           return variant_value ? "true" : "false";
         } else if constexpr (std::is_same_v<ValueType, std::string>) {
           return variant_value;
+        } else if constexpr (std::is_floating_point_v<ValueType>) {
+          // Use scientific notation to avoid truncation of small values
+          std::ostringstream oss;
+          oss << std::scientific << variant_value;
+          return oss.str();
         } else if constexpr (std::is_arithmetic_v<ValueType>) {
           return std::to_string(variant_value);
         } else if constexpr (std::is_same_v<ValueType, std::vector<bool>> ||
@@ -304,6 +309,9 @@ std::string Settings::visit_to_string(const SettingValue& value) const {
             if (idx > 0) oss << ", ";
             if constexpr (std::is_same_v<ValueType, std::vector<std::string>>) {
               oss << "\"" << variant_value[idx] << "\"";
+            } else if constexpr (std::is_same_v<ValueType,
+                                                std::vector<double>>) {
+              oss << std::scientific << variant_value[idx];
             } else {
               oss << variant_value[idx];
             }
@@ -707,9 +715,8 @@ void Settings::_to_hdf5_file(const std::string& filename) const {
 
     H5::Group settings_group = file.createGroup("/settings");
 
-    for (const auto& [key, value] : settings_) {
-      save_setting_value_to_hdf5(settings_group, key, value);
-    }
+    // Use to_hdf5 to write the settings data with proper version attribute
+    to_hdf5(settings_group);
 
   } catch (const H5::Exception& hdf5_exception) {
     throw std::runtime_error("HDF5 error: " +
