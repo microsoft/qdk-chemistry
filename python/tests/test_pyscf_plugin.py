@@ -33,7 +33,7 @@ except ImportError:
 
 if PYSCF_AVAILABLE:
     from qdk_chemistry.constants import ANGSTROM_TO_BOHR
-    from qdk_chemistry.data import BasisSet, BasisType, OrbitalType, Shell
+    from qdk_chemistry.data import AOType, BasisSet, OrbitalType, Shell
     from qdk_chemistry.plugins.pyscf.mcscf import mcsolver_to_fcisolver
     from qdk_chemistry.plugins.pyscf.utils import (
         basis_to_pyscf_mol,
@@ -1807,7 +1807,7 @@ class TestQDKChemistryPySCFBasisConversion:
         # Verify structure
         assert pyscf_mol.natm == 1
         assert pyscf_mol.atom_charges()[0] == 2  # Helium
-        assert pyscf_mol.nao_nr() == qdk_basis.get_num_basis_functions()
+        assert pyscf_mol.nao_nr() == qdk_basis.get_num_atomic_orbitals()
 
         # Verify coordinates match
         coords = pyscf_mol.atom_coords()
@@ -1827,7 +1827,7 @@ class TestQDKChemistryPySCFBasisConversion:
         assert pyscf_mol.atom_charges()[0] == 8  # Oxygen
         assert pyscf_mol.atom_charges()[1] == 1  # Hydrogen
         assert pyscf_mol.atom_charges()[2] == 1  # Hydrogen
-        assert pyscf_mol.nao_nr() == qdk_basis.get_num_basis_functions()
+        assert pyscf_mol.nao_nr() == qdk_basis.get_num_atomic_orbitals()
 
     def test_pyscf_to_qdk_conversion_helium(self):
         """Test converting PySCF molecule to QDK/Chemistry basis set for helium."""
@@ -1839,7 +1839,7 @@ class TestQDKChemistryPySCFBasisConversion:
 
         # Verify basic properties
         assert qdk_basis.get_num_atoms() == 1
-        assert qdk_basis.get_num_basis_functions() == pyscf_mol.nao_nr()
+        assert qdk_basis.get_num_atomic_orbitals() == pyscf_mol.nao_nr()
         assert qdk_basis.has_structure()
 
     def test_pyscf_to_qdk_conversion_water(self):
@@ -1860,7 +1860,7 @@ class TestQDKChemistryPySCFBasisConversion:
 
         # Verify basic properties
         assert qdk_basis.get_num_atoms() == 3
-        assert qdk_basis.get_num_basis_functions() == pyscf_mol.nao_nr()
+        assert qdk_basis.get_num_atomic_orbitals() == pyscf_mol.nao_nr()
         assert qdk_basis.has_structure()
 
     def test_pyscf_to_qdk_conversion_water_generally_contracted(self):
@@ -1881,7 +1881,7 @@ class TestQDKChemistryPySCFBasisConversion:
 
         # Verify basic properties
         assert qdk_basis.get_num_atoms() == 3
-        assert qdk_basis.get_num_basis_functions() == pyscf_mol.nao_nr()
+        assert qdk_basis.get_num_atomic_orbitals() == pyscf_mol.nao_nr()
         assert qdk_basis.has_structure()
 
     def test_round_trip_conversion_helium(self):
@@ -1898,7 +1898,7 @@ class TestQDKChemistryPySCFBasisConversion:
         # Compare key properties
         assert original_basis.get_num_atoms() == converted_basis.get_num_atoms()
         assert original_basis.get_num_shells() == converted_basis.get_num_shells()
-        assert original_basis.get_num_basis_functions() == converted_basis.get_num_basis_functions()
+        assert original_basis.get_num_atomic_orbitals() == converted_basis.get_num_atomic_orbitals()
 
         # Compare shell-by-shell (with more relaxed tolerances for numerical differences)
         orig_shells = original_basis.get_shells()
@@ -1945,20 +1945,20 @@ class TestQDKChemistryPySCFBasisConversion:
         # Compare key properties
         assert original_basis.get_num_atoms() == converted_basis.get_num_atoms()
         assert original_basis.get_num_shells() == converted_basis.get_num_shells()
-        assert original_basis.get_num_basis_functions() == converted_basis.get_num_basis_functions()
+        assert original_basis.get_num_atomic_orbitals() == converted_basis.get_num_atomic_orbitals()
 
-    def test_basis_type_handling(self):
+    def test_atomic_orbital_type_handling(self):
         """Test handling of spherical vs cartesian basis types."""
         # Create basis with spherical functions
         qdk_basis = self.create_simple_basis_set(self.he_structure)
-        original_type = qdk_basis.get_basis_type()
+        original_type = qdk_basis.get_atomic_orbital_type()
 
         # Convert to PySCF and back
         pyscf_mol = basis_to_pyscf_mol(qdk_basis)
         converted_basis = pyscf_mol_to_qdk_basis(pyscf_mol, self.he_structure)
 
         # Basis type should be preserved
-        assert converted_basis.get_basis_type() == original_type
+        assert converted_basis.get_atomic_orbital_type() == original_type
 
     def test_shell_ordering_consistency(self):
         """Test that shell ordering is consistent after conversion."""
@@ -2141,7 +2141,7 @@ class TestQDKChemistryPySCFBasisConversion:
         # Edge case 1: ECP shells exist without ECP metadata
         shells = [Shell(0, OrbitalType.S, [1.0], [1.0])]
         ecp_shells = [Shell(0, OrbitalType.S, [10.0, 5.0], [50.0, 20.0], [0, 2])]
-        qdk_basis_no_meta = BasisSet("test-basis", shells, ecp_shells, ag_structure, BasisType.Spherical)
+        qdk_basis_no_meta = BasisSet("test-basis", shells, ecp_shells, ag_structure, AOType.Spherical)
 
         assert qdk_basis_no_meta.has_ecp_shells()
         assert qdk_basis_no_meta.get_num_ecp_shells() == 1

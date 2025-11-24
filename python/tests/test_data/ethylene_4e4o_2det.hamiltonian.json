@@ -5139,7 +5139,7 @@
           ]
         }
       ],
-      "basis_type": "spherical",
+      "atomic_orbital_type": "spherical",
       "ecp_electrons": [
         0,
         0,
@@ -5151,7 +5151,7 @@
       "ecp_name": "none",
       "name": "def2-svp",
       "num_atoms": 6,
-      "num_basis_functions": 48,
+      "num_atomic_orbitals": 48,
       "num_shells": 24,
       "structure": {
         "coordinates": [

@@ -545,7 +545,7 @@ class ModelOrbitals : public Orbitals {
 
   /**
    * @brief Constructor with active and inactive space indices (restricted)
-   * @param basis_size Number of basis functions (and molecular orbitals)
+   * @param basis_size Number of atomic orbitals (and molecular orbitals)
    * @param indices Orbital indices as tuple of (active, inactive) space
    * indices. For restricted calculations, the same indices are used for both
    * alpha and beta spin channels.
@@ -556,7 +556,7 @@ class ModelOrbitals : public Orbitals {
 
   /**
    * @brief Constructor with active and inactive space indices (unrestricted)
-   * @param basis_size Number of basis functions (and molecular orbitals)
+   * @param basis_size Number of atomic orbitals (and molecular orbitals)
    * @param indices Orbital indices as tuple of (active_alpha, inactive_alpha,
    * active_beta, inactive_beta) space indices. For unrestricted calculations,
    * separate indices can be specified for alpha and beta spin channels.

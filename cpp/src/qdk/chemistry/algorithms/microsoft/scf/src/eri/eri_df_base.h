@@ -25,7 +25,7 @@ class DensityFittingBase {
  protected:
   bool unrestricted_;     ///< Whether calculation is spin unrestricted
   uint64_t n_atoms_;      ///< Number of atoms in the molecule
-  BasisMode basis_mode_;  ///< Basis function convention
+  BasisMode basis_mode_;  ///< atomic orbital convention
   ParallelConfig mpi_;    ///< MPI configuration
 
   libint2::BasisSet obs_;  ///< Orbital basis set in libint2 format

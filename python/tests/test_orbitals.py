@@ -142,8 +142,8 @@ def test_basis_info():
     retrieved_basis = orb.get_basis_set()
     assert retrieved_basis.get_name() == "6-31G"
     assert retrieved_basis.get_num_shells() > 0
-    # Number of basis functions should match what we requested
-    assert retrieved_basis.get_num_basis_functions() == 2
+    # Number of atomic orbitals should match what we requested
+    assert retrieved_basis.get_num_atomic_orbitals() == 2
 
 
 def test_calculation_restriction_query():
@@ -465,7 +465,7 @@ def test_orbitals_file_io_validation():
         Orbitals.from_hdf5_file("test.h5")
 
     # Test non-existent file
-    with pytest.raises(RuntimeError, match="Cannot open file for reading"):
+    with pytest.raises(RuntimeError, match="Unable to open Orbitals JSON file"):
         Orbitals.from_json_file("nonexistent.orbitals.json")
 
     with pytest.raises(RuntimeError):

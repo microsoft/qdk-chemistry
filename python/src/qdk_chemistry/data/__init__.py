@@ -9,7 +9,7 @@ Classes:
         Quantum chemical ansatz combining a Hamiltonian and wavefunction for energy calculations.
     BasisSet
         Gaussian basis set definitions for quantum calculations.
-    BasisType
+    AOType
         Enumeration of basis set types (STO-3G, 6-31G, etc.).
     CasWavefunctionContainer
         Complete Active Space (CAS) wavefunction with CI coefficients and determinants.
@@ -77,8 +77,8 @@ Exceptions:
 
 from qdk_chemistry._core.data import (
     Ansatz,
+    AOType,
     BasisSet,
-    BasisType,
     CasWavefunctionContainer,
     Configuration,
     CoupledClusterContainer,
@@ -113,9 +113,9 @@ SettingTypeMismatchError = SettingTypeMismatch
 
 
 __all__ = [
+    "AOType",
     "Ansatz",
     "BasisSet",
-    "BasisType",
     "CasWavefunctionContainer",
     "Configuration",
     "CoupledClusterContainer",

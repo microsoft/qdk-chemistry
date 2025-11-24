@@ -39,13 +39,13 @@ class MOERI {
   /**
    *  @brief Compute MO ERIs incore with a single transformation matrix
    *
-   *  @param[in]  nb  Number of basis functions
+   *  @param[in]  nao  Number of atomic orbitals
    *  @param[in]  nt  Number of vectors in the MO space
    *  @param[in]  C  First quarter transformation coefficients (row major)
    *  @param[out] out Output MO ERIs (row major)
    */
-  void compute(size_t nb, size_t nt, const double* C, double* out) {
-    compute(nb, nt, C, C, C, C, out);
+  void compute(size_t nao, size_t nt, const double* C, double* out) {
+    compute(nao, nt, C, C, C, C, out);
   }
 
   /**
@@ -57,7 +57,7 @@ class MOERI {
    *  If desired, a row major result can be obtained by handing in matrices in
    *  reverse order (l,k,j,i).
    *
-   *  @param[in]  nb  Number of basis functions
+   *  @param[in]  nao  Number of atomic orbitals
    *  @param[in]  nt  Number of vectors in the MO space
    *  @param[in]  Ca  First quarter transformation coefficients (row major)
    *  @param[in]  Cb  Second quarter transformation coefficients (row major)
@@ -65,7 +65,7 @@ class MOERI {
    *  @param[in]  Cd  Fourth quarter transformation coefficients (row major)
    *  @param[out] out Output MO ERIs (row major)
    */
-  void compute(size_t nb, size_t nt, const double* Ca, const double* Cb,
+  void compute(size_t nao, size_t nt, const double* Ca, const double* Cb,
                const double* Cc, const double* Cd, double* out);
 
  private:

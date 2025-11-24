@@ -84,7 +84,7 @@ std::shared_ptr<data::Hamiltonian> HamiltonianConstructor::_run_impl(
 
   auto basis_set = orbitals->get_basis_set();
   const auto& [Ca, Cb] = orbitals->get_coefficients();
-  const size_t num_basis_funcs = basis_set->get_num_basis_functions();
+  const size_t num_atomic_orbitals = basis_set->get_num_atomic_orbitals();
   const size_t num_molecular_orbitals = orbitals->get_num_molecular_orbitals();
 
   // Get alpha and beta active space indices
@@ -163,23 +163,23 @@ std::shared_ptr<data::Hamiltonian> HamiltonianConstructor::_run_impl(
       internal_basis_set.get(), mol.get(), scf_config->mpi);
 
   // Compute Core Hamiltonian in AO basis
-  Eigen::MatrixXd T_full(num_basis_funcs, num_basis_funcs),
-      V_full(num_basis_funcs, num_basis_funcs);
+  Eigen::MatrixXd T_full(num_atomic_orbitals, num_atomic_orbitals),
+      V_full(num_atomic_orbitals, num_atomic_orbitals);
   int1e->kinetic_integral(T_full.data());
   int1e->nuclear_integral(V_full.data());
   Eigen::MatrixXd H_full = T_full + V_full;
 
   // Build active coefficient matrices for alpha and beta (can have different
   // sizes)
-  Eigen::MatrixXd Ca_active(num_basis_funcs, nactive_alpha);
-  Eigen::MatrixXd Cb_active(num_basis_funcs, nactive_beta);
+  Eigen::MatrixXd Ca_active(num_atomic_orbitals, nactive_alpha);
+  Eigen::MatrixXd Cb_active(num_atomic_orbitals, nactive_beta);
 
   if (active_indices_alpha.empty()) {
     // If no active orbitals are specified, use all orbitals
     Ca_active = Ca;
   } else if (alpha_space_is_contiguous) {
     // Contiguous alpha indices
-    Ca_active = Ca.block(0, active_indices_alpha.front(), num_basis_funcs,
+    Ca_active = Ca.block(0, active_indices_alpha.front(), num_atomic_orbitals,
                          nactive_alpha);
   } else {
     // Non-contiguous alpha indices
@@ -193,8 +193,8 @@ std::shared_ptr<data::Hamiltonian> HamiltonianConstructor::_run_impl(
     Cb_active = Cb;
   } else if (beta_space_is_contiguous) {
     // Contiguous beta indices
-    Cb_active =
-        Cb.block(0, active_indices_beta.front(), num_basis_funcs, nactive_beta);
+    Cb_active = Cb.block(0, active_indices_beta.front(), num_atomic_orbitals,
+                         nactive_beta);
   } else {
     // Non-contiguous beta indices
     for (size_t i = 0; i < nactive_beta; i++) {
@@ -226,13 +226,13 @@ std::shared_ptr<data::Hamiltonian> HamiltonianConstructor::_run_impl(
 
   if (is_restricted_calc) {
     // Only compute (αα|αα) integrals - the others will be identical
-    moeri_c.compute(num_basis_funcs, nactive, Ca_active_rm.data(),
+    moeri_c.compute(num_atomic_orbitals, nactive, Ca_active_rm.data(),
                     moeri_aaaa.data());
   } else {
     // Unrestricted case - compute all three types
 
     // (αα|αα) integrals
-    moeri_c.compute(num_basis_funcs, nactive,
+    moeri_c.compute(num_atomic_orbitals, nactive,
                     Ca_active_rm.data(),  // 1st quarter: alpha
                     Ca_active_rm.data(),  // 2nd quarter: alpha
                     Ca_active_rm.data(),  // 3rd quarter: alpha
@@ -241,7 +241,7 @@ std::shared_ptr<data::Hamiltonian> HamiltonianConstructor::_run_impl(
 
     // (ββ|αα) integrals
     // NOTE these are stored in reverse order e.g. ββαα, when they are accessed.
-    moeri_c.compute(num_basis_funcs, nactive,
+    moeri_c.compute(num_atomic_orbitals, nactive,
                     Cb_active_rm.data(),  // 1st quarter: beta
                     Cb_active_rm.data(),  // 2nd quarter: beta
                     Ca_active_rm.data(),  // 3rd quarter: alpha
@@ -249,7 +249,7 @@ std::shared_ptr<data::Hamiltonian> HamiltonianConstructor::_run_impl(
                     moeri_aabb.data());
 
     // (ββ|ββ) integrals
-    moeri_c.compute(num_basis_funcs, nactive,
+    moeri_c.compute(num_atomic_orbitals, nactive,
                     Cb_active_rm.data(),  // 1st quarter: beta
                     Cb_active_rm.data(),  // 2nd quarter: beta
                     Cb_active_rm.data(),  // 3rd quarter: beta
@@ -336,10 +336,10 @@ std::shared_ptr<data::Hamiltonian> HamiltonianConstructor::_run_impl(
 
     // Compute the inactive density matrix
     Eigen::MatrixXd D_inactive =
-        Eigen::MatrixXd::Zero(num_basis_funcs, num_basis_funcs);
+        Eigen::MatrixXd::Zero(num_atomic_orbitals, num_atomic_orbitals);
     if (inactive_space_is_contiguous) {
-      auto C_inactive = Ca.block(0, inactive_indices.front(), num_basis_funcs,
-                                 inactive_indices.size());
+      auto C_inactive = Ca.block(0, inactive_indices.front(),
+                                 num_atomic_orbitals, inactive_indices.size());
       D_inactive = C_inactive * C_inactive.transpose();
     } else {
       for (size_t i : inactive_indices) {
@@ -348,8 +348,8 @@ std::shared_ptr<data::Hamiltonian> HamiltonianConstructor::_run_impl(
     }
 
     // Compute the two electron part of the inactive fock matrix
-    Eigen::MatrixXd J_inactive_ao(num_basis_funcs, num_basis_funcs),
-        K_inactive_ao(num_basis_funcs, num_basis_funcs);
+    Eigen::MatrixXd J_inactive_ao(num_atomic_orbitals, num_atomic_orbitals),
+        K_inactive_ao(num_atomic_orbitals, num_atomic_orbitals);
     eri->build_JK(D_inactive.data(), J_inactive_ao.data(), K_inactive_ao.data(),
                   1.0, 0.0, 0.0);
     Eigen::MatrixXd G_inactive_ao = 2 * J_inactive_ao - K_inactive_ao;
@@ -403,14 +403,14 @@ std::shared_ptr<data::Hamiltonian> HamiltonianConstructor::_run_impl(
 
     // Compute separate alpha and beta inactive density matrices
     Eigen::MatrixXd D_inactive_alpha =
-        Eigen::MatrixXd::Zero(num_basis_funcs, num_basis_funcs);
+        Eigen::MatrixXd::Zero(num_atomic_orbitals, num_atomic_orbitals);
     Eigen::MatrixXd D_inactive_beta =
-        Eigen::MatrixXd::Zero(num_basis_funcs, num_basis_funcs);
+        Eigen::MatrixXd::Zero(num_atomic_orbitals, num_atomic_orbitals);
 
     // Build alpha inactive density
     if (alpha_inactive_is_contiguous && !inactive_indices_alpha.empty()) {
       auto C_inactive_alpha =
-          Ca.block(0, inactive_indices_alpha.front(), num_basis_funcs,
+          Ca.block(0, inactive_indices_alpha.front(), num_atomic_orbitals,
                    inactive_indices_alpha.size());
       D_inactive_alpha = C_inactive_alpha * C_inactive_alpha.transpose();
     } else {
@@ -422,7 +422,7 @@ std::shared_ptr<data::Hamiltonian> HamiltonianConstructor::_run_impl(
     // Build beta inactive density
     if (beta_inactive_is_contiguous && !inactive_indices_beta.empty()) {
       auto C_inactive_beta =
-          Cb.block(0, inactive_indices_beta.front(), num_basis_funcs,
+          Cb.block(0, inactive_indices_beta.front(), num_atomic_orbitals,
                    inactive_indices_beta.size());
       D_inactive_beta = C_inactive_beta * C_inactive_beta.transpose();
     } else {
@@ -432,10 +432,10 @@ std::shared_ptr<data::Hamiltonian> HamiltonianConstructor::_run_impl(
     }
 
     // Compute J and K matrices for alpha and beta densities
-    Eigen::MatrixXd J_alpha_ao(num_basis_funcs, num_basis_funcs),
-        K_alpha_ao(num_basis_funcs, num_basis_funcs);
-    Eigen::MatrixXd J_beta_ao(num_basis_funcs, num_basis_funcs),
-        K_beta_ao(num_basis_funcs, num_basis_funcs);
+    Eigen::MatrixXd J_alpha_ao(num_atomic_orbitals, num_atomic_orbitals),
+        K_alpha_ao(num_atomic_orbitals, num_atomic_orbitals);
+    Eigen::MatrixXd J_beta_ao(num_atomic_orbitals, num_atomic_orbitals),
+        K_beta_ao(num_atomic_orbitals, num_atomic_orbitals);
 
     eri->build_JK(D_inactive_alpha.data(), J_alpha_ao.data(), K_alpha_ao.data(),
                   1.0, 0.0, 0.0);

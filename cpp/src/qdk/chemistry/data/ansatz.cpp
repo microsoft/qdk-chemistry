@@ -537,7 +537,9 @@ void Ansatz::_to_json_file(const std::string& filename) const {
 std::shared_ptr<Ansatz> Ansatz::_from_json_file(const std::string& filename) {
   std::ifstream file(filename);
   if (!file.is_open()) {
-    throw std::runtime_error("Failed to open file for reading: " + filename);
+    throw std::runtime_error(
+        "Unable to open Ansatz JSON file '" + filename +
+        "'. Please check that the file exists and you have read permissions.");
   }
 
   nlohmann::json j;
@@ -705,12 +707,23 @@ void Ansatz::_to_hdf5_file(const std::string& filename) const {
 }
 
 std::shared_ptr<Ansatz> Ansatz::_from_hdf5_file(const std::string& filename) {
+  H5::H5File file;
   try {
-    H5::H5File file(filename, H5F_ACC_RDONLY);
+    file.openFile(filename, H5F_ACC_RDONLY);
+  } catch (const H5::Exception& e) {
+    throw std::runtime_error("Unable to open Ansatz HDF5 file '" + filename +
+                             "'. " +
+                             "Please check that the file exists, is a valid "
+                             "HDF5 file, and you have read permissions.");
+  }
+
+  try {
     H5::Group ansatz_group = file.openGroup("/ansatz");
     return from_hdf5(ansatz_group);
   } catch (const H5::Exception& e) {
-    throw std::runtime_error("HDF5 error: " + std::string(e.getCDetailMsg()));
+    throw std::runtime_error("Unable to read Ansatz data from HDF5 file '" +
+                             filename + "'. " +
+                             "HDF5 error: " + std::string(e.getCDetailMsg()));
   }
 }
 

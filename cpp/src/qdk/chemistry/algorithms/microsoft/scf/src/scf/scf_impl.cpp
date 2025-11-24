@@ -12,19 +12,19 @@
 #ifdef QDK_CHEMISTRY_ENABLE_MPI
 #include <mpi.h>
 #endif
-#include <omp.h>
 #include <qdk/chemistry/scf/util/env_helper.h>
 #include <spdlog/spdlog.h>
 
 #include <filesystem>
 #include <fstream>
 #include <iostream>
+#include <lapack.hh>
 #include <nlohmann/json.hpp>
 #include <numeric>
+#include <qdk/chemistry/utils/omp_utils.hpp>
 #include <sstream>
 #include <thread>
 
-#include "util/lapack.h"
 #include "util/macros.h"
 #include "util/timer.h"
 
@@ -65,8 +65,8 @@ SCFImpl::SCFImpl(std::shared_ptr<Molecule> mol_ptr, const SCFConfig& cfg,
   }
   ctx_.result = {};
 
-  num_atomic_orbitals_ = ctx_.basis_set->num_basis_funcs;
-  num_molecular_orbitals_ = ctx_.basis_set->num_basis_funcs;
+  num_atomic_orbitals_ = ctx_.basis_set->num_atomic_orbitals;
+  num_molecular_orbitals_ = ctx_.basis_set->num_atomic_orbitals;
   ctx_.num_molecular_orbitals = num_molecular_orbitals_;
   num_density_matrices_ = cfg.unrestricted ? 2 : 1;
 #ifdef QDK_CHEMISTRY_ENABLE_QMMM
@@ -100,7 +100,7 @@ SCFImpl::SCFImpl(std::shared_ptr<Molecule> mol_ptr, const SCFConfig& cfg,
         mol.n_atoms, mol.n_electrons, n_ecp_electrons, mol.charge,
         mol.multiplicity, spin, alpha, beta);
     spdlog::info(
-        "restricted={}, basis={}, pure={}, num_basis_funcs={}, "
+        "restricted={}, basis={}, pure={}, num_atomic_orbitals={}, "
         "energy_threshold={:.2e}, "
         "density_threshold={:.2e}, "
         "og_threshold={:.2e}",
@@ -110,7 +110,7 @@ SCFImpl::SCFImpl(std::shared_ptr<Molecule> mol_ptr, const SCFConfig& cfg,
     spdlog::info("fock_alg={}", fock_string);
     if (cfg.do_dfj) {
       spdlog::info("aux_basis={}, naux={}", ctx_.aux_basis_set->name,
-                   ctx_.aux_basis_set->num_basis_funcs);
+                   ctx_.aux_basis_set->num_atomic_orbitals);
     }
     spdlog::info("eri_tolerance={:.2e}", cfg.eri.eri_threshold);
 
@@ -399,8 +399,8 @@ void SCFImpl::compute_orthogonalization_matrix_(const RowMajorMatrix& S_,
 #else
   std::memcpy(U_t.data(), S_.data(),
               num_atomic_orbitals_ * num_atomic_orbitals_ * sizeof(double));
-  lapack::syev("V", "L", num_atomic_orbitals_, U_t.data(), num_atomic_orbitals_,
-               s.data());
+  lapack::syev(lapack::Job::Vec, lapack::Uplo::Lower, num_atomic_orbitals_,
+               U_t.data(), num_atomic_orbitals_, s.data());
 #endif
 
   RowMajorMatrix U = U_t.transpose();
@@ -809,7 +809,7 @@ void SCFImpl::properties_() {
     for (auto i = 0; i < num_atomic_orbitals_; ++i) {
       int A = 0;
       for (A = 0; A < ctx_.mol->n_atoms; ++A) {
-        if (ctx_.basis_set->get_atom2bf()[A * num_atomic_orbitals_ + i]) break;
+        if (ctx_.basis_set->get_atom2ao()[A * num_atomic_orbitals_ + i]) break;
       }
       res.mulliken_population[A] -= PS(i, i);
     }
@@ -1073,8 +1073,8 @@ void SCFImpl::update_density_matrix_(const RowMajorMatrix& F_, int idx) {
       num_atomic_orbitals_, num_molecular_orbitals_);
   RowMajorMatrix tmp1 = X_.transpose() * F_dm;
   RowMajorMatrix tmp2 = tmp1 * X_;
-  lapack::syev("V", "L", num_molecular_orbitals_, tmp2.data(),
-               num_molecular_orbitals_,
+  lapack::syev(lapack::Job::Vec, lapack::Uplo::Lower, num_molecular_orbitals_,
+               tmp2.data(), num_molecular_orbitals_,
                eigenvalues_.data() + idx * num_molecular_orbitals_);
   tmp2.transposeInPlace();  // Row major
   C_dm.noalias() = X_ * tmp2;

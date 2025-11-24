@@ -21,6 +21,7 @@
 
 using namespace qdk::chemistry::data;
 using namespace qdk::chemistry::algorithms;
+using namespace qdk::chemistry::utils;
 
 class ValenceActiveParametersTest : public ::testing::Test {
  protected:
@@ -98,7 +99,7 @@ class ValenceActiveParametersTest : public ::testing::Test {
 
 // Test basic functionality with water molecule
 TEST_F(ValenceActiveParametersTest, WaterMoleculeBasicTest) {
-  auto result = compute_valence_space(water_wavefunction, 0);
+  auto result = compute_valence_space_parameters(water_wavefunction, 0);
 
   // For water (O + 2H):
   // O has 6 valence electrons, 4 valence orbitals (2s, 3*2p)
@@ -115,7 +116,8 @@ TEST_F(ValenceActiveParametersTest, WaterMoleculeBasicTest) {
 
 // Test basic functionality with truncated water molecule wavefunction
 TEST_F(ValenceActiveParametersTest, WaterMoleculeTruncatedTest) {
-  auto result = compute_valence_space(water_wavefunction_truncated, 0);
+  auto result =
+      compute_valence_space_parameters(water_wavefunction_truncated, 0);
 
   // For water (O + 2H):
   // O has 6 valence electrons, 4 valence orbitals (2s, 3*2p)
@@ -132,7 +134,7 @@ TEST_F(ValenceActiveParametersTest, WaterMoleculeTruncatedTest) {
 
 // Test basic functionality with single Helium atom
 TEST_F(ValenceActiveParametersTest, HeliumAtomBasicTest) {
-  auto result = compute_valence_space(he_wavefunction, 0);
+  auto result = compute_valence_space_parameters(he_wavefunction, 0);
 
   // For Helium atom:
   // - num_active_orbitals: 1 (both lower bound and upper bound is 1)
@@ -147,7 +149,7 @@ TEST_F(ValenceActiveParametersTest, HeliumAtomBasicTest) {
 
 // Test basic functionality with single Oxygen-Hydrogen molecule
 TEST_F(ValenceActiveParametersTest, OxygenHydrogenMoleculeBasicTest) {
-  auto result = compute_valence_space(oh_wavefunction, 0);
+  auto result = compute_valence_space_parameters(oh_wavefunction, 0);
 
   // For Oxygen-Hydrogen molecule:
   // - num_active_orbitals: 5 (4 from O, 1 from H)
@@ -162,7 +164,7 @@ TEST_F(ValenceActiveParametersTest, OxygenHydrogenMoleculeBasicTest) {
 
 // Test basic functionality with positive charge Oxygen-Hydrogen molecule
 TEST_F(ValenceActiveParametersTest, OxygenHydrogenMoleculePositiveChargeTest) {
-  auto result = compute_valence_space(ohp_wavefunction, 1);
+  auto result = compute_valence_space_parameters(ohp_wavefunction, 1);
 
   // For Oxygen-Hydrogen molecule:
   // - num_active_orbitals: 5 (4 from O, 1 from H)
@@ -177,7 +179,7 @@ TEST_F(ValenceActiveParametersTest, OxygenHydrogenMoleculePositiveChargeTest) {
 
 // Test basic functionality with negative charge Oxygen-Hydrogen molecule
 TEST_F(ValenceActiveParametersTest, OxygenHydrogenMoleculeNegativeChargeTest) {
-  auto result = compute_valence_space(ohn_wavefunction, -1);
+  auto result = compute_valence_space_parameters(ohn_wavefunction, -1);
 
   // For Oxygen-Hydrogen molecule:
   // - num_active_orbitals: 5 (4 from O, 1 from H)

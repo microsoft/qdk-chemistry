@@ -179,7 +179,7 @@ BasisSet::BasisSet(std::shared_ptr<Molecule> mol, const std::string& path,
                      });
   }
 
-  num_basis_funcs = std::accumulate(
+  num_atomic_orbitals = std::accumulate(
       shells.begin(), shells.end(), 0, [&pure](auto sum, const auto& sh) {
         int sz = 0;
         if (pure) {
@@ -191,23 +191,23 @@ BasisSet::BasisSet(std::shared_ptr<Molecule> mol, const std::string& path,
       });
 
   // Calculate atom -> bf idx map
-  calc_atom2bf();
+  calc_atom2ao();
 
   if (libint2::initialized()) {
-    spdlog::trace("Loaded basis set from {}: n_shells={}, n_basis_funcs={}",
-                  path, shells.size(), num_basis_funcs);
+    spdlog::trace("Loaded basis set from {}: n_shells={}, n_atomic_orbitals={}",
+                  path, shells.size(), num_atomic_orbitals);
     shell_pairs_ = OneBodyIntegral::compute_shell_pairs(shells);
   }
 }
 
-void BasisSet::calc_atom2bf() {
+void BasisSet::calc_atom2ao() {
   int bf_idx = 0;
-  atom2bf_ = std::vector<uint8_t>(mol->n_atoms * num_basis_funcs, 0);
+  atom2ao_ = std::vector<uint8_t>(mol->n_atoms * num_atomic_orbitals, 0);
   for (auto& sh : shells) {
     int sz = pure ? 2 * sh.angular_momentum + 1
                   : (sh.angular_momentum + 1) * (sh.angular_momentum + 2) / 2;
     for (int i = 0; i < sz; i++, bf_idx++) {
-      atom2bf_[sh.atom_index * num_basis_funcs + bf_idx] = 1;
+      atom2ao_[sh.atom_index * num_atomic_orbitals + bf_idx] = 1;
     }
   }
 }
@@ -235,7 +235,7 @@ void norm_psi4_mode(std::vector<Shell>& shells) {
     double_factorial[i] = double_factorial[i - 2] * (i - 1);
   }
 
-  constexpr double sqrt_PI_cubed = std::sqrt(std::pow(std::acos(-1), 3));
+  const double sqrt_PI_cubed = std::sqrt(std::pow(std::acos(-1.0), 3.0));
 
   for (auto& shell : shells) {
     int am = shell.angular_momentum;
@@ -290,7 +290,7 @@ nlohmann::ordered_json BasisSet::to_json() const {
                     ? "PSI4"
                     : (mode == BasisMode::RAW ? "RAW" : "UNKNOWN")},
        {"atoms", mol->atomic_nums},
-       {"num_basis_funcs", num_basis_funcs},
+       {"num_atomic_orbitals", num_atomic_orbitals},
        {"electron_shells", json_shells},
        {"ecp_shells", json_ecp_shells},
        {"element_ecp_electrons", json_element_ecp_electrons}});
@@ -369,7 +369,7 @@ std::shared_ptr<BasisSet> BasisSet::from_serialized_json(
   // Read flat(ish) data
   bs->name = json["name"];
   bs->pure = json["pure"].template get<bool>();
-  bs->num_basis_funcs = json["num_basis_funcs"].template get<int>();
+  bs->num_atomic_orbitals = json["num_atomic_orbitals"].template get<int>();
   bs->mode = (json["mode"].template get<std::string>() == "PSI4")
                  ? BasisMode::PSI4
                  : BasisMode::RAW;
@@ -386,8 +386,8 @@ std::shared_ptr<BasisSet> BasisSet::from_serialized_json(
     bs->shells = std::move(shells);
   }
 
-  spdlog::trace("Loaded basis set: n_shells={}, n_basis_funcs",
-                bs->shells.size(), bs->num_basis_funcs);
+  spdlog::trace("Loaded basis set: n_shells={}, n_atomic_orbitals",
+                bs->shells.size(), bs->num_atomic_orbitals);
 
   // Read ECP Shells
   nlohmann::ordered_json _ecp_shells = json["ecp_shells"];
@@ -435,7 +435,7 @@ std::shared_ptr<BasisSet> BasisSet::from_serialized_json(
 
   // Compute derived quantities
   bs->shell_pairs_ = OneBodyIntegral::compute_shell_pairs(bs->shells);
-  bs->calc_atom2bf();
+  bs->calc_atom2ao();
 
   return bs;
 }

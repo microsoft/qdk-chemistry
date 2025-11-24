@@ -8,7 +8,9 @@
  */
 
 #pragma once
+#ifdef _OPENMP
 #include <omp.h>
+#endif
 #include <spdlog/sinks/null_sink.h>
 #include <spdlog/sinks/stdout_color_sinks.h>
 #include <spdlog/spdlog.h>

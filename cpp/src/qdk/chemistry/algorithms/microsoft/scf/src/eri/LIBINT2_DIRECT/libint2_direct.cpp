@@ -4,10 +4,10 @@
 
 #include "libint2_direct.h"
 
-#include <omp.h>
 #include <qdk/chemistry/scf/core/types.h>
 #include <qdk/chemistry/scf/util/libint2_util.h>
 
+#include <qdk/chemistry/utils/omp_utils.hpp>
 #include <stdexcept>
 
 #include "util/timer.h"
@@ -194,7 +194,7 @@ class ERI {
   bool unrestricted_;        ///< Whether to use unrestricted formalism
   ::libint2::BasisSet obs_;  ///< Libint2 orbital basis set representation
   std::vector<size_t>
-      shell2bf_;  ///< Mapping from shell index to first basis function
+      shell2bf_;  ///< Mapping from shell index to first atomic orbital
   shellpair_list_t splist_;   ///< Pre-computed shell pair list for screening
   shellpair_data_t spdata_;   ///< Shell pair geometric data and bounds
   RowMajorMatrix K_schwarz_;  ///< Schwarz screening matrix for integral bounds
@@ -257,18 +257,18 @@ class ERI {
   void build_JK(const double* P, double* J, double* K, double alpha,
                 double beta, double omega) {
     AutoTimer t("ERI::build_JK");
-    const size_t num_basis_funcs = obs_.nbf();
+    const size_t num_atomic_orbitals = obs_.nbf();
     const size_t nsh = obs_.size();
     const size_t num_density_matrices = unrestricted_ ? 2 : 1;
     const size_t mat_size =
-        num_density_matrices * num_basis_funcs * num_basis_funcs;
+        num_density_matrices * num_atomic_orbitals * num_atomic_orbitals;
     const bool is_rsx = std::abs(omega) > 1e-12;
     const double precision = std::numeric_limits<double>::epsilon();
 
     if (is_rsx) throw std::runtime_error("RSX + LIBINT2_DIRECT NYI");
 
     // Compute shell block norm of P
-    const auto P_shnrm = compute_shellblock_norm(obs_, P, num_basis_funcs);
+    const auto P_shnrm = compute_shellblock_norm(obs_, P, num_atomic_orbitals);
     const auto P_shmax = P_shnrm.maxCoeff();
 
     // Check for NaN/Inf values
@@ -365,14 +365,17 @@ class ERI {
               // Contract shell quartet (J)
               if (J)
                 for (size_t idm = 0; idm < num_density_matrices; ++idm) {
-                  auto* J_cur = J + idm * num_basis_funcs * num_basis_funcs;
-                  auto* P_cur = P + idm * num_basis_funcs * num_basis_funcs;
+                  auto* J_cur =
+                      J + idm * num_atomic_orbitals * num_atomic_orbitals;
+                  auto* P_cur =
+                      P + idm * num_atomic_orbitals * num_atomic_orbitals;
                   for (size_t i = 0, ijkl = 0; i < n1; ++i) {
                     const size_t bf1 = bf1_st + i;
                     for (size_t j = 0; j < n2; ++j) {
                       const size_t bf2 = bf2_st + j;
                       double J_ij = 0.0;
-                      const double P_ij = P_cur[bf1 * num_basis_funcs + bf2];
+                      const double P_ij =
+                          P_cur[bf1 * num_atomic_orbitals + bf2];
                       for (size_t k = 0; k < n3; ++k) {
                         const size_t bf3 = bf3_st + k;
                         for (size_t l = 0; l < n4; ++l, ++ijkl) {
@@ -381,16 +384,18 @@ class ERI {
                           const auto value = buf_1234[ijkl] * s1234_deg;
 
                           // J contractions
-                          J_ij += P_cur[bf3 * num_basis_funcs + bf4] * value;
+                          J_ij +=
+                              P_cur[bf3 * num_atomic_orbitals + bf4] * value;
 #pragma omp atomic update relaxed
-                          J_cur[bf3 * num_basis_funcs + bf4] += P_ij * value;
+                          J_cur[bf3 * num_atomic_orbitals + bf4] +=
+                              P_ij * value;
 
                         }  // l
                       }  // k
 
 // Update J
 #pragma omp atomic update relaxed
-                      J_cur[bf1 * num_basis_funcs + bf2] += J_ij;
+                      J_cur[bf1 * num_atomic_orbitals + bf2] += J_ij;
                     }  // j
                   }  // i
                 }  // idm
@@ -398,8 +403,10 @@ class ERI {
               // Contract shell quartet (K)
               if (K)
                 for (size_t idm = 0; idm < num_density_matrices; ++idm) {
-                  auto* K_cur = K + idm * num_basis_funcs * num_basis_funcs;
-                  auto* P_cur = P + idm * num_basis_funcs * num_basis_funcs;
+                  auto* K_cur =
+                      K + idm * num_atomic_orbitals * num_atomic_orbitals;
+                  auto* P_cur =
+                      P + idm * num_atomic_orbitals * num_atomic_orbitals;
                   for (size_t i = 0, ijkl = 0; i < n1; ++i) {
                     const size_t bf1 = bf1_st + i;
                     for (size_t j = 0; j < n2; ++j) {
@@ -409,31 +416,35 @@ class ERI {
                         double K_ik = 0.0;
                         double K_jk = 0.0;
                         const double P_ik =
-                            0.25 * P_cur[bf1 * num_basis_funcs + bf3];
+                            0.25 * P_cur[bf1 * num_atomic_orbitals + bf3];
                         const double P_jk =
-                            0.25 * P_cur[bf2 * num_basis_funcs + bf3];
+                            0.25 * P_cur[bf2 * num_atomic_orbitals + bf3];
                         for (size_t l = 0; l < n4; ++l, ++ijkl) {
                           const size_t bf4 = bf4_st + l;
 
                           const auto value = buf_1234[ijkl] * s1234_deg;
 
                           // K contractions
-                          K_ik +=
-                              0.25 * P_cur[bf2 * num_basis_funcs + bf4] * value;
-                          K_jk +=
-                              0.25 * P_cur[bf1 * num_basis_funcs + bf4] * value;
+                          K_ik += 0.25 *
+                                  P_cur[bf2 * num_atomic_orbitals + bf4] *
+                                  value;
+                          K_jk += 0.25 *
+                                  P_cur[bf1 * num_atomic_orbitals + bf4] *
+                                  value;
 #pragma omp atomic update relaxed
-                          K_cur[bf1 * num_basis_funcs + bf4] += P_jk * value;
+                          K_cur[bf1 * num_atomic_orbitals + bf4] +=
+                              P_jk * value;
 #pragma omp atomic update relaxed
-                          K_cur[bf2 * num_basis_funcs + bf4] += P_ik * value;
+                          K_cur[bf2 * num_atomic_orbitals + bf4] +=
+                              P_ik * value;
 
                         }  // l
 
 // Update K
 #pragma omp atomic update relaxed
-                        K_cur[bf1 * num_basis_funcs + bf3] += K_ik;
+                        K_cur[bf1 * num_atomic_orbitals + bf3] += K_ik;
 #pragma omp atomic update relaxed
-                        K_cur[bf2 * num_basis_funcs + bf3] += K_jk;
+                        K_cur[bf2 * num_atomic_orbitals + bf3] += K_jk;
                       }  // k
                     }  // j
                   }  // i
@@ -449,33 +460,33 @@ class ERI {
     // Symmetrize J
     if (J)
       for (size_t idm = 0; idm < num_density_matrices; ++idm)
-        for (size_t i = 0; i < num_basis_funcs; ++i)
+        for (size_t i = 0; i < num_atomic_orbitals; ++i)
           for (size_t j = 0; j <= i; ++j) {
-            auto J_ij = J[idm * num_basis_funcs * num_basis_funcs +
-                          i * num_basis_funcs + j];
-            auto J_ji = J[idm * num_basis_funcs * num_basis_funcs +
-                          j * num_basis_funcs + i];
+            auto J_ij = J[idm * num_atomic_orbitals * num_atomic_orbitals +
+                          i * num_atomic_orbitals + j];
+            auto J_ji = J[idm * num_atomic_orbitals * num_atomic_orbitals +
+                          j * num_atomic_orbitals + i];
             J_ij = 0.25 * (J_ij + J_ji);
-            J[idm * num_basis_funcs * num_basis_funcs + i * num_basis_funcs +
-              j] = J_ij;
-            J[idm * num_basis_funcs * num_basis_funcs + j * num_basis_funcs +
-              i] = J_ij;
+            J[idm * num_atomic_orbitals * num_atomic_orbitals +
+              i * num_atomic_orbitals + j] = J_ij;
+            J[idm * num_atomic_orbitals * num_atomic_orbitals +
+              j * num_atomic_orbitals + i] = J_ij;
           }
 
     // Symmetrize K + scale by alpha/beta
     if (K)
       for (size_t idm = 0; idm < num_density_matrices; ++idm)
-        for (size_t i = 0; i < num_basis_funcs; ++i)
+        for (size_t i = 0; i < num_atomic_orbitals; ++i)
           for (size_t j = 0; j <= i; ++j) {
-            auto K_ij = K[idm * num_basis_funcs * num_basis_funcs +
-                          i * num_basis_funcs + j];
-            auto K_ji = K[idm * num_basis_funcs * num_basis_funcs +
-                          j * num_basis_funcs + i];
+            auto K_ij = K[idm * num_atomic_orbitals * num_atomic_orbitals +
+                          i * num_atomic_orbitals + j];
+            auto K_ji = K[idm * num_atomic_orbitals * num_atomic_orbitals +
+                          j * num_atomic_orbitals + i];
             K_ij = (alpha + beta) * 0.5 * (K_ij + K_ji);
-            K[idm * num_basis_funcs * num_basis_funcs + i * num_basis_funcs +
-              j] = K_ij;
-            K[idm * num_basis_funcs * num_basis_funcs + j * num_basis_funcs +
-              i] = K_ij;
+            K[idm * num_atomic_orbitals * num_atomic_orbitals +
+              i * num_atomic_orbitals + j] = K_ij;
+            K[idm * num_atomic_orbitals * num_atomic_orbitals +
+              j * num_atomic_orbitals + i] = K_ij;
           }
   }
 
@@ -517,8 +528,8 @@ class ERI {
    * @param nt Number of transformed orbitals (size of MO space)
    * @param C Transformation matrix C(AO,MO) in row-major format
    * @param out Output buffer for transformed integrals (pj|kl)
-   *           Layout: out[p + nt*(l + num_basis_funcs*(j + num_basis_funcs*k))]
-   * for (kj|lp)
+   *           Layout: out[p + nt*(l + num_atomic_orbitals*(j +
+   * num_atomic_orbitals*k))] for (kj|lp)
    *
    * @note First index (i) is transformed to MO index (p): i → p
    * @note Output tensor has mixed AO/MO indices with p as fastest index
@@ -527,15 +538,15 @@ class ERI {
    */
   void quarter_trans(size_t nt, const double* C, double* out) {
     AutoTimer t("ERI::quarter_trans");
-    const size_t num_basis_funcs = obs_.nbf();
+    const size_t num_atomic_orbitals = obs_.nbf();
     const size_t nsh = obs_.size();
     const double precision = std::numeric_limits<double>::epsilon();
 
     // Clear output tensor: (ij|kp) with p as fast index
     const size_t out_size =
-        nt * num_basis_funcs * num_basis_funcs * num_basis_funcs;
+        nt * num_atomic_orbitals * num_atomic_orbitals * num_atomic_orbitals;
     std::memset(out, 0, out_size * sizeof(double));
-    const size_t inner_size = nt * num_basis_funcs;
+    const size_t inner_size = nt * num_atomic_orbitals;
 
     // No shell block norm needed for quarter transformation
     // We'll use Schwarz screening directly
@@ -611,8 +622,8 @@ class ERI {
 
               // Perform quarter transformation: (pn|lk) = sum_m C(p,m) *
               // (mn|lk) Here: m=s1i, n=s2j, l=s3k, k=s4l Output layout: p is
-              // fast index, so out[p + nt*(k + num_basis_funcs*(j +
-              // num_basis_funcs*i))]
+              // fast index, so out[p + nt*(k + num_atomic_orbitals*(j +
+              // num_atomic_orbitals*i))]
               for (size_t i = 0, ijkl = 0; i < n1; ++i) {
                 const size_t bf1 = bf1_st + i;
                 for (size_t j = 0; j < n2; ++j) {
@@ -627,27 +638,27 @@ class ERI {
                       for (size_t p = 0; p < nt; ++p) {
 // (ij|kp) = \sum_l (ij|kl) * C(l,p)
 #pragma omp atomic update relaxed
-                        out[(bf1 * num_basis_funcs + bf2) * inner_size +
+                        out[(bf1 * num_atomic_orbitals + bf2) * inner_size +
                             bf3 * nt + p] += C[bf4 * nt + p] * value * s12_deg;
 
                         // (ij|lp) = \sum_k (ij|lk) * C(k,p) = \sum_l (ij|kl) *
                         // C(k,p)
                         if (s3 != s4) {
 #pragma omp atomic update relaxed
-                          out[(bf1 * num_basis_funcs + bf2) * inner_size +
+                          out[(bf1 * num_atomic_orbitals + bf2) * inner_size +
                               bf4 * nt + p] +=
                               C[bf3 * nt + p] * value * s12_deg;
                         }
 
 // (kl|ip) = \sum_j (kl|ij) * C(j,p)
 #pragma omp atomic update relaxed
-                        out[(bf3 * num_basis_funcs + bf4) * inner_size +
+                        out[(bf3 * num_atomic_orbitals + bf4) * inner_size +
                             bf1 * nt + p] += C[bf2 * nt + p] * value * s34_deg;
 
                         // (kl|jp) = \sum_i (kl|ji) * C(i,p)
                         if (s1 != s2) {
 #pragma omp atomic update relaxed
-                          out[(bf3 * num_basis_funcs + bf4) * inner_size +
+                          out[(bf3 * num_atomic_orbitals + bf4) * inner_size +
                               bf2 * nt + p] +=
                               C[bf1 * nt + p] * value * s34_deg;
                         }
@@ -666,14 +677,14 @@ class ERI {
 // Symmetrize the first and second index: (ij|kp) = 0.5 * ( (ji|kp) + (ij|kp) ),
 // then cut half due to s12_34_deg
 #pragma omp parallel for collapse(2)
-    for (size_t i = 0; i < num_basis_funcs; ++i)
+    for (size_t i = 0; i < num_atomic_orbitals; ++i)
       for (size_t j = 0; j <= i; ++j) {
-        for (size_t k = 0; k < num_basis_funcs; ++k) {
+        for (size_t k = 0; k < num_atomic_orbitals; ++k) {
           for (size_t p = 0; p < nt; ++p) {
             const size_t idx_ij =
-                (i * num_basis_funcs + j) * inner_size + k * nt + p;
+                (i * num_atomic_orbitals + j) * inner_size + k * nt + p;
             const size_t idx_ji =
-                (j * num_basis_funcs + i) * inner_size + k * nt + p;
+                (j * num_atomic_orbitals + i) * inner_size + k * nt + p;
             const double a = out[idx_ij];
             const double b = out[idx_ji];
             const double avg =
