@@ -916,6 +916,7 @@ const RowMajorMatrix SCFImpl::get_vxc_grad_() const {
 
 static void add_nuclear_repulsion_grad(double* dE, uint64_t n,
                                        const Molecule* mol) {
+  QDK_LOG_TRACE_ENTERING();
 #ifdef ENABLE_NVTX3
   NVTX3_FUNC_RANGE();
 #endif

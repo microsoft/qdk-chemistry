@@ -68,6 +68,7 @@ BasisSet::BasisSet(const std::string& name, const std::vector<Shell>& shells,
     : _name(name),
       _atomic_orbital_type(atomic_orbital_type),
       _ecp_name("none") {
+  QDK_LOG_TRACE_ENTERING();
   // Organize shells by atom index
   for (const auto& shell : shells) {
     size_t atom_index = shell.atom_index;
