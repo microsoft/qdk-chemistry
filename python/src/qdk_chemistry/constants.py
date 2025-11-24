@@ -77,7 +77,8 @@ from qdk_chemistry._core.constants import (
     get_constant_info,
     get_constants_info,
 )
-
+from qdk_chemistry.utils import Logger
+_LOGGER = Logger.QDK_LOGGER(__name__)
 
 def list_constants(show_values: bool = True, show_units: bool = True) -> None:
     """List all available constants with their documentation.
@@ -95,8 +96,8 @@ def list_constants(show_values: bool = True, show_units: bool = True) -> None:
 
     # TODO (NAB):  change output to logger rather than print() here and elsewhere
     # or just return strings workitem 41417
-    print("QDK/Chemistry Physical Constants (CODATA 2018)")
-    print("=" * 50)
+    constants_info_string = "\nQDK/Chemistry Physical Constants (CODATA 2018)\n";
+    constants_info_string += ("=" * 50 + "\n")
 
     # Group constants by category
     categories = {
@@ -121,8 +122,8 @@ def list_constants(show_values: bool = True, show_units: bool = True) -> None:
     }
 
     for category, constant_names in categories.items():
-        print(f"\n{category}:")
-        print("-" * len(category))
+        constants_info_string += f"\n{category}:\n"
+        constants_info_string += "-" * len(category) + "\n"
 
         for name in constant_names:
             if name in constants_info:
@@ -137,8 +138,8 @@ def list_constants(show_values: bool = True, show_units: bool = True) -> None:
                 if show_units and info.units:
                     line += f" {info.units}"
 
-                print(line)
-
+                constants_info_string += line + "\n"
+    _LOGGER.info(constants_info_string)
 
 def find_constant(search_term: str) -> dict:
     """Find constants matching a search term.
@@ -184,15 +185,17 @@ def show_constant_details(name: str) -> None:
     """
     try:
         info = get_constant_info(name)
-        print(f"Constant: {info.name}")
+        constant_details_string = f"\nConstant: {info.name}\n"
         if info.symbol:
-            print(f"Symbol: {info.symbol}")
-        print(f"Value: {info.value} {info.units}")
-        print(f"Description: {info.description}")
-        print(f"Source: {info.source}")
+            constant_details_string += f"Symbol: {info.symbol}\n"
+        constant_details_string += f"Value: {info.value} {info.units}\n"
+        constant_details_string += f"Description: {info.description}\n"
+        constant_details_string += f"Source: {info.source}\n"
+        _LOGGER.info(constant_details_string)
     except KeyError:
-        print(f"Unknown constant: {name}")
-        print("Use list_constants() to see all available constants.")
+        error_msg = f"Unknown constant: {name}\n" 
+        error_msg += "Use list_constants() to see all available constants.\n"
+        _LOGGER.error(error_msg)
 
 
 # Make the new functions available
