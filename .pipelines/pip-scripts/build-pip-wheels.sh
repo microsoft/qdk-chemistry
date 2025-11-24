@@ -89,8 +89,8 @@ python3 -m pip install auditwheel build
 cd python
 
 # Build wheel with all necessary CMake flags
-export CMAKE_C_FLAGS="-march=${MARCH} -fPIC -Os -static-libgfortran -fvisibility=hidden"
-export CMAKE_CXX_FLAGS="-march=${MARCH} -fPIC -Os -static-libgfortran -fvisibility=hidden"
+export CMAKE_C_FLAGS="-march=${MARCH} -fPIC -Os -fvisibility=hidden"
+export CMAKE_CXX_FLAGS="-march=${MARCH} -fPIC -Os -fvisibility=hidden"
 
 python3 -m build --wheel \
     -C cmake.define.QDK_UARCH=${MARCH} \

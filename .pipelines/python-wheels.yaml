@@ -1,18 +1,8 @@
-# Test the build the wheels on all PRs
-# Only deploy to Azure Artifacts on tag push
+# Pipeline for building and publishing Python wheels for QDK Chemistry
+# Only triggered manually
 
-trigger:
-  branches:
-    include:
-    - '*'
-  tags:
-    include:
-    - v*
-pr:
-  branches:
-    include:
-    - '*'
-  drafts: true
+trigger: none
+pr: none
 
 parameters:
 - name: matrix
