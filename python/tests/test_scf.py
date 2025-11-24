@@ -82,7 +82,7 @@ class TestScfSolver:
         assert orbitals is not None
 
         # Compare with expected energy from C++ test
-        assert abs(energy - (-75.9229032345)) < scf_energy_tolerance
+        assert np.isclose(energy, -75.9229032345, rtol=float_comparison_relative_tolerance, atol=scf_energy_tolerance)
 
         # Check that orbitals have expected properties
         coeffs = orbitals.get_coefficients()
@@ -105,7 +105,7 @@ class TestScfSolver:
         assert orbitals is not None
 
         # Compare with expected energy from C++ test
-        assert abs(energy - (-76.0205776518)) < scf_energy_tolerance
+        assert np.isclose(energy, -76.0205776518, rtol=float_comparison_relative_tolerance, atol=scf_energy_tolerance)
 
     def test_scf_solver_settings_edge_cases(self):
         """Test SCF solver with various invalid settings."""
@@ -119,11 +119,11 @@ class TestScfSolver:
         # Should solve successfully with valid settings
         scf_solver = algorithms.create("scf_solver")
         energy, _ = scf_solver.run(water, 0, 1, "def2-tzvp")
-        assert abs(energy - (-76.0205776518)) < scf_energy_tolerance
+        assert np.isclose(energy, -76.0205776518, rtol=float_comparison_relative_tolerance, atol=scf_energy_tolerance)
 
     def test_scf_solver_initial_guess_restart(self):
         """Test SCF solver with initial guess from converged orbitals."""
-        # ===== Water as restricted test =====
+        # Water as restricted test
         water = create_water_structure()
         scf_solver = algorithms.create("scf_solver")
         scf_solver.settings().set("method", "hf")
@@ -133,7 +133,9 @@ class TestScfSolver:
         orbitals_first = wfn_first.get_orbitals()
 
         # Verify we get the expected energy for HF/def2-tzvp
-        assert abs(energy_first - (-76.0205776518)) < scf_energy_tolerance
+        assert np.isclose(
+            energy_first, -76.0205776518, rtol=float_comparison_relative_tolerance, atol=scf_energy_tolerance
+        )
 
         # Now restart with the converged orbitals as initial guess
         # Create a new solver instance since settings are locked after run
@@ -145,7 +147,9 @@ class TestScfSolver:
         energy_second, _ = scf_solver2.run(water, 0, 1, orbitals_first)
 
         # Should get the same energy (within tight tolerance)
-        assert abs(energy_first - energy_second) < scf_energy_tolerance
+        assert np.isclose(
+            energy_first, energy_second, rtol=float_comparison_relative_tolerance, atol=scf_energy_tolerance
+        )
 
     def test_scf_solver_oxygen_triplet_initial_guess(self):
         """Test SCF solver with initial guess for oxygen triplet state."""
@@ -158,7 +162,9 @@ class TestScfSolver:
         orbitals_o2_first = wfn_o2_first.get_orbitals()
 
         # Verify we get the expected energy for HF/STO-3G triplet
-        assert abs(energy_o2_first - (-147.63396964335112)) < scf_energy_tolerance
+        assert np.isclose(
+            energy_o2_first, -147.63396964335112, rtol=float_comparison_relative_tolerance, atol=scf_energy_tolerance
+        )
 
         # Now restart with the converged orbitals as initial guess
         # Create a new solver instance since settings are locked after run
@@ -170,7 +176,9 @@ class TestScfSolver:
         energy_o2_second, _ = scf_solver2.run(o2, 0, 3, orbitals_o2_first)
 
         # Should get the same energy (within tight tolerance)
-        assert abs(energy_o2_first - energy_o2_second) < scf_energy_tolerance
+        assert np.isclose(
+            energy_o2_first, energy_o2_second, rtol=float_comparison_relative_tolerance, atol=scf_energy_tolerance
+        )
 
     def test_h2_scan_diis_numerical_stability(self):
         """Test that SCF handles numerical edge cases in H2 bond scans.

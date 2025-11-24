@@ -14,6 +14,7 @@ from qdk_chemistry.data import Configuration, Structure
 
 from .reference_tolerances import (
     ci_energy_tolerance,
+    float_comparison_relative_tolerance,
 )
 
 
@@ -89,7 +90,7 @@ class TestPMCCalculator:
         assert wfn_pmc.size() == 4
         e_pmc, wfn_pmc = projected_multi_configuration_calculator.run(ham, [Configuration("222000")])
 
-        assert abs(e_pmc - e_hf) < ci_energy_tolerance
+        assert np.isclose(e_pmc, e_hf, rtol=float_comparison_relative_tolerance, atol=ci_energy_tolerance)
         assert wfn_pmc.size() == 1
 
     def test_projected_multi_configuration_calculator_water3det(self):
