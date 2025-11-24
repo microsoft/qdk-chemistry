@@ -401,10 +401,9 @@ class TestStructure:
         )
 
         custom_coords = np.array([[0.0, 0.0, 0.0], [0.0, 0.0, 1.0]])
-        # Use integer nuclear charges as required by new immutable design
-        custom_molecule = Structure(custom_coords, [1, 2])  # Changed from [1.5, 2.5] to [1, 2]
-
-        custom_expected = (1 * 2) / 1.0  # Updated calculation
+        # Use integer nuclear charges
+        custom_molecule = Structure(custom_coords, [1, 2])  
+        custom_expected = (1 * 2) / 1.0  
         assert np.isclose(
             custom_molecule.calculate_nuclear_repulsion_energy(),
             custom_expected,
