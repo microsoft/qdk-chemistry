@@ -6,10 +6,11 @@
 #include <qdk/chemistry/scf/exc/gauxc_impl.h>
 #include <spdlog/spdlog.h>
 
+#include <blas.hh>
+#include <lapack.hh>
+
 #include "scf/ks_impl.h"
 #include "scf/scf_impl.h"
-#include "util/blas.h"
-#include "util/lapack.h"
 #include "util/opt/gmresxx/arnoldi/arnoldi_gmres.h"
 #include "util/timer.h"
 
@@ -63,24 +64,25 @@ void SCFImpl::polarizability_() {
       // R_{ia} = \Sum_{uv} C_{ui} Dipole_{uv} C_{av}
       // (C is row-major, temp matrix is column-major, R_vec has
       // num_alpha_virtual_orbitals as fast-index)
-      blas::gemm("N", "N", num_alpha, num_atomic_orbitals_,
-                 num_atomic_orbitals_, 1.0, Ca_occ_ptr, num_molecular_orbitals_,
-                 dipole_x_ptr, num_atomic_orbitals_, 0.0, temp.data(),
-                 num_alpha);
-      blas::gemm("N", "T", num_alpha_virtual_orbitals, num_alpha,
-                 num_atomic_orbitals_, 1.0, Ca_vir_ptr, num_molecular_orbitals_,
-                 temp.data(), num_alpha, 0.0, R_vec.data(),
-                 num_alpha_virtual_orbitals);
+      blas::gemm(blas::Layout::ColMajor, blas::Op::NoTrans, blas::Op::NoTrans,
+                 num_alpha, num_atomic_orbitals_, num_atomic_orbitals_, 1.0,
+                 Ca_occ_ptr, num_molecular_orbitals_, dipole_x_ptr,
+                 num_atomic_orbitals_, 0.0, temp.data(), num_alpha);
+      blas::gemm(blas::Layout::ColMajor, blas::Op::NoTrans, blas::Op::Trans,
+                 num_alpha_virtual_orbitals, num_alpha, num_atomic_orbitals_,
+                 1.0, Ca_vir_ptr, num_molecular_orbitals_, temp.data(),
+                 num_alpha, 0.0, R_vec.data(), num_alpha_virtual_orbitals);
 
       if (ctx_.cfg->unrestricted) {
-        blas::gemm("N", "N", num_beta, num_atomic_orbitals_,
-                   num_atomic_orbitals_, 1.0, Cb_occ_ptr,
-                   num_molecular_orbitals_, dipole_x_ptr, num_atomic_orbitals_,
-                   0.0, temp.data(), num_beta);
-        blas::gemm("N", "T", num_beta_virtual_orbitals, num_beta,
-                   num_atomic_orbitals_, 1.0, Cb_vir_ptr,
-                   num_molecular_orbitals_, temp.data(), num_beta, 0.0,
-                   R_vec.data() + nova, num_beta_virtual_orbitals);
+        blas::gemm(blas::Layout::ColMajor, blas::Op::NoTrans, blas::Op::NoTrans,
+                   num_beta, num_atomic_orbitals_, num_atomic_orbitals_, 1.0,
+                   Cb_occ_ptr, num_molecular_orbitals_, dipole_x_ptr,
+                   num_atomic_orbitals_, 0.0, temp.data(), num_beta);
+        blas::gemm(blas::Layout::ColMajor, blas::Op::NoTrans, blas::Op::Trans,
+                   num_beta_virtual_orbitals, num_beta, num_atomic_orbitals_,
+                   1.0, Cb_vir_ptr, num_molecular_orbitals_, temp.data(),
+                   num_beta, 0.0, R_vec.data() + nova,
+                   num_beta_virtual_orbitals);
       }
     }
 
@@ -92,22 +94,24 @@ void SCFImpl::polarizability_() {
     // R^x_{ia}
     if (ctx_.cfg->mpi.world_rank == 0) {
       RowMajorMatrix Dx(num_atomic_orbitals_, num_atomic_orbitals_);
-      blas::gemm("T", "N", num_alpha, num_atomic_orbitals_,
-                 num_alpha_virtual_orbitals, 1.0, X_vec.data(),
-                 num_alpha_virtual_orbitals, Ca_vir_ptr,
+      blas::gemm(blas::Layout::ColMajor, blas::Op::Trans, blas::Op::NoTrans,
+                 num_alpha, num_atomic_orbitals_, num_alpha_virtual_orbitals,
+                 1.0, X_vec.data(), num_alpha_virtual_orbitals, Ca_vir_ptr,
                  num_molecular_orbitals_, 0.0, temp.data(), num_alpha);
-      blas::gemm("T", "N", num_atomic_orbitals_, num_atomic_orbitals_,
-                 num_alpha, 1.0, temp.data(), num_alpha, Ca_occ_ptr,
-                 num_molecular_orbitals_, 0.0, Dx.data(), num_atomic_orbitals_);
+      blas::gemm(blas::Layout::ColMajor, blas::Op::Trans, blas::Op::NoTrans,
+                 num_atomic_orbitals_, num_atomic_orbitals_, num_alpha, 1.0,
+                 temp.data(), num_alpha, Ca_occ_ptr, num_molecular_orbitals_,
+                 0.0, Dx.data(), num_atomic_orbitals_);
       if (ctx_.cfg->unrestricted) {
-        blas::gemm("T", "N", num_beta, num_atomic_orbitals_,
-                   num_beta_virtual_orbitals, 1.0, X_vec.data() + nova,
-                   num_beta_virtual_orbitals, Cb_vir_ptr,
-                   num_molecular_orbitals_, 0.0, temp.data(), num_beta);
-        blas::gemm("T", "N", num_atomic_orbitals_, num_atomic_orbitals_,
-                   num_beta, 1.0, temp.data(), num_beta, Cb_occ_ptr,
-                   num_molecular_orbitals_, 1.0, Dx.data(),
-                   num_atomic_orbitals_);
+        blas::gemm(blas::Layout::ColMajor, blas::Op::Trans, blas::Op::NoTrans,
+                   num_beta, num_atomic_orbitals_, num_beta_virtual_orbitals,
+                   1.0, X_vec.data() + nova, num_beta_virtual_orbitals,
+                   Cb_vir_ptr, num_molecular_orbitals_, 0.0, temp.data(),
+                   num_beta);
+        blas::gemm(blas::Layout::ColMajor, blas::Op::Trans, blas::Op::NoTrans,
+                   num_atomic_orbitals_, num_atomic_orbitals_, num_beta, 1.0,
+                   temp.data(), num_beta, Cb_occ_ptr, num_molecular_orbitals_,
+                   1.0, Dx.data(), num_atomic_orbitals_);
       }
       // Symmetrize the matrix
       for (size_t i = 0; i < num_atomic_orbitals_; ++i)
@@ -252,14 +256,14 @@ void SCFImpl::cpscf_(const double* R_input, double* X_sol) {
 
         // tP_{uv} = \sum_{ia}  R_{ia} (C_{ui} C_{av} + C_{vi} C_{au})
         // R has num_alpha_virtual_orbitals as fast-index, tP is symmetric
-        blas::gemm("T", "N", num_alpha, num_atomic_orbitals_,
-                   num_alpha_virtual_orbitals, 1.0, X_rhs,
-                   num_alpha_virtual_orbitals, Ca_vir_ptr,
+        blas::gemm(blas::Layout::ColMajor, blas::Op::Trans, blas::Op::NoTrans,
+                   num_alpha, num_atomic_orbitals_, num_alpha_virtual_orbitals,
+                   1.0, X_rhs, num_alpha_virtual_orbitals, Ca_vir_ptr,
                    num_molecular_orbitals_, 0.0, temp.data(), num_alpha);
-        blas::gemm("T", "N", num_atomic_orbitals_, num_atomic_orbitals_,
-                   num_alpha, 1.0, temp.data(), num_alpha, Ca_occ_ptr,
-                   num_molecular_orbitals_, 0.0, tP_.data(),
-                   num_atomic_orbitals_);
+        blas::gemm(blas::Layout::ColMajor, blas::Op::Trans, blas::Op::NoTrans,
+                   num_atomic_orbitals_, num_atomic_orbitals_, num_alpha, 1.0,
+                   temp.data(), num_alpha, Ca_occ_ptr, num_molecular_orbitals_,
+                   0.0, tP_.data(), num_atomic_orbitals_);
         for (size_t i = 0; i < num_atomic_orbitals_; ++i)
           for (size_t j = i; j < num_atomic_orbitals_; ++j) {
             const auto symm_ij = tP_(i, j) + tP_(j, i);
@@ -267,13 +271,14 @@ void SCFImpl::cpscf_(const double* R_input, double* X_sol) {
             tP_(j, i) = symm_ij;
           }
         if (ctx_.cfg->unrestricted) {
-          blas::gemm("T", "N", num_beta, num_atomic_orbitals_,
-                     num_beta_virtual_orbitals, 1.0, X_rhs + nova,
-                     num_beta_virtual_orbitals, Cb_vir_ptr,
+          blas::gemm(blas::Layout::ColMajor, blas::Op::Trans, blas::Op::NoTrans,
+                     num_beta, num_atomic_orbitals_, num_beta_virtual_orbitals,
+                     1.0, X_rhs + nova, num_beta_virtual_orbitals, Cb_vir_ptr,
                      num_molecular_orbitals_, 0.0, temp.data(), num_beta);
-          blas::gemm("T", "N", num_atomic_orbitals_, num_atomic_orbitals_,
-                     num_beta, 1.0, temp.data(), num_beta, Cb_occ_ptr,
-                     num_molecular_orbitals_, 0.0,
+          blas::gemm(blas::Layout::ColMajor, blas::Op::Trans, blas::Op::NoTrans,
+                     num_atomic_orbitals_, num_atomic_orbitals_, num_beta, 1.0,
+                     temp.data(), num_beta, Cb_occ_ptr, num_molecular_orbitals_,
+                     0.0,
                      tP_.data() + num_atomic_orbitals_ * num_atomic_orbitals_,
                      num_atomic_orbitals_);
           for (size_t i = 0; i < num_atomic_orbitals_; ++i)
@@ -309,24 +314,25 @@ void SCFImpl::cpscf_(const double* R_input, double* X_sol) {
         }
 
         // ABX_{ia} = \sum_{uv} C_{ui} F_{uv} C_{av}
-        blas::gemm("N", "N", num_alpha, num_atomic_orbitals_,
-                   num_atomic_orbitals_, 1.0, Ca_occ_ptr,
-                   num_molecular_orbitals_, tFock_.data(), num_atomic_orbitals_,
-                   0.0, temp.data(), num_alpha);
-        blas::gemm("N", "T", num_alpha_virtual_orbitals, num_alpha,
-                   num_atomic_orbitals_, alpha, Ca_vir_ptr,
-                   num_molecular_orbitals_, temp.data(), num_alpha, 1.0, Y_rhs,
-                   num_alpha_virtual_orbitals);
+        blas::gemm(blas::Layout::ColMajor, blas::Op::NoTrans, blas::Op::NoTrans,
+                   num_alpha, num_atomic_orbitals_, num_atomic_orbitals_, 1.0,
+                   Ca_occ_ptr, num_molecular_orbitals_, tFock_.data(),
+                   num_atomic_orbitals_, 0.0, temp.data(), num_alpha);
+        blas::gemm(blas::Layout::ColMajor, blas::Op::NoTrans, blas::Op::Trans,
+                   num_alpha_virtual_orbitals, num_alpha, num_atomic_orbitals_,
+                   alpha, Ca_vir_ptr, num_molecular_orbitals_, temp.data(),
+                   num_alpha, 1.0, Y_rhs, num_alpha_virtual_orbitals);
         if (ctx_.cfg->unrestricted) {
           blas::gemm(
-              "N", "N", num_beta, num_atomic_orbitals_, num_atomic_orbitals_,
-              1.0, Cb_occ_ptr, num_molecular_orbitals_,
+              blas::Layout::ColMajor, blas::Op::NoTrans, blas::Op::NoTrans,
+              num_beta, num_atomic_orbitals_, num_atomic_orbitals_, 1.0,
+              Cb_occ_ptr, num_molecular_orbitals_,
               tFock_.data() + num_atomic_orbitals_ * num_atomic_orbitals_,
               num_atomic_orbitals_, 0.0, temp.data(), num_beta);
-          blas::gemm("N", "T", num_beta_virtual_orbitals, num_beta,
-                     num_atomic_orbitals_, alpha, Cb_vir_ptr,
-                     num_molecular_orbitals_, temp.data(), num_beta, 1.0,
-                     Y_rhs + nova, num_beta_virtual_orbitals);
+          blas::gemm(blas::Layout::ColMajor, blas::Op::NoTrans, blas::Op::Trans,
+                     num_beta_virtual_orbitals, num_beta, num_atomic_orbitals_,
+                     alpha, Cb_vir_ptr, num_molecular_orbitals_, temp.data(),
+                     num_beta, 1.0, Y_rhs + nova, num_beta_virtual_orbitals);
         }
       }
     };

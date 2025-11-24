@@ -76,7 +76,7 @@ TEST_F(OrbitalsEdgeCasesTest, EmptyDataHandling) {
 }
 
 TEST_F(OrbitalsEdgeCasesTest, SingleOrbitalSingleBasis) {
-  // Test minimal case: 1 basis function, 1 orbital
+  // Test minimal case: 1 atomic orbital, 1 orbital
   Eigen::MatrixXd coeffs(1, 1);
   coeffs(0, 0) = 1.0;
   Eigen::VectorXd energies(1);
@@ -96,7 +96,7 @@ TEST_F(OrbitalsEdgeCasesTest, SingleOrbitalSingleBasis) {
 }
 
 TEST_F(OrbitalsEdgeCasesTest, AsymmetricDimensions) {
-  // Test case: more basis functions than orbitals
+  // Test case: more atomic orbitals than orbitals
   const int n_basis = 10;
   const int n_orbitals = 3;
 
@@ -267,7 +267,7 @@ TEST_F(OrbitalsEdgeCasesTest, UnrestrictedEdgeCases) {
   // constructor)
   Eigen::MatrixXd alpha_coeffs(3, 2);
   alpha_coeffs.setRandom();
-  Eigen::MatrixXd beta_coeffs(4, 2);  // Different number of basis functions
+  Eigen::MatrixXd beta_coeffs(4, 2);  // Different number of atomic orbitals
   beta_coeffs.setRandom();
 
   // This should be rejected by the constructor

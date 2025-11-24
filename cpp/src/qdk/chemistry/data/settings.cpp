@@ -668,7 +668,9 @@ std::shared_ptr<Settings> Settings::_from_json_file(
     const std::string& filename) {
   std::ifstream file(filename);
   if (!file.is_open()) {
-    throw std::runtime_error("Cannot open file for reading: " + filename);
+    throw std::runtime_error(
+        "Unable to open Settings JSON file '" + filename +
+        "'. Please check that the file exists and you have read permissions.");
   }
 
   nlohmann::json json_obj;
@@ -724,9 +726,17 @@ void Settings::_to_hdf5_file(const std::string& filename) const {
 
 std::shared_ptr<Settings> Settings::_from_hdf5_file(
     const std::string& filename) {
+  H5::H5File file;
   try {
-    H5::H5File file(filename, H5F_ACC_RDONLY);
+    file.openFile(filename, H5F_ACC_RDONLY);
+  } catch (const H5::Exception& e) {
+    throw std::runtime_error("Unable to open Settings HDF5 file '" + filename +
+                             "'. " +
+                             "Please check that the file exists, is a valid "
+                             "HDF5 file, and you have read permissions.");
+  }
 
+  try {
     // Check version first
     H5::StrType string_type(H5::PredType::C_S1, H5T_VARIABLE);
     H5::Attribute version_attr = file.openAttribute("version");
@@ -740,10 +750,10 @@ std::shared_ptr<Settings> Settings::_from_hdf5_file(
 
     H5::Group settings_group = file.openGroup("/settings");
     return from_hdf5(settings_group);
-
   } catch (const H5::Exception& hdf5_exception) {
-    throw std::runtime_error("HDF5 error: " +
-                             std::string(hdf5_exception.getCDetailMsg()));
+    throw std::runtime_error(
+        "Unable to read Settings data from HDF5 file '" + filename + "'. " +
+        "HDF5 error: " + std::string(hdf5_exception.getCDetailMsg()));
   }
 }
 

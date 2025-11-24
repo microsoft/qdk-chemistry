@@ -36,7 +36,7 @@ except ImportError:
 if PYSCF_AVAILABLE:
     import qdk_chemistry.plugins.pyscf
     from qdk_chemistry.constants import ANGSTROM_TO_BOHR
-    from qdk_chemistry.data import BasisSet, BasisType, OrbitalType, Shell
+    from qdk_chemistry.data import AOType, BasisSet, OrbitalType, Shell
     from qdk_chemistry.plugins.pyscf.mcscf import mcsolver_to_fcisolver
     from qdk_chemistry.plugins.pyscf.utils import (
         basis_to_pyscf_mol,
@@ -1376,7 +1376,9 @@ class TestPyscfPlugin:
         assert np.isclose(
             np.sum(occ_a), 5.0, rtol=float_comparison_relative_tolerance, atol=float_comparison_absolute_tolerance
         )
-        assert np.allclose(occ_a, occ_b)
+        assert np.allclose(
+            occ_a, occ_b, rtol=float_comparison_relative_tolerance, atol=float_comparison_absolute_tolerance
+        )
 
     def test_pyscf_avas_selector_o2_triplet_def2svp(self):
         """Test PySCF AVAS selector on O2 molecule (triplet ROHF) with def2-svp basis."""
@@ -1442,7 +1444,12 @@ class TestPyscfPlugin:
         pyscf_mcscf = algorithms.create("multi_configuration_scf", "pyscf")
         pyscf_mcscf_energy, _ = pyscf_mcscf.run(active_orbitals_sd.get_orbitals(), ham_calculator, macis_calc, 3, 3)
 
-        assert np.isclose(pyscf_mcscf_energy, -108.78966139913287, atol=mcscf_energy_tolerance)
+        assert np.isclose(
+            pyscf_mcscf_energy,
+            -108.78966139913287,
+            rtol=float_comparison_relative_tolerance,
+            atol=mcscf_energy_tolerance,
+        )
 
     def test_pyscf_mcscf_triplet(self):
         """Test PySCF MCSCF for o2 triplet with cc-pvdz basis and CAS(6,6)."""
@@ -1474,7 +1481,12 @@ class TestPyscfPlugin:
         pyscf_mcscf = algorithms.create("multi_configuration_scf", "pyscf")
         pyscf_mcscf_energy, _ = pyscf_mcscf.run(active_orbitals_sd.get_orbitals(), ham_calculator, macis_calc, 4, 2)
 
-        assert np.isclose(pyscf_mcscf_energy, -149.68131616317658, atol=mcscf_energy_tolerance)
+        assert np.isclose(
+            pyscf_mcscf_energy,
+            -149.68131616317658,
+            rtol=float_comparison_relative_tolerance,
+            atol=mcscf_energy_tolerance,
+        )
 
     def test_pyscf_fciwrapper_casci_singlet(self):
         """Test MC wrapper for n2 with cc-pvdz basis and CAS(6,6)."""
@@ -1504,7 +1516,9 @@ class TestPyscfPlugin:
         casci.verbose = 0
         casci_energy = casci.kernel()[0]
 
-        assert np.isclose(casci_energy, -108.74113344655625, atol=mcscf_energy_tolerance)
+        assert np.isclose(
+            casci_energy, -108.74113344655625, rtol=float_comparison_relative_tolerance, atol=mcscf_energy_tolerance
+        )
 
     def test_pyscf_fciwrapper_casci_triplet(self):
         """Test MC wrapper for o2 triplet with cc-pvdz basis and CAS(6,6)."""
@@ -1532,7 +1546,9 @@ class TestPyscfPlugin:
         casci.verbose = 0
         casci_energy = casci.kernel()[0]
 
-        assert np.isclose(casci_energy, -149.661310389037, atol=mcscf_energy_tolerance)
+        assert np.isclose(
+            casci_energy, -149.661310389037, rtol=float_comparison_relative_tolerance, atol=mcscf_energy_tolerance
+        )
 
     def test_pyscf_fciwrapper_casscf_singlet(self):
         """Test MC wrapper in casscf for n2 with cc-pvdz basis and CAS(6,6)."""
@@ -1562,7 +1578,9 @@ class TestPyscfPlugin:
         casscf.verbose = 0
         casscf_energy = casscf.kernel()[0]
 
-        assert np.isclose(casscf_energy, -108.78966139913287, atol=mcscf_energy_tolerance)
+        assert np.isclose(
+            casscf_energy, -108.78966139913287, rtol=float_comparison_relative_tolerance, atol=mcscf_energy_tolerance
+        )
 
     def test_pyscf_fciwrapper_casscf_triplet(self):
         """Test MC wrapper in casscf for o2 triplet with cc-pvdz basis and CAS(6,6)."""
@@ -1592,7 +1610,9 @@ class TestPyscfPlugin:
         casscf.verbose = 0
         casscf_energy = casscf.kernel()[0]
 
-        assert np.isclose(casscf_energy, -149.68131616317658, atol=mcscf_energy_tolerance)
+        assert np.isclose(
+            casscf_energy, -149.68131616317658, rtol=float_comparison_relative_tolerance, atol=mcscf_energy_tolerance
+        )
 
     def test_pyscf_occupations_from_n_electrons_and_multiplicity(self):
         """Test occupations from n_electrons and multiplicity on water with def2-svp basis."""
@@ -1609,24 +1629,44 @@ class TestPyscfPlugin:
         occupation_singlet = [np.concatenate((np.ones(5), np.zeros(19))), np.concatenate((np.ones(5), np.zeros(19)))]
         scf_1 = orbitals_to_scf(orbitals, occupation_singlet[0], occupation_singlet[1])
         scf_2 = orbitals_to_scf_from_n_electrons_and_multiplicity(orbitals, 10, 1)
-        assert np.allclose(scf_1.mo_occ, scf_2.mo_occ)
+        assert np.allclose(
+            scf_1.mo_occ,
+            scf_2.mo_occ,
+            rtol=float_comparison_relative_tolerance,
+            atol=float_comparison_absolute_tolerance,
+        )
 
         # Check orbitals to SCF for doublet state
         occupation_doublet = [np.concatenate((np.ones(6), np.zeros(18))), np.concatenate((np.ones(5), np.zeros(19)))]
         scf_1 = orbitals_to_scf(orbitals, occupation_doublet[0], occupation_doublet[1])
         scf_2 = orbitals_to_scf_from_n_electrons_and_multiplicity(orbitals, 11, 2)
-        assert np.allclose(scf_1.mo_occ, scf_2.mo_occ)
+        assert np.allclose(
+            scf_1.mo_occ,
+            scf_2.mo_occ,
+            rtol=float_comparison_relative_tolerance,
+            atol=float_comparison_absolute_tolerance,
+        )
 
         # Check orbitals to SCF for triplet state
         occupation_triplet = [np.concatenate((np.ones(6), np.zeros(18))), np.concatenate((np.ones(4), np.zeros(20)))]
         scf_1 = orbitals_to_scf(orbitals, occupation_triplet[0], occupation_triplet[1])
         scf_2 = orbitals_to_scf_from_n_electrons_and_multiplicity(orbitals, 10, 3)
-        assert np.allclose(scf_1.mo_occ, scf_2.mo_occ)
+        assert np.allclose(
+            scf_1.mo_occ,
+            scf_2.mo_occ,
+            rtol=float_comparison_relative_tolerance,
+            atol=float_comparison_absolute_tolerance,
+        )
 
         # Check Hamiltonian to SCF for singlet state
         scf_1 = hamiltonian_to_scf(hamiltonian, occupation_singlet[0], occupation_singlet[1])
         scf_2 = hamiltonian_to_scf_from_n_electrons_and_multiplicity(hamiltonian, 10, 1)
-        assert np.allclose(scf_1.mo_occ, scf_2.mo_occ)
+        assert np.allclose(
+            scf_1.mo_occ,
+            scf_2.mo_occ,
+            rtol=float_comparison_relative_tolerance,
+            atol=float_comparison_absolute_tolerance,
+        )
 
 
 class TestQDKChemistryPySCFBasisConversion:
@@ -1677,7 +1717,7 @@ class TestQDKChemistryPySCFBasisConversion:
         # Verify structure
         assert pyscf_mol.natm == 1
         assert pyscf_mol.atom_charges()[0] == 2  # Helium
-        assert pyscf_mol.nao_nr() == qdk_basis.get_num_basis_functions()
+        assert pyscf_mol.nao_nr() == qdk_basis.get_num_atomic_orbitals()
 
         # Verify coordinates match
         coords = pyscf_mol.atom_coords()
@@ -1697,7 +1737,7 @@ class TestQDKChemistryPySCFBasisConversion:
         assert pyscf_mol.atom_charges()[0] == 8  # Oxygen
         assert pyscf_mol.atom_charges()[1] == 1  # Hydrogen
         assert pyscf_mol.atom_charges()[2] == 1  # Hydrogen
-        assert pyscf_mol.nao_nr() == qdk_basis.get_num_basis_functions()
+        assert pyscf_mol.nao_nr() == qdk_basis.get_num_atomic_orbitals()
 
     def test_pyscf_to_qdk_conversion_helium(self):
         """Test converting PySCF molecule to QDK/Chemistry basis set for helium."""
@@ -1709,7 +1749,7 @@ class TestQDKChemistryPySCFBasisConversion:
 
         # Verify basic properties
         assert qdk_basis.get_num_atoms() == 1
-        assert qdk_basis.get_num_basis_functions() == pyscf_mol.nao_nr()
+        assert qdk_basis.get_num_atomic_orbitals() == pyscf_mol.nao_nr()
         assert qdk_basis.has_structure()
 
     def test_pyscf_to_qdk_conversion_water(self):
@@ -1730,7 +1770,7 @@ class TestQDKChemistryPySCFBasisConversion:
 
         # Verify basic properties
         assert qdk_basis.get_num_atoms() == 3
-        assert qdk_basis.get_num_basis_functions() == pyscf_mol.nao_nr()
+        assert qdk_basis.get_num_atomic_orbitals() == pyscf_mol.nao_nr()
         assert qdk_basis.has_structure()
 
     def test_pyscf_to_qdk_conversion_water_generally_contracted(self):
@@ -1751,7 +1791,7 @@ class TestQDKChemistryPySCFBasisConversion:
 
         # Verify basic properties
         assert qdk_basis.get_num_atoms() == 3
-        assert qdk_basis.get_num_basis_functions() == pyscf_mol.nao_nr()
+        assert qdk_basis.get_num_atomic_orbitals() == pyscf_mol.nao_nr()
         assert qdk_basis.has_structure()
 
     def test_round_trip_conversion_helium(self):
@@ -1768,7 +1808,7 @@ class TestQDKChemistryPySCFBasisConversion:
         # Compare key properties
         assert original_basis.get_num_atoms() == converted_basis.get_num_atoms()
         assert original_basis.get_num_shells() == converted_basis.get_num_shells()
-        assert original_basis.get_num_basis_functions() == converted_basis.get_num_basis_functions()
+        assert original_basis.get_num_atomic_orbitals() == converted_basis.get_num_atomic_orbitals()
 
         # Compare shell-by-shell (with more relaxed tolerances for numerical differences)
         orig_shells = original_basis.get_shells()
@@ -1815,20 +1855,20 @@ class TestQDKChemistryPySCFBasisConversion:
         # Compare key properties
         assert original_basis.get_num_atoms() == converted_basis.get_num_atoms()
         assert original_basis.get_num_shells() == converted_basis.get_num_shells()
-        assert original_basis.get_num_basis_functions() == converted_basis.get_num_basis_functions()
+        assert original_basis.get_num_atomic_orbitals() == converted_basis.get_num_atomic_orbitals()
 
-    def test_basis_type_handling(self):
+    def test_atomic_orbital_type_handling(self):
         """Test handling of spherical vs cartesian basis types."""
         # Create basis with spherical functions
         qdk_basis = self.create_simple_basis_set(self.he_structure)
-        original_type = qdk_basis.get_basis_type()
+        original_type = qdk_basis.get_atomic_orbital_type()
 
         # Convert to PySCF and back
         pyscf_mol = basis_to_pyscf_mol(qdk_basis)
         converted_basis = pyscf_mol_to_qdk_basis(pyscf_mol, self.he_structure)
 
         # Basis type should be preserved
-        assert converted_basis.get_basis_type() == original_type
+        assert converted_basis.get_atomic_orbital_type() == original_type
 
     def test_shell_ordering_consistency(self):
         """Test that shell ordering is consistent after conversion."""
@@ -2011,7 +2051,7 @@ class TestQDKChemistryPySCFBasisConversion:
         # Edge case 1: ECP shells exist without ECP metadata
         shells = [Shell(0, OrbitalType.S, [1.0], [1.0])]
         ecp_shells = [Shell(0, OrbitalType.S, [10.0, 5.0], [50.0, 20.0], [0, 2])]
-        qdk_basis_no_meta = BasisSet("test-basis", shells, ecp_shells, ag_structure, BasisType.Spherical)
+        qdk_basis_no_meta = BasisSet("test-basis", shells, ecp_shells, ag_structure, AOType.Spherical)
 
         assert qdk_basis_no_meta.has_ecp_shells()
         assert qdk_basis_no_meta.get_num_ecp_shells() == 1

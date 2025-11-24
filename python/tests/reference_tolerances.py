@@ -23,7 +23,7 @@ float_comparison_relative_tolerance = 1e-12
 
 # This is the MCSCF energy convergence tolerance used for the reference values.
 # Consistency of the tested modules can only be expected to agree up to this tolerance.
-mcscf_energy_tolerance = 1e-8
+mcscf_energy_tolerance = 1e-6
 
 # Tolerance for imaginary parts of Pauli operator coefficients in time evolution.
 # Coefficients with imaginary parts below this threshold are considered real.

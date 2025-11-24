@@ -14,6 +14,8 @@ import pytest
 from qdk_chemistry import algorithms
 from qdk_chemistry.data import StabilityResult, Structure
 
+from .reference_tolerances import float_comparison_absolute_tolerance, float_comparison_relative_tolerance
+
 try:
     import qdk_chemistry.plugins.pyscf  # noqa: F401
     from qdk_chemistry.constants import ANGSTROM_TO_BOHR
@@ -62,12 +64,32 @@ class TestStabilityResultIO:
         assert result_in.external_size() == result_out.external_size()
 
         # Verify eigenvalues are preserved
-        assert np.allclose(result_out.get_internal_eigenvalues(), result_in.get_internal_eigenvalues())
-        assert np.allclose(result_out.get_external_eigenvalues(), result_in.get_external_eigenvalues())
+        assert np.allclose(
+            result_out.get_internal_eigenvalues(),
+            result_in.get_internal_eigenvalues(),
+            rtol=float_comparison_relative_tolerance,
+            atol=float_comparison_absolute_tolerance,
+        )
+        assert np.allclose(
+            result_out.get_external_eigenvalues(),
+            result_in.get_external_eigenvalues(),
+            rtol=float_comparison_relative_tolerance,
+            atol=float_comparison_absolute_tolerance,
+        )
 
         # Verify eigenvectors are preserved
-        assert np.allclose(result_out.get_internal_eigenvectors(), result_in.get_internal_eigenvectors())
-        assert np.allclose(result_out.get_external_eigenvectors(), result_in.get_external_eigenvectors())
+        assert np.allclose(
+            result_out.get_internal_eigenvectors(),
+            result_in.get_internal_eigenvectors(),
+            rtol=float_comparison_relative_tolerance,
+            atol=float_comparison_absolute_tolerance,
+        )
+        assert np.allclose(
+            result_out.get_external_eigenvectors(),
+            result_in.get_external_eigenvectors(),
+            rtol=float_comparison_relative_tolerance,
+            atol=float_comparison_absolute_tolerance,
+        )
 
         # Test file-based serialization
         with tempfile.NamedTemporaryFile(suffix=".stability_result.json") as tmp:
@@ -79,8 +101,18 @@ class TestStabilityResultIO:
             # Verify data is preserved
             assert result_file.internal_size() == result_out.internal_size()
             assert result_file.external_size() == result_out.external_size()
-            assert np.allclose(result_out.get_internal_eigenvalues(), result_file.get_internal_eigenvalues())
-            assert np.allclose(result_out.get_external_eigenvalues(), result_file.get_external_eigenvalues())
+            assert np.allclose(
+                result_out.get_internal_eigenvalues(),
+                result_file.get_internal_eigenvalues(),
+                rtol=float_comparison_relative_tolerance,
+                atol=float_comparison_absolute_tolerance,
+            )
+            assert np.allclose(
+                result_out.get_external_eigenvalues(),
+                result_file.get_external_eigenvalues(),
+                rtol=float_comparison_relative_tolerance,
+                atol=float_comparison_absolute_tolerance,
+            )
 
     def test_stability_result_hdf5_serialization(self):
         """Test HDF5 serialization and deserialization."""
@@ -96,10 +128,30 @@ class TestStabilityResultIO:
                 # Verify data preservation
                 assert result_in.is_internal_stable() == result_out.is_internal_stable()
                 assert result_in.is_external_stable() == result_out.is_external_stable()
-                assert np.allclose(result_out.get_internal_eigenvalues(), result_in.get_internal_eigenvalues())
-                assert np.allclose(result_out.get_external_eigenvalues(), result_in.get_external_eigenvalues())
-                assert np.allclose(result_out.get_internal_eigenvectors(), result_in.get_internal_eigenvectors())
-                assert np.allclose(result_out.get_external_eigenvectors(), result_in.get_external_eigenvectors())
+                assert np.allclose(
+                    result_out.get_internal_eigenvalues(),
+                    result_in.get_internal_eigenvalues(),
+                    rtol=float_comparison_relative_tolerance,
+                    atol=float_comparison_absolute_tolerance,
+                )
+                assert np.allclose(
+                    result_out.get_external_eigenvalues(),
+                    result_in.get_external_eigenvalues(),
+                    rtol=float_comparison_relative_tolerance,
+                    atol=float_comparison_absolute_tolerance,
+                )
+                assert np.allclose(
+                    result_out.get_internal_eigenvectors(),
+                    result_in.get_internal_eigenvectors(),
+                    rtol=float_comparison_relative_tolerance,
+                    atol=float_comparison_absolute_tolerance,
+                )
+                assert np.allclose(
+                    result_out.get_external_eigenvectors(),
+                    result_in.get_external_eigenvectors(),
+                    rtol=float_comparison_relative_tolerance,
+                    atol=float_comparison_absolute_tolerance,
+                )
         except RuntimeError as e:
             pytest.skip(f"HDF5 test skipped - {e!s}")
 
@@ -122,8 +174,18 @@ class TestStabilityResultIO:
             assert result2.external_size() == result.external_size()
 
             # Check eigenvalues
-            assert np.allclose(result.get_internal_eigenvalues(), result2.get_internal_eigenvalues())
-            assert np.allclose(result.get_external_eigenvalues(), result2.get_external_eigenvalues())
+            assert np.allclose(
+                result.get_internal_eigenvalues(),
+                result2.get_internal_eigenvalues(),
+                rtol=float_comparison_relative_tolerance,
+                atol=float_comparison_absolute_tolerance,
+            )
+            assert np.allclose(
+                result.get_external_eigenvalues(),
+                result2.get_external_eigenvalues(),
+                rtol=float_comparison_relative_tolerance,
+                atol=float_comparison_absolute_tolerance,
+            )
 
         # Test HDF5 file I/O
         with tempfile.NamedTemporaryFile(suffix=".stability_result.h5") as tmp_hdf5:
@@ -140,8 +202,18 @@ class TestStabilityResultIO:
             assert result3.external_size() == result.external_size()
 
             # Check eigenvalues
-            assert np.allclose(result.get_internal_eigenvalues(), result3.get_internal_eigenvalues())
-            assert np.allclose(result.get_external_eigenvalues(), result3.get_external_eigenvalues())
+            assert np.allclose(
+                result.get_internal_eigenvalues(),
+                result3.get_internal_eigenvalues(),
+                rtol=float_comparison_relative_tolerance,
+                atol=float_comparison_absolute_tolerance,
+            )
+            assert np.allclose(
+                result.get_external_eigenvalues(),
+                result3.get_external_eigenvalues(),
+                rtol=float_comparison_relative_tolerance,
+                atol=float_comparison_absolute_tolerance,
+            )
 
         # Test unsupported file type
         with pytest.raises(ValueError, match="Unsupported file type"):
@@ -169,7 +241,7 @@ class TestStabilityResultIO:
             StabilityResult.from_hdf5_file("test.h5")
 
         # Test non-existent file
-        with pytest.raises(RuntimeError, match="Failed to open file for reading"):
+        with pytest.raises(RuntimeError, match="Unable to open StabilityResult JSON file"):
             StabilityResult.from_json_file("nonexistent.stability_result.json")
 
         with pytest.raises(RuntimeError):
@@ -215,19 +287,31 @@ class TestStabilityResultIO:
         assert deserialized.is_external_stable() == original.is_external_stable()
 
         # Check eigenvalues are preserved
-        np.testing.assert_array_almost_equal(
-            original.get_internal_eigenvalues(), deserialized.get_internal_eigenvalues()
+        assert np.allclose(
+            original.get_internal_eigenvalues(),
+            deserialized.get_internal_eigenvalues(),
+            rtol=float_comparison_relative_tolerance,
+            atol=float_comparison_absolute_tolerance,
         )
-        np.testing.assert_array_almost_equal(
-            original.get_external_eigenvalues(), deserialized.get_external_eigenvalues()
+        assert np.allclose(
+            original.get_external_eigenvalues(),
+            deserialized.get_external_eigenvalues(),
+            rtol=float_comparison_relative_tolerance,
+            atol=float_comparison_absolute_tolerance,
         )
 
         # Check eigenvectors are preserved
-        np.testing.assert_array_almost_equal(
-            original.get_internal_eigenvectors(), deserialized.get_internal_eigenvectors()
+        assert np.allclose(
+            original.get_internal_eigenvectors(),
+            deserialized.get_internal_eigenvectors(),
+            rtol=float_comparison_relative_tolerance,
+            atol=float_comparison_absolute_tolerance,
         )
-        np.testing.assert_array_almost_equal(
-            original.get_external_eigenvectors(), deserialized.get_external_eigenvectors()
+        assert np.allclose(
+            original.get_external_eigenvectors(),
+            deserialized.get_external_eigenvectors(),
+            rtol=float_comparison_relative_tolerance,
+            atol=float_comparison_absolute_tolerance,
         )
 
         # Test multiple round trips

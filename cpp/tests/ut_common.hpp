@@ -51,15 +51,15 @@ inline static constexpr double small_value_upper_bound_tolerance = 1e-14;
 using namespace qdk::chemistry::data;
 
 /**
- * @brief Creates a random basis set with specified number of basis functions
- * @param n_basis_functions Number of basis functions to generate
+ * @brief Creates a random basis set with specified number of atomic orbitals
+ * @param n_atomic_orbitals Number of atomic orbitals to generate
  * @param name Name for the basis set (default: "test")
  * @return Shared pointer to a random basis set
  */
 inline std::shared_ptr<BasisSet> create_random_basis_set(
-    int n_basis_functions = 4, const std::string& name = "test") {
+    int n_atomic_orbitals = 4, const std::string& name = "test") {
   // Create a simple structure with enough atoms
-  int n_atoms = std::max(1, n_basis_functions / 2);
+  int n_atoms = std::max(1, n_atomic_orbitals / 2);
   std::vector<Eigen::Vector3d> coords;
   std::vector<Element> elements;
 
@@ -70,13 +70,13 @@ inline std::shared_ptr<BasisSet> create_random_basis_set(
 
   auto structure = std::make_shared<Structure>(coords, elements);
 
-  // Create shells to match the requested number of basis functions
+  // Create shells to match the requested number of atomic orbitals
   std::vector<Shell> shells;
   int functions_created = 0;
   int atom_idx = 0;
 
-  while (functions_created < n_basis_functions) {
-    int remaining = n_basis_functions - functions_created;
+  while (functions_created < n_atomic_orbitals) {
+    int remaining = n_atomic_orbitals - functions_created;
 
     // Choose orbital type based on remaining functions needed
     OrbitalType orbital_type;
@@ -107,7 +107,7 @@ inline std::shared_ptr<BasisSet> create_random_basis_set(
 
 /**
  * @brief Creates a simple test orbital object with basic data
- * @param n_basis Number of basis functions
+ * @param n_basis Number of atomic orbitals
  * @param n_orbitals Number of orbitals
  * @param restricted Whether to create a restricted calculation
  */

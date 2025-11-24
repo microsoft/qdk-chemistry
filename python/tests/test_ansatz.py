@@ -11,6 +11,7 @@ import pickle
 import numpy as np
 import pytest
 
+from qdk_chemistry import algorithms
 from qdk_chemistry.data import (
     Ansatz,
     CasWavefunctionContainer,
@@ -24,6 +25,7 @@ from qdk_chemistry.data import (
 from .reference_tolerances import (
     float_comparison_absolute_tolerance,
     float_comparison_relative_tolerance,
+    scf_energy_tolerance,
 )
 from .test_helpers import create_test_basis_set
 
@@ -209,7 +211,7 @@ class TestAnsatzSerialization:
         wf_basis = recon_wf_orbitals.get_basis_set()
         ham_basis = recon_ham_orbitals.get_basis_set()
 
-        assert wf_basis.get_num_basis_functions() == ham_basis.get_num_basis_functions()
+        assert wf_basis.get_num_atomic_orbitals() == ham_basis.get_num_atomic_orbitals()
         assert wf_basis.get_name() == ham_basis.get_name()
 
     def test_repr_method(self, test_ansatz):
@@ -244,7 +246,7 @@ class TestAnsatzSerialization:
             assert orig_ham.get_core_energy() == restored_ham.get_core_energy()
 
             if orig_ham.has_one_body_integrals():
-                np.testing.assert_array_equal(orig_ham.get_one_body_integrals(), restored_ham.get_one_body_integrals())
+                assert np.array_equal(orig_ham.get_one_body_integrals(), restored_ham.get_one_body_integrals())
 
         # Verify wavefunction data
         if test_ansatz.has_wavefunction():
@@ -287,4 +289,42 @@ class TestAnsatzSerialization:
             orig_orbs = test_ansatz.get_orbitals()
             restored_orbs = ansatz_restored.get_orbitals()
             assert orig_orbs.get_num_molecular_orbitals() == restored_orbs.get_num_molecular_orbitals()
-            np.testing.assert_array_equal(orig_orbs.get_coefficients(), restored_orbs.get_coefficients())
+            assert np.array_equal(orig_orbs.get_coefficients(), restored_orbs.get_coefficients())
+
+    def test_restricted_closed_shell_energy(self):
+        """Test the energy evaluation for a restricted closed-shell system."""
+        mol = Structure([[0.0, 0.0, 0.0], [0.0, 0.0, 4.0]], ["N", "N"])
+        # get scf energy and wfn
+        scf = algorithms.create("scf_solver")
+        scf.settings().set("basis_set", "cc-pvdz")
+        e_scf, hf_wfn = scf.run(mol, 0, 1)
+        # get hamiltonian
+        h_ctor = algorithms.create("hamiltonian_constructor")
+        hamiltonian = h_ctor.run(hf_wfn.get_orbitals())
+        # get ansatz
+        ansatz = Ansatz(hamiltonian, hf_wfn)
+        e_rhf = ansatz.calculate_energy()
+        # energy from ansatz should reproduce scf energy
+        assert np.isclose(e_rhf, e_scf, rtol=float_comparison_relative_tolerance, atol=scf_energy_tolerance)
+
+    def test_restricted_open_shell_energy(self):
+        """Test the energy evaluation for a restricted open-shell system."""
+        try:
+            import qdk_chemistry.plugins.pyscf  # noqa: F401 PLC0415
+        except ImportError:
+            pytest.skip("pyscf not available, skipping O2 triplet Ansatz test")
+
+        mol = Structure([[0.0, 0.0, 0.0], [0.0, 0.0, 4.0]], ["O", "O"])
+        # get scf energy and wfn
+        scf = algorithms.create("scf_solver", "pyscf")
+        scf.settings().set("force_restricted", True)
+        scf.settings().set("basis_set", "cc-pvdz")
+        e_scf, hf_wfn = scf.run(mol, 0, 3)
+        # get hamiltonian
+        h_ctor = algorithms.create("hamiltonian_constructor")
+        hamiltonian = h_ctor.run(hf_wfn.get_orbitals())
+        # get ansatz
+        ansatz = Ansatz(hamiltonian, hf_wfn)
+        e_rohf = ansatz.calculate_energy()
+        # energy from ansatz should reproduce scf energy
+        assert np.isclose(e_rohf, e_scf, rtol=float_comparison_relative_tolerance, atol=scf_energy_tolerance)

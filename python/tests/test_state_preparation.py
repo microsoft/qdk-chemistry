@@ -183,7 +183,7 @@ def test_eliminate_column() -> None:
         dtype=np.int8,
     )
 
-    np.testing.assert_array_equal(m_result, expected)
+    assert np.array_equal(m_result, expected)
 
     # Verify CNOT operations are recorded correctly
     expected_cnots = [(1, 0), (3, 0)]  # (target, control) pairs
@@ -192,7 +192,7 @@ def test_eliminate_column() -> None:
     # Verify original inputs are not modified
     assert cnot_ops == []  # Original list should be empty
     original_expected = np.array([[1, 1, 0], [1, 0, 1], [0, 1, 1], [1, 1, 0]], dtype=np.int8)
-    np.testing.assert_array_equal(matrix, original_expected)
+    assert np.array_equal(matrix, original_expected)
 
 
 def test_perform_gaussian_elimination() -> None:
@@ -229,7 +229,7 @@ def test_perform_gaussian_elimination() -> None:
 
     # Verify original inputs are not modified
     original_expected = np.array([[1, 1, 0], [0, 1, 1], [1, 0, 1]], dtype=np.int8)
-    np.testing.assert_array_equal(matrix, original_expected)
+    assert np.array_equal(matrix, original_expected)
     assert row_map == [0, 1, 2]
     assert cnot_ops == []
 
@@ -256,7 +256,7 @@ def test_remove_zero_rows():
     # Verify zero rows are removed
     expected_matrix = np.array([[1, 0, 1], [0, 1, 0], [1, 1, 1]], dtype=np.int8)
 
-    np.testing.assert_array_equal(m_result, expected_matrix)
+    assert np.array_equal(m_result, expected_matrix)
     assert row_map_result == [10, 12, 14]  # Indices of non-zero rows
     assert rank == 3
 
@@ -266,7 +266,7 @@ def test_remove_zero_rows():
     row_map_no_zeros = [5, 6]
     m_result2, row_map_result2, rank2 = _remove_zero_rows(m_no_zeros, row_map_no_zeros)
 
-    np.testing.assert_array_equal(m_result2, m_no_zeros)
+    assert np.array_equal(m_result2, m_no_zeros)
     assert row_map_result2 == [5, 6]
     assert rank2 == 2
 
@@ -504,7 +504,7 @@ def test_gf2x_with_tracking_reconstruction():
                     reconstructed[row_idx] = 1 - reconstructed[row_idx]
 
             # Verify reconstruction
-            np.testing.assert_array_equal(original_matrix, reconstructed, f"Matrix {i + 1} reconstruction failed")
+            assert np.array_equal(original_matrix, reconstructed), f"Matrix {i + 1} reconstruction failed"
 
 
 def test_remove_duplicate_rows_with_cnot() -> None:

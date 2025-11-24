@@ -52,12 +52,15 @@ Shell::Shell(size_t atom_idx, OrbitalType orb_type,
 }
 
 BasisSet::BasisSet(const std::string& name, const Structure& structure,
-                   BasisType basis_type)
-    : BasisSet(name, std::make_shared<Structure>(structure), basis_type) {}
+                   AOType atomic_orbital_type)
+    : BasisSet(name, std::make_shared<Structure>(structure),
+               atomic_orbital_type) {}
 
 BasisSet::BasisSet(const std::string& name, const std::vector<Shell>& shells,
-                   BasisType basis_type)
-    : _name(name), _basis_type(basis_type), _ecp_name("none") {
+                   AOType atomic_orbital_type)
+    : _name(name),
+      _atomic_orbital_type(atomic_orbital_type),
+      _ecp_name("none") {
   // Organize shells by atom index
   for (const auto& shell : shells) {
     size_t atom_index = shell.atom_index;
@@ -79,14 +82,15 @@ BasisSet::BasisSet(const std::string& name, const std::vector<Shell>& shells,
 }
 
 BasisSet::BasisSet(const std::string& name, const std::vector<Shell>& shells,
-                   const Structure& structure, BasisType basis_type)
+                   const Structure& structure, AOType atomic_orbital_type)
     : BasisSet(name, shells, std::make_shared<Structure>(structure),
-               basis_type) {}
+               atomic_orbital_type) {}
 
 BasisSet::BasisSet(const std::string& name,
-                   std::shared_ptr<Structure> structure, BasisType basis_type)
+                   std::shared_ptr<Structure> structure,
+                   AOType atomic_orbital_type)
     : _name(name),
-      _basis_type(basis_type),
+      _atomic_orbital_type(atomic_orbital_type),
       _structure(structure),
       _ecp_name("none") {
   if (_name.empty()) {
@@ -105,9 +109,10 @@ BasisSet::BasisSet(const std::string& name,
 }
 
 BasisSet::BasisSet(const std::string& name, const std::vector<Shell>& shells,
-                   std::shared_ptr<Structure> structure, BasisType basis_type)
+                   std::shared_ptr<Structure> structure,
+                   AOType atomic_orbital_type)
     : _name(name),
-      _basis_type(basis_type),
+      _atomic_orbital_type(atomic_orbital_type),
       _structure(structure),
       _ecp_name("none") {
   if (!structure) {
@@ -136,15 +141,16 @@ BasisSet::BasisSet(const std::string& name, const std::vector<Shell>& shells,
 
 BasisSet::BasisSet(const std::string& name, const std::vector<Shell>& shells,
                    const std::vector<Shell>& ecp_shells,
-                   const Structure& structure, BasisType basis_type)
+                   const Structure& structure, AOType atomic_orbital_type)
     : BasisSet(name, shells, ecp_shells, std::make_shared<Structure>(structure),
-               basis_type) {}
+               atomic_orbital_type) {}
 
 BasisSet::BasisSet(const std::string& name, const std::vector<Shell>& shells,
                    const std::vector<Shell>& ecp_shells,
-                   std::shared_ptr<Structure> structure, BasisType basis_type)
+                   std::shared_ptr<Structure> structure,
+                   AOType atomic_orbital_type)
     : _name(name),
-      _basis_type(basis_type),
+      _atomic_orbital_type(atomic_orbital_type),
       _structure(structure),
       _ecp_name("none") {
   if (!structure) {
@@ -187,17 +193,18 @@ BasisSet::BasisSet(const std::string& name, const std::vector<Shell>& shells,
                    const std::string& ecp_name,
                    const std::vector<Shell>& ecp_shells,
                    const std::vector<size_t>& ecp_electrons,
-                   const Structure& structure, BasisType basis_type)
+                   const Structure& structure, AOType atomic_orbital_type)
     : BasisSet(name, shells, ecp_name, ecp_shells, ecp_electrons,
-               std::make_shared<Structure>(structure), basis_type) {}
+               std::make_shared<Structure>(structure), atomic_orbital_type) {}
 
 BasisSet::BasisSet(const std::string& name, const std::vector<Shell>& shells,
                    const std::string& ecp_name,
                    const std::vector<Shell>& ecp_shells,
                    const std::vector<size_t>& ecp_electrons,
-                   std::shared_ptr<Structure> structure, BasisType basis_type)
+                   std::shared_ptr<Structure> structure,
+                   AOType atomic_orbital_type)
     : _name(name),
-      _basis_type(basis_type),
+      _atomic_orbital_type(atomic_orbital_type),
       _structure(structure),
       _ecp_name(ecp_name),
       _ecp_electrons(ecp_electrons) {
@@ -241,7 +248,7 @@ BasisSet::BasisSet(const std::string& name, const std::vector<Shell>& shells,
 
 BasisSet::BasisSet(const BasisSet& other)
     : _name(other._name),
-      _basis_type(other._basis_type),
+      _atomic_orbital_type(other._atomic_orbital_type),
       _shells_per_atom(other._shells_per_atom),
       _ecp_name(other._ecp_name),
       _ecp_shells_per_atom(other._ecp_shells_per_atom),
@@ -258,7 +265,7 @@ BasisSet::BasisSet(const BasisSet& other)
 BasisSet& BasisSet::operator=(const BasisSet& other) {
   if (this != &other) {
     _name = other._name;
-    _basis_type = other._basis_type;
+    _atomic_orbital_type = other._atomic_orbital_type;
     _shells_per_atom = other._shells_per_atom;
     _ecp_name = other._ecp_name;
     _ecp_shells_per_atom = other._ecp_shells_per_atom;
@@ -274,7 +281,9 @@ BasisSet& BasisSet::operator=(const BasisSet& other) {
   return *this;
 }
 
-BasisType BasisSet::get_basis_type() const { return _basis_type; }
+AOType BasisSet::get_atomic_orbital_type() const {
+  return _atomic_orbital_type;
+}
 
 std::vector<Shell> BasisSet::get_shells() const {
   std::vector<Shell> all_shells;
@@ -370,45 +379,46 @@ size_t BasisSet::get_num_ecp_shells() const {
 
 bool BasisSet::has_ecp_shells() const { return get_num_ecp_shells() > 0; }
 
-std::pair<size_t, int> BasisSet::get_basis_function_info(
-    size_t basis_index) const {
-  _validate_basis_index(basis_index);
-  return basis_to_shell_index(basis_index);
+std::pair<size_t, int> BasisSet::get_atomic_orbital_info(
+    size_t atomic_orbital_index) const {
+  _validate_atomic_orbital_index(atomic_orbital_index);
+  return basis_to_shell_index(atomic_orbital_index);
 }
 
-size_t BasisSet::get_num_basis_functions() const {
+size_t BasisSet::get_num_atomic_orbitals() const {
   if (!_cache_valid) {
     _compute_mappings();
   }
-  return _cached_num_basis_functions;
+  return _cached_num_atomic_orbitals;
 }
 
-size_t BasisSet::get_atom_index_for_basis_function(size_t basis_index) const {
+size_t BasisSet::get_atom_index_for_atomic_orbital(
+    size_t atomic_orbital_index) const {
   if (!_cache_valid) {
     _compute_mappings();
   }
 
-  _validate_basis_index(basis_index);
-  return _basis_to_atom_map[basis_index];
+  _validate_atomic_orbital_index(atomic_orbital_index);
+  return _basis_to_atom_map[atomic_orbital_index];
 }
 
-std::vector<size_t> BasisSet::get_basis_function_indices_for_atom(
+std::vector<size_t> BasisSet::get_atomic_orbital_indices_for_atom(
     size_t atom_index) const {
   _validate_atom_index(atom_index);
 
   std::vector<size_t> result;
   size_t basis_idx = 0;
 
-  // Count basis functions from atoms before this one
+  // Count atomic orbitals from atoms before this one
   for (size_t i = 0; i < atom_index; ++i) {
     for (const auto& shell : _shells_per_atom[i]) {
-      basis_idx += shell.get_num_basis_functions(_basis_type);
+      basis_idx += shell.get_num_atomic_orbitals(_atomic_orbital_type);
     }
   }
 
-  // Add basis functions from this atom
+  // Add atomic orbitals from this atom
   for (const auto& shell : _shells_per_atom[atom_index]) {
-    size_t num_bf = shell.get_num_basis_functions(_basis_type);
+    size_t num_bf = shell.get_num_atomic_orbitals(_atomic_orbital_type);
     for (size_t j = 0; j < num_bf; ++j) {
       result.push_back(basis_idx + j);
     }
@@ -438,12 +448,12 @@ std::vector<size_t> BasisSet::get_shell_indices_for_atom(
   return result;
 }
 
-size_t BasisSet::get_num_basis_functions_for_atom(size_t atom_index) const {
+size_t BasisSet::get_num_atomic_orbitals_for_atom(size_t atom_index) const {
   _validate_atom_index(atom_index);
 
   size_t total = 0;
   for (const auto& shell : _shells_per_atom[atom_index]) {
-    total += shell.get_num_basis_functions(_basis_type);
+    total += shell.get_num_atomic_orbitals(_atomic_orbital_type);
   }
   return total;
 }
@@ -465,13 +475,13 @@ std::vector<size_t> BasisSet::get_shell_indices_for_orbital_type(
   return result;
 }
 
-size_t BasisSet::get_num_basis_functions_for_orbital_type(
+size_t BasisSet::get_num_atomic_orbitals_for_orbital_type(
     OrbitalType orbital_type) const {
   size_t total = 0;
   for (const auto& atom_shells : _shells_per_atom) {
     for (const auto& shell : atom_shells) {
       if (shell.orbital_type == orbital_type) {
-        total += shell.get_num_basis_functions(_basis_type);
+        total += shell.get_num_atomic_orbitals(_atomic_orbital_type);
       }
     }
   }
@@ -646,9 +656,10 @@ bool BasisSet::_is_valid() const {
 std::string BasisSet::get_summary() const {
   std::ostringstream oss;
   oss << "BasisSet: " << _name << "\n";
-  oss << "Basis type: " << basis_type_to_string(_basis_type) << "\n";
+  oss << "Basis type: " << atomic_orbital_type_to_string(_atomic_orbital_type)
+      << "\n";
   oss << "Total shells: " << get_num_shells() << "\n";
-  oss << "Total basis functions: " << get_num_basis_functions() << "\n";
+  oss << "Total atomic orbitals: " << get_num_atomic_orbitals() << "\n";
   oss << "Number of atoms: " << get_num_atoms() << "\n";
 
   if (has_structure()) {
@@ -663,14 +674,14 @@ std::string BasisSet::get_summary() const {
     for (const auto& shell : atom_shells) {
       shell_counts[shell.orbital_type]++;
       bf_counts[shell.orbital_type] +=
-          shell.get_num_basis_functions(_basis_type);
+          shell.get_num_atomic_orbitals(_atomic_orbital_type);
     }
   }
 
   oss << "Shell breakdown:\n";
   for (const auto& [type, count] : shell_counts) {
     oss << "  " << orbital_type_to_string(type) << " shells: " << count
-        << " (basis functions: " << bf_counts[type] << ")\n";
+        << " (atomic orbitals: " << bf_counts[type] << ")\n";
   }
 
   return oss.str();
@@ -752,7 +763,9 @@ std::shared_ptr<BasisSet> BasisSet::_from_json_file(
     const std::string& filename) {
   std::ifstream file(filename);
   if (!file.is_open()) {
-    throw std::runtime_error("Cannot open file for reading: " + filename);
+    throw std::runtime_error(
+        "Unable to open BasisSet JSON file '" + filename +
+        "'. Please check that the file exists and you have read permissions.");
   }
 
   nlohmann::json j;
@@ -794,10 +807,11 @@ void BasisSet::to_hdf5(H5::Group& group) const {
     name_attr.write(string_type, _name);
 
     // Save basis type
-    H5::Attribute basis_type_attr =
-        metadata_group.createAttribute("basis_type", string_type, scalar_space);
-    std::string basis_type_str = basis_type_to_string(_basis_type);
-    basis_type_attr.write(string_type, basis_type_str);
+    H5::Attribute atomic_orbital_type_attr = metadata_group.createAttribute(
+        "atomic_orbital_type", string_type, scalar_space);
+    std::string atomic_orbital_type_str =
+        atomic_orbital_type_to_string(_atomic_orbital_type);
+    atomic_orbital_type_attr.write(string_type, atomic_orbital_type_str);
 
     // Save shell data
     if (get_num_shells() > 0) {
@@ -965,12 +979,23 @@ void BasisSet::to_hdf5(H5::Group& group) const {
 
 std::shared_ptr<BasisSet> BasisSet::_from_hdf5_file(
     const std::string& filename) {
+  H5::H5File file;
   try {
-    H5::H5File file(filename, H5F_ACC_RDONLY);
+    file.openFile(filename, H5F_ACC_RDONLY);
+  } catch (const H5::Exception& e) {
+    throw std::runtime_error("Unable to open BasisSet HDF5 file '" + filename +
+                             "'. " +
+                             "Please check that the file exists, is a valid "
+                             "HDF5 file, and you have read permissions.");
+  }
+
+  try {
     H5::Group basis_set_group = file.openGroup("/basis_set");
     return from_hdf5(basis_set_group);
   } catch (const H5::Exception& e) {
-    throw std::runtime_error("HDF5 error: " + std::string(e.getCDetailMsg()));
+    throw std::runtime_error("Unable to read BasisSet data from HDF5 file '" +
+                             filename + "'. " +
+                             "HDF5 error: " + std::string(e.getCDetailMsg()));
   }
 }
 
@@ -996,13 +1021,14 @@ std::shared_ptr<BasisSet> BasisSet::from_hdf5(H5::Group& group) {
     name_attr.read(string_type, name);
 
     // Load basis type if present
-    BasisType basis_type = BasisType::Spherical;  // Default
-    if (metadata_group.attrExists("basis_type")) {
-      H5::Attribute basis_type_attr =
-          metadata_group.openAttribute("basis_type");
-      std::string basis_type_str;
-      basis_type_attr.read(string_type, basis_type_str);
-      basis_type = string_to_basis_type(basis_type_str);
+    AOType atomic_orbital_type = AOType::Spherical;  // Default
+    if (metadata_group.attrExists("atomic_orbital_type")) {
+      H5::Attribute atomic_orbital_type_attr =
+          metadata_group.openAttribute("atomic_orbital_type");
+      std::string atomic_orbital_type_str;
+      atomic_orbital_type_attr.read(string_type, atomic_orbital_type_str);
+      atomic_orbital_type =
+          string_to_atomic_orbital_type(atomic_orbital_type_str);
     }
 
     // Collect shells
@@ -1204,19 +1230,19 @@ std::shared_ptr<BasisSet> BasisSet::from_hdf5(H5::Group& group) {
       auto structure = Structure::from_hdf5(structure_group);
       if (!ecp_shells.empty()) {
         if (!ecp_name.empty() && !ecp_electrons.empty()) {
-          basis_set =
-              std::make_shared<BasisSet>(name, shells, ecp_name, ecp_shells,
-                                         ecp_electrons, *structure, basis_type);
+          basis_set = std::make_shared<BasisSet>(
+              name, shells, ecp_name, ecp_shells, ecp_electrons, *structure,
+              atomic_orbital_type);
         } else {
-          basis_set = std::make_shared<BasisSet>(name, shells, ecp_shells,
-                                                 *structure, basis_type);
+          basis_set = std::make_shared<BasisSet>(
+              name, shells, ecp_shells, *structure, atomic_orbital_type);
         }
       } else {
-        basis_set =
-            std::make_shared<BasisSet>(name, shells, *structure, basis_type);
+        basis_set = std::make_shared<BasisSet>(name, shells, *structure,
+                                               atomic_orbital_type);
       }
     } else {
-      basis_set = std::make_shared<BasisSet>(name, shells, basis_type);
+      basis_set = std::make_shared<BasisSet>(name, shells, atomic_orbital_type);
     }
 
     return basis_set;
@@ -1233,8 +1259,9 @@ nlohmann::json BasisSet::to_json() const {
   j["version"] = SERIALIZATION_VERSION;
 
   j["name"] = _name;
-  j["basis_type"] = basis_type_to_string(_basis_type);
-  j["num_basis_functions"] = get_num_basis_functions();
+  j["atomic_orbital_type"] =
+      atomic_orbital_type_to_string(_atomic_orbital_type);
+  j["num_atomic_orbitals"] = get_num_atomic_orbitals();
   j["num_shells"] = get_num_shells();
   j["num_atoms"] = get_num_atoms();
 
@@ -1333,11 +1360,12 @@ std::shared_ptr<BasisSet> BasisSet::from_json(const nlohmann::json& j) {
     std::string name = j.value("name", "");
 
     // Load basis type if present, default to spherical
-    BasisType basis_type;
-    if (j.contains("basis_type")) {
-      basis_type = string_to_basis_type(j["basis_type"]);
+    AOType atomic_orbital_type;
+    if (j.contains("atomic_orbital_type")) {
+      atomic_orbital_type =
+          string_to_atomic_orbital_type(j["atomic_orbital_type"]);
     } else {
-      basis_type = BasisType::Spherical;
+      atomic_orbital_type = AOType::Spherical;
     }
 
     // Collect all shells and ECP shells
@@ -1475,13 +1503,13 @@ std::shared_ptr<BasisSet> BasisSet::from_json(const nlohmann::json& j) {
         }
       }
     }
-    // Legacy support - basis functions converted to shells
-    else if (j.contains("basis_functions") && j["basis_functions"].is_array()) {
+    // Legacy support - atomic orbitals converted to shells
+    else if (j.contains("atomic_orbitals") && j["atomic_orbitals"].is_array()) {
       std::map<std::pair<size_t, OrbitalType>,
                std::vector<std::pair<double, double>>>
           primitive_map;
 
-      for (const auto& bf_json : j["basis_functions"]) {
+      for (const auto& bf_json : j["atomic_orbitals"]) {
         size_t atom_index = bf_json["atom_index"];
         OrbitalType orbital_type =
             string_to_orbital_type(bf_json["orbital_type"]);
@@ -1491,7 +1519,7 @@ std::shared_ptr<BasisSet> BasisSet::from_json(const nlohmann::json& j) {
         if (primitive_map.find(key) == primitive_map.end()) {
           primitive_map[key] = std::vector<std::pair<double, double>>();
 
-          // Load primitives (assuming all basis functions in same shell have
+          // Load primitives (assuming all atomic orbitals in same shell have
           // same primitives)
           if (bf_json.contains("primitives") &&
               bf_json["primitives"].is_array()) {
@@ -1539,16 +1567,16 @@ std::shared_ptr<BasisSet> BasisSet::from_json(const nlohmann::json& j) {
       auto structure = Structure::from_json(j["structure"]);
       if (!ecp_shells.empty()) {
         if (!ecp_name.empty() && !ecp_electrons.empty()) {
-          basis_set =
-              std::make_shared<BasisSet>(name, shells, ecp_name, ecp_shells,
-                                         ecp_electrons, *structure, basis_type);
+          basis_set = std::make_shared<BasisSet>(
+              name, shells, ecp_name, ecp_shells, ecp_electrons, *structure,
+              atomic_orbital_type);
         } else {
-          basis_set = std::make_shared<BasisSet>(name, shells, ecp_shells,
-                                                 *structure, basis_type);
+          basis_set = std::make_shared<BasisSet>(
+              name, shells, ecp_shells, *structure, atomic_orbital_type);
         }
       } else {
-        basis_set =
-            std::make_shared<BasisSet>(name, shells, *structure, basis_type);
+        basis_set = std::make_shared<BasisSet>(name, shells, *structure,
+                                               atomic_orbital_type);
       }
     } else {
       if (!ecp_shells.empty()) {
@@ -1556,7 +1584,7 @@ std::shared_ptr<BasisSet> BasisSet::from_json(const nlohmann::json& j) {
         throw std::runtime_error(
             "Cannot create BasisSet with ECP shells but without structure");
       }
-      basis_set = std::make_shared<BasisSet>(name, shells, basis_type);
+      basis_set = std::make_shared<BasisSet>(name, shells, atomic_orbital_type);
     }
 
     return basis_set;
@@ -1636,34 +1664,34 @@ int BasisSet::get_angular_momentum(OrbitalType orbital_type) {
   return static_cast<int>(orbital_type);
 }
 
-int BasisSet::get_num_orbitals_for_l(int l, BasisType basis_type) {
-  if (basis_type == BasisType::Spherical) {
+int BasisSet::get_num_orbitals_for_l(int l, AOType atomic_orbital_type) {
+  if (atomic_orbital_type == AOType::Spherical) {
     return 2 * l + 1;  // Spherical harmonics
   } else {
     return (l + 1) * (l + 2) / 2;  // Cartesian coordinates
   }
 }
 
-std::string BasisSet::basis_type_to_string(BasisType basis_type) {
-  switch (basis_type) {
-    case BasisType::Spherical:
+std::string BasisSet::atomic_orbital_type_to_string(
+    AOType atomic_orbital_type) {
+  switch (atomic_orbital_type) {
+    case AOType::Spherical:
       return "spherical";
-    case BasisType::Cartesian:
+    case AOType::Cartesian:
       return "cartesian";
     default:
       return "unknown";
   }
 }
 
-BasisType BasisSet::string_to_basis_type(const std::string& basis_string) {
+AOType BasisSet::string_to_atomic_orbital_type(
+    const std::string& basis_string) {
   std::string lower_str = basis_string;
   std::transform(lower_str.begin(), lower_str.end(), lower_str.begin(),
                  ::tolower);
 
-  if (lower_str == "spherical" || lower_str == "sph")
-    return BasisType::Spherical;
-  if (lower_str == "cartesian" || lower_str == "cart")
-    return BasisType::Cartesian;
+  if (lower_str == "spherical" || lower_str == "sph") return AOType::Spherical;
+  if (lower_str == "cartesian" || lower_str == "cart") return AOType::Cartesian;
 
   throw std::invalid_argument("Unknown basis type: " + basis_string);
 }
@@ -1672,7 +1700,7 @@ void BasisSet::_clear_maps() {
   _cache_valid = false;
   _basis_to_atom_map.clear();
   _basis_to_shell_map.clear();
-  _cached_num_basis_functions = 0;
+  _cached_num_atomic_orbitals = 0;
   _cached_num_shells = 0;
 }
 
@@ -1684,20 +1712,21 @@ void BasisSet::_compute_mappings() const {
   // Clear existing mappings
   _basis_to_atom_map.clear();
   _basis_to_shell_map.clear();
-  _cached_num_basis_functions = 0;
+  _cached_num_atomic_orbitals = 0;
   _cached_num_shells = 0;
 
-  // Compute total number of shells and basis functions
+  // Compute total number of shells and atomic orbitals
   for (const auto& atom_shells : _shells_per_atom) {
     _cached_num_shells += atom_shells.size();
     for (const auto& shell : atom_shells) {
-      _cached_num_basis_functions += shell.get_num_basis_functions(_basis_type);
+      _cached_num_atomic_orbitals +=
+          shell.get_num_atomic_orbitals(_atomic_orbital_type);
     }
   }
 
   // Reserve space for mappings
-  _basis_to_atom_map.reserve(_cached_num_basis_functions);
-  _basis_to_shell_map.reserve(_cached_num_basis_functions);
+  _basis_to_atom_map.reserve(_cached_num_atomic_orbitals);
+  _basis_to_shell_map.reserve(_cached_num_atomic_orbitals);
 
   // Build mappings
   size_t current_shell_idx = 0;
@@ -1705,9 +1734,9 @@ void BasisSet::_compute_mappings() const {
     const auto& atom_shells = _shells_per_atom[atom_idx];
 
     for (const auto& shell : atom_shells) {
-      size_t num_bf = shell.get_num_basis_functions(_basis_type);
+      size_t num_bf = shell.get_num_atomic_orbitals(_atomic_orbital_type);
 
-      // Map each basis function in this shell to the atom and shell
+      // Map each atomic orbital in this shell to the atom and shell
       for (size_t bf_idx = 0; bf_idx < num_bf; ++bf_idx) {
         _basis_to_atom_map.push_back(atom_idx);
         _basis_to_shell_map.push_back(current_shell_idx);
@@ -1720,12 +1749,13 @@ void BasisSet::_compute_mappings() const {
   _cache_valid = true;
 }
 
-void BasisSet::_validate_basis_index(size_t basis_index) const {
-  if (basis_index >= get_num_basis_functions()) {
-    throw std::out_of_range("Basis function index " +
-                            std::to_string(basis_index) +
+void BasisSet::_validate_atomic_orbital_index(
+    size_t atomic_orbital_index) const {
+  if (atomic_orbital_index >= get_num_atomic_orbitals()) {
+    throw std::out_of_range("atomic orbital index " +
+                            std::to_string(atomic_orbital_index) +
                             " is out of range. Maximum index: " +
-                            std::to_string(get_num_basis_functions() - 1));
+                            std::to_string(get_num_atomic_orbitals() - 1));
   }
 }
 
@@ -1746,14 +1776,14 @@ void BasisSet::_validate_atom_index(size_t atom_index) const {
 }
 
 std::pair<size_t, int> BasisSet::basis_to_shell_index(
-    size_t basis_index) const {
+    size_t atomic_orbital_index) const {
   if (!_cache_valid) {
     _compute_mappings();
   }
 
-  _validate_basis_index(basis_index);
+  _validate_atomic_orbital_index(atomic_orbital_index);
 
-  size_t shell_index = _basis_to_shell_map[basis_index];
+  size_t shell_index = _basis_to_shell_map[atomic_orbital_index];
 
   // Find the offset within the shell to compute magnetic quantum number
   size_t basis_offset_in_shell = 0;
@@ -1762,11 +1792,11 @@ std::pair<size_t, int> BasisSet::basis_to_shell_index(
 
   for (const auto& atom_shells : _shells_per_atom) {
     for (const auto& shell : atom_shells) {
-      size_t num_bf = shell.get_num_basis_functions(_basis_type);
+      size_t num_bf = shell.get_num_atomic_orbitals(_atomic_orbital_type);
 
       if (current_shell_idx == shell_index) {
         // Found the shell, compute the offset
-        basis_offset_in_shell = basis_index - current_basis_idx;
+        basis_offset_in_shell = atomic_orbital_index - current_basis_idx;
         int l = shell.get_angular_momentum();
         int m_l = static_cast<int>(basis_offset_in_shell) - l;
         return std::make_pair(shell_index, m_l);

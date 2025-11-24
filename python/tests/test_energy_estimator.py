@@ -224,11 +224,11 @@ def test_create_measurement_circuits_qubit_mismatch():
 def test_compute_expval_and_variance_for_paulis_from_bitstring_counts(counts, paulis, expected_expvals, expected_vars):
     """Test the statistics (mean and variance) calculation for Pauli observables."""
     expvals, vars_ = _compute_expval_and_variance_from_bitstrings(counts, paulis)
-    np.testing.assert_allclose(
-        expvals, expected_expvals, atol=float_comparison_absolute_tolerance, rtol=float_comparison_relative_tolerance
+    assert np.allclose(
+        expvals, expected_expvals, rtol=float_comparison_relative_tolerance, atol=float_comparison_absolute_tolerance
     )
-    np.testing.assert_allclose(
-        vars_, expected_vars, atol=float_comparison_absolute_tolerance, rtol=float_comparison_relative_tolerance
+    assert np.allclose(
+        vars_, expected_vars, rtol=float_comparison_relative_tolerance, atol=float_comparison_absolute_tolerance
     )
 
 
