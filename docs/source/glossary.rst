@@ -7,8 +7,17 @@ Acronym definitions
    AO
       Atomic Orbital.
 
+   ASCI
+      Adaptive Sampling Configuration Interaction.
+
    CAS
       Complete Active Space.
+
+   CCSD
+      Coupled Cluster with Single and Double excitations.
+
+   CCSD(T)
+      Coupled Cluster with Single and Double excitations and perturbative Triple excitations.
 
    CI
       Configuration Interaction.
@@ -71,6 +80,9 @@ Acronym definitions
 
    UKS
       Unrestricted Kohn-Sham.
+
+   VQE
+      Variational Quantum Eigensolver.
 
    VVHV
       Valence Virtual Hard Virtual.
