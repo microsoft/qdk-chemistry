@@ -89,7 +89,7 @@ class DIIS {
    * @param[out] x_diis Output extrapolated Fock matrix with reduced error
    */
   void extrapolate_(const RowMajorMatrix& x, const RowMajorMatrix& error,
-                    RowMajorMatrix* x_diis);
+                    RowMajorMatrix& x_diis);
 
   /**
    * @brief Remove oldest Fock matrix and error vector when subspace is full
@@ -155,7 +155,7 @@ void DIIS::iterate(const RowMajorMatrix& P, const RowMajorMatrix& F,
     apply_level_shift_(F, P, S, F_extrapolated, mu);
   } else {
     // Use DIIS extrapolation
-    extrapolate_(F, error, &F_extrapolated);
+    extrapolate_(F, error, F_extrapolated);
   }
 
   // Store the extrapolated Fock matrix for use in main DIIS::iterate
@@ -163,8 +163,8 @@ void DIIS::iterate(const RowMajorMatrix& P, const RowMajorMatrix& F,
 }
 
 void DIIS::extrapolate_(const RowMajorMatrix& x, const RowMajorMatrix& error,
-                        RowMajorMatrix* x_diis) {
-  *x_diis = x;
+                        RowMajorMatrix& x_diis) {
+  x_diis = x;
   if (hist_.size() == subspace_size_) delete_oldest_();
   hist_.push_back(x);
   errors_.push_back(error);
@@ -192,7 +192,7 @@ void DIIS::extrapolate_(const RowMajorMatrix& x, const RowMajorMatrix& error,
     double b_max = B_.maxCoeff();
     if (b_max == 0.0) {
       // Fallback: just return the input x without extrapolation
-      *x_diis = x;
+      x_diis = x;
       return;
     }
 
@@ -207,9 +207,9 @@ void DIIS::extrapolate_(const RowMajorMatrix& x, const RowMajorMatrix& error,
     if (absdet < diis_linear_dependence_threshold) {
       delete_oldest_();
     } else {
-      x_diis->setZero();
+      x_diis.setZero();
       for (size_t i = 0; i < hist_.size(); i++) {
-        *x_diis += c[i + 1] * hist_[i];
+        x_diis += c[i + 1] * hist_[i];
       }
       break;
     }

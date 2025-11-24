@@ -101,7 +101,6 @@ SCFImpl::SCFImpl(std::shared_ptr<Molecule> mol_ptr, const SCFConfig& cfg,
         mol.multiplicity, spin, alpha, beta);
     spdlog::info(
         "restricted={}, basis={}, pure={}, num_atomic_orbitals={}, "
-        "energy_threshold={:.2e}, "
         "density_threshold={:.2e}, "
         "og_threshold={:.2e}",
         !cfg.unrestricted, ctx_.basis_set->name, ctx_.basis_set->pure,
