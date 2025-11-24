@@ -240,13 +240,17 @@ install-dir = "qdk_chemistry"
 
 [tool.scikit-build.cmake.define]
 BUILD_SHARED_LIBS = "OFF"
-QDK_ENABLE_COVERAGE = {env="QDK_COVERAGE_BUILD", default="OFF"}
+QDK_CHEMISTRY_ENABLE_COVERAGE = {env="QDK_CHEMISTRY_ENABLE_COVERAGE", default="OFF"}
 QDK_UARCH = {env="QDK_UARCH", default="x86-64"}
 CMAKE_BUILD_PARALLEL_LEVEL = {env="CMAKE_BUILD_PARALLEL_LEVEL", default="4"}
 
 [[tool.scikit-build.overrides]]
 if.env.CMAKE_BUILD_TYPE = "Debug"
 cmake.build-type = "Debug"
+
+[[tool.scikit-build.overrides]]
+if.env.CMAKE_BUILD_TYPE = "RelWithDebInfo"
+cmake.build-type = "RelWithDebInfo"
 
 # Use setuptools_scm to get version from git tags
 [tool.setuptools_scm]

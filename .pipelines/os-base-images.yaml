@@ -20,7 +20,6 @@
 trigger: none
 pr: none
 
-
 parameters:
 - name: forcePublishing
   displayName: Force the publishing of resulting artifacts
