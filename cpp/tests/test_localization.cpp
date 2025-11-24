@@ -297,7 +297,7 @@ TEST_F(LocalizationTest, Iterative_EdgeCase) {
         auto localizer = LocalizerFactory::create("qdk_pipek_mezey");
         Eigen::MatrixXd coeffs(4, 4);
         coeffs.setIdentity();
-        // Create a fake basis set with 4 basis functions for testing
+        // Create a fake basis set with 4 atomic orbitals for testing
         auto fake_basis_set = testing::create_random_basis_set(4, "test");
         // Create a fake AO overlap matrix (4x4 identity matrix for simplicity)
         Eigen::MatrixXd fake_ao_overlap = Eigen::MatrixXd::Identity(4, 4);

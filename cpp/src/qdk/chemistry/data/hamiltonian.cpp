@@ -540,7 +540,9 @@ std::shared_ptr<Hamiltonian> Hamiltonian::_from_json_file(
     const std::string& filename) {
   std::ifstream file(filename);
   if (!file.is_open()) {
-    throw std::runtime_error("Cannot open file for reading: " + filename);
+    throw std::runtime_error(
+        "Unable to open Hamiltonian JSON file '" + filename +
+        "'. Please check that the file exists and you have read permissions.");
   }
 
   nlohmann::json j;
@@ -971,15 +973,24 @@ void Hamiltonian::to_hdf5(H5::Group& group) const {
 
 std::shared_ptr<Hamiltonian> Hamiltonian::_from_hdf5_file(
     const std::string& filename) {
+  H5::H5File file;
   try {
     // Open HDF5 file
-    H5::H5File file(filename, H5F_ACC_RDONLY);
+    file.openFile(filename, H5F_ACC_RDONLY);
+  } catch (const H5::Exception& e) {
+    throw std::runtime_error("Unable to open Hamiltonian HDF5 file '" +
+                             filename + "'. " +
+                             "Please check that the file exists, is a valid "
+                             "HDF5 file, and you have read permissions.");
+  }
 
+  try {
     // Use the group-based deserialization method
     return from_hdf5(file);
-
   } catch (const H5::Exception& e) {
-    throw std::runtime_error("HDF5 error: " + std::string(e.getCDetailMsg()));
+    throw std::runtime_error(
+        "Unable to read Hamiltonian data from HDF5 file '" + filename + "'. " +
+        "HDF5 error: " + std::string(e.getCDetailMsg()));
   }
 }
 

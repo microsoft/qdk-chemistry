@@ -15,7 +15,7 @@ These utilities are essential for workflows that need to leverage both QDK/Chemi
 data management capabilities and PySCF's quantum chemistry calculations.
 
 Note:
-    * Currently supports spherical basis functions only
+    * Currently supports spherical atomic orbitals only
     * Cartesian basis set support is planned for future versions
     * Assumes atomic numbers do not exceed 200
 
@@ -38,7 +38,7 @@ from collections import Counter
 import numpy as np
 from pyscf import gto, scf
 
-from qdk_chemistry.data import BasisSet, BasisType, Hamiltonian, Orbitals, Shell, Structure
+from qdk_chemistry.data import AOType, BasisSet, Hamiltonian, Orbitals, Shell, Structure
 
 
 def structure_to_pyscf_atom_labels(structure: Structure) -> tuple:
@@ -368,10 +368,10 @@ def pyscf_mol_to_qdk_basis(pyscf_mol: gto.Mole, structure: Structure, basis_name
 
         # Create BasisSet with name, shells, ecp_name, ecp_shells, ecp_electrons, structure, and basis type
         if any(n > 0 for n in ecp_electrons):
-            return BasisSet(basis_name, shells, ecp_name, ecp_shells, ecp_electrons, structure, BasisType.Spherical)
+            return BasisSet(basis_name, shells, ecp_name, ecp_shells, ecp_electrons, structure, AOType.Spherical)
 
     # Create BasisSet with name, shells, ecp_shells, structure, and basis type
-    return BasisSet(basis_name, shells, ecp_shells, structure, BasisType.Spherical)
+    return BasisSet(basis_name, shells, ecp_shells, structure, AOType.Spherical)
 
 
 def orbitals_to_scf(

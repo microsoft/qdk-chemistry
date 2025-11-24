@@ -42,10 +42,8 @@ target_sources(chemistry PRIVATE
 ###############################################################################
 
 target_sources(chemistry PRIVATE
-  util/blas.cpp
   util/gauxc_util.cpp
   util/int1e.cpp
-  util/lapack.cpp
   util/libint2_util.cpp
 )
 if(QDK_CHEMISTRY_ENABLE_MPI)

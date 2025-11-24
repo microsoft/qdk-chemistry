@@ -23,11 +23,11 @@ if(NOT lapackpp_FOUND )
 include( FetchContent )
   FetchContent_Declare( blaspp
     GIT_REPOSITORY https://github.com/icl-utk-edu/blaspp.git
-    GIT_TAG 13622021629f5fd27591bb7da60bae5b19561f01
+    GIT_TAG v2025.05.28
   )
   FetchContent_Declare( lapackpp
     GIT_REPOSITORY https://github.com/icl-utk-edu/lapackpp.git
-    GIT_TAG 5bc9c85201ace48213df5ac7d1ef026c9668dfbd
+    GIT_TAG v2025.05.28
   )
 
   FetchContent_MakeAvailable( blaspp )
@@ -38,6 +38,7 @@ endif()
 add_library( lobpcgxx INTERFACE )
 target_link_libraries( lobpcgxx INTERFACE blaspp lapackpp )
 target_compile_features( lobpcgxx INTERFACE cxx_std_20 )
+target_compile_definitions( lobpcgxx INTERFACE LAPACK_COMPLEX_CPP )
 
 target_include_directories( lobpcgxx INTERFACE
   $<BUILD_INTERFACE:${PROJECT_SOURCE_DIR}/include>

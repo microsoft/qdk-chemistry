@@ -9,6 +9,8 @@
 #include <qdk/chemistry/data/wavefunction.hpp>
 #include <vector>
 
+namespace qdk::chemistry::utils {
+
 /**
  * @brief Computes the default number of valence orbitals and electrons for a
  * given structure and wavefunction
@@ -26,6 +28,8 @@
  *         - first: Number of valence electrons
  *         - second: Number of valence orbitals
  */
-std::pair<size_t, size_t> compute_valence_space(
+std::pair<size_t, size_t> compute_valence_space_parameters(
     std::shared_ptr<qdk::chemistry::data::Wavefunction> wavefunction,
     int charge);
+
+}  // namespace qdk::chemistry::utils

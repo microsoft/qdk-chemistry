@@ -45,11 +45,6 @@ from qiskit.transpiler import PassManager
 
 from qdk_chemistry.algorithms.state_preparation.state_preparation import StatePreparation, StatePreparationSettings
 from qdk_chemistry.data import Wavefunction
-from qdk_chemistry.plugins.qiskit._interop.transpiler import (
-    MergeZBasisRotations,
-    RemoveZBasisOnZeroState,
-    SubstituteCliffordRz,
-)
 from qdk_chemistry.utils.bitstring import bitstrings_to_binary_matrix, separate_alpha_beta_to_binary_string
 
 _LOGGER = logging.getLogger(__name__)
@@ -99,6 +94,13 @@ class SparseIsometryGF2XStatePreparation(StatePreparation):
             OpenQASM3 string of the quantum circuit that prepares the wavefunction.
 
         """
+        # Imported here to avoid circular import issues
+        from qdk_chemistry.plugins.qiskit._interop.transpiler import (  # noqa: PLC0415
+            MergeZBasisRotations,
+            RemoveZBasisOnZeroState,
+            SubstituteCliffordRz,
+        )
+
         # Active Space Consistency Check
         alpha_indices, beta_indices = wavefunction.get_orbitals().get_active_space_indices()
         if alpha_indices != beta_indices:

@@ -11,7 +11,7 @@ namespace qdk::chemistry::scf {
  * Generates initial SCF guess by superimposing atomic densities.
  *
  * @param density_matrix Output density matrix
- * @param n_atomic_orbitals Number of basis functions
+ * @param n_atomic_orbitals Number of atomic orbitals
  * @param atomic_nums Atomic numbers for each atom
  * @param n_atoms Number of atoms
  */
