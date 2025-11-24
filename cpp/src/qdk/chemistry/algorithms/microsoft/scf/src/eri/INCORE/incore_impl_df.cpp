@@ -49,10 +49,10 @@ ERI_DF::ERI_DF(bool unr, const BasisSet& obs, const BasisSet& abs,
 }
 
 void ERI_DF::generate_eri_() {
-  const size_t num_basis_funcs = obs_.nbf();
+  const size_t num_atomic_orbitals = obs_.nbf();
   const size_t naux = abs_.nbf();
-  const size_t num_basis_funcs2 = num_basis_funcs * num_basis_funcs;
-  const size_t eri_sz = num_basis_funcs2 * (loc_i_en_ - loc_i_st_);
+  const size_t num_atomic_orbitals2 = num_atomic_orbitals * num_atomic_orbitals;
+  const size_t eri_sz = num_atomic_orbitals2 * (loc_i_en_ - loc_i_st_);
 
   if (!mpi_.world_rank) spdlog::trace("Generating DF-ERIs via Libint2");
   h_eri_ = libint2_util::eri_df(basis_mode_, obs_, abs_, loc_i_st_, loc_i_en_);
@@ -84,9 +84,9 @@ void ERI_DF::build_JK(const double* P, double* J, double* K, double alpha,
     throw std::runtime_error("ERIINCORE_DF + Exchange is Not Yet Implemented");
   if (not J) throw std::runtime_error("ERIINCORE_DF is only valid for DF-J");
 
-  const size_t num_basis_funcs = obs_.nbf();
+  const size_t num_atomic_orbitals = obs_.nbf();
   const size_t naux = abs_.nbf();
-  const size_t num_basis_funcs2 = num_basis_funcs * num_basis_funcs;
+  const size_t num_atomic_orbitals2 = num_atomic_orbitals * num_atomic_orbitals;
   const size_t naux_loc = loc_i_en_ - loc_i_st_;
   const double one = 1.0, zero = 0.0;
 
@@ -94,9 +94,9 @@ void ERI_DF::build_JK(const double* P, double* J, double* K, double alpha,
   std::vector<double> P_total;
   const double* P_use = P;
   if (unrestricted_) {
-    P_total.resize(num_basis_funcs2, 0.0);
-    for (auto i = 0; i < num_basis_funcs2; ++i)
-      P_total[i] = P[i] + P[i + num_basis_funcs2];
+    P_total.resize(num_atomic_orbitals2, 0.0);
+    for (auto i = 0; i < num_atomic_orbitals2; ++i)
+      P_total[i] = P[i] + P[i + num_atomic_orbitals2];
     P_use = P_total.data();
   }
 
@@ -104,8 +104,8 @@ void ERI_DF::build_JK(const double* P, double* J, double* K, double alpha,
 #ifdef QDK_CHEMISTRY_ENABLE_GPU
   double *dP, *dJ, *dX;
   if (gpu()) {
-    CUDA_CHECK(cudaMallocAsync(&dP, num_basis_funcs2 * sizeof(double), 0));
-    CUDA_CHECK(cudaMallocAsync(&dJ, num_basis_funcs2 * sizeof(double), 0));
+    CUDA_CHECK(cudaMallocAsync(&dP, num_atomic_orbitals2 * sizeof(double), 0));
+    CUDA_CHECK(cudaMallocAsync(&dJ, num_atomic_orbitals2 * sizeof(double), 0));
     CUDA_CHECK(cudaMallocAsync(&dX, naux * sizeof(double), 0));
     CUDA_CHECK(cudaStreamSynchronize(0));
 
@@ -113,7 +113,7 @@ void ERI_DF::build_JK(const double* P, double* J, double* K, double alpha,
     if (mpi_.world_size > 1) {
       CUDA_CHECK(cudaMemset(dX, 0, naux * sizeof(double)));
     }
-    CUDA_CHECK(cudaMemcpy(dP, P_use, num_basis_funcs2 * sizeof(double),
+    CUDA_CHECK(cudaMemcpy(dP, P_use, num_atomic_orbitals2 * sizeof(double),
                           cudaMemcpyHostToDevice));
     std::vector<double>().swap(P_total);  // Deallocate host copy of P_total
   }
@@ -124,13 +124,13 @@ void ERI_DF::build_JK(const double* P, double* J, double* K, double alpha,
   // Form X(I) = (pq|I) P(p,q)
   if (gpu()) {
 #ifdef QDK_CHEMISTRY_ENABLE_GPU
-    CUBLAS_CHECK(cublasDgemv(*cublasHandle_, CUBLAS_OP_T, num_basis_funcs2,
-                             naux_loc, &one, d_eri_, num_basis_funcs2, dP, 1,
-                             &zero, dX_loc, 1));
+    CUBLAS_CHECK(cublasDgemv(*cublasHandle_, CUBLAS_OP_T, num_atomic_orbitals2,
+                             naux_loc, &one, d_eri_, num_atomic_orbitals2, dP,
+                             1, &zero, dX_loc, 1));
 #endif
   } else {
-    blas::gemv(blas::Layout::ColMajor, blas::Op::Trans, num_basis_funcs2,
-               naux_loc, 1.0, h_eri_.get(), num_basis_funcs2, P_use, 1, 0.0,
+    blas::gemv(blas::Layout::ColMajor, blas::Op::Trans, num_atomic_orbitals2,
+               naux_loc, 1.0, h_eri_.get(), num_atomic_orbitals2, P_use, 1, 0.0,
                X_loc, 1);
   }
 
@@ -164,19 +164,19 @@ void ERI_DF::build_JK(const double* P, double* J, double* K, double alpha,
   // Reduction happens in ERI::build_JK
   if (gpu()) {
 #ifdef QDK_CHEMISTRY_ENABLE_GPU
-    CUBLAS_CHECK(cublasDgemv(*cublasHandle_, CUBLAS_OP_N, num_basis_funcs2,
-                             naux_loc, &one, d_eri_, num_basis_funcs2, dX_loc,
-                             1, &zero, dJ, 1));
+    CUBLAS_CHECK(cublasDgemv(*cublasHandle_, CUBLAS_OP_N, num_atomic_orbitals2,
+                             naux_loc, &one, d_eri_, num_atomic_orbitals2,
+                             dX_loc, 1, &zero, dJ, 1));
 #endif
   } else {
-    blas::gemv(blas::Layout::ColMajor, blas::Op::NoTrans, num_basis_funcs2,
-               naux_loc, 1.0, h_eri_.get(), num_basis_funcs2, X_loc, 1, 0.0, J,
-               1);
+    blas::gemv(blas::Layout::ColMajor, blas::Op::NoTrans, num_atomic_orbitals2,
+               naux_loc, 1.0, h_eri_.get(), num_atomic_orbitals2, X_loc, 1, 0.0,
+               J, 1);
   }
 
 #ifdef QDK_CHEMISTRY_ENABLE_GPU
   if (gpu()) {
-    CUDA_CHECK(cudaMemcpy(J, dJ, num_basis_funcs2 * sizeof(double),
+    CUDA_CHECK(cudaMemcpy(J, dJ, num_atomic_orbitals2 * sizeof(double),
                           cudaMemcpyDeviceToHost));
     CUDA_CHECK(cudaFree(dP));
     CUDA_CHECK(cudaFree(dJ));
@@ -184,12 +184,12 @@ void ERI_DF::build_JK(const double* P, double* J, double* K, double alpha,
   }
 #endif
 
-  if (K) std::fill_n(K, (unrestricted_ ? 2 : 1) * num_basis_funcs2, 0.0);
+  if (K) std::fill_n(K, (unrestricted_ ? 2 : 1) * num_atomic_orbitals2, 0.0);
   if (unrestricted_) {
     // J[alpha] contains J_total and J[beta] is zero - this is hacky but it
     // works
-    for (size_t i = 0; i < num_basis_funcs2; ++i) {
-      J[i + num_basis_funcs2] = 0.0;
+    for (size_t i = 0; i < num_atomic_orbitals2; ++i) {
+      J[i + num_atomic_orbitals2] = 0.0;
     }
   }
 }
@@ -205,9 +205,9 @@ void ERI_DF::get_gradients(const double* P, double* dJ, double* dK,
   if (not dJ)
     throw std::runtime_error("ERIINCORE_DF is only valid for DF-J gradients");
 
-  const size_t num_basis_funcs = obs_.nbf();
+  const size_t num_atomic_orbitals = obs_.nbf();
   const size_t naux = abs_.nbf();
-  const size_t num_basis_funcs2 = num_basis_funcs * num_basis_funcs;
+  const size_t num_atomic_orbitals2 = num_atomic_orbitals * num_atomic_orbitals;
   const size_t n_atoms = n_atoms_;
   const size_t naux_loc = loc_i_en_ - loc_i_st_;
   const double one = 1.0, zero = 0.0;
@@ -219,9 +219,9 @@ void ERI_DF::get_gradients(const double* P, double* dJ, double* dK,
   std::vector<double> P_total;
   const double* P_use = P;
   if (unrestricted_) {
-    P_total.resize(num_basis_funcs2, 0.0);
-    for (auto i = 0; i < num_basis_funcs2; ++i)
-      P_total[i] = P[i] + P[i + num_basis_funcs2];
+    P_total.resize(num_atomic_orbitals2, 0.0);
+    for (auto i = 0; i < num_atomic_orbitals2; ++i)
+      P_total[i] = P[i] + P[i + num_atomic_orbitals2];
     P_use = P_total.data();
   }
 
@@ -229,7 +229,7 @@ void ERI_DF::get_gradients(const double* P, double* dJ, double* dK,
 #ifdef QDK_CHEMISTRY_ENABLE_GPU
   double *dP, *dX;
   if (gpu()) {
-    CUDA_CHECK(cudaMallocAsync(&dP, num_basis_funcs2 * sizeof(double), 0));
+    CUDA_CHECK(cudaMallocAsync(&dP, num_atomic_orbitals2 * sizeof(double), 0));
     CUDA_CHECK(cudaMallocAsync(&dX, naux * sizeof(double), 0));
     CUDA_CHECK(cudaStreamSynchronize(0));
 
@@ -237,7 +237,7 @@ void ERI_DF::get_gradients(const double* P, double* dJ, double* dK,
     if (mpi_.world_size > 1) {
       CUDA_CHECK(cudaMemset(dX, 0, naux * sizeof(double)));
     }
-    CUDA_CHECK(cudaMemcpy(dP, P_use, num_basis_funcs2 * sizeof(double),
+    CUDA_CHECK(cudaMemcpy(dP, P_use, num_atomic_orbitals2 * sizeof(double),
                           cudaMemcpyHostToDevice));
   }
   auto dX_loc = dX + loc_i_st_;
@@ -247,13 +247,13 @@ void ERI_DF::get_gradients(const double* P, double* dJ, double* dK,
   // Form X(I) = \Sum_{pq} (pq|I) P(p,q)
   if (gpu()) {
 #ifdef QDK_CHEMISTRY_ENABLE_GPU
-    CUBLAS_CHECK(cublasDgemv(*cublasHandle_, CUBLAS_OP_T, num_basis_funcs2,
-                             naux_loc, &one, d_eri_, num_basis_funcs2, dP, 1,
-                             &zero, dX_loc, 1));
+    CUBLAS_CHECK(cublasDgemv(*cublasHandle_, CUBLAS_OP_T, num_atomic_orbitals2,
+                             naux_loc, &one, d_eri_, num_atomic_orbitals2, dP,
+                             1, &zero, dX_loc, 1));
 #endif
   } else {
-    blas::gemv(blas::Layout::ColMajor, blas::Op::Trans, num_basis_funcs2,
-               naux_loc, 1.0, h_eri_.get(), num_basis_funcs2, P_use, 1, 0.0,
+    blas::gemv(blas::Layout::ColMajor, blas::Op::Trans, num_atomic_orbitals2,
+               naux_loc, 1.0, h_eri_.get(), num_atomic_orbitals2, P_use, 1, 0.0,
                X_loc, 1);
   }
 
