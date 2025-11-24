@@ -92,6 +92,10 @@ class _TelemetryWrapper:
     def run(self, *args, **kwargs):
         """Run the wrapped algorithm with telemetry tracking."""
         start_time = time.perf_counter()
+        mol = args[0]
+        mol_formula =  (mol.get_summary().split('\n')[2].split(': ')[-1].replace(', ', '') 
+               if len(mol.get_summary().split('\n')) > 2 
+               else "unknown")
         try:
             result = self._wrapped.run(*args, **kwargs)
             duration = time.perf_counter() - start_time
@@ -101,7 +105,8 @@ class _TelemetryWrapper:
                 algorithm_name=self._algorithm_name,
                 duration_sec=duration,
                 status="success",
-                num_basis_functions=telemetry_events.get_basis_functions_bucket(n_basis)
+                num_basis_functions=telemetry_events.get_basis_functions_bucket(n_basis),
+                molecular_formula=mol_formula
             )
             return result
         except Exception as e:
@@ -111,7 +116,8 @@ class _TelemetryWrapper:
                 algorithm_name=self._algorithm_name,
                 duration_sec=duration,
                 status="failed",
-                error_type=type(e).__name__
+                error_type=type(e).__name__,
+                molecular_formula=mol_formula
             )
             raise
     
