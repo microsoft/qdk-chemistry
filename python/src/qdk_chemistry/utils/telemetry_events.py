@@ -5,6 +5,69 @@ from .telemetry import log_telemetry
 import math
 from typing import Union
 
+def get_basis_functions_bucket(basis_functions: Union[str, int]) -> str:
+    """
+    Categorize the number of basis functions into buckets for telemetry aggregation.
+    
+    This function groups basis function counts into discrete buckets to enable
+    meaningful aggregation and analysis in telemetry data. Rather than tracking
+    exact counts (which would result in too many unique values), this bucketing
+    approach provides useful ranges for performance and usage analysis.
+    
+    Args:
+        basis_functions (Union[str, int]): The number of basis functions in a 
+            molecular calculation. Can be an integer count or the string "unknown"
+            if the count is not available.
+    
+    Returns:
+        str: A string representation of the bucket that the basis function count
+             falls into. Possible return values are:
+             - "unknown": When input is "unknown"
+             - "10": For 1-10 basis functions
+             - "20", "30", "40": For 11-49 basis functions (rounded down to nearest 10)
+             - "50": For 50-99 basis functions  
+             - "100": For 100-249 basis functions
+             - "250": For 250-499 basis functions
+             - "500": For 500-999 basis functions
+             - "1000": For 1000+ basis functions
+    
+    Examples:
+        >>> get_basis_functions_bucket(7)
+        "10"
+        >>> get_basis_functions_bucket(23)
+        "20"
+        >>> get_basis_functions_bucket(150)
+        "100"
+        >>> get_basis_functions_bucket(1500)
+        "1000"
+        >>> get_basis_functions_bucket("unknown")
+        "unknown"
+    
+    Notes:
+        The bucketing scheme is designed for typical quantum chemistry calculations
+        where basis function counts typically range from ~10 for small molecules
+        to 1000+ for large systems. The buckets provide good granularity for 
+        performance analysis while avoiding excessive cardinality in telemetry data.
+    """
+    if basis_functions == "unknown":
+        return "unknown"
+    basis_functions = int(basis_functions)
+    if basis_functions <= 10:
+        return "10"
+    elif basis_functions >= 1000:
+        return "1000"
+    elif basis_functions >= 500:
+        return "500"
+    elif basis_functions >= 250:
+        return "250"
+    elif basis_functions >= 100:
+        return "100"
+    elif basis_functions >= 50:
+        return "50"
+    else:
+        # integer divide by 10 to get nearest 10
+        return str(basis_functions // 10 * 10)
+    
 def on_qdk_chemistry_import() -> None:
     """
     Logs a telemetry event indicating that the QDK Chemistry module has been imported.

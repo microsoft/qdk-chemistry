@@ -95,12 +95,13 @@ class _TelemetryWrapper:
         try:
             result = self._wrapped.run(*args, **kwargs)
             duration = time.perf_counter() - start_time
-            
+            n_basis = result[1].orbitals.get_basis_set().get_num_basis_functions()
             telemetry_events.on_algorithm_end(
                 algorithm_type=self._algorithm_type,
                 algorithm_name=self._algorithm_name,
                 duration_sec=duration,
-                status="success"
+                status="success",
+                num_basis_functions=telemetry_events.get_basis_functions_bucket(n_basis)
             )
             return result
         except Exception as e:
