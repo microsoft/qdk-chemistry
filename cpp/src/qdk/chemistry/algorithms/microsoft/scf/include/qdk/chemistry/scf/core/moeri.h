@@ -54,7 +54,7 @@ class MOERI {
    *  Note that the resulting vector is sorted column major, meaning that access
    *  to MO integrals (i,j,k,l) happens as i + j*n + k*n*n + l*n*n*n.
    *
-   *  If desired, a row major result can be obtained by handing in matrices in
+   *  If desired, a row major result can be obtained by passing matrices in
    *  reverse order (l,k,j,i).
    *
    *  @param[in]  nao  Number of atomic orbitals
