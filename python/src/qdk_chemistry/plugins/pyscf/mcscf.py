@@ -116,7 +116,7 @@ class _QdkMcSolverWrapper:
 
         """
         # Handle nelec format (can be int or tuple)
-        if isinstance(nelec, (tuple, list)):
+        if isinstance(nelec, tuple | list):
             n_alpha, n_beta = nelec
         else:
             # If total electrons given, assume equal spin

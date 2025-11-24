@@ -103,7 +103,7 @@ def test_energy_expectation_result_hdf5_file_io():
         assert loaded_result.energy_expectation_value == result.energy_expectation_value
         assert loaded_result.energy_variance == result.energy_variance
         assert len(loaded_result.expvals_each_term) == len(result.expvals_each_term)
-        np.testing.assert_array_equal(loaded_result.expvals_each_term[0], result.expvals_each_term[0])
+        assert np.array_equal(loaded_result.expvals_each_term[0], result.expvals_each_term[0])
     finally:
         Path(filename).unlink()
 

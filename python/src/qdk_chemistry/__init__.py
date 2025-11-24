@@ -30,7 +30,6 @@ def _setup_resources() -> None:
     """
     # Fallback standard location within the installed package
     package_dir = Path(__file__).parent
-    resources_dir = package_dir / "share" / "qdk" / "chemistry" / "scf" / "resources"
 
     # Check if the user has specified a resources path via environment variable
     env_resources_path = os.getenv("QDK_CHEMISTRY_RESOURCES_PATH")
@@ -50,6 +49,13 @@ def _setup_resources() -> None:
             stacklevel=2,
         )
 
+    try:
+        original_dir = QDKChemistryConfig.get_resources_dir()
+        if original_dir and Path(original_dir).exists():
+            return  # Resources directory already set and exists
+    except RuntimeError:
+        pass  # Not set yet, continue to set it
+    resources_dir = package_dir / "share" / "qdk" / "chemistry" / "scf" / "resources"
     # Fallback to the installed version with a check for invalid installations (e.g. missing resources)
     try:
         if resources_dir.exists() and resources_dir.is_dir() and any(resources_dir.iterdir()):

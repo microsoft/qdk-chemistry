@@ -21,11 +21,11 @@ from qdk_chemistry.data import (
 )
 
 
-def create_test_basis_set(num_basis_functions, name="test-basis", structure=None):
-    """Create a test basis set with the specified number of basis functions.
+def create_test_basis_set(num_atomic_orbitals, name="test-basis", structure=None):
+    """Create a test basis set with the specified number of atomic orbitals.
 
     Args:
-        num_basis_functions: Number of basis functions to generate
+        num_atomic_orbitals: Number of atomic orbitals to generate
         name: Name for the basis set
         structure: a structure to attach
 
@@ -37,9 +37,9 @@ def create_test_basis_set(num_basis_functions, name="test-basis", structure=None
     atom_index = 0
     functions_created = 0
 
-    # Create shells to reach the desired number of basis functions
-    while functions_created < num_basis_functions:
-        remaining = num_basis_functions - functions_created
+    # Create shells to reach the desired number of atomic orbitals
+    while functions_created < num_atomic_orbitals:
+        remaining = num_atomic_orbitals - functions_created
 
         if remaining >= 3:
             # Add a P shell (3 functions: Px, Py, Pz)

@@ -657,7 +657,9 @@ std::shared_ptr<Structure> Structure::_from_json_file(
     const std::string& filename) {
   std::ifstream file(filename);
   if (!file.is_open()) {
-    throw std::runtime_error("Cannot open file for reading: " + filename);
+    throw std::runtime_error(
+        "Unable to open Structure JSON file '" + filename +
+        "'. Please check that the file exists and you have read permissions.");
   }
 
   nlohmann::json j;
@@ -1158,9 +1160,17 @@ void Structure::_to_hdf5_file(const std::string& filename) const {
 
 std::shared_ptr<Structure> Structure::_from_hdf5_file(
     const std::string& filename) {
+  H5::H5File file;
   try {
-    H5::H5File file(filename, H5F_ACC_RDONLY);
+    file.openFile(filename, H5F_ACC_RDONLY);
+  } catch (const H5::Exception& e) {
+    throw std::runtime_error("Unable to open Structure HDF5 file '" + filename +
+                             "'. " +
+                             "Please check that the file exists, is a valid "
+                             "HDF5 file, and you have read permissions.");
+  }
 
+  try {
     // Check if structure group exists
     bool group_exists = false;
     try {
@@ -1176,10 +1186,10 @@ std::shared_ptr<Structure> Structure::_from_hdf5_file(
 
     H5::Group structure_group = file.openGroup("/structure");
     return from_hdf5(structure_group);
-
   } catch (const H5::Exception& hdf5_exception) {
-    throw std::runtime_error("HDF5 error: " +
-                             std::string(hdf5_exception.getCDetailMsg()));
+    throw std::runtime_error(
+        "Unable to read Structure data from HDF5 file '" + filename + "'. " +
+        "HDF5 error: " + std::string(hdf5_exception.getCDetailMsg()));
   }
 }
 

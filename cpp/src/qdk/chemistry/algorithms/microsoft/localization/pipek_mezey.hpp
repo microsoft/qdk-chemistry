@@ -81,21 +81,21 @@ class PipekMezeyLocalization : public IterativeOrbitalLocalizationScheme {
    *                       localization procedure to ensure orthonormality
    *                       of the localized orbitals
    * @param num_atoms Total number of atoms in the molecular system
-   * @param bf_to_atom_map Mapping from basis function index to atom index,
+   * @param ao_to_atom_map Mapping from atomic orbital index to atom index,
    *                       required for computing atomic populations. Must have
-   *                       size equal to the number of basis functions, with
+   *                       size equal to the number of atomic orbitals, with
    *                       each element indicating which atom the corresponding
-   *                       basis function belongs to
+   *                       atomic orbital belongs to
    *
    * @note The overlap_matrix must be symmetric and positive definite.
-   * @note The bf_to_atom_map indices must be in the range [0, num_atoms).
+   * @note The ao_to_atom_map indices must be in the range [0, num_atoms).
    *
    * @see IterativeOrbitalLocalizationSettings for available configuration
    *      options
    */
   PipekMezeyLocalization(IterativeOrbitalLocalizationSettings settings,
                          const Eigen::MatrixXd& overlap_matrix,
-                         size_t num_atoms, std::vector<int> bf_to_atom_map);
+                         size_t num_atoms, std::vector<int> ao_to_atom_map);
 
   ~PipekMezeyLocalization() override = default;
 
@@ -113,7 +113,7 @@ class PipekMezeyLocalization : public IterativeOrbitalLocalizationScheme {
 
  private:
   Eigen::MatrixXd overlap_matrix_;   // Overlap matrix for the orbitals
-  std::vector<int> bf_to_atom_map_;  // Basis function to atom mapping
+  std::vector<int> ao_to_atom_map_;  // atomic orbital to atom mapping
   size_t num_atoms_;                 // Number of atoms in the system
 };
 }  // namespace qdk::chemistry::algorithms::microsoft

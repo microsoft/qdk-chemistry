@@ -64,6 +64,7 @@ void DIIS::delete_oldest_() {
   hist_.pop_front();
   errors_.pop_front();
   size_t sz = B_.rows();
-  B_ = B_.block(1, 1, sz - 1, sz - 1);
+  Eigen::MatrixXd tmp = B_.block(1, 1, sz - 1, sz - 1);
+  B_ = tmp;
 }
 }  // namespace qdk::chemistry::scf

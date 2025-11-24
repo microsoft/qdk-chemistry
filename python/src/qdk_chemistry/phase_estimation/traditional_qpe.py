@@ -18,7 +18,7 @@ References:
 import logging
 
 from qiskit import ClassicalRegister, QuantumCircuit, QuantumRegister
-from qiskit.circuit.library import QFT
+from qiskit.synthesis.qft.qft_decompose_full import synth_qft_full
 
 from qdk_chemistry.data import QubitHamiltonian
 from qdk_chemistry.phase_estimation.base import PhaseEstimation, PhaseEstimationAlgorithm
@@ -107,7 +107,7 @@ class TraditionalPhaseEstimation(PhaseEstimation):
                 power=power,
             )
 
-        inverse_qft = QFT(num_bits, do_swaps=self._qft_do_swaps).inverse()
+        inverse_qft = synth_qft_full(num_bits, do_swaps=self._qft_do_swaps, inverse=True)
         qc.barrier(label="controlled-U")
         qc.compose(inverse_qft, qubits=ancilla, inplace=True)
 

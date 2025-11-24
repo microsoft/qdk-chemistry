@@ -11,10 +11,10 @@ import numpy as np
 import pytest
 from qiskit import QuantumCircuit, qasm3, transpile
 from qiskit_aer import AerSimulator
-from qiskit_aer.primitives import Estimator as AerEstimator
+from qiskit_aer.primitives import EstimatorV2 as AerEstimator
 
 from qdk_chemistry.algorithms import create
-from qdk_chemistry.algorithms.state_preparation.sparse_isometry import _prepare_single_reference_state
+from qdk_chemistry.plugins.qiskit.sparse_isometry import _prepare_single_reference_state
 
 from .reference_tolerances import float_comparison_absolute_tolerance, float_comparison_relative_tolerance
 
@@ -37,21 +37,21 @@ def test_energy_agreement_between_state_prep_methods(wavefunction_4e4o, hamilton
     regular_circuit = qasm3.loads(regular_prep.run(wavefunction_4e4o))
 
     # Create estimator and calculate energy for both circuits
-    estimator = AerEstimator(approximation=True)
+    estimator = AerEstimator()
 
-    sparse_gf2x_job = estimator.run(sparse_gf2x_circuit, hamiltonian_4e4o.pauli_ops)
+    sparse_gf2x_job = estimator.run([(sparse_gf2x_circuit, hamiltonian_4e4o.pauli_ops)])
     result = sparse_gf2x_job.result()
-    sparse_gf2x_energy = result.values[0]
+    sparse_gf2x_energy = result[0].data.evs
 
-    regular_job = estimator.run(regular_circuit, hamiltonian_4e4o.pauli_ops)
+    regular_job = estimator.run([(regular_circuit, hamiltonian_4e4o.pauli_ops)])
     result = regular_job.result()
-    regular_energy = result.values[0]
+    regular_energy = result[0].data.evs
 
     energy_diff = []
     for energy_a, energy_b in combinations([ref_energy_4e4o, sparse_gf2x_energy, regular_energy], 2):
         energy_diff.append(abs(energy_a - energy_b))
     assert np.allclose(
-        energy_diff, 0, atol=float_comparison_absolute_tolerance, rtol=float_comparison_relative_tolerance
+        energy_diff, 0, rtol=float_comparison_relative_tolerance, atol=float_comparison_absolute_tolerance
     ), f"Energy difference {energy_diff} exceeds tolerance. "
 
 
@@ -69,15 +69,17 @@ def test_sparse_isometry_gf2x_energy_validation(wavefunction_10e6o, hamiltonian_
     circuit = qasm3.loads(sparse_prep.run(wavefunction_10e6o))
 
     # Calculate circuit energy using the estimator
-    estimator = AerEstimator(approximation=True)
-    job = estimator.run(circuit, hamiltonian_10e6o.pauli_ops)
+    estimator = AerEstimator()
+    job = estimator.run([(circuit, hamiltonian_10e6o.pauli_ops)])
     result = job.result()
-    circuit_energy = result.values[0]
+    circuit_energy = result[0].data.evs
     # Basic validation: energy should be negative
     assert circuit_energy < 0, f"Circuit energy should be negative for electronic systems, got {circuit_energy:.6f}"
     # For exact 10e6o f2 case: circuit should match reference
     energy_diff = abs(circuit_energy - ref_energy_10e6o)
-    assert np.isclose(energy_diff, 0), (
+    assert np.isclose(
+        energy_diff, 0, rtol=float_comparison_relative_tolerance, atol=float_comparison_absolute_tolerance
+    ), (
         f"For 10e6o f2 wavefunction, circuit energy should match "
         f"reference energy. Got energy difference: {energy_diff:.8f} Hartree"
     )
@@ -117,15 +119,6 @@ def test_sparse_isometry_gf2x_circuit_efficiency(wavefunction_4e4o):
     assert sparse_size <= regular_size, (
         f"Sparse isometry size ({sparse_size}) should be <= regular isometry size ({regular_size})"
     )
-
-    # Log the efficiency gains for information
-    if regular_depth > 0:
-        depth_ratio = sparse_depth / regular_depth
-        print(f"Depth efficiency: {depth_ratio:.2f} (sparse/regular)")
-
-    if regular_size > 0:
-        size_ratio = sparse_size / regular_size
-        print(f"Size efficiency: {size_ratio:.2f} (sparse/regular)")
 
 
 def get_bitstring(circuit: QuantumCircuit) -> str:

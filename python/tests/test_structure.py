@@ -1,3 +1,5 @@
+"""Tests for Structure class and related functionality in QDK/Chemistry."""
+
 # --------------------------------------------------------------------------------------------
 # Copyright (c) Microsoft Corporation. All rights reserved.
 # Licensed under the MIT License. See LICENSE.txt in the project root for license information.
@@ -328,7 +330,7 @@ class TestStructure:
         assert coords_matrix.shape == (3, 3)
 
         charges = s.get_nuclear_charges()
-        np.testing.assert_array_equal(charges, [8, 1, 1])
+        assert np.array_equal(charges, [8, 1, 1])
 
         symbols = s.get_atomic_symbols()
         assert symbols == ["O", "H", "H"]
@@ -347,7 +349,7 @@ class TestStructure:
         )
 
         s_charges = Structure(new_coords, [1, 1])
-        np.testing.assert_array_equal(s_charges.get_nuclear_charges(), [1, 1])
+        assert np.array_equal(s_charges.get_nuclear_charges(), [1, 1])
 
     def test_nuclear_repulsion_energy(self):
         """Test calculation of nuclear repulsion energy."""

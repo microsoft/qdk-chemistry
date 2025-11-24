@@ -10,15 +10,15 @@
 #include <spdlog/spdlog.h>
 
 #include <algorithm>
+#include <blas.hh>
 #include <cmath>
 #include <iostream>
+#include <lapack.hh>
 #include <memory>
 #include <qdk/chemistry/algorithms/active_space.hpp>
 #include <qdk/chemistry/data/basis_set.hpp>
 #include <stdexcept>
 
-#include "../scf/src/util/blas.h"
-#include "../scf/src/util/lapack.h"
 #include "../utils.hpp"
 #include "iterative_localizer_base.hpp"
 #include "pipek_mezey.hpp"
@@ -26,10 +26,6 @@
 namespace qdk::chemistry::algorithms::microsoft {
 
 namespace qcs = qdk::chemistry::scf;
-
-using qdk::chemistry::scf::blas::gemm;
-using qdk::chemistry::scf::lapack::dgelss;
-using qdk::chemistry::scf::lapack::syev;
 
 std::shared_ptr<data::Wavefunction> VVHVLocalizer::_run_impl(
     std::shared_ptr<data::Wavefunction> wavefunction,
@@ -100,7 +96,7 @@ std::shared_ptr<data::Wavefunction> VVHVLocalizer::_run_impl(
         "identical");
   }
   const auto& basis_set = orbitals->get_basis_set();
-  const size_t num_atomic_orbitals = orbitals->get_num_atomic_orbitals();
+  const size_t num_atomic_orbitals = basis_set->get_num_atomic_orbitals();
   if (num_atomic_orbitals != num_molecular_orbitals) {
     throw std::runtime_error(
         "Current VVHVLocalizer can not handle basis set linear dependence");
@@ -120,10 +116,9 @@ std::shared_ptr<data::Wavefunction> VVHVLocalizer::_run_impl(
   // Work Item: 41816
   // Create reusable Pipek-Mezey localizer for inner localization
   const size_t num_atoms = basis_set->get_structure()->get_num_atoms();
-  const size_t num_basis_funcs = basis_set->get_num_basis_functions();
-  std::vector<int> bf_to_atom(num_basis_funcs);
-  for (size_t i = 0; i < num_basis_funcs; ++i) {
-    bf_to_atom[i] = basis_set->get_atom_index_for_basis_function(i);
+  std::vector<int> bf_to_atom(num_atomic_orbitals);
+  for (size_t i = 0; i < num_atomic_orbitals; ++i) {
+    bf_to_atom[i] = basis_set->get_atom_index_for_atomic_orbital(i);
   }
   auto inner_localizer = std::make_shared<PipekMezeyLocalization>(
       *static_cast<const IterativeOrbitalLocalizationSettings*>(
@@ -144,12 +139,12 @@ std::shared_ptr<data::Wavefunction> VVHVLocalizer::_run_impl(
     // Extract occupied orbitals and pass to localize, get back localized
     // virtual orbitals only
     Eigen::MatrixXd occupied_orbitals =
-        coeffs_alpha.block(0, 0, num_basis_funcs, num_occupied_orbitals);
+        coeffs_alpha.block(0, 0, num_atomic_orbitals, num_occupied_orbitals);
     Eigen::MatrixXd C_virt_loc = localizer.localize(occupied_orbitals);
 
     // Reconstruct full coefficient matrix with original occupied orbitals
     Eigen::MatrixXd C_lmo = coeffs_alpha;
-    C_lmo.block(0, num_occupied_orbitals, num_basis_funcs,
+    C_lmo.block(0, num_occupied_orbitals, num_atomic_orbitals,
                 num_virtual_orbitals) = C_virt_loc;
 
     auto new_orbitals = std::make_shared<data::Orbitals>(
@@ -174,20 +169,20 @@ std::shared_ptr<data::Wavefunction> VVHVLocalizer::_run_impl(
 
     // Alpha channel
     Eigen::MatrixXd occupied_alpha =
-        coeffs_alpha.block(0, 0, num_basis_funcs, n_alpha_electrons);
+        coeffs_alpha.block(0, 0, num_atomic_orbitals, n_alpha_electrons);
     Eigen::MatrixXd C_virt_alpha_loc = localizer.localize(occupied_alpha);
 
     // Beta channel - reuse the same localizer instance
     Eigen::MatrixXd occupied_beta =
-        coeffs_beta.block(0, 0, num_basis_funcs, n_beta_electrons);
+        coeffs_beta.block(0, 0, num_atomic_orbitals, n_beta_electrons);
     Eigen::MatrixXd C_virt_beta_loc = localizer.localize(occupied_beta);
 
     // Reconstruct full coefficient matrices with original occupied orbitals
     Eigen::MatrixXd C_alpha = coeffs_alpha;
     Eigen::MatrixXd C_beta = coeffs_beta;
-    C_alpha.block(0, n_alpha_electrons, num_basis_funcs,
+    C_alpha.block(0, n_alpha_electrons, num_atomic_orbitals,
                   num_alpha_virtual_orbitalslpha) = C_virt_alpha_loc;
-    C_beta.block(0, n_beta_electrons, num_basis_funcs,
+    C_beta.block(0, n_beta_electrons, num_atomic_orbitals,
                  num_beta_virtual_orbitals) = C_virt_beta_loc;
 
     auto new_orbitals = std::make_shared<data::Orbitals>(
@@ -220,11 +215,11 @@ Eigen::MatrixXd VVHVLocalization::localize(
     const Eigen::MatrixXd& occupied_orbitals) {
   const auto* ori_bs = this->basis_ori_fp_.get();  // Original/full basis set
   const auto* min_bs = this->minimal_basis_fp_.get();  // Minimal basis set
-  const auto num_basis_funcs_ori = ori_bs->num_basis_funcs;
-  const auto num_basis_funcs_min = min_bs->num_basis_funcs;
+  const auto num_atomic_orbitals_ori = ori_bs->num_atomic_orbitals;
+  const auto num_atomic_orbitals_min = min_bs->num_atomic_orbitals;
   const auto num_occupied_orbitals = occupied_orbitals.cols();
-  const auto n_val_virt = num_basis_funcs_min - num_occupied_orbitals;
-  const auto nhv = num_basis_funcs_ori - num_basis_funcs_min;
+  const auto n_val_virt = num_atomic_orbitals_min - num_occupied_orbitals;
+  const auto nhv = num_atomic_orbitals_ori - num_atomic_orbitals_min;
   const auto num_virtual_orbitals = n_val_virt + nhv;
 
   // Calculate valence virtuals
@@ -235,21 +230,21 @@ Eigen::MatrixXd VVHVLocalization::localize(
   Eigen::MatrixXd C_valence_loc = localize_valence_virtual(C_valence_virtual);
 
   // Combine C_valence_virtual and occupied_orbitals to get C_minimal
-  Eigen::MatrixXd C_minimal(num_basis_funcs_ori, num_basis_funcs_min);
-  C_minimal.block(0, 0, num_basis_funcs_ori, num_occupied_orbitals) =
+  Eigen::MatrixXd C_minimal(num_atomic_orbitals_ori, num_atomic_orbitals_min);
+  C_minimal.block(0, 0, num_atomic_orbitals_ori, num_occupied_orbitals) =
       occupied_orbitals;
-  C_minimal.block(0, num_occupied_orbitals, num_basis_funcs_ori, n_val_virt) =
-      C_valence_virtual;
+  C_minimal.block(0, num_occupied_orbitals, num_atomic_orbitals_ori,
+                  n_val_virt) = C_valence_virtual;
 
   // Localize hard virtuals and combine with valence virtuals
   Eigen::MatrixXd hard_orbitals_loc = localize_hard_virtuals(C_minimal);
 
   // Concatenate C_valence_loc and hard_orbitals_loc to form localized_orbitals
   Eigen::MatrixXd localized_orbitals =
-      Eigen::MatrixXd::Zero(num_basis_funcs_ori, num_virtual_orbitals);
-  localized_orbitals.block(0, 0, num_basis_funcs_ori, n_val_virt) =
+      Eigen::MatrixXd::Zero(num_atomic_orbitals_ori, num_virtual_orbitals);
+  localized_orbitals.block(0, 0, num_atomic_orbitals_ori, n_val_virt) =
       C_valence_loc;
-  localized_orbitals.block(0, n_val_virt, num_basis_funcs_ori, nhv) =
+  localized_orbitals.block(0, n_val_virt, num_atomic_orbitals_ori, nhv) =
       hard_orbitals_loc;
 
   converged_ = true;
@@ -278,9 +273,9 @@ void VVHVLocalization::initialize() {
   const auto* minimal_bs = this->minimal_basis_fp_.get();  // Minimal basis set
 
   const auto num_atoms = mol_structure->n_atoms;
-  const auto num_basis_funcs_ori = ori_bs->num_basis_funcs;
-  const auto num_basis_funcs_min = minimal_bs->num_basis_funcs;
-  this->overlap_mix_.resize(num_basis_funcs_ori, num_basis_funcs_min);
+  const auto num_atomic_orbitals_ori = ori_bs->num_atomic_orbitals;
+  const auto num_atomic_orbitals_min = minimal_bs->num_atomic_orbitals;
+  this->overlap_mix_.resize(num_atomic_orbitals_ori, num_atomic_orbitals_min);
 
   // Compute the original basis overlap matrix overlap_ori
   qcs::OneBodyIntegral ori_bs_1ee(ori_bs, ori_bs->mol.get(),
@@ -293,12 +288,12 @@ void VVHVLocalization::initialize() {
   if (weighted_orthogonalization) {
     // Allocate and compute dipole integrals
     dipole_integrals_ = std::make_unique<qcs::RowMajorMatrix>(
-        3 * num_basis_funcs_ori, num_basis_funcs_ori);
+        3 * num_atomic_orbitals_ori, num_atomic_orbitals_ori);
     ori_bs_1ee.dipole_integral(dipole_integrals_->data());
 
     // Allocate and compute quadrupole integrals
     quadrupole_integrals_ = std::make_unique<qcs::RowMajorMatrix>(
-        6 * num_basis_funcs_ori, num_basis_funcs_ori);
+        6 * num_atomic_orbitals_ori, num_atomic_orbitals_ori);
     ori_bs_1ee.quadrupole_integral(quadrupole_integrals_->data());
 
     spdlog::debug(
@@ -346,33 +341,33 @@ Eigen::MatrixXd VVHVLocalization::calculate_valence_virtual(
     const Eigen::MatrixXd& occupied_orbitals) {
   spdlog::debug("VVHV::calculate_valence_virtual()");
   const auto* ori_bs = this->basis_ori_fp_.get();  // Original/full basis set
-  const auto num_basis_funcs_ori = ori_bs->num_basis_funcs;
-  const auto num_basis_funcs_min =
-      this->minimal_basis_fp_.get()->num_basis_funcs;
+  const auto num_atomic_orbitals_ori = ori_bs->num_atomic_orbitals;
+  const auto num_atomic_orbitals_min =
+      this->minimal_basis_fp_.get()->num_atomic_orbitals;
   const auto num_occupied_orbitals = occupied_orbitals.cols();
 
-  const auto n_val_virt = num_basis_funcs_min - num_occupied_orbitals;
+  const auto n_val_virt = num_atomic_orbitals_min - num_occupied_orbitals;
 
   if (n_val_virt < 0) {
     throw std::runtime_error("VVHVLocalization: minimal basis size (" +
-                             std::to_string(num_basis_funcs_min) +
+                             std::to_string(num_atomic_orbitals_min) +
                              ") smaller than occupied count (" +
                              std::to_string(num_occupied_orbitals) + ").");
   }
 
   Eigen::MatrixXd temp =
-      Eigen::MatrixXd::Zero(num_basis_funcs_ori, num_basis_funcs_ori);
+      Eigen::MatrixXd::Zero(num_atomic_orbitals_ori, num_atomic_orbitals_ori);
   Eigen::MatrixXd temp2 =
-      Eigen::MatrixXd::Zero(num_basis_funcs_ori, num_basis_funcs_min);
+      Eigen::MatrixXd::Zero(num_atomic_orbitals_ori, num_atomic_orbitals_min);
 
   // print number of occupied and valence virtual orbitals
-  spdlog::info("VVHV::now using minimal basis '{}' with {} basis functions",
-               minimal_basis_name_, num_basis_funcs_min);
+  spdlog::info("VVHV::now using minimal basis '{}' with {} atomic orbitals",
+               minimal_basis_name_, num_atomic_orbitals_min);
   spdlog::debug(
       "VVHV::number of occupied orbitals: {}, valence virtual orbitals: {}",
       num_occupied_orbitals, n_val_virt);
 
-  if (num_basis_funcs_min > num_basis_funcs_ori) {
+  if (num_atomic_orbitals_min > num_atomic_orbitals_ori) {
     throw std::runtime_error(
         "VVHVLocalization: minimal basis size exceeds original basis size.");
   }
@@ -382,15 +377,18 @@ Eigen::MatrixXd VVHVLocalization::calculate_valence_virtual(
   // tutorial (Subotnik et al. JCP 123, 114108 (2005)) or ~p in the new tutorial
   // (Wang et al. JCTC 21, 1163 (2025)). We need to orthonormalize T first
   // according to new tutorial
-  Eigen::MatrixXd T(num_basis_funcs_ori, num_basis_funcs_min);
+  Eigen::MatrixXd T(num_atomic_orbitals_ori, num_atomic_orbitals_min);
   {
-    temp = this->overlap_ori_;   // dgelss overwrites input
+    temp = this->overlap_ori_;   // lapack::gelss overwrites input
     temp2 = this->overlap_mix_;  // the unnormalized T
-    std::vector<double> W11(num_basis_funcs_ori);
-    int RANK11 = dgelss(num_basis_funcs_ori, num_basis_funcs_ori,
-                        num_basis_funcs_min, temp.data(), num_basis_funcs_ori,
-                        temp2.data(), num_basis_funcs_ori, W11.data(), -1);
-    this->orthonormalization(num_basis_funcs_ori, num_basis_funcs_min,
+    std::vector<double> W11(num_atomic_orbitals_ori);
+    double _rcond = -1;
+    int64_t RANK11;
+    lapack::gelss(num_atomic_orbitals_ori, num_atomic_orbitals_ori,
+                  num_atomic_orbitals_min, temp.data(), num_atomic_orbitals_ori,
+                  temp2.data(), num_atomic_orbitals_ori, W11.data(), _rcond,
+                  &RANK11);
+    this->orthonormalization(num_atomic_orbitals_ori, num_atomic_orbitals_min,
                              this->overlap_ori_.data(), temp2.data(), T.data(),
                              1e-6, 0,
                              "initial orthonormalization of minimal basis");
@@ -401,27 +399,34 @@ Eigen::MatrixXd VVHVLocalization::calculate_valence_virtual(
   // Now we want to project out all components of the occupied space from the
   // virtual space C_v' = (I - C_o * C_o**H * S_11) * T
   Eigen::MatrixXd C_mp_wo_occ = T;  //
-  gemm("N", "N", num_basis_funcs_ori, num_basis_funcs_min, num_basis_funcs_ori,
-       1.0, this->overlap_ori_.data(), num_basis_funcs_ori, T.data(),
-       num_basis_funcs_ori, 0.0, temp.data(), num_basis_funcs_ori);
-  gemm("T", "N", num_occupied_orbitals, num_basis_funcs_min,
-       num_basis_funcs_ori, 1.0, C_occ_ptr, num_basis_funcs_ori, temp.data(),
-       num_basis_funcs_ori, 0.0, temp2.data(), num_occupied_orbitals);
-  gemm("N", "N", num_basis_funcs_ori, num_basis_funcs_min,
-       num_occupied_orbitals, -1.0, C_occ_ptr, num_basis_funcs_ori,
-       temp2.data(), num_occupied_orbitals, 1.0, C_mp_wo_occ.data(),
-       num_basis_funcs_ori);
+  blas::gemm(blas::Layout::ColMajor, blas::Op::NoTrans, blas::Op::NoTrans,
+             num_atomic_orbitals_ori, num_atomic_orbitals_min,
+             num_atomic_orbitals_ori, 1.0, this->overlap_ori_.data(),
+             num_atomic_orbitals_ori, T.data(), num_atomic_orbitals_ori, 0.0,
+             temp.data(), num_atomic_orbitals_ori);
+  blas::gemm(blas::Layout::ColMajor, blas::Op::Trans, blas::Op::NoTrans,
+             num_occupied_orbitals, num_atomic_orbitals_min,
+             num_atomic_orbitals_ori, 1.0, C_occ_ptr, num_atomic_orbitals_ori,
+             temp.data(), num_atomic_orbitals_ori, 0.0, temp2.data(),
+             num_occupied_orbitals);
+  blas::gemm(blas::Layout::ColMajor, blas::Op::NoTrans, blas::Op::NoTrans,
+             num_atomic_orbitals_ori, num_atomic_orbitals_min,
+             num_occupied_orbitals, -1.0, C_occ_ptr, num_atomic_orbitals_ori,
+             temp2.data(), num_occupied_orbitals, 1.0, C_mp_wo_occ.data(),
+             num_atomic_orbitals_ori);
 
   // Then form the new overlap matrix, S_ij = \sim_uv C_{ui} S_11_{uv} C_{vj}, C
   // =C_mp_wo_occ here
   this->orthonormalization(
-      num_basis_funcs_ori, num_basis_funcs_min, this->overlap_ori_.data(),
-      C_mp_wo_occ.data(), temp.data(), 1e-6, num_occupied_orbitals,
+      num_atomic_orbitals_ori, num_atomic_orbitals_min,
+      this->overlap_ori_.data(), C_mp_wo_occ.data(), temp.data(), 1e-6,
+      num_occupied_orbitals,
       "calculating minimal space (after projecting out occupied space)", 5.0);
 
   // Assign minimal basis unlocalized valence+virtual orbitals
-  Eigen::MatrixXd C_valence_unloc = temp.block(
-      0, 0, num_basis_funcs_ori, num_basis_funcs_min - num_occupied_orbitals);
+  Eigen::MatrixXd C_valence_unloc =
+      temp.block(0, 0, num_atomic_orbitals_ori,
+                 num_atomic_orbitals_min - num_occupied_orbitals);
 
   return C_valence_unloc;
 }
@@ -429,7 +434,7 @@ Eigen::MatrixXd VVHVLocalization::calculate_valence_virtual(
 Eigen::MatrixXd VVHVLocalization::localize_valence_virtual(
     const Eigen::MatrixXd& C_valence_unloc) {
   const auto* ori_bs = this->basis_ori_fp_.get();  // Original/full basis set
-  const auto num_basis_funcs_ori = ori_bs->num_basis_funcs;
+  const auto num_atomic_orbitals_ori = ori_bs->num_atomic_orbitals;
   const auto n_val_virt = C_valence_unloc.cols();
 
   spdlog::debug("VVHV::localize_valence_virtual()");
@@ -450,87 +455,99 @@ void VVHVLocalization::proto_hv(const Eigen::MatrixXd& overlap_ori_al,
                                 const std::vector<int>& bf_al_ori,
                                 const std::vector<int>& bf_al_min,
                                 Eigen::MatrixXd& C_hv_al,
-                                int num_basis_funcs_ori, int atom_index,
+                                int num_atomic_orbitals_ori, int atom_index,
                                 int l) {
-  const int num_basis_funcs_al_ori = static_cast<int>(bf_al_ori.size());
-  const int num_basis_funcs_al_min = static_cast<int>(bf_al_min.size());
-  const int nhv_al = num_basis_funcs_al_ori - num_basis_funcs_al_min;
+  const int num_atomic_orbitals_al_ori = static_cast<int>(bf_al_ori.size());
+  const int num_atomic_orbitals_al_min = static_cast<int>(bf_al_min.size());
+  const int nhv_al = num_atomic_orbitals_al_ori - num_atomic_orbitals_al_min;
   if (nhv_al <= 0) return;
-  Eigen::MatrixXd temp =
-      Eigen::MatrixXd::Zero(num_basis_funcs_al_ori, num_basis_funcs_al_ori);
+  Eigen::MatrixXd temp = Eigen::MatrixXd::Zero(num_atomic_orbitals_al_ori,
+                                               num_atomic_orbitals_al_ori);
 
   // Allocate local hard-virtual coefficient matrix with correct dimensions
-  Eigen::MatrixXd C_psi =
-      Eigen::MatrixXd::Identity(num_basis_funcs_al_ori, num_basis_funcs_al_ori);
+  Eigen::MatrixXd C_psi = Eigen::MatrixXd::Identity(num_atomic_orbitals_al_ori,
+                                                    num_atomic_orbitals_al_ori);
   // orthogonalize the C_psi
   temp = C_psi;
   this->orthonormalization(
-      num_basis_funcs_al_ori, num_basis_funcs_al_ori, overlap_ori_al.data(),
-      temp.data(), C_psi.data(), 1e-6, 0,
+      num_atomic_orbitals_al_ori, num_atomic_orbitals_al_ori,
+      overlap_ori_al.data(), temp.data(), C_psi.data(), 1e-6, 0,
       "initial orthonormalization of original basis on atom " +
           std::to_string(atom_index) + " angular momentum " +
           std::to_string(l));
 
-  if (num_basis_funcs_al_min != 0) {
+  if (num_atomic_orbitals_al_min != 0) {
     // Get T_al = overlap_ori_al**-1 * overlap_mix_al, corresponding to xi
     // coefficients in the literature, in the representation of the original
     // basis
     Eigen::MatrixXd T_al = overlap_mix_al;
     {
       Eigen::MatrixXd overlap_ori_copy =
-          overlap_ori_al;  // dgelss overwrites input
-      std::vector<double> W11(num_basis_funcs_al_ori);
-      int _tmp_rank = dgelss(num_basis_funcs_al_ori, num_basis_funcs_al_ori,
-                             num_basis_funcs_al_min, overlap_ori_copy.data(),
-                             num_basis_funcs_al_ori, T_al.data(),
-                             num_basis_funcs_al_ori, W11.data(), -1);
+          overlap_ori_al;  // lapack::gelss overwrites input
+      std::vector<double> W11(num_atomic_orbitals_al_ori);
+      double _rcond = -1.;
+      int64_t _tmp_rank;
+      lapack::gelss(num_atomic_orbitals_al_ori, num_atomic_orbitals_al_ori,
+                    num_atomic_orbitals_al_min, overlap_ori_copy.data(),
+                    num_atomic_orbitals_al_ori, T_al.data(),
+                    num_atomic_orbitals_al_ori, W11.data(), _rcond, &_tmp_rank);
     }
 
     // Get overlap of xi, S = T_al^T * overlap_ori_al * T_al = overlap_mix_al^T
     // * overlap_ori_al**-1 * overlap_mix_al = overlap_mix_al^T * T_al
-    Eigen::MatrixXd S_xi =
-        Eigen::MatrixXd::Zero(num_basis_funcs_al_min, num_basis_funcs_al_min);
-    gemm("T", "N", num_basis_funcs_al_min, num_basis_funcs_al_min,
-         num_basis_funcs_al_ori, 1.0, overlap_mix_al.data(),
-         num_basis_funcs_al_ori, T_al.data(), num_basis_funcs_al_ori, 0.0,
-         S_xi.data(), num_basis_funcs_al_min);
+    Eigen::MatrixXd S_xi = Eigen::MatrixXd::Zero(num_atomic_orbitals_al_min,
+                                                 num_atomic_orbitals_al_min);
+    blas::gemm(blas::Layout::ColMajor, blas::Op::Trans, blas::Op::NoTrans,
+               num_atomic_orbitals_al_min, num_atomic_orbitals_al_min,
+               num_atomic_orbitals_al_ori, 1.0, overlap_mix_al.data(),
+               num_atomic_orbitals_al_ori, T_al.data(),
+               num_atomic_orbitals_al_ori, 0.0, S_xi.data(),
+               num_atomic_orbitals_al_min);
 
-    // Compute S_xi^-1 * overlap_mix^T using dgelss_solver
+    // Compute S_xi^-1 * overlap_mix^T using lapack::gelss
     // Transformation matrix for proto hard virtual construction
     // C_psi = (I - T S_xi^-1 overlap_mix^T) C_psi,
     {
       // Solve S_xi * X = overlap_mix^T * C_psi for X, storing result in RHS
-      Eigen::MatrixXd RHS =
-          Eigen::MatrixXd::Zero(num_basis_funcs_al_min, num_basis_funcs_al_ori);
-      gemm("T", "N", num_basis_funcs_al_min, num_basis_funcs_al_ori,
-           num_basis_funcs_al_ori, 1.0, overlap_mix_al.data(),
-           num_basis_funcs_al_ori, C_psi.data(), num_basis_funcs_al_ori, 0.0,
-           RHS.data(), num_basis_funcs_al_min);
-      std::vector<double> W_xi(num_basis_funcs_al_min);
-      int _tmp_rank =
-          dgelss(num_basis_funcs_al_min, num_basis_funcs_al_min,
-                 num_basis_funcs_al_ori, S_xi.data(), num_basis_funcs_al_min,
-                 RHS.data(), num_basis_funcs_al_min, W_xi.data(), -1);
+      Eigen::MatrixXd RHS = Eigen::MatrixXd::Zero(num_atomic_orbitals_al_min,
+                                                  num_atomic_orbitals_al_ori);
+      blas::gemm(blas::Layout::ColMajor, blas::Op::Trans, blas::Op::NoTrans,
+                 num_atomic_orbitals_al_min, num_atomic_orbitals_al_ori,
+                 num_atomic_orbitals_al_ori, 1.0, overlap_mix_al.data(),
+                 num_atomic_orbitals_al_ori, C_psi.data(),
+                 num_atomic_orbitals_al_ori, 0.0, RHS.data(),
+                 num_atomic_orbitals_al_min);
+      std::vector<double> W_xi(num_atomic_orbitals_al_min);
+      double _rcond = -1.0;
+      int64_t _tmp_rank;
+      lapack::gelss(num_atomic_orbitals_al_min, num_atomic_orbitals_al_min,
+                    num_atomic_orbitals_al_ori, S_xi.data(),
+                    num_atomic_orbitals_al_min, RHS.data(),
+                    num_atomic_orbitals_al_min, W_xi.data(), _rcond,
+                    &_tmp_rank);
       // Compute C_psi - = T * RHS (where RHS now contains S_xi^-1 *
       // overlap_mix^T)
-      gemm("N", "N", num_basis_funcs_al_ori, num_basis_funcs_al_ori,
-           num_basis_funcs_al_min, -1.0, T_al.data(), num_basis_funcs_al_ori,
-           RHS.data(), num_basis_funcs_al_min, 1.0, C_psi.data(),
-           num_basis_funcs_al_ori);
+      blas::gemm(blas::Layout::ColMajor, blas::Op::NoTrans, blas::Op::NoTrans,
+                 num_atomic_orbitals_al_ori, num_atomic_orbitals_al_ori,
+                 num_atomic_orbitals_al_min, -1.0, T_al.data(),
+                 num_atomic_orbitals_al_ori, RHS.data(),
+                 num_atomic_orbitals_al_min, 1.0, C_psi.data(),
+                 num_atomic_orbitals_al_ori);
     }
   }
 
   // Use orthonormalization for the orthogonalization step
   this->orthonormalization(
-      num_basis_funcs_al_ori, num_basis_funcs_al_ori, overlap_ori_al.data(),
-      C_psi.data(), temp.data(), 1e-6, num_basis_funcs_al_min,
+      num_atomic_orbitals_al_ori, num_atomic_orbitals_al_ori,
+      overlap_ori_al.data(), C_psi.data(), temp.data(), 1e-6,
+      num_atomic_orbitals_al_min,
       "generating prototype hard virtuals on atom " +
           std::to_string(atom_index) + " angular momentum " + std::to_string(l),
       5.0);
 
   // Copy from temp (which contains the orthonormalized result) to the right
   // place in C_hv_al
-  for (int i = 0; i < num_basis_funcs_al_ori; ++i) {
+  for (int i = 0; i < num_atomic_orbitals_al_ori; ++i) {
     for (int j = 0; j < nhv_al; ++j) {
       C_hv_al(bf_al_ori[i], j) = temp(i, j);
     }
@@ -547,9 +564,9 @@ Eigen::MatrixXd VVHVLocalization::localize_hard_virtuals(
 
   const auto* ori_bs = this->basis_ori_fp_.get();  // Original/full basis set
   const auto* min_bs = this->minimal_basis_fp_.get();  // Minimal basis set
-  const auto num_basis_funcs_ori = ori_bs->num_basis_funcs;
-  const auto num_basis_funcs_min = min_bs->num_basis_funcs;
-  const auto nhv = num_basis_funcs_ori - num_basis_funcs_min;
+  const auto num_atomic_orbitals_ori = ori_bs->num_atomic_orbitals;
+  const auto num_atomic_orbitals_min = min_bs->num_atomic_orbitals;
+  const auto nhv = num_atomic_orbitals_ori - num_atomic_orbitals_min;
   auto mol_structure = ori_bs->mol;
   const auto num_atoms = mol_structure->n_atoms;
   const auto max_l_ori = ori_bs->max_angular_momentum();
@@ -562,7 +579,7 @@ Eigen::MatrixXd VVHVLocalization::localize_hard_virtuals(
 
   // If no hard virtuals, return empty matrix
   if (nhv == 0) {
-    return Eigen::MatrixXd::Zero(num_basis_funcs_ori, 0);
+    return Eigen::MatrixXd::Zero(num_atomic_orbitals_ori, 0);
   }
 
   // prepare the mapping of atom -> angular momentum -> basis
@@ -606,16 +623,16 @@ Eigen::MatrixXd VVHVLocalization::localize_hard_virtuals(
   }
 
   Eigen::MatrixXd C_hard_virtuals =
-      Eigen::MatrixXd::Zero(num_basis_funcs_ori, nhv);
+      Eigen::MatrixXd::Zero(num_atomic_orbitals_ori, nhv);
 
   int idx_hv = 0;  // index for placing hard virtuals
 
   Eigen::MatrixXd temp =
-      Eigen::MatrixXd::Zero(num_basis_funcs_ori, num_basis_funcs_ori);
+      Eigen::MatrixXd::Zero(num_atomic_orbitals_ori, num_atomic_orbitals_ori);
 
   // Loop over atoms to construct hard virtuals
   for (auto atom_a = 0; atom_a < num_atoms; ++atom_a) {
-    // First collect all basis functions on atom A for both basis sets
+    // First collect all atomic orbitals on atom A for both basis sets
     std::vector<int> bf_list_ori;
     std::vector<int> bf_list_min;
     for (auto l = 0; l <= max_l_ori; ++l) {
@@ -625,58 +642,58 @@ Eigen::MatrixXd VVHVLocalization::localize_hard_virtuals(
       bf_list_min.insert(bf_list_min.end(), bf_l_min.begin(), bf_l_min.end());
     }
 
-    const int num_basis_funcs_a_ori =
-        bf_list_ori.size();  // number of basis functions on
+    const int num_atomic_orbitals_a_ori =
+        bf_list_ori.size();  // number of atomic orbitals on
                              // atom A in original basis set
-    const int num_basis_funcs_a_min =
-        bf_list_min.size();  // number of basis functions on
+    const int num_atomic_orbitals_a_min =
+        bf_list_min.size();  // number of atomic orbitals on
                              // atom A in minimal basis set
     const int nhv_a =
-        num_basis_funcs_a_ori -
-        num_basis_funcs_a_min;  // number of hard virtuals on atom A
-    if (num_basis_funcs_a_min <= 0)
+        num_atomic_orbitals_a_ori -
+        num_atomic_orbitals_a_min;  // number of hard virtuals on atom A
+    if (num_atomic_orbitals_a_min <= 0)
       throw std::runtime_error(
           "VVHVLocalization: Atom " + std::to_string(atom_a) +
-          " in the minimal basis set has no basis functions.");
+          " in the minimal basis set has no atomic orbitals.");
     if (nhv_a == 0) continue;  // no hard virtuals on this atom
 
     // Add bounds checking for bf_list_ori indices
     for (const auto& bf_idx : bf_list_ori) {
-      if (bf_idx >= num_basis_funcs_ori) {
-        throw std::runtime_error("VVHVLocalization: Basis function index " +
+      if (bf_idx >= num_atomic_orbitals_ori) {
+        throw std::runtime_error("VVHVLocalization: atomic orbital index " +
                                  std::to_string(bf_idx) +
-                                 " exceeds total number of basis functions " +
-                                 std::to_string(num_basis_funcs_ori) +
+                                 " exceeds total number of atomic orbitals " +
+                                 std::to_string(num_atomic_orbitals_ori) +
                                  " on atom " + std::to_string(atom_a));
       }
     }
 
     // Loop over angular momenta to construct the proto_hard_virtuals
     Eigen::MatrixXd proto_hv =
-        Eigen::MatrixXd::Zero(num_basis_funcs_ori, nhv_a);
+        Eigen::MatrixXd::Zero(num_atomic_orbitals_ori, nhv_a);
     int proto_hv_idx = 0;
 
     for (auto l = 0; l <= max_l_ori; ++l) {
       auto& bf_al_ori = al_to_bf_ori[atom_a][l];
       if (bf_al_ori.size() == 0)
-        continue;  // no basis functions with this angular momentum on this atom
+        continue;  // no atomic orbitals with this angular momentum on this atom
                    // in the original basis set
       auto& bf_al_min = al_to_bf_min[atom_a][l];
-      const int num_basis_funcs_al_ori =
-          bf_al_ori.size();  // number of basis functions on
+      const int num_atomic_orbitals_al_ori =
+          bf_al_ori.size();  // number of atomic orbitals on
                              // atom A with angular momentum
                              // l in the original basis set
-      const int num_basis_funcs_al_min =
-          bf_al_min.size();  // number of basis functions on
+      const int num_atomic_orbitals_al_min =
+          bf_al_min.size();  // number of atomic orbitals on
                              // atom A with angular momentum
                              // l in the minimal basis set
       const int nhv_al =
-          num_basis_funcs_al_ori -
-          num_basis_funcs_al_min;  // number of hard virtuals on atom A
-                                   // with angular momentum l
+          num_atomic_orbitals_al_ori -
+          num_atomic_orbitals_al_min;  // number of hard virtuals on atom A
+                                       // with angular momentum l
       if (nhv_al < 0)
         throw std::runtime_error(
-            "VVHVLocalization: Number of basis functions on atom " +
+            "VVHVLocalization: Number of atomic orbitals on atom " +
             std::to_string(atom_a) + " with angular momentum " +
             std::to_string(l) +
             " in the original basis set is less than that in the minimal "
@@ -688,15 +705,16 @@ Eigen::MatrixXd VVHVLocalization::localize_hard_virtuals(
       // momentum
       Eigen::MatrixXd overlap_ori_al = this->overlap_ori_(bf_al_ori, bf_al_ori);
       Eigen::MatrixXd overlap_mix_al =
-          (num_basis_funcs_al_min > 0)
+          (num_atomic_orbitals_al_min > 0)
               ? Eigen::MatrixXd(this->overlap_mix_(bf_al_ori, bf_al_min))
-              : Eigen::MatrixXd::Zero(num_basis_funcs_al_ori, 0);
+              : Eigen::MatrixXd::Zero(num_atomic_orbitals_al_ori, 0);
       Eigen::MatrixXd C_hv_al =
-          Eigen::MatrixXd::Zero(num_basis_funcs_ori, nhv_al);
+          Eigen::MatrixXd::Zero(num_atomic_orbitals_ori, nhv_al);
       this->proto_hv(overlap_ori_al, overlap_mix_al, bf_al_ori, bf_al_min,
-                     C_hv_al, num_basis_funcs_ori, atom_a, l);
+                     C_hv_al, num_atomic_orbitals_ori, atom_a, l);
       // place C_hv_al into proto_hv
-      proto_hv.block(0, proto_hv_idx, num_basis_funcs_ori, nhv_al) = C_hv_al;
+      proto_hv.block(0, proto_hv_idx, num_atomic_orbitals_ori, nhv_al) =
+          C_hv_al;
       proto_hv_idx += nhv_al;
 
     }  // Loop over angular momenta to construct the proto_hard_virtuals
@@ -709,55 +727,64 @@ Eigen::MatrixXd VVHVLocalization::localize_hard_virtuals(
           ", got " + std::to_string(proto_hv_idx) + ")");
     }
 
-    // First we need to orthogonalize the original basis functions on atom A
-    Eigen::MatrixXd C_normal_a =
-        Eigen::MatrixXd::Zero(num_basis_funcs_ori, num_basis_funcs_a_ori);
-    Eigen::MatrixXd C_eta_a =
-        Eigen::MatrixXd::Zero(num_basis_funcs_ori, num_basis_funcs_a_ori);
-    for (int i = 0; i < num_basis_funcs_a_ori; ++i)
+    // First we need to orthogonalize the original atomic orbitals on atom A
+    Eigen::MatrixXd C_normal_a = Eigen::MatrixXd::Zero(
+        num_atomic_orbitals_ori, num_atomic_orbitals_a_ori);
+    Eigen::MatrixXd C_eta_a = Eigen::MatrixXd::Zero(num_atomic_orbitals_ori,
+                                                    num_atomic_orbitals_a_ori);
+    for (int i = 0; i < num_atomic_orbitals_a_ori; ++i)
       C_eta_a(bf_list_ori[i], i) = 1.0;  // the identity belong to atom A
     // Orthonormalize C_eta_A
     this->orthonormalization(
-        num_basis_funcs_ori, num_basis_funcs_a_ori, this->overlap_ori_.data(),
-        C_eta_a.data(), C_normal_a.data(), 1e-6, 0,
+        num_atomic_orbitals_ori, num_atomic_orbitals_a_ori,
+        this->overlap_ori_.data(), C_eta_a.data(), C_normal_a.data(), 1e-6, 0,
         "initial orthonormalization of original basis on atom " +
             std::to_string(atom_a));
 
     // Now we want to project out all components of the minimal space from the
     // orbitals on A C_eta_A = (I - C_minimal_unloc * C_minimal_unloc^T *
     // overlap_ori) * C_normal_A
-    gemm("N", "N", num_basis_funcs_ori, num_basis_funcs_a_ori,
-         num_basis_funcs_ori, 1.0, this->overlap_ori_.data(),
-         num_basis_funcs_ori, C_normal_a.data(), num_basis_funcs_ori, 0.0,
-         C_eta_a.data(), num_basis_funcs_ori);
-    gemm("T", "N", num_basis_funcs_min, num_basis_funcs_a_ori,
-         num_basis_funcs_ori, 1.0, C_minimal_unloc.data(), num_basis_funcs_ori,
-         C_eta_a.data(), num_basis_funcs_ori, 0.0, temp.data(),
-         num_basis_funcs_min);
-    gemm("N", "N", num_basis_funcs_ori, num_basis_funcs_a_ori,
-         num_basis_funcs_min, -1.0, C_minimal_unloc.data(), num_basis_funcs_ori,
-         temp.data(), num_basis_funcs_min, 0.0, C_eta_a.data(),
-         num_basis_funcs_ori);
+    blas::gemm(blas::Layout::ColMajor, blas::Op::NoTrans, blas::Op::NoTrans,
+               num_atomic_orbitals_ori, num_atomic_orbitals_a_ori,
+               num_atomic_orbitals_ori, 1.0, this->overlap_ori_.data(),
+               num_atomic_orbitals_ori, C_normal_a.data(),
+               num_atomic_orbitals_ori, 0.0, C_eta_a.data(),
+               num_atomic_orbitals_ori);
+    blas::gemm(blas::Layout::ColMajor, blas::Op::Trans, blas::Op::NoTrans,
+               num_atomic_orbitals_min, num_atomic_orbitals_a_ori,
+               num_atomic_orbitals_ori, 1.0, C_minimal_unloc.data(),
+               num_atomic_orbitals_ori, C_eta_a.data(), num_atomic_orbitals_ori,
+               0.0, temp.data(), num_atomic_orbitals_min);
+    blas::gemm(blas::Layout::ColMajor, blas::Op::NoTrans, blas::Op::NoTrans,
+               num_atomic_orbitals_ori, num_atomic_orbitals_a_ori,
+               num_atomic_orbitals_min, -1.0, C_minimal_unloc.data(),
+               num_atomic_orbitals_ori, temp.data(), num_atomic_orbitals_min,
+               0.0, C_eta_a.data(), num_atomic_orbitals_ori);
     C_eta_a += C_normal_a;
 
     // Form normalized hard unmatched hard virtuals on atom A (xi in the paper
     // is unnormalized)
-    Eigen::MatrixXd C_hv_a = Eigen::MatrixXd::Zero(num_basis_funcs_ori, nhv_a);
+    Eigen::MatrixXd C_hv_a =
+        Eigen::MatrixXd::Zero(num_atomic_orbitals_ori, nhv_a);
 
     this->orthonormalization(
-        num_basis_funcs_ori, num_basis_funcs_a_ori, this->overlap_ori_.data(),
-        C_eta_a.data(), C_hv_a.data(), 1e-6, num_basis_funcs_a_min,
+        num_atomic_orbitals_ori, num_atomic_orbitals_a_ori,
+        this->overlap_ori_.data(), C_eta_a.data(), C_hv_a.data(), 1e-6,
+        num_atomic_orbitals_a_min,
         "projecting out the minimal space from the orbitals on atom " +
             std::to_string(atom_a),
         2.0);
 
     // Form T = C_hv_A^T * overlap_ori * proto_hv
     Eigen::MatrixXd T = Eigen::MatrixXd::Zero(nhv_a, nhv_a);
-    gemm("T", "N", nhv_a, num_basis_funcs_ori, num_basis_funcs_ori, 1.0,
-         C_hv_a.data(), num_basis_funcs_ori, this->overlap_ori_.data(),
-         num_basis_funcs_ori, 0.0, temp.data(), nhv_a);
-    gemm("N", "N", nhv_a, nhv_a, num_basis_funcs_ori, 1.0, temp.data(), nhv_a,
-         proto_hv.data(), num_basis_funcs_ori, 0.0, T.data(), nhv_a);
+    blas::gemm(blas::Layout::ColMajor, blas::Op::Trans, blas::Op::NoTrans,
+               nhv_a, num_atomic_orbitals_ori, num_atomic_orbitals_ori, 1.0,
+               C_hv_a.data(), num_atomic_orbitals_ori,
+               this->overlap_ori_.data(), num_atomic_orbitals_ori, 0.0,
+               temp.data(), nhv_a);
+    blas::gemm(blas::Layout::ColMajor, blas::Op::NoTrans, blas::Op::NoTrans,
+               nhv_a, nhv_a, num_atomic_orbitals_ori, 1.0, temp.data(), nhv_a,
+               proto_hv.data(), num_atomic_orbitals_ori, 0.0, T.data(), nhv_a);
     // Now to form Z, Z is just orthonormalized T in our case
     Eigen::MatrixXd Z = Eigen::MatrixXd::Zero(nhv_a, nhv_a);
     Eigen::MatrixXd Iden = Eigen::MatrixXd::Identity(nhv_a, nhv_a);
@@ -767,10 +794,11 @@ Eigen::MatrixXd VVHVLocalization::localize_hard_virtuals(
     // Finally form the hard virtuals on atom A (gamma in the paper) in the
     // representation of the original basis
     Eigen::MatrixXd C_hv_final =
-        Eigen::MatrixXd::Zero(num_basis_funcs_ori, nhv_a);
-    gemm("N", "N", num_basis_funcs_ori, nhv_a, nhv_a, 1.0, C_hv_a.data(),
-         num_basis_funcs_ori, Z.data(), nhv_a, 0.0, C_hv_final.data(),
-         num_basis_funcs_ori);
+        Eigen::MatrixXd::Zero(num_atomic_orbitals_ori, nhv_a);
+    blas::gemm(blas::Layout::ColMajor, blas::Op::NoTrans, blas::Op::NoTrans,
+               num_atomic_orbitals_ori, nhv_a, nhv_a, 1.0, C_hv_a.data(),
+               num_atomic_orbitals_ori, Z.data(), nhv_a, 0.0, C_hv_final.data(),
+               num_atomic_orbitals_ori);
 
     // Place C_hv_final into the right place in this->C_hard_virtuals
     if (idx_hv + nhv_a > nhv) {
@@ -780,7 +808,8 @@ Eigen::MatrixXd VVHVLocalization::localize_hard_virtuals(
           ", total_nhv=" + std::to_string(nhv) + ") on atom " +
           std::to_string(atom_a));
     }
-    C_hard_virtuals.block(0, idx_hv, num_basis_funcs_ori, nhv_a) = C_hv_final;
+    C_hard_virtuals.block(0, idx_hv, num_atomic_orbitals_ori, nhv_a) =
+        C_hv_final;
 
     idx_hv += nhv_a;
 
@@ -801,13 +830,14 @@ Eigen::MatrixXd VVHVLocalization::localize_hard_virtuals(
 
   // Now hard virtuals are only orthonormal on each atom, we need to
   // orthogonalize them globally
-  this->orthonormalization(num_basis_funcs_ori, nhv, this->overlap_ori_.data(),
-                           C_hard_virtuals.data(), temp.data(), 1e-6, 0,
+  this->orthonormalization(num_atomic_orbitals_ori, nhv,
+                           this->overlap_ori_.data(), C_hard_virtuals.data(),
+                           temp.data(), 1e-6, 0,
                            "VVHVLocalization: Final orthonormalization of hard "
                            "virtuals");  // No expected near-zero eigenvalues
 
   Eigen::MatrixXd result_hard_virtuals =
-      temp.block(0, 0, num_basis_funcs_ori, nhv);
+      temp.block(0, 0, num_atomic_orbitals_ori, nhv);
 
   return result_hard_virtuals;
 }
@@ -815,7 +845,7 @@ Eigen::MatrixXd VVHVLocalization::localize_hard_virtuals(
 void VVHVLocalization::calculate_orbital_spreads(
     const Eigen::MatrixXd& orbitals, Eigen::VectorXd& spreads) const {
   const auto* ori_bs = this->basis_ori_fp_.get();  // Original/full basis set
-  const auto num_basis_funcs_ori = ori_bs->num_basis_funcs;
+  const auto num_atomic_orbitals_ori = ori_bs->num_atomic_orbitals;
   const int num_orbitals = orbitals.cols();
 
   // Check if spreads vector has the correct size
@@ -843,9 +873,9 @@ void VVHVLocalization::calculate_orbital_spreads(
   } else {
     // Compute integrals locally
     local_dipole = std::make_unique<qcs::RowMajorMatrix>(
-        3 * num_basis_funcs_ori, num_basis_funcs_ori);
+        3 * num_atomic_orbitals_ori, num_atomic_orbitals_ori);
     local_quadrupole = std::make_unique<qcs::RowMajorMatrix>(
-        6 * num_basis_funcs_ori, num_basis_funcs_ori);
+        6 * num_atomic_orbitals_ori, num_atomic_orbitals_ori);
 
     // Create one-body integral object to compute dipole and quadrupole
     // integrals
@@ -870,8 +900,9 @@ void VVHVLocalization::calculate_orbital_spreads(
     std::array<double, 3> r_mean = {0.0, 0.0, 0.0};
     for (int comp = 0; comp < 3; ++comp) {
       Eigen::Map<const qcs::RowMajorMatrix> dipole_comp(
-          dipole->data() + comp * num_basis_funcs_ori * num_basis_funcs_ori,
-          num_basis_funcs_ori, num_basis_funcs_ori);
+          dipole->data() +
+              comp * num_atomic_orbitals_ori * num_atomic_orbitals_ori,
+          num_atomic_orbitals_ori, num_atomic_orbitals_ori);
       r_mean[comp] = c.transpose() * dipole_comp * c;
     }
 
@@ -882,20 +913,23 @@ void VVHVLocalization::calculate_orbital_spreads(
 
     // x² component (xx)
     Eigen::Map<const qcs::RowMajorMatrix> quad_xx(
-        quadrupole->data() + 0 * num_basis_funcs_ori * num_basis_funcs_ori,
-        num_basis_funcs_ori, num_basis_funcs_ori);
+        quadrupole->data() +
+            0 * num_atomic_orbitals_ori * num_atomic_orbitals_ori,
+        num_atomic_orbitals_ori, num_atomic_orbitals_ori);
     r2_mean += c.transpose() * quad_xx * c;
 
     // y² component (yy)
     Eigen::Map<const qcs::RowMajorMatrix> quad_yy(
-        quadrupole->data() + 3 * num_basis_funcs_ori * num_basis_funcs_ori,
-        num_basis_funcs_ori, num_basis_funcs_ori);
+        quadrupole->data() +
+            3 * num_atomic_orbitals_ori * num_atomic_orbitals_ori,
+        num_atomic_orbitals_ori, num_atomic_orbitals_ori);
     r2_mean += c.transpose() * quad_yy * c;
 
     // z² component (zz)
     Eigen::Map<const qcs::RowMajorMatrix> quad_zz(
-        quadrupole->data() + 5 * num_basis_funcs_ori * num_basis_funcs_ori,
-        num_basis_funcs_ori, num_basis_funcs_ori);
+        quadrupole->data() +
+            5 * num_atomic_orbitals_ori * num_atomic_orbitals_ori,
+        num_atomic_orbitals_ori, num_atomic_orbitals_ori);
     r2_mean += c.transpose() * quad_zz * c;
 
     // Calculate |<r>|² = <x>² + <y>² + <z>²
@@ -907,7 +941,8 @@ void VVHVLocalization::calculate_orbital_spreads(
   }
 }
 
-void VVHVLocalization::orthonormalization(int num_basis_funcs, int num_orbitals,
+void VVHVLocalization::orthonormalization(int num_atomic_orbitals,
+                                          int num_orbitals,
                                           const double* overlap_inp, double* C,
                                           double* C_out, double ortho_threshold,
                                           unsigned int expected_near_zero,
@@ -916,19 +951,23 @@ void VVHVLocalization::orthonormalization(int num_basis_funcs, int num_orbitals,
   // Compute overlap matrix S = C^T * overlap_inp * C
   Eigen::MatrixXd S = Eigen::MatrixXd::Zero(num_orbitals, num_orbitals);
   {
-    Eigen::MatrixXd temp = Eigen::MatrixXd::Zero(num_orbitals, num_basis_funcs);
-    gemm("T", "N", num_orbitals, num_basis_funcs, num_basis_funcs, 1.0, C,
-         num_basis_funcs, overlap_inp, num_basis_funcs, 0.0, temp.data(),
-         num_orbitals);
-    gemm("N", "N", num_orbitals, num_orbitals, num_basis_funcs, 1.0,
-         temp.data(), num_orbitals, C, num_basis_funcs, 0.0, S.data(),
-         num_orbitals);
+    Eigen::MatrixXd temp =
+        Eigen::MatrixXd::Zero(num_orbitals, num_atomic_orbitals);
+    blas::gemm(blas::Layout::ColMajor, blas::Op::Trans, blas::Op::NoTrans,
+               num_orbitals, num_atomic_orbitals, num_atomic_orbitals, 1.0, C,
+               num_atomic_orbitals, overlap_inp, num_atomic_orbitals, 0.0,
+               temp.data(), num_orbitals);
+    blas::gemm(blas::Layout::ColMajor, blas::Op::NoTrans, blas::Op::NoTrans,
+               num_orbitals, num_orbitals, num_atomic_orbitals, 1.0,
+               temp.data(), num_orbitals, C, num_atomic_orbitals, 0.0, S.data(),
+               num_orbitals);
   }
 
   // Diagonalize S = U * Lambda * U^T
   Eigen::VectorXd eigenvalues = Eigen::VectorXd::Zero(num_orbitals);
-  syev("V", "L", num_orbitals, S.data(), num_orbitals,
-       eigenvalues.data());  // S now contains eigenvectors U
+  lapack::syev(lapack::Job::Vec, lapack::Uplo::Lower, num_orbitals, S.data(),
+               num_orbitals,
+               eigenvalues.data());  // S now contains eigenvectors U
 
   if (expected_near_zero > 0) {
     // Check eigenvalue structure if selection needed
@@ -944,10 +983,11 @@ void VVHVLocalization::orthonormalization(int num_basis_funcs, int num_orbitals,
       for (int j = 0; j < num_orbitals; ++j) temp_col_i[j] *= lambda_inv_sqrt;
     }
     // Compute C_out = C * W
-    gemm("N", "N", num_basis_funcs, num_orbitals - expected_near_zero,
-         num_orbitals, 1.0, C, num_basis_funcs,
-         S.data() + expected_near_zero * num_orbitals, num_orbitals, 0.0, C_out,
-         num_basis_funcs);
+    blas::gemm(blas::Layout::ColMajor, blas::Op::NoTrans, blas::Op::NoTrans,
+               num_atomic_orbitals, num_orbitals - expected_near_zero,
+               num_orbitals, 1.0, C, num_atomic_orbitals,
+               S.data() + expected_near_zero * num_orbitals, num_orbitals, 0.0,
+               C_out, num_atomic_orbitals);
   } else {
     // If no selection needed,
     // compute C_out = C *  U * Lambda^(-1/2) * U^T for symmetric
@@ -966,13 +1006,15 @@ void VVHVLocalization::orthonormalization(int num_basis_funcs, int num_orbitals,
     // Compute orthonorm_transform = U_scaled * U^T using temporary storage
     Eigen::MatrixXd orthonorm_transform =
         Eigen::MatrixXd::Zero(num_orbitals, num_orbitals);
-    gemm("N", "T", num_orbitals, num_orbitals, num_orbitals, 1.0, temp.data(),
-         num_orbitals, S.data(), num_orbitals, 0.0, orthonorm_transform.data(),
-         num_orbitals);
+    blas::gemm(blas::Layout::ColMajor, blas::Op::NoTrans, blas::Op::Trans,
+               num_orbitals, num_orbitals, num_orbitals, 1.0, temp.data(),
+               num_orbitals, S.data(), num_orbitals, 0.0,
+               orthonorm_transform.data(), num_orbitals);
     // Compute C_out = C * orthonorm_transform
-    gemm("N", "N", num_basis_funcs, num_orbitals, num_orbitals, 1.0, C,
-         num_basis_funcs, orthonorm_transform.data(), num_orbitals, 0.0, C_out,
-         num_basis_funcs);
+    blas::gemm(blas::Layout::ColMajor, blas::Op::NoTrans, blas::Op::NoTrans,
+               num_atomic_orbitals, num_orbitals, num_orbitals, 1.0, C,
+               num_atomic_orbitals, orthonorm_transform.data(), num_orbitals,
+               0.0, C_out, num_atomic_orbitals);
   }
 }
 

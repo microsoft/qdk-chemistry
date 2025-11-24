@@ -6,10 +6,10 @@
 # --------------------------------------------------------------------------------------------
 
 # import numpy as np
-# from qdk_chemistry.data import BasisSet, BasisType, OrbitalType, Structure
+# from qdk_chemistry.data import BasisSet, AOType, OrbitalType, Structure
 
 # # Create an empty basis set with a name
-# basis_set = BasisSet("6-31G", BasisType.SPHERICAL)
+# basis_set = BasisSet("6-31G", AOType.SPHERICAL)
 
 # # Add a shell with multiple primitives
 # atom_index = 0  # First atom
@@ -37,15 +37,15 @@
 
 # # Get counts
 # num_shells = basis_set.get_num_shells()
-# num_basis_functions = basis_set.get_num_basis_functions()
+# num_atomic_orbitals = basis_set.get_num_atomic_orbitals()
 # num_atoms = basis_set.get_num_atoms()
 
 # # Get mapping information
-# shell_index, m_quantum_number = basis_set.get_basis_function_info(0)
-# atom_index = basis_set.get_atom_index_for_basis_function(0)
+# shell_index, m_quantum_number = basis_set.get_atomic_orbital_info(0)
+# atom_index = basis_set.get_atom_index_for_atomic_orbital(0)
 
 # # Get indices for specific atoms/orbitals
-# basis_indices = basis_set.get_basis_function_indices_for_atom(0)
+# atomic_orbital_indices = basis_set.get_atomic_orbital_indices_for_atom(0)
 # shell_indices = basis_set.get_shell_indices_for_orbital_type(OrbitalType.P)
 
 # # Check validity
@@ -57,7 +57,7 @@
 # shell_orb_type = shell.get_orbital_type()
 # shell_l = shell.get_l()
 # shell_num_primitives = shell.get_num_primitives()
-# shell_num_basis_funcs = shell.get_num_basis_functions()
+# shell_num_atomic_orbitals = shell.get_num_atomic_orbitals()
 
 # # Access shell primitive data
 # shell_exponents = shell.get_exponents()
@@ -91,7 +91,7 @@
 # orbital_type = BasisSet.string_to_orbital_type("f")  # OrbitalType.F
 
 # l_value = BasisSet.get_angular_momentum(OrbitalType.P)  # 1
-# num_orbitals = BasisSet.get_num_orbitals_for_l(2, BasisType.SPHERICAL)  # 5
+# num_orbitals = BasisSet.get_num_orbitals_for_l(2, AOType.SPHERICAL)  # 5
 
-# basis_str = BasisSet.basis_type_to_string(BasisType.CARTESIAN)  # "cartesian"
-# basis_type = BasisSet.string_to_basis_type("spherical")  # BasisType.SPHERICAL
+# basis_str = BasisSet.basis_type_to_string(AOType.CARTESIAN)  # "cartesian"
+# basis_type = BasisSet.string_to_basis_type("spherical")  # AOType.SPHERICAL

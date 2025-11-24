@@ -7,8 +7,8 @@
 #include <qdk/chemistry/scf/util/libint2_util.h>
 #include <spdlog/spdlog.h>
 
-#include "util/blas.h"
-#include "util/lapack.h"
+#include <blas.hh>
+#include <lapack.hh>
 
 #ifdef QDK_CHEMISTRY_ENABLE_GPU
 #include <qdk/chemistry/scf/util/gpu/cublas_utils.h>
@@ -82,7 +82,7 @@ void DensityFittingBase::generate_metric() {
     if (!mpi_.world_rank) spdlog::trace("Saving DF Metric in Host Memory");
 #if QDK_CHEMISTRY_DF_INV_METHOD == QDK_CHEMISTRY_DF_CHOLESKY
     // Cholesky factorization
-    lapack::potrf("L", naux, h_metric_.get(), naux);
+    lapack::potrf(lapack::Uplo::Lower, naux, h_metric_.get(), naux);
 #elif QDK_CHEMISTRY_DF_INV_METHOD == QDK_CHEMISTRY_DF_LU
   h_metric_ipiv_ = std::make_unique<int[]>(naux);
   lapack::getrf(naux, naux, h_metric_.get(), naux, h_metric_ipiv_.get());
@@ -94,7 +94,7 @@ void DensityFittingBase::generate_metric() {
 
 #ifdef QDK_CHEMISTRY_ENABLE_GPU
 void DensityFittingBase::solve_metric_system_device(double* X, size_t LDX) {
-  const size_t naux = abs_.num_basis_funcs();
+  const size_t naux = abs_.num_atomic_orbitals();
 #if QDK_CHEMISTRY_DF_INV_METHOD == QDK_CHEMISTRY_DF_CHOLESKY
   cusolver::potrs(*cusolverHandle_, CUBLAS_FILL_MODE_LOWER, naux, 1, d_metric_,
                   naux, X, LDX);
@@ -107,10 +107,10 @@ void DensityFittingBase::solve_metric_system_device(double* X, size_t LDX) {
 void DensityFittingBase::solve_metric_system_host(double* X, size_t LDX) {
   const size_t naux = abs_.nbf();
 #if QDK_CHEMISTRY_DF_INV_METHOD == QDK_CHEMISTRY_DF_CHOLESKY
-  lapack::potrs("L", naux, 1, h_metric_.get(), naux, X, LDX);
+  lapack::potrs(lapack::Uplo::Lower, naux, 1, h_metric_.get(), naux, X, LDX);
 #elif QDK_CHEMISTRY_DF_INV_METHOD == QDK_CHEMISTRY_DF_LU
-  lapack::getrs("N", naux, 1, h_metric_.get(), naux, h_metric_ipiv_.get(), X,
-                LDX);
+  lapack::getrs(lapack::Op::NoTrans, naux, 1, h_metric_.get(), naux,
+                h_metric_ipiv_.get(), X, LDX);
 #endif
 }
 }  // namespace qdk::chemistry::scf
