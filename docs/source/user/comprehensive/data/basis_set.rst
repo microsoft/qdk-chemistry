@@ -24,10 +24,10 @@ Usage
 -----
 
 The ``BasisSet`` class is a fundamental component in quantum chemistry calculations, providing the mathematical foundation for representing molecular orbitals.
-It's typically used as input for :term:`SCF` calculations and is usually created automatically when selecting a :doc:`predefined basis set <basis_sets>` for a calculation.
+It's typically used as input for :term:`SCF` calculations and is usually created automatically when selecting a :doc:`predefined basis set <../basis_functionals>` for a calculation.
 
 .. note::
-   QDK/Chemistry provides a collection of predefined basis sets that can be accessed through the appropriate factory functions.
+   QDK/Chemistry provides a collection of :doc:`predefined basis sets <../basis_functionals>` that can be accessed through the appropriate factory functions.
    For common calculations, you typically won't need to construct basis sets manually.
 
 Core concepts
@@ -49,7 +49,7 @@ Orbital types
 
 The ``BasisSet`` class supports various orbital types with different angular momentum:
 
-- S orbital (angular momentum :math:`l=0`) : 1 function per shell (spherical or Cartesian)
+- S orbital (angular momentum :math:`l=0`): 1 function per shell (spherical or Cartesian)
 - P orbital (angular momentum :math:`l=1`): 3 functions per shell (spherical or Cartesian)
 - D orbital (angular momentum :math:`l=2`): 5 functions (spherical) or 6 functions (Cartesian) per shell
 - F orbital (angular momentum :math:`l=3`): 7 functions (spherical) or 10 functions (Cartesian) per shell
@@ -324,7 +324,7 @@ Predefined basis sets
 
 QDK/Chemistry provides access to a library of standard basis sets commonly used in quantum chemistry calculations.
 These predefined basis sets can be easily loaded without having to manually specify the atomic orbitals.
-For a complete list of available basis sets and their specifications, see the :doc:`Supported Basis Sets <../data/basis_sets>` documentation.
+For a complete list of available basis sets and their specifications, see the :doc:`Supported Basis Sets <../../basis_functionals>` documentation.
 
 .. tab:: C++ API
 
@@ -364,4 +364,4 @@ Related topics
 
 - :doc:`Serialization <../advanced/serialization>`: Data serialization and deserialization
 - :doc:`Settings <../advanced/settings>`: Configuration settings for algorithms
-- :doc:`Supported basis sets <basis_sets>`: List of pre-defined basis sets available in QDK/Chemistry
+- :doc:`Supported basis sets <../basis_functionals>`: List of pre-defined basis sets available in QDK/Chemistry

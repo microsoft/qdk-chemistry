@@ -65,7 +65,7 @@ The :class:`~qdk_chemistry.algorithms.ScfSolver` in QDK/Chemistry provides the f
 
 - **DFT-specific features**:
 
-  - Support for various exchange-correlation functionals including :term:`LDA`, :term:`GGA`, meta-:term:`GGA`, hybrid, and range-separated functionals
+  - Support for :doc:`various exchange-correlation functionals <../basis_functionals>` including :term:`LDA`, :term:`GGA`, meta-:term:`GGA`, hybrid, and range-separated functionals
 
 - **Basis set support**:
 
@@ -124,7 +124,7 @@ QDK/Chemistry provides both standard settings that work across all :term:`SCF` s
 See the `Available Settings`_ section below for a complete list of configuration options.
 
 .. note::
-   For a complete list of available basis sets and their specifications, see the :doc:`Supported Basis Sets <../data/basis_sets>` documentation.
+   For a complete list of available basis sets and their specifications, see the :doc:`Supported Basis Sets <../basis_functionals>` documentation.
    This reference provides detailed information about all pre-defined basis sets you can use with the ``basis_set`` setting.
 
 .. tab:: C++ API
@@ -280,3 +280,4 @@ Related topics
 
 - :doc:`Settings <../advanced/settings>`: Configuration settings for algorithms
 - :doc:`Factory Pattern <../advanced/factory_pattern>`: Understanding algorithm creation
+- :doc:`../basis_functionals`: Exchange-correlation functionals for DFT calculations
