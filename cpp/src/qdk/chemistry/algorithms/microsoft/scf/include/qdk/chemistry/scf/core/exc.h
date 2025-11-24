@@ -66,9 +66,9 @@ class EXC {
    * classes.
    *
    * @param[in] P Density matrix in AO basis (size: num_density_matrices *
-   * num_basis_funcs * num_basis_funcs)
+   * num_atomic_orbitals * num_atomic_orbitals)
    * @param[out] VXC XC matrix contribution to Fock matrix (size:
-   * num_density_matrices * num_basis_funcs * num_basis_funcs)
+   * num_density_matrices * num_atomic_orbitals * num_atomic_orbitals)
    * @param[out] xc_energy Total XC energy E_XC[ρ]
    * @note ``ndm`` is the number of density matrices; 1 for restricted, 2 for
    *       unrestricted calculations.
@@ -85,7 +85,7 @@ class EXC {
    * classes.
    *
    * @param[in] P Density matrix in AO basis (size: (num_density_matrices,
-   * num_basis_funcs, num_basis_funcs))
+   * num_atomic_orbitals, num_atomic_orbitals))
    * @param[out] dXC XC contribution to energy gradient (size: (3,natoms))
    * @note ``ndm`` is the number of density matrices; 1 for restricted, 2 for
    *       unrestricted calculations.
@@ -107,9 +107,9 @@ class EXC {
    * classes.
    *
    * @param[in] D Ground state density matrix in the AO basis (side:
-   * num_density_matrices * num_basis_funcs * num_basis_funcs)
+   * num_density_matrices * num_atomic_orbitals * num_atomic_orbitals)
    * @param[in] tD Trial/perturbed density matrix in the AO basis (size:
-   * num_density_matrices * num_basis_funcs * num_basis_funcs)
+   * num_density_matrices * num_atomic_orbitals * num_atomic_orbitals)
    * @param[out] Fxc XC kernel contribution to response matrix
    * @note ``ndm`` is the number of density matrices; 1 for restricted, 2 for
    *       unrestricted calculations.

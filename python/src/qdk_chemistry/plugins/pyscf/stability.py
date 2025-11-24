@@ -274,8 +274,8 @@ class PyscfStabilityChecker(StabilityChecker):
             # ROHF stability analysis
             if do_internal:
                 e, v = _rohf_internal(mf, with_symmetry=with_symmetry, nroots=nroots, tol=alg_tol)
-                internal_eigenvalues_list.extend(e if isinstance(e, (list, tuple, np.ndarray)) else [e])
-                internal_eigenvectors_list.extend(v if isinstance(v, (list, tuple, np.ndarray)) else [v])
+                internal_eigenvalues_list.extend(e if isinstance(e, list | tuple | np.ndarray) else [e])
+                internal_eigenvectors_list.extend(v if isinstance(v, list | tuple | np.ndarray) else [v])
             # Raise error if external stability is requested for ROHF
             if do_external:
                 raise ValueError(
@@ -287,8 +287,8 @@ class PyscfStabilityChecker(StabilityChecker):
             # UHF stability analysis
             if do_internal:
                 e, v = _uhf_internal(mf, with_symmetry=with_symmetry, nroots=nroots, tol=alg_tol)
-                internal_eigenvalues_list.extend(e if isinstance(e, (list, tuple, np.ndarray)) else [e])
-                internal_eigenvectors_list.extend(v if isinstance(v, (list, tuple, np.ndarray)) else [v])
+                internal_eigenvalues_list.extend(e if isinstance(e, list | tuple | np.ndarray) else [e])
+                internal_eigenvectors_list.extend(v if isinstance(v, list | tuple | np.ndarray) else [v])
             # Raise error if external stability is requested for UHF
             if do_external:
                 raise ValueError(
@@ -300,12 +300,12 @@ class PyscfStabilityChecker(StabilityChecker):
             # RHF stability analysis (default)
             if do_internal:
                 e, v = _rhf_internal(mf, with_symmetry=with_symmetry, nroots=nroots, tol=alg_tol)
-                internal_eigenvalues_list.extend(e if isinstance(e, (list, tuple, np.ndarray)) else [e])
-                internal_eigenvectors_list.extend(v if isinstance(v, (list, tuple, np.ndarray)) else [v])
+                internal_eigenvalues_list.extend(e if isinstance(e, list | tuple | np.ndarray) else [e])
+                internal_eigenvectors_list.extend(v if isinstance(v, list | tuple | np.ndarray) else [v])
             if do_external:
                 e, v = _rhf_external(mf, with_symmetry=with_symmetry, nroots=nroots, tol=alg_tol)
-                external_eigenvalues_list.extend(e if isinstance(e, (list, tuple, np.ndarray)) else [e])
-                external_eigenvectors_list.extend(v if isinstance(v, (list, tuple, np.ndarray)) else [v])
+                external_eigenvalues_list.extend(e if isinstance(e, list | tuple | np.ndarray) else [e])
+                external_eigenvectors_list.extend(v if isinstance(v, list | tuple | np.ndarray) else [v])
 
         # Process results and create StabilityResult
         internal_stable = True

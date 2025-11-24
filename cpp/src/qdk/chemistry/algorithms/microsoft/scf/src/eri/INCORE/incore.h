@@ -26,7 +26,7 @@ class ERI_DF;
  * Implements conventional 4-index ERI computation with full storage of all
  * (μν|λσ) integrals in memory for subsequent fast Fock matrix construction.
  *
- * Memory scaling: O(N⁴) where N = number of basis functions
+ * Memory scaling: O(N⁴) where N = number of atomic orbitals
  * Computational scaling: O(N⁴) for integral computation
  *
  * @note Only practical for small to medium-sized systems (< 500 basis

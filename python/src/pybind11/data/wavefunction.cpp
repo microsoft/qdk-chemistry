@@ -474,8 +474,8 @@ Examples:
     >>> two_rdm = wf.get_active_two_rdm_spin_traced()
 )");
 
-  // TODO (NAB):  it would be helpful to explain how to mark or check whether
-  // orbitals are active.  Same comment applies to other methods that refer to
+  // TODO (NAB): it would be helpful to explain how to mark or check whether
+  // orbitals are active. Same comment applies to other methods that refer to
   // "active orbitals". Workitem: 41398
 
   wavefunction.def("get_single_orbital_entropies",

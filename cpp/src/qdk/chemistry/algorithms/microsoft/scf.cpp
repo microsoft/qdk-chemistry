@@ -137,9 +137,9 @@ std::pair<double, std::shared_ptr<data::Wavefunction>> ScfSolver::_run_impl(
       *qdk_basis_set, *scf->context().basis_set_raw);
 
   // Compute the transformation matrix
-  const size_t num_basis_funcs = qdk_basis_set->get_num_basis_functions();
+  const size_t num_atomic_orbitals = qdk_basis_set->get_num_atomic_orbitals();
   auto shells = qdk_basis_set->get_shells();
-  Eigen::MatrixXd qdk_basis_map(num_basis_funcs, num_basis_funcs);
+  Eigen::MatrixXd qdk_basis_map(num_atomic_orbitals, num_atomic_orbitals);
   qdk_basis_map.setZero();
 
   // Convert internal to libint2 basis
@@ -149,7 +149,7 @@ std::pair<double, std::shared_ptr<data::Wavefunction>> ScfSolver::_run_impl(
 
   for (size_t i = 0, ibf = 0; i < qdk_basis_set->get_num_shells(); ++i) {
     const auto& shell = shells[i];
-    const auto sh_sz = shell.get_num_basis_functions();
+    const auto sh_sz = shell.get_num_atomic_orbitals();
     size_t jbf = libint_sh2bf[qdk_to_internal_shells[i]];
 
     qdk_basis_map.block(ibf, jbf, sh_sz, sh_sz) =

@@ -32,11 +32,11 @@ using qdk::chemistry::scf::Shell;
 
 /**
  * @brief Compute ERI integrals with debug-level checks
- * @param basis_mode Basis function type (cartesian/spherical)
+ * @param basis_mode atomic orbital type (cartesian/spherical)
  * @param obs Orbital basis set
  * @param omega Range-separation parameter for long-range integrals
- * @param i_lo Starting basis function index
- * @param i_hi Ending basis function index
+ * @param i_lo Starting atomic orbital index
+ * @param i_hi Ending atomic orbital index
  * @return ERI integral buffer
  */
 std::unique_ptr<double[]> debug_eri(BasisMode basis_mode,
@@ -45,11 +45,11 @@ std::unique_ptr<double[]> debug_eri(BasisMode basis_mode,
 
 /**
  * @brief Compute ERI integrals with optimized screening
- * @param basis_mode Basis function type (cartesian/spherical)
+ * @param basis_mode atomic orbital type (cartesian/spherical)
  * @param obs Orbital basis set
  * @param omega Range-separation parameter for long-range integrals
- * @param i_lo Starting basis function index
- * @param i_hi Ending basis function index
+ * @param i_lo Starting atomic orbital index
+ * @param i_hi Ending atomic orbital index
  * @return ERI integral buffer
  */
 std::unique_ptr<double[]> opt_eri(BasisMode basis_mode,
@@ -58,11 +58,11 @@ std::unique_ptr<double[]> opt_eri(BasisMode basis_mode,
 
 /**
  * @brief Compute density-fitted ERI integrals (Q|μν)
- * @param basis_mode Basis function type (cartesian/spherical)
+ * @param basis_mode atomic orbital type (cartesian/spherical)
  * @param obs Orbital basis set
  * @param abs Auxiliary basis set for density fitting
- * @param i_lo Starting basis function index
- * @param i_hi Ending basis function index
+ * @param i_lo Starting atomic orbital index
+ * @param i_hi Ending atomic orbital index
  * @return Three-center integral buffer
  */
 std::unique_ptr<double[]> eri_df(BasisMode basis_mode,
@@ -72,7 +72,7 @@ std::unique_ptr<double[]> eri_df(BasisMode basis_mode,
 
 /**
  * @brief Compute density-fitted metric integrals (Q|P)
- * @param basis_mode Basis function type (cartesian/spherical)
+ * @param basis_mode atomic orbital type (cartesian/spherical)
  * @param abs Auxiliary basis set for density fitting
  * @return Two-center integral buffer
  */
@@ -84,7 +84,7 @@ std::unique_ptr<double[]> metric_df(BasisMode basis_mode,
  * @param dJ Output gradient buffer for Coulomb contribution
  * @param P Density matrix
  * @param X DF fitting coefficients
- * @param basis_mode Basis function type (cartesian/spherical)
+ * @param basis_mode atomic orbital type (cartesian/spherical)
  * @param obs Orbital basis set
  * @param abs Auxiliary basis set
  * @param obs_sh2atom Shell to atom mapping for orbital basis
@@ -103,7 +103,7 @@ void eri_df_grad(double* dJ, const double* P, const double* X,
  * @brief Compute gradient contributions from density-fitted metric integrals
  * @param dJ Output gradient buffer for metric contribution
  * @param X DF fitting coefficients
- * @param basis_mode Basis function type (cartesian/spherical)
+ * @param basis_mode atomic orbital type (cartesian/spherical)
  * @param abs Auxiliary basis set
  * @param abs_sh2atom Shell to atom mapping for auxiliary basis
  * @param n_atoms Number of atoms

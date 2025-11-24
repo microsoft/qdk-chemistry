@@ -15,9 +15,11 @@ from .reference_tolerances import (
     float_comparison_absolute_tolerance,
     float_comparison_relative_tolerance,
     mcscf_energy_tolerance,
+    orthonormality_error_tolerance,
     plain_text_tolerance,
     scf_energy_tolerance,
     scf_orbital_tolerance,
+    unitarity_error_tolerance,
 )
 
 try:
@@ -34,7 +36,7 @@ except ImportError:
 if PYSCF_AVAILABLE:
     import qdk_chemistry.plugins.pyscf
     from qdk_chemistry.constants import ANGSTROM_TO_BOHR
-    from qdk_chemistry.data import BasisSet, BasisType, OrbitalType, Shell
+    from qdk_chemistry.data import AOType, BasisSet, OrbitalType, Shell
     from qdk_chemistry.plugins.pyscf.mcscf import mcsolver_to_fcisolver
     from qdk_chemistry.plugins.pyscf.utils import (
         basis_to_pyscf_mol,
@@ -285,7 +287,9 @@ class TestPyscfPlugin:
 
         # Check that we get reasonable results
         assert isinstance(energy, float)
-        assert abs(energy - (-75.9229032346701)) < scf_energy_tolerance
+        assert np.isclose(
+            energy, -75.9229032346701, rtol=float_comparison_relative_tolerance, atol=scf_energy_tolerance
+        )
         assert orbitals is not None
         assert orbitals.has_basis_set()
         assert orbitals.has_overlap_matrix()
@@ -315,7 +319,9 @@ class TestPyscfPlugin:
 
         # Check that we get reasonable results
         assert isinstance(energy, float)
-        assert abs(energy - (-76.02057765181318)) < scf_energy_tolerance
+        assert np.isclose(
+            energy, -76.02057765181318, rtol=float_comparison_relative_tolerance, atol=scf_energy_tolerance
+        )
         assert orbitals is not None
         assert orbitals.has_basis_set()
         assert orbitals.has_overlap_matrix()
@@ -345,7 +351,7 @@ class TestPyscfPlugin:
 
         # Check that we get reasonable results
         assert isinstance(energy, float)
-        assert abs(energy - (-7.4250663561)) < scf_energy_tolerance
+        assert np.isclose(energy, -7.4250663561, rtol=float_comparison_relative_tolerance, atol=scf_energy_tolerance)
         assert orbitals is not None
         assert orbitals.has_basis_set()
         assert orbitals.has_overlap_matrix()
@@ -372,7 +378,9 @@ class TestPyscfPlugin:
 
         # Check that we get reasonable results
         assert isinstance(energy, float)
-        assert abs(energy - (-7.42506404463744)) < scf_energy_tolerance
+        assert np.isclose(
+            energy, -7.42506404463744, rtol=float_comparison_relative_tolerance, atol=scf_energy_tolerance
+        )
         assert orbitals is not None
         assert orbitals.has_basis_set()
         assert orbitals.has_overlap_matrix()
@@ -398,7 +406,9 @@ class TestPyscfPlugin:
 
         # Check that we get reasonable results
         assert isinstance(energy, float)
-        assert abs(energy - (-7.23289811389006)) < scf_energy_tolerance
+        assert np.isclose(
+            energy, -7.23289811389006, rtol=float_comparison_relative_tolerance, atol=scf_energy_tolerance
+        )
         assert orbitals is not None
         assert orbitals.has_basis_set()
         assert orbitals.has_overlap_matrix()
@@ -424,8 +434,9 @@ class TestPyscfPlugin:
 
         # Check that we get reasonable results
         assert isinstance(energy, float)
-        # TODO (NAB):  change output to logger rather than print() here and elsewhere, workitem:40460
-        assert abs(energy - (-149.49029917454197)) < scf_energy_tolerance
+        assert np.isclose(
+            energy, -149.49029917454197, rtol=float_comparison_relative_tolerance, atol=scf_energy_tolerance
+        )
         assert orbitals is not None
         assert orbitals.has_basis_set()
         assert orbitals.has_overlap_matrix()
@@ -452,8 +463,9 @@ class TestPyscfPlugin:
 
         # Check that we get reasonable DFT results
         assert isinstance(energy, float)
-        # B3LYP energy should be different from HF
-        assert abs(energy - (-76.33342033646656)) < scf_energy_tolerance
+        assert np.isclose(
+            energy, -76.33342033646656, rtol=float_comparison_relative_tolerance, atol=scf_energy_tolerance
+        )
         assert orbitals is not None
         assert orbitals.has_basis_set()
         assert orbitals.has_overlap_matrix()
@@ -480,9 +492,9 @@ class TestPyscfPlugin:
 
         # Check that we get reasonable DFT results
         assert isinstance(energy, float)
-        # PBE energy should be different from HF and B3LYP
-        # this is not tested here but can be seen in the #s.
-        assert abs(energy - (-76.2511269787294)) < scf_energy_tolerance
+        assert np.isclose(
+            energy, -76.2511269787294, rtol=float_comparison_relative_tolerance, atol=scf_energy_tolerance
+        )
         assert orbitals is not None
         assert orbitals.has_basis_set()
         assert orbitals.has_overlap_matrix()
@@ -500,8 +512,9 @@ class TestPyscfPlugin:
 
         # Check that we get reasonable DFT results
         assert isinstance(energy, float)
-        # B3LYP energy for Li should be different from HF
-        assert abs(energy - (-7.484980651804635)) < scf_energy_tolerance
+        assert np.isclose(
+            energy, -7.484980651804635, rtol=float_comparison_relative_tolerance, atol=scf_energy_tolerance
+        )
         assert orbitals is not None
         assert orbitals.has_basis_set()
         assert orbitals.has_overlap_matrix()
@@ -529,8 +542,9 @@ class TestPyscfPlugin:
 
         # Check that we get reasonable ROKS DFT results
         assert isinstance(energy, float)
-        # ROKS B3LYP energy should be different from UKS B3LYP
-        assert abs(energy - (-7.484979697016255)) < scf_energy_tolerance
+        assert np.isclose(
+            energy, -7.484979697016255, rtol=float_comparison_relative_tolerance, atol=scf_energy_tolerance
+        )
         assert orbitals is not None
         assert orbitals.has_basis_set()
         assert orbitals.has_overlap_matrix()
@@ -557,8 +571,9 @@ class TestPyscfPlugin:
 
         # Check that we get reasonable DFT results
         assert isinstance(energy, float)
-        # B3LYP energy should be different from HF
-        assert abs(energy - (-150.204697358644)) < scf_energy_tolerance
+        assert np.isclose(
+            energy, -150.204697358644, rtol=float_comparison_relative_tolerance, atol=scf_energy_tolerance
+        )
         assert orbitals is not None
         assert orbitals.has_basis_set()
         assert orbitals.has_overlap_matrix()
@@ -591,7 +606,9 @@ class TestPyscfPlugin:
         energy_lower, _ = scf_solver.run(water, 0, 1)
 
         # Should give the same result
-        assert abs(energy_upper - energy_lower) < scf_energy_tolerance
+        assert np.isclose(
+            energy_upper, energy_lower, rtol=float_comparison_relative_tolerance, atol=scf_energy_tolerance
+        )
 
     def test_pyscf_uo2_lanl2dz(self):
         """Test PySCF SCF solver on UO2 with LANL2DZ basis and ECP."""
@@ -601,11 +618,11 @@ class TestPyscfPlugin:
 
         energy, _ = scf_solver.run(uo2, 0, 1)
         ref_energy = -200.29749139183
-        assert abs(energy - ref_energy) < scf_energy_tolerance
+        assert np.isclose(energy, ref_energy, rtol=float_comparison_relative_tolerance, atol=scf_energy_tolerance)
 
     def test_pyscf_scf_solver_initial_guess_restart(self):
         """Test PySCF SCF solver with initial guess from converged orbitals."""
-        # ===== Water as restricted test =====
+        # Water as restricted test
         water = create_water_structure()
         scf_solver = algorithms.create("scf_solver", "pyscf")
         scf_solver.settings().set("basis_set", "def2-tzvp")
@@ -616,7 +633,9 @@ class TestPyscfPlugin:
         orbitals_first = wfn_first.get_orbitals()
 
         # Verify we get the expected energy for HF/def2-tzvp
-        assert abs(energy_first - (-76.0205776518)) < scf_energy_tolerance
+        assert np.isclose(
+            energy_first, -76.0205776518, rtol=float_comparison_relative_tolerance, atol=scf_energy_tolerance
+        )
 
         # Now restart with the converged orbitals as initial guess
         # Create a new solver instance since settings are locked after run
@@ -629,9 +648,11 @@ class TestPyscfPlugin:
         energy_second, _ = scf_solver2.run(water, 0, 1, orbitals_first)
 
         # Should get the same energy (within tight tolerance)
-        assert abs(energy_first - energy_second) < scf_energy_tolerance
+        assert np.isclose(
+            energy_first, energy_second, rtol=float_comparison_relative_tolerance, atol=scf_energy_tolerance
+        )
 
-        # ===== Oxygen Triplet Initial Guess Test =====
+        # Oxygen Triplet Initial Guess Test
         o2 = create_o2_structure()
         scf_solver3 = algorithms.create("scf_solver", "pyscf")
         scf_solver3.settings().set("basis_set", "sto-3g")
@@ -642,7 +663,9 @@ class TestPyscfPlugin:
         orbitals_o2_first = wfn_o2_first.get_orbitals()
 
         # Verify we get the expected energy for HF/STO-3G triplet
-        assert abs(energy_o2_first - (-147.633969608498)) < scf_energy_tolerance
+        assert np.isclose(
+            energy_o2_first, -147.633969608498, rtol=float_comparison_relative_tolerance, atol=scf_energy_tolerance
+        )
 
         # Now restart with the converged orbitals as initial guess
         # Create a new solver instance since settings are locked after run
@@ -655,7 +678,9 @@ class TestPyscfPlugin:
         energy_o2_second, _ = scf_solver4.run(o2, 0, 3, orbitals_o2_first)
 
         # Should get the same energy (within tight tolerance)
-        assert abs(energy_o2_first - energy_o2_second) < scf_energy_tolerance
+        assert np.isclose(
+            energy_o2_first, energy_o2_second, rtol=float_comparison_relative_tolerance, atol=scf_energy_tolerance
+        )
 
     def test_pyscf_water_pm_localization_def2svp(self):
         """Test PySCF Pipek-Mezey localization on water molecule with def2-svp basis."""
@@ -711,12 +736,12 @@ class TestPyscfPlugin:
         # Check that the transformation for selected indices is unitary
         u_selected = ca_selected.T @ s_matrix @ ca_loc_selected
         unitarity_error = np.linalg.norm(u_selected @ u_selected.T - np.eye(len(random_occ_indices)))
-        assert unitarity_error < 1e-10
+        assert unitarity_error < unitarity_error_tolerance
 
         # Check that localized orbitals are orthonormal
         overlap_check = ca_loc_selected.T @ s_matrix @ ca_loc_selected
         orthonormality_error = np.linalg.norm(overlap_check - np.eye(len(random_occ_indices)))
-        assert orthonormality_error < 1e-10
+        assert orthonormality_error < orthonormality_error_tolerance
 
         # Test that the objective function improved for the random selection
         random_objective_value = pipek_objective_function(localized_random.get_orbitals(), ca_loc_selected)
@@ -777,12 +802,12 @@ class TestPyscfPlugin:
         # Check that the transformation for selected indices is unitary
         u_selected = ca_selected.T @ s_matrix @ ca_loc_selected
         unitarity_error = np.linalg.norm(u_selected @ u_selected.T - np.eye(len(random_virt_indices)))
-        assert unitarity_error < 1e-10
+        assert unitarity_error < unitarity_error_tolerance
 
         # Check that localized orbitals are orthonormal
         overlap_check = ca_loc_selected.T @ s_matrix @ ca_loc_selected
         orthonormality_error = np.linalg.norm(overlap_check - np.eye(len(random_virt_indices)))
-        assert orthonormality_error < 1e-10
+        assert orthonormality_error < orthonormality_error_tolerance
 
         # Test that the objective function improved for the random selection
         random_objective_value = boys_objective_function(localized_random.get_orbitals(), ca_loc_selected)
@@ -844,12 +869,12 @@ class TestPyscfPlugin:
         # Check that the transformation for selected indices is unitary
         u_selected = ca_selected.T @ s_matrix @ ca_loc_selected
         unitarity_error = np.linalg.norm(u_selected @ u_selected.T - np.eye(len(random_occ_indices)))
-        assert unitarity_error < 1e-10
+        assert unitarity_error < unitarity_error_tolerance
 
         # Check that localized orbitals are orthonormal
         overlap_check = ca_loc_selected.T @ s_matrix @ ca_loc_selected
         orthonormality_error = np.linalg.norm(overlap_check - np.eye(len(random_occ_indices)))
-        assert orthonormality_error < 1e-10
+        assert orthonormality_error < orthonormality_error_tolerance
 
     def test_pyscf_o2_pm_localization_def2svp_uhf(self):
         """Test PySCF Pipek-Mezey localization on O2 molecule with UHF/def2-svp."""
@@ -912,12 +937,12 @@ class TestPyscfPlugin:
         # Check that the transformation for selected indices is unitary - alpha
         u_selected_a = ca_selected.T @ s_matrix @ ca_loc_selected
         unitarity_error_a = np.linalg.norm(u_selected_a @ u_selected_a.T - np.eye(len(random_occ_indices_alpha)))
-        assert unitarity_error_a < 1e-10
+        assert unitarity_error_a < unitarity_error_tolerance
 
         # Check that localized orbitals are orthonormal - alpha
         overlap_check_a = ca_loc_selected.T @ s_matrix @ ca_loc_selected
         orthonormality_error_a = np.linalg.norm(overlap_check_a - np.eye(len(random_occ_indices_alpha)))
-        assert orthonormality_error_a < 1e-10
+        assert orthonormality_error_a < orthonormality_error_tolerance
 
         # Test beta channel
         cb_loc_selected = mos_rand_b[:, random_occ_indices_beta]
@@ -925,12 +950,12 @@ class TestPyscfPlugin:
         # Check that the transformation for selected indices is unitary - beta
         u_selected_b = cb_selected.T @ s_matrix @ cb_loc_selected
         unitarity_error_b = np.linalg.norm(u_selected_b @ u_selected_b.T - np.eye(len(random_occ_indices_beta)))
-        assert unitarity_error_b < 1e-10
+        assert unitarity_error_b < unitarity_error_tolerance
 
         # Check that localized orbitals are orthonormal - beta
         overlap_check_b = cb_loc_selected.T @ s_matrix @ cb_loc_selected
         orthonormality_error_b = np.linalg.norm(overlap_check_b - np.eye(len(random_occ_indices_beta)))
-        assert orthonormality_error_b < 1e-10
+        assert orthonormality_error_b < orthonormality_error_tolerance
 
         # Test that the objective function improved for the random selection
         random_objective_value_a = pipek_objective_function(localized_random.get_orbitals(), ca_loc_selected)
@@ -1008,12 +1033,12 @@ class TestPyscfPlugin:
         # Check that the transformation for selected indices is unitary - alpha
         u_selected_a = ca_selected.T @ s_matrix @ ca_loc_selected
         unitarity_error_a = np.linalg.norm(u_selected_a @ u_selected_a.T - np.eye(len(random_virt_indices_alpha)))
-        assert unitarity_error_a < 1e-10
+        assert unitarity_error_a < unitarity_error_tolerance
 
         # Check that localized orbitals are orthonormal - alpha
         overlap_check_a = ca_loc_selected.T @ s_matrix @ ca_loc_selected
         orthonormality_error_a = np.linalg.norm(overlap_check_a - np.eye(len(random_virt_indices_alpha)))
-        assert orthonormality_error_a < 1e-10
+        assert orthonormality_error_a < orthonormality_error_tolerance
 
         # Test beta channel
         cb_loc_selected = mos_rand_b[:, random_virt_indices_beta]
@@ -1021,12 +1046,12 @@ class TestPyscfPlugin:
         # Check that the transformation for selected indices is unitary - beta
         u_selected_b = cb_selected.T @ s_matrix @ cb_loc_selected
         unitarity_error_b = np.linalg.norm(u_selected_b @ u_selected_b.T - np.eye(len(random_virt_indices_beta)))
-        assert unitarity_error_b < 1e-10
+        assert unitarity_error_b < unitarity_error_tolerance
 
         # Check that localized orbitals are orthonormal - beta
         overlap_check_b = cb_loc_selected.T @ s_matrix @ cb_loc_selected
         orthonormality_error_b = np.linalg.norm(overlap_check_b - np.eye(len(random_virt_indices_beta)))
-        assert orthonormality_error_b < 1e-10
+        assert orthonormality_error_b < orthonormality_error_tolerance
 
         # Test that the objective function improved for the random selection
         random_objective_value_a = boys_objective_function(localized_random.get_orbitals(), ca_loc_selected)
@@ -1098,12 +1123,12 @@ class TestPyscfPlugin:
         # Check that the transformation for selected indices is unitary - alpha
         u_selected_a = ca_selected.T @ s_matrix @ ca_loc_selected
         unitarity_error_a = np.linalg.norm(u_selected_a @ u_selected_a.T - np.eye(len(random_occ_indices_alpha)))
-        assert unitarity_error_a < 1e-10
+        assert unitarity_error_a < unitarity_error_tolerance
 
         # Check that localized orbitals are orthonormal - alpha
         overlap_check_a = ca_loc_selected.T @ s_matrix @ ca_loc_selected
         orthonormality_error_a = np.linalg.norm(overlap_check_a - np.eye(len(random_occ_indices_alpha)))
-        assert orthonormality_error_a < 1e-10
+        assert orthonormality_error_a < orthonormality_error_tolerance
 
         # Test beta channel
         cb_loc_selected = mos_rand_b[:, random_occ_indices_beta]
@@ -1111,12 +1136,12 @@ class TestPyscfPlugin:
         # Check that the transformation for selected indices is unitary - beta
         u_selected_b = cb_selected.T @ s_matrix @ cb_loc_selected
         unitarity_error_b = np.linalg.norm(u_selected_b @ u_selected_b.T - np.eye(len(random_occ_indices_beta)))
-        assert unitarity_error_b < 1e-10
+        assert unitarity_error_b < unitarity_error_tolerance
 
         # Check that localized orbitals are orthonormal - beta
         overlap_check_b = cb_loc_selected.T @ s_matrix @ cb_loc_selected
         orthonormality_error_b = np.linalg.norm(overlap_check_b - np.eye(len(random_occ_indices_beta)))
-        assert orthonormality_error_b < 1e-10
+        assert orthonormality_error_b < orthonormality_error_tolerance
 
         # Test that the objective function improved for the random selection
         random_objective_value_a = er_objective_function(localized_random.get_orbitals(), ca_loc_selected)
@@ -1180,12 +1205,12 @@ class TestPyscfPlugin:
         # Check that the transformation for selected indices is unitary
         u_selected = ca_selected.T @ s_matrix @ ca_loc_selected
         unitarity_error = np.linalg.norm(u_selected @ u_selected.T - np.eye(len(random_occ_indices)))
-        assert unitarity_error < 1e-10
+        assert unitarity_error < unitarity_error_tolerance
 
         # Check that localized orbitals are orthonormal
         overlap_check = ca_loc_selected.T @ s_matrix @ ca_loc_selected
         orthonormality_error = np.linalg.norm(overlap_check - np.eye(len(random_occ_indices)))
-        assert orthonormality_error < 1e-10
+        assert orthonormality_error < orthonormality_error_tolerance
 
         # Test that the objective function improved for the random selection
         random_objective_value = pipek_objective_function(localized_random.get_orbitals(), ca_loc_selected)
@@ -1252,12 +1277,12 @@ class TestPyscfPlugin:
         # Check that the transformation for selected indices is unitary
         u_selected = ca_selected.T @ s_matrix @ ca_loc_selected
         unitarity_error = np.linalg.norm(u_selected @ u_selected.T - np.eye(len(random_virt_indices)))
-        assert unitarity_error < 1e-10
+        assert unitarity_error < unitarity_error_tolerance
 
         # Check that localized orbitals are orthonormal
         overlap_check = ca_loc_selected.T @ s_matrix @ ca_loc_selected
         orthonormality_error = np.linalg.norm(overlap_check - np.eye(len(random_virt_indices)))
-        assert orthonormality_error < 1e-10
+        assert orthonormality_error < orthonormality_error_tolerance
 
         # Test that the objective function improved for the random selection
         random_objective_value = boys_objective_function(localized_random.get_orbitals(), ca_loc_selected)
@@ -1319,12 +1344,12 @@ class TestPyscfPlugin:
         # Check that the transformation for selected indices is unitary
         u_selected = ca_selected.T @ s_matrix @ ca_loc_selected
         unitarity_error = np.linalg.norm(u_selected @ u_selected.T - np.eye(len(random_occ_indices)))
-        assert unitarity_error < 1e-10
+        assert unitarity_error < unitarity_error_tolerance
 
         # Check that localized orbitals are orthonormal
         overlap_check = ca_loc_selected.T @ s_matrix @ ca_loc_selected
         orthonormality_error = np.linalg.norm(overlap_check - np.eye(len(random_occ_indices)))
-        assert orthonormality_error < 1e-10
+        assert orthonormality_error < orthonormality_error_tolerance
 
         # Test that the objective function improved for the random selection
         random_objective_value = er_objective_function(localized_random.get_orbitals(), ca_loc_selected)
@@ -1351,7 +1376,9 @@ class TestPyscfPlugin:
         assert np.isclose(
             np.sum(occ_a), 5.0, rtol=float_comparison_relative_tolerance, atol=float_comparison_absolute_tolerance
         )
-        assert np.allclose(occ_a, occ_b)
+        assert np.allclose(
+            occ_a, occ_b, rtol=float_comparison_relative_tolerance, atol=float_comparison_absolute_tolerance
+        )
 
     def test_pyscf_avas_selector_o2_triplet_def2svp(self):
         """Test PySCF AVAS selector on O2 molecule (triplet ROHF) with def2-svp basis."""
@@ -1365,7 +1392,6 @@ class TestPyscfPlugin:
         # Select active space using AVAS
         avas_selector = algorithms.create("active_space_selector", "pyscf_avas")
         avas_selector.settings().set("ao_labels", ["O 2s", "O 2p"])
-        print(wavefunction.get_active_determinants()[0])
         active_wfn = avas_selector.run(wavefunction)
 
         act_a, act_b = active_wfn.get_orbitals().get_active_space_indices()
@@ -1418,7 +1444,12 @@ class TestPyscfPlugin:
         pyscf_mcscf = algorithms.create("multi_configuration_scf", "pyscf")
         pyscf_mcscf_energy, _ = pyscf_mcscf.run(active_orbitals_sd.get_orbitals(), ham_calculator, macis_calc, 3, 3)
 
-        assert np.isclose(pyscf_mcscf_energy, -108.78966139913287, atol=mcscf_energy_tolerance)
+        assert np.isclose(
+            pyscf_mcscf_energy,
+            -108.78966139913287,
+            rtol=float_comparison_relative_tolerance,
+            atol=mcscf_energy_tolerance,
+        )
 
     def test_pyscf_mcscf_triplet(self):
         """Test PySCF MCSCF for o2 triplet with cc-pvdz basis and CAS(6,6)."""
@@ -1450,7 +1481,12 @@ class TestPyscfPlugin:
         pyscf_mcscf = algorithms.create("multi_configuration_scf", "pyscf")
         pyscf_mcscf_energy, _ = pyscf_mcscf.run(active_orbitals_sd.get_orbitals(), ham_calculator, macis_calc, 4, 2)
 
-        assert np.isclose(pyscf_mcscf_energy, -149.68131616317658, atol=mcscf_energy_tolerance)
+        assert np.isclose(
+            pyscf_mcscf_energy,
+            -149.68131616317658,
+            rtol=float_comparison_relative_tolerance,
+            atol=mcscf_energy_tolerance,
+        )
 
     def test_pyscf_fciwrapper_casci_singlet(self):
         """Test MC wrapper for n2 with cc-pvdz basis and CAS(6,6)."""
@@ -1480,7 +1516,9 @@ class TestPyscfPlugin:
         casci.verbose = 0
         casci_energy = casci.kernel()[0]
 
-        assert np.isclose(casci_energy, -108.74113344655625, atol=mcscf_energy_tolerance)
+        assert np.isclose(
+            casci_energy, -108.74113344655625, rtol=float_comparison_relative_tolerance, atol=mcscf_energy_tolerance
+        )
 
     def test_pyscf_fciwrapper_casci_triplet(self):
         """Test MC wrapper for o2 triplet with cc-pvdz basis and CAS(6,6)."""
@@ -1508,7 +1546,9 @@ class TestPyscfPlugin:
         casci.verbose = 0
         casci_energy = casci.kernel()[0]
 
-        assert np.isclose(casci_energy, -149.661310389037, atol=mcscf_energy_tolerance)
+        assert np.isclose(
+            casci_energy, -149.661310389037, rtol=float_comparison_relative_tolerance, atol=mcscf_energy_tolerance
+        )
 
     def test_pyscf_fciwrapper_casscf_singlet(self):
         """Test MC wrapper in casscf for n2 with cc-pvdz basis and CAS(6,6)."""
@@ -1538,7 +1578,9 @@ class TestPyscfPlugin:
         casscf.verbose = 0
         casscf_energy = casscf.kernel()[0]
 
-        assert np.isclose(casscf_energy, -108.78966139913287, atol=mcscf_energy_tolerance)
+        assert np.isclose(
+            casscf_energy, -108.78966139913287, rtol=float_comparison_relative_tolerance, atol=mcscf_energy_tolerance
+        )
 
     def test_pyscf_fciwrapper_casscf_triplet(self):
         """Test MC wrapper in casscf for o2 triplet with cc-pvdz basis and CAS(6,6)."""
@@ -1568,7 +1610,9 @@ class TestPyscfPlugin:
         casscf.verbose = 0
         casscf_energy = casscf.kernel()[0]
 
-        assert np.isclose(casscf_energy, -149.68131616317658, atol=mcscf_energy_tolerance)
+        assert np.isclose(
+            casscf_energy, -149.68131616317658, rtol=float_comparison_relative_tolerance, atol=mcscf_energy_tolerance
+        )
 
     def test_pyscf_occupations_from_n_electrons_and_multiplicity(self):
         """Test occupations from n_electrons and multiplicity on water with def2-svp basis."""
@@ -1585,24 +1629,44 @@ class TestPyscfPlugin:
         occupation_singlet = [np.concatenate((np.ones(5), np.zeros(19))), np.concatenate((np.ones(5), np.zeros(19)))]
         scf_1 = orbitals_to_scf(orbitals, occupation_singlet[0], occupation_singlet[1])
         scf_2 = orbitals_to_scf_from_n_electrons_and_multiplicity(orbitals, 10, 1)
-        assert np.allclose(scf_1.mo_occ, scf_2.mo_occ)
+        assert np.allclose(
+            scf_1.mo_occ,
+            scf_2.mo_occ,
+            rtol=float_comparison_relative_tolerance,
+            atol=float_comparison_absolute_tolerance,
+        )
 
         # Check orbitals to SCF for doublet state
         occupation_doublet = [np.concatenate((np.ones(6), np.zeros(18))), np.concatenate((np.ones(5), np.zeros(19)))]
         scf_1 = orbitals_to_scf(orbitals, occupation_doublet[0], occupation_doublet[1])
         scf_2 = orbitals_to_scf_from_n_electrons_and_multiplicity(orbitals, 11, 2)
-        assert np.allclose(scf_1.mo_occ, scf_2.mo_occ)
+        assert np.allclose(
+            scf_1.mo_occ,
+            scf_2.mo_occ,
+            rtol=float_comparison_relative_tolerance,
+            atol=float_comparison_absolute_tolerance,
+        )
 
         # Check orbitals to SCF for triplet state
         occupation_triplet = [np.concatenate((np.ones(6), np.zeros(18))), np.concatenate((np.ones(4), np.zeros(20)))]
         scf_1 = orbitals_to_scf(orbitals, occupation_triplet[0], occupation_triplet[1])
         scf_2 = orbitals_to_scf_from_n_electrons_and_multiplicity(orbitals, 10, 3)
-        assert np.allclose(scf_1.mo_occ, scf_2.mo_occ)
+        assert np.allclose(
+            scf_1.mo_occ,
+            scf_2.mo_occ,
+            rtol=float_comparison_relative_tolerance,
+            atol=float_comparison_absolute_tolerance,
+        )
 
         # Check Hamiltonian to SCF for singlet state
         scf_1 = hamiltonian_to_scf(hamiltonian, occupation_singlet[0], occupation_singlet[1])
         scf_2 = hamiltonian_to_scf_from_n_electrons_and_multiplicity(hamiltonian, 10, 1)
-        assert np.allclose(scf_1.mo_occ, scf_2.mo_occ)
+        assert np.allclose(
+            scf_1.mo_occ,
+            scf_2.mo_occ,
+            rtol=float_comparison_relative_tolerance,
+            atol=float_comparison_absolute_tolerance,
+        )
 
 
 class TestQDKChemistryPySCFBasisConversion:
@@ -1653,7 +1717,7 @@ class TestQDKChemistryPySCFBasisConversion:
         # Verify structure
         assert pyscf_mol.natm == 1
         assert pyscf_mol.atom_charges()[0] == 2  # Helium
-        assert pyscf_mol.nao_nr() == qdk_basis.get_num_basis_functions()
+        assert pyscf_mol.nao_nr() == qdk_basis.get_num_atomic_orbitals()
 
         # Verify coordinates match
         coords = pyscf_mol.atom_coords()
@@ -1673,7 +1737,7 @@ class TestQDKChemistryPySCFBasisConversion:
         assert pyscf_mol.atom_charges()[0] == 8  # Oxygen
         assert pyscf_mol.atom_charges()[1] == 1  # Hydrogen
         assert pyscf_mol.atom_charges()[2] == 1  # Hydrogen
-        assert pyscf_mol.nao_nr() == qdk_basis.get_num_basis_functions()
+        assert pyscf_mol.nao_nr() == qdk_basis.get_num_atomic_orbitals()
 
     def test_pyscf_to_qdk_conversion_helium(self):
         """Test converting PySCF molecule to QDK/Chemistry basis set for helium."""
@@ -1685,7 +1749,7 @@ class TestQDKChemistryPySCFBasisConversion:
 
         # Verify basic properties
         assert qdk_basis.get_num_atoms() == 1
-        assert qdk_basis.get_num_basis_functions() == pyscf_mol.nao_nr()
+        assert qdk_basis.get_num_atomic_orbitals() == pyscf_mol.nao_nr()
         assert qdk_basis.has_structure()
 
     def test_pyscf_to_qdk_conversion_water(self):
@@ -1706,7 +1770,7 @@ class TestQDKChemistryPySCFBasisConversion:
 
         # Verify basic properties
         assert qdk_basis.get_num_atoms() == 3
-        assert qdk_basis.get_num_basis_functions() == pyscf_mol.nao_nr()
+        assert qdk_basis.get_num_atomic_orbitals() == pyscf_mol.nao_nr()
         assert qdk_basis.has_structure()
 
     def test_pyscf_to_qdk_conversion_water_generally_contracted(self):
@@ -1727,7 +1791,7 @@ class TestQDKChemistryPySCFBasisConversion:
 
         # Verify basic properties
         assert qdk_basis.get_num_atoms() == 3
-        assert qdk_basis.get_num_basis_functions() == pyscf_mol.nao_nr()
+        assert qdk_basis.get_num_atomic_orbitals() == pyscf_mol.nao_nr()
         assert qdk_basis.has_structure()
 
     def test_round_trip_conversion_helium(self):
@@ -1744,7 +1808,7 @@ class TestQDKChemistryPySCFBasisConversion:
         # Compare key properties
         assert original_basis.get_num_atoms() == converted_basis.get_num_atoms()
         assert original_basis.get_num_shells() == converted_basis.get_num_shells()
-        assert original_basis.get_num_basis_functions() == converted_basis.get_num_basis_functions()
+        assert original_basis.get_num_atomic_orbitals() == converted_basis.get_num_atomic_orbitals()
 
         # Compare shell-by-shell (with more relaxed tolerances for numerical differences)
         orig_shells = original_basis.get_shells()
@@ -1791,20 +1855,20 @@ class TestQDKChemistryPySCFBasisConversion:
         # Compare key properties
         assert original_basis.get_num_atoms() == converted_basis.get_num_atoms()
         assert original_basis.get_num_shells() == converted_basis.get_num_shells()
-        assert original_basis.get_num_basis_functions() == converted_basis.get_num_basis_functions()
+        assert original_basis.get_num_atomic_orbitals() == converted_basis.get_num_atomic_orbitals()
 
-    def test_basis_type_handling(self):
+    def test_atomic_orbital_type_handling(self):
         """Test handling of spherical vs cartesian basis types."""
         # Create basis with spherical functions
         qdk_basis = self.create_simple_basis_set(self.he_structure)
-        original_type = qdk_basis.get_basis_type()
+        original_type = qdk_basis.get_atomic_orbital_type()
 
         # Convert to PySCF and back
         pyscf_mol = basis_to_pyscf_mol(qdk_basis)
         converted_basis = pyscf_mol_to_qdk_basis(pyscf_mol, self.he_structure)
 
         # Basis type should be preserved
-        assert converted_basis.get_basis_type() == original_type
+        assert converted_basis.get_atomic_orbital_type() == original_type
 
     def test_shell_ordering_consistency(self):
         """Test that shell ordering is consistent after conversion."""
@@ -1987,7 +2051,7 @@ class TestQDKChemistryPySCFBasisConversion:
         # Edge case 1: ECP shells exist without ECP metadata
         shells = [Shell(0, OrbitalType.S, [1.0], [1.0])]
         ecp_shells = [Shell(0, OrbitalType.S, [10.0, 5.0], [50.0, 20.0], [0, 2])]
-        qdk_basis_no_meta = BasisSet("test-basis", shells, ecp_shells, ag_structure, BasisType.Spherical)
+        qdk_basis_no_meta = BasisSet("test-basis", shells, ecp_shells, ag_structure, AOType.Spherical)
 
         assert qdk_basis_no_meta.has_ecp_shells()
         assert qdk_basis_no_meta.get_num_ecp_shells() == 1

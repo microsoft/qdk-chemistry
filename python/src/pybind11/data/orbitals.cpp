@@ -377,10 +377,10 @@ Examples:
 
   orbitals.def("get_num_atomic_orbitals", &Orbitals::get_num_atomic_orbitals,
                R"(
-Get number of atomic orbitals (basis functions).
+Get number of atomic orbitals (atomic orbitals).
 
 Returns:
-    int: Number of atomic orbitals/basis functions
+    int: Number of atomic orbitals/atomic orbitals
 
 Examples:
     >>> num_atomic_orbitals = orbitals.get_num_atomic_orbitals()
@@ -793,7 +793,7 @@ Examples:
 Constructor for model orbitals with basic parameters.
 
 Args:
-    basis_size (int): Number of basis functions (and molecular orbitals)
+    basis_size (int): Number of atomic orbitals (and molecular orbitals)
     restricted (bool): Whether the calculation is restricted (True) or unrestricted (False)
 
 Examples:
@@ -817,7 +817,7 @@ Constructor with active and inactive space indices (restricted).
 For restricted calculations, the same active and inactive space indices are used for both alpha and beta electrons.
 
 Args:
-    basis_size (int): Number of basis functions (and molecular orbitals)
+    basis_size (int): Number of atomic orbitals (and molecular orbitals)
     indices (tuple[list[int], list[int]]): Tuple of ``(active_space_indices, inactive_space_indices)``
 
 Raises:
@@ -844,7 +844,7 @@ Constructor with active and inactive space indices (unrestricted).
 For unrestricted calculations, separate active and inactive space indices can be provided for alpha and beta electrons.
 
 Args:
-    basis_size (int): Number of basis functions (and molecular orbitals)
+    basis_size (int): Number of atomic orbitals (and molecular orbitals)
     indices (tuple[list[int], list[int], list[int], list[int]]): Tuple of ``(active_alpha, active_beta, inactive_alpha, inactive_beta)``
 
 Raises:

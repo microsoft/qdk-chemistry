@@ -1,24 +1,24 @@
 Basis set
 =========
 
-The ``BasisSet`` class in QDK/Chemistry represents a collection of atomic orbital basis functions used to describe the electronic structure of molecules.
-It organizes basis functions into shells and provides methods for managing, querying, and serializing basis set data.
+The ``BasisSet`` class in QDK/Chemistry represents a collection of atomic orbital used to describe the electronic structure of molecules.
+It organizes atomic orbitals into shells and provides methods for managing, querying, and serializing basis set data.
 
 Overview
 --------
 
-In quantum chemistry, a basis set is a collection of mathematical functions used to represent molecular orbitals.
-The ``BasisSet`` class in QDK/Chemistry uses a shell-based organization, where each shell contains basis functions with the same atom, angular momentum, and primitive Gaussian functions.
+In quantum chemistry, a basis set is a collection of atomic orbitals used to represent molecular orbitals.
+The ``BasisSet`` class in QDK/Chemistry uses a shell-based organization, where each shell contains atomic orbitals with the same atom, angular momentum, and primitive Gaussian functions.
 
 Key features of the ``BasisSet`` class include:
 
 - Shell-based storage for memory efficiency
-- Support for both spherical and Cartesian basis functions
-- Mapping between shells/basis functions and atoms
-- Mapping between shells/basis functions and orbital types
+- Support for both spherical and Cartesian atomic orbitals
+- Mapping between shells/atomic orbitals and atoms
+- Mapping between shells/atomic orbitals and orbital types
 - Basis set metadata (name, parameters)
 - Integration with molecular structure information
-- On-demand expansion of shells to individual basis functions
+- On-demand expansion of shells to individual atomic orbitals
 
 Usage
 -----
@@ -36,7 +36,7 @@ Core concepts
 Shells and primitives
 ~~~~~~~~~~~~~~~~~~~~~
 
-A shell represents a group of basis functions that share the same atom, angular momentum, and primitive functions, but differ in magnetic quantum numbers.
+A shell represents a group of atomic orbitals that share the same atom, angular momentum, and primitive functions, but differ in magnetic quantum numbers.
 For example, a :math:`p`-shell contains :math:`p_x, p_y, p_z` functions.
 
 Shells contain primitives, which are Gaussian functions defined by:
@@ -58,7 +58,7 @@ The ``BasisSet`` class supports various orbital types with different angular mom
 Basis types
 ~~~~~~~~~~~
 
-The ``BasisSet`` class supports two types of basis functions:
+The ``BasisSet`` class supports two types of atomic orbitals:
 
 - **Spherical**: Uses spherical harmonics with :math:`2l+1` functions per shell
 - **Cartesian**: Uses Cartesian coordinates with :math:`(l+1)(l+2)/2` functions per shell
@@ -75,7 +75,7 @@ Creating a basis set
    .. code-block:: cpp
 
       // Create an empty basis set with a name
-      BasisSet basis_set("6-31G", BasisType::Spherical);
+      BasisSet basis_set("6-31G", AOType::Spherical);
 
       // Add a shell with multiple primitives
       size_t atom_index = 0;  // First atom
@@ -115,8 +115,8 @@ This ensures that the basis set data remains consistent and prevents accidental 
 
    .. code-block:: cpp
 
-      // Get basis set type and name (returns BasisType)
-      auto basis_type = basis_set.get_basis_type();
+      // Get basis set type and name (returns AOType)
+      auto atomic_orbital_type = basis_set.get_atomic_orbital_type();
       // Get basis set name (returns std::string)
       auto name = basis_set.get_name();
 
@@ -129,16 +129,16 @@ This ensures that the basis set data remains consistent and prevents accidental 
 
       // Get counts
       size_t num_shells = basis_set.get_num_shells();
-      size_t num_basis_functions = basis_set.get_num_basis_functions();
+      size_t num_atomic_orbitals = basis_set.get_num_atomic_orbitals();
       size_t num_atoms = basis_set.get_num_atoms();
 
-      // Get basis function information (returns std::pair<size_t, int>)
-      auto [shell_index, m_quantum_number] = basis_set.get_basis_function_info(5);
-      size_t atom_index = basis_set.get_atom_index_for_basis_function(5);
+      // Get atomic orbital information (returns std::pair<size_t, int>)
+      auto [shell_index, m_quantum_number] = basis_set.get_atomic_orbital_info(5);
+      size_t atom_index = basis_set.get_atom_index_for_atomic_orbital(5);
 
       // Get indices for specific atoms or orbital types
       // Returns std::vector<size_t>
-      auto basis_indices = basis_set.get_basis_function_indices_for_atom(1);
+      auto atomic_orbital_indices = basis_set.get_atomic_orbital_indices_for_atom(1);
       // Returns std::vector<size_t>
       auto shell_indices = basis_set.get_shell_indices_for_orbital_type(OrbitalType::P);
       // Returns std::vector<size_t>
@@ -160,7 +160,7 @@ This ensures that the basis set data remains consistent and prevents accidental 
 Working with shells
 -------------------
 
-The ``Shell`` structure contains information about a group of basis functions:
+The ``Shell`` structure contains information about a group of atomic orbitals:
 
 .. tab:: C++ API
 
@@ -177,7 +177,7 @@ The ``Shell`` structure contains information about a group of basis functions:
 
       // Get information from shell
       size_t num_primitives = shell.get_num_primitives();
-      size_t num_basis_funcs = shell.get_num_basis_functions(BasisType::Spherical);
+      size_t num_atomic_orbitals = shell.get_num_atomic_orbitals(AOType::Spherical);
       int angular_momentum = shell.get_angular_momentum();
 
 .. tab:: Python API
@@ -233,10 +233,10 @@ JSON representation of a ``BasisSet`` has the following structure (showing simpl
          "shells": ["..."]
        }
      ],
-     "basis_type": "spherical",
+     "atomic_orbital_type": "spherical",
      "name": "6-31G",
      "num_atoms": 2,
-     "num_basis_functions": 9,
+     "num_atomic_orbitals": 9,
      "num_shells": 3
    }
 
@@ -303,12 +303,12 @@ The ``BasisSet`` class provides several static utility functions:
       // Get angular momentum (returns int)
       int l_value = BasisSet::get_angular_momentum(OrbitalType::P);  // 1
       // Get number of orbitals for angular momentum (returns int)
-      int num_orbitals = BasisSet::get_num_orbitals_for_l(2, BasisType::Spherical);  // 5
+      int num_orbitals = BasisSet::get_num_orbitals_for_l(2, AOType::Spherical);  // 5
 
       // Convert basis type to string (returns std::string)
-      std::string basis_str = BasisSet::basis_type_to_string(BasisType::Cartesian);  // "cartesian"
-      // Convert string to basis type (returns BasisType)
-      BasisType basis_type = BasisSet::string_to_basis_type("spherical");  // BasisType::Spherical
+      std::string basis_str = BasisSet::atomic_orbital_type_to_string(AOType::Cartesian);  // "cartesian"
+      // Convert string to basis type (returns AOType)
+      AOType atomic_orbital_type = BasisSet::string_to_atomic_orbital_type("spherical");  // AOType::Spherical
 
 .. tab:: Python API
 
@@ -323,7 +323,7 @@ Predefined basis sets
 ---------------------
 
 QDK/Chemistry provides access to a library of standard basis sets commonly used in quantum chemistry calculations.
-These predefined basis sets can be easily loaded without having to manually specify the basis functions.
+These predefined basis sets can be easily loaded without having to manually specify the atomic orbitals.
 For a complete list of available basis sets and their specifications, see the :doc:`Supported Basis Sets <../data/basis_sets>` documentation.
 
 .. tab:: C++ API
