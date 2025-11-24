@@ -139,14 +139,14 @@ std::shared_ptr<data::Wavefunction> MP2NaturalOrbitalLocalizer::_run_impl(
                               mp2_natural_orbitals.data(), num_orbitals);
 
   // Transform selected orbitals with MP2 natural orbital rotation
-  const size_t num_basis_funcs = selected_coeffs.rows();
+  const size_t num_atomic_orbitals = selected_coeffs.rows();
   Eigen::MatrixXd selected_no_coeffs =
-      Eigen::MatrixXd::Zero(num_basis_funcs, num_orbitals);
+      Eigen::MatrixXd::Zero(num_atomic_orbitals, num_orbitals);
   blas::gemm(blas::Layout::ColMajor, blas::Op::NoTrans, blas::Op::NoTrans,
-             num_basis_funcs, num_orbitals, num_orbitals, 1.0,
-             selected_coeffs.data(), num_basis_funcs,
+             num_atomic_orbitals, num_orbitals, num_orbitals, 1.0,
+             selected_coeffs.data(), num_atomic_orbitals,
              mp2_natural_orbitals.data(), num_orbitals, 0.0,
-             selected_no_coeffs.data(), num_basis_funcs);
+             selected_no_coeffs.data(), num_atomic_orbitals);
 
   // Form final orbitals by updating only the selected orbitals
   Eigen::MatrixXd coeffs = full_coeffs;  // Start with original coefficients

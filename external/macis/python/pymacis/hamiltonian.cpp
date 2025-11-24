@@ -29,10 +29,10 @@ void export_hamiltonian_pybind(py::module &m) {
       .def_property_readonly(
           "nbasis", [](const Hamiltonian &self) { return self.nbasis; },
           R"pbdoc(
-                Number of basis functions.
+                Number of atomic orbitals.
 
                 Returns:
-                    int: Total number of basis functions from which active orbitals are selected.
+                    int: Total number of atomic orbitals from which active orbitals are selected.
                     For most cases, this equals norb unless using an active space subset.
             )pbdoc")
       .def_property_readonly(

@@ -1903,10 +1903,10 @@
           ]
         }
       ],
-      "basis_type": "spherical",
+      "atomic_orbital_type": "spherical",
       "name": "def2-svp",
       "num_atoms": 2,
-      "num_basis_functions": 28,
+      "num_atomic_orbitals": 28,
       "num_shells": 12,
       "structure": {
         "coordinates": [

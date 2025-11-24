@@ -58,7 +58,7 @@ class SCF {
    *
    * @return Const reference to overlap matrix S (size: (nao, nao))
    *
-   * @note ``nao`` is the number of atomic orbitals (basis functions)
+   * @note ``nao`` is the number of atomic orbitals (atomic orbitals)
    */
   const RowMajorMatrix& overlap() const;
 
@@ -80,11 +80,11 @@ class SCF {
   std::vector<int> get_num_electrons() const;
 
   /**
-   * @brief Get number of basis functions
+   * @brief Get number of atomic orbitals
    *
-   * @return Number of atomic orbital basis functions
+   * @return Number of atomic orbital atomic orbitals
    */
-  int get_num_basis_functions() const;
+  int get_num_atomic_orbitals() const;
 
   /**
    * @brief Get number of molecular orbitals
