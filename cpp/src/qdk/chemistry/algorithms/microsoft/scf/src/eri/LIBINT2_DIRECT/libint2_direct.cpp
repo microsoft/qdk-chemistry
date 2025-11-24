@@ -388,9 +388,11 @@ class ERI {
                 for (size_t idm = 0; idm < num_density_matrices; ++idm) {
                   auto* J_cur =
                       use_thread_local_buffers_
-                          ? J_thread + idm * num_atomic_orbitals * num_atomic_orbitals
+                          ? J_thread +
+                                idm * num_atomic_orbitals * num_atomic_orbitals
                           : J + idm * num_atomic_orbitals * num_atomic_orbitals;
-                  auto* P_cur = P + idm * num_atomic_orbitals * num_atomic_orbitals;
+                  auto* P_cur =
+                      P + idm * num_atomic_orbitals * num_atomic_orbitals;
                   for (size_t i = 0, ijkl = 0; i < n1; ++i) {
                     const size_t bf1 = bf1_st + i;
                     for (size_t j = 0; j < n2; ++j) {
@@ -406,12 +408,15 @@ class ERI {
                           const auto value = buf_1234[ijkl] * s1234_deg;
 
                           // J contractions
-                          J_ij += P_cur[bf3 * num_atomic_orbitals + bf4] * value;
+                          J_ij +=
+                              P_cur[bf3 * num_atomic_orbitals + bf4] * value;
                           if (use_thread_local_buffers_) {
-                            J_cur[bf3 * num_atomic_orbitals + bf4] += P_ij * value;
+                            J_cur[bf3 * num_atomic_orbitals + bf4] +=
+                                P_ij * value;
                           } else {
 #pragma omp atomic update relaxed
-                            J_cur[bf3 * num_atomic_orbitals + bf4] += P_ij * value;
+                            J_cur[bf3 * num_atomic_orbitals + bf4] +=
+                                P_ij * value;
                           }
 
                         }  // l
@@ -433,9 +438,11 @@ class ERI {
                 for (size_t idm = 0; idm < num_density_matrices; ++idm) {
                   auto* K_cur =
                       use_thread_local_buffers_
-                          ? K_thread + idm * num_atomic_orbitals * num_atomic_orbitals
+                          ? K_thread +
+                                idm * num_atomic_orbitals * num_atomic_orbitals
                           : K + idm * num_atomic_orbitals * num_atomic_orbitals;
-                  auto* P_cur = P + idm * num_atomic_orbitals * num_atomic_orbitals;
+                  auto* P_cur =
+                      P + idm * num_atomic_orbitals * num_atomic_orbitals;
                   for (size_t i = 0, ijkl = 0; i < n1; ++i) {
                     const size_t bf1 = bf1_st + i;
                     for (size_t j = 0; j < n2; ++j) {
@@ -454,18 +461,24 @@ class ERI {
                           const auto value = buf_1234[ijkl] * s1234_deg;
 
                           // K contractions
-                          K_ik +=
-                              0.25 * P_cur[bf2 * num_atomic_orbitals + bf4] * value;
-                          K_jk +=
-                              0.25 * P_cur[bf1 * num_atomic_orbitals + bf4] * value;
+                          K_ik += 0.25 *
+                                  P_cur[bf2 * num_atomic_orbitals + bf4] *
+                                  value;
+                          K_jk += 0.25 *
+                                  P_cur[bf1 * num_atomic_orbitals + bf4] *
+                                  value;
                           if (use_thread_local_buffers_) {
-                            K_cur[bf1 * num_atomic_orbitals + bf4] += P_jk * value;
-                            K_cur[bf2 * num_atomic_orbitals + bf4] += P_ik * value;
+                            K_cur[bf1 * num_atomic_orbitals + bf4] +=
+                                P_jk * value;
+                            K_cur[bf2 * num_atomic_orbitals + bf4] +=
+                                P_ik * value;
                           } else {
 #pragma omp atomic update relaxed
-                            K_cur[bf1 * num_atomic_orbitals + bf4] += P_jk * value;
+                            K_cur[bf1 * num_atomic_orbitals + bf4] +=
+                                P_jk * value;
 #pragma omp atomic update relaxed
-                            K_cur[bf2 * num_atomic_orbitals + bf4] += P_ik * value;
+                            K_cur[bf2 * num_atomic_orbitals + bf4] +=
+                                P_ik * value;
                           }
 
                         }  // l
