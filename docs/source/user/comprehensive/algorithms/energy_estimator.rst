@@ -69,6 +69,11 @@ The Qiskit implementation uses the Aer simulator to execute quantum circuits. Ke
 Implemented interface
 ---------------------
 
+QDK/Chemistry's ``EnergyEstimator`` provides a unified interface for selecting simulator backend for energy estimation.
+
+QDK/Chemistry implementations
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
 - **qdk_base_simulator**: Native implementation with support for Qsharp simulator backends
 
 Third-party interfaces
