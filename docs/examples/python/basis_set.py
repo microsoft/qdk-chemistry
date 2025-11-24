@@ -30,7 +30,7 @@
 
 # start-cell-2
 # # Access basic properties
-# basis_type = basis_set.get_basis_type()
+# atomic_orbital_type = basis_set.get_atomic_orbital_type()
 # name = basis_set.get_name()
 
 # # Access shell information
@@ -104,6 +104,6 @@
 # l_value = BasisSet.get_angular_momentum(OrbitalType.P)  # 1
 # num_orbitals = BasisSet.get_num_orbitals_for_l(2, AOType.SPHERICAL)  # 5
 
-# basis_str = BasisSet.basis_type_to_string(AOType.CARTESIAN)  # "cartesian"
-# basis_type = BasisSet.string_to_basis_type("spherical")  # AOType.SPHERICAL
+# basis_str = BasisSet.atomic_orbital_type_to_string(AOType.CARTESIAN)  # "cartesian"
+# atomic_orbital_type = BasisSet.string_to_atomic_orbital_type("spherical")  # AOType.SPHERICAL
 # end-cell-5
