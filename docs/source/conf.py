@@ -258,6 +258,7 @@ exclude_patterns = ["_build"]  # Directories to exclude from build
 suppress_warnings = [
     "duplicate_declaration.cpp",  # Suppress warnings about duplicate C++ declarations, this happens due to nested namespaces
     "ref.ref",  # sphinx does not like bools for some reason
+    "autodoc.duplicate",  # Suppress warnings about duplicate object descriptions from imported classes
 ]
 
 # -----------------------------------------------------------------------------

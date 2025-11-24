@@ -1,6 +1,13 @@
 cmake_minimum_required(VERSION 3.15)
 project(qdk_chemistry_python VERSION 1.0.0.1 LANGUAGES CXX)
 
+# Set default build type to Release if not specified
+if(NOT CMAKE_BUILD_TYPE AND NOT CMAKE_CONFIGURATION_TYPES)
+    message(WARNING "CMAKE_BUILD_TYPE not specified, defaulting to Release")
+    set(CMAKE_BUILD_TYPE "Release" CACHE STRING "Choose the type of build." FORCE)
+    set_property(CACHE CMAKE_BUILD_TYPE PROPERTY STRINGS "Debug" "Release" "MinSizeRel" "RelWithDebInfo")
+endif()
+
 # Enable ccache if available
 find_program(CCACHE_EXECUTABLE ccache)
 if(CCACHE_EXECUTABLE AND NOT CMAKE_CXX_COMPILER_LAUNCHER)
@@ -83,12 +90,12 @@ target_compile_features(_core PUBLIC cxx_std_20)
 
 # Handle Coverage build
 if(QDK_CHEMISTRY_ENABLE_COVERAGE)
-    if(CMAKE_BUILD_TYPE STREQUAL "Debug")
+    if(CMAKE_BUILD_TYPE STREQUAL "Debug" OR CMAKE_BUILD_TYPE STREQUAL "RelWithDebInfo")
         message(STATUS "Enabling coverage build")
         target_compile_options(_core PRIVATE --coverage -fprofile-arcs -ftest-coverage)
         target_link_libraries(_core PRIVATE --coverage)
     else()
-        message(FATAL_ERROR "Coverage build is only supported in CMAKE_BUILD_TYPE=Debug mode")
+        message(FATAL_ERROR "Coverage build is only supported in CMAKE_BUILD_TYPE=Debug or RelWithDebInfo mode")
     endif()
 endif()
 
