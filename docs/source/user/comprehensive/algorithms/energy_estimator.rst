@@ -1,7 +1,7 @@
-Energy Estimator
-================
+Energy estimation
+=================
 
-The ``EnergyEstimator`` algorithm in QDK/Chemistry provides a flexible and efficient framework for computing expectation values with quantum circuit and Hamiltonians.
+The :class:`~qdk_chemistry.algorithms.EnergyEstimator` algorithm in QDK/Chemistry provides a flexible and efficient framework for computing expectation values with quantum circuit and Hamiltonians.
 The estimator evaluates energies by generating measurement circuits, executing them on a backend with a configurable number of shots, and statistically aggregating the resulting bitstring outcomes.
 It is designed to support multiple backend simulators.
 
@@ -9,7 +9,7 @@ It is designed to support multiple backend simulators.
 Overview
 --------
 
-The ``EnergyEstimator`` evaluates the expectation value of a qubit Hamiltonian with respect to a given quantum circuit.
+The :class:`~qdk_chemistry.algorithms.EnergyEstimator` evaluates the expectation value of a qubit Hamiltonian with respect to a given quantum circuit.
 It takes a circuit in OpenQASM format with target qubit Hamiltonians, automatically generates the corresponding measurement circuits.
 These circuits are executed on a selected backend simulator with the user-specified number of shots, and the resulting bitstring statistics are used to calculate per-term expectation values and the total energy.
 
@@ -17,7 +17,7 @@ These circuits are executed on a selected backend simulator with the user-specif
 Capabilities
 ------------
 
-The ``EnergyEstimator`` provides the following capabilities:
+The :class:`~qdk_chemistry.algorithms.EnergyEstimator` provides the following capabilities:
 
 - **Expectation Value and Variance Calculation**: Computes the energy expectation value and variance for a given quantum circuit and Hamiltonians. It supports multiple Hamiltonians for simultaneous evaluation.
 - **Backend Flexibility**: Allows users to choose between Qsharp and Qiskit backends, each with unique features and configurations, such as noise modeling.
@@ -25,7 +25,7 @@ The ``EnergyEstimator`` provides the following capabilities:
 Creating an Energy Estimator
 ----------------------------
 
-The ``EnergyEstimator`` is created using the :doc:`factory pattern <../advanced/factory_pattern>`.
+The :class:`~qdk_chemistry.algorithms.EnergyEstimator` is created using the :doc:`factory pattern <../advanced/factory_pattern>`.
 
 .. tab:: Python API
 
@@ -40,7 +40,7 @@ Configuring the Energy Estimator
 Qsharp Backend
 ~~~~~~~~~~
 
-The Qsharp implementation of the ``EnergyEstimator`` leverages the QDK simulator to execute quantum circuits. Key features include:
+The Qsharp implementation of the :class:`~qdk_chemistry.algorithms.EnergyEstimator` leverages the QDK simulator to execute quantum circuits. Key features include:
 
 - Support for depolarizing noise, bit flip noise, pauli noise, and phase flip noise.
 - Simulation with qubit loss.
@@ -69,7 +69,7 @@ The Qiskit implementation uses the Aer simulator to execute quantum circuits. Ke
 Implemented interface
 ---------------------
 
-QDK/Chemistry's ``EnergyEstimator`` provides a unified interface for selecting simulator backend for energy estimation.
+QDK/Chemistry's :class:`~qdk_chemistry.algorithms.EnergyEstimator` provides a unified interface for selecting simulator backend for energy estimation.
 
 QDK/Chemistry implementations
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
