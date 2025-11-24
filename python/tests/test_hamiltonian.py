@@ -76,7 +76,6 @@ class TestHamiltonian:
         assert np.array_equal(aabb, two_body)
         assert np.array_equal(bbbb, two_body)
 
-
     def test_two_body_element_access(self):
         h = create_test_hamiltonian(2)
         val = h.get_two_body_element(0, 1, 1, 0)
