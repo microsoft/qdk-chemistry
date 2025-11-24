@@ -420,6 +420,7 @@ bool BasisSet::has_ecp_shells() const {
 }
 
 std::vector<Shell> BasisSet::get_ecp_shells() const {
+  QDK_LOG_TRACE_ENTERING();
   std::vector<Shell> all_ecp_shells;
 
   for (const auto& atom_ecp_shells : _ecp_shells_per_atom) {
@@ -433,6 +434,7 @@ std::vector<Shell> BasisSet::get_ecp_shells() const {
 
 const std::vector<Shell>& BasisSet::get_ecp_shells_for_atom(
     size_t atom_index) const {
+  QDK_LOG_TRACE_ENTERING();
   _validate_atom_index(atom_index);
   if (atom_index >= _ecp_shells_per_atom.size()) {
     static const std::vector<Shell> empty_vector;
@@ -442,6 +444,7 @@ const std::vector<Shell>& BasisSet::get_ecp_shells_for_atom(
 }
 
 const Shell& BasisSet::get_ecp_shell(size_t shell_index) const {
+  QDK_LOG_TRACE_ENTERING();
   size_t total_ecp_shells = get_num_ecp_shells();
   if (shell_index >= total_ecp_shells) {
     throw std::out_of_range("ECP shell index " + std::to_string(shell_index) +
@@ -722,22 +725,6 @@ const std::vector<size_t>& BasisSet::get_ecp_electrons() const {
 
 bool BasisSet::has_ecp_electrons() const {
   QDK_LOG_TRACE_ENTERING();
-  // Check if any atom has a finite number of ECP electrons
-  for (size_t ecp_electrons : _ecp_electrons) {
-    if (ecp_electrons > 0) {
-      return true;
-    }
-  }
-  return false;
-}
-
-const std::string& BasisSet::get_ecp_name() const { return _ecp_name; }
-
-const std::vector<size_t>& BasisSet::get_ecp_electrons() const {
-  return _ecp_electrons;
-}
-
-bool BasisSet::has_ecp_electrons() const {
   // Check if any atom has a finite number of ECP electrons
   for (size_t ecp_electrons : _ecp_electrons) {
     if (ecp_electrons > 0) {

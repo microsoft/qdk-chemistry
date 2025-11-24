@@ -511,184 +511,188 @@ bool SlaterDeterminantContainer::has_one_rdm_spin_traced() const {
 bool SlaterDeterminantContainer::has_two_rdm_spin_dependent() const {
   QDK_LOG_TRACE_ENTERING();
 
-  bool SlaterDeterminantContainer::has_two_rdm_spin_traced() const {
-    QDK_LOG_TRACE_ENTERING();
+  // Always available for Slater determinants (can be computed on-the-fly)
+  return true;
+}
 
-    // Always available for Slater determinants (can be computed on-the-fly)
-    return true;
+bool SlaterDeterminantContainer::has_two_rdm_spin_traced() const {
+  QDK_LOG_TRACE_ENTERING();
+
+  // Always available for Slater determinants (can be computed on-the-fly)
+  return true;
+}
+
+std::string SlaterDeterminantContainer::get_container_type() const {
+  QDK_LOG_TRACE_ENTERING();
+
+  return "sd";
+}
+
+bool SlaterDeterminantContainer::is_complex() const {
+  QDK_LOG_TRACE_ENTERING();
+
+  return false;  // Slater determinants always use real coefficients (unity)
+}
+
+nlohmann::json SlaterDeterminantContainer::to_json() const {
+  QDK_LOG_TRACE_ENTERING();
+
+  nlohmann::json j;
+
+  // Store version first
+  j["version"] = SERIALIZATION_VERSION;
+
+  // Store container type
+  j["container_type"] = get_container_type();
+
+  // Store wavefunction type
+  j["wavefunction_type"] =
+      (_type == WavefunctionType::SelfDual) ? "self_dual" : "not_self_dual";
+
+  // Store orbitals
+  j["orbitals"] = _orbitals->to_json();
+
+  // Store single determinant
+  j["determinant"] = _determinant.to_json();
+
+  // SD containers are always real with coefficient 1.0
+  j["is_complex"] = false;
+
+  return j;
+}
+
+std::unique_ptr<SlaterDeterminantContainer>
+SlaterDeterminantContainer::from_json(const nlohmann::json& j) {
+  QDK_LOG_TRACE_ENTERING();
+
+  try {
+    // Validate version first
+    if (!j.contains("version")) {
+      throw std::runtime_error("Invalid JSON: missing version field");
+    }
+    validate_serialization_version(SERIALIZATION_VERSION, j["version"]);
+
+    // Load orbitals
+    if (!j.contains("orbitals")) {
+      throw std::runtime_error("JSON missing required 'orbitals' field");
+    }
+    auto orbitals = Orbitals::from_json(j["orbitals"]);
+
+    // Load wavefunction type
+    WavefunctionType type = WavefunctionType::SelfDual;
+    if (j.contains("wavefunction_type")) {
+      std::string type_str = j["wavefunction_type"];
+      type = (type_str == "self_dual") ? WavefunctionType::SelfDual
+                                       : WavefunctionType::NotSelfDual;
+    }
+
+    // Load determinant
+    if (!j.contains("determinant")) {
+      throw std::runtime_error("JSON missing required 'determinant' field");
+    }
+    Configuration determinant = Configuration::from_json(j["determinant"]);
+
+    return std::make_unique<SlaterDeterminantContainer>(determinant, orbitals,
+                                                        type);
+
+  } catch (const std::exception& e) {
+    throw std::runtime_error(
+        "Failed to parse SlaterDeterminantContainer from JSON: " +
+        std::string(e.what()));
   }
+}
 
-  std::string SlaterDeterminantContainer::get_container_type() const {
-    QDK_LOG_TRACE_ENTERING();
+void SlaterDeterminantContainer::to_hdf5(H5::Group& group) const {
+  QDK_LOG_TRACE_ENTERING();
 
-    return "sd";
-  }
+  try {
+    H5::StrType string_type(H5::PredType::C_S1, H5T_VARIABLE);
 
-  bool SlaterDeterminantContainer::is_complex() const {
-    QDK_LOG_TRACE_ENTERING();
-
-    return false;  // Slater determinants always use real coefficients (unity)
-  }
-
-  nlohmann::json SlaterDeterminantContainer::to_json() const {
-    QDK_LOG_TRACE_ENTERING();
-
-    nlohmann::json j;
-
-    // Store version first
-    j["version"] = SERIALIZATION_VERSION;
+    // Add version attribute
+    H5::Attribute version_attr = group.createAttribute(
+        "version", string_type, H5::DataSpace(H5S_SCALAR));
+    std::string version_str(SERIALIZATION_VERSION);
+    version_attr.write(string_type, version_str);
+    version_attr.close();
 
     // Store container type
-    j["container_type"] = get_container_type();
+    std::string container_type = get_container_type();
+    H5::Attribute type_attr = group.createAttribute(
+        "container_type", string_type, H5::DataSpace(H5S_SCALAR));
+    type_attr.write(string_type, container_type);
 
     // Store wavefunction type
-    j["wavefunction_type"] =
+    std::string wf_type =
         (_type == WavefunctionType::SelfDual) ? "self_dual" : "not_self_dual";
+    H5::Attribute wf_type_attr = group.createAttribute(
+        "wavefunction_type", string_type, H5::DataSpace(H5S_SCALAR));
+    wf_type_attr.write(string_type, wf_type);
 
     // Store orbitals
-    j["orbitals"] = _orbitals->to_json();
+    H5::Group orbitals_group = group.createGroup("orbitals");
+    _orbitals->to_hdf5(orbitals_group);
+
+    // Store complexity flag (always false for SD)
+    H5::Attribute complex_attr = group.createAttribute(
+        "is_complex", H5::PredType::NATIVE_HBOOL, H5::DataSpace(H5S_SCALAR));
+    hbool_t is_complex_flag = 0;  // Always false for SlaterDeterminant
+    complex_attr.write(H5::PredType::NATIVE_HBOOL, &is_complex_flag);
 
     // Store single determinant
-    j["determinant"] = _determinant.to_json();
+    H5::Group det_group = group.createGroup("determinant");
+    _determinant.to_hdf5(det_group);
 
-    // SD containers are always real with coefficient 1.0
-    j["is_complex"] = false;
-
-    return j;
+  } catch (const H5::Exception& e) {
+    throw std::runtime_error("HDF5 error: " + std::string(e.getCDetailMsg()));
   }
+}
 
-  std::unique_ptr<SlaterDeterminantContainer>
-  SlaterDeterminantContainer::from_json(const nlohmann::json& j) {
-    QDK_LOG_TRACE_ENTERING();
+std::unique_ptr<SlaterDeterminantContainer>
+SlaterDeterminantContainer::from_hdf5(H5::Group& group) {
+  QDK_LOG_TRACE_ENTERING();
 
-    try {
-      // Validate version first
-      if (!j.contains("version")) {
-        throw std::runtime_error("Invalid JSON: missing version field");
-      }
-      validate_serialization_version(SERIALIZATION_VERSION, j["version"]);
+  try {
+    // Check version first
+    H5::StrType string_type(H5::PredType::C_S1, H5T_VARIABLE);
+    H5::Attribute version_attr = group.openAttribute("version");
+    std::string version;
+    version_attr.read(string_type, version);
+    validate_serialization_version(SERIALIZATION_VERSION, version);
 
-      // Load orbitals
-      if (!j.contains("orbitals")) {
-        throw std::runtime_error("JSON missing required 'orbitals' field");
-      }
-      auto orbitals = Orbitals::from_json(j["orbitals"]);
-
-      // Load wavefunction type
-      WavefunctionType type = WavefunctionType::SelfDual;
-      if (j.contains("wavefunction_type")) {
-        std::string type_str = j["wavefunction_type"];
-        type = (type_str == "self_dual") ? WavefunctionType::SelfDual
-                                         : WavefunctionType::NotSelfDual;
-      }
-
-      // Load determinant
-      if (!j.contains("determinant")) {
-        throw std::runtime_error("JSON missing required 'determinant' field");
-      }
-      Configuration determinant = Configuration::from_json(j["determinant"]);
-
-      return std::make_unique<SlaterDeterminantContainer>(determinant, orbitals,
-                                                          type);
-
-    } catch (const std::exception& e) {
+    // Load orbitals
+    if (!group.nameExists("orbitals")) {
       throw std::runtime_error(
-          "Failed to parse SlaterDeterminantContainer from JSON: " +
-          std::string(e.what()));
+          "HDF5 group missing required 'orbitals' subgroup");
     }
-  }
+    H5::Group orbitals_group = group.openGroup("orbitals");
+    auto orbitals = Orbitals::from_hdf5(orbitals_group);
 
-  void SlaterDeterminantContainer::to_hdf5(H5::Group & group) const {
-    QDK_LOG_TRACE_ENTERING();
-
-    try {
+    // Load wavefunction type
+    WavefunctionType type = WavefunctionType::SelfDual;
+    if (group.attrExists("wavefunction_type")) {
       H5::StrType string_type(H5::PredType::C_S1, H5T_VARIABLE);
-
-      // Add version attribute
-      H5::Attribute version_attr = group.createAttribute(
-          "version", string_type, H5::DataSpace(H5S_SCALAR));
-      std::string version_str(SERIALIZATION_VERSION);
-      version_attr.write(string_type, version_str);
-      version_attr.close();
-
-      // Store container type
-      std::string container_type = get_container_type();
-      H5::Attribute type_attr = group.createAttribute(
-          "container_type", string_type, H5::DataSpace(H5S_SCALAR));
-      type_attr.write(string_type, container_type);
-
-      // Store wavefunction type
-      std::string wf_type =
-          (_type == WavefunctionType::SelfDual) ? "self_dual" : "not_self_dual";
-      H5::Attribute wf_type_attr = group.createAttribute(
-          "wavefunction_type", string_type, H5::DataSpace(H5S_SCALAR));
-      wf_type_attr.write(string_type, wf_type);
-
-      // Store orbitals
-      H5::Group orbitals_group = group.createGroup("orbitals");
-      _orbitals->to_hdf5(orbitals_group);
-
-      // Store complexity flag (always false for SD)
-      H5::Attribute complex_attr = group.createAttribute(
-          "is_complex", H5::PredType::NATIVE_HBOOL, H5::DataSpace(H5S_SCALAR));
-      hbool_t is_complex_flag = 0;  // Always false for SlaterDeterminant
-      complex_attr.write(H5::PredType::NATIVE_HBOOL, &is_complex_flag);
-
-      // Store single determinant
-      H5::Group det_group = group.createGroup("determinant");
-      _determinant.to_hdf5(det_group);
-
-    } catch (const H5::Exception& e) {
-      throw std::runtime_error("HDF5 error: " + std::string(e.getCDetailMsg()));
+      H5::Attribute wf_type_attr = group.openAttribute("wavefunction_type");
+      std::string type_str;
+      wf_type_attr.read(string_type, type_str);
+      type = (type_str == "self_dual") ? WavefunctionType::SelfDual
+                                       : WavefunctionType::NotSelfDual;
     }
-  }
 
-  std::unique_ptr<SlaterDeterminantContainer>
-  SlaterDeterminantContainer::from_hdf5(H5::Group & group) {
-    QDK_LOG_TRACE_ENTERING();
-
-    try {
-      // Check version first
-      H5::StrType string_type(H5::PredType::C_S1, H5T_VARIABLE);
-      H5::Attribute version_attr = group.openAttribute("version");
-      std::string version;
-      version_attr.read(string_type, version);
-      validate_serialization_version(SERIALIZATION_VERSION, version);
-
-      // Load orbitals
-      if (!group.nameExists("orbitals")) {
-        throw std::runtime_error(
-            "HDF5 group missing required 'orbitals' subgroup");
-      }
-      H5::Group orbitals_group = group.openGroup("orbitals");
-      auto orbitals = Orbitals::from_hdf5(orbitals_group);
-
-      // Load wavefunction type
-      WavefunctionType type = WavefunctionType::SelfDual;
-      if (group.attrExists("wavefunction_type")) {
-        H5::StrType string_type(H5::PredType::C_S1, H5T_VARIABLE);
-        H5::Attribute wf_type_attr = group.openAttribute("wavefunction_type");
-        std::string type_str;
-        wf_type_attr.read(string_type, type_str);
-        type = (type_str == "self_dual") ? WavefunctionType::SelfDual
-                                         : WavefunctionType::NotSelfDual;
-      }
-
-      // Load determinant
-      if (!group.nameExists("determinant")) {
-        throw std::runtime_error(
-            "HDF5 group missing required 'determinant' dataset");
-      }
-      H5::Group det_group = group.openGroup("determinant");
-      Configuration determinant = Configuration::from_hdf5(det_group);
-      det_group.close();
-
-      return std::make_unique<SlaterDeterminantContainer>(determinant, orbitals,
-                                                          type);
-
-    } catch (const H5::Exception& e) {
-      throw std::runtime_error("HDF5 error: " + std::string(e.getCDetailMsg()));
+    // Load determinant
+    if (!group.nameExists("determinant")) {
+      throw std::runtime_error(
+          "HDF5 group missing required 'determinant' dataset");
     }
+    H5::Group det_group = group.openGroup("determinant");
+    Configuration determinant = Configuration::from_hdf5(det_group);
+    det_group.close();
+
+    return std::make_unique<SlaterDeterminantContainer>(determinant, orbitals,
+                                                        type);
+
+  } catch (const H5::Exception& e) {
+    throw std::runtime_error("HDF5 error: " + std::string(e.getCDetailMsg()));
   }
+}
 
 }  // namespace qdk::chemistry::data

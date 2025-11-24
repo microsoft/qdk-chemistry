@@ -2037,6 +2037,5 @@ std::shared_ptr<ModelOrbitals> ModelOrbitals::from_hdf5(H5::Group& group) {
     throw std::runtime_error("HDF5 error: " + std::string(e.getCDetailMsg()));
   }
 }
-
 }  // namespace data
 }  // namespace qdk::chemistry
