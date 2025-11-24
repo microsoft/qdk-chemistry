@@ -45,90 +45,77 @@ void bind_stability(py::module &m) {
   // StabilityChecker abstract base class
   py::class_<StabilityChecker, StabilityCheckerBase, py::smart_holder>
       stability_checker(m, "StabilityChecker", R"(
-    Abstract base class for wavefunction stability checkers.
+Abstract base class for wavefunction stability checkers.
 
-    This class defines the interface for checking the stability of
-    wavefunctions in quantum chemistry calculations. Stability checking
-    examines the second-order response of a wavefunction to determine if
-    it corresponds to a true minimum or if there are directions in which
-    the energy can be lowered.
+This class defines the interface for checking the stability of wavefunctions in quantum chemistry calculations.
+Stability checking examines the second-order response of a wavefunction to determine if it corresponds to a true minimum or if there are directions in which the energy can be lowered.
 
-    Examples
-    --------
+Examples:
     To create a custom stability checker, inherit from this class:
 
-    >>> import qdk_chemistry.algorithms as alg
-    >>> import qdk_chemistry.data as data
-    >>> class MyStabilityChecker(alg.StabilityChecker):
-    ...     def __init__(self):
-    ...         super().__init__()  # Call the base class constructor
-    ...     # Implement the _run_impl method
-    ...     def _run_impl(self, wavefunction: data.Wavefunction) -> tuple[bool, data.StabilityResult]:
-    ...         # Custom stability checking implementation
-    ...         import numpy as np
-    ...         internal_eigenvalues = np.array([1.0, 2.0, 3.0])
-    ...         external_eigenvalues = np.array([0.5, 1.5])
-    ...         internal_eigenvectors = np.eye(3)
-    ...         external_eigenvectors = np.eye(2)
-    ...         internal_stable = np.all(internal_eigenvalues > 0)
-    ...         external_stable = np.all(external_eigenvalues > 0)
-    ...         result = data.StabilityResult(internal_stable, external_stable,
-    ...                                       internal_eigenvalues, internal_eigenvectors,
-    ...                                       external_eigenvalues, external_eigenvectors)
-    ...         return (result.is_stable(), result)
+        >>> import qdk_chemistry.algorithms as alg
+        >>> import qdk_chemistry.data as data
+        >>> class MyStabilityChecker(alg.StabilityChecker):
+        ...     def __init__(self):
+        ...         super().__init__()  # Call the base class constructor
+        ...     # Implement the _run_impl method
+        ...     def _run_impl(self, wavefunction: data.Wavefunction) -> tuple[bool, data.StabilityResult]:
+        ...         # Custom stability checking implementation
+        ...         import numpy as np
+        ...         internal_eigenvalues = np.array([1.0, 2.0, 3.0])
+        ...         external_eigenvalues = np.array([0.5, 1.5])
+        ...         internal_eigenvectors = np.eye(3)
+        ...         external_eigenvectors = np.eye(2)
+        ...         internal_stable = np.all(internal_eigenvalues > 0)
+        ...         external_stable = np.all(external_eigenvalues > 0)
+        ...         result = data.StabilityResult(internal_stable, external_stable,
+        ...                                       internal_eigenvalues, internal_eigenvectors,
+        ...                                       external_eigenvalues, external_eigenvectors)
+        ...         return (result.is_stable(), result)
 )");
 
   stability_checker.def(py::init<>(),
                         R"(
-        Create a StabilityChecker instance.
+Create a StabilityChecker instance.
 
-        Initializes a new stability checker with default settings.
-        Configuration options can be modified through the ``settings()`` method.
+Initializes a new stability checker with default settings.
+Configuration options can be modified through the ``settings()`` method.
 
-        Examples
-        --------
-        >>> checker = alg.StabilityChecker()
-        >>> checker.settings().set("nroots", 5)
-        >>> checker.settings().set("tolerance", 1e-6)
-        )");
+Examples:
+    >>> checker = alg.StabilityChecker()
+    >>> checker.settings().set("nroots", 5)
+    >>> checker.settings().set("tolerance", 1e-6)
+)");
 
   stability_checker.def("run", &StabilityChecker::run,
                         R"(
-        Check the stability of the given wavefunction.
+Check the stability of the given wavefunction.
 
-        This method automatically locks settings before execution and performs
-        stability analysis on the input wavefunction by examining the eigenvalues
-        of the electronic Hessian matrix. A stable wavefunction should have all
-        positive eigenvalues for both internal and external stability.
+This method automatically locks settings before execution and performs stability analysis on the input wavefunction by examining the eigenvalues of the electronic Hessian matrix.
+A stable wavefunction should have all positive eigenvalues for both internal and external stability.
 
-        Parameters
-        ----------
-        wavefunction : qdk_chemistry.data.Wavefunction
-            The wavefunction to analyze for stability
+Args:
+    wavefunction (qdk_chemistry.data.Wavefunction): The wavefunction to analyze for stability
 
-        Returns
-        -------
-        tuple[bool, qdk_chemistry.data.StabilityResult]
-            A tuple containing:
-            - bool: Overall stability status (True if stable, False if unstable)
-            - qdk_chemistry.data.StabilityResult: Detailed stability information containing:
-              - internal and external stability status (accessible via is_internal_stable(), is_external_stable())
-              - overall stability status (accessible via is_stable(), requires both internal and external to be stable)
-              - internal eigenvalues and eigenvectors (accessible via get_internal_eigenvalues(), get_internal_eigenvectors())
-              - external eigenvalues and eigenvectors (accessible via get_external_eigenvalues(), get_external_eigenvectors())
-              - overall smallest eigenvalue methods (accessible via get_smallest_eigenvalue())
-        )",
+Returns:
+    tuple[bool, qdk_chemistry.data.StabilityResult]: A tuple containing
+        - bool: Overall stability status (True if stable, False if unstable)
+        - qdk_chemistry.data.StabilityResult: Detailed stability information containing:
+            - internal and external stability status (accessible via is_internal_stable(), is_external_stable())
+            - overall stability status (accessible via is_stable(), requires both internal and external to be stable)
+            - internal eigenvalues and eigenvectors (accessible via get_internal_eigenvalues(), get_internal_eigenvectors())
+            - external eigenvalues and eigenvectors (accessible via get_external_eigenvalues(), get_external_eigenvectors())
+            - overall smallest eigenvalue methods (accessible via get_smallest_eigenvalue())
+)",
                         py::arg("wavefunction"));
 
   stability_checker.def("settings", &StabilityChecker::settings,
                         R"(
-        Access the stability checker's configuration settings.
+Access the stability checker's configuration settings.
 
-        Returns
-        -------
-        qdk_chemistry.data.Settings
-            Reference to the settings object for configuring the stability checker
-        )",
+Returns:
+    qdk_chemistry.data.Settings: Reference to the settings object for configuring the stability checker
+)",
                         py::return_value_policy::reference_internal);
 
   // Expose _settings as a writable property for derived classes
@@ -143,21 +130,18 @@ void bind_stability(py::module &m) {
       },
       py::return_value_policy::reference_internal,
       R"(
-        Internal settings object property.
+Internal settings object property.
 
-        This property allows derived classes to replace the settings object with
-        a specialized Settings subclass in their constructors.
-        )");
+This property allows derived classes to replace the settings object with a specialized Settings subclass in their constructors.
+)");
 
   stability_checker.def("type_name", &StabilityChecker::type_name,
                         R"(
-        The algorithm's type name.
+The algorithm's type name.
 
-        Returns
-        -------
-        str
-            The type name of the algorithm
-        )");
+Returns:
+    str: The type name of the algorithm
+)");
 
   // Factory class binding - creates StabilityCheckerFactory class with static
   // methods
