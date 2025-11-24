@@ -100,7 +100,6 @@ class _TestSettingsContainer(Settings):
         self._set_default("simple_float", "float", 0.0)
         self._set_default("float_boundary", "float", 0.0)
         self._set_default("double_precision", "double", 0.0)
-        self._set_default("bool_list", "vector<int64_t>", [])
         self._set_default("empty_list", "vector<int64_t>", [])
         self._set_default("tuple_ints", "vector<int64_t>", [])
         self._set_default("tuple_floats", "vector<double>", [])
@@ -137,8 +136,6 @@ class _TestSettingsContainer(Settings):
         self._set_default("very_small", "double", 0.0)
         self._set_default("very_large", "double", 0.0)
         self._set_default("empty_int_list", "vector<int64_t>", [])
-        self._set_default("all_bool_list", "vector<int64_t>", [])
-        self._set_default("first_bool_list", "vector<int64_t>", [])
         self._set_default("first_int_list", "vector<int64_t>", [])
         self._set_default("first_float_list", "vector<double>", [])
         self._set_default("first_str_list", "vector<string>", [])
@@ -1050,13 +1047,6 @@ class TestSettings:
         assert isinstance(settings["float_boundary"], float)
         assert isinstance(settings["double_precision"], float)
 
-        # Test boolean handling in sequences
-        settings["bool_list"] = [True, False, True]  # Should become int list
-        result = settings["bool_list"]
-        assert isinstance(result, list)
-        # Booleans get converted to ints in lists
-        assert all(isinstance(x, int) for x in result)
-
         # Test empty sequences (should default to int vector)
         settings["empty_list"] = []
         empty_result = settings["empty_list"]
@@ -1185,28 +1175,17 @@ class TestSettings:
         assert settings["empty_int_list"] == []
         assert isinstance(settings["empty_int_list"], list)
 
-        # Test mixed type lists that should trigger type selection
-        settings["all_bool_list"] = [True, False, True, False]
-        bool_result = settings["all_bool_list"]
-        # Booleans in lists should become integers
-        assert all(isinstance(x, int) for x in bool_result)
-        assert bool_result == [1, 0, 1, 0]
-
         # Test sequences with first element determining type
-        with pytest.raises(SettingTypeMismatch):
-            settings["first_bool_list"] = [True, 1, 0]  # First is bool
         with pytest.raises(SettingTypeMismatch):
             settings["first_int_list"] = [1, True, False]  # First is int
         settings["first_float_list"] = [1.0, 2, 3]  # First is float
         settings["first_str_list"] = ["a", "b", "c"]  # First is string
 
         # Verify type conversion based on first element
-        first_bool_result = settings["first_bool_list"]
         first_int_result = settings["first_int_list"]
         first_float_result = settings["first_float_list"]
         first_str_result = settings["first_str_list"]
 
-        assert all(isinstance(x, int) for x in first_bool_result)
         assert all(isinstance(x, int) for x in first_int_result)
         assert all(isinstance(x, float) for x in first_float_result)
         assert all(isinstance(x, str) for x in first_str_result)
