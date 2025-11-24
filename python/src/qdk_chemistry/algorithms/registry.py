@@ -43,7 +43,7 @@ from qdk_chemistry._core._algorithms import (
 )
 from qdk_chemistry.algorithms.energy_estimator import EnergyEstimatorFactory, QDKEnergyEstimator
 from qdk_chemistry.algorithms.qubit_mapper import QubitMapperFactory
-from qdk_chemistry.algorithms.state_preparation import StatePreparationFactory
+from qdk_chemistry.algorithms.state_preparation import SparseIsometryGF2XStatePreparation, StatePreparationFactory
 
 from .base import Algorithm, AlgorithmFactory
 
@@ -400,3 +400,4 @@ def _cleanup_algorithms():
 
 # Register built-in Python energy estimators
 register(lambda: QDKEnergyEstimator())
+register(lambda: SparseIsometryGF2XStatePreparation())
