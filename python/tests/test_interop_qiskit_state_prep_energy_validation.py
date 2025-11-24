@@ -14,7 +14,7 @@ from qiskit_aer import AerSimulator
 from qiskit_aer.primitives import EstimatorV2 as AerEstimator
 
 from qdk_chemistry.algorithms import create
-from qdk_chemistry.plugins.qiskit.sparse_isometry import _prepare_single_reference_state
+from qdk_chemistry.algorithms.state_preparation.sparse_isometry import _prepare_single_reference_state
 
 from .reference_tolerances import float_comparison_absolute_tolerance, float_comparison_relative_tolerance
 
