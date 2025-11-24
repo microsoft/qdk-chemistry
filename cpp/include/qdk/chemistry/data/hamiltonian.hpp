@@ -122,11 +122,12 @@ class Hamiltonian : public DataClass,
   virtual ~Hamiltonian() = default;
 
   /**
-   * @brief Get one-electron integrals in MO basis
-   * @return Reference to one-electron integrals matrix
+   * @brief Get tuple of alpha, beta one-electron integrals in MO basis
+   * @return Reference to alpha, beta one-electron integrals matrices
    * @throws std::runtime_error if integrals are not set
    */
-  const Eigen::MatrixXd& get_one_body_integrals() const;
+  std::tuple<const Eigen::MatrixXd&, const Eigen::MatrixXd&>
+  get_one_body_integrals() const;
 
   /**
    * @brief Check if one-body integrals are available

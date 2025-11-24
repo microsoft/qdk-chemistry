@@ -114,11 +114,13 @@ Hamiltonian& Hamiltonian::operator=(const Hamiltonian& other) {
   return *this;
 }
 
-const Eigen::MatrixXd& Hamiltonian::get_one_body_integrals() const {
+std::tuple<const Eigen::MatrixXd&, const Eigen::MatrixXd&>
+Hamiltonian::get_one_body_integrals() const {
   if (!has_one_body_integrals()) {
     throw std::runtime_error("One-body integrals are not set");
   }
-  return *_one_body_integrals.first;
+  return std::make_tuple(std::cref(*std::get<0>(_one_body_integrals)),
+                         std::cref(*std::get<1>(_one_body_integrals)));
 }
 
 bool Hamiltonian::has_one_body_integrals() const {
@@ -407,30 +409,76 @@ std::string Hamiltonian::get_summary() const {
   summary += "  Type: ";
   summary += (is_hermitian() ? "Hermitian" : "NonHermitian");
   summary += "\n";
+  summary += "  Restrictedness: ";
+  summary += (is_restricted() ? "Restricted" : "Unrestricted");
+  summary += "\n";
   summary += "  Active Orbitals: " + std::to_string(norb) + "\n";
   summary +=
       "  Total Orbitals: " + std::to_string(num_molecular_orbitals) + "\n";
 
   const double threshold = 1e-6;  // Threshold for determining negligible
                                   // integrals in summary statistics
-  const size_t non_negligible_one_body_ints = std::count_if(
-      get_one_body_integrals().data(),
-      get_one_body_integrals().data() + get_one_body_integrals().size(),
-      [threshold](double val) { return std::abs(val) > threshold; });
-  const auto& two_body_aaaa = std::get<0>(get_two_body_integrals());
-  const size_t non_negligible_two_body_ints = std::count_if(
-      two_body_aaaa.data(), two_body_aaaa.data() + two_body_aaaa.size(),
-      [threshold](double val) { return std::abs(val) > threshold; });
 
   summary += "  Core Energy: " + std::to_string(get_core_energy()) + "\n";
   summary += "  Integral Statistics:\n";
-  summary += "    One-body Integrals: " +
-             std::to_string(get_one_body_integrals().size()) +
-             " (larger than " + std::to_string(threshold) + ": " +
-             std::to_string(non_negligible_one_body_ints) + ")\n";
-  summary += "    Two-body Integrals: " + std::to_string(two_body_aaaa.size()) +
-             " (larger than " + std::to_string(threshold) + ": " +
-             std::to_string(non_negligible_two_body_ints) + ")\n";
+
+  // One-body integrals - alpha
+  const auto& one_body_alpha = get_one_body_integrals_alpha();
+  const size_t non_negligible_one_body_alpha = std::count_if(
+      one_body_alpha.data(), one_body_alpha.data() + one_body_alpha.size(),
+      [threshold](double val) { return std::abs(val) > threshold; });
+
+  summary += "    One-body Integrals (alpha): " +
+             std::to_string(one_body_alpha.size()) + " (larger than " +
+             std::to_string(threshold) + ": " +
+             std::to_string(non_negligible_one_body_alpha) + ")\n";
+
+  // One-body integrals - beta (if unrestricted)
+  if (is_unrestricted()) {
+    const auto& one_body_beta = get_one_body_integrals_beta();
+    const size_t non_negligible_one_body_beta = std::count_if(
+        one_body_beta.data(), one_body_beta.data() + one_body_beta.size(),
+        [threshold](double val) { return std::abs(val) > threshold; });
+
+    summary += "    One-body Integrals (beta): " +
+               std::to_string(one_body_beta.size()) + " (larger than " +
+               std::to_string(threshold) + ": " +
+               std::to_string(non_negligible_one_body_beta) + ")\n";
+  }
+
+  // Two-body integrals - aaaa
+  const auto& two_body_aaaa = std::get<0>(get_two_body_integrals());
+  const size_t non_negligible_two_body_aaaa = std::count_if(
+      two_body_aaaa.data(), two_body_aaaa.data() + two_body_aaaa.size(),
+      [threshold](double val) { return std::abs(val) > threshold; });
+
+  summary +=
+      "    Two-body Integrals (aaaa): " + std::to_string(two_body_aaaa.size()) +
+      " (larger than " + std::to_string(threshold) + ": " +
+      std::to_string(non_negligible_two_body_aaaa) + ")\n";
+
+  // Two-body integrals - aabb and bbbb (if unrestricted)
+  if (is_unrestricted()) {
+    const auto& two_body_aabb = std::get<1>(get_two_body_integrals());
+    const size_t non_negligible_two_body_aabb = std::count_if(
+        two_body_aabb.data(), two_body_aabb.data() + two_body_aabb.size(),
+        [threshold](double val) { return std::abs(val) > threshold; });
+
+    summary += "    Two-body Integrals (aabb): " +
+               std::to_string(two_body_aabb.size()) + " (larger than " +
+               std::to_string(threshold) + ": " +
+               std::to_string(non_negligible_two_body_aabb) + ")\n";
+
+    const auto& two_body_bbbb = std::get<2>(get_two_body_integrals());
+    const size_t non_negligible_two_body_bbbb = std::count_if(
+        two_body_bbbb.data(), two_body_bbbb.data() + two_body_bbbb.size(),
+        [threshold](double val) { return std::abs(val) > threshold; });
+
+    summary += "    Two-body Integrals (bbbb): " +
+               std::to_string(two_body_bbbb.size()) + " (larger than " +
+               std::to_string(threshold) + ": " +
+               std::to_string(non_negligible_two_body_bbbb) + ")\n";
+  }
 
   return summary;
 }

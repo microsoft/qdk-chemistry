@@ -102,7 +102,7 @@ double Ansatz::calculate_energy() const {
         _wavefunction->get_active_one_rdm_spin_traced());
 
     // get integrals from hamiltonian
-    const auto& h1 = _hamiltonian->get_one_body_integrals();
+    const auto& [h1, h1_b] = _hamiltonian->get_one_body_integrals();
     // get_two_body_integrals returns (aaaa, aabb, bbbb) tuple
     const auto& [h2_aaaa, h2_aabb, h2_bbbb] =
         _hamiltonian->get_two_body_integrals();
@@ -162,9 +162,8 @@ double Ansatz::calculate_energy() const {
     const auto& rdm2_aaaa = std::get<Eigen::VectorXd>(rdm2_aaaa_var);
     const auto& rdm2_bbbb = std::get<Eigen::VectorXd>(rdm2_bbbb_var);
 
-    // get integrals from hamiltonian
-    const auto& h1_alpha = _hamiltonian->get_one_body_integrals_alpha();
-    const auto& h1_beta = _hamiltonian->get_one_body_integrals_beta();
+    // get one body integrals from hamiltonian
+    const auto& [h1_alpha, h1_beta] = _hamiltonian->get_one_body_integrals();
 
     // get_two_body_integrals returns (aaaa, aabb, bbbb) tuple
     const auto& [h2_aaaa, h2_aabb, h2_bbbb] =
@@ -481,7 +480,7 @@ std::shared_ptr<Ansatz> Ansatz::from_json(const nlohmann::json& j) {
           original_hamiltonian->get_two_body_integrals();
       // For restricted, all components are the same; use aaaa
       new_hamiltonian = std::make_shared<Hamiltonian>(
-          original_hamiltonian->get_one_body_integrals(), h2_aaaa,
+          original_hamiltonian->get_one_body_integrals_alpha(), h2_aaaa,
           wavefunction_orbitals, original_hamiltonian->get_core_energy(),
           fock_matrix, original_hamiltonian->get_type());
     } else {
@@ -659,7 +658,7 @@ std::shared_ptr<Ansatz> Ansatz::from_hdf5(H5::Group& group) {
           original_hamiltonian->get_two_body_integrals();
       // For restricted, all components are the same; use aaaa
       new_hamiltonian = std::make_shared<Hamiltonian>(
-          original_hamiltonian->get_one_body_integrals(), h2_aaaa,
+          original_hamiltonian->get_one_body_integrals_alpha(), h2_aaaa,
           wavefunction_orbitals, original_hamiltonian->get_core_energy(),
           fock_matrix, original_hamiltonian->get_type());
     } else {

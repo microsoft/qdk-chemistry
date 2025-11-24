@@ -186,9 +186,11 @@ TEST_F(HamiltonianTest, CopyConstructorAndAssignment) {
   EXPECT_EQ(h2.get_orbitals()->get_num_molecular_orbitals(), 2);
   EXPECT_EQ(h2.get_core_energy(), 1.5);
 
-  // Verify deep copying of matrices
-  EXPECT_TRUE(
-      h1.get_one_body_integrals().isApprox(h2.get_one_body_integrals()));
+  // Verify one body integral copy
+  EXPECT_TRUE(std::get<0>(h1.get_one_body_integrals())
+                  .isApprox(std::get<0>(h2.get_one_body_integrals())));
+  EXPECT_TRUE(std::get<1>(h1.get_one_body_integrals())
+                  .isApprox(std::get<1>(h2.get_one_body_integrals())));
   // Compare each component of the two-body integrals tuple
   EXPECT_TRUE(std::get<0>(h1.get_two_body_integrals())
                   .isApprox(std::get<0>(h2.get_two_body_integrals())));
@@ -302,12 +304,18 @@ TEST_F(HamiltonianTest, JSONSerialization) {
   EXPECT_TRUE(h2->has_two_body_integrals());
   EXPECT_TRUE(h2->has_orbitals());
 
-  // Check that matrices are approximately equal
-  EXPECT_TRUE(
-      h.get_one_body_integrals().isApprox(h2->get_one_body_integrals()));
-  // Check first element in tuple (aaaa)
+  // Check one body
+  EXPECT_TRUE(h.get_one_body_integrals_alpha().isApprox(
+      h2->get_one_body_integrals_alpha()));
+  EXPECT_TRUE(h.get_one_body_integrals_beta().isApprox(
+      h2->get_one_body_integrals_beta()));
+  // Check two body
   EXPECT_TRUE(std::get<0>(h.get_two_body_integrals())
                   .isApprox(std::get<0>(h2->get_two_body_integrals())));
+  EXPECT_TRUE(std::get<1>(h.get_two_body_integrals())
+                  .isApprox(std::get<1>(h2->get_two_body_integrals())));
+  EXPECT_TRUE(std::get<2>(h.get_two_body_integrals())
+                  .isApprox(std::get<2>(h2->get_two_body_integrals())));
 
   // Check they are still restricted
   EXPECT_TRUE(h2->is_restricted());
@@ -333,8 +341,10 @@ TEST_F(HamiltonianTest, JSONFileIO) {
   EXPECT_TRUE(h2->has_orbitals());
 
   // Check that matrices are approximately equal
-  EXPECT_TRUE(
-      h.get_one_body_integrals().isApprox(h2->get_one_body_integrals()));
+  EXPECT_TRUE(h.get_one_body_integrals_alpha().isApprox(
+      h2->get_one_body_integrals_alpha()));
+  EXPECT_TRUE(h.get_one_body_integrals_beta().isApprox(
+      h2->get_one_body_integrals_beta()));
   EXPECT_TRUE(std::get<0>(h.get_two_body_integrals())
                   .isApprox(std::get<0>(h2->get_two_body_integrals())));
   EXPECT_TRUE(std::get<1>(h.get_two_body_integrals())
@@ -366,8 +376,10 @@ TEST_F(HamiltonianTest, HDF5FileIO) {
   EXPECT_TRUE(h2->has_orbitals());
 
   // Check that matrices are approximately equal
-  EXPECT_TRUE(
-      h.get_one_body_integrals().isApprox(h2->get_one_body_integrals()));
+  EXPECT_TRUE(h.get_one_body_integrals_alpha().isApprox(
+      h2->get_one_body_integrals_alpha()));
+  EXPECT_TRUE(h.get_one_body_integrals_beta().isApprox(
+      h2->get_one_body_integrals_beta()));
   EXPECT_TRUE(std::get<0>(h.get_two_body_integrals())
                   .isApprox(std::get<0>(h2->get_two_body_integrals())));
   EXPECT_TRUE(std::get<1>(h.get_two_body_integrals())
@@ -388,8 +400,8 @@ TEST_F(HamiltonianTest, GenericFileIO) {
   auto h2 = Hamiltonian::from_file(json_filename, "json");
 
   EXPECT_EQ(h2->get_orbitals()->get_num_molecular_orbitals(), 2);
-  EXPECT_TRUE(
-      h.get_one_body_integrals().isApprox(h2->get_one_body_integrals()));
+  EXPECT_TRUE(h.get_one_body_integrals_alpha().isApprox(
+      h2->get_one_body_integrals_alpha()));
 
   // Test HDF5 via generic interface
   std::string hdf5_filename = "test.hamiltonian.h5";
@@ -399,8 +411,8 @@ TEST_F(HamiltonianTest, GenericFileIO) {
   auto h3 = Hamiltonian::from_file(hdf5_filename, "hdf5");
 
   EXPECT_EQ(h3->get_orbitals()->get_num_molecular_orbitals(), 2);
-  EXPECT_TRUE(
-      h.get_one_body_integrals().isApprox(h3->get_one_body_integrals()));
+  EXPECT_TRUE(h.get_one_body_integrals_alpha().isApprox(
+      h3->get_one_body_integrals_alpha()));
 }
 
 TEST_F(HamiltonianTest, InvalidFileType) {
