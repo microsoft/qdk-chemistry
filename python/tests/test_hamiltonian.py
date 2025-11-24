@@ -62,7 +62,6 @@ class TestHamiltonian:
         assert h.has_one_body_integrals()
         assert np.array_equal(h.get_one_body_integrals_alpha(), one_body)
 
-
     def test_two_body_integrals(self):
         one_body = np.eye(2)
         rng = np.random.default_rng(1)
