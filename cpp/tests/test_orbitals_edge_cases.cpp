@@ -335,8 +335,8 @@ TEST_F(OrbitalsEdgeCasesTest, CopyConstructorWithNullPointers) {
   EXPECT_EQ(2, orb4.get_num_molecular_orbitals());
   // Should have coefficients but no energies
   const auto& [alpha_coeffs, beta_coeffs] = orb4.get_coefficients();
-  EXPECT_TRUE(coeffs.isApprox(alpha_coeffs, 1e-12));
-  EXPECT_TRUE(coeffs.isApprox(beta_coeffs, 1e-12));
+  EXPECT_TRUE(coeffs.isApprox(alpha_coeffs, testing::numerical_zero_tolerance));
+  EXPECT_TRUE(coeffs.isApprox(beta_coeffs, testing::numerical_zero_tolerance));
 
   // Should throw for missing energies when requested
   EXPECT_THROW(orb4.get_energies(), std::runtime_error);
@@ -374,13 +374,17 @@ TEST_F(OrbitalsEdgeCasesTest, CopyConstructorUnrestrictedPaths) {
   // Verify all data copied correctly
   const auto& [copied_alpha_coeffs, copied_beta_coeffs] =
       orb2.get_coefficients();
-  EXPECT_TRUE(alpha_coeffs.isApprox(copied_alpha_coeffs, 1e-12));
-  EXPECT_TRUE(beta_coeffs.isApprox(copied_beta_coeffs, 1e-12));
+  EXPECT_TRUE(alpha_coeffs.isApprox(copied_alpha_coeffs,
+                                    testing::numerical_zero_tolerance));
+  EXPECT_TRUE(beta_coeffs.isApprox(copied_beta_coeffs,
+                                   testing::numerical_zero_tolerance));
 
   const auto& [copied_alpha_energies, copied_beta_energies] =
       orb2.get_energies();
-  EXPECT_TRUE(alpha_energies.isApprox(copied_alpha_energies, 1e-12));
-  EXPECT_TRUE(beta_energies.isApprox(copied_beta_energies, 1e-12));
+  EXPECT_TRUE(alpha_energies.isApprox(copied_alpha_energies,
+                                      testing::numerical_zero_tolerance));
+  EXPECT_TRUE(beta_energies.isApprox(copied_beta_energies,
+                                     testing::numerical_zero_tolerance));
 
   // Verify that modifications to original don't affect copy (deep copy test).
   // Since objects are immutable, we'll create a new object with modified data.
@@ -424,7 +428,7 @@ TEST_F(OrbitalsEdgeCasesTest, AssignmentOperatorWithNullPointers) {
 
   // Should have coefficients but missing energies
   const auto& [alpha_coeffs, beta_coeffs] = orb2.get_coefficients();
-  EXPECT_TRUE(coeffs.isApprox(alpha_coeffs, 1e-12));
+  EXPECT_TRUE(coeffs.isApprox(alpha_coeffs, testing::numerical_zero_tolerance));
   EXPECT_THROW(orb2.get_energies(), std::runtime_error);
 }
 
@@ -465,13 +469,17 @@ TEST_F(OrbitalsEdgeCasesTest, AssignmentOperatorUnrestrictedPaths) {
   // Verify all data copied correctly
   const auto& [assigned_alpha_coeffs, assigned_beta_coeffs] =
       orb2.get_coefficients();
-  EXPECT_TRUE(alpha_coeffs.isApprox(assigned_alpha_coeffs, 1e-12));
-  EXPECT_TRUE(beta_coeffs.isApprox(assigned_beta_coeffs, 1e-12));
+  EXPECT_TRUE(alpha_coeffs.isApprox(assigned_alpha_coeffs,
+                                    testing::numerical_zero_tolerance));
+  EXPECT_TRUE(beta_coeffs.isApprox(assigned_beta_coeffs,
+                                   testing::numerical_zero_tolerance));
 
   const auto& [assigned_alpha_energies, assigned_beta_energies] =
       orb2.get_energies();
-  EXPECT_TRUE(alpha_energies.isApprox(assigned_alpha_energies, 1e-12));
-  EXPECT_TRUE(beta_energies.isApprox(assigned_beta_energies, 1e-12));
+  EXPECT_TRUE(alpha_energies.isApprox(assigned_alpha_energies,
+                                      testing::numerical_zero_tolerance));
+  EXPECT_TRUE(beta_energies.isApprox(assigned_beta_energies,
+                                     testing::numerical_zero_tolerance));
 
   // Test assignment from unrestricted to restricted (transition coverage)
   Eigen::MatrixXd restricted_coeffs(2, 2);
@@ -520,14 +528,18 @@ TEST_F(OrbitalsEdgeCasesTest, AssignmentOperatorRestrictedToRestricted) {
 
   // Verify data copied correctly
   const auto& [alpha_coeffs, beta_coeffs] = orb2.get_coefficients();
-  EXPECT_TRUE(coeffs.isApprox(alpha_coeffs, 1e-12));
+  EXPECT_TRUE(coeffs.isApprox(alpha_coeffs, testing::numerical_zero_tolerance));
   EXPECT_TRUE(alpha_coeffs.isApprox(
-      beta_coeffs, 1e-12));  // Should be identical for restricted
+      beta_coeffs, testing::numerical_zero_tolerance));  // Should be identical
+                                                         // for restricted
 
   const auto& [alpha_energies, beta_energies] = orb2.get_energies();
-  EXPECT_TRUE(energies.isApprox(alpha_energies, 1e-12));
+  EXPECT_TRUE(
+      energies.isApprox(alpha_energies, testing::numerical_zero_tolerance));
   EXPECT_TRUE(alpha_energies.isApprox(
-      beta_energies, 1e-12));  // Should be identical for restricted
+      beta_energies,
+      testing::numerical_zero_tolerance));  // Should be identical for
+                                            // restricted
 }
 
 TEST_F(OrbitalsEdgeCasesTest, AssignmentOperatorOptionalComponents) {
@@ -558,7 +570,8 @@ TEST_F(OrbitalsEdgeCasesTest, AssignmentOperatorOptionalComponents) {
   orb2 = orb1;
   EXPECT_TRUE(orb2.has_overlap_matrix());
   const auto& copied_overlap = orb2.get_overlap_matrix();
-  EXPECT_TRUE(overlap.isApprox(copied_overlap, 1e-12));
+  EXPECT_TRUE(
+      overlap.isApprox(copied_overlap, testing::numerical_zero_tolerance));
 
   // Test assignment to orbital that already has overlap
   Eigen::MatrixXd different_overlap(n_basis, n_basis);
@@ -570,8 +583,10 @@ TEST_F(OrbitalsEdgeCasesTest, AssignmentOperatorOptionalComponents) {
   orb3 = orb1;  // Should replace the existing overlap
   EXPECT_TRUE(orb3.has_overlap_matrix());
   const auto& replaced_overlap = orb3.get_overlap_matrix();
-  EXPECT_TRUE(overlap.isApprox(replaced_overlap, 1e-12));
-  EXPECT_FALSE(different_overlap.isApprox(replaced_overlap, 1e-12));
+  EXPECT_TRUE(
+      overlap.isApprox(replaced_overlap, testing::numerical_zero_tolerance));
+  EXPECT_FALSE(different_overlap.isApprox(replaced_overlap,
+                                          testing::numerical_zero_tolerance));
 
   // Test assignment from orbital without optional components
   Orbitals orb4(coeffs, std::nullopt, std::nullopt, optional_basis);
@@ -681,11 +696,13 @@ TEST_F(OrbitalsEdgeCasesTest, HDF5BasisSetTemporaryFileOperations) {
   // Verify data loaded correctly
   const auto& [loaded_alpha_coeffs, loaded_beta_coeffs] =
       orb_load->get_coefficients();
-  EXPECT_TRUE(coeffs.isApprox(loaded_alpha_coeffs, 1e-12));
+  EXPECT_TRUE(
+      coeffs.isApprox(loaded_alpha_coeffs, testing::numerical_zero_tolerance));
 
   const auto& [loaded_alpha_energies, loaded_beta_energies] =
       orb_load->get_energies();
-  EXPECT_TRUE(energies.isApprox(loaded_alpha_energies, 1e-12));
+  EXPECT_TRUE(energies.isApprox(loaded_alpha_energies,
+                                testing::numerical_zero_tolerance));
 
   // Test temporary file cleanup scenarios
   // The temporary files should be automatically cleaned up
@@ -741,7 +758,7 @@ TEST_F(OrbitalsEdgeCasesTest, HDF5DatasetExistenceChecks) {
 
   // Should have coefficients and occupations (occupations are always saved)
   const auto& [alpha_coeffs, beta_coeffs] = orb_minimal->get_coefficients();
-  EXPECT_TRUE(coeffs.isApprox(alpha_coeffs, 1e-12));
+  EXPECT_TRUE(coeffs.isApprox(alpha_coeffs, testing::numerical_zero_tolerance));
 
   // Should throw for missing energies only
   EXPECT_THROW(orb_minimal->get_energies(), std::runtime_error);

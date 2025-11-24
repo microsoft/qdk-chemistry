@@ -25,6 +25,12 @@ from qdk_chemistry.data import (
     WavefunctionType,
 )
 
+from .reference_tolerances import (
+    float_comparison_absolute_tolerance,
+    float_comparison_relative_tolerance,
+    rdm_tolerance,
+    scf_orbital_tolerance,
+)
 from .test_helpers import create_test_basis_set
 
 
@@ -114,12 +120,16 @@ class TestWavefunction:
 
         det1 = Configuration("20")
         coeff1 = wf.get_coefficient(det1)
-        assert abs(coeff1 - 0.9) < 1e-10
+        assert np.isclose(
+            coeff1, 0.9, rtol=float_comparison_relative_tolerance, atol=float_comparison_absolute_tolerance
+        )
 
     def test_wavefunction_get_coefficients(self, cas_wavefunction):
         wf = cas_wavefunction
         coeffs = wf.get_coefficients()
-        assert np.linalg.norm(coeffs - [0.9, 0.436]) < 1e-12
+        assert np.allclose(
+            coeffs, [0.9, 0.436], rtol=float_comparison_relative_tolerance, atol=float_comparison_absolute_tolerance
+        )
 
     def test_wavefunction_determinants_access(self, cas_wavefunction):
         """Test accessing determinants from wavefunction."""
@@ -136,11 +146,15 @@ class TestWavefunction:
         # SCI wavefunction
         sci_norm = cas_wavefunction.norm()
         expected_norm = np.sqrt(0.9**2 + 0.436**2)
-        assert abs(sci_norm - expected_norm) < 1e-6
+        assert np.isclose(
+            sci_norm, expected_norm, rtol=float_comparison_relative_tolerance, atol=float_comparison_absolute_tolerance
+        )
 
         # Slater determinant should have norm 1.0
         slater_norm = slater_wavefunction.norm()
-        assert abs(slater_norm - 1.0) < 1e-10
+        assert np.isclose(
+            slater_norm, 1.0, rtol=float_comparison_relative_tolerance, atol=float_comparison_absolute_tolerance
+        )
 
     def test_wavefunction_overlap(self, basic_orbitals):
         """Test overlap calculation between wavefunctions."""
@@ -160,7 +174,12 @@ class TestWavefunction:
 
         overlap = wf1.overlap(wf2)
         expected_overlap = 0.9 * 0.8 + 0.1 * 0.2
-        assert abs(overlap - expected_overlap) < 1e-10
+        assert np.isclose(
+            overlap,
+            expected_overlap,
+            rtol=float_comparison_relative_tolerance,
+            atol=float_comparison_absolute_tolerance,
+        )
 
     def test_wavefunction_self_overlap(self, cas_wavefunction):
         """Test that self-overlap equals norm squared."""
@@ -169,7 +188,12 @@ class TestWavefunction:
         self_overlap = wf.overlap(wf)
         norm_squared = wf.norm() ** 2
 
-        assert abs(self_overlap - norm_squared) < 1e-10
+        assert np.isclose(
+            self_overlap,
+            norm_squared,
+            rtol=float_comparison_relative_tolerance,
+            atol=float_comparison_absolute_tolerance,
+        )
 
     def test_wavefunction_rdm_availability_checks(self, cas_wavefunction):
         """Test RDM availability check methods."""
@@ -218,6 +242,24 @@ class TestWavefunction:
         assert "norm=" in str_str
         assert str(cas_wavefunction.size()) in str_str
 
+    def test_get_summary(self, cas_wavefunction):
+        """Test that get_summary() returns a proper summary string."""
+        summary = cas_wavefunction.get_summary()
+        assert isinstance(summary, str)
+
+        # Verify it contains expected content based on C++ implementation
+        assert "Wavefunction Summary:" in summary
+        assert "Container type: cas" in summary
+        assert "Number of determinants: 2" in summary
+        assert "Wavefunction type: SelfDual" in summary
+        assert "Complex: no" in summary
+        assert "Norm:" in summary
+        assert "Total electrons" in summary
+        assert "Active electrons" in summary
+        assert "1-RDM available:" in summary
+        assert "2-RDM available:" in summary
+        assert "Orbitals:" in summary
+
     def test_pickling_wavefunction(self, cas_wavefunction):
         """Test that Wavefunction can be pickled and unpickled correctly."""
         # Test pickling round-trip
@@ -226,7 +268,12 @@ class TestWavefunction:
 
         # Verify core properties
         assert wf_restored.size() == cas_wavefunction.size()
-        assert abs(wf_restored.norm() - cas_wavefunction.norm()) < 1e-10
+        assert np.isclose(
+            wf_restored.norm(),
+            cas_wavefunction.norm(),
+            rtol=float_comparison_relative_tolerance,
+            atol=float_comparison_absolute_tolerance,
+        )
         assert wf_restored.is_complex() == cas_wavefunction.is_complex()
         assert wf_restored.get_type() == cas_wavefunction.get_type()
 
@@ -245,9 +292,19 @@ class TestWavefunction:
             orig_coeff = cas_wavefunction.get_coefficient(det)
             restored_coeff = wf_restored.get_coefficient(det)
             if isinstance(orig_coeff, complex):
-                assert abs(orig_coeff - restored_coeff) < 1e-10
+                assert np.isclose(
+                    orig_coeff,
+                    restored_coeff,
+                    rtol=float_comparison_relative_tolerance,
+                    atol=float_comparison_absolute_tolerance,
+                )
             else:
-                assert abs(orig_coeff - restored_coeff) < 1e-10
+                assert np.isclose(
+                    orig_coeff,
+                    restored_coeff,
+                    rtol=float_comparison_relative_tolerance,
+                    atol=float_comparison_absolute_tolerance,
+                )
 
         # Verify orbital consistency
         orig_orbs = cas_wavefunction.get_orbitals()
@@ -353,12 +410,19 @@ class TestWavefunctionComplexSupport:
 
         # Test coefficient retrieval
         coeff1 = wf.get_coefficient(det1)
-        assert abs(coeff1 - (0.8 + 0.2j)) < 1e-10
+        assert np.isclose(
+            coeff1, 0.8 + 0.2j, rtol=float_comparison_relative_tolerance, atol=float_comparison_absolute_tolerance
+        )
 
         # Test norm calculation with complex coefficients
         expected_norm = np.sqrt(abs(0.8 + 0.2j) ** 2 + abs(0.3 - 0.4j) ** 2)
         actual_norm = wf.norm()
-        assert abs(actual_norm - expected_norm) < 1e-10
+        assert np.isclose(
+            actual_norm,
+            expected_norm,
+            rtol=float_comparison_relative_tolerance,
+            atol=float_comparison_absolute_tolerance,
+        )
 
     def test_complex_overlap(self, basic_orbitals):
         """Test overlap with complex wavefunctions."""
@@ -378,7 +442,9 @@ class TestWavefunctionComplexSupport:
         overlap = wf1.overlap(wf2)
         # For complex wavefunctions: ⟨ψ₁|ψ₂⟩ = Σᵢ c₁ᵢ* c₂ᵢ
         expected = (0.8 - 0.2j) * (0.7 - 0.1j) + (0.3 + 0.4j) * (0.2 + 0.3j)
-        assert abs(overlap - expected) < 1e-10
+        assert np.isclose(
+            overlap, expected, rtol=float_comparison_relative_tolerance, atol=float_comparison_absolute_tolerance
+        )
 
 
 class TestWavefunctionEdgeCases:
@@ -391,7 +457,7 @@ class TestWavefunctionEdgeCases:
         basis_set = create_test_basis_set(2, "test-edge-cases")
         return Orbitals(coeffs, None, None, basis_set)
 
-    def test_empty_wavefunction(self, basic_orbitals):
+    def test_empty_wavefunction(self, basic_orbitals) -> None:
         """Test wavefunction with no determinants."""
         dets: list[Configuration] = []
         coeffs = np.array([])
@@ -412,10 +478,14 @@ class TestWavefunctionEdgeCases:
         wf = Wavefunction(container)
 
         assert wf.size() == 1
-        assert abs(wf.norm() - 0.7) < 1e-10
+        assert np.isclose(
+            wf.norm(), 0.7, rtol=float_comparison_relative_tolerance, atol=float_comparison_absolute_tolerance
+        )
 
         coeff = wf.get_coefficient(det)
-        assert abs(coeff - 0.7) < 1e-10
+        assert np.isclose(
+            coeff, 0.7, rtol=float_comparison_relative_tolerance, atol=float_comparison_absolute_tolerance
+        )
 
     def test_zero_coefficient_handling(self, basic_orbitals):
         """Test handling of zero coefficients."""
@@ -432,12 +502,18 @@ class TestWavefunctionEdgeCases:
         coeff1 = wf.get_coefficient(det1)
         coeff2 = wf.get_coefficient(det2)
 
-        assert abs(coeff1 - 1.0) < 1e-10
-        assert abs(coeff2 - 0.0) < 1e-10
+        assert np.isclose(
+            coeff1, 1.0, rtol=float_comparison_relative_tolerance, atol=float_comparison_absolute_tolerance
+        )
+        assert np.isclose(
+            coeff2, 0.0, rtol=float_comparison_relative_tolerance, atol=float_comparison_absolute_tolerance
+        )
 
-        assert abs(wf.norm() - 1.0) < 1e-10
+        assert np.isclose(
+            wf.norm(), 1.0, rtol=float_comparison_relative_tolerance, atol=float_comparison_absolute_tolerance
+        )
 
-    def test_empty_wavefunction_bounds_checking(self, basic_orbitals):
+    def test_empty_wavefunction_bounds_checking(self, basic_orbitals) -> None:
         """Test that empty wavefunctions properly raise exceptions for determinant-dependent methods."""
         dets: list[Configuration] = []
         coeffs = np.array([])
@@ -528,7 +604,12 @@ class TestWavefunctionSerialization:
 
         # Verify properties are preserved
         assert wf_reconstructed.size() == cas_wavefunction_real.size()
-        assert abs(wf_reconstructed.norm() - cas_wavefunction_real.norm()) < 1e-10
+        assert np.isclose(
+            wf_reconstructed.norm(),
+            cas_wavefunction_real.norm(),
+            rtol=float_comparison_relative_tolerance,
+            atol=float_comparison_absolute_tolerance,
+        )
         assert wf_reconstructed.get_type() == cas_wavefunction_real.get_type()
         assert wf_reconstructed.is_complex() == cas_wavefunction_real.is_complex()
 
@@ -555,7 +636,12 @@ class TestWavefunctionSerialization:
 
         # Verify properties are preserved
         assert wf_reconstructed.size() == cas_wavefunction_complex.size()
-        assert abs(wf_reconstructed.norm() - cas_wavefunction_complex.norm()) < 1e-10
+        assert np.isclose(
+            wf_reconstructed.norm(),
+            cas_wavefunction_complex.norm(),
+            rtol=float_comparison_relative_tolerance,
+            atol=float_comparison_absolute_tolerance,
+        )
         assert wf_reconstructed.is_complex() == cas_wavefunction_complex.is_complex()
 
     def test_json_serialization_slater_determinant(self, sd_wavefunction):
@@ -573,7 +659,12 @@ class TestWavefunctionSerialization:
 
         # Verify properties are preserved
         assert wf_reconstructed.size() == 1
-        assert abs(wf_reconstructed.norm() - 1.0) < 1e-10
+        assert np.isclose(
+            wf_reconstructed.norm(),
+            1.0,
+            rtol=float_comparison_relative_tolerance,
+            atol=float_comparison_absolute_tolerance,
+        )
         assert not wf_reconstructed.is_complex()
 
     def test_hdf5_serialization_cas_real(self, cas_wavefunction_real, tmp_path):
@@ -588,7 +679,12 @@ class TestWavefunctionSerialization:
 
         # Verify properties are preserved
         assert wf_reconstructed.size() == cas_wavefunction_real.size()
-        assert abs(wf_reconstructed.norm() - cas_wavefunction_real.norm()) < 1e-10
+        assert np.isclose(
+            wf_reconstructed.norm(),
+            cas_wavefunction_real.norm(),
+            rtol=float_comparison_relative_tolerance,
+            atol=float_comparison_absolute_tolerance,
+        )
         assert wf_reconstructed.get_type() == cas_wavefunction_real.get_type()
 
         # Compare determinants
@@ -608,7 +704,12 @@ class TestWavefunctionSerialization:
 
         # Verify properties are preserved
         assert wf_reconstructed.size() == cas_wavefunction_complex.size()
-        assert abs(wf_reconstructed.norm() - cas_wavefunction_complex.norm()) < 1e-10
+        assert np.isclose(
+            wf_reconstructed.norm(),
+            cas_wavefunction_complex.norm(),
+            rtol=float_comparison_relative_tolerance,
+            atol=float_comparison_absolute_tolerance,
+        )
         assert wf_reconstructed.is_complex()
 
     def test_hdf5_serialization_slater_determinant(self, sd_wavefunction, tmp_path):
@@ -623,7 +724,12 @@ class TestWavefunctionSerialization:
 
         # Verify properties are preserved
         assert wf_reconstructed.size() == 1
-        assert abs(wf_reconstructed.norm() - 1.0) < 1e-10
+        assert np.isclose(
+            wf_reconstructed.norm(),
+            1.0,
+            rtol=float_comparison_relative_tolerance,
+            atol=float_comparison_absolute_tolerance,
+        )
         assert not wf_reconstructed.is_complex()
 
     def test_json_file_io(self, cas_wavefunction_real, tmp_path):
@@ -638,7 +744,12 @@ class TestWavefunctionSerialization:
 
         # Verify properties are preserved
         assert wf_reconstructed.size() == cas_wavefunction_real.size()
-        assert abs(wf_reconstructed.norm() - cas_wavefunction_real.norm()) < 1e-10
+        assert np.isclose(
+            wf_reconstructed.norm(),
+            cas_wavefunction_real.norm(),
+            rtol=float_comparison_relative_tolerance,
+            atol=float_comparison_absolute_tolerance,
+        )
 
     def test_generic_file_io(self, cas_wavefunction_real, tmp_path):
         """Test generic file I/O with different formats."""
@@ -648,12 +759,22 @@ class TestWavefunctionSerialization:
         # Test JSON format
         cas_wavefunction_real.to_file(str(json_filename), "json")
         wf_json = Wavefunction.from_file(str(json_filename), "json")
-        assert abs(wf_json.norm() - cas_wavefunction_real.norm()) < 1e-10
+        assert np.isclose(
+            wf_json.norm(),
+            cas_wavefunction_real.norm(),
+            rtol=float_comparison_relative_tolerance,
+            atol=float_comparison_absolute_tolerance,
+        )
 
         # Test HDF5 format
         cas_wavefunction_real.to_file(str(hdf5_filename), "hdf5")
         wf_hdf5 = Wavefunction.from_file(str(hdf5_filename), "hdf5")
-        assert abs(wf_hdf5.norm() - cas_wavefunction_real.norm()) < 1e-10
+        assert np.isclose(
+            wf_hdf5.norm(),
+            cas_wavefunction_real.norm(),
+            rtol=float_comparison_relative_tolerance,
+            atol=float_comparison_absolute_tolerance,
+        )
 
         # Test invalid format
         with pytest.raises(ValueError, match="Unsupported file type"):
@@ -717,19 +838,40 @@ class TestMP2Container:
         two_rdm_ab = np.reshape(two_rdm_ab, (norb, norb, norb, norb))
         two_rdm_ba = np.einsum("pqrs->rspq", two_rdm_ab)
 
-        assert np.allclose(one_rdm, one_rdm_aa + one_rdm_bb, atol=1e-6)
+        assert np.allclose(
+            one_rdm, one_rdm_aa + one_rdm_bb, rtol=float_comparison_relative_tolerance, atol=rdm_tolerance
+        )
         assert np.allclose(
             two_rdm,
             two_rdm_aa + two_rdm_bb + two_rdm_ab + two_rdm_ba,
-            atol=1e-6,
+            rtol=float_comparison_relative_tolerance,
+            atol=rdm_tolerance,
         )
-        assert np.allclose(one_rdm, np.einsum("pqrr->pq", two_rdm) / (ntot - 1), atol=1e-6)
-        assert np.allclose(one_rdm_aa, np.einsum("pqrr->pq", two_rdm_ab) / (nelec_beta), atol=1e-6)
-        assert np.allclose(one_rdm_bb, np.einsum("rrpq->pq", two_rdm_ab) / (nelec_alpha), atol=1e-6)
+        assert np.allclose(
+            one_rdm,
+            np.einsum("pqrr->pq", two_rdm) / (ntot - 1),
+            rtol=float_comparison_relative_tolerance,
+            atol=rdm_tolerance,
+        )
+        assert np.allclose(
+            one_rdm_aa,
+            np.einsum("pqrr->pq", two_rdm_ab) / (nelec_beta),
+            rtol=float_comparison_relative_tolerance,
+            atol=rdm_tolerance,
+        )
+        assert np.allclose(
+            one_rdm_bb,
+            np.einsum("rrpq->pq", two_rdm_ab) / (nelec_alpha),
+            rtol=float_comparison_relative_tolerance,
+            atol=rdm_tolerance,
+        )
 
         s1_entropy = wfn.get_single_orbital_entropies()
         assert np.allclose(
-            s1_entropy, np.array([0.02040482, 0.17135976, 0.17135976, 0.17651599, 0.17651599, 0.00478807]), atol=1e-6
+            s1_entropy,
+            np.array([0.02040482, 0.17135976, 0.17135976, 0.17651599, 0.17651599, 0.00478807]),
+            rtol=float_comparison_relative_tolerance,
+            atol=scf_orbital_tolerance,
         )
 
     def test_rdm_o2_triplet_6_6(self):
@@ -775,19 +917,40 @@ class TestMP2Container:
         two_rdm_ab = np.reshape(two_rdm_ab, (norb, norb, norb, norb))
         two_rdm_ba = np.einsum("pqrs->rspq", two_rdm_ab)
 
-        assert np.allclose(one_rdm, one_rdm_aa + one_rdm_bb, atol=1e-6)
+        assert np.allclose(
+            one_rdm, one_rdm_aa + one_rdm_bb, rtol=float_comparison_relative_tolerance, atol=rdm_tolerance
+        )
         assert np.allclose(
             two_rdm,
             two_rdm_aa + two_rdm_bb + two_rdm_ab + two_rdm_ba,
-            atol=1e-6,
+            rtol=float_comparison_relative_tolerance,
+            atol=rdm_tolerance,
         )
-        assert np.allclose(one_rdm, np.einsum("pqrr->pq", two_rdm) / (ntot - 1), atol=1e-6)
-        assert np.allclose(one_rdm_aa, np.einsum("pqrr->pq", two_rdm_ab) / (nelec_beta), atol=1e-6)
-        assert np.allclose(one_rdm_bb, np.einsum("rrpq->pq", two_rdm_ab) / (nelec_alpha), atol=1e-6)
+        assert np.allclose(
+            one_rdm,
+            np.einsum("pqrr->pq", two_rdm) / (ntot - 1),
+            rtol=float_comparison_relative_tolerance,
+            atol=rdm_tolerance,
+        )
+        assert np.allclose(
+            one_rdm_aa,
+            np.einsum("pqrr->pq", two_rdm_ab) / (nelec_beta),
+            rtol=float_comparison_relative_tolerance,
+            atol=rdm_tolerance,
+        )
+        assert np.allclose(
+            one_rdm_bb,
+            np.einsum("rrpq->pq", two_rdm_ab) / (nelec_alpha),
+            rtol=float_comparison_relative_tolerance,
+            atol=rdm_tolerance,
+        )
 
         s1_entropy = wfn.get_single_orbital_entropies()
         assert np.allclose(
-            s1_entropy, np.array([0.11641596, 0.11641596, 0.03304609, 0.11492634, 0.11492634, 0.03494613]), atol=1e-6
+            s1_entropy,
+            np.array([0.11641596, 0.11641596, 0.03304609, 0.11492634, 0.11492634, 0.03494613]),
+            rtol=float_comparison_relative_tolerance,
+            atol=scf_orbital_tolerance,
         )
 
     @pytest.fixture

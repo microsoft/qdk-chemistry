@@ -490,16 +490,16 @@ def test_shell_creation():
     coefficients = [0.1, 0.2, 0.3]
     contracted_shell = Shell(0, OrbitalType.S, exponents, coefficients)
     assert contracted_shell.get_num_primitives() == 3
-    np.testing.assert_array_equal(contracted_shell.exponents, exponents)
-    np.testing.assert_array_equal(contracted_shell.coefficients, coefficients)
+    assert np.array_equal(contracted_shell.exponents, exponents)
+    assert np.array_equal(contracted_shell.coefficients, coefficients)
 
     # Test with explicit numpy arrays to ensure Eigen::VectorXd overload is called
     exponents_np = np.array([4.0, 5.0])
     coefficients_np = np.array([0.4, 0.6])
     contracted_shell_np = Shell(1, OrbitalType.P, exponents_np, coefficients_np)
     assert contracted_shell_np.get_num_primitives() == 2
-    np.testing.assert_array_equal(contracted_shell_np.exponents, exponents_np)
-    np.testing.assert_array_equal(contracted_shell_np.coefficients, coefficients_np)
+    assert np.array_equal(contracted_shell_np.exponents, exponents_np)
+    assert np.array_equal(contracted_shell_np.coefficients, coefficients_np)
 
 
 def test_utility_functions():
@@ -1207,8 +1207,8 @@ def test_basis_set_ecp_shells():
     assert shell_s.has_radial_powers()
     assert len(shell_s.rpowers) == 3
     assert np.array_equal(shell_s.rpowers, [0, 1, 2])
-    assert np.allclose(shell_s.exponents, [10.0, 5.0, 2.0])
-    assert np.allclose(shell_s.coefficients, [50.0, 20.0, 10.0])
+    assert np.array_equal(shell_s.exponents, [10.0, 5.0, 2.0])
+    assert np.array_equal(shell_s.coefficients, [50.0, 20.0, 10.0])
 
     # Test ECP shell without radial powers (regular shell)
     regular_shell = shells[0]
@@ -1242,8 +1242,8 @@ def test_basis_set_ecp_shells_serialization():
         loaded_shell = loaded_basis.get_ecp_shell(0)
         assert loaded_shell.has_radial_powers()
         assert np.array_equal(loaded_shell.rpowers, [0, 2])
-        assert np.allclose(loaded_shell.exponents, [10.0, 5.0])
-        assert np.allclose(loaded_shell.coefficients, [50.0, 20.0])
+        assert np.array_equal(loaded_shell.exponents, [10.0, 5.0])
+        assert np.array_equal(loaded_shell.coefficients, [50.0, 20.0])
 
     # Test HDF5 serialization
     with tempfile.TemporaryDirectory() as tmpdir:
@@ -1282,8 +1282,8 @@ def test_basis_set_ecp_shells_copy():
     copy_shell = basis_copy.get_ecp_shell(0)
     assert copy_shell.has_radial_powers() == orig_shell.has_radial_powers()
     assert np.array_equal(copy_shell.rpowers, orig_shell.rpowers)
-    assert np.allclose(copy_shell.exponents, orig_shell.exponents)
-    assert np.allclose(copy_shell.coefficients, orig_shell.coefficients)
+    assert np.array_equal(copy_shell.exponents, orig_shell.exponents)
+    assert np.array_equal(copy_shell.coefficients, orig_shell.coefficients)
 
 
 def test_basis_set_ecp_shells_multi_atom():
