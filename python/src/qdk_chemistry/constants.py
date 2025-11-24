@@ -78,7 +78,9 @@ from qdk_chemistry._core.constants import (
     get_constants_info,
 )
 from qdk_chemistry.utils import Logger
+
 _LOGGER = Logger.QDK_LOGGER(__name__)
+
 
 def list_constants(show_values: bool = True, show_units: bool = True) -> None:
     """List all available constants with their documentation.
@@ -96,8 +98,8 @@ def list_constants(show_values: bool = True, show_units: bool = True) -> None:
 
     # TODO (NAB):  change output to logger rather than print() here and elsewhere
     # or just return strings workitem 41417
-    constants_info_string = "\nQDK/Chemistry Physical Constants (CODATA 2018)\n";
-    constants_info_string += ("=" * 50 + "\n")
+    constants_info_string = "\nQDK/Chemistry Physical Constants (CODATA 2018)\n"
+    constants_info_string += "=" * 50 + "\n"
 
     # Group constants by category
     categories = {
@@ -140,6 +142,7 @@ def list_constants(show_values: bool = True, show_units: bool = True) -> None:
 
                 constants_info_string += line + "\n"
     _LOGGER.info(constants_info_string)
+
 
 def find_constant(search_term: str) -> dict:
     """Find constants matching a search term.
@@ -193,7 +196,7 @@ def show_constant_details(name: str) -> None:
         constant_details_string += f"Source: {info.source}\n"
         _LOGGER.info(constant_details_string)
     except KeyError:
-        error_msg = f"Unknown constant: {name}\n" 
+        error_msg = f"Unknown constant: {name}\n"
         error_msg += "Use list_constants() to see all available constants.\n"
         _LOGGER.error(error_msg)
 
