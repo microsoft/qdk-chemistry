@@ -19,8 +19,7 @@ import numpy as np
 import pytest
 
 from qdk_chemistry.algorithms import available, create
-from qdk_chemistry.data import CasWavefunctionContainer, Configuration, Wavefunction
-from qdk_chemistry.plugins.qiskit.sparse_isometry import (
+from qdk_chemistry.algorithms.state_preparation.sparse_isometry import (
     GF2XEliminationResult,
     _eliminate_column,
     _find_pivot_row,
@@ -33,6 +32,7 @@ from qdk_chemistry.plugins.qiskit.sparse_isometry import (
     _remove_zero_rows,
     gf2x_with_tracking,
 )
+from qdk_chemistry.data import CasWavefunctionContainer, Configuration, Wavefunction
 
 from .test_helpers import create_test_orbitals
 
