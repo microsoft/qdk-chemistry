@@ -83,7 +83,7 @@ Accessing Orbital Data
 ----------------------
 
 The ``Orbitals`` class provides methods to access orbital coefficients, energies, and other properties.
-Following the :doc:`immutable design principle <../advanced/design_principles>` used throughout QDK/Chemistry, all getter methods return const references or copies of the data.
+Following the :doc:`immutable design principle <../design/index>` used throughout QDK/Chemistry, all getter methods return const references or copies of the data.
 For spin-dependent properties, methods return pairs of (alpha, beta) data.
 
 .. tab:: C++ API
@@ -130,7 +130,7 @@ Serialization
 -------------
 
 The ``Orbitals`` class supports serialization to and from JSON and HDF5 formats.
-For detailed information about serialization in QDK/Chemistry, see the :doc:`Serialization <../advanced/serialization>` documentation.
+For detailed information about serialization in QDK/Chemistry, see the :doc:`Serialization <../data/serialization>` documentation.
 
 .. note::
    All orbitals-related files require the ``.orbitals`` suffix before the file type extension, for example ``molecule.orbitals.json`` and ``h2.orbitals.h5`` for JSON and HDF5 files respectively.
@@ -261,5 +261,5 @@ Related classes
 Related topics
 --------------
 
-- :doc:`Serialization <../advanced/serialization>`: Data serialization and deserialization
-- :doc:`Settings <../advanced/settings>`: Configuration settings for algorithms
+- :doc:`Serialization <../data/serialization>`: Data serialization and deserialization
+- :doc:`Settings <../design/settings>`: Configuration settings for algorithms
