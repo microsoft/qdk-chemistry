@@ -47,8 +47,6 @@ class ProjectedMultiConfigurationCalculatorBase
 
 void bind_pmc(py::module &m) {
   // ProjectedMultiConfigurationCalculator abstract base class
-  // TODO (NAB):  I don't understand the wording in the docstring about
-  // "This contracts the..." 41394
   py::class_<ProjectedMultiConfigurationCalculator,
              ProjectedMultiConfigurationCalculatorBase, py::smart_holder>
       pmc_calculator(m, "ProjectedMultiConfigurationCalculator",
@@ -57,8 +55,8 @@ void bind_pmc(py::module &m) {
     in quantum chemistry.
 
     This class provides the interface for projected multi-configurational-based
-    quantum chemistry calculations. This contracts the ``MultiConfigurationCalculator``
-    in that the space of determinants upon which the Hamltonian is projected is
+    quantum chemistry calculations. This contrasts the ``MultiConfigurationCalculator``
+    in that the space of determinants upon which the Hamiltonian is projected is
     taken to be a *free parameter* and must be specified. In this manner, the
     high-performance solvers which underly other MC algorithms can be interfaced
     with external methods for selecting important determinants.

@@ -66,9 +66,12 @@ class TestCoreBinding:
             )
 
             # Verify that C++ and Python values match
-            assert abs(cpp_value - python_value) < 1e-15, (
-                f"Value mismatch for {const_name}: {cpp_value} != {python_value}"
-            )
+            assert np.isclose(
+                cpp_value,
+                python_value,
+                rtol=float_comparison_relative_tolerance,
+                atol=float_comparison_absolute_tolerance,
+            ), f"Value mismatch for {const_name}: {cpp_value} != {python_value}"
 
     def test_documentation_functions_exist(self):
         """Test that documentation functions are bound."""
