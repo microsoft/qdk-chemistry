@@ -809,6 +809,7 @@ class TestWavefunctionRdmIntegraion:
         mol = Structure(["N", "N"], [[0.0, 0.0, 2.0], [0.0, 0.0, 0.0]])
         scf_solver = qdk_chemistry.algorithms.create("scf_solver")
         scf_solver.settings().set("basis_set", "def2-svp")
+        scf_solver.settings().set("convergence_threshold", 5e-9)
         sd_wf = scf_solver.run(mol, 0, np.abs(nelec_alpha - nelec_beta) + 1)[1]
 
         active_space_selector = qdk_chemistry.algorithms.create("active_space_selector", "qdk_valence")
