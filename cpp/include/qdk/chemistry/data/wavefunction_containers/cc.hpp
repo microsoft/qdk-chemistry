@@ -279,21 +279,14 @@ class CoupledClusterContainer : public WavefunctionContainer {
   size_t size() const override;
 
   /**
-   * @brief Not implmemented for CC wavefunctions
+   * @brief Not implemented for CC wavefunctions
    */
   ScalarVariant overlap(const WavefunctionContainer& other) const override;
 
   /**
-   * @brief Not implmemented for CC wavefunctions
+   * @brief Not implemented for CC wavefunctions
    */
   double norm() const override;
-
-  /**
-   * @brief Calculate single orbital entropies for active orbitals only
-   * @return Vector of orbital entropies for active orbitals
-   * @throws std::runtime_error if required RDMs are not available
-   */
-  Eigen::VectorXd get_single_orbital_entropies() const override;
 
   /**
    * @brief Get total number of alpha and beta electrons (active + inactive)
