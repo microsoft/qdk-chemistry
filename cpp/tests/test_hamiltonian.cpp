@@ -379,7 +379,7 @@ TEST_F(HamiltonianTest, GenericFileIO) {
 
   EXPECT_EQ(h2->get_orbitals()->get_num_molecular_orbitals(), 2);
   EXPECT_TRUE(std::get<0>(h.get_one_body_integrals())
-                  .isApprox(std::get<0>(h2.get_one_body_integrals())));
+                  .isApprox(std::get<0>(h2->get_one_body_integrals())));
 
   // Test HDF5 via generic interface
   std::string hdf5_filename = "test.hamiltonian.h5";
@@ -390,7 +390,7 @@ TEST_F(HamiltonianTest, GenericFileIO) {
 
   EXPECT_EQ(h3->get_orbitals()->get_num_molecular_orbitals(), 2);
   EXPECT_TRUE(std::get<0>(h.get_one_body_integrals())
-                  .isApprox(std::get<0>(h3.get_one_body_integrals())));
+                  .isApprox(std::get<0>(h3->get_one_body_integrals())));
 }
 
 TEST_F(HamiltonianTest, InvalidFileType) {
@@ -838,7 +838,7 @@ TEST_F(HamiltonianTest, UnrestrictedAccessorMethods) {
 
   // Test alpha/beta one-body integral access
   EXPECT_TRUE(std::get<0>(h.get_one_body_integrals()).isApprox(one_body_alpha));
-  EXPECT_TRUE(std::get<1>(h.get_one_body_integrals()).isApprox(one_body_alpha));
+  EXPECT_TRUE(std::get<1>(h.get_one_body_integrals()).isApprox(one_body_beta));
 
   // Test tuple access for two-body integrals
   auto [aaaa, aabb, bbbb] = h.get_two_body_integrals();
@@ -1249,7 +1249,7 @@ TEST_F(HamiltonianTest, IntegralSymmetriesEnergiesO2Singlet) {
          "closed-shell O2";
 
   // Verify one-body integral symmetries alpha == beta
-  const auto& [alpha_one_body, beta_two_body] =
+  const auto& [alpha_one_body, beta_one_body] =
       uhf_hamiltonian->get_one_body_integrals();
 
   EXPECT_TRUE(alpha_one_body.isApprox(beta_one_body, tolerance))

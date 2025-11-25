@@ -7,6 +7,7 @@
 
 #include <Eigen/Dense>
 #include <complex>
+#include <memory>
 #include <string>
 #include <variant>
 #include <vector>
@@ -70,6 +71,24 @@ void save_matrix_to_hdf5(H5::H5File& file, const std::string& dataset_name,
  */
 void save_vector_to_hdf5(H5::H5File& file, const std::string& dataset_name,
                          const Eigen::VectorXd& vector);
+
+/**
+ * @brief Write a vector variant (real or complex) to an HDF5 group.
+ *
+ * Writes either a real (VectorXd) or complex (VectorXcd) Eigen vector to
+ * an HDF5 group as a dataset. For complex vectors, uses HDF5 compound type
+ * with "real" and "imag" fields.
+ *
+ * @param grp HDF5 group handle
+ * @param name Name for the dataset to create in the group
+ * @param vec Shared pointer to VectorVariant containing either Eigen::VectorXd
+ *            or Eigen::VectorXcd. If nullptr, no dataset is created.
+ * @param is_complex If true, treats vec as complex vector; if false, as real
+ * vector
+ */
+void write_vector_to_hdf5(H5::Group& grp, const std::string& name,
+                          const std::shared_ptr<VectorVariant>& vec,
+                          bool is_complex = false);
 
 /**
  * @brief Load an Eigen matrix from an HDF5 file dataset.

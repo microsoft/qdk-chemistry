@@ -455,25 +455,6 @@ nlohmann::json CoupledClusterContainer::to_json() const {
     j["references"].push_back(ref.to_json());
   }
 
-  // lambda to convert vector variant to json
-  auto vector_variant_to_json = [&](const VectorVariant& vec_var,
-                                    bool is_complex) {
-    nlohmann::json j_vec;
-    if (is_complex) {
-      const auto& vec_c = std::get<Eigen::VectorXcd>(vec_var);
-      for (int i = 0; i < vec_c.size(); ++i) {
-        j_vec.push_back({vec_c(i).real(), vec_c(i).imag()});
-      }
-      return j_vec;
-    } else {
-      const auto& vec_r = std::get<Eigen::VectorXd>(vec_var);
-      for (int i = 0; i < vec_r.size(); ++i) {
-        j_vec.push_back(vec_r(i));
-      }
-    }
-    return j_vec;
-  };
-
   bool is_complex = this->is_complex();
   j["is_complex"] = is_complex;
   if (is_complex) {
@@ -538,37 +519,6 @@ std::unique_ptr<CoupledClusterContainer> CoupledClusterContainer::from_json(
       type_str == "self_dual" ? wf_type = WavefunctionType::SelfDual
                               : wf_type = WavefunctionType::NotSelfDual;
     }
-
-    // lambda to load vector variant from json
-    auto json_to_vector_variant = [&](const nlohmann::json& j_vec,
-                                      bool is_complex = false) {
-      VectorVariant vec_var;
-      if (is_complex) {
-        if (!j_vec.is_array() || j_vec.empty() || !j_vec[0].is_array()) {
-          throw std::runtime_error(
-              "Invalid complex format: expected array of [real, imag] pairs");
-        }
-        Eigen::VectorXcd vec(j_vec.size());
-        for (size_t i = 0; i < j_vec.size(); ++i) {
-          if (j_vec[i].size() != 2) {
-            throw std::runtime_error(
-                "Invalid complex format: expected array of [real, imag] pairs");
-          }
-          vec(i) = std::complex<double>(j_vec[i][0], j_vec[i][1]);
-        }
-        vec_var = vec;
-      } else {
-        if (!j_vec.is_array()) {
-          throw std::runtime_error("Invalid format: expected array of numbers");
-        }
-        Eigen::VectorXd vec(j_vec.size());
-        for (size_t i = 0; i < j_vec.size(); ++i) {
-          vec(i) = j_vec[i];
-        }
-        vec_var = vec;
-      }
-      return vec_var;
-    };
 
     auto orbitals = Orbitals::from_json(j["orbitals"]);
     DeterminantVector references;
@@ -637,36 +587,6 @@ void CoupledClusterContainer::to_hdf5(H5::Group& group) const {
     H5::Attribute is_complex_attr = group.createAttribute(
         "is_complex", H5::PredType::NATIVE_HBOOL, H5::DataSpace(H5S_SCALAR));
     is_complex_attr.write(H5::PredType::NATIVE_HBOOL, &is_complex);
-
-    // lambda to write amplitudes
-    auto write_vector_to_hdf5 = [&](H5::Group& grp, const std::string& name,
-                                    const std::shared_ptr<VectorVariant>& vec,
-                                    bool is_complex = false) {
-      if (vec) {
-        if (is_complex) {
-          const auto& data = std::get<Eigen::VectorXcd>(*vec);
-          hsize_t dim = data.size();
-          H5::DataSpace dataspace(1, &dim);
-
-          H5::CompType complex_type(sizeof(std::complex<double>));
-          complex_type.insertMember("real", 0, H5::PredType::NATIVE_DOUBLE);
-          complex_type.insertMember("imag", sizeof(double),
-                                    H5::PredType::NATIVE_DOUBLE);
-
-          H5::DataSet dataset =
-              grp.createDataSet(name, complex_type, dataspace);
-          dataset.write(data.data(), complex_type);
-        } else {
-          const auto& data = std::get<Eigen::VectorXd>(*vec);
-          hsize_t dim = data.size();
-          H5::DataSpace dataspace(1, &dim);
-
-          H5::DataSet dataset =
-              grp.createDataSet(name, H5::PredType::NATIVE_DOUBLE, dataspace);
-          dataset.write(data.data(), H5::PredType::NATIVE_DOUBLE);
-        }
-      }
-    };
 
     //  store amplitudes
     if (_t1_amplitudes_aa) {

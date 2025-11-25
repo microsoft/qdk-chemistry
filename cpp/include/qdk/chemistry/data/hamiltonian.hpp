@@ -136,7 +136,7 @@ class Hamiltonian : public DataClass,
   bool has_one_body_integrals() const;
 
   /**
-   * @brief Get specific two-electron integral element
+   * @brief Get specific one-electron integral element
    * @param i First orbital index
    * @param j Second orbital index
    * @param channel Spin channel to query (aa, or bb), defaults to aa

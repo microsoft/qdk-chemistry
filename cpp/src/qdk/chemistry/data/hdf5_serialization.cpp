@@ -181,4 +181,32 @@ bool group_exists_in_group(H5::Group& group, const std::string& group_name) {
   return group.nameExists(group_name);
 }
 
+void write_vector_to_hdf5(H5::Group& grp, const std::string& name,
+                          const std::shared_ptr<VectorVariant>& vec,
+                          bool is_complex) {
+  if (vec) {
+    if (is_complex) {
+      const auto& data = std::get<Eigen::VectorXcd>(*vec);
+      hsize_t dim = data.size();
+      H5::DataSpace dataspace(1, &dim);
+
+      H5::CompType complex_type(sizeof(std::complex<double>));
+      complex_type.insertMember("real", 0, H5::PredType::NATIVE_DOUBLE);
+      complex_type.insertMember("imag", sizeof(double),
+                                H5::PredType::NATIVE_DOUBLE);
+
+      H5::DataSet dataset = grp.createDataSet(name, complex_type, dataspace);
+      dataset.write(data.data(), complex_type);
+    } else {
+      const auto& data = std::get<Eigen::VectorXd>(*vec);
+      hsize_t dim = data.size();
+      H5::DataSpace dataspace(1, &dim);
+
+      H5::DataSet dataset =
+          grp.createDataSet(name, H5::PredType::NATIVE_DOUBLE, dataspace);
+      dataset.write(data.data(), H5::PredType::NATIVE_DOUBLE);
+    }
+  }
+}
+
 }  // namespace qdk::chemistry::data
