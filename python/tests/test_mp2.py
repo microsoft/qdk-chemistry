@@ -9,9 +9,7 @@ import numpy as np
 from qdk_chemistry.algorithms import create
 from qdk_chemistry.data import Ansatz, Structure
 
-ENERGY_TOLERANCE = 1e-7
-BASIS_SET = "cc-pvdz"
-
+from .reference_tolerances import mp2_energy_tolerance
 
 def create_o2_molecule(bond_length=2.3):
     """Create O2 molecule for testing.
@@ -40,7 +38,7 @@ class TestMP2Validation:
 
         # QDK Chemistry HF
         qdk_scf_solver = create("scf_solver")
-        qdk_scf_solver.settings().set("basis_set", BASIS_SET)
+        qdk_scf_solver.settings().set("basis_set", "cc-pvdz")
         qdk_scf_solver.settings().set("method", "hf")
 
         _, hf_wavefunction = qdk_scf_solver.run(o2_molecule, 0, 1)
@@ -61,8 +59,8 @@ class TestMP2Validation:
 
         qdk_mp2_corr_energy = qdk_mp2_total_energy - reference_energy
 
-        assert abs(qdk_mp2_corr_energy - pyscf_corr_reference) < ENERGY_TOLERANCE, (
-            f"MP2 correlation energy mismatch for {BASIS_SET}: QDK={qdk_mp2_corr_energy:.8f}, "
+        assert abs(qdk_mp2_corr_energy - pyscf_corr_reference) < mp2_energy_tolerance, (
+            f"MP2 correlation energy mismatch: QDK={qdk_mp2_corr_energy:.8f}, "
             f"PySCF={pyscf_corr_reference:.8f}, "
             f"diff={abs(qdk_mp2_corr_energy - pyscf_corr_reference):.2e}"
         )
@@ -79,7 +77,7 @@ class TestMP2Validation:
 
         # Restricted calculation
         qdk_scf_solver = create("scf_solver")
-        qdk_scf_solver.settings().set("basis_set", BASIS_SET)
+        qdk_scf_solver.settings().set("basis_set", "cc-pvdz")
         qdk_scf_solver.settings().set("method", "hf")
 
         _, hf_wavefunction = qdk_scf_solver.run(o2_molecule, 0, 3)
@@ -96,8 +94,8 @@ class TestMP2Validation:
         qdk_ump2_corr_energy = qdk_ump2_total_energy - reference_energy
 
         # check energy equality for unrestricted
-        assert abs(qdk_ump2_corr_energy - pyscf_corr_reference) < ENERGY_TOLERANCE, (
-            f"Unrestricted MP2 correlation energy mismatch for {BASIS_SET}: QDK={qdk_ump2_corr_energy:.8f}, "
+        assert abs(qdk_ump2_corr_energy - pyscf_corr_reference) < mp2_energy_tolerance, (
+            f"Unrestricted MP2 correlation energy mismatch: QDK={qdk_ump2_corr_energy:.8f}, "
             f"PySCF={pyscf_corr_reference:.8f}, "
             f"diff={abs(qdk_ump2_corr_energy - pyscf_corr_reference):.2e}"
         )

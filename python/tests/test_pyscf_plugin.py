@@ -1410,7 +1410,9 @@ class TestPyscfPlugin:
         cc_calculator = algorithms.create("reference_derived_calculator", "pyscf_coupled_cluster")
         cc_calculator.settings().set("store_amplitudes", True)
         ansatz_object = Ansatz(hamiltonian, wavefunction)
-        _, updated_wavefunction = cc_calculator.run(ansatz_object)
+        cc_energy, updated_wavefunction = cc_calculator.run(ansatz_object)
+        reference_energy = -76.14613724756676
+        assert np.isclose(cc_energy, reference_energy), f"{cc_energy=} should match total energy {reference_energy=}"
 
         # Get amplitudes from the wavefunction container
         cc_container = updated_wavefunction.get_container()
@@ -1442,7 +1444,9 @@ class TestPyscfPlugin:
         cc_calculator = algorithms.create("reference_derived_calculator", "pyscf_coupled_cluster")
         cc_calculator.settings().set("store_amplitudes", True)
         ansatz_object = Ansatz(hamiltonian, wavefunction)
-        _, updated_wavefunction = cc_calculator.run(ansatz_object)
+        cc_energy, updated_wavefunction = cc_calculator.run(ansatz_object)
+        reference_energy = -149.8417973596817
+        assert np.isclose(cc_energy, reference_energy), f"cc energy {cc_energy} should match reference {reference_energy}"
 
         # Get amplitudes from the wavefunction container
         cc_container = updated_wavefunction.get_container()

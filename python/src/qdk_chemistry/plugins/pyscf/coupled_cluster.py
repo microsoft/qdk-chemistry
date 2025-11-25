@@ -106,7 +106,7 @@ class PyscfCoupledClusterCalculator(ReferenceDerivedCalculator):
         """Perform a Coupled Cluster calculation using PySCF.
 
         This method takes a QDK/Chemistry Ansatz object, converts it to the PySCF format,
-        performs a CCSD calculation, and returns the results as a pair of energy and
+        performs a CCSD calculation, and returns the results as a pair of total energy and
         wavefunction containing the CC amplitudes.
 
         Args:
@@ -150,6 +150,7 @@ class PyscfCoupledClusterCalculator(ReferenceDerivedCalculator):
 
         original_wavefunction = ansatz.get_wavefunction()
         orbitals = original_wavefunction.get_orbitals()
+        initial_energy = ansatz.calculate_energy()
 
         # Get reference determinants from the original wavefunction
         references = original_wavefunction.get_active_determinants()
@@ -222,7 +223,7 @@ class PyscfCoupledClusterCalculator(ReferenceDerivedCalculator):
         updated_wavefunction = Wavefunction(cc_container)
 
         # Total energy = SCF energy + correlation energy
-        total_energy = pyscf_scf.e_tot + pyscf_cc.e_corr
+        total_energy = initial_energy + pyscf_cc.e_corr
 
         return total_energy, updated_wavefunction
 
