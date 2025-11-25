@@ -41,6 +41,12 @@ qdk-chemistry/
 
 Detailed instructions for installing QDK/Chemistry can be found in [INSTALL.md](./INSTALL.md)
 
+## Telemetry
+
+This library collects anonymous usage and performance data to help improve the product. All telemetry events can be found in the source file [telemetry_events.py](https://github.com/microsoft/qdk-chemistry/blob/gh-feature/awm/telemetry/python/src/qdk_chemistry/utils/telemetry_events.py).
+
+Telemetry can be disabled by setting `QDK_CHEMISTRY_PYTHON_TELEMETRY=none`
+
 ## Contributing
 
 There are many ways in which you can participate in this project, for example:
