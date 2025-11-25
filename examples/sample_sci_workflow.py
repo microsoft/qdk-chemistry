@@ -190,7 +190,7 @@ def main(argv: Sequence[str] | None = None) -> None:
             f"AutoCAS selected active space with indices: {indices}"
         )  # Use f-string!
         if len(indices) == 0:
-            LOGGER.warning(
+            LOGGER.warn(
                 "AutoCAS did not identify correlated orbitals; retaining the initial space."
             )
         else:

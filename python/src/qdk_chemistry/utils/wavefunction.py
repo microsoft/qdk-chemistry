@@ -97,7 +97,7 @@ def calculate_sparse_wavefunction(
     """
     ranked = get_top_determinants(reference_wavefunction, max_determinants)
     if not ranked:
-        _LOGGER.warning("No determinants found; returning an empty wavefunction.")
+        _LOGGER.warn("No determinants found; returning an empty wavefunction.")
         return Wavefunction(SciWavefunctionContainer(np.array([]), [], reference_wavefunction.get_orbitals()))
 
     projector = create("projected_multi_configuration_calculator", pmc_calculator)
@@ -125,7 +125,7 @@ def calculate_sparse_wavefunction(
     best_count = count
 
     if count == len(ranked_items) and not found:
-        _LOGGER.warning(
+        _LOGGER.warn(
             f"Sparse CI tolerance not reached with {best_count} determinants; returning the full truncated set."
         )
 

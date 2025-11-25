@@ -740,7 +740,7 @@ def _reduce_diagonal_matrix(
 
     # Verify this is actually a diagonal matrix
     if not _is_diagonal_matrix(matrix_work):
-        _LOGGER.warning("Matrix is not diagonal, skipping diagonal reduction")
+        _LOGGER.warn("Matrix is not diagonal, skipping diagonal reduction")
         return GF2XEliminationResult(
             reduced_matrix=matrix_work, row_map=row_map_work, col_map=col_map, operations=operations_work, rank=rank
         )
