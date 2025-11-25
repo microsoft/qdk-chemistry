@@ -131,16 +131,9 @@ The :class:`~qdk_chemistry.algorithms.Localizer` accepts a range of settings to 
 Base settings
 ~~~~~~~~~~~~~
 
-These settings apply to all localization methods:
-
-.. list-table::
-   :header-rows: 1
-   :widths: 25 15 15 45
-
-   * - Setting
-     - Type
-     - Default
-     - Description
+.. note::
+   TODO:  The base settings table is currently under construction.
+   Please see `online examples <https://github.com/microsoft/qdk-chemistry/blob/main/examples/factory_list.ipynb>`_ for the most up-to-date information.
 
 Specialized settings
 ~~~~~~~~~~~~~~~~~~~~

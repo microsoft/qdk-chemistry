@@ -1,16 +1,16 @@
 Basis set
 =========
 
-The ``BasisSet`` class in QDK/Chemistry represents a collection of atomic orbital used to describe the electronic structure of molecules.
+The :class:`~qdk_chemistry.data.BasisSet` class in QDK/Chemistry represents a collection of atomic orbital used to describe the electronic structure of molecules.
 It organizes atomic orbitals into shells and provides methods for managing, querying, and serializing basis set data.
 
 Overview
 --------
 
 In quantum chemistry, a basis set is a collection of atomic orbitals used to represent molecular orbitals.
-The ``BasisSet`` class in QDK/Chemistry uses a shell-based organization, where each shell contains atomic orbitals with the same atom, angular momentum, and primitive Gaussian functions.
+The :class:`~qdk_chemistry.data.BasisSet` class in QDK/Chemistry uses a shell-based organization, where each shell contains atomic orbitals with the same atom, angular momentum, and primitive Gaussian functions.
 
-Key features of the ``BasisSet`` class include:
+Key features of the :class:`~qdk_chemistry.data.BasisSet` class include:
 
 - Shell-based storage for memory efficiency
 - Support for both spherical and Cartesian atomic orbitals
@@ -23,11 +23,11 @@ Key features of the ``BasisSet`` class include:
 Usage
 -----
 
-The ``BasisSet`` class is a fundamental component in quantum chemistry calculations, providing the mathematical foundation for representing molecular orbitals.
-It's typically used as input for :term:`SCF` calculations and is usually created automatically when selecting a :doc:`predefined basis set <basis_sets>` for a calculation.
+The :class:`~qdk_chemistry.data.BasisSet` class is a fundamental component in quantum chemistry calculations, providing the mathematical foundation for representing molecular orbitals.
+It's typically used as input for :term:`SCF` calculations and is usually created automatically when selecting a :doc:`predefined basis set <../basis_functionals>` for a calculation.
 
 .. note::
-   QDK/Chemistry provides a collection of predefined basis sets that can be accessed through the appropriate factory functions.
+   QDK/Chemistry provides a collection of :doc:`predefined basis sets <../basis_functionals>` that can be accessed through the appropriate factory functions.
    For common calculations, you typically won't need to construct basis sets manually.
 
 Core concepts
@@ -47,9 +47,9 @@ Shells contain primitives, which are Gaussian functions defined by:
 Orbital types
 ~~~~~~~~~~~~~
 
-The ``BasisSet`` class supports various orbital types with different angular momentum:
+The :class:`~qdk_chemistry.data.BasisSet` class supports various orbital types with different angular momentum:
 
-- S orbital (angular momentum :math:`l=0`) : 1 function per shell (spherical or Cartesian)
+- S orbital (angular momentum :math:`l=0`): 1 function per shell (spherical or Cartesian)
 - P orbital (angular momentum :math:`l=1`): 3 functions per shell (spherical or Cartesian)
 - D orbital (angular momentum :math:`l=2`): 5 functions (spherical) or 6 functions (Cartesian) per shell
 - F orbital (angular momentum :math:`l=3`): 7 functions (spherical) or 10 functions (Cartesian) per shell
@@ -58,7 +58,7 @@ The ``BasisSet`` class supports various orbital types with different angular mom
 Basis types
 ~~~~~~~~~~~
 
-The ``BasisSet`` class supports two types of atomic orbitals:
+The :class:`~qdk_chemistry.data.BasisSet` class supports two types of atomic orbitals:
 
 - **Spherical**: Uses spherical harmonics with :math:`2l+1` functions per shell
 - **Cartesian**: Uses Cartesian coordinates with :math:`(l+1)(l+2)/2` functions per shell
@@ -104,7 +104,7 @@ Creating a basis set
 Accessing basis set data
 ------------------------
 
-Following the :doc:`immutable design principle <../advanced/design_principles>` used throughout QDK/Chemistry, all getter methods return const references or copies of the data.
+Following the :doc:`immutable design principle <../design/index>` used throughout QDK/Chemistry, all getter methods return const references or copies of the data.
 This ensures that the basis set data remains consistent and prevents accidental modifications that could lead to inconsistent states.
 
 .. note::
@@ -192,8 +192,8 @@ The ``Shell`` structure contains information about a group of atomic orbitals:
 Serialization
 -------------
 
-The ``BasisSet`` class supports serialization to and from JSON and HDF5 formats.
-For detailed information about serialization in QDK/Chemistry, see the :doc:`Serialization <../advanced/serialization>` documentation.
+The :class:`~qdk_chemistry.data.BasisSet` class supports serialization to and from JSON and HDF5 formats.
+For detailed information about serialization in QDK/Chemistry, see the :doc:`Serialization <../data/serialization>` documentation.
 
 .. note::
    All basis set-related files require the ``.basis_set`` suffix before the file type extension, for example ``molecule.basis_set.json`` and ``h2.basis_set.h5`` for JSON and HDF5 files respectively.
@@ -207,7 +207,7 @@ QDK/Chemistry supports multiple serialization formats for basis set data:
 JSON format
 ^^^^^^^^^^^
 
-JSON representation of a ``BasisSet`` has the following structure (showing simplified content):
+JSON representation of a :class:`~qdk_chemistry.data.BasisSet` has the following structure (showing simplified content):
 
 .. code-block:: json
 
@@ -243,7 +243,7 @@ JSON representation of a ``BasisSet`` has the following structure (showing simpl
 HDF5 format
 ^^^^^^^^^^^
 
-HDF5 representation of a ``BasisSet`` has the following structure (showing groups and datasets):
+HDF5 representation of a :class:`~qdk_chemistry.data.BasisSet` has the following structure (showing groups and datasets):
 
 .. code-block:: text
 
@@ -289,7 +289,7 @@ HDF5 representation of a ``BasisSet`` has the following structure (showing group
 Utility functions
 -----------------
 
-The ``BasisSet`` class provides several static utility functions:
+The :class:`~qdk_chemistry.data.BasisSet` class provides several static utility functions:
 
 .. tab:: C++ API
 
@@ -324,7 +324,7 @@ Predefined basis sets
 
 QDK/Chemistry provides access to a library of standard basis sets commonly used in quantum chemistry calculations.
 These predefined basis sets can be easily loaded without having to manually specify the atomic orbitals.
-For a complete list of available basis sets and their specifications, see the :doc:`Supported Basis Sets <../data/basis_sets>` documentation.
+For a complete list of available basis sets and their specifications, see the :doc:`Supported Basis Sets <../basis_functionals>` documentation.
 
 .. tab:: C++ API
 
@@ -362,6 +362,6 @@ Related classes
 Related topics
 --------------
 
-- :doc:`Serialization <../advanced/serialization>`: Data serialization and deserialization
-- :doc:`Settings <../advanced/settings>`: Configuration settings for algorithms
-- :doc:`Supported basis sets <basis_sets>`: List of pre-defined basis sets available in QDK/Chemistry
+- :doc:`Serialization <../data/serialization>`: Data serialization and deserialization
+- :doc:`Settings <../design/settings>`: Configuration settings for algorithms
+- :doc:`Supported basis sets <../basis_functionals>`: List of pre-defined basis sets available in QDK/Chemistry

@@ -2,7 +2,7 @@ Structure
 =========
 
 The :class:`~qdk_chemistry.data.Structure` class in QDK/Chemistry represents a molecular structure, storing information about atomic positions, elements, and related properties for chemical systems of interest.
-As a core :doc:`data class <../advanced/design_principles>`, it follows QDK/Chemistry's immutable data pattern.
+As a core :doc:`data class <../design/index>`, it follows QDK/Chemistry's immutable data pattern.
 
 Overview
 --------
@@ -90,7 +90,7 @@ The :class:`~qdk_chemistry.data.Structure` class provides methods to access atom
 
 .. note::
    Functions that deal with specific atoms include the word "atom" in their name (e.g., ``get_atom_coordinates``), while functions that return properties for all atoms omit this word (e.g., ``get_coordinates``).
-   All atomic data is const and immutable once set, following QDK/Chemistry's :doc:`immutable data pattern <../advanced/design_principles>`.
+   All atomic data is const and immutable once set, following QDK/Chemistry's :doc:`immutable data pattern <../design/index>`.
    If you need to modify coordinates or other properties, you must create a new Structure object with the desired changes.
 
 .. tab:: C++ API
@@ -119,7 +119,7 @@ Serialization
 -------------
 
 The :class:`~qdk_chemistry.data.Structure` class supports serialization to and from various formats.
-For detailed information about serialization in QDK/Chemistry, see the :doc:`Serialization <../advanced/serialization>` documentation.
+For detailed information about serialization in QDK/Chemistry, see the :doc:`Serialization <../data/serialization>` documentation.
 
 .. note::
    All structure-related files require the ``.structure`` suffix before the file type extension, for example ``molecule.structure.xyz`` and ``h2.structure.json`` for XYZ and JSON files respectively.
@@ -232,4 +232,4 @@ Related classes
 Related topics
 --------------
 
-- :doc:`Serialization <../advanced/serialization>`: Data serialization and deserialization
+- :doc:`Serialization <../data/serialization>`: Data serialization and deserialization
