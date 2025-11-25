@@ -55,41 +55,39 @@ void bind_reference_derived_calculator(py::module &m) {
   py::class_<ReferenceDerivedCalculator, ReferenceDerivedCalculatorBase,
              py::smart_holder>
       ref_calc(m, "ReferenceDerivedCalculator", R"(
-    Abstract base class for reference-derived quantum chemistry methods.
+Abstract base class for reference-derived quantum chemistry methods.
 
-    This class provides a unified interface for quantum chemistry methods that derive
-    corrections from a reference wavefunction, such as Møller-Plesset perturbation
-    theory (MP2) and Coupled Cluster (CC) methods.
+This class provides a unified interface for quantum chemistry methods that derive
+corrections from a reference wavefunction, such as Møller-Plesset perturbation
+theory (MP2) and Coupled Cluster (CC) methods.
 
-    The calculator takes an Ansatz (containing both Hamiltonian and reference
-    wavefunction) as input and returns both the total energy and an updated
-    wavefunction that may contain correlation information.
+The calculator takes an Ansatz (containing both Hamiltonian and reference
+wavefunction) as input and returns both the total energy and an updated
+wavefunction that may contain correlation information.
 
-    Examples
-    --------
-    >>> import qdk
-    >>> # Create ansatz from hamiltonian and wavefunction
-    >>> ansatz = qdk.chemistry.data.Ansatz(hamiltonian, wavefunction)
-    >>>
-    >>> # Create calculator (e.g., MP2) using the registry
-    >>> calculator = qdk.chemistry.algorithms.create("reference_derived_calculator", "microsoft_mp2_calculator")
-    >>>
-    >>> # Run calculation
-    >>> total_energy, result_wavefunction = calculator.run(ansatz)
+Examples:
+  >>> import qdk
+  >>> # Create ansatz from hamiltonian and wavefunction
+  >>> ansatz = qdk.chemistry.data.Ansatz(hamiltonian, wavefunction)
+  >>>
+  >>> # Create calculator (e.g., MP2) using the registry
+  >>> calculator = qdk.chemistry.algorithms.create("reference_derived_calculator", "microsoft_mp2_calculator")
+  >>>
+  >>> # Run calculation
+  >>> total_energy, result_wavefunction = calculator.run(ansatz)
     )");
 
   ref_calc.def(py::init<>(),
                R"(
-        Create a ReferenceDerivedCalculator instance.
+  Create a ReferenceDerivedCalculator instance.
 
-        Initializes a new reference-derived calculator with default settings.
-        Configuration options can be modified through the ``settings()`` method.
+  Initializes a new reference-derived calculator with default settings.
+  Configuration options can be modified through the ``settings()`` method.
 
-        Examples
-        --------
-        >>> calc = alg.ReferenceDerivedCalculator()
-        >>> calc.settings().set("max_iterations", 100)
-        >>> calc.settings().set("convergence_threshold", 1e-8)
+  Examples:
+    >>> calc = alg.ReferenceDerivedCalculator()
+    >>> calc.settings().set("max_iterations", 100)
+    >>> calc.settings().set("convergence_threshold", 1e-8)
         )");
 
   ref_calc.def("__repr__", [](const ReferenceDerivedCalculator &) {
@@ -98,17 +96,13 @@ void bind_reference_derived_calculator(py::module &m) {
 
   ref_calc.def("run", &ReferenceDerivedCalculator::run, py::arg("ansatz"),
                R"(
-    Perform reference-derived calculation.
+  Perform reference-derived calculation.
 
-    Parameters
-    ----------
-    ansatz : Ansatz
-        The Ansatz (Wavefunction and Hamiltonian) describing the quantum system
+  Parameters:
+    ansatz (Ansatz): The Ansatz (Wavefunction and Hamiltonian) describing the quantum system
 
-    Returns
-    -------
-    tuple[float, Wavefunction]
-        A tuple containing the total energy and the resulting wavefunction
+  Returns:
+    tuple[float, Wavefunction]: A tuple containing the total energy and the resulting wavefunction
               )");
 
   ref_calc.def("name", &ReferenceDerivedCalculator::name,
@@ -116,22 +110,18 @@ void bind_reference_derived_calculator(py::module &m) {
 
   ref_calc.def("type_name", &ReferenceDerivedCalculator::type_name,
                R"(
-        The algorithm's type name.
+The algorithm's type name.
 
-        Returns
-        -------
-        str
-            The type name of the algorithm
+Returns:
+  str: The type name of the algorithm
         )");
 
   ref_calc.def("settings", &ReferenceDerivedCalculator::settings,
                R"(
-        Access the calculator's configuration settings.
+Access the calculator's configuration settings.
 
-        Returns
-        -------
-        qdk.chemistry.data.Settings
-            Reference to the settings object for configuring the calculator
+Returns:
+  qdk.chemistry.data.Settings: Reference to the settings object for configuring the calculator
         )",
                py::return_value_policy::reference_internal);
 
@@ -147,18 +137,17 @@ void bind_reference_derived_calculator(py::module &m) {
       },
       py::return_value_policy::reference_internal,
       R"(
-        Internal settings object property.
+Internal settings object property.
 
-        This property allows derived classes to replace the settings object with
-        a specialized Settings subclass in their constructors.
+This property allows derived classes to replace the settings object with
+a specialized Settings subclass in their constructors.
 
-        Examples
-        --------
-        >>> class MyReferenceDerivedCalculator(alg.ReferenceDerivedCalculator):
-        ...     def __init__(self):
-        ...         super().__init__()
-        ...         from qdk.chemistry.data import ElectronicStructureSettings
-        ...         self._settings = ElectronicStructureSettings()
+Examples:
+  >>> class MyReferenceDerivedCalculator(alg.ReferenceDerivedCalculator):
+  ...     def __init__(self):
+  ...         super().__init__()
+  ...         from qdk.chemistry.data import ElectronicStructureSettings
+  ...         self._settings = ElectronicStructureSettings()
         )");
 
   // Factory bindings
