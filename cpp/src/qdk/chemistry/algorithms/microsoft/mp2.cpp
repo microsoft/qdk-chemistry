@@ -109,7 +109,7 @@ double MP2Calculator::_calculate_restricted_mp2_energy(
   const size_t n_vir = active_space_size - n_occ;
 
   // Get two-electron integrals
-  const auto& [moeri, moeri_aabb, moeri_bbbb] = ham->get_two_body_integrals();
+  const auto& [moeri, moeri_bbaa, moeri_bbbb] = ham->get_two_body_integrals();
 
   double E_MP2 = 0.0;
 
@@ -170,7 +170,7 @@ double MP2Calculator::_calculate_unrestricted_mp2_energy(
   const size_t n_vir_alpha = active_space_size - n_alpha;
   const size_t n_vir_beta = active_space_size - n_beta;
 
-  const auto& [moeri_aaaa, moeri_aabb, moeri_bbbb] =
+  const auto& [moeri_aaaa, moeri_bbaa, moeri_bbbb] =
       ham->get_two_body_integrals();
 
   double E_MP2_AA = 0.0, E_MP2_BB = 0.0, E_MP2_AB = 0.0;
@@ -201,7 +201,7 @@ double MP2Calculator::_calculate_unrestricted_mp2_energy(
 
   // Alpha-Beta contribution
   mp2_helpers::compute_opposite_spin_t2(
-      eps_alpha, eps_beta, moeri_aabb, n_alpha, n_beta, n_vir_alpha, n_vir_beta,
+      eps_alpha, eps_beta, moeri_bbaa, n_alpha, n_beta, n_vir_alpha, n_vir_beta,
       stride_i, stride_j, stride_k, t2_ab, &E_MP2_AB);
 
   // Beta-Beta contribution

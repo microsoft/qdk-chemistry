@@ -20,13 +20,6 @@ namespace qdk::chemistry::algorithms {
  * methods that provide corrections on top of a reference wavefunction, such as
  * Møller-Plesset perturbation theory (MP2) and Coupled Cluster (CC) methods.
  *
- * The calculator takes an Ansatz (containing both Hamiltonian and reference
- * wavefunction) as input and returns the total energy and an updated
- * wavefunction that contains information like amplitudes and RDMs, if
- * requested. Note that the default behavior is to NOT store the amplitudes and
- * RDMs since they are memory-heavy. In this case, the wavefunction is a minimal
- * object. For more details, @see MP2Calculator.
- *
  * @see data::Ansatz
  * @see data::Wavefunction
  * @see MP2Calculator

@@ -123,7 +123,7 @@ void MP2Container::_compute_t2_amplitudes() const {
     const size_t n_vir_alpha = active_space_size - n_alpha;
     const size_t n_vir_beta = active_space_size - n_beta;
 
-    const auto& [moeri_aaaa, moeri_aabb, moeri_bbbb] =
+    const auto& [moeri_aaaa, moeri_bbaa, moeri_bbbb] =
         _hamiltonian->get_two_body_integrals();
 
     // Initialize T2 amplitudes storage
@@ -151,7 +151,7 @@ void MP2Container::_compute_t2_amplitudes() const {
 
     // Alpha-Beta contribution
     algorithms::microsoft::mp2_helpers::compute_opposite_spin_t2(
-        eps_alpha, eps_beta, moeri_aabb, n_alpha, n_beta, n_vir_alpha,
+        eps_alpha, eps_beta, moeri_bbaa, n_alpha, n_beta, n_vir_alpha,
         n_vir_beta, stride_i, stride_j, stride_k, t2_ab);
 
     // Beta-Beta contribution
@@ -173,7 +173,7 @@ void MP2Container::_compute_t2_amplitudes() const {
     const size_t n_occ = n_alpha;
     const size_t n_vir = active_space_size - n_occ;
 
-    const auto& [moeri_aaaa, moeri_aabb, moeri_bbbb] =
+    const auto& [moeri_aaaa, moeri_bbaa, moeri_bbbb] =
         _hamiltonian->get_two_body_integrals();
     // For restricted case, all components are the same; use aaaa
     const auto& moeri = moeri_aaaa;
