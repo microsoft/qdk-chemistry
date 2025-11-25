@@ -47,10 +47,11 @@ ERI::ERI(bool unr, const BasisSet& basis, ParallelConfig mpi, double omega) {
 
 void ERI::generate_eri_() {
   // Allocate and populate ERIs on host
-  const size_t num_basis_funcs = obs_.nbf();
-  const size_t num_basis_funcs2 = num_basis_funcs * num_basis_funcs;
-  const size_t num_basis_funcs3 = num_basis_funcs2 * num_basis_funcs;
-  const size_t eri_sz = num_basis_funcs3 * (loc_i_en_ - loc_i_st_);
+  const size_t num_atomic_orbitals = obs_.nbf();
+  const size_t num_atomic_orbitals2 = num_atomic_orbitals * num_atomic_orbitals;
+  const size_t num_atomic_orbitals3 =
+      num_atomic_orbitals2 * num_atomic_orbitals;
+  const size_t eri_sz = num_atomic_orbitals3 * (loc_i_en_ - loc_i_st_);
 
   const bool is_rsx = std::abs(omega_) > 1e-12;
 
@@ -97,14 +98,15 @@ void ERI::generate_eri_() {
   // Setup cuTensor
   handle_ = std::make_shared<cutensor::TensorHandle>();
 
-  std::vector<int64_t> extents4 = {loc_i_en_ - loc_i_st_, num_basis_funcs,
-                                   num_basis_funcs, num_basis_funcs};
-  std::vector<int64_t> extents2_P = {unrestricted_ ? 2 : 1, num_basis_funcs,
-                                     num_basis_funcs};
-  std::vector<int64_t> extents2_R = {unrestricted_ ? 2 : 1,
-                                     loc_i_en_ - loc_i_st_, num_basis_funcs};
-  std::vector<int64_t> strides2 = {num_basis_funcs * num_basis_funcs,
-                                   num_basis_funcs, 1};  // Output is full space
+  std::vector<int64_t> extents4 = {loc_i_en_ - loc_i_st_, num_atomic_orbitals,
+                                   num_atomic_orbitals, num_atomic_orbitals};
+  std::vector<int64_t> extents2_P = {unrestricted_ ? 2 : 1, num_atomic_orbitals,
+                                     num_atomic_orbitals};
+  std::vector<int64_t> extents2_R = {
+      unrestricted_ ? 2 : 1, loc_i_en_ - loc_i_st_, num_atomic_orbitals};
+  std::vector<int64_t> strides2 = {num_atomic_orbitals * num_atomic_orbitals,
+                                   num_atomic_orbitals,
+                                   1};  // Output is full space
   descERI_ = std::make_shared<cutensor::TensorDesc>(
       *handle_, 4, extents4.data(), CUTENSOR_R_64F);
   descR_ = std::make_shared<cutensor::TensorDesc>(
@@ -131,43 +133,45 @@ void ERI::build_JK(const double* P, double* J, double* K, double alpha,
 
   const bool is_rsx = std::abs(omega_) > 1e-12;
 
-  const size_t num_basis_funcs = obs_.nbf();
-  const size_t num_basis_funcs2 = num_basis_funcs * num_basis_funcs;
-  const size_t mat_size = (unrestricted_ ? 2 : 1) * num_basis_funcs2;
+  const size_t num_atomic_orbitals = obs_.nbf();
+  const size_t num_atomic_orbitals2 = num_atomic_orbitals * num_atomic_orbitals;
+  const size_t mat_size = (unrestricted_ ? 2 : 1) * num_atomic_orbitals2;
 
   // Clear out data
   if (J) std::fill_n(J, mat_size, 0.0);
   if (K) std::fill_n(K, mat_size, 0.0);
 
 #if (QDK_CHEMISTRY_INCORE_ERI_STRATEGY & INCORE_ERI_CON_HOST) > 0
-  const size_t num_basis_funcs3 = num_basis_funcs2 * num_basis_funcs;
-  const size_t num_basis_funcs4 = num_basis_funcs2 * num_basis_funcs2;
+  const size_t num_atomic_orbitals3 =
+      num_atomic_orbitals2 * num_atomic_orbitals;
+  const size_t num_atomic_orbitals4 =
+      num_atomic_orbitals2 * num_atomic_orbitals2;
   const auto* h_eri_ptr = h_eri_.get();
   const auto* h_eri_erf_ptr = h_eri_erf_.get();
 
   const auto* Pa = P;
-  const auto* Pb = unrestricted_ ? Pa + num_basis_funcs2 : nullptr;
+  const auto* Pb = unrestricted_ ? Pa + num_atomic_orbitals2 : nullptr;
 
   if (J)
     for (size_t idm = 0; idm < (unrestricted_ ? 2 : 1); ++idm) {
-      blas::gemv(blas::Layout::ColMajor, blas::Op::Trans, num_basis_funcs2,
-                 num_basis_funcs2, 1.0, h_eri_ptr, num_basis_funcs2,
-                 P + idm * num_basis_funcs2, 1, 0.0, J + idm * num_basis_funcs2,
-                 1);
+      blas::gemv(blas::Layout::ColMajor, blas::Op::Trans, num_atomic_orbitals2,
+                 num_atomic_orbitals2, 1.0, h_eri_ptr, num_atomic_orbitals2,
+                 P + idm * num_atomic_orbitals2, 1, 0.0,
+                 J + idm * num_atomic_orbitals2, 1);
     }
 
   if (K)
     for (size_t idm = 0; idm < (unrestricted_ ? 2 : 1); ++idm)
       for (size_t i = loc_i_st_; i < loc_i_en_; ++i) {
-        const double* eri_i = h_eri_ptr + i * num_basis_funcs3;
-        double* K_i = K + i * num_basis_funcs + idm * num_basis_funcs2;
-        for (size_t k = 0; k < num_basis_funcs; ++k)
-          for (size_t l = 0; l < num_basis_funcs; ++l) {
+        const double* eri_i = h_eri_ptr + i * num_atomic_orbitals3;
+        double* K_i = K + i * num_atomic_orbitals + idm * num_atomic_orbitals2;
+        for (size_t k = 0; k < num_atomic_orbitals; ++k)
+          for (size_t l = 0; l < num_atomic_orbitals; ++l) {
             const auto val =
-                P[k * num_basis_funcs + l + idm * num_basis_funcs2];
-            const auto* eri_ikl = eri_i + k * num_basis_funcs2 + l;
-            for (size_t j = 0; j < num_basis_funcs; ++j) {
-              K_i[j] += (alpha + beta) * val * eri_ikl[j * num_basis_funcs];
+                P[k * num_atomic_orbitals + l + idm * num_atomic_orbitals2];
+            const auto* eri_ikl = eri_i + k * num_atomic_orbitals2 + l;
+            for (size_t j = 0; j < num_atomic_orbitals; ++j) {
+              K_i[j] += (alpha + beta) * val * eri_ikl[j * num_atomic_orbitals];
             }
           }
       }
@@ -175,15 +179,15 @@ void ERI::build_JK(const double* P, double* J, double* K, double alpha,
   if (K and is_rsx)
     for (size_t idm = 0; idm < (unrestricted_ ? 2 : 1); ++idm)
       for (size_t i = loc_i_st_; i < loc_i_en_; ++i) {
-        const double* eri_i = h_eri_erf_ptr + i * num_basis_funcs3;
-        double* K_i = K + i * num_basis_funcs + idm * num_basis_funcs2;
-        for (size_t k = 0; k < num_basis_funcs; ++k)
-          for (size_t l = 0; l < num_basis_funcs; ++l) {
+        const double* eri_i = h_eri_erf_ptr + i * num_atomic_orbitals3;
+        double* K_i = K + i * num_atomic_orbitals + idm * num_atomic_orbitals2;
+        for (size_t k = 0; k < num_atomic_orbitals; ++k)
+          for (size_t l = 0; l < num_atomic_orbitals; ++l) {
             const auto val =
-                P[k * num_basis_funcs + l + idm * num_basis_funcs2];
-            const auto* eri_ikl = eri_i + k * num_basis_funcs2 + l;
-            for (size_t j = 0; j < num_basis_funcs; ++j) {
-              K_i[j] -= beta * val * eri_ikl[j * num_basis_funcs];
+                P[k * num_atomic_orbitals + l + idm * num_atomic_orbitals2];
+            const auto* eri_ikl = eri_i + k * num_atomic_orbitals2 + l;
+            for (size_t j = 0; j < num_atomic_orbitals; ++j) {
+              K_i[j] -= beta * val * eri_ikl[j * num_atomic_orbitals];
             }
           }
       }
@@ -203,13 +207,13 @@ void ERI::build_JK(const double* P, double* J, double* K, double alpha,
   // Perform Contractions
   if (J)
     couContraction_->contract(1.0, d_eri_, dP->data(), 0.0,
-                              dJ->data() + loc_i_st_ * num_basis_funcs);
+                              dJ->data() + loc_i_st_ * num_atomic_orbitals);
   if (K) {
     exxContraction_->contract(alpha + beta, d_eri_, dP->data(), 0.0,
-                              dK->data() + loc_i_st_ * num_basis_funcs);
+                              dK->data() + loc_i_st_ * num_atomic_orbitals);
     if (is_rsx) {
       exxContraction_->contract(-beta, d_eri_erf_, dP->data(), 1.0,
-                                dK->data() + loc_i_st_ * num_basis_funcs);
+                                dK->data() + loc_i_st_ * num_atomic_orbitals);
     }
   }
 
@@ -230,17 +234,19 @@ void ERI::get_gradients(const double* P, double* dJ, double* dK, double alpha,
 }
 
 void ERI::quarter_trans(size_t nt, const double* C, double* out) {
-  const size_t num_basis_funcs = obs_.nbf();
-  const size_t num_basis_funcs2 = num_basis_funcs * num_basis_funcs;
-  const size_t num_basis_funcs3 = num_basis_funcs2 * num_basis_funcs;
-  const size_t num_basis_funcs4 = num_basis_funcs2 * num_basis_funcs2;
+  const size_t num_atomic_orbitals = obs_.nbf();
+  const size_t num_atomic_orbitals2 = num_atomic_orbitals * num_atomic_orbitals;
+  const size_t num_atomic_orbitals3 =
+      num_atomic_orbitals2 * num_atomic_orbitals;
+  const size_t num_atomic_orbitals4 =
+      num_atomic_orbitals2 * num_atomic_orbitals2;
 
 #ifdef QDK_CHEMISTRY_ENABLE_GPU
 
   // Setup
-  std::vector<int64_t> extents_out = {num_basis_funcs, num_basis_funcs,
-                                      num_basis_funcs, nt};
-  std::vector<int64_t> extents_mat = {num_basis_funcs, nt};
+  std::vector<int64_t> extents_out = {num_atomic_orbitals, num_atomic_orbitals,
+                                      num_atomic_orbitals, nt};
+  std::vector<int64_t> extents_mat = {num_atomic_orbitals, nt};
 
   auto descOut = std::make_shared<cutensor::TensorDesc>(
       *handle_, 4, extents_out.data(), CUTENSOR_R_64F);
@@ -254,29 +260,30 @@ void ERI::quarter_trans(size_t nt, const double* C, double* out) {
       handle_, descERI_, eri_ind, descMat, mat_ind, descOut, out_ind);
 
   // Allocation
-  auto dC = cuda::alloc<double>(num_basis_funcs * nt);
-  auto dOut = cuda::alloc<double>(num_basis_funcs3 * nt);
+  auto dC = cuda::alloc<double>(num_atomic_orbitals * nt);
+  auto dOut = cuda::alloc<double>(num_atomic_orbitals3 * nt);
 
-  CUDA_CHECK(cudaMemcpy(dC->data(), C, num_basis_funcs * nt * sizeof(double),
+  CUDA_CHECK(cudaMemcpy(dC->data(), C,
+                        num_atomic_orbitals * nt * sizeof(double),
                         cudaMemcpyHostToDevice));
 
   // 1st Quarter Contraction
   quarterTrans->contract(1.0, d_eri_, dC->data(), 0.0, dOut->data());
 
   CUDA_CHECK(cudaMemcpy(out, dOut->data(),
-                        num_basis_funcs3 * nt * sizeof(double),
+                        num_atomic_orbitals3 * nt * sizeof(double),
                         cudaMemcpyDeviceToHost));
 
 #else
 
   if (omega_ > 1e-12) {
     blas::gemm(blas::Layout::ColMajor, blas::Op::NoTrans, blas::Op::NoTrans, nt,
-               num_basis_funcs3, num_basis_funcs, 1.0, C, nt, h_eri_erf_.get(),
-               num_basis_funcs, 0.0, out, nt);
+               num_atomic_orbitals3, num_atomic_orbitals, 1.0, C, nt,
+               h_eri_erf_.get(), num_atomic_orbitals, 0.0, out, nt);
   } else {
     blas::gemm(blas::Layout::ColMajor, blas::Op::NoTrans, blas::Op::NoTrans, nt,
-               num_basis_funcs3, num_basis_funcs, 1.0, C, nt, h_eri_.get(),
-               num_basis_funcs, 0.0, out, nt);
+               num_atomic_orbitals3, num_atomic_orbitals, 1.0, C, nt,
+               h_eri_.get(), num_atomic_orbitals, 0.0, out, nt);
   }
 
 #endif  // QDK_CHEMISTRY_ENABLE_GPU

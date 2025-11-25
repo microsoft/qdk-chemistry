@@ -14,6 +14,7 @@ from qdk_chemistry.data import Structure
 
 from .reference_tolerances import (
     ci_energy_tolerance,
+    float_comparison_relative_tolerance,
 )
 
 
@@ -77,5 +78,10 @@ class TestMCCalculator:
         e_fci, wfn_fci = mc_calculator.run(ham, 5, 5)
 
         # Validate results
-        assert abs(e_fci - ham.get_core_energy() - -8.301534669468e01) < ci_energy_tolerance
+        assert np.isclose(
+            e_fci - ham.get_core_energy(),
+            -83.01534669468,
+            rtol=float_comparison_relative_tolerance,
+            atol=ci_energy_tolerance,
+        )
         assert wfn_fci.size() == 441

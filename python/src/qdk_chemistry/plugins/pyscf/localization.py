@@ -137,12 +137,7 @@ class PyscfLocalizer(Localizer):
         # If both index vectors are empty, return original orbitals unchanged
         if len(loc_indices_a) == 0 and len(loc_indices_b) == 0:
             return wavefunction
-        # TODO (NAB): fix TODO above
-        # 41404
 
-        # TODO assumes aufbau filling
-        # TODO (NAB): fix TODO above
-        # 41404
         pop_method = self._settings.get("population_method")
         loc_method = self._settings.get("method").lower()
 

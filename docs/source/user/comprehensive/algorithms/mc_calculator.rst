@@ -24,7 +24,7 @@ The ``MultiConfigurationCalculator`` in QDK/Chemistry provides:
 Creating an MultiConfigurationCalculator
 ----------------------------------------
 
-The ``MultiConfigurationCalculator`` is created using the :doc:`factory pattern <../advanced/factory_pattern>`.
+The ``MultiConfigurationCalculator`` is created using the :doc:`factory pattern <../design/factory_pattern>`.
 
 .. tab:: C++ API
 
@@ -79,7 +79,7 @@ The ``MultiConfigurationCalculator`` can be configured using the ``Settings`` ob
 Running a :term:`CI` calculation
 ---------------------------------
 
-Once configured, the :term:`CI` calculation can be executed using a :doc:`Hamiltonian <../data/hamiltonian>` object as input, which returns energy values and a :doc:`Wavefunction <../data/wavefunction>` object as output:
+Once configured, the :term:`CI` calculation can be executed using a :doc:`Hamiltonian <../data/hamiltonian>` object as input, which returns energy values and a :class:`qdk_chemistry.data.Wavefunction` object as output:
 
 .. tab:: C++ API
 
@@ -176,7 +176,7 @@ QDK/Chemistry's ``MultiConfigurationCalculator`` provides a unified interface fo
 The factory pattern allows seamless selection between these implementations, with the most appropriate option chosen
 based on the calculation requirements and available packages.
 
-For more details on how QDK/Chemistry interfaces with external packages, see the :doc:`Interfaces <../advanced/interfaces>` documentation.
+For more details on how QDK/Chemistry interfaces with external packages, see the :doc:`Interfaces <../design/interfaces>` documentation.
 
 :term:`MACIS` implementation
 -----------------------------
@@ -188,7 +188,6 @@ Related classes
 ---------------
 
 - :doc:`Hamiltonian <../data/hamiltonian>`: Input Hamiltonian for CI calculation
-- :doc:`Wavefunction <../data/wavefunction>`: Output CI wavefunction
+- :class:`qdk_chemistry.data.Wavefunction`: Output CI wavefunction
 - :doc:`HamiltonianConstructor <hamiltonian_constructor>`: Produces the Hamiltonian for CI
 - :doc:`ActiveSpaceSelector <active_space>`: Helps identify important orbitals for the active space
-.. - :doc:`DynamicalCorrelation <dynamical_correlation>`: Can add dynamical correlation to CI results

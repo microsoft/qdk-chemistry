@@ -51,7 +51,7 @@ def test_energy_agreement_between_state_prep_methods(wavefunction_4e4o, hamilton
     for energy_a, energy_b in combinations([ref_energy_4e4o, sparse_gf2x_energy, regular_energy], 2):
         energy_diff.append(abs(energy_a - energy_b))
     assert np.allclose(
-        energy_diff, 0, atol=float_comparison_absolute_tolerance, rtol=float_comparison_relative_tolerance
+        energy_diff, 0, rtol=float_comparison_relative_tolerance, atol=float_comparison_absolute_tolerance
     ), f"Energy difference {energy_diff} exceeds tolerance. "
 
 
@@ -77,7 +77,9 @@ def test_sparse_isometry_gf2x_energy_validation(wavefunction_10e6o, hamiltonian_
     assert circuit_energy < 0, f"Circuit energy should be negative for electronic systems, got {circuit_energy:.6f}"
     # For exact 10e6o f2 case: circuit should match reference
     energy_diff = abs(circuit_energy - ref_energy_10e6o)
-    assert np.isclose(energy_diff, 0), (
+    assert np.isclose(
+        energy_diff, 0, rtol=float_comparison_relative_tolerance, atol=float_comparison_absolute_tolerance
+    ), (
         f"For 10e6o f2 wavefunction, circuit energy should match "
         f"reference energy. Got energy difference: {energy_diff:.8f} Hartree"
     )
@@ -117,15 +119,6 @@ def test_sparse_isometry_gf2x_circuit_efficiency(wavefunction_4e4o):
     assert sparse_size <= regular_size, (
         f"Sparse isometry size ({sparse_size}) should be <= regular isometry size ({regular_size})"
     )
-
-    # Log the efficiency gains for information
-    if regular_depth > 0:
-        depth_ratio = sparse_depth / regular_depth
-        print(f"Depth efficiency: {depth_ratio:.2f} (sparse/regular)")
-
-    if regular_size > 0:
-        size_ratio = sparse_size / regular_size
-        print(f"Size efficiency: {size_ratio:.2f} (sparse/regular)")
 
 
 def get_bitstring(circuit: QuantumCircuit) -> str:

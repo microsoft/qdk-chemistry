@@ -70,33 +70,33 @@ class DataClass(_CoreDataClass):
     """Base class for immutable data classes with common serialization methods.
 
     This abstract base class provides:
+
     - Immutability after construction (__setattr__ and __delattr__ protection)
     - Common implementations of to_json_file, to_hdf5_file, and to_file
     - Filename validation to enforce naming convention (.<data_type>.<extension>)
     - Requires derived classes to implement abstract methods
 
     Derived classes MUST implement:
+
     1. get_summary() -> str
         Return a human-readable summary string of the object
-
     2. to_json() -> dict
         Return a dictionary representation suitable for JSON serialization
-
     3. to_hdf5(group: h5py.Group) -> None
         Write the object's data to an HDF5 group
-
     4. to_file(filename: str, format_type: str) -> None
         Save the object to a file with the specified format
         (default implementation provided, but can be overridden)
 
     Derived classes should:
+
     - Set all attributes before calling super().__init__()
     - Call super().__init__() at the end of __init__ to enable immutability
     - Set the _data_type_name class attribute (e.g., "structure", "wavefunction")
 
-    Note:
-        These methods are pure virtual in the C++ base class and MUST be
-        overridden. The C++ binding will enforce this at runtime.
+    Notes:
+        These methods are pure virtual in the C++ base class and MUST be overridden.
+        The C++ binding will enforce this at runtime.
 
         Filename validation enforces the convention that filenames must include
         the data type, e.g., "example.structure.json" or "data.wavefunction.h5"

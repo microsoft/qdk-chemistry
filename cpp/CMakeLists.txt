@@ -14,6 +14,7 @@ endif()
 
 # Set default build type
 if(NOT CMAKE_BUILD_TYPE)
+    message(WARNING "CMAKE_BUILD_TYPE not specified, defaulting to Release")
     set(CMAKE_BUILD_TYPE Release)
 endif()
 
@@ -135,12 +136,12 @@ set_target_properties(chemistry PROPERTIES OUTPUT_NAME "qdk_chemistry")
 
 # Handle Coverage build
 if(QDK_CHEMISTRY_ENABLE_COVERAGE)
-    if(CMAKE_BUILD_TYPE STREQUAL "Debug")
+    if(CMAKE_BUILD_TYPE STREQUAL "Debug" OR CMAKE_BUILD_TYPE STREQUAL "RelWithDebInfo")
         message(STATUS "Enabling coverage build")
         target_compile_options(chemistry PRIVATE --coverage -fprofile-arcs -ftest-coverage)
         target_link_libraries(chemistry PRIVATE --coverage)
     else()
-        message(FATAL_ERROR "Coverage build is only supported in CMAKE_BUILD_TYPE=Debug mode")
+        message(FATAL_ERROR "Coverage build is only supported in CMAKE_BUILD_TYPE=Debug or RelWithDebInfo mode")
     endif()
 endif()
 

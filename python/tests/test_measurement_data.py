@@ -127,7 +127,7 @@ def test_measurement_data_hdf5_file_io():
         assert loaded_data.shots_list == [100, 100]
 
         # Verify Hamiltonian data
-        np.testing.assert_array_equal(
+        assert np.array_equal(
             loaded_data.hamiltonians[0].coefficients,
             data.hamiltonians[0].coefficients,
         )

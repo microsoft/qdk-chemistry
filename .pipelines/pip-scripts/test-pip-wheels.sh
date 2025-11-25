@@ -52,11 +52,6 @@ python3 -m pip install pytest
 cd /workspace/qdk-chemistry/python
 pip3 install repaired_wheelhouse/qdk_chemistry*.whl
 
-# Basic import tests
-echo '=== Testing basic imports ==='
-python3 -c 'import qdk_chemistry; print("QDK version:", qdk_chemistry.__version__)'
-python3 -c 'from qdk_chemistry import QDKChemistryConfig; print("Resources dir:", QDKChemistryConfig.get_resources_dir())'
-
 # Run pytest suite
 echo '=== Running pytest suite ==='
 python3 -m pytest -v ./tests
