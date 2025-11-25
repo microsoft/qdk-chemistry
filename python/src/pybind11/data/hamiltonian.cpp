@@ -187,8 +187,8 @@ Examples:
 Get tuple of one-electron integrals (alpha, beta) in molecular orbital basis.
 
 Returns:
-    [numpy.ndarray, numpy.ndarray]: One-electron integral matrix [norb x norb] 
-    of alpha and beta respectively, containing kinetic energy and nuclear 
+    [numpy.ndarray, numpy.ndarray]: One-electron integral matrix [norb x norb]
+    of alpha and beta respectively, containing kinetic energy and nuclear
     attraction integrals.
 
 Raises:
@@ -241,8 +241,8 @@ Examples:
 Get two-electron integrals in molecular orbital basis.
 
 Returns:
-    tuple[numpy.ndarray, numpy.ndarray, numpy.ndarray]: Tuple of two-electron 
-    integral vectors [norb^4] containing electron-electron repulsion integrals 
+    tuple[numpy.ndarray, numpy.ndarray, numpy.ndarray]: Tuple of two-electron
+    integral vectors [norb^4] containing electron-electron repulsion integrals
     aaaa, aabb and bbbb
 
 Raises:
@@ -266,7 +266,7 @@ Get specific two-electron integral element <ij|kl>.
 
 Args:
     i, j, k, l (int): Orbital indices for the two-electron integral
-    channel (SpinChannel) : Which spin channel to check, aaaa, aabb, bbbb 
+    channel (SpinChannel) : Which spin channel to check, aaaa, aabb, bbbb
     (default is aaaa)
 
 Returns:

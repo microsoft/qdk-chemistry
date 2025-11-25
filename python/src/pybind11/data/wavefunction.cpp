@@ -988,13 +988,13 @@ Constructs a coupled cluster wavefunction container with restricted-like interfa
 
 Parameters:
     orbitals (Orbitals): Shared pointer to orbital basis set
-    references (list of Configuration): Reference determinant(s) for the CC 
+    references (list of Configuration): Reference determinant(s) for the CC
     wavefunction
-    t1_amplitudes (numpy.ndarray, optional): T1 amplitudes (will be used for 
+    t1_amplitudes (numpy.ndarray, optional): T1 amplitudes (will be used for
     both alpha and beta in restricted case)
-    t2_amplitudes (numpy.ndarray, optional): T2 amplitudes (will be used for 
+    t2_amplitudes (numpy.ndarray, optional): T2 amplitudes (will be used for
     alpha-beta coupling)
-    type (WavefunctionType, optional): Type of wavefunction (default: 
+    type (WavefunctionType, optional): Type of wavefunction (default:
     NotSelfDual)
 
 Examples:
@@ -1021,14 +1021,14 @@ Constructs a coupled cluster wavefunction container with spin-separated amplitud
 
 Parameters:
     orbitals (Orbitals): Shared pointer to orbital basis set
-    references (list of Configuration): Reference determinant(s) for the CC 
+    references (list of Configuration): Reference determinant(s) for the CC
     wavefunction
     t1_amplitudes_aa (numpy.ndarray, optional): Alpha T1 amplitudes
     t1_amplitudes_bb (numpy.ndarray, optional): Beta T1 amplitudes
     t2_amplitudes_abab (numpy.ndarray, optional): Alpha-beta T2 amplitudes
     t2_amplitudes_aaaa (numpy.ndarray, optional): Alpha-alpha T2 amplitudes
     t2_amplitudes_bbbb (numpy.ndarray, optional): Beta-beta T2 amplitudes
-    type (WavefunctionType, optional): Type of wavefunction (default: 
+    type (WavefunctionType, optional): Type of wavefunction (default:
     NotSelfDual)
 
 Examples:
@@ -1061,7 +1061,7 @@ Constructs a coupled cluster wavefunction container with amplitudes and RDMs.
 
 Parameters:
     orbitals (Orbitals): Shared pointer to orbital basis set
-    references (list of Configuration): Reference determinant(s) for the CC 
+    references (list of Configuration): Reference determinant(s) for the CC
     wavefunction
     t1_amplitudes_aa (numpy.ndarray, optional): Alpha T1 amplitudes
     t1_amplitudes_bb (numpy.ndarray, optional): Beta T1 amplitudes
@@ -1070,7 +1070,7 @@ Parameters:
     t2_amplitudes_bbbb (numpy.ndarray, optional): Beta-beta T2 amplitudes
     one_rdm_spin_traced (numpy.ndarray, optional): Spin-traced one-particle RDM
     two_rdm_spin_traced (numpy.ndarray, optional): Spin-traced two-particle RDM
-    type (WavefunctionType, optional): Type of wavefunction (default: 
+    type (WavefunctionType, optional): Type of wavefunction (default:
     NotSelfDual)
 
 Examples:
@@ -1176,9 +1176,9 @@ Constructs an MP2 wavefunction container.
 
 Parameters:
     hamiltonian (Hamiltonian): Shared pointer to the Hamiltonian
-    references (list of Configuration): Reference determinant(s) for the MP2 
+    references (list of Configuration): Reference determinant(s) for the MP2
     wavefunction
-    type (WavefunctionType, optional): Type of wavefunction (default: 
+    type (WavefunctionType, optional): Type of wavefunction (default:
     NotSelfDual)
 
 Examples:
@@ -1265,7 +1265,7 @@ Examples:
            R"(
 Check if T2 amplitudes are available.
 
-Returns:   
+Returns:
     bool: Whether T2 amplitudes are available.
 
 Examples:

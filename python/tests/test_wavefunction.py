@@ -977,7 +977,32 @@ class TestWavefunctionRdmIntegraion:
         inactive_fock = np.eye(0)  # Empty inactive Fock matrix
         return Hamiltonian(h1e, h2e.flatten(), basic_orbitals, core_energy, inactive_fock)
 
+
 class TestMP2Container:
+    @pytest.fixture
+    def basic_orbitals(self):
+        """Create basic orbitals for testing."""
+        coeffs = np.array([[1.0, 0.0, 0.0], [0.0, 1.0, 0.0], [0.0, 0.0, 1.0]])
+        energies = np.array([-1.0, -0.5, 0.5])  # Two occupied, one virtual
+        basis_set = create_test_basis_set(3, "test-mp2")
+        return Orbitals(coeffs, energies, None, basis_set)
+
+    @pytest.fixture
+    def basic_hamiltonian(self, basic_orbitals):
+        """Create a basic Hamiltonian for testing."""
+        # Create simple 1e and 2e integrals for 3 orbitals
+        h1e = np.array([[-1.0, 0.0, 0.0], [0.0, -0.5, 0.0], [0.0, 0.0, 0.5]])
+        h2e = np.zeros((3, 3, 3, 3))
+        # Add some simple repulsion integrals
+        h2e[0, 0, 0, 0] = 0.5
+        h2e[1, 1, 1, 1] = 0.3
+        h2e[0, 1, 0, 1] = 0.2
+        h2e[1, 0, 1, 0] = 0.2
+
+        core_energy = 0.0
+        inactive_fock = np.eye(0)  # Empty inactive Fock matrix
+        return Hamiltonian(h1e, h2e.flatten(), basic_orbitals, core_energy, inactive_fock)
+
     def test_mp2_container_construction(self, basic_hamiltonian):
         """Test MP2Container construction with lazy evaluation."""
         ref = Configuration("220")  # Two electrons in first two orbitals
