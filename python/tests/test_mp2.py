@@ -11,6 +11,7 @@ from qdk_chemistry.data import Ansatz, Structure
 
 from .reference_tolerances import mp2_energy_tolerance
 
+
 def create_o2_molecule(bond_length=2.3):
     """Create O2 molecule for testing.
 

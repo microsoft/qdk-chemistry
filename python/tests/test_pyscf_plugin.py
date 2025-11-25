@@ -1446,7 +1446,9 @@ class TestPyscfPlugin:
         ansatz_object = Ansatz(hamiltonian, wavefunction)
         cc_energy, updated_wavefunction = cc_calculator.run(ansatz_object)
         reference_energy = -149.8417973596817
-        assert np.isclose(cc_energy, reference_energy), f"cc energy {cc_energy} should match reference {reference_energy}"
+        assert np.isclose(cc_energy, reference_energy), (
+            f"cc energy {cc_energy} should match reference {reference_energy}"
+        )
 
         # Get amplitudes from the wavefunction container
         cc_container = updated_wavefunction.get_container()
