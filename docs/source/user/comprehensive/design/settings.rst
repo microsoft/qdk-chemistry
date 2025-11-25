@@ -1,18 +1,17 @@
 Settings
 ========
 
-The ``Settings`` class in QDK/Chemistry provides a flexible configuration mechanism for all algorithms and data structures in the quantum chemistry toolkit.
+The :class:`~qdk_chemistry.data.Settings` class in QDK/Chemistry provides a flexible configuration mechanism for all algorithms and data structures in the quantum chemistry toolkit.
 It allows users to customize the behavior of algorithms by setting various parameters with type safety and extensibility.
 This unified settings system ensures consistency across the toolkit and makes it easy to save, load, and share configurations between different parts of your application.
 
 Overview
 --------
 
-The ``Settings`` class is a type-safe key-value store that provides a unified interface for configuring algorithms and data structures.
-Each algorithm type (such as ``ScfSolver``, ``Localizer``, etc.) extends the base ``Settings`` class to
-create its own specialized settings with appropriate default values.
+The :class:`~qdk_chemistry.data.Settings` class is a type-safe key-value store that provides a unified interface for configuring algorithms and data structures.
+Each algorithm type (such as :doc:`../algorithms/scf_solver`, :doc:`../algorithms/localizer`, etc.) extends the base :class:`~qdk_chemistry.data.Settings` class to create its own specialized settings with appropriate default values.
 The class follows a design philosophy where default settings are established during class initialization.
-This approach aligns with QDK/Chemistry's broader :doc:`design principles <design_principles>` of type safety and flexibility.
+This approach aligns with QDK/Chemistry's broader :doc:`design principles <index>` of type safety and flexibility.
 
 The class supports:
 
@@ -20,14 +19,14 @@ The class supports:
   type-safe variant system
 - **Convenient accessor methods**: Get values with or without default fallbacks, check existence, and validate types
 - **Multiple serialization formats**: Save and load from JSON and HDF5 files for interoperability (see
-  :doc:`Serialization <serialization>` for more details)
+  :doc:`Serialization <../data/serialization>` for more details)
 - **Default settings protection**: Default settings are defined during initialization through the protected
   ``set_default`` method, values can be alterd before algorithm execution but are locked afterwasrds to ensure consistency
 
 Accessing settings
 ------------------
 
-All QDK/Chemistry algorithm classes that use configurable parameters provide access to their settings through the ``settings()`` method, which returns a reference to their internal ``Settings`` object.
+All QDK/Chemistry algorithm classes that use configurable parameters provide access to their settings through the ``settings()`` method, which returns a reference to their internal :class:`~qdk_chemistry.data.Settings` object.
 This consistent interface makes it easy to configure any algorithm in the toolkit using the same pattern.
 
 The settings object acts as a bridge between the user interface and the internal algorithm implementation, allowing you to modify algorithm behavior without changing its code.
@@ -55,7 +54,7 @@ Most algorithms validate their settings only at execution time, so you can adjus
 Common settings operations
 --------------------------
 
-The ``Settings`` class provides a rich set of methods for manipulating and accessing configuration parameters.
+The :class:`~qdk_chemistry.data.Settings` class provides a rich set of methods for manipulating and accessing configuration parameters.
 Each method is designed to be intuitive while providing robust error handling and type safety.
 
 Setting values
@@ -124,7 +123,7 @@ Checking for settings
 ~~~~~~~~~~~~~~~~~~~~~
 
 Before accessing a setting, you might want to check if it exists or if it has the expected type.
-The ``Settings`` class provides methods for both checks.
+The :class:`~qdk_chemistry.data.Settings` class provides methods for both checks.
 Additionally, the ``try_get`` method returns an ``std::optional`` that contains the value if it exists and has the correct type, or is empty otherwise.
 
 .. tab:: C++ API
@@ -157,7 +156,7 @@ Additionally, the ``try_get`` method returns an ``std::optional`` that contains 
 Other operations
 ~~~~~~~~~~~~~~~~
 
-The ``Settings`` class provides numerous utility methods for working with the settings collection as a whole.
+The :class:`~qdk_chemistry.data.Settings` class provides numerous utility methods for working with the settings collection as a whole.
 These include methods for introspection (examining what settings exist), validation (checking that required settings are
 present), manipulation (merging with other settings objects), and more.
 
@@ -203,11 +202,11 @@ Serialization
 -------------
 
 Configuration persistence is important for reproducibility in scientific computing.
-The ``Settings`` class provides methods to serialize and deserialize settings to both JSON and HDF5 formats.
+The :class:`~qdk_chemistry.data.Settings` class provides methods to serialize and deserialize settings to both JSON and HDF5 formats.
 This allows you to save algorithm configurations, share them with colleagues, or use them in future runs to ensure consistent results.
 
 JSON is a human-readable format ideal for manual editing and inspection, while HDF5 offers better performance and type preservation for large datasets.
-For more information on serialization throughout QDK/Chemistry, see the :doc:`Serialization <serialization>` documentation.
+For more information on serialization throughout QDK/Chemistry, see the :doc:`Serialization <../data/serialization>` documentation.
 
 .. tab:: C++ API
 
@@ -273,7 +272,7 @@ HDF5 format
 Extending settings
 ------------------
 
-The ``Settings`` class is designed with inheritance in mind, allowing algorithm developers to create specialized settings classes with predefined parameters and defaults.
+The :class:`~qdk_chemistry.data.Settings` class is designed with inheritance in mind, allowing algorithm developers to create specialized settings classes with predefined parameters and defaults.
 This design pattern ensures that algorithm settings are well-defined and discoverable.
 
 The key aspect of this design is that default values are established during construction using the protected ``set_default`` method, which ensures baseline functionality.
@@ -282,7 +281,7 @@ While new settings can be added at runtime through the public ``set`` method, de
 This extensibility model is part of QDK/Chemistry's broader :doc:`Factory Pattern <factory_pattern>` design, which allows for flexible algorithm implementations while maintaining a consistent API.
 The pattern is used throughout QDK/Chemistry, such as in the :doc:`Interface System <interfaces>` for integrating third-party packages.
 
-Here's how to extend the ``Settings`` class for a custom algorithm:
+Here's how to extend the :class:`~qdk_chemistry.data.Settings` class for a custom algorithm:
 
 .. tab:: C++ API
 
@@ -308,7 +307,7 @@ Here's how to extend the ``Settings`` class for a custom algorithm:
 Supported types
 ---------------
 
-The ``Settings`` class uses a variant-based type system to store different types of values in a type-safe manner.
+The :class:`~qdk_chemistry.data.Settings` class uses a variant-based type system to store different types of values in a type-safe manner.
 This system balances flexibility with strong typing, allowing settings to hold various types of data while still providing compile-time type checking when accessed.
 
 Currently, the following value types are supported:
@@ -330,7 +329,7 @@ The implementation ensures type safety through C++ templates and variant handlin
 Error handling
 --------------
 
-The ``Settings`` class uses exceptions to provide clear error messages when operations fail.
+The :class:`~qdk_chemistry.data.Settings` class uses exceptions to provide clear error messages when operations fail.
 This exception-based approach makes errors explicit and helps catch configuration issues early in development.
 The class defines two specific exception types:
 
@@ -367,7 +366,7 @@ These exceptions can be caught and handled to provide graceful error recovery:
 Related topics
 --------------
 
-- :doc:`Design Principles <design_principles>`: Core architectural principles of QDK/Chemistry
+- :doc:`Design Principles <index>`: Core architectural principles of QDK/Chemistry
 - :doc:`Factory Pattern <factory_pattern>`: Understanding the factory pattern and extending QDK/Chemistry
 - :doc:`Interfaces <interfaces>`: QDK/Chemistry's interface system to external packages
-- :doc:`Serialization <serialization>`: Data persistence in QDK/Chemistry
+- :doc:`Serialization <../data/serialization>`: Data persistence in QDK/Chemistry

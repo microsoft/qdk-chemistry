@@ -234,7 +234,7 @@ To create a new interface to an external program in Python:
    solver = create_scf_solver("external-program")
 
 Connection to the interface system
-------------------------------
+----------------------------------
 
 The factory pattern serves as the foundation for QDK/Chemistry's :doc:`Interface System <interfaces>`.
 In QDK/Chemistry, factories enable the registration and instantiation of interface implementations that connect to external quantum chemistry programs.
