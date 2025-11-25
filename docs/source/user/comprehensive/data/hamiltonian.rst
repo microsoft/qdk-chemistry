@@ -232,13 +232,10 @@ You can access the spin-separated integral tensors like:
 
    .. code-block:: cpp
 
-      // Access alpha one-electron integrals, returns const Eigen::MatrixXd&
-      auto h1_alpha = hamiltonian.get_one_body_integrals_alpha();
+      // Access alpha one-electron integrals
+      auto [h1_alpha, h1_beta] = hamiltonian.get_one_body_integrals();
 
-      // Access beta one-electron integrals, returns const Eigen::MatrixXd&
-      auto h1_beta = hamiltonian.get_one_body_integrals_beta();
-
-      // Access all two-electron integrals as tuple (aaaa, aabb, bbbb)
+      // Access all two-electron integrals
       auto [h2_aaaa, h2_aabb, h2_bbbb] = hamiltonian.get_two_body_integrals();
 
       // Access specific two-electron integral channels
@@ -255,13 +252,14 @@ You can access the spin-separated integral tensors like:
    .. code-block:: python
 
       # Access alpha one-electron integrals
-      h1_alpha = h_unrestricted.get_one_body_integrals_alpha()
+      h1_alpha, h1_beta = h_unrestricted.get_one_body_integrals()
 
-      # Access beta one-electron integrals
-      h1_beta = h_unrestricted.get_one_body_integrals_beta()
-
-      # Access all two-electron integrals as tuple (aaaa, aabb, bbbb)
+      # Access all two-electron integrals
       h2_aaaa, h2_aabb, h2_bbbb = h_unrestricted.get_two_body_integrals()
+
+      # Access specific one-electron integral channels
+      integral_aa = hamiltonian.get_one_body_element(i, j, SpinChannel.aa)
+      integral_bb = hamiltonian.get_one_body_element(i, j, SpinChannel.bb)
 
       # Access specific two-electron integral channels
       integral_aaaa = hamiltonian.get_two_body_element(i, j, k, l, SpinChannel.aaaa)
@@ -275,7 +273,8 @@ You can access the spin-separated integral tensors like:
 .. note::
    For restricted Hamiltonians, the spin-separated accessors return the same data for both alpha and beta channels.
    The ``get_two_body_integrals()`` method always returns a tuple of three components (aaaa, aabb, bbbb),
-   which are identical for restricted cases.
+   which are identical for restricted cases. Likewise for ``get_one_body_integrals()``, which returns a tuple (aa,bb)
+   where these are identical for restricted cases.
 
 Serialization
 -------------

@@ -129,18 +129,27 @@ bool Hamiltonian::has_one_body_integrals() const {
          _one_body_integrals.first->cols() > 0;
 }
 
-const Eigen::MatrixXd& Hamiltonian::get_one_body_integrals_alpha() const {
+double Hamiltonian::get_one_body_element(unsigned i, unsigned j,
+                                         SpinChannel channel) const {
   if (!has_one_body_integrals()) {
     throw std::runtime_error("One-body integrals are not set");
   }
-  return *_one_body_integrals.first;
-}
 
-const Eigen::MatrixXd& Hamiltonian::get_one_body_integrals_beta() const {
-  if (!has_one_body_integrals()) {
-    throw std::runtime_error("One-body integrals are not set");
+  size_t norb = _orbitals->get_active_space_indices().first.size();
+  if (i >= norb || j >= norb) {
+    throw std::out_of_range("Orbital index out of range");
   }
-  return *_one_body_integrals.second;
+
+  // Select the appropriate integral based on spin channel
+  switch (channel) {
+    case SpinChannel::aa:
+      return (*_one_body_integrals.first)(i, j);
+    case SpinChannel::bb:
+      return (*_one_body_integrals.second)(i, j);
+    default:
+      throw std::invalid_argument(
+          "Invalid spin channel for one-body integrals");
+  }
 }
 
 std::tuple<const Eigen::VectorXd&, const Eigen::VectorXd&,
@@ -423,7 +432,7 @@ std::string Hamiltonian::get_summary() const {
   summary += "  Integral Statistics:\n";
 
   // One-body integrals - alpha
-  const auto& one_body_alpha = get_one_body_integrals_alpha();
+  auto [one_body_alpha, one_body_beta] = get_one_body_integrals();
   const size_t non_negligible_one_body_alpha = std::count_if(
       one_body_alpha.data(), one_body_alpha.data() + one_body_alpha.size(),
       [threshold](double val) { return std::abs(val) > threshold; });
@@ -435,7 +444,6 @@ std::string Hamiltonian::get_summary() const {
 
   // One-body integrals - beta (if unrestricted)
   if (is_unrestricted()) {
-    const auto& one_body_beta = get_one_body_integrals_beta();
     const size_t non_negligible_one_body_beta = std::count_if(
         one_body_beta.data(), one_body_beta.data() + one_body_beta.size(),
         [threshold](double val) { return std::abs(val) > threshold; });

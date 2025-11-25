@@ -19,7 +19,7 @@ namespace qdk::chemistry::data {
 
 enum class HamiltonianType { Hermitian, NonHermitian };
 
-enum class SpinChannel { aaaa, aabb, bbbb };
+enum class SpinChannel { aa, bb, aaaa, aabb, bbbb };
 
 /**
  * @class Hamiltonian
@@ -136,18 +136,15 @@ class Hamiltonian : public DataClass,
   bool has_one_body_integrals() const;
 
   /**
-   * @brief Get alpha one-electron integrals in MO basis
-   * @return Reference to alpha one-electron integrals matrix
-   * @throws std::runtime_error if integrals are not set
+   * @brief Get specific two-electron integral element
+   * @param i First orbital index
+   * @param j Second orbital index
+   * @param channel Spin channel to query (aa, or bb), defaults to aa
+   * @return One-electron integral <ij>
+   * @throws std::out_of_range if indices are invalid
    */
-  const Eigen::MatrixXd& get_one_body_integrals_alpha() const;
-
-  /**
-   * @brief Get beta one-electron integrals in MO basis
-   * @return Reference to beta one-electron integrals matrix
-   * @throws std::runtime_error if integrals are not set
-   */
-  const Eigen::MatrixXd& get_one_body_integrals_beta() const;
+  double get_one_body_element(unsigned i, unsigned j,
+                              SpinChannel channel = SpinChannel::aa) const;
 
   /**
    * @brief Get two-electron integrals in MO basis for all spin channels

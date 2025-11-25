@@ -200,6 +200,7 @@ Examples:
     >>> print(f"Diagonal element h1_alpha[0,0] = {h1_alpha[0,0]}")
     )",
                           py::return_value_policy::reference_internal);
+
   hamiltonian.def("has_one_body_integrals",
                   &Hamiltonian::has_one_body_integrals,
                   R"(
@@ -215,43 +216,23 @@ Examples:
     ...     print("One-body integrals not available")
 )");
 
-  hamiltonian.def("get_one_body_integrals_alpha",
-                  &Hamiltonian::get_one_body_integrals_alpha,
+  hamiltonian.def("get_one_body_element", &Hamiltonian::get_one_body_element,
                   R"(
-Get alpha one-electron integrals in MO basis
+Get specific one-electron integral element <ij>.
+
+Args:
+    i, j (int): Orbital indices for the one-electron integral
+    channel (SpinChannel): spin channel to check (aa or bb, default is aa)
 
 Returns:
-    numpy.ndarray: Alpha one electron integrals matrix
-
-Raises:
-    RuntimeError: If one-body integrals have not been set
+    float: Value of the one-electron integral <ij>
 
 Examples:
-    >>> if hamiltonian.has_one_body_integrals():
-    ...     integrals_alpha = hamiltonian.get_one_body_integrals_alpha()
-    ... else:
-    ...     print("One-body integrals not available")
+    >>> integral = hamiltonian.get_one_body_element(0, 1)
+    >>> print(f"<01> = {integral}")
 )",
-                  py::return_value_policy::reference_internal);
-
-  hamiltonian.def("get_one_body_integrals_beta",
-                  &Hamiltonian::get_one_body_integrals_beta,
-                  R"(
-Get beta one-electron integrals in MO basis
-
-Returns:
-    numpy.ndarray: Beta one electron integrals matrix
-
-Raises:
-    RuntimeError: If one-body integrals have not been set
-
-Examples:
-    >>> if hamiltonian.has_one_body_integrals():
-    ...     integrals_beta = hamiltonian.get_one_body_integrals_beta()
-    ... else:
-    ...     print("One-body integrals not available")
-    )",
-                  py::return_value_policy::reference_internal);
+                  py::arg("i"), py::arg("j"),
+                  py::arg("channel") = SpinChannel::aa);
 
   // Two-body integral access
   bind_getter_as_property(hamiltonian, "get_two_body_integrals",
@@ -278,12 +259,15 @@ Examples:
     >>> print(f"Expected length: {norb**4}")
         )",
                           py::return_value_policy::reference_internal);
+
   hamiltonian.def("get_two_body_element", &Hamiltonian::get_two_body_element,
                   R"(
 Get specific two-electron integral element <ij|kl>.
 
 Args:
     i, j, k, l (int): Orbital indices for the two-electron integral
+    channel (SpinChannel) : Which spin channel to check, aaaa, aabb, bbbb 
+    (default is aaaa)
 
 Returns:
     float: Value of the two-electron integral <ij|kl>

@@ -284,10 +284,10 @@ TEST_F(HamiltonianTest, JSONSerialization) {
   EXPECT_TRUE(h2->has_orbitals());
 
   // Check one body
-  EXPECT_TRUE(h.get_one_body_integrals_alpha().isApprox(
-      h2->get_one_body_integrals_alpha()));
-  EXPECT_TRUE(h.get_one_body_integrals_beta().isApprox(
-      h2->get_one_body_integrals_beta()));
+  EXPECT_TRUE(std::get<0>(h.get_one_body_integrals())
+                  .isApprox(std::get<0>(h2->get_one_body_integrals())));
+  EXPECT_TRUE(std::get<1>(h.get_one_body_integrals())
+                  .isApprox(std::get<1>(h2->get_one_body_integrals())));
   // Check two body
   EXPECT_TRUE(std::get<0>(h.get_two_body_integrals())
                   .isApprox(std::get<0>(h2->get_two_body_integrals())));
@@ -320,10 +320,10 @@ TEST_F(HamiltonianTest, JSONFileIO) {
   EXPECT_TRUE(h2->has_orbitals());
 
   // Check that matrices are approximately equal
-  EXPECT_TRUE(h.get_one_body_integrals_alpha().isApprox(
-      h2->get_one_body_integrals_alpha()));
-  EXPECT_TRUE(h.get_one_body_integrals_beta().isApprox(
-      h2->get_one_body_integrals_beta()));
+  EXPECT_TRUE(std::get<0>(h.get_one_body_integrals())
+                  .isApprox(std::get<0>(h2->get_one_body_integrals())));
+  EXPECT_TRUE(std::get<1>(h.get_one_body_integrals())
+                  .isApprox(std::get<1>(h2->get_one_body_integrals())));
   EXPECT_TRUE(std::get<0>(h.get_two_body_integrals())
                   .isApprox(std::get<0>(h2->get_two_body_integrals())));
   EXPECT_TRUE(std::get<1>(h.get_two_body_integrals())
@@ -355,10 +355,10 @@ TEST_F(HamiltonianTest, HDF5FileIO) {
   EXPECT_TRUE(h2->has_orbitals());
 
   // Check that matrices are approximately equal
-  EXPECT_TRUE(h.get_one_body_integrals_alpha().isApprox(
-      h2->get_one_body_integrals_alpha()));
-  EXPECT_TRUE(h.get_one_body_integrals_beta().isApprox(
-      h2->get_one_body_integrals_beta()));
+  EXPECT_TRUE(std::get<0>(h.get_one_body_integrals())
+                  .isApprox(std::get<0>(h2->get_one_body_integrals())));
+  EXPECT_TRUE(std::get<1>(h.get_one_body_integrals())
+                  .isApprox(std::get<1>(h2->get_one_body_integrals())));
   EXPECT_TRUE(std::get<0>(h.get_two_body_integrals())
                   .isApprox(std::get<0>(h2->get_two_body_integrals())));
   EXPECT_TRUE(std::get<1>(h.get_two_body_integrals())
@@ -378,8 +378,8 @@ TEST_F(HamiltonianTest, GenericFileIO) {
   auto h2 = Hamiltonian::from_file(json_filename, "json");
 
   EXPECT_EQ(h2->get_orbitals()->get_num_molecular_orbitals(), 2);
-  EXPECT_TRUE(h.get_one_body_integrals_alpha().isApprox(
-      h2->get_one_body_integrals_alpha()));
+  EXPECT_TRUE(std::get<0>(h.get_one_body_integrals())
+                  .isApprox(std::get<0>(h2.get_one_body_integrals())));
 
   // Test HDF5 via generic interface
   std::string hdf5_filename = "test.hamiltonian.h5";
@@ -389,8 +389,8 @@ TEST_F(HamiltonianTest, GenericFileIO) {
   auto h3 = Hamiltonian::from_file(hdf5_filename, "hdf5");
 
   EXPECT_EQ(h3->get_orbitals()->get_num_molecular_orbitals(), 2);
-  EXPECT_TRUE(h.get_one_body_integrals_alpha().isApprox(
-      h3->get_one_body_integrals_alpha()));
+  EXPECT_TRUE(std::get<0>(h.get_one_body_integrals())
+                  .isApprox(std::get<0>(h3.get_one_body_integrals())));
 }
 
 TEST_F(HamiltonianTest, InvalidFileType) {
@@ -837,8 +837,8 @@ TEST_F(HamiltonianTest, UnrestrictedAccessorMethods) {
                 inactive_fock_alpha, inactive_fock_beta);
 
   // Test alpha/beta one-body integral access
-  EXPECT_TRUE(h.get_one_body_integrals_alpha().isApprox(one_body_alpha));
-  EXPECT_TRUE(h.get_one_body_integrals_beta().isApprox(one_body_beta));
+  EXPECT_TRUE(std::get<0>(h.get_one_body_integrals()).isApprox(one_body_alpha));
+  EXPECT_TRUE(std::get<1>(h.get_one_body_integrals()).isApprox(one_body_alpha));
 
   // Test tuple access for two-body integrals
   auto [aaaa, aabb, bbbb] = h.get_two_body_integrals();
@@ -944,10 +944,10 @@ TEST_F(HamiltonianTest, UnrestrictedJSONSerialization) {
   EXPECT_FALSE(h_loaded->is_restricted());
   EXPECT_TRUE(h_loaded->is_unrestricted());
 
-  EXPECT_TRUE(h_orig.get_one_body_integrals_alpha().isApprox(
-      h_loaded->get_one_body_integrals_alpha()));
-  EXPECT_TRUE(h_orig.get_one_body_integrals_beta().isApprox(
-      h_loaded->get_one_body_integrals_beta()));
+  EXPECT_TRUE(std::get<0>(h_orig.get_one_body_integrals())
+                  .isApprox(std::get<0>(h_loaded->get_one_body_integrals())));
+  EXPECT_TRUE(std::get<1>(h_orig.get_one_body_integrals())
+                  .isApprox(std::get<1>(h_loaded->get_one_body_integrals())));
   EXPECT_TRUE(std::get<0>(h_orig.get_two_body_integrals())
                   .isApprox(std::get<0>(h_loaded->get_two_body_integrals())));
   EXPECT_TRUE(std::get<1>(h_orig.get_two_body_integrals())
@@ -988,10 +988,10 @@ TEST_F(HamiltonianTest, UnrestrictedHDF5Serialization) {
   EXPECT_FALSE(h_loaded->is_restricted());
   EXPECT_TRUE(h_loaded->is_unrestricted());
 
-  EXPECT_TRUE(h_orig.get_one_body_integrals_alpha().isApprox(
-      h_loaded->get_one_body_integrals_alpha()));
-  EXPECT_TRUE(h_orig.get_one_body_integrals_beta().isApprox(
-      h_loaded->get_one_body_integrals_beta()));
+  EXPECT_TRUE(std::get<0>(h_orig.get_one_body_integrals())
+                  .isApprox(std::get<0>(h_loaded->get_one_body_integrals())));
+  EXPECT_TRUE(std::get<1>(h_orig.get_one_body_integrals())
+                  .isApprox(std::get<1>(h_loaded->get_one_body_integrals())));
   EXPECT_TRUE(std::get<0>(h_orig.get_two_body_integrals())
                   .isApprox(std::get<0>(h_loaded->get_two_body_integrals())));
   EXPECT_TRUE(std::get<1>(h_orig.get_two_body_integrals())
@@ -1249,8 +1249,8 @@ TEST_F(HamiltonianTest, IntegralSymmetriesEnergiesO2Singlet) {
          "closed-shell O2";
 
   // Verify one-body integral symmetries alpha == beta
-  const auto& alpha_one_body = uhf_hamiltonian->get_one_body_integrals_alpha();
-  const auto& beta_one_body = uhf_hamiltonian->get_one_body_integrals_beta();
+  const auto& [alpha_one_body, beta_two_body] =
+      uhf_hamiltonian->get_one_body_integrals();
 
   EXPECT_TRUE(alpha_one_body.isApprox(beta_one_body, tolerance))
       << "Alpha and beta one-body integrals should be identical for "
