@@ -339,6 +339,18 @@ Examples:
     >>> print(f"Core energy: {e_core} hartree")
 )");
 
+  bind_getter_as_property(hamiltonian, "get_inactive_fock_matrix",
+                          &Hamiltonian::get_inactive_fock_matrix,
+                          R"(
+Get tuple of alpha, beta inactive fock matrices
+
+Returns:
+    [np.ndarray, np.ndarray] alpha, beta fock matrices
+
+Examples:
+    >>> alpha_inactive_fock, beta_inactive_fock = hamiltonian.get_inactive_fock_matrix()
+)");
+
   hamiltonian.def("is_restricted", &Hamiltonian::is_restricted,
                   R"(
 Check if Hamiltonian is restricted by checking if alpha

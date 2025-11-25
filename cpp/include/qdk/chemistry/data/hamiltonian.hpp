@@ -177,7 +177,8 @@ class Hamiltonian : public DataClass,
   bool has_two_body_integrals() const;
 
   /**
-   * @brief Get inactive Fock matrix for the selected active space
+   * @brief Get tuple of inactive Fock matrices (alpha, beta) for the selected
+   * active space
    * @return Reference to the inactive Fock matrix
    * @throws std::runtime_error if inactive Fock matrix is not set
    */
@@ -189,20 +190,6 @@ class Hamiltonian : public DataClass,
    * @return True if inactive Fock matrix is set
    */
   bool has_inactive_fock_matrix() const;
-
-  /**
-   * @brief Get alpha inactive Fock matrix for the selected active space
-   * @return Reference to the alpha inactive Fock matrix
-   * @throws std::runtime_error if inactive Fock matrix is not set
-   */
-  const Eigen::MatrixXd& get_inactive_fock_matrix_alpha() const;
-
-  /**
-   * @brief Get beta inactive Fock matrix for the selected active space
-   * @return Reference to the beta inactive Fock matrix
-   * @throws std::runtime_error if inactive Fock matrix is not set
-   */
-  const Eigen::MatrixXd& get_inactive_fock_matrix_beta() const;
 
   /**
    * @brief Get molecular orbital data

@@ -208,20 +208,6 @@ Hamiltonian::get_inactive_fock_matrix() const {
   return {*_inactive_fock_matrix.first, *_inactive_fock_matrix.second};
 }
 
-const Eigen::MatrixXd& Hamiltonian::get_inactive_fock_matrix_alpha() const {
-  if (!has_inactive_fock_matrix()) {
-    throw std::runtime_error("Inactive Fock matrix is not set");
-  }
-  return *_inactive_fock_matrix.first;
-}
-
-const Eigen::MatrixXd& Hamiltonian::get_inactive_fock_matrix_beta() const {
-  if (!has_inactive_fock_matrix()) {
-    throw std::runtime_error("Inactive Fock matrix is not set");
-  }
-  return *_inactive_fock_matrix.second;
-}
-
 const std::shared_ptr<Orbitals> Hamiltonian::get_orbitals() const {
   if (!has_orbitals()) {
     throw std::runtime_error("Orbitals are not set");

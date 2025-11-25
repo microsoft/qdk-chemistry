@@ -468,7 +468,8 @@ std::shared_ptr<Ansatz> Ansatz::from_json(const nlohmann::json& j) {
       // Create restricted hamiltonian with wavefunction's orbitals
       Eigen::MatrixXd fock_matrix;
       if (original_hamiltonian->has_inactive_fock_matrix()) {
-        fock_matrix = original_hamiltonian->get_inactive_fock_matrix_alpha();
+        auto [fock_matrix, fock_matrix_beta] =
+            original_hamiltonian->get_inactive_fock_matrix();
       } else {
         // Use empty matrix if fock matrix is not set
         fock_matrix = Eigen::MatrixXd(0, 0);
@@ -485,10 +486,8 @@ std::shared_ptr<Ansatz> Ansatz::from_json(const nlohmann::json& j) {
       // Create unrestricted hamiltonian with wavefunction's orbitals
       Eigen::MatrixXd fock_matrix_alpha, fock_matrix_beta;
       if (original_hamiltonian->has_inactive_fock_matrix()) {
-        fock_matrix_alpha =
-            original_hamiltonian->get_inactive_fock_matrix_alpha();
-        fock_matrix_beta =
-            original_hamiltonian->get_inactive_fock_matrix_beta();
+        auto [fock_matrix_alpha, fock_matrix_beta] =
+            original_hamiltonian->get_inactive_fock_matrix();
       } else {
         // Use empty matrices if fock matrix is not set
         fock_matrix_alpha = Eigen::MatrixXd(0, 0);
@@ -643,7 +642,8 @@ std::shared_ptr<Ansatz> Ansatz::from_hdf5(H5::Group& group) {
       // Create restricted Hamiltonian with wavefunction's orbitals
       Eigen::MatrixXd fock_matrix;
       if (original_hamiltonian->has_inactive_fock_matrix()) {
-        fock_matrix = original_hamiltonian->get_inactive_fock_matrix_alpha();
+        auto [fock_matrix, fock_matrix_beta] =
+            original_hamiltonian->get_inactive_fock_matrix();
       } else {
         // Use empty matrix if Fock matrix is not set
         fock_matrix = Eigen::MatrixXd(0, 0);
@@ -660,10 +660,8 @@ std::shared_ptr<Ansatz> Ansatz::from_hdf5(H5::Group& group) {
       // Create unrestricted Hamiltonian with wavefunction's orbitals
       Eigen::MatrixXd fock_matrix_alpha, fock_matrix_beta;
       if (original_hamiltonian->has_inactive_fock_matrix()) {
-        fock_matrix_alpha =
-            original_hamiltonian->get_inactive_fock_matrix_alpha();
-        fock_matrix_beta =
-            original_hamiltonian->get_inactive_fock_matrix_beta();
+        auto [fock_matrix_alpha, fock_matrix_beta] =
+            original_hamiltonian->get_inactive_fock_matrix();
       } else {
         // Use empty matrices if Fock matrix is not set
         fock_matrix_alpha = Eigen::MatrixXd(0, 0);

@@ -849,9 +849,6 @@ TEST_F(HamiltonianTest, UnrestrictedAccessorMethods) {
   auto fock_matrices = h.get_inactive_fock_matrix();
   EXPECT_TRUE(fock_matrices.first.isApprox(inactive_fock_alpha));
   EXPECT_TRUE(fock_matrices.second.isApprox(inactive_fock_beta));
-
-  EXPECT_TRUE(h.get_inactive_fock_matrix_alpha().isApprox(inactive_fock_alpha));
-  EXPECT_TRUE(h.get_inactive_fock_matrix_beta().isApprox(inactive_fock_beta));
 }
 
 TEST_F(HamiltonianTest, RestrictedVsUnrestrictedDetection) {
@@ -954,10 +951,11 @@ TEST_F(HamiltonianTest, UnrestrictedJSONSerialization) {
                   .isApprox(std::get<1>(h_loaded->get_two_body_integrals())));
   EXPECT_TRUE(std::get<2>(h_orig.get_two_body_integrals())
                   .isApprox(std::get<2>(h_loaded->get_two_body_integrals())));
-  EXPECT_TRUE(h_orig.get_inactive_fock_matrix_alpha().isApprox(
-      h_loaded->get_inactive_fock_matrix_alpha()));
-  EXPECT_TRUE(h_orig.get_inactive_fock_matrix_beta().isApprox(
-      h_loaded->get_inactive_fock_matrix_beta()));
+
+  auto [h_orig_alpha, h_orig_beta] = h_orig.get_inactive_fock_matrix();
+  auto [h_loaded_alpha, h_loaded_beta] = h_loaded->get_inactive_fock_matrix();
+  EXPECT_TRUE(h_orig_alpha.isApprox(h_loaded_alpha));
+  EXPECT_TRUE(h_orig_beta.isApprox(h_loaded_beta));
 }
 
 TEST_F(HamiltonianTest, UnrestrictedHDF5Serialization) {
@@ -998,10 +996,11 @@ TEST_F(HamiltonianTest, UnrestrictedHDF5Serialization) {
                   .isApprox(std::get<1>(h_loaded->get_two_body_integrals())));
   EXPECT_TRUE(std::get<2>(h_orig.get_two_body_integrals())
                   .isApprox(std::get<2>(h_loaded->get_two_body_integrals())));
-  EXPECT_TRUE(h_orig.get_inactive_fock_matrix_alpha().isApprox(
-      h_loaded->get_inactive_fock_matrix_alpha()));
-  EXPECT_TRUE(h_orig.get_inactive_fock_matrix_beta().isApprox(
-      h_loaded->get_inactive_fock_matrix_beta()));
+
+  auto [h_orig_alpha, h_orig_beta] = h_orig.get_inactive_fock_matrix();
+  auto [h_loaded_alpha, h_loaded_beta] = h_loaded->get_inactive_fock_matrix();
+  EXPECT_TRUE(h_orig_alpha.isApprox(h_loaded_alpha));
+  EXPECT_TRUE(h_orig_beta.isApprox(h_loaded_beta));
 }
 
 TEST_F(HamiltonianTest, FCIDUMPSerialization) {
