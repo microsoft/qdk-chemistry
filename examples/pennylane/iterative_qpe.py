@@ -74,9 +74,7 @@ one_body = np.array(
     active_hamiltonian.get_one_body_integrals(), dtype=float
 )  # One-electron integrals
 norb = one_body.shape[0]  # Number of spatial orbitals
-(two_body_integrals, _, _) = (
-    active_hamiltonian.get_two_body_integrals()
-)  # First spin channel (aaaa)
+(two_body_integrals, _, _) = active_hamiltonian.get_two_body_integrals()
 two_body_flat = np.array(two_body_integrals, dtype=float)  # Two-electron integrals
 two_body = two_body_flat.reshape(
     (norb,) * 4
