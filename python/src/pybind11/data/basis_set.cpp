@@ -691,12 +691,11 @@ orbital_type : OrbitalType
     Type of orbital (S, P, D, F, etc.)
 
 Returns:
-list[int]
-    Vector of ECP shell indices matching both criteria
+    list[int]: Vector of ECP shell indices matching both criteria
 
 Examples:
->>> p_ecp_indices = basis_set.get_ecp_shell_indices_for_atom_and_orbital_type(0, OrbitalType.P)
->>> print(f"P-type ECP shells on atom 0: {p_ecp_indices}")
+    >>> p_ecp_indices = basis_set.get_ecp_shell_indices_for_atom_and_orbital_type(0, OrbitalType.P)
+    >>> print(f"P-type ECP shells on atom 0: {p_ecp_indices}")
 )",
            py::arg("atom_index"), py::arg("orbital_type"))
 
