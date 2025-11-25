@@ -42,7 +42,7 @@ Most algorithms validate their settings only at execution time, so you can adjus
 
 .. tab:: Python API
 
-   .. literalinclude:: ../../../../examples/python/settings.py
+   .. literalinclude:: ../../../examples/python/settings.py
       :language: python
       :start-after: # start-cell-1
       :end-before: # end-cell-1
@@ -70,7 +70,7 @@ The ``set`` method is overloaded to handle various types including C-style strin
 
 .. tab:: Python API
 
-   .. literalinclude:: ../../../../examples/python/settings.py
+   .. literalinclude:: ../../../examples/python/settings.py
       :language: python
       :start-after: # start-cell-2
       :end-before: # end-cell-2
@@ -91,7 +91,7 @@ For cases where you want to provide a fallback value if the key doesn't exist, u
 
 .. tab:: Python API
 
-   .. literalinclude:: ../../../../examples/python/settings.py
+   .. literalinclude:: ../../../examples/python/settings.py
       :language: python
       :start-after: # start-cell-3
       :end-before: # end-cell-3
@@ -112,7 +112,7 @@ Additionally, the ``try_get`` method returns an ``std::optional`` that contains 
 
 .. tab:: Python API
 
-   .. literalinclude:: ../../../../examples/python/settings.py
+   .. literalinclude:: ../../../examples/python/settings.py
       :language: python
       :start-after: # start-cell-4
       :end-before: # end-cell-4
@@ -133,7 +133,7 @@ present), manipulation (merging with other settings objects), and more.
 
 .. tab:: Python API
 
-   .. Literalinclude:: ../../../../examples/python/settings.py
+   .. Literalinclude:: ../../../examples/python/settings.py
       :language: python
       :start-after: # start-cell-5
       :end-before: # end-cell-5
@@ -157,7 +157,7 @@ For more information on serialization throughout QDK/Chemistry, see the :doc:`Se
 
 .. tab:: Python API
 
-   .. literalinclude:: ../../../../examples/python/settings.py
+   .. literalinclude:: ../../../examples/python/settings.py
       :language: python
       :start-after: # start-cell-6
       :end-before: # end-cell-6
@@ -214,7 +214,7 @@ Here's how to extend the ``Settings`` class for a custom algorithm:
 
 .. tab:: Python API
 
-   .. literalinclude:: ../../../../examples/python/settings.py
+   .. literalinclude:: ../../../examples/python/settings.py
       :language: python
       :start-after: # start-cell-7
       :end-before: # end-cell-7
@@ -266,7 +266,7 @@ These exceptions can be caught and handled to provide graceful error recovery:
 
 .. tab:: Python API
 
-   .. literalinclude:: ../../../../examples/python/settings.py
+   .. literalinclude:: ../../../examples/python/settings.py
       :language: python
       :start-after: # start-cell-8
       :end-before: # end-cell-8

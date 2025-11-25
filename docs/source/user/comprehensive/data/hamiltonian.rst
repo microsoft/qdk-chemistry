@@ -51,10 +51,13 @@ Hamiltonian object should be considered constant and not modified:
 
 .. tab:: Python API
 
-   .. literalinclude:: ../../../../examples/python/hamiltonian.py
+   .. note::
+      This example shows the API pattern. For complete working examples, see the test suite.
+
+   .. literalinclude:: ../../../examples/python/hamiltonian.py
       :language: python
-      :start-after: # start-cell-2
-      :end-before: # end-cell-2
+      :start-after: # start-cell-1
+      :end-before: # end-cell-1
 
 Accessing Hamiltonian data
 --------------------------
@@ -101,7 +104,10 @@ When accessing specific elements with ``get_two_body_element(i, j, k, l)``, the 
 
 .. tab:: Python API
 
-   .. literalinclude:: ../../../../examples/python/hamiltonian.py
+   .. note::
+      This example shows the API pattern. For complete working examples, see the test suite.
+
+   .. literalinclude:: ../../../examples/python/hamiltonian.py
       :language: python
       :start-after: # start-cell-2
       :end-before: # end-cell-2
@@ -186,10 +192,20 @@ HDF5 representation of a ``Hamiltonian`` object has the following structure (sho
 
 .. tab:: Python API
 
-   .. literalinclude:: ../../../../examples/python/hamiltonian.py
+   .. note::
+      This example shows the API pattern.
+      For complete working examples, see the test suite.
+
+   .. literalinclude:: ../../../examples/python/hamiltonian.py
       :language: python
       :start-after: # start-cell-3
       :end-before: # end-cell-3
+
+      # Convert to/from JSON in Python
+      import json
+      j = hamiltonian.to_json()
+      j_str = json.dumps(j)
+      hamiltonian_from_json = Hamiltonian.from_json(json.loads(j_str))
 
 Active space Hamiltonian
 ------------------------
@@ -212,7 +228,10 @@ The ``Hamiltonian`` class provides methods to check the validity and consistency
 
 .. tab:: Python API
 
-   .. literalinclude:: ../../../../examples/python/hamiltonian.py
+   .. note::
+      This example shows the API pattern. For complete working examples, see the test suite.
+
+   .. literalinclude:: ../../../examples/python/hamiltonian.py
       :language: python
       :start-after: # start-cell-4
       :end-before: # end-cell-4

@@ -46,7 +46,7 @@ JSON serialization
 
 .. tab:: Python API
 
-   .. literalinclude:: ../../../../examples/python/serialization.py
+   .. literalinclude:: ../../../examples/python/serialization.py
       :language: python
       :start-after: # start-cell-1
       :end-before: # end-cell-1
@@ -63,7 +63,7 @@ HDF5 serialization
 
 .. tab:: Python API
 
-   .. literalinclude:: ../../../../examples/python/serialization.py
+   .. literalinclude:: ../../../examples/python/serialization.py
       :language: python
       :start-after: # start-cell-2
       :end-before: # end-cell-2

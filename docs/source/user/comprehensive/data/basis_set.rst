@@ -1,24 +1,24 @@
 Basis set
 =========
 
-The ``BasisSet`` class in QDK/Chemistry represents a collection of atomic orbital used to describe the electronic structure of molecules.
-It organizes atomic orbitals into shells and provides methods for managing, querying, and serializing basis set data.
+The ``BasisSet`` class in QDK/Chemistry represents a collection of atomic orbital basis functions used to describe the electronic structure of molecules.
+It organizes basis functions into shells and provides methods for managing, querying, and serializing basis set data.
 
 Overview
 --------
 
-In quantum chemistry, a basis set is a collection of atomic orbitals used to represent molecular orbitals.
-The ``BasisSet`` class in QDK/Chemistry uses a shell-based organization, where each shell contains atomic orbitals with the same atom, angular momentum, and primitive Gaussian functions.
+In quantum chemistry, a basis set is a collection of mathematical functions used to represent molecular orbitals.
+The ``BasisSet`` class in QDK/Chemistry uses a shell-based organization, where each shell contains basis functions with the same atom, angular momentum, and primitive Gaussian functions.
 
 Key features of the ``BasisSet`` class include:
 
 - Shell-based storage for memory efficiency
-- Support for both spherical and Cartesian atomic orbitals
-- Mapping between shells/atomic orbitals and atoms
-- Mapping between shells/atomic orbitals and orbital types
+- Support for both spherical and Cartesian basis functions
+- Mapping between shells/basis functions and atoms
+- Mapping between shells/basis functions and orbital types
 - Basis set metadata (name, parameters)
 - Integration with molecular structure information
-- On-demand expansion of shells to individual atomic orbitals
+- On-demand expansion of shells to individual basis functions
 
 Usage
 -----
@@ -36,7 +36,7 @@ Core concepts
 Shells and primitives
 ~~~~~~~~~~~~~~~~~~~~~
 
-A shell represents a group of atomic orbitals that share the same atom, angular momentum, and primitive functions, but differ in magnetic quantum numbers.
+A shell represents a group of basis functions that share the same atom, angular momentum, and primitive functions, but differ in magnetic quantum numbers.
 For example, a :math:`p`-shell contains :math:`p_x, p_y, p_z` functions.
 
 Shells contain primitives, which are Gaussian functions defined by:
@@ -58,7 +58,7 @@ The ``BasisSet`` class supports various orbital types with different angular mom
 Basis types
 ~~~~~~~~~~~
 
-The ``BasisSet`` class supports two types of atomic orbitals:
+The ``BasisSet`` class supports two types of basis functions:
 
 - **Spherical**: Uses spherical harmonics with :math:`2l+1` functions per shell
 - **Cartesian**: Uses Cartesian coordinates with :math:`(l+1)(l+2)/2` functions per shell
@@ -82,7 +82,7 @@ Creating a basis set
    .. note::
       This example shows the API pattern. For complete working examples, see the test suite.
 
-   .. literalinclude:: ../../../../examples/python/basis_set.py
+   .. literalinclude:: ../../../examples/python/basis_set.py
       :language: python
       :start-after: # start-cell-1
       :end-before: # end-cell-1
@@ -109,7 +109,7 @@ This ensures that the basis set data remains consistent and prevents accidental 
    .. note::
       This example shows the API pattern. For complete working examples, see the test suite.
 
-   .. literalinclude:: ../../../../examples/python/basis_set.py
+   .. literalinclude:: ../../../examples/python/basis_set.py
       :language: python
       :start-after: # start-cell-2
       :end-before: # end-cell-2
@@ -117,7 +117,7 @@ This ensures that the basis set data remains consistent and prevents accidental 
 Working with shells
 -------------------
 
-The ``Shell`` structure contains information about a group of atomic orbitals:
+The ``Shell`` structure contains information about a group of basis functions:
 
 .. tab:: C++ API
 
@@ -131,7 +131,7 @@ The ``Shell`` structure contains information about a group of atomic orbitals:
    .. note::
       This example shows the API pattern. For complete working examples, see the test suite.
 
-   .. literalinclude:: ../../../../examples/python/basis_set.py
+   .. literalinclude:: ../../../examples/python/basis_set.py
       :language: python
       :start-after: # start-cell-3
       :end-before: # end-cell-3
@@ -180,10 +180,10 @@ JSON representation of a ``BasisSet`` has the following structure (showing simpl
          "shells": ["..."]
        }
      ],
-     "atomic_orbital_type": "spherical",
+     "basis_type": "spherical",
      "name": "6-31G",
      "num_atoms": 2,
-     "num_atomic_orbitals": 9,
+     "num_basis_functions": 9,
      "num_shells": 3
    }
 
@@ -216,7 +216,7 @@ HDF5 representation of a ``BasisSet`` has the following structure (showing group
    .. note::
       This example shows the API pattern. For complete working examples, see the test suite.
 
-   .. literalinclude:: ../../../../examples/python/basis_set.py
+   .. literalinclude:: ../../../examples/python/basis_set.py
       :language: python
       :start-after: # start-cell-4
       :end-before: # end-cell-4
@@ -238,7 +238,7 @@ The ``BasisSet`` class provides several static utility functions:
    .. note::
       This example shows the API pattern. For complete working examples, see the test suite.
 
-   .. literalinclude:: ../../../../examples/python/basis_set.py
+   .. literalinclude:: ../../../examples/python/basis_set.py
       :language: python
       :start-after: # start-cell-5
       :end-before: # end-cell-5
@@ -247,7 +247,7 @@ Predefined basis sets
 ---------------------
 
 QDK/Chemistry provides access to a library of standard basis sets commonly used in quantum chemistry calculations.
-These predefined basis sets can be easily loaded without having to manually specify the atomic orbitals.
+These predefined basis sets can be easily loaded without having to manually specify the basis functions.
 For a complete list of available basis sets and their specifications, see the :doc:`Supported Basis Sets <../data/basis_sets>` documentation.
 
 .. tab:: C++ API
@@ -262,7 +262,7 @@ For a complete list of available basis sets and their specifications, see the :d
    .. note::
       This example shows the API pattern. For complete working examples, see the test suite.
 
-   .. literalinclude:: ../../../../examples/python/basis_set.py
+   .. literalinclude:: ../../../examples/python/basis_set.py
       :language: python
       :start-after: # start-cell-6
       :end-before: # end-cell-6

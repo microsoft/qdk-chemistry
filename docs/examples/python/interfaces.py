@@ -14,25 +14,47 @@ structure = Structure(coords, ["H", "H"])
 # start-cell-1
 from qdk_chemistry.algorithms import create
 
-# Create an SCF solver that uses the QDK/Chemistry library as solver
+# Create an SCF solver using the factory
 scf_solver = create("scf_solver")
 
 # Configure it using the standard settings interface
-settings = scf_solver.settings()
-settings.set("basis_set", "cc-pvdz")
-settings.set("method", "hf")
+scf_solver.settings().set("basis_set", "cc-pvdz")
+scf_solver.settings().set("method", "hf")
 
-# Run calculation
-scf_solver.run(structure, charge=0, spin_multiplicity=1)
+# Run calculation - returns (energy, wavefunction)
+energy, wavefunction = scf_solver.run(structure, charge=0, spin_multiplicity=1)
+orbitals = wavefunction.get_orbitals()
+
+print(f"SCF Energy: {energy:.10f} Hartree")
 # end-cell-1
 
 
 # start-cell-2
 from qdk_chemistry.algorithms import available
 
-# Get a list of available SCF solver implementations
-available_solvers = available("scf_solver")
-print(f"Available SCF solvers: {available_solvers}")
+# List available implementations for each algorithm type
+print("Available SCF solvers:", available("scf_solver"))
+print("Available Hamiltonian constructors:", available("hamiltonian_constructor"))
+print("Available orbital localizers:", available("orbital_localizer"))
+print("Available MC calculators:", available("multi_configuration_calculator"))
 # end-cell-2
+
+
+# start-cell-4
+# All algorithms use a consistent settings interface
+scf = create("scf_solver")
+
+# Set general options that work across implementations
+scf.settings().set("basis_set", "sto-3g")
+scf.settings().set("max_iterations", 100)
+scf.settings().set("tolerance", 1.0e-8)
+
+# Query available settings for an algorithm
+print(f"SCF settings: {scf.settings().keys()}")
+
+# Get a setting value
+max_iter = scf.settings().get("max_iterations")
+print(f"Max iterations: {max_iter}")
+# end-cell-4
 
 

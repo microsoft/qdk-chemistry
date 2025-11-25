@@ -71,7 +71,7 @@ QDK/Chemistry implements the :doc:`factory pattern <factory_pattern>` for algori
 
 .. tab:: Python API
 
-   .. literalinclude:: ../../../../examples/python/design_principles.py
+   .. literalinclude:: ../../../examples/python/factory_pattern.py
       :language: python
       :start-after: # start-cell-1
       :end-before: # end-cell-1
@@ -97,10 +97,10 @@ Algorithm configuration is managed through a consistent :doc:`Settings <settings
 
 .. tab:: Python API
 
-   .. literalinclude:: ../../../../examples/python/design_principles.py
+   .. literalinclude:: ../../../examples/python/settings.py
       :language: python
-      :start-after: # start-cell-2
-      :end-before: # end-cell-2
+      :start-after: # start-cell-1
+      :end-before: # end-cell-1
 
 This approach provides:
 
@@ -124,7 +124,7 @@ A typical workflow in QDK/Chemistry demonstrates the data-algorithm separation:
 
 .. tab:: Python API
 
-   .. literalinclude:: ../../../../examples/python/design_principles.py
+   .. literalinclude:: ../../../examples/python/design_principles.py
       :language: python
       :start-after: # start-cell-3
       :end-before: # end-cell-3

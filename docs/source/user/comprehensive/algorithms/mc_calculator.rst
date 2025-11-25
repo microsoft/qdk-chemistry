@@ -35,7 +35,7 @@ The ``MultiConfigurationCalculator`` is created using the :doc:`factory pattern 
 
 .. tab:: Python API
 
-   .. literalinclude:: ../../../../examples/python/mc_calculator.py
+   .. literalinclude:: ../../../examples/python/mc_calculator.py
       :language: python
       :start-after: # start-cell-1
       :end-before: # end-cell-1
@@ -58,10 +58,10 @@ The ``MultiConfigurationCalculator`` can be configured using the ``Settings`` ob
 
 .. tab:: Python API
 
-   .. literalinclude:: ../../../../examples/python/mc_calculator.py
+   .. literalinclude:: ../../../examples/python/mc_calculator.py
       :language: python
-      :start-after: # start-cell-1
-      :end-before: # end-cell-1
+      :start-after: # start-cell-2
+      :end-before: # end-cell-2
 
 Running a :term:`CI` calculation
 ---------------------------------
@@ -80,10 +80,10 @@ Once configured, the :term:`CI` calculation can be executed using a :doc:`Hamilt
    .. note::
       This example shows the API pattern. For complete working examples, see the test suite.
 
-   .. literalinclude:: ../../../../examples/python/mc_calculator.py
+   .. literalinclude:: ../../../examples/python/mc_calculator.py
       :language: python
-      :start-after: # start-cell-1
-      :end-before: # end-cell-1
+      :start-after: # start-cell-3
+      :end-before: # end-cell-3
 
 Available :term:`MC` calculators
 ---------------------------------
