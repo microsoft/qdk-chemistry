@@ -72,6 +72,7 @@ Acronym definitions
 
    ROKS
       Restricted Open-shell Kohn-Sham.
+
    SCF
       Self-Consistent Field.
 
