@@ -149,7 +149,6 @@ double Ansatz::calculate_energy() const {
   // Unrestricted case
   else {
     // Use spin-dependent RDMs for unrestricted case
-    // TODO right now this throws. need the RDMs.
     const auto& [rdm1_aa_var, rdm1_bb_var] =
         _wavefunction->get_active_one_rdm_spin_dependent();
     const auto& [rdm2_aabb_var, rdm2_aaaa_var, rdm2_bbbb_var] =

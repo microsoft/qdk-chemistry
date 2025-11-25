@@ -218,7 +218,7 @@ std::shared_ptr<data::Hamiltonian> HamiltonianConstructor::_run_impl(
   // Compute integrals (same size for alpha and beta)
   const size_t nactive = nactive_alpha;
   Eigen::VectorXd moeri_aaaa(nactive * nactive * nactive * nactive);
-  Eigen::VectorXd moeri_bbaa(nactive * nactive * nactive * nactive);
+  Eigen::VectorXd moeri_aabb(nactive * nactive * nactive * nactive);
   Eigen::VectorXd moeri_bbbb(nactive * nactive * nactive * nactive);
 
   if (is_restricted_calc) {
@@ -236,18 +236,16 @@ std::shared_ptr<data::Hamiltonian> HamiltonianConstructor::_run_impl(
                     Ca_active_rm.data(),  // 4th quarter: alpha
                     moeri_aaaa.data());
 
-    // (ββ|αα) integrals
-    // Computation: Integrals are computed with beta orbitals for the
-    // first two indices (i,j) and alpha orbitals for the last two indices
-    // (k,l), computing <ij|kl> = <ββ|αα>
-    // Storage: Stored with index order i + j*norb + k*norb*norb +
-    // l*norb*norb*norb where i,j are beta indices and k, l are alpha indices.
+    // (αα|ββ) integrals
+    // Here, the C's are accessed like beta, beta, alpha, alpha, but results in
+    // saving alpha, alpha, beta beta integrals that can be indexed "as usual"
+    // in αα|ββ order.
     moeri_c.compute(num_atomic_orbitals, nactive,
                     Cb_active_rm.data(),  // 1st quarter: beta
                     Cb_active_rm.data(),  // 2nd quarter: beta
                     Ca_active_rm.data(),  // 3rd quarter: alpha
                     Ca_active_rm.data(),  // 4th quarter: alpha
-                    moeri_bbaa.data());
+                    moeri_aabb.data());
 
     // (ββ|ββ) integrals
     moeri_c.compute(num_atomic_orbitals, nactive,
@@ -290,7 +288,7 @@ std::shared_ptr<data::Hamiltonian> HamiltonianConstructor::_run_impl(
       Eigen::MatrixXd dummy_fock_alpha = Eigen::MatrixXd::Zero(0, 0);
       Eigen::MatrixXd dummy_fock_beta = Eigen::MatrixXd::Zero(0, 0);
       return std::make_shared<data::Hamiltonian>(
-          H_active_alpha, H_active_beta, moeri_aaaa, moeri_bbaa, moeri_bbbb,
+          H_active_alpha, H_active_beta, moeri_aaaa, moeri_aabb, moeri_bbbb,
           orbitals, structure->calculate_nuclear_repulsion_energy(),
           dummy_fock_alpha, dummy_fock_beta);
     }
@@ -458,7 +456,7 @@ std::shared_ptr<data::Hamiltonian> HamiltonianConstructor::_run_impl(
     }
 
     return std::make_shared<data::Hamiltonian>(
-        H_active_alpha, H_active_beta, moeri_aaaa, moeri_bbaa, moeri_bbbb,
+        H_active_alpha, H_active_beta, moeri_aaaa, moeri_aabb, moeri_bbbb,
         orbitals, E_inactive + structure->calculate_nuclear_repulsion_energy(),
         F_inactive_alpha, F_inactive_beta);
   }
