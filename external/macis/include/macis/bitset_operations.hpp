@@ -228,6 +228,7 @@ uint32_t ffs(std::bitset<N> bits) {
  */
 template <size_t N>
 uint32_t fls(std::bitset<N> bits) {
+  if (bits.none()) return UINT32_MAX;
   if constexpr (N <= 32)
     return fls(fast_to_ulong(bits));
   else if constexpr (N <= 64)

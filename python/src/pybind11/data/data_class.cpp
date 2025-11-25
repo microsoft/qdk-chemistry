@@ -178,327 +178,255 @@ py::object base_class_from_file_wrapper(const py::object &filename,
 
 void bind_base_class(py::module &m) {
   py::class_<DataClass, PyDataClass, py::smart_holder>(m, "DataClass", R"(
-    Base class providing common interface for all data classes.
+Base class providing common interface for all data classes.
 
-    This abstract base class defines a consistent interface for serialization
-    and basic operations that all data classes must implement. It ensures
-    uniform behavior across different data types for:
+This abstract base class defines a consistent interface for serialization
+and basic operations that all data classes must implement. It ensures
+uniform behavior across different data types for:
 
-    - Summary generation
-    - JSON serialization/deserialization
-    - HDF5 serialization
-    - Generic file I/O with format detection
+- Summary generation
+- JSON serialization/deserialization
+- HDF5 serialization
+- Generic file I/O with format detection
 
-    The base class enforces that derived classes implement proper serialization
-    methods, ensuring data persistence and interoperability throughout the package.
+The base class enforces that derived classes implement proper serialization
+methods, ensuring data persistence and interoperability throughout the package.
 
-    Note
-    ----
+Note:
     This is an abstract base class and cannot be instantiated directly.
     Use the concrete derived classes like Structure, BasisSet, Settings, etc.
 
     All derived classes are guaranteed to provide:
+
     - `get_summary()` - Human-readable summary string
     - `to_json()` - JSON serialization
     - `to_hdf5()` - HDF5 serialization
     - `to_file()` - Generic file export with format detection
     - Corresponding deserialization methods (implementation varies by class)
-    )")
+)")
 
       .def(py::init<>(), R"(
-        Initialize a DataClass object.
+Initialize a DataClass object.
 
-        Note
-        ----
-        This is an abstract base class and cannot be instantiated directly.
-        Use the concrete derived classes like Structure, BasisSet, Settings, etc.
-      )")
+Note:
+    This is an abstract base class and cannot be instantiated directly.
+    Use the concrete derived classes like Structure, BasisSet, Settings, etc.
+)")
 
       // Core interface methods
       .def("get_summary", &DataClass::get_summary, R"(
-        Get a human-readable summary of the object.
+Get a human-readable summary of the object.
 
-        Returns
-        -------
-        str
-            Summary string describing the object's contents and properties
+Returns:
+  str: Summary string describing the object's contents and properties
 
-        Examples
-        --------
-        >>> obj = SomeDataClass(...)
-        >>> print(obj.get_summary())
-        "SomeDataClass with X properties..."
-      )")
+Examples:
+    >>> obj = SomeDataClass(...)
+    >>> print(obj.get_summary())
+    "SomeDataClass with X properties..."
+)")
 
       // JSON serialization
       .def("to_json", &DataClass::to_json, R"(
-        Serialize object to JSON string.
+Serialize object to JSON string.
 
-        Returns
-        -------
-        str
-            JSON string representation of the object
+Returns:
+    str: JSON string representation of the object
 
-        Examples
-        --------
-        >>> json_str = obj.to_json()
-        >>> print(json_str)
-        {"version": "1.0", "data": {...}}
-      )")
+Examples:
+    >>> json_str = obj.to_json()
+    >>> print(json_str)
+    {"version": "1.0", "data": {...}}
+)")
 
       .def("to_json_file", base_class_to_json_file_wrapper, R"(
-        Save object to JSON file.
+Save object to JSON file.
 
-        Parameters
-        ----------
-        filename : str or pathlib.Path
-            Path to the output JSON file
+Args:
+    filename (str | pathlib.Path): Path to the output JSON file
 
-        Raises
-        ------
-        RuntimeError
-            If file cannot be written or I/O error occurs
+Raises:
+    RuntimeError: If file cannot be written or I/O error occurs
 
-        Examples
-        --------
-        >>> obj.to_json_file("data.json")
-        >>> from pathlib import Path
-        >>> obj.to_json_file(Path("data.json"))
-      )",
+Examples:
+    >>> obj.to_json_file("data.json")
+    >>> from pathlib import Path
+    >>> obj.to_json_file(Path("data.json"))
+)",
            py::arg("filename"))
 
       // HDF5 serialization
       .def("to_hdf5", base_class_to_hdf5_wrapper, R"(
-        Save object to HDF5 group.
+Save object to HDF5 group.
 
-        Parameters
-        ----------
-        group : h5py.Group or h5py.File
-            HDF5 group or file object to save data to
+Args:
+    group (h5py.Group | h5py.File): HDF5 group or file object to save data to
 
-        Raises
-        ------
-        RuntimeError
-            If I/O error occurs
+Raises:
+    RuntimeError: If I/O error occurs
 
-        Note
-        ----
-        This method is primarily for Python-derived classes that work with h5py.
-        It allows writing to an existing HDF5 group within a larger file structure.
+Notes:
+    This method is primarily for Python-derived classes that work with h5py.
+    It allows writing to an existing HDF5 group within a larger file structure.
 
-        Examples
-        --------
-        >>> import h5py
-        >>> with h5py.File("data.h5", "w") as f:
-        ...     group = f.create_group("my_data")
-        ...     obj.to_hdf5(group)
-      )",
+Examples:
+    >>> import h5py
+    >>> with h5py.File("data.h5", "w") as f:
+    ...     group = f.create_group("my_data")
+    ...     obj.to_hdf5(group)
+)",
            py::arg("group"))
 
       .def("to_hdf5_file", base_class_to_hdf5_file_wrapper, R"(
-        Save object to HDF5 file.
+Save object to HDF5 file.
 
-        Parameters
-        ----------
-        filename : str or pathlib.Path
-            Path to the output HDF5 file
+Args:
+    filename (str | pathlib.Path): Path to the output HDF5 file
 
-        Raises
-        ------
-        RuntimeError
-            If file cannot be written or I/O error occurs
+Raises:
+    RuntimeError: If file cannot be written or I/O error occurs
 
-        Examples
-        --------
-        >>> obj.to_hdf5_file("data.h5")
-        >>> from pathlib import Path
-        >>> obj.to_hdf5_file(Path("data.h5"))
-      )",
+Examples:
+    >>> obj.to_hdf5_file("data.h5")
+    >>> from pathlib import Path
+    >>> obj.to_hdf5_file(Path("data.h5"))
+)",
            py::arg("filename"))
 
       // Generic file I/O
       .def("to_file", base_class_to_file_wrapper, R"(
-        Save object to file with specified format.
+Save object to file with specified format.
 
-        Parameters
-        ----------
-        filename : str or pathlib.Path
-            Path to the output file
-        format_type : str
-            Format type (e.g., "json", "hdf5"). Available formats
-            depend on the specific derived class.
+Args:
+    filename (str | pathlib.Path): Path to the output file
+    format_type (str): Format type (e.g., "json", "hdf5").
+        Available formats depend on the specific derived class.
 
-        Raises
-        ------
-        ValueError
-            If format_type is not supported by this class
-        RuntimeError
-            If file cannot be written or I/O error occurs
+Raises:
+    ValueError: If format_type is not supported by this class
+    RuntimeError: If file cannot be written or I/O error occurs
 
-        Examples
-        --------
-        >>> obj.to_file("data.json", "json")
-        >>> obj.to_file("data.h5", "hdf5")
-        >>> from pathlib import Path
-        >>> obj.to_file(Path("data.json"), "json")
-      )",
+Examples:
+    >>> obj.to_file("data.json", "json")
+    >>> obj.to_file("data.h5", "hdf5")
+    >>> from pathlib import Path
+    >>> obj.to_file(Path("data.json"), "json")
+)",
            py::arg("filename"), py::arg("format_type"))
 
       // Deserialization methods (classmethods)
       .def_static("from_json", base_class_from_json_wrapper, R"(
-        Create object from JSON data.
+Create object from JSON data.
 
-        Parameters
-        ----------
-        json_data : dict
-            Dictionary containing the serialized data
+Args:
+    json_data (dict): Dictionary containing the serialized data
 
-        Returns
-        -------
-        DataClass
-            New instance of the derived class
+Returns:
+    DataClass: New instance of the derived class
 
-        Raises
-        ------
-        RuntimeError
-            If deserialization fails or data is invalid
+Raises:
+    RuntimeError: If deserialization fails or data is invalid
 
-        Note
-        ----
-        This is a classmethod that must be overridden by derived classes.
+Notes:
+    This is a classmethod that must be overridden by derived classes.
 
-        Examples
-        --------
-        >>> json_data = {"version": "1.0", "data": {...}}
-        >>> obj = SomeDataClass.from_json(json_data)
-      )",
+Examples:
+    >>> json_data = {"version": "1.0", "data": {...}}
+    >>> obj = SomeDataClass.from_json(json_data)
+)",
                   py::arg("json_data"))
 
       .def_static("from_json_file", base_class_from_json_file_wrapper, R"(
-        Load object from JSON file.
+Load object from JSON file.
 
-        Parameters
-        ----------
-        filename : str or pathlib.Path
-            Path to the input JSON file
+Args:
+    filename (str | pathlib.Path): Path to the input JSON file
 
-        Returns
-        -------
-        DataClass
-            New instance of the derived class
+Returns:
+    DataClass: New instance of the derived class
 
-        Raises
-        ------
-        RuntimeError
-            If file cannot be read or I/O error occurs
+Raises:
+    RuntimeError: If file cannot be read or I/O error occurs
 
-        Note
-        ----
-        This is a classmethod that must be overridden by derived classes.
+Note:
+    This is a classmethod that must be overridden by derived classes.
 
-        Examples
-        --------
-        >>> obj = SomeDataClass.from_json_file("data.json")
-        >>> from pathlib import Path
-        >>> obj = SomeDataClass.from_json_file(Path("data.json"))
-      )",
+Examples:
+    >>> obj = SomeDataClass.from_json_file("data.json")
+    >>> from pathlib import Path
+    >>> obj = SomeDataClass.from_json_file(Path("data.json"))
+)",
                   py::arg("filename"))
 
       .def_static("from_hdf5", base_class_from_hdf5_wrapper, R"(
-        Load object from HDF5 group.
+    Load object from HDF5 group.
 
-        Parameters
-        ----------
-        group : h5py.Group or h5py.File
-            HDF5 group or file object to load data from
+Args:
+    group (h5py.Group | h5py.File): HDF5 group or file object to load data from
 
-        Returns
-        -------
-        DataClass
-            New instance of the derived class
+Returns:
+    DataClass: New instance of the derived class
 
-        Raises
-        ------
-        RuntimeError
-            If I/O error occurs
+Raises:
+    RuntimeError: If I/O error occurs
 
-        Note
-        ----
-        This is a classmethod that must be overridden by derived classes.
-        It allows reading from an existing HDF5 group within a larger file structure.
+Notes:
+    This is a classmethod that must be overridden by derived classes.
+    It allows reading from an existing HDF5 group within a larger file structure.
 
-        Examples
-        --------
-        >>> import h5py
-        >>> with h5py.File("data.h5", "r") as f:
-        ...     group = f["my_data"]
-        ...     obj = SomeDataClass.from_hdf5(group)
-      )",
+Examples:
+    >>> import h5py
+    >>> with h5py.File("data.h5", "r") as f:
+    ...     group = f["my_data"]
+    ...     obj = SomeDataClass.from_hdf5(group)
+)",
                   py::arg("group"))
 
       .def_static("from_hdf5_file", base_class_from_hdf5_file_wrapper, R"(
-        Load object from HDF5 file.
+Load object from HDF5 file.
 
-        Parameters
-        ----------
-        filename : str or pathlib.Path
-            Path to the input HDF5 file
+Args:
+    filename (str | pathlib.Path): Path to the input HDF5 file
 
-        Returns
-        -------
-        DataClass
-            New instance of the derived class
+Returns:
+    DataClass: New instance of the derived class
 
-        Raises
-        ------
-        RuntimeError
-            If file cannot be read or I/O error occurs
+Raises:
+    RuntimeError: If file cannot be read or I/O error occurs
 
-        Note
-        ----
-        This is a classmethod that must be overridden by derived classes.
+Notes:
+    This is a classmethod that must be overridden by derived classes.
 
-        Examples
-        --------
-        >>> obj = SomeDataClass.from_hdf5_file("data.h5")
-        >>> from pathlib import Path
-        >>> obj = SomeDataClass.from_hdf5_file(Path("data.h5"))
-      )",
+Examples:
+    >>> obj = SomeDataClass.from_hdf5_file("data.h5")
+    >>> from pathlib import Path
+    >>> obj = SomeDataClass.from_hdf5_file(Path("data.h5"))
+)",
                   py::arg("filename"))
 
       .def_static("from_file", base_class_from_file_wrapper, R"(
-        Load object from file with specified format.
+Load object from file with specified format.
 
-        Parameters
-        ----------
-        filename : str or pathlib.Path
-            Path to the input file
-        format_type : str
-            Format type (e.g., "json", "hdf5"). Available formats
-            depend on the specific derived class.
+Args:
+    filename (str | pathlib.Path): Path to the input file
+    format_type (str): Format type (e.g., "json", "hdf5").
+        Available formats depend on the specific derived class.
 
-        Returns
-        -------
-        DataClass
-            New instance of the derived class
+Returns:
+    DataClass: New instance of the derived class
 
-        Raises
-        ------
-        ValueError
-            If format_type is not supported by this class
-        RuntimeError
-            If file cannot be read or I/O error occurs
+Raises:
+    ValueError: If format_type is not supported by this class
+    RuntimeError: If file cannot be read or I/O error occurs
 
-        Note
-        ----
-        This is a classmethod that must be overridden by derived classes.
+Notes:
+    This is a classmethod that must be overridden by derived classes.
 
-        Examples
-        --------
-        >>> obj = SomeDataClass.from_file("data.json", "json")
-        >>> obj = SomeDataClass.from_file("data.h5", "hdf5")
-        >>> from pathlib import Path
-        >>> obj = SomeDataClass.from_file(Path("data.json"), "json")
-      )",
+Examples:
+    >>> obj = SomeDataClass.from_file("data.json", "json")
+    >>> obj = SomeDataClass.from_file("data.h5", "hdf5")
+    >>> from pathlib import Path
+    >>> obj = SomeDataClass.from_file(Path("data.json"), "json")
+)",
                   py::arg("filename"), py::arg("format_type"));
 }

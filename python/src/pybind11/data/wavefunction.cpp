@@ -49,13 +49,13 @@ void bind_wavefunction(pybind11::module& data) {
   // Bind WavefunctionType enum
   py::enum_<WavefunctionType>(data, "WavefunctionType",
                               R"(
-    Enum to distinguish between different wavefunction representations.
+Enum to distinguish between different wavefunction representations.
 
-    This enum allows tagging wavefunctions based on their mathematical role:
+This enum allows tagging wavefunctions based on their mathematical role:
 
-    * SelfDual: Wavefunctions that can be used as both bra and ket
-    * NotSelfDual: Wavefunctions that are strictly bra or ket
-    )")
+* SelfDual: Wavefunctions that can be used as both bra and ket
+* NotSelfDual: Wavefunctions that are strictly bra or ket
+)")
       .value("SelfDual", WavefunctionType::SelfDual,
              "Wavefunction that can be used as both bra and ket")
       .value("NotSelfDual", WavefunctionType::NotSelfDual,
@@ -66,11 +66,10 @@ void bind_wavefunction(pybind11::module& data) {
   py::class_<WavefunctionContainer, py::smart_holder>(data,
                                                       "WavefunctionContainer",
                                                       R"(
-    Abstract base class for wavefunction containers.
+Abstract base class for wavefunction containers.
 
-    This class provides the interface for different types of wavefunction
-    representations (e.g., CI, MCSCF, coupled cluster). It uses variant types to
-    support both real and complex arithmetic.
+This class provides the interface for different types of wavefunction representations (e.g., CI, MCSCF, coupled cluster).
+It uses variant types to support both real and complex arithmetic.
     )")
       .def("get_coefficient", &WavefunctionContainer::get_coefficient,
            "Get coefficient for a specific determinant", py::arg("det"))
@@ -123,49 +122,43 @@ void bind_wavefunction(pybind11::module& data) {
   py::class_<Wavefunction, DataClass, py::smart_holder> wavefunction(
       data, "Wavefunction",
       R"(
-      Represents a wavefunction with associated properties.
+Represents a wavefunction with associated properties.
 
-    This class encapsulates wavefunction data including:
+This class encapsulates wavefunction data including:
 
-    * Configuration interaction coefficients
-    * Reduced density matrices (RDMs) in spin-dependent and spin-traced forms
-    * Methods for computing properties
+* Configuration interaction coefficients
+* Reduced density matrices (RDMs) in spin-dependent and spin-traced forms
+* Methods for computing properties
 
-    Supports both restricted and unrestricted wavefunctions with real or complex coefficients.
+Supports both restricted and unrestricted wavefunctions with real or complex coefficients.
     )");
 
   // Constructor with container
   wavefunction.def(py::init<std::unique_ptr<WavefunctionContainer>>(),
                    R"(
-        Constructs a wavefunction with a container implementation.
+Constructs a wavefunction with a container implementation.
 
-        Parameters
-        ----------
-        container : WavefunctionContainer
-            The container holding the wavefunction implementation
+Args:
+    container (WavefunctionContainer): The container holding the wavefunction implementation
 
-        Examples
-        --------
-        >>> container = qdk_chemistry.SciWavefunctionContainer(coeffs, dets, orbitals)
-        >>> wf = qdk_chemistry.Wavefunction(container)
-        )",
+Examples:
+    >>> container = qdk_chemistry.SciWavefunctionContainer(coeffs, dets, orbitals)
+    >>> wf = qdk_chemistry.Wavefunction(container)
+)",
                    py::arg("container"));
 
   // Orbital and container access
   bind_getter_as_property(wavefunction, "get_orbitals",
                           &Wavefunction::get_orbitals,
                           R"(
-        Get reference to orbital basis set.
+Get reference to orbital basis set.
 
-        Returns
-        -------
-        Orbitals
-            Shared pointer to orbital basis set
+Returns:
+    Orbitals: Shared pointer to orbital basis set
 
-        Examples
-        --------
-        >>> orbitals = wf.get_orbitals()
-        )",
+Examples:
+    >>> orbitals = wf.get_orbitals()
+)",
                           py::return_value_policy::reference_internal);
 
   wavefunction.def(
@@ -186,84 +179,67 @@ void bind_wavefunction(pybind11::module& data) {
         }
       },
       R"(
-      Get the underlying wavefunciton container.
+Get the underlying wavefunciton container.
 
-      Returns
-      -------
-      WavefunctionContainer
-          The underlying wavefunction container
+Returns:
+    WavefunctionContainer: The underlying wavefunction container
 
-      Raises
-      ------
-      RuntimeError
-          If the container is not available
+Raises:
+    RuntimeError: If the container is not available
 
-      Examples
-      --------
-      >>> container = wf.get_container()
-      )",
+Examples:
+    >>> container = wf.get_container()
+)",
       py::return_value_policy::reference_internal);
 
   // Electron and occupation methods
   wavefunction.def("get_active_num_electrons",
                    &Wavefunction::get_active_num_electrons,
                    R"(
-        Get number of active alpha and beta electrons.
+Get number of active alpha and beta electrons.
 
-        Returns
-        -------
-        tuple
-            Pair of ``(n_alpha, n_beta)`` electrons
+Returns:
+    tuple: Pair of ``(n_alpha, n_beta)`` electrons
 
-        Examples
-        --------
-        >>> n_alpha, n_beta = wf.get_active_num_electrons()
-        )");
+Examples:
+    >>> n_alpha, n_beta = wf.get_active_num_electrons()
+)");
 
   wavefunction.def("get_total_num_electrons",
                    &Wavefunction::get_total_num_electrons,
                    R"(
-        Get total number of alpha and beta electrons.
+    Get total number of alpha and beta electrons.
 
-        Returns
-        -------
-        tuple
-            Pair of ``(n_alpha, n_beta)`` electrons
+Returns:
+    tuple: Pair of ``(n_alpha, n_beta)`` electrons
 
-        Examples
-        --------
-        >>> n_alpha, n_beta = wf.get_total_num_electrons()
-        )");
+Examples:
+    >>> n_alpha, n_beta = wf.get_total_num_electrons()
+)");
 
   wavefunction.def("get_total_orbital_occupations",
                    &Wavefunction::get_total_orbital_occupations,
                    R"(
-        Get orbital occupations for all orbitals.
+    Get orbital occupations for all orbitals.
 
-        Returns
-        -------
-        tuple
-            Pair of ``(alpha_occupations, beta_occupations)``
+Returns:
+    tuple: Pair of ``(alpha_occupations, beta_occupations)``
 
-        Examples
-        --------
-        >>> alpha_occ, beta_occ = wf.get_total_orbital_occupations()
-        )");
+Examples:
+    >>> alpha_occ, beta_occ = wf.get_total_orbital_occupations()
+)");
 
   wavefunction.def("get_active_orbital_occupations",
                    &Wavefunction::get_active_orbital_occupations,
                    R"(
-        Get orbital occupations for active orbitals only.
+    Get orbital occupations for active orbitals only.
 
-        Returns
-        -------
-        tuple
-            Pair of ``(alpha_active_occupations, beta_active_occupations)``
+Returns:
+    tuple: Pair of ``(alpha_active_occupations, beta_active_occupations)``
 
-        Examples
-        --------
-        >>> alpha_active, beta_active = wf.get_active_orbital_occupations()
-        )");
+Examples:
+    >>> alpha_active, beta_active = wf.get_active_orbital_occupations()
+)");
 
   // Coefficient access methods
   wavefunction.def(
@@ -272,22 +248,17 @@ void bind_wavefunction(pybind11::module& data) {
         return variant_to_python(self.get_coefficient(det));
       },
       R"(
-        Get coefficient for a specific determinant.
+Get coefficient for a specific determinant.
 
-        Parameters
-        ----------
-        det : Configuration
-            The determinant configuration to look up
+Args:
+    det (Configuration): The determinant configuration to look up
 
-        Returns
-        -------
-        complex or float
-            The coefficient for the determinant if found, zero otherwise
+Returns:
+    complex | float: The coefficient for the determinant if found, zero otherwise
 
-        Examples
-        --------
-        >>> coeff = wf.get_coefficient(qdk_chemistry.Configuration("33221100"))
-        )",
+Examples:
+    >>> coeff = wf.get_coefficient(qdk_chemistry.Configuration("33221100"))
+)",
       py::arg("det"));
 
   wavefunction.def(
@@ -296,149 +267,114 @@ void bind_wavefunction(pybind11::module& data) {
         return variant_to_python(self.get_coefficients());
       },
       R"(
-      Get coefficients for all determinants as a vector, in which the
-      sequence of coefficients is consistent with the vector from
-      ``get_active_determinants()``
+Get coefficients for all determinants as a vector, in which the sequence of coefficients is consistent with the vector from ``get_active_determinants()``
 
-      Returns
-      -------
-      numpy.ndarray
-          Vector of all coefficients (real or complex)
+Returns:
+    numpy.ndarray: Vector of all coefficients (real or complex)
 
-      Examples
-      --------
-      >>> coeffs = wf.get_coefficients()
-      >>> print(f"Number of coefficients: {len(coeffs)}")
-      )");
+Examples:
+    >>> coeffs = wf.get_coefficients()
+    >>> print(f"Number of coefficients: {len(coeffs)}")
+)");
 
   wavefunction.def("get_active_determinants",
                    &Wavefunction::get_active_determinants,
                    R"(
-        Get all determinants in the wavefunction (active space only).
+Get all determinants in the wavefunction (active space only).
 
-        Returns
-        -------
-        list of Configuration
-            Vector of all configurations/determinants representing only the active space
+Returns:
+    list[Configuration]: Vector of all configurations/determinants representing only the active space
 
-        Notes
-        -----
-        The determinants only include the active space orbitals. To get determinants
-        with full orbital space (including inactive and virtual orbitals), use
-        ``get_total_determinants()``.
+Notes:
+    The determinants only include the active space orbitals.
+    To get determinants with full orbital space (including inactive and virtual orbitals), use ``get_total_determinants()``.
 
-        Examples
-        --------
-        >>> dets = wf.get_active_determinants()
-        )",
+Examples:
+    >>> dets = wf.get_active_determinants()
+)",
                    py::return_value_policy::reference_internal);
 
   wavefunction.def("get_total_determinants",
                    &Wavefunction::get_total_determinants,
                    R"(
-        Get all determinants in the wavefunction with full orbital space.
+    Get all determinants in the wavefunction with full orbital space.
 
-        Returns
-        -------
-        list of Configuration
-            Vector of all configurations/determinants including inactive and virtual orbitals
+Returns:
+    list[Configuration]: Vector of all configurations/determinants including inactive and virtual orbitals
 
-        Notes
-        -----
-        Converts active-space-only determinants to full orbital space by prepending
-        doubly occupied inactive orbitals and appending unoccupied virtual orbitals.
+Notes:
+    Converts active-space-only determinants to full orbital space by prepending doubly occupied inactive orbitals and appending unoccupied virtual orbitals.
 
-        Examples
-        --------
-        >>> total_dets = wf.get_total_determinants()
-        >>> # Each determinant now includes inactive (doubly occupied) and virtual (unoccupied) orbitals
-        )");
+Examples:
+    >>> total_dets = wf.get_total_determinants()
+    >>> # Each determinant now includes inactive (doubly occupied) and virtual (unoccupied) orbitals
+)");
 
   wavefunction.def("get_active_determinant",
                    &Wavefunction::get_active_determinant,
                    R"(
-        Extract active space determinant from a full orbital space determinant.
+Extract active space determinant from a full orbital space determinant.
 
-        Parameters
-        ----------
-        total_determinant : Configuration
-            Configuration representing full orbital space
+Args:
+    total_determinant (Configuration): Configuration representing full orbital space
 
-        Returns
-        -------
-        Configuration
-            Configuration representing only the active space portion
+Returns:
+    Configuration: Configuration representing only the active space portion
 
-        Notes
-        -----
-        Removes inactive and virtual orbital information, keeping only the active
-        space orbitals.
+Notes:
+    Removes inactive and virtual orbital information, keeping only the active space orbitals.
 
-        Examples
-        --------
-        >>> total_det = qdk_chemistry.Configuration("2222uudd0000")  # 4 inactive, 4 active, 4 virtual
-        >>> active_det = wf.get_active_determinant(total_det)
-        >>> # active_det now contains only "uudd" (the 4 active orbitals)
-        )",
+Examples:
+    >>> total_det = qdk_chemistry.Configuration("2222uudd0000")  # 4 inactive, 4 active, 4 virtual
+    >>> active_det = wf.get_active_determinant(total_det)
+    >>> # active_det now contains only "uudd" (the 4 active orbitals)
+)",
                    py::arg("total_determinant"));
 
   wavefunction.def("get_total_determinant",
                    &Wavefunction::get_total_determinant,
                    R"(
-        Convert active space determinant to full orbital space determinant.
+Convert active space determinant to full orbital space determinant.
 
-        Parameters
-        ----------
-        active_determinant : Configuration
-            Configuration representing only active space
+Args:
+    active_determinant (Configuration): Configuration representing only active space
 
-        Returns
-        -------
-        Configuration
-            Configuration representing full orbital space
+Returns:
+    Configuration: Configuration representing full orbital space
 
-        Notes
-        -----
-        Expands active-space-only determinant to full orbital space by prepending
-        doubly occupied inactive orbitals and appending unoccupied virtual orbitals.
+Notes:
+    Expands active-space-only determinant to full orbital space by prepending doubly occupied inactive orbitals and appending unoccupied virtual orbitals.
 
-        Examples
-        --------
-        >>> active_det = qdk_chemistry.Configuration("uudd")  # 4 active orbitals
-        >>> total_det = wf.get_total_determinant(active_det)
-        >>> # If there are 4 inactive and 4 virtual orbitals, total_det will be "2222uudd0000"
-        )",
+Examples:
+    >>> active_det = qdk_chemistry.Configuration("uudd")  # 4 active orbitals
+    >>> total_det = wf.get_total_determinant(active_det)
+    >>> # If there are 4 inactive and 4 virtual orbitals, total_det will be "2222uudd0000"
+)",
                    py::arg("active_determinant"));
 
   wavefunction.def("size", &Wavefunction::size,
                    R"(
-        Get number of determinants.
+Get number of determinants.
 
-        Returns
-        -------
-        int
-            Number of determinants in the wavefunction
+Returns:
+    int: Number of determinants in the wavefunction
 
-        Examples
-        --------
-        >>> dim = wf.size()
-        >>> print(f"Wavefunction dimension: {dim}")
-        )");
+Examples:
+    >>> dim = wf.size()
+    >>> print(f"Wavefunction dimension: {dim}")
+)");
 
   wavefunction.def("norm", &Wavefunction::norm,
                    R"(
-        Calculate norm of the wavefunction.
+Calculate norm of the wavefunction.
 
-        Returns
-        -------
-        float
-            Norm (always real)
+Returns:
+    float: Norm (always real)
 
-        Examples
-        --------
-        >>> norm_value = wf.norm()
-        >>> print(f"Wavefunction norm: {norm_value}")
-        )");
+Examples:
+    >>> norm_value = wf.norm()
+    >>> print(f"Wavefunction norm: {norm_value}")
+)");
 
   wavefunction.def(
       "overlap",
@@ -446,25 +382,20 @@ void bind_wavefunction(pybind11::module& data) {
         return variant_to_python(self.overlap(other));
       },
       R"(
-        Calculate overlap with another wavefunction.
+Calculate overlap with another wavefunction.
 
-        Parameters
-        ----------
-        other : Wavefunction
-            Other wavefunction
+Args:
+    other (Wavefunction): Other wavefunction
 
-        Returns
-        -------
-        complex or float
-            Overlap value (real or complex)
+Returns:
+    complex | float: Overlap value (real or complex)
 
-        Examples
-        --------
-        >>> wf1 = qdk_chemistry.Wavefunction(container1)
-        >>> wf2 = qdk_chemistry.Wavefunction(container2)
-        >>> overlap = wf1.overlap(wf2)
-        >>> print(f"Overlap: {overlap}")
-        )",
+Examples:
+    >>> wf1 = qdk_chemistry.Wavefunction(container1)
+    >>> wf2 = qdk_chemistry.Wavefunction(container2)
+    >>> overlap = wf1.overlap(wf2)
+    >>> print(f"Overlap: {overlap}")
+)",
       py::arg("other"));
 
   // RDM methods
@@ -475,22 +406,17 @@ void bind_wavefunction(pybind11::module& data) {
         return py::make_tuple(variant_to_python(aa), variant_to_python(bb));
       },
       R"(
-        Get spin-dependent one-particle reduced density matrices (RDMs) for active orbitals only.
+Get spin-dependent one-particle reduced density matrices (RDMs) for active orbitals only.
 
-        Returns
-        -------
-        tuple
-            Tuple of (alpha-alpha, beta-beta) one-particle RDMs for active orbitals
+Returns:
+    tuple: Tuple of (alpha-alpha, beta-beta) one-particle RDMs for active orbitals
 
-        Raises
-        ------
-        RuntimeError
-            If the spin-dependent 1-RDM is not available
+Raises:
+    RuntimeError: If the spin-dependent 1-RDM is not available
 
-        Examples
-        --------
-        >>> rdm_aa, rdm_bb = wf.get_active_one_rdm_spin_dependent()
-        )");
+Examples:
+    >>> rdm_aa, rdm_bb = wf.get_active_one_rdm_spin_dependent()
+)");
 
   wavefunction.def(
       "get_active_two_rdm_spin_dependent",
@@ -500,22 +426,17 @@ void bind_wavefunction(pybind11::module& data) {
                               variant_to_python(bbbb));
       },
       R"(
-        Get spin-dependent two-particle reduced density matrices (RDMs) for active orbitals only.
+Get spin-dependent two-particle reduced density matrices (RDMs) for active orbitals only.
 
-        Returns
-        -------
-        tuple
-            Tuple of (aaaa, aabb, bbbb) two-particle RDMs for active orbitals
+Returns:
+    tuple: Tuple of (aaaa, aabb, bbbb) two-particle RDMs for active orbitals
 
-        Raises
-        ------
-        RuntimeError
-            If the spin-dependent 2-RDM is not available
+Raises:
+    RuntimeError: If the spin-dependent 2-RDM is not available
 
-        Examples
-        --------
-        >>> aaaa, aabb, bbbb = wf.get_active_two_rdm_spin_dependent()
-        )");
+Examples:
+    >>> aaaa, aabb, bbbb = wf.get_active_two_rdm_spin_dependent()
+)");
 
   wavefunction.def(
       "get_active_one_rdm_spin_traced",
@@ -523,22 +444,17 @@ void bind_wavefunction(pybind11::module& data) {
         return variant_to_python(self.get_active_one_rdm_spin_traced());
       },
       R"(
-        Get spin-traced one-particle reduced density matrix (RDM) for active orbitals only.
+Get spin-traced one-particle reduced density matrix (RDM) for active orbitals only.
 
-        Returns
-        -------
-        numpy.ndarray
-            Spin-traced one-particle RDM for active orbitals
+Returns:
+    numpy.ndarray: Spin-traced one-particle RDM for active orbitals
 
-        Raises
-        ------
-        RuntimeError
-            If the 1-RDM is not available
+Raises:
+    RuntimeError: If the 1-RDM is not available
 
-        Examples
-        --------
-        >>> rdm = wf.get_active_one_rdm_spin_traced()
-        )");
+Examples:
+    >>> rdm = wf.get_active_one_rdm_spin_traced()
+)");
 
   wavefunction.def(
       "get_active_two_rdm_spin_traced",
@@ -546,22 +462,17 @@ void bind_wavefunction(pybind11::module& data) {
         return variant_to_python(self.get_active_two_rdm_spin_traced());
       },
       R"(
-        Get spin-traced two-particle reduced density matrix (RDM) for active orbitals only.
+Get spin-traced two-particle reduced density matrix (RDM) for active orbitals only.
 
-        Returns
-        -------
-        numpy.ndarray
-            Spin-traced two-particle RDM for active orbitals
+Returns:
+    numpy.ndarray: Spin-traced two-particle RDM for active orbitals
 
-        Raises
-        ------
-        RuntimeError
-            If the 2-RDM is not available
+Raises:
+    RuntimeError: If the 2-RDM is not available
 
-        Examples
-        --------
-        >>> two_rdm = wf.get_active_two_rdm_spin_traced()
-        )");
+Examples:
+    >>> two_rdm = wf.get_active_two_rdm_spin_traced()
+)");
 
   // TODO (NAB): it would be helpful to explain how to mark or check whether
   // orbitals are active. Same comment applies to other methods that refer to
@@ -570,118 +481,95 @@ void bind_wavefunction(pybind11::module& data) {
   wavefunction.def("get_single_orbital_entropies",
                    &Wavefunction::get_single_orbital_entropies,
                    R"(
-        Calculate single orbital entropies for active orbitals only.
+Calculate single orbital entropies for active orbitals only.
 
-        Returns
-        -------
-        numpy.ndarray
-            Vector of orbital entropies for active orbitals (always real)
+Returns:
+    numpy.ndarray: Vector of orbital entropies for active orbitals (always real)
 
-        Raises
-        ------
-        RuntimeError
-            If the required reduced density matrices (RDMs) are not available
+Raises:
+    RuntimeError: If the required reduced density matrices (RDMs) are not available
 
-        Examples
-        --------
-        >>> entropies = wf.get_single_orbital_entropies()
-        )");
+Examples:
+    >>> entropies = wf.get_single_orbital_entropies()
+)");
 
   // RDM availability check methods
   wavefunction.def("has_one_rdm_spin_dependent",
                    &Wavefunction::has_one_rdm_spin_dependent,
                    R"(
-        Check if spin-dependent one-particle RDMs for active orbitals are available.
+Check if spin-dependent one-particle RDMs for active orbitals are available.
 
-        Returns
-        -------
-        bool
-            True if available
+Returns:
+    bool: True if available
 
-        Examples
-        --------
-        >>> if wf.has_one_rdm_spin_dependent():
-        ...     rdm_aa, rdm_bb = wf.get_active_one_rdm_spin_dependent()
-        )");
+Examples:
+    >>> if wf.has_one_rdm_spin_dependent():
+    ...     rdm_aa, rdm_bb = wf.get_active_one_rdm_spin_dependent()
+)");
 
   wavefunction.def("has_one_rdm_spin_traced",
                    &Wavefunction::has_one_rdm_spin_traced,
                    R"(
-        Check if spin-traced one-particle RDM for active orbitals is available.
+    Check if spin-traced one-particle RDM for active orbitals is available.
 
-        Returns
-        -------
-        bool
-            True if available
+Returns:
+    bool: True if available
 
-        Examples
-        --------
-        >>> if wf.has_one_rdm_spin_traced():
-        ...     rdm = wf.get_active_one_rdm_spin_traced()
-        )");
+Examples:
+    >>> if wf.has_one_rdm_spin_traced():
+    ...     rdm = wf.get_active_one_rdm_spin_traced()
+)");
 
   wavefunction.def("has_two_rdm_spin_dependent",
                    &Wavefunction::has_two_rdm_spin_dependent,
                    R"(
-        Check if spin-dependent two-particle RDMs for active orbitals are available.
+Check if spin-dependent two-particle RDMs for active orbitals are available.
 
-        Returns
-        -------
-        bool
-            True if available
+Returns:
+    bool: True if available
 
-        Examples
-        --------
-        >>> if wf.has_two_rdm_spin_dependent():
-        ...     aaaa, aabb, bbbb = wf.get_active_two_rdm_spin_dependent()
-        )");
+Examples:
+    >>> if wf.has_two_rdm_spin_dependent():
+    ...     aaaa, aabb, bbbb = wf.get_active_two_rdm_spin_dependent()
+)");
 
   wavefunction.def("has_two_rdm_spin_traced",
                    &Wavefunction::has_two_rdm_spin_traced,
                    R"(
-        Check if spin-traced two-particle RDM for active orbitals is available.
+Check if spin-traced two-particle RDM for active orbitals is available.
 
-        Returns
-        -------
-        bool
-            True if available
+Returns:
+    bool: True if available
 
-        Examples
-        --------
-        >>> if wf.has_two_rdm_spin_traced():
-        ...     two_rdm = wf.get_active_two_rdm_spin_traced()
-        )");
+Examples:
+    >>> if wf.has_two_rdm_spin_traced():
+    ...     two_rdm = wf.get_active_two_rdm_spin_traced()
+)");
 
   // Type checking methods
   wavefunction.def("is_complex", &Wavefunction::is_complex,
                    R"(
-        Check if the wavefunction is complex-valued.
+Check if the wavefunction is complex-valued.
 
-        Returns
-        -------
-        bool
-            True if the wavefunction uses complex coefficients, False if real
+Returns:
+    bool: True if the wavefunction uses complex coefficients, False if real
 
-        Examples
-        --------
-        >>> is_complex = wf.is_complex()
-        >>> print(f"Wavefunction uses complex coefficients: {is_complex}")
-        )");
+Examples:
+    >>> is_complex = wf.is_complex()
+    >>> print(f"Wavefunction uses complex coefficients: {is_complex}")
+)");
 
   // Type access methods
   wavefunction.def("get_type", &Wavefunction::get_type,
                    R"(
-        Get the wavefunction type (Bra, Ket, or Both).
+    Get the wavefunction type (Bra, Ket, or Both).
 
-        Returns
-        -------
-        WavefunctionType
-            Enum value representing the wavefunction type
+Returns:
+    WavefunctionType: Enum value representing the wavefunction type
 
-        Examples
-        --------
-        >>> wf_type = wf.get_type()
-        )");
+Examples:
+    >>> wf_type = wf.get_type()
+)");
 
   // Serialization methods
   wavefunction.def(
@@ -690,17 +578,14 @@ void bind_wavefunction(pybind11::module& data) {
         return self.to_json().dump();
       },
       R"(
-        Convert wavefunction to JSON string format.
+Convert wavefunction to JSON string format.
 
-        Returns
-        -------
-        str
-            JSON string containing wavefunction data
+Returns:
+    str: JSON string containing wavefunction data
 
-        Examples
-        --------
-        >>> json_str = wf.to_json()
-        )");
+Examples:
+    >>> json_str = wf.to_json()
+)");
 
   wavefunction.def_static(
       "from_json",
@@ -708,133 +593,102 @@ void bind_wavefunction(pybind11::module& data) {
         return Wavefunction::from_json(nlohmann::json::parse(json_str));
       },
       R"(
-        Load wavefunction from JSON string format.
+Load wavefunction from JSON string format.
 
-        Parameters
-        ----------
-        json_str : str
-            JSON string containing wavefunction data
+Args:
+    json_str (str): JSON string containing wavefunction data
 
-        Returns
-        -------
-        Wavefunction
-            Wavefunction object created from JSON string
+Returns:
+    Wavefunction: Wavefunction object created from JSON string
 
-        Examples
-        --------
-        >>> wf = qdk_chemistry.Wavefunction.from_json(json_str)
-        )",
+Examples:
+    >>> wf = qdk_chemistry.Wavefunction.from_json(json_str)
+)",
       py::arg("json_str"));
 
   wavefunction.def("to_json_file", &Wavefunction::to_json_file,
                    R"(
-        Save wavefunction to JSON file.
+Save wavefunction to JSON file.
 
-        Parameters
-        ----------
-        filename : str
-            Path to JSON file to create/overwrite
+Args:
+    filename (str): Path to JSON file to create/overwrite
 
-        Examples
-        --------
-        >>> wf.to_json_file("wavefunction.json")
-        )",
+Examples:
+    >>> wf.to_json_file("wavefunction.json")
+)",
                    py::arg("filename"));
 
   wavefunction.def_static("from_json_file", &Wavefunction::from_json_file,
                           R"(
-        Load wavefunction from JSON file.
+Load wavefunction from JSON file.
 
-        Parameters
-        ----------
-        filename : str
-            Path to JSON file to read
+Args:
+    filename (str): Path to JSON file to read
 
-        Returns
-        -------
-        Wavefunction
-            Wavefunction object created from JSON file
+Returns:
+    Wavefunction: Wavefunction object created from JSON file
 
-        Examples
-        --------
-        >>> wf = qdk_chemistry.Wavefunction.from_json_file("wavefunction.json")
-        )",
+Examples:
+    >>> wf = qdk_chemistry.Wavefunction.from_json_file("wavefunction.json")
+)",
                           py::arg("filename"));
 
   wavefunction.def("to_hdf5_file", &Wavefunction::to_hdf5_file,
                    R"(
-        Save wavefunction to HDF5 file.
+Save wavefunction to HDF5 file.
 
-        Parameters
-        ----------
-        filename : str
-            Path to HDF5 file to create/overwrite
+Args:
+    filename (str): Path to HDF5 file to create/overwrite
 
-        Examples
-        --------
-        >>> wf.to_hdf5_file("wavefunction.h5")
-        )",
+Examples:
+    >>> wf.to_hdf5_file("wavefunction.h5")
+)",
                    py::arg("filename"));
 
   wavefunction.def_static("from_hdf5_file", &Wavefunction::from_hdf5_file,
                           R"(
-        Load wavefunction from HDF5 file.
+Load wavefunction from HDF5 file.
 
-        Parameters
-        ----------
-        filename : str
-            Path to HDF5 file to read
+Args:
+    filename (str): Path to HDF5 file to read
 
-        Returns
-        -------
-        Wavefunction
-            Wavefunction object created from HDF5 file
+Returns:
+    Wavefunction: Wavefunction object created from HDF5 file
 
-        Examples
-        --------
-        >>> wf = qdk_chemistry.Wavefunction.from_hdf5_file("wavefunction.h5")
-        )",
+Examples:
+    >>> wf = qdk_chemistry.Wavefunction.from_hdf5_file("wavefunction.h5")
+)",
                           py::arg("filename"));
 
   wavefunction.def("to_file", &Wavefunction::to_file,
                    R"(
-        Save wavefunction to file in specified format.
+Save wavefunction to file in specified format.
 
-        Parameters
-        ----------
-        filename : str
-            Path to file to create/overwrite
-        format : str
-            Format type ("json" or "hdf5")
+Args:
+    filename (str): Path to file to create/overwrite
+    format (str): Format type ("json" or "hdf5")
 
-        Examples
-        --------
-        >>> wf.to_file("wavefunction.json", "json")
-        >>> wf.to_file("wavefunction.h5", "hdf5")
-        )",
+Examples:
+    >>> wf.to_file("wavefunction.json", "json")
+    >>> wf.to_file("wavefunction.h5", "hdf5")
+)",
                    py::arg("filename"), py::arg("format"));
 
   wavefunction.def_static("from_file", &Wavefunction::from_file,
                           R"(
-        Load wavefunction from file in specified format.
+Load wavefunction from file in specified format.
 
-        Parameters
-        ----------
-        filename : str
-            Path to file to read
-        format : str
-            Format type ("json" or "hdf5")
+Args:
+    filename (str): Path to file to read
+    format (str): Format type ("json" or "hdf5")
 
-        Returns
-        -------
-        Wavefunction
-            Wavefunction object created from file
+Returns:
+    Wavefunction: Wavefunction object created from file
 
-        Examples
-        --------
-        >>> wf = qdk_chemistry.Wavefunction.from_file("wavefunction.json", "json")
-        >>> wf = qdk_chemistry.Wavefunction.from_file("wavefunction.h5", "hdf5")
-        )",
+Examples:
+    >>> wf = qdk_chemistry.Wavefunction.from_file("wavefunction.json", "json")
+    >>> wf = qdk_chemistry.Wavefunction.from_file("wavefunction.h5", "hdf5")
+)",
                           py::arg("filename"), py::arg("format"));
 
   wavefunction.def(
@@ -844,29 +698,25 @@ void bind_wavefunction(pybind11::module& data) {
                " norm=" + std::to_string(w.norm()) + ">";
       },
       R"(
-        Returns a string representation of the Wavefunction object.
+Returns a string representation of the Wavefunction object.
 
-        The representation includes the size of the wavefunction and its norm.
+The representation includes the size of the wavefunction and its norm.
 
-        Returns
-        -------
-        str
-            String representation of the Wavefunction object
-        )");
+Returns:
+    str: String representation of the Wavefunction object
+)");
+
   wavefunction.def("get_container_type", &Wavefunction::get_container_type,
                    R"(
-      Get the type of the underlying wavefunction container.
+Get the type of the underlying wavefunction container.
 
-      Returns
-      -------
-      str
-          Type name of the underlying wavefunction container
+Returns:
+      str: Type name of the underlying wavefunction container
 
-      Examples
-      --------
-      >>> container_type = wf.get_container_type()
-      >>> print(f"Container type: {container_type}")
-      )");
+Examples:
+    >>> container_type = wf.get_container_type()
+    >>> print(f"Container type: {container_type}")
+)");
 
   wavefunction.def("__str__", [](const Wavefunction& w) {
     return "<qdk_chemistry.Wavefunction size=" + std::to_string(w.size()) +
@@ -891,36 +741,29 @@ void bind_wavefunction(pybind11::module& data) {
   py::class_<SciWavefunctionContainer, WavefunctionContainer, py::smart_holder>(
       data, "SciWavefunctionContainer",
       R"(
-    Selected CI wavefunction container implementation.
+Selected CI wavefunction container implementation.
 
-    This container represents wavefunctions obtained from selected configuration
-    interaction (SCI) methods or full configuration interaction (FCI).
-    )")
+This container represents wavefunctions obtained from selected configuration interaction (SCI) methods or full configuration interaction (FCI).
+)")
       // Basic constructor: coeffs, dets, orbitals, type
       .def(py::init<const ContainerTypes::VectorVariant&,
                     const ContainerTypes::DeterminantVector&,
                     std::shared_ptr<Orbitals>, WavefunctionType>(),
            R"(
-        Constructs a basic SCI wavefunction container.
+Constructs a basic SCI wavefunction container.
 
-        Parameters
-        ----------
-        coeffs : numpy.ndarray
-            The vector of CI coefficients (real or complex)
-        dets : list of Configuration
-            The vector of determinants
-        orbitals : Orbitals
-            Shared pointer to orbital basis set
-        type : WavefunctionType, optional
-            Type of wavefunction (default: SelfDual)
+Args:
+    coeffs (numpy.ndarray): The vector of CI coefficients (real or complex)
+    dets (list[Configuration]): The vector of determinants
+    orbitals (Orbitals): Shared pointer to orbital basis set
+    type (Optional[WavefunctionType]): Type of wavefunction (default: SelfDual)
 
-        Examples
-        --------
-        >>> import numpy as np
-        >>> coeffs = np.array([0.9, 0.1])
-        >>> dets = [qdk_chemistry.Configuration("33221100"), qdk_chemistry.Configuration("33221001")]
-        >>> container = qdk_chemistry.SciWavefunctionContainer(coeffs, dets, orbitals)
-        )",
+Examples:
+    >>> import numpy as np
+    >>> coeffs = np.array([0.9, 0.1])
+    >>> dets = [qdk_chemistry.Configuration("33221100"), qdk_chemistry.Configuration("33221001")]
+    >>> container = qdk_chemistry.SciWavefunctionContainer(coeffs, dets, orbitals)
+)",
            py::arg("coeffs"), py::arg("dets"), py::arg("orbitals"),
            py::arg("type") = WavefunctionType::SelfDual)
       // Constructor with spin-traced RDMs: coeffs, dets, orbitals,
@@ -932,31 +775,23 @@ void bind_wavefunction(pybind11::module& data) {
                     const std::optional<ContainerTypes::VectorVariant>&,
                     WavefunctionType>(),
            R"(
-        Constructs a SCI wavefunction container with spin-traced RDMs.
+Constructs a SCI wavefunction container with spin-traced RDMs.
 
-        Parameters
-        ----------
-        coeffs : numpy.ndarray
-            The vector of CI coefficients (real or complex)
-        dets : list of Configuration
-            The vector of determinants
-        orbitals : Orbitals
-            Shared pointer to orbital basis set
-        one_rdm_spin_traced : numpy.ndarray, optional
-            Spin-traced one-particle reduced density matrix
-        two_rdm_spin_traced : numpy.ndarray, optional
-            Spin-traced two-particle reduced density matrix
-        type : WavefunctionType, optional
-            Type of wavefunction (default: SelfDual)
+Args:
+    coeffs (numpy.ndarray): The vector of CI coefficients (real or complex)
+    dets (list[Configuration]): The vector of determinants
+    orbitals (Orbitals): Shared pointer to orbital basis set
+    one_rdm_spin_traced (Optional[numpy.ndarray]): Spin-traced one-particle reduced density matrix
+    two_rdm_spin_traced (Optional[numpy.ndarray]): Spin-traced two-particle reduced density matrix
+    type (Optional[WavefunctionType]): Type of wavefunction (default: SelfDual)
 
-        Examples
-        --------
-        >>> import numpy as np
-        >>> coeffs = np.array([0.9, 0.1])
-        >>> dets = [qdk_chemistry.Configuration("33221100"), qdk_chemistry.Configuration("33221001")]
-        >>> one_rdm = np.eye(4)  # Example 1-RDM
-        >>> container = qdk_chemistry.SciWavefunctionContainer(coeffs, dets, orbitals, one_rdm, None)
-        )",
+Examples:
+    >>> import numpy as np
+    >>> coeffs = np.array([0.9, 0.1])
+    >>> dets = [qdk_chemistry.Configuration("33221100"), qdk_chemistry.Configuration("33221001")]
+    >>> one_rdm = np.eye(4)  # Example 1-RDM
+    >>> container = qdk_chemistry.SciWavefunctionContainer(coeffs, dets, orbitals, one_rdm, None)
+)",
            py::arg("coeffs"), py::arg("dets"), py::arg("orbitals"),
            py::arg("one_rdm_spin_traced") = std::nullopt,
            py::arg("two_rdm_spin_traced") = std::nullopt,
@@ -974,42 +809,29 @@ void bind_wavefunction(pybind11::module& data) {
                     const std::optional<ContainerTypes::VectorVariant>&,
                     WavefunctionType>(),
            R"(
-        Constructs a SCI wavefunction container with full RDM data.
+Constructs a SCI wavefunction container with full RDM data.
 
-        Parameters
-        ----------
-        coeffs : numpy.ndarray
-            The vector of CI coefficients (real or complex)
-        dets : list of Configuration
-            The vector of determinants
-        orbitals : Orbitals
-            Shared pointer to orbital basis set
-        one_rdm_spin_traced : numpy.ndarray, optional
-            Spin-traced one-particle reduced density matrix
-        one_rdm_aa : numpy.ndarray, optional
-            Alpha-alpha block of one-particle RDM
-        one_rdm_bb : numpy.ndarray, optional
-            Beta-beta block of one-particle RDM
-        two_rdm_spin_traced : numpy.ndarray, optional
-            Spin-traced two-particle reduced density matrix
-        two_rdm_aabb : numpy.ndarray, optional
-            Alpha-beta-beta-alpha block of two-particle RDM
-        two_rdm_aaaa : numpy.ndarray, optional
-            Alpha-alpha-alpha-alpha block of two-particle RDM
-        two_rdm_bbbb : numpy.ndarray, optional
-            Beta-beta-beta-beta block of two-particle RDM
-        type : WavefunctionType, optional
-            Type of wavefunction (default: SelfDual)
+Args:
+    coeffs (numpy.ndarray): The vector of CI coefficients (real or complex)
+    dets (list[Configuration]): The vector of determinants
+    orbitals (Orbitals): Shared pointer to orbital basis set
+    one_rdm_spin_traced (Optional[numpy.ndarray]): Spin-traced one-particle reduced density matrix
+    one_rdm_aa (Optional[numpy.ndarray]): Alpha-alpha block of one-particle RDM
+    one_rdm_bb (Optional[numpy.ndarray]): Beta-beta block of one-particle RDM
+    two_rdm_spin_traced (Optional[numpy.ndarray]): Spin-traced two-particle reduced density matrix
+    two_rdm_aabb (Optional[numpy.ndarray]): Alpha-beta-beta-alpha block of two-particle RDM
+    two_rdm_aaaa (Optional[numpy.ndarray]): Alpha-alpha-alpha-alpha block of two-particle RDM
+    two_rdm_bbbb (Optional[numpy.ndarray]): Beta-beta-beta-beta block of two-particle RDM
+    type (Optional[WavefunctionType]): Type of wavefunction (default: SelfDual)
 
-        Examples
-        --------
-        >>> import numpy as np
-        >>> coeffs = np.array([0.9, 0.1])
-        >>> dets = [qdk_chemistry.Configuration("33221100"), qdk_chemistry.Configuration("33221001")]
-        >>> container = qdk_chemistry.SciWavefunctionContainer(coeffs, dets, orbitals,
-        ...                                          one_rdm, one_rdm_aa, one_rdm_bb,
-        ...                                          two_rdm, two_rdm_aabb, two_rdm_aaaa, two_rdm_bbbb)
-        )",
+Examples:
+    >>> import numpy as np
+    >>> coeffs = np.array([0.9, 0.1])
+    >>> dets = [qdk_chemistry.Configuration("33221100"), qdk_chemistry.Configuration("33221001")]
+    >>> container = qdk_chemistry.SciWavefunctionContainer(coeffs, dets, orbitals,
+    ...                                          one_rdm, one_rdm_aa, one_rdm_bb,
+    ...                                          two_rdm, two_rdm_aabb, two_rdm_aaaa, two_rdm_bbbb)
+)",
            py::arg("coeffs"), py::arg("dets"), py::arg("orbitals"),
            py::arg("one_rdm_spin_traced") = std::nullopt,
            py::arg("one_rdm_aa") = std::nullopt,
@@ -1030,37 +852,29 @@ void bind_wavefunction(pybind11::module& data) {
   py::class_<CasWavefunctionContainer, WavefunctionContainer, py::smart_holder>(
       data, "CasWavefunctionContainer",
       R"(
-    Complete Active Space (CAS) wavefunction container implementation.
+Complete Active Space (CAS) wavefunction container implementation.
 
-    This container represents wavefunctions obtained from complete active space
-    self-consistent field (CASSCF) or complete active space configuration
-    interaction (CASCI) methods.
-    )")
+This container represents wavefunctions obtained from complete active space self-consistent field (CASSCF) or complete active space configuration interaction (CASCI) methods.
+)")
       // Basic constructor: coeffs, dets, orbitals, type
       .def(py::init<const ContainerTypes::VectorVariant&,
                     const ContainerTypes::DeterminantVector&,
                     std::shared_ptr<Orbitals>, WavefunctionType>(),
            R"(
-        Constructs a basic CAS wavefunction container.
+Constructs a basic CAS wavefunction container.
 
-        Parameters
-        ----------
-        coeffs : numpy.ndarray
-            The vector of CI coefficients (real or complex)
-        dets : list of Configuration
-            The vector of determinants
-        orbitals : Orbitals
-            Shared pointer to orbital basis set
-        type : WavefunctionType, optional
-            Type of wavefunction (default: SelfDual)
+Args:
+    coeffs (numpy.ndarray): The vector of CI coefficients (real or complex)
+    dets (list[Configuration]): The vector of determinants
+    orbitals (Orbitals): Shared pointer to orbital basis set
+    type (Optional[WavefunctionType]): Type of wavefunction (default: SelfDual)
 
-        Examples
-        --------
-        >>> import numpy as np
-        >>> coeffs = np.array([0.9, 0.1])
-        >>> dets = [qdk_chemistry.Configuration("33221100"), qdk_chemistry.Configuration("33221001")]
-        >>> container = qdk_chemistry.CasWavefunctionContainer(coeffs, dets, orbitals)
-        )",
+Examples:
+    >>> import numpy as np
+    >>> coeffs = np.array([0.9, 0.1])
+    >>> dets = [qdk_chemistry.Configuration("33221100"), qdk_chemistry.Configuration("33221001")]
+    >>> container = qdk_chemistry.CasWavefunctionContainer(coeffs, dets, orbitals)
+)",
            py::arg("coeffs"), py::arg("dets"), py::arg("orbitals"),
            py::arg("type") = WavefunctionType::SelfDual)
       // Constructor with spin-traced RDMs: coeffs, dets, orbitals,
@@ -1072,31 +886,23 @@ void bind_wavefunction(pybind11::module& data) {
                     const std::optional<ContainerTypes::VectorVariant>&,
                     WavefunctionType>(),
            R"(
-        Constructs a CAS wavefunction container with spin-traced RDMs.
+Constructs a CAS wavefunction container with spin-traced RDMs.
 
-        Parameters
-        ----------
-        coeffs : numpy.ndarray
-            The vector of CI coefficients (real or complex)
-        dets : list of Configuration
-            The vector of determinants
-        orbitals : Orbitals
-            Shared pointer to orbital basis set
-        one_rdm_spin_traced : numpy.ndarray, optional
-            Spin-traced one-particle reduced density matrix
-        two_rdm_spin_traced : numpy.ndarray, optional
-            Spin-traced two-particle reduced density matrix
-        type : WavefunctionType, optional
-            Type of wavefunction (default: SelfDual)
+Args:
+    coeffs (numpy.ndarray): The vector of CI coefficients (real or complex)
+    dets (list[Configuration]): The vector of determinants
+    orbitals (Orbitals): Shared pointer to orbital basis set
+    one_rdm_spin_traced (Optional[numpy.ndarray]): Spin-traced one-particle reduced density matrix
+    two_rdm_spin_traced (Optional[numpy.ndarray]): Spin-traced two-particle reduced density matrix
+    type (Optional[WavefunctionType]): Type of wavefunction (default: SelfDual)
 
-        Examples
-        --------
-        >>> import numpy as np
-        >>> coeffs = np.array([0.9, 0.1])
-        >>> dets = [qdk_chemistry.Configuration("33221100"), qdk_chemistry.Configuration("33221001")]
-        >>> one_rdm = np.eye(4)  # Example 1-RDM
-        >>> container = qdk_chemistry.CasWavefunctionContainer(coeffs, dets, orbitals, one_rdm, None)
-        )",
+Examples:
+    >>> import numpy as np
+    >>> coeffs = np.array([0.9, 0.1])
+    >>> dets = [qdk_chemistry.Configuration("33221100"), qdk_chemistry.Configuration("33221001")]
+    >>> one_rdm = np.eye(4)  # Example 1-RDM
+    >>> container = qdk_chemistry.CasWavefunctionContainer(coeffs, dets, orbitals, one_rdm, None)
+)",
            py::arg("coeffs"), py::arg("dets"), py::arg("orbitals"),
            py::arg("one_rdm_spin_traced") = std::nullopt,
            py::arg("two_rdm_spin_traced") = std::nullopt,
@@ -1114,42 +920,29 @@ void bind_wavefunction(pybind11::module& data) {
                     const std::optional<ContainerTypes::VectorVariant>&,
                     WavefunctionType>(),
            R"(
-        Constructs a CAS wavefunction container with full RDM data.
+Constructs a CAS wavefunction container with full RDM data.
 
-        Parameters
-        ----------
-        coeffs : numpy.ndarray
-            The vector of CI coefficients (real or complex)
-        dets : list of Configuration
-            The vector of determinants
-        orbitals : Orbitals
-            Shared pointer to orbital basis set
-        one_rdm_spin_traced : numpy.ndarray, optional
-            Spin-traced one-particle reduced density matrix
-        one_rdm_aa : numpy.ndarray, optional
-            Alpha-alpha block of one-particle RDM
-        one_rdm_bb : numpy.ndarray, optional
-            Beta-beta block of one-particle RDM
-        two_rdm_spin_traced : numpy.ndarray, optional
-            Spin-traced two-particle reduced density matrix
-        two_rdm_aabb : numpy.ndarray, optional
-            Alpha-beta-beta-alpha block of two-particle RDM
-        two_rdm_aaaa : numpy.ndarray, optional
-            Alpha-alpha-alpha-alpha block of two-particle RDM
-        two_rdm_bbbb : numpy.ndarray, optional
-            Beta-beta-beta-beta block of two-particle RDM
-        type : WavefunctionType, optional
-            Type of wavefunction (default: SelfDual)
+Args:
+    coeffs (numpy.ndarray): The vector of CI coefficients (real or complex)
+    dets (list[Configuration]): The vector of determinants
+    orbitals (Orbitals): Shared pointer to orbital basis set
+    one_rdm_spin_traced (Optional[numpy.ndarray]): Spin-traced one-particle reduced density matrix
+    one_rdm_aa (Optional[numpy.ndarray]): Alpha-alpha block of one-particle RDM
+    one_rdm_bb (Optional[numpy.ndarray]): Beta-beta block of one-particle RDM
+    two_rdm_spin_traced (Optional[numpy.ndarray]): Spin-traced two-particle reduced density matrix
+    two_rdm_aabb (Optional[numpy.ndarray]): Alpha-beta-beta-alpha block of two-particle RDM
+    two_rdm_aaaa (Optional[numpy.ndarray]): Alpha-alpha-alpha-alpha block of two-particle RDM
+    two_rdm_bbbb (Optional[numpy.ndarray]): Beta-beta-beta-beta block of two-particle RDM
+    type (Optional[WavefunctionType]): Type of wavefunction (default: SelfDual)
 
-        Examples
-        --------
-        >>> import numpy as np
-        >>> coeffs = np.array([0.9, 0.1])
-        >>> dets = [qdk_chemistry.Configuration("33221100"), qdk_chemistry.Configuration("33221001")]
-        >>> container = qdk_chemistry.CasWavefunctionContainer(coeffs, dets, orbitals,
-        ...                                          one_rdm, one_rdm_aa, one_rdm_bb,
-        ...                                          two_rdm, two_rdm_aabb, two_rdm_aaaa, two_rdm_bbbb)
-        )",
+Examples:
+    >>> import numpy as np
+    >>> coeffs = np.array([0.9, 0.1])
+    >>> dets = [qdk_chemistry.Configuration("33221100"), qdk_chemistry.Configuration("33221001")]
+    >>> container = qdk_chemistry.CasWavefunctionContainer(coeffs, dets, orbitals,
+    ...                                          one_rdm, one_rdm_aa, one_rdm_bb,
+    ...                                          two_rdm, two_rdm_aabb, two_rdm_aaaa, two_rdm_bbbb)
+)",
            py::arg("coeffs"), py::arg("dets"), py::arg("orbitals"),
            py::arg("one_rdm_spin_traced") = std::nullopt,
            py::arg("one_rdm_aa") = std::nullopt,
@@ -1167,31 +960,25 @@ void bind_wavefunction(pybind11::module& data) {
   py::class_<SlaterDeterminantContainer, WavefunctionContainer,
              py::smart_holder>(data, "SlaterDeterminantContainer",
                                R"(
-    Single Slater determinant wavefunction container implementation.
+Single Slater determinant wavefunction container implementation.
 
-    This container represents the simplest wavefunction - a single Slater determinant
-    with coefficient 1.0. It provides efficient storage and computation for
-    single-determinant wavefunctions such as Hartree-Fock reference states.
-    )")
+This container represents the simplest wavefunction - a single Slater determinant with coefficient 1.0.
+It provides efficient storage and computation for single-determinant wavefunctions such as Hartree-Fock reference states.
+)")
       .def(py::init<const Configuration&, std::shared_ptr<Orbitals>,
                     WavefunctionType>(),
            R"(
-        Constructs a single Slater determinant wavefunction container.
+Constructs a single Slater determinant wavefunction container.
 
-        Parameters
-        ----------
-        det : Configuration
-            The single determinant configuration
-        orbitals : Orbitals
-            Shared pointer to orbital basis set
-        type : WavefunctionType, optional
-            Type of wavefunction (default: Both)
+Args:
+    det (Configuration): The single determinant configuration
+    orbitals (Orbitals): Shared pointer to orbital basis set
+    type (Optional[WavefunctionType]): Type of wavefunction (default: Both)
 
-        Examples
-        --------
-        >>> det = qdk_chemistry.Configuration("33221100")
-        >>> container = qdk_chemistry.SlaterDeterminantContainer(det, orbitals)
-        )",
+Examples:
+    >>> det = qdk_chemistry.Configuration("33221100")
+    >>> container = qdk_chemistry.SlaterDeterminantContainer(det, orbitals)
+)",
            py::arg("det"), py::arg("orbitals"),
            py::arg("type") = WavefunctionType::SelfDual)
       .def("contains_determinant",

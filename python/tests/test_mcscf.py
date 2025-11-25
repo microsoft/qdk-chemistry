@@ -6,12 +6,23 @@
 # --------------------------------------------------------------------------------------------
 
 import numpy as np
+import pytest
 
 from qdk_chemistry import algorithms as alg
 from qdk_chemistry.constants import ANGSTROM_TO_BOHR
 from qdk_chemistry.data import Structure
 
 from .reference_tolerances import float_comparison_relative_tolerance, mcscf_energy_tolerance
+
+# Check if PySCF is available and import the plugin
+try:
+    import pyscf  # noqa: F401
+
+    import qdk_chemistry.plugins.pyscf  # noqa: F401
+
+    PYSCF_AVAILABLE = True
+except ImportError:
+    PYSCF_AVAILABLE = False
 
 
 def create_n2_structure():
@@ -28,6 +39,7 @@ def create_o2_structure():
     return Structure(symbols, coords)
 
 
+@pytest.mark.skipif(not PYSCF_AVAILABLE, reason="PySCF not available")
 class TestMCSCF:
     """Test class MCSCF functionality."""
 

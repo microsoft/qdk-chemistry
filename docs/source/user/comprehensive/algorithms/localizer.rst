@@ -1,21 +1,21 @@
 Orbital localization
 ====================
 
-The ``Localizer`` algorithm in QDK/Chemistry performs various orbital transformations to create localized or otherwise transformed molecular orbitals.
-Following QDK/Chemistry's :doc:`algorithm design principles <../advanced/design_principles>`, it takes an :doc:`Orbitals <../data/orbitals>` instance as input and produces a new :doc:`Orbitals <../data/orbitals>` instance as output.
+The :class:`~qdk_chemistry.algorithms.Localizer` algorithm in QDK/Chemistry performs various orbital transformations to create localized or otherwise transformed molecular orbitals.
+Following QDK/Chemistry's :doc:`algorithm design principles <../design/index>`, it takes an :doc:`Orbitals <../data/orbitals>` instance as input and produces a new :doc:`Orbitals <../data/orbitals>` instance as output.
 These transformations preserve the overall electronic state but provide orbitals with different properties that are useful for chemical analysis or subsequent calculations.
 
 Overview
 --------
 
 Canonical molecular orbitals from :term:`SCF` calculations are often delocalized over the entire molecule, which can make chemical interpretation difficult and lead to slow convergence in post-:term:`HF` methods.
-The ``Localizer`` algorithm applies unitary transformations to these orbitals to obtain alternative representations that may be more physically intuitive or computationally advantageous.
+The :class:`~qdk_chemistry.algorithms.Localizer` algorithm applies unitary transformations to these orbitals to obtain alternative representations that may be more physically intuitive or computationally advantageous.
 Multiple localization methods are available through a unified interface, each optimizing different criteria to achieve localization.
 
 Localization Methods
 --------------------
 
-QDK/Chemistry provides several orbital transformation methods through the ``Localizer`` interface:
+QDK/Chemistry provides several orbital transformation methods through the :class:`~qdk_chemistry.algorithms.Localizer` interface:
 
 - **Pipek-Mezey Localization**
 - **Natural Orbitals**
@@ -24,9 +24,9 @@ QDK/Chemistry provides several orbital transformation methods through the ``Loca
 Creating a localizer
 --------------------
 
-As an algorithm class in QDK/Chemistry, the ``Localizer`` follows the :doc:`factory pattern design principle <../advanced/design_principles>`.
+As an algorithm class in QDK/Chemistry, the :class:`~qdk_chemistry.algorithms.Localizer` follows the :doc:`factory pattern design principle <../design/index>`.
 It is created using its corresponding factory, which provides a unified interface for different localization method implementations.
-For more information about this pattern, see the :doc:`Factory Pattern <../advanced/factory_pattern>` documentation.
+For more information about this pattern, see the :doc:`Factory Pattern <../design/factory_pattern>` documentation.
 
 .. tab:: C++ API
 
@@ -48,7 +48,7 @@ For more information about this pattern, see the :doc:`Factory Pattern <../advan
 Configuring the localizer
 -------------------------
 
-The ``Localizer`` can be configured using the ``Settings`` object:
+The :class:`~qdk_chemistry.algorithms.Localizer` can be configured using the :doc:`Settings <../design/settings>` object:
 
 .. tab:: C++ API
 
@@ -68,7 +68,7 @@ Performing orbital localization
 
 Before performing localization, you need an :doc:`Orbitals <../data/orbitals>` instance as input.
 This is typically obtained from an :doc:`ScfSolver <scf_solver>` calculation, as localization is usually applied to converged :term:`SCF` orbitals.
-Following QDK/Chemistry's :doc:`algorithm design principles <../advanced/design_principles>`, the ``Localizer`` algorithm takes an ``Orbitals`` object as input and produces a new ``Orbitals`` object as output, preserving the original orbitals while creating a transformed representation.
+Following QDK/Chemistry's :doc:`algorithm design principles <../design/index>`, the :class:`~qdk_chemistry.algorithms.Localizer` algorithm takes an :doc:`Orbitals <../data/orbitals>` object as input and produces a new :doc:`Orbitals <../data/orbitals>` object as output, preserving the original orbitals while creating a transformed representation.
 
 The ``run`` method requires three parameters:
 
@@ -125,7 +125,7 @@ qdk_vvhv
 Available settings
 ------------------
 
-The ``Localizer`` accepts a range of settings to control its behavior. These settings are divided into base settings
+The :class:`~qdk_chemistry.algorithms.Localizer` accepts a range of settings to control its behavior. These settings are divided into base settings
 (common to all localization methods) and specialized settings (specific to certain localization variants).
 
 Base settings
@@ -212,7 +212,7 @@ These settings apply only to specific variants of localization:
 Implemented interface
 ---------------------
 
-QDK/Chemistry's ``Localizer`` provides a unified interface for localization methods.
+QDK/Chemistry's :class:`~qdk_chemistry.algorithms.Localizer` provides a unified interface for localization methods.
 
 QDK/Chemistry implementations
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -226,7 +226,7 @@ Third-party interfaces
 
 The factory pattern allows seamless selection between these implementations.
 
-For more details on how QDK/Chemistry interfaces with external packages, see the :doc:`Interfaces <../advanced/interfaces>` documentation.
+For more details on how QDK/Chemistry interfaces with external packages, see the :doc:`Interfaces <../design/interfaces>` documentation.
 
 Related classes
 ---------------
