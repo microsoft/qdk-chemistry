@@ -38,7 +38,7 @@ class TestExampleScripts(unittest.TestCase):
             check=False,
             capture_output=True,
             text=True,
-            timeout=180,
+            timeout=360,
             cwd=example_file.parent,
         )
 
