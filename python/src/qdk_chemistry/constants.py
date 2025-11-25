@@ -96,8 +96,6 @@ def list_constants(show_values: bool = True, show_units: bool = True) -> None:
     """
     constants_info = get_constants_info()
 
-    # TODO (NAB):  change output to logger rather than print() here and elsewhere
-    # or just return strings workitem 41417
     constants_info_string = "\nQDK/Chemistry Physical Constants (CODATA 2018)\n"
     constants_info_string += "=" * 50 + "\n"
 

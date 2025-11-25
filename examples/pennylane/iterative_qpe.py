@@ -8,6 +8,7 @@
 import numpy as np
 from qdk_chemistry.algorithms import create
 from qdk_chemistry.data import QpeResult, Structure
+from qdk_chemistry.utils import Logger
 
 try:
     import pennylane as qml
@@ -16,6 +17,8 @@ except ImportError as e:
         "PennyLane is not installed. Please install PennyLane to run this example: pip install pennylane"
     ) from e
 
+Logger.set_global_level("info")
+LOGGER = Logger.QDK_LOGGER(__name__)
 
 ACTIVE_ELECTRONS = 2
 ACTIVE_ORBITALS = 2
@@ -61,9 +64,9 @@ casci_energy, _ = multi_configuration_calculator.run(
     active_hamiltonian, n_alpha, n_beta
 )  # Solve CASCI
 
-print("=== Generating QDK/Chemistry artifacts for H2 (0.76 Å, STO-3G) ===")
-print(f"  SCF total energy:   {scf_energy: .4f} Hartree")
-print(f"  CASCI total energy: {casci_energy: .4f} Hartree")
+LOGGER.info("=== Generating QDK/Chemistry artifacts for H2 (0.76 Å, STO-3G) ===")
+LOGGER.info(f"  SCF total energy:   {scf_energy: .4f} Hartree")
+LOGGER.info(f"  CASCI total energy: {casci_energy: .4f} Hartree")
 
 
 ########################################################################################
@@ -104,9 +107,9 @@ sys_wires = [w + M_PRECISION for w in range(num_spin_orbitals)]
 wire_map: dict = dict(zip(H_qubit_raw.wires, sys_wires, strict=True))
 H_qubit = H_qubit_raw.map_wires(wire_map)
 
-print(f"  Hamiltonian terms: {len(H_qubit)}")  # type: ignore
-print(f"  System qubits (spin orbitals): {num_spin_orbitals}")
-print(f"  Electron sector (alpha, beta): ({n_alpha}, {n_beta})")
+LOGGER.info(f"  Hamiltonian terms: {len(H_qubit)}")  # type: ignore
+LOGGER.info(f"  System qubits (spin orbitals): {num_spin_orbitals}")
+LOGGER.info(f"  Electron sector (alpha, beta): ({n_alpha}, {n_beta})")
 
 
 ########################################################################################
@@ -172,18 +175,18 @@ estimated_total_energy = (
     result.resolved_energy if result.resolved_energy is not None else raw_energy
 )
 
-print(f"\nMost likely phase bitstring: {dominant_bits}")
-print(f"Phase fraction φ (measured): {result.phase_fraction:.4f} rad")
+LOGGER.info(f"\nMost likely phase bitstring: {dominant_bits}")
+LOGGER.info(f"Phase fraction φ (measured): {result.phase_fraction:.4f} rad")
 
-print(f"Estimated total energy: {estimated_total_energy:.4f} Hartree")
-print("Candidate energies (alias checks):")
+LOGGER.info(f"Estimated total energy: {estimated_total_energy:.4f} Hartree")
+LOGGER.info("Candidate energies (alias checks):")
 for energy in candidate_energies:
-    print(f"  E = {energy:.4f} Hartree")
+    LOGGER.info(f"  E = {energy:.4f} Hartree")
 
-print(
+LOGGER.info(
     f"Total energy difference (QPE - CASCI): {estimated_total_energy - casci_energy:.4e} Hartree"
 )
-print(
+LOGGER.info(
     "Diagnostic: PennyLane's controlled evolve applies exp(-i H t) exactly, so this residual "
     "difference is dominated by finite phase-register resolution rather than Trotterization."
 )

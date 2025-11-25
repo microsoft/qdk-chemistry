@@ -73,9 +73,9 @@ casci_energy, casci_wavefunction = mc_calculator.run(
 )
 core_energy = active_hamiltonian.get_core_energy()
 
-print("=== Generating QDK/Chemistry artifacts for H2 (0.76 Å, STO-3G) ===")
-print(f"  SCF total energy:   {scf_energy: .8f} Hartree")
-print(f"  CASCI total energy: {casci_energy: .8f} Hartree")
+LOGGER.info("=== Generating QDK/Chemistry artifacts for H2 (0.76 Å, STO-3G) ===")
+LOGGER.info(f"  SCF total energy:   {scf_energy: .8f} Hartree")
+LOGGER.info(f"  CASCI total energy: {casci_energy: .8f} Hartree")
 
 
 ########################################################################################
@@ -102,9 +102,10 @@ state_prep = transpile(
 )
 state_prep.name = "casci_sparse_isometry"
 
-print("\nSparse-isometry state preparation circuit:")
-print(state_prep.draw(output="text"))
-
+LOGGER.info(
+    "\nSparse-isometry state preparation circuit:\n"
+    + str(state_prep.draw(output="text"))
+)
 
 ########################################################################################
 # 4. Build and run the Trotterized iterative QPE circuit
@@ -112,10 +113,10 @@ print(state_prep.draw(output="text"))
 simulator = AerSimulator(method="statevector", seed_simulator=SIMULATOR_SEED)
 iqpe = IterativePhaseEstimation(qubit_hamiltonian, T_TIME)
 
-print("\n=== Running iterative phase estimation (Trotterized) ===")
-print(f"  Hamiltonian terms: {len(qubit_pauli_op.paulis)}")
-print(f"  System qubits (spin orbitals): {num_spin_orbitals}")
-print(f"  Electron sector (alpha, beta): ({n_alpha}, {n_beta})")
+LOGGER.info("\n=== Running iterative phase estimation (Trotterized) ===")
+LOGGER.info(f"  Hamiltonian terms: {len(qubit_pauli_op.paulis)}")
+LOGGER.info(f"  System qubits (spin orbitals): {num_spin_orbitals}")
+LOGGER.info(f"  Electron sector (alpha, beta): ({n_alpha}, {n_beta})")
 
 phase_feedback = 0.0
 bits: list[int] = []
@@ -158,24 +159,24 @@ estimated_electronic_energy = (
 )
 estimated_total_energy = estimated_electronic_energy + core_energy
 
-print(f"Measured bits (MSB → LSB): {list(result.bits_msb_first or [])}")
-print(
+LOGGER.info(f"Measured bits (MSB → LSB): {list(result.bits_msb_first or [])}")
+LOGGER.info(
     f"Phase fraction φ (measured): {result.phase_fraction:.6f} (angle = {phase_angle_measured:.6f} rad)"
 )
 if not np.isclose(result.phase_fraction, result.canonical_phase_fraction):
-    print(
+    LOGGER.info(
         f"Canonical phase fraction φ: {result.canonical_phase_fraction:.6f} (angle = {phase_angle_canonical:.6f} rad)",
     )
-print(f"Raw energy_from_phase output: {raw_energy:+.8f} Hartree")
-print("Candidate energies (alias checks):")
+LOGGER.info(f"Raw energy_from_phase output: {raw_energy:+.8f} Hartree")
+LOGGER.info("Candidate energies (alias checks):")
 for energy in candidate_energies:
-    print(f"  E = {energy:+.8f} Hartree")
-print(f"Estimated electronic energy: {estimated_electronic_energy:.8f} Hartree")
-print(f"Estimated total energy: {estimated_total_energy:.8f} Hartree")
-print(f"Reference total energy (CASCI): {casci_energy:.8f} Hartree")
-print(f"Reference sparse energy (CASCI): {E_sparse:.8f} Hartree")
+    LOGGER.info(f"  E = {energy:+.8f} Hartree")
+LOGGER.info(f"Estimated electronic energy: {estimated_electronic_energy:.8f} Hartree")
+LOGGER.info(f"Estimated total energy: {estimated_total_energy:.8f} Hartree")
+LOGGER.info(f"Reference total energy (CASCI): {casci_energy:.8f} Hartree")
+LOGGER.info(f"Reference sparse energy (CASCI): {E_sparse:.8f} Hartree")
 iterative_energy_error = estimated_total_energy - casci_energy
-print(f"Energy difference (QPE - CASCI): {iterative_energy_error:+.8e} Hartree")
-print(
+LOGGER.info(f"Energy difference (QPE - CASCI): {iterative_energy_error:+.8e} Hartree")
+LOGGER.info(
     "Energy error is large due to Trotterization and finite numerical resolution in this demo."
 )
