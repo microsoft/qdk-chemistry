@@ -6,14 +6,14 @@
 
 #include "mp2.hpp"
 
+#include <Eigen/Dense>
+#include <cstddef>
 #include <optional>
 #include <qdk/chemistry/data/hamiltonian.hpp>
 #include <qdk/chemistry/data/orbitals.hpp>
 #include <qdk/chemistry/data/wavefunction_containers/mp2.hpp>
 #include <stdexcept>
 #include <tuple>
-
-#include "mp2_amplitude_helpers.hpp"
 
 namespace qdk::chemistry::algorithms::microsoft {
 
@@ -126,8 +126,8 @@ double MP2Calculator::_calculate_restricted_mp2_energy(
       active_space_size * active_space_size * active_space_size;
 
   // Sum over all occupied and virtual orbital pairs
-  mp2_helpers::compute_restricted_t2(eps_alpha, moeri, n_occ, n_vir, stride_i,
-                                     stride_j, stride_k, t2_amplitudes, &E_MP2);
+  compute_restricted_t2(eps_alpha, moeri, n_occ, n_vir, stride_i, stride_j,
+                        stride_k, t2_amplitudes, &E_MP2);
 
   return E_MP2;
 }
@@ -195,22 +195,156 @@ double MP2Calculator::_calculate_unrestricted_mp2_energy(
       active_space_size * active_space_size * active_space_size;
 
   // Alpha-Alpha contribution
-  mp2_helpers::compute_same_spin_t2(eps_alpha, moeri_aaaa, n_alpha, n_vir_alpha,
-                                    stride_i, stride_j, stride_k, t2_aa,
-                                    &E_MP2_AA);
+  compute_same_spin_t2(eps_alpha, moeri_aaaa, n_alpha, n_vir_alpha, stride_i,
+                       stride_j, stride_k, t2_aa, &E_MP2_AA);
 
   // Alpha-Beta contribution
-  mp2_helpers::compute_opposite_spin_t2(
-      eps_alpha, eps_beta, moeri_bbaa, n_alpha, n_beta, n_vir_alpha, n_vir_beta,
-      stride_i, stride_j, stride_k, t2_ab, &E_MP2_AB);
+  compute_opposite_spin_t2(eps_alpha, eps_beta, moeri_bbaa, n_alpha, n_beta,
+                           n_vir_alpha, n_vir_beta, stride_i, stride_j,
+                           stride_k, t2_ab, &E_MP2_AB);
 
   // Beta-Beta contribution
-  mp2_helpers::compute_same_spin_t2(eps_beta, moeri_bbbb, n_beta, n_vir_beta,
-                                    stride_i, stride_j, stride_k, t2_bb,
-                                    &E_MP2_BB);
+  compute_same_spin_t2(eps_beta, moeri_bbbb, n_beta, n_vir_beta, stride_i,
+                       stride_j, stride_k, t2_bb, &E_MP2_BB);
 
   double total_energy = E_MP2_AA + E_MP2_BB + E_MP2_AB;
   return total_energy;
 }
 
+void MP2Calculator::compute_opposite_spin_t2(
+    const Eigen::VectorXd& eps_i_spin, const Eigen::VectorXd& eps_j_spin,
+    const Eigen::VectorXd& moeri, size_t n_occ_i, size_t n_occ_j,
+    size_t n_vir_i, size_t n_vir_j, size_t stride_i, size_t stride_j,
+    size_t stride_k, Eigen::VectorXd& t2, double* energy) {
+  for (size_t i = 0; i < n_occ_i; ++i) {
+    const double eps_i = eps_i_spin[i];
+
+    for (size_t a = 0; a < n_vir_i; ++a) {
+      const size_t a_idx = a + n_occ_i;
+      const double eps_ia = eps_i - eps_i_spin[a_idx];
+
+      for (size_t j = 0; j < n_occ_j; ++j) {
+        const double eps_ija = eps_ia + eps_j_spin[j];
+
+        for (size_t b = 0; b < n_vir_j; ++b) {
+          const size_t b_idx = b + n_occ_j;
+
+          const size_t idx_ijab =
+              i * stride_i + a_idx * stride_j + j * stride_k + b_idx;
+
+          const double eri_ijab = moeri[idx_ijab];
+          const double denom = eps_ija - eps_j_spin[b_idx];
+
+          // T2 amplitude
+          const double t2_ijab = eri_ijab / denom;
+
+          // Store T2 amplitude
+          size_t t2_flat_idx = i * n_occ_j * n_vir_i * n_vir_j +
+                               j * n_vir_i * n_vir_j + a * n_vir_j + b;
+          t2[t2_flat_idx] = t2_ijab;
+
+          // Energy contribution (if requested)
+          if (energy) {
+            *energy += t2_ijab * eri_ijab;
+          }
+        }
+      }
+    }
+  }
+}
+
+void MP2Calculator::compute_restricted_t2(const Eigen::VectorXd& eps,
+                                          const Eigen::VectorXd& moeri,
+                                          size_t n_occ, size_t n_vir,
+                                          size_t stride_i, size_t stride_j,
+                                          size_t stride_k, Eigen::VectorXd& t2,
+                                          double* energy) {
+  for (size_t i = 0; i < n_occ; ++i) {
+    const size_t i_base = i * stride_i;
+
+    for (size_t j = 0; j < n_occ; ++j) {
+      const double eps_ij = eps[i] + eps[j];
+
+      for (size_t a = 0; a < n_vir; ++a) {
+        const size_t a_idx = a + n_occ;
+        const size_t ia_base = i_base + a_idx * stride_j;
+        const double eps_ija = eps_ij - eps[a_idx];
+
+        for (size_t b = 0; b < n_vir; ++b) {
+          const size_t b_idx = b + n_occ;
+
+          // Get integrals <ij|ab> and <ij|ba>
+          const size_t idx_ijab = ia_base + j * stride_k + b_idx;
+          const double eri_ijab = moeri[idx_ijab];
+
+          // Energy denominator
+          const double denom = eps_ija - eps[b_idx];
+
+          // T2 amplitude: T_ijab = <ij|ab> / denominator
+          const double t2_ijab = eri_ijab / denom;
+
+          // Store T2 amplitude
+          size_t t2_flat_idx =
+              i * n_occ * n_vir * n_vir + j * n_vir * n_vir + a * n_vir + b;
+          t2[t2_flat_idx] = t2_ijab;
+
+          // MP2 energy: E_MP2 += T_ijab * (2*<ij|ab> - <ij|ba>)
+          if (energy) {
+            const size_t idx_ijba =
+                i_base + b_idx * stride_j + j * stride_k + a_idx;
+            const double eri_ijba = moeri[idx_ijba];
+            *energy += t2_ijab * (2.0 * eri_ijab - eri_ijba);
+          }
+        }
+      }
+    }
+  }
+}
+
+void MP2Calculator::compute_same_spin_t2(const Eigen::VectorXd& eps,
+                                         const Eigen::VectorXd& moeri,
+                                         size_t n_occ, size_t n_vir,
+                                         size_t stride_i, size_t stride_j,
+                                         size_t stride_k, Eigen::VectorXd& t2,
+                                         double* energy) {
+  for (size_t i = 0; i < n_occ; ++i) {
+    const size_t i_base = i * stride_i;
+
+    for (size_t a = 0; a < n_vir; ++a) {
+      const size_t a_idx = a + n_occ;
+      const size_t ia_base = i_base + a_idx * stride_j;
+      const double eps_ia = eps[i] - eps[a_idx];
+
+      for (size_t j = i + 1; j < n_occ; ++j) {
+        const double eps_ija = eps_ia + eps[j];
+
+        for (size_t b = a + 1; b < n_vir; ++b) {
+          const size_t b_idx = b + n_occ;
+
+          const size_t idx_ijab = ia_base + j * stride_k + b_idx;
+          const size_t idx_ijba =
+              i_base + b_idx * stride_j + j * stride_k + a_idx;
+
+          const double eri_ijab = moeri[idx_ijab];
+          const double eri_ijba = moeri[idx_ijba];
+          const double antisym_integral = eri_ijab - eri_ijba;
+          const double denom = eps_ija - eps[b_idx];
+
+          // T2 amplitude
+          const double t2_ijab = antisym_integral / denom;
+
+          // Store T2 amplitude
+          size_t t2_flat_idx =
+              i * n_occ * n_vir * n_vir + j * n_vir * n_vir + a * n_vir + b;
+          t2[t2_flat_idx] = t2_ijab;
+
+          // Energy contribution (if requested)
+          if (energy) {
+            *energy += t2_ijab * antisym_integral;
+          }
+        }
+      }
+    }
+  }
+}
 }  // namespace qdk::chemistry::algorithms::microsoft

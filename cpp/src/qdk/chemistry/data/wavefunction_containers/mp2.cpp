@@ -4,12 +4,13 @@
  * license information.
  */
 
+#include "../../algorithms/microsoft/mp2.hpp"
+
 #include <optional>
 #include <qdk/chemistry/data/wavefunction_containers/mp2.hpp>
 #include <stdexcept>
 #include <variant>
 
-#include "../../algorithms/microsoft/mp2_amplitude_helpers.hpp"
 #include "../json_serialization.hpp"
 
 namespace qdk::chemistry::data {
@@ -145,17 +146,17 @@ void MP2Container::_compute_t2_amplitudes() const {
         active_space_size * active_space_size * active_space_size;
 
     // Alpha-Alpha contribution
-    algorithms::microsoft::mp2_helpers::compute_same_spin_t2(
+    algorithms::microsoft::MP2Calculator::compute_same_spin_t2(
         eps_alpha, moeri_aaaa, n_alpha, n_vir_alpha, stride_i, stride_j,
         stride_k, t2_aa);
 
     // Alpha-Beta contribution
-    algorithms::microsoft::mp2_helpers::compute_opposite_spin_t2(
+    algorithms::microsoft::MP2Calculator::compute_opposite_spin_t2(
         eps_alpha, eps_beta, moeri_bbaa, n_alpha, n_beta, n_vir_alpha,
         n_vir_beta, stride_i, stride_j, stride_k, t2_ab);
 
     // Beta-Beta contribution
-    algorithms::microsoft::mp2_helpers::compute_same_spin_t2(
+    algorithms::microsoft::MP2Calculator::compute_same_spin_t2(
         eps_beta, moeri_bbbb, n_beta, n_vir_beta, stride_i, stride_j, stride_k,
         t2_bb);
 
@@ -189,7 +190,7 @@ void MP2Container::_compute_t2_amplitudes() const {
         active_space_size * active_space_size * active_space_size;
 
     // Compute T2 amplitudes
-    algorithms::microsoft::mp2_helpers::compute_restricted_t2(
+    algorithms::microsoft::MP2Calculator::compute_restricted_t2(
         eps_alpha, moeri, n_occ, n_vir, stride_i, stride_j, stride_k,
         t2_amplitudes);
 
