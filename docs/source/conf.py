@@ -148,6 +148,7 @@ show_warning_types = True  # Show types of warnings in output
 suppress_warnings = [
     "duplicate_declaration.cpp",  # Suppress warnings about duplicate C++ declarations, this happens due to nested namespaces
     "ref.ref",  # sphinx does not like bools for some reason
+    "autodoc.duplicate",  # Suppress warnings about duplicate object descriptions from imported classes
 ]
 
 # Configure output for to-dos

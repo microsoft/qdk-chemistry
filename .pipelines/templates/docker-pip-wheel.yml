@@ -23,6 +23,18 @@ parameters:
 - name: pythonVersion
   type: string
   default: 3.11
+- name: cmakeVersion
+  type: string
+  default: 3.28.3
+- name: hdf5Version
+  type: string
+  default: 1.13.0
+- name: blisVersion
+  type: string
+  default: 2.0
+- name: libflameVersion
+  type: string
+  default: 5.2.0
 - name: artifactProject
   type: string
   default: 37e07de7-e7fd-4be8-8379-dc164a4401f3
@@ -47,5 +59,5 @@ steps:
       -e QDK_UARCH=${{ parameters.march }} \
       -w /workspace/qdk-chemistry \
       ${{ parameters.dockerImage }} \
-    bash .pipelines/pip-scripts/build-pip-wheels.sh ${{ parameters.march }} ${{ parameters.pythonVersion }} ${{ parameters.buildType }} ${{ parameters.buildTesting }} ${{ parameters.enableCoverage }}
+    bash .pipelines/pip-scripts/build-pip-wheels.sh ${{ parameters.march }} ${{ parameters.pythonVersion }} ${{ parameters.buildType }} ${{ parameters.buildTesting }} ${{ parameters.enableCoverage }} ${{ parameters.cmakeVersion }} ${{ parameters.hdf5Version }} ${{ parameters.blisVersion }} ${{ parameters.libflameVersion }}
   displayName: Build wheel in container
