@@ -164,8 +164,11 @@ Hamiltonian::get_two_body_integrals() const {
 }
 
 bool Hamiltonian::has_inactive_fock_matrix() const {
-  return _inactive_fock_matrix.first != nullptr &&
-         _inactive_fock_matrix.first->size() > 0;
+  bool has_alpha = _inactive_fock_matrix.first != nullptr &&
+                   _inactive_fock_matrix.first->size() > 0;
+  bool has_beta = _inactive_fock_matrix.second != nullptr &&
+                  _inactive_fock_matrix.second->size() > 0;
+  return has_alpha && has_beta;
 }
 
 double Hamiltonian::get_two_body_element(unsigned i, unsigned j, unsigned k,

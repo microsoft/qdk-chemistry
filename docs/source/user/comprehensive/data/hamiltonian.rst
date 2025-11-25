@@ -29,7 +29,7 @@ The ``Hamiltonian`` class supports both restricted and unrestricted representati
 
 For unrestricted Hamiltonians, the one-electron and two-electron integrals are stored separately for each spin channel:
 
-- One-electron integrals: :math:`h_{\alpha}` and :math:`h_{\beta}`
+- One-electron integrals: :math:`h_{\alpha\alpha}` and :math:`h_{\beta\beta}`
 - Two-electron integrals: :math:`h_{\alpha\alpha\alpha\alpha}`, :math:`h_{\alpha\beta\alpha\beta}`, and :math:`h_{\beta\beta\beta\beta}`
 
 Properties
@@ -84,95 +84,6 @@ Hamiltonian object should be considered constant and not modified:
       :language: python
       :lines: 3-16
 
-Accessing Hamiltonian data
---------------------------
-
-The ``Hamiltonian`` class provides methods to access the one- and two-electron integrals and other properties. In line
-with its immutable design principle, these methods return const references or copies of the internal data:
-
-Two-Electron Integral Storage and Notation
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-Two-electron integrals in quantum chemistry can be represented using different notations and storage formats.
-QDK/Chemistry uses the physicist notation by default, but it's important to understand the different conventions:
-
-- **Physicist/Dirac notation** :math:`\left\langle ij|kl \right\rangle` or :math:`\left\langle ij|kl \right\rangle`: represents the Coulomb interaction where electron 1 occupies orbitals :math:`i` and :math:`k`, while electron 2 occupies orbitals :math:`j` and :math:`l`.
-  This is the default representation in QDK/Chemistry.
-  In this notation, the first index of each pair :math:`(i,k)` refers to electron 1, and the second index of each pair :math:`(j,l)` refers to electron 2, following a (1,2,1,2) electron indexing pattern.
-
-- **Chemist/Mulliken notation** :math:`(ij|kl)` or :math:`[ij|kl]`: represents the Coulomb interaction where electron 1 occupies orbitals :math:`i` and :math:`j`, while electron 2 occupies orbitals :math:`k` and :math:`l`.
-  In this notation, the first pair of indices :math:`(i,j)` refers to electron 1, and the second pair :math:`(k,l)` refers to electron 2, following a (1,1,2,2) electron indexing pattern.
-  The symbols differ (parentheses vs square brackets), but the indexing convention is the same.
-
-The relationship between physicist and chemist notation is:
-
-.. math::
-
-   \left\langle ij | kl \right\rangle = \left(ik|jl \right)
-
-Two-electron integrals with real-valued orbitals possess inherent symmetry properties. From a theoretical perspective,
-these symmetries can be expressed as:
-
-.. math::
-
-   \left\langle ij|kl \right\rangle = \left\langle ji|lk \right\rangle = \left\langle kl|ij \right\rangle = \left\langle lk|ji \right\rangle = \left\langle jl|ki \right\rangle = \left\langle lj|ik \right\rangle = \left\langle ki|jl \right\rangle = \left\langle ik|lj \right\rangle
-
-These permutational symmetries arise from the mathematical properties of the two-electron repulsion integrals.
-When accessing specific elements with ``get_two_body_element(i, j, k, l)``, the function handles the appropriate index mapping to retrieve the correct value based on the implementation's storage format.
-
-.. tab:: C++ API
-
-   .. code-block:: cpp
-
-      // Access one-electron integrals, returns const Eigen::MatrixXd&
-      auto [h1_alpha, h1_beta] = hamiltonian.get_one_body_integrals();
-
-      // Access two-electron integrals, returns const Eigen::VectorXd&
-      auto [h2_aaaa, h2_aabb, h2_bbbb] = hamiltonian.get_two_body_integrals();
-
-      // Access a specific two-electron integral <ij|kl>
-      double element = hamiltonian.get_two_body_element(i, j, k, l);
-
-      // Get core energy (nuclear repulsion + inactive orbital energy), returns double
-      auto core_energy = hamiltonian.get_core_energy();
-
-      // Get inactive Fock matrix (if available), returns const Eigen::MatrixXd&
-      if (hamiltonian.has_inactive_fock_matrix()) {
-          auto inactive_fock = hamiltonian.get_inactive_fock_matrix();
-      }
-
-      // Get orbital data, returns const Orbitals&
-      const auto& orbitals = hamiltonian.get_orbitals();
-
-      // Get active space information, returns const std::vector<size_t>&
-      auto active_indices = hamiltonian.get_selected_orbital_indices();
-      // Returns size_t
-      auto num_electrons = hamiltonian.get_num_electrons();
-      // Returns size_t
-      auto num_orbitals = hamiltonian.get_num_orbitals();
-
-.. tab:: Python API
-
-   .. note::
-      This example shows the API pattern. For complete working examples, see the test suite.
-
-   .. literalinclude:: ../../../../examples/hamiltonian.py
-      :language: python
-      :lines: 18-32
-
-      # Get orbital data
-      orbitals = hamiltonian.get_orbitals()
-
-      # Get active space information
-      active_indices = hamiltonian.get_selected_orbital_indices()
-      num_electrons = hamiltonian.get_num_electrons()
-      num_orbitals = hamiltonian.get_num_orbitals()
-
-Unrestricted Hamiltonians
--------------------------
-
-For systems requiring unrestricted treatment, the ``Hamiltonian`` class provides specialized constructors and accessors for spin-separated integrals.
-
 Creating an unrestricted Hamiltonian
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
@@ -223,68 +134,112 @@ Unrestricted Hamiltonians can be created using a specialized constructor that ac
       is_unrestricted = h_unrestricted.is_unrestricted()
       is_restricted = h_unrestricted.is_restricted()
 
-Accessing spin-separated integrals
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Accessing Hamiltonian data
+--------------------------
 
-You can access the spin-separated integral tensors like:
+The ``Hamiltonian`` class provides methods to access the one- and two-electron integrals and other properties. In line
+with its immutable design principle, these methods return const references or copies of the internal data:
+
+Two-Electron Integral Storage and Notation
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Two-electron integrals in quantum chemistry can be represented using different notations and storage formats.
+QDK/Chemistry uses the physicist notation by default, but it's important to understand the different conventions:
+
+- **Physicist/Dirac notation** :math:`\left\langle ij|kl \right\rangle` or :math:`\left\langle ij|kl \right\rangle`: represents the Coulomb interaction where electron 1 occupies orbitals :math:`i` and :math:`k`, while electron 2 occupies orbitals :math:`j` and :math:`l`.
+  This is the default representation in QDK/Chemistry.
+  In this notation, the first index of each pair :math:`(i,k)` refers to electron 1, and the second index of each pair :math:`(j,l)` refers to electron 2, following a (1,2,1,2) electron indexing pattern.
+
+- **Chemist/Mulliken notation** :math:`(ij|kl)` or :math:`[ij|kl]`: represents the Coulomb interaction where electron 1 occupies orbitals :math:`i` and :math:`j`, while electron 2 occupies orbitals :math:`k` and :math:`l`.
+  In this notation, the first pair of indices :math:`(i,j)` refers to electron 1, and the second pair :math:`(k,l)` refers to electron 2, following a (1,1,2,2) electron indexing pattern.
+  The symbols differ (parentheses vs square brackets), but the indexing convention is the same.
+
+The relationship between physicist and chemist notation is:
+
+.. math::
+
+   \left\langle ij | kl \right\rangle = \left(ik|jl \right)
+
+Two-electron integrals with real-valued orbitals possess inherent symmetry properties. From a theoretical perspective,
+these symmetries can be expressed as:
+
+.. math::
+
+   \left\langle ij|kl \right\rangle = \left\langle ji|lk \right\rangle = \left\langle kl|ij \right\rangle = \left\langle lk|ji \right\rangle = \left\langle jl|ki \right\rangle = \left\langle lj|ik \right\rangle = \left\langle ki|jl \right\rangle = \left\langle ik|lj \right\rangle
+
+These permutational symmetries arise from the mathematical properties of the two-electron repulsion integrals.
+When accessing specific elements with ``get_two_body_element(i, j, k, l)``, the function handles the appropriate index mapping to retrieve the correct value based on the implementation's storage format.
 
 .. tab:: C++ API
 
    .. code-block:: cpp
 
-      // Access alpha one-electron integrals
+      // Access one-electron integrals, returns tuple of const Eigen::MatrixXd&
+      // For restricted hamiltonians, these point to the same data
       auto [h1_alpha, h1_beta] = hamiltonian.get_one_body_integrals();
 
-      // Access all two-electron integrals
+      // Access two-electron integrals, returns triple of const Eigen::VectorXd&
+      // For restricted hamiltonians, these point to the same data
       auto [h2_aaaa, h2_aabb, h2_bbbb] = hamiltonian.get_two_body_integrals();
 
-      // Access specific two-electron integral channels
+      // Access a specific two-electron integral <ij|kl>
+      double element = hamiltonian.get_two_body_element(i, j, k, l);
+
+      // For unrestricted Hamiltonians, access specific one-electron integral channels
+      double integral_aa = hamiltonian.get_one_body_element(i, j, SpinChannel::aa);
+      double integral_bb = hamiltonian.get_one_body_element(i, j, SpinChannel::bb);
+
+      // For unrestricted Hamiltonians, access specific two-electron integral channels
       double integral_aaaa = hamiltonian.get_two_body_element(i, j, k, l, SpinChannel::aaaa);
       double integral_aabb = hamiltonian.get_two_body_element(i, j, k, l, SpinChannel::aabb);
       double integral_bbbb = hamiltonian.get_two_body_element(i, j, k, l, SpinChannel::bbbb);
 
-      // Access inactive Fock matrices
-      auto fock_alpha = hamiltonian.get_inactive_fock_matrix_alpha();
-      auto fock_beta = hamiltonian.get_inactive_fock_matrix_beta();
+      // Get core energy (nuclear repulsion + inactive orbital energy), returns double
+      auto core_energy = hamiltonian.get_core_energy();
+
+      // Get inactive Fock matrix (if available), returns tuple of  const Eigen::MatrixXd&
+      if (hamiltonian.has_inactive_fock_matrix()) {
+          auto [inactive_fock_alpha, inactive_fock_beta] = hamiltonian.get_inactive_fock_matrix();
+      }
+
+      // Get orbital data, returns const Orbitals&
+      const auto& orbitals = hamiltonian.get_orbitals();
+
+      // Get active space information, returns const std::vector<size_t>&
+      auto active_indices = hamiltonian.get_selected_orbital_indices();
+      // Returns size_t
+      auto num_electrons = hamiltonian.get_num_electrons();
+      // Returns size_t
+      auto num_orbitals = hamiltonian.get_num_orbitals();
 
 .. tab:: Python API
 
-   .. code-block:: python
+   .. note::
+      This example shows the API pattern. For complete working examples, see the test suite.
 
-      # Access alpha one-electron integrals
-      h1_alpha, h1_beta = h_unrestricted.get_one_body_integrals()
+   .. literalinclude:: ../../../../examples/hamiltonian.py
+      :language: python
+      :lines: 18-32
 
-      # Access all two-electron integrals
-      h2_aaaa, h2_aabb, h2_bbbb = h_unrestricted.get_two_body_integrals()
-
-      # Access specific one-electron integral channels
+      # For unrestricted Hamiltonians, access specific one-electron integral channels
       integral_aa = hamiltonian.get_one_body_element(i, j, SpinChannel.aa)
       integral_bb = hamiltonian.get_one_body_element(i, j, SpinChannel.bb)
 
-      # Access specific two-electron integral channels
+      # For unrestricted Hamiltonians, access specific two-electron integral channels
       integral_aaaa = hamiltonian.get_two_body_element(i, j, k, l, SpinChannel.aaaa)
       integral_aabb = hamiltonian.get_two_body_element(i, j, k, l, SpinChannel.aabb)
       integral_bbbb = hamiltonian.get_two_body_element(i, j, k, l, SpinChannel.bbbb)
 
-      # Access inactive Fock matrices
-      fock_alpha = h_unrestricted.get_inactive_fock_matrix_alpha()
-      fock_beta = h_unrestricted.get_inactive_fock_matrix_beta()
+      # Access fock matrices for alpha and beta
+      fock_alpha, fock_beta = h_unrestricted.get_inactive_fock_matrix()
 
-.. note::
-   For restricted Hamiltonians, the spin-separated accessors return the same data for both alpha and beta channels.
-   The ``get_two_body_integrals()`` method always returns a tuple of three components (aaaa, aabb, bbbb),
-   which are identical for restricted cases. Likewise for ``get_one_body_integrals()``, which returns a tuple (aa,bb)
-   where these are identical for restricted cases.
+      # Get orbital data
+      orbitals = hamiltonian.get_orbitals()
 
-Serialization
--------------
-
-The ``Hamiltonian`` class supports serialization to and from JSON and HDF5 formats.
-For detailed information about serialization in QDK/Chemistry, see the :doc:`Serialization <../advanced/serialization>` documentation.
-
-.. note::
-   All Hamiltonian-related files should follow a consistent naming convention, such as
-   ``molecule.hamiltonian.json`` and ``molecule.hamiltonian.h5`` for JSON and HDF5 files respectively.
+      # Get active space information
+      active_indices = hamiltonian.get_selected_orbital_indices()
+      num_electrons = hamiltonian.get_num_electrons()
+      num_orbitals = hamiltonian.get_num_orbitals()
 
 File formats
 ~~~~~~~~~~~~

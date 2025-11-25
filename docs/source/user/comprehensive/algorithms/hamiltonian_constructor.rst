@@ -27,6 +27,7 @@ The ``HamiltonianConstructor`` in QDK/Chemistry provides:
 
 Creating a HamiltonianConstructor
 ---------------------------------
+TODO PVG why are there docs for hamiltonian and hamiltonian constructor...
 
 The ``HamiltonianConstructor`` is created using the factory pattern.
 This constructor is used to create a :doc:`Hamiltonian <../data/hamiltonian>` object from a set of :doc:`Orbitals <../data/orbitals>`.
@@ -42,9 +43,10 @@ The orbitals provide the necessary information about the molecular system includ
       // Create the default HamiltonianConstructor instance
       auto hamiltonian_constructor = HamiltonianConstructorFactory::create();
 
+THIS DUPLCIATES THE HAMILTONIAN EXAMPLE.
 .. tab:: Python API
 
-   .. literalinclude:: ../../../../examples/hamiltonian_constructor.py
+   .. literalinclude:: ../../../../examples/hamiltonian.py
       :language: python
       :lines: 3-
 

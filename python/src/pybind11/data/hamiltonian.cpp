@@ -84,10 +84,14 @@ Values:
 Enumeration for different spin channels in unrestricted calculations.
 
 Values:
-    aaaa: Alpha-alpha-alpha-alpha spin channel
-    aabb: Alpha-beta-alpha-beta spin channel
-    bbbb: Beta-beta-beta-beta spin channel
+    aa: Alpha-alpha spin channel (for one-body integrals)
+    bb: Beta-beta spin channel (for one-body integrals)
+    aaaa: Alpha-alpha-alpha-alpha spin channel (for two-body integrals)
+    aabb: Alpha-beta-alpha-beta spin channel (for two-body integrals)
+    bbbb: Beta-beta-beta-beta spin channel (for two-body integrals)
 )")
+      .value("aa", SpinChannel::aa)
+      .value("bb", SpinChannel::bb)
       .value("aaaa", SpinChannel::aaaa)
       .value("aabb", SpinChannel::aabb)
       .value("bbbb", SpinChannel::bbbb);
@@ -337,6 +341,21 @@ Returns:
 Examples:
     >>> e_core = hamiltonian.get_core_energy()
     >>> print(f"Core energy: {e_core} hartree")
+)");
+
+  hamiltonian.def("has_inactive_fock_matrix",
+                  &Hamiltonian::has_inactive_fock_matrix,
+                  R"(
+Check if inactive fock matrix is available.
+
+Returns:
+    bool: True if fock matrix is available.
+
+Examples:
+    >>> if hamiltonian.has_inactive_fock_matrix():
+    ...    alpha_fock, beta_fock = get_inactive_fock_matrix()
+    ... else:
+    ...     print("Inactive fock matrix is not available")
 )");
 
   bind_getter_as_property(hamiltonian, "get_inactive_fock_matrix",
