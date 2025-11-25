@@ -92,7 +92,7 @@ std::shared_ptr<data::Hamiltonian> HamiltonianConstructor::_run_impl(
   auto active_indices_alpha = active_space_indices.first;
   auto active_indices_beta = active_space_indices.second;
 
-  if (active_indices_alpha.empty() && active_indices_beta.empty()) {
+  if (active_indices_alpha.empty() || active_indices_beta.empty()) {
     throw std::runtime_error(
         "Need to specify an active space for alpha and beta.");
   }
@@ -174,10 +174,7 @@ std::shared_ptr<data::Hamiltonian> HamiltonianConstructor::_run_impl(
   Eigen::MatrixXd Ca_active(num_atomic_orbitals, nactive_alpha);
   Eigen::MatrixXd Cb_active(num_atomic_orbitals, nactive_beta);
 
-  if (active_indices_alpha.empty()) {
-    // If no active orbitals are specified, throw
-    throw std::runtime_error("Need an active space for calculation.");
-  } else if (alpha_space_is_contiguous) {
+  if (alpha_space_is_contiguous) {
     // Contiguous alpha indices
     Ca_active = Ca.block(0, active_indices_alpha.front(), num_atomic_orbitals,
                          nactive_alpha);
@@ -188,10 +185,7 @@ std::shared_ptr<data::Hamiltonian> HamiltonianConstructor::_run_impl(
     }
   }
 
-  if (active_indices_beta.empty()) {
-    // If no active orbitals are specified, throw
-    throw std::runtime_error("Need an active space for calculation.");
-  } else if (beta_space_is_contiguous) {
+  if (beta_space_is_contiguous) {
     // Contiguous beta indices
     Cb_active = Cb.block(0, active_indices_beta.front(), num_atomic_orbitals,
                          nactive_beta);
@@ -259,32 +253,6 @@ std::shared_ptr<data::Hamiltonian> HamiltonianConstructor::_run_impl(
                     Cb_active_rm.data(),  // 3rd quarter: beta
                     Cb_active_rm.data(),  // 4th quarter: beta
                     moeri_bbbb.data());
-  }
-
-  // Early exit
-  if (active_indices_alpha.empty() && active_indices_beta.empty()) {
-    // If no active orbitals are specified, use all orbitals
-    if (is_restricted_calc) {
-      // Use restricted constructor
-      Eigen::MatrixXd H_active(nactive, nactive);
-      H_active = Ca.transpose() * H_full * Ca;
-      Eigen::MatrixXd dummy_fock = Eigen::MatrixXd::Zero(0, 0);
-      return std::make_shared<data::Hamiltonian>(
-          H_active, moeri_aaaa, orbitals,
-          structure->calculate_nuclear_repulsion_energy(), dummy_fock);
-    } else {
-      // Use unrestricted constructor
-      Eigen::MatrixXd H_active_alpha(nactive, nactive);
-      Eigen::MatrixXd H_active_beta(nactive, nactive);
-      H_active_alpha = Ca.transpose() * H_full * Ca;
-      H_active_beta = Cb.transpose() * H_full * Cb;
-      Eigen::MatrixXd dummy_fock_alpha = Eigen::MatrixXd::Zero(0, 0);
-      Eigen::MatrixXd dummy_fock_beta = Eigen::MatrixXd::Zero(0, 0);
-      return std::make_shared<data::Hamiltonian>(
-          H_active_alpha, H_active_beta, moeri_aaaa, moeri_bbaa, moeri_bbbb,
-          orbitals, structure->calculate_nuclear_repulsion_energy(),
-          dummy_fock_alpha, dummy_fock_beta);
-    }
   }
 
   // Get inactive space indices for both alpha and beta
