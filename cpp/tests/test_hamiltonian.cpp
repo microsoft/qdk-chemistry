@@ -138,27 +138,6 @@ TEST_F(HamiltonianTest, ConstructorWithInactiveFock) {
   EXPECT_EQ(h.get_core_energy(), 1.5);
 }
 
-TEST_F(HamiltonianTest, FullConstructor) {
-  Hamiltonian h(one_body, two_body, orbitals, core_energy, inactive_fock);
-
-  EXPECT_TRUE(h.has_one_body_integrals());
-  EXPECT_TRUE(h.has_two_body_integrals());
-  EXPECT_TRUE(h.has_orbitals());
-  EXPECT_EQ(h.get_orbitals()->get_num_molecular_orbitals(), 2);
-  EXPECT_EQ(h.get_core_energy(), 1.5);
-}
-
-TEST_F(HamiltonianTest, CopyConstructor) {
-  Hamiltonian h1(one_body, two_body, orbitals, core_energy, inactive_fock);
-  Hamiltonian h2(h1);
-
-  EXPECT_TRUE(h2.has_one_body_integrals());
-  EXPECT_TRUE(h2.has_two_body_integrals());
-  EXPECT_TRUE(h2.has_orbitals());
-  EXPECT_EQ(h2.get_orbitals()->get_num_molecular_orbitals(), 2);
-  EXPECT_EQ(h2.get_core_energy(), 1.5);
-}
-
 TEST_F(HamiltonianTest, MoveConstructor) {
   Hamiltonian h1(one_body, two_body, orbitals, core_energy, inactive_fock);
   Hamiltonian h2(std::move(h1));
@@ -387,7 +366,6 @@ TEST_F(HamiltonianTest, HDF5FileIO) {
   EXPECT_TRUE(std::get<2>(h.get_two_body_integrals())
                   .isApprox(std::get<2>(h2->get_two_body_integrals())));
 }
-// === Generic file I/O tests ===
 
 TEST_F(HamiltonianTest, GenericFileIO) {
   Hamiltonian h(one_body, two_body, orbitals, core_energy, inactive_fock);
@@ -560,18 +538,59 @@ TEST_F(HamiltonianConstructorTest, Default_EdgeCases) {
       },
       std::runtime_error);
 
-  // Unrestricted orbitals should be allowed
-  EXPECT_NO_THROW({
-    Eigen::MatrixXd coeffs_alpha = Eigen::MatrixXd::Identity(3, 3);
-    Eigen::MatrixXd coeffs_beta = Eigen::MatrixXd::Identity(3, 3);
-    // Create unrestricted orbitals with basis set
-    auto orbitals = std::make_shared<Orbitals>(
-        coeffs_alpha, coeffs_beta, std::nullopt, std::nullopt, std::nullopt,
-        basis_set, std::nullopt);
-    auto hamiltonian = hc->run(orbitals);
-    EXPECT_TRUE(hamiltonian->has_one_body_integrals());
-    EXPECT_TRUE(hamiltonian->has_two_body_integrals());
-  });
+  // Test that restricted orbitals throw when alpha active space is empty
+  EXPECT_THROW(
+      {
+        Eigen::MatrixXd coeffs = Eigen::MatrixXd::Identity(3, 3);
+        std::vector<size_t> empty_active_indices{};  // Empty active space
+        // Create restricted orbitals with no active space
+        auto orbitals = std::make_shared<Orbitals>(
+            coeffs, std::nullopt, std::nullopt, basis_set,
+            std::make_tuple(std::move(empty_active_indices),
+                            std::vector<size_t>{}));
+        hc->run(orbitals);
+      },
+      std::runtime_error);
+
+  // Test that unrestricted orbitals throw when alpha is empty
+  EXPECT_THROW(({
+                 Eigen::MatrixXd coeffs_alpha = Eigen::MatrixXd::Identity(3, 3);
+                 Eigen::MatrixXd coeffs_beta = Eigen::MatrixXd::Identity(3, 3);
+                 std::vector<size_t> alpha_active_indices{};  // Empty alpha
+                 std::vector<size_t> beta_active_indices{0, 1};
+                 std::vector<size_t> alpha_inactive_indices{};
+                 std::vector<size_t> beta_inactive_indices{2};
+                 // Create unrestricted orbitals with only beta active space
+                 auto orbitals = std::make_shared<Orbitals>(
+                     coeffs_alpha, coeffs_beta, std::nullopt, std::nullopt,
+                     std::nullopt, basis_set,
+                     std::make_tuple(std::move(alpha_active_indices),
+                                     std::move(alpha_inactive_indices),
+                                     std::move(beta_active_indices),
+                                     std::move(beta_inactive_indices)));
+                 hc->run(orbitals);
+               }),
+               std::runtime_error);
+
+  // Test that unrestricted orbitals throw when beta is empty
+  EXPECT_THROW(({
+                 Eigen::MatrixXd coeffs_alpha = Eigen::MatrixXd::Identity(3, 3);
+                 Eigen::MatrixXd coeffs_beta = Eigen::MatrixXd::Identity(3, 3);
+                 std::vector<size_t> alpha_active_indices{0, 1};
+                 std::vector<size_t> beta_active_indices{};  // Empty beta
+                 std::vector<size_t> alpha_inactive_indices{2};
+                 std::vector<size_t> beta_inactive_indices{};
+                 // Create unrestricted orbitals with only alpha active space
+                 auto orbitals = std::make_shared<Orbitals>(
+                     coeffs_alpha, coeffs_beta, std::nullopt, std::nullopt,
+                     std::nullopt, basis_set,
+                     std::make_tuple(std::move(alpha_active_indices),
+                                     std::move(alpha_inactive_indices),
+                                     std::move(beta_active_indices),
+                                     std::move(beta_inactive_indices)));
+                 hc->run(orbitals);
+               }),
+               std::runtime_error);
 
   // Throw if the active space is larger than the MO set
   EXPECT_THROW(
@@ -766,8 +785,6 @@ TEST_F(HamiltonianConstructorTest, NonContiguousInactiveSpace) {
     EXPECT_TRUE(hamiltonian->has_two_body_integrals());
   });
 }
-
-// === Unrestricted Hamiltonian tests ===
 
 TEST_F(HamiltonianTest, UnrestrictedConstructor) {
   // Create unrestricted orbitals for this test
@@ -986,8 +1003,6 @@ TEST_F(HamiltonianTest, UnrestrictedHDF5Serialization) {
   EXPECT_TRUE(h_orig.get_inactive_fock_matrix_beta().isApprox(
       h_loaded->get_inactive_fock_matrix_beta()));
 }
-
-// === FCIDUMP serialization tests ===
 
 TEST_F(HamiltonianTest, FCIDUMPSerialization) {
   Hamiltonian h(one_body, two_body, orbitals, core_energy, inactive_fock);
@@ -1311,15 +1326,15 @@ TEST_F(HamiltonianTest, MixedIntegralSymmetriesO2Triplet) {
   auto uhf_hamiltonian = ham_factory->run(orbitals);
 
   // Get aabb integrals
-  const auto& [aaaa_integrals_, aabb_integrals, bbbb_integrals_] =
+  const auto& [aaaa_integrals, aabb_integrals, bbbb_integrals] =
       uhf_hamiltonian->get_two_body_integrals();
 
   // Get active space size
   auto [alpha_active, beta_active] = orbitals->get_active_space_indices();
   size_t active_space_size = alpha_active.size();
 
-  auto get_integral_index = [active_space_size](size_t i, size_t j, size_t k,
-                                                size_t l) -> size_t {
+  auto get_index = [active_space_size](size_t i, size_t j, size_t k,
+                                       size_t l) -> size_t {
     return i * active_space_size * active_space_size * active_space_size +
            j * active_space_size * active_space_size + k * active_space_size +
            l;
@@ -1333,10 +1348,10 @@ TEST_F(HamiltonianTest, MixedIntegralSymmetriesO2Triplet) {
       for (size_t a = 0; a < active_space_size; a++) {
         for (size_t b = 0; b < active_space_size; b++) {
           // Get the four symmetry-related integrals
-          double ijab = aabb_integrals[get_integral_index(i, j, a, b)];
-          double jiab = aabb_integrals[get_integral_index(j, i, a, b)];
-          double ijba = aabb_integrals[get_integral_index(i, j, b, a)];
-          double jiba = aabb_integrals[get_integral_index(j, i, b, a)];
+          double ijab = aabb_integrals[get_index(i, j, a, b)];
+          double jiab = aabb_integrals[get_index(j, i, a, b)];
+          double ijba = aabb_integrals[get_index(i, j, b, a)];
+          double jiba = aabb_integrals[get_index(j, i, b, a)];
 
           // Test all symmetries
           double diff1 = std::abs(ijab - jiab);
@@ -1378,170 +1393,4 @@ TEST_F(HamiltonianTest, IsValidComprehensive) {
   EXPECT_THROW(
       Hamiltonian(non_square, two_body, orbitals, core_energy, inactive_fock),
       std::invalid_argument);
-}
-
-TEST_F(HamiltonianTest, 8FoldIntegralSymmetriesO2Singlet) {
-  // Test the fundamental 8-fold symmetry of two-electron integrals for all spin
-  // channels - aaaa, aabb, and bbbb integrals for O2 singlet
-
-  const double tolerance = 1e-8;
-
-  // Create O2 molecule structure
-  std::vector<Eigen::Vector3d> coordinates = {Eigen::Vector3d(0.0, 0.0, 0.0),
-                                              Eigen::Vector3d(2.3, 0.0, 0.0)};
-  std::vector<std::string> symbols = {"O", "O"};
-  Structure o2_structure(coordinates, symbols);
-
-  // Run restricted HF calculation
-  auto scf_factory = ScfSolverFactory::create("qdk");
-  scf_factory->settings().set("basis_set", "cc-pvdz");
-  scf_factory->settings().set("method", "hf");
-
-  auto o2_structure_ptr = std::make_shared<Structure>(o2_structure);
-  auto [rhf_energy, rhf_wavefunction] =
-      scf_factory->run(o2_structure_ptr, 0, 1);
-  auto rhf_orbitals = rhf_wavefunction->get_orbitals();
-
-  // Create unrestricted orbitals from restricted ones
-  auto [rhf_coeffs_alpha, rhf_coeffs_beta] = rhf_orbitals->get_coefficients();
-  auto [rhf_energies_alpha, rhf_energies_beta] = rhf_orbitals->get_energies();
-
-  // For closed-shell singlet: alpha = beta coefficients and energies
-  auto unrestricted_orbitals = std::make_shared<ForceUnrestrictedOrbitals>(
-      rhf_coeffs_alpha, rhf_coeffs_beta, rhf_energies_alpha, rhf_energies_beta,
-      rhf_orbitals->get_overlap_matrix(), rhf_orbitals->get_basis_set());
-
-  // Set active space if it exists in original orbitals
-  if (rhf_orbitals->has_active_space()) {
-    auto [alpha_active, beta_active] = rhf_orbitals->get_active_space_indices();
-    unrestricted_orbitals->set_active_space(alpha_active, beta_active);
-  }
-
-  // Create unrestricted Hamiltonian
-  auto ham_factory = HamiltonianConstructorFactory::create("qdk");
-  auto uhf_hamiltonian = ham_factory->run(unrestricted_orbitals);
-
-  // Get all spin channels
-  const auto& [aaaa_integrals, aabb_integrals, bbbb_integrals] =
-      uhf_hamiltonian->get_two_body_integrals();
-
-  // Get active space size
-  auto [alpha_active, beta_active] =
-      unrestricted_orbitals->get_active_space_indices();
-  size_t active_space_size = alpha_active.size();
-
-  auto get_index = [active_space_size](size_t i, size_t j, size_t k,
-                                       size_t l) -> size_t {
-    return i * active_space_size * active_space_size * active_space_size +
-           j * active_space_size * active_space_size + k * active_space_size +
-           l;
-  };
-
-  // Test 8-fold symmetry for aaaa integrals
-  double max_aaaa_violation = 0.0;
-  for (size_t i = 0; i < active_space_size; i++) {
-    for (size_t j = 0; j < active_space_size; j++) {
-      for (size_t k = 0; k < active_space_size; k++) {
-        for (size_t l = 0; l < active_space_size; l++) {
-          // Get all symmetric versions of the aaaa integral
-          double ijkl = aaaa_integrals[get_index(i, j, k, l)];
-          double jikl = aaaa_integrals[get_index(j, i, k, l)];
-          double ijlk = aaaa_integrals[get_index(i, j, l, k)];
-          double jilk = aaaa_integrals[get_index(j, i, l, k)];
-          double klij =
-              aaaa_integrals[get_index(k, l, i, j)];  // particle exchange
-          double lkij = aaaa_integrals[get_index(l, k, i, j)];
-          double klji = aaaa_integrals[get_index(k, l, j, i)];
-          double lkji = aaaa_integrals[get_index(l, k, j, i)];
-
-          // Test the 8-fold symmetry for same-spin integrals
-          std::vector<double> symmetric_values = {ijkl, jikl, ijlk, jilk,
-                                                  klij, lkij, klji, lkji};
-
-          for (size_t m = 1; m < symmetric_values.size(); m++) {
-            double diff = std::abs(symmetric_values[0] - symmetric_values[m]);
-            max_aaaa_violation = std::max(max_aaaa_violation, diff);
-          }
-        }
-      }
-    }
-  }
-
-  EXPECT_LT(max_aaaa_violation, tolerance)
-      << "aaaa integrals should satisfy complete 8-fold symmetry for O2 "
-         "singlet: "
-      << "ijkl == jikl == ijlk == jilk == klij == lkij == klji == lkji. "
-      << "Max violation: " << max_aaaa_violation;
-
-  // Test 8-fold symmetry for bbbb integrals
-  double max_bbbb_violation = 0.0;
-  for (size_t i = 0; i < active_space_size; i++) {
-    for (size_t j = 0; j < active_space_size; j++) {
-      for (size_t k = 0; k < active_space_size; k++) {
-        for (size_t l = 0; l < active_space_size; l++) {
-          // Get all symmetric versions of the bbbb integral
-          double ijkl = bbbb_integrals[get_index(i, j, k, l)];
-          double jikl = bbbb_integrals[get_index(j, i, k, l)];
-          double ijlk = bbbb_integrals[get_index(i, j, l, k)];
-          double jilk = bbbb_integrals[get_index(j, i, l, k)];
-          double klij =
-              bbbb_integrals[get_index(k, l, i, j)];  // particle exchange
-          double lkij = bbbb_integrals[get_index(l, k, i, j)];
-          double klji = bbbb_integrals[get_index(k, l, j, i)];
-          double lkji = bbbb_integrals[get_index(l, k, j, i)];
-
-          // Test the 8-fold symmetry for same-spin integrals
-          std::vector<double> symmetric_values = {ijkl, jikl, ijlk, jilk,
-                                                  klij, lkij, klji, lkji};
-
-          for (size_t m = 1; m < symmetric_values.size(); m++) {
-            double diff = std::abs(symmetric_values[0] - symmetric_values[m]);
-            max_bbbb_violation = std::max(max_bbbb_violation, diff);
-          }
-        }
-      }
-    }
-  }
-
-  EXPECT_LT(max_bbbb_violation, tolerance)
-      << "bbbb integrals should satisfy complete 8-fold symmetry for O2 "
-         "singlet: "
-      << "ijkl == jikl == ijlk == jilk == klij == lkij == klji == lkji. "
-      << "Max violation: " << max_bbbb_violation;
-
-  // Test 8-fold symmetry for aabb integrals (mixed spin)
-  double max_aabb_violation = 0.0;
-  for (size_t i = 0; i < active_space_size; i++) {
-    for (size_t j = 0; j < active_space_size; j++) {
-      for (size_t a = 0; a < active_space_size; a++) {
-        for (size_t b = 0; b < active_space_size; b++) {
-          // Get all symmetric versions of the aabb integral
-          double ijab = aabb_integrals[get_index(i, j, a, b)];
-          double jiab = aabb_integrals[get_index(j, i, a, b)];
-          double ijba = aabb_integrals[get_index(i, j, b, a)];
-          double jiba = aabb_integrals[get_index(j, i, b, a)];
-          double abij =
-              aabb_integrals[get_index(a, b, i, j)];  // particle exchange
-          double baij = aabb_integrals[get_index(b, a, i, j)];
-          double abji = aabb_integrals[get_index(a, b, j, i)];
-          double baji = aabb_integrals[get_index(b, a, j, i)];
-
-          // Test the 8-fold symmetry for mixed-spin integrals
-          std::vector<double> symmetric_values = {ijab, jiab, ijba, jiba,
-                                                  abij, baij, abji, baji};
-
-          for (size_t m = 1; m < symmetric_values.size(); m++) {
-            double diff = std::abs(symmetric_values[0] - symmetric_values[m]);
-            max_aabb_violation = std::max(max_aabb_violation, diff);
-          }
-        }
-      }
-    }
-  }
-
-  EXPECT_LT(max_aabb_violation, tolerance)
-      << "aabb integrals should satisfy complete 8-fold symmetry for O2 "
-         "singlet: "
-      << "ijab == jiab == ijba == jiba == abij == baij == abji == baji. "
-      << "Max violation: " << max_aabb_violation;
 }

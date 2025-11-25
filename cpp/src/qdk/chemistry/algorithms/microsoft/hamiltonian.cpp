@@ -92,7 +92,10 @@ std::shared_ptr<data::Hamiltonian> HamiltonianConstructor::_run_impl(
   auto active_indices_alpha = active_space_indices.first;
   auto active_indices_beta = active_space_indices.second;
 
-  if (active_indices_alpha.empty() || active_indices_beta.empty()) {
+  if (orbitals->is_restricted() && active_indices_alpha.empty()) {
+    throw std::runtime_error("Need to specify an active space.");
+  } else if (orbitals->is_unrestricted() &&
+             (active_indices_alpha.empty() || active_indices_beta.empty())) {
     throw std::runtime_error(
         "Need to specify an active space for alpha and beta.");
   }
