@@ -60,7 +60,6 @@ Hamiltonian object should be considered constant and not modified:
    .. code-block:: cpp
 
       // Create a Hamiltonian constructor
-      // Returns std::shared_ptr<HamiltonianConstructor>
       auto hamiltonian_constructor = HamiltonianConstructorFactory::create();
 
       // Set active orbitals if needed
@@ -68,21 +67,14 @@ Hamiltonian object should be considered constant and not modified:
       hamiltonian_constructor->settings().set("active_orbitals", active_orbitals);
 
       // Construct the Hamiltonian from orbitals
-      // Returns Hamiltonian
-      auto hamiltonian = hamiltonian_constructor->run(orbitals);
-
-      // Alternatively, create a Hamiltonian directly
-      Hamiltonian direct_hamiltonian(one_body_integrals, two_body_integrals, orbitals,
-                                   selected_orbital_indices, num_electrons, core_energy);
+      // (assuming 'orbitals' object exists from prior calculation)
+      // auto hamiltonian = hamiltonian_constructor->run(orbitals);
 
 .. tab:: Python API
 
-   .. note::
-      This example shows the API pattern. For complete working examples, see the test suite.
-
    .. literalinclude:: ../../../../examples/hamiltonian.py
       :language: python
-      :lines: 3-16
+      :lines: 15-24
 
 Creating an unrestricted Hamiltonian
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -93,46 +85,46 @@ Unrestricted Hamiltonians can be created using a specialized constructor that ac
 
    .. code-block:: cpp
 
-      // Create unrestricted Hamiltonian with spin-separated integrals
-      Hamiltonian unrestricted_hamiltonian(
-          one_body_integrals_alpha,      // Alpha one-electron integrals
-          one_body_integrals_beta,       // Beta one-electron integrals
-          two_body_integrals_aaaa,       // Alpha-alpha two-electron integrals
-          two_body_integrals_aabb,       // Alpha-beta two-electron integrals
-          two_body_integrals_bbbb,       // Beta-beta two-electron integrals
-          orbitals,                      // Orbitals object (should be unrestricted, will throw otherwise)
-          core_energy,                   // Core energy
-          inactive_fock_matrix_alpha,    // Alpha inactive Fock matrix
-          inactive_fock_matrix_beta      // Beta inactive Fock matrix
+      // Create unrestricted integral data (alpha and beta are different)
+      Eigen::MatrixXd one_body_alpha(2, 2);
+      one_body_alpha << 1.0, 0.2, 0.2, 1.5;
+      Eigen::MatrixXd one_body_beta(2, 2);
+      one_body_beta << 1.1, 0.3, 0.3, 1.6;
+
+      // Create spin-separated two-body integrals
+      size_t num_orbitals = 2;
+      Eigen::VectorXd two_body_aaaa = Eigen::VectorXd::Random(num_orbitals * num_orbitals * num_orbitals * num_orbitals);
+      Eigen::VectorXd two_body_aabb = Eigen::VectorXd::Random(num_orbitals * num_orbitals * num_orbitals * num_orbitals);
+      Eigen::VectorXd two_body_bbbb = Eigen::VectorXd::Random(num_orbitals * num_orbitals * num_orbitals * num_orbitals);
+
+      // Inactive Fock matrices (also spin-separated)
+      Eigen::MatrixXd inactive_fock_alpha(2, 2);
+      inactive_fock_alpha << 0.5, 0.1, 0.1, 0.7;
+      Eigen::MatrixXd inactive_fock_beta(2, 2);
+      inactive_fock_beta << 0.6, 0.2, 0.2, 0.8;
+
+      // Construct unrestricted Hamiltonian directly
+      Hamiltonian h_unrestricted(
+          one_body_alpha,
+          one_body_beta,
+          two_body_aaaa,
+          two_body_aabb,
+          two_body_bbbb,
+          unrestricted_orbitals,
+          2.0,                           // Core energy
+          inactive_fock_alpha,
+          inactive_fock_beta
       );
 
       // Check if Hamiltonian is unrestricted
-      bool is_unrestricted = unrestricted_hamiltonian.is_unrestricted();
-      bool is_restricted = unrestricted_hamiltonian.is_restricted();
+      bool is_unrestricted = h_unrestricted.is_unrestricted();
+      bool is_restricted = h_unrestricted.is_restricted();
 
 .. tab:: Python API
 
-   .. code-block:: python
-
-      import numpy as np
-      from qdk_chemistry.data import Hamiltonian, Orbitals
-
-      # Create unrestricted Hamiltonian with spin-separated integrals
-      h_unrestricted = Hamiltonian(
-          one_body_integrals_alpha,      # Alpha one-electron integrals
-          one_body_integrals_beta,       # Beta one-electron integrals
-          two_body_integrals_aaaa,       # Alpha-alpha two-electron integrals
-          two_body_integrals_aabb,       # Alpha-beta two-electron integrals
-          two_body_integrals_bbbb,       # Beta-beta two-electron integrals
-          orbitals,                      # Orbitals object (should be unrestricted, will throw otherwise)
-          core_energy,                   # Core energy
-          inactive_fock_alpha,           # Alpha inactive Fock matrix
-          inactive_fock_beta             # Beta inactive Fock matrix
-      )
-
-      # Check if Hamiltonian is unrestricted
-      is_unrestricted = h_unrestricted.is_unrestricted()
-      is_restricted = h_unrestricted.is_restricted()
+   .. literalinclude:: ../../../../examples/hamiltonian.py
+      :language: python
+      :lines: 30-78
 
 Accessing Hamiltonian data
 --------------------------
@@ -185,61 +177,51 @@ When accessing specific elements with ``get_two_body_element(i, j, k, l)``, the 
       // Access a specific two-electron integral <ij|kl>
       double element = hamiltonian.get_two_body_element(i, j, k, l);
 
-      // For unrestricted Hamiltonians, access specific one-electron integral channels
-      double integral_aa = hamiltonian.get_one_body_element(i, j, SpinChannel::aa);
-      double integral_bb = hamiltonian.get_one_body_element(i, j, SpinChannel::bb);
-
-      // For unrestricted Hamiltonians, access specific two-electron integral channels
-      double integral_aaaa = hamiltonian.get_two_body_element(i, j, k, l, SpinChannel::aaaa);
-      double integral_aabb = hamiltonian.get_two_body_element(i, j, k, l, SpinChannel::aabb);
-      double integral_bbbb = hamiltonian.get_two_body_element(i, j, k, l, SpinChannel::bbbb);
-
-      // Get core energy (nuclear repulsion + inactive orbital energy), returns double
+      // Get core energy (nuclear repulsion + inactive orbital energy)
       auto core_energy = hamiltonian.get_core_energy();
 
-      // Get inactive Fock matrix (if available), returns tuple of  const Eigen::MatrixXd&
+      // Get inactive Fock matrix (if available)
       if (hamiltonian.has_inactive_fock_matrix()) {
           auto [inactive_fock_alpha, inactive_fock_beta] = hamiltonian.get_inactive_fock_matrix();
       }
 
-      // Get orbital data, returns const Orbitals&
+      // Get orbital data
       const auto& orbitals = hamiltonian.get_orbitals();
 
-      // Get active space information, returns const std::vector<size_t>&
+      // Get active space information
       auto active_indices = hamiltonian.get_selected_orbital_indices();
-      // Returns size_t
       auto num_electrons = hamiltonian.get_num_electrons();
-      // Returns size_t
       auto num_orbitals = hamiltonian.get_num_orbitals();
+
+      // For unrestricted Hamiltonians, access specific one-electron integral channels
+      double integral_aa = h_unrestricted.get_one_body_element(0, 0, SpinChannel::aa);
+      double integral_bb = h_unrestricted.get_one_body_element(0, 0, SpinChannel::bb);
+
+      // For unrestricted Hamiltonians, access specific two-electron integral channels
+      double integral_aaaa = h_unrestricted.get_two_body_element(0, 0, 0, 0, SpinChannel::aaaa);
+      double integral_aabb = h_unrestricted.get_two_body_element(0, 0, 0, 0, SpinChannel::aabb);
+      double integral_bbbb = h_unrestricted.get_two_body_element(0, 0, 0, 0, SpinChannel::bbbb);
+
+      // Access fock matrices for alpha and beta
+      auto [fock_alpha, fock_beta] = h_unrestricted.get_inactive_fock_matrix();
+
+      // Get orbital data
+      const auto& orbitals_unrestricted = h_unrestricted.get_orbitals();
+
+      // Get active space information
+      auto active_indices_unrestricted = h_unrestricted.get_selected_orbital_indices();
+      auto num_electrons_unrestricted = h_unrestricted.get_num_electrons();
+      auto num_orbitals_unrestricted = h_unrestricted.get_num_orbitals();
 
 .. tab:: Python API
 
-   .. note::
-      This example shows the API pattern. For complete working examples, see the test suite.
+   .. literalinclude:: ../../../../examples/hamiltonian.py
+      :language: python
+      :lines: 84-110
 
    .. literalinclude:: ../../../../examples/hamiltonian.py
       :language: python
-      :lines: 18-32
-
-      # For unrestricted Hamiltonians, access specific one-electron integral channels
-      integral_aa = hamiltonian.get_one_body_element(i, j, SpinChannel.aa)
-      integral_bb = hamiltonian.get_one_body_element(i, j, SpinChannel.bb)
-
-      # For unrestricted Hamiltonians, access specific two-electron integral channels
-      integral_aaaa = hamiltonian.get_two_body_element(i, j, k, l, SpinChannel.aaaa)
-      integral_aabb = hamiltonian.get_two_body_element(i, j, k, l, SpinChannel.aabb)
-      integral_bbbb = hamiltonian.get_two_body_element(i, j, k, l, SpinChannel.bbbb)
-
-      # Access fock matrices for alpha and beta
-      fock_alpha, fock_beta = h_unrestricted.get_inactive_fock_matrix()
-
-      # Get orbital data
-      orbitals = hamiltonian.get_orbitals()
-
-      # Get active space information
-      active_indices = hamiltonian.get_selected_orbital_indices()
-      num_electrons = hamiltonian.get_num_electrons()
-      num_orbitals = hamiltonian.get_num_orbitals()
+      :lines: 112-127
 
 File formats
 ~~~~~~~~~~~~
@@ -315,28 +297,15 @@ HDF5 representation of a ``Hamiltonian`` object has the following structure (sho
       hamiltonian.to_file("molecule.hamiltonian.json", "json");
       auto hamiltonian_from_file = Hamiltonian::from_file("molecule.hamiltonian.h5", "hdf5");
 
-      // Convert to JSON object
-      // Returns nlohmann::json
+      // Convert to/from JSON object
       nlohmann::json j = hamiltonian.to_json();
-
-      // Load from JSON object
       auto hamiltonian_from_json = Hamiltonian::from_json(j);
 
 .. tab:: Python API
 
-   .. note::
-      This example shows the API pattern.
-      For complete working examples, see the test suite.
-
    .. literalinclude:: ../../../../examples/hamiltonian.py
       :language: python
-      :lines: 34-49
-
-      # Convert to/from JSON in Python
-      import json
-      j = hamiltonian.to_json()
-      j_str = json.dumps(j)
-      hamiltonian_from_json = Hamiltonian.from_json(json.loads(j_str))
+      :lines: 133-153
 
 Active space Hamiltonian
 ------------------------
@@ -355,11 +324,9 @@ The ``Hamiltonian`` class provides methods to check the validity and consistency
    .. code-block:: cpp
 
       // Check if the Hamiltonian data is complete and consistent
-      // Returns bool
       bool valid = hamiltonian.is_valid();
 
       // Check if specific components are available
-      // All return bool
       bool has_one_body = hamiltonian.has_one_body_integrals();
       bool has_two_body = hamiltonian.has_two_body_integrals();
       bool has_orbitals = hamiltonian.has_orbitals();
@@ -367,12 +334,9 @@ The ``Hamiltonian`` class provides methods to check the validity and consistency
 
 .. tab:: Python API
 
-   .. note::
-      This example shows the API pattern. For complete working examples, see the test suite.
-
    .. literalinclude:: ../../../../examples/hamiltonian.py
       :language: python
-      :lines: 51-58
+      :lines: 159-167
 
 Related classes
 ---------------
