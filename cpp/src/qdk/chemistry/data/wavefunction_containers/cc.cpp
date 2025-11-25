@@ -136,6 +136,101 @@ CoupledClusterContainer::CoupledClusterContainer(
     }
   }
 
+  // Helper lambda to get size from VectorVariant
+  auto get_vector_size = [](const VectorVariant& vec) -> size_t {
+    if (std::holds_alternative<Eigen::VectorXd>(vec)) {
+      return std::get<Eigen::VectorXd>(vec).size();
+    } else if (std::holds_alternative<Eigen::VectorXcd>(vec)) {
+      return std::get<Eigen::VectorXcd>(vec).size();
+    }
+    return 0;
+  };
+
+  // Get number of occupied and virtual orbitals from reference determinant
+  auto [n_alpha, n_beta] = references[0].get_n_electrons();
+  size_t active_space_size = orbitals->get_num_molecular_orbitals();
+
+  // For restricted case, use alpha counts
+  size_t n_occ_alpha = n_alpha;
+  size_t n_occ_beta = n_beta;
+  size_t n_vir_alpha = active_space_size - n_occ_alpha;
+  size_t n_vir_beta = active_space_size - n_occ_beta;
+
+  // Validate T1 amplitude sizes
+  if (t1_amplitudes_aa) {
+    size_t expected_t1_aa_size = n_occ_alpha * n_vir_alpha;
+    size_t actual_t1_aa_size = get_vector_size(*t1_amplitudes_aa);
+    if (actual_t1_aa_size != expected_t1_aa_size) {
+      throw std::invalid_argument(
+          "T1 alpha amplitude size mismatch: expected " +
+          std::to_string(expected_t1_aa_size) +
+          " (nocc=" + std::to_string(n_occ_alpha) +
+          " * nvir=" + std::to_string(n_vir_alpha) + "), got " +
+          std::to_string(actual_t1_aa_size));
+    }
+  }
+
+  if (t1_amplitudes_bb) {
+    size_t expected_t1_bb_size = n_occ_beta * n_vir_beta;
+    size_t actual_t1_bb_size = get_vector_size(*t1_amplitudes_bb);
+    if (actual_t1_bb_size != expected_t1_bb_size) {
+      throw std::invalid_argument("T1 beta amplitude size mismatch: expected " +
+                                  std::to_string(expected_t1_bb_size) +
+                                  " (nocc=" + std::to_string(n_occ_beta) +
+                                  " * nvir=" + std::to_string(n_vir_beta) +
+                                  "), got " +
+                                  std::to_string(actual_t1_bb_size));
+    }
+  }
+
+  // Validate T2 amplitude sizes
+  if (t2_amplitudes_abab) {
+    size_t expected_t2_abab_size =
+        n_occ_alpha * n_occ_beta * n_vir_alpha * n_vir_beta;
+    size_t actual_t2_abab_size = get_vector_size(*t2_amplitudes_abab);
+    if (actual_t2_abab_size != expected_t2_abab_size) {
+      throw std::invalid_argument(
+          "T2 alpha-beta amplitude size mismatch: expected " +
+          std::to_string(expected_t2_abab_size) +
+          " (nocc_a=" + std::to_string(n_occ_alpha) +
+          " * nocc_b=" + std::to_string(n_occ_beta) +
+          " * nvir_a=" + std::to_string(n_vir_alpha) +
+          " * nvir_b=" + std::to_string(n_vir_beta) + "), got " +
+          std::to_string(actual_t2_abab_size));
+    }
+  }
+
+  if (t2_amplitudes_aaaa) {
+    size_t expected_t2_aaaa_size =
+        n_occ_alpha * n_occ_alpha * n_vir_alpha * n_vir_alpha;
+    size_t actual_t2_aaaa_size = get_vector_size(*t2_amplitudes_aaaa);
+    if (actual_t2_aaaa_size != expected_t2_aaaa_size) {
+      throw std::invalid_argument(
+          "T2 alpha-alpha amplitude size mismatch: expected " +
+          std::to_string(expected_t2_aaaa_size) +
+          " (nocc=" + std::to_string(n_occ_alpha) +
+          " * nocc=" + std::to_string(n_occ_alpha) +
+          " * nvir=" + std::to_string(n_vir_alpha) +
+          " * nvir=" + std::to_string(n_vir_alpha) + "), got " +
+          std::to_string(actual_t2_aaaa_size));
+    }
+  }
+
+  if (t2_amplitudes_bbbb) {
+    size_t expected_t2_bbbb_size =
+        n_occ_beta * n_occ_beta * n_vir_beta * n_vir_beta;
+    size_t actual_t2_bbbb_size = get_vector_size(*t2_amplitudes_bbbb);
+    if (actual_t2_bbbb_size != expected_t2_bbbb_size) {
+      throw std::invalid_argument(
+          "T2 beta-beta amplitude size mismatch: expected " +
+          std::to_string(expected_t2_bbbb_size) + " (nocc=" +
+          std::to_string(n_occ_beta) + " * nocc=" + std::to_string(n_occ_beta) +
+          " * nvir=" + std::to_string(n_vir_beta) +
+          " * nvir=" + std::to_string(n_vir_beta) + "), got " +
+          std::to_string(actual_t2_bbbb_size));
+    }
+  }
+
   // Store spin-separated amplitudes if provided
   if (t1_amplitudes_aa) {
     _t1_amplitudes_aa = std::make_shared<VectorVariant>(*t1_amplitudes_aa);

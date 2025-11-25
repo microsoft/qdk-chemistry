@@ -51,6 +51,53 @@ TEST_F(CoupledClusterContainerTest, BasicProperties) {
       t2_amplitudes, testing::wf_tolerance));
 }
 
+// Test it throws when amplitude sizes are wrong
+TEST_F(CoupledClusterContainerTest, InvalidAmplitudeSizesThrow) {
+  size_t nocc = 2;
+  size_t nvirt = 2;
+  size_t nmo = nocc + nvirt;
+
+  auto orbitals = testing::create_test_orbitals(nocc + nvirt, 4, true);
+  Configuration ref("2200");
+
+  // Correct sizes: T1 = nocc * nvirt = 4, T2 = nocc * nocc * nvirt * nvirt = 16
+
+  // Test: T1 amplitude with wrong size (too small)
+  Eigen::VectorXd t1_wrong_size = Eigen::VectorXd::Random(2);  // Should be 4
+  Eigen::VectorXd t2_correct = Eigen::VectorXd::Random(16);
+  EXPECT_THROW(
+      CoupledClusterContainer(orbitals, {ref}, t1_wrong_size, t2_correct),
+      std::invalid_argument);
+
+  // Test: T1 amplitude with wrong size (too large)
+  Eigen::VectorXd t1_too_large = Eigen::VectorXd::Random(10);  // Should be 4
+  EXPECT_THROW(
+      CoupledClusterContainer(orbitals, {ref}, t1_too_large, t2_correct),
+      std::invalid_argument);
+
+  // Test: T2 amplitude with wrong size (too small)
+  Eigen::VectorXd t1_correct = Eigen::VectorXd::Random(4);
+  Eigen::VectorXd t2_wrong_size = Eigen::VectorXd::Random(10);  // Should be 16
+  EXPECT_THROW(
+      CoupledClusterContainer(orbitals, {ref}, t1_correct, t2_wrong_size),
+      std::invalid_argument);
+
+  // Test: T2 amplitude with wrong size (too large)
+  Eigen::VectorXd t2_too_large = Eigen::VectorXd::Random(20);  // Should be 16
+  EXPECT_THROW(
+      CoupledClusterContainer(orbitals, {ref}, t1_correct, t2_too_large),
+      std::invalid_argument);
+
+  // Test: Both amplitudes with wrong sizes
+  EXPECT_THROW(
+      CoupledClusterContainer(orbitals, {ref}, t1_wrong_size, t2_wrong_size),
+      std::invalid_argument);
+
+  // Test: Correct sizes should not throw
+  EXPECT_NO_THROW(
+      CoupledClusterContainer(orbitals, {ref}, t1_correct, t2_correct));
+}
+
 // Test JSON serialization/deserialization
 TEST_F(CoupledClusterContainerTest, JsonSerializationSpatial) {
   size_t nocc = 2;

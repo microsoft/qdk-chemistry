@@ -36,7 +36,7 @@ std::unique_ptr<WavefunctionContainer> MP2Container::clone() const {
 }
 
 std::shared_ptr<Orbitals> MP2Container::get_orbitals() const {
-  return MP2Container::get_hamiltonian()->get_orbitals();
+  return _hamiltonian->get_orbitals();
 }
 
 std::shared_ptr<Hamiltonian> MP2Container::get_hamiltonian() const {

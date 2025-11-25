@@ -799,8 +799,8 @@ class TestWavefunctionSerialization:
             Wavefunction.from_hdf5_file("non_existent.h5")
 
 
-class TestMP2Container:
-    """Test the MP2Container wavefunction container."""
+class TestWavefunctionRdmIntegraion:
+    """Test integration of RDMs within the Wavefunction class."""
 
     def test_rdm_n2_singlet_6_6(self):
         """Test RDM properties for N2 singlet 6e 6o wavefunction."""
@@ -977,6 +977,7 @@ class TestMP2Container:
         inactive_fock = np.eye(0)  # Empty inactive Fock matrix
         return Hamiltonian(h1e, h2e.flatten(), basic_orbitals, core_energy, inactive_fock)
 
+class TestMP2Container:
     def test_mp2_container_construction(self, basic_hamiltonian):
         """Test MP2Container construction with lazy evaluation."""
         ref = Configuration("220")  # Two electrons in first two orbitals
@@ -1029,8 +1030,10 @@ class TestCCContainer:
         references = [ref]
 
         # Create dummy amplitudes for 2 occupied, 1 virtual orbital
-        t1 = np.array([[0.01], [0.02]])
-        t2 = np.array([0.001])
+        # T1: nocc * nvir = 2 * 1 = 2
+        t1 = np.array([0.01, 0.02])
+        # T2: nocc * nocc * nvir * nvir = 2 * 2 * 1 * 1 = 4
+        t2 = np.array([0.001, 0.002, 0.003, 0.004])
 
         # Enable amplitude storage
         cc_container = CoupledClusterContainer(basic_orbitals, references, t1, t2)
@@ -1056,8 +1059,10 @@ class TestCCContainer:
         references = [ref]
 
         # Create dummy amplitudes
-        t1 = np.array([[0.01], [0.02]])
-        t2 = np.array([0.001])
+        # T1: nocc * nvir = 2 * 1 = 2
+        t1 = np.array([0.01, 0.02])
+        # T2: nocc * nocc * nvir * nvir = 2 * 2 * 1 * 1 = 4
+        t2 = np.array([0.001, 0.002, 0.003, 0.004])
 
         cc_container = CoupledClusterContainer(basic_orbitals, references, t1, t2)
         wf = Wavefunction(cc_container)
