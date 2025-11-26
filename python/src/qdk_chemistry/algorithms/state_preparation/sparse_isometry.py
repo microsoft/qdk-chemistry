@@ -252,7 +252,8 @@ class SparseIsometryGF2XStatePreparation(StatePreparation):
                 * N is the number of qubits (rows)
                 * k is the number of determinants (columns)
 
-            The matrix follows Qiskit circuit top-down convention with row ordering "q[0]...q[N-1]" (qubit 0 at the top).
+            The matrix follows Qiskit circuit top-down convention with row ordering "q[0]...q[N-1]"
+            (qubit 0 at the top).
 
         Note:
             The input bitstrings are in Qiskit little endian order ("q[N-1]...q[0]"),
