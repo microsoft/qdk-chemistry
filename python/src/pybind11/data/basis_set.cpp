@@ -156,7 +156,7 @@ Get number of atomic orbitals this shell contributes.
 
 Args:
     atomic_orbital_type (Optional[AOType]): Whether to use spherical (2l+1) or Cartesian functions.
-    Default is Spherical
+        Default is Spherical
 
 Returns:
     int: Number of atomic orbitals

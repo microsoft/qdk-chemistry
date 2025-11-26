@@ -323,7 +323,7 @@ def gf2x_with_tracking(matrix: np.ndarray) -> GF2XEliminationResult:
     especially for certain types of matrices.
 
     Args:
-        matrix (np.ndarray): shape (m, n), binary (0/1) matrix
+        matrix: shape (m, n), binary (0/1) matrix
 
     Returns:
         A dataclass containing GF2+X elimination results.
@@ -666,10 +666,10 @@ def _remove_zero_rows(matrix: np.ndarray, row_map: list[int]) -> tuple[np.ndarra
 
     Returns:
         A tuple containing:
-            * M_reduced (np.ndarray): New matrix with only non-zero rows
-            * reduced_row_map (list[int]): Updated mapping from reduced matrix
+            * M_reduced: New matrix with only non-zero rows
+            * reduced_row_map: Updated mapping from reduced matrix
               rows to original row indices
-            * rank (int): Number of non-zero rows (matrix rank)
+            * rank: Number of non-zero rows (matrix rank)
 
     Note:
         This function does not modify its input arguments. It creates and returns
