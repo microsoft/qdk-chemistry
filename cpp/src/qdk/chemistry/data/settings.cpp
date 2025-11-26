@@ -344,21 +344,7 @@ SettingValue Settings::convert_json_to_setting_value(
   if (json_obj.is_boolean()) {
     return json_obj.get<bool>();
   } else if (json_obj.is_number_integer()) {
-    // Check if the value fits in int64_t, otherwise use uint64_t
-    auto val = json_obj.get<int64_t>();
-    if (val >= 0) {
-      // Try to get as uint64_t if value is too large for int64_t
-      // nlohmann::json stores numbers as int64_t or uint64_t internally
-      // so we can check the underlying type
-      // If the value is greater than INT64_MAX, get as uint64_t
-      if (json_obj.is_number_unsigned()) {
-        auto uval = json_obj.get<uint64_t>();
-        if (uval > static_cast<uint64_t>(INT64_MAX)) {
-          return uval;
-        }
-      }
-    }
-    return val;
+    return json_obj.get<int64_t>();
   } else if (json_obj.is_number_float()) {
     return json_obj.get<double>();
   } else if (json_obj.is_string()) {
@@ -371,22 +357,8 @@ SettingValue Settings::convert_json_to_setting_value(
 
     // Check the type of the first element to determine vector type
     if (json_obj[0].is_number_integer()) {
-      // Check if any element is negative; if so, use int64_t, else use uint64_t
-      bool has_negative = false;
-      for (const auto& elem : json_obj) {
-        if (!elem.is_number_integer()) {
-          throw std::runtime_error("Mixed types in integer array");
-        }
-        if (elem.get<int64_t>() < 0) {
-          has_negative = true;
-          break;
-        }
-      }
-      if (has_negative) {
-        return json_obj.get<std::vector<int64_t>>();
-      } else {
-        return json_obj.get<std::vector<uint64_t>>();
-      }
+      return json_obj.get<std::vector<int64_t>>();
+    } else if (json_obj[0].is_number_float()) {
       return json_obj.get<std::vector<double>>();
     } else if (json_obj[0].is_string()) {
       return json_obj.get<std::vector<std::string>>();

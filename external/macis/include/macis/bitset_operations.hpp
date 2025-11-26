@@ -204,7 +204,7 @@ uint32_t ffs(const std::bitset<N>& bits) {
     std::bitset<64> high_bits;
     for (size_t i = 0; i < 64; ++i) {
       low_bits[i] = bits[i];
-      if (64 + i < N) high_bits[i] = bits[i + 64];
+      if (i < N - 64) high_bits[i] = bits[i + 64];
     }
     auto low_result = ffsll(fast_to_ullong(low_bits));
     if (low_result) return low_result;
@@ -218,6 +218,7 @@ uint32_t ffs(const std::bitset<N>& bits) {
       if (bits[ind]) return (ind + 1);
     return 0;
   }
+  abort();
 }
 
 /**
