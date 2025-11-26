@@ -129,7 +129,7 @@ for i, results in enumerate(simulation_data.bitstring_counts):
         f"Measurement Results for Hamiltonian Group {i + 1}: {simulation_data.hamiltonians[i].pauli_strings}"
     )
 
-# Print statistic for measured energy
+# Print statistics for the measured energy
 energy_mean = energy_results.energy_expectation_value + hamiltonian.get_core_energy()
 energy_stddev = np.sqrt(energy_results.energy_variance)
 print(
