@@ -12,7 +12,10 @@
 #include <spdlog/spdlog.h>
 
 #include <qdk/chemistry/data/wavefunction_containers/sd.hpp>
-#include <qdk/chemistry/utils/omp_utils.hpp>
+
+#ifdef _OPENMP
+#include <omp.h>
+#endif
 
 // Local implementation details
 #include "utils.hpp"
@@ -114,8 +117,10 @@ std::pair<double, std::shared_ptr<data::Wavefunction>> ScfSolver::_run_impl(
 
   // FP scales poorly with threads
   // TODO: Make this configurable, workitem: 41325
+#ifdef _OPENMP
   auto old_max_threads = omp_get_max_threads();
   // omp_set_num_threads(1);
+#endif
 
   // Turnoff SCF logger
   // std::vector<spdlog::sink_ptr> sinks = {};
@@ -233,7 +238,9 @@ std::pair<double, std::shared_ptr<data::Wavefunction>> ScfSolver::_run_impl(
   auto& context = scf->run();
 
   // Reset threads
+#ifdef _OPENMP
   if (old_max_threads != 1) omp_set_num_threads(old_max_threads);
+#endif
   qcs::util::GAUXCRegistry::clear();
 
   // Handle Return
