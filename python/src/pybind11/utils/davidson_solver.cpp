@@ -11,9 +11,10 @@
 #include <sparsexx/util/submatrix.hpp>
 
 namespace py = pybind11;
-using sparse_csr = sparsexx::csr_matrix<double, int64_t>;
 
-namespace {
+namespace qdk::chemistry::python::utils {
+
+using sparse_csr = sparsexx::csr_matrix<double, int64_t>;
 
 /**
  * @brief Convert a SciPy CSR matrix to a sparsexx CSR matrix.
@@ -21,7 +22,7 @@ namespace {
  * @param py_csr Python object representing a SciPy CSR matrix
  * @return sparsexx CSR matrix
  */
-sparse_csr from_scipy_csr(const py::object& py_csr) {
+inline sparse_csr from_scipy_csr(const py::object& py_csr) {
   // Add basic validation
   if (py_csr.is_none()) {
     throw std::invalid_argument("CSR matrix cannot be None");
@@ -46,13 +47,16 @@ sparse_csr from_scipy_csr(const py::object& py_csr) {
                     std::move(values));
 }
 
-}  // namespace
+}  // namespace qdk::chemistry::python::utils
 
 /**
  * @brief Bind Davidson solver utilities to Python module.
  *
  */
 void bind_davidson_utils(py::module& m) {
+  using qdk::chemistry::python::utils::from_scipy_csr;
+  using qdk::chemistry::python::utils::sparse_csr;
+
   m.def(
       "davidson_solver",
       [](const py::object& csr_matrix, double tol, int max_m) -> py::tuple {
