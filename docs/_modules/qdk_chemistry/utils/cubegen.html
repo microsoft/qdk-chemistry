@@ -119,26 +119,18 @@
 <span class="sd">    This method creates cube files containing the spatial distribution of molecular</span>
 <span class="sd">    orbitals on a 3D grid. It supports both canonical and localized orbitals.</span>
 
-<span class="sd">    Parameters</span>
-<span class="sd">    ----------</span>
-<span class="sd">    orbitals : Orbitals</span>
-<span class="sd">        The orbitals object containing the molecular orbital coefficients and basis set</span>
-<span class="sd">    output_folder : str or Path, optional</span>
-<span class="sd">        The folder where the cube files will be saved. If None, files are not saved to temporary storage.</span>
-<span class="sd">    indices: list[int] | None = None, optional</span>
-<span class="sd">        Specific molecular orbital indices to generate cube files for. If None, all orbitals are processed.</span>
-<span class="sd">    grid_size : tuple, optional</span>
-<span class="sd">        The size of the grid in each dimension (nx, ny, nz). Default is (40, 40, 40).</span>
-<span class="sd">    margin : float, optional</span>
-<span class="sd">        The margin (in Bohr radii) to extend around molecule. Default is 3.</span>
-<span class="sd">    label_maker : Callable[[int], str], optional</span>
-<span class="sd">        A function that takes an orbital index and returns a string label for the cube file. If None, a default</span>
-<span class="sd">        labeling scheme is used.</span>
+<span class="sd">    Args:</span>
+<span class="sd">        orbitals:  The orbitals object containing the molecular orbital coefficients and basis set</span>
+<span class="sd">        output_folder:  The folder where the cube files will be saved. If None, files are not saved to temporary</span>
+<span class="sd">            storage.</span>
+<span class="sd">        indices: Specific molecular orbital indices to generate cube files for. If None, all orbitals are processed.</span>
+<span class="sd">        grid_size: The size of the grid in each dimension (nx, ny, nz). Default is (40, 40, 40).</span>
+<span class="sd">        margin: The margin (in Bohr radii) to extend around molecule. Default is 3.</span>
+<span class="sd">        label_maker: A function that takes an orbital index and returns a string label for the cube file.</span>
+<span class="sd">            If None, a default labeling scheme is used.</span>
 
-<span class="sd">    Returns</span>
-<span class="sd">    -------</span>
-<span class="sd">    cubefile_paths : list of str</span>
-<span class="sd">        A list of file paths to the generated cube files.</span>
+<span class="sd">    Returns:</span>
+<span class="sd">        list[str] | dict[str, str]: Paths or contents of the generated cube files.</span>
 
 <span class="sd">    &quot;&quot;&quot;</span>
     <span class="k">if</span> <span class="n">output_folder</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>

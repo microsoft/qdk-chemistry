@@ -118,11 +118,9 @@ rotations, substituting Clifford Rz gates, and removing Z-basis operations on qu
 state. It also includes functions to create custom pass managers based on preset configurations and custom passes.</p>
 <dl class="py class">
 <dt class="sig sig-object py" id="qdk_chemistry.plugins.qiskit._interop.transpiler.Settings">
-<em class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">Settings</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">self</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference internal" href="qdk_chemistry.plugins.qiskit.qubit_mapper.html#qdk_chemistry.plugins.qiskit.qubit_mapper.Settings" title="qdk_chemistry._core.data.Settings"><span class="pre">qdk_chemistry._core.data.Settings</span></a></span></em><span class="sig-paren">)</span><a class="headerlink" href="#qdk_chemistry.plugins.qiskit._interop.transpiler.Settings" title="Link to this definition"></a></dt>
+<em class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">Settings</span></span><a class="headerlink" href="#qdk_chemistry.plugins.qiskit._interop.transpiler.Settings" title="Link to this definition"></a></dt>
 <dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">DataClass</span></code></p>
-<blockquote>
-<div><p>Base class for extensible settings objects.</p>
-</div></blockquote>
+<p>Base class for extensible settings objects.</p>
 <p>This class provides a flexible settings system that can:</p>
 <ul class="simple">
 <li><p>Store arbitrary typed values using a variant system</p></li>
@@ -134,43 +132,40 @@ state. It also includes functions to create custom pass managers based on preset
 </ul>
 <p>The settings map can only be populated during construction using _set_default.</p>
 <p class="rubric">Examples</p>
-<p>To create a custom settings class in Python:
-&gt;&gt;&gt; class MySettings(qdk_chemistry.data.Settings):
-…     def __init__(self):
-…         super().__init__()
-…         self._set_default(“method”, “string”, “default”)
-…         self._set_default(“max_iterations”, “int”, 100)
-…         self._set_default(“tolerance”, “double”, 1e-6)
-…
-&gt;&gt;&gt; settings = MySettings()
-&gt;&gt;&gt; settings[“method”] = “hf”
-&gt;&gt;&gt; settings.method = “hf”     # Alternative access
-&gt;&gt;&gt; settings[“max_iterations”] = 200
-&gt;&gt;&gt; settings[“tolerance”] = 1e-8
-&gt;&gt;&gt; value = settings[“method”]
-&gt;&gt;&gt; print(“tolerance” in settings)
-&gt;&gt;&gt; print(len(settings))
-&gt;&gt;&gt;
-&gt;&gt;&gt; # Iterator functionality
-&gt;&gt;&gt; for key in settings:
-…     print(key, settings[key])
-&gt;&gt;&gt; for key in settings.keys():
-…     print(key)
-&gt;&gt;&gt; for value in settings.values():
-…     print(value)
-&gt;&gt;&gt; for key, value in settings.items():
-…     print(f”{key}: {value}”)
-&gt;&gt;&gt;
-&gt;&gt;&gt; print(settings.to_dict())  # Convert to dict</p>
-<p>Alternative: If you have an existing Settings object
-&gt;&gt;&gt; settings = get_settings_from_somewhere()  # Already has keys defined
-&gt;&gt;&gt; settings[“method”] = “hf”  # This works if “method” key exists
-&gt;&gt;&gt; settings.method = “hf”     # This also works
-};</p>
-<p>Default constructor.</p>
-<p>Creates an empty Settings object with no key-value pairs.</p>
-<p class="rubric">Examples</p>
-<div class="doctest highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="n">settings</span> <span class="o">=</span> <span class="n">Settings</span><span class="p">()</span>
+<p>To create a custom settings class in Python:</p>
+<div class="doctest highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="k">class</span><span class="w"> </span><span class="nc">MySettings</span><span class="p">(</span><span class="n">qdk_chemistry</span><span class="o">.</span><span class="n">data</span><span class="o">.</span><span class="n">Settings</span><span class="p">):</span>
+<span class="gp">... </span>    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+<span class="gp">... </span>        <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">()</span>
+<span class="gp">... </span>        <span class="bp">self</span><span class="o">.</span><span class="n">_set_default</span><span class="p">(</span><span class="s2">&quot;method&quot;</span><span class="p">,</span> <span class="s2">&quot;string&quot;</span><span class="p">,</span> <span class="s2">&quot;default&quot;</span><span class="p">)</span>
+<span class="gp">... </span>        <span class="bp">self</span><span class="o">.</span><span class="n">_set_default</span><span class="p">(</span><span class="s2">&quot;max_iterations&quot;</span><span class="p">,</span> <span class="s2">&quot;int&quot;</span><span class="p">,</span> <span class="mi">100</span><span class="p">)</span>
+<span class="gp">... </span>        <span class="bp">self</span><span class="o">.</span><span class="n">_set_default</span><span class="p">(</span><span class="s2">&quot;tolerance&quot;</span><span class="p">,</span> <span class="s2">&quot;double&quot;</span><span class="p">,</span> <span class="mf">1e-6</span><span class="p">)</span>
+<span class="gp">...</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">settings</span> <span class="o">=</span> <span class="n">MySettings</span><span class="p">()</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">settings</span><span class="p">[</span><span class="s2">&quot;method&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="s2">&quot;hf&quot;</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">settings</span><span class="o">.</span><span class="n">method</span> <span class="o">=</span> <span class="s2">&quot;hf&quot;</span>     <span class="c1"># Alternative access</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">settings</span><span class="p">[</span><span class="s2">&quot;max_iterations&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="mi">200</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">settings</span><span class="p">[</span><span class="s2">&quot;tolerance&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="mf">1e-8</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">value</span> <span class="o">=</span> <span class="n">settings</span><span class="p">[</span><span class="s2">&quot;method&quot;</span><span class="p">]</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="nb">print</span><span class="p">(</span><span class="s2">&quot;tolerance&quot;</span> <span class="ow">in</span> <span class="n">settings</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="nb">print</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">settings</span><span class="p">))</span>
+<span class="gp">&gt;&gt;&gt;</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="c1"># Iterator functionality</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="k">for</span> <span class="n">key</span> <span class="ow">in</span> <span class="n">settings</span><span class="p">:</span>
+<span class="gp">... </span>    <span class="nb">print</span><span class="p">(</span><span class="n">key</span><span class="p">,</span> <span class="n">settings</span><span class="p">[</span><span class="n">key</span><span class="p">])</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="k">for</span> <span class="n">key</span> <span class="ow">in</span> <span class="n">settings</span><span class="o">.</span><span class="n">keys</span><span class="p">():</span>
+<span class="gp">... </span>    <span class="nb">print</span><span class="p">(</span><span class="n">key</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="k">for</span> <span class="n">value</span> <span class="ow">in</span> <span class="n">settings</span><span class="o">.</span><span class="n">values</span><span class="p">():</span>
+<span class="gp">... </span>    <span class="nb">print</span><span class="p">(</span><span class="n">value</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="k">for</span> <span class="n">key</span><span class="p">,</span> <span class="n">value</span> <span class="ow">in</span> <span class="n">settings</span><span class="o">.</span><span class="n">items</span><span class="p">():</span>
+<span class="gp">... </span>    <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">key</span><span class="si">}</span><span class="s2">: </span><span class="si">{</span><span class="n">value</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt;</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="nb">print</span><span class="p">(</span><span class="n">settings</span><span class="o">.</span><span class="n">to_dict</span><span class="p">())</span>  <span class="c1"># Convert to dict</span>
+</pre></div>
+</div>
+<p>Alternative: If you have an existing Settings object</p>
+<div class="doctest highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="n">settings</span> <span class="o">=</span> <span class="n">get_settings_from_somewhere</span><span class="p">()</span>  <span class="c1"># Already has keys defined</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">settings</span><span class="p">[</span><span class="s2">&quot;method&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="s2">&quot;hf&quot;</span>  <span class="c1"># This works if &quot;method&quot; key exists</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">settings</span><span class="o">.</span><span class="n">method</span> <span class="o">=</span> <span class="s2">&quot;hf&quot;</span>     <span class="c1"># This also works</span>
 </pre></div>
 </div>
 <dl class="py method">
@@ -207,124 +202,120 @@ state. It also includes functions to create custom pass managers based on preset
 <dt class="sig sig-object py" id="qdk_chemistry.plugins.qiskit._interop.transpiler.Settings.from_dict">
 <span class="sig-name descname"><span class="pre">from_dict</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="o"><span class="pre">*</span></span><span class="n"><span class="pre">args</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">kwargs</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#qdk_chemistry.plugins.qiskit._interop.transpiler.Settings.from_dict" title="Link to this definition"></a></dt>
 <dd><p>Overloaded function.</p>
-<ol class="arabic">
-<li><p>from_dict(self: qdk_chemistry._core.data.Settings, dict: dict) -&gt; None</p>
-<blockquote>
-<div><p>Load settings from Python dictionary.</p>
-<p>Updates existing settings with values from the provided dictionary.
-Keys must be strings or convertible to strings. Only predefined
-settings keys can be updated. Values must match expected types.</p>
-<dl class="simple">
-<dt>dict<span class="classifier">dict</span></dt><dd><p>Python dictionary containing settings</p>
-</dd>
-</dl>
-<dl class="simple">
-<dt>SettingNotFound</dt><dd><p>If any key does not exist in settings</p>
-</dd>
-<dt>SettingTypeMismatch</dt><dd><p>If any value type does not match the expected type for its key</p>
-</dd>
-</dl>
-<div class="doctest highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="n">config</span> <span class="o">=</span> <span class="p">{</span>
-<span class="gp">... </span>    <span class="s1">&#39;method&#39;</span><span class="p">:</span> <span class="s1">&#39;hf&#39;</span><span class="p">,</span>
-<span class="gp">... </span>    <span class="s1">&#39;max_iterations&#39;</span><span class="p">:</span> <span class="mi">100</span><span class="p">,</span>
-<span class="gp">... </span>    <span class="s1">&#39;tolerance&#39;</span><span class="p">:</span> <span class="mf">1e-6</span><span class="p">,</span>
-<span class="gp">... </span>    <span class="s1">&#39;parameters&#39;</span><span class="p">:</span> <span class="p">[</span><span class="mf">1.0</span><span class="p">,</span> <span class="mf">2.0</span><span class="p">,</span> <span class="mf">3.0</span><span class="p">]</span>
-<span class="gp">... </span><span class="p">}</span>
-<span class="gp">&gt;&gt;&gt; </span><span class="n">settings</span><span class="o">.</span><span class="n">from_dict</span><span class="p">(</span><span class="n">config</span><span class="p">)</span>
-<span class="gp">&gt;&gt;&gt; </span><span class="k">assert</span> <span class="n">settings</span><span class="p">[</span><span class="s1">&#39;method&#39;</span><span class="p">]</span> <span class="o">==</span> <span class="s1">&#39;hf&#39;</span>
-</pre></div>
-</div>
-</div></blockquote>
-</li>
-<li><p>from_dict(self: qdk_chemistry._core.data.Settings, dict: dict) -&gt; None</p>
-<blockquote>
-<div><p>Load settings from Python dictionary.</p>
-<p>Updates existing settings with values from the provided dictionary.
-Keys must be strings or convertible to strings. Only predefined
-settings keys can be updated. Values must match expected types.</p>
-<dl class="simple">
-<dt>dict<span class="classifier">dict</span></dt><dd><p>Python dictionary containing settings</p>
-</dd>
-</dl>
-<dl class="simple">
-<dt>SettingNotFound</dt><dd><p>If any key does not exist in settings</p>
-</dd>
-<dt>SettingTypeMismatch</dt><dd><p>If any value type does not match the expected type for its key</p>
-</dd>
-</dl>
-<div class="doctest highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="n">config</span> <span class="o">=</span> <span class="p">{</span>
-<span class="gp">... </span>    <span class="s1">&#39;method&#39;</span><span class="p">:</span> <span class="s1">&#39;hf&#39;</span><span class="p">,</span>
-<span class="gp">... </span>    <span class="s1">&#39;max_iterations&#39;</span><span class="p">:</span> <span class="mi">100</span><span class="p">,</span>
-<span class="gp">... </span>    <span class="s1">&#39;tolerance&#39;</span><span class="p">:</span> <span class="mf">1e-6</span><span class="p">,</span>
-<span class="gp">... </span>    <span class="s1">&#39;parameters&#39;</span><span class="p">:</span> <span class="p">[</span><span class="mf">1.0</span><span class="p">,</span> <span class="mf">2.0</span><span class="p">,</span> <span class="mf">3.0</span><span class="p">]</span>
-<span class="gp">... </span><span class="p">}</span>
-<span class="gp">&gt;&gt;&gt; </span><span class="n">settings</span><span class="o">.</span><span class="n">from_dict</span><span class="p">(</span><span class="n">config</span><span class="p">)</span>
-<span class="gp">&gt;&gt;&gt; </span><span class="k">assert</span> <span class="n">settings</span><span class="p">[</span><span class="s1">&#39;method&#39;</span><span class="p">]</span> <span class="o">==</span> <span class="s1">&#39;hf&#39;</span>
-</pre></div>
-</div>
-</div></blockquote>
-</li>
+<ol class="arabic simple">
+<li><p>from_dict(self: qdk_chemistry._core.data.Settings, dict: dict) -&gt; None</p></li>
 </ol>
+<p>Load settings from Python dictionary.</p>
+<p>Updates existing settings with values from the provided dictionary.
+Keys must be strings or convertible to strings.
+Only predefined settings keys can be updated.
+Values must match expected types.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>dict</strong> (<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#dict" title="(in Python v3.14)"><em>dict</em></a>) – Python dictionary containing settings</p>
+</dd>
+<dt class="field-even">Raises<span class="colon">:</span></dt>
+<dd class="field-even"><ul class="simple">
+<li><p><a class="reference internal" href="qdk_chemistry.data.html#qdk_chemistry.data.SettingNotFound" title="qdk_chemistry.data.SettingNotFound"><strong>SettingNotFound</strong></a> – If any key does not exist in settings</p></li>
+<li><p><a class="reference internal" href="qdk_chemistry.data.html#qdk_chemistry.data.SettingTypeMismatch" title="qdk_chemistry.data.SettingTypeMismatch"><strong>SettingTypeMismatch</strong></a> – If any value type does not match the expected type for its key</p></li>
+</ul>
+</dd>
+</dl>
+<p class="rubric">Examples</p>
+<div class="doctest highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="n">config</span> <span class="o">=</span> <span class="p">{</span>
+<span class="gp">... </span>    <span class="s1">&#39;method&#39;</span><span class="p">:</span> <span class="s1">&#39;hf&#39;</span><span class="p">,</span>
+<span class="gp">... </span>    <span class="s1">&#39;max_iterations&#39;</span><span class="p">:</span> <span class="mi">100</span><span class="p">,</span>
+<span class="gp">... </span>    <span class="s1">&#39;tolerance&#39;</span><span class="p">:</span> <span class="mf">1e-6</span><span class="p">,</span>
+<span class="gp">... </span>    <span class="s1">&#39;parameters&#39;</span><span class="p">:</span> <span class="p">[</span><span class="mf">1.0</span><span class="p">,</span> <span class="mf">2.0</span><span class="p">,</span> <span class="mf">3.0</span><span class="p">]</span>
+<span class="gp">... </span><span class="p">}</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">settings</span><span class="o">.</span><span class="n">from_dict</span><span class="p">(</span><span class="n">config</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="k">assert</span> <span class="n">settings</span><span class="p">[</span><span class="s1">&#39;method&#39;</span><span class="p">]</span> <span class="o">==</span> <span class="s1">&#39;hf&#39;</span>
+</pre></div>
+</div>
+<ol class="arabic simple" start="2">
+<li><p>from_dict(self: qdk_chemistry._core.data.Settings, dict: dict) -&gt; None</p></li>
+</ol>
+<p>Load settings from Python dictionary.</p>
+<p>Updates existing settings with values from the provided dictionary.
+Keys must be strings or convertible to strings.
+Only predefined settings keys can be updated. Values must match expected types.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>dict</strong> (<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#dict" title="(in Python v3.14)"><em>dict</em></a>) – Python dictionary containing settings</p>
+</dd>
+<dt class="field-even">Raises<span class="colon">:</span></dt>
+<dd class="field-even"><ul class="simple">
+<li><p><a class="reference internal" href="qdk_chemistry.data.html#qdk_chemistry.data.SettingNotFound" title="qdk_chemistry.data.SettingNotFound"><strong>SettingNotFound</strong></a> – If any key does not exist in settings</p></li>
+<li><p><a class="reference internal" href="qdk_chemistry.data.html#qdk_chemistry.data.SettingTypeMismatch" title="qdk_chemistry.data.SettingTypeMismatch"><strong>SettingTypeMismatch</strong></a> – If any value type does not match the expected type for its key</p></li>
+</ul>
+</dd>
+</dl>
+<p class="rubric">Examples</p>
+<div class="doctest highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="n">config</span> <span class="o">=</span> <span class="p">{</span>
+<span class="gp">... </span>    <span class="s1">&#39;method&#39;</span><span class="p">:</span> <span class="s1">&#39;hf&#39;</span><span class="p">,</span>
+<span class="gp">... </span>    <span class="s1">&#39;max_iterations&#39;</span><span class="p">:</span> <span class="mi">100</span><span class="p">,</span>
+<span class="gp">... </span>    <span class="s1">&#39;tolerance&#39;</span><span class="p">:</span> <span class="mf">1e-6</span><span class="p">,</span>
+<span class="gp">... </span>    <span class="s1">&#39;parameters&#39;</span><span class="p">:</span> <span class="p">[</span><span class="mf">1.0</span><span class="p">,</span> <span class="mf">2.0</span><span class="p">,</span> <span class="mf">3.0</span><span class="p">]</span>
+<span class="gp">... </span><span class="p">}</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">settings</span><span class="o">.</span><span class="n">from_dict</span><span class="p">(</span><span class="n">config</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="k">assert</span> <span class="n">settings</span><span class="p">[</span><span class="s1">&#39;method&#39;</span><span class="p">]</span> <span class="o">==</span> <span class="s1">&#39;hf&#39;</span>
+</pre></div>
+</div>
 </dd></dl>
 
 <dl class="py method">
 <dt class="sig sig-object py" id="qdk_chemistry.plugins.qiskit._interop.transpiler.Settings.from_file">
 <em class="property"><span class="k"><span class="pre">static</span></span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">from_file</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">filename</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/library/functions.html#object" title="(in Python v3.14)"><span class="pre">object</span></a></span></em>, <em class="sig-param"><span class="n"><span class="pre">format_type</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)"><span class="pre">str</span></a></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><a class="reference internal" href="qdk_chemistry.plugins.qiskit.qubit_mapper.html#qdk_chemistry.plugins.qiskit.qubit_mapper.Settings" title="qdk_chemistry._core.data.Settings"><span class="pre">qdk_chemistry._core.data.Settings</span></a></span></span><a class="headerlink" href="#qdk_chemistry.plugins.qiskit._interop.transpiler.Settings.from_file" title="Link to this definition"></a></dt>
-<dd><blockquote>
-<div><p>Load settings from file in specified format.</p>
-</div></blockquote>
+<dd><p>Load settings from file in specified format.</p>
 <dl class="field-list simple">
 <dt class="field-odd">Parameters<span class="colon">:</span></dt>
 <dd class="field-odd"><ul class="simple">
-<li><p><strong>filename</strong> (<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)"><em>str</em></a><em> or </em><a class="reference external" href="https://docs.python.org/3/library/pathlib.html#pathlib.Path" title="(in Python v3.14)"><em>pathlib.Path</em></a>) – Path to input file.</p></li>
+<li><p><strong>filename</strong> (<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)"><em>str</em></a><em> | </em><a class="reference external" href="https://docs.python.org/3/library/pathlib.html#pathlib.Path" title="(in Python v3.14)"><em>pathlib.Path</em></a>) – Path to input file.</p></li>
 <li><p><strong>format_type</strong> (<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)"><em>str</em></a>) – Format type (“json” or “hdf5”)</p></li>
 </ul>
 </dd>
 <dt class="field-even">Raises<span class="colon">:</span></dt>
-<dd class="field-even"><p><a class="reference external" href="https://docs.python.org/3/library/exceptions.html#RuntimeError" title="(in Python v3.14)"><strong>RuntimeError</strong></a> – If the file cannot be opened, read, or contains invalid settings data
-    
-       Examples
-       ——–
-       &gt;&gt;&gt; settings.from_file(“config.settings.json”, “json”)
-       &gt;&gt;&gt; settings.from_file(“config.settings.h5”, “hdf5”)
-       &gt;&gt;&gt; from pathlib import Path
-       &gt;&gt;&gt; settings.from_file(Path(“config.settings.json”), “json”)</p>
+<dd class="field-even"><p><a class="reference external" href="https://docs.python.org/3/library/exceptions.html#RuntimeError" title="(in Python v3.14)"><strong>RuntimeError</strong></a> – If the file cannot be opened, read, or contains invalid settings data</p>
 </dd>
 </dl>
+<p class="rubric">Examples</p>
+<div class="doctest highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="n">settings</span><span class="o">.</span><span class="n">from_file</span><span class="p">(</span><span class="s2">&quot;config.settings.json&quot;</span><span class="p">,</span> <span class="s2">&quot;json&quot;</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">settings</span><span class="o">.</span><span class="n">from_file</span><span class="p">(</span><span class="s2">&quot;config.settings.h5&quot;</span><span class="p">,</span> <span class="s2">&quot;hdf5&quot;</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="kn">from</span><span class="w"> </span><span class="nn">pathlib</span><span class="w"> </span><span class="kn">import</span> <span class="n">Path</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">settings</span><span class="o">.</span><span class="n">from_file</span><span class="p">(</span><span class="n">Path</span><span class="p">(</span><span class="s2">&quot;config.settings.json&quot;</span><span class="p">),</span> <span class="s2">&quot;json&quot;</span><span class="p">)</span>
+</pre></div>
+</div>
 </dd></dl>
 
 <dl class="py method">
 <dt class="sig sig-object py" id="qdk_chemistry.plugins.qiskit._interop.transpiler.Settings.from_hdf5_file">
 <em class="property"><span class="k"><span class="pre">static</span></span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">from_hdf5_file</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">filename</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/library/functions.html#object" title="(in Python v3.14)"><span class="pre">object</span></a></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><a class="reference internal" href="qdk_chemistry.plugins.qiskit.qubit_mapper.html#qdk_chemistry.plugins.qiskit.qubit_mapper.Settings" title="qdk_chemistry._core.data.Settings"><span class="pre">qdk_chemistry._core.data.Settings</span></a></span></span><a class="headerlink" href="#qdk_chemistry.plugins.qiskit._interop.transpiler.Settings.from_hdf5_file" title="Link to this definition"></a></dt>
-<dd><blockquote>
-<div><p>Load settings from HDF5 file.</p>
-</div></blockquote>
+<dd><p>Load settings from HDF5 file.</p>
 <dl class="field-list simple">
 <dt class="field-odd">Parameters<span class="colon">:</span></dt>
-<dd class="field-odd"><p><strong>filename</strong> (<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)"><em>str</em></a>) – Path to input file. Must have ‘.settings.h5’ extension
-(e.g., <code class="docutils literal notranslate"><span class="pre">config.settings.h5</span></code>, <code class="docutils literal notranslate"><span class="pre">parameters.settings.h5</span></code>)</p>
+<dd class="field-odd"><p><strong>filename</strong> (<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)"><em>str</em></a>) – Path to input file.
+Must have ‘.settings.h5’ extension (e.g., <code class="docutils literal notranslate"><span class="pre">config.settings.h5</span></code>, <code class="docutils literal notranslate"><span class="pre">parameters.settings.h5</span></code>)</p>
 </dd>
 <dt class="field-even">Raises<span class="colon">:</span></dt>
 <dd class="field-even"><ul class="simple">
 <li><p><a class="reference external" href="https://docs.python.org/3/library/exceptions.html#ValueError" title="(in Python v3.14)"><strong>ValueError</strong></a> – If filename doesn’t follow the required naming convention</p></li>
-<li><p><a class="reference external" href="https://docs.python.org/3/library/exceptions.html#RuntimeError" title="(in Python v3.14)"><strong>RuntimeError</strong></a> – If the file cannot be opened, read, or contains invalid settings data
-    
-       Examples
-       ——–
-       &gt;&gt;&gt; settings.from_hdf5_file(“config.settings.h5”)
-       &gt;&gt;&gt; settings.from_hdf5_file(“parameters.settings.h5”)</p></li>
+<li><p><a class="reference external" href="https://docs.python.org/3/library/exceptions.html#RuntimeError" title="(in Python v3.14)"><strong>RuntimeError</strong></a> – If the file cannot be opened, read, or contains invalid settings data</p></li>
 </ul>
 </dd>
 </dl>
+<p class="rubric">Examples</p>
+<div class="doctest highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="n">settings</span><span class="o">.</span><span class="n">from_hdf5_file</span><span class="p">(</span><span class="s2">&quot;config.settings.h5&quot;</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">settings</span><span class="o">.</span><span class="n">from_hdf5_file</span><span class="p">(</span><span class="s2">&quot;parameters.settings.h5&quot;</span><span class="p">)</span>
+</pre></div>
+</div>
 </dd></dl>
 
 <dl class="py method">
 <dt class="sig sig-object py" id="qdk_chemistry.plugins.qiskit._interop.transpiler.Settings.from_json">
 <em class="property"><span class="k"><span class="pre">static</span></span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">from_json</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">json_str</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)"><span class="pre">str</span></a></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><a class="reference internal" href="qdk_chemistry.plugins.qiskit.qubit_mapper.html#qdk_chemistry.plugins.qiskit.qubit_mapper.Settings" title="qdk_chemistry._core.data.Settings"><span class="pre">qdk_chemistry._core.data.Settings</span></a></span></span><a class="headerlink" href="#qdk_chemistry.plugins.qiskit._interop.transpiler.Settings.from_json" title="Link to this definition"></a></dt>
 <dd><p>Load settings from JSON format.</p>
-<p>Parses a JSON string and loads all contained settings, replacing
-any existing settings. The JSON format should match the output
-of <code class="docutils literal notranslate"><span class="pre">to_json()</span></code>.</p>
+<p>Parses a JSON string and loads all contained settings, replacing any existing settings.
+The JSON format should match the output of <code class="docutils literal notranslate"><span class="pre">to_json()</span></code>.</p>
 <dl class="field-list simple">
 <dt class="field-odd">Parameters<span class="colon">:</span></dt>
 <dd class="field-odd"><p><strong>json_str</strong> (<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)"><em>str</em></a>) – JSON string containing settings data</p>
@@ -345,86 +336,79 @@ of <code class="docutils literal notranslate"><span class="pre">to_json()</span>
 <dt class="sig sig-object py" id="qdk_chemistry.plugins.qiskit._interop.transpiler.Settings.from_json_file">
 <em class="property"><span class="k"><span class="pre">static</span></span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">from_json_file</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="o"><span class="pre">*</span></span><span class="n"><span class="pre">args</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">kwargs</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#qdk_chemistry.plugins.qiskit._interop.transpiler.Settings.from_json_file" title="Link to this definition"></a></dt>
 <dd><p>Overloaded function.</p>
-<ol class="arabic">
-<li><p>from_json_file(filename: object) -&gt; qdk_chemistry._core.data.Settings</p>
-<blockquote>
-<div><p>Load settings from JSON file.</p>
-<blockquote>
-<div><p>Reads settings from a JSON file, replacing any existing settings.
+<ol class="arabic simple">
+<li><p>from_json_file(filename: object) -&gt; qdk_chemistry._core.data.Settings</p></li>
+</ol>
+<p>Load settings from JSON file.</p>
+<p>Reads settings from a JSON file, replacing any existing settings.
 The file should contain JSON data in the format produced by <code class="docutils literal notranslate"><span class="pre">to_json_file()</span></code>.</p>
-<dl class="simple">
-<dt>filename<span class="classifier">str or pathlib.Path</span></dt><dd><p>Path to the JSON file to read. Must have ‘.settings’ before the file
-extension (e.g., <code class="docutils literal notranslate"><span class="pre">config.settings.json</span></code>, <code class="docutils literal notranslate"><span class="pre">params.settings.json</span></code>)</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>filename</strong> (<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)"><em>str</em></a><em> | </em><a class="reference external" href="https://docs.python.org/3/library/pathlib.html#pathlib.Path" title="(in Python v3.14)"><em>pathlib.Path</em></a>) – Path to the JSON file to read.
+Must have ‘.settings’ before the file extension (e.g., <code class="docutils literal notranslate"><span class="pre">config.settings.json</span></code>, <code class="docutils literal notranslate"><span class="pre">params.settings.json</span></code>)</p>
+</dd>
+<dt class="field-even">Raises<span class="colon">:</span></dt>
+<dd class="field-even"><ul class="simple">
+<li><p><a class="reference external" href="https://docs.python.org/3/library/exceptions.html#ValueError" title="(in Python v3.14)"><strong>ValueError</strong></a> – If filename doesn’t follow the required naming convention</p></li>
+<li><p><a class="reference external" href="https://docs.python.org/3/library/exceptions.html#RuntimeError" title="(in Python v3.14)"><strong>RuntimeError</strong></a> – If the file cannot be opened, read, or contains malformed JSON</p></li>
+</ul>
 </dd>
 </dl>
-<dl class="simple">
-<dt>ValueError</dt><dd><p>If filename doesn’t follow the required naming convention</p>
-</dd>
-<dt>RuntimeError</dt><dd><p>If the file cannot be opened, read, or contains malformed JSON</p>
-</dd>
-</dl>
-</div></blockquote>
+<p class="rubric">Examples</p>
 <div class="doctest highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="n">settings</span><span class="o">.</span><span class="n">from_json_file</span><span class="p">(</span><span class="s2">&quot;config.settings.json&quot;</span><span class="p">)</span>
 <span class="gp">&gt;&gt;&gt; </span><span class="n">settings</span><span class="o">.</span><span class="n">from_json_file</span><span class="p">(</span><span class="s2">&quot;params.settings.json&quot;</span><span class="p">)</span>
 <span class="gp">&gt;&gt;&gt; </span><span class="kn">from</span><span class="w"> </span><span class="nn">pathlib</span><span class="w"> </span><span class="kn">import</span> <span class="n">Path</span>
 <span class="gp">&gt;&gt;&gt; </span><span class="n">settings</span><span class="o">.</span><span class="n">from_json_file</span><span class="p">(</span><span class="n">Path</span><span class="p">(</span><span class="s2">&quot;config.settings.json&quot;</span><span class="p">))</span>
 </pre></div>
 </div>
-</div></blockquote>
-</li>
-<li><p>from_json_file(filename: object) -&gt; qdk_chemistry._core.data.Settings</p>
-<blockquote>
-<div><p>Load settings from JSON file.</p>
-<blockquote>
-<div><p>Reads settings from a JSON file, replacing any existing settings.
+<ol class="arabic simple" start="2">
+<li><p>from_json_file(filename: object) -&gt; qdk_chemistry._core.data.Settings</p></li>
+</ol>
+<p>Load settings from JSON file.</p>
+<p>Reads settings from a JSON file, replacing any existing settings.
 The file should contain JSON data in the format produced by <code class="docutils literal notranslate"><span class="pre">to_json_file()</span></code>.</p>
-<dl class="simple">
-<dt>filename<span class="classifier">str or pathlib.Path</span></dt><dd><p>Path to the JSON file to read. Must have ‘.settings’ before the file
-extension (e.g., <code class="docutils literal notranslate"><span class="pre">config.settings.json</span></code>, <code class="docutils literal notranslate"><span class="pre">params.settings.json</span></code>)</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>filename</strong> (<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)"><em>str</em></a><em> | </em><a class="reference external" href="https://docs.python.org/3/library/pathlib.html#pathlib.Path" title="(in Python v3.14)"><em>pathlib.Path</em></a>) – Path to the JSON file to read.
+Must have ‘.settings’ before the file extension (e.g., <code class="docutils literal notranslate"><span class="pre">config.settings.json</span></code>, <code class="docutils literal notranslate"><span class="pre">params.settings.json</span></code>)</p>
+</dd>
+<dt class="field-even">Raises<span class="colon">:</span></dt>
+<dd class="field-even"><ul class="simple">
+<li><p><a class="reference external" href="https://docs.python.org/3/library/exceptions.html#ValueError" title="(in Python v3.14)"><strong>ValueError</strong></a> – If filename doesn’t follow the required naming convention</p></li>
+<li><p><a class="reference external" href="https://docs.python.org/3/library/exceptions.html#RuntimeError" title="(in Python v3.14)"><strong>RuntimeError</strong></a> – If the file cannot be opened, read, or contains malformed JSON</p></li>
+</ul>
 </dd>
 </dl>
-<dl class="simple">
-<dt>ValueError</dt><dd><p>If filename doesn’t follow the required naming convention</p>
-</dd>
-<dt>RuntimeError</dt><dd><p>If the file cannot be opened, read, or contains malformed JSON</p>
-</dd>
-</dl>
-</div></blockquote>
+<p class="rubric">Examples</p>
 <div class="doctest highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="n">settings</span><span class="o">.</span><span class="n">from_json_file</span><span class="p">(</span><span class="s2">&quot;config.settings.json&quot;</span><span class="p">)</span>
 <span class="gp">&gt;&gt;&gt; </span><span class="n">settings</span><span class="o">.</span><span class="n">from_json_file</span><span class="p">(</span><span class="s2">&quot;parameters.settings.json&quot;</span><span class="p">)</span>
 <span class="gp">&gt;&gt;&gt; </span><span class="kn">from</span><span class="w"> </span><span class="nn">pathlib</span><span class="w"> </span><span class="kn">import</span> <span class="n">Path</span>
 <span class="gp">&gt;&gt;&gt; </span><span class="n">settings</span><span class="o">.</span><span class="n">from_json_file</span><span class="p">(</span><span class="n">Path</span><span class="p">(</span><span class="s2">&quot;config.settings.json&quot;</span><span class="p">))</span>
 </pre></div>
 </div>
-</div></blockquote>
-</li>
-<li><p>from_json_file(filename: object) -&gt; qdk_chemistry._core.data.Settings</p>
-<blockquote>
-<div><blockquote>
-<div><p>Load settings from JSON file.</p>
-</div></blockquote>
-<dl class="simple">
-<dt>filename<span class="classifier">str or pathlib.Path</span></dt><dd><p>Path to input file. Must have ‘.settings.json’ extension
-(e.g., <code class="docutils literal notranslate"><span class="pre">config.settings.json</span></code>, <code class="docutils literal notranslate"><span class="pre">parameters.settings.json</span></code>)</p>
+<ol class="arabic simple" start="3">
+<li><p>from_json_file(filename: object) -&gt; qdk_chemistry._core.data.Settings</p></li>
+</ol>
+<p>Load settings from JSON file.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>filename</strong> (<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)"><em>str</em></a><em> | </em><a class="reference external" href="https://docs.python.org/3/library/pathlib.html#pathlib.Path" title="(in Python v3.14)"><em>pathlib.Path</em></a>) – Path to input file.
+Must have ‘.settings.json’ extension (e.g., <code class="docutils literal notranslate"><span class="pre">config.settings.json</span></code>, <code class="docutils literal notranslate"><span class="pre">parameters.settings.json</span></code>)</p>
+</dd>
+<dt class="field-even">Raises<span class="colon">:</span></dt>
+<dd class="field-even"><ul class="simple">
+<li><p><a class="reference external" href="https://docs.python.org/3/library/exceptions.html#ValueError" title="(in Python v3.14)"><strong>ValueError</strong></a> – If filename doesn’t follow the required naming convention</p></li>
+<li><p><a class="reference external" href="https://docs.python.org/3/library/exceptions.html#RuntimeError" title="(in Python v3.14)"><strong>RuntimeError</strong></a> – If the file cannot be opened, read, or contains invalid settings data</p></li>
+</ul>
 </dd>
 </dl>
-<dl>
-<dt>ValueError</dt><dd><p>If filename doesn’t follow the required naming convention</p>
-</dd>
-<dt>RuntimeError</dt><dd><p>If the file cannot be opened, read, or contains invalid settings data</p>
-<blockquote>
-<div><div class="doctest highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="n">settings</span><span class="o">.</span><span class="n">from_json_file</span><span class="p">(</span><span class="s2">&quot;config.settings.json&quot;</span><span class="p">)</span>
+<p class="rubric">Examples</p>
+<div class="doctest highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="n">settings</span><span class="o">.</span><span class="n">from_json_file</span><span class="p">(</span><span class="s2">&quot;config.settings.json&quot;</span><span class="p">)</span>
 <span class="gp">&gt;&gt;&gt; </span><span class="n">settings</span><span class="o">.</span><span class="n">from_json_file</span><span class="p">(</span><span class="s2">&quot;parameters.settings.json&quot;</span><span class="p">)</span>
 <span class="gp">&gt;&gt;&gt; </span><span class="kn">from</span><span class="w"> </span><span class="nn">pathlib</span><span class="w"> </span><span class="kn">import</span> <span class="n">Path</span>
 <span class="gp">&gt;&gt;&gt; </span><span class="n">settings</span><span class="o">.</span><span class="n">from_json_file</span><span class="p">(</span><span class="n">Path</span><span class="p">(</span><span class="s2">&quot;config.settings.json&quot;</span><span class="p">))</span>
 </pre></div>
 </div>
-</div></blockquote>
-</dd>
-</dl>
-</div></blockquote>
-</li>
-</ol>
 </dd></dl>
 
 <dl class="py method">
@@ -453,8 +437,7 @@ Both methods accept the same JSON string format.</p>
 <dt class="sig sig-object py" id="qdk_chemistry.plugins.qiskit._interop.transpiler.Settings.get">
 <span class="sig-name descname"><span class="pre">get</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">self</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference internal" href="qdk_chemistry.plugins.qiskit.qubit_mapper.html#qdk_chemistry.plugins.qiskit.qubit_mapper.Settings" title="qdk_chemistry._core.data.Settings"><span class="pre">qdk_chemistry._core.data.Settings</span></a></span></em>, <em class="sig-param"><span class="n"><span class="pre">key</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)"><span class="pre">str</span></a></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><a class="reference external" href="https://docs.python.org/3/library/functions.html#object" title="(in Python v3.14)"><span class="pre">object</span></a></span></span><a class="headerlink" href="#qdk_chemistry.plugins.qiskit._interop.transpiler.Settings.get" title="Link to this definition"></a></dt>
 <dd><p>Get a setting value as a Python object.</p>
-<p>Retrieves the value associated with the given key and converts it
-to the appropriate Python type.</p>
+<p>Retrieves the value associated with the given key and converts it to the appropriate Python type.</p>
 <dl class="field-list simple">
 <dt class="field-odd">Parameters<span class="colon">:</span></dt>
 <dd class="field-odd"><p><strong>key</strong> (<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)"><em>str</em></a>) – The setting key name</p>
@@ -481,8 +464,7 @@ to the appropriate Python type.</p>
 <dt class="sig sig-object py" id="qdk_chemistry.plugins.qiskit._interop.transpiler.Settings.get_all_settings">
 <span class="sig-name descname"><span class="pre">get_all_settings</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">self</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference internal" href="qdk_chemistry.plugins.qiskit.qubit_mapper.html#qdk_chemistry.plugins.qiskit.qubit_mapper.Settings" title="qdk_chemistry._core.data.Settings"><span class="pre">qdk_chemistry._core.data.Settings</span></a></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#dict" title="(in Python v3.14)"><span class="pre">dict</span></a><span class="p"><span class="pre">[</span></span><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)"><span class="pre">str</span></a><span class="p"><span class="pre">,</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/library/functions.html#bool" title="(in Python v3.14)"><span class="pre">bool</span></a><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(in Python v3.14)"><span class="pre">int</span></a><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(in Python v3.14)"><span class="pre">int</span></a><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(in Python v3.14)"><span class="pre">int</span></a><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/library/functions.html#float" title="(in Python v3.14)"><span class="pre">float</span></a><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/library/functions.html#float" title="(in Python v3.14)"><span class="pre">float</span></a><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)"><span class="pre">str</span></a><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#list" title="(in Python v3.14)"><span class="pre">list</span></a><span class="p"><span class="pre">[</span></span><a class="reference external" href="https://docs.python.org/3/library/functions.html#bool" title="(in Python v3.14)"><span class="pre">bool</span></a><span class="p"><span class="pre">]</span></span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#list" title="(in Python v3.14)"><span class="pre">list</span></a><span class="p"><span class="pre">[</span></span><a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(in Python v3.14)"><span class="pre">int</span></a><span class="p"><span class="pre">]</span></span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#list" title="(in Python v3.14)"><span class="pre">list</span></a><span class="p"><span class="pre">[</span></span><a class="reference external" href="https://docs.python.org/3/library/functions.html#float" title="(in Python v3.14)"><span class="pre">float</span></a><span class="p"><span class="pre">]</span></span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#list" title="(in Python v3.14)"><span class="pre">list</span></a><span class="p"><span class="pre">[</span></span><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)"><span class="pre">str</span></a><span class="p"><span class="pre">]</span></span><span class="p"><span class="pre">]</span></span></span></span><a class="headerlink" href="#qdk_chemistry.plugins.qiskit._interop.transpiler.Settings.get_all_settings" title="Link to this definition"></a></dt>
 <dd><p>Get all settings as a map for Python interoperability.</p>
-<p>Returns the internal settings map, primarily for advanced use cases
-and internal operations.</p>
+<p>Returns the internal settings map, primarily for advanced use cases and internal operations.</p>
 <dl class="field-list simple">
 <dt class="field-odd">Returns<span class="colon">:</span></dt>
 <dd class="field-odd"><p>Reference to internal settings map</p>
@@ -500,8 +482,7 @@ Use <cite>to_dict()</cite> for a safe copy of the settings.</p>
 <dt class="sig sig-object py" id="qdk_chemistry.plugins.qiskit._interop.transpiler.Settings.get_as_string">
 <span class="sig-name descname"><span class="pre">get_as_string</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">self</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference internal" href="qdk_chemistry.plugins.qiskit.qubit_mapper.html#qdk_chemistry.plugins.qiskit.qubit_mapper.Settings" title="qdk_chemistry._core.data.Settings"><span class="pre">qdk_chemistry._core.data.Settings</span></a></span></em>, <em class="sig-param"><span class="n"><span class="pre">key</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)"><span class="pre">str</span></a></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)"><span class="pre">str</span></a></span></span><a class="headerlink" href="#qdk_chemistry.plugins.qiskit._interop.transpiler.Settings.get_as_string" title="Link to this definition"></a></dt>
 <dd><p>Get a setting value as a string representation.</p>
-<p>Converts any setting value to its string representation,
-regardless of the original type.</p>
+<p>Converts any setting value to its string representation, regardless of the original type.</p>
 <dl class="field-list simple">
 <dt class="field-odd">Parameters<span class="colon">:</span></dt>
 <dd class="field-odd"><p><strong>key</strong> (<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)"><em>str</em></a>) – The setting key name</p>
@@ -527,17 +508,14 @@ regardless of the original type.</p>
 <dt class="sig sig-object py" id="qdk_chemistry.plugins.qiskit._interop.transpiler.Settings.get_expected_python_type">
 <span class="sig-name descname"><span class="pre">get_expected_python_type</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">self</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference internal" href="qdk_chemistry.plugins.qiskit.qubit_mapper.html#qdk_chemistry.plugins.qiskit.qubit_mapper.Settings" title="qdk_chemistry._core.data.Settings"><span class="pre">qdk_chemistry._core.data.Settings</span></a></span></em>, <em class="sig-param"><span class="n"><span class="pre">key</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)"><span class="pre">str</span></a></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)"><span class="pre">str</span></a></span></span><a class="headerlink" href="#qdk_chemistry.plugins.qiskit._interop.transpiler.Settings.get_expected_python_type" title="Link to this definition"></a></dt>
 <dd><p>Get the expected Python type for a setting key.</p>
-<p>Returns a string describing what Python type should be provided
-when setting the value for the given key. This is useful for
-understanding what type of value is expected before attempting
-to set it.</p>
+<p>Returns a string describing what Python type should be provided when setting the value for the given key.
+This is useful for understanding what type of value is expected before attempting to set it.</p>
 <dl class="field-list simple">
 <dt class="field-odd">Parameters<span class="colon">:</span></dt>
 <dd class="field-odd"><p><strong>key</strong> (<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)"><em>str</em></a>) – The setting key name</p>
 </dd>
 <dt class="field-even">Returns<span class="colon">:</span></dt>
-<dd class="field-even"><p>Expected Python type (e.g., “int”, “float”, “str”, “bool”,
-“list[int]”, “list[float]”, “list[str]”, “list[bool]”)</p>
+<dd class="field-even"><p>Expected Python type (e.g., “int”, “float”, “str”, “bool”, “list[int]”, “list[float]”, “list[str]”, “list[bool]”)</p>
 </dd>
 <dt class="field-odd">Return type<span class="colon">:</span></dt>
 <dd class="field-odd"><p><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)">str</a></p>
@@ -563,8 +541,7 @@ to set it.</p>
 <dt class="sig sig-object py" id="qdk_chemistry.plugins.qiskit._interop.transpiler.Settings.get_or_default">
 <span class="sig-name descname"><span class="pre">get_or_default</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">self</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference internal" href="qdk_chemistry.plugins.qiskit.qubit_mapper.html#qdk_chemistry.plugins.qiskit.qubit_mapper.Settings" title="qdk_chemistry._core.data.Settings"><span class="pre">qdk_chemistry._core.data.Settings</span></a></span></em>, <em class="sig-param"><span class="n"><span class="pre">key</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)"><span class="pre">str</span></a></span></em>, <em class="sig-param"><span class="n"><span class="pre">default_value</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/library/functions.html#object" title="(in Python v3.14)"><span class="pre">object</span></a></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><a class="reference external" href="https://docs.python.org/3/library/functions.html#object" title="(in Python v3.14)"><span class="pre">object</span></a></span></span><a class="headerlink" href="#qdk_chemistry.plugins.qiskit._interop.transpiler.Settings.get_or_default" title="Link to this definition"></a></dt>
 <dd><p>Get a setting value with a default if not found (accepts any Python object).</p>
-<p>Retrieves the value for the given key if it exists, or returns the
-default value if the key is not found.</p>
+<p>Retrieves the value for the given key if it exists, or returns the default value if the key is not found.</p>
 <dl class="field-list simple">
 <dt class="field-odd">Parameters<span class="colon">:</span></dt>
 <dd class="field-odd"><ul class="simple">
@@ -612,8 +589,7 @@ default value if the key is not found.</p>
 <dt class="sig sig-object py" id="qdk_chemistry.plugins.qiskit._interop.transpiler.Settings.get_raw">
 <span class="sig-name descname"><span class="pre">get_raw</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">self</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference internal" href="qdk_chemistry.plugins.qiskit.qubit_mapper.html#qdk_chemistry.plugins.qiskit.qubit_mapper.Settings" title="qdk_chemistry._core.data.Settings"><span class="pre">qdk_chemistry._core.data.Settings</span></a></span></em>, <em class="sig-param"><span class="n"><span class="pre">key</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)"><span class="pre">str</span></a></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><a class="reference external" href="https://docs.python.org/3/library/functions.html#bool" title="(in Python v3.14)"><span class="pre">bool</span></a><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(in Python v3.14)"><span class="pre">int</span></a><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(in Python v3.14)"><span class="pre">int</span></a><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(in Python v3.14)"><span class="pre">int</span></a><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/library/functions.html#float" title="(in Python v3.14)"><span class="pre">float</span></a><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/library/functions.html#float" title="(in Python v3.14)"><span class="pre">float</span></a><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)"><span class="pre">str</span></a><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#list" title="(in Python v3.14)"><span class="pre">list</span></a><span class="p"><span class="pre">[</span></span><a class="reference external" href="https://docs.python.org/3/library/functions.html#bool" title="(in Python v3.14)"><span class="pre">bool</span></a><span class="p"><span class="pre">]</span></span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#list" title="(in Python v3.14)"><span class="pre">list</span></a><span class="p"><span class="pre">[</span></span><a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(in Python v3.14)"><span class="pre">int</span></a><span class="p"><span class="pre">]</span></span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#list" title="(in Python v3.14)"><span class="pre">list</span></a><span class="p"><span class="pre">[</span></span><a class="reference external" href="https://docs.python.org/3/library/functions.html#float" title="(in Python v3.14)"><span class="pre">float</span></a><span class="p"><span class="pre">]</span></span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#list" title="(in Python v3.14)"><span class="pre">list</span></a><span class="p"><span class="pre">[</span></span><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)"><span class="pre">str</span></a><span class="p"><span class="pre">]</span></span></span></span><a class="headerlink" href="#qdk_chemistry.plugins.qiskit._interop.transpiler.Settings.get_raw" title="Link to this definition"></a></dt>
 <dd><p>Get a setting value as a <code class="docutils literal notranslate"><span class="pre">SettingValue</span></code> variant.</p>
-<p>This is the raw interface that returns a <code class="docutils literal notranslate"><span class="pre">SettingValue</span></code> directly,
-primarily for internal use or advanced scenarios.</p>
+<p>This is the raw interface that returns a <code class="docutils literal notranslate"><span class="pre">SettingValue</span></code> directly, primarily for internal use or advanced scenarios.</p>
 <dl class="field-list simple">
 <dt class="field-odd">Parameters<span class="colon">:</span></dt>
 <dd class="field-odd"><p><strong>key</strong> (<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)"><em>str</em></a>) – The setting key name</p>
@@ -634,54 +610,54 @@ primarily for internal use or advanced scenarios.</p>
 <dt class="sig sig-object py" id="qdk_chemistry.plugins.qiskit._interop.transpiler.Settings.get_type_name">
 <span class="sig-name descname"><span class="pre">get_type_name</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="o"><span class="pre">*</span></span><span class="n"><span class="pre">args</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">kwargs</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#qdk_chemistry.plugins.qiskit._interop.transpiler.Settings.get_type_name" title="Link to this definition"></a></dt>
 <dd><p>Overloaded function.</p>
-<ol class="arabic">
-<li><p>get_type_name(self: qdk_chemistry._core.data.Settings, key: str) -&gt; str</p>
-<blockquote>
-<div><p>Get the type name of a setting value.</p>
-<p>Returns a string describing the current type of the value
-stored for the given key.</p>
-<dl class="simple">
-<dt>key<span class="classifier">str</span></dt><dd><p>The setting key name</p>
-</dd>
-</dl>
-<dl class="simple">
-<dt>str</dt><dd><p>Type name (e.g., “int”, “double”, “string”, “vector&lt;int&gt;”)</p>
-</dd>
-</dl>
-<dl class="simple">
-<dt>SettingNotFound</dt><dd><p>If the key is not found</p>
-</dd>
-</dl>
-<div class="doctest highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="n">type_name</span> <span class="o">=</span> <span class="n">settings</span><span class="o">.</span><span class="n">get_type_name</span><span class="p">(</span><span class="s2">&quot;max_iterations&quot;</span><span class="p">)</span>  <span class="c1"># &quot;int&quot;</span>
-<span class="gp">&gt;&gt;&gt; </span><span class="n">type_name</span> <span class="o">=</span> <span class="n">settings</span><span class="o">.</span><span class="n">get_type_name</span><span class="p">(</span><span class="s2">&quot;tolerance&quot;</span><span class="p">)</span>       <span class="c1"># &quot;double&quot;</span>
-</pre></div>
-</div>
-</div></blockquote>
-</li>
-<li><p>get_type_name(self: qdk_chemistry._core.data.Settings, key: str) -&gt; str</p>
-<blockquote>
-<div><p>Get the type name of a setting value.</p>
-<p>Returns a string describing the current type of the value
-stored for the given key.</p>
-<dl class="simple">
-<dt>key<span class="classifier">str</span></dt><dd><p>The setting key name</p>
-</dd>
-</dl>
-<dl class="simple">
-<dt>str</dt><dd><p>Type name (e.g., “int”, “double”, “string”, “vector&lt;int&gt;”)</p>
-</dd>
-</dl>
-<dl class="simple">
-<dt>SettingNotFound</dt><dd><p>If the key is not found</p>
-</dd>
-</dl>
-<div class="doctest highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="n">type_name</span> <span class="o">=</span> <span class="n">settings</span><span class="o">.</span><span class="n">get_type_name</span><span class="p">(</span><span class="s2">&quot;max_iterations&quot;</span><span class="p">)</span>  <span class="c1"># &quot;int&quot;</span>
-<span class="gp">&gt;&gt;&gt; </span><span class="n">type_name</span> <span class="o">=</span> <span class="n">settings</span><span class="o">.</span><span class="n">get_type_name</span><span class="p">(</span><span class="s2">&quot;tolerance&quot;</span><span class="p">)</span>       <span class="c1"># &quot;double&quot;</span>
-</pre></div>
-</div>
-</div></blockquote>
-</li>
+<ol class="arabic simple">
+<li><p>get_type_name(self: qdk_chemistry._core.data.Settings, key: str) -&gt; str</p></li>
 </ol>
+<p>Get the type name of a setting value.</p>
+<p>Returns a string describing the current type of the value stored for the given key.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>key</strong> (<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)"><em>str</em></a>) – The setting key name</p>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>Type name (e.g., “int”, “double”, “string”, “vector&lt;int&gt;”)</p>
+</dd>
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)">str</a></p>
+</dd>
+<dt class="field-even">Raises<span class="colon">:</span></dt>
+<dd class="field-even"><p><a class="reference internal" href="qdk_chemistry.data.html#qdk_chemistry.data.SettingNotFound" title="qdk_chemistry.data.SettingNotFound"><strong>SettingNotFound</strong></a> – If the key is not found</p>
+</dd>
+</dl>
+<p class="rubric">Examples</p>
+<div class="doctest highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="n">type_name</span> <span class="o">=</span> <span class="n">settings</span><span class="o">.</span><span class="n">get_type_name</span><span class="p">(</span><span class="s2">&quot;max_iterations&quot;</span><span class="p">)</span>  <span class="c1"># &quot;int&quot;</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">type_name</span> <span class="o">=</span> <span class="n">settings</span><span class="o">.</span><span class="n">get_type_name</span><span class="p">(</span><span class="s2">&quot;tolerance&quot;</span><span class="p">)</span>       <span class="c1"># &quot;double&quot;</span>
+</pre></div>
+</div>
+<ol class="arabic simple" start="2">
+<li><p>get_type_name(self: qdk_chemistry._core.data.Settings, key: str) -&gt; str</p></li>
+</ol>
+<p>Get the type name of a setting value.</p>
+<p>Returns a string describing the current type of the value stored for the given key.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>key</strong> (<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)"><em>str</em></a>) – The setting key name</p>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>Type name (e.g., “int”, “double”, “string”, “vector&lt;int&gt;”)</p>
+</dd>
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)">str</a></p>
+</dd>
+<dt class="field-even">Raises<span class="colon">:</span></dt>
+<dd class="field-even"><p><a class="reference internal" href="qdk_chemistry.data.html#qdk_chemistry.data.SettingNotFound" title="qdk_chemistry.data.SettingNotFound"><strong>SettingNotFound</strong></a> – If the key is not found</p>
+</dd>
+</dl>
+<p class="rubric">Examples</p>
+<div class="doctest highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="n">type_name</span> <span class="o">=</span> <span class="n">settings</span><span class="o">.</span><span class="n">get_type_name</span><span class="p">(</span><span class="s2">&quot;max_iterations&quot;</span><span class="p">)</span>  <span class="c1"># &quot;int&quot;</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">type_name</span> <span class="o">=</span> <span class="n">settings</span><span class="o">.</span><span class="n">get_type_name</span><span class="p">(</span><span class="s2">&quot;tolerance&quot;</span><span class="p">)</span>       <span class="c1"># &quot;double&quot;</span>
+</pre></div>
+</div>
 </dd></dl>
 
 <dl class="py method">
@@ -711,42 +687,48 @@ stored for the given key.</p>
 <dt class="sig sig-object py" id="qdk_chemistry.plugins.qiskit._interop.transpiler.Settings.items">
 <span class="sig-name descname"><span class="pre">items</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="o"><span class="pre">*</span></span><span class="n"><span class="pre">args</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">kwargs</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#qdk_chemistry.plugins.qiskit._interop.transpiler.Settings.items" title="Link to this definition"></a></dt>
 <dd><p>Overloaded function.</p>
-<ol class="arabic">
-<li><p>items(self: qdk_chemistry._core.data.Settings) -&gt; list</p>
-<blockquote>
-<div><p>Get key-value pairs as a list of tuples.</p>
-<dl class="simple">
-<dt>list of tuple</dt><dd><p>List of (key, value) tuples</p>
-</dd>
-</dl>
-<div class="doctest highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="n">all_items</span> <span class="o">=</span> <span class="n">settings</span><span class="o">.</span><span class="n">items</span><span class="p">()</span>
-<span class="gp">&gt;&gt;&gt; </span><span class="k">for</span> <span class="n">key</span><span class="p">,</span> <span class="n">value</span> <span class="ow">in</span> <span class="n">all_items</span><span class="p">:</span>
-<span class="gp">... </span>    <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">key</span><span class="si">}</span><span class="s2">: </span><span class="si">{</span><span class="n">value</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
-<span class="gp">&gt;&gt;&gt; </span><span class="c1"># Or iterate directly:</span>
-<span class="gp">&gt;&gt;&gt; </span><span class="k">for</span> <span class="n">key</span><span class="p">,</span> <span class="n">value</span> <span class="ow">in</span> <span class="n">settings</span><span class="o">.</span><span class="n">items</span><span class="p">():</span>
-<span class="gp">... </span>    <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">key</span><span class="si">}</span><span class="s2">: </span><span class="si">{</span><span class="n">value</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
-</pre></div>
-</div>
-</div></blockquote>
-</li>
-<li><p>items(self: qdk_chemistry._core.data.Settings) -&gt; list</p>
-<blockquote>
-<div><p>Get key-value pairs as a list of tuples.</p>
-<dl class="simple">
-<dt>list of tuple</dt><dd><p>List of (key, value) tuples</p>
-</dd>
-</dl>
-<div class="doctest highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="n">all_items</span> <span class="o">=</span> <span class="n">settings</span><span class="o">.</span><span class="n">items</span><span class="p">()</span>
-<span class="gp">&gt;&gt;&gt; </span><span class="k">for</span> <span class="n">key</span><span class="p">,</span> <span class="n">value</span> <span class="ow">in</span> <span class="n">all_items</span><span class="p">:</span>
-<span class="gp">... </span>    <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">key</span><span class="si">}</span><span class="s2">: </span><span class="si">{</span><span class="n">value</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
-<span class="gp">&gt;&gt;&gt; </span><span class="c1"># Or iterate directly:</span>
-<span class="gp">&gt;&gt;&gt; </span><span class="k">for</span> <span class="n">key</span><span class="p">,</span> <span class="n">value</span> <span class="ow">in</span> <span class="n">settings</span><span class="o">.</span><span class="n">items</span><span class="p">():</span>
-<span class="gp">... </span>    <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">key</span><span class="si">}</span><span class="s2">: </span><span class="si">{</span><span class="n">value</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
-</pre></div>
-</div>
-</div></blockquote>
-</li>
+<ol class="arabic simple">
+<li><p>items(self: qdk_chemistry._core.data.Settings) -&gt; list</p></li>
 </ol>
+<p>Get key-value pairs as a list of tuples.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Returns<span class="colon">:</span></dt>
+<dd class="field-odd"><p>List of (key, value) tuples</p>
+</dd>
+<dt class="field-even">Return type<span class="colon">:</span></dt>
+<dd class="field-even"><p><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#list" title="(in Python v3.14)">list</a>[<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#tuple" title="(in Python v3.14)">tuple</a>]</p>
+</dd>
+</dl>
+<p class="rubric">Examples</p>
+<div class="doctest highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="n">all_items</span> <span class="o">=</span> <span class="n">settings</span><span class="o">.</span><span class="n">items</span><span class="p">()</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="k">for</span> <span class="n">key</span><span class="p">,</span> <span class="n">value</span> <span class="ow">in</span> <span class="n">all_items</span><span class="p">:</span>
+<span class="gp">... </span>    <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">key</span><span class="si">}</span><span class="s2">: </span><span class="si">{</span><span class="n">value</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="c1"># Or iterate directly:</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="k">for</span> <span class="n">key</span><span class="p">,</span> <span class="n">value</span> <span class="ow">in</span> <span class="n">settings</span><span class="o">.</span><span class="n">items</span><span class="p">():</span>
+<span class="gp">... </span>    <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">key</span><span class="si">}</span><span class="s2">: </span><span class="si">{</span><span class="n">value</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+</pre></div>
+</div>
+<ol class="arabic simple" start="2">
+<li><p>items(self: qdk_chemistry._core.data.Settings) -&gt; list</p></li>
+</ol>
+<p>Get key-value pairs as a list of tuples.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Returns<span class="colon">:</span></dt>
+<dd class="field-odd"><p>List of (key, value) tuples</p>
+</dd>
+<dt class="field-even">Return type<span class="colon">:</span></dt>
+<dd class="field-even"><p><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#list" title="(in Python v3.14)">list</a>[<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#tuple" title="(in Python v3.14)">tuple</a>]</p>
+</dd>
+</dl>
+<p class="rubric">Examples</p>
+<div class="doctest highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="n">all_items</span> <span class="o">=</span> <span class="n">settings</span><span class="o">.</span><span class="n">items</span><span class="p">()</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="k">for</span> <span class="n">key</span><span class="p">,</span> <span class="n">value</span> <span class="ow">in</span> <span class="n">all_items</span><span class="p">:</span>
+<span class="gp">... </span>    <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">key</span><span class="si">}</span><span class="s2">: </span><span class="si">{</span><span class="n">value</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="c1"># Or iterate directly:</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="k">for</span> <span class="n">key</span><span class="p">,</span> <span class="n">value</span> <span class="ow">in</span> <span class="n">settings</span><span class="o">.</span><span class="n">items</span><span class="p">():</span>
+<span class="gp">... </span>    <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">key</span><span class="si">}</span><span class="s2">: </span><span class="si">{</span><span class="n">value</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+</pre></div>
+</div>
 </dd></dl>
 
 <dl class="py method">
@@ -758,7 +740,7 @@ stored for the given key.</p>
 <dd class="field-odd"><p>List of all setting key names</p>
 </dd>
 <dt class="field-even">Return type<span class="colon">:</span></dt>
-<dd class="field-even"><p><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#list" title="(in Python v3.14)">list</a> of <a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)">str</a></p>
+<dd class="field-even"><p><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#list" title="(in Python v3.14)">list</a>[<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)">str</a>]</p>
 </dd>
 </dl>
 <p class="rubric">Examples</p>
@@ -773,14 +755,11 @@ stored for the given key.</p>
 <dt class="sig sig-object py" id="qdk_chemistry.plugins.qiskit._interop.transpiler.Settings.lock">
 <span class="sig-name descname"><span class="pre">lock</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">self</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference internal" href="qdk_chemistry.plugins.qiskit.qubit_mapper.html#qdk_chemistry.plugins.qiskit.qubit_mapper.Settings" title="qdk_chemistry._core.data.Settings"><span class="pre">qdk_chemistry._core.data.Settings</span></a></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><a class="reference external" href="https://docs.python.org/3/library/constants.html#None" title="(in Python v3.14)"><span class="pre">None</span></a></span></span><a class="headerlink" href="#qdk_chemistry.plugins.qiskit._interop.transpiler.Settings.lock" title="Link to this definition"></a></dt>
 <dd><p>Lock the settings to prevent further modifications.</p>
-<p>Once settings are locked, any attempt to modify them will raise
-an exception. This is useful to ensure that settings remain unchanged
-after they have been validated or after a computation has started.</p>
-<div class="admonition note">
-<p class="admonition-title">Note</p>
+<p>Once settings are locked, any attempt to modify them will raise an exception.
+This is useful to ensure that settings remain unchanged after they have been validated or after a computation has started.</p>
+<p class="rubric">Notes</p>
 <p>Locking is irreversible for the lifetime of the Settings object.
 To modify settings after locking, create a copy of the Settings object.</p>
-</div>
 <p class="rubric">Examples</p>
 <div class="doctest highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="n">settings</span><span class="p">[</span><span class="s2">&quot;method&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="s2">&quot;hf&quot;</span>
 <span class="gp">&gt;&gt;&gt; </span><span class="n">settings</span><span class="p">[</span><span class="s2">&quot;max_iterations&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="mi">100</span>
@@ -795,8 +774,7 @@ To modify settings after locking, create a copy of the Settings object.</p>
 <dt class="sig sig-object py" id="qdk_chemistry.plugins.qiskit._interop.transpiler.Settings.set">
 <span class="sig-name descname"><span class="pre">set</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">self</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference internal" href="qdk_chemistry.plugins.qiskit.qubit_mapper.html#qdk_chemistry.plugins.qiskit.qubit_mapper.Settings" title="qdk_chemistry._core.data.Settings"><span class="pre">qdk_chemistry._core.data.Settings</span></a></span></em>, <em class="sig-param"><span class="n"><span class="pre">key</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)"><span class="pre">str</span></a></span></em>, <em class="sig-param"><span class="n"><span class="pre">value</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/library/functions.html#object" title="(in Python v3.14)"><span class="pre">object</span></a></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><a class="reference external" href="https://docs.python.org/3/library/constants.html#None" title="(in Python v3.14)"><span class="pre">None</span></a></span></span><a class="headerlink" href="#qdk_chemistry.plugins.qiskit._interop.transpiler.Settings.set" title="Link to this definition"></a></dt>
 <dd><p>Set a setting value (accepts any Python object).</p>
-<p>This method allows setting values using any supported Python type,
-which will be automatically converted to the appropriate SettingValue variant.
+<p>This method allows setting values using any supported Python type, which will be automatically converted to the appropriate SettingValue variant.
 The value must match the expected type for the setting key.</p>
 <dl class="field-list simple">
 <dt class="field-odd">Parameters<span class="colon">:</span></dt>
@@ -826,8 +804,8 @@ The value must match the expected type for the setting key.</p>
 <dt class="sig sig-object py" id="qdk_chemistry.plugins.qiskit._interop.transpiler.Settings.set_from_map">
 <span class="sig-name descname"><span class="pre">set_from_map</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">self</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference internal" href="qdk_chemistry.plugins.qiskit.qubit_mapper.html#qdk_chemistry.plugins.qiskit.qubit_mapper.Settings" title="qdk_chemistry._core.data.Settings"><span class="pre">qdk_chemistry._core.data.Settings</span></a></span></em>, <em class="sig-param"><span class="n"><span class="pre">settings_map</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/library/collections.abc.html#collections.abc.Mapping" title="(in Python v3.14)"><span class="pre">collections.abc.Mapping</span></a><span class="p"><span class="pre">[</span></span><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)"><span class="pre">str</span></a><span class="p"><span class="pre">,</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/library/functions.html#bool" title="(in Python v3.14)"><span class="pre">bool</span></a><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.SupportsInt" title="(in Python v3.14)"><span class="pre">SupportsInt</span></a><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.SupportsInt" title="(in Python v3.14)"><span class="pre">SupportsInt</span></a><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.SupportsInt" title="(in Python v3.14)"><span class="pre">SupportsInt</span></a><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.SupportsFloat" title="(in Python v3.14)"><span class="pre">SupportsFloat</span></a><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.SupportsFloat" title="(in Python v3.14)"><span class="pre">SupportsFloat</span></a><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)"><span class="pre">str</span></a><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/library/collections.abc.html#collections.abc.Sequence" title="(in Python v3.14)"><span class="pre">collections.abc.Sequence</span></a><span class="p"><span class="pre">[</span></span><a class="reference external" href="https://docs.python.org/3/library/functions.html#bool" title="(in Python v3.14)"><span class="pre">bool</span></a><span class="p"><span class="pre">]</span></span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/library/collections.abc.html#collections.abc.Sequence" title="(in Python v3.14)"><span class="pre">collections.abc.Sequence</span></a><span class="p"><span class="pre">[</span></span><a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.SupportsInt" title="(in Python v3.14)"><span class="pre">SupportsInt</span></a><span class="p"><span class="pre">]</span></span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/library/collections.abc.html#collections.abc.Sequence" title="(in Python v3.14)"><span class="pre">collections.abc.Sequence</span></a><span class="p"><span class="pre">[</span></span><a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.SupportsFloat" title="(in Python v3.14)"><span class="pre">SupportsFloat</span></a><span class="p"><span class="pre">]</span></span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/library/collections.abc.html#collections.abc.Sequence" title="(in Python v3.14)"><span class="pre">collections.abc.Sequence</span></a><span class="p"><span class="pre">[</span></span><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)"><span class="pre">str</span></a><span class="p"><span class="pre">]</span></span><span class="p"><span class="pre">]</span></span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><a class="reference external" href="https://docs.python.org/3/library/constants.html#None" title="(in Python v3.14)"><span class="pre">None</span></a></span></span><a class="headerlink" href="#qdk_chemistry.plugins.qiskit._interop.transpiler.Settings.set_from_map" title="Link to this definition"></a></dt>
 <dd><p>Set settings from a map (useful for Python dictionary conversion).</p>
-<p>Loads settings from a C++ map structure. This is primarily used
-internally for converting from Python dictionaries.</p>
+<p>Loads settings from a C++ map structure.
+This is primarily used internally for converting from Python dictionaries.</p>
 <dl class="field-list simple">
 <dt class="field-odd">Parameters<span class="colon">:</span></dt>
 <dd class="field-odd"><p><strong>settings_map</strong> (<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#dict" title="(in Python v3.14)"><em>dict</em></a>) – Map containing setting key-value pairs</p>
@@ -845,8 +823,7 @@ internally for converting from Python dictionaries.</p>
 <dt class="sig sig-object py" id="qdk_chemistry.plugins.qiskit._interop.transpiler.Settings.set_raw">
 <span class="sig-name descname"><span class="pre">set_raw</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">self</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference internal" href="qdk_chemistry.plugins.qiskit.qubit_mapper.html#qdk_chemistry.plugins.qiskit.qubit_mapper.Settings" title="qdk_chemistry._core.data.Settings"><span class="pre">qdk_chemistry._core.data.Settings</span></a></span></em>, <em class="sig-param"><span class="n"><span class="pre">key</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)"><span class="pre">str</span></a></span></em>, <em class="sig-param"><span class="n"><span class="pre">value</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/library/functions.html#bool" title="(in Python v3.14)"><span class="pre">bool</span></a><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.SupportsInt" title="(in Python v3.14)"><span class="pre">SupportsInt</span></a><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.SupportsInt" title="(in Python v3.14)"><span class="pre">SupportsInt</span></a><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.SupportsInt" title="(in Python v3.14)"><span class="pre">SupportsInt</span></a><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.SupportsFloat" title="(in Python v3.14)"><span class="pre">SupportsFloat</span></a><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.SupportsFloat" title="(in Python v3.14)"><span class="pre">SupportsFloat</span></a><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)"><span class="pre">str</span></a><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/library/collections.abc.html#collections.abc.Sequence" title="(in Python v3.14)"><span class="pre">collections.abc.Sequence</span></a><span class="p"><span class="pre">[</span></span><a class="reference external" href="https://docs.python.org/3/library/functions.html#bool" title="(in Python v3.14)"><span class="pre">bool</span></a><span class="p"><span class="pre">]</span></span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/library/collections.abc.html#collections.abc.Sequence" title="(in Python v3.14)"><span class="pre">collections.abc.Sequence</span></a><span class="p"><span class="pre">[</span></span><a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.SupportsInt" title="(in Python v3.14)"><span class="pre">SupportsInt</span></a><span class="p"><span class="pre">]</span></span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/library/collections.abc.html#collections.abc.Sequence" title="(in Python v3.14)"><span class="pre">collections.abc.Sequence</span></a><span class="p"><span class="pre">[</span></span><a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.SupportsFloat" title="(in Python v3.14)"><span class="pre">SupportsFloat</span></a><span class="p"><span class="pre">]</span></span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/library/collections.abc.html#collections.abc.Sequence" title="(in Python v3.14)"><span class="pre">collections.abc.Sequence</span></a><span class="p"><span class="pre">[</span></span><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)"><span class="pre">str</span></a><span class="p"><span class="pre">]</span></span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><a class="reference external" href="https://docs.python.org/3/library/constants.html#None" title="(in Python v3.14)"><span class="pre">None</span></a></span></span><a class="headerlink" href="#qdk_chemistry.plugins.qiskit._interop.transpiler.Settings.set_raw" title="Link to this definition"></a></dt>
 <dd><p>Set a setting value using a SettingValue variant.</p>
-<p>This is the raw interface that accepts a SettingValue directly,
-primarily for internal use or advanced scenarios.</p>
+<p>This is the raw interface that accepts a SettingValue directly, primarily for internal use or advanced scenarios.</p>
 <dl class="field-list simple">
 <dt class="field-odd">Parameters<span class="colon">:</span></dt>
 <dd class="field-odd"><ul class="simple">
@@ -883,48 +860,52 @@ primarily for internal use or advanced scenarios.</p>
 <dt class="sig sig-object py" id="qdk_chemistry.plugins.qiskit._interop.transpiler.Settings.to_dict">
 <span class="sig-name descname"><span class="pre">to_dict</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="o"><span class="pre">*</span></span><span class="n"><span class="pre">args</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">kwargs</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#qdk_chemistry.plugins.qiskit._interop.transpiler.Settings.to_dict" title="Link to this definition"></a></dt>
 <dd><p>Overloaded function.</p>
-<ol class="arabic">
-<li><p>to_dict(self: qdk_chemistry._core.data.Settings) -&gt; dict</p>
-<blockquote>
-<div><p>Convert settings to Python dictionary.</p>
-<p>Creates a Python dictionary containing all settings with keys as strings
-and values converted to appropriate Python types.</p>
-<dl class="simple">
-<dt>dict</dt><dd><p>Python dictionary with all settings</p>
-</dd>
-</dl>
-<div class="doctest highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="n">settings_dict</span> <span class="o">=</span> <span class="n">settings</span><span class="o">.</span><span class="n">to_dict</span><span class="p">()</span>
-<span class="gp">&gt;&gt;&gt; </span><span class="nb">print</span><span class="p">(</span><span class="n">settings_dict</span><span class="p">)</span>
-<span class="go">{&#39;method&#39;: &#39;hf&#39;, &#39;max_iterations&#39;: 100, &#39;tolerance&#39;: 1e-06}</span>
-<span class="gp">&gt;&gt;&gt;</span>
-<span class="gp">&gt;&gt;&gt; </span><span class="c1"># Can be used with JSON, pickle, etc.</span>
-<span class="gp">&gt;&gt;&gt; </span><span class="kn">import</span><span class="w"> </span><span class="nn">json</span>
-<span class="gp">&gt;&gt;&gt; </span><span class="n">json_str</span> <span class="o">=</span> <span class="n">json</span><span class="o">.</span><span class="n">dumps</span><span class="p">(</span><span class="n">settings_dict</span><span class="p">)</span>
-</pre></div>
-</div>
-</div></blockquote>
-</li>
-<li><p>to_dict(self: qdk_chemistry._core.data.Settings) -&gt; dict</p>
-<blockquote>
-<div><p>Convert settings to Python dictionary.</p>
-<p>Creates a Python dictionary containing all settings with keys as strings
-and values converted to appropriate Python types.</p>
-<dl class="simple">
-<dt>dict</dt><dd><p>Python dictionary with all settings</p>
-</dd>
-</dl>
-<div class="doctest highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="n">settings_dict</span> <span class="o">=</span> <span class="n">settings</span><span class="o">.</span><span class="n">to_dict</span><span class="p">()</span>
-<span class="gp">&gt;&gt;&gt; </span><span class="nb">print</span><span class="p">(</span><span class="n">settings_dict</span><span class="p">)</span>
-<span class="go">{&#39;method&#39;: &#39;hf&#39;, &#39;max_iterations&#39;: 100, &#39;tolerance&#39;: 1e-06}</span>
-<span class="gp">&gt;&gt;&gt;</span>
-<span class="gp">&gt;&gt;&gt; </span><span class="c1"># Can be used with JSON, pickle, etc.</span>
-<span class="gp">&gt;&gt;&gt; </span><span class="kn">import</span><span class="w"> </span><span class="nn">json</span>
-<span class="gp">&gt;&gt;&gt; </span><span class="n">json_str</span> <span class="o">=</span> <span class="n">json</span><span class="o">.</span><span class="n">dumps</span><span class="p">(</span><span class="n">settings_dict</span><span class="p">)</span>
-</pre></div>
-</div>
-</div></blockquote>
-</li>
+<ol class="arabic simple">
+<li><p>to_dict(self: qdk_chemistry._core.data.Settings) -&gt; dict</p></li>
 </ol>
+<p>Convert settings to Python dictionary.</p>
+<p>Creates a Python dictionary containing all settings with keys as strings and values converted to appropriate Python types.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Returns<span class="colon">:</span></dt>
+<dd class="field-odd"><p>Python dictionary with all settings</p>
+</dd>
+<dt class="field-even">Return type<span class="colon">:</span></dt>
+<dd class="field-even"><p><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#dict" title="(in Python v3.14)">dict</a></p>
+</dd>
+</dl>
+<p class="rubric">Examples</p>
+<div class="doctest highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="n">settings_dict</span> <span class="o">=</span> <span class="n">settings</span><span class="o">.</span><span class="n">to_dict</span><span class="p">()</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="nb">print</span><span class="p">(</span><span class="n">settings_dict</span><span class="p">)</span>
+<span class="go">{&#39;method&#39;: &#39;hf&#39;, &#39;max_iterations&#39;: 100, &#39;tolerance&#39;: 1e-06}</span>
+<span class="gp">&gt;&gt;&gt;</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="c1"># Can be used with JSON, pickle, etc.</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="kn">import</span><span class="w"> </span><span class="nn">json</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">json_str</span> <span class="o">=</span> <span class="n">json</span><span class="o">.</span><span class="n">dumps</span><span class="p">(</span><span class="n">settings_dict</span><span class="p">)</span>
+</pre></div>
+</div>
+<ol class="arabic simple" start="2">
+<li><p>to_dict(self: qdk_chemistry._core.data.Settings) -&gt; dict</p></li>
+</ol>
+<p>Convert settings to Python dictionary.</p>
+<p>Creates a Python dictionary containing all settings with keys as strings and values converted to appropriate Python types.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Returns<span class="colon">:</span></dt>
+<dd class="field-odd"><p>Python dictionary with all settings</p>
+</dd>
+<dt class="field-even">Return type<span class="colon">:</span></dt>
+<dd class="field-even"><p><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#dict" title="(in Python v3.14)">dict</a></p>
+</dd>
+</dl>
+<p class="rubric">Examples</p>
+<div class="doctest highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="n">settings_dict</span> <span class="o">=</span> <span class="n">settings</span><span class="o">.</span><span class="n">to_dict</span><span class="p">()</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="nb">print</span><span class="p">(</span><span class="n">settings_dict</span><span class="p">)</span>
+<span class="go">{&#39;method&#39;: &#39;hf&#39;, &#39;max_iterations&#39;: 100, &#39;tolerance&#39;: 1e-06}</span>
+<span class="gp">&gt;&gt;&gt;</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="c1"># Can be used with JSON, pickle, etc.</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="kn">import</span><span class="w"> </span><span class="nn">json</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">json_str</span> <span class="o">=</span> <span class="n">json</span><span class="o">.</span><span class="n">dumps</span><span class="p">(</span><span class="n">settings_dict</span><span class="p">)</span>
+</pre></div>
+</div>
 </dd></dl>
 
 <dl class="py method">
@@ -934,7 +915,7 @@ and values converted to appropriate Python types.</p>
 <dl class="field-list simple">
 <dt class="field-odd">Parameters<span class="colon">:</span></dt>
 <dd class="field-odd"><ul class="simple">
-<li><p><strong>filename</strong> (<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)"><em>str</em></a><em> or </em><a class="reference external" href="https://docs.python.org/3/library/pathlib.html#pathlib.Path" title="(in Python v3.14)"><em>pathlib.Path</em></a>) – Path to output file.</p></li>
+<li><p><strong>filename</strong> (<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)"><em>str</em></a><em> | </em><a class="reference external" href="https://docs.python.org/3/library/pathlib.html#pathlib.Path" title="(in Python v3.14)"><em>pathlib.Path</em></a>) – Path to output file.</p></li>
 <li><p><strong>format_type</strong> (<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)"><em>str</em></a>) – Format type (“json” or “hdf5”)</p></li>
 </ul>
 </dd>
@@ -957,8 +938,7 @@ and values converted to appropriate Python types.</p>
 <dd><p>Save settings to HDF5 file.</p>
 <dl class="field-list simple">
 <dt class="field-odd">Parameters<span class="colon">:</span></dt>
-<dd class="field-odd"><p><strong>filename</strong> (<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)"><em>str</em></a>) – Path to output file. Must have ‘.settings.h5’ extension
-(e.g., <code class="docutils literal notranslate"><span class="pre">config.settings.h5</span></code>, <code class="docutils literal notranslate"><span class="pre">parameters.settings.h5</span></code>)</p>
+<dd class="field-odd"><p><strong>filename</strong> (<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)"><em>str</em></a>) – Path to output file. Must have ‘.settings.h5’ extension (e.g., <code class="docutils literal notranslate"><span class="pre">config.settings.h5</span></code>, <code class="docutils literal notranslate"><span class="pre">parameters.settings.h5</span></code>)</p>
 </dd>
 <dt class="field-even">Raises<span class="colon">:</span></dt>
 <dd class="field-even"><ul class="simple">
@@ -979,8 +959,7 @@ and values converted to appropriate Python types.</p>
 <span class="sig-name descname"><span class="pre">to_json</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">self</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference internal" href="qdk_chemistry.plugins.qiskit.qubit_mapper.html#qdk_chemistry.plugins.qiskit.qubit_mapper.Settings" title="qdk_chemistry._core.data.Settings"><span class="pre">qdk_chemistry._core.data.Settings</span></a></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)"><span class="pre">str</span></a></span></span><a class="headerlink" href="#qdk_chemistry.plugins.qiskit._interop.transpiler.Settings.to_json" title="Link to this definition"></a></dt>
 <dd><p>Convert settings to JSON format.</p>
 <p>Serializes all settings to a JSON string with pretty formatting.
-The JSON format preserves all type information and can be used
-to reconstruct the settings later.</p>
+The JSON format preserves all type information and can be used to reconstruct the settings later.</p>
 <dl class="field-list simple">
 <dt class="field-odd">Returns<span class="colon">:</span></dt>
 <dd class="field-odd"><p>JSON string representation of all settings</p>
@@ -1005,76 +984,77 @@ to reconstruct the settings later.</p>
 <dt class="sig sig-object py" id="qdk_chemistry.plugins.qiskit._interop.transpiler.Settings.to_json_file">
 <span class="sig-name descname"><span class="pre">to_json_file</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="o"><span class="pre">*</span></span><span class="n"><span class="pre">args</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">kwargs</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#qdk_chemistry.plugins.qiskit._interop.transpiler.Settings.to_json_file" title="Link to this definition"></a></dt>
 <dd><p>Overloaded function.</p>
-<ol class="arabic">
-<li><p>to_json_file(self: qdk_chemistry._core.data.Settings, filename: object) -&gt; None</p>
-<blockquote>
-<div><p>Save settings to JSON file.</p>
+<ol class="arabic simple">
+<li><p>to_json_file(self: qdk_chemistry._core.data.Settings, filename: object) -&gt; None</p></li>
+</ol>
+<p>Save settings to JSON file.</p>
 <p>Writes all settings to a JSON file with pretty formatting.
 The file will be created or overwritten if it already exists.</p>
-<dl class="simple">
-<dt>filename<span class="classifier">str or pathlib.Path</span></dt><dd><p>Path to the JSON file to write. Must have ‘.settings’ before the file
-extension (e.g., <code class="docutils literal notranslate"><span class="pre">config.settings.json</span></code>, <code class="docutils literal notranslate"><span class="pre">params.settings.json</span></code>)</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>filename</strong> (<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)"><em>str</em></a><em> | </em><a class="reference external" href="https://docs.python.org/3/library/pathlib.html#pathlib.Path" title="(in Python v3.14)"><em>pathlib.Path</em></a>) – Path to the JSON file to write.
+Must have ‘.settings’ before the file extension (e.g., <code class="docutils literal notranslate"><span class="pre">config.settings.json</span></code>, <code class="docutils literal notranslate"><span class="pre">params.settings.json</span></code>)</p>
+</dd>
+<dt class="field-even">Raises<span class="colon">:</span></dt>
+<dd class="field-even"><ul class="simple">
+<li><p><a class="reference external" href="https://docs.python.org/3/library/exceptions.html#ValueError" title="(in Python v3.14)"><strong>ValueError</strong></a> – If filename doesn’t follow the required naming convention</p></li>
+<li><p><a class="reference external" href="https://docs.python.org/3/library/exceptions.html#RuntimeError" title="(in Python v3.14)"><strong>RuntimeError</strong></a> – If the file cannot be opened or written</p></li>
+</ul>
 </dd>
 </dl>
-<dl class="simple">
-<dt>ValueError</dt><dd><p>If filename doesn’t follow the required naming convention</p>
-</dd>
-<dt>RuntimeError</dt><dd><p>If the file cannot be opened or written</p>
-</dd>
-</dl>
+<p class="rubric">Examples</p>
 <div class="doctest highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="n">settings</span><span class="o">.</span><span class="n">to_json_file</span><span class="p">(</span><span class="s2">&quot;config.settings.json&quot;</span><span class="p">)</span>
 <span class="gp">&gt;&gt;&gt; </span><span class="n">settings</span><span class="o">.</span><span class="n">to_json_file</span><span class="p">(</span><span class="s2">&quot;params.settings.json&quot;</span><span class="p">)</span>
 <span class="gp">&gt;&gt;&gt; </span><span class="kn">from</span><span class="w"> </span><span class="nn">pathlib</span><span class="w"> </span><span class="kn">import</span> <span class="n">Path</span>
 <span class="gp">&gt;&gt;&gt; </span><span class="n">settings</span><span class="o">.</span><span class="n">to_json_file</span><span class="p">(</span><span class="n">Path</span><span class="p">(</span><span class="s2">&quot;config.settings.json&quot;</span><span class="p">))</span>
 </pre></div>
 </div>
-</div></blockquote>
-</li>
-<li><p>to_json_file(self: qdk_chemistry._core.data.Settings, filename: object) -&gt; None</p>
-<blockquote>
-<div><p>Save settings to JSON file.</p>
-<dl class="simple">
-<dt>filename<span class="classifier">str or pathlib.Path</span></dt><dd><p>Path to output file. Must have ‘.settings.json’ extension
-(e.g., <code class="docutils literal notranslate"><span class="pre">config.settings.json</span></code>, <code class="docutils literal notranslate"><span class="pre">parameters.settings.json</span></code>)</p>
-</dd>
-</dl>
-<dl class="simple">
-<dt>ValueError</dt><dd><p>If filename doesn’t follow the required naming convention</p>
-</dd>
-<dt>RuntimeError</dt><dd><p>If the file cannot be opened or written</p>
-</dd>
-</dl>
-<div class="doctest highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="n">settings</span><span class="o">.</span><span class="n">to_json_file</span><span class="p">(</span><span class="s2">&quot;config.settings.json&quot;</span><span class="p">)</span>
-<span class="gp">&gt;&gt;&gt; </span><span class="n">settings</span><span class="o">.</span><span class="n">to_json_file</span><span class="p">(</span><span class="s2">&quot;parameters.settings.json&quot;</span><span class="p">)</span>
-<span class="gp">&gt;&gt;&gt; </span><span class="kn">from</span><span class="w"> </span><span class="nn">pathlib</span><span class="w"> </span><span class="kn">import</span> <span class="n">Path</span>
-<span class="gp">&gt;&gt;&gt; </span><span class="n">settings</span><span class="o">.</span><span class="n">to_json_file</span><span class="p">(</span><span class="n">Path</span><span class="p">(</span><span class="s2">&quot;config.settings.json&quot;</span><span class="p">))</span>
-</pre></div>
-</div>
-</div></blockquote>
-</li>
-<li><p>to_json_file(self: qdk_chemistry._core.data.Settings, filename: object) -&gt; None</p>
-<blockquote>
-<div><p>Save settings to JSON file.</p>
-<dl class="simple">
-<dt>filename<span class="classifier">str or pathlib.Path</span></dt><dd><p>Path to output file. Must have ‘.settings.json’ extension
-(e.g., <code class="docutils literal notranslate"><span class="pre">config.settings.json</span></code>, <code class="docutils literal notranslate"><span class="pre">parameters.settings.json</span></code>)</p>
-</dd>
-</dl>
-<dl class="simple">
-<dt>ValueError</dt><dd><p>If filename doesn’t follow the required naming convention</p>
-</dd>
-<dt>RuntimeError</dt><dd><p>If the file cannot be opened or written</p>
-</dd>
-</dl>
-<div class="doctest highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="n">settings</span><span class="o">.</span><span class="n">to_json_file</span><span class="p">(</span><span class="s2">&quot;config.settings.json&quot;</span><span class="p">)</span>
-<span class="gp">&gt;&gt;&gt; </span><span class="n">settings</span><span class="o">.</span><span class="n">to_json_file</span><span class="p">(</span><span class="s2">&quot;parameters.settings.json&quot;</span><span class="p">)</span>
-<span class="gp">&gt;&gt;&gt; </span><span class="kn">from</span><span class="w"> </span><span class="nn">pathlib</span><span class="w"> </span><span class="kn">import</span> <span class="n">Path</span>
-<span class="gp">&gt;&gt;&gt; </span><span class="n">settings</span><span class="o">.</span><span class="n">to_json_file</span><span class="p">(</span><span class="n">Path</span><span class="p">(</span><span class="s2">&quot;config.settings.json&quot;</span><span class="p">))</span>
-</pre></div>
-</div>
-</div></blockquote>
-</li>
+<ol class="arabic simple" start="2">
+<li><p>to_json_file(self: qdk_chemistry._core.data.Settings, filename: object) -&gt; None</p></li>
 </ol>
+<p>Save settings to JSON file.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>filename</strong> (<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)"><em>str</em></a><em> | </em><a class="reference external" href="https://docs.python.org/3/library/pathlib.html#pathlib.Path" title="(in Python v3.14)"><em>pathlib.Path</em></a>) – Path to output file.
+Must have ‘.settings.json’ extension (e.g., <code class="docutils literal notranslate"><span class="pre">config.settings.json</span></code>, <code class="docutils literal notranslate"><span class="pre">parameters.settings.json</span></code>)</p>
+</dd>
+<dt class="field-even">Raises<span class="colon">:</span></dt>
+<dd class="field-even"><ul class="simple">
+<li><p><a class="reference external" href="https://docs.python.org/3/library/exceptions.html#ValueError" title="(in Python v3.14)"><strong>ValueError</strong></a> – If filename doesn’t follow the required naming convention</p></li>
+<li><p><a class="reference external" href="https://docs.python.org/3/library/exceptions.html#RuntimeError" title="(in Python v3.14)"><strong>RuntimeError</strong></a> – If the file cannot be opened or written</p></li>
+</ul>
+</dd>
+</dl>
+<p class="rubric">Examples</p>
+<div class="doctest highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="n">settings</span><span class="o">.</span><span class="n">to_json_file</span><span class="p">(</span><span class="s2">&quot;config.settings.json&quot;</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">settings</span><span class="o">.</span><span class="n">to_json_file</span><span class="p">(</span><span class="s2">&quot;parameters.settings.json&quot;</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="kn">from</span><span class="w"> </span><span class="nn">pathlib</span><span class="w"> </span><span class="kn">import</span> <span class="n">Path</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">settings</span><span class="o">.</span><span class="n">to_json_file</span><span class="p">(</span><span class="n">Path</span><span class="p">(</span><span class="s2">&quot;config.settings.json&quot;</span><span class="p">))</span>
+</pre></div>
+</div>
+<ol class="arabic simple" start="3">
+<li><p>to_json_file(self: qdk_chemistry._core.data.Settings, filename: object) -&gt; None</p></li>
+</ol>
+<p>Save settings to JSON file.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>filename</strong> (<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)"><em>str</em></a><em> | </em><a class="reference external" href="https://docs.python.org/3/library/pathlib.html#pathlib.Path" title="(in Python v3.14)"><em>pathlib.Path</em></a>) – Path to output file.
+Must have ‘.settings.json’ extension (e.g., <code class="docutils literal notranslate"><span class="pre">config.settings.json</span></code>, <code class="docutils literal notranslate"><span class="pre">parameters.settings.json</span></code>)</p>
+</dd>
+<dt class="field-even">Raises<span class="colon">:</span></dt>
+<dd class="field-even"><ul class="simple">
+<li><p><a class="reference external" href="https://docs.python.org/3/library/exceptions.html#ValueError" title="(in Python v3.14)"><strong>ValueError</strong></a> – If filename doesn’t follow the required naming convention</p></li>
+<li><p><a class="reference external" href="https://docs.python.org/3/library/exceptions.html#RuntimeError" title="(in Python v3.14)"><strong>RuntimeError</strong></a> – If the file cannot be opened or written</p></li>
+</ul>
+</dd>
+</dl>
+<p class="rubric">Examples</p>
+<div class="doctest highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="n">settings</span><span class="o">.</span><span class="n">to_json_file</span><span class="p">(</span><span class="s2">&quot;config.settings.json&quot;</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">settings</span><span class="o">.</span><span class="n">to_json_file</span><span class="p">(</span><span class="s2">&quot;parameters.settings.json&quot;</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="kn">from</span><span class="w"> </span><span class="nn">pathlib</span><span class="w"> </span><span class="kn">import</span> <span class="n">Path</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">settings</span><span class="o">.</span><span class="n">to_json_file</span><span class="p">(</span><span class="n">Path</span><span class="p">(</span><span class="s2">&quot;config.settings.json&quot;</span><span class="p">))</span>
+</pre></div>
+</div>
 </dd></dl>
 
 <dl class="py method">
@@ -1103,29 +1083,29 @@ Both methods return the same JSON string representation.</p>
 <dt class="sig sig-object py" id="qdk_chemistry.plugins.qiskit._interop.transpiler.Settings.update">
 <span class="sig-name descname"><span class="pre">update</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="o"><span class="pre">*</span></span><span class="n"><span class="pre">args</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">kwargs</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#qdk_chemistry.plugins.qiskit._interop.transpiler.Settings.update" title="Link to this definition"></a></dt>
 <dd><p>Overloaded function.</p>
-<ol class="arabic">
-<li><p>update(self: qdk_chemistry._core.data.Settings, key: str, value: object) -&gt; None</p>
-<blockquote>
-<div><p>Update a setting value, throwing if key doesn’t exist.</p>
-<p>Unlike <code class="docutils literal notranslate"><span class="pre">set()</span></code>, this method will only update existing settings and
-will raise an exception if the key is not already present.
+<ol class="arabic simple">
+<li><p>update(self: qdk_chemistry._core.data.Settings, key: str, value: object) -&gt; None</p></li>
+</ol>
+<p>Update a setting value, throwing if key doesn’t exist.</p>
+<p>Unlike <code class="docutils literal notranslate"><span class="pre">set()</span></code>, this method will only update existing settings and will raise an exception if the key is not already present.
 Accepts any Python object for the value, which must match the expected type.</p>
-<dl class="simple">
-<dt>dict<span class="classifier">dict</span></dt><dd><p>Python dictionary containing settings to update, or instead</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>dict</strong> (<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#dict" title="(in Python v3.14)"><em>dict</em></a>) – Python dictionary containing settings to update, or instead</p></li>
+<li><p><strong>key</strong> (<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)"><em>str</em></a>) – The setting key name (must already exist)</p></li>
+<li><p><strong>value</strong> (<a class="reference external" href="https://docs.python.org/3/library/functions.html#object" title="(in Python v3.14)"><em>object</em></a>) – The new value to set</p></li>
+</ul>
 </dd>
-<dt>key<span class="classifier">str</span></dt><dd><p>The setting key name (must already exist)</p>
-</dd>
-<dt>value<span class="classifier">object</span></dt><dd><p>The new value to set</p>
+<dt class="field-even">Raises<span class="colon">:</span></dt>
+<dd class="field-even"><ul class="simple">
+<li><p><a class="reference internal" href="qdk_chemistry.data.html#qdk_chemistry.data.SettingNotFound" title="qdk_chemistry.data.SettingNotFound"><strong>SettingNotFound</strong></a> – If the key doesn’t exist in the settings</p></li>
+<li><p><a class="reference internal" href="qdk_chemistry.data.html#qdk_chemistry.data.SettingTypeMismatch" title="qdk_chemistry.data.SettingTypeMismatch"><strong>SettingTypeMismatch</strong></a> – If the value type does not match the expected type for this key</p></li>
+<li><p><a class="reference external" href="https://docs.python.org/3/library/exceptions.html#RuntimeError" title="(in Python v3.14)"><strong>RuntimeError</strong></a> – If the value type is not supported</p></li>
+</ul>
 </dd>
 </dl>
-<dl class="simple">
-<dt>SettingNotFound</dt><dd><p>If the key doesn’t exist in the settings</p>
-</dd>
-<dt>SettingTypeMismatch</dt><dd><p>If the value type does not match the expected type for this key</p>
-</dd>
-<dt>RuntimeError</dt><dd><p>If the value type is not supported</p>
-</dd>
-</dl>
+<p class="rubric">Examples</p>
 <div class="doctest highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="n">settings</span><span class="o">.</span><span class="n">update</span><span class="p">(</span><span class="s2">&quot;max_iterations&quot;</span><span class="p">,</span> <span class="mi">200</span><span class="p">)</span>  <span class="c1"># OK if key exists</span>
 <span class="gp">&gt;&gt;&gt; </span><span class="n">settings</span><span class="o">.</span><span class="n">update</span><span class="p">(</span><span class="s2">&quot;new_key&quot;</span><span class="p">,</span> <span class="s2">&quot;value&quot;</span><span class="p">)</span>     <span class="c1"># Raises SettingNotFound</span>
 </pre></div>
@@ -1138,31 +1118,30 @@ Accepts any Python object for the value, which must match the expected type.</p>
 <span class="gp">&gt;&gt;&gt; </span><span class="n">settings</span><span class="o">.</span><span class="n">update</span><span class="p">({</span><span class="s1">&#39;new_key&#39;</span><span class="p">:</span> <span class="s1">&#39;value&#39;</span><span class="p">})</span>  <span class="c1"># Raises SettingNotFound</span>
 </pre></div>
 </div>
-</div></blockquote>
-</li>
+<ol class="arabic simple" start="2">
 <li><p>update(self: qdk_chemistry._core.data.Settings, dict: dict) -&gt; None</p></li>
-<li><p>update(self: qdk_chemistry._core.data.Settings, key: str, value: object) -&gt; None</p>
-<blockquote>
-<div><p>Update a setting value, throwing if key doesn’t exist.</p>
-<p>Unlike <code class="docutils literal notranslate"><span class="pre">set()</span></code>, this method will only update existing settings and
-will raise an exception if the key is not already present.
+<li><p>update(self: qdk_chemistry._core.data.Settings, key: str, value: object) -&gt; None</p></li>
+</ol>
+<p>Update a setting value, throwing if key doesn’t exist.</p>
+<p>Unlike <code class="docutils literal notranslate"><span class="pre">set()</span></code>, this method will only update existing settings and will raise an exception if the key is not already present.
 Accepts any Python object for the value, which must match the expected type.</p>
-<dl class="simple">
-<dt>dict<span class="classifier">dict</span></dt><dd><p>Python dictionary containing settings to update, or instead</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>dict</strong> (<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#dict" title="(in Python v3.14)"><em>dict</em></a>) – Python dictionary containing settings to update, or instead</p></li>
+<li><p><strong>key</strong> (<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)"><em>str</em></a>) – The setting key name (must already exist)</p></li>
+<li><p><strong>value</strong> (<a class="reference external" href="https://docs.python.org/3/library/functions.html#object" title="(in Python v3.14)"><em>object</em></a>) – The new value to set</p></li>
+</ul>
 </dd>
-<dt>key<span class="classifier">str</span></dt><dd><p>The setting key name (must already exist)</p>
-</dd>
-<dt>value<span class="classifier">object</span></dt><dd><p>The new value to set</p>
+<dt class="field-even">Raises<span class="colon">:</span></dt>
+<dd class="field-even"><ul class="simple">
+<li><p><a class="reference internal" href="qdk_chemistry.data.html#qdk_chemistry.data.SettingNotFound" title="qdk_chemistry.data.SettingNotFound"><strong>SettingNotFound</strong></a> – If the key doesn’t exist in the settings</p></li>
+<li><p><a class="reference internal" href="qdk_chemistry.data.html#qdk_chemistry.data.SettingTypeMismatch" title="qdk_chemistry.data.SettingTypeMismatch"><strong>SettingTypeMismatch</strong></a> – If the value type does not match the expected type for this key</p></li>
+<li><p><a class="reference external" href="https://docs.python.org/3/library/exceptions.html#RuntimeError" title="(in Python v3.14)"><strong>RuntimeError</strong></a> – If the value type is not supported</p></li>
+</ul>
 </dd>
 </dl>
-<dl class="simple">
-<dt>SettingNotFound</dt><dd><p>If the key doesn’t exist in the settings</p>
-</dd>
-<dt>SettingTypeMismatch</dt><dd><p>If the value type does not match the expected type for this key</p>
-</dd>
-<dt>RuntimeError</dt><dd><p>If the value type is not supported</p>
-</dd>
-</dl>
+<p class="rubric">Examples</p>
 <div class="doctest highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="n">settings</span><span class="o">.</span><span class="n">update</span><span class="p">(</span><span class="s2">&quot;max_iterations&quot;</span><span class="p">,</span> <span class="mi">200</span><span class="p">)</span>  <span class="c1"># OK if key exists</span>
 <span class="gp">&gt;&gt;&gt; </span><span class="n">settings</span><span class="o">.</span><span class="n">update</span><span class="p">(</span><span class="s2">&quot;new_key&quot;</span><span class="p">,</span> <span class="s2">&quot;value&quot;</span><span class="p">)</span>     <span class="c1"># Raises SettingNotFound</span>
 </pre></div>
@@ -1175,8 +1154,7 @@ Accepts any Python object for the value, which must match the expected type.</p>
 <span class="gp">&gt;&gt;&gt; </span><span class="n">settings</span><span class="o">.</span><span class="n">update</span><span class="p">({</span><span class="s1">&#39;new_key&#39;</span><span class="p">:</span> <span class="s1">&#39;value&#39;</span><span class="p">})</span>  <span class="c1"># Raises SettingNotFound</span>
 </pre></div>
 </div>
-</div></blockquote>
-</li>
+<ol class="arabic simple" start="4">
 <li><p>update(self: qdk_chemistry._core.data.Settings, dict: dict) -&gt; None</p></li>
 </ol>
 </dd></dl>
@@ -1185,132 +1163,132 @@ Accepts any Python object for the value, which must match the expected type.</p>
 <dt class="sig sig-object py" id="qdk_chemistry.plugins.qiskit._interop.transpiler.Settings.update_raw">
 <span class="sig-name descname"><span class="pre">update_raw</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="o"><span class="pre">*</span></span><span class="n"><span class="pre">args</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">kwargs</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#qdk_chemistry.plugins.qiskit._interop.transpiler.Settings.update_raw" title="Link to this definition"></a></dt>
 <dd><p>Overloaded function.</p>
-<ol class="arabic">
-<li><p>update_raw(self: qdk_chemistry._core.data.Settings, key: str, value: bool | typing.SupportsInt | typing.SupportsInt | typing.SupportsInt | typing.SupportsFloat | typing.SupportsFloat | str | collections.abc.Sequence[bool] | collections.abc.Sequence[typing.SupportsInt] | collections.abc.Sequence[typing.SupportsFloat] | collections.abc.Sequence[str]) -&gt; None</p>
-<blockquote>
-<div><p>Update a setting value using <code class="docutils literal notranslate"><span class="pre">SettingValue</span></code>, throwing if key doesn’t exist.</p>
-<p>Raw interface that works with <code class="docutils literal notranslate"><span class="pre">SettingValue</span></code> variants directly.</p>
-<dl class="simple">
-<dt>key<span class="classifier">str</span></dt><dd><p>The setting key name (must already exist)</p>
-</dd>
-<dt>value<span class="classifier">SettingValue</span></dt><dd><p>The new SettingValue to set</p>
-</dd>
-</dl>
-<dl class="simple">
-<dt>SettingNotFound</dt><dd><p>If the key doesn’t exist in the settings</p>
-</dd>
-</dl>
-</div></blockquote>
-</li>
-<li><p>update_raw(self: qdk_chemistry._core.data.Settings, key: str, value: bool | typing.SupportsInt | typing.SupportsInt | typing.SupportsInt | typing.SupportsFloat | typing.SupportsFloat | str | collections.abc.Sequence[bool] | collections.abc.Sequence[typing.SupportsInt] | collections.abc.Sequence[typing.SupportsFloat] | collections.abc.Sequence[str]) -&gt; None</p>
-<blockquote>
-<div><p>Update a setting value using <code class="docutils literal notranslate"><span class="pre">SettingValue</span></code>, throwing if key doesn’t exist.</p>
-<p>Raw interface that works with <code class="docutils literal notranslate"><span class="pre">SettingValue</span></code> variants directly.</p>
-<dl class="simple">
-<dt>key<span class="classifier">str</span></dt><dd><p>The setting key name (must already exist)</p>
-</dd>
-<dt>value<span class="classifier">SettingValue</span></dt><dd><p>The new SettingValue to set</p>
-</dd>
-</dl>
-<dl class="simple">
-<dt>SettingNotFound</dt><dd><p>If the key doesn’t exist in the settings</p>
-</dd>
-</dl>
-</div></blockquote>
-</li>
+<ol class="arabic simple">
+<li><p>update_raw(self: qdk_chemistry._core.data.Settings, key: str, value: bool | typing.SupportsInt | typing.SupportsInt | typing.SupportsInt | typing.SupportsFloat | typing.SupportsFloat | str | collections.abc.Sequence[bool] | collections.abc.Sequence[typing.SupportsInt] | collections.abc.Sequence[typing.SupportsFloat] | collections.abc.Sequence[str]) -&gt; None</p></li>
 </ol>
+<p>Update a setting value using <code class="docutils literal notranslate"><span class="pre">SettingValue</span></code>, throwing if key doesn’t exist.</p>
+<p>Raw interface that works with <code class="docutils literal notranslate"><span class="pre">SettingValue</span></code> variants directly.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>key</strong> (<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)"><em>str</em></a>) – The setting key name (must already exist)</p></li>
+<li><p><strong>value</strong> (<a class="reference internal" href="qdk_chemistry.data.html#qdk_chemistry.data.SettingValue" title="qdk_chemistry.data.SettingValue"><em>SettingValue</em></a>) – The new SettingValue to set</p></li>
+</ul>
+</dd>
+<dt class="field-even">Raises<span class="colon">:</span></dt>
+<dd class="field-even"><p><a class="reference internal" href="qdk_chemistry.data.html#qdk_chemistry.data.SettingNotFound" title="qdk_chemistry.data.SettingNotFound"><strong>SettingNotFound</strong></a> – If the key doesn’t exist in the settings</p>
+</dd>
+</dl>
+<ol class="arabic simple" start="2">
+<li><p>update_raw(self: qdk_chemistry._core.data.Settings, key: str, value: bool | typing.SupportsInt | typing.SupportsInt | typing.SupportsInt | typing.SupportsFloat | typing.SupportsFloat | str | collections.abc.Sequence[bool] | collections.abc.Sequence[typing.SupportsInt] | collections.abc.Sequence[typing.SupportsFloat] | collections.abc.Sequence[str]) -&gt; None</p></li>
+</ol>
+<p>Update a setting value using <code class="docutils literal notranslate"><span class="pre">SettingValue</span></code>, throwing if key doesn’t exist.</p>
+<p>Raw interface that works with <code class="docutils literal notranslate"><span class="pre">SettingValue</span></code> variants directly.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>key</strong> (<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)"><em>str</em></a>) – The setting key name (must already exist)</p></li>
+<li><p><strong>value</strong> (<a class="reference internal" href="qdk_chemistry.data.html#qdk_chemistry.data.SettingValue" title="qdk_chemistry.data.SettingValue"><em>SettingValue</em></a>) – The new SettingValue to set</p></li>
+</ul>
+</dd>
+<dt class="field-even">Raises<span class="colon">:</span></dt>
+<dd class="field-even"><p><a class="reference internal" href="qdk_chemistry.data.html#qdk_chemistry.data.SettingNotFound" title="qdk_chemistry.data.SettingNotFound"><strong>SettingNotFound</strong></a> – If the key doesn’t exist in the settings</p>
+</dd>
+</dl>
 </dd></dl>
 
 <dl class="py method">
 <dt class="sig sig-object py" id="qdk_chemistry.plugins.qiskit._interop.transpiler.Settings.validate_required">
 <span class="sig-name descname"><span class="pre">validate_required</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="o"><span class="pre">*</span></span><span class="n"><span class="pre">args</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">kwargs</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#qdk_chemistry.plugins.qiskit._interop.transpiler.Settings.validate_required" title="Link to this definition"></a></dt>
 <dd><p>Overloaded function.</p>
-<ol class="arabic">
-<li><p>validate_required(self: qdk_chemistry._core.data.Settings, required_keys: collections.abc.Sequence[str]) -&gt; None</p>
-<blockquote>
-<div><p>Validate that all required settings are present.</p>
-<p>Checks that all keys in the provided list exist in the settings.
-This is useful for ensuring that all necessary configuration
-parameters have been set before proceeding with computations.</p>
-<dl class="simple">
-<dt>required_keys<span class="classifier">list of str</span></dt><dd><p>List of setting keys that must be present</p>
-</dd>
-</dl>
-<dl class="simple">
-<dt>SettingNotFound</dt><dd><p>If any required key is missing</p>
-</dd>
-</dl>
-<div class="doctest highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="n">required</span> <span class="o">=</span> <span class="p">[</span><span class="s2">&quot;method&quot;</span><span class="p">,</span> <span class="s2">&quot;max_iter&quot;</span><span class="p">]</span>
-<span class="gp">&gt;&gt;&gt; </span><span class="n">settings</span><span class="o">.</span><span class="n">validate_required</span><span class="p">(</span><span class="n">required</span><span class="p">)</span>
-<span class="gp">&gt;&gt;&gt; </span><span class="c1"># Raises SettingNotFound if any key is missing</span>
-</pre></div>
-</div>
-</div></blockquote>
-</li>
-<li><p>validate_required(self: qdk_chemistry._core.data.Settings, required_keys: collections.abc.Sequence[str]) -&gt; None</p>
-<blockquote>
-<div><p>Validate that all required settings are present.</p>
-<p>Checks that all keys in the provided list exist in the settings.
-This is useful for ensuring that all necessary configuration
-parameters have been set before proceeding with computations.</p>
-<dl class="simple">
-<dt>required_keys<span class="classifier">list of str</span></dt><dd><p>List of setting keys that must be present</p>
-</dd>
-</dl>
-<dl class="simple">
-<dt>SettingNotFound</dt><dd><p>If any required key is missing</p>
-</dd>
-</dl>
-<div class="doctest highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="n">required</span> <span class="o">=</span> <span class="p">[</span><span class="s2">&quot;method&quot;</span><span class="p">,</span> <span class="s2">&quot;max_iter&quot;</span><span class="p">]</span>
-<span class="gp">&gt;&gt;&gt; </span><span class="n">settings</span><span class="o">.</span><span class="n">validate_required</span><span class="p">(</span><span class="n">required</span><span class="p">)</span>
-<span class="gp">&gt;&gt;&gt; </span><span class="c1"># Raises SettingNotFound if any key is missing</span>
-</pre></div>
-</div>
-</div></blockquote>
-</li>
+<ol class="arabic simple">
+<li><p>validate_required(self: qdk_chemistry._core.data.Settings, required_keys: collections.abc.Sequence[str]) -&gt; None</p></li>
 </ol>
+<p>Validate that all required settings are present.</p>
+<p>Checks that all keys in the provided list exist in the settings.
+This is useful for ensuring that all necessary configuration parameters have been set before proceeding with computations.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>required_keys</strong> (<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#list" title="(in Python v3.14)"><em>list</em></a><em>[</em><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)"><em>str</em></a><em>]</em>) – List of setting keys that must be present</p>
+</dd>
+<dt class="field-even">Raises<span class="colon">:</span></dt>
+<dd class="field-even"><p><a class="reference internal" href="qdk_chemistry.data.html#qdk_chemistry.data.SettingNotFound" title="qdk_chemistry.data.SettingNotFound"><strong>SettingNotFound</strong></a> – If any required key is missing</p>
+</dd>
+</dl>
+<p class="rubric">Examples</p>
+<div class="doctest highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="n">required</span> <span class="o">=</span> <span class="p">[</span><span class="s2">&quot;method&quot;</span><span class="p">,</span> <span class="s2">&quot;max_iter&quot;</span><span class="p">]</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">settings</span><span class="o">.</span><span class="n">validate_required</span><span class="p">(</span><span class="n">required</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="c1"># Raises SettingNotFound if any key is missing</span>
+</pre></div>
+</div>
+<ol class="arabic simple" start="2">
+<li><p>validate_required(self: qdk_chemistry._core.data.Settings, required_keys: collections.abc.Sequence[str]) -&gt; None</p></li>
+</ol>
+<p>Validate that all required settings are present.</p>
+<p>Checks that all keys in the provided list exist in the settings.
+This is useful for ensuring that all necessary configuration parameters have been set before proceeding with computations.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>required_keys</strong> (<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#list" title="(in Python v3.14)"><em>list</em></a><em>[</em><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)"><em>str</em></a><em>]</em>) – List of setting keys that must be present</p>
+</dd>
+<dt class="field-even">Raises<span class="colon">:</span></dt>
+<dd class="field-even"><p><a class="reference internal" href="qdk_chemistry.data.html#qdk_chemistry.data.SettingNotFound" title="qdk_chemistry.data.SettingNotFound"><strong>SettingNotFound</strong></a> – If any required key is missing</p>
+</dd>
+</dl>
+<p class="rubric">Examples</p>
+<div class="doctest highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="n">required</span> <span class="o">=</span> <span class="p">[</span><span class="s2">&quot;method&quot;</span><span class="p">,</span> <span class="s2">&quot;max_iter&quot;</span><span class="p">]</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">settings</span><span class="o">.</span><span class="n">validate_required</span><span class="p">(</span><span class="n">required</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="c1"># Raises SettingNotFound if any key is missing</span>
+</pre></div>
+</div>
 </dd></dl>
 
 <dl class="py method">
 <dt class="sig sig-object py" id="qdk_chemistry.plugins.qiskit._interop.transpiler.Settings.values">
 <span class="sig-name descname"><span class="pre">values</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="o"><span class="pre">*</span></span><span class="n"><span class="pre">args</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">kwargs</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#qdk_chemistry.plugins.qiskit._interop.transpiler.Settings.values" title="Link to this definition"></a></dt>
 <dd><p>Overloaded function.</p>
-<ol class="arabic">
-<li><p>values(self: qdk_chemistry._core.data.Settings) -&gt; list</p>
-<blockquote>
-<div><p>Get all setting values as a list.</p>
-<dl class="simple">
-<dt>list</dt><dd><p>List of all setting values</p>
-</dd>
-</dl>
-<div class="doctest highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="n">all_values</span> <span class="o">=</span> <span class="n">settings</span><span class="o">.</span><span class="n">values</span><span class="p">()</span>
-<span class="gp">&gt;&gt;&gt; </span><span class="k">for</span> <span class="n">value</span> <span class="ow">in</span> <span class="n">all_values</span><span class="p">:</span>
-<span class="gp">... </span>    <span class="nb">print</span><span class="p">(</span><span class="n">value</span><span class="p">)</span>
-<span class="gp">&gt;&gt;&gt; </span><span class="c1"># Or iterate directly:</span>
-<span class="gp">&gt;&gt;&gt; </span><span class="k">for</span> <span class="n">value</span> <span class="ow">in</span> <span class="n">settings</span><span class="o">.</span><span class="n">values</span><span class="p">():</span>
-<span class="gp">... </span>    <span class="nb">print</span><span class="p">(</span><span class="n">value</span><span class="p">)</span>
-</pre></div>
-</div>
-</div></blockquote>
-</li>
-<li><p>values(self: qdk_chemistry._core.data.Settings) -&gt; list</p>
-<blockquote>
-<div><p>Get all setting values as a list.</p>
-<dl class="simple">
-<dt>list</dt><dd><p>List of all setting values</p>
-</dd>
-</dl>
-<div class="doctest highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="n">all_values</span> <span class="o">=</span> <span class="n">settings</span><span class="o">.</span><span class="n">values</span><span class="p">()</span>
-<span class="gp">&gt;&gt;&gt; </span><span class="k">for</span> <span class="n">value</span> <span class="ow">in</span> <span class="n">all_values</span><span class="p">:</span>
-<span class="gp">... </span>    <span class="nb">print</span><span class="p">(</span><span class="n">value</span><span class="p">)</span>
-<span class="gp">&gt;&gt;&gt; </span><span class="c1"># Or iterate directly:</span>
-<span class="gp">&gt;&gt;&gt; </span><span class="k">for</span> <span class="n">value</span> <span class="ow">in</span> <span class="n">settings</span><span class="o">.</span><span class="n">values</span><span class="p">():</span>
-<span class="gp">... </span>    <span class="nb">print</span><span class="p">(</span><span class="n">value</span><span class="p">)</span>
-</pre></div>
-</div>
-</div></blockquote>
-</li>
+<ol class="arabic simple">
+<li><p>values(self: qdk_chemistry._core.data.Settings) -&gt; list</p></li>
 </ol>
+<p>Get all setting values as a list.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Returns<span class="colon">:</span></dt>
+<dd class="field-odd"><p>List of all setting values</p>
+</dd>
+<dt class="field-even">Return type<span class="colon">:</span></dt>
+<dd class="field-even"><p><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#list" title="(in Python v3.14)">list</a></p>
+</dd>
+</dl>
+<p class="rubric">Examples</p>
+<div class="doctest highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="n">all_values</span> <span class="o">=</span> <span class="n">settings</span><span class="o">.</span><span class="n">values</span><span class="p">()</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="k">for</span> <span class="n">value</span> <span class="ow">in</span> <span class="n">all_values</span><span class="p">:</span>
+<span class="gp">... </span>    <span class="nb">print</span><span class="p">(</span><span class="n">value</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="c1"># Or iterate directly:</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="k">for</span> <span class="n">value</span> <span class="ow">in</span> <span class="n">settings</span><span class="o">.</span><span class="n">values</span><span class="p">():</span>
+<span class="gp">... </span>    <span class="nb">print</span><span class="p">(</span><span class="n">value</span><span class="p">)</span>
+</pre></div>
+</div>
+<ol class="arabic simple" start="2">
+<li><p>values(self: qdk_chemistry._core.data.Settings) -&gt; list</p></li>
+</ol>
+<p>Get all setting values as a list.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Returns<span class="colon">:</span></dt>
+<dd class="field-odd"><p>List of all setting values</p>
+</dd>
+<dt class="field-even">Return type<span class="colon">:</span></dt>
+<dd class="field-even"><p><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#list" title="(in Python v3.14)">list</a></p>
+</dd>
+</dl>
+<p class="rubric">Examples</p>
+<div class="doctest highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="n">all_values</span> <span class="o">=</span> <span class="n">settings</span><span class="o">.</span><span class="n">values</span><span class="p">()</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="k">for</span> <span class="n">value</span> <span class="ow">in</span> <span class="n">all_values</span><span class="p">:</span>
+<span class="gp">... </span>    <span class="nb">print</span><span class="p">(</span><span class="n">value</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="c1"># Or iterate directly:</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="k">for</span> <span class="n">value</span> <span class="ow">in</span> <span class="n">settings</span><span class="o">.</span><span class="n">values</span><span class="p">():</span>
+<span class="gp">... </span>    <span class="nb">print</span><span class="p">(</span><span class="n">value</span><span class="p">)</span>
+</pre></div>
+</div>
 </dd></dl>
 
 </dd></dl>
@@ -1352,7 +1330,6 @@ Z-axis of the Bloch sphere and can be represented in a unified form.</p>
 <li><p>Reduces gate count and improves optimization opportunities downstream.</p></li>
 </ul>
 </div>
-<p>Use Optimize1qGatesDecomposition to handle gate optimization to merge Z basis rotations.</p>
 <dl class="py method">
 <dt class="sig sig-object py" id="qdk_chemistry.plugins.qiskit._interop.transpiler.MergeZBasisRotations.__init__">
 <span class="sig-name descname"><span class="pre">__init__</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="../../_modules/qdk_chemistry/plugins/qiskit/_interop/transpiler.html#MergeZBasisRotations.__init__"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#qdk_chemistry.plugins.qiskit._interop.transpiler.MergeZBasisRotations.__init__" title="Link to this definition"></a></dt>
@@ -1388,7 +1365,6 @@ Z-axis of the Bloch sphere and can be represented in a unified form.</p>
 tolerance (float, default=float(np.finfo(np.float64).eps)): Float comparison tolerance to use.</p>
 </dd>
 </dl>
-<p>Initialize SubstituteCliffordRzSettings.</p>
 <dl class="py method">
 <dt class="sig sig-object py" id="qdk_chemistry.plugins.qiskit._interop.transpiler.SubstituteCliffordRzSettings.__init__">
 <span class="sig-name descname"><span class="pre">__init__</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="../../_modules/qdk_chemistry/plugins/qiskit/_interop/transpiler.html#SubstituteCliffordRzSettings.__init__"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#qdk_chemistry.plugins.qiskit._interop.transpiler.SubstituteCliffordRzSettings.__init__" title="Link to this definition"></a></dt>
@@ -1424,7 +1400,7 @@ tolerance (float, default=float(np.finfo(np.float64).eps)): Float comparison tol
 
 <dl class="py class">
 <dt class="sig sig-object py" id="qdk_chemistry.plugins.qiskit._interop.transpiler.SubstituteCliffordRz">
-<em class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">SubstituteCliffordRz</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">equivalent_gate_set</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">tolerance</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">float(np.finfo(np.float64).eps)</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../../_modules/qdk_chemistry/plugins/qiskit/_interop/transpiler.html#SubstituteCliffordRz"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#qdk_chemistry.plugins.qiskit._interop.transpiler.SubstituteCliffordRz" title="Link to this definition"></a></dt>
+<em class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">SubstituteCliffordRz</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">equivalent_gate_set</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">tolerance</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">2.220446049250313e-16</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../../_modules/qdk_chemistry/plugins/qiskit/_interop/transpiler.html#SubstituteCliffordRz"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#qdk_chemistry.plugins.qiskit._interop.transpiler.SubstituteCliffordRz" title="Link to this definition"></a></dt>
 <dd><p>Bases: <a class="reference external" href="https://quantum.cloud.ibm.com/docs/api/qiskit/qiskit.transpiler.TransformationPass" title="(in Qiskit v2.2)"><code class="xref py py-class docutils literal notranslate"><span class="pre">TransformationPass</span></code></a></p>
 <p>Transformation pass to substitute Rz(θ) gates with equivalent Clifford gates for special angles.</p>
 <p>This pass replaces Rz(θ) gates with one of the following Clifford gates:</p>
@@ -1465,16 +1441,6 @@ one of the above special Clifford phases within the specified tolerance.</p></li
 <li><p>Ignores gates not in the user-specified <code class="docutils literal notranslate"><span class="pre">equivalent_gate_set</span></code></p></li>
 </ul>
 </div>
-<p>Initialize the SubstituteCliffordRz transformation pass.</p>
-<dl class="field-list simple">
-<dt class="field-odd">Parameters<span class="colon">:</span></dt>
-<dd class="field-odd"><ul class="simple">
-<li><p><strong>equivalent_gate_set</strong> (<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#list" title="(in Python v3.14)"><em>list</em></a><em>[</em><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)"><em>str</em></a><em>] </em><em>| </em><em>None</em>) – List of gates to substitute rz with special
-angles. Default is None, which means [‘id’, ‘s’, ‘sdg’, ‘z’].</p></li>
-<li><p><strong>tolerance</strong> (<a class="reference external" href="https://docs.python.org/3/library/functions.html#float" title="(in Python v3.14)"><em>float</em></a>) – Angle comparison tolerance. Default is np.finfo(np.float64).eps.</p></li>
-</ul>
-</dd>
-</dl>
 <dl class="py method">
 <dt class="sig sig-object py" id="qdk_chemistry.plugins.qiskit._interop.transpiler.SubstituteCliffordRz.__init__">
 <span class="sig-name descname"><span class="pre">__init__</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">equivalent_gate_set</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">tolerance</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">float(np.finfo(np.float64).eps)</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../../_modules/qdk_chemistry/plugins/qiskit/_interop/transpiler.html#SubstituteCliffordRz.__init__"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#qdk_chemistry.plugins.qiskit._interop.transpiler.SubstituteCliffordRz.__init__" title="Link to this definition"></a></dt>
@@ -1541,7 +1507,6 @@ basis (e.g., Rz(θ), Z, S, Sdg) act trivially on the <span class="math notransla
 <p>These gates only introduce a global phase factor, which is physically unobservable.</p>
 <p>This transformation must not be applied to qubits in superposition or entangled
 states, since Z-basis rotations there modify relative phases between basis states.</p>
-<p>Initialize the <code class="docutils literal notranslate"><span class="pre">RemoveZBasisOnZeroState</span></code> transformation pass.</p>
 <dl class="py method">
 <dt class="sig sig-object py" id="qdk_chemistry.plugins.qiskit._interop.transpiler.RemoveZBasisOnZeroState.__init__">
 <span class="sig-name descname"><span class="pre">__init__</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="../../_modules/qdk_chemistry/plugins/qiskit/_interop/transpiler.html#RemoveZBasisOnZeroState.__init__"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#qdk_chemistry.plugins.qiskit._interop.transpiler.RemoveZBasisOnZeroState.__init__" title="Link to this definition"></a></dt>

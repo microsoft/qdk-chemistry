@@ -59,9 +59,9 @@
 <li class="toctree-l1 current"><a class="reference internal" href="../python_api.html">Python API</a><ul class="current">
 <li class="toctree-l2 current"><a class="reference internal" href="../python_api.html#data-classes">Data Classes</a><ul class="current">
 <li class="toctree-l3 current"><a class="reference internal" href="qdk_chemistry.data.html">qdk_chemistry.data package</a><ul class="current">
+<li class="toctree-l4"><a class="reference internal" href="qdk_chemistry.data.html#qdk_chemistry.data.AOType"><code class="docutils literal notranslate"><span class="pre">AOType</span></code></a></li>
 <li class="toctree-l4"><a class="reference internal" href="qdk_chemistry.data.html#qdk_chemistry.data.Ansatz"><code class="docutils literal notranslate"><span class="pre">Ansatz</span></code></a></li>
 <li class="toctree-l4"><a class="reference internal" href="qdk_chemistry.data.html#qdk_chemistry.data.BasisSet"><code class="docutils literal notranslate"><span class="pre">BasisSet</span></code></a></li>
-<li class="toctree-l4"><a class="reference internal" href="qdk_chemistry.data.html#qdk_chemistry.data.BasisType"><code class="docutils literal notranslate"><span class="pre">BasisType</span></code></a></li>
 <li class="toctree-l4"><a class="reference internal" href="qdk_chemistry.data.html#qdk_chemistry.data.CasWavefunctionContainer"><code class="docutils literal notranslate"><span class="pre">CasWavefunctionContainer</span></code></a></li>
 <li class="toctree-l4"><a class="reference internal" href="qdk_chemistry.data.html#qdk_chemistry.data.Configuration"><code class="docutils literal notranslate"><span class="pre">Configuration</span></code></a></li>
 <li class="toctree-l4"><a class="reference internal" href="qdk_chemistry.data.html#qdk_chemistry.data.CoupledClusterAmplitudes"><code class="docutils literal notranslate"><span class="pre">CoupledClusterAmplitudes</span></code></a></li>
@@ -143,17 +143,20 @@
 <em class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">DataClass</span></span><a class="reference internal" href="../../_modules/qdk_chemistry/data/base.html#DataClass"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#qdk_chemistry.data.base.DataClass" title="Link to this definition"></a></dt>
 <dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">DataClass</span></code></p>
 <p>Base class for immutable data classes with common serialization methods.</p>
-<p>This abstract base class provides:
-- Immutability after construction (__setattr__ and __delattr__ protection)
-- Common implementations of to_json_file, to_hdf5_file, and to_file
-- Filename validation to enforce naming convention (.&lt;data_type&gt;.&lt;extension&gt;)
-- Requires derived classes to implement abstract methods</p>
-<p>Derived classes MUST implement:
-1. get_summary() -&gt; str</p>
-<blockquote>
-<div><p>Return a human-readable summary string of the object</p>
-</div></blockquote>
-<ol class="arabic simple" start="2">
+<p>This abstract base class provides:</p>
+<ul class="simple">
+<li><p>Immutability after construction (__setattr__ and __delattr__ protection)</p></li>
+<li><p>Common implementations of to_json_file, to_hdf5_file, and to_file</p></li>
+<li><p>Filename validation to enforce naming convention (.&lt;data_type&gt;.&lt;extension&gt;)</p></li>
+<li><p>Requires derived classes to implement abstract methods</p></li>
+</ul>
+<p>Derived classes MUST implement:</p>
+<ol class="arabic simple">
+<li><dl class="simple">
+<dt>get_summary() -&gt; str</dt><dd><p>Return a human-readable summary string of the object</p>
+</dd>
+</dl>
+</li>
 <li><dl class="simple">
 <dt>to_json() -&gt; dict</dt><dd><p>Return a dictionary representation suitable for JSON serialization</p>
 </dd>
@@ -171,19 +174,17 @@
 </dl>
 </li>
 </ol>
-<p>Derived classes should:
-- Set all attributes before calling super().__init__()
-- Call super().__init__() at the end of __init__ to enable immutability
-- Set the _data_type_name class attribute (e.g., “structure”, “wavefunction”)</p>
-<div class="admonition note">
-<p class="admonition-title">Note</p>
-<p>These methods are pure virtual in the C++ base class and MUST be
-overridden. The C++ binding will enforce this at runtime.</p>
+<p>Derived classes should:</p>
+<ul class="simple">
+<li><p>Set all attributes before calling super().__init__()</p></li>
+<li><p>Call super().__init__() at the end of __init__ to enable immutability</p></li>
+<li><p>Set the _data_type_name class attribute (e.g., “structure”, “wavefunction”)</p></li>
+</ul>
+<p class="rubric">Notes</p>
+<p>These methods are pure virtual in the C++ base class and MUST be overridden.
+The C++ binding will enforce this at runtime.</p>
 <p>Filename validation enforces the convention that filenames must include
 the data type, e.g., “example.structure.json” or “data.wavefunction.h5”</p>
-</div>
-<p>Initialize the base class and mark instance as initialized.</p>
-<p>This must be called by derived classes after setting all attributes.</p>
 <dl class="field-list simple">
 </dl>
 <dl class="py method">

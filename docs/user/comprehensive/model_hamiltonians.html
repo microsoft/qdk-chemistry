@@ -27,7 +27,7 @@
     <link rel="index" title="Index" href="../../genindex.html" />
     <link rel="search" title="Search" href="../../search.html" />
     <link rel="next" title="Plugins" href="plugins.html" />
-    <link rel="prev" title="Functionals and basis sets" href="keywords.html" /> 
+    <link rel="prev" title="Functionals and basis sets" href="basis_functionals.html" /> 
 </head>
 
 <body class="wy-body-for-nav"> 
@@ -54,9 +54,9 @@
 <li class="toctree-l1"><a class="reference internal" href="../quickstart.html">Quickstart</a></li>
 <li class="toctree-l1 current"><a class="reference internal" href="index.html">In-depth user guide</a><ul class="current">
 <li class="toctree-l2"><a class="reference internal" href="design/index.html">Design principles of QDK/Chemistry</a></li>
-<li class="toctree-l2"><a class="reference internal" href="data/index.html">Data Management</a></li>
+<li class="toctree-l2"><a class="reference internal" href="data/index.html">Data management</a></li>
 <li class="toctree-l2"><a class="reference internal" href="algorithms/index.html">Available algorithms</a></li>
-<li class="toctree-l2"><a class="reference internal" href="keywords.html">Functionals and basis sets</a></li>
+<li class="toctree-l2"><a class="reference internal" href="basis_functionals.html">Functionals and basis sets</a></li>
 <li class="toctree-l2 current"><a class="current reference internal" href="#">Model Hamiltonians</a><ul>
 <li class="toctree-l3"><a class="reference internal" href="#creating-model-hamiltonians">Creating model Hamiltonians</a><ul>
 <li class="toctree-l4"><a class="reference internal" href="#example-hubbard-model-hamiltonian">Example: Hubbard model Hamiltonian</a></li>
@@ -115,7 +115,7 @@ Hence, they also do not require the use of integrals derived from quantum chemis
 Instead, model Hamiltonians are defined directly in terms of their parameters.</p>
 <section id="creating-model-hamiltonians">
 <h2>Creating model Hamiltonians<a class="headerlink" href="#creating-model-hamiltonians" title="Link to this heading"></a></h2>
-<p>To define a model Hamiltonian in QDK/Chemistry, users can utilize the <code class="docutils literal notranslate"><span class="pre">ModelOrbitals</span></code> class, which is a simplified version of the <span class="xref std std-doc">Orbitals</span> class that doesn’t require basis set information or molecular orbital coefficients.
+<p>To define a model Hamiltonian in QDK/Chemistry, users can utilize the <code class="docutils literal notranslate"><span class="pre">ModelOrbitals</span></code> class, which is a simplified version of the <a class="reference internal" href="data/orbitals.html"><span class="doc">Orbitals</span></a> class that doesn’t require basis set information or molecular orbital coefficients.
 This is particularly useful for studying model systems like Hubbard models, Heisenberg models, or other phenomenological Hamiltonians.</p>
 <section id="example-hubbard-model-hamiltonian">
 <h3>Example: Hubbard model Hamiltonian<a class="headerlink" href="#example-hubbard-model-hamiltonian" title="Link to this heading"></a></h3>
@@ -168,11 +168,11 @@ This is particularly useful for studying model systems like Hubbard models, Heis
 </section>
 <section id="using-model-hamiltonians-with-algorithms">
 <h2>Using model Hamiltonians with algorithms<a class="headerlink" href="#using-model-hamiltonians-with-algorithms" title="Link to this heading"></a></h2>
-<p>Model Hamiltonians created with <code class="docutils literal notranslate"><span class="pre">ModelOrbitals</span></code> can be used with any QDK/Chemistry algorithm that accepts <span class="xref std std-doc">Hamiltonian</span> objects, including:</p>
+<p>Model Hamiltonians created with <code class="docutils literal notranslate"><span class="pre">ModelOrbitals</span></code> can be used with any QDK/Chemistry algorithm that accepts <a class="reference internal" href="data/hamiltonian.html"><span class="doc">Hamiltonian</span></a> objects, including:</p>
 <ul class="simple">
-<li><p><span class="xref std std-doc">Multi-configuration calculators</span> (<a class="reference internal" href="../../glossary.html#term-FCI"><span class="xref std std-term">FCI</span></a>, <span class="xref std std-term">ASCI</span>, etc.)</p></li>
-<li><p><span class="xref std std-doc">Coupled cluster calculators</span></p></li>
-<li><p>Quantum algorithm interfaces (VQE, QPE, etc.)</p></li>
+<li><p><a class="reference internal" href="algorithms/mc_calculator.html"><span class="doc">Multi-configuration calculators</span></a> (<a class="reference internal" href="../../glossary.html#term-FCI"><span class="xref std std-term">FCI</span></a>, <a class="reference internal" href="../../glossary.html#term-ASCI"><span class="xref std std-term">ASCI</span></a>, etc.)</p></li>
+<li><p><a class="reference internal" href="../../api/api_autogen/qdk_chemistry.algorithms.html#qdk_chemistry.algorithms.CoupledClusterCalculator" title="qdk_chemistry.algorithms.CoupledClusterCalculator"><code class="xref py py-class docutils literal notranslate"><span class="pre">CoupledClusterCalculator</span></code></a> (<a class="reference internal" href="../../glossary.html#term-CCSD"><span class="xref std std-term">CCSD</span></a>, <a class="reference internal" href="../../glossary.html#term-CCSD-T"><span class="xref std std-term">CCSD(T)</span></a>, etc.)</p></li>
+<li><p>Quantum algorithm interfaces (<a class="reference internal" href="../../glossary.html#term-VQE"><span class="xref std std-term">VQE</span></a>, <a class="reference internal" href="../../glossary.html#term-QPE"><span class="xref std std-term">QPE</span></a>, etc.)</p></li>
 </ul>
 <p>Example with multi-configuration calculator:</p>
 <div class="tab-set docutils container">
@@ -203,7 +203,7 @@ This is particularly useful for studying model systems like Hubbard models, Heis
            </div>
           </div>
           <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
-        <a href="keywords.html" class="btn btn-neutral float-left" title="Functionals and basis sets" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+        <a href="basis_functionals.html" class="btn btn-neutral float-left" title="Functionals and basis sets" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
         <a href="plugins.html" class="btn btn-neutral float-right" title="Plugins" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
     </div>
 

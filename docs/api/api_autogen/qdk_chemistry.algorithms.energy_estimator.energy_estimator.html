@@ -189,7 +189,6 @@ defined in this base class.</p>
 <span class="gp">&gt;&gt;&gt; </span><span class="n">energy</span><span class="p">,</span> <span class="n">wfn</span> <span class="o">=</span> <span class="n">scf</span><span class="o">.</span><span class="n">run</span><span class="p">(</span><span class="n">structure</span><span class="p">,</span> <span class="n">charge</span><span class="o">=</span><span class="mi">0</span><span class="p">,</span> <span class="n">spin_multiplicity</span><span class="o">=</span><span class="mi">1</span><span class="p">)</span>
 </pre></div>
 </div>
-<p>Initialize the base algorithm.</p>
 <dl class="py method">
 <dt class="sig sig-object py" id="qdk_chemistry.algorithms.energy_estimator.energy_estimator.Algorithm.__init__">
 <span class="sig-name descname"><span class="pre">__init__</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#qdk_chemistry.algorithms.energy_estimator.energy_estimator.Algorithm.__init__" title="Link to this definition"></a></dt>
@@ -370,7 +369,6 @@ creating and registering algorithms.</p>
 </dd>
 </dl>
 </div>
-<p>Initialize the algorithm factory with an empty registry.</p>
 <dl class="field-list simple">
 </dl>
 <dl class="py method">
@@ -580,6 +578,16 @@ will be used as the registration key.</p>
 <em class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">EnergyExpectationResult</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">energy_expectation_value</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">energy_variance</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">expvals_each_term</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">variances_each_term</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#qdk_chemistry.algorithms.energy_estimator.energy_estimator.EnergyExpectationResult" title="Link to this definition"></a></dt>
 <dd><p>Bases: <a class="reference internal" href="qdk_chemistry.data.base.html#qdk_chemistry.data.base.DataClass" title="qdk_chemistry.data.base.DataClass"><code class="xref py py-class docutils literal notranslate"><span class="pre">DataClass</span></code></a></p>
 <p>Expectation value and variance for a Hamiltonian energy estimate.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>energy_expectation_value</strong> (<a class="reference external" href="https://docs.python.org/3/library/functions.html#float" title="(in Python v3.14)"><em>float</em></a>)</p></li>
+<li><p><strong>energy_variance</strong> (<a class="reference external" href="https://docs.python.org/3/library/functions.html#float" title="(in Python v3.14)"><em>float</em></a>)</p></li>
+<li><p><strong>expvals_each_term</strong> (<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#list" title="(in Python v3.14)"><em>list</em></a><em>[</em><a class="reference external" href="https://numpy.org/doc/stable/reference/generated/numpy.ndarray.html#numpy.ndarray" title="(in NumPy v2.3)"><em>ndarray</em></a><em>]</em>)</p></li>
+<li><p><strong>variances_each_term</strong> (<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#list" title="(in Python v3.14)"><em>list</em></a><em>[</em><a class="reference external" href="https://numpy.org/doc/stable/reference/generated/numpy.ndarray.html#numpy.ndarray" title="(in NumPy v2.3)"><em>ndarray</em></a><em>]</em>)</p></li>
+</ul>
+</dd>
+</dl>
 <dl class="py attribute">
 <dt class="sig sig-object py" id="qdk_chemistry.algorithms.energy_estimator.energy_estimator.EnergyExpectationResult.energy_expectation_value">
 <span class="sig-name descname"><span class="pre">energy_expectation_value</span></span><a class="headerlink" href="#qdk_chemistry.algorithms.energy_estimator.energy_estimator.EnergyExpectationResult.energy_expectation_value" title="Link to this definition"></a></dt>
@@ -604,17 +612,6 @@ will be used as the registration key.</p>
 <dd><p>Variances for each term in the Hamiltonian.</p>
 </dd></dl>
 
-<p>Initialize an energy expectation result.</p>
-<dl class="field-list simple">
-<dt class="field-odd">Parameters<span class="colon">:</span></dt>
-<dd class="field-odd"><ul class="simple">
-<li><p><strong>energy_expectation_value</strong> (<a class="reference external" href="https://docs.python.org/3/library/functions.html#float" title="(in Python v3.14)"><em>float</em></a>) – Expectation value of the energy.</p></li>
-<li><p><strong>energy_variance</strong> (<a class="reference external" href="https://docs.python.org/3/library/functions.html#float" title="(in Python v3.14)"><em>float</em></a>) – Variance of the energy.</p></li>
-<li><p><strong>expvals_each_term</strong> (<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#list" title="(in Python v3.14)"><em>list</em></a><em>[</em><a class="reference external" href="https://numpy.org/doc/stable/reference/generated/numpy.ndarray.html#numpy.ndarray" title="(in NumPy v2.3)"><em>ndarray</em></a><em>]</em>) – Expectation values for each term in the Hamiltonian.</p></li>
-<li><p><strong>variances_each_term</strong> (<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#list" title="(in Python v3.14)"><em>list</em></a><em>[</em><a class="reference external" href="https://numpy.org/doc/stable/reference/generated/numpy.ndarray.html#numpy.ndarray" title="(in NumPy v2.3)"><em>ndarray</em></a><em>]</em>) – Variances for each term in the Hamiltonian.</p></li>
-</ul>
-</dd>
-</dl>
 <dl class="py method">
 <dt class="sig sig-object py" id="qdk_chemistry.algorithms.energy_estimator.energy_estimator.EnergyExpectationResult.__init__">
 <span class="sig-name descname"><span class="pre">__init__</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">energy_expectation_value</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">energy_variance</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">expvals_each_term</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">variances_each_term</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#qdk_chemistry.algorithms.energy_estimator.energy_estimator.EnergyExpectationResult.__init__" title="Link to this definition"></a></dt>
@@ -719,6 +716,14 @@ Python users should call to_hdf5_file() directly.</p>
 <em class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">QubitHamiltonian</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">pauli_strings</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">coefficients</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#qdk_chemistry.algorithms.energy_estimator.energy_estimator.QubitHamiltonian" title="Link to this definition"></a></dt>
 <dd><p>Bases: <a class="reference internal" href="qdk_chemistry.data.base.html#qdk_chemistry.data.base.DataClass" title="qdk_chemistry.data.base.DataClass"><code class="xref py py-class docutils literal notranslate"><span class="pre">DataClass</span></code></a></p>
 <p>Data class for representing chemical electronic Hamiltonians in qubits.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>pauli_strings</strong> (<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#list" title="(in Python v3.14)"><em>list</em></a><em>[</em><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)"><em>str</em></a><em>]</em>)</p></li>
+<li><p><strong>coefficients</strong> (<a class="reference external" href="https://numpy.org/doc/stable/reference/generated/numpy.ndarray.html#numpy.ndarray" title="(in NumPy v2.3)"><em>ndarray</em></a>)</p></li>
+</ul>
+</dd>
+</dl>
 <dl class="py attribute">
 <dt class="sig sig-object py" id="qdk_chemistry.algorithms.energy_estimator.energy_estimator.QubitHamiltonian.pauli_strings">
 <span class="sig-name descname"><span class="pre">pauli_strings</span></span><a class="headerlink" href="#qdk_chemistry.algorithms.energy_estimator.energy_estimator.QubitHamiltonian.pauli_strings" title="Link to this definition"></a></dt>
@@ -731,19 +736,6 @@ Python users should call to_hdf5_file() directly.</p>
 <dd><p>Array of coefficients corresponding to each Pauli string.</p>
 </dd></dl>
 
-<p>Initialize a QubitHamiltonian.</p>
-<dl class="field-list simple">
-<dt class="field-odd">Parameters<span class="colon">:</span></dt>
-<dd class="field-odd"><ul class="simple">
-<li><p><strong>pauli_strings</strong> (<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#list" title="(in Python v3.14)"><em>list</em></a><em>[</em><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)"><em>str</em></a><em>]</em>) – List of Pauli strings.</p></li>
-<li><p><strong>coefficients</strong> (<a class="reference external" href="https://numpy.org/doc/stable/reference/generated/numpy.ndarray.html#numpy.ndarray" title="(in NumPy v2.3)"><em>ndarray</em></a>) – Array of coefficients corresponding to each Pauli string.</p></li>
-</ul>
-</dd>
-<dt class="field-even">Raises<span class="colon">:</span></dt>
-<dd class="field-even"><p><a class="reference external" href="https://docs.python.org/3/library/exceptions.html#ValueError" title="(in Python v3.14)"><strong>ValueError</strong></a> – If the number of Pauli strings and coefficients don’t match,
-    or if the Pauli strings or coefficients are invalid.</p>
-</dd>
-</dl>
 <dl class="py method">
 <dt class="sig sig-object py" id="qdk_chemistry.algorithms.energy_estimator.energy_estimator.QubitHamiltonian.__init__">
 <span class="sig-name descname"><span class="pre">__init__</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">pauli_strings</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">coefficients</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#qdk_chemistry.algorithms.energy_estimator.energy_estimator.QubitHamiltonian.__init__" title="Link to this definition"></a></dt>
@@ -947,7 +939,6 @@ Python users should call to_hdf5_file() directly.</p>
 <em class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">EnergyEstimator</span></span><a class="reference internal" href="../../_modules/qdk_chemistry/algorithms/energy_estimator/energy_estimator.html#EnergyEstimator"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#qdk_chemistry.algorithms.energy_estimator.energy_estimator.EnergyEstimator" title="Link to this definition"></a></dt>
 <dd><p>Bases: <a class="reference internal" href="qdk_chemistry.algorithms.base.html#qdk_chemistry.algorithms.base.Algorithm" title="qdk_chemistry.algorithms.base.Algorithm"><code class="xref py py-class docutils literal notranslate"><span class="pre">Algorithm</span></code></a></p>
 <p>Abstract base class for energy estimator algorithms.</p>
-<p>Initialize the EnergyEstimator.</p>
 <dl class="py method">
 <dt class="sig sig-object py" id="qdk_chemistry.algorithms.energy_estimator.energy_estimator.EnergyEstimator.__init__">
 <span class="sig-name descname"><span class="pre">__init__</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="../../_modules/qdk_chemistry/algorithms/energy_estimator/energy_estimator.html#EnergyEstimator.__init__"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#qdk_chemistry.algorithms.energy_estimator.energy_estimator.EnergyEstimator.__init__" title="Link to this definition"></a></dt>
@@ -1002,7 +993,6 @@ Python users should call to_hdf5_file() directly.</p>
 <em class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">EnergyEstimatorFactory</span></span><a class="reference internal" href="../../_modules/qdk_chemistry/algorithms/energy_estimator/energy_estimator.html#EnergyEstimatorFactory"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#qdk_chemistry.algorithms.energy_estimator.energy_estimator.EnergyEstimatorFactory" title="Link to this definition"></a></dt>
 <dd><p>Bases: <a class="reference internal" href="qdk_chemistry.algorithms.base.html#qdk_chemistry.algorithms.base.AlgorithmFactory" title="qdk_chemistry.algorithms.base.AlgorithmFactory"><code class="xref py py-class docutils literal notranslate"><span class="pre">AlgorithmFactory</span></code></a></p>
 <p>Factory class for creating EnergyEstimator instances.</p>
-<p>Initialize the algorithm factory with an empty registry.</p>
 <dl class="field-list simple">
 </dl>
 <dl class="py method">

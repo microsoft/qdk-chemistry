@@ -62,7 +62,7 @@
 <li class="toctree-l2"><a class="reference internal" href="../python_api.html#plugins">Plugins</a></li>
 <li class="toctree-l2 current"><a class="reference internal" href="../python_api.html#utilities">Utilities</a><ul class="current">
 <li class="toctree-l3 current"><a class="reference internal" href="qdk_chemistry.utils.html">qdk_chemistry.utils package</a><ul class="current">
-<li class="toctree-l4"><a class="reference internal" href="qdk_chemistry.utils.html#qdk_chemistry.utils.compute_valence_space"><code class="docutils literal notranslate"><span class="pre">compute_valence_space()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="qdk_chemistry.utils.html#qdk_chemistry.utils.compute_valence_space_parameters"><code class="docutils literal notranslate"><span class="pre">compute_valence_space_parameters()</span></code></a></li>
 <li class="toctree-l4 current"><a class="reference internal" href="qdk_chemistry.utils.html#submodules">Submodules</a></li>
 </ul>
 </li>
@@ -110,11 +110,9 @@
 <p>Statevector utilities in qdk_chemistry.</p>
 <dl class="py class">
 <dt class="sig sig-object py" id="qdk_chemistry.utils.statevector.Wavefunction">
-<em class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">Wavefunction</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">self</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference internal" href="qdk_chemistry.utils.wavefunction.html#qdk_chemistry.utils.wavefunction.Wavefunction" title="qdk_chemistry._core.data.Wavefunction"><span class="pre">qdk_chemistry._core.data.Wavefunction</span></a></span></em>, <em class="sig-param"><span class="n"><span class="pre">container</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference internal" href="qdk_chemistry.data.html#qdk_chemistry.data.WavefunctionContainer" title="qdk_chemistry._core.data.WavefunctionContainer"><span class="pre">qdk_chemistry._core.data.WavefunctionContainer</span></a></span></em><span class="sig-paren">)</span><a class="headerlink" href="#qdk_chemistry.utils.statevector.Wavefunction" title="Link to this definition"></a></dt>
+<em class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">Wavefunction</span></span><a class="headerlink" href="#qdk_chemistry.utils.statevector.Wavefunction" title="Link to this definition"></a></dt>
 <dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">DataClass</span></code></p>
-<blockquote>
-<div><p>Represents a wavefunction with associated properties.</p>
-</div></blockquote>
+<p>Represents a wavefunction with associated properties.</p>
 <p>This class encapsulates wavefunction data including:</p>
 <ul class="simple">
 <li><p>Configuration interaction coefficients</p></li>
@@ -122,17 +120,6 @@
 <li><p>Methods for computing properties</p></li>
 </ul>
 <p>Supports both restricted and unrestricted wavefunctions with real or complex coefficients.</p>
-<p>Constructs a wavefunction with a container implementation.</p>
-<dl class="field-list simple">
-<dt class="field-odd">Parameters<span class="colon">:</span></dt>
-<dd class="field-odd"><p><strong>container</strong> (<a class="reference internal" href="qdk_chemistry.data.html#qdk_chemistry.data.WavefunctionContainer" title="qdk_chemistry.data.WavefunctionContainer"><em>WavefunctionContainer</em></a>) – The container holding the wavefunction implementation</p>
-</dd>
-</dl>
-<p class="rubric">Examples</p>
-<div class="doctest highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="n">container</span> <span class="o">=</span> <span class="n">qdk_chemistry</span><span class="o">.</span><span class="n">SciWavefunctionContainer</span><span class="p">(</span><span class="n">coeffs</span><span class="p">,</span> <span class="n">dets</span><span class="p">,</span> <span class="n">orbitals</span><span class="p">)</span>
-<span class="gp">&gt;&gt;&gt; </span><span class="n">wf</span> <span class="o">=</span> <span class="n">qdk_chemistry</span><span class="o">.</span><span class="n">Wavefunction</span><span class="p">(</span><span class="n">container</span><span class="p">)</span>
-</pre></div>
-</div>
 <dl class="py method">
 <dt class="sig sig-object py" id="qdk_chemistry.utils.statevector.Wavefunction.__init__">
 <span class="sig-name descname"><span class="pre">__init__</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">self</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference internal" href="qdk_chemistry.utils.wavefunction.html#qdk_chemistry.utils.wavefunction.Wavefunction" title="qdk_chemistry._core.data.Wavefunction"><span class="pre">qdk_chemistry._core.data.Wavefunction</span></a></span></em>, <em class="sig-param"><span class="n"><span class="pre">container</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference internal" href="qdk_chemistry.data.html#qdk_chemistry.data.WavefunctionContainer" title="qdk_chemistry._core.data.WavefunctionContainer"><span class="pre">qdk_chemistry._core.data.WavefunctionContainer</span></a></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><a class="reference external" href="https://docs.python.org/3/library/constants.html#None" title="(in Python v3.14)"><span class="pre">None</span></a></span></span><a class="headerlink" href="#qdk_chemistry.utils.statevector.Wavefunction.__init__" title="Link to this definition"></a></dt>
@@ -253,8 +240,7 @@
 </dd>
 </dl>
 <p class="rubric">Notes</p>
-<p>Removes inactive and virtual orbital information, keeping only the active
-space orbitals.</p>
+<p>Removes inactive and virtual orbital information, keeping only the active space orbitals.</p>
 <p class="rubric">Examples</p>
 <div class="doctest highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="n">total_det</span> <span class="o">=</span> <span class="n">qdk_chemistry</span><span class="o">.</span><span class="n">Configuration</span><span class="p">(</span><span class="s2">&quot;2222uudd0000&quot;</span><span class="p">)</span>  <span class="c1"># 4 inactive, 4 active, 4 virtual</span>
 <span class="gp">&gt;&gt;&gt; </span><span class="n">active_det</span> <span class="o">=</span> <span class="n">wf</span><span class="o">.</span><span class="n">get_active_determinant</span><span class="p">(</span><span class="n">total_det</span><span class="p">)</span>
@@ -272,13 +258,12 @@ space orbitals.</p>
 <dd class="field-odd"><p>Vector of all configurations/determinants representing only the active space</p>
 </dd>
 <dt class="field-even">Return type<span class="colon">:</span></dt>
-<dd class="field-even"><p><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#list" title="(in Python v3.14)">list</a> of <a class="reference internal" href="qdk_chemistry.data.html#qdk_chemistry.data.Configuration" title="qdk_chemistry.data.Configuration">Configuration</a></p>
+<dd class="field-even"><p><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#list" title="(in Python v3.14)">list</a>[<a class="reference internal" href="qdk_chemistry.data.html#qdk_chemistry.data.Configuration" title="qdk_chemistry.data.Configuration">Configuration</a>]</p>
 </dd>
 </dl>
 <p class="rubric">Notes</p>
-<p>The determinants only include the active space orbitals. To get determinants
-with full orbital space (including inactive and virtual orbitals), use
-<code class="docutils literal notranslate"><span class="pre">get_total_determinants()</span></code>.</p>
+<p>The determinants only include the active space orbitals.
+To get determinants with full orbital space (including inactive and virtual orbitals), use <code class="docutils literal notranslate"><span class="pre">get_total_determinants()</span></code>.</p>
 <p class="rubric">Examples</p>
 <div class="doctest highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="n">dets</span> <span class="o">=</span> <span class="n">wf</span><span class="o">.</span><span class="n">get_active_determinants</span><span class="p">()</span>
 </pre></div>
@@ -417,7 +402,7 @@ with full orbital space (including inactive and virtual orbitals), use
 <dd class="field-even"><p>The coefficient for the determinant if found, zero otherwise</p>
 </dd>
 <dt class="field-odd">Return type<span class="colon">:</span></dt>
-<dd class="field-odd"><p><a class="reference external" href="https://docs.python.org/3/library/functions.html#complex" title="(in Python v3.14)">complex</a> or <a class="reference external" href="https://docs.python.org/3/library/functions.html#float" title="(in Python v3.14)">float</a></p>
+<dd class="field-odd"><p><a class="reference external" href="https://docs.python.org/3/library/functions.html#complex" title="(in Python v3.14)">complex</a> | <a class="reference external" href="https://docs.python.org/3/library/functions.html#float" title="(in Python v3.14)">float</a></p>
 </dd>
 </dl>
 <p class="rubric">Examples</p>
@@ -429,9 +414,7 @@ with full orbital space (including inactive and virtual orbitals), use
 <dl class="py method">
 <dt class="sig sig-object py" id="qdk_chemistry.utils.statevector.Wavefunction.get_coefficients">
 <span class="sig-name descname"><span class="pre">get_coefficients</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">self</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference internal" href="qdk_chemistry.utils.wavefunction.html#qdk_chemistry.utils.wavefunction.Wavefunction" title="qdk_chemistry._core.data.Wavefunction"><span class="pre">qdk_chemistry._core.data.Wavefunction</span></a></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><a class="reference external" href="https://docs.python.org/3/library/functions.html#object" title="(in Python v3.14)"><span class="pre">object</span></a></span></span><a class="headerlink" href="#qdk_chemistry.utils.statevector.Wavefunction.get_coefficients" title="Link to this definition"></a></dt>
-<dd><p>Get coefficients for all determinants as a vector, in which the
-sequence of coefficients is consistent with the vector from
-<code class="docutils literal notranslate"><span class="pre">get_active_determinants()</span></code></p>
+<dd><p>Get coefficients for all determinants as a vector, in which the sequence of coefficients is consistent with the vector from <code class="docutils literal notranslate"><span class="pre">get_active_determinants()</span></code></p>
 <dl class="field-list simple">
 <dt class="field-odd">Returns<span class="colon">:</span></dt>
 <dd class="field-odd"><p>Vector of all coefficients (real or complex)</p>
@@ -542,8 +525,7 @@ sequence of coefficients is consistent with the vector from
 </dd>
 </dl>
 <p class="rubric">Notes</p>
-<p>Expands active-space-only determinant to full orbital space by prepending
-doubly occupied inactive orbitals and appending unoccupied virtual orbitals.</p>
+<p>Expands active-space-only determinant to full orbital space by prepending doubly occupied inactive orbitals and appending unoccupied virtual orbitals.</p>
 <p class="rubric">Examples</p>
 <div class="doctest highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="n">active_det</span> <span class="o">=</span> <span class="n">qdk_chemistry</span><span class="o">.</span><span class="n">Configuration</span><span class="p">(</span><span class="s2">&quot;uudd&quot;</span><span class="p">)</span>  <span class="c1"># 4 active orbitals</span>
 <span class="gp">&gt;&gt;&gt; </span><span class="n">total_det</span> <span class="o">=</span> <span class="n">wf</span><span class="o">.</span><span class="n">get_total_determinant</span><span class="p">(</span><span class="n">active_det</span><span class="p">)</span>
@@ -555,18 +537,19 @@ doubly occupied inactive orbitals and appending unoccupied virtual orbitals.</p>
 <dl class="py method">
 <dt class="sig sig-object py" id="qdk_chemistry.utils.statevector.Wavefunction.get_total_determinants">
 <span class="sig-name descname"><span class="pre">get_total_determinants</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">self</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference internal" href="qdk_chemistry.utils.wavefunction.html#qdk_chemistry.utils.wavefunction.Wavefunction" title="qdk_chemistry._core.data.Wavefunction"><span class="pre">qdk_chemistry._core.data.Wavefunction</span></a></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#list" title="(in Python v3.14)"><span class="pre">list</span></a><span class="p"><span class="pre">[</span></span><a class="reference internal" href="qdk_chemistry.utils.wavefunction.html#qdk_chemistry.utils.wavefunction.Configuration" title="qdk_chemistry._core.data.Configuration"><span class="pre">qdk_chemistry._core.data.Configuration</span></a><span class="p"><span class="pre">]</span></span></span></span><a class="headerlink" href="#qdk_chemistry.utils.statevector.Wavefunction.get_total_determinants" title="Link to this definition"></a></dt>
-<dd><p>Get all determinants in the wavefunction with full orbital space.</p>
+<dd><blockquote>
+<div><p>Get all determinants in the wavefunction with full orbital space.</p>
+</div></blockquote>
 <dl class="field-list simple">
 <dt class="field-odd">Returns<span class="colon">:</span></dt>
 <dd class="field-odd"><p>Vector of all configurations/determinants including inactive and virtual orbitals</p>
 </dd>
 <dt class="field-even">Return type<span class="colon">:</span></dt>
-<dd class="field-even"><p><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#list" title="(in Python v3.14)">list</a> of <a class="reference internal" href="qdk_chemistry.data.html#qdk_chemistry.data.Configuration" title="qdk_chemistry.data.Configuration">Configuration</a></p>
+<dd class="field-even"><p><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#list" title="(in Python v3.14)">list</a>[<a class="reference internal" href="qdk_chemistry.data.html#qdk_chemistry.data.Configuration" title="qdk_chemistry.data.Configuration">Configuration</a>]</p>
 </dd>
 </dl>
 <p class="rubric">Notes</p>
-<p>Converts active-space-only determinants to full orbital space by prepending
-doubly occupied inactive orbitals and appending unoccupied virtual orbitals.</p>
+<p>Converts active-space-only determinants to full orbital space by prepending doubly occupied inactive orbitals and appending unoccupied virtual orbitals.</p>
 <p class="rubric">Examples</p>
 <div class="doctest highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="n">total_dets</span> <span class="o">=</span> <span class="n">wf</span><span class="o">.</span><span class="n">get_total_determinants</span><span class="p">()</span>
 <span class="gp">&gt;&gt;&gt; </span><span class="c1"># Each determinant now includes inactive (doubly occupied) and virtual (unoccupied) orbitals</span>
@@ -613,7 +596,9 @@ doubly occupied inactive orbitals and appending unoccupied virtual orbitals.</p>
 <dl class="py method">
 <dt class="sig sig-object py" id="qdk_chemistry.utils.statevector.Wavefunction.get_type">
 <span class="sig-name descname"><span class="pre">get_type</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">self</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference internal" href="qdk_chemistry.utils.wavefunction.html#qdk_chemistry.utils.wavefunction.Wavefunction" title="qdk_chemistry._core.data.Wavefunction"><span class="pre">qdk_chemistry._core.data.Wavefunction</span></a></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><a class="reference internal" href="qdk_chemistry.data.html#qdk_chemistry.data.WavefunctionType" title="qdk_chemistry._core.data.WavefunctionType"><span class="pre">qdk_chemistry._core.data.WavefunctionType</span></a></span></span><a class="headerlink" href="#qdk_chemistry.utils.statevector.Wavefunction.get_type" title="Link to this definition"></a></dt>
-<dd><p>Get the wavefunction type (Bra, Ket, or Both).</p>
+<dd><blockquote>
+<div><p>Get the wavefunction type (Bra, Ket, or Both).</p>
+</div></blockquote>
 <dl class="field-list simple">
 <dt class="field-odd">Returns<span class="colon">:</span></dt>
 <dd class="field-odd"><p>Enum value representing the wavefunction type</p>
@@ -650,7 +635,9 @@ doubly occupied inactive orbitals and appending unoccupied virtual orbitals.</p>
 <dl class="py method">
 <dt class="sig sig-object py" id="qdk_chemistry.utils.statevector.Wavefunction.has_one_rdm_spin_traced">
 <span class="sig-name descname"><span class="pre">has_one_rdm_spin_traced</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">self</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference internal" href="qdk_chemistry.utils.wavefunction.html#qdk_chemistry.utils.wavefunction.Wavefunction" title="qdk_chemistry._core.data.Wavefunction"><span class="pre">qdk_chemistry._core.data.Wavefunction</span></a></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><a class="reference external" href="https://docs.python.org/3/library/functions.html#bool" title="(in Python v3.14)"><span class="pre">bool</span></a></span></span><a class="headerlink" href="#qdk_chemistry.utils.statevector.Wavefunction.has_one_rdm_spin_traced" title="Link to this definition"></a></dt>
-<dd><p>Check if spin-traced one-particle RDM for active orbitals is available.</p>
+<dd><blockquote>
+<div><p>Check if spin-traced one-particle RDM for active orbitals is available.</p>
+</div></blockquote>
 <dl class="field-list simple">
 <dt class="field-odd">Returns<span class="colon">:</span></dt>
 <dd class="field-odd"><p>True if available</p>
@@ -772,7 +759,7 @@ doubly occupied inactive orbitals and appending unoccupied virtual orbitals.</p>
 <dd class="field-even"><p>Overlap value (real or complex)</p>
 </dd>
 <dt class="field-odd">Return type<span class="colon">:</span></dt>
-<dd class="field-odd"><p><a class="reference external" href="https://docs.python.org/3/library/functions.html#complex" title="(in Python v3.14)">complex</a> or <a class="reference external" href="https://docs.python.org/3/library/functions.html#float" title="(in Python v3.14)">float</a></p>
+<dd class="field-odd"><p><a class="reference external" href="https://docs.python.org/3/library/functions.html#complex" title="(in Python v3.14)">complex</a> | <a class="reference external" href="https://docs.python.org/3/library/functions.html#float" title="(in Python v3.14)">float</a></p>
 </dd>
 </dl>
 <p class="rubric">Examples</p>

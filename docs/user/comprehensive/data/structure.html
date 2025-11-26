@@ -54,7 +54,7 @@
 <li class="toctree-l1"><a class="reference internal" href="../../quickstart.html">Quickstart</a></li>
 <li class="toctree-l1 current"><a class="reference internal" href="../index.html">In-depth user guide</a><ul class="current">
 <li class="toctree-l2"><a class="reference internal" href="../design/index.html">Design principles of QDK/Chemistry</a></li>
-<li class="toctree-l2 current"><a class="reference internal" href="index.html">Data Management</a><ul class="current">
+<li class="toctree-l2 current"><a class="reference internal" href="index.html">Data management</a><ul class="current">
 <li class="toctree-l3"><a class="reference internal" href="serialization.html">Serialization</a></li>
 <li class="toctree-l3"><a class="reference internal" href="basis_set.html">Basis set</a></li>
 <li class="toctree-l3"><a class="reference internal" href="hamiltonian.html">Hamiltonian</a></li>
@@ -75,7 +75,7 @@
 </ul>
 </li>
 <li class="toctree-l2"><a class="reference internal" href="../algorithms/index.html">Available algorithms</a></li>
-<li class="toctree-l2"><a class="reference internal" href="../keywords.html">Functionals and basis sets</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../basis_functionals.html">Functionals and basis sets</a></li>
 <li class="toctree-l2"><a class="reference internal" href="../model_hamiltonians.html">Model Hamiltonians</a></li>
 <li class="toctree-l2"><a class="reference internal" href="../plugins.html">Plugins</a></li>
 </ul>
@@ -107,7 +107,7 @@
   <ul class="wy-breadcrumbs">
       <li><a href="../../../index.html" class="icon icon-home" aria-label="Home"></a></li>
           <li class="breadcrumb-item"><a href="../index.html">In-depth user guide</a></li>
-          <li class="breadcrumb-item"><a href="index.html">Data Management</a></li>
+          <li class="breadcrumb-item"><a href="index.html">Data management</a></li>
       <li class="breadcrumb-item active">Structure</li>
       <li class="wy-breadcrumbs-aside">
             <a href="../../../_sources/user/comprehensive/data/structure.rst.txt" rel="nofollow"> View page source</a>
@@ -120,11 +120,11 @@
              
   <section id="structure">
 <h1>Structure<a class="headerlink" href="#structure" title="Link to this heading"></a></h1>
-<p>The <code class="docutils literal notranslate"><span class="pre">Structure</span></code> class in QDK/Chemistry represents a molecular structure, storing information about atomic positions, elements, and related properties for chemical systems of interest.
-As a core <span class="xref std std-doc">data class</span>, it follows QDK/Chemistry’s immutable data pattern.</p>
+<p>The <a class="reference internal" href="../../../api/api_autogen/qdk_chemistry.data.html#qdk_chemistry.data.Structure" title="qdk_chemistry.data.Structure"><code class="xref py py-class docutils literal notranslate"><span class="pre">Structure</span></code></a> class in QDK/Chemistry represents a molecular structure, storing information about atomic positions, elements, and related properties for chemical systems of interest.
+As a core <a class="reference internal" href="../design/index.html"><span class="doc">data class</span></a>, it follows QDK/Chemistry’s immutable data pattern.</p>
 <section id="overview">
 <h2>Overview<a class="headerlink" href="#overview" title="Link to this heading"></a></h2>
-<p>The <code class="docutils literal notranslate"><span class="pre">Structure</span></code> class is a fundamental data container in QDK/Chemistry that represents the geometric arrangement of atoms in a molecular system.
+<p>The <a class="reference internal" href="../../../api/api_autogen/qdk_chemistry.data.html#qdk_chemistry.data.Structure" title="qdk_chemistry.data.Structure"><code class="xref py py-class docutils literal notranslate"><span class="pre">Structure</span></code></a> class is a fundamental data container in QDK/Chemistry that represents the geometric arrangement of atoms in a molecular system.
 It provides the foundation for all quantum chemistry calculations by defining the nuclear framework on which electronic structure calculations are performed.</p>
 <section id="properties">
 <h3>Properties<a class="headerlink" href="#properties" title="Link to this heading"></a></h3>
@@ -141,7 +141,7 @@ lowest possible value (singlet for even-electron systems, doublet for odd-electr
 </section>
 <section id="usage">
 <h2>Usage<a class="headerlink" href="#usage" title="Link to this heading"></a></h2>
-<p>The <code class="docutils literal notranslate"><span class="pre">Structure</span></code> class is typically the starting point for any calculation workflow in QDK/Chemistry.
+<p>The <a class="reference internal" href="../../../api/api_autogen/qdk_chemistry.data.html#qdk_chemistry.data.Structure" title="qdk_chemistry.data.Structure"><code class="xref py py-class docutils literal notranslate"><span class="pre">Structure</span></code></a> class is typically the starting point for any calculation workflow in QDK/Chemistry.
 It is used to define the molecular system before performing electronic structure calculations.</p>
 <div class="admonition note">
 <p class="admonition-title">Note</p>
@@ -150,7 +150,7 @@ It is used to define the molecular system before performing electronic structure
 </section>
 <section id="creating-a-structure-object-manually">
 <h2>Creating a structure object manually<a class="headerlink" href="#creating-a-structure-object-manually" title="Link to this heading"></a></h2>
-<p>A <code class="docutils literal notranslate"><span class="pre">Structure</span></code> object can be created manually by adding atoms one by one:</p>
+<p>A <a class="reference internal" href="../../../api/api_autogen/qdk_chemistry.data.html#qdk_chemistry.data.Structure" title="qdk_chemistry.data.Structure"><code class="xref py py-class docutils literal notranslate"><span class="pre">Structure</span></code></a> object can be created manually by adding atoms one by one:</p>
 <div class="tab-set docutils container">
 <input checked="True" class="tab-input" id="tab-set--0-input--1" name="tab-set--0" type="radio"><label class="tab-label" for="tab-set--0-input--1">C++ API</label><div class="tab-content docutils container">
 <div class="highlight-cpp notranslate"><div class="highlight"><pre><span></span><span class="cp">#include</span><span class="w"> </span><span class="cpf">&lt;qdk/chemistry.hpp&gt;</span>
@@ -184,7 +184,7 @@ It is used to define the molecular system before performing electronic structure
 </section>
 <section id="loading-from-files">
 <h2>Loading from files<a class="headerlink" href="#loading-from-files" title="Link to this heading"></a></h2>
-<p>The <code class="docutils literal notranslate"><span class="pre">Structure</span></code> class can load molecular structures from various file formats.
+<p>The <a class="reference internal" href="../../../api/api_autogen/qdk_chemistry.data.html#qdk_chemistry.data.Structure" title="qdk_chemistry.data.Structure"><code class="xref py py-class docutils literal notranslate"><span class="pre">Structure</span></code></a> class can load molecular structures from various file formats.
 For detailed format specifications, see the <a class="reference internal" href="#file-formats">File Formats</a> section below.</p>
 <div class="admonition note">
 <p class="admonition-title">Note</p>
@@ -218,11 +218,11 @@ For detailed format specifications, see the <a class="reference internal" href="
 </section>
 <section id="accessing-structure-data">
 <h2>Accessing structure data<a class="headerlink" href="#accessing-structure-data" title="Link to this heading"></a></h2>
-<p>The <code class="docutils literal notranslate"><span class="pre">Structure</span></code> class provides methods to access atomic data:</p>
+<p>The <a class="reference internal" href="../../../api/api_autogen/qdk_chemistry.data.html#qdk_chemistry.data.Structure" title="qdk_chemistry.data.Structure"><code class="xref py py-class docutils literal notranslate"><span class="pre">Structure</span></code></a> class provides methods to access atomic data:</p>
 <div class="admonition note">
 <p class="admonition-title">Note</p>
 <p>Functions that deal with specific atoms include the word “atom” in their name (e.g., <code class="docutils literal notranslate"><span class="pre">get_atom_coordinates</span></code>), while functions that return properties for all atoms omit this word (e.g., <code class="docutils literal notranslate"><span class="pre">get_coordinates</span></code>).
-All atomic data is const and immutable once set, following QDK/Chemistry’s <span class="xref std std-doc">immutable data pattern</span>.
+All atomic data is const and immutable once set, following QDK/Chemistry’s <a class="reference internal" href="../design/index.html"><span class="doc">immutable data pattern</span></a>.
 If you need to modify coordinates or other properties, you must create a new Structure object with the desired changes.</p>
 </div>
 <div class="tab-set docutils container">
@@ -260,8 +260,8 @@ If you need to modify coordinates or other properties, you must create a new Str
 </section>
 <section id="serialization">
 <h2>Serialization<a class="headerlink" href="#serialization" title="Link to this heading"></a></h2>
-<p>The <code class="docutils literal notranslate"><span class="pre">Structure</span></code> class supports serialization to and from various formats.
-For detailed information about serialization in QDK/Chemistry, see the <span class="xref std std-doc">Serialization</span> documentation.</p>
+<p>The <a class="reference internal" href="../../../api/api_autogen/qdk_chemistry.data.html#qdk_chemistry.data.Structure" title="qdk_chemistry.data.Structure"><code class="xref py py-class docutils literal notranslate"><span class="pre">Structure</span></code></a> class supports serialization to and from various formats.
+For detailed information about serialization in QDK/Chemistry, see the <a class="reference internal" href="serialization.html"><span class="doc">Serialization</span></a> documentation.</p>
 <div class="admonition note">
 <p class="admonition-title">Note</p>
 <p>All structure-related files require the <code class="docutils literal notranslate"><span class="pre">.structure</span></code> suffix before the file type extension, for example <code class="docutils literal notranslate"><span class="pre">molecule.structure.xyz</span></code> and <code class="docutils literal notranslate"><span class="pre">h2.structure.json</span></code> for XYZ and JSON files respectively.
@@ -272,7 +272,7 @@ This naming convention is enforced to maintain consistency across the QDK/Chemis
 <p>QDK/Chemistry supports multiple serialization formats for molecular structures:</p>
 <section id="json-format">
 <h4>JSON format<a class="headerlink" href="#json-format" title="Link to this heading"></a></h4>
-<p>JSON representation of a <code class="docutils literal notranslate"><span class="pre">Structure</span></code> looks like:</p>
+<p>JSON representation of a <a class="reference internal" href="../../../api/api_autogen/qdk_chemistry.data.html#qdk_chemistry.data.Structure" title="qdk_chemistry.data.Structure"><code class="xref py py-class docutils literal notranslate"><span class="pre">Structure</span></code></a> looks like:</p>
 <div class="highlight-json notranslate"><div class="highlight"><pre><span></span><span class="p">{</span>
 <span class="w">  </span><span class="nt">&quot;coordinates&quot;</span><span class="p">:[[</span><span class="mf">0.0</span><span class="p">,</span><span class="mf">0.0</span><span class="p">,</span><span class="mf">0.0</span><span class="p">],[</span><span class="mf">0.0</span><span class="p">,</span><span class="mf">0.0</span><span class="p">,</span><span class="mf">1.4</span><span class="p">]],</span>
 <span class="w">  </span><span class="nt">&quot;elements&quot;</span><span class="p">:[</span><span class="mi">1</span><span class="p">,</span><span class="mi">1</span><span class="p">],</span>
@@ -288,7 +288,7 @@ This naming convention is enforced to maintain consistency across the QDK/Chemis
 </section>
 <section id="xyz-format">
 <h4>XYZ format<a class="headerlink" href="#xyz-format" title="Link to this heading"></a></h4>
-<p><a class="reference external" href="https://en.wikipedia.org/wiki/XYZ_file_format">XYZ representation</a> of the same <code class="docutils literal notranslate"><span class="pre">Structure</span></code>:</p>
+<p><a class="reference external" href="https://en.wikipedia.org/wiki/XYZ_file_format">XYZ representation</a> of the same <a class="reference internal" href="../../../api/api_autogen/qdk_chemistry.data.html#qdk_chemistry.data.Structure" title="qdk_chemistry.data.Structure"><code class="xref py py-class docutils literal notranslate"><span class="pre">Structure</span></code></a>:</p>
 <div class="admonition note">
 <p class="admonition-title">Note</p>
 <p>QDK/Chemistry uses the comment field (second line) of the XYZ format to store the charge and spin multiplicity information, as this data is not part of the standard XYZ specification.</p>
@@ -349,7 +349,7 @@ H      0.000000    0.000000    1.400000
 </section>
 <section id="molecular-manipulation">
 <h2>Molecular manipulation<a class="headerlink" href="#molecular-manipulation" title="Link to this heading"></a></h2>
-<p>The <code class="docutils literal notranslate"><span class="pre">Structure</span></code> class provides methods for basic molecular manipulations:</p>
+<p>The <a class="reference internal" href="../../../api/api_autogen/qdk_chemistry.data.html#qdk_chemistry.data.Structure" title="qdk_chemistry.data.Structure"><code class="xref py py-class docutils literal notranslate"><span class="pre">Structure</span></code></a> class provides methods for basic molecular manipulations:</p>
 <div class="tab-set docutils container">
 <input checked="True" class="tab-input" id="tab-set--4-input--1" name="tab-set--4" type="radio"><label class="tab-label" for="tab-set--4-input--1">C++ API</label><div class="tab-content docutils container">
 <div class="highlight-cpp notranslate"><div class="highlight"><pre><span></span><span class="c1">// Add an atom with coordinates and element</span>
@@ -378,7 +378,7 @@ H      0.000000    0.000000    1.400000
 </section>
 <section id="units">
 <h2>Units<a class="headerlink" href="#units" title="Link to this heading"></a></h2>
-<p>All internal coordinates in the <code class="docutils literal notranslate"><span class="pre">Structure</span></code> class are in Bohr by default.
+<p>All internal coordinates in the <a class="reference internal" href="../../../api/api_autogen/qdk_chemistry.data.html#qdk_chemistry.data.Structure" title="qdk_chemistry.data.Structure"><code class="xref py py-class docutils literal notranslate"><span class="pre">Structure</span></code></a> class are in Bohr by default.
 This applies to all methods that return or accept coordinates.</p>
 </section>
 <section id="related-classes">
@@ -391,7 +391,7 @@ This applies to all methods that return or accept coordinates.</p>
 <section id="related-topics">
 <h2>Related topics<a class="headerlink" href="#related-topics" title="Link to this heading"></a></h2>
 <ul class="simple">
-<li><p><span class="xref std std-doc">Serialization</span>: Data serialization and deserialization</p></li>
+<li><p><a class="reference internal" href="serialization.html"><span class="doc">Serialization</span></a>: Data serialization and deserialization</p></li>
 </ul>
 </section>
 </section>

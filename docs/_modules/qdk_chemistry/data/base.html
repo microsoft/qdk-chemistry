@@ -161,33 +161,33 @@
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;Base class for immutable data classes with common serialization methods.</span>
 
 <span class="sd">    This abstract base class provides:</span>
+
 <span class="sd">    - Immutability after construction (__setattr__ and __delattr__ protection)</span>
 <span class="sd">    - Common implementations of to_json_file, to_hdf5_file, and to_file</span>
 <span class="sd">    - Filename validation to enforce naming convention (.&lt;data_type&gt;.&lt;extension&gt;)</span>
 <span class="sd">    - Requires derived classes to implement abstract methods</span>
 
 <span class="sd">    Derived classes MUST implement:</span>
+
 <span class="sd">    1. get_summary() -&gt; str</span>
 <span class="sd">        Return a human-readable summary string of the object</span>
-
 <span class="sd">    2. to_json() -&gt; dict</span>
 <span class="sd">        Return a dictionary representation suitable for JSON serialization</span>
-
 <span class="sd">    3. to_hdf5(group: h5py.Group) -&gt; None</span>
 <span class="sd">        Write the object&#39;s data to an HDF5 group</span>
-
 <span class="sd">    4. to_file(filename: str, format_type: str) -&gt; None</span>
 <span class="sd">        Save the object to a file with the specified format</span>
 <span class="sd">        (default implementation provided, but can be overridden)</span>
 
 <span class="sd">    Derived classes should:</span>
+
 <span class="sd">    - Set all attributes before calling super().__init__()</span>
 <span class="sd">    - Call super().__init__() at the end of __init__ to enable immutability</span>
 <span class="sd">    - Set the _data_type_name class attribute (e.g., &quot;structure&quot;, &quot;wavefunction&quot;)</span>
 
-<span class="sd">    Note:</span>
-<span class="sd">        These methods are pure virtual in the C++ base class and MUST be</span>
-<span class="sd">        overridden. The C++ binding will enforce this at runtime.</span>
+<span class="sd">    Notes:</span>
+<span class="sd">        These methods are pure virtual in the C++ base class and MUST be overridden.</span>
+<span class="sd">        The C++ binding will enforce this at runtime.</span>
 
 <span class="sd">        Filename validation enforces the convention that filenames must include</span>
 <span class="sd">        the data type, e.g., &quot;example.structure.json&quot; or &quot;data.wavefunction.h5&quot;</span>

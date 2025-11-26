@@ -134,11 +134,6 @@
 
 <span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.algorithms.state_preparation.state_preparation</span><span class="w"> </span><span class="kn">import</span> <span class="n">StatePreparation</span><span class="p">,</span> <span class="n">StatePreparationSettings</span>
 <span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.data</span><span class="w"> </span><span class="kn">import</span> <span class="n">Wavefunction</span>
-<span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.plugins.qiskit._interop.transpiler</span><span class="w"> </span><span class="kn">import</span> <span class="p">(</span>
-    <span class="n">MergeZBasisRotations</span><span class="p">,</span>
-    <span class="n">RemoveZBasisOnZeroState</span><span class="p">,</span>
-    <span class="n">SubstituteCliffordRz</span><span class="p">,</span>
-<span class="p">)</span>
 <span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.utils.bitstring</span><span class="w"> </span><span class="kn">import</span> <span class="n">bitstrings_to_binary_matrix</span><span class="p">,</span> <span class="n">separate_alpha_beta_to_binary_string</span>
 
 <span class="n">_LOGGER</span> <span class="o">=</span> <span class="n">logging</span><span class="o">.</span><span class="n">getLogger</span><span class="p">(</span><span class="vm">__name__</span><span class="p">)</span>
@@ -193,6 +188,13 @@
 <span class="sd">            OpenQASM3 string of the quantum circuit that prepares the wavefunction.</span>
 
 <span class="sd">        &quot;&quot;&quot;</span>
+        <span class="c1"># Imported here to avoid circular import issues</span>
+        <span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.plugins.qiskit._interop.transpiler</span><span class="w"> </span><span class="kn">import</span> <span class="p">(</span>  <span class="c1"># noqa: PLC0415</span>
+            <span class="n">MergeZBasisRotations</span><span class="p">,</span>
+            <span class="n">RemoveZBasisOnZeroState</span><span class="p">,</span>
+            <span class="n">SubstituteCliffordRz</span><span class="p">,</span>
+        <span class="p">)</span>
+
         <span class="c1"># Active Space Consistency Check</span>
         <span class="n">alpha_indices</span><span class="p">,</span> <span class="n">beta_indices</span> <span class="o">=</span> <span class="n">wavefunction</span><span class="o">.</span><span class="n">get_orbitals</span><span class="p">()</span><span class="o">.</span><span class="n">get_active_space_indices</span><span class="p">()</span>
         <span class="k">if</span> <span class="n">alpha_indices</span> <span class="o">!=</span> <span class="n">beta_indices</span><span class="p">:</span>
@@ -424,7 +426,7 @@
 <span class="sd">    especially for certain types of matrices.</span>
 
 <span class="sd">    Args:</span>
-<span class="sd">        matrix (np.ndarray): shape (m, n), binary (0/1) matrix</span>
+<span class="sd">        matrix: shape (m, n), binary (0/1) matrix</span>
 
 <span class="sd">    Returns:</span>
 <span class="sd">        A dataclass containing GF2+X elimination results.</span>
@@ -768,10 +770,10 @@
 
 <span class="sd">    Returns:</span>
 <span class="sd">        A tuple containing:</span>
-<span class="sd">            * M_reduced (np.ndarray): New matrix with only non-zero rows</span>
-<span class="sd">            * reduced_row_map (list[int]): Updated mapping from reduced matrix</span>
+<span class="sd">            * M_reduced: New matrix with only non-zero rows</span>
+<span class="sd">            * reduced_row_map: Updated mapping from reduced matrix</span>
 <span class="sd">              rows to original row indices</span>
-<span class="sd">            * rank (int): Number of non-zero rows (matrix rank)</span>
+<span class="sd">            * rank: Number of non-zero rows (matrix rank)</span>
 
 <span class="sd">    Note:</span>
 <span class="sd">        This function does not modify its input arguments. It creates and returns</span>

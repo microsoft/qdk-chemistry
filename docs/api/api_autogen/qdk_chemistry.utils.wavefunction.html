@@ -62,7 +62,7 @@
 <li class="toctree-l2"><a class="reference internal" href="../python_api.html#plugins">Plugins</a></li>
 <li class="toctree-l2 current"><a class="reference internal" href="../python_api.html#utilities">Utilities</a><ul class="current">
 <li class="toctree-l3 current"><a class="reference internal" href="qdk_chemistry.utils.html">qdk_chemistry.utils package</a><ul class="current">
-<li class="toctree-l4"><a class="reference internal" href="qdk_chemistry.utils.html#qdk_chemistry.utils.compute_valence_space"><code class="docutils literal notranslate"><span class="pre">compute_valence_space()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="qdk_chemistry.utils.html#qdk_chemistry.utils.compute_valence_space_parameters"><code class="docutils literal notranslate"><span class="pre">compute_valence_space_parameters()</span></code></a></li>
 <li class="toctree-l4 current"><a class="reference internal" href="qdk_chemistry.utils.html#submodules">Submodules</a></li>
 </ul>
 </li>
@@ -169,85 +169,54 @@ and can be looked up with show_settings() method in .</p></li>
 
 <dl class="py class">
 <dt class="sig sig-object py" id="qdk_chemistry.utils.wavefunction.Configuration">
-<em class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">Configuration</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="o"><span class="pre">*</span></span><span class="n"><span class="pre">args</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">kwargs</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#qdk_chemistry.utils.wavefunction.Configuration" title="Link to this definition"></a></dt>
+<em class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">Configuration</span></span><a class="headerlink" href="#qdk_chemistry.utils.wavefunction.Configuration" title="Link to this definition"></a></dt>
 <dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">DataClass</span></code></p>
 <p>Represents a molecular electronic configuration.</p>
-<blockquote>
-<div><p>This class efficiently stores the occupation pattern of molecular orbitals
-using a compact representation where each orbital can be in one of four states:
-- UNOCCUPIED (0): No electrons
-- ALPHA (1): One alpha electron
-- BETA (2): One beta electron
-- DOUBLY (3): Both alpha and beta electrons</p>
-</div></blockquote>
+<p>This class efficiently stores the occupation pattern of molecular orbitals using a compact representation where each orbital can be in one of four states:</p>
+<ul class="simple">
+<li><p>UNOCCUPIED (0): No electrons</p></li>
+<li><p>ALPHA (1): One alpha electron</p></li>
+<li><p>BETA (2): One beta electron</p></li>
+<li><p>DOUBLY (3): Both alpha and beta electrons</p></li>
+</ul>
 <p>The class provides methods for constructing, manipulating, and querying configurations.</p>
-<p>Overloaded function.</p>
-<ol class="arabic">
-<li><p>__init__(self: qdk_chemistry._core.data.Configuration) -&gt; None</p>
-<blockquote>
-<div><p>Default constructor for an empty configuration.</p>
-<div class="doctest highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="n">config</span> <span class="o">=</span> <span class="n">qdk_chemistry</span><span class="o">.</span><span class="n">Configuration</span><span class="p">()</span>
-</pre></div>
-</div>
-</div></blockquote>
-</li>
-<li><p>__init__(self: qdk_chemistry._core.data.Configuration, str: str) -&gt; None</p>
-<blockquote>
-<div><p>Constructs a configuration from a string representation.</p>
-<dl class="simple">
-<dt>str<span class="classifier">str</span></dt><dd><p>String representation of the configuration where:
-‘0’ = unoccupied orbital
-‘1’ = alpha-occupied orbital
-‘2’ = beta-occupied orbital
-‘3’ = doubly-occupied orbital</p>
-</dd>
-</dl>
-<div class="doctest highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="n">config</span> <span class="o">=</span> <span class="n">qdk_chemistry</span><span class="o">.</span><span class="n">Configuration</span><span class="p">(</span><span class="s2">&quot;3322110&quot;</span><span class="p">)</span>  <span class="c1"># 7 orbitals with different occupations</span>
-</pre></div>
-</div>
-</div></blockquote>
-</li>
-</ol>
 <dl class="py method">
 <dt class="sig sig-object py" id="qdk_chemistry.utils.wavefunction.Configuration.__init__">
 <span class="sig-name descname"><span class="pre">__init__</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="o"><span class="pre">*</span></span><span class="n"><span class="pre">args</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">kwargs</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#qdk_chemistry.utils.wavefunction.Configuration.__init__" title="Link to this definition"></a></dt>
 <dd><p>Overloaded function.</p>
-<ol class="arabic">
-<li><p>__init__(self: qdk_chemistry._core.data.Configuration) -&gt; None</p>
-<blockquote>
-<div><p>Default constructor for an empty configuration.</p>
+<ol class="arabic simple">
+<li><p>__init__(self: qdk_chemistry._core.data.Configuration) -&gt; None</p></li>
+</ol>
+<p>Default constructor for an empty configuration.</p>
+<p class="rubric">Examples</p>
 <div class="doctest highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="n">config</span> <span class="o">=</span> <span class="n">qdk_chemistry</span><span class="o">.</span><span class="n">Configuration</span><span class="p">()</span>
 </pre></div>
 </div>
-</div></blockquote>
-</li>
-<li><p>__init__(self: qdk_chemistry._core.data.Configuration, str: str) -&gt; None</p>
-<blockquote>
-<div><p>Constructs a configuration from a string representation.</p>
-<dl class="simple">
-<dt>str<span class="classifier">str</span></dt><dd><p>String representation of the configuration where:
-‘0’ = unoccupied orbital
-‘1’ = alpha-occupied orbital
-‘2’ = beta-occupied orbital
-‘3’ = doubly-occupied orbital</p>
+<ol class="arabic simple" start="2">
+<li><p>__init__(self: qdk_chemistry._core.data.Configuration, str: str) -&gt; None</p></li>
+</ol>
+<p>Constructs a configuration from a string representation.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>str</strong> (<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)"><em>str</em></a>) – String representation of the configuration where ‘0’ = unoccupied orbital, ‘1’ = alpha-occupied orbital, ‘2’ = beta-occupied orbital, ‘3’ = doubly-occupied orbital</p>
 </dd>
 </dl>
+<p class="rubric">Examples</p>
 <div class="doctest highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="n">config</span> <span class="o">=</span> <span class="n">qdk_chemistry</span><span class="o">.</span><span class="n">Configuration</span><span class="p">(</span><span class="s2">&quot;3322110&quot;</span><span class="p">)</span>  <span class="c1"># 7 orbitals with different occupations</span>
 </pre></div>
 </div>
-</div></blockquote>
-</li>
-</ol>
 </dd></dl>
 
 <dl class="py method">
 <dt class="sig sig-object py" id="qdk_chemistry.utils.wavefunction.Configuration.canonical_hf_configuration">
 <em class="property"><span class="k"><span class="pre">static</span></span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">canonical_hf_configuration</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">n_alpha</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.SupportsInt" title="(in Python v3.14)"><span class="pre">SupportsInt</span></a></span></em>, <em class="sig-param"><span class="n"><span class="pre">n_beta</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.SupportsInt" title="(in Python v3.14)"><span class="pre">SupportsInt</span></a></span></em>, <em class="sig-param"><span class="n"><span class="pre">n_orbitals</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.SupportsInt" title="(in Python v3.14)"><span class="pre">SupportsInt</span></a></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><a class="reference internal" href="#qdk_chemistry.utils.wavefunction.Configuration" title="qdk_chemistry._core.data.Configuration"><span class="pre">qdk_chemistry._core.data.Configuration</span></a></span></span><a class="headerlink" href="#qdk_chemistry.utils.wavefunction.Configuration.canonical_hf_configuration" title="Link to this definition"></a></dt>
 <dd><p>Create a canonical Hartree-Fock configuration using the Aufbau principle.</p>
-<p>Fills orbitals from lowest energy according to the Aufbau principle:
-- Doubly occupied orbitals for paired electrons
-- Singly occupied orbitals for unpaired electrons (alpha first if n_alpha &gt; n_beta)
-- Unoccupied orbitals for remaining positions</p>
+<p>Fills orbitals from lowest energy according to the Aufbau principle:</p>
+<ul class="simple">
+<li><p>Doubly occupied orbitals for paired electrons</p></li>
+<li><p>Singly occupied orbitals for unpaired electrons (alpha first if n_alpha &gt; n_beta)</p></li>
+<li><p>Unoccupied orbitals for remaining positions</p></li>
+</ul>
 <dl class="field-list simple">
 <dt class="field-odd">Parameters<span class="colon">:</span></dt>
 <dd class="field-odd"><ul class="simple">
@@ -317,11 +286,7 @@ using a compact representation where each orbital can be in one of four states:
 <dd><p>Convert the configuration to a string representation.</p>
 <dl class="field-list simple">
 <dt class="field-odd">Returns<span class="colon">:</span></dt>
-<dd class="field-odd"><p>String representation where:
-‘0’ = unoccupied orbital
-‘1’ = alpha-occupied orbital
-‘2’ = beta-occupied orbital
-‘3’ = doubly-occupied orbital</p>
+<dd class="field-odd"><p>String representation where ‘0’ = unoccupied orbital, ‘1’ = alpha-occupied orbital, ‘2’ = beta-occupied orbital, ‘3’ = doubly-occupied orbital</p>
 </dd>
 <dt class="field-even">Return type<span class="colon">:</span></dt>
 <dd class="field-even"><p><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)">str</a></p>
@@ -339,11 +304,9 @@ using a compact representation where each orbital can be in one of four states:
 
 <dl class="py class">
 <dt class="sig sig-object py" id="qdk_chemistry.utils.wavefunction.Hamiltonian">
-<em class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">Hamiltonian</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="o"><span class="pre">*</span></span><span class="n"><span class="pre">args</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">kwargs</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#qdk_chemistry.utils.wavefunction.Hamiltonian" title="Link to this definition"></a></dt>
+<em class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">Hamiltonian</span></span><a class="headerlink" href="#qdk_chemistry.utils.wavefunction.Hamiltonian" title="Link to this definition"></a></dt>
 <dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">DataClass</span></code></p>
-<blockquote>
-<div><p>Represents a molecular Hamiltonian in the molecular orbital basis.</p>
-</div></blockquote>
+<p>Represents a molecular Hamiltonian in the molecular orbital basis.</p>
 <p>This class stores and manipulates molecular Hamiltonian data for quantum chemistry
 calculations, specifically designed for active space methods. It contains:</p>
 <ul class="simple">
@@ -354,98 +317,28 @@ calculations, specifically designed for active space methods. It contains:</p>
 <li><p>Number of electrons in the selected MO space</p></li>
 <li><p>Core energy contributions from inactive orbitals and nuclear repulsion</p></li>
 </ul>
-<p>Overloaded function.</p>
-<ol class="arabic">
-<li><p>__init__(self: qdk_chemistry._core.data.Hamiltonian, one_body_integrals: typing.Annotated[numpy.typing.ArrayLike, numpy.float64, “[m, n]”], two_body_integrals: typing.Annotated[numpy.typing.ArrayLike, numpy.float64, “[m, 1]”], orbitals: qdk_chemistry._core.data.Orbitals, core_energy: typing.SupportsFloat, inactive_fock_matrix: typing.Annotated[numpy.typing.ArrayLike, numpy.float64, “[m, n]”], type: qdk_chemistry._core.data.HamiltonianType = &lt;HamiltonianType.Hermitian: 0&gt;) -&gt; None</p>
-<blockquote>
-<div><p>Constructor for restricted active space Hamiltonian.</p>
-<p><code class="docutils literal notranslate"><span class="pre">norb</span></code> denotes the number of orbitals in the active space.</p>
-<dl class="simple">
-<dt>one_body_integrals<span class="classifier">numpy.ndarray</span></dt><dd><p>One-electron integrals matrix [norb x norb]</p>
-</dd>
-<dt>two_body_integrals<span class="classifier">numpy.ndarray</span></dt><dd><p>Two-electron integrals vector [norb^4]</p>
-</dd>
-<dt>orbitals<span class="classifier">Orbitals</span></dt><dd><p>Molecular orbital data</p>
-</dd>
-<dt>core_energy<span class="classifier">float</span></dt><dd><p>Core energy (nuclear repulsion + inactive orbitals)</p>
-</dd>
-<dt>inactive_fock_matrix<span class="classifier">numpy.ndarray</span></dt><dd><p>Inactive Fock matrix for the selected active space</p>
-</dd>
-<dt>type<span class="classifier">HamiltonianType, optional</span></dt><dd><p>Type of Hamiltonian (Hermitian by default)</p>
-</dd>
-</dl>
-<div class="doctest highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="kn">import</span><span class="w"> </span><span class="nn">numpy</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">np</span>
-<span class="gp">&gt;&gt;&gt; </span><span class="n">one_body</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">random</span><span class="o">.</span><span class="n">rand</span><span class="p">(</span><span class="mi">4</span><span class="p">,</span> <span class="mi">4</span><span class="p">)</span>  <span class="c1"># 4 orbitals</span>
-<span class="gp">&gt;&gt;&gt; </span><span class="n">two_body</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">random</span><span class="o">.</span><span class="n">rand</span><span class="p">(</span><span class="mi">256</span><span class="p">)</span>   <span class="c1"># 4^4 elements</span>
-<span class="gp">&gt;&gt;&gt; </span><span class="n">fock_matrix</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">random</span><span class="o">.</span><span class="n">rand</span><span class="p">(</span><span class="mi">4</span><span class="p">,</span> <span class="mi">4</span><span class="p">)</span>
-<span class="gp">&gt;&gt;&gt; </span><span class="n">hamiltonian</span> <span class="o">=</span> <span class="n">Hamiltonian</span><span class="p">(</span><span class="n">one_body</span><span class="p">,</span> <span class="n">two_body</span><span class="p">,</span> <span class="n">orbitals</span><span class="p">,</span> <span class="mf">10.5</span><span class="p">,</span> <span class="n">fock_matrix</span><span class="p">)</span>
-</pre></div>
-</div>
-</div></blockquote>
-</li>
-<li><p>__init__(self: qdk_chemistry._core.data.Hamiltonian, one_body_integrals_alpha: typing.Annotated[numpy.typing.ArrayLike, numpy.float64, “[m, n]”], one_body_integrals_beta: typing.Annotated[numpy.typing.ArrayLike, numpy.float64, “[m, n]”], two_body_integrals_aaaa: typing.Annotated[numpy.typing.ArrayLike, numpy.float64, “[m, 1]”], two_body_integrals_aabb: typing.Annotated[numpy.typing.ArrayLike, numpy.float64, “[m, 1]”], two_body_integrals_bbbb: typing.Annotated[numpy.typing.ArrayLike, numpy.float64, “[m, 1]”], orbitals: qdk_chemistry._core.data.Orbitals, core_energy: typing.SupportsFloat, inactive_fock_matrix_alpha: typing.Annotated[numpy.typing.ArrayLike, numpy.float64, “[m, n]”], inactive_fock_matrix_beta: typing.Annotated[numpy.typing.ArrayLike, numpy.float64, “[m, n]”], type: qdk_chemistry._core.data.HamiltonianType = &lt;HamiltonianType.Hermitian: 0&gt;) -&gt; None</p>
-<blockquote>
-<div><p>Constructor for unrestricted active space Hamiltonian.</p>
-<p><code class="docutils literal notranslate"><span class="pre">norb</span></code> denotes the number of orbitals in the active space.</p>
-<dl class="simple">
-<dt>one_body_integrals_alpha<span class="classifier">numpy.ndarray</span></dt><dd><p>Alpha one-electron integrals matrix [norb x norb]</p>
-</dd>
-<dt>one_body_integrals_beta<span class="classifier">numpy.ndarray</span></dt><dd><p>Beta one-electron integrals matrix [norb x norb]</p>
-</dd>
-<dt>two_body_integrals_aaaa<span class="classifier">numpy.ndarray</span></dt><dd><p>Alpha-alpha-alpha-alpha two-electron integrals vector</p>
-</dd>
-<dt>two_body_integrals_aabb<span class="classifier">numpy.ndarray</span></dt><dd><p>Alpha-beta-alpha-beta two-electron integrals vector</p>
-</dd>
-<dt>two_body_integrals_bbbb<span class="classifier">numpy.ndarray</span></dt><dd><p>Beta-beta-beta-beta two-electron integrals vector</p>
-</dd>
-<dt>orbitals<span class="classifier">Orbitals</span></dt><dd><p>Molecular orbital data</p>
-</dd>
-<dt>core_energy<span class="classifier">float</span></dt><dd><p>Core energy (nuclear repulsion + inactive orbitals)</p>
-</dd>
-<dt>inactive_fock_matrix_alpha<span class="classifier">numpy.ndarray</span></dt><dd><p>Alpha inactive Fock matrix for the selected active space</p>
-</dd>
-<dt>inactive_fock_matrix_beta<span class="classifier">numpy.ndarray</span></dt><dd><p>Beta inactive Fock matrix for the selected active space</p>
-</dd>
-<dt>type<span class="classifier">HamiltonianType, optional</span></dt><dd><p>Type of Hamiltonian (Hermitian by default)</p>
-</dd>
-</dl>
-<div class="doctest highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="kn">import</span><span class="w"> </span><span class="nn">numpy</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">np</span>
-<span class="gp">&gt;&gt;&gt; </span><span class="n">one_body_a</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">random</span><span class="o">.</span><span class="n">rand</span><span class="p">(</span><span class="mi">4</span><span class="p">,</span> <span class="mi">4</span><span class="p">)</span>
-<span class="gp">&gt;&gt;&gt; </span><span class="n">one_body_b</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">random</span><span class="o">.</span><span class="n">rand</span><span class="p">(</span><span class="mi">4</span><span class="p">,</span> <span class="mi">4</span><span class="p">)</span>
-<span class="gp">&gt;&gt;&gt; </span><span class="n">two_body_aaaa</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">random</span><span class="o">.</span><span class="n">rand</span><span class="p">(</span><span class="mi">256</span><span class="p">)</span>
-<span class="gp">&gt;&gt;&gt; </span><span class="n">two_body_aabb</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">random</span><span class="o">.</span><span class="n">rand</span><span class="p">(</span><span class="mi">256</span><span class="p">)</span>
-<span class="gp">&gt;&gt;&gt; </span><span class="n">two_body_bbbb</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">random</span><span class="o">.</span><span class="n">rand</span><span class="p">(</span><span class="mi">256</span><span class="p">)</span>
-<span class="gp">&gt;&gt;&gt; </span><span class="n">fock_a</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">random</span><span class="o">.</span><span class="n">rand</span><span class="p">(</span><span class="mi">4</span><span class="p">,</span> <span class="mi">4</span><span class="p">)</span>
-<span class="gp">&gt;&gt;&gt; </span><span class="n">fock_b</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">random</span><span class="o">.</span><span class="n">rand</span><span class="p">(</span><span class="mi">4</span><span class="p">,</span> <span class="mi">4</span><span class="p">)</span>
-<span class="gp">&gt;&gt;&gt; </span><span class="n">hamiltonian</span> <span class="o">=</span> <span class="n">Hamiltonian</span><span class="p">(</span><span class="n">one_body_a</span><span class="p">,</span> <span class="n">one_body_b</span><span class="p">,</span> <span class="n">two_body_aaaa</span><span class="p">,</span> <span class="n">two_body_aabb</span><span class="p">,</span> <span class="n">two_body_bbbb</span><span class="p">,</span> <span class="n">orbitals</span><span class="p">,</span> <span class="mf">10.5</span><span class="p">,</span> <span class="n">fock_a</span><span class="p">,</span> <span class="n">fock_b</span><span class="p">)</span>
-</pre></div>
-</div>
-</div></blockquote>
-</li>
-</ol>
 <dl class="py method">
 <dt class="sig sig-object py" id="qdk_chemistry.utils.wavefunction.Hamiltonian.__init__">
 <span class="sig-name descname"><span class="pre">__init__</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="o"><span class="pre">*</span></span><span class="n"><span class="pre">args</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">kwargs</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#qdk_chemistry.utils.wavefunction.Hamiltonian.__init__" title="Link to this definition"></a></dt>
 <dd><p>Overloaded function.</p>
-<ol class="arabic">
-<li><p>__init__(self: qdk_chemistry._core.data.Hamiltonian, one_body_integrals: typing.Annotated[numpy.typing.ArrayLike, numpy.float64, “[m, n]”], two_body_integrals: typing.Annotated[numpy.typing.ArrayLike, numpy.float64, “[m, 1]”], orbitals: qdk_chemistry._core.data.Orbitals, core_energy: typing.SupportsFloat, inactive_fock_matrix: typing.Annotated[numpy.typing.ArrayLike, numpy.float64, “[m, n]”], type: qdk_chemistry._core.data.HamiltonianType = &lt;HamiltonianType.Hermitian: 0&gt;) -&gt; None</p>
-<blockquote>
-<div><p>Constructor for restricted active space Hamiltonian.</p>
+<ol class="arabic simple">
+<li><p>__init__(self: qdk_chemistry._core.data.Hamiltonian, one_body_integrals: typing.Annotated[numpy.typing.ArrayLike, numpy.float64, “[m, n]”], two_body_integrals: typing.Annotated[numpy.typing.ArrayLike, numpy.float64, “[m, 1]”], orbitals: qdk_chemistry._core.data.Orbitals, core_energy: typing.SupportsFloat, inactive_fock_matrix: typing.Annotated[numpy.typing.ArrayLike, numpy.float64, “[m, n]”], type: qdk_chemistry._core.data.HamiltonianType = &lt;HamiltonianType.Hermitian: 0&gt;) -&gt; None</p></li>
+</ol>
+<p>Constructor for restricted active space Hamiltonian.</p>
 <p><code class="docutils literal notranslate"><span class="pre">norb</span></code> denotes the number of orbitals in the active space.</p>
-<dl class="simple">
-<dt>one_body_integrals<span class="classifier">numpy.ndarray</span></dt><dd><p>One-electron integrals matrix [norb x norb]</p>
-</dd>
-<dt>two_body_integrals<span class="classifier">numpy.ndarray</span></dt><dd><p>Two-electron integrals vector [norb^4]</p>
-</dd>
-<dt>orbitals<span class="classifier">Orbitals</span></dt><dd><p>Molecular orbital data</p>
-</dd>
-<dt>core_energy<span class="classifier">float</span></dt><dd><p>Core energy (nuclear repulsion + inactive orbitals)</p>
-</dd>
-<dt>inactive_fock_matrix<span class="classifier">numpy.ndarray</span></dt><dd><p>Inactive Fock matrix for the selected active space</p>
-</dd>
-<dt>type<span class="classifier">HamiltonianType, optional</span></dt><dd><p>Type of Hamiltonian (Hermitian by default)</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>one_body_integrals</strong> (<a class="reference external" href="https://numpy.org/doc/stable/reference/generated/numpy.ndarray.html#numpy.ndarray" title="(in NumPy v2.3)"><em>numpy.ndarray</em></a>) – One-electron integrals matrix [norb x norb]</p></li>
+<li><p><strong>two_body_integrals</strong> (<a class="reference external" href="https://numpy.org/doc/stable/reference/generated/numpy.ndarray.html#numpy.ndarray" title="(in NumPy v2.3)"><em>numpy.ndarray</em></a>) – Two-electron integrals vector [norb^4]</p></li>
+<li><p><strong>orbitals</strong> (<a class="reference internal" href="qdk_chemistry.data.html#qdk_chemistry.data.Orbitals" title="qdk_chemistry.data.Orbitals"><em>Orbitals</em></a>) – Molecular orbital data</p></li>
+<li><p><strong>core_energy</strong> (<a class="reference external" href="https://docs.python.org/3/library/functions.html#float" title="(in Python v3.14)"><em>float</em></a>) – Core energy (nuclear repulsion + inactive orbitals)</p></li>
+<li><p><strong>inactive_fock_matrix</strong> (<a class="reference external" href="https://numpy.org/doc/stable/reference/generated/numpy.ndarray.html#numpy.ndarray" title="(in NumPy v2.3)"><em>numpy.ndarray</em></a>) – Inactive Fock matrix for the selected active space</p></li>
+<li><p><strong>type</strong> (<em>HamiltonianType</em><em>, </em><em>optional</em>) – Type of Hamiltonian (Hermitian by default)</p></li>
+</ul>
 </dd>
 </dl>
+<p class="rubric">Examples</p>
 <div class="doctest highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="kn">import</span><span class="w"> </span><span class="nn">numpy</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">np</span>
 <span class="gp">&gt;&gt;&gt; </span><span class="n">one_body</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">random</span><span class="o">.</span><span class="n">rand</span><span class="p">(</span><span class="mi">4</span><span class="p">,</span> <span class="mi">4</span><span class="p">)</span>  <span class="c1"># 4 orbitals</span>
 <span class="gp">&gt;&gt;&gt; </span><span class="n">two_body</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">random</span><span class="o">.</span><span class="n">rand</span><span class="p">(</span><span class="mi">256</span><span class="p">)</span>   <span class="c1"># 4^4 elements</span>
@@ -453,34 +346,28 @@ calculations, specifically designed for active space methods. It contains:</p>
 <span class="gp">&gt;&gt;&gt; </span><span class="n">hamiltonian</span> <span class="o">=</span> <span class="n">Hamiltonian</span><span class="p">(</span><span class="n">one_body</span><span class="p">,</span> <span class="n">two_body</span><span class="p">,</span> <span class="n">orbitals</span><span class="p">,</span> <span class="mf">10.5</span><span class="p">,</span> <span class="n">fock_matrix</span><span class="p">)</span>
 </pre></div>
 </div>
-</div></blockquote>
-</li>
-<li><p>__init__(self: qdk_chemistry._core.data.Hamiltonian, one_body_integrals_alpha: typing.Annotated[numpy.typing.ArrayLike, numpy.float64, “[m, n]”], one_body_integrals_beta: typing.Annotated[numpy.typing.ArrayLike, numpy.float64, “[m, n]”], two_body_integrals_aaaa: typing.Annotated[numpy.typing.ArrayLike, numpy.float64, “[m, 1]”], two_body_integrals_aabb: typing.Annotated[numpy.typing.ArrayLike, numpy.float64, “[m, 1]”], two_body_integrals_bbbb: typing.Annotated[numpy.typing.ArrayLike, numpy.float64, “[m, 1]”], orbitals: qdk_chemistry._core.data.Orbitals, core_energy: typing.SupportsFloat, inactive_fock_matrix_alpha: typing.Annotated[numpy.typing.ArrayLike, numpy.float64, “[m, n]”], inactive_fock_matrix_beta: typing.Annotated[numpy.typing.ArrayLike, numpy.float64, “[m, n]”], type: qdk_chemistry._core.data.HamiltonianType = &lt;HamiltonianType.Hermitian: 0&gt;) -&gt; None</p>
-<blockquote>
-<div><p>Constructor for unrestricted active space Hamiltonian.</p>
+<ol class="arabic simple" start="2">
+<li><p>__init__(self: qdk_chemistry._core.data.Hamiltonian, one_body_integrals_alpha: typing.Annotated[numpy.typing.ArrayLike, numpy.float64, “[m, n]”], one_body_integrals_beta: typing.Annotated[numpy.typing.ArrayLike, numpy.float64, “[m, n]”], two_body_integrals_aaaa: typing.Annotated[numpy.typing.ArrayLike, numpy.float64, “[m, 1]”], two_body_integrals_aabb: typing.Annotated[numpy.typing.ArrayLike, numpy.float64, “[m, 1]”], two_body_integrals_bbbb: typing.Annotated[numpy.typing.ArrayLike, numpy.float64, “[m, 1]”], orbitals: qdk_chemistry._core.data.Orbitals, core_energy: typing.SupportsFloat, inactive_fock_matrix_alpha: typing.Annotated[numpy.typing.ArrayLike, numpy.float64, “[m, n]”], inactive_fock_matrix_beta: typing.Annotated[numpy.typing.ArrayLike, numpy.float64, “[m, n]”], type: qdk_chemistry._core.data.HamiltonianType = &lt;HamiltonianType.Hermitian: 0&gt;) -&gt; None</p></li>
+</ol>
+<p>Constructor for unrestricted active space Hamiltonian.</p>
 <p><code class="docutils literal notranslate"><span class="pre">norb</span></code> denotes the number of orbitals in the active space.</p>
-<dl class="simple">
-<dt>one_body_integrals_alpha<span class="classifier">numpy.ndarray</span></dt><dd><p>Alpha one-electron integrals matrix [norb x norb]</p>
-</dd>
-<dt>one_body_integrals_beta<span class="classifier">numpy.ndarray</span></dt><dd><p>Beta one-electron integrals matrix [norb x norb]</p>
-</dd>
-<dt>two_body_integrals_aaaa<span class="classifier">numpy.ndarray</span></dt><dd><p>Alpha-alpha-alpha-alpha two-electron integrals vector</p>
-</dd>
-<dt>two_body_integrals_aabb<span class="classifier">numpy.ndarray</span></dt><dd><p>Alpha-beta-alpha-beta two-electron integrals vector</p>
-</dd>
-<dt>two_body_integrals_bbbb<span class="classifier">numpy.ndarray</span></dt><dd><p>Beta-beta-beta-beta two-electron integrals vector</p>
-</dd>
-<dt>orbitals<span class="classifier">Orbitals</span></dt><dd><p>Molecular orbital data</p>
-</dd>
-<dt>core_energy<span class="classifier">float</span></dt><dd><p>Core energy (nuclear repulsion + inactive orbitals)</p>
-</dd>
-<dt>inactive_fock_matrix_alpha<span class="classifier">numpy.ndarray</span></dt><dd><p>Alpha inactive Fock matrix for the selected active space</p>
-</dd>
-<dt>inactive_fock_matrix_beta<span class="classifier">numpy.ndarray</span></dt><dd><p>Beta inactive Fock matrix for the selected active space</p>
-</dd>
-<dt>type<span class="classifier">HamiltonianType, optional</span></dt><dd><p>Type of Hamiltonian (Hermitian by default)</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>one_body_integrals_alpha</strong> (<a class="reference external" href="https://numpy.org/doc/stable/reference/generated/numpy.ndarray.html#numpy.ndarray" title="(in NumPy v2.3)"><em>numpy.ndarray</em></a>) – Alpha one-electron integrals matrix [norb x norb]</p></li>
+<li><p><strong>one_body_integrals_beta</strong> (<a class="reference external" href="https://numpy.org/doc/stable/reference/generated/numpy.ndarray.html#numpy.ndarray" title="(in NumPy v2.3)"><em>numpy.ndarray</em></a>) – Beta one-electron integrals matrix [norb x norb]</p></li>
+<li><p><strong>two_body_integrals_aaaa</strong> (<a class="reference external" href="https://numpy.org/doc/stable/reference/generated/numpy.ndarray.html#numpy.ndarray" title="(in NumPy v2.3)"><em>numpy.ndarray</em></a>) – Alpha-alpha-alpha-alpha two-electron integrals vector</p></li>
+<li><p><strong>two_body_integrals_aabb</strong> (<a class="reference external" href="https://numpy.org/doc/stable/reference/generated/numpy.ndarray.html#numpy.ndarray" title="(in NumPy v2.3)"><em>numpy.ndarray</em></a>) – Alpha-beta-alpha-beta two-electron integrals vector</p></li>
+<li><p><strong>two_body_integrals_bbbb</strong> (<a class="reference external" href="https://numpy.org/doc/stable/reference/generated/numpy.ndarray.html#numpy.ndarray" title="(in NumPy v2.3)"><em>numpy.ndarray</em></a>) – Beta-beta-beta-beta two-electron integrals vector</p></li>
+<li><p><strong>orbitals</strong> (<a class="reference internal" href="qdk_chemistry.data.html#qdk_chemistry.data.Orbitals" title="qdk_chemistry.data.Orbitals"><em>Orbitals</em></a>) – Molecular orbital data</p></li>
+<li><p><strong>core_energy</strong> (<a class="reference external" href="https://docs.python.org/3/library/functions.html#float" title="(in Python v3.14)"><em>float</em></a>) – Core energy (nuclear repulsion + inactive orbitals)</p></li>
+<li><p><strong>inactive_fock_matrix_alpha</strong> (<a class="reference external" href="https://numpy.org/doc/stable/reference/generated/numpy.ndarray.html#numpy.ndarray" title="(in NumPy v2.3)"><em>numpy.ndarray</em></a>) – Alpha inactive Fock matrix for the selected active space</p></li>
+<li><p><strong>inactive_fock_matrix_beta</strong> (<a class="reference external" href="https://numpy.org/doc/stable/reference/generated/numpy.ndarray.html#numpy.ndarray" title="(in NumPy v2.3)"><em>numpy.ndarray</em></a>) – Beta inactive Fock matrix for the selected active space</p></li>
+<li><p><strong>type</strong> (<em>HamiltonianType</em><em>, </em><em>optional</em>) – Type of Hamiltonian (Hermitian by default)</p></li>
+</ul>
 </dd>
 </dl>
+<p class="rubric">Examples</p>
 <div class="doctest highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="kn">import</span><span class="w"> </span><span class="nn">numpy</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">np</span>
 <span class="gp">&gt;&gt;&gt; </span><span class="n">one_body_a</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">random</span><span class="o">.</span><span class="n">rand</span><span class="p">(</span><span class="mi">4</span><span class="p">,</span> <span class="mi">4</span><span class="p">)</span>
 <span class="gp">&gt;&gt;&gt; </span><span class="n">one_body_b</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">random</span><span class="o">.</span><span class="n">rand</span><span class="p">(</span><span class="mi">4</span><span class="p">,</span> <span class="mi">4</span><span class="p">)</span>
@@ -492,9 +379,6 @@ calculations, specifically designed for active space methods. It contains:</p>
 <span class="gp">&gt;&gt;&gt; </span><span class="n">hamiltonian</span> <span class="o">=</span> <span class="n">Hamiltonian</span><span class="p">(</span><span class="n">one_body_a</span><span class="p">,</span> <span class="n">one_body_b</span><span class="p">,</span> <span class="n">two_body_aaaa</span><span class="p">,</span> <span class="n">two_body_aabb</span><span class="p">,</span> <span class="n">two_body_bbbb</span><span class="p">,</span> <span class="n">orbitals</span><span class="p">,</span> <span class="mf">10.5</span><span class="p">,</span> <span class="n">fock_a</span><span class="p">,</span> <span class="n">fock_b</span><span class="p">)</span>
 </pre></div>
 </div>
-</div></blockquote>
-</li>
-</ol>
 </dd></dl>
 
 <dl class="py property">
@@ -555,8 +439,8 @@ calculations, specifically designed for active space methods. It contains:</p>
 <dd><p>Load Hamiltonian from HDF5 file (static method with validation).</p>
 <dl class="field-list simple">
 <dt class="field-odd">Parameters<span class="colon">:</span></dt>
-<dd class="field-odd"><p><strong>filename</strong> (<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)"><em>str</em></a><em> or </em><a class="reference external" href="https://docs.python.org/3/library/pathlib.html#pathlib.Path" title="(in Python v3.14)"><em>pathlib.Path</em></a>) – Path to HDF5 file to read. Must have ‘.hamiltonian’ before the file
-extension (e.g., <code class="docutils literal notranslate"><span class="pre">water.hamiltonian.h5</span></code>, <code class="docutils literal notranslate"><span class="pre">molecule.hamiltonian.hdf5</span></code>)</p>
+<dd class="field-odd"><p><strong>filename</strong> (<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)"><em>str</em></a><em> or </em><a class="reference external" href="https://docs.python.org/3/library/pathlib.html#pathlib.Path" title="(in Python v3.14)"><em>pathlib.Path</em></a>) – Path to HDF5 file to read.
+Must have ‘.hamiltonian’ before the file extension (e.g., <code class="docutils literal notranslate"><span class="pre">water.hamiltonian.h5</span></code>, <code class="docutils literal notranslate"><span class="pre">molecule.hamiltonian.hdf5</span></code>)</p>
 </dd>
 <dt class="field-even">Returns<span class="colon">:</span></dt>
 <dd class="field-even"><p>New Hamiltonian loaded from file</p>
@@ -611,8 +495,8 @@ extension (e.g., <code class="docutils literal notranslate"><span class="pre">wa
 <dd><p>Load Hamiltonian from JSON file (static method with validation).</p>
 <dl class="field-list simple">
 <dt class="field-odd">Parameters<span class="colon">:</span></dt>
-<dd class="field-odd"><p><strong>filename</strong> (<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)"><em>str</em></a><em> or </em><a class="reference external" href="https://docs.python.org/3/library/pathlib.html#pathlib.Path" title="(in Python v3.14)"><em>pathlib.Path</em></a>) – Path to JSON file to read. Must have ‘.hamiltonian’ before the file
-extension (e.g., <code class="docutils literal notranslate"><span class="pre">water.hamiltonian.json</span></code>, <code class="docutils literal notranslate"><span class="pre">molecule.hamiltonian.json</span></code>)</p>
+<dd class="field-odd"><p><strong>filename</strong> (<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)"><em>str</em></a><em> or </em><a class="reference external" href="https://docs.python.org/3/library/pathlib.html#pathlib.Path" title="(in Python v3.14)"><em>pathlib.Path</em></a>) – Path to JSON file to read.
+Must have ‘.hamiltonian’ before the file extension (e.g., <code class="docutils literal notranslate"><span class="pre">water.hamiltonian.json</span></code>, <code class="docutils literal notranslate"><span class="pre">molecule.hamiltonian.json</span></code>)</p>
 </dd>
 <dt class="field-even">Returns<span class="colon">:</span></dt>
 <dd class="field-even"><p>New Hamiltonian loaded from file</p>
@@ -661,8 +545,7 @@ extension (e.g., <code class="docutils literal notranslate"><span class="pre">wa
 <dd><p>Get one-electron integrals in molecular orbital basis.</p>
 <dl class="field-list simple">
 <dt class="field-odd">Returns<span class="colon">:</span></dt>
-<dd class="field-odd"><p>One-electron integral matrix [norb x norb] containing
-kinetic energy and nuclear attraction integrals</p>
+<dd class="field-odd"><p>One-electron integral matrix [norb x norb] containing kinetic energy and nuclear attraction integrals</p>
 </dd>
 <dt class="field-even">Return type<span class="colon">:</span></dt>
 <dd class="field-even"><p><a class="reference external" href="https://numpy.org/doc/stable/reference/generated/numpy.ndarray.html#numpy.ndarray" title="(in NumPy v2.3)">numpy.ndarray</a></p>
@@ -707,8 +590,7 @@ kinetic energy and nuclear attraction integrals</p>
 <dd><p>Get a human-readable summary of the Hamiltonian data.</p>
 <dl class="field-list simple">
 <dt class="field-odd">Returns<span class="colon">:</span></dt>
-<dd class="field-odd"><p>Multi-line string describing the Hamiltonian properties
-including number of orbitals, electrons, core energy, etc.</p>
+<dd class="field-odd"><p>Multi-line string describing the Hamiltonian properties including number of orbitals, electrons, core energy, etc.</p>
 </dd>
 <dt class="field-even">Return type<span class="colon">:</span></dt>
 <dd class="field-even"><p><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)">str</a></p>
@@ -755,8 +637,7 @@ including number of orbitals, electrons, core energy, etc.</p>
 <dd><p>Get two-electron integrals in molecular orbital basis.</p>
 <dl class="field-list simple">
 <dt class="field-odd">Returns<span class="colon">:</span></dt>
-<dd class="field-odd"><p>Two-electron integral vector [norb^4] containing
-electron-electron repulsion integrals stored in chemist notation</p>
+<dd class="field-odd"><p>Two-electron integral vector [norb^4] containing electron-electron repulsion integrals stored in chemist notation</p>
 </dd>
 <dt class="field-even">Return type<span class="colon">:</span></dt>
 <dd class="field-even"><p><a class="reference external" href="https://numpy.org/doc/stable/reference/generated/numpy.ndarray.html#numpy.ndarray" title="(in NumPy v2.3)">numpy.ndarray</a></p>
@@ -766,8 +647,7 @@ electron-electron repulsion integrals stored in chemist notation</p>
 </dd>
 </dl>
 <p class="rubric">Notes</p>
-<p>The integrals are stored as a flattened vector in chemist notation
-&lt;ij|kl&gt; where the indices are ordered as i + j*norb + k*norb^2 + l*norb^3</p>
+<p>The integrals are stored as a flattened vector in chemist notation &lt;ij|kl&gt; where the indices are ordered as i + j*norb + k*norb^2 + l*norb^3</p>
 <p class="rubric">Examples</p>
 <div class="doctest highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="n">h2</span> <span class="o">=</span> <span class="n">hamiltonian</span><span class="o">.</span><span class="n">get_two_body_integrals</span><span class="p">()</span>
 <span class="gp">&gt;&gt;&gt; </span><span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Two-body vector length: </span><span class="si">{</span><span class="nb">len</span><span class="p">(</span><span class="n">h2</span><span class="p">)</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
@@ -846,8 +726,7 @@ electron-electron repulsion integrals stored in chemist notation</p>
 <dd><p>Get one-electron integrals in molecular orbital basis.</p>
 <dl class="field-list simple">
 <dt class="field-odd">Returns<span class="colon">:</span></dt>
-<dd class="field-odd"><p>One-electron integral matrix [norb x norb] containing
-kinetic energy and nuclear attraction integrals</p>
+<dd class="field-odd"><p>One-electron integral matrix [norb x norb] containing kinetic energy and nuclear attraction integrals</p>
 </dd>
 <dt class="field-even">Return type<span class="colon">:</span></dt>
 <dd class="field-even"><p><a class="reference external" href="https://numpy.org/doc/stable/reference/generated/numpy.ndarray.html#numpy.ndarray" title="(in NumPy v2.3)">numpy.ndarray</a></p>
@@ -892,8 +771,7 @@ kinetic energy and nuclear attraction integrals</p>
 <dd><p>Get a human-readable summary of the Hamiltonian data.</p>
 <dl class="field-list simple">
 <dt class="field-odd">Returns<span class="colon">:</span></dt>
-<dd class="field-odd"><p>Multi-line string describing the Hamiltonian properties
-including number of orbitals, electrons, core energy, etc.</p>
+<dd class="field-odd"><p>Multi-line string describing the Hamiltonian properties including number of orbitals, electrons, core energy, etc.</p>
 </dd>
 <dt class="field-even">Return type<span class="colon">:</span></dt>
 <dd class="field-even"><p><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)">str</a></p>
@@ -914,8 +792,8 @@ including number of orbitals, electrons, core energy, etc.</p>
 <dl class="field-list simple">
 <dt class="field-odd">Parameters<span class="colon">:</span></dt>
 <dd class="field-odd"><ul class="simple">
-<li><p><strong>filename</strong> (<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)"><em>str</em></a><em> or </em><a class="reference external" href="https://docs.python.org/3/library/pathlib.html#pathlib.Path" title="(in Python v3.14)"><em>pathlib.Path</em></a>) – Path to FCIDUMP file to create/overwrite. Typically uses ‘.fcidump’
-extension (e.g., <code class="docutils literal notranslate"><span class="pre">water.fcidump</span></code>, <code class="docutils literal notranslate"><span class="pre">molecule.fcidump</span></code>)</p></li>
+<li><p><strong>filename</strong> (<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)"><em>str</em></a><em> or </em><a class="reference external" href="https://docs.python.org/3/library/pathlib.html#pathlib.Path" title="(in Python v3.14)"><em>pathlib.Path</em></a>) – Path to FCIDUMP file to create/overwrite.
+Typically uses ‘.fcidump’ extension (e.g., <code class="docutils literal notranslate"><span class="pre">water.fcidump</span></code>, <code class="docutils literal notranslate"><span class="pre">molecule.fcidump</span></code>)</p></li>
 <li><p><strong>nalpha</strong> (<a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(in Python v3.14)"><em>int</em></a>) – Number of alpha electrons</p></li>
 <li><p><strong>nbeta</strong> (<a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(in Python v3.14)"><em>int</em></a>) – Number of beta electrons</p></li>
 </ul>
@@ -969,8 +847,8 @@ molecular integrals and is widely supported by quantum chemistry codes.</p>
 <dd><p>Save Hamiltonian to HDF5 file (with validation).</p>
 <dl class="field-list simple">
 <dt class="field-odd">Parameters<span class="colon">:</span></dt>
-<dd class="field-odd"><p><strong>filename</strong> (<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)"><em>str</em></a><em> or </em><a class="reference external" href="https://docs.python.org/3/library/pathlib.html#pathlib.Path" title="(in Python v3.14)"><em>pathlib.Path</em></a>) – Path to HDF5 file to create/overwrite. Must have ‘.hamiltonian’ before the file
-extension (e.g., <code class="docutils literal notranslate"><span class="pre">water.hamiltonian.h5</span></code>, <code class="docutils literal notranslate"><span class="pre">molecule.hamiltonian.hdf5</span></code>)</p>
+<dd class="field-odd"><p><strong>filename</strong> (<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)"><em>str</em></a><em> or </em><a class="reference external" href="https://docs.python.org/3/library/pathlib.html#pathlib.Path" title="(in Python v3.14)"><em>pathlib.Path</em></a>) – Path to HDF5 file to create/overwrite.
+Must have ‘.hamiltonian’ before the file extension (e.g., <code class="docutils literal notranslate"><span class="pre">water.hamiltonian.h5</span></code>, <code class="docutils literal notranslate"><span class="pre">molecule.hamiltonian.hdf5</span></code>)</p>
 </dd>
 <dt class="field-even">Raises<span class="colon">:</span></dt>
 <dd class="field-even"><ul class="simple">
@@ -1005,11 +883,13 @@ extension (e.g., <code class="docutils literal notranslate"><span class="pre">wa
 <dl class="py method">
 <dt class="sig sig-object py" id="qdk_chemistry.utils.wavefunction.Hamiltonian.to_json_file">
 <span class="sig-name descname"><span class="pre">to_json_file</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">self</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference internal" href="#qdk_chemistry.utils.wavefunction.Hamiltonian" title="qdk_chemistry._core.data.Hamiltonian"><span class="pre">qdk_chemistry._core.data.Hamiltonian</span></a></span></em>, <em class="sig-param"><span class="n"><span class="pre">filename</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/library/functions.html#object" title="(in Python v3.14)"><span class="pre">object</span></a></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><a class="reference external" href="https://docs.python.org/3/library/constants.html#None" title="(in Python v3.14)"><span class="pre">None</span></a></span></span><a class="headerlink" href="#qdk_chemistry.utils.wavefunction.Hamiltonian.to_json_file" title="Link to this definition"></a></dt>
-<dd><p>Save Hamiltonian to JSON file (with validation).</p>
+<dd><blockquote>
+<div><p>Save Hamiltonian to JSON file (with validation).</p>
+</div></blockquote>
 <dl class="field-list simple">
 <dt class="field-odd">Parameters<span class="colon">:</span></dt>
-<dd class="field-odd"><p><strong>filename</strong> (<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)"><em>str</em></a><em> or </em><a class="reference external" href="https://docs.python.org/3/library/pathlib.html#pathlib.Path" title="(in Python v3.14)"><em>pathlib.Path</em></a>) – Path to JSON file to create/overwrite. Must have ‘.hamiltonian’ before the file
-extension (e.g., <code class="docutils literal notranslate"><span class="pre">water.hamiltonian.json</span></code>, <code class="docutils literal notranslate"><span class="pre">molecule.hamiltonian.json</span></code>)</p>
+<dd class="field-odd"><p><strong>filename</strong> (<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)"><em>str</em></a><em> or </em><a class="reference external" href="https://docs.python.org/3/library/pathlib.html#pathlib.Path" title="(in Python v3.14)"><em>pathlib.Path</em></a>) – Path to JSON file to create/overwrite.
+Must have ‘.hamiltonian’ before the file extension (e.g., <code class="docutils literal notranslate"><span class="pre">water.hamiltonian.json</span></code>, <code class="docutils literal notranslate"><span class="pre">molecule.hamiltonian.json</span></code>)</p>
 </dd>
 <dt class="field-even">Raises<span class="colon">:</span></dt>
 <dd class="field-even"><ul class="simple">
@@ -1033,8 +913,7 @@ extension (e.g., <code class="docutils literal notranslate"><span class="pre">wa
 <dd><p>Get two-electron integrals in molecular orbital basis.</p>
 <dl class="field-list simple">
 <dt class="field-odd">Returns<span class="colon">:</span></dt>
-<dd class="field-odd"><p>Two-electron integral vector [norb^4] containing
-electron-electron repulsion integrals stored in chemist notation</p>
+<dd class="field-odd"><p>Two-electron integral vector [norb^4] containing electron-electron repulsion integrals stored in chemist notation</p>
 </dd>
 <dt class="field-even">Return type<span class="colon">:</span></dt>
 <dd class="field-even"><p><a class="reference external" href="https://numpy.org/doc/stable/reference/generated/numpy.ndarray.html#numpy.ndarray" title="(in NumPy v2.3)">numpy.ndarray</a></p>
@@ -1044,8 +923,7 @@ electron-electron repulsion integrals stored in chemist notation</p>
 </dd>
 </dl>
 <p class="rubric">Notes</p>
-<p>The integrals are stored as a flattened vector in chemist notation
-&lt;ij|kl&gt; where the indices are ordered as i + j*norb + k*norb^2 + l*norb^3</p>
+<p>The integrals are stored as a flattened vector in chemist notation &lt;ij|kl&gt; where the indices are ordered as i + j*norb + k*norb^2 + l*norb^3</p>
 <p class="rubric">Examples</p>
 <div class="doctest highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="n">h2</span> <span class="o">=</span> <span class="n">hamiltonian</span><span class="o">.</span><span class="n">get_two_body_integrals</span><span class="p">()</span>
 <span class="gp">&gt;&gt;&gt; </span><span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Two-body vector length: </span><span class="si">{</span><span class="nb">len</span><span class="p">(</span><span class="n">h2</span><span class="p">)</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
@@ -1059,141 +937,52 @@ electron-electron repulsion integrals stored in chemist notation</p>
 
 <dl class="py class">
 <dt class="sig sig-object py" id="qdk_chemistry.utils.wavefunction.SciWavefunctionContainer">
-<em class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">SciWavefunctionContainer</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="o"><span class="pre">*</span></span><span class="n"><span class="pre">args</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">kwargs</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#qdk_chemistry.utils.wavefunction.SciWavefunctionContainer" title="Link to this definition"></a></dt>
+<em class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">SciWavefunctionContainer</span></span><a class="headerlink" href="#qdk_chemistry.utils.wavefunction.SciWavefunctionContainer" title="Link to this definition"></a></dt>
 <dd><p>Bases: <a class="reference internal" href="qdk_chemistry.data.html#qdk_chemistry.data.WavefunctionContainer" title="qdk_chemistry._core.data.WavefunctionContainer"><code class="xref py py-class docutils literal notranslate"><span class="pre">WavefunctionContainer</span></code></a></p>
 <p>Selected CI wavefunction container implementation.</p>
-<p>This container represents wavefunctions obtained from selected configuration
-interaction (SCI) methods or full configuration interaction (FCI).</p>
-<p>Overloaded function.</p>
-<ol class="arabic">
-<li><p>__init__(self: qdk_chemistry._core.data.SciWavefunctionContainer, coeffs: typing.Annotated[numpy.typing.ArrayLike, numpy.float64, “[m, 1]”] | typing.Annotated[numpy.typing.ArrayLike, numpy.complex128, “[m, 1]”], dets: collections.abc.Sequence[qdk_chemistry._core.data.Configuration], orbitals: qdk_chemistry._core.data.Orbitals, type: qdk_chemistry._core.data.WavefunctionType = &lt;WavefunctionType.SelfDual: 0&gt;) -&gt; None</p>
-<blockquote>
-<div><p>Constructs a basic SCI wavefunction container.</p>
-<dl class="simple">
-<dt>coeffs<span class="classifier">numpy.ndarray</span></dt><dd><p>The vector of CI coefficients (real or complex)</p>
-</dd>
-<dt>dets<span class="classifier">list of Configuration</span></dt><dd><p>The vector of determinants</p>
-</dd>
-<dt>orbitals<span class="classifier">Orbitals</span></dt><dd><p>Shared pointer to orbital basis set</p>
-</dd>
-<dt>type<span class="classifier">WavefunctionType, optional</span></dt><dd><p>Type of wavefunction (default: SelfDual)</p>
-</dd>
-</dl>
-<div class="doctest highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="kn">import</span><span class="w"> </span><span class="nn">numpy</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">np</span>
-<span class="gp">&gt;&gt;&gt; </span><span class="n">coeffs</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">([</span><span class="mf">0.9</span><span class="p">,</span> <span class="mf">0.1</span><span class="p">])</span>
-<span class="gp">&gt;&gt;&gt; </span><span class="n">dets</span> <span class="o">=</span> <span class="p">[</span><span class="n">qdk_chemistry</span><span class="o">.</span><span class="n">Configuration</span><span class="p">(</span><span class="s2">&quot;33221100&quot;</span><span class="p">),</span> <span class="n">qdk_chemistry</span><span class="o">.</span><span class="n">Configuration</span><span class="p">(</span><span class="s2">&quot;33221001&quot;</span><span class="p">)]</span>
-<span class="gp">&gt;&gt;&gt; </span><span class="n">container</span> <span class="o">=</span> <span class="n">qdk_chemistry</span><span class="o">.</span><span class="n">SciWavefunctionContainer</span><span class="p">(</span><span class="n">coeffs</span><span class="p">,</span> <span class="n">dets</span><span class="p">,</span> <span class="n">orbitals</span><span class="p">)</span>
-</pre></div>
-</div>
-</div></blockquote>
-</li>
-<li><p>__init__(self: qdk_chemistry._core.data.SciWavefunctionContainer, coeffs: typing.Annotated[numpy.typing.ArrayLike, numpy.float64, “[m, 1]”] | typing.Annotated[numpy.typing.ArrayLike, numpy.complex128, “[m, 1]”], dets: collections.abc.Sequence[qdk_chemistry._core.data.Configuration], orbitals: qdk_chemistry._core.data.Orbitals, one_rdm_spin_traced: typing.Annotated[numpy.typing.ArrayLike, numpy.float64, “[m, n]”] | typing.Annotated[numpy.typing.ArrayLike, numpy.complex128, “[m, n]”] | None = None, two_rdm_spin_traced: typing.Annotated[numpy.typing.ArrayLike, numpy.float64, “[m, 1]”] | typing.Annotated[numpy.typing.ArrayLike, numpy.complex128, “[m, 1]”] | None = None, type: qdk_chemistry._core.data.WavefunctionType = &lt;WavefunctionType.SelfDual: 0&gt;) -&gt; None</p>
-<blockquote>
-<div><p>Constructs a SCI wavefunction container with spin-traced RDMs.</p>
-<dl class="simple">
-<dt>coeffs<span class="classifier">numpy.ndarray</span></dt><dd><p>The vector of CI coefficients (real or complex)</p>
-</dd>
-<dt>dets<span class="classifier">list of Configuration</span></dt><dd><p>The vector of determinants</p>
-</dd>
-<dt>orbitals<span class="classifier">Orbitals</span></dt><dd><p>Shared pointer to orbital basis set</p>
-</dd>
-<dt>one_rdm_spin_traced<span class="classifier">numpy.ndarray, optional</span></dt><dd><p>Spin-traced one-particle reduced density matrix</p>
-</dd>
-<dt>two_rdm_spin_traced<span class="classifier">numpy.ndarray, optional</span></dt><dd><p>Spin-traced two-particle reduced density matrix</p>
-</dd>
-<dt>type<span class="classifier">WavefunctionType, optional</span></dt><dd><p>Type of wavefunction (default: SelfDual)</p>
-</dd>
-</dl>
-<div class="doctest highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="kn">import</span><span class="w"> </span><span class="nn">numpy</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">np</span>
-<span class="gp">&gt;&gt;&gt; </span><span class="n">coeffs</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">([</span><span class="mf">0.9</span><span class="p">,</span> <span class="mf">0.1</span><span class="p">])</span>
-<span class="gp">&gt;&gt;&gt; </span><span class="n">dets</span> <span class="o">=</span> <span class="p">[</span><span class="n">qdk_chemistry</span><span class="o">.</span><span class="n">Configuration</span><span class="p">(</span><span class="s2">&quot;33221100&quot;</span><span class="p">),</span> <span class="n">qdk_chemistry</span><span class="o">.</span><span class="n">Configuration</span><span class="p">(</span><span class="s2">&quot;33221001&quot;</span><span class="p">)]</span>
-<span class="gp">&gt;&gt;&gt; </span><span class="n">one_rdm</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">eye</span><span class="p">(</span><span class="mi">4</span><span class="p">)</span>  <span class="c1"># Example 1-RDM</span>
-<span class="gp">&gt;&gt;&gt; </span><span class="n">container</span> <span class="o">=</span> <span class="n">qdk_chemistry</span><span class="o">.</span><span class="n">SciWavefunctionContainer</span><span class="p">(</span><span class="n">coeffs</span><span class="p">,</span> <span class="n">dets</span><span class="p">,</span> <span class="n">orbitals</span><span class="p">,</span> <span class="n">one_rdm</span><span class="p">,</span> <span class="kc">None</span><span class="p">)</span>
-</pre></div>
-</div>
-</div></blockquote>
-</li>
-<li><p>__init__(self: qdk_chemistry._core.data.SciWavefunctionContainer, coeffs: typing.Annotated[numpy.typing.ArrayLike, numpy.float64, “[m, 1]”] | typing.Annotated[numpy.typing.ArrayLike, numpy.complex128, “[m, 1]”], dets: collections.abc.Sequence[qdk_chemistry._core.data.Configuration], orbitals: qdk_chemistry._core.data.Orbitals, one_rdm_spin_traced: typing.Annotated[numpy.typing.ArrayLike, numpy.float64, “[m, n]”] | typing.Annotated[numpy.typing.ArrayLike, numpy.complex128, “[m, n]”] | None = None, one_rdm_aa: typing.Annotated[numpy.typing.ArrayLike, numpy.float64, “[m, n]”] | typing.Annotated[numpy.typing.ArrayLike, numpy.complex128, “[m, n]”] | None = None, one_rdm_bb: typing.Annotated[numpy.typing.ArrayLike, numpy.float64, “[m, n]”] | typing.Annotated[numpy.typing.ArrayLike, numpy.complex128, “[m, n]”] | None = None, two_rdm_spin_traced: typing.Annotated[numpy.typing.ArrayLike, numpy.float64, “[m, 1]”] | typing.Annotated[numpy.typing.ArrayLike, numpy.complex128, “[m, 1]”] | None = None, two_rdm_aabb: typing.Annotated[numpy.typing.ArrayLike, numpy.float64, “[m, 1]”] | typing.Annotated[numpy.typing.ArrayLike, numpy.complex128, “[m, 1]”] | None = None, two_rdm_aaaa: typing.Annotated[numpy.typing.ArrayLike, numpy.float64, “[m, 1]”] | typing.Annotated[numpy.typing.ArrayLike, numpy.complex128, “[m, 1]”] | None = None, two_rdm_bbbb: typing.Annotated[numpy.typing.ArrayLike, numpy.float64, “[m, 1]”] | typing.Annotated[numpy.typing.ArrayLike, numpy.complex128, “[m, 1]”] | None = None, type: qdk_chemistry._core.data.WavefunctionType = &lt;WavefunctionType.SelfDual: 0&gt;) -&gt; None</p>
-<blockquote>
-<div><p>Constructs a SCI wavefunction container with full RDM data.</p>
-<dl class="simple">
-<dt>coeffs<span class="classifier">numpy.ndarray</span></dt><dd><p>The vector of CI coefficients (real or complex)</p>
-</dd>
-<dt>dets<span class="classifier">list of Configuration</span></dt><dd><p>The vector of determinants</p>
-</dd>
-<dt>orbitals<span class="classifier">Orbitals</span></dt><dd><p>Shared pointer to orbital basis set</p>
-</dd>
-<dt>one_rdm_spin_traced<span class="classifier">numpy.ndarray, optional</span></dt><dd><p>Spin-traced one-particle reduced density matrix</p>
-</dd>
-<dt>one_rdm_aa<span class="classifier">numpy.ndarray, optional</span></dt><dd><p>Alpha-alpha block of one-particle RDM</p>
-</dd>
-<dt>one_rdm_bb<span class="classifier">numpy.ndarray, optional</span></dt><dd><p>Beta-beta block of one-particle RDM</p>
-</dd>
-<dt>two_rdm_spin_traced<span class="classifier">numpy.ndarray, optional</span></dt><dd><p>Spin-traced two-particle reduced density matrix</p>
-</dd>
-<dt>two_rdm_aabb<span class="classifier">numpy.ndarray, optional</span></dt><dd><p>Alpha-beta-beta-alpha block of two-particle RDM</p>
-</dd>
-<dt>two_rdm_aaaa<span class="classifier">numpy.ndarray, optional</span></dt><dd><p>Alpha-alpha-alpha-alpha block of two-particle RDM</p>
-</dd>
-<dt>two_rdm_bbbb<span class="classifier">numpy.ndarray, optional</span></dt><dd><p>Beta-beta-beta-beta block of two-particle RDM</p>
-</dd>
-<dt>type<span class="classifier">WavefunctionType, optional</span></dt><dd><p>Type of wavefunction (default: SelfDual)</p>
-</dd>
-</dl>
-<div class="doctest highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="kn">import</span><span class="w"> </span><span class="nn">numpy</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">np</span>
-<span class="gp">&gt;&gt;&gt; </span><span class="n">coeffs</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">([</span><span class="mf">0.9</span><span class="p">,</span> <span class="mf">0.1</span><span class="p">])</span>
-<span class="gp">&gt;&gt;&gt; </span><span class="n">dets</span> <span class="o">=</span> <span class="p">[</span><span class="n">qdk_chemistry</span><span class="o">.</span><span class="n">Configuration</span><span class="p">(</span><span class="s2">&quot;33221100&quot;</span><span class="p">),</span> <span class="n">qdk_chemistry</span><span class="o">.</span><span class="n">Configuration</span><span class="p">(</span><span class="s2">&quot;33221001&quot;</span><span class="p">)]</span>
-<span class="gp">&gt;&gt;&gt; </span><span class="n">container</span> <span class="o">=</span> <span class="n">qdk_chemistry</span><span class="o">.</span><span class="n">SciWavefunctionContainer</span><span class="p">(</span><span class="n">coeffs</span><span class="p">,</span> <span class="n">dets</span><span class="p">,</span> <span class="n">orbitals</span><span class="p">,</span>
-<span class="gp">... </span>                                         <span class="n">one_rdm</span><span class="p">,</span> <span class="n">one_rdm_aa</span><span class="p">,</span> <span class="n">one_rdm_bb</span><span class="p">,</span>
-<span class="gp">... </span>                                         <span class="n">two_rdm</span><span class="p">,</span> <span class="n">two_rdm_aabb</span><span class="p">,</span> <span class="n">two_rdm_aaaa</span><span class="p">,</span> <span class="n">two_rdm_bbbb</span><span class="p">)</span>
-</pre></div>
-</div>
-</div></blockquote>
-</li>
-</ol>
+<p>This container represents wavefunctions obtained from selected configuration interaction (SCI) methods or full configuration interaction (FCI).</p>
 <dl class="py method">
 <dt class="sig sig-object py" id="qdk_chemistry.utils.wavefunction.SciWavefunctionContainer.__init__">
 <span class="sig-name descname"><span class="pre">__init__</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="o"><span class="pre">*</span></span><span class="n"><span class="pre">args</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">kwargs</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#qdk_chemistry.utils.wavefunction.SciWavefunctionContainer.__init__" title="Link to this definition"></a></dt>
 <dd><p>Overloaded function.</p>
-<ol class="arabic">
-<li><p>__init__(self: qdk_chemistry._core.data.SciWavefunctionContainer, coeffs: typing.Annotated[numpy.typing.ArrayLike, numpy.float64, “[m, 1]”] | typing.Annotated[numpy.typing.ArrayLike, numpy.complex128, “[m, 1]”], dets: collections.abc.Sequence[qdk_chemistry._core.data.Configuration], orbitals: qdk_chemistry._core.data.Orbitals, type: qdk_chemistry._core.data.WavefunctionType = &lt;WavefunctionType.SelfDual: 0&gt;) -&gt; None</p>
-<blockquote>
-<div><p>Constructs a basic SCI wavefunction container.</p>
-<dl class="simple">
-<dt>coeffs<span class="classifier">numpy.ndarray</span></dt><dd><p>The vector of CI coefficients (real or complex)</p>
-</dd>
-<dt>dets<span class="classifier">list of Configuration</span></dt><dd><p>The vector of determinants</p>
-</dd>
-<dt>orbitals<span class="classifier">Orbitals</span></dt><dd><p>Shared pointer to orbital basis set</p>
-</dd>
-<dt>type<span class="classifier">WavefunctionType, optional</span></dt><dd><p>Type of wavefunction (default: SelfDual)</p>
+<ol class="arabic simple">
+<li><p>__init__(self: qdk_chemistry._core.data.SciWavefunctionContainer, coeffs: typing.Annotated[numpy.typing.ArrayLike, numpy.float64, “[m, 1]”] | typing.Annotated[numpy.typing.ArrayLike, numpy.complex128, “[m, 1]”], dets: collections.abc.Sequence[qdk_chemistry._core.data.Configuration], orbitals: qdk_chemistry._core.data.Orbitals, type: qdk_chemistry._core.data.WavefunctionType = &lt;WavefunctionType.SelfDual: 0&gt;) -&gt; None</p></li>
+</ol>
+<p>Constructs a basic SCI wavefunction container.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>coeffs</strong> (<a class="reference external" href="https://numpy.org/doc/stable/reference/generated/numpy.ndarray.html#numpy.ndarray" title="(in NumPy v2.3)"><em>numpy.ndarray</em></a>) – The vector of CI coefficients (real or complex)</p></li>
+<li><p><strong>dets</strong> (<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#list" title="(in Python v3.14)"><em>list</em></a><em>[</em><a class="reference internal" href="#qdk_chemistry.utils.wavefunction.Configuration" title="qdk_chemistry.utils.wavefunction.Configuration"><em>Configuration</em></a><em>]</em>) – The vector of determinants</p></li>
+<li><p><strong>orbitals</strong> (<a class="reference internal" href="qdk_chemistry.data.html#qdk_chemistry.data.Orbitals" title="qdk_chemistry.data.Orbitals"><em>Orbitals</em></a>) – Shared pointer to orbital basis set</p></li>
+<li><p><strong>type</strong> (<em>Optional</em><em>[</em><a class="reference internal" href="qdk_chemistry.data.html#qdk_chemistry.data.WavefunctionType" title="qdk_chemistry.data.WavefunctionType"><em>WavefunctionType</em></a><em>]</em>) – Type of wavefunction (default: SelfDual)</p></li>
+</ul>
 </dd>
 </dl>
+<p class="rubric">Examples</p>
 <div class="doctest highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="kn">import</span><span class="w"> </span><span class="nn">numpy</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">np</span>
 <span class="gp">&gt;&gt;&gt; </span><span class="n">coeffs</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">([</span><span class="mf">0.9</span><span class="p">,</span> <span class="mf">0.1</span><span class="p">])</span>
 <span class="gp">&gt;&gt;&gt; </span><span class="n">dets</span> <span class="o">=</span> <span class="p">[</span><span class="n">qdk_chemistry</span><span class="o">.</span><span class="n">Configuration</span><span class="p">(</span><span class="s2">&quot;33221100&quot;</span><span class="p">),</span> <span class="n">qdk_chemistry</span><span class="o">.</span><span class="n">Configuration</span><span class="p">(</span><span class="s2">&quot;33221001&quot;</span><span class="p">)]</span>
 <span class="gp">&gt;&gt;&gt; </span><span class="n">container</span> <span class="o">=</span> <span class="n">qdk_chemistry</span><span class="o">.</span><span class="n">SciWavefunctionContainer</span><span class="p">(</span><span class="n">coeffs</span><span class="p">,</span> <span class="n">dets</span><span class="p">,</span> <span class="n">orbitals</span><span class="p">)</span>
 </pre></div>
 </div>
-</div></blockquote>
-</li>
-<li><p>__init__(self: qdk_chemistry._core.data.SciWavefunctionContainer, coeffs: typing.Annotated[numpy.typing.ArrayLike, numpy.float64, “[m, 1]”] | typing.Annotated[numpy.typing.ArrayLike, numpy.complex128, “[m, 1]”], dets: collections.abc.Sequence[qdk_chemistry._core.data.Configuration], orbitals: qdk_chemistry._core.data.Orbitals, one_rdm_spin_traced: typing.Annotated[numpy.typing.ArrayLike, numpy.float64, “[m, n]”] | typing.Annotated[numpy.typing.ArrayLike, numpy.complex128, “[m, n]”] | None = None, two_rdm_spin_traced: typing.Annotated[numpy.typing.ArrayLike, numpy.float64, “[m, 1]”] | typing.Annotated[numpy.typing.ArrayLike, numpy.complex128, “[m, 1]”] | None = None, type: qdk_chemistry._core.data.WavefunctionType = &lt;WavefunctionType.SelfDual: 0&gt;) -&gt; None</p>
-<blockquote>
-<div><p>Constructs a SCI wavefunction container with spin-traced RDMs.</p>
-<dl class="simple">
-<dt>coeffs<span class="classifier">numpy.ndarray</span></dt><dd><p>The vector of CI coefficients (real or complex)</p>
-</dd>
-<dt>dets<span class="classifier">list of Configuration</span></dt><dd><p>The vector of determinants</p>
-</dd>
-<dt>orbitals<span class="classifier">Orbitals</span></dt><dd><p>Shared pointer to orbital basis set</p>
-</dd>
-<dt>one_rdm_spin_traced<span class="classifier">numpy.ndarray, optional</span></dt><dd><p>Spin-traced one-particle reduced density matrix</p>
-</dd>
-<dt>two_rdm_spin_traced<span class="classifier">numpy.ndarray, optional</span></dt><dd><p>Spin-traced two-particle reduced density matrix</p>
-</dd>
-<dt>type<span class="classifier">WavefunctionType, optional</span></dt><dd><p>Type of wavefunction (default: SelfDual)</p>
+<ol class="arabic simple" start="2">
+<li><p>__init__(self: qdk_chemistry._core.data.SciWavefunctionContainer, coeffs: typing.Annotated[numpy.typing.ArrayLike, numpy.float64, “[m, 1]”] | typing.Annotated[numpy.typing.ArrayLike, numpy.complex128, “[m, 1]”], dets: collections.abc.Sequence[qdk_chemistry._core.data.Configuration], orbitals: qdk_chemistry._core.data.Orbitals, one_rdm_spin_traced: typing.Annotated[numpy.typing.ArrayLike, numpy.float64, “[m, n]”] | typing.Annotated[numpy.typing.ArrayLike, numpy.complex128, “[m, n]”] | None = None, two_rdm_spin_traced: typing.Annotated[numpy.typing.ArrayLike, numpy.float64, “[m, 1]”] | typing.Annotated[numpy.typing.ArrayLike, numpy.complex128, “[m, 1]”] | None = None, type: qdk_chemistry._core.data.WavefunctionType = &lt;WavefunctionType.SelfDual: 0&gt;) -&gt; None</p></li>
+</ol>
+<p>Constructs a SCI wavefunction container with spin-traced RDMs.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>coeffs</strong> (<a class="reference external" href="https://numpy.org/doc/stable/reference/generated/numpy.ndarray.html#numpy.ndarray" title="(in NumPy v2.3)"><em>numpy.ndarray</em></a>) – The vector of CI coefficients (real or complex)</p></li>
+<li><p><strong>dets</strong> (<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#list" title="(in Python v3.14)"><em>list</em></a><em>[</em><a class="reference internal" href="#qdk_chemistry.utils.wavefunction.Configuration" title="qdk_chemistry.utils.wavefunction.Configuration"><em>Configuration</em></a><em>]</em>) – The vector of determinants</p></li>
+<li><p><strong>orbitals</strong> (<a class="reference internal" href="qdk_chemistry.data.html#qdk_chemistry.data.Orbitals" title="qdk_chemistry.data.Orbitals"><em>Orbitals</em></a>) – Shared pointer to orbital basis set</p></li>
+<li><p><strong>one_rdm_spin_traced</strong> (<em>Optional</em><em>[</em><a class="reference external" href="https://numpy.org/doc/stable/reference/generated/numpy.ndarray.html#numpy.ndarray" title="(in NumPy v2.3)"><em>numpy.ndarray</em></a><em>]</em>) – Spin-traced one-particle reduced density matrix</p></li>
+<li><p><strong>two_rdm_spin_traced</strong> (<em>Optional</em><em>[</em><a class="reference external" href="https://numpy.org/doc/stable/reference/generated/numpy.ndarray.html#numpy.ndarray" title="(in NumPy v2.3)"><em>numpy.ndarray</em></a><em>]</em>) – Spin-traced two-particle reduced density matrix</p></li>
+<li><p><strong>type</strong> (<em>Optional</em><em>[</em><a class="reference internal" href="qdk_chemistry.data.html#qdk_chemistry.data.WavefunctionType" title="qdk_chemistry.data.WavefunctionType"><em>WavefunctionType</em></a><em>]</em>) – Type of wavefunction (default: SelfDual)</p></li>
+</ul>
 </dd>
 </dl>
+<p class="rubric">Examples</p>
 <div class="doctest highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="kn">import</span><span class="w"> </span><span class="nn">numpy</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">np</span>
 <span class="gp">&gt;&gt;&gt; </span><span class="n">coeffs</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">([</span><span class="mf">0.9</span><span class="p">,</span> <span class="mf">0.1</span><span class="p">])</span>
 <span class="gp">&gt;&gt;&gt; </span><span class="n">dets</span> <span class="o">=</span> <span class="p">[</span><span class="n">qdk_chemistry</span><span class="o">.</span><span class="n">Configuration</span><span class="p">(</span><span class="s2">&quot;33221100&quot;</span><span class="p">),</span> <span class="n">qdk_chemistry</span><span class="o">.</span><span class="n">Configuration</span><span class="p">(</span><span class="s2">&quot;33221001&quot;</span><span class="p">)]</span>
@@ -1201,35 +990,28 @@ interaction (SCI) methods or full configuration interaction (FCI).</p>
 <span class="gp">&gt;&gt;&gt; </span><span class="n">container</span> <span class="o">=</span> <span class="n">qdk_chemistry</span><span class="o">.</span><span class="n">SciWavefunctionContainer</span><span class="p">(</span><span class="n">coeffs</span><span class="p">,</span> <span class="n">dets</span><span class="p">,</span> <span class="n">orbitals</span><span class="p">,</span> <span class="n">one_rdm</span><span class="p">,</span> <span class="kc">None</span><span class="p">)</span>
 </pre></div>
 </div>
-</div></blockquote>
-</li>
-<li><p>__init__(self: qdk_chemistry._core.data.SciWavefunctionContainer, coeffs: typing.Annotated[numpy.typing.ArrayLike, numpy.float64, “[m, 1]”] | typing.Annotated[numpy.typing.ArrayLike, numpy.complex128, “[m, 1]”], dets: collections.abc.Sequence[qdk_chemistry._core.data.Configuration], orbitals: qdk_chemistry._core.data.Orbitals, one_rdm_spin_traced: typing.Annotated[numpy.typing.ArrayLike, numpy.float64, “[m, n]”] | typing.Annotated[numpy.typing.ArrayLike, numpy.complex128, “[m, n]”] | None = None, one_rdm_aa: typing.Annotated[numpy.typing.ArrayLike, numpy.float64, “[m, n]”] | typing.Annotated[numpy.typing.ArrayLike, numpy.complex128, “[m, n]”] | None = None, one_rdm_bb: typing.Annotated[numpy.typing.ArrayLike, numpy.float64, “[m, n]”] | typing.Annotated[numpy.typing.ArrayLike, numpy.complex128, “[m, n]”] | None = None, two_rdm_spin_traced: typing.Annotated[numpy.typing.ArrayLike, numpy.float64, “[m, 1]”] | typing.Annotated[numpy.typing.ArrayLike, numpy.complex128, “[m, 1]”] | None = None, two_rdm_aabb: typing.Annotated[numpy.typing.ArrayLike, numpy.float64, “[m, 1]”] | typing.Annotated[numpy.typing.ArrayLike, numpy.complex128, “[m, 1]”] | None = None, two_rdm_aaaa: typing.Annotated[numpy.typing.ArrayLike, numpy.float64, “[m, 1]”] | typing.Annotated[numpy.typing.ArrayLike, numpy.complex128, “[m, 1]”] | None = None, two_rdm_bbbb: typing.Annotated[numpy.typing.ArrayLike, numpy.float64, “[m, 1]”] | typing.Annotated[numpy.typing.ArrayLike, numpy.complex128, “[m, 1]”] | None = None, type: qdk_chemistry._core.data.WavefunctionType = &lt;WavefunctionType.SelfDual: 0&gt;) -&gt; None</p>
-<blockquote>
-<div><p>Constructs a SCI wavefunction container with full RDM data.</p>
-<dl class="simple">
-<dt>coeffs<span class="classifier">numpy.ndarray</span></dt><dd><p>The vector of CI coefficients (real or complex)</p>
-</dd>
-<dt>dets<span class="classifier">list of Configuration</span></dt><dd><p>The vector of determinants</p>
-</dd>
-<dt>orbitals<span class="classifier">Orbitals</span></dt><dd><p>Shared pointer to orbital basis set</p>
-</dd>
-<dt>one_rdm_spin_traced<span class="classifier">numpy.ndarray, optional</span></dt><dd><p>Spin-traced one-particle reduced density matrix</p>
-</dd>
-<dt>one_rdm_aa<span class="classifier">numpy.ndarray, optional</span></dt><dd><p>Alpha-alpha block of one-particle RDM</p>
-</dd>
-<dt>one_rdm_bb<span class="classifier">numpy.ndarray, optional</span></dt><dd><p>Beta-beta block of one-particle RDM</p>
-</dd>
-<dt>two_rdm_spin_traced<span class="classifier">numpy.ndarray, optional</span></dt><dd><p>Spin-traced two-particle reduced density matrix</p>
-</dd>
-<dt>two_rdm_aabb<span class="classifier">numpy.ndarray, optional</span></dt><dd><p>Alpha-beta-beta-alpha block of two-particle RDM</p>
-</dd>
-<dt>two_rdm_aaaa<span class="classifier">numpy.ndarray, optional</span></dt><dd><p>Alpha-alpha-alpha-alpha block of two-particle RDM</p>
-</dd>
-<dt>two_rdm_bbbb<span class="classifier">numpy.ndarray, optional</span></dt><dd><p>Beta-beta-beta-beta block of two-particle RDM</p>
-</dd>
-<dt>type<span class="classifier">WavefunctionType, optional</span></dt><dd><p>Type of wavefunction (default: SelfDual)</p>
+<ol class="arabic simple" start="3">
+<li><p>__init__(self: qdk_chemistry._core.data.SciWavefunctionContainer, coeffs: typing.Annotated[numpy.typing.ArrayLike, numpy.float64, “[m, 1]”] | typing.Annotated[numpy.typing.ArrayLike, numpy.complex128, “[m, 1]”], dets: collections.abc.Sequence[qdk_chemistry._core.data.Configuration], orbitals: qdk_chemistry._core.data.Orbitals, one_rdm_spin_traced: typing.Annotated[numpy.typing.ArrayLike, numpy.float64, “[m, n]”] | typing.Annotated[numpy.typing.ArrayLike, numpy.complex128, “[m, n]”] | None = None, one_rdm_aa: typing.Annotated[numpy.typing.ArrayLike, numpy.float64, “[m, n]”] | typing.Annotated[numpy.typing.ArrayLike, numpy.complex128, “[m, n]”] | None = None, one_rdm_bb: typing.Annotated[numpy.typing.ArrayLike, numpy.float64, “[m, n]”] | typing.Annotated[numpy.typing.ArrayLike, numpy.complex128, “[m, n]”] | None = None, two_rdm_spin_traced: typing.Annotated[numpy.typing.ArrayLike, numpy.float64, “[m, 1]”] | typing.Annotated[numpy.typing.ArrayLike, numpy.complex128, “[m, 1]”] | None = None, two_rdm_aabb: typing.Annotated[numpy.typing.ArrayLike, numpy.float64, “[m, 1]”] | typing.Annotated[numpy.typing.ArrayLike, numpy.complex128, “[m, 1]”] | None = None, two_rdm_aaaa: typing.Annotated[numpy.typing.ArrayLike, numpy.float64, “[m, 1]”] | typing.Annotated[numpy.typing.ArrayLike, numpy.complex128, “[m, 1]”] | None = None, two_rdm_bbbb: typing.Annotated[numpy.typing.ArrayLike, numpy.float64, “[m, 1]”] | typing.Annotated[numpy.typing.ArrayLike, numpy.complex128, “[m, 1]”] | None = None, type: qdk_chemistry._core.data.WavefunctionType = &lt;WavefunctionType.SelfDual: 0&gt;) -&gt; None</p></li>
+</ol>
+<p>Constructs a SCI wavefunction container with full RDM data.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>coeffs</strong> (<a class="reference external" href="https://numpy.org/doc/stable/reference/generated/numpy.ndarray.html#numpy.ndarray" title="(in NumPy v2.3)"><em>numpy.ndarray</em></a>) – The vector of CI coefficients (real or complex)</p></li>
+<li><p><strong>dets</strong> (<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#list" title="(in Python v3.14)"><em>list</em></a><em>[</em><a class="reference internal" href="#qdk_chemistry.utils.wavefunction.Configuration" title="qdk_chemistry.utils.wavefunction.Configuration"><em>Configuration</em></a><em>]</em>) – The vector of determinants</p></li>
+<li><p><strong>orbitals</strong> (<a class="reference internal" href="qdk_chemistry.data.html#qdk_chemistry.data.Orbitals" title="qdk_chemistry.data.Orbitals"><em>Orbitals</em></a>) – Shared pointer to orbital basis set</p></li>
+<li><p><strong>one_rdm_spin_traced</strong> (<em>Optional</em><em>[</em><a class="reference external" href="https://numpy.org/doc/stable/reference/generated/numpy.ndarray.html#numpy.ndarray" title="(in NumPy v2.3)"><em>numpy.ndarray</em></a><em>]</em>) – Spin-traced one-particle reduced density matrix</p></li>
+<li><p><strong>one_rdm_aa</strong> (<em>Optional</em><em>[</em><a class="reference external" href="https://numpy.org/doc/stable/reference/generated/numpy.ndarray.html#numpy.ndarray" title="(in NumPy v2.3)"><em>numpy.ndarray</em></a><em>]</em>) – Alpha-alpha block of one-particle RDM</p></li>
+<li><p><strong>one_rdm_bb</strong> (<em>Optional</em><em>[</em><a class="reference external" href="https://numpy.org/doc/stable/reference/generated/numpy.ndarray.html#numpy.ndarray" title="(in NumPy v2.3)"><em>numpy.ndarray</em></a><em>]</em>) – Beta-beta block of one-particle RDM</p></li>
+<li><p><strong>two_rdm_spin_traced</strong> (<em>Optional</em><em>[</em><a class="reference external" href="https://numpy.org/doc/stable/reference/generated/numpy.ndarray.html#numpy.ndarray" title="(in NumPy v2.3)"><em>numpy.ndarray</em></a><em>]</em>) – Spin-traced two-particle reduced density matrix</p></li>
+<li><p><strong>two_rdm_aabb</strong> (<em>Optional</em><em>[</em><a class="reference external" href="https://numpy.org/doc/stable/reference/generated/numpy.ndarray.html#numpy.ndarray" title="(in NumPy v2.3)"><em>numpy.ndarray</em></a><em>]</em>) – Alpha-beta-beta-alpha block of two-particle RDM</p></li>
+<li><p><strong>two_rdm_aaaa</strong> (<em>Optional</em><em>[</em><a class="reference external" href="https://numpy.org/doc/stable/reference/generated/numpy.ndarray.html#numpy.ndarray" title="(in NumPy v2.3)"><em>numpy.ndarray</em></a><em>]</em>) – Alpha-alpha-alpha-alpha block of two-particle RDM</p></li>
+<li><p><strong>two_rdm_bbbb</strong> (<em>Optional</em><em>[</em><a class="reference external" href="https://numpy.org/doc/stable/reference/generated/numpy.ndarray.html#numpy.ndarray" title="(in NumPy v2.3)"><em>numpy.ndarray</em></a><em>]</em>) – Beta-beta-beta-beta block of two-particle RDM</p></li>
+<li><p><strong>type</strong> (<em>Optional</em><em>[</em><a class="reference internal" href="qdk_chemistry.data.html#qdk_chemistry.data.WavefunctionType" title="qdk_chemistry.data.WavefunctionType"><em>WavefunctionType</em></a><em>]</em>) – Type of wavefunction (default: SelfDual)</p></li>
+</ul>
 </dd>
 </dl>
+<p class="rubric">Examples</p>
 <div class="doctest highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="kn">import</span><span class="w"> </span><span class="nn">numpy</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">np</span>
 <span class="gp">&gt;&gt;&gt; </span><span class="n">coeffs</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">([</span><span class="mf">0.9</span><span class="p">,</span> <span class="mf">0.1</span><span class="p">])</span>
 <span class="gp">&gt;&gt;&gt; </span><span class="n">dets</span> <span class="o">=</span> <span class="p">[</span><span class="n">qdk_chemistry</span><span class="o">.</span><span class="n">Configuration</span><span class="p">(</span><span class="s2">&quot;33221100&quot;</span><span class="p">),</span> <span class="n">qdk_chemistry</span><span class="o">.</span><span class="n">Configuration</span><span class="p">(</span><span class="s2">&quot;33221001&quot;</span><span class="p">)]</span>
@@ -1238,9 +1020,6 @@ interaction (SCI) methods or full configuration interaction (FCI).</p>
 <span class="gp">... </span>                                         <span class="n">two_rdm</span><span class="p">,</span> <span class="n">two_rdm_aabb</span><span class="p">,</span> <span class="n">two_rdm_aaaa</span><span class="p">,</span> <span class="n">two_rdm_bbbb</span><span class="p">)</span>
 </pre></div>
 </div>
-</div></blockquote>
-</li>
-</ol>
 </dd></dl>
 
 <dl class="py method">
@@ -1253,11 +1032,9 @@ interaction (SCI) methods or full configuration interaction (FCI).</p>
 
 <dl class="py class">
 <dt class="sig sig-object py" id="qdk_chemistry.utils.wavefunction.Wavefunction">
-<em class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">Wavefunction</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">self</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference internal" href="#qdk_chemistry.utils.wavefunction.Wavefunction" title="qdk_chemistry._core.data.Wavefunction"><span class="pre">qdk_chemistry._core.data.Wavefunction</span></a></span></em>, <em class="sig-param"><span class="n"><span class="pre">container</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference internal" href="qdk_chemistry.data.html#qdk_chemistry.data.WavefunctionContainer" title="qdk_chemistry._core.data.WavefunctionContainer"><span class="pre">qdk_chemistry._core.data.WavefunctionContainer</span></a></span></em><span class="sig-paren">)</span><a class="headerlink" href="#qdk_chemistry.utils.wavefunction.Wavefunction" title="Link to this definition"></a></dt>
+<em class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">Wavefunction</span></span><a class="headerlink" href="#qdk_chemistry.utils.wavefunction.Wavefunction" title="Link to this definition"></a></dt>
 <dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">DataClass</span></code></p>
-<blockquote>
-<div><p>Represents a wavefunction with associated properties.</p>
-</div></blockquote>
+<p>Represents a wavefunction with associated properties.</p>
 <p>This class encapsulates wavefunction data including:</p>
 <ul class="simple">
 <li><p>Configuration interaction coefficients</p></li>
@@ -1265,17 +1042,6 @@ interaction (SCI) methods or full configuration interaction (FCI).</p>
 <li><p>Methods for computing properties</p></li>
 </ul>
 <p>Supports both restricted and unrestricted wavefunctions with real or complex coefficients.</p>
-<p>Constructs a wavefunction with a container implementation.</p>
-<dl class="field-list simple">
-<dt class="field-odd">Parameters<span class="colon">:</span></dt>
-<dd class="field-odd"><p><strong>container</strong> (<a class="reference internal" href="qdk_chemistry.data.html#qdk_chemistry.data.WavefunctionContainer" title="qdk_chemistry.data.WavefunctionContainer"><em>WavefunctionContainer</em></a>) – The container holding the wavefunction implementation</p>
-</dd>
-</dl>
-<p class="rubric">Examples</p>
-<div class="doctest highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="n">container</span> <span class="o">=</span> <span class="n">qdk_chemistry</span><span class="o">.</span><span class="n">SciWavefunctionContainer</span><span class="p">(</span><span class="n">coeffs</span><span class="p">,</span> <span class="n">dets</span><span class="p">,</span> <span class="n">orbitals</span><span class="p">)</span>
-<span class="gp">&gt;&gt;&gt; </span><span class="n">wf</span> <span class="o">=</span> <span class="n">qdk_chemistry</span><span class="o">.</span><span class="n">Wavefunction</span><span class="p">(</span><span class="n">container</span><span class="p">)</span>
-</pre></div>
-</div>
 <dl class="py method">
 <dt class="sig sig-object py" id="qdk_chemistry.utils.wavefunction.Wavefunction.__init__">
 <span class="sig-name descname"><span class="pre">__init__</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">self</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference internal" href="#qdk_chemistry.utils.wavefunction.Wavefunction" title="qdk_chemistry._core.data.Wavefunction"><span class="pre">qdk_chemistry._core.data.Wavefunction</span></a></span></em>, <em class="sig-param"><span class="n"><span class="pre">container</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference internal" href="qdk_chemistry.data.html#qdk_chemistry.data.WavefunctionContainer" title="qdk_chemistry._core.data.WavefunctionContainer"><span class="pre">qdk_chemistry._core.data.WavefunctionContainer</span></a></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><a class="reference external" href="https://docs.python.org/3/library/constants.html#None" title="(in Python v3.14)"><span class="pre">None</span></a></span></span><a class="headerlink" href="#qdk_chemistry.utils.wavefunction.Wavefunction.__init__" title="Link to this definition"></a></dt>
@@ -1396,8 +1162,7 @@ interaction (SCI) methods or full configuration interaction (FCI).</p>
 </dd>
 </dl>
 <p class="rubric">Notes</p>
-<p>Removes inactive and virtual orbital information, keeping only the active
-space orbitals.</p>
+<p>Removes inactive and virtual orbital information, keeping only the active space orbitals.</p>
 <p class="rubric">Examples</p>
 <div class="doctest highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="n">total_det</span> <span class="o">=</span> <span class="n">qdk_chemistry</span><span class="o">.</span><span class="n">Configuration</span><span class="p">(</span><span class="s2">&quot;2222uudd0000&quot;</span><span class="p">)</span>  <span class="c1"># 4 inactive, 4 active, 4 virtual</span>
 <span class="gp">&gt;&gt;&gt; </span><span class="n">active_det</span> <span class="o">=</span> <span class="n">wf</span><span class="o">.</span><span class="n">get_active_determinant</span><span class="p">(</span><span class="n">total_det</span><span class="p">)</span>
@@ -1415,13 +1180,12 @@ space orbitals.</p>
 <dd class="field-odd"><p>Vector of all configurations/determinants representing only the active space</p>
 </dd>
 <dt class="field-even">Return type<span class="colon">:</span></dt>
-<dd class="field-even"><p><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#list" title="(in Python v3.14)">list</a> of <a class="reference internal" href="#qdk_chemistry.utils.wavefunction.Configuration" title="qdk_chemistry.utils.wavefunction.Configuration">Configuration</a></p>
+<dd class="field-even"><p><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#list" title="(in Python v3.14)">list</a>[<a class="reference internal" href="#qdk_chemistry.utils.wavefunction.Configuration" title="qdk_chemistry.utils.wavefunction.Configuration">Configuration</a>]</p>
 </dd>
 </dl>
 <p class="rubric">Notes</p>
-<p>The determinants only include the active space orbitals. To get determinants
-with full orbital space (including inactive and virtual orbitals), use
-<code class="docutils literal notranslate"><span class="pre">get_total_determinants()</span></code>.</p>
+<p>The determinants only include the active space orbitals.
+To get determinants with full orbital space (including inactive and virtual orbitals), use <code class="docutils literal notranslate"><span class="pre">get_total_determinants()</span></code>.</p>
 <p class="rubric">Examples</p>
 <div class="doctest highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="n">dets</span> <span class="o">=</span> <span class="n">wf</span><span class="o">.</span><span class="n">get_active_determinants</span><span class="p">()</span>
 </pre></div>
@@ -1560,7 +1324,7 @@ with full orbital space (including inactive and virtual orbitals), use
 <dd class="field-even"><p>The coefficient for the determinant if found, zero otherwise</p>
 </dd>
 <dt class="field-odd">Return type<span class="colon">:</span></dt>
-<dd class="field-odd"><p><a class="reference external" href="https://docs.python.org/3/library/functions.html#complex" title="(in Python v3.14)">complex</a> or <a class="reference external" href="https://docs.python.org/3/library/functions.html#float" title="(in Python v3.14)">float</a></p>
+<dd class="field-odd"><p><a class="reference external" href="https://docs.python.org/3/library/functions.html#complex" title="(in Python v3.14)">complex</a> | <a class="reference external" href="https://docs.python.org/3/library/functions.html#float" title="(in Python v3.14)">float</a></p>
 </dd>
 </dl>
 <p class="rubric">Examples</p>
@@ -1572,9 +1336,7 @@ with full orbital space (including inactive and virtual orbitals), use
 <dl class="py method">
 <dt class="sig sig-object py" id="qdk_chemistry.utils.wavefunction.Wavefunction.get_coefficients">
 <span class="sig-name descname"><span class="pre">get_coefficients</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">self</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference internal" href="#qdk_chemistry.utils.wavefunction.Wavefunction" title="qdk_chemistry._core.data.Wavefunction"><span class="pre">qdk_chemistry._core.data.Wavefunction</span></a></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><a class="reference external" href="https://docs.python.org/3/library/functions.html#object" title="(in Python v3.14)"><span class="pre">object</span></a></span></span><a class="headerlink" href="#qdk_chemistry.utils.wavefunction.Wavefunction.get_coefficients" title="Link to this definition"></a></dt>
-<dd><p>Get coefficients for all determinants as a vector, in which the
-sequence of coefficients is consistent with the vector from
-<code class="docutils literal notranslate"><span class="pre">get_active_determinants()</span></code></p>
+<dd><p>Get coefficients for all determinants as a vector, in which the sequence of coefficients is consistent with the vector from <code class="docutils literal notranslate"><span class="pre">get_active_determinants()</span></code></p>
 <dl class="field-list simple">
 <dt class="field-odd">Returns<span class="colon">:</span></dt>
 <dd class="field-odd"><p>Vector of all coefficients (real or complex)</p>
@@ -1685,8 +1447,7 @@ sequence of coefficients is consistent with the vector from
 </dd>
 </dl>
 <p class="rubric">Notes</p>
-<p>Expands active-space-only determinant to full orbital space by prepending
-doubly occupied inactive orbitals and appending unoccupied virtual orbitals.</p>
+<p>Expands active-space-only determinant to full orbital space by prepending doubly occupied inactive orbitals and appending unoccupied virtual orbitals.</p>
 <p class="rubric">Examples</p>
 <div class="doctest highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="n">active_det</span> <span class="o">=</span> <span class="n">qdk_chemistry</span><span class="o">.</span><span class="n">Configuration</span><span class="p">(</span><span class="s2">&quot;uudd&quot;</span><span class="p">)</span>  <span class="c1"># 4 active orbitals</span>
 <span class="gp">&gt;&gt;&gt; </span><span class="n">total_det</span> <span class="o">=</span> <span class="n">wf</span><span class="o">.</span><span class="n">get_total_determinant</span><span class="p">(</span><span class="n">active_det</span><span class="p">)</span>
@@ -1698,18 +1459,19 @@ doubly occupied inactive orbitals and appending unoccupied virtual orbitals.</p>
 <dl class="py method">
 <dt class="sig sig-object py" id="qdk_chemistry.utils.wavefunction.Wavefunction.get_total_determinants">
 <span class="sig-name descname"><span class="pre">get_total_determinants</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">self</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference internal" href="#qdk_chemistry.utils.wavefunction.Wavefunction" title="qdk_chemistry._core.data.Wavefunction"><span class="pre">qdk_chemistry._core.data.Wavefunction</span></a></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#list" title="(in Python v3.14)"><span class="pre">list</span></a><span class="p"><span class="pre">[</span></span><a class="reference internal" href="#qdk_chemistry.utils.wavefunction.Configuration" title="qdk_chemistry._core.data.Configuration"><span class="pre">qdk_chemistry._core.data.Configuration</span></a><span class="p"><span class="pre">]</span></span></span></span><a class="headerlink" href="#qdk_chemistry.utils.wavefunction.Wavefunction.get_total_determinants" title="Link to this definition"></a></dt>
-<dd><p>Get all determinants in the wavefunction with full orbital space.</p>
+<dd><blockquote>
+<div><p>Get all determinants in the wavefunction with full orbital space.</p>
+</div></blockquote>
 <dl class="field-list simple">
 <dt class="field-odd">Returns<span class="colon">:</span></dt>
 <dd class="field-odd"><p>Vector of all configurations/determinants including inactive and virtual orbitals</p>
 </dd>
 <dt class="field-even">Return type<span class="colon">:</span></dt>
-<dd class="field-even"><p><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#list" title="(in Python v3.14)">list</a> of <a class="reference internal" href="#qdk_chemistry.utils.wavefunction.Configuration" title="qdk_chemistry.utils.wavefunction.Configuration">Configuration</a></p>
+<dd class="field-even"><p><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#list" title="(in Python v3.14)">list</a>[<a class="reference internal" href="#qdk_chemistry.utils.wavefunction.Configuration" title="qdk_chemistry.utils.wavefunction.Configuration">Configuration</a>]</p>
 </dd>
 </dl>
 <p class="rubric">Notes</p>
-<p>Converts active-space-only determinants to full orbital space by prepending
-doubly occupied inactive orbitals and appending unoccupied virtual orbitals.</p>
+<p>Converts active-space-only determinants to full orbital space by prepending doubly occupied inactive orbitals and appending unoccupied virtual orbitals.</p>
 <p class="rubric">Examples</p>
 <div class="doctest highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="n">total_dets</span> <span class="o">=</span> <span class="n">wf</span><span class="o">.</span><span class="n">get_total_determinants</span><span class="p">()</span>
 <span class="gp">&gt;&gt;&gt; </span><span class="c1"># Each determinant now includes inactive (doubly occupied) and virtual (unoccupied) orbitals</span>
@@ -1756,7 +1518,9 @@ doubly occupied inactive orbitals and appending unoccupied virtual orbitals.</p>
 <dl class="py method">
 <dt class="sig sig-object py" id="qdk_chemistry.utils.wavefunction.Wavefunction.get_type">
 <span class="sig-name descname"><span class="pre">get_type</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">self</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference internal" href="#qdk_chemistry.utils.wavefunction.Wavefunction" title="qdk_chemistry._core.data.Wavefunction"><span class="pre">qdk_chemistry._core.data.Wavefunction</span></a></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><a class="reference internal" href="qdk_chemistry.data.html#qdk_chemistry.data.WavefunctionType" title="qdk_chemistry._core.data.WavefunctionType"><span class="pre">qdk_chemistry._core.data.WavefunctionType</span></a></span></span><a class="headerlink" href="#qdk_chemistry.utils.wavefunction.Wavefunction.get_type" title="Link to this definition"></a></dt>
-<dd><p>Get the wavefunction type (Bra, Ket, or Both).</p>
+<dd><blockquote>
+<div><p>Get the wavefunction type (Bra, Ket, or Both).</p>
+</div></blockquote>
 <dl class="field-list simple">
 <dt class="field-odd">Returns<span class="colon">:</span></dt>
 <dd class="field-odd"><p>Enum value representing the wavefunction type</p>
@@ -1793,7 +1557,9 @@ doubly occupied inactive orbitals and appending unoccupied virtual orbitals.</p>
 <dl class="py method">
 <dt class="sig sig-object py" id="qdk_chemistry.utils.wavefunction.Wavefunction.has_one_rdm_spin_traced">
 <span class="sig-name descname"><span class="pre">has_one_rdm_spin_traced</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">self</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference internal" href="#qdk_chemistry.utils.wavefunction.Wavefunction" title="qdk_chemistry._core.data.Wavefunction"><span class="pre">qdk_chemistry._core.data.Wavefunction</span></a></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><a class="reference external" href="https://docs.python.org/3/library/functions.html#bool" title="(in Python v3.14)"><span class="pre">bool</span></a></span></span><a class="headerlink" href="#qdk_chemistry.utils.wavefunction.Wavefunction.has_one_rdm_spin_traced" title="Link to this definition"></a></dt>
-<dd><p>Check if spin-traced one-particle RDM for active orbitals is available.</p>
+<dd><blockquote>
+<div><p>Check if spin-traced one-particle RDM for active orbitals is available.</p>
+</div></blockquote>
 <dl class="field-list simple">
 <dt class="field-odd">Returns<span class="colon">:</span></dt>
 <dd class="field-odd"><p>True if available</p>
@@ -1915,7 +1681,7 @@ doubly occupied inactive orbitals and appending unoccupied virtual orbitals.</p>
 <dd class="field-even"><p>Overlap value (real or complex)</p>
 </dd>
 <dt class="field-odd">Return type<span class="colon">:</span></dt>
-<dd class="field-odd"><p><a class="reference external" href="https://docs.python.org/3/library/functions.html#complex" title="(in Python v3.14)">complex</a> or <a class="reference external" href="https://docs.python.org/3/library/functions.html#float" title="(in Python v3.14)">float</a></p>
+<dd class="field-odd"><p><a class="reference external" href="https://docs.python.org/3/library/functions.html#complex" title="(in Python v3.14)">complex</a> | <a class="reference external" href="https://docs.python.org/3/library/functions.html#float" title="(in Python v3.14)">float</a></p>
 </dd>
 </dl>
 <p class="rubric">Examples</p>

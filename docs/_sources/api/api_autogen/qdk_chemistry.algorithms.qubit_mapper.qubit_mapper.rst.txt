@@ -1,0 +1,8 @@
+qdk\_chemistry.algorithms.qubit\_mapper.qubit\_mapper module
+============================================================
+
+.. automodule:: qdk_chemistry.algorithms.qubit_mapper.qubit_mapper
+   :members:
+   :private-members:
+   :show-inheritance:
+   :undoc-members:

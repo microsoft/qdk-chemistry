@@ -62,7 +62,7 @@
 <li class="toctree-l2"><a class="reference internal" href="../python_api.html#plugins">Plugins</a></li>
 <li class="toctree-l2 current"><a class="reference internal" href="../python_api.html#utilities">Utilities</a><ul class="current">
 <li class="toctree-l3 current"><a class="reference internal" href="qdk_chemistry.utils.html">qdk_chemistry.utils package</a><ul class="current">
-<li class="toctree-l4"><a class="reference internal" href="qdk_chemistry.utils.html#qdk_chemistry.utils.compute_valence_space"><code class="docutils literal notranslate"><span class="pre">compute_valence_space()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="qdk_chemistry.utils.html#qdk_chemistry.utils.compute_valence_space_parameters"><code class="docutils literal notranslate"><span class="pre">compute_valence_space_parameters()</span></code></a></li>
 <li class="toctree-l4 current"><a class="reference internal" href="qdk_chemistry.utils.html#submodules">Submodules</a></li>
 </ul>
 </li>
@@ -113,6 +113,14 @@
 <em class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">QubitHamiltonian</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">pauli_strings</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">coefficients</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#qdk_chemistry.utils.time_evolution.QubitHamiltonian" title="Link to this definition"></a></dt>
 <dd><p>Bases: <a class="reference internal" href="qdk_chemistry.data.base.html#qdk_chemistry.data.base.DataClass" title="qdk_chemistry.data.base.DataClass"><code class="xref py py-class docutils literal notranslate"><span class="pre">DataClass</span></code></a></p>
 <p>Data class for representing chemical electronic Hamiltonians in qubits.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>pauli_strings</strong> (<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#list" title="(in Python v3.14)"><em>list</em></a><em>[</em><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)"><em>str</em></a><em>]</em>)</p></li>
+<li><p><strong>coefficients</strong> (<a class="reference external" href="https://numpy.org/doc/stable/reference/generated/numpy.ndarray.html#numpy.ndarray" title="(in NumPy v2.3)"><em>ndarray</em></a>)</p></li>
+</ul>
+</dd>
+</dl>
 <dl class="py attribute">
 <dt class="sig sig-object py" id="qdk_chemistry.utils.time_evolution.QubitHamiltonian.pauli_strings">
 <span class="sig-name descname"><span class="pre">pauli_strings</span></span><a class="headerlink" href="#qdk_chemistry.utils.time_evolution.QubitHamiltonian.pauli_strings" title="Link to this definition"></a></dt>
@@ -125,19 +133,6 @@
 <dd><p>Array of coefficients corresponding to each Pauli string.</p>
 </dd></dl>
 
-<p>Initialize a QubitHamiltonian.</p>
-<dl class="field-list simple">
-<dt class="field-odd">Parameters<span class="colon">:</span></dt>
-<dd class="field-odd"><ul class="simple">
-<li><p><strong>pauli_strings</strong> (<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#list" title="(in Python v3.14)"><em>list</em></a><em>[</em><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)"><em>str</em></a><em>]</em>) – List of Pauli strings.</p></li>
-<li><p><strong>coefficients</strong> (<a class="reference external" href="https://numpy.org/doc/stable/reference/generated/numpy.ndarray.html#numpy.ndarray" title="(in NumPy v2.3)"><em>ndarray</em></a>) – Array of coefficients corresponding to each Pauli string.</p></li>
-</ul>
-</dd>
-<dt class="field-even">Raises<span class="colon">:</span></dt>
-<dd class="field-even"><p><a class="reference external" href="https://docs.python.org/3/library/exceptions.html#ValueError" title="(in Python v3.14)"><strong>ValueError</strong></a> – If the number of Pauli strings and coefficients don’t match,
-    or if the Pauli strings or coefficients are invalid.</p>
-</dd>
-</dl>
 <dl class="py method">
 <dt class="sig sig-object py" id="qdk_chemistry.utils.time_evolution.QubitHamiltonian.__init__">
 <span class="sig-name descname"><span class="pre">__init__</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">pauli_strings</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">coefficients</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#qdk_chemistry.utils.time_evolution.QubitHamiltonian.__init__" title="Link to this definition"></a></dt>
@@ -339,7 +334,7 @@ Python users should call to_hdf5_file() directly.</p>
 <dl class="py function">
 <dt class="sig sig-object py" id="qdk_chemistry.utils.time_evolution.pauli_evolution_terms">
 <span class="sig-name descname"><span class="pre">pauli_evolution_terms</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">pauli_op</span></span></em>, <em class="sig-param"><span class="keyword-only-separator o"><abbr title="Keyword-only parameters separator (PEP 3102)"><span class="pre">*</span></abbr></span></em>, <em class="sig-param"><span class="n"><span class="pre">atol</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">1e-12</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../../_modules/qdk_chemistry/utils/time_evolution.html#pauli_evolution_terms"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#qdk_chemistry.utils.time_evolution.pauli_evolution_terms" title="Link to this definition"></a></dt>
-<dd><p>Convert a <code class="xref py py-class docutils literal notranslate"><span class="pre">SparsePauliOp</span></code> into rotation data for time evolution.</p>
+<dd><p>Convert a <code class="docutils literal notranslate"><span class="pre">SparsePauliOp</span></code> into rotation data for time evolution.</p>
 <dl class="field-list simple">
 <dt class="field-odd">Return type<span class="colon">:</span></dt>
 <dd class="field-odd"><p><span class="sphinx_autodoc_typehints-type"><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#list" title="(in Python v3.14)"><code class="xref py py-class docutils literal notranslate"><span class="pre">list</span></code></a>[<a class="reference internal" href="#qdk_chemistry.utils.time_evolution.PauliEvolutionTerm" title="qdk_chemistry.utils.time_evolution.PauliEvolutionTerm"><code class="xref py py-class docutils literal notranslate"><span class="pre">PauliEvolutionTerm</span></code></a>]</span></p>

@@ -55,7 +55,7 @@
 <li class="toctree-l1 current"><a class="current reference internal" href="#">Quickstart</a><ul>
 <li class="toctree-l2"><a class="reference internal" href="#installation">Installation</a></li>
 <li class="toctree-l2"><a class="reference internal" href="#end-to-end-example">End-to-end example</a><ul>
-<li class="toctree-l3"><a class="reference internal" href="#create-a-structure-object">Create a <code class="docutils literal notranslate"><span class="pre">Structure</span></code> object</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#create-a-structure-object">Create a Structure object</a></li>
 <li class="toctree-l3"><a class="reference internal" href="#run-a-self-consistent-field-scf-calculation">Run a self-consistent field (SCF) calculation</a></li>
 <li class="toctree-l3"><a class="reference internal" href="#select-an-active-space">Select an active space</a></li>
 <li class="toctree-l3"><a class="reference internal" href="#calculate-the-hamiltonian">Calculate the Hamiltonian</a></li>
@@ -121,12 +121,12 @@ The example starts with a molecular structure and ends with a simulated calculat
 The focus of this example is on high-level concepts and common coding patterns.</p>
 <p>You can also view a related code sample in a Jupyter notebook format, along with several other examples, in the <a class="reference external" href="https://github.com/microsoft/qdk-chemistry/blob/main/examples/">examples folder</a> of the GitHub repository.</p>
 <section id="create-a-structure-object">
-<h3>Create a <code class="docutils literal notranslate"><span class="pre">Structure</span></code> object<a class="headerlink" href="#create-a-structure-object" title="Link to this heading"></a></h3>
-<p>The <code class="docutils literal notranslate"><span class="pre">Structure</span></code> class represents a molecular structure, i.e. the coordinates of its atoms.
-<code class="docutils literal notranslate"><span class="pre">Structure</span></code> objects can be constructed manually, or via deserialization from a file.
-QDK/Chemistry supports multiple serialization formats for <code class="docutils literal notranslate"><span class="pre">Structure</span></code> objects, including the standard <a class="reference external" href="https://en.wikipedia.org/wiki/XYZ_file_format">XYZ file format</a>, as well as QDK/Chemistry-specific JSON and HDF5 serialization schemes.
+<h3>Create a Structure object<a class="headerlink" href="#create-a-structure-object" title="Link to this heading"></a></h3>
+<p>The <a class="reference internal" href="comprehensive/data/structure.html"><span class="doc">Structure</span></a> class represents a molecular structure, i.e. the coordinates of its atoms.
+<a class="reference internal" href="comprehensive/data/structure.html"><span class="doc">Structure</span></a> objects can be constructed manually, or via deserialization from a file.
+QDK/Chemistry supports multiple serialization formats for <a class="reference internal" href="comprehensive/data/structure.html"><span class="doc">Structure</span></a> objects, including the standard <a class="reference external" href="https://en.wikipedia.org/wiki/XYZ_file_format">XYZ file format</a>, as well as QDK/Chemistry-specific JSON and HDF5 serialization schemes.
 Internally to QDK/Chemistry, coordinates are always stored in Bohr/atomic units; however, when reading or writing to files, the units follow the file format convention (XYZ) or can be specified (JSON, HDF5).
-See below for language specific examples of creating and serializing <code class="docutils literal notranslate"><span class="pre">Structure</span></code> objects.</p>
+See below for language specific examples of creating and serializing <a class="reference internal" href="comprehensive/data/structure.html"><span class="doc">Structure</span></a> objects.</p>
 <div class="tab-set docutils container">
 <input checked="True" class="tab-input" id="tab-set--0-input--1" name="tab-set--0" type="radio"><label class="tab-label" for="tab-set--0-input--1">C++ API</label><div class="tab-content docutils container">
 <div class="highlight-cpp notranslate"><div class="highlight"><pre><span></span><span class="w">  </span><span class="c1">// Define benzene diradical structure directly using coordinates</span>
@@ -192,12 +192,12 @@ See below for language specific examples of creating and serializing <code class
 </section>
 <section id="run-a-self-consistent-field-scf-calculation">
 <h3>Run a self-consistent field (SCF) calculation<a class="headerlink" href="#run-a-self-consistent-field-scf-calculation" title="Link to this heading"></a></h3>
-<p>Once a <code class="docutils literal notranslate"><span class="pre">Structure</span></code> is created, an <a class="reference internal" href="../glossary.html#term-SCF"><span class="xref std std-term">SCF</span></a> calculation can be performed to produce an initial <code class="docutils literal notranslate"><span class="pre">Wavefunction</span></code> as well as an <a class="reference internal" href="../glossary.html#term-SCF"><span class="xref std std-term">SCF</span></a> energy.
-QDK/Chemistry performs <a class="reference internal" href="../glossary.html#term-SCF"><span class="xref std std-term">SCF</span></a> calculations via instantiations of the <code class="docutils literal notranslate"><span class="pre">ScfSolver</span></code> algorithm.
-Instantiations of the <code class="docutils literal notranslate"><span class="pre">ScfSolver</span></code> algorithm (and all other <code class="docutils literal notranslate"><span class="pre">Algorithm</span></code> classes for that matter) are managed by a factory.
-See the <span class="xref std std-doc">comprehensive/advanced/factory_pattern</span> documentation for more information on how it is used in the QDK/Chemistry.</p>
-<p>The inputs for an <a class="reference internal" href="../glossary.html#term-SCF"><span class="xref std std-term">SCF</span></a> calculation are a <code class="docutils literal notranslate"><span class="pre">Structure</span></code> object, the charge and multiplicity of the molecular system, and information about the single-particle basis to be used.
-Optionally, <code class="docutils literal notranslate"><span class="pre">Settings</span></code> specific to the particular <code class="docutils literal notranslate"><span class="pre">ScfSolver</span></code> can be configured by accessing the <code class="docutils literal notranslate"><span class="pre">settings()</span></code> method.
+<p>Once a <a class="reference internal" href="comprehensive/data/structure.html"><span class="doc">Structure</span></a> is created, an <a class="reference internal" href="../glossary.html#term-SCF"><span class="xref std std-term">SCF</span></a> calculation can be performed to produce an initial <a class="reference internal" href="../api/api_autogen/qdk_chemistry.data.html#qdk_chemistry.data.Wavefunction" title="qdk_chemistry.data.Wavefunction"><code class="xref py py-class docutils literal notranslate"><span class="pre">Wavefunction</span></code></a> as well as an <a class="reference internal" href="../glossary.html#term-SCF"><span class="xref std std-term">SCF</span></a> energy.
+QDK/Chemistry performs <a class="reference internal" href="../glossary.html#term-SCF"><span class="xref std std-term">SCF</span></a> calculations via instantiations of a <a class="reference internal" href="comprehensive/algorithms/scf_solver.html"><span class="doc">Self-consistent field solver</span></a> algorithm.
+Instantiations of the <a class="reference internal" href="comprehensive/algorithms/scf_solver.html"><span class="doc">Self-consistent field solver</span></a> algorithm (and all other <code class="docutils literal notranslate"><span class="pre">Algorithm</span></code> classes) are managed by a factory.
+See the <a class="reference internal" href="comprehensive/design/factory_pattern.html"><span class="doc">Factory pattern</span></a> documentation for more information on how it is used in the QDK/Chemistry.</p>
+<p>The inputs for an <a class="reference internal" href="../glossary.html#term-SCF"><span class="xref std std-term">SCF</span></a> calculation are a <a class="reference internal" href="comprehensive/data/structure.html"><span class="doc">Structure</span></a> object, the charge and multiplicity of the molecular system, and information about the single-particle basis to be used.
+Optionally, <a class="reference internal" href="comprehensive/design/settings.html"><span class="doc">Settings</span></a> specific to the particular <a class="reference internal" href="comprehensive/algorithms/scf_solver.html"><span class="doc">Self-consistent field solver</span></a> can be configured by accessing the <code class="docutils literal notranslate"><span class="pre">settings()</span></code> method.
 The basis for the <a class="reference internal" href="../glossary.html#term-SCF"><span class="xref std std-term">SCF</span></a> calculation can be set via a string input, a custom basis set or initial orbitals can also be provided.
 See below for language-specific examples.</p>
 <div class="tab-set docutils container">
@@ -233,7 +233,7 @@ See below for language-specific examples.</p>
 <p>While a full set of <a class="reference internal" href="../glossary.html#term-SCF"><span class="xref std std-term">SCF</span></a> orbitals are useful for many applications, they are often not the optimal set for further post-<a class="reference internal" href="../glossary.html#term-SCF"><span class="xref std std-term">SCF</span></a> calculations.
 For this reason, both localization (orbital manipulation) and active space selection (orbital selection) algorithms are provided within QDK/Chemistry.</p>
 <p>QDK/Chemistry offers many methods for the selection of active spaces to reduce the problem size:  accurately modeling the quantum many-body problem while avoiding the prohibitive computational scaling of full configuration interaction.
-See the <a class="reference internal" href="comprehensive/algorithms/active_space.html"><span class="doc">Active space selection</span></a> documentation for a list of supported methods, along with their associated <code class="docutils literal notranslate"><span class="pre">Settings</span></code>, which accompany the standard QDK/Chemistry distribution.</p>
+See the <a class="reference internal" href="comprehensive/algorithms/active_space.html"><span class="doc">Active space selection</span></a> documentation for a list of supported methods, along with their associated <a class="reference internal" href="comprehensive/design/settings.html"><span class="doc">Settings</span></a>, which accompany the standard QDK/Chemistry distribution.</p>
 <p>The following are language-specific examples of how to select a so-called “valence” active space containing a subset of only those orbitals surrounding the Fermi level.</p>
 <div class="tab-set docutils container">
 <input checked="True" class="tab-input" id="tab-set--2-input--1" name="tab-set--2" type="radio"><label class="tab-label" for="tab-set--2-input--1">C++ API</label><div class="tab-content docutils container">
@@ -278,7 +278,7 @@ See the <a class="reference internal" href="comprehensive/algorithms/active_spac
 <section id="calculate-the-hamiltonian">
 <h3>Calculate the Hamiltonian<a class="headerlink" href="#calculate-the-hamiltonian" title="Link to this heading"></a></h3>
 <p>Once an active space has been selected, the electronic Hamiltonian can be computed within that active space to describe the energetic interactions between electrons.
-QDK/Chemistry provides flexible Hamiltonian construction capabilities through the <code class="docutils literal notranslate"><span class="pre">HamiltonianConstructor</span></code> algorithm.
+QDK/Chemistry provides flexible Hamiltonian construction capabilities through the <a class="reference internal" href="comprehensive/algorithms/hamiltonian_constructor.html"><span class="doc">Classical Hamiltonian construction</span></a> algorithm.
 The Hamiltonian constructor can generate the one- and two-electron integrals needed for subsequent quantum many-body calculations.</p>
 <div class="tab-set docutils container">
 <input checked="True" class="tab-input" id="tab-set--3-input--1" name="tab-set--3" type="radio"><label class="tab-label" for="tab-set--3-input--1">C++ API</label><div class="tab-content docutils container">
@@ -311,7 +311,7 @@ The Hamiltonian constructor can generate the one- and two-electron integrals nee
 can be performed to obtain accurate electronic energies and wavefunctions.
 QDK/Chemistry supports various Multi-Configuration (MC) methods including full
 Configuration Interaction (CI) and selected <a class="reference internal" href="../glossary.html#term-CI"><span class="xref std std-term">CI</span></a> approaches.
-<a class="reference internal" href="../glossary.html#term-MC"><span class="xref std std-term">MC</span></a> calculations are performed via instantiations of the <code class="docutils literal notranslate"><span class="pre">MultiConfigurationCalculator</span></code> algorithm.</p>
+<a class="reference internal" href="../glossary.html#term-MC"><span class="xref std std-term">MC</span></a> calculations are performed via instantiations of the <a class="reference internal" href="comprehensive/algorithms/mc_calculator.html"><span class="doc">Multi-configuration calculations</span></a> algorithm.</p>
 <div class="tab-set docutils container">
 <input checked="True" class="tab-input" id="tab-set--4-input--1" name="tab-set--4" type="radio"><label class="tab-label" for="tab-set--4-input--1">C++ API</label><div class="tab-content docutils container">
 <div class="highlight-cpp notranslate"><div class="highlight"><pre><span></span><span class="w">  </span><span class="c1">// Perform CASCI calculation</span>
@@ -343,9 +343,9 @@ Configuration Interaction (CI) and selected <a class="reference internal" href="
 </section>
 <section id="select-important-configurations">
 <h3>Select important configurations<a class="headerlink" href="#select-important-configurations" title="Link to this heading"></a></h3>
-<p>For large active spaces, the multi-configuration <span class="xref std std-doc">Wavefunction</span> may contain thousands or millions of configurations, but often only a small subset contributes significantly to the overall state.
+<p>For large active spaces, the multi-configuration <a class="reference internal" href="../api/api_autogen/qdk_chemistry.data.html#qdk_chemistry.data.Wavefunction" title="qdk_chemistry.data.Wavefunction"><code class="xref py py-class docutils literal notranslate"><span class="pre">Wavefunction</span></code></a> may contain thousands or millions of configurations, but often only a small subset contributes significantly to the overall state.
 By identifying and retaining only the dominant configurations (those with the largest amplitudes), we can create a sparse wavefunction that maintains high fidelity with the original while dramatically reducing computational requirements for quantum state preparation.
-This truncation is characterized by computing the overlap between the truncated state and the full wavefunction, and by recalculating the energy of the reduced wavefunction using the <code class="docutils literal notranslate"><span class="pre">ProjectedMultiConfigurationCalculator</span></code>.</p>
+This truncation is characterized by computing the overlap between the truncated state and the full wavefunction, and by recalculating the energy of the reduced wavefunction using the <a class="reference internal" href="comprehensive/algorithms/pmc.html"><span class="doc">Projected multi-configuration calculations</span></a>.</p>
 <div class="tab-set docutils container">
 <input checked="True" class="tab-input" id="tab-set--5-input--1" name="tab-set--5" type="radio"><label class="tab-label" for="tab-set--5-input--1">C++ API</label><div class="tab-content docutils container">
 <div class="highlight-cpp notranslate"><div class="highlight"><pre><span></span><span class="cm">/**</span>
@@ -413,7 +413,7 @@ This truncation is characterized by computing the overlap between the truncated 
 QDK/Chemistry supports multiple encoding schemes including the Jordan-Wigner and Bravyi-Kitaev transformations.
 The resulting qubit Hamiltonian is represented as a sum of Pauli strings (tensor products of Pauli <span class="math notranslate nohighlight">\(X, Y, Z\)</span>, and identity operators), each with an associated coefficient.</p>
 <p>For efficient energy estimation, the qubit Hamiltonian can be optimized in two ways.
-First, by filtering out terms that have negligible expectation values given the sparse <span class="xref std std-doc">wavefunction</span>, pre-computing their classical contributions.
+First, by filtering out terms that have negligible expectation values given the sparse <a class="reference internal" href="../api/api_autogen/qdk_chemistry.data.html#qdk_chemistry.data.Wavefunction" title="qdk_chemistry.data.Wavefunction"><code class="xref py py-class docutils literal notranslate"><span class="pre">Wavefunction</span></code></a>, pre-computing their classical contributions.
 Second, by grouping the remaining Pauli operators into commuting sets that can be measured simultaneously, significantly reducing the number of measurement circuits required on the quantum device.</p>
 <div class="tab-set docutils container">
 <input checked="True" class="tab-input" id="tab-set--6-input--1" name="tab-set--6" type="radio"><label class="tab-label" for="tab-set--6-input--1">C++ API</label><div class="tab-content docutils container">

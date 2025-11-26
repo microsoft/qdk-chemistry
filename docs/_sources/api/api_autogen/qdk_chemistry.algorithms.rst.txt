@@ -14,6 +14,7 @@ Subpackages
    :maxdepth: 4
 
    qdk_chemistry.algorithms.energy_estimator
+   qdk_chemistry.algorithms.qubit_mapper
    qdk_chemistry.algorithms.state_preparation
 
 Submodules
@@ -23,5 +24,4 @@ Submodules
    :maxdepth: 4
 
    qdk_chemistry.algorithms.base
-   qdk_chemistry.algorithms.qubit_mapper
    qdk_chemistry.algorithms.registry

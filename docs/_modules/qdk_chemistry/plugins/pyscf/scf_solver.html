@@ -148,14 +148,16 @@
 <span class="sd">    ElectronicStructureSettings and adding PySCF-specific customizations.</span>
 
 <span class="sd">    Inherits from ElectronicStructureSettings:</span>
-<span class="sd">        method (str, default=&quot;hf&quot;): The electronic structure method (Hartree-Fock).</span>
-<span class="sd">        basis_set (str, default=&quot;def2-svp&quot;): The basis set used for quantum chemistry calculations.</span>
-<span class="sd">            Common options include &quot;def2-svp&quot;, &quot;def2-tzvp&quot;, &quot;cc-pvdz&quot;, etc.</span>
-<span class="sd">        tolerance (float, default=1e-6): Convergence tolerance.</span>
-<span class="sd">        max_iterations (int, default=50): Maximum number of iterations.</span>
+
+<span class="sd">    - method (str, default=&quot;hf&quot;): The electronic structure method (Hartree-Fock).</span>
+<span class="sd">    - basis_set (str, default=&quot;def2-svp&quot;): The basis set used for quantum chemistry calculations.</span>
+<span class="sd">      Common options include &quot;def2-svp&quot;, &quot;def2-tzvp&quot;, &quot;cc-pvdz&quot;, etc.</span>
+<span class="sd">    - tolerance (float, default=1e-6): Convergence tolerance.</span>
+<span class="sd">    - max_iterations (int, default=50): Maximum number of iterations.</span>
 
 <span class="sd">    PySCF-specific settings:</span>
-<span class="sd">        force_restricted (bool, default=False): If True, enforce restricted orbitals, even if open shell (e.g. ROHF).</span>
+
+<span class="sd">    - force_restricted (bool, default=False): If True, enforce restricted orbitals, even if open shell (e.g. ROHF).</span>
 
 <span class="sd">    Examples:</span>
 <span class="sd">        &gt;&gt;&gt; settings = PyscfScfSettings()</span>

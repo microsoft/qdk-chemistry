@@ -1,8 +1,16 @@
-qdk\_chemistry.algorithms.qubit\_mapper module
-==============================================
+qdk\_chemistry.algorithms.qubit\_mapper package
+===============================================
 
 .. automodule:: qdk_chemistry.algorithms.qubit_mapper
    :members:
    :private-members:
    :show-inheritance:
    :undoc-members:
+
+Submodules
+----------
+
+.. toctree::
+   :maxdepth: 4
+
+   qdk_chemistry.algorithms.qubit_mapper.qubit_mapper

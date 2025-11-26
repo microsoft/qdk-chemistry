@@ -72,9 +72,9 @@
 <li class="toctree-l3"><a class="reference internal" href="settings.html">Settings</a></li>
 </ul>
 </li>
-<li class="toctree-l2"><a class="reference internal" href="../data/index.html">Data Management</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../data/index.html">Data management</a></li>
 <li class="toctree-l2"><a class="reference internal" href="../algorithms/index.html">Available algorithms</a></li>
-<li class="toctree-l2"><a class="reference internal" href="../keywords.html">Functionals and basis sets</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../basis_functionals.html">Functionals and basis sets</a></li>
 <li class="toctree-l2"><a class="reference internal" href="../model_hamiltonians.html">Model Hamiltonians</a></li>
 <li class="toctree-l2"><a class="reference internal" href="../plugins.html">Plugins</a></li>
 </ul>
@@ -124,7 +124,7 @@ This design allows researchers to leverage the unique strengths of various quant
 <section id="overview">
 <h2>Overview<a class="headerlink" href="#overview" title="Link to this heading"></a></h2>
 <p>QDK/Chemistry is designed with an extensible plugin architecture that allows algorithms to be implemented either natively within QDK/Chemistry or as interfaces to established third-party quantum chemistry packages.
-This approach combines the benefits of a consistent API with the specialized capabilities of different software packages, following QDK/Chemistry’s core <span class="xref std std-doc">design principles</span> of extensibility and interoperability.</p>
+This approach combines the benefits of a consistent API with the specialized capabilities of different software packages, following QDK/Chemistry’s core <a class="reference internal" href="index.html"><span class="doc">design principles</span></a> of extensibility and interoperability.</p>
 <p>The interface system implements the <a class="reference internal" href="factory_pattern.html"><span class="doc">factory pattern</span></a>, which allows algorithms to be instantiated by name without the user needing to know the specific implementation details.
 This abstraction enables seamless switching between different backends without changing your code, making it easier to benchmark and compare different approaches.</p>
 </section>
@@ -165,7 +165,7 @@ These include:</p>
 <li><p><strong>PySCF</strong>: Python-based Simulations of Chemistry Framework</p></li>
 </ul>
 <p>Each interface is implemented as a derived class that inherits from the appropriate algorithm base class (e.g.,
-<code class="docutils literal notranslate"><span class="pre">ScfSolver</span></code>, <code class="docutils literal notranslate"><span class="pre">Localizer</span></code>), ensuring type safety and consistent behavior across implementations.</p>
+<a class="reference internal" href="../algorithms/scf_solver.html"><span class="doc">ScfSolver</span></a>, <a class="reference internal" href="../algorithms/localizer.html"><span class="doc">Localizer</span></a>), ensuring type safety and consistent behavior across implementations.</p>
 </section>
 <section id="using-interfaces">
 <h2>Using interfaces<a class="headerlink" href="#using-interfaces" title="Link to this heading"></a></h2>
@@ -367,17 +367,16 @@ translated to the backend and the backend-specific settings that are passed thro
 <h2>Data conversion<a class="headerlink" href="#data-conversion" title="Link to this heading"></a></h2>
 <p>QDK/Chemistry handles the conversion of data between its own format and third-party packages automatically.
 This internal conversion process is transparent to the user, allowing you to work exclusively with QDK/Chemistry data structures regardless of which backend implementation is used.
-This capability is built on QDK/Chemistry’s robust <span class="xref std std-doc">serialization</span> system, which provides standardized methods for data conversion between different formats.</p>
+This capability is built on QDK/Chemistry’s robust <a class="reference internal" href="../data/serialization.html"><span class="doc">serialization</span></a> system, which provides standardized methods for data conversion between different formats.</p>
 <p>The data types that are automatically converted include:</p>
 <ul class="simple">
 <li><p><strong>:doc:`Molecular structures &lt;../data/structure&gt;`</strong>: Atoms, coordinates, charges, and multiplicity</p></li>
 <li><p><strong>:doc:`Basis sets &lt;../data/basis_set&gt;`</strong>: Basis set specifications, primitive and contracted functions</p></li>
 <li><p><strong>:doc:`Orbitals and wavefunctions &lt;../data/orbitals&gt;`</strong>: Coefficients, occupations, and energies</p></li>
 <li><p><strong>:doc:`Hamiltonians &lt;../data/hamiltonian&gt;`</strong>: One and two-electron integrals, core Hamiltonians</p></li>
-<li><p><strong>:doc:`Calculation results &lt;../data/wavefunction&gt;`</strong>: Energies, gradients, properties</p></li>
+<li><p><strong>Calculation results</strong> (see <a class="reference internal" href="../../../api/api_autogen/qdk_chemistry.data.html#qdk_chemistry.data.Wavefunction" title="qdk_chemistry.data.Wavefunction"><code class="xref py py-class docutils literal notranslate"><span class="pre">Wavefunction</span></code></a>): Energies, gradients, properties</p></li>
 </ul>
-<p>The conversion process is optimized to minimize data copying when possible, especially for large data structures like
-electron repulsion integrals (ERIs).
+<p>The conversion process is optimized to minimize data copying when possible, especially for large data structures like electron repulsion integrals (<a class="reference internal" href="../../../glossary.html#term-ERIs"><span class="xref std std-term">ERIs</span></a>).
 When working with large systems, QDK/Chemistry may use direct algorithms or disk-based approaches to manage memory usage efficiently.</p>
 </section>
 <section id="performance-considerations">
@@ -401,16 +400,40 @@ and hardware environment.</p>
 </div>
 <p>The following table provides an overview of the available interfaces for each algorithm class in QDK/Chemistry.
 Each algorithm class is implemented through the factory pattern, allowing you to select different implementations at runtime.</p>
-<p>You can discover all available implementations for a particular algorithm using the appropriate listing function (e.g.,
-<code class="docutils literal notranslate"><span class="pre">list_scf_solvers()</span></code> in Python or <code class="docutils literal notranslate"><span class="pre">ScfSolverFactory::available()</span></code> in C++).</p>
+<table class="docutils align-default">
+<thead>
+<tr class="row-odd"><th class="head"><p>Algorithm class</p></th>
+<th class="head"><p>QDK/Chemistry implementations</p></th>
+<th class="head"><p>Third-party interfaces</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p><a class="reference internal" href="../../../api/api_autogen/qdk_chemistry.algorithms.html#qdk_chemistry.algorithms.ScfSolver" title="qdk_chemistry.algorithms.ScfSolver"><code class="xref py py-class docutils literal notranslate"><span class="pre">ScfSolver</span></code></a></p></td>
+<td><p>“qdk”</p></td>
+<td><p>“pyscf”</p></td>
+</tr>
+<tr class="row-odd"><td><p><a class="reference internal" href="../../../api/api_autogen/qdk_chemistry.algorithms.html#qdk_chemistry.algorithms.Localizer" title="qdk_chemistry.algorithms.Localizer"><code class="xref py py-class docutils literal notranslate"><span class="pre">Localizer</span></code></a></p></td>
+<td><p>“qdk”</p></td>
+<td><p>“pyscf”</p></td>
+</tr>
+<tr class="row-even"><td><p><a class="reference internal" href="../../../api/api_autogen/qdk_chemistry.algorithms.html#qdk_chemistry.algorithms.MultiConfigurationCalculator" title="qdk_chemistry.algorithms.MultiConfigurationCalculator"><code class="xref py py-class docutils literal notranslate"><span class="pre">MultiConfigurationCalculator</span></code></a></p></td>
+<td><p>“macis_asci”, “macis_cas”</p></td>
+<td><p>“pyscf”</p></td>
+</tr>
+<tr class="row-odd"><td><p><a class="reference internal" href="../../../api/api_autogen/qdk_chemistry.algorithms.html#qdk_chemistry.algorithms.ActiveSpaceSelector" title="qdk_chemistry.algorithms.ActiveSpaceSelector"><code class="xref py py-class docutils literal notranslate"><span class="pre">ActiveSpaceSelector</span></code></a></p></td>
+<td><p>“qdk”, “autocas”</p></td>
+<td><p>“pyscf”</p></td>
+</tr>
+</tbody>
+</table>
 </section>
 <section id="related-topics">
 <h2>Related topics<a class="headerlink" href="#related-topics" title="Link to this heading"></a></h2>
 <ul class="simple">
-<li><p><span class="xref std std-doc">Design principles</span>: Core architectural principles of QDK/Chemistry</p></li>
+<li><p><a class="reference internal" href="index.html"><span class="doc">Design principles</span></a>: Core architectural principles of QDK/Chemistry</p></li>
 <li><p><a class="reference internal" href="factory_pattern.html"><span class="doc">Factory pattern</span></a>: How to extend QDK/Chemistry with new algorithms and interfaces</p></li>
 <li><p><a class="reference internal" href="settings.html"><span class="doc">Settings</span></a>: Configuring algorithm behavior consistently across implementations</p></li>
-<li><p><span class="xref std std-doc">Serialization</span>: Data persistence and conversion in QDK/Chemistry</p></li>
+<li><p><a class="reference internal" href="../data/serialization.html"><span class="doc">Serialization</span></a>: Data persistence and conversion in QDK/Chemistry</p></li>
 </ul>
 </section>
 </section>

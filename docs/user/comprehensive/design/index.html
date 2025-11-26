@@ -59,9 +59,9 @@
 <li class="toctree-l3"><a class="reference internal" href="settings.html">Settings</a></li>
 </ul>
 </li>
-<li class="toctree-l2"><a class="reference internal" href="../data/index.html">Data Management</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../data/index.html">Data management</a></li>
 <li class="toctree-l2"><a class="reference internal" href="../algorithms/index.html">Available algorithms</a></li>
-<li class="toctree-l2"><a class="reference internal" href="../keywords.html">Functionals and basis sets</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../basis_functionals.html">Functionals and basis sets</a></li>
 <li class="toctree-l2"><a class="reference internal" href="../model_hamiltonians.html">Model Hamiltonians</a></li>
 <li class="toctree-l2"><a class="reference internal" href="../plugins.html">Plugins</a></li>
 </ul>
@@ -135,7 +135,7 @@ workflows.</p>
 <ul class="simple">
 <li><p>Immutable: Once created, the core data cannot be modified</p></li>
 <li><p>Self-contained: Include all information necessary to represent the concept</p></li>
-<li><p><span class="xref std std-doc">Serializable</span>: Can be easily saved to and loaded from files</p></li>
+<li><p><a class="reference internal" href="../data/serialization.html"><span class="doc">Serializable</span></a>: Can be easily saved to and loaded from files</p></li>
 <li><p>Language-agnostic: Accessible through identical APIs in both C++ and Python</p></li>
 </ul>
 <p>QDK/Chemistry includes the following data classes:</p>
@@ -144,7 +144,7 @@ workflows.</p>
 <li><p><a class="reference internal" href="../data/basis_set.html"><span class="doc">BasisSet</span></a>: Quantum chemistry basis set definitions</p></li>
 <li><p><a class="reference internal" href="../data/orbitals.html"><span class="doc">Orbitals</span></a>: Molecular orbital coefficients and energies</p></li>
 <li><p><a class="reference internal" href="../data/hamiltonian.html"><span class="doc">Hamiltonian</span></a>: Molecular Hamiltonian</p></li>
-<li><p><span class="xref std std-doc">Wavefunction</span>: Wavefunction representation</p></li>
+<li><p><a class="reference internal" href="../../../api/api_autogen/qdk_chemistry.data.html#qdk_chemistry.data.Wavefunction" title="qdk_chemistry.data.Wavefunction"><code class="xref py py-class docutils literal notranslate"><span class="pre">Wavefunction</span></code></a>: Wavefunction representation</p></li>
 </ul>
 <p class="rubric">Algorithm classes</p>
 <p>Algorithm classes in QDK/Chemistry are designed to be:</p>
@@ -252,6 +252,143 @@ This design allows users to benefit from specialized capabilities of external so
 </div>
 </div>
 <input class="tab-input" id="tab-set--2-input--2" name="tab-set--2" type="radio"><label class="tab-label" for="tab-set--2-input--2">Python API</label><div class="tab-content docutils container">
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span>
+<span class="c1"># start-cell-1</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">numpy</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">np</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.algorithms</span><span class="w"> </span><span class="kn">import</span> <span class="n">create</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.data</span><span class="w"> </span><span class="kn">import</span> <span class="n">Structure</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.data.qubit_hamiltonian</span><span class="w"> </span><span class="kn">import</span> <span class="p">(</span>
+    <span class="n">filter_and_group_pauli_ops_from_wavefunction</span><span class="p">,</span>
+<span class="p">)</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.utils.wavefunction</span><span class="w"> </span><span class="kn">import</span> <span class="n">get_top_determinants</span>
+
+<span class="c1"># Define benzene diradical structure directly using numpy arrays</span>
+<span class="n">coords</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">(</span>
+    <span class="p">[</span>
+        <span class="p">[</span><span class="mf">0.000000</span><span class="p">,</span> <span class="mf">1.396000</span><span class="p">,</span> <span class="mf">0.000000</span><span class="p">],</span>
+        <span class="p">[</span><span class="mf">1.209077</span><span class="p">,</span> <span class="mf">0.698000</span><span class="p">,</span> <span class="mf">0.000000</span><span class="p">],</span>
+        <span class="p">[</span><span class="mf">1.209077</span><span class="p">,</span> <span class="o">-</span><span class="mf">0.698000</span><span class="p">,</span> <span class="mf">0.000000</span><span class="p">],</span>
+        <span class="p">[</span><span class="mf">0.000000</span><span class="p">,</span> <span class="o">-</span><span class="mf">1.396000</span><span class="p">,</span> <span class="mf">0.000000</span><span class="p">],</span>
+        <span class="p">[</span><span class="o">-</span><span class="mf">1.209077</span><span class="p">,</span> <span class="o">-</span><span class="mf">0.698000</span><span class="p">,</span> <span class="mf">0.000000</span><span class="p">],</span>
+        <span class="p">[</span><span class="o">-</span><span class="mf">1.209077</span><span class="p">,</span> <span class="mf">0.698000</span><span class="p">,</span> <span class="mf">0.000000</span><span class="p">],</span>
+        <span class="p">[</span><span class="mf">2.151000</span><span class="p">,</span> <span class="mf">1.242000</span><span class="p">,</span> <span class="mf">0.000000</span><span class="p">],</span>
+        <span class="p">[</span><span class="mf">2.151000</span><span class="p">,</span> <span class="o">-</span><span class="mf">1.242000</span><span class="p">,</span> <span class="mf">0.000000</span><span class="p">],</span>
+        <span class="p">[</span><span class="o">-</span><span class="mf">2.151000</span><span class="p">,</span> <span class="o">-</span><span class="mf">1.242000</span><span class="p">,</span> <span class="mf">0.000000</span><span class="p">],</span>
+        <span class="p">[</span><span class="o">-</span><span class="mf">2.151000</span><span class="p">,</span> <span class="mf">1.242000</span><span class="p">,</span> <span class="mf">0.000000</span><span class="p">],</span>
+    <span class="p">]</span>
+<span class="p">)</span>
+<span class="n">elements</span> <span class="o">=</span> <span class="p">[</span><span class="s2">&quot;C&quot;</span><span class="p">,</span> <span class="s2">&quot;C&quot;</span><span class="p">,</span> <span class="s2">&quot;C&quot;</span><span class="p">,</span> <span class="s2">&quot;C&quot;</span><span class="p">,</span> <span class="s2">&quot;C&quot;</span><span class="p">,</span> <span class="s2">&quot;C&quot;</span><span class="p">,</span> <span class="s2">&quot;H&quot;</span><span class="p">,</span> <span class="s2">&quot;H&quot;</span><span class="p">,</span> <span class="s2">&quot;H&quot;</span><span class="p">,</span> <span class="s2">&quot;H&quot;</span><span class="p">]</span>
+<span class="n">structure</span> <span class="o">=</span> <span class="n">Structure</span><span class="p">(</span><span class="n">coords</span><span class="p">,</span> <span class="n">elements</span><span class="p">)</span>
+
+<span class="c1"># Alternative: load from XYZ file</span>
+<span class="c1"># from pathlib import Path</span>
+<span class="c1"># structure = Structure.from_xyz_file(Path(&quot;benzene_diradical.structure.xyz&quot;))</span>
+
+<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Created structure with </span><span class="si">{</span><span class="n">structure</span><span class="o">.</span><span class="n">get_num_atoms</span><span class="p">()</span><span class="si">}</span><span class="s2"> atoms&quot;</span><span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Elements: </span><span class="si">{</span><span class="n">structure</span><span class="o">.</span><span class="n">get_elements</span><span class="p">()</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+<span class="c1"># end-cell-1</span>
+<span class="c1"># start-cell-2</span>
+<span class="c1"># Perform an SCF calculation, returning the energy and wavefunction</span>
+<span class="n">scf_solver</span> <span class="o">=</span> <span class="n">create</span><span class="p">(</span><span class="s2">&quot;scf_solver&quot;</span><span class="p">,</span> <span class="n">basis_set</span><span class="o">=</span><span class="s2">&quot;cc-pvdz&quot;</span><span class="p">)</span>
+<span class="n">E_hf</span><span class="p">,</span> <span class="n">wfn_hf</span> <span class="o">=</span> <span class="n">scf_solver</span><span class="o">.</span><span class="n">run</span><span class="p">(</span><span class="n">structure</span><span class="p">,</span> <span class="n">charge</span><span class="o">=</span><span class="mi">0</span><span class="p">,</span> <span class="n">spin_multiplicity</span><span class="o">=</span><span class="mi">1</span><span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;SCF energy is </span><span class="si">{</span><span class="n">E_hf</span><span class="si">:</span><span class="s2">.3f</span><span class="si">}</span><span class="s2"> Hartree&quot;</span><span class="p">)</span>
+
+<span class="c1"># Display a summary of the molecular orbitals obtained from the SCF calculation</span>
+<span class="nb">print</span><span class="p">(</span><span class="s2">&quot;SCF Orbitals:</span><span class="se">\n</span><span class="s2">&quot;</span><span class="p">,</span> <span class="n">wfn_hf</span><span class="o">.</span><span class="n">get_orbitals</span><span class="p">()</span><span class="o">.</span><span class="n">get_summary</span><span class="p">())</span>
+<span class="c1"># end-cell-2</span>
+<span class="c1"># start-cell-3</span>
+<span class="c1"># Select active space (6 electrons in 6 orbitals for the benzene diradical)</span>
+<span class="c1">#   to choose most chemically relevant orbitals</span>
+<span class="n">active_space_selector</span> <span class="o">=</span> <span class="n">create</span><span class="p">(</span>
+    <span class="s2">&quot;active_space_selector&quot;</span><span class="p">,</span>
+    <span class="n">algorithm_name</span><span class="o">=</span><span class="s2">&quot;qdk_valence&quot;</span><span class="p">,</span>
+    <span class="n">num_active_electrons</span><span class="o">=</span><span class="mi">6</span><span class="p">,</span>
+    <span class="n">num_active_orbitals</span><span class="o">=</span><span class="mi">6</span><span class="p">,</span>
+<span class="p">)</span>
+<span class="n">active_wfn</span> <span class="o">=</span> <span class="n">active_space_selector</span><span class="o">.</span><span class="n">run</span><span class="p">(</span><span class="n">wfn_hf</span><span class="p">)</span>
+<span class="n">active_orbitals</span> <span class="o">=</span> <span class="n">active_wfn</span><span class="o">.</span><span class="n">get_orbitals</span><span class="p">()</span>
+
+<span class="c1"># Print a summary of the active space orbitals</span>
+<span class="nb">print</span><span class="p">(</span><span class="s2">&quot;Active Space Orbitals:</span><span class="se">\n</span><span class="s2">&quot;</span><span class="p">,</span> <span class="n">active_orbitals</span><span class="o">.</span><span class="n">get_summary</span><span class="p">())</span>
+<span class="c1"># end-cell-3</span>
+<span class="c1"># start-cell-4</span>
+<span class="c1"># Construct Hamiltonian in the active space and print its summary</span>
+<span class="n">hamiltonian_constructor</span> <span class="o">=</span> <span class="n">create</span><span class="p">(</span><span class="s2">&quot;hamiltonian_constructor&quot;</span><span class="p">)</span>
+<span class="n">hamiltonian</span> <span class="o">=</span> <span class="n">hamiltonian_constructor</span><span class="o">.</span><span class="n">run</span><span class="p">(</span><span class="n">active_orbitals</span><span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="s2">&quot;Active Space Hamiltonian:</span><span class="se">\n</span><span class="s2">&quot;</span><span class="p">,</span> <span class="n">hamiltonian</span><span class="o">.</span><span class="n">get_summary</span><span class="p">())</span>
+<span class="c1"># end-cell-4</span>
+<span class="c1"># start-cell-5</span>
+<span class="c1"># Perform CASCI calculation to get the wavefunction and exact energy for the active space</span>
+<span class="n">mc</span> <span class="o">=</span> <span class="n">create</span><span class="p">(</span><span class="s2">&quot;multi_configuration_calculator&quot;</span><span class="p">)</span>
+<span class="n">E_cas</span><span class="p">,</span> <span class="n">wfn_cas</span> <span class="o">=</span> <span class="n">mc</span><span class="o">.</span><span class="n">run</span><span class="p">(</span>
+    <span class="n">hamiltonian</span><span class="p">,</span> <span class="n">n_active_alpha_electrons</span><span class="o">=</span><span class="mi">3</span><span class="p">,</span> <span class="n">n_active_beta_electrons</span><span class="o">=</span><span class="mi">3</span>
+<span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span>
+    <span class="sa">f</span><span class="s2">&quot;CASCI energy is </span><span class="si">{</span><span class="n">E_cas</span><span class="si">:</span><span class="s2">.3f</span><span class="si">}</span><span class="s2"> Hartree, and the electron correlation energy is </span><span class="si">{</span><span class="n">E_cas</span><span class="w"> </span><span class="o">-</span><span class="w"> </span><span class="n">E_hf</span><span class="si">:</span><span class="s2">.3f</span><span class="si">}</span><span class="s2"> Hartree&quot;</span>
+<span class="p">)</span>
+<span class="c1"># end-cell-5</span>
+<span class="c1"># start-cell-6</span>
+<span class="c1"># Get top 2 determinants from the CASCI wavefunction to form a sparse wavefunction</span>
+<span class="n">top_configurations</span> <span class="o">=</span> <span class="n">get_top_determinants</span><span class="p">(</span><span class="n">wfn_cas</span><span class="p">,</span> <span class="n">max_determinants</span><span class="o">=</span><span class="mi">2</span><span class="p">)</span>
+
+<span class="c1"># Compute the reference energy of the sparse wavefunction</span>
+<span class="n">pmc_calculator</span> <span class="o">=</span> <span class="n">create</span><span class="p">(</span><span class="s2">&quot;projected_multi_configuration_calculator&quot;</span><span class="p">)</span>
+<span class="n">E_sparse</span><span class="p">,</span> <span class="n">wfn_sparse</span> <span class="o">=</span> <span class="n">pmc_calculator</span><span class="o">.</span><span class="n">run</span><span class="p">(</span><span class="n">hamiltonian</span><span class="p">,</span> <span class="nb">list</span><span class="p">(</span><span class="n">top_configurations</span><span class="o">.</span><span class="n">keys</span><span class="p">()))</span>
+
+<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Reference energy for top 2 determinants is </span><span class="si">{</span><span class="n">E_sparse</span><span class="si">:</span><span class="s2">.6f</span><span class="si">}</span><span class="s2"> Hartree&quot;</span><span class="p">)</span>
+
+<span class="c1"># Generate state preparation circuit for the sparse state via sparse isometry (GF2 + X)</span>
+<span class="n">state_prep</span> <span class="o">=</span> <span class="n">create</span><span class="p">(</span><span class="s2">&quot;state_prep&quot;</span><span class="p">,</span> <span class="s2">&quot;sparse_isometry_gf2x&quot;</span><span class="p">)</span>
+<span class="n">sparse_isometry_circuit</span> <span class="o">=</span> <span class="n">state_prep</span><span class="o">.</span><span class="n">run</span><span class="p">(</span><span class="n">wfn_sparse</span><span class="p">)</span>
+<span class="c1"># end-cell-6</span>
+<span class="c1"># start-cell-7</span>
+<span class="c1"># Prepare qubit Hamiltonian</span>
+<span class="n">qubit_mapper</span> <span class="o">=</span> <span class="n">create</span><span class="p">(</span><span class="s2">&quot;qubit_mapper&quot;</span><span class="p">,</span> <span class="n">algorithm_name</span><span class="o">=</span><span class="s2">&quot;qiskit&quot;</span><span class="p">,</span> <span class="n">encoding</span><span class="o">=</span><span class="s2">&quot;jordan-wigner&quot;</span><span class="p">)</span>
+<span class="n">qubit_hamiltonian</span> <span class="o">=</span> <span class="n">qubit_mapper</span><span class="o">.</span><span class="n">run</span><span class="p">(</span><span class="n">hamiltonian</span><span class="p">)</span>
+
+<span class="c1"># Print the number of Pauli strings in the full Hamiltonian</span>
+<span class="nb">print</span><span class="p">(</span>
+    <span class="sa">f</span><span class="s2">&quot;Number of Pauli strings in the Hamiltonian: </span><span class="si">{</span><span class="nb">len</span><span class="p">(</span><span class="n">qubit_hamiltonian</span><span class="o">.</span><span class="n">pauli_strings</span><span class="p">)</span><span class="si">}</span><span class="s2">&quot;</span>
+<span class="p">)</span>
+
+<span class="c1"># Filter and group Pauli operators based on the wavefunction</span>
+<span class="n">filtered_hamiltonian_ops</span><span class="p">,</span> <span class="n">classical_coeffs</span> <span class="o">=</span> <span class="p">(</span>
+    <span class="n">filter_and_group_pauli_ops_from_wavefunction</span><span class="p">(</span><span class="n">qubit_hamiltonian</span><span class="p">,</span> <span class="n">wfn_sparse</span><span class="p">)</span>
+<span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span>
+    <span class="sa">f</span><span class="s2">&quot;Filtered and grouped qubit Hamiltonian contains </span><span class="si">{</span><span class="nb">len</span><span class="p">(</span><span class="n">filtered_hamiltonian_ops</span><span class="p">)</span><span class="si">}</span><span class="s2"> groups:&quot;</span>
+<span class="p">)</span>
+<span class="k">for</span> <span class="n">igroup</span><span class="p">,</span> <span class="n">group</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="n">filtered_hamiltonian_ops</span><span class="p">):</span>
+    <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Group </span><span class="si">{</span><span class="n">igroup</span><span class="w"> </span><span class="o">+</span><span class="w"> </span><span class="mi">1</span><span class="si">}</span><span class="s2">: </span><span class="si">{</span><span class="p">[</span><span class="n">group</span><span class="o">.</span><span class="n">pauli_strings</span><span class="p">]</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Number of classical coefficients: </span><span class="si">{</span><span class="nb">len</span><span class="p">(</span><span class="n">classical_coeffs</span><span class="p">)</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+<span class="c1"># end-cell-7</span>
+<span class="c1"># start-cell-8</span>
+<span class="c1"># Estimate energy using the optimized circuit and filtered Hamiltonian operators</span>
+<span class="n">estimator</span> <span class="o">=</span> <span class="n">create</span><span class="p">(</span><span class="s2">&quot;energy_estimator&quot;</span><span class="p">,</span> <span class="n">algorithm_name</span><span class="o">=</span><span class="s2">&quot;qdk_base_simulator&quot;</span><span class="p">)</span>
+<span class="n">energy_results</span><span class="p">,</span> <span class="n">simulation_data</span> <span class="o">=</span> <span class="n">estimator</span><span class="o">.</span><span class="n">run</span><span class="p">(</span>
+    <span class="n">circuit_qasm</span><span class="o">=</span><span class="n">sparse_isometry_circuit</span><span class="p">,</span>
+    <span class="n">qubit_hamiltonians</span><span class="o">=</span><span class="n">filtered_hamiltonian_ops</span><span class="p">,</span>
+    <span class="n">total_shots</span><span class="o">=</span><span class="mi">250000</span><span class="p">,</span>
+    <span class="n">classical_coeffs</span><span class="o">=</span><span class="n">classical_coeffs</span><span class="p">,</span>
+<span class="p">)</span>
+
+<span class="k">for</span> <span class="n">i</span><span class="p">,</span> <span class="n">results</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="n">simulation_data</span><span class="o">.</span><span class="n">bitstring_counts</span><span class="p">):</span>
+    <span class="nb">print</span><span class="p">(</span>
+        <span class="sa">f</span><span class="s2">&quot;Measurement Results for Hamiltonian Group </span><span class="si">{</span><span class="n">i</span><span class="w"> </span><span class="o">+</span><span class="w"> </span><span class="mi">1</span><span class="si">}</span><span class="s2">: </span><span class="si">{</span><span class="n">simulation_data</span><span class="o">.</span><span class="n">hamiltonians</span><span class="p">[</span><span class="n">i</span><span class="p">]</span><span class="o">.</span><span class="n">pauli_strings</span><span class="si">}</span><span class="s2">&quot;</span>
+    <span class="p">)</span>
+
+<span class="c1"># Print statistic for measured energy</span>
+<span class="n">energy_mean</span> <span class="o">=</span> <span class="n">energy_results</span><span class="o">.</span><span class="n">energy_expectation_value</span> <span class="o">+</span> <span class="n">hamiltonian</span><span class="o">.</span><span class="n">get_core_energy</span><span class="p">()</span>
+<span class="n">energy_stddev</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">sqrt</span><span class="p">(</span><span class="n">energy_results</span><span class="o">.</span><span class="n">energy_variance</span><span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span>
+    <span class="sa">f</span><span class="s2">&quot;Estimated energy from quantum circuit: </span><span class="si">{</span><span class="n">energy_mean</span><span class="si">:</span><span class="s2">.3f</span><span class="si">}</span><span class="s2"> ± </span><span class="si">{</span><span class="n">energy_stddev</span><span class="si">:</span><span class="s2">.3f</span><span class="si">}</span><span class="s2"> Hartree&quot;</span>
+<span class="p">)</span>
+
+<span class="c1"># Print comparison with reference energy</span>
+<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Difference from reference energy: </span><span class="si">{</span><span class="n">energy_mean</span><span class="w"> </span><span class="o">-</span><span class="w"> </span><span class="n">E_sparse</span><span class="si">}</span><span class="s2"> Hartree&quot;</span><span class="p">)</span>
+<span class="c1"># end-cell-8</span>
+</pre></div>
+</div>
 </div>
 </div>
 <p class="rubric">Interface architecture</p>

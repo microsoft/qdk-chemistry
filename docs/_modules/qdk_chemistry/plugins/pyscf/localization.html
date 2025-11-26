@@ -133,16 +133,16 @@
 <span class="sd">    configurable options used by :class:`PyscfLocalizer`.</span>
 
 <span class="sd">    Attributes:</span>
-<span class="sd">        method (str, default = &quot;pipek-mezey&quot;): The localization algorithm to use.</span>
-<span class="sd">        Supported values (case-insensitive) include &quot;pipek-mezey&quot;, &quot;foster-boys&quot;, &quot;edmiston-ruedenberg&quot;,</span>
-<span class="sd">        and &quot;cholesky&quot;.</span>
+<span class="sd">        method (str): The localization algorithm to use (default = &quot;pipek-mezey&quot;).</span>
+<span class="sd">            Supported values (case-insensitive) include &quot;pipek-mezey&quot;, &quot;foster-boys&quot;, &quot;edmiston-ruedenberg&quot;, and</span>
+<span class="sd">            &quot;cholesky&quot;.</span>
 
-<span class="sd">    population_method (str, default = &quot;mulliken&quot;): The population analysis used for the Pipek-Mezey localization.</span>
-<span class="sd">        Passed through to PySCF&#39;s PM implementation (for example, &quot;mulliken&quot;).</span>
+<span class="sd">        population_method (str): The population analysis used for the Pipek-Mezey localization (default = &quot;mulliken&quot;).</span>
+<span class="sd">            Passed through to PySCF&#39;s PM implementation (for example, &quot;mulliken&quot;).</span>
 
-<span class="sd">    occupation_threshold (float, default = 1e-10): Tolerance threshold used to classify orbitals as occupied,</span>
-<span class="sd">        singly-occupied (for ROHF/UHF), or virtual. Orbitals with occupations below this threshold are considered</span>
-<span class="sd">        unoccupied.</span>
+<span class="sd">        occupation_threshold (float): Tolerance threshold used to classify orbitals as occupied,</span>
+<span class="sd">            singly-occupied (for ROHF/UHF), or virtual (default = 1e-10). Orbitals with occupations below this</span>
+<span class="sd">            threshold are considered unoccupied.</span>
 
 <span class="sd">    Examples:</span>
 <span class="sd">        &gt;&gt;&gt; settings = PyscfLocalizerSettings()</span>
@@ -175,10 +175,11 @@
 <span class="sd">    restricted (closed-shell) and unrestricted (open-shell) orbital inputs.</span>
 
 <span class="sd">    Key behavior:</span>
-<span class="sd">    - Supported algorithms: Pipek-Mezey (PM), Foster-Boys (FB),</span>
-<span class="sd">      Edmiston-Ruedenberg (ER), and a Cholesky-based localizer.</span>
-<span class="sd">    - It is the user&#39;s responsibility to provide appropriate orbital indices</span>
-<span class="sd">      (e.g., only occupied orbitals or only virtual orbitals).</span>
+
+<span class="sd">        - Supported algorithms: Pipek-Mezey (PM), Foster-Boys (FB), Edmiston-Ruedenberg (ER), and a Cholesky-based</span>
+<span class="sd">          localizer.</span>
+<span class="sd">        - It is the user&#39;s responsibility to provide appropriate orbital indices (e.g., only occupied orbitals or only</span>
+<span class="sd">          virtual orbitals).</span>
 
 <span class="sd">    Examples:</span>
 <span class="sd">        &gt;&gt;&gt; localizer = PyscfLocalizer()</span>
@@ -237,12 +238,7 @@
         <span class="c1"># If both index vectors are empty, return original orbitals unchanged</span>
         <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">loc_indices_a</span><span class="p">)</span> <span class="o">==</span> <span class="mi">0</span> <span class="ow">and</span> <span class="nb">len</span><span class="p">(</span><span class="n">loc_indices_b</span><span class="p">)</span> <span class="o">==</span> <span class="mi">0</span><span class="p">:</span>
             <span class="k">return</span> <span class="n">wavefunction</span>
-        <span class="c1"># TODO (NAB): fix TODO above</span>
-        <span class="c1"># 41404</span>
 
-        <span class="c1"># TODO assumes aufbau filling</span>
-        <span class="c1"># TODO (NAB): fix TODO above</span>
-        <span class="c1"># 41404</span>
         <span class="n">pop_method</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_settings</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;population_method&quot;</span><span class="p">)</span>
         <span class="n">loc_method</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_settings</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;method&quot;</span><span class="p">)</span><span class="o">.</span><span class="n">lower</span><span class="p">()</span>
 

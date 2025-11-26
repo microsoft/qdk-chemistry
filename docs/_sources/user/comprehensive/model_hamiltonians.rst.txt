@@ -11,7 +11,7 @@ Instead, model Hamiltonians are defined directly in terms of their parameters.
 Creating model Hamiltonians
 ----------------------------
 
-To define a model Hamiltonian in QDK/Chemistry, users can utilize the ``ModelOrbitals`` class, which is a simplified version of the :doc:`Orbitals <../data/orbitals>` class that doesn't require basis set information or molecular orbital coefficients.
+To define a model Hamiltonian in QDK/Chemistry, users can utilize the ``ModelOrbitals`` class, which is a simplified version of the :doc:`Orbitals <data/orbitals>` class that doesn't require basis set information or molecular orbital coefficients.
 This is particularly useful for studying model systems like Hubbard models, Heisenberg models, or other phenomenological Hamiltonians.
 
 Example: Hubbard model Hamiltonian
@@ -30,11 +30,11 @@ The following example demonstrates how to create a simple Hubbard model Hamilton
 Using model Hamiltonians with algorithms
 -----------------------------------------
 
-Model Hamiltonians created with ``ModelOrbitals`` can be used with any QDK/Chemistry algorithm that accepts :doc:`Hamiltonian <../data/hamiltonian>` objects, including:
+Model Hamiltonians created with ``ModelOrbitals`` can be used with any QDK/Chemistry algorithm that accepts :doc:`Hamiltonian <data/hamiltonian>` objects, including:
 
-* :doc:`Multi-configuration calculators <../algorithms/mc_calculator>` (:term:`FCI`, :term:`ASCI`, etc.)
-* :doc:`Coupled cluster calculators <../algorithms/coupled_cluster>`
-* Quantum algorithm interfaces (VQE, QPE, etc.)
+* :doc:`Multi-configuration calculators <algorithms/mc_calculator>` (:term:`FCI`, :term:`ASCI`, etc.)
+* :class:`~qdk_chemistry.algorithms.CoupledClusterCalculator` (:term:`CCSD`, :term:`CCSD(T)`, etc.)
+* Quantum algorithm interfaces (:term:`VQE`, :term:`QPE`, etc.)
 
 Example with multi-configuration calculator:
 

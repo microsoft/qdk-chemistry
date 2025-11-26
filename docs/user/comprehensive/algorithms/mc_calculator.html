@@ -26,7 +26,7 @@
     <script src="../../../_static/js/theme.js"></script>
     <link rel="index" title="Index" href="../../../genindex.html" />
     <link rel="search" title="Search" href="../../../search.html" />
-    <link rel="next" title="Projected multi-configuration calculations" href="pmc.html" />
+    <link rel="next" title="Multi-configuration SCF" href="mcscf.html" />
     <link rel="prev" title="Orbital localization" href="localizer.html" /> 
 </head>
 
@@ -54,7 +54,7 @@
 <li class="toctree-l1"><a class="reference internal" href="../../quickstart.html">Quickstart</a></li>
 <li class="toctree-l1 current"><a class="reference internal" href="../index.html">In-depth user guide</a><ul class="current">
 <li class="toctree-l2"><a class="reference internal" href="../design/index.html">Design principles of QDK/Chemistry</a></li>
-<li class="toctree-l2"><a class="reference internal" href="../data/index.html">Data Management</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../data/index.html">Data management</a></li>
 <li class="toctree-l2 current"><a class="reference internal" href="index.html">Available algorithms</a><ul class="current">
 <li class="toctree-l3"><a class="reference internal" href="active_space.html">Active space selection</a></li>
 <li class="toctree-l3"><a class="reference internal" href="energy_estimator.html">Energy estimation</a></li>
@@ -73,15 +73,16 @@
 <li class="toctree-l4"><a class="reference internal" href="#related-classes">Related classes</a></li>
 </ul>
 </li>
+<li class="toctree-l3"><a class="reference internal" href="mcscf.html">Multi-configuration <span class="xref std std-term">SCF</span></a></li>
 <li class="toctree-l3"><a class="reference internal" href="pmc.html">Projected multi-configuration calculations</a></li>
 <li class="toctree-l3"><a class="reference internal" href="qubit_mapper.html">Qubit mapping</a></li>
 <li class="toctree-l3"><a class="reference internal" href="reference_derived.html">Reference-derived calculations</a></li>
-<li class="toctree-l3"><a class="reference internal" href="scf_solver.html">Self-consistent field solving</a></li>
+<li class="toctree-l3"><a class="reference internal" href="scf_solver.html">Self-consistent field solver</a></li>
 <li class="toctree-l3"><a class="reference internal" href="stability_checker.html">Self-consistent field stability checks</a></li>
 <li class="toctree-l3"><a class="reference internal" href="state_preparation.html">State preparation</a></li>
 </ul>
 </li>
-<li class="toctree-l2"><a class="reference internal" href="../keywords.html">Functionals and basis sets</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../basis_functionals.html">Functionals and basis sets</a></li>
 <li class="toctree-l2"><a class="reference internal" href="../model_hamiltonians.html">Model Hamiltonians</a></li>
 <li class="toctree-l2"><a class="reference internal" href="../plugins.html">Plugins</a></li>
 </ul>
@@ -146,7 +147,7 @@ Space (<strong>CAS</strong>) when performed within a selected active space of or
 </section>
 <section id="creating-an-multiconfigurationcalculator">
 <h2>Creating an MultiConfigurationCalculator<a class="headerlink" href="#creating-an-multiconfigurationcalculator" title="Link to this heading"></a></h2>
-<p>The <code class="docutils literal notranslate"><span class="pre">MultiConfigurationCalculator</span></code> is created using the <span class="xref std std-doc">factory pattern</span>.</p>
+<p>The <code class="docutils literal notranslate"><span class="pre">MultiConfigurationCalculator</span></code> is created using the <a class="reference internal" href="../design/factory_pattern.html"><span class="doc">factory pattern</span></a>.</p>
 <div class="tab-set docutils container">
 <input checked="True" class="tab-input" id="tab-set--0-input--1" name="tab-set--0" type="radio"><label class="tab-label" for="tab-set--0-input--1">C++ API</label><div class="tab-content docutils container">
 <div class="highlight-cpp notranslate"><div class="highlight"><pre><span></span><span class="cp">#include</span><span class="w"> </span><span class="cpf">&lt;qdk/chemistry.hpp&gt;</span>
@@ -219,7 +220,7 @@ For a complete list of available settings with descriptions, see the <a class="r
 </section>
 <section id="running-a-ci-calculation">
 <h2>Running a <a class="reference internal" href="../../../glossary.html#term-CI"><span class="xref std std-term">CI</span></a> calculation<a class="headerlink" href="#running-a-ci-calculation" title="Link to this heading"></a></h2>
-<p>Once configured, the <a class="reference internal" href="../../../glossary.html#term-CI"><span class="xref std std-term">CI</span></a> calculation can be executed using a <a class="reference internal" href="../data/hamiltonian.html"><span class="doc">Hamiltonian</span></a> object as input, which returns energy values and a <span class="xref std std-doc">Wavefunction</span> object as output:</p>
+<p>Once configured, the <a class="reference internal" href="../../../glossary.html#term-CI"><span class="xref std std-term">CI</span></a> calculation can be executed using a <a class="reference internal" href="../data/hamiltonian.html"><span class="doc">Hamiltonian</span></a> object as input, which returns energy values and a <a class="reference internal" href="../../../api/api_autogen/qdk_chemistry.data.html#qdk_chemistry.data.Wavefunction" title="qdk_chemistry.data.Wavefunction"><code class="xref py py-class docutils literal notranslate"><span class="pre">qdk_chemistry.data.Wavefunction</span></code></a> object as output:</p>
 <div class="tab-set docutils container">
 <input checked="True" class="tab-input" id="tab-set--2-input--1" name="tab-set--2" type="radio"><label class="tab-label" for="tab-set--2-input--1">C++ API</label><div class="tab-content docutils container">
 <div class="highlight-cpp notranslate"><div class="highlight"><pre><span></span><span class="c1">// Obtain a valid Hamiltonian</span>
@@ -335,7 +336,7 @@ These settings are divided into base settings (common to all <a class="reference
 </ul>
 <p>The factory pattern allows seamless selection between these implementations, with the most appropriate option chosen
 based on the calculation requirements and available packages.</p>
-<p>For more details on how QDK/Chemistry interfaces with external packages, see the <span class="xref std std-doc">Interfaces</span> documentation.</p>
+<p>For more details on how QDK/Chemistry interfaces with external packages, see the <a class="reference internal" href="../design/interfaces.html"><span class="doc">Interfaces</span></a> documentation.</p>
 </section>
 <section id="macis-implementation">
 <h2><a class="reference internal" href="../../../glossary.html#term-MACIS"><span class="xref std std-term">MACIS</span></a> implementation<a class="headerlink" href="#macis-implementation" title="Link to this heading"></a></h2>
@@ -346,7 +347,7 @@ The <a class="reference internal" href="../../../glossary.html#term-MACIS"><span
 <h2>Related classes<a class="headerlink" href="#related-classes" title="Link to this heading"></a></h2>
 <ul class="simple">
 <li><p><a class="reference internal" href="../data/hamiltonian.html"><span class="doc">Hamiltonian</span></a>: Input Hamiltonian for CI calculation</p></li>
-<li><p><span class="xref std std-doc">Wavefunction</span>: Output CI wavefunction</p></li>
+<li><p><a class="reference internal" href="../../../api/api_autogen/qdk_chemistry.data.html#qdk_chemistry.data.Wavefunction" title="qdk_chemistry.data.Wavefunction"><code class="xref py py-class docutils literal notranslate"><span class="pre">qdk_chemistry.data.Wavefunction</span></code></a>: Output CI wavefunction</p></li>
 <li><p><a class="reference internal" href="hamiltonian_constructor.html"><span class="doc">HamiltonianConstructor</span></a>: Produces the Hamiltonian for CI</p></li>
 <li><p><a class="reference internal" href="active_space.html"><span class="doc">ActiveSpaceSelector</span></a>: Helps identify important orbitals for the active space</p></li>
 </ul>
@@ -358,7 +359,7 @@ The <a class="reference internal" href="../../../glossary.html#term-MACIS"><span
           </div>
           <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
         <a href="localizer.html" class="btn btn-neutral float-left" title="Orbital localization" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
-        <a href="pmc.html" class="btn btn-neutral float-right" title="Projected multi-configuration calculations" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+        <a href="mcscf.html" class="btn btn-neutral float-right" title="Multi-configuration SCF" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
     </div>
 
   <hr/>

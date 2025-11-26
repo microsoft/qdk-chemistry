@@ -59,9 +59,9 @@
 <li class="toctree-l1 current"><a class="reference internal" href="../python_api.html">Python API</a><ul class="current">
 <li class="toctree-l2 current"><a class="reference internal" href="../python_api.html#data-classes">Data Classes</a><ul class="current">
 <li class="toctree-l3 current"><a class="reference internal" href="qdk_chemistry.data.html">qdk_chemistry.data package</a><ul class="current">
+<li class="toctree-l4"><a class="reference internal" href="qdk_chemistry.data.html#qdk_chemistry.data.AOType"><code class="docutils literal notranslate"><span class="pre">AOType</span></code></a></li>
 <li class="toctree-l4"><a class="reference internal" href="qdk_chemistry.data.html#qdk_chemistry.data.Ansatz"><code class="docutils literal notranslate"><span class="pre">Ansatz</span></code></a></li>
 <li class="toctree-l4"><a class="reference internal" href="qdk_chemistry.data.html#qdk_chemistry.data.BasisSet"><code class="docutils literal notranslate"><span class="pre">BasisSet</span></code></a></li>
-<li class="toctree-l4"><a class="reference internal" href="qdk_chemistry.data.html#qdk_chemistry.data.BasisType"><code class="docutils literal notranslate"><span class="pre">BasisType</span></code></a></li>
 <li class="toctree-l4"><a class="reference internal" href="qdk_chemistry.data.html#qdk_chemistry.data.CasWavefunctionContainer"><code class="docutils literal notranslate"><span class="pre">CasWavefunctionContainer</span></code></a></li>
 <li class="toctree-l4"><a class="reference internal" href="qdk_chemistry.data.html#qdk_chemistry.data.Configuration"><code class="docutils literal notranslate"><span class="pre">Configuration</span></code></a></li>
 <li class="toctree-l4"><a class="reference internal" href="qdk_chemistry.data.html#qdk_chemistry.data.CoupledClusterAmplitudes"><code class="docutils literal notranslate"><span class="pre">CoupledClusterAmplitudes</span></code></a></li>
@@ -153,11 +153,9 @@ and quantum circuit construction or measurement workflows.</p>
 
 <dl class="py class">
 <dt class="sig sig-object py" id="qdk_chemistry.data.qubit_hamiltonian.Wavefunction">
-<em class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">Wavefunction</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">self</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference internal" href="qdk_chemistry.utils.wavefunction.html#qdk_chemistry.utils.wavefunction.Wavefunction" title="qdk_chemistry._core.data.Wavefunction"><span class="pre">qdk_chemistry._core.data.Wavefunction</span></a></span></em>, <em class="sig-param"><span class="n"><span class="pre">container</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference internal" href="qdk_chemistry.data.html#qdk_chemistry.data.WavefunctionContainer" title="qdk_chemistry._core.data.WavefunctionContainer"><span class="pre">qdk_chemistry._core.data.WavefunctionContainer</span></a></span></em><span class="sig-paren">)</span><a class="headerlink" href="#qdk_chemistry.data.qubit_hamiltonian.Wavefunction" title="Link to this definition"></a></dt>
+<em class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">Wavefunction</span></span><a class="headerlink" href="#qdk_chemistry.data.qubit_hamiltonian.Wavefunction" title="Link to this definition"></a></dt>
 <dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">DataClass</span></code></p>
-<blockquote>
-<div><p>Represents a wavefunction with associated properties.</p>
-</div></blockquote>
+<p>Represents a wavefunction with associated properties.</p>
 <p>This class encapsulates wavefunction data including:</p>
 <ul class="simple">
 <li><p>Configuration interaction coefficients</p></li>
@@ -165,17 +163,6 @@ and quantum circuit construction or measurement workflows.</p>
 <li><p>Methods for computing properties</p></li>
 </ul>
 <p>Supports both restricted and unrestricted wavefunctions with real or complex coefficients.</p>
-<p>Constructs a wavefunction with a container implementation.</p>
-<dl class="field-list simple">
-<dt class="field-odd">Parameters<span class="colon">:</span></dt>
-<dd class="field-odd"><p><strong>container</strong> (<a class="reference internal" href="qdk_chemistry.data.html#qdk_chemistry.data.WavefunctionContainer" title="qdk_chemistry.data.WavefunctionContainer"><em>WavefunctionContainer</em></a>) – The container holding the wavefunction implementation</p>
-</dd>
-</dl>
-<p class="rubric">Examples</p>
-<div class="doctest highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="n">container</span> <span class="o">=</span> <span class="n">qdk_chemistry</span><span class="o">.</span><span class="n">SciWavefunctionContainer</span><span class="p">(</span><span class="n">coeffs</span><span class="p">,</span> <span class="n">dets</span><span class="p">,</span> <span class="n">orbitals</span><span class="p">)</span>
-<span class="gp">&gt;&gt;&gt; </span><span class="n">wf</span> <span class="o">=</span> <span class="n">qdk_chemistry</span><span class="o">.</span><span class="n">Wavefunction</span><span class="p">(</span><span class="n">container</span><span class="p">)</span>
-</pre></div>
-</div>
 <dl class="py method">
 <dt class="sig sig-object py" id="qdk_chemistry.data.qubit_hamiltonian.Wavefunction.__init__">
 <span class="sig-name descname"><span class="pre">__init__</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">self</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference internal" href="qdk_chemistry.utils.wavefunction.html#qdk_chemistry.utils.wavefunction.Wavefunction" title="qdk_chemistry._core.data.Wavefunction"><span class="pre">qdk_chemistry._core.data.Wavefunction</span></a></span></em>, <em class="sig-param"><span class="n"><span class="pre">container</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference internal" href="qdk_chemistry.data.html#qdk_chemistry.data.WavefunctionContainer" title="qdk_chemistry._core.data.WavefunctionContainer"><span class="pre">qdk_chemistry._core.data.WavefunctionContainer</span></a></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><a class="reference external" href="https://docs.python.org/3/library/constants.html#None" title="(in Python v3.14)"><span class="pre">None</span></a></span></span><a class="headerlink" href="#qdk_chemistry.data.qubit_hamiltonian.Wavefunction.__init__" title="Link to this definition"></a></dt>
@@ -296,8 +283,7 @@ and quantum circuit construction or measurement workflows.</p>
 </dd>
 </dl>
 <p class="rubric">Notes</p>
-<p>Removes inactive and virtual orbital information, keeping only the active
-space orbitals.</p>
+<p>Removes inactive and virtual orbital information, keeping only the active space orbitals.</p>
 <p class="rubric">Examples</p>
 <div class="doctest highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="n">total_det</span> <span class="o">=</span> <span class="n">qdk_chemistry</span><span class="o">.</span><span class="n">Configuration</span><span class="p">(</span><span class="s2">&quot;2222uudd0000&quot;</span><span class="p">)</span>  <span class="c1"># 4 inactive, 4 active, 4 virtual</span>
 <span class="gp">&gt;&gt;&gt; </span><span class="n">active_det</span> <span class="o">=</span> <span class="n">wf</span><span class="o">.</span><span class="n">get_active_determinant</span><span class="p">(</span><span class="n">total_det</span><span class="p">)</span>
@@ -315,13 +301,12 @@ space orbitals.</p>
 <dd class="field-odd"><p>Vector of all configurations/determinants representing only the active space</p>
 </dd>
 <dt class="field-even">Return type<span class="colon">:</span></dt>
-<dd class="field-even"><p><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#list" title="(in Python v3.14)">list</a> of <a class="reference internal" href="qdk_chemistry.data.html#qdk_chemistry.data.Configuration" title="qdk_chemistry.data.Configuration">Configuration</a></p>
+<dd class="field-even"><p><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#list" title="(in Python v3.14)">list</a>[<a class="reference internal" href="qdk_chemistry.data.html#qdk_chemistry.data.Configuration" title="qdk_chemistry.data.Configuration">Configuration</a>]</p>
 </dd>
 </dl>
 <p class="rubric">Notes</p>
-<p>The determinants only include the active space orbitals. To get determinants
-with full orbital space (including inactive and virtual orbitals), use
-<code class="docutils literal notranslate"><span class="pre">get_total_determinants()</span></code>.</p>
+<p>The determinants only include the active space orbitals.
+To get determinants with full orbital space (including inactive and virtual orbitals), use <code class="docutils literal notranslate"><span class="pre">get_total_determinants()</span></code>.</p>
 <p class="rubric">Examples</p>
 <div class="doctest highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="n">dets</span> <span class="o">=</span> <span class="n">wf</span><span class="o">.</span><span class="n">get_active_determinants</span><span class="p">()</span>
 </pre></div>
@@ -460,7 +445,7 @@ with full orbital space (including inactive and virtual orbitals), use
 <dd class="field-even"><p>The coefficient for the determinant if found, zero otherwise</p>
 </dd>
 <dt class="field-odd">Return type<span class="colon">:</span></dt>
-<dd class="field-odd"><p><a class="reference external" href="https://docs.python.org/3/library/functions.html#complex" title="(in Python v3.14)">complex</a> or <a class="reference external" href="https://docs.python.org/3/library/functions.html#float" title="(in Python v3.14)">float</a></p>
+<dd class="field-odd"><p><a class="reference external" href="https://docs.python.org/3/library/functions.html#complex" title="(in Python v3.14)">complex</a> | <a class="reference external" href="https://docs.python.org/3/library/functions.html#float" title="(in Python v3.14)">float</a></p>
 </dd>
 </dl>
 <p class="rubric">Examples</p>
@@ -472,9 +457,7 @@ with full orbital space (including inactive and virtual orbitals), use
 <dl class="py method">
 <dt class="sig sig-object py" id="qdk_chemistry.data.qubit_hamiltonian.Wavefunction.get_coefficients">
 <span class="sig-name descname"><span class="pre">get_coefficients</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">self</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference internal" href="qdk_chemistry.utils.wavefunction.html#qdk_chemistry.utils.wavefunction.Wavefunction" title="qdk_chemistry._core.data.Wavefunction"><span class="pre">qdk_chemistry._core.data.Wavefunction</span></a></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><a class="reference external" href="https://docs.python.org/3/library/functions.html#object" title="(in Python v3.14)"><span class="pre">object</span></a></span></span><a class="headerlink" href="#qdk_chemistry.data.qubit_hamiltonian.Wavefunction.get_coefficients" title="Link to this definition"></a></dt>
-<dd><p>Get coefficients for all determinants as a vector, in which the
-sequence of coefficients is consistent with the vector from
-<code class="docutils literal notranslate"><span class="pre">get_active_determinants()</span></code></p>
+<dd><p>Get coefficients for all determinants as a vector, in which the sequence of coefficients is consistent with the vector from <code class="docutils literal notranslate"><span class="pre">get_active_determinants()</span></code></p>
 <dl class="field-list simple">
 <dt class="field-odd">Returns<span class="colon">:</span></dt>
 <dd class="field-odd"><p>Vector of all coefficients (real or complex)</p>
@@ -585,8 +568,7 @@ sequence of coefficients is consistent with the vector from
 </dd>
 </dl>
 <p class="rubric">Notes</p>
-<p>Expands active-space-only determinant to full orbital space by prepending
-doubly occupied inactive orbitals and appending unoccupied virtual orbitals.</p>
+<p>Expands active-space-only determinant to full orbital space by prepending doubly occupied inactive orbitals and appending unoccupied virtual orbitals.</p>
 <p class="rubric">Examples</p>
 <div class="doctest highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="n">active_det</span> <span class="o">=</span> <span class="n">qdk_chemistry</span><span class="o">.</span><span class="n">Configuration</span><span class="p">(</span><span class="s2">&quot;uudd&quot;</span><span class="p">)</span>  <span class="c1"># 4 active orbitals</span>
 <span class="gp">&gt;&gt;&gt; </span><span class="n">total_det</span> <span class="o">=</span> <span class="n">wf</span><span class="o">.</span><span class="n">get_total_determinant</span><span class="p">(</span><span class="n">active_det</span><span class="p">)</span>
@@ -598,18 +580,19 @@ doubly occupied inactive orbitals and appending unoccupied virtual orbitals.</p>
 <dl class="py method">
 <dt class="sig sig-object py" id="qdk_chemistry.data.qubit_hamiltonian.Wavefunction.get_total_determinants">
 <span class="sig-name descname"><span class="pre">get_total_determinants</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">self</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference internal" href="qdk_chemistry.utils.wavefunction.html#qdk_chemistry.utils.wavefunction.Wavefunction" title="qdk_chemistry._core.data.Wavefunction"><span class="pre">qdk_chemistry._core.data.Wavefunction</span></a></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#list" title="(in Python v3.14)"><span class="pre">list</span></a><span class="p"><span class="pre">[</span></span><a class="reference internal" href="qdk_chemistry.utils.wavefunction.html#qdk_chemistry.utils.wavefunction.Configuration" title="qdk_chemistry._core.data.Configuration"><span class="pre">qdk_chemistry._core.data.Configuration</span></a><span class="p"><span class="pre">]</span></span></span></span><a class="headerlink" href="#qdk_chemistry.data.qubit_hamiltonian.Wavefunction.get_total_determinants" title="Link to this definition"></a></dt>
-<dd><p>Get all determinants in the wavefunction with full orbital space.</p>
+<dd><blockquote>
+<div><p>Get all determinants in the wavefunction with full orbital space.</p>
+</div></blockquote>
 <dl class="field-list simple">
 <dt class="field-odd">Returns<span class="colon">:</span></dt>
 <dd class="field-odd"><p>Vector of all configurations/determinants including inactive and virtual orbitals</p>
 </dd>
 <dt class="field-even">Return type<span class="colon">:</span></dt>
-<dd class="field-even"><p><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#list" title="(in Python v3.14)">list</a> of <a class="reference internal" href="qdk_chemistry.data.html#qdk_chemistry.data.Configuration" title="qdk_chemistry.data.Configuration">Configuration</a></p>
+<dd class="field-even"><p><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#list" title="(in Python v3.14)">list</a>[<a class="reference internal" href="qdk_chemistry.data.html#qdk_chemistry.data.Configuration" title="qdk_chemistry.data.Configuration">Configuration</a>]</p>
 </dd>
 </dl>
 <p class="rubric">Notes</p>
-<p>Converts active-space-only determinants to full orbital space by prepending
-doubly occupied inactive orbitals and appending unoccupied virtual orbitals.</p>
+<p>Converts active-space-only determinants to full orbital space by prepending doubly occupied inactive orbitals and appending unoccupied virtual orbitals.</p>
 <p class="rubric">Examples</p>
 <div class="doctest highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="n">total_dets</span> <span class="o">=</span> <span class="n">wf</span><span class="o">.</span><span class="n">get_total_determinants</span><span class="p">()</span>
 <span class="gp">&gt;&gt;&gt; </span><span class="c1"># Each determinant now includes inactive (doubly occupied) and virtual (unoccupied) orbitals</span>
@@ -656,7 +639,9 @@ doubly occupied inactive orbitals and appending unoccupied virtual orbitals.</p>
 <dl class="py method">
 <dt class="sig sig-object py" id="qdk_chemistry.data.qubit_hamiltonian.Wavefunction.get_type">
 <span class="sig-name descname"><span class="pre">get_type</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">self</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference internal" href="qdk_chemistry.utils.wavefunction.html#qdk_chemistry.utils.wavefunction.Wavefunction" title="qdk_chemistry._core.data.Wavefunction"><span class="pre">qdk_chemistry._core.data.Wavefunction</span></a></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><a class="reference internal" href="qdk_chemistry.data.html#qdk_chemistry.data.WavefunctionType" title="qdk_chemistry._core.data.WavefunctionType"><span class="pre">qdk_chemistry._core.data.WavefunctionType</span></a></span></span><a class="headerlink" href="#qdk_chemistry.data.qubit_hamiltonian.Wavefunction.get_type" title="Link to this definition"></a></dt>
-<dd><p>Get the wavefunction type (Bra, Ket, or Both).</p>
+<dd><blockquote>
+<div><p>Get the wavefunction type (Bra, Ket, or Both).</p>
+</div></blockquote>
 <dl class="field-list simple">
 <dt class="field-odd">Returns<span class="colon">:</span></dt>
 <dd class="field-odd"><p>Enum value representing the wavefunction type</p>
@@ -693,7 +678,9 @@ doubly occupied inactive orbitals and appending unoccupied virtual orbitals.</p>
 <dl class="py method">
 <dt class="sig sig-object py" id="qdk_chemistry.data.qubit_hamiltonian.Wavefunction.has_one_rdm_spin_traced">
 <span class="sig-name descname"><span class="pre">has_one_rdm_spin_traced</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">self</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference internal" href="qdk_chemistry.utils.wavefunction.html#qdk_chemistry.utils.wavefunction.Wavefunction" title="qdk_chemistry._core.data.Wavefunction"><span class="pre">qdk_chemistry._core.data.Wavefunction</span></a></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><a class="reference external" href="https://docs.python.org/3/library/functions.html#bool" title="(in Python v3.14)"><span class="pre">bool</span></a></span></span><a class="headerlink" href="#qdk_chemistry.data.qubit_hamiltonian.Wavefunction.has_one_rdm_spin_traced" title="Link to this definition"></a></dt>
-<dd><p>Check if spin-traced one-particle RDM for active orbitals is available.</p>
+<dd><blockquote>
+<div><p>Check if spin-traced one-particle RDM for active orbitals is available.</p>
+</div></blockquote>
 <dl class="field-list simple">
 <dt class="field-odd">Returns<span class="colon">:</span></dt>
 <dd class="field-odd"><p>True if available</p>
@@ -815,7 +802,7 @@ doubly occupied inactive orbitals and appending unoccupied virtual orbitals.</p>
 <dd class="field-even"><p>Overlap value (real or complex)</p>
 </dd>
 <dt class="field-odd">Return type<span class="colon">:</span></dt>
-<dd class="field-odd"><p><a class="reference external" href="https://docs.python.org/3/library/functions.html#complex" title="(in Python v3.14)">complex</a> or <a class="reference external" href="https://docs.python.org/3/library/functions.html#float" title="(in Python v3.14)">float</a></p>
+<dd class="field-odd"><p><a class="reference external" href="https://docs.python.org/3/library/functions.html#complex" title="(in Python v3.14)">complex</a> | <a class="reference external" href="https://docs.python.org/3/library/functions.html#float" title="(in Python v3.14)">float</a></p>
 </dd>
 </dl>
 <p class="rubric">Examples</p>
@@ -920,17 +907,20 @@ doubly occupied inactive orbitals and appending unoccupied virtual orbitals.</p>
 <em class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">DataClass</span></span><a class="headerlink" href="#qdk_chemistry.data.qubit_hamiltonian.DataClass" title="Link to this definition"></a></dt>
 <dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">DataClass</span></code></p>
 <p>Base class for immutable data classes with common serialization methods.</p>
-<p>This abstract base class provides:
-- Immutability after construction (__setattr__ and __delattr__ protection)
-- Common implementations of to_json_file, to_hdf5_file, and to_file
-- Filename validation to enforce naming convention (.&lt;data_type&gt;.&lt;extension&gt;)
-- Requires derived classes to implement abstract methods</p>
-<p>Derived classes MUST implement:
-1. get_summary() -&gt; str</p>
-<blockquote>
-<div><p>Return a human-readable summary string of the object</p>
-</div></blockquote>
-<ol class="arabic simple" start="2">
+<p>This abstract base class provides:</p>
+<ul class="simple">
+<li><p>Immutability after construction (__setattr__ and __delattr__ protection)</p></li>
+<li><p>Common implementations of to_json_file, to_hdf5_file, and to_file</p></li>
+<li><p>Filename validation to enforce naming convention (.&lt;data_type&gt;.&lt;extension&gt;)</p></li>
+<li><p>Requires derived classes to implement abstract methods</p></li>
+</ul>
+<p>Derived classes MUST implement:</p>
+<ol class="arabic simple">
+<li><dl class="simple">
+<dt>get_summary() -&gt; str</dt><dd><p>Return a human-readable summary string of the object</p>
+</dd>
+</dl>
+</li>
 <li><dl class="simple">
 <dt>to_json() -&gt; dict</dt><dd><p>Return a dictionary representation suitable for JSON serialization</p>
 </dd>
@@ -948,19 +938,17 @@ doubly occupied inactive orbitals and appending unoccupied virtual orbitals.</p>
 </dl>
 </li>
 </ol>
-<p>Derived classes should:
-- Set all attributes before calling super().__init__()
-- Call super().__init__() at the end of __init__ to enable immutability
-- Set the _data_type_name class attribute (e.g., “structure”, “wavefunction”)</p>
-<div class="admonition note">
-<p class="admonition-title">Note</p>
-<p>These methods are pure virtual in the C++ base class and MUST be
-overridden. The C++ binding will enforce this at runtime.</p>
+<p>Derived classes should:</p>
+<ul class="simple">
+<li><p>Set all attributes before calling super().__init__()</p></li>
+<li><p>Call super().__init__() at the end of __init__ to enable immutability</p></li>
+<li><p>Set the _data_type_name class attribute (e.g., “structure”, “wavefunction”)</p></li>
+</ul>
+<p class="rubric">Notes</p>
+<p>These methods are pure virtual in the C++ base class and MUST be overridden.
+The C++ binding will enforce this at runtime.</p>
 <p>Filename validation enforces the convention that filenames must include
 the data type, e.g., “example.structure.json” or “data.wavefunction.h5”</p>
-</div>
-<p>Initialize the base class and mark instance as initialized.</p>
-<p>This must be called by derived classes after setting all attributes.</p>
 <dl class="field-list simple">
 </dl>
 <dl class="py method">
@@ -1291,6 +1279,14 @@ Must match pattern: &lt;name&gt;.&lt;data_type&gt;.json</p>
 <em class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">QubitHamiltonian</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">pauli_strings</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">coefficients</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../../_modules/qdk_chemistry/data/qubit_hamiltonian.html#QubitHamiltonian"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#qdk_chemistry.data.qubit_hamiltonian.QubitHamiltonian" title="Link to this definition"></a></dt>
 <dd><p>Bases: <a class="reference internal" href="qdk_chemistry.data.base.html#qdk_chemistry.data.base.DataClass" title="qdk_chemistry.data.base.DataClass"><code class="xref py py-class docutils literal notranslate"><span class="pre">DataClass</span></code></a></p>
 <p>Data class for representing chemical electronic Hamiltonians in qubits.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>pauli_strings</strong> (<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#list" title="(in Python v3.14)"><em>list</em></a><em>[</em><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)"><em>str</em></a><em>]</em>)</p></li>
+<li><p><strong>coefficients</strong> (<a class="reference external" href="https://numpy.org/doc/stable/reference/generated/numpy.ndarray.html#numpy.ndarray" title="(in NumPy v2.3)"><em>ndarray</em></a>)</p></li>
+</ul>
+</dd>
+</dl>
 <dl class="py attribute">
 <dt class="sig sig-object py" id="qdk_chemistry.data.qubit_hamiltonian.QubitHamiltonian.pauli_strings">
 <span class="sig-name descname"><span class="pre">pauli_strings</span></span><a class="headerlink" href="#qdk_chemistry.data.qubit_hamiltonian.QubitHamiltonian.pauli_strings" title="Link to this definition"></a></dt>
@@ -1303,19 +1299,6 @@ Must match pattern: &lt;name&gt;.&lt;data_type&gt;.json</p>
 <dd><p>Array of coefficients corresponding to each Pauli string.</p>
 </dd></dl>
 
-<p>Initialize a QubitHamiltonian.</p>
-<dl class="field-list simple">
-<dt class="field-odd">Parameters<span class="colon">:</span></dt>
-<dd class="field-odd"><ul class="simple">
-<li><p><strong>pauli_strings</strong> (<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#list" title="(in Python v3.14)"><em>list</em></a><em>[</em><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)"><em>str</em></a><em>]</em>) – List of Pauli strings.</p></li>
-<li><p><strong>coefficients</strong> (<a class="reference external" href="https://numpy.org/doc/stable/reference/generated/numpy.ndarray.html#numpy.ndarray" title="(in NumPy v2.3)"><em>ndarray</em></a>) – Array of coefficients corresponding to each Pauli string.</p></li>
-</ul>
-</dd>
-<dt class="field-even">Raises<span class="colon">:</span></dt>
-<dd class="field-even"><p><a class="reference external" href="https://docs.python.org/3/library/exceptions.html#ValueError" title="(in Python v3.14)"><strong>ValueError</strong></a> – If the number of Pauli strings and coefficients don’t match,
-    or if the Pauli strings or coefficients are invalid.</p>
-</dd>
-</dl>
 <dl class="py method">
 <dt class="sig sig-object py" id="qdk_chemistry.data.qubit_hamiltonian.QubitHamiltonian.__init__">
 <span class="sig-name descname"><span class="pre">__init__</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">pauli_strings</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">coefficients</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../../_modules/qdk_chemistry/data/qubit_hamiltonian.html#QubitHamiltonian.__init__"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#qdk_chemistry.data.qubit_hamiltonian.QubitHamiltonian.__init__" title="Link to this definition"></a></dt>

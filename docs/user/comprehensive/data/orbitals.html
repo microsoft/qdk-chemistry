@@ -54,7 +54,7 @@
 <li class="toctree-l1"><a class="reference internal" href="../../quickstart.html">Quickstart</a></li>
 <li class="toctree-l1 current"><a class="reference internal" href="../index.html">In-depth user guide</a><ul class="current">
 <li class="toctree-l2"><a class="reference internal" href="../design/index.html">Design principles of QDK/Chemistry</a></li>
-<li class="toctree-l2 current"><a class="reference internal" href="index.html">Data Management</a><ul class="current">
+<li class="toctree-l2 current"><a class="reference internal" href="index.html">Data management</a><ul class="current">
 <li class="toctree-l3"><a class="reference internal" href="serialization.html">Serialization</a></li>
 <li class="toctree-l3"><a class="reference internal" href="basis_set.html">Basis set</a></li>
 <li class="toctree-l3"><a class="reference internal" href="hamiltonian.html">Hamiltonian</a></li>
@@ -74,7 +74,7 @@
 </ul>
 </li>
 <li class="toctree-l2"><a class="reference internal" href="../algorithms/index.html">Available algorithms</a></li>
-<li class="toctree-l2"><a class="reference internal" href="../keywords.html">Functionals and basis sets</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../basis_functionals.html">Functionals and basis sets</a></li>
 <li class="toctree-l2"><a class="reference internal" href="../model_hamiltonians.html">Model Hamiltonians</a></li>
 <li class="toctree-l2"><a class="reference internal" href="../plugins.html">Plugins</a></li>
 </ul>
@@ -106,7 +106,7 @@
   <ul class="wy-breadcrumbs">
       <li><a href="../../../index.html" class="icon icon-home" aria-label="Home"></a></li>
           <li class="breadcrumb-item"><a href="../index.html">In-depth user guide</a></li>
-          <li class="breadcrumb-item"><a href="index.html">Data Management</a></li>
+          <li class="breadcrumb-item"><a href="index.html">Data management</a></li>
       <li class="breadcrumb-item active">Orbitals</li>
       <li class="wy-breadcrumbs-aside">
             <a href="../../../_sources/user/comprehensive/data/orbitals.rst.txt" rel="nofollow"> View page source</a>
@@ -119,16 +119,16 @@
              
   <section id="orbitals">
 <h1>Orbitals<a class="headerlink" href="#orbitals" title="Link to this heading"></a></h1>
-<p>The <code class="docutils literal notranslate"><span class="pre">Orbitals</span></code> class in QDK/Chemistry represents a set of molecular orbitals.
+<p>The <a class="reference internal" href="../../../api/api_autogen/qdk_chemistry.data.html#qdk_chemistry.data.Orbitals" title="qdk_chemistry.data.Orbitals"><code class="xref py py-class docutils literal notranslate"><span class="pre">Orbitals</span></code></a> class in QDK/Chemistry represents a set of molecular orbitals.
 This class stores orbital coefficients, energies, and other properties necessary for quantum chemical calculations.</p>
 <section id="overview">
 <h2>Overview<a class="headerlink" href="#overview" title="Link to this heading"></a></h2>
 <p>Molecular orbitals are a fundamental concept in quantum chemistry.
 They are formed through linear combinations of atomic orbitals and provide a framework for understanding chemical bonding and electronic structure.
-In QDK/Chemistry, the <code class="docutils literal notranslate"><span class="pre">Orbitals</span></code> class encapsulates all relevant information about these orbitals, including their coefficients, energies, and occupation numbers.</p>
+In QDK/Chemistry, the <a class="reference internal" href="../../../api/api_autogen/qdk_chemistry.data.html#qdk_chemistry.data.Orbitals" title="qdk_chemistry.data.Orbitals"><code class="xref py py-class docutils literal notranslate"><span class="pre">Orbitals</span></code></a> class encapsulates all relevant information about these orbitals, including their coefficients, energies, and occupation numbers.</p>
 <section id="restricted-vs-unrestricted-calculations">
 <h3>Restricted vs. unrestricted calculations<a class="headerlink" href="#restricted-vs-unrestricted-calculations" title="Link to this heading"></a></h3>
-<p>The <code class="docutils literal notranslate"><span class="pre">Orbitals</span></code> class supports both restricted and unrestricted calculations:</p>
+<p>The <a class="reference internal" href="../../../api/api_autogen/qdk_chemistry.data.html#qdk_chemistry.data.Orbitals" title="qdk_chemistry.data.Orbitals"><code class="xref py py-class docutils literal notranslate"><span class="pre">Orbitals</span></code></a> class supports both restricted and unrestricted calculations:</p>
 <ul class="simple">
 <li><p><strong>Restricted</strong>: Alpha and beta electrons share the same spatial orbitals (<a class="reference internal" href="../../../glossary.html#term-RHF"><span class="xref std std-term">RHF</span></a>, <a class="reference internal" href="../../../glossary.html#term-RKS"><span class="xref std std-term">RKS</span></a>)</p></li>
 <li><p><strong>Unrestricted</strong>: Alpha and beta electrons have separate spatial orbitals (<a class="reference internal" href="../../../glossary.html#term-UHF"><span class="xref std std-term">UHF</span></a>, <a class="reference internal" href="../../../glossary.html#term-UKS"><span class="xref std std-term">UKS</span></a>)</p></li>
@@ -154,12 +154,12 @@ The basis set defines the atomic orbitals used to construct molecular orbitals a
 </section>
 <section id="usage">
 <h2>Usage<a class="headerlink" href="#usage" title="Link to this heading"></a></h2>
-<p>The <code class="docutils literal notranslate"><span class="pre">Orbitals</span></code> class is typically created as the output of an <a class="reference internal" href="../algorithms/scf_solver.html"><span class="doc">SCF calculation</span></a> or <a class="reference internal" href="../algorithms/localizer.html"><span class="doc">orbital transformation</span></a>.
+<p>The <a class="reference internal" href="../../../api/api_autogen/qdk_chemistry.data.html#qdk_chemistry.data.Orbitals" title="qdk_chemistry.data.Orbitals"><code class="xref py py-class docutils literal notranslate"><span class="pre">Orbitals</span></code></a> class is typically created as the output of an <a class="reference internal" href="../algorithms/scf_solver.html"><span class="doc">SCF calculation</span></a> or <a class="reference internal" href="../algorithms/localizer.html"><span class="doc">orbital transformation</span></a>.
 It serves as input to various post-<a class="reference internal" href="../../../glossary.html#term-HF"><span class="xref std std-term">HF</span></a> methods such as <a class="reference internal" href="../algorithms/active_space.html"><span class="doc">active space selection</span></a> and <a class="reference internal" href="../algorithms/hamiltonian_constructor.html"><span class="doc">Hamiltonian construction</span></a>.</p>
 </section>
 <section id="creating-an-orbitals-object">
 <h2>Creating an Orbitals object<a class="headerlink" href="#creating-an-orbitals-object" title="Link to this heading"></a></h2>
-<p>The <code class="docutils literal notranslate"><span class="pre">Orbitals</span></code> object is typically created by algorithms rather than manually.
+<p>The <a class="reference internal" href="../../../api/api_autogen/qdk_chemistry.data.html#qdk_chemistry.data.Orbitals" title="qdk_chemistry.data.Orbitals"><code class="xref py py-class docutils literal notranslate"><span class="pre">Orbitals</span></code></a> object is typically created by algorithms rather than manually.
 However, for advanced use cases, you can create and populate orbitals directly:</p>
 <div class="admonition note">
 <p class="admonition-title">Note</p>
@@ -206,8 +206,8 @@ The single-argument versions (restricted setters) set the same values for both a
 </section>
 <section id="accessing-orbital-data">
 <h2>Accessing Orbital Data<a class="headerlink" href="#accessing-orbital-data" title="Link to this heading"></a></h2>
-<p>The <code class="docutils literal notranslate"><span class="pre">Orbitals</span></code> class provides methods to access orbital coefficients, energies, and other properties.
-Following the <span class="xref std std-doc">immutable design principle</span> used throughout QDK/Chemistry, all getter methods return const references or copies of the data.
+<p>The <a class="reference internal" href="../../../api/api_autogen/qdk_chemistry.data.html#qdk_chemistry.data.Orbitals" title="qdk_chemistry.data.Orbitals"><code class="xref py py-class docutils literal notranslate"><span class="pre">Orbitals</span></code></a> class provides methods to access orbital coefficients, energies, and other properties.
+Following the <a class="reference internal" href="../design/index.html"><span class="doc">immutable design principle</span></a> used throughout QDK/Chemistry, all getter methods return const references or copies of the data.
 For spin-dependent properties, methods return pairs of (alpha, beta) data.</p>
 <div class="tab-set docutils container">
 <input checked="True" class="tab-input" id="tab-set--1-input--1" name="tab-set--1" type="radio"><label class="tab-label" for="tab-set--1-input--1">C++ API</label><div class="tab-content docutils container">
@@ -266,8 +266,8 @@ For spin-dependent properties, methods return pairs of (alpha, beta) data.</p>
 </section>
 <section id="serialization">
 <h2>Serialization<a class="headerlink" href="#serialization" title="Link to this heading"></a></h2>
-<p>The <code class="docutils literal notranslate"><span class="pre">Orbitals</span></code> class supports serialization to and from JSON and HDF5 formats.
-For detailed information about serialization in QDK/Chemistry, see the <span class="xref std std-doc">Serialization</span> documentation.</p>
+<p>The <a class="reference internal" href="../../../api/api_autogen/qdk_chemistry.data.html#qdk_chemistry.data.Orbitals" title="qdk_chemistry.data.Orbitals"><code class="xref py py-class docutils literal notranslate"><span class="pre">Orbitals</span></code></a> class supports serialization to and from JSON and HDF5 formats.
+For detailed information about serialization in QDK/Chemistry, see the <a class="reference internal" href="serialization.html"><span class="doc">Serialization</span></a> documentation.</p>
 <div class="admonition note">
 <p class="admonition-title">Note</p>
 <p>All orbitals-related files require the <code class="docutils literal notranslate"><span class="pre">.orbitals</span></code> suffix before the file type extension, for example <code class="docutils literal notranslate"><span class="pre">molecule.orbitals.json</span></code> and <code class="docutils literal notranslate"><span class="pre">h2.orbitals.h5</span></code> for JSON and HDF5 files respectively.
@@ -280,10 +280,10 @@ This naming convention is enforced to maintain consistency across the QDK/Chemis
 <h4>JSON format<a class="headerlink" href="#json-format" title="Link to this heading"></a></h4>
 <div class="admonition note">
 <p class="admonition-title">Note</p>
-<p>The <code class="docutils literal notranslate"><span class="pre">basis_set</span></code> field in the JSON representation contains a complete serialization of the <code class="docutils literal notranslate"><span class="pre">BasisSet</span></code> object.
+<p>The <code class="docutils literal notranslate"><span class="pre">basis_set</span></code> field in the JSON representation contains a complete serialization of the <a class="reference internal" href="../../../api/api_autogen/qdk_chemistry.data.html#qdk_chemistry.data.BasisSet" title="qdk_chemistry.data.BasisSet"><code class="xref py py-class docutils literal notranslate"><span class="pre">BasisSet</span></code></a> object.
 For details on how basis sets are serialized, see the <span class="xref std std-ref">JSON Format section in the Basis Set documentation</span>.</p>
 </div>
-<p>JSON representation of an <code class="docutils literal notranslate"><span class="pre">Orbitals</span></code> object has the following structure (showing simplified content):</p>
+<p>JSON representation of an <a class="reference internal" href="../../../api/api_autogen/qdk_chemistry.data.html#qdk_chemistry.data.Orbitals" title="qdk_chemistry.data.Orbitals"><code class="xref py py-class docutils literal notranslate"><span class="pre">Orbitals</span></code></a> object has the following structure (showing simplified content):</p>
 <div class="highlight-json notranslate"><div class="highlight"><pre><span></span><span class="p">{</span>
 <span class="w">  </span><span class="nt">&quot;ao_overlap&quot;</span><span class="p">:[[</span><span class="mf">1.0</span><span class="p">,</span><span class="mf">0.11921652588876666</span><span class="p">],[</span><span class="mf">0.11921652588876666</span><span class="p">,</span><span class="mf">1.0</span><span class="p">]],</span>
 <span class="w">  </span><span class="nt">&quot;basis_set&quot;</span><span class="p">:{</span><span class="s2">&quot;...&quot;</span><span class="p">},</span>
@@ -312,10 +312,10 @@ For details on how basis sets are serialized, see the <span class="xref std std-
 <h4>HDF5 format<a class="headerlink" href="#hdf5-format" title="Link to this heading"></a></h4>
 <div class="admonition note">
 <p class="admonition-title">Note</p>
-<p>The <code class="docutils literal notranslate"><span class="pre">basis_set/</span></code> group in the HDF5 representation contains a complete serialization of the <code class="docutils literal notranslate"><span class="pre">BasisSet</span></code> object.
+<p>The <code class="docutils literal notranslate"><span class="pre">basis_set/</span></code> group in the HDF5 representation contains a complete serialization of the <a class="reference internal" href="../../../api/api_autogen/qdk_chemistry.data.html#qdk_chemistry.data.BasisSet" title="qdk_chemistry.data.BasisSet"><code class="xref py py-class docutils literal notranslate"><span class="pre">BasisSet</span></code></a> object.
 For details on the HDF5 structure of basis sets, see the <span class="xref std std-ref">HDF5 Format section in the Basis Set documentation</span>.</p>
 </div>
-<p>HDF5 representation of an <code class="docutils literal notranslate"><span class="pre">Orbitals</span></code> object has the following structure (showing groups and datasets):</p>
+<p>HDF5 representation of an <a class="reference internal" href="../../../api/api_autogen/qdk_chemistry.data.html#qdk_chemistry.data.Orbitals" title="qdk_chemistry.data.Orbitals"><code class="xref py py-class docutils literal notranslate"><span class="pre">Orbitals</span></code></a> object has the following structure (showing groups and datasets):</p>
 <div class="highlight-text notranslate"><div class="highlight"><pre><span></span>/
 ├── ao_overlap          # Dataset: 2D array of AO overlap matrix
 ├── basis_set/          # 🔧 **TODO**: Group: Contains basis set information
@@ -382,7 +382,7 @@ For details on the HDF5 structure of basis sets, see the <span class="xref std s
 </section>
 <section id="orbital-transformations-and-applications">
 <h2>Orbital transformations and applications<a class="headerlink" href="#orbital-transformations-and-applications" title="Link to this heading"></a></h2>
-<p>The <code class="docutils literal notranslate"><span class="pre">Orbitals</span></code> class serves as a foundation for several important quantum chemical applications and transformations:</p>
+<p>The <a class="reference internal" href="../../../api/api_autogen/qdk_chemistry.data.html#qdk_chemistry.data.Orbitals" title="qdk_chemistry.data.Orbitals"><code class="xref py py-class docutils literal notranslate"><span class="pre">Orbitals</span></code></a> class serves as a foundation for several important quantum chemical applications and transformations:</p>
 <ul class="simple">
 <li><p><strong>Orbital Localization</strong>: Transform delocalized <a class="reference internal" href="../../../glossary.html#term-SCF"><span class="xref std std-term">SCF</span></a> orbitals into localized representations for better chemical interpretation and more efficient correlation methods.
 See <a class="reference internal" href="../algorithms/localizer.html"><span class="doc">Localizer</span></a> for details.</p></li>
@@ -407,8 +407,8 @@ See <a class="reference internal" href="../algorithms/hamiltonian_constructor.ht
 <section id="related-topics">
 <h2>Related topics<a class="headerlink" href="#related-topics" title="Link to this heading"></a></h2>
 <ul class="simple">
-<li><p><span class="xref std std-doc">Serialization</span>: Data serialization and deserialization</p></li>
-<li><p><span class="xref std std-doc">Settings</span>: Configuration settings for algorithms</p></li>
+<li><p><a class="reference internal" href="serialization.html"><span class="doc">Serialization</span></a>: Data serialization and deserialization</p></li>
+<li><p><a class="reference internal" href="../design/settings.html"><span class="doc">Settings</span></a>: Configuration settings for algorithms</p></li>
 </ul>
 </section>
 </section>

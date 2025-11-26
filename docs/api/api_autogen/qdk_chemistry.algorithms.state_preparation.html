@@ -27,7 +27,7 @@
     <link rel="index" title="Index" href="../../genindex.html" />
     <link rel="search" title="Search" href="../../search.html" />
     <link rel="next" title="qdk_chemistry.algorithms.state_preparation.sparse_isometry module" href="qdk_chemistry.algorithms.state_preparation.sparse_isometry.html" />
-    <link rel="prev" title="qdk_chemistry.algorithms.energy_estimator.qsharp module" href="qdk_chemistry.algorithms.energy_estimator.qsharp.html" /> 
+    <link rel="prev" title="qdk_chemistry.algorithms.qubit_mapper.qubit_mapper module" href="qdk_chemistry.algorithms.qubit_mapper.qubit_mapper.html" /> 
 </head>
 
 <body class="wy-body-for-nav"> 
@@ -168,7 +168,6 @@ tracks both CNOT and X operations for proper circuit reconstruction.</p>
 <li><p>Sparse isometry: Malvetti, Iten and Colbeck, <a class="reference external" href="https://arxiv.org/abs/2006.00016">arXiv:2006.00016</a></p></li>
 </ul>
 </div></blockquote>
-<p>Initialize the SparseIsometryGF2XStatePreparation.</p>
 <dl class="py method">
 <dt class="sig sig-object py" id="qdk_chemistry.algorithms.state_preparation.SparseIsometryGF2XStatePreparation.__init__">
 <span class="sig-name descname"><span class="pre">__init__</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#qdk_chemistry.algorithms.state_preparation.SparseIsometryGF2XStatePreparation.__init__" title="Link to this definition"></a></dt>
@@ -193,7 +192,6 @@ tracks both CNOT and X operations for proper circuit reconstruction.</p>
 <em class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">StatePreparation</span></span><a class="headerlink" href="#qdk_chemistry.algorithms.state_preparation.StatePreparation" title="Link to this definition"></a></dt>
 <dd><p>Bases: <a class="reference internal" href="qdk_chemistry.algorithms.base.html#qdk_chemistry.algorithms.base.Algorithm" title="qdk_chemistry.algorithms.base.Algorithm"><code class="xref py py-class docutils literal notranslate"><span class="pre">Algorithm</span></code></a></p>
 <p>Abstract base class for state preparation algorithms.</p>
-<p>Initialize the StatePreparation with default settings.</p>
 <dl class="py method">
 <dt class="sig sig-object py" id="qdk_chemistry.algorithms.state_preparation.StatePreparation.__init__">
 <span class="sig-name descname"><span class="pre">__init__</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#qdk_chemistry.algorithms.state_preparation.StatePreparation.__init__" title="Link to this definition"></a></dt>
@@ -235,7 +233,6 @@ tracks both CNOT and X operations for proper circuit reconstruction.</p>
 <em class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">StatePreparationFactory</span></span><a class="headerlink" href="#qdk_chemistry.algorithms.state_preparation.StatePreparationFactory" title="Link to this definition"></a></dt>
 <dd><p>Bases: <a class="reference internal" href="qdk_chemistry.algorithms.base.html#qdk_chemistry.algorithms.base.AlgorithmFactory" title="qdk_chemistry.algorithms.base.AlgorithmFactory"><code class="xref py py-class docutils literal notranslate"><span class="pre">AlgorithmFactory</span></code></a></p>
 <p>Factory class for creating StatePreparation instances.</p>
-<p>Initialize the StatePreparationFactory.</p>
 <dl class="py method">
 <dt class="sig sig-object py" id="qdk_chemistry.algorithms.state_preparation.StatePreparationFactory.__init__">
 <span class="sig-name descname"><span class="pre">__init__</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#qdk_chemistry.algorithms.state_preparation.StatePreparationFactory.__init__" title="Link to this definition"></a></dt>
@@ -262,6 +259,19 @@ tracks both CNOT and X operations for proper circuit reconstruction.</p>
 <dd class="field-odd"><p><span class="sphinx_autodoc_typehints-type"><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)"><code class="xref py py-class docutils literal notranslate"><span class="pre">str</span></code></a></span></p>
 </dd>
 </dl>
+</dd></dl>
+
+</dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="qdk_chemistry.algorithms.state_preparation.StatePreparationSettings">
+<em class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">StatePreparationSettings</span></span><a class="headerlink" href="#qdk_chemistry.algorithms.state_preparation.StatePreparationSettings" title="Link to this definition"></a></dt>
+<dd><p>Bases: <a class="reference internal" href="qdk_chemistry.plugins.qiskit.qubit_mapper.html#qdk_chemistry.plugins.qiskit.qubit_mapper.Settings" title="qdk_chemistry._core.data.Settings"><code class="xref py py-class docutils literal notranslate"><span class="pre">Settings</span></code></a></p>
+<p>Settings for state preparation algorithms.</p>
+<dl class="py method">
+<dt class="sig sig-object py" id="qdk_chemistry.algorithms.state_preparation.StatePreparationSettings.__init__">
+<span class="sig-name descname"><span class="pre">__init__</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#qdk_chemistry.algorithms.state_preparation.StatePreparationSettings.__init__" title="Link to this definition"></a></dt>
+<dd><p>Initialize the StatePreparationSettings.</p>
 </dd></dl>
 
 </dd></dl>
@@ -319,22 +329,6 @@ tracks both CNOT and X operations for proper circuit reconstruction.</p>
 <li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.algorithms.state_preparation.sparse_isometry.html#qdk_chemistry.algorithms.state_preparation.sparse_isometry.Wavefunction.to_hdf5_file"><code class="docutils literal notranslate"><span class="pre">Wavefunction.to_hdf5_file()</span></code></a></li>
 <li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.algorithms.state_preparation.sparse_isometry.html#qdk_chemistry.algorithms.state_preparation.sparse_isometry.Wavefunction.to_json"><code class="docutils literal notranslate"><span class="pre">Wavefunction.to_json()</span></code></a></li>
 <li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.algorithms.state_preparation.sparse_isometry.html#qdk_chemistry.algorithms.state_preparation.sparse_isometry.Wavefunction.to_json_file"><code class="docutils literal notranslate"><span class="pre">Wavefunction.to_json_file()</span></code></a></li>
-</ul>
-</li>
-<li class="toctree-l2"><a class="reference internal" href="qdk_chemistry.algorithms.state_preparation.sparse_isometry.html#qdk_chemistry.algorithms.state_preparation.sparse_isometry.MergeZBasisRotations"><code class="docutils literal notranslate"><span class="pre">MergeZBasisRotations</span></code></a><ul>
-<li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.algorithms.state_preparation.sparse_isometry.html#qdk_chemistry.algorithms.state_preparation.sparse_isometry.MergeZBasisRotations.__init__"><code class="docutils literal notranslate"><span class="pre">MergeZBasisRotations.__init__()</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.algorithms.state_preparation.sparse_isometry.html#qdk_chemistry.algorithms.state_preparation.sparse_isometry.MergeZBasisRotations.run"><code class="docutils literal notranslate"><span class="pre">MergeZBasisRotations.run()</span></code></a></li>
-</ul>
-</li>
-<li class="toctree-l2"><a class="reference internal" href="qdk_chemistry.algorithms.state_preparation.sparse_isometry.html#qdk_chemistry.algorithms.state_preparation.sparse_isometry.RemoveZBasisOnZeroState"><code class="docutils literal notranslate"><span class="pre">RemoveZBasisOnZeroState</span></code></a><ul>
-<li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.algorithms.state_preparation.sparse_isometry.html#qdk_chemistry.algorithms.state_preparation.sparse_isometry.RemoveZBasisOnZeroState.__init__"><code class="docutils literal notranslate"><span class="pre">RemoveZBasisOnZeroState.__init__()</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.algorithms.state_preparation.sparse_isometry.html#qdk_chemistry.algorithms.state_preparation.sparse_isometry.RemoveZBasisOnZeroState.run"><code class="docutils literal notranslate"><span class="pre">RemoveZBasisOnZeroState.run()</span></code></a></li>
-</ul>
-</li>
-<li class="toctree-l2"><a class="reference internal" href="qdk_chemistry.algorithms.state_preparation.sparse_isometry.html#qdk_chemistry.algorithms.state_preparation.sparse_isometry.SubstituteCliffordRz"><code class="docutils literal notranslate"><span class="pre">SubstituteCliffordRz</span></code></a><ul>
-<li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.algorithms.state_preparation.sparse_isometry.html#qdk_chemistry.algorithms.state_preparation.sparse_isometry.SubstituteCliffordRz.__init__"><code class="docutils literal notranslate"><span class="pre">SubstituteCliffordRz.__init__()</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.algorithms.state_preparation.sparse_isometry.html#qdk_chemistry.algorithms.state_preparation.sparse_isometry.SubstituteCliffordRz.run"><code class="docutils literal notranslate"><span class="pre">SubstituteCliffordRz.run()</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.algorithms.state_preparation.sparse_isometry.html#qdk_chemistry.algorithms.state_preparation.sparse_isometry.SubstituteCliffordRz.settings"><code class="docutils literal notranslate"><span class="pre">SubstituteCliffordRz.settings()</span></code></a></li>
 </ul>
 </li>
 <li class="toctree-l2"><a class="reference internal" href="qdk_chemistry.algorithms.state_preparation.sparse_isometry.html#qdk_chemistry.algorithms.state_preparation.sparse_isometry.bitstrings_to_binary_matrix"><code class="docutils literal notranslate"><span class="pre">bitstrings_to_binary_matrix()</span></code></a></li>
@@ -482,7 +476,7 @@ tracks both CNOT and X operations for proper circuit reconstruction.</p>
            </div>
           </div>
           <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
-        <a href="qdk_chemistry.algorithms.energy_estimator.qsharp.html" class="btn btn-neutral float-left" title="qdk_chemistry.algorithms.energy_estimator.qsharp module" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+        <a href="qdk_chemistry.algorithms.qubit_mapper.qubit_mapper.html" class="btn btn-neutral float-left" title="qdk_chemistry.algorithms.qubit_mapper.qubit_mapper module" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
         <a href="qdk_chemistry.algorithms.state_preparation.sparse_isometry.html" class="btn btn-neutral float-right" title="qdk_chemistry.algorithms.state_preparation.sparse_isometry module" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
     </div>
 

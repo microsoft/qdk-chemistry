@@ -59,9 +59,9 @@
 <li class="toctree-l1 current"><a class="reference internal" href="../python_api.html">Python API</a><ul class="current">
 <li class="toctree-l2 current"><a class="reference internal" href="../python_api.html#data-classes">Data Classes</a><ul class="current">
 <li class="toctree-l3 current"><a class="reference internal" href="qdk_chemistry.data.html">qdk_chemistry.data package</a><ul class="current">
+<li class="toctree-l4"><a class="reference internal" href="qdk_chemistry.data.html#qdk_chemistry.data.AOType"><code class="docutils literal notranslate"><span class="pre">AOType</span></code></a></li>
 <li class="toctree-l4"><a class="reference internal" href="qdk_chemistry.data.html#qdk_chemistry.data.Ansatz"><code class="docutils literal notranslate"><span class="pre">Ansatz</span></code></a></li>
 <li class="toctree-l4"><a class="reference internal" href="qdk_chemistry.data.html#qdk_chemistry.data.BasisSet"><code class="docutils literal notranslate"><span class="pre">BasisSet</span></code></a></li>
-<li class="toctree-l4"><a class="reference internal" href="qdk_chemistry.data.html#qdk_chemistry.data.BasisType"><code class="docutils literal notranslate"><span class="pre">BasisType</span></code></a></li>
 <li class="toctree-l4"><a class="reference internal" href="qdk_chemistry.data.html#qdk_chemistry.data.CasWavefunctionContainer"><code class="docutils literal notranslate"><span class="pre">CasWavefunctionContainer</span></code></a></li>
 <li class="toctree-l4"><a class="reference internal" href="qdk_chemistry.data.html#qdk_chemistry.data.Configuration"><code class="docutils literal notranslate"><span class="pre">Configuration</span></code></a></li>
 <li class="toctree-l4"><a class="reference internal" href="qdk_chemistry.data.html#qdk_chemistry.data.CoupledClusterAmplitudes"><code class="docutils literal notranslate"><span class="pre">CoupledClusterAmplitudes</span></code></a></li>
@@ -143,17 +143,20 @@
 <em class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">DataClass</span></span><a class="headerlink" href="#qdk_chemistry.data.estimator_data.DataClass" title="Link to this definition"></a></dt>
 <dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">DataClass</span></code></p>
 <p>Base class for immutable data classes with common serialization methods.</p>
-<p>This abstract base class provides:
-- Immutability after construction (__setattr__ and __delattr__ protection)
-- Common implementations of to_json_file, to_hdf5_file, and to_file
-- Filename validation to enforce naming convention (.&lt;data_type&gt;.&lt;extension&gt;)
-- Requires derived classes to implement abstract methods</p>
-<p>Derived classes MUST implement:
-1. get_summary() -&gt; str</p>
-<blockquote>
-<div><p>Return a human-readable summary string of the object</p>
-</div></blockquote>
-<ol class="arabic simple" start="2">
+<p>This abstract base class provides:</p>
+<ul class="simple">
+<li><p>Immutability after construction (__setattr__ and __delattr__ protection)</p></li>
+<li><p>Common implementations of to_json_file, to_hdf5_file, and to_file</p></li>
+<li><p>Filename validation to enforce naming convention (.&lt;data_type&gt;.&lt;extension&gt;)</p></li>
+<li><p>Requires derived classes to implement abstract methods</p></li>
+</ul>
+<p>Derived classes MUST implement:</p>
+<ol class="arabic simple">
+<li><dl class="simple">
+<dt>get_summary() -&gt; str</dt><dd><p>Return a human-readable summary string of the object</p>
+</dd>
+</dl>
+</li>
 <li><dl class="simple">
 <dt>to_json() -&gt; dict</dt><dd><p>Return a dictionary representation suitable for JSON serialization</p>
 </dd>
@@ -171,19 +174,17 @@
 </dl>
 </li>
 </ol>
-<p>Derived classes should:
-- Set all attributes before calling super().__init__()
-- Call super().__init__() at the end of __init__ to enable immutability
-- Set the _data_type_name class attribute (e.g., “structure”, “wavefunction”)</p>
-<div class="admonition note">
-<p class="admonition-title">Note</p>
-<p>These methods are pure virtual in the C++ base class and MUST be
-overridden. The C++ binding will enforce this at runtime.</p>
+<p>Derived classes should:</p>
+<ul class="simple">
+<li><p>Set all attributes before calling super().__init__()</p></li>
+<li><p>Call super().__init__() at the end of __init__ to enable immutability</p></li>
+<li><p>Set the _data_type_name class attribute (e.g., “structure”, “wavefunction”)</p></li>
+</ul>
+<p class="rubric">Notes</p>
+<p>These methods are pure virtual in the C++ base class and MUST be overridden.
+The C++ binding will enforce this at runtime.</p>
 <p>Filename validation enforces the convention that filenames must include
 the data type, e.g., “example.structure.json” or “data.wavefunction.h5”</p>
-</div>
-<p>Initialize the base class and mark instance as initialized.</p>
-<p>This must be called by derived classes after setting all attributes.</p>
 <dl class="field-list simple">
 </dl>
 <dl class="py method">
@@ -493,6 +494,14 @@ Must match pattern: &lt;name&gt;.&lt;data_type&gt;.json</p>
 <em class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">QubitHamiltonian</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">pauli_strings</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">coefficients</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#qdk_chemistry.data.estimator_data.QubitHamiltonian" title="Link to this definition"></a></dt>
 <dd><p>Bases: <a class="reference internal" href="qdk_chemistry.data.base.html#qdk_chemistry.data.base.DataClass" title="qdk_chemistry.data.base.DataClass"><code class="xref py py-class docutils literal notranslate"><span class="pre">DataClass</span></code></a></p>
 <p>Data class for representing chemical electronic Hamiltonians in qubits.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>pauli_strings</strong> (<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#list" title="(in Python v3.14)"><em>list</em></a><em>[</em><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)"><em>str</em></a><em>]</em>)</p></li>
+<li><p><strong>coefficients</strong> (<a class="reference external" href="https://numpy.org/doc/stable/reference/generated/numpy.ndarray.html#numpy.ndarray" title="(in NumPy v2.3)"><em>ndarray</em></a>)</p></li>
+</ul>
+</dd>
+</dl>
 <dl class="py attribute">
 <dt class="sig sig-object py" id="qdk_chemistry.data.estimator_data.QubitHamiltonian.pauli_strings">
 <span class="sig-name descname"><span class="pre">pauli_strings</span></span><a class="headerlink" href="#qdk_chemistry.data.estimator_data.QubitHamiltonian.pauli_strings" title="Link to this definition"></a></dt>
@@ -505,19 +514,6 @@ Must match pattern: &lt;name&gt;.&lt;data_type&gt;.json</p>
 <dd><p>Array of coefficients corresponding to each Pauli string.</p>
 </dd></dl>
 
-<p>Initialize a QubitHamiltonian.</p>
-<dl class="field-list simple">
-<dt class="field-odd">Parameters<span class="colon">:</span></dt>
-<dd class="field-odd"><ul class="simple">
-<li><p><strong>pauli_strings</strong> (<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#list" title="(in Python v3.14)"><em>list</em></a><em>[</em><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)"><em>str</em></a><em>]</em>) – List of Pauli strings.</p></li>
-<li><p><strong>coefficients</strong> (<a class="reference external" href="https://numpy.org/doc/stable/reference/generated/numpy.ndarray.html#numpy.ndarray" title="(in NumPy v2.3)"><em>ndarray</em></a>) – Array of coefficients corresponding to each Pauli string.</p></li>
-</ul>
-</dd>
-<dt class="field-even">Raises<span class="colon">:</span></dt>
-<dd class="field-even"><p><a class="reference external" href="https://docs.python.org/3/library/exceptions.html#ValueError" title="(in Python v3.14)"><strong>ValueError</strong></a> – If the number of Pauli strings and coefficients don’t match,
-    or if the Pauli strings or coefficients are invalid.</p>
-</dd>
-</dl>
 <dl class="py method">
 <dt class="sig sig-object py" id="qdk_chemistry.data.estimator_data.QubitHamiltonian.__init__">
 <span class="sig-name descname"><span class="pre">__init__</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">pauli_strings</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">coefficients</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#qdk_chemistry.data.estimator_data.QubitHamiltonian.__init__" title="Link to this definition"></a></dt>
@@ -680,6 +676,16 @@ Python users should call to_hdf5_file() directly.</p>
 <em class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">EnergyExpectationResult</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">energy_expectation_value</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">energy_variance</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">expvals_each_term</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">variances_each_term</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../../_modules/qdk_chemistry/data/estimator_data.html#EnergyExpectationResult"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#qdk_chemistry.data.estimator_data.EnergyExpectationResult" title="Link to this definition"></a></dt>
 <dd><p>Bases: <a class="reference internal" href="qdk_chemistry.data.base.html#qdk_chemistry.data.base.DataClass" title="qdk_chemistry.data.base.DataClass"><code class="xref py py-class docutils literal notranslate"><span class="pre">DataClass</span></code></a></p>
 <p>Expectation value and variance for a Hamiltonian energy estimate.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>energy_expectation_value</strong> (<a class="reference external" href="https://docs.python.org/3/library/functions.html#float" title="(in Python v3.14)"><em>float</em></a>)</p></li>
+<li><p><strong>energy_variance</strong> (<a class="reference external" href="https://docs.python.org/3/library/functions.html#float" title="(in Python v3.14)"><em>float</em></a>)</p></li>
+<li><p><strong>expvals_each_term</strong> (<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#list" title="(in Python v3.14)"><em>list</em></a><em>[</em><a class="reference external" href="https://numpy.org/doc/stable/reference/generated/numpy.ndarray.html#numpy.ndarray" title="(in NumPy v2.3)"><em>ndarray</em></a><em>]</em>)</p></li>
+<li><p><strong>variances_each_term</strong> (<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#list" title="(in Python v3.14)"><em>list</em></a><em>[</em><a class="reference external" href="https://numpy.org/doc/stable/reference/generated/numpy.ndarray.html#numpy.ndarray" title="(in NumPy v2.3)"><em>ndarray</em></a><em>]</em>)</p></li>
+</ul>
+</dd>
+</dl>
 <dl class="py attribute">
 <dt class="sig sig-object py" id="qdk_chemistry.data.estimator_data.EnergyExpectationResult.energy_expectation_value">
 <span class="sig-name descname"><span class="pre">energy_expectation_value</span></span><a class="headerlink" href="#qdk_chemistry.data.estimator_data.EnergyExpectationResult.energy_expectation_value" title="Link to this definition"></a></dt>
@@ -704,17 +710,6 @@ Python users should call to_hdf5_file() directly.</p>
 <dd><p>Variances for each term in the Hamiltonian.</p>
 </dd></dl>
 
-<p>Initialize an energy expectation result.</p>
-<dl class="field-list simple">
-<dt class="field-odd">Parameters<span class="colon">:</span></dt>
-<dd class="field-odd"><ul class="simple">
-<li><p><strong>energy_expectation_value</strong> (<a class="reference external" href="https://docs.python.org/3/library/functions.html#float" title="(in Python v3.14)"><em>float</em></a>) – Expectation value of the energy.</p></li>
-<li><p><strong>energy_variance</strong> (<a class="reference external" href="https://docs.python.org/3/library/functions.html#float" title="(in Python v3.14)"><em>float</em></a>) – Variance of the energy.</p></li>
-<li><p><strong>expvals_each_term</strong> (<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#list" title="(in Python v3.14)"><em>list</em></a><em>[</em><a class="reference external" href="https://numpy.org/doc/stable/reference/generated/numpy.ndarray.html#numpy.ndarray" title="(in NumPy v2.3)"><em>ndarray</em></a><em>]</em>) – Expectation values for each term in the Hamiltonian.</p></li>
-<li><p><strong>variances_each_term</strong> (<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#list" title="(in Python v3.14)"><em>list</em></a><em>[</em><a class="reference external" href="https://numpy.org/doc/stable/reference/generated/numpy.ndarray.html#numpy.ndarray" title="(in NumPy v2.3)"><em>ndarray</em></a><em>]</em>) – Variances for each term in the Hamiltonian.</p></li>
-</ul>
-</dd>
-</dl>
 <dl class="py method">
 <dt class="sig sig-object py" id="qdk_chemistry.data.estimator_data.EnergyExpectationResult.__init__">
 <span class="sig-name descname"><span class="pre">__init__</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">energy_expectation_value</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">energy_variance</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">expvals_each_term</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">variances_each_term</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../../_modules/qdk_chemistry/data/estimator_data.html#EnergyExpectationResult.__init__"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#qdk_chemistry.data.estimator_data.EnergyExpectationResult.__init__" title="Link to this definition"></a></dt>
@@ -819,6 +814,15 @@ Python users should call to_hdf5_file() directly.</p>
 <em class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">MeasurementData</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">hamiltonians</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">bitstring_counts</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">shots_list</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../../_modules/qdk_chemistry/data/estimator_data.html#MeasurementData"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#qdk_chemistry.data.estimator_data.MeasurementData" title="Link to this definition"></a></dt>
 <dd><p>Bases: <a class="reference internal" href="qdk_chemistry.data.base.html#qdk_chemistry.data.base.DataClass" title="qdk_chemistry.data.base.DataClass"><code class="xref py py-class docutils literal notranslate"><span class="pre">DataClass</span></code></a></p>
 <p>Measurement bitstring data and metadata for a <code class="docutils literal notranslate"><span class="pre">QubitHamiltonian</span></code>.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>hamiltonians</strong> (<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#list" title="(in Python v3.14)"><em>list</em></a><em>[</em><a class="reference internal" href="qdk_chemistry.data.qubit_hamiltonian.html#qdk_chemistry.data.qubit_hamiltonian.QubitHamiltonian" title="qdk_chemistry.data.qubit_hamiltonian.QubitHamiltonian"><em>QubitHamiltonian</em></a><em>]</em>)</p></li>
+<li><p><strong>bitstring_counts</strong> (<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#list" title="(in Python v3.14)"><em>list</em></a><em>[</em><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#dict" title="(in Python v3.14)"><em>dict</em></a><em>[</em><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)"><em>str</em></a><em>, </em><a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(in Python v3.14)"><em>int</em></a><em>] </em><em>| </em><em>None</em><em>] </em><em>| </em><em>None</em>)</p></li>
+<li><p><strong>shots_list</strong> (<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#list" title="(in Python v3.14)"><em>list</em></a><em>[</em><a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(in Python v3.14)"><em>int</em></a><em>] </em><em>| </em><em>None</em>)</p></li>
+</ul>
+</dd>
+</dl>
 <dl class="py attribute">
 <dt class="sig sig-object py" id="qdk_chemistry.data.estimator_data.MeasurementData.hamiltonians">
 <span class="sig-name descname"><span class="pre">hamiltonians</span></span><a class="headerlink" href="#qdk_chemistry.data.estimator_data.MeasurementData.hamiltonians" title="Link to this definition"></a></dt>
@@ -837,16 +841,6 @@ Python users should call to_hdf5_file() directly.</p>
 <dd><p>List of number of shots used for each measurement.</p>
 </dd></dl>
 
-<p>Initialize measurement data.</p>
-<dl class="field-list simple">
-<dt class="field-odd">Parameters<span class="colon">:</span></dt>
-<dd class="field-odd"><ul class="simple">
-<li><p><strong>hamiltonians</strong> (<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#list" title="(in Python v3.14)"><em>list</em></a><em>[</em><a class="reference internal" href="qdk_chemistry.data.qubit_hamiltonian.html#qdk_chemistry.data.qubit_hamiltonian.QubitHamiltonian" title="qdk_chemistry.data.qubit_hamiltonian.QubitHamiltonian"><em>QubitHamiltonian</em></a><em>]</em>) – List of QubitHamiltonian objects.</p></li>
-<li><p><strong>bitstring_counts</strong> (<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#list" title="(in Python v3.14)"><em>list</em></a><em>[</em><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#dict" title="(in Python v3.14)"><em>dict</em></a><em>[</em><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)"><em>str</em></a><em>, </em><a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(in Python v3.14)"><em>int</em></a><em>] </em><em>| </em><em>None</em><em>] </em><em>| </em><em>None</em>) – List of bitstring count dictionaries for each QubitHamiltonian.</p></li>
-<li><p><strong>shots_list</strong> (<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#list" title="(in Python v3.14)"><em>list</em></a><em>[</em><a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(in Python v3.14)"><em>int</em></a><em>] </em><em>| </em><em>None</em>) – List of number of shots used for each measurement.</p></li>
-</ul>
-</dd>
-</dl>
 <dl class="py method">
 <dt class="sig sig-object py" id="qdk_chemistry.data.estimator_data.MeasurementData.__init__">
 <span class="sig-name descname"><span class="pre">__init__</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">hamiltonians</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">bitstring_counts</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">shots_list</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../../_modules/qdk_chemistry/data/estimator_data.html#MeasurementData.__init__"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#qdk_chemistry.data.estimator_data.MeasurementData.__init__" title="Link to this definition"></a></dt>

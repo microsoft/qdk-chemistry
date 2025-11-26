@@ -101,6 +101,14 @@ Information” (10th Anniversary Edition), Ch. 5.2.</p>
 <em class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">QubitHamiltonian</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">pauli_strings</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">coefficients</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#qdk_chemistry.phase_estimation.traditional_qpe.QubitHamiltonian" title="Link to this definition"></a></dt>
 <dd><p>Bases: <a class="reference internal" href="qdk_chemistry.data.base.html#qdk_chemistry.data.base.DataClass" title="qdk_chemistry.data.base.DataClass"><code class="xref py py-class docutils literal notranslate"><span class="pre">DataClass</span></code></a></p>
 <p>Data class for representing chemical electronic Hamiltonians in qubits.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>pauli_strings</strong> (<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#list" title="(in Python v3.14)"><em>list</em></a><em>[</em><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)"><em>str</em></a><em>]</em>)</p></li>
+<li><p><strong>coefficients</strong> (<a class="reference external" href="https://numpy.org/doc/stable/reference/generated/numpy.ndarray.html#numpy.ndarray" title="(in NumPy v2.3)"><em>ndarray</em></a>)</p></li>
+</ul>
+</dd>
+</dl>
 <dl class="py attribute">
 <dt class="sig sig-object py" id="qdk_chemistry.phase_estimation.traditional_qpe.QubitHamiltonian.pauli_strings">
 <span class="sig-name descname"><span class="pre">pauli_strings</span></span><a class="headerlink" href="#qdk_chemistry.phase_estimation.traditional_qpe.QubitHamiltonian.pauli_strings" title="Link to this definition"></a></dt>
@@ -113,19 +121,6 @@ Information” (10th Anniversary Edition), Ch. 5.2.</p>
 <dd><p>Array of coefficients corresponding to each Pauli string.</p>
 </dd></dl>
 
-<p>Initialize a QubitHamiltonian.</p>
-<dl class="field-list simple">
-<dt class="field-odd">Parameters<span class="colon">:</span></dt>
-<dd class="field-odd"><ul class="simple">
-<li><p><strong>pauli_strings</strong> (<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#list" title="(in Python v3.14)"><em>list</em></a><em>[</em><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)"><em>str</em></a><em>]</em>) – List of Pauli strings.</p></li>
-<li><p><strong>coefficients</strong> (<a class="reference external" href="https://numpy.org/doc/stable/reference/generated/numpy.ndarray.html#numpy.ndarray" title="(in NumPy v2.3)"><em>ndarray</em></a>) – Array of coefficients corresponding to each Pauli string.</p></li>
-</ul>
-</dd>
-<dt class="field-even">Raises<span class="colon">:</span></dt>
-<dd class="field-even"><p><a class="reference external" href="https://docs.python.org/3/library/exceptions.html#ValueError" title="(in Python v3.14)"><strong>ValueError</strong></a> – If the number of Pauli strings and coefficients don’t match,
-    or if the Pauli strings or coefficients are invalid.</p>
-</dd>
-</dl>
 <dl class="py method">
 <dt class="sig sig-object py" id="qdk_chemistry.phase_estimation.traditional_qpe.QubitHamiltonian.__init__">
 <span class="sig-name descname"><span class="pre">__init__</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">pauli_strings</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">coefficients</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#qdk_chemistry.phase_estimation.traditional_qpe.QubitHamiltonian.__init__" title="Link to this definition"></a></dt>
@@ -288,13 +283,11 @@ Python users should call to_hdf5_file() directly.</p>
 <em class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">PhaseEstimation</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">hamiltonian</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">evolution_time</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#qdk_chemistry.phase_estimation.traditional_qpe.PhaseEstimation" title="Link to this definition"></a></dt>
 <dd><p>Bases: <a class="reference external" href="https://docs.python.org/3/library/abc.html#abc.ABC" title="(in Python v3.14)"><code class="xref py py-class docutils literal notranslate"><span class="pre">ABC</span></code></a></p>
 <p>Abstract interface for phase estimation strategies.</p>
-<p>Store common data for phase estimation routines.</p>
 <dl class="field-list simple">
 <dt class="field-odd">Parameters<span class="colon">:</span></dt>
 <dd class="field-odd"><ul class="simple">
-<li><p><strong>hamiltonian</strong> (<a class="reference internal" href="#qdk_chemistry.phase_estimation.traditional_qpe.QubitHamiltonian" title="qdk_chemistry.phase_estimation.traditional_qpe.QubitHamiltonian"><em>QubitHamiltonian</em></a>) – Target Hamiltonian whose eigenvalues are estimated.</p></li>
-<li><p><strong>evolution_time</strong> (<a class="reference external" href="https://docs.python.org/3/library/functions.html#float" title="(in Python v3.14)"><em>float</em></a>) – Time parameter <code class="docutils literal notranslate"><span class="pre">t</span></code> used in the time-evolution
-unitary <code class="docutils literal notranslate"><span class="pre">U</span> <span class="pre">=</span> <span class="pre">exp(-i</span> <span class="pre">H</span> <span class="pre">t)</span></code>.</p></li>
+<li><p><strong>hamiltonian</strong> (<a class="reference internal" href="#qdk_chemistry.phase_estimation.traditional_qpe.QubitHamiltonian" title="qdk_chemistry.phase_estimation.traditional_qpe.QubitHamiltonian"><em>QubitHamiltonian</em></a>)</p></li>
+<li><p><strong>evolution_time</strong> (<a class="reference external" href="https://docs.python.org/3/library/functions.html#float" title="(in Python v3.14)"><em>float</em></a>)</p></li>
 </ul>
 </dd>
 </dl>
@@ -468,15 +461,12 @@ https://arxiv.org/abs/quant-ph/9511026</p>
 <em class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">TraditionalPhaseEstimation</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">hamiltonian</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">evolution_time</span></span></em>, <em class="sig-param"><span class="keyword-only-separator o"><abbr title="Keyword-only parameters separator (PEP 3102)"><span class="pre">*</span></abbr></span></em>, <em class="sig-param"><span class="n"><span class="pre">qft_do_swaps</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">True</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../../_modules/qdk_chemistry/phase_estimation/traditional_qpe.html#TraditionalPhaseEstimation"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#qdk_chemistry.phase_estimation.traditional_qpe.TraditionalPhaseEstimation" title="Link to this definition"></a></dt>
 <dd><p>Bases: <a class="reference internal" href="qdk_chemistry.phase_estimation.base.html#qdk_chemistry.phase_estimation.base.PhaseEstimation" title="qdk_chemistry.phase_estimation.base.PhaseEstimation"><code class="xref py py-class docutils literal notranslate"><span class="pre">PhaseEstimation</span></code></a></p>
 <p>Standard QFT-based (non-iterative) phase estimation.</p>
-<p>Initialize the traditional phase estimation routine.</p>
 <dl class="field-list simple">
 <dt class="field-odd">Parameters<span class="colon">:</span></dt>
 <dd class="field-odd"><ul class="simple">
-<li><p><strong>hamiltonian</strong> (<a class="reference internal" href="qdk_chemistry.data.qubit_hamiltonian.html#qdk_chemistry.data.qubit_hamiltonian.QubitHamiltonian" title="qdk_chemistry.data.qubit_hamiltonian.QubitHamiltonian"><em>QubitHamiltonian</em></a>) – Target Hamiltonian.</p></li>
-<li><p><strong>evolution_time</strong> (<a class="reference external" href="https://docs.python.org/3/library/functions.html#float" title="(in Python v3.14)"><em>float</em></a>) – Time parameter <code class="docutils literal notranslate"><span class="pre">t</span></code> for <code class="docutils literal notranslate"><span class="pre">U</span> <span class="pre">=</span> <span class="pre">exp(-i</span> <span class="pre">H</span> <span class="pre">t)</span></code>.</p></li>
-<li><p><strong>qft_do_swaps</strong> (<a class="reference external" href="https://docs.python.org/3/library/functions.html#bool" title="(in Python v3.14)"><em>bool</em></a>) – Whether to include the final swap layer in the inverse
-QFT. Defaults to <code class="docutils literal notranslate"><span class="pre">True</span></code> so that the measured bit string is
-ordered from most-significant to least-significant bit.</p></li>
+<li><p><strong>hamiltonian</strong> (<a class="reference internal" href="qdk_chemistry.data.qubit_hamiltonian.html#qdk_chemistry.data.qubit_hamiltonian.QubitHamiltonian" title="qdk_chemistry.data.qubit_hamiltonian.QubitHamiltonian"><em>QubitHamiltonian</em></a>)</p></li>
+<li><p><strong>evolution_time</strong> (<a class="reference external" href="https://docs.python.org/3/library/functions.html#float" title="(in Python v3.14)"><em>float</em></a>)</p></li>
+<li><p><strong>qft_do_swaps</strong> (<a class="reference external" href="https://docs.python.org/3/library/functions.html#bool" title="(in Python v3.14)"><em>bool</em></a>)</p></li>
 </ul>
 </dd>
 </dl>

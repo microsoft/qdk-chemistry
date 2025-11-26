@@ -253,17 +253,14 @@
 <p>The specific criteria and side effects (such as unitary rotations) for selecting the active space may vary between implementations. See the documentation for the specific active space selector being used (docstring). </p>
 </div>
 <dl class="field-list simple">
-<dt class="field-odd">Parameters<span class="colon">:</span></dt>
-<dd class="field-odd"><p><strong>wavefunction</strong> – The input wavefunction from which to select the active space. </p>
-</dd>
-<dt class="field-even">Throws<span class="colon">:</span></dt>
-<dd class="field-even"><ul class="simple">
+<dt class="field-odd">Throws<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
 <li><p><span><span class="cpp-expr sig sig-inline cpp"><span class="n">std</span><span class="p">::</span><span class="n">runtime_error</span></span></span> – if the active space selection fails or if the input orbitals already have an active space defined. </p></li>
 <li><p><span><span class="cpp-expr sig sig-inline cpp"><span class="n">SettingsAreLocked</span></span></span> – if attempting to modify settings after run) is called </p></li>
 </ul>
 </dd>
-<dt class="field-odd">Returns<span class="colon">:</span></dt>
-<dd class="field-odd"><p>Orbitals with active space data populated. Depending on the implementation, the returned orbitals may be a copy with only metadata added (e.g., occupation/valence selectors), or they may include transformations to the underlying coefficients/energies (e.g., AVAS may rotate/canonicalize orbitals). The input orbitals are not modified. </p>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>Orbitals with active space data populated. Depending on the implementation, the returned orbitals may be a copy with only metadata added (e.g., occupation/valence selectors), or they may include transformations to the underlying coefficients/energies (e.g., AVAS may rotate/canonicalize orbitals). The input orbitals are not modified. </p>
 </dd>
 </dl>
 </dd></dl>
@@ -605,18 +602,15 @@ Usage: <div class="highlight-default notranslate"><div class="highlight"><pre><s
 <p>Settings are automatically locked when this method is called and cannot be modified during or after execution.</p>
 </div>
 <dl class="field-list simple">
-<dt class="field-odd">Parameters<span class="colon">:</span></dt>
-<dd class="field-odd"><p><strong>ansatz</strong> – The Ansatz (Wavefunction and Hamiltonian) describing the quantum system </p>
-</dd>
-<dt class="field-even">Throws<span class="colon">:</span></dt>
-<dd class="field-even"><ul class="simple">
+<dt class="field-odd">Throws<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
 <li><p><span><span class="cpp-expr sig sig-inline cpp"><span class="n">std</span><span class="p">::</span><span class="n">runtime_error</span></span></span> – if the calculation fails </p></li>
 <li><p><span><span class="cpp-expr sig sig-inline cpp"><span class="n">std</span><span class="p">::</span><span class="n">invalid_argument</span></span></span> – if the Ansatz is invalid or electron counts are invalid </p></li>
 <li><p><span><span class="cpp-expr sig sig-inline cpp"><span class="n">SettingsAreLocked</span></span></span> – if attempting to modify settings after calculate() is called</p></li>
 </ul>
 </dd>
-<dt class="field-odd">Returns<span class="colon">:</span></dt>
-<dd class="field-odd"><p>A pair containing the calculated total energy (first) and the resulting coupled-cluster amplitudes (second)</p>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>A pair containing the calculated total energy (first) and the resulting coupled-cluster amplitudes (second)</p>
 </dd>
 </dl>
 </dd></dl>
@@ -766,18 +760,15 @@ Usage: <div class="highlight-default notranslate"><div class="highlight"><pre><s
 <p>Settings are automatically locked when this method is called and cannot be modified during or after execution.</p>
 </div>
 <dl class="field-list simple">
-<dt class="field-odd">Parameters<span class="colon">:</span></dt>
-<dd class="field-odd"><p><strong>orbitals</strong> – The orbital data from which to construct the Hamiltonian </p>
-</dd>
-<dt class="field-even">Throws<span class="colon">:</span></dt>
-<dd class="field-even"><ul class="simple">
+<dt class="field-odd">Throws<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
 <li><p><span><span class="cpp-expr sig sig-inline cpp"><span class="n">std</span><span class="p">::</span><span class="n">runtime_error</span></span></span> – if Hamiltonian construction fails </p></li>
 <li><p><span><span class="cpp-expr sig sig-inline cpp"><span class="n">std</span><span class="p">::</span><span class="n">invalid_argument</span></span></span> – if orbital data is incomplete or invalid </p></li>
 <li><p><span><span class="cpp-expr sig sig-inline cpp"><span class="n">SettingsAreLocked</span></span></span> – if attempting to modify settings after run) is called</p></li>
 </ul>
 </dd>
-<dt class="field-odd">Returns<span class="colon">:</span></dt>
-<dd class="field-odd"><p>The constructed Hamiltonian operator ready for use in quantum chemistry calculations</p>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>The constructed Hamiltonian operator ready for use in quantum chemistry calculations</p>
 </dd>
 </dl>
 </dd></dl>
@@ -912,15 +903,8 @@ Usage: <div class="highlight-default notranslate"><div class="highlight"><pre><s
 <p>All localizer implementations require sorted index arrays for performance and consistency reasons </p>
 </div>
 <dl class="field-list simple">
-<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dt class="field-odd">Throws<span class="colon">:</span></dt>
 <dd class="field-odd"><ul class="simple">
-<li><p><strong>orbitals</strong> – The orbitals to localize </p></li>
-<li><p><strong>loc_indices_a</strong> – Indices of alpha orbitals to localize (must be sorted, if empty, no alpha orbitals are localized) </p></li>
-<li><p><strong>loc_indices_b</strong> – Indices of beta orbitals to localize (must be sorted, if empty, no beta orbitals are localized)</p></li>
-</ul>
-</dd>
-<dt class="field-even">Throws<span class="colon">:</span></dt>
-<dd class="field-even"><ul class="simple">
 <li><p><span><span class="cpp-expr sig sig-inline cpp"><span class="n">std</span><span class="p">::</span><span class="n">runtime_error</span></span></span> – If localization fails </p></li>
 <li><p><span><span class="cpp-expr sig sig-inline cpp"><span class="n">std</span><span class="p">::</span><span class="n">invalid_argument</span></span></span> – If the input orbitals are invalid for the specified instance of the localizer </p></li>
 <li><p><span><span class="cpp-expr sig sig-inline cpp"><span class="n">SettingsAreLocked</span></span></span> – if attempting to modify settings after <a class="reference internal" href="#classqdk_1_1chemistry_1_1algorithms_1_1Localizer_1ac10450fd146d7907f47a5fdb7bade8ba"><span class="std std-ref">run()</span></a> is called </p></li>
@@ -928,8 +912,8 @@ Usage: <div class="highlight-default notranslate"><div class="highlight"><pre><s
 <li><p><span><span class="cpp-expr sig sig-inline cpp"><span class="n">SettingsAreLocked</span></span></span> – if attempting to modify settings after <a class="reference internal" href="#classqdk_1_1chemistry_1_1algorithms_1_1Localizer_1ac10450fd146d7907f47a5fdb7bade8ba"><span class="std std-ref">run()</span></a> is called</p></li>
 </ul>
 </dd>
-<dt class="field-odd">Returns<span class="colon">:</span></dt>
-<dd class="field-odd"><p>The localized molecular orbitals with updated coefficients.</p>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>The localized molecular orbitals with updated coefficients.</p>
 </dd>
 </dl>
 </dd></dl>
@@ -1028,8 +1012,7 @@ Usage: <div class="highlight-default notranslate"><div class="highlight"><pre><s
 <dt class="sig sig-object cpp" id="_CPPv4NK3qdk9chemistry10algorithms28MultiConfigurationCalculator3runEDp4Args">
 <span id="_CPPv3NK3qdk9chemistry10algorithms28MultiConfigurationCalculator3runEDp4Args"></span><span id="_CPPv2NK3qdk9chemistry10algorithms28MultiConfigurationCalculator3runEDp4Args"></span><span id="qdk::chemistry::algorithms::MultiConfigurationCalculator::run__ArgsDpC"></span><span class="target" id="classqdk_1_1chemistry_1_1algorithms_1_1MultiConfigurationCalculator_1ac10450fd146d7907f47a5fdb7bade8ba"></span><span class="k"><span class="pre">inline</span></span><span class="w"> </span><span class="n"><span class="pre">ReturnType</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">run</span></span></span><span class="sig-paren">(</span><span class="n"><span class="pre">Args</span></span><span class="p"><span class="pre">...</span></span><span class="w"> </span><span class="n sig-param"><span class="pre">args</span></span><span class="sig-paren">)</span><span class="w"> </span><span class="k"><span class="pre">const</span></span><br /></dt>
 <dd><p>Perform multi-configurational calculation. </p>
-<p>This method is auto-generated by the <a class="reference internal" href="#classqdk_1_1chemistry_1_1algorithms_1_1Algorithm"><span class="std std-ref">Algorithm</span></a> base class and automatically locks settings before execution, then delegates to _run_impl().</p>
-<p><div class="admonition seealso">
+<p>This method is auto-generated by the <a class="reference internal" href="#classqdk_1_1chemistry_1_1algorithms_1_1Algorithm"><span class="std std-ref">Algorithm</span></a> base class and automatically locks settings before execution, then delegates to _run_impl(). <div class="admonition seealso">
 <p class="admonition-title">See also</p>
 <p><a class="reference internal" href="namespaceqdk_1_1chemistry_1_1data.html#classqdk_1_1chemistry_1_1data_1_1Hamiltonian"><span class="std std-ref">data::Hamiltonian</span></a></p>
 </div>
@@ -1043,22 +1026,15 @@ Usage: <div class="highlight-default notranslate"><div class="highlight"><pre><s
 <p>Settings are automatically locked when this method is called and cannot be modified during or after execution.</p>
 </div>
 <dl class="field-list simple">
-<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dt class="field-odd">Throws<span class="colon">:</span></dt>
 <dd class="field-odd"><ul class="simple">
-<li><p><strong>hamiltonian</strong> – The Hamiltonian operator describing the quantum system </p></li>
-<li><p><strong>n_active_alpha_electrons</strong> – The number of alpha electrons in the active space, inactive orbitals are assumed to be fully occupied. </p></li>
-<li><p><strong>n_active_beta_electrons</strong> – The number of beta electrons in the active space, inactive orbitals are assumed to be fully occupied.</p></li>
-</ul>
-</dd>
-<dt class="field-even">Throws<span class="colon">:</span></dt>
-<dd class="field-even"><ul class="simple">
 <li><p><span><span class="cpp-expr sig sig-inline cpp"><span class="n">std</span><span class="p">::</span><span class="n">runtime_error</span></span></span> – if the calculation fails </p></li>
 <li><p><span><span class="cpp-expr sig sig-inline cpp"><span class="n">std</span><span class="p">::</span><span class="n">invalid_argument</span></span></span> – if hamiltonian is invalid </p></li>
 <li><p><span><span class="cpp-expr sig sig-inline cpp"><span class="n">SettingsAreLocked</span></span></span> – if attempting to modify settings after <a class="reference internal" href="#classqdk_1_1chemistry_1_1algorithms_1_1MultiConfigurationCalculator_1ac10450fd146d7907f47a5fdb7bade8ba"><span class="std std-ref">run()</span></a> is called</p></li>
 </ul>
 </dd>
-<dt class="field-odd">Returns<span class="colon">:</span></dt>
-<dd class="field-odd"><p>A pair containing the calculated energy (first) and the resulting multi-configurational wavefunction (second)</p>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>A pair containing the calculated energy (first) and the resulting multi-configurational wavefunction (second)</p>
 </dd>
 </dl>
 </dd></dl>
@@ -1179,8 +1155,7 @@ Usage: <div class="highlight-default notranslate"><div class="highlight"><pre><s
 <dt class="sig sig-object cpp" id="_CPPv4NK3qdk9chemistry10algorithms21MultiConfigurationScf3runEDp4Args">
 <span id="_CPPv3NK3qdk9chemistry10algorithms21MultiConfigurationScf3runEDp4Args"></span><span id="_CPPv2NK3qdk9chemistry10algorithms21MultiConfigurationScf3runEDp4Args"></span><span id="qdk::chemistry::algorithms::MultiConfigurationScf::run__ArgsDpC"></span><span class="target" id="classqdk_1_1chemistry_1_1algorithms_1_1MultiConfigurationScf_1ac10450fd146d7907f47a5fdb7bade8ba"></span><span class="k"><span class="pre">inline</span></span><span class="w"> </span><span class="n"><span class="pre">ReturnType</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">run</span></span></span><span class="sig-paren">(</span><span class="n"><span class="pre">Args</span></span><span class="p"><span class="pre">...</span></span><span class="w"> </span><span class="n sig-param"><span class="pre">args</span></span><span class="sig-paren">)</span><span class="w"> </span><span class="k"><span class="pre">const</span></span><br /></dt>
 <dd><p>Perform an <a class="reference internal" href="#classqdk_1_1chemistry_1_1algorithms_1_1MultiConfigurationScf"><span class="std std-ref">MultiConfigurationScf</span></a> calculation. </p>
-<p>This pure virtual method must be implemented by derived classes to perform the <a class="reference internal" href="#classqdk_1_1chemistry_1_1algorithms_1_1MultiConfigurationScf"><span class="std std-ref">MultiConfigurationScf</span></a> calculation, which optimizes both orbital and CI coefficients. The method takes a Hamiltonian describing the quantum system and returns both the calculated energy and the optimized multi-configurational wavefunction, including both optimized orbital coefficients and CI coefficients.</p>
-<p><div class="admonition seealso">
+<p>This pure virtual method must be implemented by derived classes to perform the <a class="reference internal" href="#classqdk_1_1chemistry_1_1algorithms_1_1MultiConfigurationScf"><span class="std std-ref">MultiConfigurationScf</span></a> calculation, which optimizes both orbital and CI coefficients. The method takes a Hamiltonian describing the quantum system and returns both the calculated energy and the optimized multi-configurational wavefunction, including both optimized orbital coefficients and CI coefficients. <div class="admonition seealso">
 <p class="admonition-title">See also</p>
 <p><a class="reference internal" href="namespaceqdk_1_1chemistry_1_1data.html#classqdk_1_1chemistry_1_1data_1_1Hamiltonian"><span class="std std-ref">data::Hamiltonian</span></a></p>
 </div>
@@ -1198,23 +1173,14 @@ Usage: <div class="highlight-default notranslate"><div class="highlight"><pre><s
 <p>The specific requirements for the inputs and settings affecting this method may vary by implementation. See the documentation for the specific <a class="reference internal" href="#classqdk_1_1chemistry_1_1algorithms_1_1MultiConfigurationScf"><span class="std std-ref">MultiConfigurationScf</span></a> solver being used (docstring). </p>
 </div>
 <dl class="field-list simple">
-<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dt class="field-odd">Throws<span class="colon">:</span></dt>
 <dd class="field-odd"><ul class="simple">
-<li><p><strong>orbitals</strong> – The initial molecular orbitals for the calculation </p></li>
-<li><p><strong>hamiltonian_ctor</strong> – The Hamiltonian constructor for building the Hamiltonian </p></li>
-<li><p><strong>mc_calculator</strong> – The multi-configurational calculator for evaluation of the active space </p></li>
-<li><p><strong>n_active_alpha_electrons</strong> – The number of alpha electrons in the active space, inactive orbitals are assumed to be fully occupied. </p></li>
-<li><p><strong>n_active_beta_electrons</strong> – The number of beta electrons in the active space, inactive orbitals are assumed to be fully occupied.</p></li>
-</ul>
-</dd>
-<dt class="field-even">Throws<span class="colon">:</span></dt>
-<dd class="field-even"><ul class="simple">
 <li><p><span><span class="cpp-expr sig sig-inline cpp"><span class="n">std</span><span class="p">::</span><span class="n">runtime_error</span></span></span> – if calculation fails to converge </p></li>
 <li><p><span><span class="cpp-expr sig sig-inline cpp"><span class="n">std</span><span class="p">::</span><span class="n">invalid_argument</span></span></span> – if hamiltonian is invalid</p></li>
 </ul>
 </dd>
-<dt class="field-odd">Returns<span class="colon">:</span></dt>
-<dd class="field-odd"><p>A pair containing the calculated energy (first) and the resulting multi-configurational wavefunction (second)</p>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>A pair containing the calculated energy (first) and the resulting multi-configurational wavefunction (second)</p>
 </dd>
 </dl>
 </dd></dl>
@@ -1313,7 +1279,7 @@ Usage: <div class="highlight-default notranslate"><div class="highlight"><pre><s
 <dd><div class="docutils container">
 <em>#include &lt;qdk/chemistry/algorithms/pmc.hpp&gt;</em></div>
 <p>Abstract base class for projected multi-configurational calculations in quantum chemistry. </p>
-<p>This class provides the interface for projected multi-configurational-based quantum chemistry calculations. This contracts the <a class="reference internal" href="#classqdk_1_1chemistry_1_1algorithms_1_1MultiConfigurationCalculator"><span class="std std-ref">MultiConfigurationCalculator</span></a> in that the space of determinants upon which the Hamltonian is projected is taken to be a <em>free parameter</em> and must be specified. In this manner, the high-performance solvers which underly other MC algorithms can be interfaced with external methods for selecting important determinants.</p>
+<p>This class provides the interface for projected multi-configurational-based quantum chemistry calculations. This contrasts the <a class="reference internal" href="#classqdk_1_1chemistry_1_1algorithms_1_1MultiConfigurationCalculator"><span class="std std-ref">MultiConfigurationCalculator</span></a> in that the space of determinants upon which the Hamiltonian is projected is taken to be a <em>free parameter</em> and must be specified. In this manner, the high-performance solvers which underly other MC algorithms can be interfaced with external methods for selecting important determinants.</p>
 <p>The calculator takes a Hamiltonian and a set of configurations as input and returns both the calculated energy and the corresponding multi-configurational wavefunction.</p>
 <p><div class="admonition seealso">
 <p class="admonition-title">See also</p>
@@ -1378,22 +1344,16 @@ Usage: <div class="highlight-default notranslate"><div class="highlight"><pre><s
 <p>Settings are automatically locked when this method is called and cannot be modified during or after execution.</p>
 </div>
 <dl class="field-list simple">
-<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dt class="field-odd">Throws<span class="colon">:</span></dt>
 <dd class="field-odd"><ul class="simple">
-<li><p><strong>hamiltonian</strong> – The Hamiltonian operator describing the quantum system </p></li>
-<li><p><strong>configurations</strong> – The set of configurations/determinants to project the Hamiltonian onto</p></li>
-</ul>
-</dd>
-<dt class="field-even">Throws<span class="colon">:</span></dt>
-<dd class="field-even"><ul class="simple">
 <li><p><span><span class="cpp-expr sig sig-inline cpp"><span class="n">std</span><span class="p">::</span><span class="n">runtime_error</span></span></span> – if the calculation fails </p></li>
 <li><p><span><span class="cpp-expr sig sig-inline cpp"><span class="n">std</span><span class="p">::</span><span class="n">invalid_argument</span></span></span> – if hamiltonian is invalid </p></li>
 <li><p><span><span class="cpp-expr sig sig-inline cpp"><span class="n">std</span><span class="p">::</span><span class="n">invalid_argument</span></span></span> – if configurations is invalid </p></li>
 <li><p><span><span class="cpp-expr sig sig-inline cpp"><span class="n">SettingsAreLocked</span></span></span> – if attempting to modify settings after <a class="reference internal" href="#classqdk_1_1chemistry_1_1algorithms_1_1ProjectedMultiConfigurationCalculator_1ac10450fd146d7907f47a5fdb7bade8ba"><span class="std std-ref">run()</span></a> is called</p></li>
 </ul>
 </dd>
-<dt class="field-odd">Returns<span class="colon">:</span></dt>
-<dd class="field-odd"><p>A pair containing the calculated energy (first) and the resulting multi-configurational wavefunction (second)</p>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>A pair containing the calculated energy (first) and the resulting multi-configurational wavefunction (second)</p>
 </dd>
 </dl>
 </dd></dl>
@@ -1542,7 +1502,7 @@ Usage: <div class="highlight-default notranslate"><div class="highlight"><pre><s
 <span id="_CPPv3NK3qdk9chemistry10algorithms9ScfSolver3runEDp4Args"></span><span id="_CPPv2NK3qdk9chemistry10algorithms9ScfSolver3runEDp4Args"></span><span id="qdk::chemistry::algorithms::ScfSolver::run__ArgsDpC"></span><span class="target" id="classqdk_1_1chemistry_1_1algorithms_1_1ScfSolver_1ac10450fd146d7907f47a5fdb7bade8ba"></span><span class="k"><span class="pre">inline</span></span><span class="w"> </span><span class="n"><span class="pre">ReturnType</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">run</span></span></span><span class="sig-paren">(</span><span class="n"><span class="pre">Args</span></span><span class="p"><span class="pre">...</span></span><span class="w"> </span><span class="n sig-param"><span class="pre">args</span></span><span class="sig-paren">)</span><span class="w"> </span><span class="k"><span class="pre">const</span></span><br /></dt>
 <dd><p>Solve the SCF equations for a given molecular structure. </p>
 <p>This method performs the iterative SCF procedure to find the self-consistent molecular orbitals and total energy.</p>
-<p>The specific algorithm (HF, DFT, etc.) is determined by the concrete implementation.</p>
+<p>The specific algorithm (HF, DFT, etc.) is determined by the concrete implementation. </p>
 <div class="admonition note">
 <p class="admonition-title">Note</p>
 <p>Settings are automatically locked when this method is called and cannot be modified during or after execution. </p>
@@ -1552,23 +1512,15 @@ Usage: <div class="highlight-default notranslate"><div class="highlight"><pre><s
 <p>The specific requirements for the inputs and settings affecting the SCF calculation may vary by implementation. See the documentation for the specific SCF solver being used. </p>
 </div>
 <dl class="field-list simple">
-<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dt class="field-odd">Throws<span class="colon">:</span></dt>
 <dd class="field-odd"><ul class="simple">
-<li><p><strong>structure</strong> – The molecular structure containing atomic positions, nuclear charges, and other structural information </p></li>
-<li><p><strong>charge</strong> – The molecular charge </p></li>
-<li><p><strong>spin_multiplicity</strong> – The spin multiplicity of the molecular system </p></li>
-<li><p><strong>initial_guess</strong> – Initial orbital guess for the SCF calculation (optional, defaults to a standard configurable guess). If provided, the initial guess should be generated using the same basis set and either the same molecular structure or a similar structure (e.g., from a previous step in a geometry optimization)</p></li>
-</ul>
-</dd>
-<dt class="field-even">Throws<span class="colon">:</span></dt>
-<dd class="field-even"><ul class="simple">
 <li><p><span><span class="cpp-expr sig sig-inline cpp"><span class="n">std</span><span class="p">::</span><span class="n">runtime_error</span></span></span> – If SCF fails to converge </p></li>
 <li><p><span><span class="cpp-expr sig sig-inline cpp"><span class="n">std</span><span class="p">::</span><span class="n">invalid_argument</span></span></span> – If the input structure is invalid </p></li>
 <li><p><span><span class="cpp-expr sig sig-inline cpp"><span class="n">SettingsAreLocked</span></span></span> – If attempting to modify settings after <a class="reference internal" href="#classqdk_1_1chemistry_1_1algorithms_1_1ScfSolver_1a92d44928e1fbff8f9910b77661c27a21"><span class="std std-ref">run()</span></a> is called</p></li>
 </ul>
 </dd>
-<dt class="field-odd">Returns<span class="colon">:</span></dt>
-<dd class="field-odd"><p>A pair containing:<ul class="simple">
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>A pair containing:<ul class="simple">
 <li><p>double: The converged total energy in Hartree</p></li>
 <li><p><a class="reference internal" href="namespaceqdk_1_1chemistry_1_1data.html#classqdk_1_1chemistry_1_1data_1_1Wavefunction"><span class="std std-ref">data::Wavefunction</span></a>: The converged wavefunction, including orbitals, their energies, coefficients, and occupancies</p></li>
 </ul>
@@ -1688,7 +1640,7 @@ Usage: <div class="highlight-default notranslate"><div class="highlight"><pre><s
 <span id="_CPPv3NK3qdk9chemistry10algorithms16StabilityChecker3runEDp4Args"></span><span id="_CPPv2NK3qdk9chemistry10algorithms16StabilityChecker3runEDp4Args"></span><span id="qdk::chemistry::algorithms::StabilityChecker::run__ArgsDpC"></span><span class="target" id="classqdk_1_1chemistry_1_1algorithms_1_1StabilityChecker_1ac10450fd146d7907f47a5fdb7bade8ba"></span><span class="k"><span class="pre">inline</span></span><span class="w"> </span><span class="n"><span class="pre">ReturnType</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">run</span></span></span><span class="sig-paren">(</span><span class="n"><span class="pre">Args</span></span><span class="p"><span class="pre">...</span></span><span class="w"> </span><span class="n sig-param"><span class="pre">args</span></span><span class="sig-paren">)</span><span class="w"> </span><span class="k"><span class="pre">const</span></span><br /></dt>
 <dd><p>Check the stability of the given wavefunction with respect to orbital rotation. </p>
 <p>This method performs stability analysis on the input wavefunction by examining the eigenvalues of the electronic Hessian matrix. A stable wavefunction should have all non-negative eigenvalues. Near-zero eigenvalues may indicate orbital degeneracy.</p>
-<p>The specific algorithm (PySCF-based, etc.) is determined by the concrete implementation.</p>
+<p>The specific algorithm (PySCF-based, etc.) is determined by the concrete implementation. </p>
 <div class="admonition note">
 <p class="admonition-title">Note</p>
 <p>Settings are automatically locked when this method is called and cannot be modified during or after execution. </p>
@@ -1698,18 +1650,15 @@ Usage: <div class="highlight-default notranslate"><div class="highlight"><pre><s
 <p>The specific requirements for the inputs and settings affecting the stability check may vary by implementation. See the documentation for the specific stability checker being used. </p>
 </div>
 <dl class="field-list simple">
-<dt class="field-odd">Parameters<span class="colon">:</span></dt>
-<dd class="field-odd"><p><strong>wavefunction</strong> – The wavefunction to analyze for stability</p>
-</dd>
-<dt class="field-even">Throws<span class="colon">:</span></dt>
-<dd class="field-even"><ul class="simple">
+<dt class="field-odd">Throws<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
 <li><p><span><span class="cpp-expr sig sig-inline cpp"><span class="n">std</span><span class="p">::</span><span class="n">runtime_error</span></span></span> – If stability analysis fails </p></li>
 <li><p><span><span class="cpp-expr sig sig-inline cpp"><span class="n">std</span><span class="p">::</span><span class="n">invalid_argument</span></span></span> – If the input wavefunction is invalid for the specified instance of the stability checker </p></li>
 <li><p><span><span class="cpp-expr sig sig-inline cpp"><span class="n">SettingsAreLocked</span></span></span> – If attempting to modify settings after <a class="reference internal" href="#classqdk_1_1chemistry_1_1algorithms_1_1StabilityChecker_1ac10450fd146d7907f47a5fdb7bade8ba"><span class="std std-ref">run()</span></a> is called</p></li>
 </ul>
 </dd>
-<dt class="field-odd">Returns<span class="colon">:</span></dt>
-<dd class="field-odd"><p>A pair containing:<ul class="simple">
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>A pair containing:<ul class="simple">
 <li><p>bool: Overall stability status (true if stable, false if unstable)</p></li>
 <li><p><a class="reference internal" href="namespaceqdk_1_1chemistry_1_1data.html#classqdk_1_1chemistry_1_1data_1_1StabilityResult"><span class="std std-ref">data::StabilityResult</span></a>: Detailed stability information including eigenvalues and eigenvectors of the stability matrix, which can be used to start a new SCF calculation if an instability is detected.</p></li>
 </ul>
@@ -1933,7 +1882,10 @@ Usage: <div class="highlight-default notranslate"><div class="highlight"><pre><s
 </ul>
 </dd>
 <dt class="field-even">Parameters<span class="colon">:</span></dt>
-<dd class="field-even"><p><strong>norb</strong> – Number of active orbitals. </p>
+<dd class="field-even"><ul class="simple">
+<li><p><strong>args</strong> – Argument pack to forward. </p></li>
+<li><p><strong>norb</strong> – Number of active orbitals. </p></li>
+</ul>
 </dd>
 <dt class="field-odd">Throws<span class="colon">:</span></dt>
 <dd class="field-odd"><p><span><span class="cpp-expr sig sig-inline cpp"><span class="n">std</span><span class="p">::</span><span class="n">runtime_error</span></span></span> – if <code class="docutils literal notranslate"><span class="pre">norb</span> <span class="pre">&gt;=</span> <span class="pre">128</span></code> (unsupported size). </p>
@@ -2023,7 +1975,7 @@ Usage: <div class="highlight-default notranslate"><div class="highlight"><pre><s
 <dt class="sig sig-object cpp" id="_CPPv4N3qdk9chemistry10algorithms9microsoft26AutocasActiveSpaceSelectorE">
 <span id="_CPPv3N3qdk9chemistry10algorithms9microsoft26AutocasActiveSpaceSelectorE"></span><span id="_CPPv2N3qdk9chemistry10algorithms9microsoft26AutocasActiveSpaceSelectorE"></span><span id="qdk::chemistry::algorithms::microsoft::AutocasActiveSpaceSelector"></span><span class="target" id="classqdk_1_1chemistry_1_1algorithms_1_1microsoft_1_1AutocasActiveSpaceSelector"></span><span class="k"><span class="pre">class</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">AutocasActiveSpaceSelector</span></span></span><span class="w"> </span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="k"><span class="pre">public</span></span><span class="w"> </span><a class="reference internal" href="namespaceqdk.html#_CPPv43qdk" title="qdk"><span class="n"><span class="pre">qdk</span></span></a><span class="p"><span class="pre">::</span></span><a class="reference internal" href="namespaceqdk.html#_CPPv4N3qdk9chemistryE" title="qdk::chemistry"><span class="n"><span class="pre">chemistry</span></span></a><span class="p"><span class="pre">::</span></span><a class="reference internal" href="namespaceqdk.html#_CPPv4N3qdk9chemistry10algorithmsE" title="qdk::chemistry::algorithms"><span class="n"><span class="pre">algorithms</span></span></a><span class="p"><span class="pre">::</span></span><a class="reference internal" href="namespaceqdk.html#_CPPv4N3qdk9chemistry10algorithms19ActiveSpaceSelectorE" title="qdk::chemistry::algorithms::ActiveSpaceSelector"><span class="n"><span class="pre">ActiveSpaceSelector</span></span></a><br /></dt>
 <dd><div class="docutils container">
-<em>#include &lt;/workspaces/qdk-chemistry/cpp/src/qdk/chemistry/algorithms/microsoft/active_space/autocas_active_space.hpp&gt;</em></div>
+<em>#include &lt;/home/baker/code/qdk-chemistry/cpp/src/qdk/chemistry/algorithms/microsoft/active_space/autocas_active_space.hpp&gt;</em></div>
 <p>Selects active space orbitals based on single orbital entropies. </p>
 <p>This class provides a concrete implementation of the WavefunctionBasedActiveSpaceSelector interface that selects active space orbitals based on single orbital entropies. It identifies gaps in the sorted entropies to determine plateaus of strongly correlated orbitals.</p>
 <p>Typical usage: <div class="highlight-cpp notranslate"><div class="highlight"><pre><span></span><span class="c1">// Create an autocas active space selector</span>
@@ -2085,7 +2037,7 @@ Usage: <div class="highlight-default notranslate"><div class="highlight"><pre><s
 <dt class="sig sig-object cpp" id="_CPPv4N3qdk9chemistry10algorithms9microsoft26AutocasActiveSpaceSettingsE">
 <span id="_CPPv3N3qdk9chemistry10algorithms9microsoft26AutocasActiveSpaceSettingsE"></span><span id="_CPPv2N3qdk9chemistry10algorithms9microsoft26AutocasActiveSpaceSettingsE"></span><span id="qdk::chemistry::algorithms::microsoft::AutocasActiveSpaceSettings"></span><span class="target" id="classqdk_1_1chemistry_1_1algorithms_1_1microsoft_1_1AutocasActiveSpaceSettings"></span><span class="k"><span class="pre">class</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">AutocasActiveSpaceSettings</span></span></span><span class="w"> </span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="k"><span class="pre">public</span></span><span class="w"> </span><a class="reference internal" href="namespaceqdk.html#_CPPv43qdk" title="qdk"><span class="n"><span class="pre">qdk</span></span></a><span class="p"><span class="pre">::</span></span><a class="reference internal" href="namespaceqdk.html#_CPPv4N3qdk9chemistryE" title="qdk::chemistry"><span class="n"><span class="pre">chemistry</span></span></a><span class="p"><span class="pre">::</span></span><a class="reference internal" href="namespaceqdk.html#_CPPv4N3qdk9chemistry4dataE" title="qdk::chemistry::data"><span class="n"><span class="pre">data</span></span></a><span class="p"><span class="pre">::</span></span><a class="reference internal" href="namespaceqdk.html#_CPPv4N3qdk9chemistry4data8SettingsE" title="qdk::chemistry::data::Settings"><span class="n"><span class="pre">Settings</span></span></a><br /></dt>
 <dd><div class="docutils container">
-<em>#include &lt;/workspaces/qdk-chemistry/cpp/src/qdk/chemistry/algorithms/microsoft/active_space/autocas_active_space.hpp&gt;</em></div>
+<em>#include &lt;/home/baker/code/qdk-chemistry/cpp/src/qdk/chemistry/algorithms/microsoft/active_space/autocas_active_space.hpp&gt;</em></div>
 <p>Settings container for the autocas active space selection algorithm. </p>
 <p>This class extends the base Settings class to provide specific default settings for the autocas active space selector. It pre-configures parameters for determining which orbitals should be included in the active space based on their single orbital entropies.</p>
 <p>The entropy-based selection uses single orbitals entropies to identify orbitals that are strongly correlated.</p>
@@ -2121,7 +2073,7 @@ Usage: <div class="highlight-default notranslate"><div class="highlight"><pre><s
 <dt class="sig sig-object cpp" id="_CPPv4N3qdk9chemistry10algorithms9microsoft29AutocasEosActiveSpaceSelectorE">
 <span id="_CPPv3N3qdk9chemistry10algorithms9microsoft29AutocasEosActiveSpaceSelectorE"></span><span id="_CPPv2N3qdk9chemistry10algorithms9microsoft29AutocasEosActiveSpaceSelectorE"></span><span id="qdk::chemistry::algorithms::microsoft::AutocasEosActiveSpaceSelector"></span><span class="target" id="classqdk_1_1chemistry_1_1algorithms_1_1microsoft_1_1AutocasEosActiveSpaceSelector"></span><span class="k"><span class="pre">class</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">AutocasEosActiveSpaceSelector</span></span></span><span class="w"> </span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="k"><span class="pre">public</span></span><span class="w"> </span><a class="reference internal" href="namespaceqdk.html#_CPPv43qdk" title="qdk"><span class="n"><span class="pre">qdk</span></span></a><span class="p"><span class="pre">::</span></span><a class="reference internal" href="namespaceqdk.html#_CPPv4N3qdk9chemistryE" title="qdk::chemistry"><span class="n"><span class="pre">chemistry</span></span></a><span class="p"><span class="pre">::</span></span><a class="reference internal" href="namespaceqdk.html#_CPPv4N3qdk9chemistry10algorithmsE" title="qdk::chemistry::algorithms"><span class="n"><span class="pre">algorithms</span></span></a><span class="p"><span class="pre">::</span></span><a class="reference internal" href="namespaceqdk.html#_CPPv4N3qdk9chemistry10algorithms19ActiveSpaceSelectorE" title="qdk::chemistry::algorithms::ActiveSpaceSelector"><span class="n"><span class="pre">ActiveSpaceSelector</span></span></a><br /></dt>
 <dd><div class="docutils container">
-<em>#include &lt;/workspaces/qdk-chemistry/cpp/src/qdk/chemistry/algorithms/microsoft/active_space/entropy_active_space.hpp&gt;</em></div>
+<em>#include &lt;/home/baker/code/qdk-chemistry/cpp/src/qdk/chemistry/algorithms/microsoft/active_space/entropy_active_space.hpp&gt;</em></div>
 <p>Selects active space orbitals based on single orbital entropies. </p>
 <p>This class provides a concrete implementation of the WavefunctionBasedActiveSpaceSelector interface that selects active space orbitals based on single orbital entropies. It identifies gaps in the sorted entropies to determine plateaus of strongly correlated orbitals.</p>
 <p>Typical usage: <div class="highlight-cpp notranslate"><div class="highlight"><pre><span></span><span class="c1">// Create an entropy-based active space selector</span>
@@ -2222,7 +2174,7 @@ Usage: <div class="highlight-default notranslate"><div class="highlight"><pre><s
 <dt class="sig sig-object cpp" id="_CPPv4N3qdk9chemistry10algorithms9microsoft22HamiltonianConstructorE">
 <span id="_CPPv3N3qdk9chemistry10algorithms9microsoft22HamiltonianConstructorE"></span><span id="_CPPv2N3qdk9chemistry10algorithms9microsoft22HamiltonianConstructorE"></span><span id="qdk::chemistry::algorithms::microsoft::HamiltonianConstructor"></span><span class="target" id="classqdk_1_1chemistry_1_1algorithms_1_1microsoft_1_1HamiltonianConstructor"></span><span class="k"><span class="pre">class</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">HamiltonianConstructor</span></span></span><span class="w"> </span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="k"><span class="pre">public</span></span><span class="w"> </span><a class="reference internal" href="namespaceqdk.html#_CPPv43qdk" title="qdk"><span class="n"><span class="pre">qdk</span></span></a><span class="p"><span class="pre">::</span></span><a class="reference internal" href="namespaceqdk.html#_CPPv4N3qdk9chemistryE" title="qdk::chemistry"><span class="n"><span class="pre">chemistry</span></span></a><span class="p"><span class="pre">::</span></span><a class="reference internal" href="namespaceqdk.html#_CPPv4N3qdk9chemistry10algorithmsE" title="qdk::chemistry::algorithms"><span class="n"><span class="pre">algorithms</span></span></a><span class="p"><span class="pre">::</span></span><a class="reference internal" href="namespaceqdk.html#_CPPv4N3qdk9chemistry10algorithms22HamiltonianConstructorE" title="qdk::chemistry::algorithms::HamiltonianConstructor"><span class="n"><span class="pre">HamiltonianConstructor</span></span></a><br /></dt>
 <dd><div class="docutils container">
-<em>#include &lt;/workspaces/qdk-chemistry/cpp/src/qdk/chemistry/algorithms/microsoft/hamiltonian.hpp&gt;</em></div>
+<em>#include &lt;/home/baker/code/qdk-chemistry/cpp/src/qdk/chemistry/algorithms/microsoft/hamiltonian.hpp&gt;</em></div>
 <div class="breathe-sectiondef docutils container">
 <p class="breathe-sectiondef-title rubric" id="breathe-section-title-public-functions">Public Functions</p>
 <dl class="cpp function">
@@ -2255,7 +2207,7 @@ Usage: <div class="highlight-default notranslate"><div class="highlight"><pre><s
 <dt class="sig sig-object cpp" id="_CPPv4N3qdk9chemistry10algorithms9microsoft19HamiltonianSettingsE">
 <span id="_CPPv3N3qdk9chemistry10algorithms9microsoft19HamiltonianSettingsE"></span><span id="_CPPv2N3qdk9chemistry10algorithms9microsoft19HamiltonianSettingsE"></span><span id="qdk::chemistry::algorithms::microsoft::HamiltonianSettings"></span><span class="target" id="classqdk_1_1chemistry_1_1algorithms_1_1microsoft_1_1HamiltonianSettings"></span><span class="k"><span class="pre">class</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">HamiltonianSettings</span></span></span><span class="w"> </span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="k"><span class="pre">public</span></span><span class="w"> </span><a class="reference internal" href="namespaceqdk.html#_CPPv43qdk" title="qdk"><span class="n"><span class="pre">qdk</span></span></a><span class="p"><span class="pre">::</span></span><a class="reference internal" href="namespaceqdk.html#_CPPv4N3qdk9chemistryE" title="qdk::chemistry"><span class="n"><span class="pre">chemistry</span></span></a><span class="p"><span class="pre">::</span></span><a class="reference internal" href="namespaceqdk.html#_CPPv4N3qdk9chemistry4dataE" title="qdk::chemistry::data"><span class="n"><span class="pre">data</span></span></a><span class="p"><span class="pre">::</span></span><a class="reference internal" href="namespaceqdk.html#_CPPv4N3qdk9chemistry4data8SettingsE" title="qdk::chemistry::data::Settings"><span class="n"><span class="pre">Settings</span></span></a><br /></dt>
 <dd><div class="docutils container">
-<em>#include &lt;/workspaces/qdk-chemistry/cpp/src/qdk/chemistry/algorithms/microsoft/hamiltonian.hpp&gt;</em></div>
+<em>#include &lt;/home/baker/code/qdk-chemistry/cpp/src/qdk/chemistry/algorithms/microsoft/hamiltonian.hpp&gt;</em></div>
 <div class="breathe-sectiondef docutils container">
 <p class="breathe-sectiondef-title rubric" id="breathe-section-title-public-functions">Public Functions</p>
 <dl class="cpp function">
@@ -2275,7 +2227,7 @@ Usage: <div class="highlight-default notranslate"><div class="highlight"><pre><s
 <dt class="sig sig-object cpp" id="_CPPv4N3qdk9chemistry10algorithms9microsoft34IterativeOrbitalLocalizationSchemeE">
 <span id="_CPPv3N3qdk9chemistry10algorithms9microsoft34IterativeOrbitalLocalizationSchemeE"></span><span id="_CPPv2N3qdk9chemistry10algorithms9microsoft34IterativeOrbitalLocalizationSchemeE"></span><span id="qdk::chemistry::algorithms::microsoft::IterativeOrbitalLocalizationScheme"></span><span class="target" id="classqdk_1_1chemistry_1_1algorithms_1_1microsoft_1_1IterativeOrbitalLocalizationScheme"></span><span class="k"><span class="pre">class</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">IterativeOrbitalLocalizationScheme</span></span></span><br /></dt>
 <dd><div class="docutils container">
-<em>#include &lt;/workspaces/qdk-chemistry/cpp/src/qdk/chemistry/algorithms/microsoft/localization/iterative_localizer_base.hpp&gt;</em></div>
+<em>#include &lt;/home/baker/code/qdk-chemistry/cpp/src/qdk/chemistry/algorithms/microsoft/localization/iterative_localizer_base.hpp&gt;</em></div>
 <p>Subclassed by <a class="reference internal" href="namespaceqdk_1_1chemistry_1_1algorithms_1_1microsoft.html#classqdk_1_1chemistry_1_1algorithms_1_1microsoft_1_1PipekMezeyLocalization"><span class="std std-ref">qdk::chemistry::algorithms::microsoft::PipekMezeyLocalization</span></a>, <a class="reference internal" href="namespaceqdk_1_1chemistry_1_1algorithms_1_1microsoft.html#classqdk_1_1chemistry_1_1algorithms_1_1microsoft_1_1VVHVLocalization"><span class="std std-ref">qdk::chemistry::algorithms::microsoft::VVHVLocalization</span></a></p>
 <div class="breathe-sectiondef docutils container">
 <p class="breathe-sectiondef-title rubric" id="breathe-section-title-public-types">Public Types</p>
@@ -2355,7 +2307,7 @@ Usage: <div class="highlight-default notranslate"><div class="highlight"><pre><s
 <dt class="sig sig-object cpp" id="_CPPv4N3qdk9chemistry10algorithms9microsoft36IterativeOrbitalLocalizationSettingsE">
 <span id="_CPPv3N3qdk9chemistry10algorithms9microsoft36IterativeOrbitalLocalizationSettingsE"></span><span id="_CPPv2N3qdk9chemistry10algorithms9microsoft36IterativeOrbitalLocalizationSettingsE"></span><span id="qdk::chemistry::algorithms::microsoft::IterativeOrbitalLocalizationSettings"></span><span class="target" id="classqdk_1_1chemistry_1_1algorithms_1_1microsoft_1_1IterativeOrbitalLocalizationSettings"></span><span class="k"><span class="pre">class</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">IterativeOrbitalLocalizationSettings</span></span></span><span class="w"> </span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="k"><span class="pre">public</span></span><span class="w"> </span><a class="reference internal" href="namespaceqdk.html#_CPPv43qdk" title="qdk"><span class="n"><span class="pre">qdk</span></span></a><span class="p"><span class="pre">::</span></span><a class="reference internal" href="namespaceqdk.html#_CPPv4N3qdk9chemistryE" title="qdk::chemistry"><span class="n"><span class="pre">chemistry</span></span></a><span class="p"><span class="pre">::</span></span><a class="reference internal" href="namespaceqdk.html#_CPPv4N3qdk9chemistry4dataE" title="qdk::chemistry::data"><span class="n"><span class="pre">data</span></span></a><span class="p"><span class="pre">::</span></span><a class="reference internal" href="namespaceqdk.html#_CPPv4N3qdk9chemistry4data8SettingsE" title="qdk::chemistry::data::Settings"><span class="n"><span class="pre">Settings</span></span></a><br /></dt>
 <dd><div class="docutils container">
-<em>#include &lt;/workspaces/qdk-chemistry/cpp/src/qdk/chemistry/algorithms/microsoft/localization/iterative_localizer_base.hpp&gt;</em></div>
+<em>#include &lt;/home/baker/code/qdk-chemistry/cpp/src/qdk/chemistry/algorithms/microsoft/localization/iterative_localizer_base.hpp&gt;</em></div>
 <p>Base class for all orbital localization algorithms. </p>
 <p>Contains common convergence parameters and general settings used by all localization methods. </p>
 <p>Subclassed by <a class="reference internal" href="namespaceqdk_1_1chemistry_1_1algorithms_1_1microsoft.html#classqdk_1_1chemistry_1_1algorithms_1_1microsoft_1_1VVHVLocalizerSettings"><span class="std std-ref">qdk::chemistry::algorithms::microsoft::VVHVLocalizerSettings</span></a></p>
@@ -2373,7 +2325,7 @@ Usage: <div class="highlight-default notranslate"><div class="highlight"><pre><s
 <dt class="sig sig-object cpp" id="_CPPv4N3qdk9chemistry10algorithms9microsoft5MacisE">
 <span id="_CPPv3N3qdk9chemistry10algorithms9microsoft5MacisE"></span><span id="_CPPv2N3qdk9chemistry10algorithms9microsoft5MacisE"></span><span id="qdk::chemistry::algorithms::microsoft::Macis"></span><span class="target" id="classqdk_1_1chemistry_1_1algorithms_1_1microsoft_1_1Macis"></span><span class="k"><span class="pre">class</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">Macis</span></span></span><span class="w"> </span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="k"><span class="pre">public</span></span><span class="w"> </span><a class="reference internal" href="namespaceqdk.html#_CPPv43qdk" title="qdk"><span class="n"><span class="pre">qdk</span></span></a><span class="p"><span class="pre">::</span></span><a class="reference internal" href="namespaceqdk.html#_CPPv4N3qdk9chemistryE" title="qdk::chemistry"><span class="n"><span class="pre">chemistry</span></span></a><span class="p"><span class="pre">::</span></span><a class="reference internal" href="namespaceqdk.html#_CPPv4N3qdk9chemistry10algorithmsE" title="qdk::chemistry::algorithms"><span class="n"><span class="pre">algorithms</span></span></a><span class="p"><span class="pre">::</span></span><a class="reference internal" href="namespaceqdk.html#_CPPv4N3qdk9chemistry10algorithms28MultiConfigurationCalculatorE" title="qdk::chemistry::algorithms::MultiConfigurationCalculator"><span class="n"><span class="pre">MultiConfigurationCalculator</span></span></a><br /></dt>
 <dd><div class="docutils container">
-<em>#include &lt;/workspaces/qdk-chemistry/cpp/src/qdk/chemistry/algorithms/microsoft/macis_base.hpp&gt;</em></div>
+<em>#include &lt;/home/baker/code/qdk-chemistry/cpp/src/qdk/chemistry/algorithms/microsoft/macis_base.hpp&gt;</em></div>
 <p>Many-body Adaptive Configuration Interaction Solver implementation. </p>
 <p>The MACIS class provides a concrete implementation of the <a class="reference internal" href="#classqdk_1_1chemistry_1_1algorithms_1_1MultiConfigurationCalculator"><span class="std std-ref">MultiConfigurationCalculator</span></a> interface using the MACIS (Many-body Adaptive Configuration Interaction Solver) library. This solver performs configuration interaction calculations on molecular systems with strong electron correlation.</p>
 <p>Features:<ul class="simple">
@@ -2449,7 +2401,7 @@ Usage: <div class="highlight-default notranslate"><div class="highlight"><pre><s
 <dt class="sig sig-object cpp" id="_CPPv4N3qdk9chemistry10algorithms9microsoft9MacisAsciE">
 <span id="_CPPv3N3qdk9chemistry10algorithms9microsoft9MacisAsciE"></span><span id="_CPPv2N3qdk9chemistry10algorithms9microsoft9MacisAsciE"></span><span id="qdk::chemistry::algorithms::microsoft::MacisAsci"></span><span class="target" id="classqdk_1_1chemistry_1_1algorithms_1_1microsoft_1_1MacisAsci"></span><span class="k"><span class="pre">class</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">MacisAsci</span></span></span><span class="w"> </span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="k"><span class="pre">public</span></span><span class="w"> </span><a class="reference internal" href="namespaceqdk.html#_CPPv43qdk" title="qdk"><span class="n"><span class="pre">qdk</span></span></a><span class="p"><span class="pre">::</span></span><a class="reference internal" href="namespaceqdk.html#_CPPv4N3qdk9chemistryE" title="qdk::chemistry"><span class="n"><span class="pre">chemistry</span></span></a><span class="p"><span class="pre">::</span></span><a class="reference internal" href="namespaceqdk.html#_CPPv4N3qdk9chemistry10algorithmsE" title="qdk::chemistry::algorithms"><span class="n"><span class="pre">algorithms</span></span></a><span class="p"><span class="pre">::</span></span><a class="reference internal" href="namespaceqdk.html#_CPPv4N3qdk9chemistry10algorithms9microsoftE" title="qdk::chemistry::algorithms::microsoft"><span class="n"><span class="pre">microsoft</span></span></a><span class="p"><span class="pre">::</span></span><a class="reference internal" href="namespaceqdk.html#_CPPv4N3qdk9chemistry10algorithms9microsoft5MacisE" title="qdk::chemistry::algorithms::microsoft::Macis"><span class="n"><span class="pre">Macis</span></span></a><br /></dt>
 <dd><div class="docutils container">
-<em>#include &lt;/workspaces/qdk-chemistry/cpp/src/qdk/chemistry/algorithms/microsoft/macis_asci.hpp&gt;</em></div>
+<em>#include &lt;/home/baker/code/qdk-chemistry/cpp/src/qdk/chemistry/algorithms/microsoft/macis_asci.hpp&gt;</em></div>
 <div class="breathe-sectiondef docutils container">
 <p class="breathe-sectiondef-title rubric" id="breathe-section-title-public-functions">Public Functions</p>
 <dl class="cpp function">
@@ -2482,7 +2434,7 @@ Usage: <div class="highlight-default notranslate"><div class="highlight"><pre><s
 <dt class="sig sig-object cpp" id="_CPPv4N3qdk9chemistry10algorithms9microsoft17MacisAsciSettingsE">
 <span id="_CPPv3N3qdk9chemistry10algorithms9microsoft17MacisAsciSettingsE"></span><span id="_CPPv2N3qdk9chemistry10algorithms9microsoft17MacisAsciSettingsE"></span><span id="qdk::chemistry::algorithms::microsoft::MacisAsciSettings"></span><span class="target" id="classqdk_1_1chemistry_1_1algorithms_1_1microsoft_1_1MacisAsciSettings"></span><span class="k"><span class="pre">class</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">MacisAsciSettings</span></span></span><span class="w"> </span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="k"><span class="pre">public</span></span><span class="w"> </span><a class="reference internal" href="namespaceqdk.html#_CPPv43qdk" title="qdk"><span class="n"><span class="pre">qdk</span></span></a><span class="p"><span class="pre">::</span></span><a class="reference internal" href="namespaceqdk.html#_CPPv4N3qdk9chemistryE" title="qdk::chemistry"><span class="n"><span class="pre">chemistry</span></span></a><span class="p"><span class="pre">::</span></span><a class="reference internal" href="namespaceqdk.html#_CPPv4N3qdk9chemistry10algorithmsE" title="qdk::chemistry::algorithms"><span class="n"><span class="pre">algorithms</span></span></a><span class="p"><span class="pre">::</span></span><a class="reference internal" href="namespaceqdk.html#_CPPv4N3qdk9chemistry10algorithms26MultiConfigurationSettingsE" title="qdk::chemistry::algorithms::MultiConfigurationSettings"><span class="n"><span class="pre">MultiConfigurationSettings</span></span></a><br /></dt>
 <dd><div class="docutils container">
-<em>#include &lt;/workspaces/qdk-chemistry/cpp/src/qdk/chemistry/algorithms/microsoft/macis_asci.hpp&gt;</em></div>
+<em>#include &lt;/home/baker/code/qdk-chemistry/cpp/src/qdk/chemistry/algorithms/microsoft/macis_asci.hpp&gt;</em></div>
 <p>Settings class specific to MACIS ASCI calculations. </p>
 <p>This class extends the base <a class="reference internal" href="#classqdk_1_1chemistry_1_1algorithms_1_1MultiConfigurationSettings"><span class="std std-ref">MultiConfigurationSettings</span></a> class with parameters specific to Adaptive Sampling Configuration Interaction (ASCI) calculations. It provides default values for ASCI-specific settings such as determinant limits, tolerances, and algorithm control parameters.</p>
 <p><div class="admonition seealso">
@@ -2512,7 +2464,7 @@ Usage: <div class="highlight-default notranslate"><div class="highlight"><pre><s
 <dt class="sig sig-object cpp" id="_CPPv4N3qdk9chemistry10algorithms9microsoft8MacisCasE">
 <span id="_CPPv3N3qdk9chemistry10algorithms9microsoft8MacisCasE"></span><span id="_CPPv2N3qdk9chemistry10algorithms9microsoft8MacisCasE"></span><span id="qdk::chemistry::algorithms::microsoft::MacisCas"></span><span class="target" id="classqdk_1_1chemistry_1_1algorithms_1_1microsoft_1_1MacisCas"></span><span class="k"><span class="pre">class</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">MacisCas</span></span></span><span class="w"> </span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="k"><span class="pre">public</span></span><span class="w"> </span><a class="reference internal" href="namespaceqdk.html#_CPPv43qdk" title="qdk"><span class="n"><span class="pre">qdk</span></span></a><span class="p"><span class="pre">::</span></span><a class="reference internal" href="namespaceqdk.html#_CPPv4N3qdk9chemistryE" title="qdk::chemistry"><span class="n"><span class="pre">chemistry</span></span></a><span class="p"><span class="pre">::</span></span><a class="reference internal" href="namespaceqdk.html#_CPPv4N3qdk9chemistry10algorithmsE" title="qdk::chemistry::algorithms"><span class="n"><span class="pre">algorithms</span></span></a><span class="p"><span class="pre">::</span></span><a class="reference internal" href="namespaceqdk.html#_CPPv4N3qdk9chemistry10algorithms9microsoftE" title="qdk::chemistry::algorithms::microsoft"><span class="n"><span class="pre">microsoft</span></span></a><span class="p"><span class="pre">::</span></span><a class="reference internal" href="namespaceqdk.html#_CPPv4N3qdk9chemistry10algorithms9microsoft5MacisE" title="qdk::chemistry::algorithms::microsoft::Macis"><span class="n"><span class="pre">Macis</span></span></a><br /></dt>
 <dd><div class="docutils container">
-<em>#include &lt;/workspaces/qdk-chemistry/cpp/src/qdk/chemistry/algorithms/microsoft/macis_cas.hpp&gt;</em></div>
+<em>#include &lt;/home/baker/code/qdk-chemistry/cpp/src/qdk/chemistry/algorithms/microsoft/macis_cas.hpp&gt;</em></div>
 <div class="breathe-sectiondef docutils container">
 <p class="breathe-sectiondef-title rubric" id="breathe-section-title-public-functions">Public Functions</p>
 <dl class="cpp function">
@@ -2545,7 +2497,7 @@ Usage: <div class="highlight-default notranslate"><div class="highlight"><pre><s
 <dt class="sig sig-object cpp" id="_CPPv4N3qdk9chemistry10algorithms9microsoft8MacisPmcE">
 <span id="_CPPv3N3qdk9chemistry10algorithms9microsoft8MacisPmcE"></span><span id="_CPPv2N3qdk9chemistry10algorithms9microsoft8MacisPmcE"></span><span id="qdk::chemistry::algorithms::microsoft::MacisPmc"></span><span class="target" id="classqdk_1_1chemistry_1_1algorithms_1_1microsoft_1_1MacisPmc"></span><span class="k"><span class="pre">class</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">MacisPmc</span></span></span><span class="w"> </span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="k"><span class="pre">public</span></span><span class="w"> </span><a class="reference internal" href="namespaceqdk.html#_CPPv43qdk" title="qdk"><span class="n"><span class="pre">qdk</span></span></a><span class="p"><span class="pre">::</span></span><a class="reference internal" href="namespaceqdk.html#_CPPv4N3qdk9chemistryE" title="qdk::chemistry"><span class="n"><span class="pre">chemistry</span></span></a><span class="p"><span class="pre">::</span></span><a class="reference internal" href="namespaceqdk.html#_CPPv4N3qdk9chemistry10algorithmsE" title="qdk::chemistry::algorithms"><span class="n"><span class="pre">algorithms</span></span></a><span class="p"><span class="pre">::</span></span><a class="reference internal" href="namespaceqdk.html#_CPPv4N3qdk9chemistry10algorithms37ProjectedMultiConfigurationCalculatorE" title="qdk::chemistry::algorithms::ProjectedMultiConfigurationCalculator"><span class="n"><span class="pre">ProjectedMultiConfigurationCalculator</span></span></a><br /></dt>
 <dd><div class="docutils container">
-<em>#include &lt;/workspaces/qdk-chemistry/cpp/src/qdk/chemistry/algorithms/microsoft/macis_pmc.hpp&gt;</em></div>
+<em>#include &lt;/home/baker/code/qdk-chemistry/cpp/src/qdk/chemistry/algorithms/microsoft/macis_pmc.hpp&gt;</em></div>
 <p>MACIS-based Projected Multi-Configuration calculator. </p>
 <p>This class implements projected multi-configuration calculations using the MACIS library. It performs projections of the Hamiltonian onto a specified set of determinants to compute energies and wavefunctions for strongly correlated molecular systems.</p>
 <p>The calculator inherits from <a class="reference internal" href="#classqdk_1_1chemistry_1_1algorithms_1_1ProjectedMultiConfigurationCalculator"><span class="std std-ref">ProjectedMultiConfigurationCalculator</span></a> and uses MACIS library routines to perform the actual projected calculations where the determinant space is provided as input rather than generated adaptively. </p>
@@ -2582,7 +2534,7 @@ Usage: <div class="highlight-default notranslate"><div class="highlight"><pre><s
 <dt class="sig sig-object cpp" id="_CPPv4N3qdk9chemistry10algorithms9microsoft16MacisPmcSettingsE">
 <span id="_CPPv3N3qdk9chemistry10algorithms9microsoft16MacisPmcSettingsE"></span><span id="_CPPv2N3qdk9chemistry10algorithms9microsoft16MacisPmcSettingsE"></span><span id="qdk::chemistry::algorithms::microsoft::MacisPmcSettings"></span><span class="target" id="classqdk_1_1chemistry_1_1algorithms_1_1microsoft_1_1MacisPmcSettings"></span><span class="k"><span class="pre">class</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">MacisPmcSettings</span></span></span><span class="w"> </span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="k"><span class="pre">public</span></span><span class="w"> </span><a class="reference internal" href="namespaceqdk.html#_CPPv43qdk" title="qdk"><span class="n"><span class="pre">qdk</span></span></a><span class="p"><span class="pre">::</span></span><a class="reference internal" href="namespaceqdk.html#_CPPv4N3qdk9chemistryE" title="qdk::chemistry"><span class="n"><span class="pre">chemistry</span></span></a><span class="p"><span class="pre">::</span></span><a class="reference internal" href="namespaceqdk.html#_CPPv4N3qdk9chemistry10algorithmsE" title="qdk::chemistry::algorithms"><span class="n"><span class="pre">algorithms</span></span></a><span class="p"><span class="pre">::</span></span><a class="reference internal" href="namespaceqdk.html#_CPPv4N3qdk9chemistry10algorithms35ProjectedMultiConfigurationSettingsE" title="qdk::chemistry::algorithms::ProjectedMultiConfigurationSettings"><span class="n"><span class="pre">ProjectedMultiConfigurationSettings</span></span></a><br /></dt>
 <dd><div class="docutils container">
-<em>#include &lt;/workspaces/qdk-chemistry/cpp/src/qdk/chemistry/algorithms/microsoft/macis_pmc.hpp&gt;</em></div>
+<em>#include &lt;/home/baker/code/qdk-chemistry/cpp/src/qdk/chemistry/algorithms/microsoft/macis_pmc.hpp&gt;</em></div>
 <p>Settings class specific to MACIS PMC calculations. </p>
 <p>This class extends the base <a class="reference internal" href="#classqdk_1_1chemistry_1_1algorithms_1_1ProjectedMultiConfigurationSettings"><span class="std std-ref">ProjectedMultiConfigurationSettings</span></a> class with parameters specific to Projected Multi-Configuration (PMC) calculations using the MACIS library. It provides default values for PMC-specific settings such as determinant limits, tolerances, and algorithm control parameters.</p>
 <p><div class="admonition seealso">
@@ -2613,7 +2565,7 @@ Usage: <div class="highlight-default notranslate"><div class="highlight"><pre><s
 <dt class="sig sig-object cpp" id="_CPPv4N3qdk9chemistry10algorithms9microsoft26MP2NaturalOrbitalLocalizerE">
 <span id="_CPPv3N3qdk9chemistry10algorithms9microsoft26MP2NaturalOrbitalLocalizerE"></span><span id="_CPPv2N3qdk9chemistry10algorithms9microsoft26MP2NaturalOrbitalLocalizerE"></span><span id="qdk::chemistry::algorithms::microsoft::MP2NaturalOrbitalLocalizer"></span><span class="target" id="classqdk_1_1chemistry_1_1algorithms_1_1microsoft_1_1MP2NaturalOrbitalLocalizer"></span><span class="k"><span class="pre">class</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">MP2NaturalOrbitalLocalizer</span></span></span><span class="w"> </span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="k"><span class="pre">public</span></span><span class="w"> </span><a class="reference internal" href="namespaceqdk.html#_CPPv43qdk" title="qdk"><span class="n"><span class="pre">qdk</span></span></a><span class="p"><span class="pre">::</span></span><a class="reference internal" href="namespaceqdk.html#_CPPv4N3qdk9chemistryE" title="qdk::chemistry"><span class="n"><span class="pre">chemistry</span></span></a><span class="p"><span class="pre">::</span></span><a class="reference internal" href="namespaceqdk.html#_CPPv4N3qdk9chemistry10algorithmsE" title="qdk::chemistry::algorithms"><span class="n"><span class="pre">algorithms</span></span></a><span class="p"><span class="pre">::</span></span><a class="reference internal" href="namespaceqdk.html#_CPPv4N3qdk9chemistry10algorithms9LocalizerE" title="qdk::chemistry::algorithms::Localizer"><span class="n"><span class="pre">Localizer</span></span></a><br /></dt>
 <dd><div class="docutils container">
-<em>#include &lt;/workspaces/qdk-chemistry/cpp/src/qdk/chemistry/algorithms/microsoft/localization/mp2_natural_orbitals.hpp&gt;</em></div>
+<em>#include &lt;/home/baker/code/qdk-chemistry/cpp/src/qdk/chemistry/algorithms/microsoft/localization/mp2_natural_orbitals.hpp&gt;</em></div>
 <p><a class="reference internal" href="#classqdk_1_1chemistry_1_1algorithms_1_1Localizer"><span class="std std-ref">Localizer</span></a> implementation that transforms orbitals to MP2 natural orbitals. </p>
 <p>This class provides a concrete implementation of the <a class="reference internal" href="#classqdk_1_1chemistry_1_1algorithms_1_1Localizer"><span class="std std-ref">Localizer</span></a> interface that transforms canonical molecular orbitals into natural orbitals derived from second-order Møller-Plesset perturbation theory (MP2). Natural orbitals are eigenfunctions of the first-order reduced density matrix.</p>
 <p>MP2 natural orbitals often provide a more compact representation of the electronic wavefunction, which can improve computational efficiency in correlation methods. The transformation diagonalizes the MP2 density matrix to produce orbitals with well-defined occupation numbers.</p>
@@ -2662,7 +2614,7 @@ Usage: <div class="highlight-default notranslate"><div class="highlight"><pre><s
 <dt class="sig sig-object cpp" id="_CPPv4N3qdk9chemistry10algorithms9microsoft29OccupationActiveSpaceSelectorE">
 <span id="_CPPv3N3qdk9chemistry10algorithms9microsoft29OccupationActiveSpaceSelectorE"></span><span id="_CPPv2N3qdk9chemistry10algorithms9microsoft29OccupationActiveSpaceSelectorE"></span><span id="qdk::chemistry::algorithms::microsoft::OccupationActiveSpaceSelector"></span><span class="target" id="classqdk_1_1chemistry_1_1algorithms_1_1microsoft_1_1OccupationActiveSpaceSelector"></span><span class="k"><span class="pre">class</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">OccupationActiveSpaceSelector</span></span></span><span class="w"> </span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="k"><span class="pre">public</span></span><span class="w"> </span><a class="reference internal" href="namespaceqdk.html#_CPPv43qdk" title="qdk"><span class="n"><span class="pre">qdk</span></span></a><span class="p"><span class="pre">::</span></span><a class="reference internal" href="namespaceqdk.html#_CPPv4N3qdk9chemistryE" title="qdk::chemistry"><span class="n"><span class="pre">chemistry</span></span></a><span class="p"><span class="pre">::</span></span><a class="reference internal" href="namespaceqdk.html#_CPPv4N3qdk9chemistry10algorithmsE" title="qdk::chemistry::algorithms"><span class="n"><span class="pre">algorithms</span></span></a><span class="p"><span class="pre">::</span></span><a class="reference internal" href="namespaceqdk.html#_CPPv4N3qdk9chemistry10algorithms19ActiveSpaceSelectorE" title="qdk::chemistry::algorithms::ActiveSpaceSelector"><span class="n"><span class="pre">ActiveSpaceSelector</span></span></a><br /></dt>
 <dd><div class="docutils container">
-<em>#include &lt;/workspaces/qdk-chemistry/cpp/src/qdk/chemistry/algorithms/microsoft/active_space/occupation_active_space.hpp&gt;</em></div>
+<em>#include &lt;/home/baker/code/qdk-chemistry/cpp/src/qdk/chemistry/algorithms/microsoft/active_space/occupation_active_space.hpp&gt;</em></div>
 <p>Selects active space orbitals based on orbital occupation numbers. </p>
 <p>This class provides a concrete implementation of the <a class="reference internal" href="#classqdk_1_1chemistry_1_1algorithms_1_1ActiveSpaceSelector"><span class="std std-ref">ActiveSpaceSelector</span></a> interface that selects active space orbitals based on their occupation numbers. It identifies orbitals that have partial occupations (not close to 0 or 2 electrons).</p>
 <p>Typical usage: <div class="highlight-cpp notranslate"><div class="highlight"><pre><span></span><span class="c1">// Create an occupation-based active space selector</span>
@@ -2724,7 +2676,7 @@ Usage: <div class="highlight-default notranslate"><div class="highlight"><pre><s
 <dt class="sig sig-object cpp" id="_CPPv4N3qdk9chemistry10algorithms9microsoft29OccupationActiveSpaceSettingsE">
 <span id="_CPPv3N3qdk9chemistry10algorithms9microsoft29OccupationActiveSpaceSettingsE"></span><span id="_CPPv2N3qdk9chemistry10algorithms9microsoft29OccupationActiveSpaceSettingsE"></span><span id="qdk::chemistry::algorithms::microsoft::OccupationActiveSpaceSettings"></span><span class="target" id="classqdk_1_1chemistry_1_1algorithms_1_1microsoft_1_1OccupationActiveSpaceSettings"></span><span class="k"><span class="pre">class</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">OccupationActiveSpaceSettings</span></span></span><span class="w"> </span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="k"><span class="pre">public</span></span><span class="w"> </span><a class="reference internal" href="namespaceqdk.html#_CPPv43qdk" title="qdk"><span class="n"><span class="pre">qdk</span></span></a><span class="p"><span class="pre">::</span></span><a class="reference internal" href="namespaceqdk.html#_CPPv4N3qdk9chemistryE" title="qdk::chemistry"><span class="n"><span class="pre">chemistry</span></span></a><span class="p"><span class="pre">::</span></span><a class="reference internal" href="namespaceqdk.html#_CPPv4N3qdk9chemistry4dataE" title="qdk::chemistry::data"><span class="n"><span class="pre">data</span></span></a><span class="p"><span class="pre">::</span></span><a class="reference internal" href="namespaceqdk.html#_CPPv4N3qdk9chemistry4data8SettingsE" title="qdk::chemistry::data::Settings"><span class="n"><span class="pre">Settings</span></span></a><br /></dt>
 <dd><div class="docutils container">
-<em>#include &lt;/workspaces/qdk-chemistry/cpp/src/qdk/chemistry/algorithms/microsoft/active_space/occupation_active_space.hpp&gt;</em></div>
+<em>#include &lt;/home/baker/code/qdk-chemistry/cpp/src/qdk/chemistry/algorithms/microsoft/active_space/occupation_active_space.hpp&gt;</em></div>
 <p>Settings container for the occupation-based active space selection algorithm. </p>
 <p>This class pre-configures threshold parameters for determining which orbitals should be included in the active space based on their occupation numbers.</p>
 <p>The occupation-based selection uses orbital occupation numbers to identify orbitals that exhibit partial occupation (not close to 0 or 2 electrons), which typically indicates significant multi-reference character and strong electron correlation.</p>
@@ -2756,7 +2708,7 @@ Usage: <div class="highlight-default notranslate"><div class="highlight"><pre><s
 <dt class="sig sig-object cpp" id="_CPPv4N3qdk9chemistry10algorithms9microsoft22PipekMezeyLocalizationE">
 <span id="_CPPv3N3qdk9chemistry10algorithms9microsoft22PipekMezeyLocalizationE"></span><span id="_CPPv2N3qdk9chemistry10algorithms9microsoft22PipekMezeyLocalizationE"></span><span id="qdk::chemistry::algorithms::microsoft::PipekMezeyLocalization"></span><span class="target" id="classqdk_1_1chemistry_1_1algorithms_1_1microsoft_1_1PipekMezeyLocalization"></span><span class="k"><span class="pre">class</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">PipekMezeyLocalization</span></span></span><span class="w"> </span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="k"><span class="pre">public</span></span><span class="w"> </span><a class="reference internal" href="namespaceqdk.html#_CPPv43qdk" title="qdk"><span class="n"><span class="pre">qdk</span></span></a><span class="p"><span class="pre">::</span></span><a class="reference internal" href="namespaceqdk.html#_CPPv4N3qdk9chemistryE" title="qdk::chemistry"><span class="n"><span class="pre">chemistry</span></span></a><span class="p"><span class="pre">::</span></span><a class="reference internal" href="namespaceqdk.html#_CPPv4N3qdk9chemistry10algorithmsE" title="qdk::chemistry::algorithms"><span class="n"><span class="pre">algorithms</span></span></a><span class="p"><span class="pre">::</span></span><a class="reference internal" href="namespaceqdk.html#_CPPv4N3qdk9chemistry10algorithms9microsoftE" title="qdk::chemistry::algorithms::microsoft"><span class="n"><span class="pre">microsoft</span></span></a><span class="p"><span class="pre">::</span></span><a class="reference internal" href="namespaceqdk.html#_CPPv4N3qdk9chemistry10algorithms9microsoft34IterativeOrbitalLocalizationSchemeE" title="qdk::chemistry::algorithms::microsoft::IterativeOrbitalLocalizationScheme"><span class="n"><span class="pre">IterativeOrbitalLocalizationScheme</span></span></a><br /></dt>
 <dd><div class="docutils container">
-<em>#include &lt;/workspaces/qdk-chemistry/cpp/src/qdk/chemistry/algorithms/microsoft/localization/pipek_mezey.hpp&gt;</em></div>
+<em>#include &lt;/home/baker/code/qdk-chemistry/cpp/src/qdk/chemistry/algorithms/microsoft/localization/pipek_mezey.hpp&gt;</em></div>
 <p>Pipek-Mezey localization scheme implementation. </p>
 <p>Implementation according to: J. W. Boughton, P. Pulay; J. Comp. Chem. 14 (1993), 736 - 740. <a class="reference external" href="https://doi.org/10.1002/jcc.540140615">https://doi.org/10.1002/jcc.540140615</a></p>
 <p>This class implements the Pipek-Mezey localization algorithm for molecular orbitals. It inherits from the <a class="reference internal" href="namespaceqdk_1_1chemistry_1_1algorithms_1_1microsoft.html#classqdk_1_1chemistry_1_1algorithms_1_1microsoft_1_1IterativeOrbitalLocalizationScheme"><span class="std std-ref">IterativeOrbitalLocalizationScheme</span></a> base class and provides a concrete implementation of the localize method. </p>
@@ -2764,7 +2716,7 @@ Usage: <div class="highlight-default notranslate"><div class="highlight"><pre><s
 <p class="breathe-sectiondef-title rubric" id="breathe-section-title-public-functions">Public Functions</p>
 <dl class="cpp function">
 <dt class="sig sig-object cpp" id="_CPPv4N3qdk9chemistry10algorithms9microsoft22PipekMezeyLocalization22PipekMezeyLocalizationE36IterativeOrbitalLocalizationSettingsRKN5Eigen8MatrixXdE6size_tNSt6vectorIiEE">
-<span id="_CPPv3N3qdk9chemistry10algorithms9microsoft22PipekMezeyLocalization22PipekMezeyLocalizationE36IterativeOrbitalLocalizationSettingsRKN5Eigen8MatrixXdE6size_tNSt6vectorIiEE"></span><span id="_CPPv2N3qdk9chemistry10algorithms9microsoft22PipekMezeyLocalization22PipekMezeyLocalizationE36IterativeOrbitalLocalizationSettingsRKN5Eigen8MatrixXdE6size_tNSt6vectorIiEE"></span><span id="qdk::chemistry::algorithms::microsoft::PipekMezeyLocalization::PipekMezeyLocalization__IterativeOrbitalLocalizationSettings.Eigen::MatrixXdCR.s.std::vector:i:"></span><span class="target" id="classqdk_1_1chemistry_1_1algorithms_1_1microsoft_1_1PipekMezeyLocalization_1a0a771d272849bf4ef551665eca57afa9"></span><span class="sig-name descname"><span class="n"><span class="pre">PipekMezeyLocalization</span></span></span><span class="sig-paren">(</span><a class="reference internal" href="namespaceqdk.html#_CPPv4N3qdk9chemistry10algorithms9microsoft36IterativeOrbitalLocalizationSettingsE" title="qdk::chemistry::algorithms::microsoft::IterativeOrbitalLocalizationSettings"><span class="n"><span class="pre">IterativeOrbitalLocalizationSettings</span></span></a><span class="w"> </span><span class="n sig-param"><span class="pre">settings</span></span>, <span class="k"><span class="pre">const</span></span><span class="w"> </span><span class="n"><span class="pre">Eigen</span></span><span class="p"><span class="pre">::</span></span><span class="n"><span class="pre">MatrixXd</span></span><span class="w"> </span><span class="p"><span class="pre">&amp;</span></span><span class="n sig-param"><span class="pre">overlap_matrix</span></span>, <span class="n"><span class="pre">size_t</span></span><span class="w"> </span><span class="n sig-param"><span class="pre">num_atoms</span></span>, <span class="n"><span class="pre">std</span></span><span class="p"><span class="pre">::</span></span><span class="n"><span class="pre">vector</span></span><span class="p"><span class="pre">&lt;</span></span><span class="kt"><span class="pre">int</span></span><span class="p"><span class="pre">&gt;</span></span><span class="w"> </span><span class="n sig-param"><span class="pre">bf_to_atom_map</span></span><span class="sig-paren">)</span><br /></dt>
+<span id="_CPPv3N3qdk9chemistry10algorithms9microsoft22PipekMezeyLocalization22PipekMezeyLocalizationE36IterativeOrbitalLocalizationSettingsRKN5Eigen8MatrixXdE6size_tNSt6vectorIiEE"></span><span id="_CPPv2N3qdk9chemistry10algorithms9microsoft22PipekMezeyLocalization22PipekMezeyLocalizationE36IterativeOrbitalLocalizationSettingsRKN5Eigen8MatrixXdE6size_tNSt6vectorIiEE"></span><span id="qdk::chemistry::algorithms::microsoft::PipekMezeyLocalization::PipekMezeyLocalization__IterativeOrbitalLocalizationSettings.Eigen::MatrixXdCR.s.std::vector:i:"></span><span class="target" id="classqdk_1_1chemistry_1_1algorithms_1_1microsoft_1_1PipekMezeyLocalization_1a9afd8b5ea650024fe33f9cb40b8c0870"></span><span class="sig-name descname"><span class="n"><span class="pre">PipekMezeyLocalization</span></span></span><span class="sig-paren">(</span><a class="reference internal" href="namespaceqdk.html#_CPPv4N3qdk9chemistry10algorithms9microsoft36IterativeOrbitalLocalizationSettingsE" title="qdk::chemistry::algorithms::microsoft::IterativeOrbitalLocalizationSettings"><span class="n"><span class="pre">IterativeOrbitalLocalizationSettings</span></span></a><span class="w"> </span><span class="n sig-param"><span class="pre">settings</span></span>, <span class="k"><span class="pre">const</span></span><span class="w"> </span><span class="n"><span class="pre">Eigen</span></span><span class="p"><span class="pre">::</span></span><span class="n"><span class="pre">MatrixXd</span></span><span class="w"> </span><span class="p"><span class="pre">&amp;</span></span><span class="n sig-param"><span class="pre">overlap_matrix</span></span>, <span class="n"><span class="pre">size_t</span></span><span class="w"> </span><span class="n sig-param"><span class="pre">num_atoms</span></span>, <span class="n"><span class="pre">std</span></span><span class="p"><span class="pre">::</span></span><span class="n"><span class="pre">vector</span></span><span class="p"><span class="pre">&lt;</span></span><span class="kt"><span class="pre">int</span></span><span class="p"><span class="pre">&gt;</span></span><span class="w"> </span><span class="n sig-param"><span class="pre">ao_to_atom_map</span></span><span class="sig-paren">)</span><br /></dt>
 <dd><p>Construct a new Pipek-Mezey localization object. </p>
 <p>Initializes the Pipek-Mezey localization scheme with the necessary parameters for orbital localization.</p>
 <p><div class="admonition seealso">
@@ -2778,7 +2730,7 @@ Usage: <div class="highlight-default notranslate"><div class="highlight"><pre><s
 </div>
 <div class="admonition note">
 <p class="admonition-title">Note</p>
-<p>The bf_to_atom_map indices must be in the range [0, num_atoms).</p>
+<p>The ao_to_atom_map indices must be in the range [0, num_atoms).</p>
 </div>
 <dl class="field-list simple">
 <dt class="field-odd">Parameters<span class="colon">:</span></dt>
@@ -2786,7 +2738,7 @@ Usage: <div class="highlight-default notranslate"><div class="highlight"><pre><s
 <li><p><strong>settings</strong> – Configuration settings for the iterative localization algorithm, including convergence tolerances, maximum iterations, and rotation thresholds </p></li>
 <li><p><strong>overlap_matrix</strong> – Atomic orbital overlap matrix (S_μν) used in the localization procedure to ensure orthonormality of the localized orbitals </p></li>
 <li><p><strong>num_atoms</strong> – Total number of atoms in the molecular system </p></li>
-<li><p><strong>bf_to_atom_map</strong> – Mapping from basis function index to atom index, required for computing atomic populations. Must have size equal to the number of basis functions, with each element indicating which atom the corresponding basis function belongs to</p></li>
+<li><p><strong>ao_to_atom_map</strong> – Mapping from atomic orbital index to atom index, required for computing atomic populations. Must have size equal to the number of atomic orbitals, with each element indicating which atom the corresponding atomic orbital belongs to</p></li>
 </ul>
 </dd>
 </dl>
@@ -2819,7 +2771,7 @@ Usage: <div class="highlight-default notranslate"><div class="highlight"><pre><s
 <dt class="sig sig-object cpp" id="_CPPv4N3qdk9chemistry10algorithms9microsoft19PipekMezeyLocalizerE">
 <span id="_CPPv3N3qdk9chemistry10algorithms9microsoft19PipekMezeyLocalizerE"></span><span id="_CPPv2N3qdk9chemistry10algorithms9microsoft19PipekMezeyLocalizerE"></span><span id="qdk::chemistry::algorithms::microsoft::PipekMezeyLocalizer"></span><span class="target" id="classqdk_1_1chemistry_1_1algorithms_1_1microsoft_1_1PipekMezeyLocalizer"></span><span class="k"><span class="pre">class</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">PipekMezeyLocalizer</span></span></span><span class="w"> </span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="k"><span class="pre">public</span></span><span class="w"> </span><a class="reference internal" href="namespaceqdk.html#_CPPv43qdk" title="qdk"><span class="n"><span class="pre">qdk</span></span></a><span class="p"><span class="pre">::</span></span><a class="reference internal" href="namespaceqdk.html#_CPPv4N3qdk9chemistryE" title="qdk::chemistry"><span class="n"><span class="pre">chemistry</span></span></a><span class="p"><span class="pre">::</span></span><a class="reference internal" href="namespaceqdk.html#_CPPv4N3qdk9chemistry10algorithmsE" title="qdk::chemistry::algorithms"><span class="n"><span class="pre">algorithms</span></span></a><span class="p"><span class="pre">::</span></span><a class="reference internal" href="namespaceqdk.html#_CPPv4N3qdk9chemistry10algorithms9LocalizerE" title="qdk::chemistry::algorithms::Localizer"><span class="n"><span class="pre">Localizer</span></span></a><br /></dt>
 <dd><div class="docutils container">
-<em>#include &lt;/workspaces/qdk-chemistry/cpp/src/qdk/chemistry/algorithms/microsoft/localization/pipek_mezey.hpp&gt;</em></div>
+<em>#include &lt;/home/baker/code/qdk-chemistry/cpp/src/qdk/chemistry/algorithms/microsoft/localization/pipek_mezey.hpp&gt;</em></div>
 <p>Default Pipek-Mezey implementation of the <a class="reference internal" href="#classqdk_1_1chemistry_1_1algorithms_1_1Localizer"><span class="std std-ref">Localizer</span></a> interface. </p>
 <p>This class provides a concrete implementation of the <a class="reference internal" href="#classqdk_1_1chemistry_1_1algorithms_1_1Localizer"><span class="std std-ref">Localizer</span></a> interface using the Pipek-Mezey localization algorithm as the default method. It inherits from the base <code class="docutils literal notranslate"><a class="reference internal" href="#classqdk_1_1chemistry_1_1algorithms_1_1Localizer"><span class="std std-ref"><span class="pre">qdk::chemistry::algorithms::Localizer</span></span></a></code> class and implements the <code class="docutils literal notranslate"><span class="pre">localize</span></code> method to perform orbital localization.</p>
 <p>The Pipek-Mezey algorithm maximizes the sum of squares of atomic orbital populations on atoms, resulting in orbitals that are more localized to individual atoms or bonds. This implementation separately localizes occupied and virtual orbitals to maintain the occupied-virtual separation.</p>
@@ -2921,7 +2873,7 @@ Usage: <div class="highlight-default notranslate"><div class="highlight"><pre><s
 <dt class="sig sig-object cpp" id="_CPPv4N3qdk9chemistry10algorithms9microsoft11ScfSettingsE">
 <span id="_CPPv3N3qdk9chemistry10algorithms9microsoft11ScfSettingsE"></span><span id="_CPPv2N3qdk9chemistry10algorithms9microsoft11ScfSettingsE"></span><span id="qdk::chemistry::algorithms::microsoft::ScfSettings"></span><span class="target" id="classqdk_1_1chemistry_1_1algorithms_1_1microsoft_1_1ScfSettings"></span><span class="k"><span class="pre">class</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">ScfSettings</span></span></span><span class="w"> </span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="k"><span class="pre">public</span></span><span class="w"> </span><a class="reference internal" href="namespaceqdk.html#_CPPv43qdk" title="qdk"><span class="n"><span class="pre">qdk</span></span></a><span class="p"><span class="pre">::</span></span><a class="reference internal" href="namespaceqdk.html#_CPPv4N3qdk9chemistryE" title="qdk::chemistry"><span class="n"><span class="pre">chemistry</span></span></a><span class="p"><span class="pre">::</span></span><a class="reference internal" href="namespaceqdk.html#_CPPv4N3qdk9chemistry10algorithmsE" title="qdk::chemistry::algorithms"><span class="n"><span class="pre">algorithms</span></span></a><span class="p"><span class="pre">::</span></span><a class="reference internal" href="namespaceqdk.html#_CPPv4N3qdk9chemistry10algorithms27ElectronicStructureSettingsE" title="qdk::chemistry::algorithms::ElectronicStructureSettings"><span class="n"><span class="pre">ElectronicStructureSettings</span></span></a><br /></dt>
 <dd><div class="docutils container">
-<em>#include &lt;/workspaces/qdk-chemistry/cpp/src/qdk/chemistry/algorithms/microsoft/scf.hpp&gt;</em></div>
+<em>#include &lt;/home/baker/code/qdk-chemistry/cpp/src/qdk/chemistry/algorithms/microsoft/scf.hpp&gt;</em></div>
 <p>Settings container for the internal SCF solver implementation. </p>
 <p>This class extends the <a class="reference internal" href="#classqdk_1_1chemistry_1_1algorithms_1_1ElectronicStructureSettings"><span class="std std-ref">ElectronicStructureSettings</span></a> class to provide specific default settings for the internal SCF solver. It pre-configures common SCF calculation parameters with sensible default values.</p>
 <p>Default settings include:<ul class="simple">
@@ -2966,7 +2918,7 @@ Usage: <div class="highlight-default notranslate"><div class="highlight"><pre><s
 <dt class="sig sig-object cpp" id="_CPPv4N3qdk9chemistry10algorithms9microsoft9ScfSolverE">
 <span id="_CPPv3N3qdk9chemistry10algorithms9microsoft9ScfSolverE"></span><span id="_CPPv2N3qdk9chemistry10algorithms9microsoft9ScfSolverE"></span><span id="qdk::chemistry::algorithms::microsoft::ScfSolver"></span><span class="target" id="classqdk_1_1chemistry_1_1algorithms_1_1microsoft_1_1ScfSolver"></span><span class="k"><span class="pre">class</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">ScfSolver</span></span></span><span class="w"> </span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="k"><span class="pre">public</span></span><span class="w"> </span><a class="reference internal" href="namespaceqdk.html#_CPPv43qdk" title="qdk"><span class="n"><span class="pre">qdk</span></span></a><span class="p"><span class="pre">::</span></span><a class="reference internal" href="namespaceqdk.html#_CPPv4N3qdk9chemistryE" title="qdk::chemistry"><span class="n"><span class="pre">chemistry</span></span></a><span class="p"><span class="pre">::</span></span><a class="reference internal" href="namespaceqdk.html#_CPPv4N3qdk9chemistry10algorithmsE" title="qdk::chemistry::algorithms"><span class="n"><span class="pre">algorithms</span></span></a><span class="p"><span class="pre">::</span></span><a class="reference internal" href="namespaceqdk.html#_CPPv4N3qdk9chemistry10algorithms9ScfSolverE" title="qdk::chemistry::algorithms::ScfSolver"><span class="n"><span class="pre">ScfSolver</span></span></a><br /></dt>
 <dd><div class="docutils container">
-<em>#include &lt;/workspaces/qdk-chemistry/cpp/src/qdk/chemistry/algorithms/microsoft/scf.hpp&gt;</em></div>
+<em>#include &lt;/home/baker/code/qdk-chemistry/cpp/src/qdk/chemistry/algorithms/microsoft/scf.hpp&gt;</em></div>
 <p>Internal implementation of the SCF solver. </p>
 <p>This class provides a concrete implementation of the SCF (Self-Consistent Field) solver using the internal backend. It inherits from the base <code class="docutils literal notranslate"><a class="reference internal" href="namespaceqdk_1_1chemistry_1_1algorithms_1_1microsoft.html#classqdk_1_1chemistry_1_1algorithms_1_1microsoft_1_1ScfSolver"><span class="std std-ref"><span class="pre">ScfSolver</span></span></a></code> class and implements the <code class="docutils literal notranslate"><span class="pre">solve</span></code> method to perform self-consistent field calculations on molecular structures.</p>
 <p>Typical usage: <div class="highlight-cpp notranslate"><div class="highlight"><pre><span></span><span class="c1">// Create a molecular structure</span>
@@ -3041,7 +2993,7 @@ Usage: <div class="highlight-default notranslate"><div class="highlight"><pre><s
 <dt class="sig sig-object cpp" id="_CPPv4N3qdk9chemistry10algorithms9microsoft26ValenceActiveSpaceSelectorE">
 <span id="_CPPv3N3qdk9chemistry10algorithms9microsoft26ValenceActiveSpaceSelectorE"></span><span id="_CPPv2N3qdk9chemistry10algorithms9microsoft26ValenceActiveSpaceSelectorE"></span><span id="qdk::chemistry::algorithms::microsoft::ValenceActiveSpaceSelector"></span><span class="target" id="classqdk_1_1chemistry_1_1algorithms_1_1microsoft_1_1ValenceActiveSpaceSelector"></span><span class="k"><span class="pre">class</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">ValenceActiveSpaceSelector</span></span></span><span class="w"> </span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="k"><span class="pre">public</span></span><span class="w"> </span><a class="reference internal" href="namespaceqdk.html#_CPPv43qdk" title="qdk"><span class="n"><span class="pre">qdk</span></span></a><span class="p"><span class="pre">::</span></span><a class="reference internal" href="namespaceqdk.html#_CPPv4N3qdk9chemistryE" title="qdk::chemistry"><span class="n"><span class="pre">chemistry</span></span></a><span class="p"><span class="pre">::</span></span><a class="reference internal" href="namespaceqdk.html#_CPPv4N3qdk9chemistry10algorithmsE" title="qdk::chemistry::algorithms"><span class="n"><span class="pre">algorithms</span></span></a><span class="p"><span class="pre">::</span></span><a class="reference internal" href="namespaceqdk.html#_CPPv4N3qdk9chemistry10algorithms19ActiveSpaceSelectorE" title="qdk::chemistry::algorithms::ActiveSpaceSelector"><span class="n"><span class="pre">ActiveSpaceSelector</span></span></a><br /></dt>
 <dd><div class="docutils container">
-<em>#include &lt;/workspaces/qdk-chemistry/cpp/src/qdk/chemistry/algorithms/microsoft/active_space/valence_active_space.hpp&gt;</em></div>
+<em>#include &lt;/home/baker/code/qdk-chemistry/cpp/src/qdk/chemistry/algorithms/microsoft/active_space/valence_active_space.hpp&gt;</em></div>
 <p>Selects active space orbitals based on specified number of electrons and orbitals. </p>
 <p>This class implements the <a class="reference internal" href="#classqdk_1_1chemistry_1_1algorithms_1_1ActiveSpaceSelector"><span class="std std-ref">ActiveSpaceSelector</span></a> interface to create an active space consisting of a specified number of orbitals with a given number of electrons. It selects a contiguous block of orbitals starting after the inactive orbitals.</p>
 <p>The selector requires:<ul class="simple">
@@ -3088,7 +3040,7 @@ Usage: <div class="highlight-default notranslate"><div class="highlight"><pre><s
 <dt class="sig sig-object cpp" id="_CPPv4N3qdk9chemistry10algorithms9microsoft26ValenceActiveSpaceSettingsE">
 <span id="_CPPv3N3qdk9chemistry10algorithms9microsoft26ValenceActiveSpaceSettingsE"></span><span id="_CPPv2N3qdk9chemistry10algorithms9microsoft26ValenceActiveSpaceSettingsE"></span><span id="qdk::chemistry::algorithms::microsoft::ValenceActiveSpaceSettings"></span><span class="target" id="classqdk_1_1chemistry_1_1algorithms_1_1microsoft_1_1ValenceActiveSpaceSettings"></span><span class="k"><span class="pre">class</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">ValenceActiveSpaceSettings</span></span></span><span class="w"> </span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="k"><span class="pre">public</span></span><span class="w"> </span><a class="reference internal" href="namespaceqdk.html#_CPPv43qdk" title="qdk"><span class="n"><span class="pre">qdk</span></span></a><span class="p"><span class="pre">::</span></span><a class="reference internal" href="namespaceqdk.html#_CPPv4N3qdk9chemistryE" title="qdk::chemistry"><span class="n"><span class="pre">chemistry</span></span></a><span class="p"><span class="pre">::</span></span><a class="reference internal" href="namespaceqdk.html#_CPPv4N3qdk9chemistry4dataE" title="qdk::chemistry::data"><span class="n"><span class="pre">data</span></span></a><span class="p"><span class="pre">::</span></span><a class="reference internal" href="namespaceqdk.html#_CPPv4N3qdk9chemistry4data8SettingsE" title="qdk::chemistry::data::Settings"><span class="n"><span class="pre">Settings</span></span></a><br /></dt>
 <dd><div class="docutils container">
-<em>#include &lt;/workspaces/qdk-chemistry/cpp/src/qdk/chemistry/algorithms/microsoft/active_space/valence_active_space.hpp&gt;</em></div>
+<em>#include &lt;/home/baker/code/qdk-chemistry/cpp/src/qdk/chemistry/algorithms/microsoft/active_space/valence_active_space.hpp&gt;</em></div>
 <p>Settings container for the valence-based active space selection algorithm. </p>
 <p>This class defines settings for specifying the number of active electrons and active orbitals.</p>
 <p>Default settings:<ul class="simple">
@@ -3116,7 +3068,7 @@ Usage: <div class="highlight-default notranslate"><div class="highlight"><pre><s
 <dt class="sig sig-object cpp" id="_CPPv4N3qdk9chemistry10algorithms9microsoft16VVHVLocalizationE">
 <span id="_CPPv3N3qdk9chemistry10algorithms9microsoft16VVHVLocalizationE"></span><span id="_CPPv2N3qdk9chemistry10algorithms9microsoft16VVHVLocalizationE"></span><span id="qdk::chemistry::algorithms::microsoft::VVHVLocalization"></span><span class="target" id="classqdk_1_1chemistry_1_1algorithms_1_1microsoft_1_1VVHVLocalization"></span><span class="k"><span class="pre">class</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">VVHVLocalization</span></span></span><span class="w"> </span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="k"><span class="pre">public</span></span><span class="w"> </span><a class="reference internal" href="namespaceqdk.html#_CPPv43qdk" title="qdk"><span class="n"><span class="pre">qdk</span></span></a><span class="p"><span class="pre">::</span></span><a class="reference internal" href="namespaceqdk.html#_CPPv4N3qdk9chemistryE" title="qdk::chemistry"><span class="n"><span class="pre">chemistry</span></span></a><span class="p"><span class="pre">::</span></span><a class="reference internal" href="namespaceqdk.html#_CPPv4N3qdk9chemistry10algorithmsE" title="qdk::chemistry::algorithms"><span class="n"><span class="pre">algorithms</span></span></a><span class="p"><span class="pre">::</span></span><a class="reference internal" href="namespaceqdk.html#_CPPv4N3qdk9chemistry10algorithms9microsoftE" title="qdk::chemistry::algorithms::microsoft"><span class="n"><span class="pre">microsoft</span></span></a><span class="p"><span class="pre">::</span></span><a class="reference internal" href="namespaceqdk.html#_CPPv4N3qdk9chemistry10algorithms9microsoft34IterativeOrbitalLocalizationSchemeE" title="qdk::chemistry::algorithms::microsoft::IterativeOrbitalLocalizationScheme"><span class="n"><span class="pre">IterativeOrbitalLocalizationScheme</span></span></a><br /></dt>
 <dd><div class="docutils container">
-<em>#include &lt;/workspaces/qdk-chemistry/cpp/src/qdk/chemistry/algorithms/microsoft/localization/vvhv.hpp&gt;</em></div>
+<em>#include &lt;/home/baker/code/qdk-chemistry/cpp/src/qdk/chemistry/algorithms/microsoft/localization/vvhv.hpp&gt;</em></div>
 <p>VV-HV localization scheme implementation. </p>
 <p>This class implements the VV-HV localization algorithm for molecular orbitals. It partitions the virtual space into valence virtuals and hard virtuals based on projection onto a minimal basis, then uses a pluggable localization scheme (e.g., Pipek-Mezey) to localize the occupied space and valence virtuals space and project Atomic orbitals into the hard virtual space.</p>
 <p>This class holds a pointer to an <a class="reference internal" href="namespaceqdk_1_1chemistry_1_1algorithms_1_1microsoft.html#classqdk_1_1chemistry_1_1algorithms_1_1microsoft_1_1IterativeOrbitalLocalizationScheme"><span class="std std-ref">IterativeOrbitalLocalizationScheme</span></a> for the actual localization work. This allows flexibility to use different localization methods (Pipek-Mezey, Foster-Boys, etc.) for occupied orbitals and valence virtuals in the future. </p>
@@ -3151,10 +3103,10 @@ Usage: <div class="highlight-default notranslate"><div class="highlight"><pre><s
 <p>This method performs the localization of virtual molecular orbitals according to the VV-HV scheme. It constructs the valence virtual space by projecting the occupied space out of the minimal basis, then localizes valence virtuals and constructs hard virtual orbitals.</p>
 <dl class="field-list simple">
 <dt class="field-odd">Parameters<span class="colon">:</span></dt>
-<dd class="field-odd"><p><strong>occupied_orbitals</strong> – Matrix of occupied orbital coefficients (num_basis_funcs x num_occupied_orbitals) </p>
+<dd class="field-odd"><p><strong>occupied_orbitals</strong> – Matrix of occupied orbital coefficients (num_atomic_orbitals x num_occupied_orbitals) </p>
 </dd>
 <dt class="field-even">Returns<span class="colon">:</span></dt>
-<dd class="field-even"><p>Localized virtual orbital coefficient matrix (num_basis_funcs x num_virtual_orbitals) </p>
+<dd class="field-even"><p>Localized virtual orbital coefficient matrix (num_atomic_orbitals x num_virtual_orbitals) </p>
 </dd>
 </dl>
 </dd></dl>
@@ -3166,7 +3118,7 @@ Usage: <div class="highlight-default notranslate"><div class="highlight"><pre><s
 <dt class="sig sig-object cpp" id="_CPPv4N3qdk9chemistry10algorithms9microsoft13VVHVLocalizerE">
 <span id="_CPPv3N3qdk9chemistry10algorithms9microsoft13VVHVLocalizerE"></span><span id="_CPPv2N3qdk9chemistry10algorithms9microsoft13VVHVLocalizerE"></span><span id="qdk::chemistry::algorithms::microsoft::VVHVLocalizer"></span><span class="target" id="classqdk_1_1chemistry_1_1algorithms_1_1microsoft_1_1VVHVLocalizer"></span><span class="k"><span class="pre">class</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">VVHVLocalizer</span></span></span><span class="w"> </span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="k"><span class="pre">public</span></span><span class="w"> </span><a class="reference internal" href="namespaceqdk.html#_CPPv43qdk" title="qdk"><span class="n"><span class="pre">qdk</span></span></a><span class="p"><span class="pre">::</span></span><a class="reference internal" href="namespaceqdk.html#_CPPv4N3qdk9chemistryE" title="qdk::chemistry"><span class="n"><span class="pre">chemistry</span></span></a><span class="p"><span class="pre">::</span></span><a class="reference internal" href="namespaceqdk.html#_CPPv4N3qdk9chemistry10algorithmsE" title="qdk::chemistry::algorithms"><span class="n"><span class="pre">algorithms</span></span></a><span class="p"><span class="pre">::</span></span><a class="reference internal" href="namespaceqdk.html#_CPPv4N3qdk9chemistry10algorithms9LocalizerE" title="qdk::chemistry::algorithms::Localizer"><span class="n"><span class="pre">Localizer</span></span></a><br /></dt>
 <dd><div class="docutils container">
-<em>#include &lt;/workspaces/qdk-chemistry/cpp/src/qdk/chemistry/algorithms/microsoft/localization/vvhv.hpp&gt;</em></div>
+<em>#include &lt;/home/baker/code/qdk-chemistry/cpp/src/qdk/chemistry/algorithms/microsoft/localization/vvhv.hpp&gt;</em></div>
 <p>Valence Virtual - Hard Virtual (VV-HV) implementation of the <a class="reference internal" href="#classqdk_1_1chemistry_1_1algorithms_1_1Localizer"><span class="std std-ref">Localizer</span></a> interface. </p>
 <p>This class provides a concrete implementation of the <a class="reference internal" href="#classqdk_1_1chemistry_1_1algorithms_1_1Localizer"><span class="std std-ref">Localizer</span></a> interface using the VV-HV localization algorithm.</p>
 <p>The VV-HV algorithm partitions virtual orbitals into valence virtuals (VVs) and hard virtuals (HVs) based on projection onto a minimal basis, then localizes each space separately using Pipek-Mezey localization.</p>
@@ -3186,25 +3138,18 @@ Usage: <div class="highlight-default notranslate"><div class="highlight"><pre><s
 <dt class="sig sig-object cpp" id="_CPPv4NK3qdk9chemistry10algorithms9microsoft13VVHVLocalizer9_run_implENSt10shared_ptrIN4data12WavefunctionEEERKNSt6vectorI6size_tEERKNSt6vectorI6size_tEE">
 <span id="_CPPv3NK3qdk9chemistry10algorithms9microsoft13VVHVLocalizer9_run_implENSt10shared_ptrIN4data12WavefunctionEEERKNSt6vectorI6size_tEERKNSt6vectorI6size_tEE"></span><span id="_CPPv2NK3qdk9chemistry10algorithms9microsoft13VVHVLocalizer9_run_implENSt10shared_ptrIN4data12WavefunctionEEERKNSt6vectorI6size_tEERKNSt6vectorI6size_tEE"></span><span id="qdk::chemistry::algorithms::microsoft::VVHVLocalizer::_run_impl__std::shared_ptr:data::Wavefunction:.std::vector:s:CR.std::vector:s:CRC"></span><span class="target" id="classqdk_1_1chemistry_1_1algorithms_1_1microsoft_1_1VVHVLocalizer_1a96b6999cd5a3e05b9012deedb4071dbd"></span><span class="k"><span class="pre">virtual</span></span><span class="w"> </span><span class="n"><span class="pre">std</span></span><span class="p"><span class="pre">::</span></span><span class="n"><span class="pre">shared_ptr</span></span><span class="p"><span class="pre">&lt;</span></span><a class="reference internal" href="namespaceqdk.html#_CPPv4N3qdk9chemistry4dataE" title="qdk::chemistry::data"><span class="n"><span class="pre">data</span></span></a><span class="p"><span class="pre">::</span></span><a class="reference internal" href="namespaceqdk.html#_CPPv4N3qdk9chemistry4data12WavefunctionE" title="qdk::chemistry::data::Wavefunction"><span class="n"><span class="pre">Wavefunction</span></span></a><span class="p"><span class="pre">&gt;</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">_run_impl</span></span></span><span class="sig-paren">(</span><span class="n"><span class="pre">std</span></span><span class="p"><span class="pre">::</span></span><span class="n"><span class="pre">shared_ptr</span></span><span class="p"><span class="pre">&lt;</span></span><a class="reference internal" href="namespaceqdk.html#_CPPv4N3qdk9chemistry4dataE" title="qdk::chemistry::data"><span class="n"><span class="pre">data</span></span></a><span class="p"><span class="pre">::</span></span><a class="reference internal" href="namespaceqdk.html#_CPPv4N3qdk9chemistry4data12WavefunctionE" title="qdk::chemistry::data::Wavefunction"><span class="n"><span class="pre">Wavefunction</span></span></a><span class="p"><span class="pre">&gt;</span></span><span class="w"> </span><span class="n sig-param"><span class="pre">wavefunction</span></span>, <span class="k"><span class="pre">const</span></span><span class="w"> </span><span class="n"><span class="pre">std</span></span><span class="p"><span class="pre">::</span></span><span class="n"><span class="pre">vector</span></span><span class="p"><span class="pre">&lt;</span></span><span class="n"><span class="pre">size_t</span></span><span class="p"><span class="pre">&gt;</span></span><span class="w"> </span><span class="p"><span class="pre">&amp;</span></span><span class="n sig-param"><span class="pre">loc_indices_a</span></span>, <span class="k"><span class="pre">const</span></span><span class="w"> </span><span class="n"><span class="pre">std</span></span><span class="p"><span class="pre">::</span></span><span class="n"><span class="pre">vector</span></span><span class="p"><span class="pre">&lt;</span></span><span class="n"><span class="pre">size_t</span></span><span class="p"><span class="pre">&gt;</span></span><span class="w"> </span><span class="p"><span class="pre">&amp;</span></span><span class="n sig-param"><span class="pre">loc_indices_b</span></span><span class="sig-paren">)</span><span class="w"> </span><span class="k"><span class="pre">const</span></span><span class="w"> </span><span class="k"><span class="pre">override</span></span><br /></dt>
 <dd><p>Localize orbitals using the VV-HV algorithm. </p>
-<p>This method performs VV-HV localization on the input orbitals. It requires that all orbital indices are covered (loc_indices_a and loc_indices_b must span all orbitals).</p>
+<p>This method performs VV-HV localization on the input orbitals. It requires that all orbital indices are covered (loc_indices_a and loc_indices_b must span all orbitals). </p>
 <dl class="field-list simple">
-<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dt class="field-odd">Throws<span class="colon">:</span></dt>
 <dd class="field-odd"><ul class="simple">
-<li><p><strong>orbitals</strong> – The orbitals to localize </p></li>
-<li><p><strong>loc_indices_a</strong> – Indices of alpha orbitals (must cover all orbitals, must be sorted) </p></li>
-<li><p><strong>loc_indices_b</strong> – Indices of beta orbitals (must cover all orbitals, must be sorted) </p></li>
-</ul>
-</dd>
-<dt class="field-even">Throws<span class="colon">:</span></dt>
-<dd class="field-even"><ul class="simple">
 <li><p><span><span class="cpp-expr sig sig-inline cpp"><span class="n">std</span><span class="p">::</span><span class="n">invalid_argument</span></span></span> – If loc_indices_a or loc_indices_b are not sorted </p></li>
 <li><p><span><span class="cpp-expr sig sig-inline cpp"><span class="n">std</span><span class="p">::</span><span class="n">invalid_argument</span></span></span> – If not all orbital indices are covered </p></li>
 <li><p><span><span class="cpp-expr sig sig-inline cpp"><span class="n">std</span><span class="p">::</span><span class="n">invalid_argument</span></span></span> – If restricted orbitals have different alpha/beta indices </p></li>
 <li><p><span><span class="cpp-expr sig sig-inline cpp"><span class="n">std</span><span class="p">::</span><span class="n">runtime_error</span></span></span> – If basis set has linear dependence issues </p></li>
 </ul>
 </dd>
-<dt class="field-odd">Returns<span class="colon">:</span></dt>
-<dd class="field-odd"><p>The localized molecular orbitals </p>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>The localized molecular orbitals </p>
 </dd>
 </dl>
 </dd></dl>
@@ -3227,7 +3172,7 @@ Usage: <div class="highlight-default notranslate"><div class="highlight"><pre><s
 <dt class="sig sig-object cpp" id="_CPPv4N3qdk9chemistry10algorithms9microsoft21VVHVLocalizerSettingsE">
 <span id="_CPPv3N3qdk9chemistry10algorithms9microsoft21VVHVLocalizerSettingsE"></span><span id="_CPPv2N3qdk9chemistry10algorithms9microsoft21VVHVLocalizerSettingsE"></span><span id="qdk::chemistry::algorithms::microsoft::VVHVLocalizerSettings"></span><span class="target" id="classqdk_1_1chemistry_1_1algorithms_1_1microsoft_1_1VVHVLocalizerSettings"></span><span class="k"><span class="pre">class</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">VVHVLocalizerSettings</span></span></span><span class="w"> </span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="k"><span class="pre">public</span></span><span class="w"> </span><a class="reference internal" href="namespaceqdk.html#_CPPv43qdk" title="qdk"><span class="n"><span class="pre">qdk</span></span></a><span class="p"><span class="pre">::</span></span><a class="reference internal" href="namespaceqdk.html#_CPPv4N3qdk9chemistryE" title="qdk::chemistry"><span class="n"><span class="pre">chemistry</span></span></a><span class="p"><span class="pre">::</span></span><a class="reference internal" href="namespaceqdk.html#_CPPv4N3qdk9chemistry10algorithmsE" title="qdk::chemistry::algorithms"><span class="n"><span class="pre">algorithms</span></span></a><span class="p"><span class="pre">::</span></span><a class="reference internal" href="namespaceqdk.html#_CPPv4N3qdk9chemistry10algorithms9microsoftE" title="qdk::chemistry::algorithms::microsoft"><span class="n"><span class="pre">microsoft</span></span></a><span class="p"><span class="pre">::</span></span><a class="reference internal" href="namespaceqdk.html#_CPPv4N3qdk9chemistry10algorithms9microsoft36IterativeOrbitalLocalizationSettingsE" title="qdk::chemistry::algorithms::microsoft::IterativeOrbitalLocalizationSettings"><span class="n"><span class="pre">IterativeOrbitalLocalizationSettings</span></span></a><br /></dt>
 <dd><div class="docutils container">
-<em>#include &lt;/workspaces/qdk-chemistry/cpp/src/qdk/chemistry/algorithms/microsoft/localization/vvhv.hpp&gt;</em></div>
+<em>#include &lt;/home/baker/code/qdk-chemistry/cpp/src/qdk/chemistry/algorithms/microsoft/localization/vvhv.hpp&gt;</em></div>
 <p>Settings class for VVHV localization. </p>
 <p>Contains configuration parameters specific to Valence Virtual - Hard Virtual (VV-HV) localization, including all parameters from the base iterative localization settings plus any VVHV-specific options. </p>
 <div class="breathe-sectiondef docutils container">
@@ -3244,7 +3189,7 @@ Usage: <div class="highlight-default notranslate"><div class="highlight"><pre><s
 <dt class="sig sig-object cpp" id="_CPPv4N3qdk9chemistry10algorithms9microsoft29YetAnotherActiveSpaceSettingsE">
 <span id="_CPPv3N3qdk9chemistry10algorithms9microsoft29YetAnotherActiveSpaceSettingsE"></span><span id="_CPPv2N3qdk9chemistry10algorithms9microsoft29YetAnotherActiveSpaceSettingsE"></span><span id="qdk::chemistry::algorithms::microsoft::YetAnotherActiveSpaceSettings"></span><span class="target" id="classqdk_1_1chemistry_1_1algorithms_1_1microsoft_1_1YetAnotherActiveSpaceSettings"></span><span class="k"><span class="pre">class</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">YetAnotherActiveSpaceSettings</span></span></span><span class="w"> </span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="k"><span class="pre">public</span></span><span class="w"> </span><a class="reference internal" href="namespaceqdk.html#_CPPv43qdk" title="qdk"><span class="n"><span class="pre">qdk</span></span></a><span class="p"><span class="pre">::</span></span><a class="reference internal" href="namespaceqdk.html#_CPPv4N3qdk9chemistryE" title="qdk::chemistry"><span class="n"><span class="pre">chemistry</span></span></a><span class="p"><span class="pre">::</span></span><a class="reference internal" href="namespaceqdk.html#_CPPv4N3qdk9chemistry4dataE" title="qdk::chemistry::data"><span class="n"><span class="pre">data</span></span></a><span class="p"><span class="pre">::</span></span><a class="reference internal" href="namespaceqdk.html#_CPPv4N3qdk9chemistry4data8SettingsE" title="qdk::chemistry::data::Settings"><span class="n"><span class="pre">Settings</span></span></a><br /></dt>
 <dd><div class="docutils container">
-<em>#include &lt;/workspaces/qdk-chemistry/cpp/src/qdk/chemistry/algorithms/microsoft/active_space/entropy_active_space.hpp&gt;</em></div>
+<em>#include &lt;/home/baker/code/qdk-chemistry/cpp/src/qdk/chemistry/algorithms/microsoft/active_space/entropy_active_space.hpp&gt;</em></div>
 <p>Settings container for the entropy-based active space selection algorithm. </p>
 <p>This class extends the base Settings class to provide specific default settings for the entropy-based active space selector. It pre-configures threshold parameters for determining which orbitals should be included in the active space based on their single orbital entropies.</p>
 <p>The entropy-based selection uses single orbitals entropies to identify orbitals that are strongly correlated.</p>

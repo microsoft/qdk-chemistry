@@ -90,8 +90,8 @@
 <span></span><span class="sd">&quot;&quot;&quot;Utilities for converting between QDK/Chemistry and PySCF data structures.</span>
 
 <span class="sd">This module provides conversion functions to bridge between QDK/Chemistry and PySCF data structures.</span>
-<span class="sd">It enables seamless integration between the two quantum chemistry libraries by handling</span>
-<span class="sd">the conversion of molecular structures, basis sets, and Hamiltonians.</span>
+<span class="sd">It enables integration between the two quantum chemistry libraries by handling the conversion of molecular structures,</span>
+<span class="sd">basis sets, and Hamiltonians.</span>
 
 <span class="sd">The main functionality includes:</span>
 
@@ -100,11 +100,11 @@
 <span class="sd">* Converting PySCF Mole objects back to QDK/Chemistry BasisSet objects</span>
 <span class="sd">* Converting QDK/Chemistry Hamiltonian objects to PySCF SCF objects</span>
 
-<span class="sd">These utilities are essential for workflows that need to leverage both QDK/Chemistry&#39;s</span>
-<span class="sd">data management capabilities and PySCF&#39;s quantum chemistry calculations.</span>
+<span class="sd">These utilities are essential for workflows that need to leverage both QDK/Chemistry&#39;s data management capabilities and</span>
+<span class="sd">PySCF&#39;s quantum chemistry calculations.</span>
 
 <span class="sd">Note:</span>
-<span class="sd">    * Currently supports spherical basis functions only</span>
+<span class="sd">    * Currently supports spherical atomic orbitals only</span>
 <span class="sd">    * Cartesian basis set support is planned for future versions</span>
 <span class="sd">    * Assumes atomic numbers do not exceed 200</span>
 
@@ -127,7 +127,7 @@
 <span class="kn">import</span><span class="w"> </span><span class="nn">numpy</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">np</span>
 <span class="kn">from</span><span class="w"> </span><span class="nn">pyscf</span><span class="w"> </span><span class="kn">import</span> <span class="n">gto</span><span class="p">,</span> <span class="n">scf</span>
 
-<span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.data</span><span class="w"> </span><span class="kn">import</span> <span class="n">BasisSet</span><span class="p">,</span> <span class="n">BasisType</span><span class="p">,</span> <span class="n">Hamiltonian</span><span class="p">,</span> <span class="n">Orbitals</span><span class="p">,</span> <span class="n">Shell</span><span class="p">,</span> <span class="n">Structure</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.data</span><span class="w"> </span><span class="kn">import</span> <span class="n">AOType</span><span class="p">,</span> <span class="n">BasisSet</span><span class="p">,</span> <span class="n">Hamiltonian</span><span class="p">,</span> <span class="n">Orbitals</span><span class="p">,</span> <span class="n">Shell</span><span class="p">,</span> <span class="n">Structure</span>
 
 
 <div class="viewcode-block" id="structure_to_pyscf_atom_labels">
@@ -143,20 +143,15 @@
 <span class="sd">        structure: QDK/Chemistry Structure object containing molecular geometry and atomic information.</span>
 
 <span class="sd">    Returns:</span>
-<span class="sd">        A tuple containing three elements:</span>
+<span class="sd">        tuple[list[str], list[str], list[str]]: A tuple containing three lists:</span>
 
-<span class="sd">        - atoms : list[str]</span>
-<span class="sd">            List of atom strings in PySCF format, where each string contains</span>
-<span class="sd">            the atom label and its Cartesian coordinates (x, y, z) in Angstroms.</span>
-<span class="sd">            Format: ``Symbol&lt;count&gt; x y z`` (e.g., ``H1 0.000000000000 0.000000000000 0.000000000000``).</span>
-
-<span class="sd">        - pyscf_symbols : list[str]</span>
-<span class="sd">            List of unique atom labels used in PySCF, where each atom of the same</span>
-<span class="sd">            element is numbered sequentially (e.g., ``[&quot;H1&quot;, &quot;H2&quot;, &quot;O1&quot;]``).</span>
-
-<span class="sd">        - elements : list[str]</span>
-<span class="sd">            List of atomic symbols without numbering, preserving the original</span>
-<span class="sd">            element symbols from the structure (e.g., ``[&quot;H&quot;, &quot;H&quot;, &quot;O&quot;]``).</span>
+<span class="sd">        - atoms: List of atom strings in PySCF format, where each string contains</span>
+<span class="sd">          the atom label and its Cartesian coordinates (x, y, z) in Angstroms.</span>
+<span class="sd">          Format: ``Symbol&lt;count&gt; x y z`` (e.g., ``H1 0.000000000000 0.000000000000 0.000000000000``).</span>
+<span class="sd">        - pyscf_symbols: List of unique atom labels used in PySCF, where each atom of the same</span>
+<span class="sd">          element is numbered sequentially (e.g., ``[&quot;H1&quot;, &quot;H2&quot;, &quot;O1&quot;]``).</span>
+<span class="sd">        - elements: List of atomic symbols without numbering, preserving the original</span>
+<span class="sd">          element symbols from the structure (e.g., ``[&quot;H&quot;, &quot;H&quot;, &quot;O&quot;]``).</span>
 
 <span class="sd">    Note:</span>
 <span class="sd">        - Coordinates are formatted with 12 decimal places for precision.</span>
@@ -465,10 +460,10 @@
 
         <span class="c1"># Create BasisSet with name, shells, ecp_name, ecp_shells, ecp_electrons, structure, and basis type</span>
         <span class="k">if</span> <span class="nb">any</span><span class="p">(</span><span class="n">n</span> <span class="o">&gt;</span> <span class="mi">0</span> <span class="k">for</span> <span class="n">n</span> <span class="ow">in</span> <span class="n">ecp_electrons</span><span class="p">):</span>
-            <span class="k">return</span> <span class="n">BasisSet</span><span class="p">(</span><span class="n">basis_name</span><span class="p">,</span> <span class="n">shells</span><span class="p">,</span> <span class="n">ecp_name</span><span class="p">,</span> <span class="n">ecp_shells</span><span class="p">,</span> <span class="n">ecp_electrons</span><span class="p">,</span> <span class="n">structure</span><span class="p">,</span> <span class="n">BasisType</span><span class="o">.</span><span class="n">Spherical</span><span class="p">)</span>
+            <span class="k">return</span> <span class="n">BasisSet</span><span class="p">(</span><span class="n">basis_name</span><span class="p">,</span> <span class="n">shells</span><span class="p">,</span> <span class="n">ecp_name</span><span class="p">,</span> <span class="n">ecp_shells</span><span class="p">,</span> <span class="n">ecp_electrons</span><span class="p">,</span> <span class="n">structure</span><span class="p">,</span> <span class="n">AOType</span><span class="o">.</span><span class="n">Spherical</span><span class="p">)</span>
 
     <span class="c1"># Create BasisSet with name, shells, ecp_shells, structure, and basis type</span>
-    <span class="k">return</span> <span class="n">BasisSet</span><span class="p">(</span><span class="n">basis_name</span><span class="p">,</span> <span class="n">shells</span><span class="p">,</span> <span class="n">ecp_shells</span><span class="p">,</span> <span class="n">structure</span><span class="p">,</span> <span class="n">BasisType</span><span class="o">.</span><span class="n">Spherical</span><span class="p">)</span></div>
+    <span class="k">return</span> <span class="n">BasisSet</span><span class="p">(</span><span class="n">basis_name</span><span class="p">,</span> <span class="n">shells</span><span class="p">,</span> <span class="n">ecp_shells</span><span class="p">,</span> <span class="n">structure</span><span class="p">,</span> <span class="n">AOType</span><span class="o">.</span><span class="n">Spherical</span><span class="p">)</span></div>
 
 
 
@@ -496,6 +491,7 @@
 <span class="sd">    Returns:</span>
 <span class="sd">        A PySCF SCF object (RHF, ROHF, or UHF) populated with the molecular orbital data from the input ``Orbitals``</span>
 <span class="sd">        object. The type of SCF object returned depends on:</span>
+
 <span class="sd">            * RHF: for restricted closed-shell calculations</span>
 <span class="sd">            * ROHF: for restricted open-shell calculations</span>
 <span class="sd">            * UHF: for unrestricted calculations</span>
@@ -567,7 +563,7 @@
 <span class="p">):</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;Convert an Orbitals object to a PySCF SCF object.</span>
 
-<span class="sd">    This is a convenience wrapper around :func:`orbtials_to_scf` that automatically constructs</span>
+<span class="sd">    This is a convenience wrapper around :func:`orbitals_to_scf` that automatically constructs</span>
 <span class="sd">    occupation arrays from the total number of electrons and spin multiplicity.</span>
 
 <span class="sd">    Args:</span>
@@ -581,9 +577,10 @@
 <span class="sd">    Returns:</span>
 <span class="sd">        A PySCF SCF object (RHF, ROHF, or UHF) populated with the molecular orbital data from the input ``Orbitals``</span>
 <span class="sd">        object. The type of SCF object returned depends on:</span>
-<span class="sd">            * RHF: for restricted closed-shell calculations</span>
-<span class="sd">            * ROHF: for restricted open-shell calculations</span>
-<span class="sd">            * UHF: for unrestricted calculations</span>
+
+<span class="sd">        * RHF: for restricted closed-shell calculations</span>
+<span class="sd">        * ROHF: for restricted open-shell calculations</span>
+<span class="sd">        * UHF: for unrestricted calculations</span>
 
 <span class="sd">    Raises:</span>
 <span class="sd">        ValueError: If the electron count or multiplicity is invalid.</span>
@@ -622,7 +619,7 @@
 
 <span class="sd">    Raises:</span>
 <span class="sd">        ValueError: If the Hamiltonian uses unsupported features like unrestricted orbitals, open-shell systems, or</span>
-<span class="sd">        active spaces.</span>
+<span class="sd">            active spaces.</span>
 
 <span class="sd">    Note:</span>
 <span class="sd">        * Currently only supports restricted, closed-shell calculations without active spaces.</span>
@@ -632,7 +629,7 @@
 <span class="sd">        * The returned SCF object contains dummy molecular orbitals and occupations suitable for post-HF method</span>
 <span class="sd">          initialization.</span>
 <span class="sd">        * For an interface using n_electrons and multiplicity, see</span>
-<span class="sd">          :func:`hamiltonian_to_scf_from_n_electrons_and_multiplicity`.</span>
+<span class="sd">          ``hamiltonian_to_scf_from_n_electrons_and_multiplicity``.</span>
 
 <span class="sd">    Examples:</span>
 <span class="sd">        &gt;&gt;&gt; import numpy as np</span>
@@ -756,9 +753,9 @@
 <span class="sd">        n_electrons: Total number of electrons in the system.</span>
 <span class="sd">        multiplicity: Spin multiplicity (2S + 1), where S is the total spin. Default is 1 (singlet).</span>
 
-<span class="sd">    Returns:</span>
-<span class="sd">        alpha_occ: Occupation numbers for alpha (spin-up) electrons.</span>
-<span class="sd">        beta_occ: Occupation numbers for beta (spin-down) electrons.</span>
+<span class="sd">    Returns: tuple including</span>
+<span class="sd">        - alpha_occ: Occupation numbers for alpha (spin-up) electrons.</span>
+<span class="sd">        - beta_occ: Occupation numbers for beta (spin-down) electrons.</span>
 
 <span class="sd">    Raises:</span>
 <span class="sd">        ValueError: If the total number of electrons or multiplicity is invalid.</span>

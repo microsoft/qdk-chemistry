@@ -26,7 +26,7 @@
     <script src="../../_static/js/theme.js"></script>
     <link rel="index" title="Index" href="../../genindex.html" />
     <link rel="search" title="Search" href="../../search.html" />
-    <link rel="next" title="qdk_chemistry.algorithms.state_preparation package" href="qdk_chemistry.algorithms.state_preparation.html" />
+    <link rel="next" title="qdk_chemistry.algorithms.qubit_mapper package" href="qdk_chemistry.algorithms.qubit_mapper.html" />
     <link rel="prev" title="qdk_chemistry.algorithms.energy_estimator.energy_estimator module" href="qdk_chemistry.algorithms.energy_estimator.energy_estimator.html" /> 
 </head>
 
@@ -137,7 +137,6 @@
 <em class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">EnergyEstimator</span></span><a class="headerlink" href="#qdk_chemistry.algorithms.energy_estimator.qsharp.EnergyEstimator" title="Link to this definition"></a></dt>
 <dd><p>Bases: <a class="reference internal" href="qdk_chemistry.algorithms.base.html#qdk_chemistry.algorithms.base.Algorithm" title="qdk_chemistry.algorithms.base.Algorithm"><code class="xref py py-class docutils literal notranslate"><span class="pre">Algorithm</span></code></a></p>
 <p>Abstract base class for energy estimator algorithms.</p>
-<p>Initialize the EnergyEstimator.</p>
 <dl class="py method">
 <dt class="sig sig-object py" id="qdk_chemistry.algorithms.energy_estimator.qsharp.EnergyEstimator.__init__">
 <span class="sig-name descname"><span class="pre">__init__</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#qdk_chemistry.algorithms.energy_estimator.qsharp.EnergyEstimator.__init__" title="Link to this definition"></a></dt>
@@ -233,6 +232,16 @@
 <em class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">EnergyExpectationResult</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">energy_expectation_value</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">energy_variance</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">expvals_each_term</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">variances_each_term</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#qdk_chemistry.algorithms.energy_estimator.qsharp.EnergyExpectationResult" title="Link to this definition"></a></dt>
 <dd><p>Bases: <a class="reference internal" href="qdk_chemistry.data.base.html#qdk_chemistry.data.base.DataClass" title="qdk_chemistry.data.base.DataClass"><code class="xref py py-class docutils literal notranslate"><span class="pre">DataClass</span></code></a></p>
 <p>Expectation value and variance for a Hamiltonian energy estimate.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>energy_expectation_value</strong> (<a class="reference external" href="https://docs.python.org/3/library/functions.html#float" title="(in Python v3.14)"><em>float</em></a>)</p></li>
+<li><p><strong>energy_variance</strong> (<a class="reference external" href="https://docs.python.org/3/library/functions.html#float" title="(in Python v3.14)"><em>float</em></a>)</p></li>
+<li><p><strong>expvals_each_term</strong> (<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#list" title="(in Python v3.14)"><em>list</em></a><em>[</em><a class="reference external" href="https://numpy.org/doc/stable/reference/generated/numpy.ndarray.html#numpy.ndarray" title="(in NumPy v2.3)"><em>ndarray</em></a><em>]</em>)</p></li>
+<li><p><strong>variances_each_term</strong> (<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#list" title="(in Python v3.14)"><em>list</em></a><em>[</em><a class="reference external" href="https://numpy.org/doc/stable/reference/generated/numpy.ndarray.html#numpy.ndarray" title="(in NumPy v2.3)"><em>ndarray</em></a><em>]</em>)</p></li>
+</ul>
+</dd>
+</dl>
 <dl class="py attribute">
 <dt class="sig sig-object py" id="qdk_chemistry.algorithms.energy_estimator.qsharp.EnergyExpectationResult.energy_expectation_value">
 <span class="sig-name descname"><span class="pre">energy_expectation_value</span></span><a class="headerlink" href="#qdk_chemistry.algorithms.energy_estimator.qsharp.EnergyExpectationResult.energy_expectation_value" title="Link to this definition"></a></dt>
@@ -257,17 +266,6 @@
 <dd><p>Variances for each term in the Hamiltonian.</p>
 </dd></dl>
 
-<p>Initialize an energy expectation result.</p>
-<dl class="field-list simple">
-<dt class="field-odd">Parameters<span class="colon">:</span></dt>
-<dd class="field-odd"><ul class="simple">
-<li><p><strong>energy_expectation_value</strong> (<a class="reference external" href="https://docs.python.org/3/library/functions.html#float" title="(in Python v3.14)"><em>float</em></a>) – Expectation value of the energy.</p></li>
-<li><p><strong>energy_variance</strong> (<a class="reference external" href="https://docs.python.org/3/library/functions.html#float" title="(in Python v3.14)"><em>float</em></a>) – Variance of the energy.</p></li>
-<li><p><strong>expvals_each_term</strong> (<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#list" title="(in Python v3.14)"><em>list</em></a><em>[</em><a class="reference external" href="https://numpy.org/doc/stable/reference/generated/numpy.ndarray.html#numpy.ndarray" title="(in NumPy v2.3)"><em>ndarray</em></a><em>]</em>) – Expectation values for each term in the Hamiltonian.</p></li>
-<li><p><strong>variances_each_term</strong> (<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#list" title="(in Python v3.14)"><em>list</em></a><em>[</em><a class="reference external" href="https://numpy.org/doc/stable/reference/generated/numpy.ndarray.html#numpy.ndarray" title="(in NumPy v2.3)"><em>ndarray</em></a><em>]</em>) – Variances for each term in the Hamiltonian.</p></li>
-</ul>
-</dd>
-</dl>
 <dl class="py method">
 <dt class="sig sig-object py" id="qdk_chemistry.algorithms.energy_estimator.qsharp.EnergyExpectationResult.__init__">
 <span class="sig-name descname"><span class="pre">__init__</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">energy_expectation_value</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">energy_variance</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">expvals_each_term</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">variances_each_term</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#qdk_chemistry.algorithms.energy_estimator.qsharp.EnergyExpectationResult.__init__" title="Link to this definition"></a></dt>
@@ -372,6 +370,15 @@ Python users should call to_hdf5_file() directly.</p>
 <em class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">MeasurementData</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">hamiltonians</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">bitstring_counts</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">shots_list</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#qdk_chemistry.algorithms.energy_estimator.qsharp.MeasurementData" title="Link to this definition"></a></dt>
 <dd><p>Bases: <a class="reference internal" href="qdk_chemistry.data.base.html#qdk_chemistry.data.base.DataClass" title="qdk_chemistry.data.base.DataClass"><code class="xref py py-class docutils literal notranslate"><span class="pre">DataClass</span></code></a></p>
 <p>Measurement bitstring data and metadata for a <code class="docutils literal notranslate"><span class="pre">QubitHamiltonian</span></code>.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>hamiltonians</strong> (<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#list" title="(in Python v3.14)"><em>list</em></a><em>[</em><a class="reference internal" href="qdk_chemistry.data.qubit_hamiltonian.html#qdk_chemistry.data.qubit_hamiltonian.QubitHamiltonian" title="qdk_chemistry.data.qubit_hamiltonian.QubitHamiltonian"><em>QubitHamiltonian</em></a><em>]</em>)</p></li>
+<li><p><strong>bitstring_counts</strong> (<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#list" title="(in Python v3.14)"><em>list</em></a><em>[</em><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#dict" title="(in Python v3.14)"><em>dict</em></a><em>[</em><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)"><em>str</em></a><em>, </em><a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(in Python v3.14)"><em>int</em></a><em>] </em><em>| </em><em>None</em><em>] </em><em>| </em><em>None</em>)</p></li>
+<li><p><strong>shots_list</strong> (<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#list" title="(in Python v3.14)"><em>list</em></a><em>[</em><a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(in Python v3.14)"><em>int</em></a><em>] </em><em>| </em><em>None</em>)</p></li>
+</ul>
+</dd>
+</dl>
 <dl class="py attribute">
 <dt class="sig sig-object py" id="qdk_chemistry.algorithms.energy_estimator.qsharp.MeasurementData.hamiltonians">
 <span class="sig-name descname"><span class="pre">hamiltonians</span></span><a class="headerlink" href="#qdk_chemistry.algorithms.energy_estimator.qsharp.MeasurementData.hamiltonians" title="Link to this definition"></a></dt>
@@ -390,16 +397,6 @@ Python users should call to_hdf5_file() directly.</p>
 <dd><p>List of number of shots used for each measurement.</p>
 </dd></dl>
 
-<p>Initialize measurement data.</p>
-<dl class="field-list simple">
-<dt class="field-odd">Parameters<span class="colon">:</span></dt>
-<dd class="field-odd"><ul class="simple">
-<li><p><strong>hamiltonians</strong> (<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#list" title="(in Python v3.14)"><em>list</em></a><em>[</em><a class="reference internal" href="qdk_chemistry.data.qubit_hamiltonian.html#qdk_chemistry.data.qubit_hamiltonian.QubitHamiltonian" title="qdk_chemistry.data.qubit_hamiltonian.QubitHamiltonian"><em>QubitHamiltonian</em></a><em>]</em>) – List of QubitHamiltonian objects.</p></li>
-<li><p><strong>bitstring_counts</strong> (<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#list" title="(in Python v3.14)"><em>list</em></a><em>[</em><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#dict" title="(in Python v3.14)"><em>dict</em></a><em>[</em><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)"><em>str</em></a><em>, </em><a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(in Python v3.14)"><em>int</em></a><em>] </em><em>| </em><em>None</em><em>] </em><em>| </em><em>None</em>) – List of bitstring count dictionaries for each QubitHamiltonian.</p></li>
-<li><p><strong>shots_list</strong> (<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#list" title="(in Python v3.14)"><em>list</em></a><em>[</em><a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(in Python v3.14)"><em>int</em></a><em>] </em><em>| </em><em>None</em>) – List of number of shots used for each measurement.</p></li>
-</ul>
-</dd>
-</dl>
 <dl class="py method">
 <dt class="sig sig-object py" id="qdk_chemistry.algorithms.energy_estimator.qsharp.MeasurementData.__init__">
 <span class="sig-name descname"><span class="pre">__init__</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">hamiltonians</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">bitstring_counts</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">shots_list</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#qdk_chemistry.algorithms.energy_estimator.qsharp.MeasurementData.__init__" title="Link to this definition"></a></dt>
@@ -503,6 +500,14 @@ Python users should call to_hdf5_file() directly.</p>
 <em class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">QubitHamiltonian</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">pauli_strings</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">coefficients</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#qdk_chemistry.algorithms.energy_estimator.qsharp.QubitHamiltonian" title="Link to this definition"></a></dt>
 <dd><p>Bases: <a class="reference internal" href="qdk_chemistry.data.base.html#qdk_chemistry.data.base.DataClass" title="qdk_chemistry.data.base.DataClass"><code class="xref py py-class docutils literal notranslate"><span class="pre">DataClass</span></code></a></p>
 <p>Data class for representing chemical electronic Hamiltonians in qubits.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>pauli_strings</strong> (<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#list" title="(in Python v3.14)"><em>list</em></a><em>[</em><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)"><em>str</em></a><em>]</em>)</p></li>
+<li><p><strong>coefficients</strong> (<a class="reference external" href="https://numpy.org/doc/stable/reference/generated/numpy.ndarray.html#numpy.ndarray" title="(in NumPy v2.3)"><em>ndarray</em></a>)</p></li>
+</ul>
+</dd>
+</dl>
 <dl class="py attribute">
 <dt class="sig sig-object py" id="qdk_chemistry.algorithms.energy_estimator.qsharp.QubitHamiltonian.pauli_strings">
 <span class="sig-name descname"><span class="pre">pauli_strings</span></span><a class="headerlink" href="#qdk_chemistry.algorithms.energy_estimator.qsharp.QubitHamiltonian.pauli_strings" title="Link to this definition"></a></dt>
@@ -515,19 +520,6 @@ Python users should call to_hdf5_file() directly.</p>
 <dd><p>Array of coefficients corresponding to each Pauli string.</p>
 </dd></dl>
 
-<p>Initialize a QubitHamiltonian.</p>
-<dl class="field-list simple">
-<dt class="field-odd">Parameters<span class="colon">:</span></dt>
-<dd class="field-odd"><ul class="simple">
-<li><p><strong>pauli_strings</strong> (<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#list" title="(in Python v3.14)"><em>list</em></a><em>[</em><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)"><em>str</em></a><em>]</em>) – List of Pauli strings.</p></li>
-<li><p><strong>coefficients</strong> (<a class="reference external" href="https://numpy.org/doc/stable/reference/generated/numpy.ndarray.html#numpy.ndarray" title="(in NumPy v2.3)"><em>ndarray</em></a>) – Array of coefficients corresponding to each Pauli string.</p></li>
-</ul>
-</dd>
-<dt class="field-even">Raises<span class="colon">:</span></dt>
-<dd class="field-even"><p><a class="reference external" href="https://docs.python.org/3/library/exceptions.html#ValueError" title="(in Python v3.14)"><strong>ValueError</strong></a> – If the number of Pauli strings and coefficients don’t match,
-    or if the Pauli strings or coefficients are invalid.</p>
-</dd>
-</dl>
 <dl class="py method">
 <dt class="sig sig-object py" id="qdk_chemistry.algorithms.energy_estimator.qsharp.QubitHamiltonian.__init__">
 <span class="sig-name descname"><span class="pre">__init__</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">pauli_strings</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">coefficients</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#qdk_chemistry.algorithms.energy_estimator.qsharp.QubitHamiltonian.__init__" title="Link to this definition"></a></dt>
@@ -692,13 +684,12 @@ Python users should call to_hdf5_file() directly.</p>
 <p>Energy Estimator to estimate expectation values of quantum circuits with respect to a given observable.</p>
 <p>This class uses a QDK base simulator backend to run quantum circuits and estimate
 the expectation values of qubit Hamiltonians. It supports optional noise models for noise simulation.</p>
-<p>Initialize the Estimator with a backend and optional transpilation settings.</p>
 <dl class="field-list simple">
 <dt class="field-odd">Parameters<span class="colon">:</span></dt>
 <dd class="field-odd"><ul class="simple">
-<li><p><strong>seed</strong> (<a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(in Python v3.14)"><em>int</em></a>) – Random seed for reproducibility.</p></li>
-<li><p><strong>noise_model</strong> (<em>DepolarizingNoise</em><em> | </em><em>BitFlipNoise</em><em> | </em><em>PauliNoise</em><em> | </em><em>PhaseFlipNoise</em><em> | </em><em>None</em>) – Optional noise model to simulate noise in the quantum circuit.</p></li>
-<li><p><strong>qubit_loss</strong> (<a class="reference external" href="https://docs.python.org/3/library/functions.html#float" title="(in Python v3.14)"><em>float</em></a>) – Probability of qubit loss in simulation.</p></li>
+<li><p><strong>seed</strong> (<a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(in Python v3.14)"><em>int</em></a>)</p></li>
+<li><p><strong>noise_model</strong> (<em>DepolarizingNoise</em><em> | </em><em>BitFlipNoise</em><em> | </em><em>PauliNoise</em><em> | </em><em>PhaseFlipNoise</em><em> | </em><em>None</em>)</p></li>
+<li><p><strong>qubit_loss</strong> (<a class="reference external" href="https://docs.python.org/3/library/functions.html#float" title="(in Python v3.14)"><em>float</em></a>)</p></li>
 </ul>
 </dd>
 </dl>
@@ -737,7 +728,7 @@ the expectation values of qubit Hamiltonians. It supports optional noise models 
           </div>
           <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
         <a href="qdk_chemistry.algorithms.energy_estimator.energy_estimator.html" class="btn btn-neutral float-left" title="qdk_chemistry.algorithms.energy_estimator.energy_estimator module" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
-        <a href="qdk_chemistry.algorithms.state_preparation.html" class="btn btn-neutral float-right" title="qdk_chemistry.algorithms.state_preparation package" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+        <a href="qdk_chemistry.algorithms.qubit_mapper.html" class="btn btn-neutral float-right" title="qdk_chemistry.algorithms.qubit_mapper package" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
     </div>
 
   <hr/>

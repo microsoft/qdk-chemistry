@@ -62,7 +62,7 @@
 <li class="toctree-l2"><a class="reference internal" href="../python_api.html#plugins">Plugins</a></li>
 <li class="toctree-l2 current"><a class="reference internal" href="../python_api.html#utilities">Utilities</a><ul class="current">
 <li class="toctree-l3 current"><a class="reference internal" href="qdk_chemistry.utils.html">qdk_chemistry.utils package</a><ul class="current">
-<li class="toctree-l4"><a class="reference internal" href="qdk_chemistry.utils.html#qdk_chemistry.utils.compute_valence_space"><code class="docutils literal notranslate"><span class="pre">compute_valence_space()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="qdk_chemistry.utils.html#qdk_chemistry.utils.compute_valence_space_parameters"><code class="docutils literal notranslate"><span class="pre">compute_valence_space_parameters()</span></code></a></li>
 <li class="toctree-l4 current"><a class="reference internal" href="qdk_chemistry.utils.html#submodules">Submodules</a></li>
 </ul>
 </li>
@@ -109,21 +109,28 @@
 <span id="qdk-chemistry-utils-bitstring-module"></span><h1>qdk_chemistry.utils.bitstring module<a class="headerlink" href="#module-qdk_chemistry.utils.bitstring" title="Link to this heading"></a></h1>
 <p>Bitstring utility functions for quantum computing and electronic structure calculations.</p>
 <p>This module provides comprehensive utilities for working with bitstrings:</p>
-<ul>
-<li><p><strong>Quantum State Representation</strong>:  Functions for converting between different quantum state representations
-including binary strings, decimal numbers, and statevectors.</p></li>
-<li><p><strong>Format Conversions</strong>:
-Utilities for converting between different bitstring formats.</p>
 <blockquote>
 <div><ul class="simple">
+<li><dl class="simple">
+<dt><strong>Quantum State Representation</strong>:  Functions for converting between different quantum state representations</dt><dd><p>including binary strings, decimal numbers, and statevectors.</p>
+</dd>
+</dl>
+</li>
+<li><dl class="simple">
+<dt><strong>Format Conversions</strong>: Utilities for converting between different bitstring formats.</dt><dd><ul>
 <li><p>Compact format (2=doubly occupied, u=up, d=down, 0=empty)</p></li>
 <li><p>Binary format (1=occupied, 0=empty)</p></li>
 </ul>
-</div></blockquote>
+</dd>
+</dl>
 </li>
-<li><p><strong>Matrix Operations</strong>: Functions for converting bitstrings to binary matrices and performing operations on them,
-particularly useful for quantum circuit optimization and state preparation.</p></li>
+<li><dl class="simple">
+<dt><strong>Matrix Operations</strong>: Functions for converting bitstrings to binary matrices and performing operations on them,</dt><dd><p>particularly useful for quantum circuit optimization and state preparation.</p>
+</dd>
+</dl>
+</li>
 </ul>
+</div></blockquote>
 <p>Key Features:</p>
 <blockquote>
 <div><ul class="simple">
@@ -142,85 +149,54 @@ particularly useful for quantum circuit optimization and state preparation.</p><
 </div></blockquote>
 <dl class="py class">
 <dt class="sig sig-object py" id="qdk_chemistry.utils.bitstring.Configuration">
-<em class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">Configuration</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="o"><span class="pre">*</span></span><span class="n"><span class="pre">args</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">kwargs</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#qdk_chemistry.utils.bitstring.Configuration" title="Link to this definition"></a></dt>
+<em class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">Configuration</span></span><a class="headerlink" href="#qdk_chemistry.utils.bitstring.Configuration" title="Link to this definition"></a></dt>
 <dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">DataClass</span></code></p>
 <p>Represents a molecular electronic configuration.</p>
-<blockquote>
-<div><p>This class efficiently stores the occupation pattern of molecular orbitals
-using a compact representation where each orbital can be in one of four states:
-- UNOCCUPIED (0): No electrons
-- ALPHA (1): One alpha electron
-- BETA (2): One beta electron
-- DOUBLY (3): Both alpha and beta electrons</p>
-</div></blockquote>
+<p>This class efficiently stores the occupation pattern of molecular orbitals using a compact representation where each orbital can be in one of four states:</p>
+<ul class="simple">
+<li><p>UNOCCUPIED (0): No electrons</p></li>
+<li><p>ALPHA (1): One alpha electron</p></li>
+<li><p>BETA (2): One beta electron</p></li>
+<li><p>DOUBLY (3): Both alpha and beta electrons</p></li>
+</ul>
 <p>The class provides methods for constructing, manipulating, and querying configurations.</p>
-<p>Overloaded function.</p>
-<ol class="arabic">
-<li><p>__init__(self: qdk_chemistry._core.data.Configuration) -&gt; None</p>
-<blockquote>
-<div><p>Default constructor for an empty configuration.</p>
-<div class="doctest highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="n">config</span> <span class="o">=</span> <span class="n">qdk_chemistry</span><span class="o">.</span><span class="n">Configuration</span><span class="p">()</span>
-</pre></div>
-</div>
-</div></blockquote>
-</li>
-<li><p>__init__(self: qdk_chemistry._core.data.Configuration, str: str) -&gt; None</p>
-<blockquote>
-<div><p>Constructs a configuration from a string representation.</p>
-<dl class="simple">
-<dt>str<span class="classifier">str</span></dt><dd><p>String representation of the configuration where:
-‘0’ = unoccupied orbital
-‘1’ = alpha-occupied orbital
-‘2’ = beta-occupied orbital
-‘3’ = doubly-occupied orbital</p>
-</dd>
-</dl>
-<div class="doctest highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="n">config</span> <span class="o">=</span> <span class="n">qdk_chemistry</span><span class="o">.</span><span class="n">Configuration</span><span class="p">(</span><span class="s2">&quot;3322110&quot;</span><span class="p">)</span>  <span class="c1"># 7 orbitals with different occupations</span>
-</pre></div>
-</div>
-</div></blockquote>
-</li>
-</ol>
 <dl class="py method">
 <dt class="sig sig-object py" id="qdk_chemistry.utils.bitstring.Configuration.__init__">
 <span class="sig-name descname"><span class="pre">__init__</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="o"><span class="pre">*</span></span><span class="n"><span class="pre">args</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">kwargs</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#qdk_chemistry.utils.bitstring.Configuration.__init__" title="Link to this definition"></a></dt>
 <dd><p>Overloaded function.</p>
-<ol class="arabic">
-<li><p>__init__(self: qdk_chemistry._core.data.Configuration) -&gt; None</p>
-<blockquote>
-<div><p>Default constructor for an empty configuration.</p>
+<ol class="arabic simple">
+<li><p>__init__(self: qdk_chemistry._core.data.Configuration) -&gt; None</p></li>
+</ol>
+<p>Default constructor for an empty configuration.</p>
+<p class="rubric">Examples</p>
 <div class="doctest highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="n">config</span> <span class="o">=</span> <span class="n">qdk_chemistry</span><span class="o">.</span><span class="n">Configuration</span><span class="p">()</span>
 </pre></div>
 </div>
-</div></blockquote>
-</li>
-<li><p>__init__(self: qdk_chemistry._core.data.Configuration, str: str) -&gt; None</p>
-<blockquote>
-<div><p>Constructs a configuration from a string representation.</p>
-<dl class="simple">
-<dt>str<span class="classifier">str</span></dt><dd><p>String representation of the configuration where:
-‘0’ = unoccupied orbital
-‘1’ = alpha-occupied orbital
-‘2’ = beta-occupied orbital
-‘3’ = doubly-occupied orbital</p>
+<ol class="arabic simple" start="2">
+<li><p>__init__(self: qdk_chemistry._core.data.Configuration, str: str) -&gt; None</p></li>
+</ol>
+<p>Constructs a configuration from a string representation.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>str</strong> (<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)"><em>str</em></a>) – String representation of the configuration where ‘0’ = unoccupied orbital, ‘1’ = alpha-occupied orbital, ‘2’ = beta-occupied orbital, ‘3’ = doubly-occupied orbital</p>
 </dd>
 </dl>
+<p class="rubric">Examples</p>
 <div class="doctest highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="n">config</span> <span class="o">=</span> <span class="n">qdk_chemistry</span><span class="o">.</span><span class="n">Configuration</span><span class="p">(</span><span class="s2">&quot;3322110&quot;</span><span class="p">)</span>  <span class="c1"># 7 orbitals with different occupations</span>
 </pre></div>
 </div>
-</div></blockquote>
-</li>
-</ol>
 </dd></dl>
 
 <dl class="py method">
 <dt class="sig sig-object py" id="qdk_chemistry.utils.bitstring.Configuration.canonical_hf_configuration">
 <em class="property"><span class="k"><span class="pre">static</span></span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">canonical_hf_configuration</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">n_alpha</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.SupportsInt" title="(in Python v3.14)"><span class="pre">SupportsInt</span></a></span></em>, <em class="sig-param"><span class="n"><span class="pre">n_beta</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.SupportsInt" title="(in Python v3.14)"><span class="pre">SupportsInt</span></a></span></em>, <em class="sig-param"><span class="n"><span class="pre">n_orbitals</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.SupportsInt" title="(in Python v3.14)"><span class="pre">SupportsInt</span></a></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><a class="reference internal" href="qdk_chemistry.utils.wavefunction.html#qdk_chemistry.utils.wavefunction.Configuration" title="qdk_chemistry._core.data.Configuration"><span class="pre">qdk_chemistry._core.data.Configuration</span></a></span></span><a class="headerlink" href="#qdk_chemistry.utils.bitstring.Configuration.canonical_hf_configuration" title="Link to this definition"></a></dt>
 <dd><p>Create a canonical Hartree-Fock configuration using the Aufbau principle.</p>
-<p>Fills orbitals from lowest energy according to the Aufbau principle:
-- Doubly occupied orbitals for paired electrons
-- Singly occupied orbitals for unpaired electrons (alpha first if n_alpha &gt; n_beta)
-- Unoccupied orbitals for remaining positions</p>
+<p>Fills orbitals from lowest energy according to the Aufbau principle:</p>
+<ul class="simple">
+<li><p>Doubly occupied orbitals for paired electrons</p></li>
+<li><p>Singly occupied orbitals for unpaired electrons (alpha first if n_alpha &gt; n_beta)</p></li>
+<li><p>Unoccupied orbitals for remaining positions</p></li>
+</ul>
 <dl class="field-list simple">
 <dt class="field-odd">Parameters<span class="colon">:</span></dt>
 <dd class="field-odd"><ul class="simple">
@@ -290,11 +266,7 @@ using a compact representation where each orbital can be in one of four states:
 <dd><p>Convert the configuration to a string representation.</p>
 <dl class="field-list simple">
 <dt class="field-odd">Returns<span class="colon">:</span></dt>
-<dd class="field-odd"><p>String representation where:
-‘0’ = unoccupied orbital
-‘1’ = alpha-occupied orbital
-‘2’ = beta-occupied orbital
-‘3’ = doubly-occupied orbital</p>
+<dd class="field-odd"><p>String representation where ‘0’ = unoccupied orbital, ‘1’ = alpha-occupied orbital, ‘2’ = beta-occupied orbital, ‘3’ = doubly-occupied orbital</p>
 </dd>
 <dt class="field-even">Return type<span class="colon">:</span></dt>
 <dd class="field-even"><p><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)">str</a></p>

@@ -27,7 +27,7 @@
     <link rel="index" title="Index" href="../../genindex.html" />
     <link rel="search" title="Search" href="../../search.html" />
     <link rel="next" title="qdk_chemistry.plugins package" href="qdk_chemistry.plugins.html" />
-    <link rel="prev" title="qdk_chemistry.algorithms.qubit_mapper module" href="qdk_chemistry.algorithms.qubit_mapper.html" /> 
+    <link rel="prev" title="qdk_chemistry.algorithms.base module" href="qdk_chemistry.algorithms.base.html" /> 
 </head>
 
 <body class="wy-body-for-nav"> 
@@ -153,23 +153,15 @@ algorithms before Python shuts down. Users should never need to call the cleanup
 <em class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">ActiveSpaceSelectorFactory</span></span><a class="headerlink" href="#qdk_chemistry.algorithms.registry.ActiveSpaceSelectorFactory" title="Link to this definition"></a></dt>
 <dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">pybind11_object</span></code></p>
 <p>Algorithm factory for creating and managing algorithm implementations.</p>
-<p>This class provides static methods for creating, listing, and managing
-algorithm implementations through a registry pattern.</p>
+<p>This class provides static methods for creating, listing, and managing algorithm implementations through a registry pattern.</p>
 <p>All methods are static and the class cannot be instantiated.</p>
 <div class="admonition seealso">
 <p class="admonition-title">See also</p>
-<dl class="simple">
-<dt><a class="reference internal" href="#qdk_chemistry.algorithms.registry.create" title="qdk_chemistry.algorithms.registry.create"><code class="xref py py-obj docutils literal notranslate"><span class="pre">create</span></code></a></dt><dd><p>Create an algorithm instance by name</p>
-</dd>
-<dt><a class="reference internal" href="#qdk_chemistry.algorithms.registry.available" title="qdk_chemistry.algorithms.registry.available"><code class="xref py py-obj docutils literal notranslate"><span class="pre">available</span></code></a></dt><dd><p>List all registered algorithm names</p>
-</dd>
-<dt><a class="reference internal" href="#qdk_chemistry.algorithms.registry.ActiveSpaceSelectorFactory.register_instance" title="qdk_chemistry.algorithms.registry.ActiveSpaceSelectorFactory.register_instance"><code class="xref py py-obj docutils literal notranslate"><span class="pre">register_instance</span></code></a></dt><dd><p>Register a new algorithm implementation</p>
-</dd>
-<dt><a class="reference internal" href="#qdk_chemistry.algorithms.registry.ActiveSpaceSelectorFactory.unregister_instance" title="qdk_chemistry.algorithms.registry.ActiveSpaceSelectorFactory.unregister_instance"><code class="xref py py-obj docutils literal notranslate"><span class="pre">unregister_instance</span></code></a></dt><dd><p>Remove an algorithm from the registry</p>
-</dd>
-<dt><a class="reference internal" href="#qdk_chemistry.algorithms.registry.ActiveSpaceSelectorFactory.has" title="qdk_chemistry.algorithms.registry.ActiveSpaceSelectorFactory.has"><code class="xref py py-obj docutils literal notranslate"><span class="pre">has</span></code></a></dt><dd><p>Check if an algorithm name is registered</p>
-</dd>
-</dl>
+<p>create : Create an algorithm instance by name
+available : List all registered algorithm names
+register_instance : Register a new algorithm implementation
+unregister_instance : Remove an algorithm from the registry
+has : Check if an algorithm name is registered</p>
 </div>
 <dl class="py method">
 <dt class="sig sig-object py" id="qdk_chemistry.algorithms.registry.ActiveSpaceSelectorFactory.__init__">
@@ -199,7 +191,7 @@ algorithm implementations through a registry pattern.</p>
 <dd class="field-odd"><p>List of all registered algorithm implementation names</p>
 </dd>
 <dt class="field-even">Return type<span class="colon">:</span></dt>
-<dd class="field-even"><p><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#list" title="(in Python v3.14)">list</a> of <a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)">str</a></p>
+<dd class="field-even"><p><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#list" title="(in Python v3.14)">list</a>[<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)">str</a>]</p>
 </dd>
 </dl>
 <p class="rubric">Examples</p>
@@ -222,7 +214,7 @@ algorithm implementations through a registry pattern.</p>
 <p>If no name is provided or the name is empty, returns the default implementation.</p>
 <dl class="field-list simple">
 <dt class="field-odd">Parameters<span class="colon">:</span></dt>
-<dd class="field-odd"><p><strong>name</strong> (<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)"><em>str</em></a><em>, </em><em>optional</em>) – Name identifying which algorithm implementation to create.
+<dd class="field-odd"><p><strong>name</strong> (<em>Optional</em><em>[</em><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)"><em>str</em></a><em>]</em>) – Name identifying which algorithm implementation to create.
 If empty string (default), returns the default implementation.</p>
 </dd>
 <dt class="field-even">Returns<span class="colon">:</span></dt>
@@ -268,8 +260,7 @@ If empty string (default), returns the default implementation.</p>
 <dt class="sig sig-object py" id="qdk_chemistry.algorithms.registry.ActiveSpaceSelectorFactory.register_instance">
 <em class="property"><span class="k"><span class="pre">static</span></span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">register_instance</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">func</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/library/collections.abc.html#collections.abc.Callable" title="(in Python v3.14)"><span class="pre">collections.abc.Callable</span></a></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><a class="reference external" href="https://docs.python.org/3/library/constants.html#None" title="(in Python v3.14)"><span class="pre">None</span></a></span></span><a class="headerlink" href="#qdk_chemistry.algorithms.registry.ActiveSpaceSelectorFactory.register_instance" title="Link to this definition"></a></dt>
 <dd><p>Register a new algorithm implementation.</p>
-<p>The algorithm is registered under its primary name and all aliases
-as determined by the instance’s name() and aliases() methods.</p>
+<p>The algorithm is registered under its primary name and all aliases as determined by the instance’s name() and aliases() methods.</p>
 <dl class="field-list simple">
 <dt class="field-odd">Parameters<span class="colon">:</span></dt>
 <dd class="field-odd"><p><strong>func</strong> (<em>callable</em>) – Function that returns an algorithm instance.
@@ -316,23 +307,15 @@ The instance must implement the required algorithm interface.</p>
 <em class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">CoupledClusterCalculatorFactory</span></span><a class="headerlink" href="#qdk_chemistry.algorithms.registry.CoupledClusterCalculatorFactory" title="Link to this definition"></a></dt>
 <dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">pybind11_object</span></code></p>
 <p>Algorithm factory for creating and managing algorithm implementations.</p>
-<p>This class provides static methods for creating, listing, and managing
-algorithm implementations through a registry pattern.</p>
+<p>This class provides static methods for creating, listing, and managing algorithm implementations through a registry pattern.</p>
 <p>All methods are static and the class cannot be instantiated.</p>
 <div class="admonition seealso">
 <p class="admonition-title">See also</p>
-<dl class="simple">
-<dt><a class="reference internal" href="#qdk_chemistry.algorithms.registry.create" title="qdk_chemistry.algorithms.registry.create"><code class="xref py py-obj docutils literal notranslate"><span class="pre">create</span></code></a></dt><dd><p>Create an algorithm instance by name</p>
-</dd>
-<dt><a class="reference internal" href="#qdk_chemistry.algorithms.registry.available" title="qdk_chemistry.algorithms.registry.available"><code class="xref py py-obj docutils literal notranslate"><span class="pre">available</span></code></a></dt><dd><p>List all registered algorithm names</p>
-</dd>
-<dt><a class="reference internal" href="#qdk_chemistry.algorithms.registry.CoupledClusterCalculatorFactory.register_instance" title="qdk_chemistry.algorithms.registry.CoupledClusterCalculatorFactory.register_instance"><code class="xref py py-obj docutils literal notranslate"><span class="pre">register_instance</span></code></a></dt><dd><p>Register a new algorithm implementation</p>
-</dd>
-<dt><a class="reference internal" href="#qdk_chemistry.algorithms.registry.CoupledClusterCalculatorFactory.unregister_instance" title="qdk_chemistry.algorithms.registry.CoupledClusterCalculatorFactory.unregister_instance"><code class="xref py py-obj docutils literal notranslate"><span class="pre">unregister_instance</span></code></a></dt><dd><p>Remove an algorithm from the registry</p>
-</dd>
-<dt><a class="reference internal" href="#qdk_chemistry.algorithms.registry.CoupledClusterCalculatorFactory.has" title="qdk_chemistry.algorithms.registry.CoupledClusterCalculatorFactory.has"><code class="xref py py-obj docutils literal notranslate"><span class="pre">has</span></code></a></dt><dd><p>Check if an algorithm name is registered</p>
-</dd>
-</dl>
+<p>create : Create an algorithm instance by name
+available : List all registered algorithm names
+register_instance : Register a new algorithm implementation
+unregister_instance : Remove an algorithm from the registry
+has : Check if an algorithm name is registered</p>
 </div>
 <dl class="py method">
 <dt class="sig sig-object py" id="qdk_chemistry.algorithms.registry.CoupledClusterCalculatorFactory.__init__">
@@ -362,7 +345,7 @@ algorithm implementations through a registry pattern.</p>
 <dd class="field-odd"><p>List of all registered algorithm implementation names</p>
 </dd>
 <dt class="field-even">Return type<span class="colon">:</span></dt>
-<dd class="field-even"><p><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#list" title="(in Python v3.14)">list</a> of <a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)">str</a></p>
+<dd class="field-even"><p><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#list" title="(in Python v3.14)">list</a>[<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)">str</a>]</p>
 </dd>
 </dl>
 <p class="rubric">Examples</p>
@@ -385,7 +368,7 @@ algorithm implementations through a registry pattern.</p>
 <p>If no name is provided or the name is empty, returns the default implementation.</p>
 <dl class="field-list simple">
 <dt class="field-odd">Parameters<span class="colon">:</span></dt>
-<dd class="field-odd"><p><strong>name</strong> (<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)"><em>str</em></a><em>, </em><em>optional</em>) – Name identifying which algorithm implementation to create.
+<dd class="field-odd"><p><strong>name</strong> (<em>Optional</em><em>[</em><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)"><em>str</em></a><em>]</em>) – Name identifying which algorithm implementation to create.
 If empty string (default), returns the default implementation.</p>
 </dd>
 <dt class="field-even">Returns<span class="colon">:</span></dt>
@@ -431,8 +414,7 @@ If empty string (default), returns the default implementation.</p>
 <dt class="sig sig-object py" id="qdk_chemistry.algorithms.registry.CoupledClusterCalculatorFactory.register_instance">
 <em class="property"><span class="k"><span class="pre">static</span></span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">register_instance</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">func</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/library/collections.abc.html#collections.abc.Callable" title="(in Python v3.14)"><span class="pre">collections.abc.Callable</span></a></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><a class="reference external" href="https://docs.python.org/3/library/constants.html#None" title="(in Python v3.14)"><span class="pre">None</span></a></span></span><a class="headerlink" href="#qdk_chemistry.algorithms.registry.CoupledClusterCalculatorFactory.register_instance" title="Link to this definition"></a></dt>
 <dd><p>Register a new algorithm implementation.</p>
-<p>The algorithm is registered under its primary name and all aliases
-as determined by the instance’s name() and aliases() methods.</p>
+<p>The algorithm is registered under its primary name and all aliases as determined by the instance’s name() and aliases() methods.</p>
 <dl class="field-list simple">
 <dt class="field-odd">Parameters<span class="colon">:</span></dt>
 <dd class="field-odd"><p><strong>func</strong> (<em>callable</em>) – Function that returns an algorithm instance.
@@ -479,23 +461,15 @@ The instance must implement the required algorithm interface.</p>
 <em class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">HamiltonianConstructorFactory</span></span><a class="headerlink" href="#qdk_chemistry.algorithms.registry.HamiltonianConstructorFactory" title="Link to this definition"></a></dt>
 <dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">pybind11_object</span></code></p>
 <p>Algorithm factory for creating and managing algorithm implementations.</p>
-<p>This class provides static methods for creating, listing, and managing
-algorithm implementations through a registry pattern.</p>
+<p>This class provides static methods for creating, listing, and managing algorithm implementations through a registry pattern.</p>
 <p>All methods are static and the class cannot be instantiated.</p>
 <div class="admonition seealso">
 <p class="admonition-title">See also</p>
-<dl class="simple">
-<dt><a class="reference internal" href="#qdk_chemistry.algorithms.registry.create" title="qdk_chemistry.algorithms.registry.create"><code class="xref py py-obj docutils literal notranslate"><span class="pre">create</span></code></a></dt><dd><p>Create an algorithm instance by name</p>
-</dd>
-<dt><a class="reference internal" href="#qdk_chemistry.algorithms.registry.available" title="qdk_chemistry.algorithms.registry.available"><code class="xref py py-obj docutils literal notranslate"><span class="pre">available</span></code></a></dt><dd><p>List all registered algorithm names</p>
-</dd>
-<dt><a class="reference internal" href="#qdk_chemistry.algorithms.registry.HamiltonianConstructorFactory.register_instance" title="qdk_chemistry.algorithms.registry.HamiltonianConstructorFactory.register_instance"><code class="xref py py-obj docutils literal notranslate"><span class="pre">register_instance</span></code></a></dt><dd><p>Register a new algorithm implementation</p>
-</dd>
-<dt><a class="reference internal" href="#qdk_chemistry.algorithms.registry.HamiltonianConstructorFactory.unregister_instance" title="qdk_chemistry.algorithms.registry.HamiltonianConstructorFactory.unregister_instance"><code class="xref py py-obj docutils literal notranslate"><span class="pre">unregister_instance</span></code></a></dt><dd><p>Remove an algorithm from the registry</p>
-</dd>
-<dt><a class="reference internal" href="#qdk_chemistry.algorithms.registry.HamiltonianConstructorFactory.has" title="qdk_chemistry.algorithms.registry.HamiltonianConstructorFactory.has"><code class="xref py py-obj docutils literal notranslate"><span class="pre">has</span></code></a></dt><dd><p>Check if an algorithm name is registered</p>
-</dd>
-</dl>
+<p>create : Create an algorithm instance by name
+available : List all registered algorithm names
+register_instance : Register a new algorithm implementation
+unregister_instance : Remove an algorithm from the registry
+has : Check if an algorithm name is registered</p>
 </div>
 <dl class="py method">
 <dt class="sig sig-object py" id="qdk_chemistry.algorithms.registry.HamiltonianConstructorFactory.__init__">
@@ -525,7 +499,7 @@ algorithm implementations through a registry pattern.</p>
 <dd class="field-odd"><p>List of all registered algorithm implementation names</p>
 </dd>
 <dt class="field-even">Return type<span class="colon">:</span></dt>
-<dd class="field-even"><p><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#list" title="(in Python v3.14)">list</a> of <a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)">str</a></p>
+<dd class="field-even"><p><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#list" title="(in Python v3.14)">list</a>[<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)">str</a>]</p>
 </dd>
 </dl>
 <p class="rubric">Examples</p>
@@ -548,7 +522,7 @@ algorithm implementations through a registry pattern.</p>
 <p>If no name is provided or the name is empty, returns the default implementation.</p>
 <dl class="field-list simple">
 <dt class="field-odd">Parameters<span class="colon">:</span></dt>
-<dd class="field-odd"><p><strong>name</strong> (<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)"><em>str</em></a><em>, </em><em>optional</em>) – Name identifying which algorithm implementation to create.
+<dd class="field-odd"><p><strong>name</strong> (<em>Optional</em><em>[</em><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)"><em>str</em></a><em>]</em>) – Name identifying which algorithm implementation to create.
 If empty string (default), returns the default implementation.</p>
 </dd>
 <dt class="field-even">Returns<span class="colon">:</span></dt>
@@ -594,8 +568,7 @@ If empty string (default), returns the default implementation.</p>
 <dt class="sig sig-object py" id="qdk_chemistry.algorithms.registry.HamiltonianConstructorFactory.register_instance">
 <em class="property"><span class="k"><span class="pre">static</span></span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">register_instance</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">func</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/library/collections.abc.html#collections.abc.Callable" title="(in Python v3.14)"><span class="pre">collections.abc.Callable</span></a></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><a class="reference external" href="https://docs.python.org/3/library/constants.html#None" title="(in Python v3.14)"><span class="pre">None</span></a></span></span><a class="headerlink" href="#qdk_chemistry.algorithms.registry.HamiltonianConstructorFactory.register_instance" title="Link to this definition"></a></dt>
 <dd><p>Register a new algorithm implementation.</p>
-<p>The algorithm is registered under its primary name and all aliases
-as determined by the instance’s name() and aliases() methods.</p>
+<p>The algorithm is registered under its primary name and all aliases as determined by the instance’s name() and aliases() methods.</p>
 <dl class="field-list simple">
 <dt class="field-odd">Parameters<span class="colon">:</span></dt>
 <dd class="field-odd"><p><strong>func</strong> (<em>callable</em>) – Function that returns an algorithm instance.
@@ -642,23 +615,15 @@ The instance must implement the required algorithm interface.</p>
 <em class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">LocalizerFactory</span></span><a class="headerlink" href="#qdk_chemistry.algorithms.registry.LocalizerFactory" title="Link to this definition"></a></dt>
 <dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">pybind11_object</span></code></p>
 <p>Algorithm factory for creating and managing algorithm implementations.</p>
-<p>This class provides static methods for creating, listing, and managing
-algorithm implementations through a registry pattern.</p>
+<p>This class provides static methods for creating, listing, and managing algorithm implementations through a registry pattern.</p>
 <p>All methods are static and the class cannot be instantiated.</p>
 <div class="admonition seealso">
 <p class="admonition-title">See also</p>
-<dl class="simple">
-<dt><a class="reference internal" href="#qdk_chemistry.algorithms.registry.create" title="qdk_chemistry.algorithms.registry.create"><code class="xref py py-obj docutils literal notranslate"><span class="pre">create</span></code></a></dt><dd><p>Create an algorithm instance by name</p>
-</dd>
-<dt><a class="reference internal" href="#qdk_chemistry.algorithms.registry.available" title="qdk_chemistry.algorithms.registry.available"><code class="xref py py-obj docutils literal notranslate"><span class="pre">available</span></code></a></dt><dd><p>List all registered algorithm names</p>
-</dd>
-<dt><a class="reference internal" href="#qdk_chemistry.algorithms.registry.LocalizerFactory.register_instance" title="qdk_chemistry.algorithms.registry.LocalizerFactory.register_instance"><code class="xref py py-obj docutils literal notranslate"><span class="pre">register_instance</span></code></a></dt><dd><p>Register a new algorithm implementation</p>
-</dd>
-<dt><a class="reference internal" href="#qdk_chemistry.algorithms.registry.LocalizerFactory.unregister_instance" title="qdk_chemistry.algorithms.registry.LocalizerFactory.unregister_instance"><code class="xref py py-obj docutils literal notranslate"><span class="pre">unregister_instance</span></code></a></dt><dd><p>Remove an algorithm from the registry</p>
-</dd>
-<dt><a class="reference internal" href="#qdk_chemistry.algorithms.registry.LocalizerFactory.has" title="qdk_chemistry.algorithms.registry.LocalizerFactory.has"><code class="xref py py-obj docutils literal notranslate"><span class="pre">has</span></code></a></dt><dd><p>Check if an algorithm name is registered</p>
-</dd>
-</dl>
+<p>create : Create an algorithm instance by name
+available : List all registered algorithm names
+register_instance : Register a new algorithm implementation
+unregister_instance : Remove an algorithm from the registry
+has : Check if an algorithm name is registered</p>
 </div>
 <dl class="py method">
 <dt class="sig sig-object py" id="qdk_chemistry.algorithms.registry.LocalizerFactory.__init__">
@@ -688,7 +653,7 @@ algorithm implementations through a registry pattern.</p>
 <dd class="field-odd"><p>List of all registered algorithm implementation names</p>
 </dd>
 <dt class="field-even">Return type<span class="colon">:</span></dt>
-<dd class="field-even"><p><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#list" title="(in Python v3.14)">list</a> of <a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)">str</a></p>
+<dd class="field-even"><p><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#list" title="(in Python v3.14)">list</a>[<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)">str</a>]</p>
 </dd>
 </dl>
 <p class="rubric">Examples</p>
@@ -711,7 +676,7 @@ algorithm implementations through a registry pattern.</p>
 <p>If no name is provided or the name is empty, returns the default implementation.</p>
 <dl class="field-list simple">
 <dt class="field-odd">Parameters<span class="colon">:</span></dt>
-<dd class="field-odd"><p><strong>name</strong> (<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)"><em>str</em></a><em>, </em><em>optional</em>) – Name identifying which algorithm implementation to create.
+<dd class="field-odd"><p><strong>name</strong> (<em>Optional</em><em>[</em><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)"><em>str</em></a><em>]</em>) – Name identifying which algorithm implementation to create.
 If empty string (default), returns the default implementation.</p>
 </dd>
 <dt class="field-even">Returns<span class="colon">:</span></dt>
@@ -757,8 +722,7 @@ If empty string (default), returns the default implementation.</p>
 <dt class="sig sig-object py" id="qdk_chemistry.algorithms.registry.LocalizerFactory.register_instance">
 <em class="property"><span class="k"><span class="pre">static</span></span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">register_instance</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">func</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/library/collections.abc.html#collections.abc.Callable" title="(in Python v3.14)"><span class="pre">collections.abc.Callable</span></a></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><a class="reference external" href="https://docs.python.org/3/library/constants.html#None" title="(in Python v3.14)"><span class="pre">None</span></a></span></span><a class="headerlink" href="#qdk_chemistry.algorithms.registry.LocalizerFactory.register_instance" title="Link to this definition"></a></dt>
 <dd><p>Register a new algorithm implementation.</p>
-<p>The algorithm is registered under its primary name and all aliases
-as determined by the instance’s name() and aliases() methods.</p>
+<p>The algorithm is registered under its primary name and all aliases as determined by the instance’s name() and aliases() methods.</p>
 <dl class="field-list simple">
 <dt class="field-odd">Parameters<span class="colon">:</span></dt>
 <dd class="field-odd"><p><strong>func</strong> (<em>callable</em>) – Function that returns an algorithm instance.
@@ -805,23 +769,15 @@ The instance must implement the required algorithm interface.</p>
 <em class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">MultiConfigurationCalculatorFactory</span></span><a class="headerlink" href="#qdk_chemistry.algorithms.registry.MultiConfigurationCalculatorFactory" title="Link to this definition"></a></dt>
 <dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">pybind11_object</span></code></p>
 <p>Algorithm factory for creating and managing algorithm implementations.</p>
-<p>This class provides static methods for creating, listing, and managing
-algorithm implementations through a registry pattern.</p>
+<p>This class provides static methods for creating, listing, and managing algorithm implementations through a registry pattern.</p>
 <p>All methods are static and the class cannot be instantiated.</p>
 <div class="admonition seealso">
 <p class="admonition-title">See also</p>
-<dl class="simple">
-<dt><a class="reference internal" href="#qdk_chemistry.algorithms.registry.create" title="qdk_chemistry.algorithms.registry.create"><code class="xref py py-obj docutils literal notranslate"><span class="pre">create</span></code></a></dt><dd><p>Create an algorithm instance by name</p>
-</dd>
-<dt><a class="reference internal" href="#qdk_chemistry.algorithms.registry.available" title="qdk_chemistry.algorithms.registry.available"><code class="xref py py-obj docutils literal notranslate"><span class="pre">available</span></code></a></dt><dd><p>List all registered algorithm names</p>
-</dd>
-<dt><a class="reference internal" href="#qdk_chemistry.algorithms.registry.MultiConfigurationCalculatorFactory.register_instance" title="qdk_chemistry.algorithms.registry.MultiConfigurationCalculatorFactory.register_instance"><code class="xref py py-obj docutils literal notranslate"><span class="pre">register_instance</span></code></a></dt><dd><p>Register a new algorithm implementation</p>
-</dd>
-<dt><a class="reference internal" href="#qdk_chemistry.algorithms.registry.MultiConfigurationCalculatorFactory.unregister_instance" title="qdk_chemistry.algorithms.registry.MultiConfigurationCalculatorFactory.unregister_instance"><code class="xref py py-obj docutils literal notranslate"><span class="pre">unregister_instance</span></code></a></dt><dd><p>Remove an algorithm from the registry</p>
-</dd>
-<dt><a class="reference internal" href="#qdk_chemistry.algorithms.registry.MultiConfigurationCalculatorFactory.has" title="qdk_chemistry.algorithms.registry.MultiConfigurationCalculatorFactory.has"><code class="xref py py-obj docutils literal notranslate"><span class="pre">has</span></code></a></dt><dd><p>Check if an algorithm name is registered</p>
-</dd>
-</dl>
+<p>create : Create an algorithm instance by name
+available : List all registered algorithm names
+register_instance : Register a new algorithm implementation
+unregister_instance : Remove an algorithm from the registry
+has : Check if an algorithm name is registered</p>
 </div>
 <dl class="py method">
 <dt class="sig sig-object py" id="qdk_chemistry.algorithms.registry.MultiConfigurationCalculatorFactory.__init__">
@@ -851,7 +807,7 @@ algorithm implementations through a registry pattern.</p>
 <dd class="field-odd"><p>List of all registered algorithm implementation names</p>
 </dd>
 <dt class="field-even">Return type<span class="colon">:</span></dt>
-<dd class="field-even"><p><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#list" title="(in Python v3.14)">list</a> of <a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)">str</a></p>
+<dd class="field-even"><p><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#list" title="(in Python v3.14)">list</a>[<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)">str</a>]</p>
 </dd>
 </dl>
 <p class="rubric">Examples</p>
@@ -874,7 +830,7 @@ algorithm implementations through a registry pattern.</p>
 <p>If no name is provided or the name is empty, returns the default implementation.</p>
 <dl class="field-list simple">
 <dt class="field-odd">Parameters<span class="colon">:</span></dt>
-<dd class="field-odd"><p><strong>name</strong> (<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)"><em>str</em></a><em>, </em><em>optional</em>) – Name identifying which algorithm implementation to create.
+<dd class="field-odd"><p><strong>name</strong> (<em>Optional</em><em>[</em><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)"><em>str</em></a><em>]</em>) – Name identifying which algorithm implementation to create.
 If empty string (default), returns the default implementation.</p>
 </dd>
 <dt class="field-even">Returns<span class="colon">:</span></dt>
@@ -920,8 +876,7 @@ If empty string (default), returns the default implementation.</p>
 <dt class="sig sig-object py" id="qdk_chemistry.algorithms.registry.MultiConfigurationCalculatorFactory.register_instance">
 <em class="property"><span class="k"><span class="pre">static</span></span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">register_instance</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">func</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/library/collections.abc.html#collections.abc.Callable" title="(in Python v3.14)"><span class="pre">collections.abc.Callable</span></a></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><a class="reference external" href="https://docs.python.org/3/library/constants.html#None" title="(in Python v3.14)"><span class="pre">None</span></a></span></span><a class="headerlink" href="#qdk_chemistry.algorithms.registry.MultiConfigurationCalculatorFactory.register_instance" title="Link to this definition"></a></dt>
 <dd><p>Register a new algorithm implementation.</p>
-<p>The algorithm is registered under its primary name and all aliases
-as determined by the instance’s name() and aliases() methods.</p>
+<p>The algorithm is registered under its primary name and all aliases as determined by the instance’s name() and aliases() methods.</p>
 <dl class="field-list simple">
 <dt class="field-odd">Parameters<span class="colon">:</span></dt>
 <dd class="field-odd"><p><strong>func</strong> (<em>callable</em>) – Function that returns an algorithm instance.
@@ -968,23 +923,15 @@ The instance must implement the required algorithm interface.</p>
 <em class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">MultiConfigurationScfFactory</span></span><a class="headerlink" href="#qdk_chemistry.algorithms.registry.MultiConfigurationScfFactory" title="Link to this definition"></a></dt>
 <dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">pybind11_object</span></code></p>
 <p>Algorithm factory for creating and managing algorithm implementations.</p>
-<p>This class provides static methods for creating, listing, and managing
-algorithm implementations through a registry pattern.</p>
+<p>This class provides static methods for creating, listing, and managing algorithm implementations through a registry pattern.</p>
 <p>All methods are static and the class cannot be instantiated.</p>
 <div class="admonition seealso">
 <p class="admonition-title">See also</p>
-<dl class="simple">
-<dt><a class="reference internal" href="#qdk_chemistry.algorithms.registry.create" title="qdk_chemistry.algorithms.registry.create"><code class="xref py py-obj docutils literal notranslate"><span class="pre">create</span></code></a></dt><dd><p>Create an algorithm instance by name</p>
-</dd>
-<dt><a class="reference internal" href="#qdk_chemistry.algorithms.registry.available" title="qdk_chemistry.algorithms.registry.available"><code class="xref py py-obj docutils literal notranslate"><span class="pre">available</span></code></a></dt><dd><p>List all registered algorithm names</p>
-</dd>
-<dt><a class="reference internal" href="#qdk_chemistry.algorithms.registry.MultiConfigurationScfFactory.register_instance" title="qdk_chemistry.algorithms.registry.MultiConfigurationScfFactory.register_instance"><code class="xref py py-obj docutils literal notranslate"><span class="pre">register_instance</span></code></a></dt><dd><p>Register a new algorithm implementation</p>
-</dd>
-<dt><a class="reference internal" href="#qdk_chemistry.algorithms.registry.MultiConfigurationScfFactory.unregister_instance" title="qdk_chemistry.algorithms.registry.MultiConfigurationScfFactory.unregister_instance"><code class="xref py py-obj docutils literal notranslate"><span class="pre">unregister_instance</span></code></a></dt><dd><p>Remove an algorithm from the registry</p>
-</dd>
-<dt><a class="reference internal" href="#qdk_chemistry.algorithms.registry.MultiConfigurationScfFactory.has" title="qdk_chemistry.algorithms.registry.MultiConfigurationScfFactory.has"><code class="xref py py-obj docutils literal notranslate"><span class="pre">has</span></code></a></dt><dd><p>Check if an algorithm name is registered</p>
-</dd>
-</dl>
+<p>create : Create an algorithm instance by name
+available : List all registered algorithm names
+register_instance : Register a new algorithm implementation
+unregister_instance : Remove an algorithm from the registry
+has : Check if an algorithm name is registered</p>
 </div>
 <dl class="py method">
 <dt class="sig sig-object py" id="qdk_chemistry.algorithms.registry.MultiConfigurationScfFactory.__init__">
@@ -1014,7 +961,7 @@ algorithm implementations through a registry pattern.</p>
 <dd class="field-odd"><p>List of all registered algorithm implementation names</p>
 </dd>
 <dt class="field-even">Return type<span class="colon">:</span></dt>
-<dd class="field-even"><p><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#list" title="(in Python v3.14)">list</a> of <a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)">str</a></p>
+<dd class="field-even"><p><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#list" title="(in Python v3.14)">list</a>[<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)">str</a>]</p>
 </dd>
 </dl>
 <p class="rubric">Examples</p>
@@ -1037,7 +984,7 @@ algorithm implementations through a registry pattern.</p>
 <p>If no name is provided or the name is empty, returns the default implementation.</p>
 <dl class="field-list simple">
 <dt class="field-odd">Parameters<span class="colon">:</span></dt>
-<dd class="field-odd"><p><strong>name</strong> (<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)"><em>str</em></a><em>, </em><em>optional</em>) – Name identifying which algorithm implementation to create.
+<dd class="field-odd"><p><strong>name</strong> (<em>Optional</em><em>[</em><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)"><em>str</em></a><em>]</em>) – Name identifying which algorithm implementation to create.
 If empty string (default), returns the default implementation.</p>
 </dd>
 <dt class="field-even">Returns<span class="colon">:</span></dt>
@@ -1083,8 +1030,7 @@ If empty string (default), returns the default implementation.</p>
 <dt class="sig sig-object py" id="qdk_chemistry.algorithms.registry.MultiConfigurationScfFactory.register_instance">
 <em class="property"><span class="k"><span class="pre">static</span></span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">register_instance</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">func</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/library/collections.abc.html#collections.abc.Callable" title="(in Python v3.14)"><span class="pre">collections.abc.Callable</span></a></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><a class="reference external" href="https://docs.python.org/3/library/constants.html#None" title="(in Python v3.14)"><span class="pre">None</span></a></span></span><a class="headerlink" href="#qdk_chemistry.algorithms.registry.MultiConfigurationScfFactory.register_instance" title="Link to this definition"></a></dt>
 <dd><p>Register a new algorithm implementation.</p>
-<p>The algorithm is registered under its primary name and all aliases
-as determined by the instance’s name() and aliases() methods.</p>
+<p>The algorithm is registered under its primary name and all aliases as determined by the instance’s name() and aliases() methods.</p>
 <dl class="field-list simple">
 <dt class="field-odd">Parameters<span class="colon">:</span></dt>
 <dd class="field-odd"><p><strong>func</strong> (<em>callable</em>) – Function that returns an algorithm instance.
@@ -1131,23 +1077,15 @@ The instance must implement the required algorithm interface.</p>
 <em class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">ProjectedMultiConfigurationCalculatorFactory</span></span><a class="headerlink" href="#qdk_chemistry.algorithms.registry.ProjectedMultiConfigurationCalculatorFactory" title="Link to this definition"></a></dt>
 <dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">pybind11_object</span></code></p>
 <p>Algorithm factory for creating and managing algorithm implementations.</p>
-<p>This class provides static methods for creating, listing, and managing
-algorithm implementations through a registry pattern.</p>
+<p>This class provides static methods for creating, listing, and managing algorithm implementations through a registry pattern.</p>
 <p>All methods are static and the class cannot be instantiated.</p>
 <div class="admonition seealso">
 <p class="admonition-title">See also</p>
-<dl class="simple">
-<dt><a class="reference internal" href="#qdk_chemistry.algorithms.registry.create" title="qdk_chemistry.algorithms.registry.create"><code class="xref py py-obj docutils literal notranslate"><span class="pre">create</span></code></a></dt><dd><p>Create an algorithm instance by name</p>
-</dd>
-<dt><a class="reference internal" href="#qdk_chemistry.algorithms.registry.available" title="qdk_chemistry.algorithms.registry.available"><code class="xref py py-obj docutils literal notranslate"><span class="pre">available</span></code></a></dt><dd><p>List all registered algorithm names</p>
-</dd>
-<dt><a class="reference internal" href="#qdk_chemistry.algorithms.registry.ProjectedMultiConfigurationCalculatorFactory.register_instance" title="qdk_chemistry.algorithms.registry.ProjectedMultiConfigurationCalculatorFactory.register_instance"><code class="xref py py-obj docutils literal notranslate"><span class="pre">register_instance</span></code></a></dt><dd><p>Register a new algorithm implementation</p>
-</dd>
-<dt><a class="reference internal" href="#qdk_chemistry.algorithms.registry.ProjectedMultiConfigurationCalculatorFactory.unregister_instance" title="qdk_chemistry.algorithms.registry.ProjectedMultiConfigurationCalculatorFactory.unregister_instance"><code class="xref py py-obj docutils literal notranslate"><span class="pre">unregister_instance</span></code></a></dt><dd><p>Remove an algorithm from the registry</p>
-</dd>
-<dt><a class="reference internal" href="#qdk_chemistry.algorithms.registry.ProjectedMultiConfigurationCalculatorFactory.has" title="qdk_chemistry.algorithms.registry.ProjectedMultiConfigurationCalculatorFactory.has"><code class="xref py py-obj docutils literal notranslate"><span class="pre">has</span></code></a></dt><dd><p>Check if an algorithm name is registered</p>
-</dd>
-</dl>
+<p>create : Create an algorithm instance by name
+available : List all registered algorithm names
+register_instance : Register a new algorithm implementation
+unregister_instance : Remove an algorithm from the registry
+has : Check if an algorithm name is registered</p>
 </div>
 <dl class="py method">
 <dt class="sig sig-object py" id="qdk_chemistry.algorithms.registry.ProjectedMultiConfigurationCalculatorFactory.__init__">
@@ -1177,7 +1115,7 @@ algorithm implementations through a registry pattern.</p>
 <dd class="field-odd"><p>List of all registered algorithm implementation names</p>
 </dd>
 <dt class="field-even">Return type<span class="colon">:</span></dt>
-<dd class="field-even"><p><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#list" title="(in Python v3.14)">list</a> of <a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)">str</a></p>
+<dd class="field-even"><p><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#list" title="(in Python v3.14)">list</a>[<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)">str</a>]</p>
 </dd>
 </dl>
 <p class="rubric">Examples</p>
@@ -1200,7 +1138,7 @@ algorithm implementations through a registry pattern.</p>
 <p>If no name is provided or the name is empty, returns the default implementation.</p>
 <dl class="field-list simple">
 <dt class="field-odd">Parameters<span class="colon">:</span></dt>
-<dd class="field-odd"><p><strong>name</strong> (<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)"><em>str</em></a><em>, </em><em>optional</em>) – Name identifying which algorithm implementation to create.
+<dd class="field-odd"><p><strong>name</strong> (<em>Optional</em><em>[</em><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)"><em>str</em></a><em>]</em>) – Name identifying which algorithm implementation to create.
 If empty string (default), returns the default implementation.</p>
 </dd>
 <dt class="field-even">Returns<span class="colon">:</span></dt>
@@ -1246,8 +1184,7 @@ If empty string (default), returns the default implementation.</p>
 <dt class="sig sig-object py" id="qdk_chemistry.algorithms.registry.ProjectedMultiConfigurationCalculatorFactory.register_instance">
 <em class="property"><span class="k"><span class="pre">static</span></span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">register_instance</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">func</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/library/collections.abc.html#collections.abc.Callable" title="(in Python v3.14)"><span class="pre">collections.abc.Callable</span></a></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><a class="reference external" href="https://docs.python.org/3/library/constants.html#None" title="(in Python v3.14)"><span class="pre">None</span></a></span></span><a class="headerlink" href="#qdk_chemistry.algorithms.registry.ProjectedMultiConfigurationCalculatorFactory.register_instance" title="Link to this definition"></a></dt>
 <dd><p>Register a new algorithm implementation.</p>
-<p>The algorithm is registered under its primary name and all aliases
-as determined by the instance’s name() and aliases() methods.</p>
+<p>The algorithm is registered under its primary name and all aliases as determined by the instance’s name() and aliases() methods.</p>
 <dl class="field-list simple">
 <dt class="field-odd">Parameters<span class="colon">:</span></dt>
 <dd class="field-odd"><p><strong>func</strong> (<em>callable</em>) – Function that returns an algorithm instance.
@@ -1294,23 +1231,15 @@ The instance must implement the required algorithm interface.</p>
 <em class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">ScfSolverFactory</span></span><a class="headerlink" href="#qdk_chemistry.algorithms.registry.ScfSolverFactory" title="Link to this definition"></a></dt>
 <dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">pybind11_object</span></code></p>
 <p>Algorithm factory for creating and managing algorithm implementations.</p>
-<p>This class provides static methods for creating, listing, and managing
-algorithm implementations through a registry pattern.</p>
+<p>This class provides static methods for creating, listing, and managing algorithm implementations through a registry pattern.</p>
 <p>All methods are static and the class cannot be instantiated.</p>
 <div class="admonition seealso">
 <p class="admonition-title">See also</p>
-<dl class="simple">
-<dt><a class="reference internal" href="#qdk_chemistry.algorithms.registry.create" title="qdk_chemistry.algorithms.registry.create"><code class="xref py py-obj docutils literal notranslate"><span class="pre">create</span></code></a></dt><dd><p>Create an algorithm instance by name</p>
-</dd>
-<dt><a class="reference internal" href="#qdk_chemistry.algorithms.registry.available" title="qdk_chemistry.algorithms.registry.available"><code class="xref py py-obj docutils literal notranslate"><span class="pre">available</span></code></a></dt><dd><p>List all registered algorithm names</p>
-</dd>
-<dt><a class="reference internal" href="#qdk_chemistry.algorithms.registry.ScfSolverFactory.register_instance" title="qdk_chemistry.algorithms.registry.ScfSolverFactory.register_instance"><code class="xref py py-obj docutils literal notranslate"><span class="pre">register_instance</span></code></a></dt><dd><p>Register a new algorithm implementation</p>
-</dd>
-<dt><a class="reference internal" href="#qdk_chemistry.algorithms.registry.ScfSolverFactory.unregister_instance" title="qdk_chemistry.algorithms.registry.ScfSolverFactory.unregister_instance"><code class="xref py py-obj docutils literal notranslate"><span class="pre">unregister_instance</span></code></a></dt><dd><p>Remove an algorithm from the registry</p>
-</dd>
-<dt><a class="reference internal" href="#qdk_chemistry.algorithms.registry.ScfSolverFactory.has" title="qdk_chemistry.algorithms.registry.ScfSolverFactory.has"><code class="xref py py-obj docutils literal notranslate"><span class="pre">has</span></code></a></dt><dd><p>Check if an algorithm name is registered</p>
-</dd>
-</dl>
+<p>create : Create an algorithm instance by name
+available : List all registered algorithm names
+register_instance : Register a new algorithm implementation
+unregister_instance : Remove an algorithm from the registry
+has : Check if an algorithm name is registered</p>
 </div>
 <dl class="py method">
 <dt class="sig sig-object py" id="qdk_chemistry.algorithms.registry.ScfSolverFactory.__init__">
@@ -1340,7 +1269,7 @@ algorithm implementations through a registry pattern.</p>
 <dd class="field-odd"><p>List of all registered algorithm implementation names</p>
 </dd>
 <dt class="field-even">Return type<span class="colon">:</span></dt>
-<dd class="field-even"><p><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#list" title="(in Python v3.14)">list</a> of <a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)">str</a></p>
+<dd class="field-even"><p><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#list" title="(in Python v3.14)">list</a>[<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)">str</a>]</p>
 </dd>
 </dl>
 <p class="rubric">Examples</p>
@@ -1363,7 +1292,7 @@ algorithm implementations through a registry pattern.</p>
 <p>If no name is provided or the name is empty, returns the default implementation.</p>
 <dl class="field-list simple">
 <dt class="field-odd">Parameters<span class="colon">:</span></dt>
-<dd class="field-odd"><p><strong>name</strong> (<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)"><em>str</em></a><em>, </em><em>optional</em>) – Name identifying which algorithm implementation to create.
+<dd class="field-odd"><p><strong>name</strong> (<em>Optional</em><em>[</em><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)"><em>str</em></a><em>]</em>) – Name identifying which algorithm implementation to create.
 If empty string (default), returns the default implementation.</p>
 </dd>
 <dt class="field-even">Returns<span class="colon">:</span></dt>
@@ -1409,8 +1338,7 @@ If empty string (default), returns the default implementation.</p>
 <dt class="sig sig-object py" id="qdk_chemistry.algorithms.registry.ScfSolverFactory.register_instance">
 <em class="property"><span class="k"><span class="pre">static</span></span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">register_instance</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">func</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/library/collections.abc.html#collections.abc.Callable" title="(in Python v3.14)"><span class="pre">collections.abc.Callable</span></a></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><a class="reference external" href="https://docs.python.org/3/library/constants.html#None" title="(in Python v3.14)"><span class="pre">None</span></a></span></span><a class="headerlink" href="#qdk_chemistry.algorithms.registry.ScfSolverFactory.register_instance" title="Link to this definition"></a></dt>
 <dd><p>Register a new algorithm implementation.</p>
-<p>The algorithm is registered under its primary name and all aliases
-as determined by the instance’s name() and aliases() methods.</p>
+<p>The algorithm is registered under its primary name and all aliases as determined by the instance’s name() and aliases() methods.</p>
 <dl class="field-list simple">
 <dt class="field-odd">Parameters<span class="colon">:</span></dt>
 <dd class="field-odd"><p><strong>func</strong> (<em>callable</em>) – Function that returns an algorithm instance.
@@ -1457,23 +1385,15 @@ The instance must implement the required algorithm interface.</p>
 <em class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">StabilityCheckerFactory</span></span><a class="headerlink" href="#qdk_chemistry.algorithms.registry.StabilityCheckerFactory" title="Link to this definition"></a></dt>
 <dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">pybind11_object</span></code></p>
 <p>Algorithm factory for creating and managing algorithm implementations.</p>
-<p>This class provides static methods for creating, listing, and managing
-algorithm implementations through a registry pattern.</p>
+<p>This class provides static methods for creating, listing, and managing algorithm implementations through a registry pattern.</p>
 <p>All methods are static and the class cannot be instantiated.</p>
 <div class="admonition seealso">
 <p class="admonition-title">See also</p>
-<dl class="simple">
-<dt><a class="reference internal" href="#qdk_chemistry.algorithms.registry.create" title="qdk_chemistry.algorithms.registry.create"><code class="xref py py-obj docutils literal notranslate"><span class="pre">create</span></code></a></dt><dd><p>Create an algorithm instance by name</p>
-</dd>
-<dt><a class="reference internal" href="#qdk_chemistry.algorithms.registry.available" title="qdk_chemistry.algorithms.registry.available"><code class="xref py py-obj docutils literal notranslate"><span class="pre">available</span></code></a></dt><dd><p>List all registered algorithm names</p>
-</dd>
-<dt><a class="reference internal" href="#qdk_chemistry.algorithms.registry.StabilityCheckerFactory.register_instance" title="qdk_chemistry.algorithms.registry.StabilityCheckerFactory.register_instance"><code class="xref py py-obj docutils literal notranslate"><span class="pre">register_instance</span></code></a></dt><dd><p>Register a new algorithm implementation</p>
-</dd>
-<dt><a class="reference internal" href="#qdk_chemistry.algorithms.registry.StabilityCheckerFactory.unregister_instance" title="qdk_chemistry.algorithms.registry.StabilityCheckerFactory.unregister_instance"><code class="xref py py-obj docutils literal notranslate"><span class="pre">unregister_instance</span></code></a></dt><dd><p>Remove an algorithm from the registry</p>
-</dd>
-<dt><a class="reference internal" href="#qdk_chemistry.algorithms.registry.StabilityCheckerFactory.has" title="qdk_chemistry.algorithms.registry.StabilityCheckerFactory.has"><code class="xref py py-obj docutils literal notranslate"><span class="pre">has</span></code></a></dt><dd><p>Check if an algorithm name is registered</p>
-</dd>
-</dl>
+<p>create : Create an algorithm instance by name
+available : List all registered algorithm names
+register_instance : Register a new algorithm implementation
+unregister_instance : Remove an algorithm from the registry
+has : Check if an algorithm name is registered</p>
 </div>
 <dl class="py method">
 <dt class="sig sig-object py" id="qdk_chemistry.algorithms.registry.StabilityCheckerFactory.__init__">
@@ -1503,7 +1423,7 @@ algorithm implementations through a registry pattern.</p>
 <dd class="field-odd"><p>List of all registered algorithm implementation names</p>
 </dd>
 <dt class="field-even">Return type<span class="colon">:</span></dt>
-<dd class="field-even"><p><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#list" title="(in Python v3.14)">list</a> of <a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)">str</a></p>
+<dd class="field-even"><p><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#list" title="(in Python v3.14)">list</a>[<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)">str</a>]</p>
 </dd>
 </dl>
 <p class="rubric">Examples</p>
@@ -1526,7 +1446,7 @@ algorithm implementations through a registry pattern.</p>
 <p>If no name is provided or the name is empty, returns the default implementation.</p>
 <dl class="field-list simple">
 <dt class="field-odd">Parameters<span class="colon">:</span></dt>
-<dd class="field-odd"><p><strong>name</strong> (<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)"><em>str</em></a><em>, </em><em>optional</em>) – Name identifying which algorithm implementation to create.
+<dd class="field-odd"><p><strong>name</strong> (<em>Optional</em><em>[</em><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)"><em>str</em></a><em>]</em>) – Name identifying which algorithm implementation to create.
 If empty string (default), returns the default implementation.</p>
 </dd>
 <dt class="field-even">Returns<span class="colon">:</span></dt>
@@ -1572,8 +1492,7 @@ If empty string (default), returns the default implementation.</p>
 <dt class="sig sig-object py" id="qdk_chemistry.algorithms.registry.StabilityCheckerFactory.register_instance">
 <em class="property"><span class="k"><span class="pre">static</span></span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">register_instance</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">func</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/library/collections.abc.html#collections.abc.Callable" title="(in Python v3.14)"><span class="pre">collections.abc.Callable</span></a></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><a class="reference external" href="https://docs.python.org/3/library/constants.html#None" title="(in Python v3.14)"><span class="pre">None</span></a></span></span><a class="headerlink" href="#qdk_chemistry.algorithms.registry.StabilityCheckerFactory.register_instance" title="Link to this definition"></a></dt>
 <dd><p>Register a new algorithm implementation.</p>
-<p>The algorithm is registered under its primary name and all aliases
-as determined by the instance’s name() and aliases() methods.</p>
+<p>The algorithm is registered under its primary name and all aliases as determined by the instance’s name() and aliases() methods.</p>
 <dl class="field-list simple">
 <dt class="field-odd">Parameters<span class="colon">:</span></dt>
 <dd class="field-odd"><p><strong>func</strong> (<em>callable</em>) – Function that returns an algorithm instance.
@@ -1620,7 +1539,6 @@ The instance must implement the required algorithm interface.</p>
 <em class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">EnergyEstimatorFactory</span></span><a class="headerlink" href="#qdk_chemistry.algorithms.registry.EnergyEstimatorFactory" title="Link to this definition"></a></dt>
 <dd><p>Bases: <a class="reference internal" href="qdk_chemistry.algorithms.base.html#qdk_chemistry.algorithms.base.AlgorithmFactory" title="qdk_chemistry.algorithms.base.AlgorithmFactory"><code class="xref py py-class docutils literal notranslate"><span class="pre">AlgorithmFactory</span></code></a></p>
 <p>Factory class for creating EnergyEstimator instances.</p>
-<p>Initialize the algorithm factory with an empty registry.</p>
 <dl class="field-list simple">
 </dl>
 <dl class="py method">
@@ -1654,13 +1572,12 @@ The instance must implement the required algorithm interface.</p>
 <p>Energy Estimator to estimate expectation values of quantum circuits with respect to a given observable.</p>
 <p>This class uses a QDK base simulator backend to run quantum circuits and estimate
 the expectation values of qubit Hamiltonians. It supports optional noise models for noise simulation.</p>
-<p>Initialize the Estimator with a backend and optional transpilation settings.</p>
 <dl class="field-list simple">
 <dt class="field-odd">Parameters<span class="colon">:</span></dt>
 <dd class="field-odd"><ul class="simple">
-<li><p><strong>seed</strong> (<a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(in Python v3.14)"><em>int</em></a>) – Random seed for reproducibility.</p></li>
-<li><p><strong>noise_model</strong> (<em>DepolarizingNoise</em><em> | </em><em>BitFlipNoise</em><em> | </em><em>PauliNoise</em><em> | </em><em>PhaseFlipNoise</em><em> | </em><em>None</em>) – Optional noise model to simulate noise in the quantum circuit.</p></li>
-<li><p><strong>qubit_loss</strong> (<a class="reference external" href="https://docs.python.org/3/library/functions.html#float" title="(in Python v3.14)"><em>float</em></a>) – Probability of qubit loss in simulation.</p></li>
+<li><p><strong>seed</strong> (<a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(in Python v3.14)"><em>int</em></a>)</p></li>
+<li><p><strong>noise_model</strong> (<em>DepolarizingNoise</em><em> | </em><em>BitFlipNoise</em><em> | </em><em>PauliNoise</em><em> | </em><em>PhaseFlipNoise</em><em> | </em><em>None</em>)</p></li>
+<li><p><strong>qubit_loss</strong> (<a class="reference external" href="https://docs.python.org/3/library/functions.html#float" title="(in Python v3.14)"><em>float</em></a>)</p></li>
 </ul>
 </dd>
 </dl>
@@ -1697,13 +1614,12 @@ the expectation values of qubit Hamiltonians. It supports optional noise models 
 <em class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">QubitMapperFactory</span></span><a class="headerlink" href="#qdk_chemistry.algorithms.registry.QubitMapperFactory" title="Link to this definition"></a></dt>
 <dd><p>Bases: <a class="reference internal" href="qdk_chemistry.algorithms.base.html#qdk_chemistry.algorithms.base.AlgorithmFactory" title="qdk_chemistry.algorithms.base.AlgorithmFactory"><code class="xref py py-class docutils literal notranslate"><span class="pre">AlgorithmFactory</span></code></a></p>
 <p>Factory class for creating QubitMapper instances.</p>
-<p>Initialize the algorithm factory with an empty registry.</p>
 <dl class="field-list simple">
 </dl>
 <dl class="py method">
 <dt class="sig sig-object py" id="qdk_chemistry.algorithms.registry.QubitMapperFactory.algorithm_type_name">
 <span class="sig-name descname"><span class="pre">algorithm_type_name</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#qdk_chemistry.algorithms.registry.QubitMapperFactory.algorithm_type_name" title="Link to this definition"></a></dt>
-<dd><p>Return <a href="#id1"><span class="problematic" id="id2">``</span></a>qubit_mapper as the algorithm type name.</p>
+<dd><p>Return <code class="docutils literal notranslate"><span class="pre">qubit_mapper</span></code> as the algorithm type name.</p>
 <dl class="field-list simple">
 <dt class="field-odd">Return type<span class="colon">:</span></dt>
 <dd class="field-odd"><p><span class="sphinx_autodoc_typehints-type"><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)"><code class="xref py py-class docutils literal notranslate"><span class="pre">str</span></code></a></span></p>
@@ -1714,7 +1630,7 @@ the expectation values of qubit Hamiltonians. It supports optional noise models 
 <dl class="py method">
 <dt class="sig sig-object py" id="qdk_chemistry.algorithms.registry.QubitMapperFactory.default_algorithm_name">
 <span class="sig-name descname"><span class="pre">default_algorithm_name</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#qdk_chemistry.algorithms.registry.QubitMapperFactory.default_algorithm_name" title="Link to this definition"></a></dt>
-<dd><p>Return <a href="#id3"><span class="problematic" id="id4">``</span></a>qiskit```as the default algorithm name.</p>
+<dd><p>Return <code class="docutils literal notranslate"><span class="pre">qiskit</span></code> as the default algorithm name.</p>
 <dl class="field-list simple">
 <dt class="field-odd">Return type<span class="colon">:</span></dt>
 <dd class="field-odd"><p><span class="sphinx_autodoc_typehints-type"><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)"><code class="xref py py-class docutils literal notranslate"><span class="pre">str</span></code></a></span></p>
@@ -1759,7 +1675,6 @@ tracks both CNOT and X operations for proper circuit reconstruction.</p>
 <li><p>Sparse isometry: Malvetti, Iten and Colbeck, <a class="reference external" href="https://arxiv.org/abs/2006.00016">arXiv:2006.00016</a></p></li>
 </ul>
 </div></blockquote>
-<p>Initialize the SparseIsometryGF2XStatePreparation.</p>
 <dl class="py method">
 <dt class="sig sig-object py" id="qdk_chemistry.algorithms.registry.SparseIsometryGF2XStatePreparation.__init__">
 <span class="sig-name descname"><span class="pre">__init__</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#qdk_chemistry.algorithms.registry.SparseIsometryGF2XStatePreparation.__init__" title="Link to this definition"></a></dt>
@@ -1784,7 +1699,6 @@ tracks both CNOT and X operations for proper circuit reconstruction.</p>
 <em class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">StatePreparationFactory</span></span><a class="headerlink" href="#qdk_chemistry.algorithms.registry.StatePreparationFactory" title="Link to this definition"></a></dt>
 <dd><p>Bases: <a class="reference internal" href="qdk_chemistry.algorithms.base.html#qdk_chemistry.algorithms.base.AlgorithmFactory" title="qdk_chemistry.algorithms.base.AlgorithmFactory"><code class="xref py py-class docutils literal notranslate"><span class="pre">AlgorithmFactory</span></code></a></p>
 <p>Factory class for creating StatePreparation instances.</p>
-<p>Initialize the StatePreparationFactory.</p>
 <dl class="py method">
 <dt class="sig sig-object py" id="qdk_chemistry.algorithms.registry.StatePreparationFactory.__init__">
 <span class="sig-name descname"><span class="pre">__init__</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#qdk_chemistry.algorithms.registry.StatePreparationFactory.__init__" title="Link to this definition"></a></dt>
@@ -1872,7 +1786,6 @@ defined in this base class.</p>
 <span class="gp">&gt;&gt;&gt; </span><span class="n">energy</span><span class="p">,</span> <span class="n">wfn</span> <span class="o">=</span> <span class="n">scf</span><span class="o">.</span><span class="n">run</span><span class="p">(</span><span class="n">structure</span><span class="p">,</span> <span class="n">charge</span><span class="o">=</span><span class="mi">0</span><span class="p">,</span> <span class="n">spin_multiplicity</span><span class="o">=</span><span class="mi">1</span><span class="p">)</span>
 </pre></div>
 </div>
-<p>Initialize the base algorithm.</p>
 <dl class="py method">
 <dt class="sig sig-object py" id="qdk_chemistry.algorithms.registry.Algorithm.__init__">
 <span class="sig-name descname"><span class="pre">__init__</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#qdk_chemistry.algorithms.registry.Algorithm.__init__" title="Link to this definition"></a></dt>
@@ -2053,7 +1966,6 @@ creating and registering algorithms.</p>
 </dd>
 </dl>
 </div>
-<p>Initialize the algorithm factory with an empty registry.</p>
 <dl class="field-list simple">
 </dl>
 <dl class="py method">
@@ -2523,7 +2435,7 @@ thus removing entire algorithm types.</p>
            </div>
           </div>
           <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
-        <a href="qdk_chemistry.algorithms.qubit_mapper.html" class="btn btn-neutral float-left" title="qdk_chemistry.algorithms.qubit_mapper module" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+        <a href="qdk_chemistry.algorithms.base.html" class="btn btn-neutral float-left" title="qdk_chemistry.algorithms.base module" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
         <a href="qdk_chemistry.plugins.html" class="btn btn-neutral float-right" title="qdk_chemistry.plugins package" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
     </div>
 
