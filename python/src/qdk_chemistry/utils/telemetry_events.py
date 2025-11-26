@@ -1,9 +1,10 @@
 # Copyright (c) Microsoft Corporation.
 # Licensed under the MIT License.
 
-from .telemetry import log_telemetry
-import math
+from collections import Counter
 from typing import Union
+
+from .telemetry import log_telemetry
 
 def get_basis_functions_bucket(basis_functions: Union[str, int]) -> str:
     """
@@ -68,6 +69,52 @@ def get_basis_functions_bucket(basis_functions: Union[str, int]) -> str:
         # 1000+ for anything >= 1000
         return "1500+"
     
+def extract_wavefunction_data(result):
+    """
+    Extract molecular formula and basis function count from algorithm result.
+    
+    This function handles both single wavefunction objects and tuple results
+    (e.g., (energy, wavefunction) pairs) returned by QDK chemistry algorithms.
+    It extracts the molecular formula and number of basis functions from the 
+    wavefunction's orbital data for telemetry tracking.
+    
+    Args:
+        result: Algorithm result, either a Wavefunction object or a tuple containing
+            a Wavefunction (typically at index 1 for (energy, wavefunction) pairs).
+            
+    Returns:
+        tuple[str, str]: A tuple containing:
+            - Molecular formula (str): Chemical formula with element counts (e.g., "H2O", "CH4")
+              or "unknown" if no wavefunction data is available.
+            - Basis functions bucket (str): Bucketed count of basis functions (e.g., "10", "50", "100")
+              or "unknown" if no wavefunction data is available.
+    
+    Examples:
+        >>> # Single wavefunction result
+        >>> formula, n_basis = extract_wavefunction_data(wavefunction)
+        ('H2O', '50')
+        
+        >>> # Tuple result (energy, wavefunction)
+        >>> formula, n_basis = extract_wavefunction_data((energy, wavefunction))
+        ('CH4', '100')
+        
+        >>> # No wavefunction data
+        >>> formula, n_basis = extract_wavefunction_data(some_other_result)
+        ('unknown', 'unknown')
+    """
+    wavefunction = None
+    if isinstance(result, tuple) and len(result) > 1 and hasattr(result[1], 'orbitals'):
+        wavefunction = result[1]
+    elif hasattr(result, 'orbitals'):
+        wavefunction = result
+    
+    if wavefunction:
+        elements = wavefunction.orbitals.basis_set.get_structure().get_atomic_symbols()
+        formula = ''.join(f"{e}{c if c > 1 else ''}" for e, c in sorted(Counter(elements).items()))
+        n_basis = get_basis_functions_bucket(wavefunction.orbitals.get_basis_set().get_num_basis_functions())
+        return formula, n_basis
+    return "unknown", "unknown"
+
 def on_qdk_chemistry_import() -> None:
     """
     Logs a telemetry event indicating that the QDK Chemistry module has been imported.
