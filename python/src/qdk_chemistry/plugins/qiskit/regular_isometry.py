@@ -20,7 +20,6 @@ from qdk_chemistry.plugins.qiskit._interop.transpiler import (
     RemoveZBasisOnZeroState,
     SubstituteCliffordRz,
 )
-from qdk_chemistry.utils.statevector import _create_statevector_from_coeffs_and_dets_string
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -56,25 +55,16 @@ class RegularIsometryStatePreparation(StatePreparation):
                 "alpha and beta orbitals are not supported for state preparation."
             )
 
-        coeffs = wavefunction.get_coefficients()
-        dets = wavefunction.get_active_determinants()
-        num_orbitals = len(wavefunction.get_orbitals().get_active_space_indices()[0])
-        bitstrings = []
-        for det in dets:
-            alpha_str, beta_str = det.to_binary_strings(num_orbitals)
-            bitstring = beta_str[::-1] + alpha_str[::-1]  # Qiskit uses little-endian convention
-            bitstrings.append(bitstring)
+        num_orbitals = len(alpha_indices)
+        n_qubits = num_orbitals * 2
+        num_dets = wavefunction.size()
+        _LOGGER.debug(f"Using {num_dets} determinants for state preparation")
 
-        if not bitstrings:
-            raise ValueError("No valid bitstrings found. The determinants list might be empty.")
-        n_qubits = len(bitstrings[0])
-        _LOGGER.debug(f"Using {len(bitstrings)} determinants for state preparation")
-
-        # Create a statevector from the filtered terms
-        statevector_data = _create_statevector_from_coeffs_and_dets_string(coeffs, bitstrings, n_qubits)
+        # Create statevector using efficient C++ implementation
+        statevector_data = wavefunction.to_statevector(normalize=True)
 
         # Create the circuit
-        circuit = QuantumCircuit(n_qubits, name=f"regular_isometry_{len(bitstrings)}_det")
+        circuit = QuantumCircuit(n_qubits, name=f"regular_isometry_{num_dets}_det")
 
         # Use the StatePreparation class which implements efficient decomposition
         state_prep = QiskitStatePreparation(Statevector(statevector_data), normalize=True)

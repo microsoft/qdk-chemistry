@@ -912,3 +912,136 @@ TEST_F(WavefunctionActiveSpaceConversionTest, SlaterDeterminantContainer) {
   Configuration recovered_active = wf->get_active_determinant(total_det);
   EXPECT_EQ(recovered_active.to_string(), active_det1.to_string());
 }
+
+TEST_F(WavefunctionCoreTest, ToStatevectorBasic) {
+  // Create a simple wavefunction with known statevector
+  // Using 2 orbitals (4 qubits total)
+  auto test_orbitals = testing::create_test_orbitals(2, 2, true);
+
+  // Create wavefunction with two determinants:
+  // |ud⟩ and |du⟩ with equal coefficients
+  Eigen::VectorXcd coeffs(2);
+  coeffs(0) = std::complex<double>(1.0 / std::sqrt(2.0), 0.0);  // |ud⟩
+  coeffs(1) = std::complex<double>(0.0, 1.0 / std::sqrt(2.0));  // |du⟩
+
+  Wavefunction::DeterminantVector dets(2);
+  dets[0] = Configuration("ud");  // Orbital 0: α, Orbital 1: β
+  dets[1] = Configuration("du");  // Orbital 0: β, Orbital 1: α
+
+  auto wf = std::make_unique<Wavefunction>(
+      std::make_unique<CasWavefunctionContainer>(coeffs, dets, test_orbitals));
+
+  // Get statevector
+  Eigen::VectorXcd sv = wf->to_statevector(false);
+
+  // Check size: 2^(2*2) = 16
+  EXPECT_EQ(sv.size(), 16);
+
+  // Calculate expected indices
+  // |ud⟩: orbital 0 has α (bit 0 set), orbital 1 has β (bit 3 set)
+  // Index = 2^0 + 2^3 = 1 + 8 = 9
+  size_t idx_ud = dets[0].to_statevector_index(2);
+  EXPECT_EQ(idx_ud, 9);
+
+  // |du⟩: orbital 0 has β (bit 2 set), orbital 1 has α (bit 1 set)
+  // Index = 2^1 + 2^2 = 2 + 4 = 6
+  size_t idx_du = dets[1].to_statevector_index(2);
+  EXPECT_EQ(idx_du, 6);
+
+  // Check coefficients are at correct positions
+  EXPECT_NEAR(std::abs(sv(idx_ud)), 1.0 / std::sqrt(2.0), 1e-10);
+  EXPECT_NEAR(std::abs(sv(idx_du)), 1.0 / std::sqrt(2.0), 1e-10);
+
+  // Check other positions are zero
+  for (size_t i = 0; i < sv.size(); ++i) {
+    if (i != idx_ud && i != idx_du) {
+      EXPECT_NEAR(std::abs(sv(i)), 0.0, 1e-10);
+    }
+  }
+}
+
+TEST_F(WavefunctionCoreTest, ToStatevectorNormalization) {
+  // Create wavefunction with unnormalized coefficients
+  auto test_orbitals = testing::create_test_orbitals(3, 3, true);
+
+  Eigen::VectorXd coeffs(3);
+  coeffs(0) = 1.0;
+  coeffs(1) = 2.0;
+  coeffs(2) = 3.0;
+
+  Wavefunction::DeterminantVector dets(3);
+  // All configurations must have same electron count: 3 electrons (2α, 1β)
+  dets[0] = Configuration("ud0");  // α in orb 0, β in orb 1
+  dets[1] = Configuration("u0d");  // α in orb 0, β in orb 2
+  dets[2] = Configuration("0ud");  // α in orb 1, β in orb 2
+
+  auto wf = std::make_unique<Wavefunction>(
+      std::make_unique<SciWavefunctionContainer>(coeffs, dets, test_orbitals));
+
+  // Get unnormalized statevector
+  Eigen::VectorXcd sv_unnorm = wf->to_statevector(false);
+  double norm_unnorm = sv_unnorm.norm();
+  double expected_norm = std::sqrt(1.0 + 4.0 + 9.0);
+  EXPECT_NEAR(norm_unnorm, expected_norm, 1e-10);
+
+  // Get normalized statevector
+  Eigen::VectorXcd sv_norm = wf->to_statevector(true);
+  EXPECT_NEAR(sv_norm.norm(), 1.0, 1e-10);
+
+  // Check normalization is correct
+  for (size_t i = 0; i < sv_norm.size(); ++i) {
+    EXPECT_NEAR(std::abs(sv_norm(i)), std::abs(sv_unnorm(i)) / norm_unnorm,
+                1e-10);
+  }
+}
+
+TEST_F(WavefunctionCoreTest, ToStatevectorComplexCoefficients) {
+  // Test with complex coefficients
+  auto test_orbitals = testing::create_test_orbitals(2, 2, true);
+
+  Eigen::VectorXcd coeffs(2);
+  coeffs(0) = std::complex<double>(1.0, 1.0);   // 1+i
+  coeffs(1) = std::complex<double>(1.0, -1.0);  // 1-i
+
+  Wavefunction::DeterminantVector dets(2);
+  dets[0] = Configuration("20");
+  dets[1] = Configuration("02");
+
+  auto wf = std::make_unique<Wavefunction>(
+      std::make_unique<CasWavefunctionContainer>(coeffs, dets, test_orbitals));
+
+  Eigen::VectorXcd sv = wf->to_statevector(false);
+
+  // Check complex values are preserved
+  size_t idx0 = dets[0].to_statevector_index(2);
+  size_t idx1 = dets[1].to_statevector_index(2);
+
+  EXPECT_NEAR(sv(idx0).real(), 1.0, 1e-10);
+  EXPECT_NEAR(sv(idx0).imag(), 1.0, 1e-10);
+  EXPECT_NEAR(sv(idx1).real(), 1.0, 1e-10);
+  EXPECT_NEAR(sv(idx1).imag(), -1.0, 1e-10);
+}
+
+TEST_F(WavefunctionCoreTest, ToStatevectorSingleDeterminant) {
+  // Test Slater determinant (single determinant)
+  auto test_orbitals = testing::create_test_orbitals(3, 3, true);
+
+  Configuration det("u2d");
+  auto wf = std::make_unique<Wavefunction>(
+      std::make_unique<SlaterDeterminantContainer>(det, test_orbitals));
+
+  Eigen::VectorXcd sv = wf->to_statevector(false);
+
+  // Should have only one non-zero element
+  size_t idx = det.to_statevector_index(3);
+  EXPECT_NEAR(std::abs(sv(idx)), 1.0, 1e-10);
+
+  // Count non-zero elements
+  int nonzero_count = 0;
+  for (size_t i = 0; i < sv.size(); ++i) {
+    if (std::abs(sv(i)) > 1e-10) {
+      nonzero_count++;
+    }
+  }
+  EXPECT_EQ(nonzero_count, 1);
+}

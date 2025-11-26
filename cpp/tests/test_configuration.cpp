@@ -234,6 +234,82 @@ TEST_F(ConfigurationTest, Hdf5Serialization) {
   std::remove(filename.c_str());
 }
 
+TEST_F(ConfigurationTest, ToStatevectorIndex) {
+  // Test basic conversion for "2ud0"
+  // Orbital 0: doubly occupied
+  // Orbital 1: alpha only
+  // Orbital 2: beta only
+  // Orbital 3: empty
+  //
+  // Qubits: 7 6 5 4 | 3 2 1 0
+  //         β-orbs  | α-orbs
+  //         3 2 1 0 | 3 2 1 0
+  //         0 1 0 1 | 0 0 1 1
+  // Binary: 01010011 = 64 + 16 + 2 + 1 = 83
+  Configuration config1("2ud0");
+  size_t index1 = config1.to_statevector_index(4);
+  EXPECT_EQ(index1, 83);
+
+  // Test simple cases
+  Configuration empty("0000");
+  EXPECT_EQ(empty.to_statevector_index(4), 0);
+
+  Configuration all_doubly("2222");
+  // All alpha bits set (0-3) and all beta bits set (4-7)
+  // Binary: 11111111 = 255
+  EXPECT_EQ(all_doubly.to_statevector_index(4), 255);
+
+  Configuration all_alpha("uuuu");
+  // Alpha bits set (0-3), beta bits clear
+  // Binary: 00001111 = 15
+  EXPECT_EQ(all_alpha.to_statevector_index(4), 15);
+
+  Configuration all_beta("dddd");
+  // Alpha bits clear, beta bits set (4-7)
+  // Binary: 11110000 = 240
+  EXPECT_EQ(all_beta.to_statevector_index(4), 240);
+
+  // Test partial orbital usage
+  Configuration config2("2ud000");
+  // Only use first 3 orbitals
+  // Orbital 0: doubly (α=1, β=1)
+  // Orbital 1: alpha (α=1, β=0)
+  // Orbital 2: beta (α=0, β=1)
+  // Qubits: 5 4 3 | 2 1 0
+  //         2 1 0 | 2 1 0
+  //         1 0 1 | 0 1 1
+  // Binary: 101011 = 32 + 8 + 2 + 1 = 43
+  EXPECT_EQ(config2.to_statevector_index(3), 43);
+
+  // Test error handling - requesting too many orbitals
+  Configuration small("ud");
+  EXPECT_THROW(small.to_statevector_index(10), std::runtime_error);
+}
+
+TEST_F(ConfigurationTest, ToStatevectorIndexEdgeCases) {
+  // Single orbital tests
+  Configuration single_empty("0");
+  EXPECT_EQ(single_empty.to_statevector_index(1), 0);
+
+  Configuration single_alpha("u");
+  EXPECT_EQ(single_alpha.to_statevector_index(1), 1);  // Bit 0 set
+
+  Configuration single_beta("d");
+  EXPECT_EQ(single_beta.to_statevector_index(1), 2);  // Bit 1 set
+
+  Configuration single_doubly("2");
+  EXPECT_EQ(single_doubly.to_statevector_index(1), 3);  // Bits 0,1 set
+
+  // Verify little-endian ordering with specific pattern
+  // "u0d0" means orbital 0 has alpha, orbital 2 has beta
+  // Qubits: 7 6 5 4 | 3 2 1 0
+  //         3 2 1 0 | 3 2 1 0
+  //         0 1 0 0 | 0 0 0 1
+  // Binary: 01000001 = 64 + 1 = 65
+  Configuration pattern("u0d0");
+  EXPECT_EQ(pattern.to_statevector_index(4), 65);
+}
+
 // Test fixture for ConfigurationSet validation
 class ConfigurationSetTest : public ::testing::Test {
  protected:

@@ -31,6 +31,7 @@ from qdk_chemistry.algorithms.state_preparation.sparse_isometry import (
     _remove_duplicate_rows_with_cnot,
     _remove_zero_rows,
     gf2x_with_tracking,
+    prepare_single_reference_state,
 )
 from qdk_chemistry.data import CasWavefunctionContainer, Configuration, Wavefunction
 
@@ -258,15 +259,14 @@ def test_gf2x_bitstrings_to_binary_matrix_additional_validation():
     assert np.all(result[:, 1] == 1)  # Second column all ones (reversed "1"*50)
 
 
-def test_gf2x_single_reference_state_error_cases():
+def test_prepare_single_reference_state_error_cases():
     """Test error handling for invalid inputs."""
-    testclass = SparseIsometryGF2XStatePreparation()
 
     with pytest.raises(ValueError, match="Bitstring cannot be empty"):
-        testclass._prepare_single_reference_state("")
+        prepare_single_reference_state("")
 
     with pytest.raises(ValueError, match="Bitstring must contain only '0' and '1' characters"):
-        testclass._prepare_single_reference_state("1012")
+        prepare_single_reference_state("1012")
 
 
 def test_asymmetric_active_space_error():
@@ -904,3 +904,4 @@ def test_gf2x_with_tracking_edge_case_pseudo_diagonal():
 
     # Should have some operations recorded
     assert len(elimination_results.operations) > 0, "Should have recorded some operations"
+

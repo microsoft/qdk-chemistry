@@ -376,6 +376,28 @@ Examples:
     >>> print(f"Wavefunction norm: {norm_value}")
 )");
 
+  wavefunction.def("to_statevector", &Wavefunction::to_statevector,
+                   R"(
+Convert wavefunction to dense statevector representation for quantum simulation.
+
+Args:
+    normalize (bool): Whether to normalize the resulting statevector (default: True)
+
+Returns:
+    numpy.ndarray: Dense complex statevector of size 2^(2*num_active_orbitals)
+
+Notes:
+    Creates a dense statevector suitable for quantum circuit simulation frameworks like Qiskit.
+    The statevector uses little-endian qubit ordering matching Qiskit conventions.
+    Only includes active space orbitals.
+    Memory scales exponentially: 2^(2*num_active_orbitals) complex numbers.
+
+Examples:
+    >>> sv = wf.to_statevector(normalize=True)
+    >>> # Use with Qiskit: Statevector(sv)
+)",
+                   py::arg("normalize") = true);
+
   wavefunction.def(
       "overlap",
       [](const Wavefunction& self, const Wavefunction& other) {

@@ -19,7 +19,6 @@ from qiskit.quantum_info import SparsePauliOp
 
 from qdk_chemistry.data import Wavefunction
 from qdk_chemistry.data.base import DataClass
-from qdk_chemistry.utils.statevector import create_statevector_from_wavefunction
 
 
 class QubitHamiltonian(DataClass):
@@ -300,7 +299,7 @@ def filter_and_group_pauli_ops_from_wavefunction(
             * A list of classical coefficients for terms that were reduced to classical contributions.
 
     """
-    psi = create_statevector_from_wavefunction(wavefunction)
+    psi = wavefunction.to_statevector(normalize=True)
     return _filter_and_group_pauli_ops_from_statevector(
         hamiltonian, psi, abelian_grouping, trimming, trimming_tolerance
     )
