@@ -45,7 +45,7 @@ from qiskit.transpiler import PassManager
 
 from qdk_chemistry.algorithms.state_preparation.state_preparation import StatePreparation, StatePreparationSettings
 from qdk_chemistry.data import Wavefunction
-from qdk_chemistry.utils.bitstring import bitstrings_to_binary_matrix, separate_alpha_beta_to_binary_string
+from qdk_chemistry.utils.bitstring import bitstrings_to_binary_matrix
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -115,7 +115,7 @@ class SparseIsometryGF2XStatePreparation(StatePreparation):
         num_orbitals = len(wavefunction.get_orbitals().get_active_space_indices()[0])
         bitstrings = []
         for det in dets:
-            alpha_str, beta_str = separate_alpha_beta_to_binary_string(det.to_string()[:num_orbitals])
+            alpha_str, beta_str = det.to_binary_strings(num_orbitals)
             bitstring = beta_str[::-1] + alpha_str[::-1]  # Qiskit uses little-endian convention
             bitstrings.append(bitstring)
 

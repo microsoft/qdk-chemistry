@@ -17,24 +17,7 @@ import pytest
 from qdk_chemistry.utils.bitstring import (
     binary_to_decimal,
     bitstrings_to_binary_matrix,
-    separate_alpha_beta_to_binary_string,
 )
-
-
-def test_separate_alpha_beta_string():
-    """Test separation of alpha and beta strings."""
-    bitstring = "2du0"
-    alpha, beta = separate_alpha_beta_to_binary_string(bitstring)
-    assert alpha == "1010"
-    assert beta == "1100"
-
-
-def test_separate_alpha_beta_string_invalid_format():
-    """Test separation with invalid characters."""
-    bitstring = "2dx0"  # 'x' is invalid
-    with pytest.raises(ValueError, match=r"Invalid character 'x' in input string\."):
-        separate_alpha_beta_to_binary_string(bitstring)
-
 
 def test_binary_to_decimal():
     """Test function for converting binary strings/lists to decimal integers."""

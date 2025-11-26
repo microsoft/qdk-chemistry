@@ -20,7 +20,6 @@ from qdk_chemistry.plugins.qiskit._interop.transpiler import (
     RemoveZBasisOnZeroState,
     SubstituteCliffordRz,
 )
-from qdk_chemistry.utils.bitstring import separate_alpha_beta_to_binary_string
 from qdk_chemistry.utils.statevector import _create_statevector_from_coeffs_and_dets_string
 
 _LOGGER = logging.getLogger(__name__)
@@ -62,7 +61,7 @@ class RegularIsometryStatePreparation(StatePreparation):
         num_orbitals = len(wavefunction.get_orbitals().get_active_space_indices()[0])
         bitstrings = []
         for det in dets:
-            alpha_str, beta_str = separate_alpha_beta_to_binary_string(det.to_string()[:num_orbitals])
+            alpha_str, beta_str = det.to_binary_strings(num_orbitals)
             bitstring = beta_str[::-1] + alpha_str[::-1]  # Qiskit uses little-endian convention
             bitstrings.append(bitstring)
 

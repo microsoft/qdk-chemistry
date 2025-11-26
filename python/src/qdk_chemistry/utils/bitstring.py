@@ -37,47 +37,6 @@ from qdk_chemistry.data import Configuration
 _LOGGER = logging.getLogger(__name__)
 
 
-def separate_alpha_beta_to_binary_string(input_string: str) -> tuple[str, str]:
-    """Separate a compact alpha-beta bitstring into separate alpha and beta parts.
-
-    Compact format uses:
-
-        * 2: orbital doubly occupied
-        * u: orbital up electron
-        * d: orbital down electron
-        * 0: orbital unoccupied
-
-    Example:
-      Compact: 2du0 -> alpha: 1010, beta: 1100
-
-    Args:
-        input_string (str): The compact bitstring.
-
-    Returns:
-        A tuple containing the alpha and beta bitstrings.
-
-    """
-    n = len(input_string)
-    alpha_string = ""
-    beta_string = ""
-    for i in range(n):
-        if input_string[i] == "2":
-            alpha_string += "1"
-            beta_string += "1"
-        elif input_string[i] == "u":
-            alpha_string += "1"
-            beta_string += "0"
-        elif input_string[i] == "d":
-            alpha_string += "0"
-            beta_string += "1"
-        elif input_string[i] == "0":
-            alpha_string += "0"
-            beta_string += "0"
-        else:
-            raise ValueError(f"Invalid character '{input_string[i]}' in input string.")
-    return alpha_string[:n], beta_string[:n]
-
-
 def binary_string_to_configuration(bitstring: str) -> Configuration:
     """Convert a binary string to a Configuration object.
 

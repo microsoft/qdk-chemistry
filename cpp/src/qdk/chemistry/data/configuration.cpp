@@ -336,4 +336,42 @@ Configuration Configuration::from_hdf5_file(const std::string& filename) {
         "'. " + "HDF5 error: " + std::string(e.getCDetailMsg()));
   }
 }
+
+std::pair<std::string, std::string> Configuration::to_binary_strings(
+    size_t num_orbitals) const {
+  size_t capacity = get_orbital_capacity();
+
+  // If num_orbitals is 0 (default), use full capacity
+  if (num_orbitals == 0) {
+    num_orbitals = capacity;
+  }
+  // Throw if we ask for too many orbitals
+  if (num_orbitals > capacity) {
+    throw std::runtime_error(
+        "Cannot ask for more orbitals than there are in the configuration.");
+  }
+
+  std::string result_alpha(num_orbitals, '0');
+  std::string result_beta(num_orbitals, '0');
+  for (size_t i = 0; i < num_orbitals; ++i) {
+    OccupationState state = _get_orbital(i);
+    switch (state) {
+      case UNOCCUPIED:
+        break;
+      case ALPHA:
+        result_alpha[i] = '1';
+        result_beta[i] = '0';
+        break;
+      case BETA:
+        result_alpha[i] = '0';
+        result_beta[i] = '1';
+        break;
+      case DOUBLY:
+        result_alpha[i] = '1';
+        result_beta[i] = '1';
+        break;
+    }
+  }
+  return {result_alpha, result_beta};
+}
 }  // namespace qdk::chemistry::data

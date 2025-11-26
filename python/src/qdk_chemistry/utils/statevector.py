@@ -8,7 +8,7 @@
 import numpy as np
 
 from qdk_chemistry.data import Wavefunction
-from qdk_chemistry.utils.bitstring import binary_to_decimal, separate_alpha_beta_to_binary_string
+from qdk_chemistry.utils.bitstring import binary_to_decimal
 
 
 def _create_statevector_from_coeffs_and_dets_string(
@@ -67,9 +67,10 @@ def create_statevector_from_wavefunction(
     num_orbs = len(active_orbital_indices)
     det_strings = []
     coeffs = []
+
     for det in wavefunction.get_active_determinants():
         coeffs.append(wavefunction.get_coefficient(det))
-        alpha_str, beta_str = separate_alpha_beta_to_binary_string(det.to_string()[:num_orbs])
+        alpha_str, beta_str = det.to_binary_strings(num_orbs)
         bitstring = beta_str[::-1] + alpha_str[::-1]  # Convert to little-endian format to match qiskit convention
         det_strings.append(bitstring)
 

@@ -290,6 +290,20 @@ class Configuration : public DataClass {
    */
   static Configuration from_hdf5(H5::Group& group);
 
+  /**
+   * @brief Convert configuration to separate alpha and beta binary strings
+   * @param num_orbitals How many orbitals to extract (if we want to slice for
+   * active space) Default is all orbitals
+   * @return Pair of binary strings (alpha, beta) where '1' indicates occupied
+   *         and '0' indicates unoccupied for each spin channel
+   * @details Converts the compact representation to two binary strings:
+   *          - Alpha string: '1' if orbital has alpha or doubly occupied
+   *          - Beta string: '1' if orbital has beta or doubly occupied
+   *          Example: "2du0" -> ("1010", "1100")
+   */
+  std::pair<std::string, std::string> to_binary_strings(
+      size_t num_orbitals = 0) const;
+
  private:
   // Friend classes that need direct access to packed data for efficient
   // serialization
