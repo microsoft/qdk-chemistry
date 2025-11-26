@@ -11,7 +11,6 @@
 #include <blas.hh>
 #include <lapack.hh>
 #include <libint2.hpp>
-#include <qdk/chemistry/utils/omp_utils.hpp>
 #include <stdexcept>
 
 #include "incore_impl.h"
