@@ -157,6 +157,8 @@ nitpick_ignore = [
     ("cpp:identifier", "size_t"),
     ("py:class", "callable"),
     ("py:class", "optional"),
+    ("py:class", "_QdkMcSolverWrapper"),
+    ("py:class", "HamiltonianType"),  # TODO: figure out how to resolve this reference
     ("py:exc", "SettingsAreLocked"),  # TODO: figure out how to resolve this reference
 ]
 nitpick_ignore_regex = [
