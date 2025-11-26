@@ -130,15 +130,6 @@ intersphinx_mapping = {
     "qiskit": ("https://docs.quantum.ibm.com/api/qiskit/", None),
 }
 
-# Numpydoc configuration
-# TODO: can this section be removed?
-numpydoc_show_class_members = False  # Don't list class members twice
-numpydoc_show_inherited_class_members = False  # Don't show inherited members
-numpydoc_xref_param_type = True  # Cross-reference types in parameter docs
-numpydoc_xref_aliases = {  # Add any custom type mappings here
-    "ndarray": "numpy.ndarray",  # Map 'ndarray' to 'numpy.ndarray' in links
-}
-
 # Exclude patterns for documentation build
 exclude_patterns = ["_build"]  # Directories to exclude from build
 
