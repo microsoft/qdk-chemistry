@@ -165,6 +165,7 @@ jobs:
       working-directory: python
       env:
         QDK_CHEMISTRY_ENABLE_COVERAGE: 1
+        QDK_ENABLE_OPENMP: ON
         CMAKE_BUILD_TYPE: RelWithDebInfo
       run: |
         # Remove CMake files to build Python package without picking the installed library
