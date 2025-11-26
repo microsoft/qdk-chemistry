@@ -51,6 +51,7 @@ Once configured, the :class:`~qdk_chemistry.algorithms.StatePreparation` can be 
 .. tab:: Python API
 
    .. code-block:: python
+
       # --------------------------------------------------------------------------------------------
       # Copyright (c) Microsoft Corporation. All rights reserved.
       # Licensed under the MIT License. See LICENSE.txt in the project root for license information.
@@ -59,7 +60,7 @@ Once configured, the :class:`~qdk_chemistry.algorithms.StatePreparation` can be 
       from qdk_chemistry.data import Wavefunction
 
       # Obtain a valid Wavefunction instance
-      wavefunction = Wavefunction(...)
+      wavefunction = Wavefunction.from_json_file("molecule.wavefunction.json")
 
       # Generate the quantum circuit
       circuit_qasm = state_prep.run(wavefunction)
@@ -107,7 +108,7 @@ Third-party interfaces
 The factory pattern allows seamless selection between these implementations, with the most appropriate option chosen
 based on the calculation requirements and available packages.
 
-For more details on how QDK/Chemistry interfaces with external packages, see the :doc:`Interfaces <../advanced/interfaces>` documentation.
+For more details on how QDK/Chemistry interfaces with external packages, see the :doc:`Interfaces <../design/interfaces>` documentation.
 
 Related classes
 ---------------

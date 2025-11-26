@@ -31,7 +31,7 @@ The :class:`~qdk_chemistry.algorithms.EnergyEstimator` is created using the :doc
 
    .. literalinclude:: ../../../../examples/energy_estimator.py
       :language: python
-      :lines: 3-7,27-28,56-58
+      :lines: 3-7,31-32,60-62
 
 
 Configuring the Energy Estimator
@@ -49,7 +49,7 @@ The Qsharp implementation of the :class:`~qdk_chemistry.algorithms.EnergyEstimat
 
    .. literalinclude:: ../../../../examples/energy_estimator.py
       :language: python
-      :lines: 3-7,36-56
+      :lines: 3-7,40-60
 
 Qiskit Backend
 ~~~~~~~~~~~~~~~
@@ -64,7 +64,7 @@ The Qiskit implementation uses the Aer simulator to execute quantum circuits. Ke
 
    .. literalinclude:: ../../../../examples/energy_estimator.py
       :language: python
-      :lines: 3-7,66-80
+      :lines: 3-7,70-86
 
 Implemented interface
 ---------------------
@@ -84,7 +84,7 @@ Third-party interfaces
 The factory pattern allows seamless selection between these implementations, with the most appropriate option chosen
 based on the calculation requirements and available packages.
 
-For more details on how QDK/Chemistry interfaces with external packages, see the :doc:`Interfaces <../advanced/interfaces>` documentation.
+For more details on how QDK/Chemistry interfaces with external packages, see the :doc:`Interfaces <../design/interfaces>` documentation.
 
 Related Topics
 --------------

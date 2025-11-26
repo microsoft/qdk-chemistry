@@ -6,7 +6,11 @@
 # --------------------------------------------------------------------------------------------
 
 import numpy as np
+
+# Import noise models for QDK simulator examples
 from qsharp import DepolarizingNoise
+
+# Import noise models for Qiskit Aer simulator examples
 from qiskit_aer.noise import NoiseModel, depolarizing_error
 
 from qdk_chemistry.algorithms import create
