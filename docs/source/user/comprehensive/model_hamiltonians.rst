@@ -45,8 +45,8 @@ Example with multi-configuration calculator:
       :start-after: # start-cell-2
       :end-before: # end-cell-2
 
-See also
---------
+Further reading
+---------------
 
 * :doc:`data/orbitals` - Full Orbitals class documentation
 * :doc:`data/hamiltonian` - Hamiltonian class documentation
