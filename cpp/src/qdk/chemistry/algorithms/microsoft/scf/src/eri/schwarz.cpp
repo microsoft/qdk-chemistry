@@ -37,7 +37,9 @@ void schwarz_integral(const BasisSet* iobs, const ParallelConfig& mpi,
   std::vector<Engine> engines(
       nthreads,
       Engine(libint2::Operator::coulomb, obs.max_nprim(), obs.max_l(), 0, 0.0));
+#ifdef _OPENMP
 #pragma omp parallel
+#endif
   {
 #ifdef _OPENMP
     int local_thread_id = omp_get_thread_num();

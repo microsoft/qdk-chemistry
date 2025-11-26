@@ -160,7 +160,9 @@ std::unique_ptr<double[]> opt_eri(BasisMode basis_mode,
     return x_st <= (y_en - 1) and y_st <= (x_en - 1);
   };
 
+#ifdef _OPENMP
 #pragma omp parallel
+#endif
   {
 #ifdef _OPENMP
     int thread_id = omp_get_thread_num();
@@ -346,7 +348,9 @@ std::unique_ptr<double[]> eri_df(BasisMode basis_mode,
   std::vector<libint2::Engine> engines(nthreads, base_engine);
   const auto& unitshell = libint2::Shell::unit();
 
+#ifdef _OPENMP
 #pragma omp parallel
+#endif
   {
 #ifdef _OPENMP
     int thread_id = omp_get_thread_num();
@@ -421,7 +425,9 @@ std::unique_ptr<double[]> metric_df(BasisMode basis_mode,
 #endif
   std::vector<libint2::Engine> engines(nthreads, base_engine);
   const auto& unitshell = libint2::Shell::unit();
+#ifdef _OPENMP
 #pragma omp parallel
+#endif
   {
 #ifdef _OPENMP
     int thread_id = omp_get_thread_num();
@@ -487,7 +493,9 @@ void eri_df_grad(double* dJ, const double* P, const double* X,
 #endif
   int total_threads = mpi.world_size * nthreads;
   std::vector<libint2::Engine> engines(nthreads, base_engine);
+#ifdef _OPENMP
 #pragma omp parallel reduction(+ : dJ[ : 3 * n_atoms])
+#endif
   {
 #ifdef _OPENMP
     int thread_id = omp_get_thread_num();
@@ -562,7 +570,9 @@ void metric_df_grad(double* dJ, const double* X, BasisMode basis_mode,
   int total_threads = mpi.world_size * nthreads;
   std::vector<libint2::Engine> engines(nthreads, base_engine);
   const auto& unitshell = libint2::Shell::unit();
+#ifdef _OPENMP
 #pragma omp parallel reduction(+ : dJ[ : 3 * n_atoms])
+#endif
   {
 #ifdef _OPENMP
     int thread_id = omp_get_thread_num();
