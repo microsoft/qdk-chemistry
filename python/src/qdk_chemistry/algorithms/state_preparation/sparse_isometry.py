@@ -234,7 +234,7 @@ class SparseIsometryGF2XStatePreparation(StatePreparation):
             )
 
         return qasm3.dumps(qc)
-    
+
     def _bitstrings_to_binary_matrix(self, bitstrings: list[str]) -> np.ndarray:
         """Convert a list of bitstrings to a binary matrix.
 
@@ -292,7 +292,7 @@ class SparseIsometryGF2XStatePreparation(StatePreparation):
             bitstring_matrix[:, i] = np.array(list(map(int, reversed_bitstring)), dtype=np.int8)
 
         return bitstring_matrix
-    
+
     def _prepare_single_reference_state(self, bitstring: str) -> QuantumCircuit:
         r"""Prepare a single reference state on a quantum circuit based on a bitstring.
 
@@ -333,10 +333,10 @@ class SparseIsometryGF2XStatePreparation(StatePreparation):
                 circuit.x(i)
 
         return qasm3.dumps(circuit)
-    
+
     def name(self) -> str:
         """Return the name of the state preparation method."""
-        return "sparse_isometry_gf2x" 
+        return "sparse_isometry_gf2x"
 
 
 @dataclass

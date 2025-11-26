@@ -11,12 +11,12 @@ representations and quantum circuit formats.
 # Licensed under the MIT License. See LICENSE.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
 
-import numpy as np
 import pytest
 
 from qdk_chemistry.utils.bitstring import (
     binary_to_decimal,
 )
+
 
 def test_binary_to_decimal():
     """Test function for converting binary strings/lists to decimal integers."""
