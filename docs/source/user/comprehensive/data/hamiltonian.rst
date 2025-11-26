@@ -1,20 +1,20 @@
 Hamiltonian
 ===========
 
-The ``Hamiltonian`` class in QDK/Chemistry represents the electronic Hamiltonian operator, which describes the physics of a quantum system.
+The :class:`~qdk_chemistry.data.Hamiltonian` class in QDK/Chemistry represents the electronic Hamiltonian operator, which describes the physics of a quantum system.
 It contains the one- and two-electron integrals that are essential for quantum chemistry calculations, particularly for active space methods.
 
 Overview
 --------
 
 In quantum chemistry, the electronic Hamiltonian is the operator that gives the energy of a system of electrons.
-The ``Hamiltonian`` class in QDK/Chemistry stores the matrix elements of this operator in the basis of molecular orbitals.
+The :class:`~qdk_chemistry.data.Hamiltonian` class in QDK/Chemistry stores the matrix elements of this operator in the basis of molecular orbitals.
 These matrix elements consist of one-electron integrals (representing kinetic energy and electron-nucleus interactions) and two-electron integrals (representing electron-electron repulsion).
 
 Design principles
 ~~~~~~~~~~~~~~~~~
 
-The ``Hamiltonian`` class follows an immutable data model design principle as described in the :doc:`QDK/Chemistry Design Principles <../advanced/design_principles>` document.
+The :class:`~qdk_chemistry.data.Hamiltonian` class follows an immutable data model design principle as described in the :doc:`QDK/Chemistry Design Principles <../design/index>` document.
 Once properly constructed, the Hamiltonian data is typically not modified during calculations.
 This const-correctness approach ensures data integrity throughout computational workflows and prevents accidental modifications of the core quantum system representation.
 While setter methods are available for construction and initialization purposes, in normal operation the Hamiltonian object should be treated as immutable after it has been fully populated.
@@ -46,13 +46,13 @@ For unrestricted Hamiltonians, the one-electron and two-electron integrals are s
 Usage
 -----
 
-The ``Hamiltonian`` class is typically used as input to correlation methods such as Configuration Interaction (CI) and Multi-Configuration Self-Consistent Field (MCSCF) calculations.
-The :doc:`HamiltonianConstructor <../algorithms/hamiltonian_constructor>` algorithm is the primary tool for generating ``Hamiltonian`` objects from molecular data.
+The :class:`~qdk_chemistry.data.Hamiltonian` class is typically used as input to correlation methods such as Configuration Interaction (CI) and Multi-Configuration Self-Consistent Field (MCSCF) calculations.
+The :doc:`HamiltonianConstructor <../algorithms/hamiltonian_constructor>` algorithm is the primary tool for generating :class:`~qdk_chemistry.data.Hamiltonian` objects from molecular data.
 
 Creating a Hamiltonian object
 -----------------------------
 
-The ``Hamiltonian`` object is typically created using the :doc:`HamiltonianConstructor <../algorithms/hamiltonian_constructor>` algorithm (recommended approach for most users), or it can be created directly with the appropriate integral data. Once properly constructed with all required data, the
+The :class:`~qdk_chemistry.data.Hamiltonian` object is typically created using the :doc:`HamiltonianConstructor <../algorithms/hamiltonian_constructor>` algorithm (recommended approach for most users), or it can be created directly with the appropriate integral data. Once properly constructed with all required data, the
 Hamiltonian object should be considered constant and not modified:
 
 .. tab:: C++ API
@@ -269,7 +269,7 @@ Likewise for unrestricted:
 Accessing Hamiltonian data
 --------------------------
 
-The ``Hamiltonian`` class provides methods to access the one- and two-electron integrals and other properties. In line
+The :class:`~qdk_chemistry.data.Hamiltonian` class provides methods to access the one- and two-electron integrals and other properties. In line
 with its immutable design principle, these methods return const references or copies of the internal data:
 
 Two-Electron Integral Storage and Notation
@@ -373,13 +373,13 @@ Related classes
 - :doc:`Orbitals <orbitals>`: Molecular orbital information used to construct the Hamiltonian
 - :doc:`HamiltonianConstructor <../algorithms/hamiltonian_constructor>`: Algorithm for constructing Hamiltonians -
   **primary tool** for generating Hamiltonian objects from molecular data
-- :doc:`MCCalculator <../algorithms/mc_calculator>`: Uses the Hamiltonian for correlation calculations
-- :doc:`Wavefunction <wavefunction>`: Represents the solution of the Hamiltonian eigenvalue problem
+- :doc:`../algorithms/mc_calculator`: Uses the Hamiltonian for correlation calculations
+- :class:`~qdk_chemistry.data.Wavefunction`: Represents the solution of the Hamiltonian eigenvalue problem
 - :doc:`Active space methods <../algorithms/active_space>`: Selection and use of active spaces with the Hamiltonian
 
 Related topics
 --------------
 
-- :doc:`Serialization <../advanced/serialization>`: Data serialization and deserialization in QDK/Chemistry
-- :doc:`Design principles <../advanced/design_principles>`: Design principles for data classes in QDK/Chemistry
-- :doc:`Settings <../advanced/settings>`: Configuration options for algorithms operating on Hamiltonians
+- :doc:`Serialization <../data/serialization>`: Data serialization and deserialization in QDK/Chemistry
+- :doc:`Design principles <../design/index>`: Design principles for data classes in QDK/Chemistry
+- :doc:`Settings <../design/index>`: Configuration options for algorithms operating on Hamiltonians

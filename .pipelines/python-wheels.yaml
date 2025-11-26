@@ -1,21 +1,6 @@
-# Test the build the wheels on all PRs
-# Only deploy to Azure Artifacts on tag push
+# Pipeline for building and publishing Python wheels for QDK Chemistry
+# Only triggered manually
 
-# TODO : Enable triggers when pipeline works as expected
-# trigger:
-#   branches:
-#     include:
-#     - '*'
-#   tags:
-#     include:
-#     - v*
-# pr:
-#   branches:
-#     include:
-#     - '*'
-#   drafts: true
-
-# TODO DISABLED TEMPORARILY
 trigger: none
 pr: none
 
@@ -106,7 +91,7 @@ stages:
           Python3.13:
             pythonVersion: '3.13'
             buildMarch: ${{ target.march }}
-        maxParallel: 1 # There are only 2 nodes in the ARM nodepool, limit to 1 job at a time
+        maxParallel: 1
 
       steps:
       # Build - x86_64
@@ -117,7 +102,7 @@ stages:
             buildTesting: OFF
             enableCoverage: OFF
             agentBuildDirectory: $(Agent.BuildDirectory)
-            dockerImage: ubuntu:22.04
+            dockerImage: mcr.microsoft.com/mirror/docker/library/ubuntu:22.04
             imageTag: linux/amd64
             pythonVersion: $(pythonVersion)
 
@@ -126,7 +111,7 @@ stages:
         - template: templates/docker-test-wheel.yml
           parameters:
             agentBuildDirectory: $(Agent.BuildDirectory)
-            dockerImage: ubuntu:22.04
+            dockerImage: mcr.microsoft.com/mirror/docker/library/ubuntu:22.04
             imageTag: linux/amd64
             pythonVersion: $(pythonVersion)
 
@@ -138,7 +123,7 @@ stages:
             buildTesting: OFF
             enableCoverage: OFF
             agentBuildDirectory: $(Agent.BuildDirectory)
-            dockerImage: ubuntu:22.04
+            dockerImage: mcr.microsoft.com/mirror/docker/library/ubuntu:22.04
             imageTag: linux/arm64/v8
             pythonVersion: $(pythonVersion)
 
@@ -147,7 +132,7 @@ stages:
         - template: templates/docker-test-wheel.yml
           parameters:
             agentBuildDirectory: $(Agent.BuildDirectory)
-            dockerImage: ubuntu:22.04
+            dockerImage: mcr.microsoft.com/mirror/docker/library/ubuntu:22.04
             imageTag: linux/arm64/v8
             pythonVersion: $(pythonVersion)
 

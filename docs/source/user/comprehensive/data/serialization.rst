@@ -107,7 +107,7 @@ QDK/Chemistry enforces specific file extensions to ensure clarity about the cont
      - ``.hamiltonian.json``
      - ``.hamiltonian.h5``
      - ``hamiltonian.fcidump``
-   * - :doc:`Wavefunction <../data/wavefunction>`
+   * - :class:`~qdk_chemistry.data.Wavefunction`
      - ``.wavefunction.json``
      - ``.wavefunction.h5``
      - -
@@ -119,4 +119,4 @@ Related topics
 - :doc:`BasisSet <../data/basis_set>`: Quantum chemistry basis set definitions
 - :doc:`Orbitals <../data/orbitals>`: Molecular orbital coefficients and properties
 - :doc:`Hamiltonian <../data/hamiltonian>`: Electronic Hamiltonian operator
-- :doc:`Wavefunction <../data/wavefunction>`: Quantum mechanical wavefunction data
+- :class:`~qdk_chemistry.data.Wavefunction`: Quantum mechanical wavefunction data

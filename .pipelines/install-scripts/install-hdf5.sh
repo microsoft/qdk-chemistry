@@ -4,6 +4,7 @@ set -e
 INSTALL_PREFIX=${1:-/usr/local}
 BUILD_TYPE=${2:-Release}
 HDF5_PARENT_DIR=${3:-/ext}
+CXX_FLAGS=${4:-"-fPIC -O3"}
 
 echo "Installing HDF5 to ${INSTALL_PREFIX}..."
 
@@ -27,7 +28,7 @@ fi
 # Build and install HDF5 from extracted source
 cd hdf5
 echo "Configuring HDF5..."
-CXXFLAGS="-fPIC" ./configure --prefix=${INSTALL_PREFIX} \
+CXXFLAGS=${CXX_FLAGS} ./configure --prefix=${INSTALL_PREFIX} \
     --enable-cxx \
     --enable-fortran=no \
     --enable-static \

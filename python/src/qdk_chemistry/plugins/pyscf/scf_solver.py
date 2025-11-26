@@ -62,11 +62,12 @@ class PyscfScfSettings(ElectronicStructureSettings):
     ElectronicStructureSettings and adding PySCF-specific customizations.
 
     Inherits from ElectronicStructureSettings:
-        method (str, default="hf"): The electronic structure method (Hartree-Fock).
-        basis_set (str, default="def2-svp"): The basis set used for quantum chemistry calculations.
-            Common options include "def2-svp", "def2-tzvp", "cc-pvdz", etc.
-        tolerance (float, default=1e-6): Convergence tolerance.
-        max_iterations (int, default=50): Maximum number of iterations.
+
+    - method (str, default="hf"): The electronic structure method (Hartree-Fock).
+    - basis_set (str, default="def2-svp"): The basis set used for quantum chemistry calculations.
+      Common options include "def2-svp", "def2-tzvp", "cc-pvdz", etc.
+    - tolerance (float, default=1e-6): Convergence tolerance.
+    - max_iterations (int, default=50): Maximum number of iterations.
 
     PySCF-specific settings:
         scf_type (str, default="auto"): Type of SCF calculation. Can be:

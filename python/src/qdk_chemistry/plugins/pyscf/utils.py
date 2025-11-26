@@ -1,8 +1,8 @@
 """Utilities for converting between QDK/Chemistry and PySCF data structures.
 
 This module provides conversion functions to bridge between QDK/Chemistry and PySCF data structures.
-It enables seamless integration between the two quantum chemistry libraries by handling
-the conversion of molecular structures, basis sets, and Hamiltonians.
+It enables integration between the two quantum chemistry libraries by handling the conversion of molecular structures,
+basis sets, and Hamiltonians.
 
 The main functionality includes:
 
@@ -11,8 +11,8 @@ The main functionality includes:
 * Converting PySCF Mole objects back to QDK/Chemistry BasisSet objects
 * Converting QDK/Chemistry Hamiltonian objects to PySCF SCF objects
 
-These utilities are essential for workflows that need to leverage both QDK/Chemistry's
-data management capabilities and PySCF's quantum chemistry calculations.
+These utilities are essential for workflows that need to leverage both QDK/Chemistry's data management capabilities and
+PySCF's quantum chemistry calculations.
 
 Note:
     * Currently supports spherical atomic orbitals only
@@ -68,20 +68,15 @@ def structure_to_pyscf_atom_labels(structure: Structure) -> tuple:
         structure: QDK/Chemistry Structure object containing molecular geometry and atomic information.
 
     Returns:
-        A tuple containing three elements:
+        tuple[list[str], list[str], list[str]]: A tuple containing three lists:
 
-        - atoms : list[str]
-            List of atom strings in PySCF format, where each string contains
-            the atom label and its Cartesian coordinates (x, y, z) in Angstroms.
-            Format: ``Symbol<count> x y z`` (e.g., ``H1 0.000000000000 0.000000000000 0.000000000000``).
-
-        - pyscf_symbols : list[str]
-            List of unique atom labels used in PySCF, where each atom of the same
-            element is numbered sequentially (e.g., ``["H1", "H2", "O1"]``).
-
-        - elements : list[str]
-            List of atomic symbols without numbering, preserving the original
-            element symbols from the structure (e.g., ``["H", "H", "O"]``).
+        - atoms: List of atom strings in PySCF format, where each string contains
+          the atom label and its Cartesian coordinates (x, y, z) in Angstroms.
+          Format: ``Symbol<count> x y z`` (e.g., ``H1 0.000000000000 0.000000000000 0.000000000000``).
+        - pyscf_symbols: List of unique atom labels used in PySCF, where each atom of the same
+          element is numbered sequentially (e.g., ``["H1", "H2", "O1"]``).
+        - elements: List of atomic symbols without numbering, preserving the original
+          element symbols from the structure (e.g., ``["H", "H", "O"]``).
 
     Note:
         - Coordinates are formatted with 12 decimal places for precision.
@@ -414,6 +409,7 @@ def orbitals_to_scf(
     Returns:
         A PySCF SCF object (RHF, ROHF, or UHF) populated with the molecular orbital data from the input ``Orbitals``
         object. The type of SCF object returned depends on:
+
             * RHF: for restricted closed-shell calculations
             * ROHF: for restricted open-shell calculations
             * UHF: for unrestricted calculations
@@ -491,7 +487,7 @@ def orbitals_to_scf_from_n_electrons_and_multiplicity(
 ):
     """Convert an Orbitals object to a PySCF SCF object.
 
-    This is a convenience wrapper around :func:`orbtials_to_scf` that automatically constructs
+    This is a convenience wrapper around :func:`orbitals_to_scf` that automatically constructs
     occupation arrays from the total number of electrons and spin multiplicity.
 
     Args:
@@ -507,9 +503,10 @@ def orbitals_to_scf_from_n_electrons_and_multiplicity(
     Returns:
         A PySCF SCF object (RHF, ROHF, or UHF) populated with the molecular orbital data from the input ``Orbitals``
         object. The type of SCF object returned depends on:
-            * RHF: for restricted closed-shell calculations
-            * ROHF: for restricted open-shell calculations
-            * UHF: for unrestricted calculations
+
+        * RHF: for restricted closed-shell calculations
+        * ROHF: for restricted open-shell calculations
+        * UHF: for unrestricted calculations
 
     Raises:
         ValueError: If the electron count or multiplicity is invalid.
@@ -556,7 +553,7 @@ def hamiltonian_to_scf(hamiltonian: Hamiltonian, alpha_occ: np.ndarray, beta_occ
         * The returned SCF object contains dummy molecular orbitals and occupations suitable for post-HF method
           initialization.
         * For an interface using n_electrons and multiplicity, see
-          :func:`hamiltonian_to_scf_from_n_electrons_and_multiplicity`.
+          ``hamiltonian_to_scf_from_n_electrons_and_multiplicity``.
 
     Examples:
         >>> import numpy as np
@@ -678,9 +675,9 @@ def occupations_from_n_electrons_and_multiplicity(
         n_electrons: Total number of electrons in the system.
         multiplicity: Spin multiplicity (2S + 1), where S is the total spin. Default is 1 (singlet).
 
-    Returns:
-        alpha_occ: Occupation numbers for alpha (spin-up) electrons.
-        beta_occ: Occupation numbers for beta (spin-down) electrons.
+    Returns: tuple including
+        - alpha_occ: Occupation numbers for alpha (spin-up) electrons.
+        - beta_occ: Occupation numbers for beta (spin-down) electrons.
 
     Raises:
         ValueError: If the total number of electrons or multiplicity is invalid.

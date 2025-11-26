@@ -1,20 +1,32 @@
-========
+===================
 Acronym definitions
-========
+===================
 
 .. glossary::
 
    AO
       Atomic Orbital.
 
+   ASCI
+      Adaptive Sampling Configuration Interaction.
+
    CAS
       Complete Active Space.
+
+   CCSD
+      Coupled Cluster with Single and Double excitations.
+
+   CCSD(T)
+      Coupled Cluster with Single and Double excitations and perturbative Triple excitations.
 
    CI
       Configuration Interaction.
 
    DFT
       Density Functional Theory.
+
+   ERIs
+      Electron Repulsion Integrals.
 
    FCI
       Full Configuration Interaction.
@@ -60,6 +72,7 @@ Acronym definitions
 
    ROKS
       Restricted Open-shell Kohn-Sham.
+
    SCF
       Self-Consistent Field.
 
@@ -71,6 +84,9 @@ Acronym definitions
 
    UKS
       Unrestricted Kohn-Sham.
+
+   VQE
+      Variational Quantum Eigensolver.
 
    VVHV
       Valence Virtual Hard Virtual.
