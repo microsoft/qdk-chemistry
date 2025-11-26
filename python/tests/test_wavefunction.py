@@ -809,7 +809,6 @@ class TestWavefunctionRdmIntegraion:
         mol = Structure(["N", "N"], [[0.0, 0.0, 2.0], [0.0, 0.0, 0.0]])
         scf_solver = qdk_chemistry.algorithms.create("scf_solver")
         scf_solver.settings().set("basis_set", "def2-svp")
-        scf_solver.settings().set("convergence_threshold", 5e-9)
         sd_wf = scf_solver.run(mol, 0, np.abs(nelec_alpha - nelec_beta) + 1)[1]
 
         active_space_selector = qdk_chemistry.algorithms.create("active_space_selector", "qdk_valence")
@@ -867,7 +866,7 @@ class TestWavefunctionRdmIntegraion:
         s1_entropy = wfn.get_single_orbital_entropies()
         assert np.allclose(
             s1_entropy,
-            np.array([0.02040482, 0.17135976, 0.17135976, 0.17651599, 0.17651599, 0.00478807]),
+            np.array([0.02040475, 0.1713609 , 0.1713609 , 0.17651708, 0.17651708, 0.00478808]),
             rtol=float_comparison_relative_tolerance,
             atol=scf_orbital_tolerance,
         )

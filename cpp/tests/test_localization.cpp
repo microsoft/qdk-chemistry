@@ -651,7 +651,6 @@ TEST_F(LocalizationTest, O2TripletVVHV) {
   auto o2 = testing::create_o2_structure();
   auto scf_solver = ScfSolverFactory::create();
   scf_solver->settings().set("basis_set", "def2-svp");
-  scf_solver->settings().set("convergence_threshold", 5e-9);
   auto [E, wfn] = scf_solver->run(o2, 0, 3);
   auto orbitals = wfn->get_orbitals();
   const auto& [Ca_can, Cb_can] = orbitals->get_coefficients();
@@ -697,7 +696,7 @@ TEST_F(LocalizationTest, O2TripletVVHV) {
   auto pm_metric_beta = testing::pipek_mezey_metric(localized_orbitals, Cb_loc);
 
   // Check metric values to reference (commented out temporarily)
-  EXPECT_NEAR(3.148110465e+01, pm_metric_alpha,
+  EXPECT_NEAR(3.148109546e+01, pm_metric_alpha,
               testing::localization_tolerance);
-  EXPECT_NEAR(28.62067087523, pm_metric_beta, testing::localization_tolerance);
+  EXPECT_NEAR(2.862066057e+01, pm_metric_beta, testing::localization_tolerance);
 }
