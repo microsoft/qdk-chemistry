@@ -261,7 +261,6 @@ def test_gf2x_bitstrings_to_binary_matrix_additional_validation():
 
 def test_prepare_single_reference_state_error_cases():
     """Test error handling for invalid inputs."""
-
     with pytest.raises(ValueError, match="Bitstring cannot be empty"):
         prepare_single_reference_state("")
 
@@ -904,4 +903,3 @@ def test_gf2x_with_tracking_edge_case_pseudo_diagonal():
 
     # Should have some operations recorded
     assert len(elimination_results.operations) > 0, "Should have recorded some operations"
-

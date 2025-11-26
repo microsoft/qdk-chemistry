@@ -48,6 +48,7 @@ from qdk_chemistry.data import Wavefunction
 
 _LOGGER = logging.getLogger(__name__)
 
+
 def prepare_single_reference_state(bitstring: str) -> QuantumCircuit:
     r"""Prepare a single reference state on a quantum circuit based on a bitstring.
 
@@ -88,6 +89,7 @@ def prepare_single_reference_state(bitstring: str) -> QuantumCircuit:
             circuit.x(i)
 
     return qasm3.dumps(circuit)
+
 
 class SparseIsometryGF2XStatePreparation(StatePreparation):
     """State preparation using sparse isometry with enhanced GF2+X elimination.

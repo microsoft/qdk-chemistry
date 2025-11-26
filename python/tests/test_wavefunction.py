@@ -957,21 +957,26 @@ class TestWavefunctionRdmIntegraion:
         assert isinstance(result, np.ndarray)
         assert result.dtype == np.complex128
         assert result.shape == (2**12,)  # 6 active orbitals * 2 = 12 qubits
-        
+
         # Check that non-zero elements match the wavefunction
         nonzero_indices = np.nonzero(result)[0]
         assert len(nonzero_indices) == 3  # wavefunction_10e6o has 3 determinants
-        
+
         # Test with normalization
         result_normalized = wavefunction_10e6o.to_statevector(normalize=True)
-        assert np.allclose(np.linalg.norm(result_normalized), 1.0, 
-                          rtol=float_comparison_relative_tolerance, 
-                          atol=float_comparison_absolute_tolerance)
-        
+        assert np.allclose(
+            np.linalg.norm(result_normalized),
+            1.0,
+            rtol=float_comparison_relative_tolerance,
+            atol=float_comparison_absolute_tolerance,
+        )
+
         # Verify statevector is properly normalized
         norm_unnormalized = np.linalg.norm(result)
         expected_normalized = result / norm_unnormalized
-        assert np.allclose(result_normalized, expected_normalized,
-                          rtol=float_comparison_relative_tolerance,
-                          atol=float_comparison_absolute_tolerance)
-
+        assert np.allclose(
+            result_normalized,
+            expected_normalized,
+            rtol=float_comparison_relative_tolerance,
+            atol=float_comparison_absolute_tolerance,
+        )
