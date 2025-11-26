@@ -514,9 +514,7 @@ void SCFImpl::iterate_() {
       // Check convergence
       res.converged = scf_algorithm_->check_convergence(*this);
       // Perform SCF Algorithm iteration only if not converged
-      if (!res.converged) {
-        scf_algorithm_->iterate(*this);
-      }
+      scf_algorithm_->iterate(*this);
 
       res.scf_iterations = step + 1;
     }

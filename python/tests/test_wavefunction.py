@@ -866,7 +866,7 @@ class TestWavefunctionRdmIntegraion:
         s1_entropy = wfn.get_single_orbital_entropies()
         assert np.allclose(
             s1_entropy,
-            np.array([0.02040475, 0.17136090, 0.17136090, 0.17651708, 0.17651708, 0.00478808]),
+            np.array([0.02040482, 0.17135976, 0.17135976, 0.17651599, 0.17651599, 0.00478807]),
             rtol=float_comparison_relative_tolerance,
             atol=scf_orbital_tolerance,
         )
