@@ -7,25 +7,90 @@
 
 import numpy as np
 from qdk_chemistry.algorithms import create
-from qdk_chemistry.data import Hamiltonian, BasisSet, Orbitals, OrbitalType, Shell, SpinChannel
+from qdk_chemistry.data import Hamiltonian, BasisSet, Orbitals, OrbitalType, Shell, SpinChannel, Structure, Element
 
 # =============================================================================
 # Creating a Hamiltonian object
 # =============================================================================
 
+# Create a simple structure 
+coords = np.array([[0., 0., 0.], [1.4, 0., 0.]])
+elements = [Element.H, Element.H]
+structure = Structure(coords, elements=elements)
+
+# Run initial SCF
+scf_solver = create("scf_solver")
+E_hf, wfn_hf = scf_solver.run(structure, charge=0, spin_multiplicity=1)
+
 # Create a Hamiltonian constructor
 hamiltonian_constructor = create("hamiltonian_constructor")
 
-# Set active orbitals if needed
-active_orbitals = [4, 5, 6, 7]  # Example indices
-hamiltonian_constructor.settings().set("active_orbitals", active_orbitals)
-
-# Construct the Hamiltonian from orbitals
-# (assuming 'orbitals' object exists from prior calculation)
-# hamiltonian = hamiltonian_constructor.run(orbitals)
+# Construct Hamiltonian from orbitals
+hamiltonian = hamiltonian_constructor.run(wfn_hf.get_orbitals())
 
 # =============================================================================
-# Creating an unrestricted Hamiltonian
+# Creating an unrestricted Hamiltonian object
+# =============================================================================
+
+# Create O2 (spin and multiplicity are defined below)
+coords = np.array([[0., 0., 0.], [2.3, 0., 0.]])
+elements = [Element.O, Element.O]
+structure = Structure(coords, elements=elements)
+
+# Run initial SCF
+scf_solver = create("scf_solver")
+E_uhf, wfn_uhf = scf_solver.run(structure, charge=0, spin_multiplicity=3) # open shell: this will run UHF
+
+# Create a Hamiltonian constructor
+hamiltonian_constructor = create("hamiltonian_constructor")
+
+# Construct Hamiltonian from orbitals
+hamiltonian = hamiltonian_constructor.run(wfn_uhf.get_orbitals())
+# Here, the Hamiltonian will be unrestricted by default and use the UHF orbitals
+
+# can double-check it is unrestricted like: 
+is_unrestricted = hamiltonian.is_unrestricted()
+
+
+# =============================================================================
+# Custom construction (restricted)
+# =============================================================================
+
+# Create restricted orbitals
+num_orbitals = 2
+
+# Create basis set
+shells = []
+for i in range(num_orbitals):
+    shell = Shell(0, OrbitalType.S, np.array([1.0]), np.array([1.0]))
+    shells.append(shell)
+basis_set = BasisSet("test", shells)
+
+# Create restricted orbitals
+coeffs = np.eye(num_orbitals)
+restricted_orbitals = Orbitals(coeffs, None, None, basis_set)
+
+# Create one-body integrals
+one_body = np.array([[1.0, 0.2], [0.2, 1.5]])
+
+# Create two-body integrals 
+rng = np.random.default_rng(42)
+two_body = rng.random(num_orbitals**4)
+
+# Inactive Fock matrix
+inactive_fock = np.array([[0.5, 0.1], [0.1, 0.7]])
+
+# Construct Hamiltonian directly
+h_restricted = Hamiltonian(
+    one_body,
+    two_body,
+    restricted_orbitals,
+    core_energy=2.0,
+    inactive_fock_matrix=inactive_fock
+)
+
+# =============================================================================
+# Custom construction (unrestricted)
 # =============================================================================
 
 # Create test unrestricted orbitals
@@ -72,7 +137,6 @@ h_unrestricted = Hamiltonian(
 
 # Check if Hamiltonian is unrestricted
 is_unrestricted = h_unrestricted.is_unrestricted()
-is_restricted = h_unrestricted.is_restricted()
 
 # =============================================================================
 # Accessing Hamiltonian data
@@ -80,86 +144,46 @@ is_restricted = h_unrestricted.is_restricted()
 
 # Access one-electron integrals, returns tuple of numpy arrays
 # For restricted hamiltonians, these point to the same data
-# h1_alpha, h1_beta = hamiltonian.get_one_body_integrals()
+h1, _ = hamiltonian.get_one_body_integrals()
+
+# Access specific one-electron integral element <ij>
+element_one = hamiltonian.get_one_body_element(0,0)
 
 # Access two-electron integrals, returns triple of numpy arrays
 # For restricted hamiltonians, these point to the same data
-# h2_aaaa, h2_aabb, h2_bbbb = hamiltonian.get_two_body_integrals()
+h2, _, _ = hamiltonian.get_two_body_integrals()
 
 # Access a specific two-electron integral <ij|kl>
-# element = hamiltonian.get_two_body_element(i, j, k, l)
+element = hamiltonian.get_two_body_element(0, 0, 0, 0)
 
 # Get core energy (nuclear repulsion + inactive orbital energy)
-# core_energy = hamiltonian.get_core_energy()
+core_energy = hamiltonian.get_core_energy()
 
 # Get inactive Fock matrix (if available)
-# if hamiltonian.has_inactive_fock_matrix():
-#     inactive_fock_alpha, inactive_fock_beta = hamiltonian.get_inactive_fock_matrix()
+if hamiltonian.has_inactive_fock_matrix():
+    inactive_fock, _ = hamiltonian.get_inactive_fock_matrix()
 
 # Get orbital data
-# orbitals = hamiltonian.get_orbitals()
-
-# Get active space information
-# active_indices = hamiltonian.get_selected_orbital_indices()
-# num_electrons = hamiltonian.get_num_electrons()
-# num_orbitals = hamiltonian.get_num_orbitals()
-
-# For unrestricted Hamiltonians, access specific one-electron integral channels
-integral_aa = h_unrestricted.get_one_body_element(0, 0, SpinChannel.aa)
-integral_bb = h_unrestricted.get_one_body_element(0, 0, SpinChannel.bb)
-
-# For unrestricted Hamiltonians, access specific two-electron integral channels
-integral_aaaa = h_unrestricted.get_two_body_element(0, 0, 0, 0, SpinChannel.aaaa)
-integral_aabb = h_unrestricted.get_two_body_element(0, 0, 0, 0, SpinChannel.aabb)
-integral_bbbb = h_unrestricted.get_two_body_element(0, 0, 0, 0, SpinChannel.bbbb)
-
-# Access fock matrices for alpha and beta
-fock_alpha, fock_beta = h_unrestricted.get_inactive_fock_matrix()
-
-# Get orbital data
-orbitals = h_unrestricted.get_orbitals()
-
-# Get active space information
-active_indices = h_unrestricted.get_selected_orbital_indices()
-num_electrons = h_unrestricted.get_num_electrons()
-num_orbitals = h_unrestricted.get_num_orbitals()
+orbitals = hamiltonian.get_orbitals()
 
 # =============================================================================
-# File formats (Serialization)
+# Accessing Hamiltonian data (unrestricted)
 # =============================================================================
 
-# Serialize to JSON file
-# hamiltonian.to_json_file("molecule.hamiltonian.json")
+# Access one-electron integrals, returns tuple of numpy arrays
+h1_alpha, h1_beta = hamiltonian.get_one_body_integrals()
 
-# Deserialize from JSON file
-# from qdk_chemistry.data import Hamiltonian
-# hamiltonian_from_json_file = Hamiltonian.from_json_file("molecule.hamiltonian.json")
+# Access specific elements of one-electron integrals 
+element_one_aa = hamiltonian.get_one_body_element(0,0, SpinChannel.aa)
+element_one_bb = hamiltonian.get_one_body_element(0,0, SpinChannel.bb)
 
-# Serialize to HDF5 file
-# hamiltonian.to_hdf5_file("molecule.hamiltonian.h5")
+# Access two-electron integrals, returns triple of numpy arrays
+h2_aaaa, h2_aabb, h2_bbbb = hamiltonian.get_two_body_integrals()
 
-# Deserialize from HDF5 file
-# hamiltonian_from_hdf5_file = Hamiltonian.from_hdf5_file("molecule.hamiltonian.h5")
+# Access a specific two-electron integral <ij|kl>
+element_aaaa = hamiltonian.get_two_body_element(0, 0, 0, 0, SpinChannel.aaaa)
+element_aabb = hamiltonian.get_two_body_element(0, 0, 0, 0, SpinChannel.aabb)
 
-# Generic file I/O based on type parameter
-# hamiltonian.to_file("molecule.hamiltonian.json", "json")
-# hamiltonian_from_file = Hamiltonian.from_file("molecule.hamiltonian.h5", "hdf5")
-
-# Convert to/from JSON in Python
-# import json
-# j = hamiltonian.to_json()
-# j_str = json.dumps(j)
-# hamiltonian_from_json = Hamiltonian.from_json(json.loads(j_str))
-
-# =============================================================================
-# Validation methods
-# =============================================================================
-
-# Check if the Hamiltonian data is complete and consistent
-# valid = hamiltonian.is_valid()
-
-# Check if specific components are available
-# has_one_body = hamiltonian.has_one_body_integrals()
-# has_two_body = hamiltonian.has_two_body_integrals()
-# has_orbitals = hamiltonian.has_orbitals()
-# has_inactive_fock = hamiltonian.has_inactive_fock_matrix()
+# Get inactive Fock matrix (if available)
+if hamiltonian.has_inactive_fock_matrix():
+    inactive_fock_alpha, inactive_fock_beta = hamiltonian.get_inactive_fock_matrix()
