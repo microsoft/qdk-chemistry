@@ -148,7 +148,7 @@ nitpick_ignore = [
     ("cpp:identifier", "size_t"),
     ("py:class", "callable"),
     ("py:class", "optional"),
-    ("py:class", "_QdkMcSolverWrapper"),
+    ("py:class", "qdk_chemistry.plugins.pyscf.mcscf._QdkMcSolverWrapper"),
     ("py:class", "HamiltonianType"),  # TODO: figure out how to resolve this reference
     ("py:exc", "SettingsAreLocked"),  # TODO: figure out how to resolve this reference
 ]
