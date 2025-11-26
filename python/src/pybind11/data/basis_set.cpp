@@ -156,7 +156,7 @@ Get number of atomic orbitals this shell contributes.
 
 Args:
     atomic_orbital_type (Optional[AOType]): Whether to use spherical (2l+1) or Cartesian functions.
-    Default is Spherical
+        Default is Spherical
 
 Returns:
     int: Number of atomic orbitals
@@ -691,12 +691,11 @@ orbital_type : OrbitalType
     Type of orbital (S, P, D, F, etc.)
 
 Returns:
-list[int]
-    Vector of ECP shell indices matching both criteria
+    list[int]: Vector of ECP shell indices matching both criteria
 
 Examples:
->>> p_ecp_indices = basis_set.get_ecp_shell_indices_for_atom_and_orbital_type(0, OrbitalType.P)
->>> print(f"P-type ECP shells on atom 0: {p_ecp_indices}")
+    >>> p_ecp_indices = basis_set.get_ecp_shell_indices_for_atom_and_orbital_type(0, OrbitalType.P)
+    >>> print(f"P-type ECP shells on atom 0: {p_ecp_indices}")
 )",
            py::arg("atom_index"), py::arg("orbital_type"))
 
