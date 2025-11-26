@@ -2,9 +2,8 @@
 
 This module provides standalone abstractions for phase estimation workflows.
 Concrete algorithms should inherit from :class:`PhaseEstimation` and expose
-creation helpers (for example, :meth:`create_circuit` or
-:meth:`create_iterations`) that assemble the circuits required by the chosen
-phase estimation variant.
+creation helpers (for example, ``create_circuit`` or ``create_iterations``) that
+assemble the circuits required by the chosen phase estimation variant.
 """
 
 # --------------------------------------------------------------------------------------------

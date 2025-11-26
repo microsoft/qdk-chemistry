@@ -605,7 +605,7 @@ The file will be created or overwritten if it already exists.
 
 Args:
     filename (str | pathlib.Path): Path to the JSON file to write.
-    Must have '.stability_result' before the file extension (e.g., ``water.stability_result.json``, ``molecule.stability_result.json``)
+        Must have '.stability_result' before the file extension (e.g., ``water.stability_result.json``, ``molecule.stability_result.json``)
 
 Raises:
     ValueError: If filename doesn't follow the required naming convention
