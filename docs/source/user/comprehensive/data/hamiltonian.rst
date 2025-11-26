@@ -42,7 +42,7 @@ For unrestricted Hamiltonians, the one-electron and two-electron integrals are s
 
 - One-electron integrals: :math:`h_{\alpha\alpha}` and :math:`h_{\beta\beta}`
 - Two-electron integrals: :math:`h_{\alpha\alpha\alpha\alpha}`, :math:`h_{\alpha\beta\alpha\beta}`, and :math:`h_{\beta\beta\beta\beta}`
-  
+
 Usage
 -----
 
@@ -97,10 +97,10 @@ An unrestricted Hamiltonian is created by default, if an open-shell system is sp
       auto hamiltonian_constructor = HamiltonianConstructorFactory::create();
 
       // Construct the Hamiltonian from orbitals
-      auto hamiltonian = hamiltonian_constructor->run(wfn_UHF->get_orbitals()); 
+      auto hamiltonian = hamiltonian_constructor->run(wfn_UHF->get_orbitals());
       // Here, the Hamiltonian will be unrestricted by default and use the UHF orbitals
 
-      // Can double check it is unrestricted like 
+      // Can double check it is unrestricted like
       bool is_unrestricted = hamiltonian->is_unrestricted();
 
 .. tab:: Python API
@@ -133,7 +133,7 @@ If desired, the Hamiltonian can also be constructed directly using one- and two-
       // Create restricted orbitals
       Eigen::MatrixXd coeffs = Eigen::MatrixXd::Identity(num_orbitals, num_orbitals);
       auto restricted_orbitals = std::make_shared<Orbitals>(
-         coeffs, 
+         coeffs,
          std::nullopt,
          std::nullopt,  // No orbital energies
          basis_set
@@ -165,7 +165,7 @@ If desired, the Hamiltonian can also be constructed directly using one- and two-
          restricted_orbitals,
          2.0,  // core_energy
          inactive_fock
-      ); 
+      );
 
 .. tab:: Python API
 
@@ -173,7 +173,7 @@ If desired, the Hamiltonian can also be constructed directly using one- and two-
       :language: python
       :lines: 59-90
 
-Likewise for unrestricted: 
+Likewise for unrestricted:
 .. tab:: C++ API
 
    .. code-block:: cpp
@@ -355,7 +355,7 @@ In the unrestricted case we can access the spin-separated one-electron and two-e
       // Access a specific two-electron integral <ij|kl>
       double element_aaaa = hamiltonian->get_two_body_element(0, 0, 0, 0, SpinChannel::aaaa);
       double element_aabb = hamiltonian->get_two_body_element(0, 0, 0, 0, SpinChannel::aabb);
-   
+
       // Get inactive Fock matrix (if available)
       if (hamiltonian.has_inactive_fock_matrix()) {
           auto [inactive_fock_alpha, inactive_fock_beta] = hamiltonian->get_inactive_fock_matrix();

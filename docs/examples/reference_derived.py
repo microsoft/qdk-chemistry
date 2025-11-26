@@ -7,10 +7,10 @@
 
 from qdk_chemistry.algorithms import create
 from qdk_chemistry.data import Structure, Ansatz, Element
-import numpy as np 
+import numpy as np
 
-# Create a simple structure 
-coords = np.array([[0., 0., 0.], [1.4, 0., 0.]])
+# Create a simple structure
+coords = np.array([[0.0, 0.0, 0.0], [1.4, 0.0, 0.0]])
 elements = [Element.H, Element.H]
 structure = Structure(coords, elements=elements)
 
@@ -30,5 +30,5 @@ ansatz = Ansatz(hamiltonian, hf_wavefunction)
 mp2_calculator = create("reference_derived_calculator", "microsoft_mp2_calculator")
 mp2_energy, mp2_wavefunction = mp2_calculator.run(ansatz)
 
-# If desired, we can extract only the correlation energy 
+# If desired, we can extract only the correlation energy
 mp2_corr_energy = mp2_energy - hf_energy

@@ -1,7 +1,7 @@
 Reference-derived calculations
 ==============================
 
-Reference-derived calculations in QDK/Chemistry are post-Hartree-Fock methods that build upon the wavefunction with one or several reference 
+Reference-derived calculations in QDK/Chemistry are post-Hartree-Fock methods that build upon the wavefunction with one or several reference
 determinants to account for electron correlation effects. These methods include Møller-Plesset perturbation theory (MP2) and Coupled Cluster (CC) theory.
 
 Overview

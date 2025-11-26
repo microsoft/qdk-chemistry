@@ -7,14 +7,23 @@
 
 import numpy as np
 from qdk_chemistry.algorithms import create
-from qdk_chemistry.data import Hamiltonian, BasisSet, Orbitals, OrbitalType, Shell, SpinChannel, Structure, Element
+from qdk_chemistry.data import (
+    Hamiltonian,
+    BasisSet,
+    Orbitals,
+    OrbitalType,
+    Shell,
+    SpinChannel,
+    Structure,
+    Element,
+)
 
 # =============================================================================
 # Creating a Hamiltonian object
 # =============================================================================
 
-# Create a simple structure 
-coords = np.array([[0., 0., 0.], [1.4, 0., 0.]])
+# Create a simple structure
+coords = np.array([[0.0, 0.0, 0.0], [1.4, 0.0, 0.0]])
 elements = [Element.H, Element.H]
 structure = Structure(coords, elements=elements)
 
@@ -33,13 +42,15 @@ hamiltonian = hamiltonian_constructor.run(wfn_hf.get_orbitals())
 # =============================================================================
 
 # Create O2 (spin and multiplicity are defined below)
-coords = np.array([[0., 0., 0.], [2.3, 0., 0.]])
+coords = np.array([[0.0, 0.0, 0.0], [2.3, 0.0, 0.0]])
 elements = [Element.O, Element.O]
 structure = Structure(coords, elements=elements)
 
 # Run initial SCF
 scf_solver = create("scf_solver")
-E_uhf, wfn_uhf = scf_solver.run(structure, charge=0, spin_multiplicity=3) # open shell: this will run UHF
+E_uhf, wfn_uhf = scf_solver.run(
+    structure, charge=0, spin_multiplicity=3
+)  # open shell: this will run UHF
 
 # Create a Hamiltonian constructor
 hamiltonian_constructor = create("hamiltonian_constructor")
@@ -48,7 +59,7 @@ hamiltonian_constructor = create("hamiltonian_constructor")
 hamiltonian = hamiltonian_constructor.run(wfn_uhf.get_orbitals())
 # Here, the Hamiltonian will be unrestricted by default and use the UHF orbitals
 
-# can double-check it is unrestricted like: 
+# can double-check it is unrestricted like:
 is_unrestricted = hamiltonian.is_unrestricted()
 
 
@@ -73,7 +84,7 @@ restricted_orbitals = Orbitals(coeffs, None, None, basis_set)
 # Create one-body integrals
 one_body = np.array([[1.0, 0.2], [0.2, 1.5]])
 
-# Create two-body integrals 
+# Create two-body integrals
 rng = np.random.default_rng(42)
 two_body = rng.random(num_orbitals**4)
 
@@ -86,7 +97,7 @@ h_restricted = Hamiltonian(
     two_body,
     restricted_orbitals,
     core_energy=2.0,
-    inactive_fock_matrix=inactive_fock
+    inactive_fock_matrix=inactive_fock,
 )
 
 # =============================================================================
@@ -132,7 +143,7 @@ h_unrestricted = Hamiltonian(
     unrestricted_orbitals,
     core_energy=2.0,
     inactive_fock_matrix_alpha=inactive_fock_alpha,
-    inactive_fock_matrix_beta=inactive_fock_beta
+    inactive_fock_matrix_beta=inactive_fock_beta,
 )
 
 # Check if Hamiltonian is unrestricted
@@ -147,7 +158,7 @@ is_unrestricted = h_unrestricted.is_unrestricted()
 h1, _ = hamiltonian.get_one_body_integrals()
 
 # Access specific one-electron integral element <ij>
-element_one = hamiltonian.get_one_body_element(0,0)
+element_one = hamiltonian.get_one_body_element(0, 0)
 
 # Access two-electron integrals, returns triple of numpy arrays
 # For restricted hamiltonians, these point to the same data
@@ -173,9 +184,9 @@ orbitals = hamiltonian.get_orbitals()
 # Access one-electron integrals, returns tuple of numpy arrays
 h1_alpha, h1_beta = hamiltonian.get_one_body_integrals()
 
-# Access specific elements of one-electron integrals 
-element_one_aa = hamiltonian.get_one_body_element(0,0, SpinChannel.aa)
-element_one_bb = hamiltonian.get_one_body_element(0,0, SpinChannel.bb)
+# Access specific elements of one-electron integrals
+element_one_aa = hamiltonian.get_one_body_element(0, 0, SpinChannel.aa)
+element_one_bb = hamiltonian.get_one_body_element(0, 0, SpinChannel.bb)
 
 # Access two-electron integrals, returns triple of numpy arrays
 h2_aaaa, h2_aabb, h2_bbbb = hamiltonian.get_two_body_integrals()
