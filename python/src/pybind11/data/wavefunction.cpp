@@ -208,7 +208,7 @@ Examples:
   wavefunction.def("get_total_num_electrons",
                    &Wavefunction::get_total_num_electrons,
                    R"(
-    Get total number of alpha and beta electrons.
+Get total number of alpha and beta electrons.
 
 Returns:
     tuple: Pair of ``(n_alpha, n_beta)`` electrons
@@ -220,7 +220,7 @@ Examples:
   wavefunction.def("get_total_orbital_occupations",
                    &Wavefunction::get_total_orbital_occupations,
                    R"(
-    Get orbital occupations for all orbitals.
+Get orbital occupations for all orbitals.
 
 Returns:
     tuple: Pair of ``(alpha_occupations, beta_occupations)``
@@ -232,7 +232,7 @@ Examples:
   wavefunction.def("get_active_orbital_occupations",
                    &Wavefunction::get_active_orbital_occupations,
                    R"(
-    Get orbital occupations for active orbitals only.
+Get orbital occupations for active orbitals only.
 
 Returns:
     tuple: Pair of ``(alpha_active_occupations, beta_active_occupations)``

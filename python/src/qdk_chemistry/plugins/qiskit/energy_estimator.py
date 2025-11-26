@@ -65,9 +65,9 @@ class QiskitEnergyEstimator(EnergyEstimator):
 
         Args:
             seed: Seed for the simulator to ensure reproducibility. Default is 42.
-            This argument takes priority over the seed specified in the Backend configuration/options.
+                This argument takes priority over the seed specified in the Backend configuration/options.
             backend_options: Backend-specific configuration dictionary. Frequently used options include
-            ``{"seed_simulator": int, "noise_model": NoiseModel, ...}``
+                ``{"seed_simulator": int, "noise_model": NoiseModel, ...}``
 
         References: `Qiskit Aer Simulator <https://github.com/Qiskit/qiskit-aer/blob/main/qiskit_aer/backends/aer_simulator.py>`_.
 
