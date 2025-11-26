@@ -39,7 +39,7 @@ def analyze_qubit_status(circuit: QuantumCircuit) -> dict[int, str]:
     * "idle": has no gates applied
 
     Args:
-        circuit (QuantumCircuit): The quantum circuit to analyze.
+        circuit: The quantum circuit to analyze.
 
     Returns:
         A summary of qubit roles indexed by qubit index.

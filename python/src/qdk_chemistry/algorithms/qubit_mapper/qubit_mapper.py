@@ -39,9 +39,9 @@ class QubitMapperFactory(AlgorithmFactory):
     """Factory class for creating QubitMapper instances."""
 
     def algorithm_type_name(self) -> str:
-        """Return ``qubit_mapper as the algorithm type name."""
+        """Return ``qubit_mapper`` as the algorithm type name."""
         return "qubit_mapper"
 
     def default_algorithm_name(self) -> str:
-        """Return ``qiskit```as the default algorithm name."""
+        """Return ``qiskit`` as the default algorithm name."""
         return "qiskit"

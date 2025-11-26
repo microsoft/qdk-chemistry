@@ -117,6 +117,8 @@ clean-sphinx-api: check
 
 SPHINX_SUMMARY_DEBUG = sphinx-autosummary-output.txt
 SPHINX_SUMMARY_WARNINGS = sphinx-autosummary-warnings.txt
+SPHINX_SUMMARY_WARNINGS_FILTERED = sphinx-autosummary-warnings-filtered.txt
+SPHINX_REGEX_FILE = ignore-sphinx-regex.txt
 # Using more than one thread can cause issues interpreting the output
 SPHINX_SUMMARY_OPTIONS = -j 1 -n -w $(SPHINX_SUMMARY_WARNINGS)
 # Extra options for Sphinx command (can be specified in environment)
@@ -131,6 +133,16 @@ sphinx-autosummary: breathe sphinx-api $(SOURCE_DIR)/conf.py $(SOURCE_DIR)/index
 	@echo "** Warnings saved to $(SPHINX_SUMMARY_WARNINGS)."
 	@count=$$(grep -E "WARNING|ERROR|CRITICAL" $(SPHINX_SUMMARY_DEBUG) | wc -l); \
 	echo "** Found $$count warnings/errors in the Sphinx autosummary output."
+	@echo "** Filtering warnings for autosummary entries..."
+	@echo "** TODO: this grep sequence should be replaced by proper Sphinx configuration."
+	cat $(SPHINX_SUMMARY_WARNINGS) | \
+		grep -v -E "WARNING: duplicate object description.*use :no-index: for one of them" | \
+		grep -v -E "pybind11.*detail.*function.*libstdcpp.*ERROR: Unexpected indentation." | \
+		grep -v -E "pybind11.*detail.*function.*libstdcpp.*WARNING: Block quote ends without a blank line; unexpected unindent" | \
+		grep -v -E "WARNING: more than one target found for cross-reference" \
+		> $(SPHINX_SUMMARY_WARNINGS_FILTERED) || true
+	@filtered_count=$$(grep -E "WARNING|ERROR|CRITICAL" $(SPHINX_SUMMARY_WARNINGS_FILTERED) | wc -l); \
+	echo "** Found $$filtered_count unexpected autosummary warnings. See $(SPHINX_SUMMARY_WARNINGS_FILTERED) for details."
 	@echo
 
 clean-sphinx-autosummary: check
@@ -138,6 +150,7 @@ clean-sphinx-autosummary: check
 	rm -rf $(BUILD_DIR)
 	rm -f $(SPHINX_SUMMARY_DEBUG)
 	rm -f $(SPHINX_SUMMARY_WARNINGS)
+	rm -f $(SPHINX_SUMMARY_WARNINGS_FILTERED)
 	@echo
 
 ###############################################################################

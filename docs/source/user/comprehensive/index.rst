@@ -26,6 +26,6 @@ This documentation is organized into the following sections:
    design/index
    data/index
    algorithms/index
-   keywords
+   basis_functionals
    model_hamiltonians
    plugins

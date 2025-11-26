@@ -41,9 +41,9 @@ class PyscfAVASSettings(Settings):
     interface for setting and getting options.
 
     Attributes:
-        ao_labels (list of str, default = None): The atomic orbital labels to be included in the active space.
-        canonicalize (bool, default = False): Whether to canonicalize the active space orbitals after selection.
-        openshell_option (int, default = 2): How to handle singly-occupied orbitals in the active space.
+        ao_labels (list[str]): The atomic orbital labels to be included in the active space (default = None).
+        canonicalize (bool): Whether to canonicalize the active space orbitals after selection (default = False).
+        openshell_option (int): How to handle singly-occupied orbitals in the active space (default = 2).
             The singly-occupied orbitals are projected as part of alpha orbitals if ``openshell_option=2``, or
             completely kept in active space if ``openshell_option=3``.
 
