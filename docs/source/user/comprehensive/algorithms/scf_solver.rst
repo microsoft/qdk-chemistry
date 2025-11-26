@@ -2,7 +2,7 @@ Self-consistent field solver
 ============================
 
 The :class:`~qdk_chemistry.algorithms.ScfSolver` algorithm in QDK/Chemistry performs Self-Consistent Field (SCF) calculations to optimize molecular orbitals for a given molecular structure.
-Following QDK/Chemistry's :doc:`algorithm design principles <../advanced/design_principles>`, it takes a :doc:`Structure <../data/structure>` instance as input and produces an :doc:`Orbitals <../data/orbitals>` instance as output.
+Following QDK/Chemistry's :doc:`algorithm design principles <../design/index>`, it takes a :doc:`Structure <../data/structure>` instance as input and produces an :doc:`Orbitals <../data/orbitals>` instance as output.
 Its primary purpose is to find the best single-particle orbitals within a mean-field approximation.
 For Hartree-Fock (HF) theory, it yields the mean field energy, which misses electron correlation and typically requires post-HF methods for accurate energetics.
 For Density Functional Theory (DFT), some correlation effects are included through the exchange-correlation functional.
@@ -38,7 +38,6 @@ The final result provides:
 - **Static correlation**: Essential for systems with near-degenerate states or bond-breaking processes.
   See :doc:`MCCalculator <mc_calculator>` documentation.
 - **Dynamic correlation**: Required for all molecular systems to account for instantaneous electron-electron interactions.
-  .. See :doc:`Dynamic Correlation <dynamical_correlation>` documentation.
 
 The orbitals from :term:`SCF` calculations typically serve as input for post-:term:`SCF` methods that capture these correlation effects.
 :term:`SCF` methods thus serve as the foundation for more advanced electronic structure calculations and provide essential insights into molecular properties, reactivity, and spectroscopic characteristics.
@@ -65,7 +64,7 @@ The :class:`~qdk_chemistry.algorithms.ScfSolver` in QDK/Chemistry provides the f
 
 - **DFT-specific features**:
 
-  - Support for various exchange-correlation functionals including :term:`LDA`, :term:`GGA`, meta-:term:`GGA`, hybrid, and range-separated functionals
+  - Support for :doc:`various exchange-correlation functionals <../basis_functionals>` including :term:`LDA`, :term:`GGA`, meta-:term:`GGA`, hybrid, and range-separated functionals
 
 - **Basis set support**:
 
@@ -76,7 +75,7 @@ The :class:`~qdk_chemistry.algorithms.ScfSolver` in QDK/Chemistry provides the f
 Creating an :term:`SCF` solver
 ------------------------------
 
-As an algorithm class in QDK/Chemistry, the ``ScfSolver`` follows the :doc:`factory pattern design principle <../advanced/design_principles>` and is created using its corresponding factory.
+As an algorithm class in QDK/Chemistry, the :class:`~qdk_chemistry.algorithms.ScfSolver` follows the :doc:`factory pattern design principle <../design/index>` and is created using its corresponding factory.
 
 Available Solvers
 ~~~~~~~~~~~~~~~~~
@@ -88,9 +87,10 @@ QDK/Chemistry currently provides the following registered solvers:
    :widths: 20 20 60
 
    * - Solver
-     - Type
+     - Developer
      - Description
    * - **default**
+     - Microsoft
      - Default solver implemented directly in QDK/Chemistry, optimized for performance and versatility
    * - **pyscf**
      - Third-party
@@ -117,14 +117,14 @@ QDK/Chemistry currently provides the following registered solvers:
 Configuring the :term:`SCF` calculation
 ---------------------------------------
 
-The ``ScfSolver`` can be configured using the ``Settings`` object.
+The :class:`~qdk_chemistry.algorithms.ScfSolver` can be configured using the ``Settings`` object.
 QDK/Chemistry provides standard :term:`SCF` settings that apply to all solver implementations, as well as specialized settings for specific solvers or algorithms.
 
 QDK/Chemistry provides both standard settings that work across all :term:`SCF` solver implementations and specialized settings for specific algorithms or implementations.
 See the `Available Settings`_ section below for a complete list of configuration options.
 
 .. note::
-   For a complete list of available basis sets and their specifications, see the :doc:`Supported Basis Sets <../data/basis_sets>` documentation.
+   For a complete list of available basis sets and their specifications, see the :doc:`Supported Basis Sets <../basis_functionals>` documentation.
    This reference provides detailed information about all pre-defined basis sets you can use with the ``basis_set`` setting.
 
 .. tab:: C++ API
@@ -147,7 +147,7 @@ See the `Available Settings`_ section below for a complete list of configuration
       :lines: 4-12
 
 Running an :term:`SCF` calculation
---------------------------
+----------------------------------
 
 Once configured, the :term:`SCF` calculation can be executed on a molecular structure.
 The ``solve`` method returns two values:
@@ -177,7 +177,7 @@ The ``solve`` method returns two values:
 Available settings
 ------------------
 
-The ``ScfSolver`` accepts a range of settings to control its behavior.
+The :class:`~qdk_chemistry.algorithms.ScfSolver` accepts a range of settings to control its behavior.
 These settings are divided into base settings (common to all :term:`SCF` calculations) and specialized settings (specific to certain :term:`SCF` variants).
 
 Base settings
@@ -215,11 +215,11 @@ These settings apply to all :term:`SCF` calculations:
    * - ``multiplicity``
      - int
      - 1
-     - Spin multiplicity of the system (TODO: move this to structure)
+     - Spin multiplicity of the system (🔧 **TODO**: move this to structure)
    * - ``charge``
      - int
      - 0
-     - Total charge of the system (TODO: move this to structure)
+     - Total charge of the system (🔧 **TODO**: move this to structure)
 
 Specialized settings
 ~~~~~~~~~~~~~~~~~~~~
@@ -241,8 +241,8 @@ These settings apply only to specific variants of SCF calculations:
    * - ``functional``
      - string
      - TODO
-     - Exchange-correlation functional for :term:`DFT` (empty for :term:`HF`); see :doc:`functionals documentation <../data/functionals>`
-     - :term:`DFT`` only
+     - Exchange-correlation functional for :term:`DFT` (empty for :term:`HF`); see :doc:`functionals documentation <../basis_functionals>`
+     - :term:`DFT` only
    * - ``level_shift``
      - float
      - 0.0
@@ -252,7 +252,7 @@ These settings apply only to specific variants of SCF calculations:
 Implemented interface
 ---------------------
 
-QDK/Chemistry's ``ScfSolver`` provides a unified interface to SCF calculations across various quantum chemistry packages:
+QDK/Chemistry's :class:`~qdk_chemistry.algorithms.ScfSolver` provides a unified interface to SCF calculations across various quantum chemistry packages:
 
 QDK/Chemistry implementations
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -267,7 +267,7 @@ Third-party interfaces
 The factory pattern allows seamless selection between these implementations, with the most appropriate option chosen
 based on the calculation requirements and available packages.
 
-For more details on how QDK/Chemistry interfaces with external packages, see the :doc:`Interfaces <../advanced/interfaces>` documentation.
+For more details on how QDK/Chemistry interfaces with external packages, see the :doc:`Interfaces <../design/interfaces>` documentation.
 
 Related classes
 ---------------
@@ -278,5 +278,6 @@ Related classes
 Related topics
 --------------
 
-- :doc:`Settings <../advanced/settings>`: Configuration settings for algorithms
-- :doc:`Factory Pattern <../advanced/factory_pattern>`: Understanding algorithm creation
+- :doc:`Settings <../design/settings>`: Configuration settings for algorithms
+- :doc:`Factory Pattern <../design/factory_pattern>`: Understanding algorithm creation
+- :doc:`../basis_functionals`: Exchange-correlation functionals for DFT calculations

@@ -57,14 +57,16 @@ class PyscfScfSettings(ElectronicStructureSettings):
     ElectronicStructureSettings and adding PySCF-specific customizations.
 
     Inherits from ElectronicStructureSettings:
-        method (str, default="hf"): The electronic structure method (Hartree-Fock).
-        basis_set (str, default="def2-svp"): The basis set used for quantum chemistry calculations.
-            Common options include "def2-svp", "def2-tzvp", "cc-pvdz", etc.
-        convergence_threshold (float, default=1e-8): Convergence threshold for the SCF procedure.
-        max_iterations (int, default=50): Maximum number of iterations.
+
+    - method (str, default="hf"): The electronic structure method (Hartree-Fock).
+    - basis_set (str, default="def2-svp"): The basis set used for quantum chemistry calculations.
+      Common options include "def2-svp", "def2-tzvp", "cc-pvdz", etc.
+    - tolerance (float, default=1e-6): Convergence tolerance.
+    - max_iterations (int, default=50): Maximum number of iterations.
 
     PySCF-specific settings:
-        force_restricted (bool, default=False): If True, enforce restricted orbitals, even if open shell (e.g. ROHF).
+
+    - force_restricted (bool, default=False): If True, enforce restricted orbitals, even if open shell (e.g. ROHF).
 
     Examples:
         >>> settings = PyscfScfSettings()
