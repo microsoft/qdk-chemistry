@@ -30,8 +30,6 @@ The module is particularly useful for:
 
 import logging
 
-import numpy as np
-
 from qdk_chemistry.data import Configuration
 
 _LOGGER = logging.getLogger(__name__)
@@ -88,62 +86,3 @@ def binary_to_decimal(binary: str | list, reverse=False) -> int:
     if isinstance(binary, list):
         return int("".join(map(str, binary)), 2)
     raise ValueError("Input must be a non-empty binary string or list.")
-
-
-def bitstrings_to_binary_matrix(bitstrings: list[str]) -> np.ndarray:
-    """Convert a list of bitstrings to a binary matrix.
-
-    This function converts a list of bitstrings (determinants) into a binary matrix
-    where each column represents a determinant and each row represents a qubit.
-
-    Args:
-        bitstrings (list[str]): List of bitstrings in Qiskit little endian order.
-            Each bitstring represents a determinant where the string is ordered
-            as "q[N-1]...q[0]" (most significant bit first in the string).
-
-    Returns:
-        Binary matrix M of shape (N, k) where
-
-            * N is the number of qubits (rows)
-            * k is the number of determinants (columns)
-
-        The matrix follows Qiskit circuit top-down convention with row ordering "q[0]...q[N-1]" (qubit 0 at the top).
-
-    Note:
-        The input bitstrings are in Qiskit little endian order ("q[N-1]...q[0]"),
-        but the output binary matrix follows the Qiskit circuit convention with
-        row ordering "q[0]...q[N-1]". This means each bitstring is reversed
-        when converting to a column in the matrix.
-
-    Example:
-        >>> bitstrings = ["101", "010"]  # q[2]q[1]q[0] format
-        >>> matrix = bitstrings_to_binary_matrix(bitstrings)
-        >>> print(matrix)
-        [[1 0]  # q[0]
-         [0 1]  # q[1]
-         [1 0]] # q[2]
-
-    """
-    if not bitstrings:
-        raise ValueError("Bitstrings list cannot be empty")
-
-    n_qubits = len(bitstrings[0])
-    n_dets = len(bitstrings)
-
-    # Validate all bitstrings have the same length
-    for i, bitstring in enumerate(bitstrings):
-        if len(bitstring) != n_qubits:
-            raise ValueError(
-                f"All bitstrings must have the same length. "
-                f"Bitstring {i} has length {len(bitstring)}, expected {n_qubits}"
-            )
-
-    # Create binary matrix with correct row ordering (reverse each bitstring)
-    bitstring_matrix = np.zeros((n_qubits, n_dets), dtype=np.int8)
-    for i, bitstring in enumerate(bitstrings):
-        # Reverse the bitstring to get correct qubit ordering
-        # Input: "q[N-1]...q[0]" -> Output: column with q[0] at top
-        reversed_bitstring = bitstring[::-1]
-        bitstring_matrix[:, i] = np.array(list(map(int, reversed_bitstring)), dtype=np.int8)
-
-    return bitstring_matrix
