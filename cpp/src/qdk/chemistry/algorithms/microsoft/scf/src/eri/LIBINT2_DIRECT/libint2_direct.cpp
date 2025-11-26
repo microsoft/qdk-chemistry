@@ -7,7 +7,9 @@
 #include <qdk/chemistry/scf/core/types.h>
 #include <qdk/chemistry/scf/util/libint2_util.h>
 
-#include <qdk/chemistry/utils/omp_utils.hpp>
+#ifdef _OPENMP
+#include <omp.h>
+#endif
 #include <stdexcept>
 
 #include "util/timer.h"
@@ -73,7 +75,11 @@ std::tuple<shellpair_list_t, shellpair_data_t> compute_shellpairs(
     const ::libint2::BasisSet& obs, double threshold = 1e-12) {
   const auto ln_max_engine_precision = std::log(max_engine_precision);
   const size_t nsh = obs.size();
+#ifdef _OPENMP
   const int nthreads = omp_get_max_threads();
+#else
+  const int nthreads = 1;
+#endif
   std::vector<::libint2::Engine> engines(
       nthreads, ::libint2::Engine(::libint2::Operator::overlap, obs.max_nprim(),
                                   obs.max_l(), 0));
@@ -88,7 +94,11 @@ std::tuple<shellpair_list_t, shellpair_data_t> compute_shellpairs(
 
 #pragma omp parallel
   {
+#ifdef _OPENMP
     const int thread_id = omp_get_thread_num();
+#else
+    const int thread_id = 0;
+#endif
     auto& engine = engines[thread_id];
     const auto& buf = engine.results();
 #pragma omp for schedule(dynamic)
@@ -143,7 +153,11 @@ RowMajorMatrix compute_schwarz_ints(const ::libint2::BasisSet& obs,
   const size_t nsh = obs.size();
 
   // Setup the engine
+#ifdef _OPENMP
   const int nthreads = omp_get_max_threads();
+#else
+  const int nthreads = 1;
+#endif
   std::vector<::libint2::Engine> engines(nthreads);
   engines[0] = ::libint2::Engine(::libint2::Operator::coulomb, obs.max_nprim(),
                                  obs.max_l(), 0, 0.0);
@@ -152,7 +166,11 @@ RowMajorMatrix compute_schwarz_ints(const ::libint2::BasisSet& obs,
   RowMajorMatrix K(nsh, nsh);
 #pragma omp parallel
   {
+#ifdef _OPENMP
     auto& engine = engines[omp_get_thread_num()];
+#else
+    auto& engine = engines[0];
+#endif
     const auto& buf = engine.results();
 #pragma omp for collapse(2)
     for (auto i = 0; i < nsh; ++i) {
@@ -280,7 +298,11 @@ class ERI {
     const auto engine_precision = precision / P_shmax;
 
     // Setup the engine
+#ifdef _OPENMP
     const int nthreads = omp_get_max_threads();
+#else
+    const int nthreads = 1;
+#endif
     std::vector<::libint2::Engine> engines_coulomb(nthreads);
     engines_coulomb[0] = ::libint2::Engine(::libint2::Operator::coulomb,
                                            obs_.max_nprim(), obs_.max_l(), 0);
@@ -293,7 +315,11 @@ class ERI {
 
 #pragma omp parallel
     {
+#ifdef _OPENMP
       const auto thread_id = omp_get_thread_num();
+#else
+      const auto thread_id = 0;
+#endif
       auto& engine = engines_coulomb[thread_id];
       const auto& buf = engine.results();
 
@@ -555,7 +581,11 @@ class ERI {
     const auto engine_precision = precision;
 
     // Setup the engine
+#ifdef _OPENMP
     const int nthreads = omp_get_max_threads();
+#else
+    const int nthreads = 1;
+#endif
     std::vector<::libint2::Engine> engines_coulomb(nthreads);
     engines_coulomb[0] = ::libint2::Engine(::libint2::Operator::coulomb,
                                            obs_.max_nprim(), obs_.max_l(), 0);
@@ -565,7 +595,11 @@ class ERI {
 
 #pragma omp parallel
     {
+#ifdef _OPENMP
       const auto thread_id = omp_get_thread_num();
+#else
+      const auto thread_id = 0;
+#endif
       auto& engine = engines_coulomb[thread_id];
       const auto& buf = engine.results();
 
