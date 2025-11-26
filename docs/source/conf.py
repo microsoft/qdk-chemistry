@@ -148,7 +148,48 @@ show_warning_types = True  # Show types of warnings in output
 suppress_warnings = [
     "duplicate_declaration.cpp",  # Suppress warnings about duplicate C++ declarations, this happens due to nested namespaces
     "ref.ref",  # sphinx does not like bools for some reason
-    "autodoc.duplicate",  # Suppress warnings about duplicate object descriptions from imported classes
+    "ref.identifier:*breathe_api_autogen*",  # Suppress warnings about duplicate object descriptions from imported classes
+    "toc.not_included",  # Suppress warnings about toctree entries not included in the documentation
+]
+nitpicky = True  # Enable nitpicky mode to catch all warnings/errors
+nitpick_ignore = [
+    ("cpp:identifier", "int64_t"),
+    ("cpp:identifier", "size_t"),
+    ("py:class", "callable"),
+    ("py:class", "optional"),
+    ("py:exc", "SettingsAreLocked"),  # TODO: figure out how to resolve this reference
+]
+nitpick_ignore_regex = [
+    (
+        r"cpp:identifier",
+        r"AlgorithmFactory.*",
+    ),  # TODO: figure out how to resolve this reference
+    (r"cpp:identifier", r"Args.*"),  # TODO: figure out how to resolve this reference
+    (
+        r"cpp:identifier",
+        r"ConfigVector.*",
+    ),  # TODO: figure out how to resolve this reference
+    (r"cpp:identifier", r"Eigen.*"),
+    (r"cpp:identifier", r"Element.*"),  # TODO: figure out how to resolve this reference
+    (r"cpp:identifier", r"H5.*"),
+    (
+        r"cpp:identifier",
+        r"ReturnType.*",
+    ),  # TODO: figure out how to resolve this reference
+    (
+        r"cpp:identifier",
+        r"SettingsAreLocked.*",
+    ),  # TODO: figure out how to resolve this reference
+    (r"cpp:identifier", r"macis.*"),
+    (r"cpp:identifier", r"nlohmann.*"),
+    (r"cpp:identifier", r"qcs.*"),
+    (r"py:class", r"qsharp.*"),
+    (r"py:class", r"h5py.*"),
+    (r"py:class", r"numpy.*"),
+    (r"py:class", r"pybind11_builtins.*"),
+    (r"py:class", r"pyscf.*"),
+    (r"py:class", r"qiskit.*"),
+    (r"py:class", r"qdk_chemistry._core.*"),  # Ignore internal base class
 ]
 
 # Configure output for to-dos
