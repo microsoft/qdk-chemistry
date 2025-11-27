@@ -387,10 +387,8 @@ Returns:
     numpy.ndarray: Dense complex statevector of size 2^(2*num_active_orbitals)
 
 Notes:
-    Creates a dense statevector suitable for quantum circuit simulation frameworks like Qiskit.
-    The statevector uses little-endian qubit ordering matching Qiskit conventions.
-    Only includes active space orbitals.
-    Memory scales exponentially: 2^(2*num_active_orbitals) complex numbers.
+    Creates a dense statevector suitable for quantum circuit simulation frameworks
+    The statevector uses little-endian qubit ordering
 
 Examples:
     >>> sv = wf.to_statevector(normalize=True)
