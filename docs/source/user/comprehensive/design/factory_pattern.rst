@@ -54,6 +54,7 @@ QDK/Chemistry provides factory classes for each algorithm type:
    * - :doc:`MCCalculator <../algorithms/mc_calculator>`
      - ``MCCalculatorFactory``
      - ``create_mc_calculator()``
+
 ..   * - :doc:`DynamicalCorrelation <../algorithms/dynamical_correlation>`
 ..     - ``DynamicalCorrelationFactory``
 ..     - ``create_dynamical_correlation()``
@@ -69,15 +70,15 @@ These factory methods allow users to create default implementations or specific 
 
    .. literalinclude:: ../../../../examples/cpp/factory_pattern.cpp
       :language: cpp
-      :start-after: // start-cell-1
-      :end-before: // end-cell-1
+      :start-after: // start-cell-scf-localizer
+      :end-before: // end-cell-scf-localizer
 
 .. tab:: Python API
 
    .. literalinclude:: ../../../../examples/python/factory_pattern.py
       :language: python
-      :start-after: # start-cell-1
-      :end-before: # end-cell-1
+      :start-after: # start-cell-scf-localizer
+      :end-before: # end-cell-scf-localizer
 
 Extending QDK/Chemistry
 -----------------------

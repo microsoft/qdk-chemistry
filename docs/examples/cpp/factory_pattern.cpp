@@ -6,7 +6,8 @@
 // license information.
 // --------------------------------------------------------------------------------------------
 
-// start-cell-1
+// -----------------------------------------------------------------------------
+// start-cell-scf-localizer
 #include <qdk/chemistry.hpp>
 
 using namespace qdk::chemistry::algorithms;
@@ -20,9 +21,11 @@ auto localizer = LocalizerFactory::create("pipek-mezey");
 // Configure and use the instance
 scf_solver->settings().set("basis_set", "def2-tzvp");
 auto [E_scf, orbitals] = scf_solver->solve(structure);
-// end-cell-1
+// end-cell-scf-localizer
+// -----------------------------------------------------------------------------
 
-// start-cell-2
+// -----------------------------------------------------------------------------
+// start-cell-inheritance
 #include <external_program/api.h>  // Your external program's API
 
 #include <qdk/chemistry/algorithms/scf_solver.hpp>
@@ -61,4 +64,5 @@ class ExternalProgramScfSolver : public qdk::chemistry::algorithms::ScfSolver {
 };
 
 }  // namespace my_namespace
-// end-cell-2
+// end-cell-inheritance
+// -----------------------------------------------------------------------------
