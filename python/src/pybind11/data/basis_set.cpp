@@ -974,6 +974,98 @@ Examples:
 )",
                   py::arg("filename"))
 
+      .def_static(
+          "from_basis_name",
+          py::overload_cast<const std::string&, const Structure&, AOType>(
+              &BasisSet::from_basis_name),
+          R"(
+Create a basis set by name for a molecular structure.
+
+Loads a standard basis set (e.g., "sto-3g", "cc-pvdz") for all atoms in the structure.
+
+Args:
+    basis_name (str): Name of the basis set (e.g., "sto-3g", "cc-pvdz", "6-31g")
+    structure (Structure): Molecular structure
+    atomic_orbital_type (AOType, optional): Whether to use spherical or Cartesian atomic orbitals.
+        Default is Spherical
+
+Returns:
+    BasisSet: New basis set instance
+
+Raises:
+    ValueError: If basis set name is not recognized or structure is invalid
+
+Examples:
+    >>> from qdk_chemistry.data import Structure
+    >>> structure = Structure.from_xyz_file("water.xyz")
+    >>> basis = BasisSet.from_basis_name("sto-3g", structure)
+    >>> print(f"Created {basis.get_name()} basis with {basis.get_num_shells()} shells")
+)",
+          py::arg("basis_name"), py::arg("structure"),
+          py::arg("atomic_orbital_type") = AOType::Spherical)
+      .def_static("from_element_map",
+                  py::overload_cast<const std::map<std::string, std::string>&,
+                                    const Structure&, AOType>(
+                      &BasisSet::from_element_map),
+                  R"(
+Create a basis set with different basis sets per element.
+
+Allows specifying different basis sets for different elements in the structure.
+
+Args:
+    element_to_basis_map (dict[str, str]): Dictionary mapping element symbols to basis set names.
+        Example: {"H": "sto-3g", "O": "cc-pvdz"}
+    structure (Structure): Molecular structure
+    atomic_orbital_type (AOType, optional): Whether to use spherical or Cartesian atomic orbitals.
+        Default is Spherical
+
+Returns:
+    BasisSet: New basis set instance with custom name "custom_basis_set"
+
+Raises:
+    ValueError: If any element in structure is not in the map or basis set names are invalid
+
+Examples:
+    >>> from qdk_chemistry.data import Structure
+    >>> structure = Structure.from_xyz_file("water.xyz")
+    >>> basis_map = {"H": "sto-3g", "O": "cc-pvdz"}
+    >>> basis = BasisSet.from_element_map(basis_map, structure)
+    >>> print(f"Created custom basis with {basis.get_num_shells()} shells")
+)",
+                  py::arg("element_to_basis_map"), py::arg("structure"),
+                  py::arg("atomic_orbital_type") = AOType::Spherical)
+      .def_static("from_index_map",
+                  py::overload_cast<const std::map<size_t, std::string>&,
+                                    const Structure&, AOType>(
+                      &BasisSet::from_index_map),
+                  R"(
+Create a basis set with different basis sets per atom index.
+
+Allows specifying different basis sets for individual atoms by their index.
+
+Args:
+    index_to_basis_map (dict[int, str]): Dictionary mapping atom indices to basis set names.
+        Example: {0: "sto-3g", 1: "cc-pvdz", 2: "sto-3g"}
+    structure (Structure): Molecular structure
+    atomic_orbital_type (AOType, optional): Whether to use spherical or Cartesian atomic orbitals.
+        Default is Spherical
+
+Returns:
+    BasisSet: New basis set instance with custom name "custom_basis_set"
+
+Raises:
+    ValueError: If any atom index in structure is not in the map or basis set names are invalid
+
+Examples:
+    >>> from qdk_chemistry.data import Structure
+    >>> structure = Structure.from_xyz_file("water.xyz")
+    >>> basis_map = {0: "cc-pvdz", 1: "sto-3g", 2: "sto-3g"}  # O at 0, H at 1 and 2
+    >>> basis = BasisSet.from_index_map(basis_map, structure)
+    >>> print(f"Created custom basis with {basis.get_num_shells()} shells")
+)",
+                  py::arg("index_to_basis_map"), py::arg("structure"),
+                  py::arg("atomic_orbital_type") = AOType::Spherical)
+
       // Utility functions (static methods)
       .def_static("orbital_type_to_string", &BasisSet::orbital_type_to_string,
                   R"(
