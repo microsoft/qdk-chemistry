@@ -39,34 +39,34 @@ JSON serialization
 
 .. tab:: C++ API
 
-   .. literalinclude:: ../../../../examples/cpp/serialization.cpp
+   .. literalinclude:: ../../../_static/examples/cpp/serialization.cpp
       :language: cpp
-      :start-after: // start-cell-1
-      :end-before: // end-cell-1
+      :start-after: // start-cell-json
+      :end-before: // end-cell-json
 
 .. tab:: Python API
 
-   .. literalinclude:: ../../../examples/python/serialization.py
+   .. literalinclude:: ../../../_static/examples/python/serialization.py
       :language: python
-      :start-after: # start-cell-1
-      :end-before: # end-cell-1
+      :start-after: # start-cell-json
+      :end-before: # end-cell-json
 
 HDF5 serialization
 ~~~~~~~~~~~~~~~~~~
 
 .. tab:: C++ API
 
-   .. literalinclude:: ../../../../examples/cpp/serialization.cpp
+   .. literalinclude:: ../../../_static/examples/cpp/serialization.cpp
       :language: cpp
-      :start-after: // start-cell-2
-      :end-before: // end-cell-2
+      :start-after: // start-cell-hdf5
+      :end-before: // end-cell-hdf5
 
 .. tab:: Python API
 
-   .. literalinclude:: ../../../examples/python/serialization.py
+   .. literalinclude:: ../../../_static/examples/python/serialization.py
       :language: python
-      :start-after: # start-cell-2
-      :end-before: # end-cell-2
+      :start-after: # start-cell-hdf5
+      :end-before: # end-cell-hdf5
 
 File extensions
 ---------------
@@ -102,9 +102,10 @@ QDK/Chemistry enforces specific file extensions to ensure clarity about the cont
      - ``.wavefunction.h5``
      - -
 
-Related topics
---------------
+Further reading
+---------------
 
+- The above examples can be downloaded as complete `C++ <../../../_static/examples/cpp/serialization.cpp>`_ and `Python <../../../_static/examples/python/serialization.py>`_ scripts.
 - :doc:`Structure <../data/structure>`: Molecular geometry and atomic information
 - :doc:`BasisSet <../data/basis_set>`: Quantum chemistry basis set definitions
 - :doc:`Orbitals <../data/orbitals>`: Molecular orbital coefficients and properties
