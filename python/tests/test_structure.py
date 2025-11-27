@@ -554,6 +554,61 @@ class TestStructureFileIO:
         finally:
             Path(filename).unlink()
 
+    def test_hdf5_file_io(self):
+        """Test HDF5 file I/O round-trip."""
+        coords = np.array([[0.0, 0.0, 0.0], [0.0, 0.0, 1.4]])
+        symbols = ["H", "H"]
+        custom_masses = np.array([1.001, 0.999])
+        custom_charges = np.array([0.9, 1.1])
+        s1 = Structure(coords, symbols, custom_masses, custom_charges)
+
+        with tempfile.NamedTemporaryFile(suffix=".structure.h5", delete=False) as f:
+            filename = f.name
+
+        try:
+            # Save to HDF5
+            s1.to_hdf5_file(filename)
+            assert Path(filename).exists()
+
+            # Load from HDF5
+            s2 = Structure.from_hdf5_file(filename)
+
+            # Verify structure properties
+            assert s2.get_num_atoms() == s1.get_num_atoms()
+            assert s2.get_atom_symbol(0) == s1.get_atom_symbol(0)
+            assert s2.get_atom_symbol(1) == s1.get_atom_symbol(1)
+
+            # Verify coordinates
+            assert np.allclose(
+                s2.get_atom_coordinates(0),
+                s1.get_atom_coordinates(0),
+                rtol=float_comparison_relative_tolerance,
+                atol=float_comparison_absolute_tolerance,
+            )
+            assert np.allclose(
+                s2.get_atom_coordinates(1),
+                s1.get_atom_coordinates(1),
+                rtol=float_comparison_relative_tolerance,
+                atol=float_comparison_absolute_tolerance,
+            )
+
+            # Verify custom masses and charges are preserved
+            assert np.allclose(
+                s2.get_masses(),
+                custom_masses,
+                rtol=float_comparison_relative_tolerance,
+                atol=float_comparison_absolute_tolerance,
+            )
+            assert np.allclose(
+                s2.get_nuclear_charges(),
+                custom_charges,
+                rtol=float_comparison_relative_tolerance,
+                atol=float_comparison_absolute_tolerance,
+            )
+        finally:
+            if Path(filename).exists():
+                Path(filename).unlink()
+
     def test_to_file_from_file_errors(self):
         """Test error handling for generic file methods."""
         coords = np.array([[0.0, 0.0, 0.0]])
