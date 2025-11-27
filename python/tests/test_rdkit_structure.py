@@ -8,24 +8,20 @@
 import numpy as np
 import pytest
 
-from qdk_chemistry import data
 from qdk_chemistry.data import Structure
 
-
 try:
-    import rdkit
-    import rdkit.Chem
+    from rdkit import Chem
+    from rdkit.Chem import AllChem
 
     RDKIT_AVAILABLE = True
 except ImportError:
     RDKIT_AVAILABLE = False
 
 if RDKIT_AVAILABLE:
-    import rdkit
     from rdkit import Chem
-    from rdkit.Chem import AllChem
-    from rdkit.Chem import Mol
-    
+    from rdkit.Chem import AllChem, Mol
+
     from qdk_chemistry.constants import ANGSTROM_TO_BOHR
 
 
@@ -36,11 +32,11 @@ print("Running RDKit structure tests...")
 def create_structure_from_rdkit(molecule: Mol) -> Structure:
     """Create a Structure object from an RDKit molecule."""
     symbols = []
-    coords =  molecule.GetConformer().GetPositions() * ANGSTROM_TO_BOHR
+    coords = molecule.GetConformer().GetPositions() * ANGSTROM_TO_BOHR
 
     for atom in molecule.GetAtoms():
         symbols.append(f"{atom.GetSymbol()}")
-    
+
     return Structure(symbols, coords)
 
 
@@ -48,10 +44,8 @@ def create_structure_from_rdkit(molecule: Mol) -> Structure:
 class TestRDKitPlugin:
     """Test class for getting structure from RDKit."""
 
-
     def test_rdkit_water_structure(self):
         """Test construction water from RDKit."""
-
         water_rdkit = Chem.MolFromSmiles("O")
         water_rdkit = Chem.AddHs(water_rdkit)
         AllChem.EmbedMolecule(water_rdkit)
@@ -62,11 +56,10 @@ class TestRDKitPlugin:
         assert water.get_atom_symbol(0) == "O"
         assert water.get_atom_symbol(1) == "H"
         assert water.get_atom_symbol(2) == "H"
-        assert np.allclose(water.get_coordinates(), water_rdkit.GetConformer().GetPositions() * ANGSTROM_TO_BOHR) 
+        assert np.allclose(water.get_coordinates(), water_rdkit.GetConformer().GetPositions() * ANGSTROM_TO_BOHR)
 
     def test_rdkit_ethanol_structure(self):
         """Test construction ethanol from RDKit."""
-
         ethanol_rdkit = Chem.MolFromSmiles("CCO")
         ethanol_rdkit = Chem.AddHs(ethanol_rdkit)
         AllChem.EmbedMolecule(ethanol_rdkit)
@@ -83,4 +76,4 @@ class TestRDKitPlugin:
         assert ethanol.get_atom_symbol(6) == "H"
         assert ethanol.get_atom_symbol(7) == "H"
         assert ethanol.get_atom_symbol(8) == "H"
-        assert np.allclose(ethanol.get_coordinates(), ethanol_rdkit.GetConformer().GetPositions() * ANGSTROM_TO_BOHR) 
+        assert np.allclose(ethanol.get_coordinates(), ethanol_rdkit.GetConformer().GetPositions() * ANGSTROM_TO_BOHR)
