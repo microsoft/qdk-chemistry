@@ -5,22 +5,25 @@
 # Licensed under the MIT License. See LICENSE.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
 
-from qdk_chemistry.algorithms import create
-
-# start-cell-1
-scf_solver = create("scf_solver")
-# end-cell-1
-
-# start-cell-2
-scf_solver.settings().set("max_iterations", 100)
-# end-cell-2
-
-
-# start-cell-3
+################################################################################
+# start-cell-scf-create
 import numpy as np
 from qdk_chemistry.algorithms import create
 from qdk_chemistry.data import Structure
 
+scf_solver = create("scf_solver")
+# end-cell-scf-create
+################################################################################
+
+################################################################################
+# start-cell-scf-settings
+print(f"Available settings: {scf_solver.settings().items()}")
+scf_solver.settings().set("max_iterations", 100)
+# end-cell-scf-settings
+################################################################################
+
+################################################################################
+# start-cell-data-flow
 # Create a Structure (coordinates in Bohr/atomic units) or read from file
 # Data classes in QDK/Chemistry are immutable by design (coordinates in Bohr/atomic units)
 coords = np.array([[0.0, 0.0, 0.0], [0.0, 0.0, 1.4]])
@@ -28,24 +31,46 @@ structure = Structure(coords, ["H", "H"])
 
 # Configure and run SCF calculation
 scf_solver = create("scf_solver")
+print(f"Available SCF settings: {scf_solver.settings().items()}")
 scf_solver.settings().set("basis_set", "cc-pvdz")
 scf_energy, scf_wavefunction = scf_solver.run(structure, charge=0, spin_multiplicity=1)
+E_hf, wfn_hf = scf_solver.run(structure, charge=0, spin_multiplicity=1)
+print(f"Total number of electrons: {scf_wavefunction.get_total_num_electrons()}")
+print(f"Orbital occupations: {scf_wavefunction.get_total_orbital_occupations()}")
 
 # Select active space orbitals
-# TODO: Fix active_space_selector settings names
-# active_space_selector = create("active_space_selector")
-# active_space_selector.settings().set("num_active_orbitals", 6)
-# active_space_selector.settings().set("num_active_electrons", 6)
-# active_orbitals = active_space_selector.run(scf_wavefunction)
-# active_indices = active_orbitals.get_active_orbital_indices()
+active_space_selector = create("active_space_selector")
+active_space_selector = create(
+    "active_space_selector",
+    algorithm_name="qdk_valence",
+)
+print(
+    f"Available active space selector settings: {active_space_selector.settings().items()}"
+)
+active_space_selector.settings().set("num_active_orbitals", 2)
+active_space_selector.settings().set("num_active_electrons", 2)
+active_orbitals = active_space_selector.run(scf_wavefunction)
+active_wfn = active_space_selector.run(wfn_hf)
+active_orbitals = active_wfn.get_orbitals()
+print(f"Active orbitals: {active_orbitals}")
 
 # Create Hamiltonian with active space
 ham_constructor = create("hamiltonian_constructor")
-# ham_constructor.settings().set("active_orbitals", active_indices)
-hamiltonian = ham_constructor.run(scf_wavefunction.get_orbitals())
+print(
+    f"Available Hamiltonian constructor settings: {ham_constructor.settings().items()}"
+)
+ham_constructor.settings().set("eri_method", "incore")
+hamiltonian = ham_constructor.run(active_orbitals)
+print("Active Space Hamiltonian:\n", hamiltonian.get_summary())
 
-# Run multi-configuration calculation
-# TODO: Fix mc_solver once active space is working
-# mc_solver = create("mc_solver")
-# mc_energy, mc_wavefunction = mc_solver.run(hamiltonian)
-# end-cell-3
+mc = create("multi_configuration_calculator")
+print(f"Available multi-configuration calculator settings: {mc.settings().items()}")
+mc.settings().set("davidson_iterations", 300)
+E_cas, wfn_cas = mc.run(
+    hamiltonian, n_active_alpha_electrons=1, n_active_beta_electrons=1
+)
+print(
+    f"CASCI energy is {E_cas:.3f} Hartree, and the electron correlation energy is {E_cas - E_hf:.3f} Hartree"
+)
+# end-cell-data-flow
+################################################################################
