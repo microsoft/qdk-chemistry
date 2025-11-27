@@ -45,13 +45,18 @@
 
 namespace qdk::chemistry::scf {
 SCFImpl::SCFImpl(std::shared_ptr<Molecule> mol_ptr, const SCFConfig& cfg,
-                 bool delay_eri) {
+                 std::shared_ptr<BasisSet> basis_set,
+                 std::shared_ptr<BasisSet> raw_basis_set, bool delay_eri) {
   auto& mol = *mol_ptr;
   ctx_.mol = mol_ptr.get();
   ctx_.cfg = &cfg;
-  ctx_.basis_set =
-      BasisSet::from_database_json(mol_ptr, cfg.basis, cfg.basis_mode,
-                                   !cfg.cartesian /*pure*/, true /*sort*/);
+  if (basis_set == nullptr) {
+    ctx_.basis_set =
+        BasisSet::from_database_json(mol_ptr, cfg.basis, cfg.basis_mode,
+                                     !cfg.cartesian /*pure*/, true /*sort*/);
+  } else {
+    ctx_.basis_set = basis_set;
+  }
   if (cfg.do_dfj) {
     ctx_.aux_basis_set =
         BasisSet::from_database_json(mol_ptr, cfg.aux_basis, cfg.basis_mode,
@@ -59,9 +64,13 @@ SCFImpl::SCFImpl(std::shared_ptr<Molecule> mol_ptr, const SCFConfig& cfg,
   }
   if (cfg.output_basis_mode == BasisMode::RAW) {
     // create an unnormalized raw basis for output only
-    ctx_.basis_set_raw =
-        BasisSet::from_database_json(mol_ptr, cfg.basis, BasisMode::RAW,
-                                     !cfg.cartesian /*pure*/, true /*sort*/);
+    if (raw_basis_set == nullptr) {
+      ctx_.basis_set_raw =
+          BasisSet::from_database_json(mol_ptr, cfg.basis, BasisMode::RAW,
+                                       !cfg.cartesian /*pure*/, true /*sort*/);
+    } else {
+      ctx_.basis_set_raw = raw_basis_set;
+    }
   }
   ctx_.result = {};
 
@@ -212,6 +221,10 @@ SCFImpl::SCFImpl(std::shared_ptr<Molecule> mol_ptr, const SCFConfig& cfg,
   }
 }
 
+SCFImpl::SCFImpl(std::shared_ptr<Molecule> mol_ptr, const SCFConfig& cfg,
+                 bool delay_eri)
+    : SCFImpl(mol_ptr, cfg, nullptr, nullptr, delay_eri) {}
+
 SCFImpl::SCFImpl(std::shared_ptr<Molecule> mol, const SCFConfig& cfg,
                  const RowMajorMatrix& dm, bool delay_eri)
     : SCFImpl(mol, cfg, delay_eri) {
@@ -286,7 +299,8 @@ const SCFContext& SCFImpl::run() {
 #ifdef QDK_CHEMISTRY_ENABLE_QMMM
       if (add_mm_charge_) {
         spdlog::info(
-            "Calculating molecules' and point charges' gradients with respect "
+            "Calculating molecules' and point charges' gradients with "
+            "respect "
             "to each other");
       }
 #endif

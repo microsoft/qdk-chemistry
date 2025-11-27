@@ -42,21 +42,31 @@ std::pair<double, std::shared_ptr<data::Wavefunction>> ScfSolver::_run_impl(
   bool use_input_initial_guess = false;
   bool use_explicit_basis_set = false;
   bool use_basis_set_string = false;
-  std::string basis_set;
+  std::string basis_set_name;
   if (std::holds_alternative<std::shared_ptr<data::Orbitals>>(
           basis_information)) {
-    basis_set = std::get<std::shared_ptr<data::Orbitals>>(basis_information)
-                    ->get_basis_set()
-                    ->get_name();
+    basis_set_name =
+        std::get<std::shared_ptr<data::Orbitals>>(basis_information)
+            ->get_basis_set()
+            ->get_name();
     use_input_initial_guess = true;
   } else if (std::holds_alternative<std::shared_ptr<data::BasisSet>>(
                  basis_information)) {
-    basis_set = std::get<std::shared_ptr<data::BasisSet>>(basis_information)
-                    ->get_name();
+    basis_set_name =
+        std::get<std::shared_ptr<data::BasisSet>>(basis_information)
+            ->get_name();
+    use_explicit_basis_set = true;
   } else if (std::holds_alternative<std::string>(basis_information)) {
-    basis_set = std::get<std::string>(basis_information);
-    std::transform(basis_set.begin(), basis_set.end(), basis_set.begin(),
-                   ::tolower);
+    basis_set_name = std::get<std::string>(basis_information);
+  }
+  std::transform(basis_set_name.begin(), basis_set_name.end(),
+                 basis_set_name.begin(), ::tolower);
+
+  std::shared_ptr<data::BasisSet> qdk_raw_basis_set = nullptr;
+  if (basis_set_name == data::BasisSet::custom_name || use_explicit_basis_set) {
+    use_explicit_basis_set = true;
+    qdk_raw_basis_set =
+        std::get<std::shared_ptr<data::BasisSet>>(basis_information);
   }
 
   // Extract geometry from structure object
@@ -84,11 +94,12 @@ std::pair<double, std::shared_ptr<data::Wavefunction>> ScfSolver::_run_impl(
     // Workitem: 41322
   }
 
+  // use unrestricted if multiplicity != 1
   const bool unrestricted = (multiplicity != 1);
 
+  // Extract SCF settings
   std::string method = _settings->get<std::string>("method");
   std::transform(method.begin(), method.end(), method.begin(), ::tolower);
-
   double tolerance = _settings->get<double>("tolerance");
   int max_iterations = _settings->get<int>("max_iterations");
 
@@ -105,7 +116,7 @@ std::pair<double, std::shared_ptr<data::Wavefunction>> ScfSolver::_run_impl(
   std::transform(ms_scf_config->exc.xc_name.begin(),
                  ms_scf_config->exc.xc_name.end(),
                  ms_scf_config->exc.xc_name.begin(), ::toupper);
-  ms_scf_config->basis = basis_set;
+  ms_scf_config->basis = basis_set_name;
   ms_scf_config->basis_mode = qcs::BasisMode::PSI4;
   ms_scf_config->unrestricted = unrestricted;
   ms_scf_config->converge_threshold = tolerance;
@@ -113,8 +124,9 @@ std::pair<double, std::shared_ptr<data::Wavefunction>> ScfSolver::_run_impl(
   // Set density initialization method based on whether initial guess is
   // provided
   ms_scf_config->density_init_method =
-      use_input_initial_guess ? qcs::DensityInitializationMethod::UserProvided
-                              : qcs::DensityInitializationMethod::Atom;
+      (use_input_initial_guess) ? qcs::DensityInitializationMethod::UserProvided
+      : (!use_explicit_basis_set) ? qcs::DensityInitializationMethod::Atom
+                                  : qcs::DensityInitializationMethod::SOAD;
   ms_scf_config->eri.method =
       qcs::ERIMethod::Libint2Direct;  // TODO: Make this configurable
   ms_scf_config->eri.eri_threshold = ms_scf_config->converge_threshold * 1e-4;
@@ -140,48 +152,59 @@ std::pair<double, std::shared_ptr<data::Wavefunction>> ScfSolver::_run_impl(
   spdlog::set_level(spdlog::level::off);
 
   auto scf = (method == "hf")
-                 ? qcs::SCF::make_hf_solver(ms_mol, *ms_scf_config)
+                 ? (use_explicit_basis_set)
+                       ? qcs::SCF::make_hf_solver(
+                             ms_mol, *ms_scf_config,
+                             utils::microsoft::convert_basis_set_from_qdk(
+                                 *qdk_raw_basis_set),
+                             utils::microsoft::convert_basis_set_from_qdk(
+                                 *qdk_raw_basis_set, false))
+                       : qcs::SCF::make_hf_solver(ms_mol, *ms_scf_config)
+             : (use_explicit_basis_set)
+                 ? qcs::SCF::make_ks_solver(
+                       ms_mol, *ms_scf_config,
+                       utils::microsoft::convert_basis_set_from_qdk(
+                           *qdk_raw_basis_set),
+                       utils::microsoft::convert_basis_set_from_qdk(
+                           *qdk_raw_basis_set, false))
                  : qcs::SCF::make_ks_solver(ms_mol, *ms_scf_config);
 
   // Extract the basis set (rename to avoid conflict)
-  std::shared_ptr<data::BasisSet> qdk_basis_set;
-  if (use_explicit_basis_set) {
-    qdk_basis_set =
-        std::get<std::shared_ptr<data::BasisSet>>(basis_information);
-  } else {
-    qdk_basis_set = std::make_shared<qdk::chemistry::data::BasisSet>(
+  if (!use_explicit_basis_set) {
+    qdk_raw_basis_set = std::make_shared<qdk::chemistry::data::BasisSet>(
         utils::microsoft::convert_basis_set_to_qdk(
             *scf->context().basis_set_raw));
   }
 
   // Compute map from QDK shells to internal representation
   auto qdk_to_internal_shells = utils::microsoft::compute_shell_map(
-      *qdk_basis_set, *scf->context().basis_set_raw);
+      *qdk_raw_basis_set, *scf->context().basis_set_raw);
 
   // Compute the transformation matrix
-  const size_t num_atomic_orbitals = qdk_basis_set->get_num_atomic_orbitals();
-  auto shells = qdk_basis_set->get_shells();
-  Eigen::MatrixXd qdk_basis_map(num_atomic_orbitals, num_atomic_orbitals);
-  qdk_basis_map.setZero();
+  const size_t num_atomic_orbitals =
+      qdk_raw_basis_set->get_num_atomic_orbitals();
+  auto shells = qdk_raw_basis_set->get_shells();
+  Eigen::MatrixXd qdk_raw_basis_map(num_atomic_orbitals, num_atomic_orbitals);
+  qdk_raw_basis_map.setZero();
 
   // Convert internal to libint2 basis
   auto libint_basis =
       qcs::libint2_util::convert_to_libint_basisset(*scf->context().basis_set);
   auto libint_sh2bf = libint_basis.shell2bf();
 
-  for (size_t i = 0, ibf = 0; i < qdk_basis_set->get_num_shells(); ++i) {
+  for (size_t i = 0, ibf = 0; i < qdk_raw_basis_set->get_num_shells(); ++i) {
     const auto& shell = shells[i];
     const auto sh_sz = shell.get_num_atomic_orbitals();
     size_t jbf = libint_sh2bf[qdk_to_internal_shells[i]];
 
-    qdk_basis_map.block(ibf, jbf, sh_sz, sh_sz) =
+    qdk_raw_basis_map.block(ibf, jbf, sh_sz, sh_sz) =
         Eigen::MatrixXd::Identity(sh_sz, sh_sz);
 
     ibf += sh_sz;
   }
 
-  // If initial guess is provided, compute density matrix and create new SCF
-  // solver
+  // If initial guess is provided, compute density matrix and
+  // create new SCF solver
   if (use_input_initial_guess) {
     auto initial_guess =
         std::get<std::shared_ptr<data::Orbitals>>(basis_information);
@@ -197,15 +220,15 @@ std::pair<double, std::shared_ptr<data::Wavefunction>> ScfSolver::_run_impl(
     qcs::RowMajorMatrix density_matrix;
 
     if (unrestricted) {
-      // For unrestricted case, stack alpha and beta coefficients and compute
-      // density
+      // For unrestricted case, stack alpha and beta coefficients
+      // and compute density
       const size_t num_molecular_orbitals = coeff_alpha.cols();
 
       // Transform coefficients
       Eigen::MatrixXd C_alpha_transformed =
-          qdk_basis_map.transpose() * coeff_alpha;
+          qdk_raw_basis_map.transpose() * coeff_alpha;
       Eigen::MatrixXd C_beta_transformed =
-          qdk_basis_map.transpose() * coeff_beta;
+          qdk_raw_basis_map.transpose() * coeff_beta;
 
       // Initialize density matrix for unrestricted case (2 *
       // num_atomic_orbitals * num_atomic_orbitals)
@@ -230,10 +253,11 @@ std::pair<double, std::shared_ptr<data::Wavefunction>> ScfSolver::_run_impl(
               .transpose();
     } else {
       // For restricted case, use alpha coefficients only
-      Eigen::MatrixXd C_transformed = qdk_basis_map.transpose() * coeff_alpha;
+      Eigen::MatrixXd C_transformed =
+          qdk_raw_basis_map.transpose() * coeff_alpha;
 
-      // Initialize density matrix for restricted case (num_atomic_orbitals *
-      // num_atomic_orbitals)
+      // Initialize density matrix for restricted case
+      // (num_atomic_orbitals * num_atomic_orbitals)
       density_matrix =
           qcs::RowMajorMatrix::Zero(num_atomic_orbitals, num_atomic_orbitals);
 
@@ -266,24 +290,26 @@ std::pair<double, std::shared_ptr<data::Wavefunction>> ScfSolver::_run_impl(
   }
 
   // Compute AO overlap
-  auto ao_overlap = qdk_basis_map * scf->overlap() * qdk_basis_map.transpose();
+  auto ao_overlap =
+      qdk_raw_basis_map * scf->overlap() * qdk_raw_basis_map.transpose();
 
   // Compute Aufbau occupations
   auto nelec = scf->get_num_electrons();
 
   std::shared_ptr<data::Orbitals> orbitals;
   if (unrestricted) {
-    // Unrestricted case - store matrices first to avoid temporaries
+    // Unrestricted case - store matrices first to avoid
+    // temporaries
     const auto& C_full = scf->get_orbitals_matrix();
     const size_t num_atomic_orbitals = C_full.rows() / 2;
     const size_t num_molecular_orbitals = C_full.cols();
     Eigen::MatrixXd C_alpha =
-        qdk_basis_map *
+        qdk_raw_basis_map *
         C_full.block(0, 0, num_atomic_orbitals, num_molecular_orbitals);
     Eigen::MatrixXd C_beta =
-        qdk_basis_map * C_full.block(num_atomic_orbitals, 0,
-                                     num_atomic_orbitals,
-                                     num_molecular_orbitals);
+        qdk_raw_basis_map * C_full.block(num_atomic_orbitals, 0,
+                                         num_atomic_orbitals,
+                                         num_molecular_orbitals);
 
     const auto& eps = scf->get_eigenvalues();
     Eigen::VectorXd energies_alpha = eps.row(0);
@@ -291,25 +317,29 @@ std::pair<double, std::shared_ptr<data::Wavefunction>> ScfSolver::_run_impl(
 
     // Construct orbitals with correct parameter order:
     // (coeff_alpha, coeff_beta,
-    //  energies_alpha, energies_beta, ao_overlap, basis_set,
-    //  active_indices_alpha, active_indices_beta)
+    //  energies_alpha, energies_beta, ao_overlap,
+    //  basis_set_name, active_indices_alpha,
+    //  active_indices_beta)
     orbitals = std::make_shared<data::Orbitals>(
         C_alpha, C_beta, energies_alpha, energies_beta, ao_overlap,
-        qdk_basis_set,
+        qdk_raw_basis_set,
         std::nullopt);  // no active space indices
 
   } else {
-    // Restricted case - store matrices first to avoid temporaries
-    Eigen::MatrixXd coefficients = qdk_basis_map * scf->get_orbitals_matrix();
+    // Restricted case - store matrices first to avoid
+    // temporaries
+    Eigen::MatrixXd coefficients =
+        qdk_raw_basis_map * scf->get_orbitals_matrix();
 
     Eigen::VectorXd energies(scf->get_num_molecular_orbitals());
     const auto& eps = scf->get_eigenvalues();
     energies = eps.row(0);
 
     // Construct orbitals with correct parameter order:
-    // (coefficients, energies, ao_overlap, basis_set, active_space_indices)
+    // (coefficients, energies, ao_overlap, basis_set_name,
+    // active_space_indices)
     orbitals = std::make_shared<data::Orbitals>(
-        coefficients, energies, ao_overlap, qdk_basis_set,
+        coefficients, energies, ao_overlap, qdk_raw_basis_set,
         std::nullopt);  // no active space indices
   }
 

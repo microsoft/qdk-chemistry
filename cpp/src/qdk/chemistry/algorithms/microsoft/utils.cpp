@@ -248,7 +248,7 @@ qdk::chemistry::data::BasisSet convert_basis_set_to_qdk(
 }
 
 std::shared_ptr<qcs::BasisSet> convert_basis_set_from_qdk(
-    const qdk::chemistry::data::BasisSet& qdk_basis_set) {
+    const qdk::chemistry::data::BasisSet& qdk_basis_set, bool raw) {
   // Create internal Molecule from the structure
   auto structure = qdk_basis_set.get_structure();
   auto mol = convert_to_molecule(*structure, 0,
@@ -258,7 +258,7 @@ std::shared_ptr<qcs::BasisSet> convert_basis_set_from_qdk(
   auto internal_basis_set =
       qcs::BasisSet::from_serialized_json(mol, basis_json);
 
-  if (internal_basis_set->mode == qcs::BasisMode::RAW) {
+  if (internal_basis_set->mode == qcs::BasisMode::RAW && raw) {
     _norm_psi4_mode(internal_basis_set->shells);
     internal_basis_set->mode = qcs::BasisMode::PSI4;
   }
@@ -354,6 +354,7 @@ std::vector<unsigned> compute_shell_map(
     const qdk::chemistry::data::BasisSet& qdk_basis_set,
     const qcs::BasisSet& itrn_basis_set) {
   const size_t nshells = qdk_basis_set.get_num_shells();
+
   if (nshells != itrn_basis_set.shells.size()) {
     throw std::runtime_error(
         "QDK Basis size is inconsistent with internal representation");

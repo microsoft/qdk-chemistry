@@ -124,7 +124,8 @@ qdk::chemistry::data::BasisSet convert_basis_set_to_qdk(
  * @throws std::runtime_error If the basis set is not spherical(pure)
  */
 std::shared_ptr<qcs::BasisSet> convert_basis_set_from_qdk(
-    const qdk::chemistry::data::BasisSet& qdk_basis_set);
+    const qdk::chemistry::data::BasisSet& qdk_basis_set,
+bool raw = true);
 
 /**
  * @brief Compute a mapping between QDK and internal basis set shells

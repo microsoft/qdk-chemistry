@@ -9,6 +9,7 @@
 #include <filesystem>
 #include <fstream>
 #include <memory>
+#include <qdk/chemistry/algorithms/scf.hpp>
 #include <qdk/chemistry/data/basis_set.hpp>
 #include <qdk/chemistry/data/structure.hpp>
 #include <stdexcept>
@@ -1445,4 +1446,75 @@ TEST_F(BasisSetTest, HDF5Comprehensive) {
   // Clean up the temporary directory
   std::error_code ec2;
   std::filesystem::remove_all(tmp_dir, ec2);
+}
+
+TEST_F(BasisSetTest, SameBasisSetCheck) {
+  // Compare energies from standard basis set string vs custom BasisSet object
+  const std::string basis_set = "sto-3g";
+  std::shared_ptr<Structure> structure = std::make_shared<Structure>(
+      std::vector<Eigen::Vector3d>{
+          {0.0, 0.0, 0.0}, {1.0, 0.0, 0.0}, {0.0, 1.0, 0.0}},
+      std::vector<std::string>{"H", "H", "O"});
+
+  // create custom basis set object
+  std::shared_ptr<BasisSet> basis =
+      std::make_shared<BasisSet>(basis_set, structure);
+
+  // run hartree fock with both basis sets to ensure they are valid
+  auto scf_solver = qdk::chemistry::algorithms::ScfSolverFactory::create();
+  auto [e_scf_default, hf_det_default] =
+      scf_solver->run(structure, 0, 1, basis_set);
+  auto [e_scf_custom, hf_det_custom] = scf_solver->run(structure, 0, 1, basis);
+
+  EXPECT_NEAR(e_scf_custom, e_scf_default, testing::scf_energy_tolerance);
+}
+
+TEST_F(BasisSetTest, CustomBasisSetPerAtomCheck) {
+  // Compare energies from standard basis set string vs custom BasisSet object
+  std::string basis_set = "def2-SVP";
+  std::shared_ptr<Structure> structure = std::make_shared<Structure>(
+      std::vector<Eigen::Vector3d>{
+          {0.0, 0.0, 0.0}, {1.0, 0.0, 0.0}, {0.0, 1.0, 0.0}},
+      std::vector<std::string>{"H", "O", "H"});
+
+  // create map of atoms with basis sets
+  std::map<size_t, std::string> custom_basis_map;
+  custom_basis_map[0] = basis_set;
+  custom_basis_map[1] = basis_set;
+  custom_basis_map[2] = basis_set;
+  std::shared_ptr<BasisSet> basis =
+      std::make_shared<BasisSet>(custom_basis_map, structure);
+
+  // run hartree fock with both basis sets to ensure they are valid
+  auto scf_solver = qdk::chemistry::algorithms::ScfSolverFactory::create();
+  auto [e_scf_custom, hf_det_custom] = scf_solver->run(structure, 0, 1, basis);
+  auto [e_scf_default, hf_det_default] =
+      scf_solver->run(structure, 0, 1, basis_set);
+
+  EXPECT_NEAR(e_scf_custom, e_scf_default, testing::scf_energy_tolerance);
+}
+
+TEST_F(BasisSetTest, CustomBasisSetPerElementCheck) {
+  // Compare energies from standard basis set string vs custom BasisSet object
+  std::string basis_set = "def2-SVP";
+  std::shared_ptr<Structure> structure = std::make_shared<Structure>(
+      std::vector<Eigen::Vector3d>{
+          {0.0, 0.0, 0.0}, {1.0, 0.0, 0.0}, {0.0, 1.0, 0.0}},
+      std::vector<std::string>{"H", "O", "H"});
+
+  // create map of atoms with basis sets
+  std::map<std::string, std::string> custom_basis_map;
+  custom_basis_map["H"] = basis_set;
+  custom_basis_map["O"] = basis_set;
+
+  std::shared_ptr<BasisSet> basis =
+      std::make_shared<BasisSet>(custom_basis_map, structure);
+
+  // run hartree fock with both basis sets to ensure they are valid
+  auto scf_solver = qdk::chemistry::algorithms::ScfSolverFactory::create();
+  auto [e_scf_default, hf_det_default] =
+      scf_solver->run(structure, 0, 1, basis_set);
+  auto [e_scf_custom, hf_det_custom] = scf_solver->run(structure, 0, 1, basis);
+
+  EXPECT_NEAR(e_scf_custom, e_scf_default, testing::scf_energy_tolerance);
 }
