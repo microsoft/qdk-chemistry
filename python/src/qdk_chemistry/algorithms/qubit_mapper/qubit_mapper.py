@@ -1,8 +1,4 @@
-"""QDK/Chemistry qubit mapper abstractions and utilities.
-
-This module provides the bases classes `QubitMapper` and `QubitMapperSettings` as well as the `QubitMapperFactory`
-for mapping electronic structure Hamiltonians to qubit Hamiltonians using various mapping strategies.
-"""
+"""QDK/Chemistry qubit mapper abstractions and utilities."""
 
 # --------------------------------------------------------------------------------------------
 # Copyright (c) Microsoft Corporation. All rights reserved.
@@ -43,9 +39,9 @@ class QubitMapperFactory(AlgorithmFactory):
     """Factory class for creating QubitMapper instances."""
 
     def algorithm_type_name(self) -> str:
-        """Return ``qubit_mapper as the algorithm type name."""
+        """Return ``qubit_mapper`` as the algorithm type name."""
         return "qubit_mapper"
 
     def default_algorithm_name(self) -> str:
-        """Return ``qiskit```as the default algorithm name."""
+        """Return ``qiskit`` as the default algorithm name."""
         return "qiskit"

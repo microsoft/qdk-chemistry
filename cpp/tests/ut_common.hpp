@@ -39,6 +39,9 @@ inline static constexpr double scf_energy_tolerance = 1e-8;
 /// @brief Tolerance for wavefunction operations
 inline static constexpr double wf_tolerance = 1e-10;
 
+/// @brief Tolerance for RDMs
+inline static constexpr double rdm_tolerance = 1e-6;
+
 ///@brief Tolerance lower bound for extremely small values
 inline static constexpr double small_value_lower_bound_tolerance = 1e-16;
 

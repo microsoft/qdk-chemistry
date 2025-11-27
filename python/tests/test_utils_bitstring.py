@@ -72,7 +72,7 @@ def test_bitstrings_to_binary_matrix():
     )
 
     assert result.shape == (3, 2)
-    np.testing.assert_array_equal(result, expected)
+    assert np.array_equal(result, expected)
 
     # Test case 2: Single bitstring
     bitstrings = ["1100"]
@@ -90,7 +90,7 @@ def test_bitstrings_to_binary_matrix():
     )
 
     assert result.shape == (4, 1)
-    np.testing.assert_array_equal(result, expected)
+    assert np.array_equal(result, expected)
 
     # Test case 3: Multiple determinants with same length
     bitstrings = ["00", "01", "10", "11"]
@@ -107,7 +107,7 @@ def test_bitstrings_to_binary_matrix():
     )
 
     assert result.shape == (2, 4)
-    np.testing.assert_array_equal(result, expected)
+    assert np.array_equal(result, expected)
 
     # Test case 4: All zeros and all ones
     bitstrings = ["000", "111"]
@@ -123,7 +123,7 @@ def test_bitstrings_to_binary_matrix():
     )
 
     assert result.shape == (3, 2)
-    np.testing.assert_array_equal(result, expected)
+    assert np.array_equal(result, expected)
 
     # Test case 5: Verify matrix properties
     bitstrings = ["1010", "0101"]
@@ -154,7 +154,7 @@ def test_bitstrings_to_binary_matrix_edge_cases():
 
     expected = np.array([[0, 1]], dtype=np.int8)  # Single row for q[0]
     assert result.shape == (1, 2)
-    np.testing.assert_array_equal(result, expected)
+    assert np.array_equal(result, expected)
 
     # Test case 4: Large number of determinants
     bitstrings = ["01", "10", "00", "11", "01"]  # 5 determinants
@@ -169,7 +169,7 @@ def test_bitstrings_to_binary_matrix_edge_cases():
     )
 
     assert result.shape == (2, 5)
-    np.testing.assert_array_equal(result, expected)
+    assert np.array_equal(result, expected)
 
 
 def test_bitstrings_to_binary_matrix_qiskit_convention():
@@ -199,7 +199,7 @@ def test_bitstrings_to_binary_matrix_qiskit_convention():
 
     # This should give us q[0]=1, q[1]=0, q[2]=0, q[3]=1
     expected = np.array([[1], [0], [0], [1]], dtype=np.int8)
-    np.testing.assert_array_equal(result, expected)
+    assert np.array_equal(result, expected)
 
 
 def test_binary_to_decimal_edge_cases():

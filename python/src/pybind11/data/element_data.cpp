@@ -17,8 +17,7 @@ void bind_element_data(py::module &m) {
     This enum represents all chemical elements from hydrogen (1) to oganesson (118).
     Each element is represented by its atomic number.
 
-    Examples
-    --------
+Examples:
     >>> from qdk_chemistry.data import Element
     >>> Element.H  # Hydrogen
     >>> Element.C  # Carbon

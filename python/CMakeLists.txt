@@ -1,6 +1,13 @@
 cmake_minimum_required(VERSION 3.15)
 project(qdk_chemistry_python VERSION 1.0.0.1 LANGUAGES CXX)
 
+# Set default build type to Release if not specified
+if(NOT CMAKE_BUILD_TYPE AND NOT CMAKE_CONFIGURATION_TYPES)
+    message(WARNING "CMAKE_BUILD_TYPE not specified, defaulting to Release")
+    set(CMAKE_BUILD_TYPE "Release" CACHE STRING "Choose the type of build." FORCE)
+    set_property(CACHE CMAKE_BUILD_TYPE PROPERTY STRINGS "Debug" "Release" "MinSizeRel" "RelWithDebInfo")
+endif()
+
 # Enable ccache if available
 find_program(CCACHE_EXECUTABLE ccache)
 if(CCACHE_EXECUTABLE AND NOT CMAKE_CXX_COMPILER_LAUNCHER)
@@ -8,7 +15,20 @@ if(CCACHE_EXECUTABLE AND NOT CMAKE_CXX_COMPILER_LAUNCHER)
 endif()
 
 set(CMAKE_POSITION_INDEPENDENT_CODE ON CACHE BOOL "Enable PIC for all targets" FORCE)
+set(CMAKE_MACOSX_RPATH ON CACHE BOOL "Enable RPATH on macOS" FORCE)
 
+# Custom CMake Find* modules for linear algebra dependencies
+include( FetchContent )
+FetchContent_Declare( linalg-cmake-modules
+  GIT_REPOSITORY https://github.com/wavefunction91/linalg-cmake-modules.git
+  GIT_TAG        main
+)
+FetchContent_GetProperties( linalg-cmake-modules )
+if( NOT linalg-cmake-modules_POPULATED )
+  FetchContent_Populate( linalg-cmake-modules )
+endif()
+
+# list( APPEND CMAKE_MODULE_PATH ${linalg-cmake-modules_SOURCE_DIR} )
 # First try to find an installed qdk library
 find_package(qdk QUIET COMPONENTS chemistry)
 
@@ -22,7 +42,7 @@ if(NOT qdk_FOUND)
         message(FATAL_ERROR "Could not find qdk source at ${QDK_CPP_DIR}")
     endif()
 
-    # Setup C++ subbuild
+    # Setup C++ subbuild - pass through important flags
     set(QDK_EMBED_RESOURCE_LOCATION OFF CACHE BOOL "Disable embedded resource location for Python builds" FORCE)
     set(BUILD_TESTING OFF CACHE BOOL "Disable building tests for Python builds" FORCE)
     set(BUILD_SHARED_LIBS OFF CACHE BOOL "Build dependencies as static libraries for Python builds" FORCE)
@@ -84,12 +104,12 @@ target_compile_features(_core PUBLIC cxx_std_20)
 
 # Handle Coverage build
 if(QDK_CHEMISTRY_ENABLE_COVERAGE)
-    if(CMAKE_BUILD_TYPE STREQUAL "Debug")
+    if(CMAKE_BUILD_TYPE STREQUAL "Debug" OR CMAKE_BUILD_TYPE STREQUAL "RelWithDebInfo")
         message(STATUS "Enabling coverage build")
         target_compile_options(_core PRIVATE --coverage -fprofile-arcs -ftest-coverage)
         target_link_libraries(_core PRIVATE --coverage)
     else()
-        message(FATAL_ERROR "Coverage build is only supported in CMAKE_BUILD_TYPE=Debug mode")
+        message(FATAL_ERROR "Coverage build is only supported in CMAKE_BUILD_TYPE=Debug or RelWithDebInfo mode")
     endif()
 endif()
 

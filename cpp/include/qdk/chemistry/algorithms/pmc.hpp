@@ -47,9 +47,9 @@ class ProjectedMultiConfigurationSettings : public MultiConfigurationSettings {
  * in quantum chemistry
  *
  * This class provides the interface for projected multi-configurational-based
- * quantum chemistry calculations. This contracts the
+ * quantum chemistry calculations. This contrasts the
  * MultiConfigurationCalculator in that the space of determinants upon which
- * the Hamltonian is projected is taken to be a *free parameter* and must be
+ * the Hamiltonian is projected is taken to be a *free parameter* and must be
  * specified. In this manner, the high-performance solvers which underly other
  * MC algorithms can be interfaced with external methods for selecting
  * important determinants.

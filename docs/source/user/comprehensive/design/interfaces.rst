@@ -8,7 +8,7 @@ Overview
 --------
 
 QDK/Chemistry is designed with an extensible plugin architecture that allows algorithms to be implemented either natively within QDK/Chemistry or as interfaces to established third-party quantum chemistry packages.
-This approach combines the benefits of a consistent API with the specialized capabilities of different software packages, following QDK/Chemistry's core :doc:`design principles <design_principles>` of extensibility and interoperability.
+This approach combines the benefits of a consistent API with the specialized capabilities of different software packages, following QDK/Chemistry's core :doc:`design principles <index>` of extensibility and interoperability.
 
 The interface system implements the :doc:`factory pattern <factory_pattern>`, which allows algorithms to be instantiated by name without the user needing to know the specific implementation details.
 This abstraction enables seamless switching between different backends without changing your code, making it easier to benchmark and compare different approaches.
@@ -36,7 +36,7 @@ These include:
 - **PySCF**: Python-based Simulations of Chemistry Framework
 
 Each interface is implemented as a derived class that inherits from the appropriate algorithm base class (e.g.,
-``ScfSolver``, ``Localizer``), ensuring type safety and consistent behavior across implementations.
+:doc:`ScfSolver <../algorithms/scf_solver>`, :doc:`Localizer <../algorithms/localizer>`), ensuring type safety and consistent behavior across implementations.
 
 Using interfaces
 ----------------
@@ -220,7 +220,7 @@ Data conversion
 
 QDK/Chemistry handles the conversion of data between its own format and third-party packages automatically.
 This internal conversion process is transparent to the user, allowing you to work exclusively with QDK/Chemistry data structures regardless of which backend implementation is used.
-This capability is built on QDK/Chemistry's robust :doc:`serialization <serialization>` system, which provides standardized methods for data conversion between different formats.
+This capability is built on QDK/Chemistry's robust :doc:`serialization <../data/serialization>` system, which provides standardized methods for data conversion between different formats.
 
 The data types that are automatically converted include:
 
@@ -228,10 +228,9 @@ The data types that are automatically converted include:
 - **:doc:`Basis sets <../data/basis_set>`**: Basis set specifications, primitive and contracted functions
 - **:doc:`Orbitals and wavefunctions <../data/orbitals>`**: Coefficients, occupations, and energies
 - **:doc:`Hamiltonians <../data/hamiltonian>`**: One and two-electron integrals, core Hamiltonians
-- **:doc:`Calculation results <../data/wavefunction>`**: Energies, gradients, properties
+- **Calculation results** (see :class:`~qdk_chemistry.data.Wavefunction`): Energies, gradients, properties
 
-The conversion process is optimized to minimize data copying when possible, especially for large data structures like
-electron repulsion integrals (ERIs).
+The conversion process is optimized to minimize data copying when possible, especially for large data structures like electron repulsion integrals (:term:`ERIs`).
 When working with large systems, QDK/Chemistry may use direct algorithms or disk-based approaches to manage memory usage efficiently.
 
 Performance considerations
@@ -258,25 +257,32 @@ Available interfaces by algorithm
 The following table provides an overview of the available interfaces for each algorithm class in QDK/Chemistry.
 Each algorithm class is implemented through the factory pattern, allowing you to select different implementations at runtime.
 
-+---------------------+-----------------------------+------------------------+
-| Algorithm class     | QDK/Chemistry implementations | Third-Party interfaces |
-+=====================+=============================+========================+
-| ScfSolver           | "qdk"                         | "pyscf"                |
-+---------------------+-----------------------------+------------------------+
-| Localizer           | "qdk"                         | "pyscf"                |
-+---------------------+-----------------------------+------------------------+
-| MCCalculator        | "macis_asci", "macis_cas"     | "pyscf"                |
-+---------------------+-----------------------------+------------------------+
-| ActiveSpaceSelector | "qdk", "autocas"              | "pyscf"                |
-+---------------------+-----------------------------+------------------------+
+.. list-table::
+   :header-rows: 1
 
-You can discover all available implementations for a particular algorithm using the appropriate listing function (e.g.,
-``list_scf_solvers()`` in Python or ``ScfSolverFactory::available()`` in C++).
+   * - Algorithm class
+     - QDK/Chemistry implementations
+     - Third-party interfaces
+   * - :class:`~qdk_chemistry.algorithms.ScfSolver`
+     - "qdk"
+     - "pyscf"
+   * - :class:`~qdk_chemistry.algorithms.Localizer`
+     - "qdk"
+     - "pyscf"
+   * - :class:`~qdk_chemistry.algorithms.MultiConfigurationCalculator`
+     - "macis_asci", "macis_cas"
+     - "pyscf"
+   * - :class:`~qdk_chemistry.algorithms.ActiveSpaceSelector`
+     - "qdk", "autocas"
+     - "pyscf"
+
+.. TODO: fix the function names below in this commented-out text.
+.. You can discover all available implementations for a particular algorithm using the appropriate listing function (e.g., ``list_scf_solvers()`` in Python or ``ScfSolverFactory::available()`` in C++).
 
 Related topics
 --------------
 
-- :doc:`Design principles <design_principles>`: Core architectural principles of QDK/Chemistry
+- :doc:`Design principles <index>`: Core architectural principles of QDK/Chemistry
 - :doc:`Factory pattern <factory_pattern>`: How to extend QDK/Chemistry with new algorithms and interfaces
 - :doc:`Settings <settings>`: Configuring algorithm behavior consistently across implementations
-- :doc:`Serialization <serialization>`: Data persistence and conversion in QDK/Chemistry
+- :doc:`Serialization <../data/serialization>`: Data persistence and conversion in QDK/Chemistry

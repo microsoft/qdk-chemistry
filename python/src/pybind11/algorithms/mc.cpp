@@ -50,78 +50,64 @@ void bind_mc(py::module &m) {
              py::smart_holder>
       mc_calculator(m, "MultiConfigurationCalculator",
                     R"(
-    Abstract base class for multi-configuration calculators.
+Abstract base class for multi-configuration calculators.
 
-    This class defines the interface for multi configuration-based quantum chemistry
-    calculations. Concrete implementations should inherit from this class
-    and implement the ``calculate`` method.
+This class defines the interface for multi configuration-based quantum chemistry calculations.
+Concrete implementations should inherit from this class and implement the ``calculate`` method.
 
-    Examples
-    --------
+Examples:
     To create a custom MC calculator, inherit from this class:
 
-    >>> import qdk_chemistry.algorithms as alg
-    >>> import qdk_chemistry.data as data
-    >>> class MyMultiConfigurationCalculator(alg.MultiConfigurationCalculator):
-    ...     def __init__(self):
-    ...         super().__init__()  # Call the base class constructor
-    ...     # Implement the _run_impl method (called by run())
-    ...     def _run_impl(self, hamiltonian: data.Hamiltonian, n_active_alpha_electrons: int, n_active_beta_electrons: int) -> tuple[float, data.Wavefunction]:
-    ...         # Custom MC implementation
-    ...         return energy, wavefunction
-    )");
+        >>> import qdk_chemistry.algorithms as alg
+        >>> import qdk_chemistry.data as data
+        >>> class MyMultiConfigurationCalculator(alg.MultiConfigurationCalculator):
+        ...     def __init__(self):
+        ...         super().__init__()  # Call the base class constructor
+        ...     # Implement the _run_impl method (called by run())
+        ...     def _run_impl(self, hamiltonian: data.Hamiltonian, n_active_alpha_electrons: int, n_active_beta_electrons: int) -> tuple[float, data.Wavefunction]:
+        ...         # Custom MC implementation
+        ...         return energy, wavefunction
+)");
 
   mc_calculator.def(py::init<>(),
                     R"(
-        Create a MultiConfigurationCalculator instance.
+Create a MultiConfigurationCalculator instance.
 
-        Default constructor for the abstract base class.
-        This should typically be called from derived class constructors.
+Default constructor for the abstract base class.
+This should typically be called from derived class constructors.
 
-        Examples
-        --------
-        >>> # In a derived class:
-        >>> class MyCalculator(alg.MultiConfigurationCalculator):
-        ...     def __init__(self):
-        ...         super().__init__()  # Calls this constructor
-        )");
+Examples:
+    >>> # In a derived class:
+    >>> class MyCalculator(alg.MultiConfigurationCalculator):
+    ...     def __init__(self):
+    ...         super().__init__()  # Calls this constructor
+)");
 
   mc_calculator.def("run", &MultiConfigurationCalculator::run,
                     R"(
         Perform multi configuration calculation on the given Hamiltonian.
 
-        Parameters
-        ----------
-        hamiltonian : qdk_chemistry.data.Hamiltonian
-            The Hamiltonian to perform the calculation on
-        n_active_alpha_electrons : int
-            The number of alpha electrons in the active space
-        n_active_beta_electrons : int
-            The number of beta electrons in the active space
+Args:
+    hamiltonian (qdk_chemistry.data.Hamiltonian): The Hamiltonian to perform the calculation on
+    n_active_alpha_electrons (int): The number of alpha electrons in the active space
+    n_active_beta_electrons (int): The number of beta electrons in the active space
 
-        Returns
-        -------
-        tuple[float, qdk_chemistry.data.Wavefunction]
-            A tuple containing the computed total energy (active + core)
-            and wavefunction
+Returns:
+    tuple[float, qdk_chemistry.data.Wavefunction]: A tuple containing the computed total energy (active + core) and wavefunction
 
-        Raises
-        ------
-        SettingsAreLocked
-            If attempting to modify settings after run() is called
-        )",
+Raises:
+    SettingsAreLocked: If attempting to modify settings after run() is called
+)",
                     py::arg("hamiltonian"), py::arg("n_active_alpha_electrons"),
                     py::arg("n_active_beta_electrons"));
 
   mc_calculator.def("settings", &MultiConfigurationCalculator::settings,
                     R"(
-        Access the calculator's configuration settings.
+Access the calculator's configuration settings.
 
-        Returns
-        -------
-        qdk_chemistry.data.Settings
-            Reference to the settings object for configuring the calculator
-        )",
+Returns:
+    qdk_chemistry.data.Settings: Reference to the settings object for configuring the calculator
+)",
                     py::return_value_policy::reference_internal);
 
   // Expose _settings as a writable property for derived classes
@@ -136,29 +122,25 @@ void bind_mc(py::module &m) {
       },
       py::return_value_policy::reference_internal,
       R"(
-        Internal settings object property.
+Internal settings object property.
 
-        This property allows derived classes to replace the settings object with
-        a specialized Settings subclass in their constructors.
+This property allows derived classes to replace the settings object with a specialized Settings subclass in their constructors.
 
-        Examples
-        --------
-        >>> class MyMCCalculator(alg.MultiConfigurationCalculator):
-        ...     def __init__(self):
-        ...         super().__init__()
-        ...         from qdk_chemistry.data import ElectronicStructureSettings
-        ...         self._settings = ElectronicStructureSettings()
-        )");
+Examples:
+    >>> class MyMCCalculator(alg.MultiConfigurationCalculator):
+    ...     def __init__(self):
+    ...         super().__init__()
+    ...         from qdk_chemistry.data import ElectronicStructureSettings
+    ...         self._settings = ElectronicStructureSettings()
+)");
 
   mc_calculator.def("type_name", &MultiConfigurationCalculator::type_name,
                     R"(
-        The algorithm's type name.
+The algorithm's type name.
 
-        Returns
-        -------
-        str
-            The type name of the algorithm
-        )");
+Returns:
+    str: The type name of the algorithm
+)");
 
   // Factory class binding - creates MultiConfigurationCalculatorFactory class
   // with static methods

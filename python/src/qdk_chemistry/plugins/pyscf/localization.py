@@ -42,16 +42,16 @@ class PyscfLocalizerSettings(Settings):
     configurable options used by :class:`PyscfLocalizer`.
 
     Attributes:
-        method (str, default = "pipek-mezey"): The localization algorithm to use.
-        Supported values (case-insensitive) include "pipek-mezey", "foster-boys", "edmiston-ruedenberg",
-        and "cholesky".
+        method (str): The localization algorithm to use (default = "pipek-mezey").
+            Supported values (case-insensitive) include "pipek-mezey", "foster-boys", "edmiston-ruedenberg", and
+            "cholesky".
 
-    population_method (str, default = "mulliken"): The population analysis used for the Pipek-Mezey localization.
-        Passed through to PySCF's PM implementation (for example, "mulliken").
+        population_method (str): The population analysis used for the Pipek-Mezey localization (default = "mulliken").
+            Passed through to PySCF's PM implementation (for example, "mulliken").
 
-    occupation_threshold (float, default = 1e-10): Tolerance threshold used to classify orbitals as occupied,
-        singly-occupied (for ROHF/UHF), or virtual. Orbitals with occupations below this threshold are considered
-        unoccupied.
+        occupation_threshold (float): Tolerance threshold used to classify orbitals as occupied,
+            singly-occupied (for ROHF/UHF), or virtual (default = 1e-10). Orbitals with occupations below this
+            threshold are considered unoccupied.
 
     Examples:
         >>> settings = PyscfLocalizerSettings()
@@ -78,10 +78,11 @@ class PyscfLocalizer(Localizer):
     restricted (closed-shell) and unrestricted (open-shell) orbital inputs.
 
     Key behavior:
-    - Supported algorithms: Pipek-Mezey (PM), Foster-Boys (FB),
-      Edmiston-Ruedenberg (ER), and a Cholesky-based localizer.
-    - It is the user's responsibility to provide appropriate orbital indices
-      (e.g., only occupied orbitals or only virtual orbitals).
+
+        - Supported algorithms: Pipek-Mezey (PM), Foster-Boys (FB), Edmiston-Ruedenberg (ER), and a Cholesky-based
+          localizer.
+        - It is the user's responsibility to provide appropriate orbital indices (e.g., only occupied orbitals or only
+          virtual orbitals).
 
     Examples:
         >>> localizer = PyscfLocalizer()
@@ -137,12 +138,7 @@ class PyscfLocalizer(Localizer):
         # If both index vectors are empty, return original orbitals unchanged
         if len(loc_indices_a) == 0 and len(loc_indices_b) == 0:
             return wavefunction
-        # TODO (NAB): fix TODO above
-        # 41404
 
-        # TODO assumes aufbau filling
-        # TODO (NAB): fix TODO above
-        # 41404
         pop_method = self._settings.get("population_method")
         loc_method = self._settings.get("method").lower()
 

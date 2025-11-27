@@ -1,20 +1,20 @@
 Hamiltonian
 ===========
 
-The ``Hamiltonian`` class in QDK/Chemistry represents the electronic Hamiltonian operator, which describes the physics of a quantum system.
+The :class:`~qdk_chemistry.data.Hamiltonian` class in QDK/Chemistry represents the electronic Hamiltonian operator, which describes the physics of a quantum system.
 It contains the one- and two-electron integrals that are essential for quantum chemistry calculations, particularly for active space methods.
 
 Overview
 --------
 
 In quantum chemistry, the electronic Hamiltonian is the operator that gives the energy of a system of electrons.
-The ``Hamiltonian`` class in QDK/Chemistry stores the matrix elements of this operator in the basis of molecular orbitals.
+The :class:`~qdk_chemistry.data.Hamiltonian` class in QDK/Chemistry stores the matrix elements of this operator in the basis of molecular orbitals.
 These matrix elements consist of one-electron integrals (representing kinetic energy and electron-nucleus interactions) and two-electron integrals (representing electron-electron repulsion).
 
 Design principles
 ~~~~~~~~~~~~~~~~~
 
-The ``Hamiltonian`` class follows an immutable data model design principle as described in the :doc:`QDK/Chemistry Design Principles <../advanced/design_principles>` document.
+The :class:`~qdk_chemistry.data.Hamiltonian` class follows an immutable data model design principle as described in the :doc:`QDK/Chemistry Design Principles <../design/index>` document.
 Once properly constructed, the Hamiltonian data is typically not modified during calculations.
 This const-correctness approach ensures data integrity throughout computational workflows and prevents accidental modifications of the core quantum system representation.
 While setter methods are available for construction and initialization purposes, in normal operation the Hamiltonian object should be treated as immutable after it has been fully populated.
@@ -33,13 +33,13 @@ Properties
 Usage
 -----
 
-The ``Hamiltonian`` class is typically used as input to correlation methods such as Configuration Interaction (CI) and Multi-Configuration Self-Consistent Field (MCSCF) calculations.
-The :doc:`HamiltonianConstructor <../algorithms/hamiltonian_constructor>` algorithm is the primary tool for generating ``Hamiltonian`` objects from molecular data.
+The :class:`~qdk_chemistry.data.Hamiltonian` class is typically used as input to correlation methods such as Configuration Interaction (CI) and Multi-Configuration Self-Consistent Field (MCSCF) calculations.
+The :doc:`HamiltonianConstructor <../algorithms/hamiltonian_constructor>` algorithm is the primary tool for generating :class:`~qdk_chemistry.data.Hamiltonian` objects from molecular data.
 
 Creating a Hamiltonian object
 -----------------------------
 
-The ``Hamiltonian`` object is typically created using the :doc:`HamiltonianConstructor <../algorithms/hamiltonian_constructor>` algorithm (recommended approach for most users), or it can be created directly with the appropriate integral data. Once properly constructed with all required data, the
+The :class:`~qdk_chemistry.data.Hamiltonian` object is typically created using the :doc:`HamiltonianConstructor <../algorithms/hamiltonian_constructor>` algorithm (recommended approach for most users), or it can be created directly with the appropriate integral data. Once properly constructed with all required data, the
 Hamiltonian object should be considered constant and not modified:
 
 .. tab:: C++ API
@@ -74,7 +74,7 @@ Hamiltonian object should be considered constant and not modified:
 Accessing Hamiltonian data
 --------------------------
 
-The ``Hamiltonian`` class provides methods to access the one- and two-electron integrals and other properties. In line
+The :class:`~qdk_chemistry.data.Hamiltonian` class provides methods to access the one- and two-electron integrals and other properties. In line
 with its immutable design principle, these methods return const references or copies of the internal data:
 
 Two-Electron Integral Storage and Notation
@@ -147,19 +147,20 @@ When accessing specific elements with ``get_two_body_element(i, j, k, l)``, the 
       :language: python
       :lines: 18-32
 
-      # Get orbital data
-      orbitals = hamiltonian.get_orbitals()
+.. TODO: this was old example data that should be removed.
+.. # Get orbital data
+.. orbitals = hamiltonian.get_orbitals()
 
-      # Get active space information
-      active_indices = hamiltonian.get_selected_orbital_indices()
-      num_electrons = hamiltonian.get_num_electrons()
-      num_orbitals = hamiltonian.get_num_orbitals()
+.. # Get active space information
+.. active_indices = hamiltonian.get_selected_orbital_indices()
+.. num_electrons = hamiltonian.get_num_electrons()
+.. num_orbitals = hamiltonian.get_num_orbitals()
 
 Serialization
 -------------
 
-The ``Hamiltonian`` class supports serialization to and from JSON and HDF5 formats.
-For detailed information about serialization in QDK/Chemistry, see the :doc:`Serialization <../advanced/serialization>` documentation.
+The :class:`~qdk_chemistry.data.Hamiltonian` class supports serialization to and from JSON and HDF5 formats.
+For detailed information about serialization in QDK/Chemistry, see the :doc:`Serialization <../data/serialization>` documentation.
 
 .. note::
    All Hamiltonian-related files should follow a consistent naming convention, such as
@@ -173,7 +174,7 @@ QDK/Chemistry supports multiple serialization formats for Hamiltonian data:
 JSON format
 ^^^^^^^^^^^
 
-JSON representation of a ``Hamiltonian`` object has the following structure (showing simplified content):
+JSON representation of a :class:`~qdk_chemistry.data.Hamiltonian` object has the following structure (showing simplified content):
 
 .. code-block:: json
 
@@ -198,7 +199,7 @@ JSON representation of a ``Hamiltonian`` object has the following structure (sho
 HDF5 format
 ^^^^^^^^^^^
 
-HDF5 representation of a ``Hamiltonian`` object has the following structure (showing groups and datasets):
+HDF5 representation of a :class:`~qdk_chemistry.data.Hamiltonian` object has the following structure (showing groups and datasets):
 
 .. code-block:: text
 
@@ -212,7 +213,7 @@ HDF5 representation of a ``Hamiltonian`` object has the following structure (sho
   │   ├── num_electrons         # Attribute: uint32, number of electrons (in the active space)
   │   └── num_orbitals          # Attribute: uint32, number of orbitals (in the active space)
   └── orbitals/                     # Group
-      └── json_data             # Dataset: (), binary representation of the json orbital data
+      └── json_data             # Dataset: representation of the JSON orbital data
 
 .. note::
    The ``orbitals/`` group follows the same structure and organization as an independent ``Orbitals`` HDF5 file.
@@ -255,23 +256,24 @@ HDF5 representation of a ``Hamiltonian`` object has the following structure (sho
       :language: python
       :lines: 34-49
 
-      # Convert to/from JSON in Python
-      import json
-      j = hamiltonian.to_json()
-      j_str = json.dumps(j)
-      hamiltonian_from_json = Hamiltonian.from_json(json.loads(j_str))
+.. TODO: this was old example data that should be removed.
+.. # Convert to/from JSON in Python
+.. import json
+.. j = hamiltonian.to_json()
+.. j_str = json.dumps(j)
+.. hamiltonian_from_json = Hamiltonian.from_json(json.loads(j_str))
 
 Active space Hamiltonian
 ------------------------
 
-When constructed with active orbital specifications, the ``Hamiltonian`` represents an active space Hamiltonian, which is a projection of the full electronic Hamiltonian into a smaller subspace.
+When constructed with active orbital specifications, the :class:`~qdk_chemistry.data.Hamiltonian` represents an active space Hamiltonian, which is a projection of the full electronic Hamiltonian into a smaller subspace.
 This is essential for tractable multi-configuration calculations.
 The :doc:`HamiltonianConstructor <../algorithms/hamiltonian_constructor>` algorithm handles the complex process of generating an appropriate active space Hamiltonian based on your specifications.
 
 Validation methods
 ------------------
 
-The ``Hamiltonian`` class provides methods to check the validity and consistency of its data:
+The :class:`~qdk_chemistry.data.Hamiltonian` class provides methods to check the validity and consistency of its data:
 
 .. tab:: C++ API
 
@@ -303,13 +305,13 @@ Related classes
 - :doc:`Orbitals <orbitals>`: Molecular orbital information used to construct the Hamiltonian
 - :doc:`HamiltonianConstructor <../algorithms/hamiltonian_constructor>`: Algorithm for constructing Hamiltonians -
   **primary tool** for generating Hamiltonian objects from molecular data
-- :doc:`MCCalculator <../algorithms/mc_calculator>`: Uses the Hamiltonian for correlation calculations
-- :doc:`Wavefunction <wavefunction>`: Represents the solution of the Hamiltonian eigenvalue problem
+- :doc:`../algorithms/mc_calculator`: Uses the Hamiltonian for correlation calculations
+- :class:`~qdk_chemistry.data.Wavefunction`: Represents the solution of the Hamiltonian eigenvalue problem
 - :doc:`Active space methods <../algorithms/active_space>`: Selection and use of active spaces with the Hamiltonian
 
 Related topics
 --------------
 
-- :doc:`Serialization <../advanced/serialization>`: Data serialization and deserialization in QDK/Chemistry
-- :doc:`Design principles <../advanced/design_principles>`: Design principles for data classes in QDK/Chemistry
-- :doc:`Settings <../advanced/settings>`: Configuration options for algorithms operating on Hamiltonians
+- :doc:`Serialization <../data/serialization>`: Data serialization and deserialization in QDK/Chemistry
+- :doc:`Design principles <../design/index>`: Design principles for data classes in QDK/Chemistry
+- :doc:`Settings <../design/index>`: Configuration options for algorithms operating on Hamiltonians
