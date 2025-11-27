@@ -100,7 +100,7 @@ If you need to modify coordinates or other properties, you must create a new Str
       :lines: 33-43
 
 File formats
-~~~~~~~~~~~~
+------------
 
 QDK/Chemistry supports multiple serialization formats for molecular structures:
 
@@ -136,57 +136,9 @@ XYZ format
 
 Note that here the coordinates are in Angstrom, since this is the standard in xyz files. 
 
-.. tab:: C++ API
-
-   .. code-block:: cpp
-
-      // Serialize to JSON object
-      auto json_data = structure.to_json();
-
-      // Deserialize from JSON object
-      auto structure_from_json = Structure::from_json(json_data);
-
-      // Serialize to JSON file
-      structure.to_json_file("molecule.structure.json");  // Required .structure.json suffix
-
-      // Get XYZ format as string
-      std::string xyz_string = structure.to_xyz();
-
-      // Load from XYZ string
-      auto structure_from_xyz = Structure::from_xyz(xyz_string);
-
-      // Serialize to XYZ file
-      structure.to_xyz_file("molecule.structure.xyz");  // Required .structure.xyz suffix
-
-.. tab:: Python API
-
-   .. literalinclude:: ../../../../examples/serialization.py
-      :language: python
-      :lines: 1-18
-
-Molecular manipulation
-----------------------
-
-The :class:`~qdk_chemistry.data.Structure` class provides methods for basic molecular manipulations:
-
-.. tab:: C++ API
-
-   .. code-block:: cpp
-
-      // Add an atom with coordinates and element
-      structure.add_atom(Eigen::Vector3d(1.0, 0.0, 0.0), "O");  // Add an oxygen atom
-
-      // Remove an atom
-      structure.remove_atom(2);  // Remove the third atom
-
-.. tab:: Python API
-
-   .. note::
-      This example shows the API pattern. For complete working examples, see the test suite.
-
-   .. literalinclude:: ../../../../examples/structure.py
-      :language: python
-      :lines: 19-24
+HDF5 format 
+^^^^^^^^^^^
+With the same keys as in the json format, but accessed as requested. 
 
 Related classes
 ---------------

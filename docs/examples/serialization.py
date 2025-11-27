@@ -29,6 +29,4 @@ structure.to_hdf5_file("h2_molecule.structure.h5")
 # Deserialize from HDF5 file
 structure_from_hdf5 = Structure.from_hdf5_file("h2_molecule.structure.h5")
 
-# Verify the loaded structure
-print(f"Number of atoms: {structure_from_hdf5.get_num_atoms()}")
-print(f"Symbols: {[structure_from_hdf5.get_atom_symbol(i) for i in range(structure_from_hdf5.get_num_atoms())]}")
+# TODO 
