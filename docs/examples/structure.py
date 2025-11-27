@@ -6,30 +6,23 @@
 # --------------------------------------------------------------------------------------------
 
 import numpy as np
-from qdk_chemistry.data import Structure
+from qdk_chemistry.data import Structure, Element
 
-# Create the Structure manually (coordinates in Bohr/atomic units)
-coords = np.array([[0.0, 0.0, 0.0], [0.0, 0.0, 1.4]])
-elements = ["H", "H"]
-structure = Structure(coords, elements)
+# =============================================================================
+# Creating a structure
+# =============================================================================
 
-print(f"Created structure with {structure.get_num_atoms()} atoms")
-print(f"Elements: {structure.get_elements()}")
+# Specify a structure using coordinates, and either symbols or elements
+coords = np.array([[0., 0., 0.], [0., 0., 0.74]])
+symbols = ["H", "H"]
 
-# Load from XYZ file
-# structure = Structure.from_xyz_file("molecule.structure.xyz")  # Required .structure.xyz suffix
+structure = Structure(coords, symbols=symbols)
 
-# Load from JSON file
-# structure = Structure.from_json_file("molecule.structure.json")  # Required .structure.json suffix
+# Element enum alternative
+elements = [Element.H, Element.H]
+structure_alternative = Structure(coords, elements)
 
-# Add an atom with coordinates and element
-# structure.add_atom([1.0, 0.0, 0.0], "O")  # Add an oxygen atom
-
-# Remove an atom
-# structure.remove_atom(2)  # Remove the third atom
-
-# Create a structure with coordinates in Angstroms (default)
-# structure_angstrom = Structure(coords_matrix, elements_list)
-
-# Explicitly specify units as Angstrom
-# structure_angstrom_explicit = Structure(coords_matrix, elements_list, "angstrom")
+# Can specify custom masses and/or charges 
+custom_masses = [1.001, 0.999]
+custom_charges = [0.9, 1.1]
+structure_custom = Structure(coords, elements=elements, custom_masses=custom_masses, custom_charges=custom_charges)

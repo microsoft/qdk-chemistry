@@ -1,7 +1,7 @@
 Structure
 =========
 
-The :class:`~qdk_chemistry.data.Structure` class in QDK/Chemistry represents a molecular structure, storing information about atomic positions, elements, and related properties for chemical systems of interest.
+The :class:`~qdk_chemistry.data.Structure` class in QDK/Chemistry represents a molecular structure, which always includes 3d coordinates and element information, and optionally includes related properties like atomic masses and nuclear charges. 
 As a core :doc:`data class <../design/index>`, it follows QDK/Chemistry's immutable data pattern.
 
 Overview
@@ -15,10 +15,8 @@ Properties
 
 - **Coordinates**: 3D Cartesian coordinates for each atom
 - **Elements**: Chemical elements of the atoms
-
-.. note::
-   By default, the total charge of a new structure is 0 (neutral) and the spin multiplicity is set to the
-   lowest possible value (singlet for even-electron systems, doublet for odd-electron systems).
+- **Masses**: Atomic masses of each of the atoms 
+- **Nuclear charges**: Nuclear charges (atomic numbers) of each of the atoms
 
 Usage
 -----
@@ -27,12 +25,12 @@ The :class:`~qdk_chemistry.data.Structure` class is typically the starting point
 It is used to define the molecular system before performing electronic structure calculations.
 
 .. note::
-   Coordinates are in Angstrom by default when creating or importing a Structure. See the `Units`_ section below for more details on unit conversions.
+   Coordinates are in Bohr by default when creating or importing a Structure. See the `Units`_ section below for more details on unit conversions.
 
 Creating a structure object manually
 ------------------------------------
 
-A :class:`~qdk_chemistry.data.Structure` object can be created manually by adding atoms one by one:
+A :class:`~qdk_chemistry.data.Structure` object can be created manually as follows:
 
 .. tab:: C++ API
 
@@ -41,18 +39,27 @@ A :class:`~qdk_chemistry.data.Structure` object can be created manually by addin
       #include <qdk/chemistry.hpp>
       using namespace qdk::chemistry::data;
 
-      // Create an empty structure
-      Structure structure;
+      // Specify a structure using coordinates, and either symbols or elements
+      std::vector<Eigen::Vector3d> coords = {{0.0, 0.0, 0.0}, {0.0, 0.0, 0.74}};
+      std::vector<std::string> symbols = {"H", "H"};
 
-      // Add atoms with their 3D coordinates and element symbols (coordinates in Bohr/atomic units)
-      structure.add_atom(Eigen::Vector3d(0.0, 0.0, 0.0), "H");
-      structure.add_atom(Eigen::Vector3d(0.0, 0.0, 1.4), "H");
+      Structure structure(coords, symbols);
+
+      // element enum alternative 
+      std::vector<Element> elements = {Element::H, Element::H};
+      Structure structure_alternative(coords, elements);
+
+      // Can specify custom masses and/or charges
+      std::vector <double> custom_masses {1.001, 0.999};
+      std::vector<double> custom_charges = {0.9, 1.1};
+      Structure structure_custom(coords, elements, custom_masses, custom_charges);
+
 
 .. tab:: Python API
 
    .. literalinclude:: ../../../../examples/structure.py
       :language: python
-      :lines: 1-11
+      :lines: 15-28
 
 Loading from files
 ------------------
