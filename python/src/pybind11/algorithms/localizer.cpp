@@ -145,6 +145,10 @@ Returns:
     str: The type name of the algorithm
 )");
 
+  localizer.def("__repr__", [](const Localizer &) {
+    return "<qdk_chemistry.algorithms.OrbitalLocalizer>";
+  });
+
   // Factory class binding - creates LocalizerFactory class
   // with static methods
   qdk::chemistry::python::bind_algorithm_factory<LocalizerFactory, Localizer,

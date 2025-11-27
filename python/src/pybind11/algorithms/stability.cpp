@@ -98,7 +98,6 @@ Args:
 
 Returns:
   tuple[bool, qdk_chemistry.data.StabilityResult]: Tuple of the overall stability flag and the detailed stability information (eigenvalues, eigenvectors, and helper accessors).
-
 )",
                         py::arg("wavefunction"));
 
