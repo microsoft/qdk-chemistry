@@ -36,6 +36,13 @@ from qdk_chemistry.data import Configuration
 
 _LOGGER = logging.getLogger(__name__)
 
+__all__ = [
+    "binary_string_to_configuration",
+    "binary_to_decimal",
+    "bitstrings_to_binary_matrix",
+    "separate_alpha_beta_to_binary_string",
+]
+
 
 def separate_alpha_beta_to_binary_string(input_string: str) -> tuple[str, str]:
     """Separate a compact alpha-beta bitstring into separate alpha and beta parts.

@@ -53,17 +53,17 @@ This class defines the interface for SCF calculations that compute molecular orb
 Concrete implementations should inherit from this class and implement the solve method.
 
 Examples:
-    To create a custom SCF solver, inherit from this class:
+    >>> # To create a custom SCF solver, inherit from this class:
+    >>> import qdk_chemistry.algorithms as alg
+    >>> import qdk_chemistry.data as data
+    >>> class MyScfSolver(alg.ScfSolver):
+    ...     def __init__(self):
+    ...         super().__init__()  # Call the base class constructor
+    ...     # Implement the _run_impl method
+    ...     def _run_impl(self, structure: data.Structure, charge: int, spin_multiplicity: int, initial_guess=None) -> tuple[float, data.Wavefunction]:
+    ...         # Custom SCF implementation
+    ...         return energy, wavefunction
 
-        >>> import qdk_chemistry.algorithms as alg
-        >>> import qdk_chemistry.data as data
-        >>> class MyScfSolver(alg.ScfSolver):
-        ...     def __init__(self):
-        ...         super().__init__()  # Call the base class constructor
-        ...     # Implement the _run_impl method
-        ...     def _run_impl(self, structure: data.Structure, charge: int, spin_multiplicity: int, initial_guess=None) -> tuple[float, data.Wavefunction]:
-        ...         # Custom SCF implementation
-        ...         return energy, wavefunction
 )");
 
   scf_solver.def(py::init<>(),
@@ -77,6 +77,7 @@ Examples:
     >>> scf = alg.ScfSolver()
     >>> scf.settings().set("max_iterations", 100)
     >>> scf.settings().set("convergence_threshold", 1e-8)
+
 )");
 
   scf_solver.def(
@@ -97,11 +98,11 @@ Args:
     structure (qdk_chemistry.data.Structure): The molecular structure to solve
     charge (int): The molecular charge
     spin_multiplicity (int): The spin multiplicity of the molecular system
-    initial_guess (qdk_chemistry.data.Orbitals, optional): Initial orbital guess for the SCF calculation (optional, defaults to no guess)
+    initial_guess (Optional[qdk_chemistry.data.Orbitals]): Initial orbital guess for the SCF calculation. Defaults to ``None``.
 
 Returns:
-tuple[float, qdk_chemistry.data.Wavefunction]
-    A tuple containing the converged total energy (nuclear + electronic) and wavefunction
+    tuple[float, qdk_chemistry.data.Wavefunction]: Converged total energy (nuclear + electronic) and the resulting wavefunction.
+
 )",
       py::arg("structure"), py::arg("charge"), py::arg("spin_multiplicity"),
       py::arg("initial_guess") = std::nullopt);
@@ -114,20 +115,18 @@ tuple[float, qdk_chemistry.data.Wavefunction]
         return solver.run(structure, charge, spin_multiplicity);
       },
       R"(
-        Perform SCF calculation on the given molecular structure (without initial guess).
+Perform SCF calculation on the given molecular structure (without initial guess).
 
-        This method automatically locks settings before execution.
+This method automatically locks settings before execution.
 
 Args:
-        structure : qdk_chemistry.data.Structure
-            The molecular structure to solve
-        charge : int
-            The molecular charge
-        spin_multiplicity : int
-            The spin multiplicity of the molecular system
+    structure (qdk_chemistry.data.Structure): The molecular structure to solve
+    charge (int): The molecular charge
+    spin_multiplicity (int): The spin multiplicity of the molecular system
 
 Returns:
-    tuple[float, qdk_chemistry.data.Wavefunction]: A tuple containing the converged total energy (nuclear + electronic) and wavefunction
+    tuple[float, qdk_chemistry.data.Wavefunction]: Converged total energy (nuclear + electronic) and the resulting wavefunction
+
 )",
       py::arg("structure"), py::arg("charge"), py::arg("spin_multiplicity"));
 
@@ -137,6 +136,7 @@ Access the solver's configuration settings.
 
 Returns:
     qdk_chemistry.data.Settings: Reference to the settings object for configuring the solver
+
 )",
                  py::return_value_policy::reference_internal);
 
@@ -160,6 +160,7 @@ Examples:
     ...         super().__init__()
     ...         from qdk_chemistry.data import ElectronicStructureSettings
     ...         self._settings = ElectronicStructureSettings()
+
 )");
 
   scf_solver.def("type_name", &ScfSolver::type_name,
@@ -168,6 +169,7 @@ The algorithm's type name.
 
 Returns:
     str: The type name of the algorithm
+
 )");
 
   // Factory class binding - creates ScfSolverFactory class with static methods

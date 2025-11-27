@@ -369,20 +369,25 @@ Examples:
 
   // JSON file I/O
   hamiltonian.def("to_json_file", hamiltonian_to_json_file_wrapper, R"(
-        Save Hamiltonian to JSON file (with validation).
+Save Hamiltonian to JSON file (with validation).
+
 Args:
-    filename (str or pathlib.Path): Path to JSON file to create/overwrite.
-        Must have '.hamiltonian' before the file extension (e.g., ``water.hamiltonian.json``, ``molecule.hamiltonian.json``)
+    filename (str or pathlib.Path): Path to JSON file to create or overwrite.
+
+        Must have '.hamiltonian' before the file extension
+        (e.g., ``water.hamiltonian.json``, ``molecule.hamiltonian.json``)
 
 Raises:
     ValueError: If filename doesn't follow the required naming convention
-    RuntimeError: If I/O error occurs
+
+    RuntimeError: If an I/O error occurs
 
 Examples:
     >>> hamiltonian.to_json_file("water.hamiltonian.json")
     >>> hamiltonian.to_json_file("molecule.hamiltonian.json")
     >>> from pathlib import Path
     >>> hamiltonian.to_json_file(Path("water.hamiltonian.json"))
+
 )",
                   py::arg("filename"));
 
@@ -392,13 +397,16 @@ Load Hamiltonian from JSON file (static method with validation).
 
 Args:
     filename (str or pathlib.Path): Path to JSON file to read.
-        Must have '.hamiltonian' before the file extension (e.g., ``water.hamiltonian.json``, ``molecule.hamiltonian.json``)
+
+        Must have '.hamiltonian' before the file extension
+        (e.g., ``water.hamiltonian.json``, ``molecule.hamiltonian.json``)
 
 Returns:
     Hamiltonian: New Hamiltonian loaded from file
 
 Raises:
     ValueError: If filename doesn't follow the required naming convention
+
     RuntimeError: If file doesn't exist or I/O error occurs
 
 Examples:
@@ -406,6 +414,7 @@ Examples:
     >>> hamiltonian = Hamiltonian.from_json_file("molecule.hamiltonian.json")
     >>> from pathlib import Path
     >>> hamiltonian = Hamiltonian.from_json_file(Path("water.hamiltonian.json"))
+
 )",
                          py::arg("filename"));
 
@@ -415,10 +424,13 @@ Save Hamiltonian to HDF5 file (with validation).
 
 Args:
     filename (str or pathlib.Path): Path to HDF5 file to create/overwrite.
-        Must have '.hamiltonian' before the file extension (e.g., ``water.hamiltonian.h5``, ``molecule.hamiltonian.hdf5``)
+
+        Must have '.hamiltonian' before the file extension
+        (e.g., ``water.hamiltonian.h5``, ``molecule.hamiltonian.hdf5``)
 
 Raises:
     ValueError: If filename doesn't follow the required naming convention
+
     RuntimeError: If I/O error occurs
 
 Examples:
@@ -426,6 +438,7 @@ Examples:
     >>> hamiltonian.to_hdf5_file("molecule.hamiltonian.hdf5")
     >>> from pathlib import Path
     >>> hamiltonian.to_hdf5_file(Path("water.hamiltonian.h5"))
+
 )",
                   py::arg("filename"));
 
@@ -435,13 +448,16 @@ Load Hamiltonian from HDF5 file (static method with validation).
 
 Args:
     filename (str or pathlib.Path): Path to HDF5 file to read.
-        Must have '.hamiltonian' before the file extension (e.g., ``water.hamiltonian.h5``, ``molecule.hamiltonian.hdf5``)
+
+        Must have '.hamiltonian' before the file extension
+        (e.g., ``water.hamiltonian.h5``, ``molecule.hamiltonian.hdf5``)
 
 Returns:
     Hamiltonian: New Hamiltonian loaded from file
 
 Raises:
     ValueError: If filename doesn't follow the required naming convention
+
     RuntimeError: If file doesn't exist or I/O error occurs
 
 Examples:
@@ -449,6 +465,7 @@ Examples:
     >>> hamiltonian = Hamiltonian.from_hdf5_file("molecule.hamiltonian.hdf5")
     >>> from pathlib import Path
     >>> hamiltonian = Hamiltonian.from_hdf5_file(Path("water.hamiltonian.h5"))
+
 )",
                          py::arg("filename"));
 
@@ -459,7 +476,9 @@ Save Hamiltonian to FCIDUMP file.
 
 Args:
     filename (str or pathlib.Path): Path to FCIDUMP file to create/overwrite.
+
         Typically uses '.fcidump' extension (e.g., ``water.fcidump``, ``molecule.fcidump``)
+
     nalpha (int): Number of alpha electrons
     nbeta (int): Number of beta electrons
 
@@ -475,6 +494,7 @@ Examples:
 Notes:
     FCIDUMP format is a standard quantum chemistry format for storing
     molecular integrals and is widely supported by quantum chemistry codes.
+
 )",
                   py::arg("filename"), py::arg("nalpha"), py::arg("nbeta"));
 
@@ -489,6 +509,7 @@ Convert Hamiltonian to JSON object.
 
 Returns:
     str: JSON-serializable string containing Hamiltonian data
+
 )");
 
   hamiltonian.def_static(
@@ -511,6 +532,7 @@ Raises:
 Examples:
     >>> json_str = '{"num_orbitals": 2, "num_electrons": 2, ...}'
     >>> hamiltonian = Hamiltonian.from_json(json_str)
+
 )",
       py::arg("json_data"));
 

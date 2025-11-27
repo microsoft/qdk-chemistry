@@ -60,6 +60,7 @@ In this manner, the high-performance solvers which underly other MC algorithms c
 The calculator takes a Hamiltonian and a set of configurations as input and returns both the calculated total energy and the corresponding multi-configurational wavefunction.
 
 Examples:
+
     To create a custom PMC calculator, inherit from this class:
 
         >>> import qdk_chemistry.algorithms as alg
@@ -70,6 +71,7 @@ Examples:
         ...     def _run_impl(self, hamiltonian: data.Hamiltonian, configurations: list[data.Configuration]) -> tuple[float, data.Wavefunction]:
         ...         # Custom PMC implementation
         ...         return energy, wavefunction
+
 )");
 
   pmc_calculator.def(py::init<>(),
@@ -84,6 +86,7 @@ Examples:
     >>> class MyPMC(alg.ProjectedMultiConfigurationCalculator):
     ...     def __init__(self):
     ...         super().__init__()  # Calls this constructor
+
 )");
 
   pmc_calculator.def("run", &ProjectedMultiConfigurationCalculator::run,
@@ -104,6 +107,7 @@ Returns:
 Raises:
     RuntimeError: If the calculation fails
     ValueError: If hamiltonian or configurations are invalid
+
 )",
                      py::arg("hamiltonian"), py::arg("configurations"));
 
@@ -139,6 +143,7 @@ Examples:
     ...         super().__init__()
     ...         from qdk_chemistry.data import ElectronicStructureSettings
     ...         self._settings = ElectronicStructureSettings()
+
 )");
 
   pmc_calculator.def("type_name",
@@ -148,6 +153,7 @@ The algorithm's type name.
 
 Returns:
     str: The type name of the algorithm
+
 )");
 
   // Factory class binding - creates

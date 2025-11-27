@@ -56,6 +56,7 @@ This class defines the interface for multi configuration-based quantum chemistry
 Concrete implementations should inherit from this class and implement the ``calculate`` method.
 
 Examples:
+
     To create a custom MC calculator, inherit from this class:
 
         >>> import qdk_chemistry.algorithms as alg
@@ -67,6 +68,7 @@ Examples:
         ...     def _run_impl(self, hamiltonian: data.Hamiltonian, n_active_alpha_electrons: int, n_active_beta_electrons: int) -> tuple[float, data.Wavefunction]:
         ...         # Custom MC implementation
         ...         return energy, wavefunction
+
 )");
 
   mc_calculator.def(py::init<>(),
@@ -81,11 +83,12 @@ Examples:
     >>> class MyCalculator(alg.MultiConfigurationCalculator):
     ...     def __init__(self):
     ...         super().__init__()  # Calls this constructor
+
 )");
 
   mc_calculator.def("run", &MultiConfigurationCalculator::run,
                     R"(
-        Perform multi configuration calculation on the given Hamiltonian.
+Perform multi-configuration calculation on the given Hamiltonian.
 
 Args:
     hamiltonian (qdk_chemistry.data.Hamiltonian): The Hamiltonian to perform the calculation on
@@ -97,6 +100,7 @@ Returns:
 
 Raises:
     SettingsAreLocked: If attempting to modify settings after run() is called
+
 )",
                     py::arg("hamiltonian"), py::arg("n_active_alpha_electrons"),
                     py::arg("n_active_beta_electrons"));
@@ -107,6 +111,7 @@ Access the calculator's configuration settings.
 
 Returns:
     qdk_chemistry.data.Settings: Reference to the settings object for configuring the calculator
+
 )",
                     py::return_value_policy::reference_internal);
 
@@ -132,6 +137,7 @@ Examples:
     ...         super().__init__()
     ...         from qdk_chemistry.data import ElectronicStructureSettings
     ...         self._settings = ElectronicStructureSettings()
+
 )");
 
   mc_calculator.def("type_name", &MultiConfigurationCalculator::type_name,
@@ -140,6 +146,7 @@ The algorithm's type name.
 
 Returns:
     str: The type name of the algorithm
+
 )");
 
   // Factory class binding - creates MultiConfigurationCalculatorFactory class

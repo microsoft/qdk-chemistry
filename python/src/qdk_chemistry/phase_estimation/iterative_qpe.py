@@ -15,13 +15,21 @@ References:
 # Licensed under the MIT License. See LICENSE.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
 
+from __future__ import annotations
+
 import logging
-from collections.abc import Sequence
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from collections.abc import Sequence
+
+    from qdk_chemistry.data.qubit_hamiltonian import QubitHamiltonian
+
+
 from dataclasses import dataclass
 
 from qiskit import ClassicalRegister, QuantumCircuit, QuantumRegister
 
-from qdk_chemistry.data import QubitHamiltonian
 from qdk_chemistry.phase_estimation.base import PhaseEstimation, PhaseEstimationAlgorithm
 from qdk_chemistry.utils.phase import (
     accumulated_phase_from_bits,
@@ -35,6 +43,8 @@ from qdk_chemistry.utils.time_evolution import (
 )
 
 _LOGGER = logging.getLogger(__name__)
+
+__all__: list[str] = []
 
 
 @dataclass(frozen=True)

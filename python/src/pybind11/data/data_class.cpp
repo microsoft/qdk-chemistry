@@ -197,12 +197,12 @@ Note:
     Use the concrete derived classes like Structure, BasisSet, Settings, etc.
 
     All derived classes are guaranteed to provide:
+        - `get_summary()` - Human-readable summary string
+        - `to_json()` - JSON serialization
+        - `to_hdf5()` - HDF5 serialization
+        - `to_file()` - Generic file export with format detection
+        - Corresponding deserialization methods (implementation varies by class)
 
-    - `get_summary()` - Human-readable summary string
-    - `to_json()` - JSON serialization
-    - `to_hdf5()` - HDF5 serialization
-    - `to_file()` - Generic file export with format detection
-    - Corresponding deserialization methods (implementation varies by class)
 )")
 
       .def(py::init<>(), R"(
@@ -211,6 +211,7 @@ Initialize a DataClass object.
 Note:
     This is an abstract base class and cannot be instantiated directly.
     Use the concrete derived classes like Structure, BasisSet, Settings, etc.
+
 )")
 
       // Core interface methods
@@ -218,12 +219,13 @@ Note:
 Get a human-readable summary of the object.
 
 Returns:
-  str: Summary string describing the object's contents and properties
+    str: Summary string describing the object's contents and properties
 
 Examples:
     >>> obj = SomeDataClass(...)
     >>> print(obj.get_summary())
     "SomeDataClass with X properties..."
+
 )")
 
       // JSON serialization
@@ -237,6 +239,7 @@ Examples:
     >>> json_str = obj.to_json()
     >>> print(json_str)
     {"version": "1.0", "data": {...}}
+
 )")
 
       .def("to_json_file", base_class_to_json_file_wrapper, R"(
@@ -252,6 +255,7 @@ Examples:
     >>> obj.to_json_file("data.json")
     >>> from pathlib import Path
     >>> obj.to_json_file(Path("data.json"))
+
 )",
            py::arg("filename"))
 
@@ -274,6 +278,7 @@ Examples:
     >>> with h5py.File("data.h5", "w") as f:
     ...     group = f.create_group("my_data")
     ...     obj.to_hdf5(group)
+
 )",
            py::arg("group"))
 
@@ -290,6 +295,7 @@ Examples:
     >>> obj.to_hdf5_file("data.h5")
     >>> from pathlib import Path
     >>> obj.to_hdf5_file(Path("data.h5"))
+
 )",
            py::arg("filename"))
 
@@ -300,6 +306,7 @@ Save object to file with specified format.
 Args:
     filename (str | pathlib.Path): Path to the output file
     format_type (str): Format type (e.g., "json", "hdf5").
+
         Available formats depend on the specific derived class.
 
 Raises:
@@ -311,6 +318,7 @@ Examples:
     >>> obj.to_file("data.h5", "hdf5")
     >>> from pathlib import Path
     >>> obj.to_file(Path("data.json"), "json")
+
 )",
            py::arg("filename"), py::arg("format_type"))
 
@@ -333,6 +341,7 @@ Notes:
 Examples:
     >>> json_data = {"version": "1.0", "data": {...}}
     >>> obj = SomeDataClass.from_json(json_data)
+
 )",
                   py::arg("json_data"))
 
@@ -355,11 +364,12 @@ Examples:
     >>> obj = SomeDataClass.from_json_file("data.json")
     >>> from pathlib import Path
     >>> obj = SomeDataClass.from_json_file(Path("data.json"))
+
 )",
                   py::arg("filename"))
 
       .def_static("from_hdf5", base_class_from_hdf5_wrapper, R"(
-    Load object from HDF5 group.
+Load object from HDF5 group.
 
 Args:
     group (h5py.Group | h5py.File): HDF5 group or file object to load data from
@@ -379,6 +389,7 @@ Examples:
     >>> with h5py.File("data.h5", "r") as f:
     ...     group = f["my_data"]
     ...     obj = SomeDataClass.from_hdf5(group)
+
 )",
                   py::arg("group"))
 
@@ -401,6 +412,7 @@ Examples:
     >>> obj = SomeDataClass.from_hdf5_file("data.h5")
     >>> from pathlib import Path
     >>> obj = SomeDataClass.from_hdf5_file(Path("data.h5"))
+
 )",
                   py::arg("filename"))
 
@@ -410,6 +422,7 @@ Load object from file with specified format.
 Args:
     filename (str | pathlib.Path): Path to the input file
     format_type (str): Format type (e.g., "json", "hdf5").
+
         Available formats depend on the specific derived class.
 
 Returns:
@@ -427,6 +440,7 @@ Examples:
     >>> obj = SomeDataClass.from_file("data.h5", "hdf5")
     >>> from pathlib import Path
     >>> obj = SomeDataClass.from_file(Path("data.json"), "json")
+
 )",
                   py::arg("filename"), py::arg("format_type"));
 }

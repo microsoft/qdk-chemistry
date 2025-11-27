@@ -44,7 +44,7 @@ class LocalizerBase : public Localizer,
 void bind_localizer(py::module &m) {
   // Localizer abstract base class
   py::class_<Localizer, LocalizerBase, py::smart_holder> localizer(
-      m, "Localizer", R"(
+      m, "OrbitalLocalizer", R"(
 Abstract base class for orbital localizers.
 
 This class defines the interface for localizing molecular orbitals.
@@ -52,7 +52,8 @@ Localization transforms canonical molecular orbitals into localized orbitals tha
 Concrete implementations should inherit from this class and implement the localize method.
 
 Examples:
-    To create a custom orbital localizer, inherit from this class:
+
+    To create a custom orbital localizer, inherit from this class::
 
         >>> import qdk_chemistry.algorithms as alg
         >>> import qdk_chemistry.data as data
@@ -77,17 +78,20 @@ Examples:
     >>> class MyLocalizer(alg.Localizer):
     ...     def __init__(self):
     ...         super().__init__()  # Calls this constructor
+
 )");
 
   localizer.def("run", &Localizer::run,
                 R"(
-        Localize molecular orbitals in the given wavefunction.
+Localize molecular orbitals in the given wavefunction.
 
 Args:
     wavefunction (qdk_chemistry.data.Wavefunction): The canonical molecular wavefunction to localize
     loc_indices_a (list[int]): Indices of alpha orbitals to localize (empty for no localization)
     loc_indices_b (list[int]): Indices of beta orbitals to localize (empty for no localization)
-        Note: For restricted orbitals, must be identical to loc_indices_a
+
+Notes:
+    For restricted orbitals, ``loc_indices_b`` must match ``loc_indices_a``.
 
 Returns:
     qdk_chemistry.data.Wavefunction: The localized molecular wavefunction
@@ -95,6 +99,7 @@ Returns:
 Raises:
     ValueError: If orbital indices are invalid or inconsistent
     RuntimeError: If localization fails due to numerical issues
+
 )",
                 py::arg("wavefunction"), py::arg("loc_indices_a"),
                 py::arg("loc_indices_b"));
@@ -105,6 +110,7 @@ Access the localizer's configuration settings.
 
 Returns:
     qdk_chemistry.data.Settings: Reference to the settings object for configuring the localizer
+
 )",
                 py::return_value_policy::reference_internal);
 
@@ -128,6 +134,7 @@ Examples:
     ...         super().__init__()
     ...         from qdk_chemistry.data import ElectronicStructureSettings
     ...         self._settings = ElectronicStructureSettings()
+
 )");
 
   localizer.def("type_name", &Localizer::type_name,
@@ -139,7 +146,7 @@ Returns:
 )");
 
   localizer.def("__repr__", [](const Localizer &) {
-    return "<qdk_chemistry.algorithms.Localizer>";
+    return "<qdk_chemistry.algorithms.OrbitalLocalizer>";
   });
 
   // Factory class binding - creates LocalizerFactory class
@@ -149,6 +156,6 @@ Returns:
       m, "LocalizerFactory");
 
   localizer.def("__repr__", [](const Localizer &) {
-    return "<qdk_chemistry.algorithms.Localizer>";
+    return "<qdk_chemistry.algorithms.OrbitalLocalizer>";
   });
 }

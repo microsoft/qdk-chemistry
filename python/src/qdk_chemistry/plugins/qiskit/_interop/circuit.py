@@ -25,6 +25,8 @@ from qdk_chemistry.definitions import (
 
 _LOGGER = logging.getLogger(__name__)
 
+__all__ = ["CircuitInfo", "analyze_qubit_status", "plot_circuit_diagram"]
+
 
 def analyze_qubit_status(circuit: QuantumCircuit) -> dict[int, str]:
     """Analyze the status of qubits in a quantum circuit.

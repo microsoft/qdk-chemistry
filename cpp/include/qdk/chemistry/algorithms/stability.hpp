@@ -87,8 +87,8 @@ class StabilityChecker
    * @throws std::runtime_error If stability analysis fails
    * @throws std::invalid_argument If the input wavefunction is invalid for the
    * specified instance of the stability checker
-   * @throws SettingsAreLocked If attempting to modify settings after run() is
-   * called
+   * @throws qdk::chemistry::data::SettingsAreLocked If attempting to modify
+   * settings after run() is called
    *
    * @note Settings are automatically locked when this method is called and
    *       cannot be modified during or after execution.

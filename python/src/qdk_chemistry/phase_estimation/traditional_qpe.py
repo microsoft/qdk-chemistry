@@ -15,12 +15,16 @@ References:
 # Licensed under the MIT License. See LICENSE.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
 
+from __future__ import annotations
+
 import logging
+from typing import TYPE_CHECKING
 
 from qiskit import ClassicalRegister, QuantumCircuit, QuantumRegister
 from qiskit.synthesis.qft.qft_decompose_full import synth_qft_full
 
-from qdk_chemistry.data import QubitHamiltonian
+if TYPE_CHECKING:
+    from qdk_chemistry.data.qubit_hamiltonian import QubitHamiltonian
 from qdk_chemistry.phase_estimation.base import PhaseEstimation, PhaseEstimationAlgorithm
 from qdk_chemistry.utils.time_evolution import (
     PauliEvolutionTerm,
@@ -29,6 +33,8 @@ from qdk_chemistry.utils.time_evolution import (
 )
 
 _LOGGER = logging.getLogger(__name__)
+
+__all__: list[str] = []
 
 
 class TraditionalPhaseEstimation(PhaseEstimation):
