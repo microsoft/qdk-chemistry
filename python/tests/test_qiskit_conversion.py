@@ -9,16 +9,17 @@ import numpy as np
 import pytest
 
 from qdk_chemistry.data import CasWavefunctionContainer, Configuration, Orbitals, Wavefunction
-
 from qdk_chemistry.plugins.qiskit.conversion import (
     _configuration_to_statevector_index,
     create_statevector_from_wavefunction,
 )
 from tests.conftest import create_test_basis_set
+
 from .reference_tolerances import (
-    float_comparison_relative_tolerance,
     float_comparison_absolute_tolerance,
+    float_comparison_relative_tolerance,
 )
+
 
 class TestConfigurationToStatevectorIndex:
     """Test the _configuration_to_statevector_index helper function."""
@@ -199,8 +200,12 @@ class TestCreateStatevectorFromWavefunction:
         det2_index = _configuration_to_statevector_index(Configuration("ud"), 2)
 
         # Check coefficients are in the right places
-        assert np.isclose(sv[det1_index], 0.9, rtol=float_comparison_relative_tolerance, atol=float_comparison_absolute_tolerance)
-        assert np.isclose(sv[det2_index], 0.436, rtol=float_comparison_relative_tolerance, atol=float_comparison_absolute_tolerance)
+        assert np.isclose(
+            sv[det1_index], 0.9, rtol=float_comparison_relative_tolerance, atol=float_comparison_absolute_tolerance
+        )
+        assert np.isclose(
+            sv[det2_index], 0.436, rtol=float_comparison_relative_tolerance, atol=float_comparison_absolute_tolerance
+        )
 
     def test_statevector_normalization(self, simple_wavefunction):
         """Test that normalization works correctly."""
@@ -209,14 +214,29 @@ class TestCreateStatevectorFromWavefunction:
 
         # Check unnormalized has expected norm
         expected_norm = np.sqrt(0.9**2 + 0.436**2)
-        assert np.isclose(np.linalg.norm(sv_unnormalized), expected_norm, rtol=float_comparison_relative_tolerance, atol=float_comparison_absolute_tolerance)
+        assert np.isclose(
+            np.linalg.norm(sv_unnormalized),
+            expected_norm,
+            rtol=float_comparison_relative_tolerance,
+            atol=float_comparison_absolute_tolerance,
+        )
 
         # Check normalized has unit norm
-        assert np.isclose(np.linalg.norm(sv_normalized), 1.0, rtol=float_comparison_relative_tolerance, atol=float_comparison_absolute_tolerance)
+        assert np.isclose(
+            np.linalg.norm(sv_normalized),
+            1.0,
+            rtol=float_comparison_relative_tolerance,
+            atol=float_comparison_absolute_tolerance,
+        )
 
         # Check normalization is consistent
         expected_normalized = sv_unnormalized / expected_norm
-        assert np.allclose(sv_normalized, expected_normalized, rtol=float_comparison_relative_tolerance, atol=float_comparison_absolute_tolerance)
+        assert np.allclose(
+            sv_normalized,
+            expected_normalized,
+            rtol=float_comparison_relative_tolerance,
+            atol=float_comparison_absolute_tolerance,
+        )
 
     def test_complex_wavefunction(self, basic_orbitals):
         """Test statevector creation with complex coefficients."""
@@ -234,8 +254,18 @@ class TestCreateStatevectorFromWavefunction:
         det1_index = _configuration_to_statevector_index(det1, 2)
         det2_index = _configuration_to_statevector_index(det2, 2)
 
-        assert np.isclose(sv[det1_index], 0.8 + 0.2j, rtol=float_comparison_relative_tolerance, atol=float_comparison_absolute_tolerance)
-        assert np.isclose(sv[det2_index], 0.3 - 0.4j, rtol=float_comparison_relative_tolerance, atol=float_comparison_absolute_tolerance)
+        assert np.isclose(
+            sv[det1_index],
+            0.8 + 0.2j,
+            rtol=float_comparison_relative_tolerance,
+            atol=float_comparison_absolute_tolerance,
+        )
+        assert np.isclose(
+            sv[det2_index],
+            0.3 - 0.4j,
+            rtol=float_comparison_relative_tolerance,
+            atol=float_comparison_absolute_tolerance,
+        )
 
     def test_single_determinant_wavefunction(self, basic_orbitals):
         """Test statevector for wavefunction with single determinant."""
@@ -253,7 +283,9 @@ class TestCreateStatevectorFromWavefunction:
         assert len(nonzero_indices) == 1
 
         det_index = _configuration_to_statevector_index(det, 2)
-        assert np.isclose(sv[det_index], 0.7, rtol=float_comparison_relative_tolerance, atol=float_comparison_absolute_tolerance)
+        assert np.isclose(
+            sv[det_index], 0.7, rtol=float_comparison_relative_tolerance, atol=float_comparison_absolute_tolerance
+        )
 
     def test_statevector_dimension_scaling(self):
         """Test that statevector dimension scales correctly with orbital count."""
@@ -308,7 +340,12 @@ class TestCreateStatevectorFromWavefunction:
         # Check all determinants are present
         for i, det in enumerate(dets):
             det_index = _configuration_to_statevector_index(det, 2)
-            assert np.isclose(sv[det_index], coeffs[i], rtol=float_comparison_relative_tolerance, atol=float_comparison_absolute_tolerance)
+            assert np.isclose(
+                sv[det_index],
+                coeffs[i],
+                rtol=float_comparison_relative_tolerance,
+                atol=float_comparison_absolute_tolerance,
+            )
 
         # Check that there are exactly 4 non-zero elements
         nonzero_indices = np.nonzero(sv)[0]

@@ -949,4 +949,3 @@ class TestWavefunctionRdmIntegraion:
             rtol=float_comparison_relative_tolerance,
             atol=scf_orbital_tolerance,
         )
-

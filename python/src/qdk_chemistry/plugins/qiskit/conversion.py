@@ -9,15 +9,13 @@ representations, particularly for quantum circuit simulation and state preparati
 # Licensed under the MIT License. See LICENSE.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
 
-from qdk_chemistry import Wavefunction, Configuration
 import numpy as np
 
+from qdk_chemistry import Configuration, Wavefunction
 
-def create_statevector_from_wavefunction(
-    wavefunction: Wavefunction, normalize: bool = True
-) -> np.ndarray:
-    """
-    Create a Qiskit-compatible statevector from a QDK Chemistry wavefunction.
+
+def create_statevector_from_wavefunction(wavefunction: Wavefunction, normalize: bool = True) -> np.ndarray:
+    """Create a Qiskit-compatible statevector from a QDK Chemistry wavefunction.
 
     This function converts a QDK Chemistry wavefunction into a dense statevector
     representation suitable for use with Qiskit quantum circuit simulators.
@@ -82,8 +80,7 @@ def create_statevector_from_wavefunction(
 
 
 def _configuration_to_statevector_index(configuration: Configuration, num_orbitals: int) -> int:
-    """
-    Convert a Configuration to its corresponding integer index in the statevector array.
+    """Convert a Configuration to its corresponding integer index in the statevector array.
 
     This function maps an electronic configuration (orbital occupation pattern) to
     its position in a dense statevector representation. The encoding uses little-endian
@@ -122,6 +119,7 @@ def _configuration_to_statevector_index(configuration: Configuration, num_orbita
 
     Raises:
         RuntimeError: If num_orbitals exceeds the configuration's capacity.
+
     """
     # Get binary strings for alpha and beta
     alpha_str, beta_str = configuration.to_binary_strings(num_orbitals)
