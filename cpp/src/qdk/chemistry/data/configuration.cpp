@@ -379,6 +379,10 @@ size_t Configuration::to_statevector_index(size_t num_orbitals) const {
   size_t index = 0;
   size_t capacity = get_orbital_capacity();
 
+  if (num_orbitals == 0) {
+    num_orbitals = capacity;
+  }
+
   if (num_orbitals > capacity) {
     throw std::runtime_error(
         "Requested more orbitals than configuration capacity");

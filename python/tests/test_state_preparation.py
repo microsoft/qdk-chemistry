@@ -94,7 +94,7 @@ def test_sparse_isometry_gf2x_single_reference_state():
 
 
 def test_gf2x_bitstrings_to_binary_matrix():
-    """Test functionality of _bistrings_to_binary_matrix helper."""
+    """Test functionality of _bitstrings_to_binary_matrix helper."""
     testclass = SparseIsometryGF2XStatePreparation()
     # Simple 3-qubit, 2-determinant example
     bitstrings = ["101", "010"]  # q[2]q[1]q[0] format (Little Endian)

@@ -69,8 +69,13 @@ Examples:
 )");
 
   configuration.def("to_binary_strings", &Configuration::to_binary_strings,
+                    py::arg("num_orbitals") = 0,
                     R"(
 Convert configuration to separate alpha and beta binary strings.
+
+Args:
+    num_orbitals (int, default=0): Number of spatial orbitals to use from the
+    configuration (default = 0, use all)
 
 Returns:
     [str, str]: Tuple of binary strings (alpha, beta) where '1' indicates occupied
