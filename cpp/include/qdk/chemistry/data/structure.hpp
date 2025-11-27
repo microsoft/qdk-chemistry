@@ -53,7 +53,7 @@ class Structure : public DataClass,
    * @brief Constructor with coordinates, elements, masses, and nuclear charges
    * @param coordinates Matrix of atomic coordinates (N x 3) in Bohr
    * @param elements Vector of atomic elements using enum
-   * @param masses Vector of atomic masses in AMU (default: use standard masses)
+   * @param masses Vector of atomic masses in AMU (default: use default masses)
    * @param nuclear_charges Vector of nuclear charges (default: use default
    * charges)
    * @throws std::invalid_argument if dimensions don't match
@@ -95,7 +95,7 @@ class Structure : public DataClass,
    * @brief Constructor from atomic elements and coordinates as vector
    * @param coordinates Vector of atomic coordinates (N x 3) in Bohr
    * @param elements Vector of atomic elements using enum
-   * @param masses Vector of atomic masses in AMU (default: use standard masses)
+   * @param masses Vector of atomic masses in AMU (default: use default masses)
    * @param nuclear_charges Vector of nuclear charges (default: use default
    * charges)
    * @throws std::invalid_argument if dimensions don't match

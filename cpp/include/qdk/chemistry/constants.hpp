@@ -29,8 +29,9 @@
  * (e.g., qdk::chemistry::constants::codata_2022::bohr_to_angstrom) or import
  * the specific namespace.
  *
- * The default namespace (qdk::chemistry::constants) uses CODATA 2022, but
- * other versions are available for compatibility and comparison purposes.
+ * The default namespace (qdk::chemistry::constants) uses the most recent CODATA
+ * version (currently 2022) for convenience, but other versions remain available
+ * for compatibility and comparison purposes.
  *
  * To select a specific CODATA version, define QDK_CHEMISTRY_CODATA_VERSION
  */

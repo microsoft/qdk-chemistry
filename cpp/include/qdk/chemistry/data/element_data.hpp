@@ -3938,8 +3938,8 @@ namespace ciaaw_2024 {
  * @brief Standard atomic weights and isotope masses in AMU (atomic mass units)
  *
  * Includes both standard atomic weights for elements 1-118 and specific isotope
- * masses. For radioactive elements, the mass numbers of stable isotopes are
- * used.
+ * masses. For the standard atomic weights of radioactive elements, the mass
+ * numbers of the most stable isotopes are used.
  */
 extern const std::unordered_map<Isotope, double> atomic_weights;
 
