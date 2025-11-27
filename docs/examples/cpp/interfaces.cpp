@@ -6,7 +6,8 @@
 // license information.
 // --------------------------------------------------------------------------------------------
 
-// start-cell-1
+// -----------------------------------------------------------------------------
+// start-cell-scf
 #include <qdk/chemistry.hpp>
 
 // Create an SCF solver that uses the QDK/Chemistry library as solver
@@ -18,9 +19,11 @@ scf->settings().set("method", "hf");
 
 // Run calculation with the same API as native implementations
 auto [energy, orbitals] = scf->solve(structure);
-// end-cell-1
+// end-cell-scf
+// -----------------------------------------------------------------------------
 
-// start-cell-2
+// -----------------------------------------------------------------------------
+// start-cell-list-methods
 #include <iostream>
 #include <qdk/chemistry.hpp>
 
@@ -32,9 +35,11 @@ for (const auto& solver : available_solvers) {
 
 // Get documentation for a specific implementation
 std::cout << ScfSolverFactory::get_docstring("default") << std::endl;
-// end-cell-2
+// end-cell-list-methods
+// -----------------------------------------------------------------------------
 
-// start-cell-3
+// -----------------------------------------------------------------------------
+// start-cell-custom-scf
 #include <qdk/chemistry.hpp>
 
 #include "custom_chemistry_package.hpp"
@@ -79,10 +84,13 @@ bool registered = ScfSolverFactory::register_implementation(
 
 }  // namespace algorithms
 }  // namespace qdk::chemistry
-// end-cell-3
+// end-cell-custom-scf
+// -----------------------------------------------------------------------------
 
-// start-cell-4
+// -----------------------------------------------------------------------------
+// start-cell-settings
 // Set general options that work across all backends
 scf->settings().set("basis_set", "cc-pvdz");
 scf->settings().set("max_iterations", 100);
-// end-cell-4
+// end-cell-settings
+// -----------------------------------------------------------------------------

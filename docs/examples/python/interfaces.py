@@ -5,17 +5,17 @@
 # Licensed under the MIT License. See LICENSE.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
 
+################################################################################
+# start-cell-scf
 import numpy as np
+from qdk_chemistry.algorithms import available, create
 from qdk_chemistry.data import Structure
 
 coords = np.array([[0.0, 0.0, 0.0], [0.0, 0.0, 1.4]])
 structure = Structure(coords, ["H", "H"])
 
-# start-cell-1
-from qdk_chemistry.algorithms import create
-
 # Create an SCF solver using the factory
-scf_solver = create("scf_solver")
+scf_solver = create("scf_solver", "pyscf")
 
 # Configure it using the standard settings interface
 scf_solver.settings().set("basis_set", "cc-pvdz")
@@ -26,21 +26,21 @@ energy, wavefunction = scf_solver.run(structure, charge=0, spin_multiplicity=1)
 orbitals = wavefunction.get_orbitals()
 
 print(f"SCF Energy: {energy:.10f} Hartree")
-# end-cell-1
+# end-cell-scf
+################################################################################
 
-
-# start-cell-2
-from qdk_chemistry.algorithms import available
-
+################################################################################
+# start-cell-list-methods
 # List available implementations for each algorithm type
 print("Available SCF solvers:", available("scf_solver"))
 print("Available Hamiltonian constructors:", available("hamiltonian_constructor"))
 print("Available orbital localizers:", available("orbital_localizer"))
 print("Available MC calculators:", available("multi_configuration_calculator"))
-# end-cell-2
+# end-cell-list-methods
+################################################################################
 
-
-# start-cell-4
+################################################################################
+# start-cell-settings
 # All algorithms use a consistent settings interface
 scf = create("scf_solver")
 
@@ -55,6 +55,5 @@ print(f"SCF settings: {scf.settings().keys()}")
 # Get a setting value
 max_iter = scf.settings().get("max_iterations")
 print(f"Max iterations: {max_iter}")
-# end-cell-4
-
-
+# end-cell-settings
+################################################################################

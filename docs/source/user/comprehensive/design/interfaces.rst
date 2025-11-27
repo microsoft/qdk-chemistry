@@ -30,7 +30,7 @@ The interface system is built on the following principles:
 Supported interfaces
 --------------------
 
-QDK/Chemistry provides interfaces to many popular quantum chemistry packages, each carefully integrated to preserve their strengths while presenting a unified API to the user.
+QDK/Chemistry provides interfaces to other popular quantum chemistry packages, each carefully integrated to preserve their strengths while presenting a unified API to the user.
 These include:
 
 - **PySCF**: Python-based Simulations of Chemistry Framework
@@ -49,15 +49,15 @@ This pattern is implemented across all major algorithm types in QDK/Chemistry.
 
    .. literalinclude:: ../../../../examples/cpp/interfaces.cpp
       :language: cpp
-      :start-after: // start-cell-1
-      :end-before: // end-cell-1
+      :start-after: // start-cell-scf
+      :end-before: // end-cell-scf
 
 .. tab:: Python API
 
-   .. literalinclude:: ../../../examples/python/interfaces.py
+   .. literalinclude:: ../../../../examples/python/interfaces.py
       :language: python
-      :start-after: # start-cell-1
-      :end-before: # end-cell-1
+      :start-after: # start-cell-scf
+      :end-before: # end-cell-scf
 
 Listing available implementations
 ---------------------------------
@@ -68,15 +68,15 @@ You can discover what implementations are available for each algorithm type:
 
    .. literalinclude:: ../../../../examples/cpp/interfaces.cpp
       :language: cpp
-      :start-after: // start-cell-2
-      :end-before: // end-cell-2
+      :start-after: // start-cell-list-methods
+      :end-before: // end-cell-list-methods
 
 .. tab:: Python API
 
-   .. literalinclude:: ../../../examples/python/interfaces.py
+   .. literalinclude:: ../../../../examples/python/interfaces.py
       :language: python
-      :start-after: # start-cell-2
-      :end-before: # end-cell-2
+      :start-after: # start-cell-list-methods
+      :end-before: # end-cell-list-methods
 
 Adding new interfaces
 ---------------------
@@ -94,8 +94,8 @@ To create a new interface:
 
    .. literalinclude:: ../../../../examples/cpp/interfaces.cpp
       :language: cpp
-      :start-after: // start-cell-3
-      :end-before: // end-cell-3
+      :start-after: // start-cell-custom-scf
+      :end-before: // end-cell-custom-scf
 
 .. tab:: Python API
 
@@ -142,16 +142,15 @@ This approach leverages the flexibility of QDK/Chemistry's :doc:`settings system
 
    .. literalinclude:: ../../../../examples/cpp/interfaces.cpp
       :language: cpp
-      :start-after: // start-cell-4
-      :end-before: // end-cell-4
+      :start-after: // start-cell-settings
+      :end-before: // end-cell-settings
 
 .. tab:: Python API
 
-   .. code-block:: python
-
-      # Set general options that work across all backends
-      scf.settings().set("basis_set", "cc-pvdz")
-      scf.settings().set("max_iterations", 100)
+   .. literalinclude:: ../../../../examples/python/interfaces.py
+      :language: python
+      :start-after: # start-cell-settings
+      :end-before: # end-cell-settings
 
 Each interface implementation typically documents its specific settings, including both the common settings that are
 translated to the backend and the backend-specific settings that are passed through directly.
