@@ -41,5 +41,3 @@ all_coords = structure.get_coordinates()
 
 # Get all elements as a vector 
 all_elements = structure.get_elements()
-
-print(structure_custom.to_xyz())
