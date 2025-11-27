@@ -6,7 +6,8 @@
 // license information.
 // --------------------------------------------------------------------------------------------
 
-// start-cell-1
+// --------------------------------------------------------------------------------------------
+// start-cell-get-settings
 // Get the settings object
 auto& settings = algorithm->settings();
 
@@ -15,9 +16,11 @@ settings.set("parameter_name", value);
 
 // Get a parameter
 auto value = settings.get<ValueType>("parameter_name");
-// end-cell-1
+// end-cell-get-settings
+// --------------------------------------------------------------------------------------------
 
-// start-cell-2
+// --------------------------------------------------------------------------------------------
+// start-cell-set-settings
 // Set a string value
 settings.set("basis_set", "def2-tzvp");
 
@@ -29,9 +32,11 @@ settings.set("density_fitting", true);
 
 // Set an array value
 settings.set("active_orbitals", std::vector<int>{4, 5, 6, 7});
-// end-cell-2
+// end-cell-set-settings
+// --------------------------------------------------------------------------------------------
 
-// start-cell-3
+// --------------------------------------------------------------------------------------------
+// start-cell-get-settings
 // Get a string value
 std::string basis = settings.get<std::string>("basis_set");
 
@@ -46,9 +51,11 @@ auto active_orbitals = settings.get<std::vector<int>>("active_orbitals");
 
 // Get a value with default fallback
 auto max_iter = settings.get_or_default<int>("max_iterations", 100);
-// end-cell-3
+// end-cell-get-settings
+// --------------------------------------------------------------------------------------------
 
-// start-cell-4
+// --------------------------------------------------------------------------------------------
+// start-cell-check-settings
 // Check if a setting exists
 if (settings.has("basis_set")) {
   // Use the setting
@@ -65,9 +72,11 @@ if (maybe_value) {
   double value = *maybe_value;
   // Use the value
 }
-// end-cell-4
+// end-cell-check-settings
+// --------------------------------------------------------------------------------------------
 
-// start-cell-5
+// --------------------------------------------------------------------------------------------
+// start-cell-misc-settings
 // Get all setting keys
 auto keys = settings.keys();
 
@@ -95,9 +104,11 @@ settings.update("convergence_threshold", 1.0e-9);
 
 // Get the type name of a setting
 std::string type = settings.get_type_name("convergence_threshold");
-// end-cell-5
+// end-cell-misc-settings
+// --------------------------------------------------------------------------------------------
 
-// start-cell-6
+// --------------------------------------------------------------------------------------------
+// start-cell-serialization
 // Save settings to JSON file
 settings.to_json_file("configuration.settings.json");
 
@@ -120,9 +131,11 @@ auto json_data = settings.to_json();
 
 // Load from JSON object
 auto settings_from_json = Settings::from_json(json_data);
-// end-cell-6
+// end-cell-serialization
+// --------------------------------------------------------------------------------------------
 
-// start-cell-7
+// --------------------------------------------------------------------------------------------
+// start-cell-extend-settings
 class MySettings : public Settings {
  public:
   MySettings() {
@@ -132,9 +145,11 @@ class MySettings : public Settings {
     set_default("method", std::string("default"));
   }
 };
-// end-cell-7
+// end-cell-extend-settings
+// --------------------------------------------------------------------------------------------
 
-// start-cell-8
+// --------------------------------------------------------------------------------------------
+// start-cell-settings-errors
 try {
   auto value = settings.get<double>("non_existent_setting");
 } catch (const qdk::chemistry::data::SettingNotFound& e) {
@@ -149,4 +164,5 @@ try {
   std::cerr << e.what() << std::endl;  // "Type mismatch for setting
                                        // 'string_setting'. Expected: int"
 }
-// end-cell-8
+// end-cell-settings-errors
+// --------------------------------------------------------------------------------------------

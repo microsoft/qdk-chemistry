@@ -34,17 +34,17 @@ Most algorithms validate their settings only at execution time, so you can adjus
 
 .. tab:: C++ API
 
-   .. literalinclude:: ../../../../examples/cpp/settings.cpp
+   .. literalinclude:: ../../../_static/examples/cpp/settings.cpp
       :language: cpp
-      :start-after: // start-cell-1
-      :end-before: // end-cell-1
+      :start-after: // start-cell-get-settings
+      :end-before: // end-cell-get-settings
 
 .. tab:: Python API
 
-   .. literalinclude:: ../../../examples/python/settings.py
+   .. literalinclude:: ../../../_static/examples/python/settings.py
       :language: python
-      :start-after: # start-cell-1
-      :end-before: # end-cell-1
+      :start-after: # start-cell-get-settings
+      :end-before: # end-cell-get-settings
 
 Common settings operations
 --------------------------
@@ -62,17 +62,17 @@ The ``set`` method is overloaded to handle various types including C-style strin
 
 .. tab:: C++ API
 
-   .. literalinclude:: ../../../../examples/cpp/settings.cpp
+   .. literalinclude:: ../../../_static/examples/cpp/settings.cpp
       :language: cpp
-      :start-after: // start-cell-2
-      :end-before: // end-cell-2
+      :start-after: // start-cell-set-settings
+      :end-before: // end-cell-set-settings
 
 .. tab:: Python API
 
-   .. literalinclude:: ../../../examples/python/settings.py
+   .. literalinclude:: ../../../_static/examples/python/settings.py
       :language: python
-      :start-after: # start-cell-2
-      :end-before: # end-cell-2
+      :start-after: # start-cell-set-settings
+      :end-before: # end-cell-set-settings
 
 Getting values
 ~~~~~~~~~~~~~~
@@ -83,17 +83,17 @@ For cases where you want to provide a fallback value if the key doesn't exist, u
 
 .. tab:: C++ API
 
-   .. literalinclude:: ../../../../examples/cpp/settings.cpp
+   .. literalinclude:: ../../../_static/examples/cpp/settings.cpp
       :language: cpp
-      :start-after: // start-cell-3
-      :end-before: // end-cell-3
+      :start-after: // start-cell-get-settings
+      :end-before: // end-cell-get-settings
 
 .. tab:: Python API
 
-   .. literalinclude:: ../../../examples/python/settings.py
+   .. literalinclude:: ../../../_static/examples/python/settings.py
       :language: python
-      :start-after: # start-cell-3
-      :end-before: # end-cell-3
+      :start-after: # start-cell-get-settings
+      :end-before: # end-cell-get-settings
 
 Checking for settings
 ~~~~~~~~~~~~~~~~~~~~~
@@ -104,17 +104,17 @@ Additionally, the ``try_get`` method returns an ``std::optional`` that contains 
 
 .. tab:: C++ API
 
-   .. literalinclude:: ../../../../examples/cpp/settings.cpp
+   .. literalinclude:: ../../../_static/examples/cpp/settings.cpp
       :language: cpp
-      :start-after: // start-cell-4
-      :end-before: // end-cell-4
+      :start-after: // start-cell-misc-settings
+      :end-before: // end-cell-misc-settings
 
 .. tab:: Python API
 
-   .. literalinclude:: ../../../examples/python/settings.py
+   .. literalinclude:: ../../../_static/examples/python/settings.py
       :language: python
-      :start-after: # start-cell-4
-      :end-before: # end-cell-4
+      :start-after: # start-cell-misc-settings
+      :end-before: # end-cell-misc-settings
 
 Other operations
 ~~~~~~~~~~~~~~~~
@@ -125,17 +125,17 @@ present), manipulation (merging with other settings objects), and more.
 
 .. tab:: C++ API
 
-   .. literalinclude:: ../../../../examples/cpp/settings.cpp
+   .. literalinclude:: ../../../_static/examples/cpp/settings.cpp
       :language: cpp
-      :start-after: // start-cell-5
-      :end-before: // end-cell-5
+      :start-after: // start-cell-misc-settings
+      :end-before: // end-cell-misc-settings
 
 .. tab:: Python API
 
-   .. Literalinclude:: ../../../examples/python/settings.py
+   .. literalinclude:: ../../../_static/examples/python/settings.py
       :language: python
-      :start-after: # start-cell-5
-      :end-before: # end-cell-5
+      :start-after: # start-cell-misc-settings
+      :end-before: # end-cell-misc-settings
 
 Serialization
 -------------
@@ -149,17 +149,17 @@ For more information on serialization throughout QDK/Chemistry, see the :doc:`Se
 
 .. tab:: C++ API
 
-   .. literalinclude:: ../../../../examples/cpp/settings.cpp
+   .. literalinclude:: ../../../_static/examples/cpp/settings.cpp
       :language: cpp
-      :start-after: // start-cell-6
-      :end-before: // end-cell-6
+      :start-after: // start-cell-serialization
+      :end-before: // end-cell-serialization
 
 .. tab:: Python API
 
-   .. literalinclude:: ../../../examples/python/settings.py
+   .. literalinclude:: ../../../_static/examples/python/settings.py
       :language: python
-      :start-after: # start-cell-6
-      :end-before: # end-cell-6
+      :start-after: # start-cell-serialization
+      :end-before: # end-cell-serialization
 
 Serialization format
 ~~~~~~~~~~~~~~~~~~~~
@@ -206,18 +206,17 @@ Here's how to extend the :class:`~qdk_chemistry.data.Settings` class for a custo
 
 .. tab:: C++ API
 
-   .. literalinclude:: ../../../../examples/cpp/settings.cpp
+   .. literalinclude:: ../../../_static/examples/cpp/settings.cpp
       :language: cpp
-      :start-after: // start-cell-7
-      :end-before: // end-cell-7
+      :start-after: // start-cell-extend-settings
+      :end-before: // end-cell-extend-settings
 
 .. tab:: Python API
 
-   .. literalinclude:: ../../../examples/python/settings.py
+   .. literalinclude:: ../../../_static/examples/python/settings.py
       :language: python
-      :start-after: # start-cell-7
-      :end-before: # end-cell-7
-
+      :start-after: # start-cell-extend-settings
+      :end-before: # end-cell-extend-settings
 
 Supported types
 ---------------
@@ -258,21 +257,22 @@ These exceptions can be caught and handled to provide graceful error recovery:
 
 .. tab:: C++ API
 
-   .. literalinclude:: ../../../../examples/cpp/settings.cpp
+   .. literalinclude:: ../../../_static/examples/cpp/settings.cpp
       :language: cpp
-      :start-after: // start-cell-8
-      :end-before: // end-cell-8
+      :start-after: // start-cell-settings-errors
+      :end-before: // end-cell-settings-errors
 
 .. tab:: Python API
 
-   .. literalinclude:: ../../../examples/python/settings.py
+   .. literalinclude:: ../../../_static/examples/python/settings.py
       :language: python
-      :start-after: # start-cell-8
-      :end-before: # end-cell-8
+      :start-after: # start-cell-settings-errors
+      :end-before: # end-cell-settings-errors
 
-Related topics
---------------
+Further reading
+---------------
 
+- The above examples can be downloaded as complete `C++ <../../../_static/examples/cpp/settings.cpp>`_ and `Python <../../../_static/examples/python/settings.py>`_ scripts.
 - :doc:`Design Principles <index>`: Core architectural principles of QDK/Chemistry
 - :doc:`Factory Pattern <factory_pattern>`: Understanding the factory pattern and extending QDK/Chemistry
 - :doc:`Interfaces <interfaces>`: QDK/Chemistry's interface system to external packages
