@@ -4,7 +4,9 @@
 
 #include <qdk/chemistry/scf/util/libint2_util.h>
 
-#include <qdk/chemistry/utils/omp_utils.hpp>
+#ifdef _OPENMP
+#include <omp.h>
+#endif
 
 namespace qdk::chemistry::scf::libint2_util {
 
@@ -147,16 +149,26 @@ std::unique_ptr<double[]> opt_eri(BasisMode basis_mode,
                                   obs.max_l(), 0);
   }
 
+#ifdef _OPENMP
   int nthreads = omp_get_max_threads();
+#else
+  int nthreads = 1;
+#endif
   std::vector<libint2::Engine> engines(nthreads, base_engine);
 
   auto range_intersect = [](int x_st, int x_en, int y_st, int y_en) {
     return x_st <= (y_en - 1) and y_st <= (x_en - 1);
   };
 
+#ifdef _OPENMP
 #pragma omp parallel
+#endif
   {
+#ifdef _OPENMP
     int thread_id = omp_get_thread_num();
+#else
+    int thread_id = 0;
+#endif
     auto& engine = engines[thread_id];
     auto& buf = engine.results();
     for (size_t i = 0, ijkl = 0; i < nshells; ++i) {
@@ -328,13 +340,23 @@ std::unique_ptr<double[]> eri_df(BasisMode basis_mode,
                               std::max(abs.max_l(), obs.max_l()), 0);
   base_engine.set(libint2::BraKet::xs_xx);
 
+#ifdef _OPENMP
   int nthreads = omp_get_max_threads();
+#else
+  int nthreads = 1;
+#endif
   std::vector<libint2::Engine> engines(nthreads, base_engine);
   const auto& unitshell = libint2::Shell::unit();
 
+#ifdef _OPENMP
 #pragma omp parallel
+#endif
   {
+#ifdef _OPENMP
     int thread_id = omp_get_thread_num();
+#else
+    int thread_id = 0;
+#endif
     auto& engine = engines[thread_id];
     auto& buf = engine.results();
 
@@ -396,12 +418,22 @@ std::unique_ptr<double[]> metric_df(BasisMode basis_mode,
                               abs.max_l(), 0);
   base_engine.set(libint2::BraKet::xs_xs);
 
+#ifdef _OPENMP
   int nthreads = omp_get_max_threads();
+#else
+  int nthreads = 1;
+#endif
   std::vector<libint2::Engine> engines(nthreads, base_engine);
   const auto& unitshell = libint2::Shell::unit();
+#ifdef _OPENMP
 #pragma omp parallel
+#endif
   {
+#ifdef _OPENMP
     int thread_id = omp_get_thread_num();
+#else
+    int thread_id = 0;
+#endif
     auto& engine = engines[thread_id];
     auto& buf = engine.results();
 
@@ -454,12 +486,22 @@ void eri_df_grad(double* dJ, const double* P, const double* X,
   base_engine.set(libint2::BraKet::xs_xx);
 
   const auto& unitshell = libint2::Shell::unit();
+#ifdef _OPENMP
   int nthreads = omp_get_max_threads();
+#else
+  int nthreads = 1;
+#endif
   int total_threads = mpi.world_size * nthreads;
   std::vector<libint2::Engine> engines(nthreads, base_engine);
+#ifdef _OPENMP
 #pragma omp parallel reduction(+ : dJ[ : 3 * n_atoms])
+#endif
   {
+#ifdef _OPENMP
     int thread_id = omp_get_thread_num();
+#else
+    int thread_id = 0;
+#endif
     int world_thread_id = mpi.world_rank * nthreads + thread_id;
     auto& engine = engines[thread_id];
 
@@ -520,13 +562,23 @@ void metric_df_grad(double* dJ, const double* X, BasisMode basis_mode,
                               abs.max_l(), 1);
   base_engine.set(libint2::BraKet::xs_xs);
 
+#ifdef _OPENMP
   int nthreads = omp_get_max_threads();
+#else
+  int nthreads = 1;
+#endif
   int total_threads = mpi.world_size * nthreads;
   std::vector<libint2::Engine> engines(nthreads, base_engine);
   const auto& unitshell = libint2::Shell::unit();
+#ifdef _OPENMP
 #pragma omp parallel reduction(+ : dJ[ : 3 * n_atoms])
+#endif
   {
+#ifdef _OPENMP
     int thread_id = omp_get_thread_num();
+#else
+    int thread_id = 0;
+#endif
     int world_thread_id = mpi.world_rank * nthreads + thread_id;
     auto& engine = engines[thread_id];
     auto& buf = engine.results();

@@ -37,11 +37,15 @@ handle_dependency(nlohmann_json
 )
 
 # Libint2 for CPU Integral evaluation
+set(_libint2_source_subdir "SOURCE_SUBDIR;libint-2.9.0")
+if(APPLE)
+    set(_libint2_source_subdir "")
+endif()
 handle_dependency(libint2
   URL https://github.com/evaleev/libint/releases/download/v2.9.0/libint-2.9.0-mpqc4.tgz
   BUILD_TARGET Libint2::cxx
   INSTALL_TARGET Libint2::cxx
-  SOURCE_SUBDIR libint-2.9.0
+  ${_libint2_source_subdir}
   ${DEPENDENCY_BUILD_FLAGS}
   REQUIRED
 )

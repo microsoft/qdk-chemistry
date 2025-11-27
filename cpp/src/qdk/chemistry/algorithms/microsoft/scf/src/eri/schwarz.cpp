@@ -14,7 +14,9 @@
 
 #include <algorithm>
 #include <cassert>
-#include <qdk/chemistry/utils/omp_utils.hpp>
+#ifdef _OPENMP
+#include <omp.h>
+#endif
 #include <vector>
 
 #include "util/timer.h"
@@ -26,14 +28,24 @@ void schwarz_integral(const BasisSet* iobs, const ParallelConfig& mpi,
   auto obs = libint2_util::convert_to_libint_basisset(*iobs);
 
   using libint2::Engine;
+#ifdef _OPENMP
   int nthreads = omp_get_max_threads();
+#else
+  int nthreads = 1;
+#endif
   RowMajorMatrix S = RowMajorMatrix::Zero(obs.size(), obs.size());
   std::vector<Engine> engines(
       nthreads,
       Engine(libint2::Operator::coulomb, obs.max_nprim(), obs.max_l(), 0, 0.0));
+#ifdef _OPENMP
 #pragma omp parallel
+#endif
   {
+#ifdef _OPENMP
     int local_thread_id = omp_get_thread_num();
+#else
+    int local_thread_id = 0;
+#endif
     int world_thread_size = mpi.world_size * nthreads;
     int world_thread_id = mpi.world_rank * nthreads + local_thread_id;
     Engine& engine = engines[local_thread_id];

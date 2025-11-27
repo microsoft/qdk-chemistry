@@ -27,12 +27,14 @@ namespace qdk::chemistry::data {
  * @brief Type-safe variant for storing different setting value types
  *
  * This variant can hold common types used in settings configurations.
- * Additional types can be added as needed.
+ * Note: All integer types are stored internally as int64_t (signed) or uint64_t
+ * (unsigned) for simplicity. Other integer types can be requested via get()
+ * with automatic conversion.
  */
 using SettingValue =
-    std::variant<bool, int, int64_t, size_t, float, double, std::string,
-                 std::vector<bool>, std::vector<int>, std::vector<double>,
-                 std::vector<std::string>>;
+    std::variant<bool, int64_t, uint64_t, float, double, std::string,
+                 std::vector<int64_t>, std::vector<uint64_t>,
+                 std::vector<double>, std::vector<std::string>>;
 
 /**
  * @brief Exception thrown when modification of locked settings is requested
@@ -90,12 +92,13 @@ class SettingTypeMismatch : public std::runtime_error {
  *     }
  *
  *     // Convenience getters with validation (optional)
- *     int get_max_iterations() const { return get<int>("max_iterations"); }
- *     double get_tolerance() const { return get<double>("tolerance"); }
- *     std::string get_method() const { return get<std::string>("method"); }
+ *     int32_t get_max_iterations() const { return
+ * get<int32_t>("max_iterations"); } double get_tolerance() const { return
+ * get<double>("tolerance"); } std::string get_method() const { return
+ * get<std::string>("method"); }
  *
  *     // After construction, only existing settings can be modified
- *     void set_max_iterations(int value) { set("max_iterations", value); }
+ *     void set_max_iterations(int32_t value) { set("max_iterations", value); }
  *     void set_tolerance(double value) { set("tolerance", value); }
  * };
  * ```
@@ -161,7 +164,31 @@ class Settings : public DataClass,
     if (it == settings_.end()) {
       throw SettingNotFound(key);
     }
-    settings_[key] = value;
+
+    // If the type is directly in the variant, use it as-is
+    if constexpr (is_variant_member_v<T, SettingValue>) {
+      settings_[key] = value;
+    }
+    // Handle integral types - store as int64_t (signed) or uint64_t (unsigned)
+    else if constexpr (is_non_bool_integral_v<T>) {
+      if constexpr (std::is_signed_v<T>) {
+        settings_[key] = static_cast<int64_t>(value);
+      } else {
+        settings_[key] = static_cast<uint64_t>(value);
+      }
+    }
+    // Handle integer vector types
+    else if constexpr (is_non_bool_integral_vector_v<T>) {
+      if constexpr (std::is_signed_v<typename T::value_type>) {
+        // Signed integer vectors -> vector<int64_t>
+        settings_[key] = _convert_to_int64_vector(value);
+      } else {
+        // Unsigned integer vectors -> vector<uint64_t>
+        settings_[key] = _convert_to_uint64_vector(value);
+      }
+    } else {
+      settings_[key] = value;
+    }
   }
 
   /**
@@ -198,9 +225,68 @@ class Settings : public DataClass,
       throw SettingNotFound(key);
     }
 
-    try {
-      return std::get<T>(it->second);
-    } catch (const std::bad_variant_access&) {
+    // If the type is directly in the variant, return it
+    if constexpr (is_variant_member_v<T, SettingValue>) {
+      try {
+        return std::get<T>(it->second);
+      } catch (const std::bad_variant_access&) {
+        throw SettingTypeMismatch(key, typeid(T).name());
+      }
+    }
+    // Handle integral type conversions
+    else if constexpr (is_non_bool_integral_v<T>) {
+      try {
+        // Check which type is actually stored to avoid unnecessary conversion
+        // attempts
+        if (std::holds_alternative<int64_t>(it->second)) {
+          if (auto result = _try_convert_from<T, int64_t>(it->second)) {
+            return *result;
+          }
+        } else if (std::holds_alternative<uint64_t>(it->second)) {
+          if (auto result = _try_convert_from<T, uint64_t>(it->second)) {
+            return *result;
+          }
+        }
+        throw SettingTypeMismatch(key, typeid(T).name());
+      } catch (...) {
+        throw SettingTypeMismatch(key, typeid(T).name());
+      }
+    }
+    // Handle vector<int> and other integer vector conversions
+    else if constexpr (is_vector_v<T>) {
+      using ElementType = typename T::value_type;
+      if constexpr (is_non_bool_integral_v<ElementType>) {
+        // Try signed vector first (vector<int64_t>)
+        if (std::holds_alternative<std::vector<int64_t>>(it->second)) {
+          const auto& vec64 = std::get<std::vector<int64_t>>(it->second);
+          T result;
+          result.reserve(vec64.size());
+          for (const auto& val : vec64) {
+            if (auto converted = _safe_convert<ElementType>(val)) {
+              result.push_back(*converted);
+            } else {
+              throw SettingTypeMismatch(key, "vector element out of range");
+            }
+          }
+          return result;
+        }
+        // Try unsigned vector (vector<uint64_t>)
+        else if (std::holds_alternative<std::vector<uint64_t>>(it->second)) {
+          const auto& vecu64 = std::get<std::vector<uint64_t>>(it->second);
+          T result;
+          result.reserve(vecu64.size());
+          for (const auto& val : vecu64) {
+            if (auto converted = _safe_convert<ElementType>(val)) {
+              result.push_back(*converted);
+            } else {
+              throw SettingTypeMismatch(key, "vector element out of range");
+            }
+          }
+          return result;
+        }
+      }
+      throw SettingTypeMismatch(key, typeid(T).name());
+    } else {
       throw SettingTypeMismatch(key, typeid(T).name());
     }
   }
@@ -227,33 +313,37 @@ class Settings : public DataClass,
       return default_value;
     }
 
-    try {
-      return std::get<T>(it->second);
-    } catch (const std::bad_variant_access&) {
-      // Try numeric conversions for compatible types
-      if constexpr (std::is_integral_v<T>) {
-        try {
-          if (std::holds_alternative<int>(it->second)) {
-            if (auto result = _safe_convert<T>(std::get<int>(it->second)))
-              return *result;
-          } else if (std::holds_alternative<long>(it->second)) {
-            if (auto result = _safe_convert<T>(std::get<long>(it->second)))
-              return *result;
-          } else if (std::holds_alternative<size_t>(it->second)) {
-            if (auto result = _safe_convert<T>(std::get<size_t>(it->second)))
-              return *result;
-          } else if (std::holds_alternative<int64_t>(it->second)) {
-            if (auto result = _safe_convert<T>(std::get<int64_t>(it->second)))
-              return *result;
-          } else if (std::holds_alternative<uint64_t>(it->second)) {
-            if (auto result = _safe_convert<T>(std::get<uint64_t>(it->second)))
-              return *result;
+    // If the type is directly in the variant, try to get it
+    if constexpr (is_variant_member_v<T, SettingValue>) {
+      try {
+        return std::get<T>(it->second);
+      } catch (const std::bad_variant_access&) {
+        // Fall through to try conversion if T is an integral type
+        if constexpr (is_non_bool_integral_v<T>) {
+          // Type is in variant but wrong signedness - try conversion
+          if (auto result = _try_convert_from<T, int64_t>(it->second)) {
+            return *result;
+          } else if (auto result = _try_convert_from<T, uint64_t>(it->second)) {
+            return *result;
           }
-        } catch (...) {
-          // Conversion failed or would lose data
         }
+        return default_value;
       }
-      // Fall back to default value
+    }
+    // Handle integral type conversions
+    else if constexpr (is_non_bool_integral_v<T>) {
+      try {
+        // Try conversion from int64_t and uint64_t only (simplified)
+        if (auto result = _try_convert_from<T, int64_t>(it->second)) {
+          return *result;
+        } else if (auto result = _try_convert_from<T, uint64_t>(it->second)) {
+          return *result;
+        }
+      } catch (...) {
+        // Conversion failed or would lose data
+      }
+      return default_value;
+    } else {
       return default_value;
     }
   }
@@ -539,8 +629,31 @@ class Settings : public DataClass,
   template <typename T>
   void set_default(const std::string& key, const T& value) {
     if (!has(key)) {
-      settings_[key] = value;  // Direct assignment for set_default - this is
-                               // allowed to create new keys
+      // If the type is directly in the variant, use it as-is
+      if constexpr (is_variant_member_v<T, SettingValue>) {
+        settings_[key] = value;
+      }
+      // Handle integral types - store as int64_t (signed) or uint64_t
+      // (unsigned)
+      else if constexpr (is_non_bool_integral_v<T>) {
+        if constexpr (std::is_signed_v<T>) {
+          settings_[key] = static_cast<int64_t>(value);
+        } else {
+          settings_[key] = static_cast<uint64_t>(value);
+        }
+      }
+      // Handle integer vector types
+      else if constexpr (is_non_bool_integral_vector_v<T>) {
+        if constexpr (std::is_signed_v<typename T::value_type>) {
+          // Signed integer vectors -> vector<int64_t>
+          settings_[key] = _convert_to_int64_vector(value);
+        } else {
+          // Unsigned integer vectors -> vector<uint64_t>
+          settings_[key] = _convert_to_uint64_vector(value);
+        }
+      } else {
+        settings_[key] = value;
+      }
     }
   }
 
@@ -563,6 +676,58 @@ class Settings : public DataClass,
   static constexpr const char* SERIALIZATION_VERSION = "0.1.0";
 
   /**
+   * @brief Helper to check if a type is in the SettingValue variant
+   */
+  template <typename T, typename Variant>
+  struct is_variant_member;
+
+  template <typename T, typename... Ts>
+  struct is_variant_member<T, std::variant<Ts...>>
+      : std::disjunction<std::is_same<T, Ts>...> {};
+
+  template <typename T, typename Variant>
+  inline static constexpr bool is_variant_member_v =
+      is_variant_member<T, Variant>::value;
+
+  /**
+   * @brief Helper to check if a type is a std::vector
+   */
+  template <typename T>
+  struct is_vector : std::false_type {};
+
+  template <typename T, typename A>
+  struct is_vector<std::vector<T, A>> : std::true_type {};
+
+  template <typename T>
+  inline static constexpr bool is_vector_v = is_vector<T>::value;
+
+  template <typename T>
+  struct is_non_bool_integral
+      : std::conjunction<std::is_integral<T>,
+                         std::negation<std::is_same<T, bool>>> {};
+
+  template <typename T>
+  inline static constexpr bool is_non_bool_integral_v =
+      is_non_bool_integral<T>::value;
+
+  template <typename T>
+  inline static constexpr bool is_non_bool_integral_vector_v =
+      is_vector_v<T> && is_non_bool_integral_v<typename T::value_type>;
+
+  /**
+   * @brief Helper to try converting from a specific type if it's in the variant
+   */
+  template <typename TargetT, typename SourceT>
+  static std::optional<TargetT> _try_convert_from(const SettingValue& value) {
+    if constexpr (is_variant_member_v<SourceT, SettingValue>) {
+      if (std::holds_alternative<SourceT>(value)) {
+        return _safe_convert<TargetT>(std::get<SourceT>(value));
+      }
+    }
+    return std::nullopt;
+  }
+
+  /**
    * @brief Safely convert between types with range checks
    *
    * This function attempts to convert a value of type SourceT to TargetT,
@@ -577,6 +742,13 @@ class Settings : public DataClass,
    */
   template <typename TargetT, typename SourceT>
   static std::optional<TargetT> _safe_convert(const SourceT& value) {
+    // Fast path: no conversion needed for 64-bit to same 64-bit type
+    if constexpr (std::is_same_v<TargetT, SourceT> &&
+                  (std::is_same_v<TargetT, int64_t> ||
+                   std::is_same_v<TargetT, uint64_t>)) {
+      return value;
+    }
+
     if constexpr (std::is_signed_v<TargetT>) {
       // Target type is signed, check both lower and upper bounds
       if (value >= static_cast<SourceT>(std::numeric_limits<TargetT>::min()) &&
@@ -593,6 +765,36 @@ class Settings : public DataClass,
     return std::nullopt;
   }
 
+  /**
+   * @brief Convert a vector of signed integers to vector<int64_t>
+   * @tparam T The source integer type
+   * @param value The vector to convert
+   * @return vector<int64_t> with converted values
+   */
+  template <typename T>
+  static std::vector<int64_t> _convert_to_int64_vector(
+      const std::vector<T>& value) {
+    std::vector<int64_t> int64_vec(value.size());
+    std::transform(value.begin(), value.end(), int64_vec.begin(),
+                   [](const T& v) { return static_cast<int64_t>(v); });
+    return int64_vec;
+  }
+
+  /**
+   * @brief Convert a vector of unsigned integers to vector<uint64_t>
+   * @tparam T The source integer type
+   * @param value The vector to convert
+   * @return vector<uint64_t> with converted values
+   */
+  template <typename T>
+  static std::vector<uint64_t> _convert_to_uint64_vector(
+      const std::vector<T>& value) {
+    std::vector<uint64_t> uint64_vec(value.size());
+    std::transform(value.begin(), value.end(), uint64_vec.begin(),
+                   [](const T& v) { return static_cast<uint64_t>(v); });
+    return uint64_vec;
+  }
+
   /// Storage for all settings
   std::map<std::string, SettingValue> settings_;
 
@@ -604,12 +806,21 @@ class Settings : public DataClass,
    */
   template <typename T>
   static constexpr bool is_supported_type() {
-    return std::disjunction_v<
-        std::is_same<T, bool>, std::is_same<T, int>, std::is_same<T, long>,
-        std::is_same<T, size_t>, std::is_same<T, float>,
-        std::is_same<T, double>, std::is_same<T, std::string>,
-        std::is_same<T, std::vector<int>>, std::is_same<T, std::vector<double>>,
-        std::is_same<T, std::vector<std::string>>>;
+    // Use is_variant_member to check against the actual variant types
+    // Also allow integral types and integer vectors that are convertible
+    if constexpr (is_variant_member_v<T, SettingValue>) {
+      return true;
+    } else if constexpr (is_non_bool_integral_v<T>) {
+      // Allow other integral types that can be safely converted to
+      // int64_t/uint64_t
+      return true;
+    } else if constexpr (is_non_bool_integral_vector_v<T>) {
+      // Allow integer vector types that can be converted to vector<int64_t> or
+      // vector<uint64_t>
+      return true;
+    } else {
+      return false;
+    }
   }
 
   /**

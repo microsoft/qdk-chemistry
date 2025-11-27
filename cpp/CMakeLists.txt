@@ -3,6 +3,15 @@ project(qdk VERSION 1.0.0.1 LANGUAGES CXX C)
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
+if(APPLE AND NOT DEFINED CMAKE_MACOSX_RPATH)
+    set(CMAKE_MACOSX_RPATH ON CACHE BOOL "Use macOS RPATH" FORCE)
+endif()
+
+include(CMakeDependentOption)
+if(POLICY CMP0127)
+    cmake_policy(SET CMP0127 NEW)
+endif()
+
 # Set default build type
 if(NOT CMAKE_BUILD_TYPE)
     message(WARNING "CMAKE_BUILD_TYPE not specified, defaulting to Release")
@@ -19,7 +28,11 @@ option(QDK_CHEMISTRY_ENABLE_GPU         "Enable GPU acceleration in QDK" OFF)
 option(QDK_ALLOW_DEPENDENCY_FETCH "Allow fetching of dependencies"     ON)
 option(QDK_CHEMISTRY_ENABLE_MPI "Enable MPI Bindings for QDK Chemistry"  OFF)
 option(QDK_EMBED_RESOURCE_LOCATION "Point to embedded (permanent) resource location" ON)
-option(QDK_ENABLE_OPENMP "Enable OpenMP support" ON)
+
+# Enable OpenMP by default, except on Apple platforms with AppleClang
+cmake_dependent_option(QDK_ENABLE_OPENMP
+    "Enable OpenMP support" ON
+    "NOT (APPLE AND CMAKE_CXX_COMPILER_ID STREQUAL \"AppleClang\")" OFF)
 
 list(APPEND CMAKE_MODULE_PATH ${PROJECT_SOURCE_DIR}/cmake/modules)
 
@@ -29,10 +42,7 @@ FetchContent_Declare( linalg-cmake-modules
   GIT_REPOSITORY https://github.com/wavefunction91/linalg-cmake-modules.git
   GIT_TAG        main
 )
-FetchContent_GetProperties( linalg-cmake-modules )
-if( NOT linalg-cmake-modules_POPULATED )
-  FetchContent_Populate( linalg-cmake-modules )
-endif()
+FetchContent_MakeAvailable( linalg-cmake-modules )
 
 list( APPEND CMAKE_MODULE_PATH ${linalg-cmake-modules_SOURCE_DIR} )
 

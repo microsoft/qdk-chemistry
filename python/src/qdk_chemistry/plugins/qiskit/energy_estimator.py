@@ -22,7 +22,6 @@ from __future__ import annotations
 import logging
 from typing import TYPE_CHECKING, Any
 
-import numpy as np
 from qiskit import qasm3, transpile
 from qiskit_aer import AerSimulator
 from qiskit_aer.noise import NoiseModel
@@ -202,35 +201,3 @@ class QiskitEnergyEstimator(EnergyEstimator):
 
 
 register(lambda: QiskitEnergyEstimator())
-
-if __name__ == "__main__":
-    """Example usage of the Estimator from different backends."""
-    from qiskit import qasm3
-    from qiskit_aer.noise import NoiseModel, depolarizing_error
-
-    logging.basicConfig(level=logging.WARNING)
-    _LOGGER = logging.getLogger(__name__)
-    _LOGGER.setLevel(logging.INFO)
-
-    circuit_qasm = """
-        include "stdgates.inc";
-        qubit[2] q;
-        rz(pi) q[0];
-        x q[0];
-        cx q[0], q[1];
-        """
-    qubit_hamiltonians = [QubitHamiltonian(["ZZ"], np.array([1.0]))]
-
-    # Example usage: qiskit aer simulator
-    estimator = QiskitEnergyEstimator()
-    results = estimator.run(circuit_qasm, qubit_hamiltonians, total_shots=1000)
-    _LOGGER.info(f"Energy expectation value from AerSimulator: {results['energy_expectation_value']}")
-
-    # Example usage: qiskit aer simulator with noise model
-    noise_model = NoiseModel(basis_gates=["rz", "sx", "cx", "measure"])
-    noise_model.add_all_qubit_quantum_error(depolarizing_error(0.001, 1), ["rz", "sx"])
-    noise_model.add_all_qubit_quantum_error(depolarizing_error(0.007, 2), ["cx"])
-    backend_options = {"noise_model": noise_model}  # add noise
-    estimator = QiskitEnergyEstimator.from_backend_options(backend_options=backend_options)
-    results = estimator.run(circuit_qasm, qubit_hamiltonians, total_shots=1000)
-    _LOGGER.info(f"Energy expectation value from AerSimulator with noise: {results['energy_expectation_value']}")

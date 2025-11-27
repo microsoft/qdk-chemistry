@@ -16,7 +16,6 @@
 #include <iostream>
 #include <nlohmann/json.hpp>
 #include <numeric>
-#include <qdk/chemistry/utils/omp_utils.hpp>
 #include <sstream>
 #include <thread>
 
