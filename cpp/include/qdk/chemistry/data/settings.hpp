@@ -94,12 +94,12 @@ class SettingTypeMismatch : public std::runtime_error {
  *     // Convenience getters with validation (optional)
  *     int32_t get_max_iterations() const { return
  * get<int32_t>("max_iterations"); } double get_tolerance() const { return
- * get<double>("tolerance"); } std::string get_method() const { return
- * get<std::string>("method"); }
+ * get<double>("convergence_threshold"); } std::string get_method() const {
+ * return get<std::string>("method"); }
  *
  *     // After construction, only existing settings can be modified
  *     void set_max_iterations(int32_t value) { set("max_iterations", value); }
- *     void set_tolerance(double value) { set("tolerance", value); }
+ *     void set_tolerance(double value) { set("convergence_threshold", value); }
  * };
  * ```
  */
