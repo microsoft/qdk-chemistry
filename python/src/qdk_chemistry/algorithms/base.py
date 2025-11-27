@@ -25,51 +25,50 @@ class Algorithm(ABC):
     defined in this base class.
 
     Examples:
-        Creating a custom SCF solver algorithm::
-
-            >>> from qdk_chemistry.algorithms import Algorithm, registry
-            >>> from qdk_chemistry.data import Structure, Wavefunction, ElectronicStructureSettings
-            >>>
-            >>> class MyCustomScfSolver(Algorithm):
-            ...     def __init__(self):
-            ...         super().__init__()
-            ...         # Replace with specialized settings
-            ...         self._settings = ElectronicStructureSettings()
-            ...         self._settings.set("max_iterations", 50)
-            ...         self._settings.set("convergence_threshold", 1e-6)
-            ...
-            ...     def name(self) -> str:
-            ...         return "my_custom_scf"
-            ...
-            ...     def type_name(self) -> str:
-            ...         return "scf_solver"
-            ...
-            ...     def aliases(self) -> list[str]:
-            ...         return ["my_custom_scf", "custom_scf"]
-            ...
-            ...     def _run_impl(self, structure: Structure, charge: int,
-            ...                   spin_multiplicity: int) -> tuple[float, Wavefunction]:
-            ...         # Custom SCF implementation
-            ...         max_iter = self.settings().get("max_iterations")
-            ...         threshold = self.settings().get("convergence_threshold")
-            ...
-            ...         # ... perform SCF calculation ...
-            ...         energy = -1.0  # placeholder
-            ...         wavefunction = Wavefunction()  # placeholder
-            ...
-            ...         return energy, wavefunction
-            >>>
-            >>> # Register the custom algorithm
-            >>> registry.register(lambda: MyCustomScfSolver())
-            >>>
-            >>> # Use it like any built-in algorithm
-            >>> scf = registry.create("scf_solver", "my_custom_scf")
-            >>> # Or using the alias
-            >>> scf = registry.create("scf_solver", "custom_scf")
-            >>>
-            >>> # Configure and run
-            >>> scf.settings().set("max_iterations", 100)
-            >>> energy, wfn = scf.run(structure, charge=0, spin_multiplicity=1)
+        >>> # Creating a custom SCF solver algorithm
+        >>> from qdk_chemistry.algorithms import Algorithm, registry
+        >>> from qdk_chemistry.data import Structure, Wavefunction, ElectronicStructureSettings
+        >>>
+        >>> class MyCustomScfSolver(Algorithm):
+        ...     def __init__(self):
+        ...         super().__init__()
+        ...         # Replace with specialized settings
+        ...         self._settings = ElectronicStructureSettings()
+        ...         self._settings.set("max_iterations", 50)
+        ...         self._settings.set("convergence_threshold", 1e-6)
+        ...
+        ...     def name(self) -> str:
+        ...         return "my_custom_scf"
+        ...
+        ...     def type_name(self) -> str:
+        ...         return "scf_solver"
+        ...
+        ...     def aliases(self) -> list[str]:
+        ...         return ["my_custom_scf", "custom_scf"]
+        ...
+        ...     def _run_impl(self, structure: Structure, charge: int,
+        ...                   spin_multiplicity: int) -> tuple[float, Wavefunction]:
+        ...         # Custom SCF implementation
+        ...         max_iter = self.settings().get("max_iterations")
+        ...         threshold = self.settings().get("convergence_threshold")
+        ...
+        ...         # ... perform SCF calculation ...
+        ...         energy = -1.0  # placeholder
+        ...         wavefunction = Wavefunction()  # placeholder
+        ...
+        ...         return energy, wavefunction
+        >>>
+        >>> # Register the custom algorithm
+        >>> registry.register(lambda: MyCustomScfSolver())
+        >>>
+        >>> # Use it like any built-in algorithm
+        >>> scf = registry.create("scf_solver", "my_custom_scf")
+        >>> # Or using the alias
+        >>> scf = registry.create("scf_solver", "custom_scf")
+        >>>
+        >>> # Configure and run
+        >>> scf.settings().set("max_iterations", 100)
+        >>> energy, wfn = scf.run(structure, charge=0, spin_multiplicity=1)
 
     """
 
@@ -189,46 +188,45 @@ class AlgorithmFactory(ABC):
         creating and registering algorithms.
 
     Examples:
-        Creating a custom factory for a new algorithm type::
-
-            >>> from qdk_chemistry.algorithms.base import AlgorithmFactory, Algorithm
-            >>> import qdk_chemistry.algorithms.registry as registry
-            >>> import qdk_chemistry.algorithms as algorithms
-            >>> from qdk_chemistry.data import Structure
-            >>>
-            >>> # Example custom algorithm type
-            >>> class GeometryOptimizer(Algorithm):
-            ...     def type_name(self) -> str:
-            ...         return "geometry_optimizer"
-            >>>
-            >>> # Example factory for this algorithm type
-            >>> class GeometryOptimizerFactory(AlgorithmFactory):
-            ...     def algorithm_type_name(self) -> str:
-            ...         return "geometry_optimizer"
-            ...
-            ...     def default_algorithm_name(self) -> str:
-            ...         return "bfgs"  # Default algorithm
-            >>>
-            >>> # Register a custom implementation
-            >>> class BfgsOptimizer(GeometryOptimizer):
-            ...     def name(self) -> str:
-            ...         return "bfgs"
-            ...     def _run_impl(self, structure: Structure):
-            ...         # Implementation here
-            ...         pass
-            >>>
-            >>> # Register the factory with the registry system
-            >>> factory = GeometryOptimizerFactory()
-            >>> registry.register_factory(factory)
-            >>>
-            >>> # Register algorithm implementation
-            >>> algorithms.register(lambda: BfgsOptimizer())
-            >>>
-            >>> # Now use via the top-level API
-            >>> optimizer = algorithms.create("geometry_optimizer", "bfgs")
-            >>> available_opts = algorithms.available("geometry_optimizer")
-            >>> print(available_opts)
-            {'geometry_optimizer': ['bfgs']}
+        >>> # Creating a custom factory for a new algorithm type
+        >>> from qdk_chemistry.algorithms.base import AlgorithmFactory, Algorithm
+        >>> import qdk_chemistry.algorithms.registry as registry
+        >>> import qdk_chemistry.algorithms as algorithms
+        >>> from qdk_chemistry.data import Structure
+        >>>
+        >>> # Example custom algorithm type
+        >>> class GeometryOptimizer(Algorithm):
+        ...     def type_name(self) -> str:
+        ...         return "geometry_optimizer"
+        >>>
+        >>> # Example factory for this algorithm type
+        >>> class GeometryOptimizerFactory(AlgorithmFactory):
+        ...     def algorithm_type_name(self) -> str:
+        ...         return "geometry_optimizer"
+        ...
+        ...     def default_algorithm_name(self) -> str:
+        ...         return "bfgs"  # Default algorithm
+        >>>
+        >>> # Register a custom implementation
+        >>> class BfgsOptimizer(GeometryOptimizer):
+        ...     def name(self) -> str:
+        ...         return "bfgs"
+        ...     def _run_impl(self, structure: Structure):
+        ...         # Implementation here
+        ...         pass
+        >>>
+        >>> # Register the factory with the registry system
+        >>> factory = GeometryOptimizerFactory()
+        >>> registry.register_factory(factory)
+        >>>
+        >>> # Register algorithm implementation
+        >>> algorithms.register(lambda: BfgsOptimizer())
+        >>>
+        >>> # Now use via the top-level API
+        >>> optimizer = algorithms.create("geometry_optimizer", "bfgs")
+        >>> available_opts = algorithms.available("geometry_optimizer")
+        >>> print(available_opts)
+        {'geometry_optimizer': ['bfgs']}
 
     See Also:
         qdk_chemistry.algorithms.registry:

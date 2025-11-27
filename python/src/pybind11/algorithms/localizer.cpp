@@ -52,18 +52,16 @@ Localization transforms canonical molecular orbitals into localized orbitals tha
 Concrete implementations should inherit from this class and implement the localize method.
 
 Examples:
-
-    To create a custom orbital localizer, inherit from this class::
-
-        >>> import qdk_chemistry.algorithms as alg
-        >>> import qdk_chemistry.data as data
-        >>> class MyLocalizer(alg.Localizer):
-        ...     def __init__(self):
-        ...         super().__init__()  # Call the base class constructor
-        ...     # Implement the _run_impl method
-        ...     def _run_impl(self, wavefunction: data.Wavefunction, loc_indices_a: list, loc_indices_b: list) -> data.Wavefunction:
-        ...         # Custom localization implementation
-        ...         return localized_wavefunction
+    >>> # To create a custom orbital localizer, inherit from this class.
+    >>> import qdk_chemistry.algorithms as alg
+    >>> import qdk_chemistry.data as data
+    >>> class MyLocalizer(alg.Localizer):
+    ...     def __init__(self):
+    ...         super().__init__()  # Call the base class constructor
+    ...     # Implement the _run_impl method
+    ...     def _run_impl(self, wavefunction: data.Wavefunction, loc_indices_a: list, loc_indices_b: list) -> data.Wavefunction:
+    ...         # Custom localization implementation
+    ...         return localized_wavefunction
 )");
 
   localizer.def(py::init<>(),

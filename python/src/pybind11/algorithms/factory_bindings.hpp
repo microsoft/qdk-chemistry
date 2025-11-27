@@ -53,12 +53,12 @@ This class provides static methods for creating, listing, and managing algorithm
 
 All methods are static and the class cannot be instantiated.
 
-See also:
-    create : Create an algorithm instance by name
-    available : List all registered algorithm names
-    register_instance : Register a new algorithm implementation
-    unregister_instance : Remove an algorithm from the registry
-    has : Check if an algorithm name is registered
+See Also:
+    :meth:`create` : Create an algorithm instance by name
+    :meth:`available` : List all registered algorithm names
+    :meth:`register_instance` : Register a new algorithm implementation
+    :meth:`unregister_instance` : Remove an algorithm from the registry
+    :meth:`has` : Check if an algorithm name is registered
 
 )");
 
@@ -175,14 +175,16 @@ Examples:
 )");
   // Bind has static method
   factory.def_static("algorithm_type_name", &FactoryType::algorithm_type_name,
-                     R"(Return the type name of the created algorithms.
+                     R"(
+Return the type name of the created algorithms.
 
 Returns:
     str: The type name of the created algorithms
 
 )");
   factory.def_static("clear", &FactoryType::clear,
-                     R"(Clear all registered algorithm implementations.
+                     R"(
+Clear all registered algorithm implementations.
 )");
   factory.def_static("has", &FactoryType::has, py::arg("key"),
                      R"(

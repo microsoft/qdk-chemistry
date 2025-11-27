@@ -59,22 +59,20 @@ This class defines the interface for MultiConfigurationScf calculations that sim
 Concrete implementations should inherit from this class and implement the ``solve`` method.
 
 Examples:
-
-    To create a custom MultiConfigurationScf solver, inherit from this class:
-
-        >>> import qdk_chemistry.algorithms as alg
-        >>> import qdk_chemistry.data as data
-        >>> class MyMCSCF(alg.MultiConfigurationScf):
-        ...     def __init__(self):
-        ...         super().__init__()  # Call the base class constructor
-        ...     def _run_impl(self,
-        ...                   orbitals : data.Orbitals,
-        ...                   ham_ctor : alg.HamiltonianConstructor,
-        ...                   mc_calculator : alg.MultiConfigurationCalculator,
-        ...                   n_active_alpha_electrons : int,
-        ...                   n_active_beta_electrons : int) ->tuple[float, data.Wavefunction] :
-        ...         # Custom MCSCF implementation
-        ...         return -1.0, data.Wavefunction()
+    >>> # To create a custom MultiConfigurationScf algorithm, inherit from this class.
+    >>> import qdk_chemistry.algorithms as alg
+    >>> import qdk_chemistry.data as data
+    >>> class MyMCSCF(alg.MultiConfigurationScf):
+    ...     def __init__(self):
+    ...         super().__init__()  # Call the base class constructor
+    ...     def _run_impl(self,
+    ...                   orbitals : data.Orbitals,
+    ...                   ham_ctor : alg.HamiltonianConstructor,
+    ...                   mc_calculator : alg.MultiConfigurationCalculator,
+    ...                   n_active_alpha_electrons : int,
+    ...                   n_active_beta_electrons : int) ->tuple[float, data.Wavefunction] :
+    ...         # Custom MCSCF implementation
+    ...         return -1.0, data.Wavefunction()
 )");
 
   multi_configuration_scf.def(py::init<>(),

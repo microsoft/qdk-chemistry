@@ -56,18 +56,16 @@ This class defines the interface for multi configuration-based quantum chemistry
 Concrete implementations should inherit from this class and implement the ``calculate`` method.
 
 Examples:
-
-    To create a custom MC calculator, inherit from this class:
-
-        >>> import qdk_chemistry.algorithms as alg
-        >>> import qdk_chemistry.data as data
-        >>> class MyMultiConfigurationCalculator(alg.MultiConfigurationCalculator):
-        ...     def __init__(self):
-        ...         super().__init__()  # Call the base class constructor
-        ...     # Implement the _run_impl method (called by run())
-        ...     def _run_impl(self, hamiltonian: data.Hamiltonian, n_active_alpha_electrons: int, n_active_beta_electrons: int) -> tuple[float, data.Wavefunction]:
-        ...         # Custom MC implementation
-        ...         return energy, wavefunction
+    >>> # To create a custom multi-configuration calculator, inherit from this class.
+    >>> import qdk_chemistry.algorithms as alg
+    >>> import qdk_chemistry.data as data
+    >>> class MyMultiConfigurationCalculator(alg.MultiConfigurationCalculator):
+    ...     def __init__(self):
+    ...         super().__init__()  # Call the base class constructor
+    ...     # Implement the _run_impl method (called by run())
+    ...     def _run_impl(self, hamiltonian: data.Hamiltonian, n_active_alpha_electrons: int, n_active_beta_electrons: int) -> tuple[float, data.Wavefunction]:
+    ...         # Custom MC implementation
+    ...         return energy, wavefunction
 
 )");
 

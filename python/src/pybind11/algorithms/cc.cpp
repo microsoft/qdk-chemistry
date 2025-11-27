@@ -54,18 +54,16 @@ This class defines the interface for coupled cluster-based quantum chemistry cal
 Concrete implementations should inherit from this class and implement the ``calculate`` method.
 
 Examples:
-
-    To create a custom coupled cluster calculator, inherit from this class:
-
-        >>> import qdk_chemistry.algorithms as alg
-        >>> import qdk_chemistry.data as data
-        >>> class MyCCCalculator(alg.CoupledClusterCalculator):
-        ...     def __init__(self):
-        ...         super().__init__()  # Call the base class constructor
-        ...     # Implement the _run_impl method (called by calculate())
-        ...     def _run_impl(self, ansatz: data.Ansatz) -> tuple[float, data.CoupledClusterAmplitudes]:
-            ...         # Custom CC implementation
-            ...         return energy, coupled_cluster_amplitudes
+    >>> # To create a custom coupled cluster calculator, inherit from this class.
+    >>> import qdk_chemistry.algorithms as alg
+    >>> import qdk_chemistry.data as data
+    >>> class MyCCCalculator(alg.CoupledClusterCalculator):
+    ...     def __init__(self):
+    ...         super().__init__()  # Call the base class constructor
+    ...     # Implement the _run_impl method (called by calculate())
+    ...     def _run_impl(self, ansatz: data.Ansatz) -> tuple[float, data.CoupledClusterAmplitudes]:
+    ...         # Custom CC implementation
+    ...         return energy, coupled_cluster_amplitudes
 
 )");
 

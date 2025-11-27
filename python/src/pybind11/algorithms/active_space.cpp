@@ -49,17 +49,16 @@ This class defines the interface for selecting active spaces from a set of orbit
 Active space selection is a critical step in many quantum chemistry methods, particularly for multireference calculations.
 Concrete implementations should inherit from this class and implement the ``select_active_space`` method.
 
-Return value semantics:
+.. rubric:: Return value semantics
 
-    Implementations return a new ``Wavefunction`` object with active-space data populated.
-    Some selectors (e.g., occupation/valence) return a copy with only metadata updated.
-    Others (e.g., AVAS) may rotate/canonicalize orbitals and recompute occupations,
-    so the returned coefficients/occupations can differ from the input.
-    The input ``Wavefunction`` object is never modified.
+Implementations return a new ``Wavefunction`` object with active-space data populated.
+Some selectors (e.g., occupation/valence) return a copy with only metadata updated.
+Others (e.g., AVAS) may rotate/canonicalize orbitals and recompute occupations,
+so the returned coefficients/occupations can differ from the input.
+The input ``Wavefunction`` object is never modified.
 
 Examples:
-
-    To create a custom active space selector, inherit from this class::
+    To create a custom active space selector, inherit from this class.::
 
         >>> import qdk_chemistry.algorithms as alg
         >>> import qdk_chemistry.data as data

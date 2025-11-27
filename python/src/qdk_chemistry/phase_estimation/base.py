@@ -54,8 +54,7 @@ class PhaseEstimation(ABC):  # noqa: B024
 
         Args:
             hamiltonian: Target Hamiltonian whose eigenvalues are estimated.
-            evolution_time: Time parameter ``t`` used in the time-evolution
-                unitary ``U = exp(-i H t)``.
+            evolution_time: Time parameter ``t`` used in the time-evolution unitary ``U = exp(-i H t)``.
 
         """
         self._hamiltonian = hamiltonian
@@ -83,12 +82,13 @@ class PhaseEstimation(ABC):  # noqa: B024
         """Factory method returning the requested phase estimation strategy.
 
         Args:
-            algorithm: Identifier for the desired algorithm.  ``None`` selects
-                :class:`PhaseEstimationAlgorithm.ITERATIVE`.
+            algorithm: Identifier for the desired algorithm.
+
+                ``None`` selects :class:`PhaseEstimationAlgorithm.ITERATIVE`.
+
             hamiltonian: Target Hamiltonian.
             evolution_time: Time parameter ``t`` for ``U = exp(-i H t)``.
-            kwargs: Additional options forwarded to the algorithm
-                constructor.
+            kwargs: Additional options forwarded to the algorithm constructor.
 
         Raises:
             ValueError: If the requested algorithm is not registered.

@@ -49,6 +49,7 @@ class TraditionalPhaseEstimation(PhaseEstimation):
             hamiltonian: Target Hamiltonian.
             evolution_time: Time parameter ``t`` for ``U = exp(-i H t)``.
             qft_do_swaps: Whether to include the final swap layer in the inverse
+
                 QFT. Defaults to ``True`` so that the measured bit string is
                 ordered from most-significant to least-significant bit.
 

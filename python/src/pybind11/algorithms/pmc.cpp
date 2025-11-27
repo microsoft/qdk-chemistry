@@ -59,18 +59,17 @@ In this manner, the high-performance solvers which underly other MC algorithms c
 
 The calculator takes a Hamiltonian and a set of configurations as input and returns both the calculated total energy and the corresponding multi-configurational wavefunction.
 
+To create a custom PMC calculator, inherit from this class.
+
 Examples:
-
-    To create a custom PMC calculator, inherit from this class:
-
-        >>> import qdk_chemistry.algorithms as alg
-        >>> import qdk_chemistry.data as data
-        >>> class MyProjectedMultiConfigurationCalculator(alg.ProjectedMultiConfigurationCalculator):
-        ...     def __init__(self):
-        ...         super().__init__()  # Call the base class constructor
-        ...     def _run_impl(self, hamiltonian: data.Hamiltonian, configurations: list[data.Configuration]) -> tuple[float, data.Wavefunction]:
-        ...         # Custom PMC implementation
-        ...         return energy, wavefunction
+    >>> import qdk_chemistry.algorithms as alg
+    >>> import qdk_chemistry.data as data
+    >>> class MyProjectedMultiConfigurationCalculator(alg.ProjectedMultiConfigurationCalculator):
+    ...     def __init__(self):
+    ...         super().__init__()  # Call the base class constructor
+    ...     def _run_impl(self, hamiltonian: data.Hamiltonian, configurations: list[data.Configuration]) -> tuple[float, data.Wavefunction]:
+    ...         # Custom PMC implementation
+    ...         return energy, wavefunction
 
 )");
 
