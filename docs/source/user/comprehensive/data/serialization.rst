@@ -1,7 +1,7 @@
 Serialization
 =============
 
-QDK/Chemistry provides serialization capabilities for all its data classes, allowing you to save and load computational results in various formats.
+QDK/Chemistry provides serialization capabilities for all its data classes, allowing to save and load computational results in various formats.
 This document explains the serialization mechanisms and formats supported by QDK/Chemistry.
 
 Overview
@@ -14,10 +14,6 @@ In QDK/Chemistry, this is crucial for:
 - Sharing data between different programs or languages
 - Preserving computational results for future analysis
 - Implementing checkpoint and restart capabilities
-
-.. note::
-   For detailed information about the structure and organization of serialized data for each class, refer to the corresponding class documentation.
-   Each data class page includes examples of the JSON and HDF5 schema used for serialization.
 
 Supported formats
 -----------------
@@ -41,23 +37,34 @@ JSON serialization
 
    .. code-block:: cpp
 
+      #include <qdk/chemistry.hpp>
+      using namespace qdk::chemistry::data;
+
+      // Structure data class example
+      std::vector<Eigen::Vector3d> coords = {{0.0, 0.0, 0.0}, {0.0, 0.0, 1.4}};
+      std::vector<std::string> symbols = {"H", "H"};
+      std::vector <double> custom_masses {1.001, 0.999};
+      std::vector<double> custom_charges = {0.9, 1.1};
+      Structure structure(coords, elements, custom_masses, custom_charges);
+
       // Serialize to JSON object
-      auto json_data = object.to_json();
+      auto structure_data = structure.to_json();
 
       // Deserialize from JSON object
-      auto object_from_json = ObjectType::from_json(json_data);
+      // "Structure" is the data type to de-serialize into (will throw, if it doesn't match)
+      auto structure_from_json = Structure::from_json(json_data);
 
-      // Serialize to JSON file
-      object.to_json_file("filename.ext.json"); // Extension depends on object type
+      // Write to json file
+      structure.to_json_file("filename.structure.json"); // Extension depends on object type
 
-      // Deserialize from JSON file
-      auto object_from_json_file = ObjectType::from_json_file("filename.ext.json");
+      // Read from json file
+      auto structure_from_json_file = Structure::from_json_file("filename.structure.json");
 
 .. tab:: Python API
 
    .. literalinclude:: ../../../../examples/serialization.py
       :language: python
-      :lines: 14-20,26-32
+      :lines: 17-36
 
 HDF5 serialization
 ~~~~~~~~~~~~~~~~~~
@@ -66,17 +73,27 @@ HDF5 serialization
 
    .. code-block:: cpp
 
-      // Serialize to HDF5 file
-      object.to_hdf5_file("filename.ext.h5"); // Extension depends on object type
+    // Hamiltonian data class example 
+    // Create dummy data for Hamiltonian class 
+    Eigen::MatrixXd one_body = Eigen::MatrixXd::Identity(2, 2);
+    Eigen::VectorXd two_body = 2 * Eigen::VectorXd::Ones(16);
+    auto orbitals = std::make_shared<ModelOrbitals>(2, true); // 2 orbitals, restricted
+    double core_energy = 1.5;
+    Eigen::MatrixXd inactive_fock = Eigen::MatrixXd::Zero(0, 0);
 
-      // Deserialize from HDF5 file
-      auto object_from_hdf5_file = ObjectType::from_hdf5_file("filename.ext.h5");
+    Hamiltonian h_example(one_body, two_body, orbitals, core_energy, inactive_fock);
+
+    h_example.to_hdf5_file("h_example.hamiltonian.h5"); // Extension depends on object type
+
+    // Deserialize from HDF5 file
+    auto h_example_from_hdf5_file = Hamiltonian::from_hdf5_file("h_example.hamiltonian.h5");
+
 
 .. tab:: Python API
 
    .. literalinclude:: ../../../../examples/serialization.py
       :language: python
-      :lines: 35-41
+      :lines: 44-57
 
 File extensions
 ---------------
