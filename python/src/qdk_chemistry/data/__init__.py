@@ -27,6 +27,8 @@ Classes:
         Result for Hamiltonian energy expectation value and variance, including per-term statistics.
     Hamiltonian
         Quantum mechanical Hamiltonian operator representation.
+    Isotope
+        Represents an isotope of a chemical element with its properties.
     MeasurementData
         Measurement bitstring data and metadata for QubitHamiltonian objects.
     ModelOrbitals
@@ -83,6 +85,7 @@ from qdk_chemistry._core.data import (
     ElectronicStructureSettings,
     Element,
     Hamiltonian,
+    Isotope,
     ModelOrbitals,
     Orbitals,
     OrbitalType,
@@ -98,6 +101,7 @@ from qdk_chemistry._core.data import (
     Wavefunction,
     WavefunctionContainer,
     WavefunctionType,
+    get_current_ciaaw_version,
 )
 from qdk_chemistry.data.base import DataClass
 from qdk_chemistry.data.estimator_data import EnergyExpectationResult, MeasurementData
@@ -121,6 +125,7 @@ __all__ = [
     "Element",
     "EnergyExpectationResult",
     "Hamiltonian",
+    "Isotope",
     "MeasurementData",
     "ModelOrbitals",
     "OrbitalType",
@@ -141,4 +146,5 @@ __all__ = [
     "Wavefunction",
     "WavefunctionContainer",
     "WavefunctionType",
+    "get_current_ciaaw_version",
 ]

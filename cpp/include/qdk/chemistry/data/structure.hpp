@@ -9,143 +9,12 @@
 #include <memory>
 #include <nlohmann/json.hpp>
 #include <qdk/chemistry/data/data_class.hpp>
+#include <qdk/chemistry/data/element_data.hpp>
 #include <string>
 #include <utility>
 #include <vector>
 
 namespace qdk::chemistry::data {
-
-/**
- * @enum Element
- * @brief Enumeration for chemical elements in the periodic table (1-118)
- */
-enum class Element : unsigned {
-  // Period 1
-  H = 1,
-  He = 2,
-  // Period 2
-  Li = 3,
-  Be = 4,
-  B = 5,
-  C = 6,
-  N = 7,
-  O = 8,
-  F = 9,
-  Ne = 10,
-  // Period 3
-  Na = 11,
-  Mg = 12,
-  Al = 13,
-  Si = 14,
-  P = 15,
-  S = 16,
-  Cl = 17,
-  Ar = 18,
-  // Period 4
-  K = 19,
-  Ca = 20,
-  Sc = 21,
-  Ti = 22,
-  V = 23,
-  Cr = 24,
-  Mn = 25,
-  Fe = 26,
-  Co = 27,
-  Ni = 28,
-  Cu = 29,
-  Zn = 30,
-  Ga = 31,
-  Ge = 32,
-  As = 33,
-  Se = 34,
-  Br = 35,
-  Kr = 36,
-  // Period 5
-  Rb = 37,
-  Sr = 38,
-  Y = 39,
-  Zr = 40,
-  Nb = 41,
-  Mo = 42,
-  Tc = 43,
-  Ru = 44,
-  Rh = 45,
-  Pd = 46,
-  Ag = 47,
-  Cd = 48,
-  In = 49,
-  Sn = 50,
-  Sb = 51,
-  Te = 52,
-  I = 53,
-  Xe = 54,
-  // Period 6
-  Cs = 55,
-  Ba = 56,
-  La = 57,
-  Ce = 58,
-  Pr = 59,
-  Nd = 60,
-  Pm = 61,
-  Sm = 62,
-  Eu = 63,
-  Gd = 64,
-  Tb = 65,
-  Dy = 66,
-  Ho = 67,
-  Er = 68,
-  Tm = 69,
-  Yb = 70,
-  Lu = 71,
-  Hf = 72,
-  Ta = 73,
-  W = 74,
-  Re = 75,
-  Os = 76,
-  Ir = 77,
-  Pt = 78,
-  Au = 79,
-  Hg = 80,
-  Tl = 81,
-  Pb = 82,
-  Bi = 83,
-  Po = 84,
-  At = 85,
-  Rn = 86,
-  // Period 7
-  Fr = 87,
-  Ra = 88,
-  Ac = 89,
-  Th = 90,
-  Pa = 91,
-  U = 92,
-  Np = 93,
-  Pu = 94,
-  Am = 95,
-  Cm = 96,
-  Bk = 97,
-  Cf = 98,
-  Es = 99,
-  Fm = 100,
-  Md = 101,
-  No = 102,
-  Lr = 103,
-  Rf = 104,
-  Db = 105,
-  Sg = 106,
-  Bh = 107,
-  Hs = 108,
-  Mt = 109,
-  Ds = 110,
-  Rg = 111,
-  Cn = 112,
-  Nh = 113,
-  Fl = 114,
-  Mc = 115,
-  Lv = 116,
-  Ts = 117,
-  Og = 118
-};
 
 /**
  * @class Structure
@@ -154,7 +23,7 @@ enum class Element : unsigned {
  *
  * This class stores and manipulates molecular structure data including:
  * - Atomic coordinates in 3D space
- * - Atomic element identifiers using enum
+ * - Atomic element identifiers using Element or Isotope enum
  * - Atomic masses (in atomic mass units)
  * - Nuclear charges (atomic numbers) for each atom
  * - Serialization to/from JSON and XYZ formats
@@ -185,12 +54,26 @@ class Structure : public DataClass,
    * @param coordinates Matrix of atomic coordinates (N x 3) in Bohr
    * @param elements Vector of atomic elements using enum
    * @param masses Vector of atomic masses in AMU (default: use standard masses)
-   * @param nuclear_charges Vector of nuclear charges (default: use standard
+   * @param nuclear_charges Vector of nuclear charges (default: use default
    * charges)
    * @throws std::invalid_argument if dimensions don't match
    */
   Structure(const Eigen::MatrixXd& coordinates,
             const std::vector<Element>& elements,
+            const Eigen::VectorXd& masses = {},
+            const Eigen::VectorXd& nuclear_charges = {});
+
+  /**
+   * @brief Constructor with coordinates, isotopes, masses, and nuclear charges
+   * @param coordinates Matrix of atomic coordinates (N x 3) in Bohr
+   * @param isotopes Vector of isotopes using Isotope enum
+   * @param masses Vector of atomic masses in AMU (default: use default masses)
+   * @param nuclear_charges Vector of nuclear charges (default: use default
+   * charges)
+   * @throws std::invalid_argument if dimensions don't match
+   */
+  Structure(const Eigen::MatrixXd& coordinates,
+            const std::vector<Isotope>& isotopes,
             const Eigen::VectorXd& masses = {},
             const Eigen::VectorXd& nuclear_charges = {});
 
@@ -198,9 +81,9 @@ class Structure : public DataClass,
    * @brief Constructor from atomic symbols and coordinates
    * @param coordinates Matrix of atomic coordinates (N x 3) in Bohr
    * @param symbols Vector of atomic symbols (e.g., "H", "C", "O")
-   * @param masses Vector of atomic masses in AMU (default: use standard masses)
-   * @param nuclear_charges Vector of nuclear charges (default: use standard
-   * charges)
+   * @param masses Vector of atomic masses in AMU (default: use default masses)
+   * @param nuclear_charges Vector of nuclear charges (default: use default
+   *    * charges)
    * @throws std::invalid_argument if dimensions don't match or unknown symbols
    */
   Structure(const Eigen::MatrixXd& coordinates,
@@ -209,30 +92,44 @@ class Structure : public DataClass,
             const Eigen::VectorXd& nuclear_charges = {});
 
   /**
-   * @brief Constructor from atomic symbols and coordinates as vector
-   * @param coordinates Vector of atomic coordinates (N x 3) in Bohr
-   * @param symbols Vector of atomic symbols (e.g., "H", "C", "O")
-   * @param masses Vector of atomic masses in AMU (default: use standard masses)
-   * @param nuclear_charges Vector of nuclear charges (default: use standard
-   * charges)
-   * @throws std::invalid_argument if dimensions don't match or unknown symbols
-   */
-  Structure(const std::vector<Eigen::Vector3d>& coordinates,
-            const std::vector<std::string>& symbols,
-            const std::vector<double>& masses = {},
-            const std::vector<double>& nuclear_charges = {});
-
-  /**
    * @brief Constructor from atomic elements and coordinates as vector
    * @param coordinates Vector of atomic coordinates (N x 3) in Bohr
    * @param elements Vector of atomic elements using enum
    * @param masses Vector of atomic masses in AMU (default: use standard masses)
-   * @param nuclear_charges Vector of nuclear charges (default: use standard
+   * @param nuclear_charges Vector of nuclear charges (default: use default
    * charges)
    * @throws std::invalid_argument if dimensions don't match
    */
   Structure(const std::vector<Eigen::Vector3d>& coordinates,
             const std::vector<Element>& elements,
+            const std::vector<double>& masses = {},
+            const std::vector<double>& nuclear_charges = {});
+
+  /**
+   * @brief Constructor from isotopes and coordinates as vector
+   * @param coordinates Vector of atomic coordinates (N x 3) in Bohr
+   * @param isotopes Vector of isotopes using Isotope enum
+   * @param masses Vector of atomic masses in AMU (default: use default masses)
+   * @param nuclear_charges Vector of nuclear charges (default: use default
+   * charges)
+   * @throws std::invalid_argument if dimensions don't match
+   */
+  Structure(const std::vector<Eigen::Vector3d>& coordinates,
+            const std::vector<Isotope>& isotopes,
+            const std::vector<double>& masses = {},
+            const std::vector<double>& nuclear_charges = {});
+
+  /**
+   * @brief Constructor from atomic symbols and coordinates as vector
+   * @param coordinates Vector of atomic coordinates (N x 3) in Bohr
+   * @param symbols Vector of atomic symbols (e.g., "H", "C", "O")
+   * @param masses Vector of atomic masses in AMU (default: use default masses)
+   * @param nuclear_charges Vector of nuclear charges (default: use default
+   * charges)
+   * @throws std::invalid_argument if dimensions don't match or unknown symbols
+   */
+  Structure(const std::vector<Eigen::Vector3d>& coordinates,
+            const std::vector<std::string>& symbols,
             const std::vector<double>& masses = {},
             const std::vector<double>& nuclear_charges = {});
 
@@ -489,11 +386,26 @@ class Structure : public DataClass,
   static Element symbol_to_element(const std::string& symbol);
 
   /**
+   * @brief Convert isotope symbol to isotope enum
+   * @param symbol Isotope symbol (e.g., "H2", "C13", "O18")
+   * @return Isotope enum
+   * @throws std::invalid_argument if unknown symbol or invalid mass number
+   */
+  static Isotope symbol_to_isotope(const std::string& symbol);
+
+  /**
    * @brief Convert element enum to atomic symbol
    * @param element Atomic element enum
    * @return Atomic symbol (e.g., "H", "C", "O")
    */
   static std::string element_to_symbol(Element element);
+
+  /**
+   * @brief Convert isotope enum to atomic symbol with mass number
+   * @param isotope Atomic isotope enum
+   * @return Atomic symbol with mass number (e.g., "H1", "C13", "O16")
+   */
+  static std::string isotope_to_symbol(Isotope isotope);
 
   /**
    * @brief Convert atomic symbol to nuclear charge
@@ -531,14 +443,21 @@ class Structure : public DataClass,
    * @param element Atomic element enum
    * @return Standard atomic mass in AMU
    */
-  static double get_standard_atomic_mass(Element element);
+  static double get_default_atomic_mass(Element element);
 
   /**
-   * @brief Get standard nuclear charge for an element
-   * @param element Atomic element enum
-   * @return Standard nuclear charge (atomic number)
+   * @brief Get atomic mass for an isotope
+   * @param isotope Specific isotope enum
+   * @return Atomic mass in AMU
    */
-  static unsigned get_standard_nuclear_charge(Element element);
+  static double get_default_atomic_mass(Isotope isotope);
+
+  /**
+   * @brief Get nuclear charge for an element
+   * @param element Atomic element enum
+   * @return Nuclear charge (atomic number)
+   */
+  static unsigned get_default_nuclear_charge(Element element);
 
  private:
   /// Serialization version
@@ -549,6 +468,22 @@ class Structure : public DataClass,
    * @return True if all data arrays are consistent
    */
   bool _is_valid() const;
+
+  /**
+   * @brief Extract only letters from a symbol, removing all numeric characters
+   * @param symbol Input symbol that may contain letters and numbers (e.g.,
+   * "C12", "H2")
+   * @return Symbol with only letter characters (e.g., "C", "H")
+   */
+  static std::string _strip_numbers_from_symbol(const std::string& symbol);
+
+  /**
+   * @brief Extract only numbers from a symbol, removing all letter characters
+   * @param symbol Input symbol that may contain letters and numbers (e.g.,
+   * "C12", "H2")
+   * @return String with only numeric characters (e.g., "12", "2")
+   */
+  static std::string _extract_numbers_from_symbol(const std::string& symbol);
 
   /**
    * @brief Fix capitalization of atomic symbol (e.g., "he" -> "He", "CA" ->

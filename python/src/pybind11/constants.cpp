@@ -20,7 +20,7 @@ Physical constants module.
 
 This module provides access to physical constants from CODATA standards.
 The constants are sourced from the most recent CODATA recommendations
-(currently CODATA 2018 by default), but the underlying C++ implementation
+(currently CODATA 2022 by default), but the underlying C++ implementation
 supports multiple CODATA versions for compatibility and comparison purposes.
 
 All constants are provided in their original units as specified by CODATA,
@@ -32,7 +32,8 @@ and quantum mechanics.
 
 Data Sources
 ------------
-- CODATA 2018 recommended values (default)
+- CODATA 2022 recommended values (default)
+- CODATA 2018 recommended values (available via C++ preprocessor)
 - CODATA 2014 recommended values (available via C++ preprocessor)
 https://physics.nist.gov/cuu/Constants/
 
@@ -66,7 +67,7 @@ Examples
       .def_readonly("units", &qdk::chemistry::constants::ConstantInfo::units,
                     "Units of measurement")
       .def_readonly("source", &qdk::chemistry::constants::ConstantInfo::source,
-                    "Data source (e.g., 'CODATA 2018')")
+                    "Data source (e.g., 'CODATA 2022')")
       .def_readonly("symbol", &qdk::chemistry::constants::ConstantInfo::symbol,
                     "Mathematical symbol")
       .def_readonly("value", &qdk::chemistry::constants::ConstantInfo::value,
@@ -101,7 +102,13 @@ Examples
       },
       "Get documentation information for a specific constant", py::arg("name"));
 
-  // CODATA 2018 constants with detailed documentation
+  // Expose current CODATA version
+  constants.def(
+      "get_current_codata_version",
+      &qdk::chemistry::constants::get_current_codata_version,
+      "Get the current CODATA version being used (e.g., 'CODATA 2022')");
+
+  // Current CODATA version constants with detailed documentation
   constants.attr("BOHR_TO_ANGSTROM") =
       py::cast(qdk::chemistry::constants::bohr_to_angstrom);
 

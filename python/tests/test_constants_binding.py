@@ -66,16 +66,21 @@ class TestCoreBinding:
             )
 
             # Verify that C++ and Python values match
-            assert abs(cpp_value - python_value) < 1e-15, (
-                f"Value mismatch for {const_name}: {cpp_value} != {python_value}"
-            )
+            assert np.isclose(
+                cpp_value,
+                python_value,
+                rtol=float_comparison_relative_tolerance,
+                atol=float_comparison_absolute_tolerance,
+            ), f"Value mismatch for {const_name}: {cpp_value} != {python_value}"
 
     def test_documentation_functions_exist(self):
         """Test that documentation functions are bound."""
         assert hasattr(core_constants, "get_constants_info")
         assert hasattr(core_constants, "get_constant_info")
+        assert hasattr(core_constants, "get_current_codata_version")
         assert callable(core_constants.get_constants_info)
         assert callable(core_constants.get_constant_info)
+        assert callable(core_constants.get_current_codata_version)
 
     def test_constant_info_class_exists(self):
         """Test that ConstantInfo class is bound."""
@@ -131,6 +136,14 @@ class TestCoreBinding:
         """Test error handling for unknown constants."""
         with pytest.raises(KeyError):
             core_constants.get_constant_info("nonexistent_constant")
+
+    def test_get_current_codata_version(self):
+        """Test that get_current_codata_version returns a valid version string."""
+        version = core_constants.get_current_codata_version()
+
+        assert isinstance(version, str)
+        assert "CODATA" in version
+        assert any(year in version for year in ["2022", "2018", "2014"])
 
 
 class TestValueConsistency:
@@ -208,4 +221,4 @@ class TestValueConsistency:
 
         source = next(iter(sources))
         assert "CODATA" in source
-        assert any(year in source for year in ["2014", "2018"])
+        assert any(year in source for year in ["2022", "2018", "2014"])

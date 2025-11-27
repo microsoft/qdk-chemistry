@@ -4,6 +4,7 @@ target_sources(chemistry PRIVATE
     configuration.cpp
     configuration_set.cpp
     coupled_cluster.cpp
+    element_data.cpp
     hdf5_serialization.cpp
     json_serialization.cpp
     hamiltonian.cpp
