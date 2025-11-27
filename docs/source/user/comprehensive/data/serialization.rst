@@ -73,8 +73,8 @@ HDF5 serialization
 
    .. code-block:: cpp
 
-    // Hamiltonian data class example 
-    // Create dummy data for Hamiltonian class 
+    // Hamiltonian data class example
+    // Create dummy data for Hamiltonian class
     Eigen::MatrixXd one_body = Eigen::MatrixXd::Identity(2, 2);
     Eigen::VectorXd two_body = 2 * Eigen::VectorXd::Ones(16);
     auto orbitals = std::make_shared<ModelOrbitals>(2, true); // 2 orbitals, restricted
@@ -124,16 +124,18 @@ QDK/Chemistry enforces specific file extensions to ensure clarity about the cont
      - ``.hamiltonian.json``
      - ``.hamiltonian.h5``
      - ``hamiltonian.fcidump``
-   * - :class:`~qdk_chemistry.data.Wavefunction`
+   * - :doc:`Hamiltonian <../data/wavefunction>`
      - ``.wavefunction.json``
      - ``.wavefunction.h5``
      - -
+
+The same patterns are observed for other data classes in QDK/Chemistry.
 
 Related topics
 --------------
 
 - :doc:`Structure <../data/structure>`: Molecular geometry and atomic information
-- :doc:`BasisSet <../data/basis_set>`: Quantum chemistry basis set definitions
+- :doc:`BasisSet <../data/basis_set>`: Basis set definitions
 - :doc:`Orbitals <../data/orbitals>`: Molecular orbital coefficients and properties
 - :doc:`Hamiltonian <../data/hamiltonian>`: Electronic Hamiltonian operator
-- :class:`~qdk_chemistry.data.Wavefunction`: Quantum mechanical wavefunction data
+- :doc:`Wavefunction <../data/wavefunction>`: Wavefunction data

@@ -19,7 +19,9 @@ coords = np.array([[0.0, 0.0, 0.0], [0.0, 0.0, 1.4]])
 symbols = ["H", "H"]
 custom_masses = [1.001, 0.999]
 custom_charges = [0.9, 1.1]
-structure = Structure(coords, symbols=symbols, masses=custom_masses, nuclear_charges=custom_charges)
+structure = Structure(
+    coords, symbols=symbols, masses=custom_masses, nuclear_charges=custom_charges
+)
 
 # Serialize to JSON object
 structure_data = structure.to_json()
@@ -38,11 +40,11 @@ structure_from_json_file = Structure.from_json_file(tmpfile)
 os.remove(tmpfile)
 
 # =============================================================================
-# Hdf5 serialization for Hamiltonian 
+# Hdf5 serialization for Hamiltonian
 # =============================================================================
 
 # Hamiltonian data class example
-# Create dummy data for Hamiltonian class 
+# Create dummy data for Hamiltonian class
 one_body = np.identity(2)
 two_body = 2 * np.ones((16,))
 orbitals = ModelOrbitals(2, True)  # 2 orbitals, restricted

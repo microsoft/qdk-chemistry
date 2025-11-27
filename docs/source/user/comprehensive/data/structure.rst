@@ -1,7 +1,7 @@
 Structure
 =========
 
-The :class:`~qdk_chemistry.data.Structure` class in QDK/Chemistry represents a molecular structure, which always includes 3d coordinates and element information, and optionally includes related properties like atomic masses and nuclear charges. 
+The :class:`~qdk_chemistry.data.Structure` class in QDK/Chemistry represents a molecular structure, which always includes 3d coordinates and element information, and optionally includes related properties like atomic masses and nuclear charges.
 As a core :doc:`data class <../design/index>`, it follows QDK/Chemistry's immutable data pattern.
 
 Overview
@@ -15,7 +15,7 @@ Properties
 
 - **Coordinates**: 3D Cartesian coordinates for each atom
 - **Elements**: Chemical elements of the atoms
-- **Masses**: Atomic masses of each of the atoms 
+- **Masses**: Atomic masses of each of the atoms
 - **Nuclear charges**: Nuclear charges (atomic numbers) of each of the atoms
 
 Units
@@ -47,12 +47,12 @@ A :class:`~qdk_chemistry.data.Structure` object can be created manually as follo
       using namespace qdk::chemistry::data;
 
       // Specify a structure using coordinates, and either symbols or elements
-      std::vector<Eigen::Vector3d> coords = {{0.0, 0.0, 0.0}, {0.0, 0.0, 1.4}}; // Bohr 
+      std::vector<Eigen::Vector3d> coords = {{0.0, 0.0, 0.0}, {0.0, 0.0, 1.4}}; // Bohr
       std::vector<std::string> symbols = {"H", "H"};
 
       Structure structure(coords, symbols);
 
-      // element enum alternative 
+      // element enum alternative
       std::vector<Element> elements = {Element::H, Element::H};
       Structure structure_alternative(coords, elements);
 
@@ -134,11 +134,11 @@ XYZ format
     H      0.000000    0.000000    0.000000
     H      0.000000    0.000000    1.400000
 
-Note that here the coordinates are in Angstrom, since this is the standard in xyz files. 
+Note that here the coordinates are in Angstrom, since this is the standard in xyz files.
 
-HDF5 format 
+HDF5 format
 ^^^^^^^^^^^
-With the same keys as in the json format, but accessed as requested. 
+With the same keys as in the json format, but accessed as requested.
 
 Related classes
 ---------------
