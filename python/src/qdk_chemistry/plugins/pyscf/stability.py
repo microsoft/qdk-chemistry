@@ -5,6 +5,7 @@ and integrates PySCF stability algorithms into the QDK framework.
 
 The implementation supports both restricted (RHF, ROHF) and unrestricted (UHF)
 wavefunction stability analysis including:
+
 - Internal stability analysis (within the same wavefunction type)
 - RHF external stability analysis (RHF -> UHF instabilities)
 
@@ -13,7 +14,7 @@ import time, making the functionality available via
 `qdk_chemistry.algorithms.create('stability_checker', 'pyscf')`.
 
 Requires: PySCF (the code uses `pyscf.lib`, `pyscf.scf`, `pyscf.soscf`,
-          and `pyscf.scf.stability` routines).
+and `pyscf.scf.stability` routines).
 """
 
 # --------------------------------------------------------------------------------------------
@@ -156,12 +157,13 @@ class PyscfStabilitySettings(Settings):
     configurable options used by :class:`PyscfStabilityChecker`.
 
     Available settings:
-        internal: Whether to perform internal stability analysis (within the same wavefunction type).
-        external: Whether to perform external stability analysis (RHF -> UHF instabilities).
-            Only supported for RHF wavefunctions. Will raise an error if enabled for ROHF or UHF.
-        with_symmetry: Whether to respect point group symmetry during stability analysis.
-        nroots: Number of eigenvalue roots to compute in the Davidson solver.
-        tolerance: Convergence threshold for the Davidson eigenvalue solver.
+
+    - internal: Whether to perform internal stability analysis (within the same wavefunction type).
+    - external: Whether to perform external stability analysis (RHF -> UHF instabilities).
+        Only supported for RHF wavefunctions. Will raise an error if enabled for ROHF or UHF.
+    - with_symmetry: Whether to respect point group symmetry during stability analysis.
+    - nroots: Number of eigenvalue roots to compute in the Davidson solver.
+    - tolerance: Convergence threshold for the Davidson eigenvalue solver.
 
     Examples:
         >>> settings = PyscfStabilitySettings()

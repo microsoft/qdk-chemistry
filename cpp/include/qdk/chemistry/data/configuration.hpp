@@ -60,7 +60,7 @@ class Configuration : public DataClass {
    *
    * @throws std::invalid_argument If num_orbitals exceeds N/2
    */
-  template <long unsigned int N>
+  template <size_t N>
   Configuration(const std::bitset<N>& orbs, size_t num_orbitals) {
     // Check that N is even
     static_assert(N % 2 == 0, "Bitset size must be even");
@@ -107,7 +107,7 @@ class Configuration : public DataClass {
    * @throws std::invalid_argument If the configuration has more orbitals than
    * N/2
    */
-  template <long unsigned int N>
+  template <size_t N>
   std::bitset<N> to_bitset() const {
     // check that N is even
     static_assert(N % 2 == 0, "Bitset size must be even");

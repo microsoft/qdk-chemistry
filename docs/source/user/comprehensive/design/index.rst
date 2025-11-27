@@ -25,7 +25,7 @@ Data classes in QDK/Chemistry are designed to be:
 
 - Immutable: Once created, the core data cannot be modified
 - Self-contained: Include all information necessary to represent the concept
-- :doc:`Serializable <serialization>`: Can be easily saved to and loaded from files
+- :doc:`Serializable <../data/serialization>`: Can be easily saved to and loaded from files
 - Language-agnostic: Accessible through identical APIs in both C++ and Python
 
 QDK/Chemistry includes the following data classes:
@@ -34,7 +34,7 @@ QDK/Chemistry includes the following data classes:
 - :doc:`BasisSet <../data/basis_set>`: Quantum chemistry basis set definitions
 - :doc:`Orbitals <../data/orbitals>`: Molecular orbital coefficients and energies
 - :doc:`Hamiltonian <../data/hamiltonian>`: Molecular Hamiltonian
-- :doc:`Wavefunction <../data/wavefunction>`: Wavefunction representation
+- :class:`~qdk_chemistry.data.Wavefunction`: Wavefunction representation
 
 .. rubric:: Algorithm classes
 
@@ -53,6 +53,7 @@ QDK/Chemistry includes the following algorithm classes:
 - :doc:`ActiveSpaceSelector <../algorithms/active_space>`: Active space selection methods
 - :doc:`HamiltonianConstructor <../algorithms/hamiltonian_constructor>`: Hamiltonian construction
 - :doc:`MCCalculator <../algorithms/mc_calculator>`: Multi-configuration calculations
+
 .. - :doc:`DynamicalCorrelation <../algorithms/dynamical_correlation>`: Dynamical correlation methods
 
 Each algorithm class can leverage both Microsoft-developed implementations (developed within QDK/Chemistry) and :doc:`interfaces <interfaces>` to established third-party electronic structure packages.
@@ -150,9 +151,9 @@ A typical workflow in QDK/Chemistry demonstrates the data-algorithm separation:
 
 .. tab:: Python API
 
-   .. literalinclude:: ../../../../examples/complete_workflow.py
+   .. literalinclude:: ../../../../examples/quickstart.py
       :language: python
-      :lines: 3-
+      :lines: 7-
 
 .. rubric:: Interface architecture
 

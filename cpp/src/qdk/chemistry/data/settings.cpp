@@ -188,22 +188,20 @@ std::string Settings::get_type_name(const std::string& key) const {
         using ValueType = std::decay_t<decltype(value)>;
         if constexpr (std::is_same_v<ValueType, bool>)
           return "bool";
-        else if constexpr (std::is_same_v<ValueType, int>)
-          return "int";
         else if constexpr (std::is_same_v<ValueType, int64_t>)
           return "int64_t";
-        else if constexpr (std::is_same_v<ValueType, size_t>)
-          return "size_t";
+        else if constexpr (std::is_same_v<ValueType, uint64_t>)
+          return "uint64_t";
         else if constexpr (std::is_same_v<ValueType, float>)
           return "float";
         else if constexpr (std::is_same_v<ValueType, double>)
           return "double";
         else if constexpr (std::is_same_v<ValueType, std::string>)
           return "string";
-        else if constexpr (std::is_same_v<ValueType, std::vector<bool>>)
-          return "vector<bool>";
-        else if constexpr (std::is_same_v<ValueType, std::vector<int>>)
-          return "vector<int>";
+        else if constexpr (std::is_same_v<ValueType, std::vector<int64_t>>)
+          return "vector<int64_t>";
+        else if constexpr (std::is_same_v<ValueType, std::vector<uint64_t>>)
+          return "vector<uint64_t>";
         else if constexpr (std::is_same_v<ValueType, std::vector<double>>)
           return "vector<double>";
         else if constexpr (std::is_same_v<ValueType, std::vector<std::string>>)
@@ -298,16 +296,13 @@ std::string Settings::visit_to_string(const SettingValue& value) const {
           return oss.str();
         } else if constexpr (std::is_arithmetic_v<ValueType>) {
           return std::to_string(variant_value);
-        } else if constexpr (std::is_same_v<ValueType, std::vector<bool>> ||
-                             std::is_same_v<ValueType, std::vector<int>> ||
-                             std::is_same_v<ValueType, std::vector<double>> ||
-                             std::is_same_v<ValueType,
-                                            std::vector<std::string>>) {
+        } else if constexpr (is_vector_v<ValueType>) {
+          using ElementType = typename ValueType::value_type;
           std::ostringstream oss;
           oss << "[";
           for (size_t idx = 0; idx < variant_value.size(); ++idx) {
             if (idx > 0) oss << ", ";
-            if constexpr (std::is_same_v<ValueType, std::vector<std::string>>) {
+            if constexpr (std::is_same_v<ElementType, std::string>) {
               oss << "\"" << variant_value[idx] << "\"";
             } else if constexpr (std::is_same_v<ValueType,
                                                 std::vector<double>>) {
@@ -331,10 +326,7 @@ nlohmann::json Settings::convert_setting_value_to_json(
       [](const auto& variant_value) -> nlohmann::json {
         using ValueType = std::decay_t<decltype(variant_value)>;
 
-        if constexpr (std::is_same_v<ValueType, std::vector<bool>> ||
-                      std::is_same_v<ValueType, std::vector<int>> ||
-                      std::is_same_v<ValueType, std::vector<double>> ||
-                      std::is_same_v<ValueType, std::vector<std::string>>) {
+        if constexpr (is_vector_v<ValueType>) {
           nlohmann::json json_array = nlohmann::json::array();
           for (const auto& elem : variant_value) {
             json_array.push_back(elem);
@@ -352,26 +344,20 @@ SettingValue Settings::convert_json_to_setting_value(
   if (json_obj.is_boolean()) {
     return json_obj.get<bool>();
   } else if (json_obj.is_number_integer()) {
-    // Default to int for integer values unless they're too large
-    auto integer_value = json_obj.get<long long>();
-    if (integer_value >= std::numeric_limits<int>::min() &&
-        integer_value <= std::numeric_limits<int>::max()) {
-      return static_cast<int>(integer_value);
-    } else {
-      return static_cast<long>(integer_value);
-    }
+    return json_obj.get<int64_t>();
   } else if (json_obj.is_number_float()) {
     return json_obj.get<double>();
   } else if (json_obj.is_string()) {
     return json_obj.get<std::string>();
   } else if (json_obj.is_array()) {
     if (json_obj.empty()) {
-      return std::vector<int>();  // Default to int vector for empty arrays
+      return std::vector<int64_t>();  // Default to int64_t vector for empty
+                                      // arrays
     }
 
     // Check the type of the first element to determine vector type
     if (json_obj[0].is_number_integer()) {
-      return json_obj.get<std::vector<int>>();
+      return json_obj.get<std::vector<int64_t>>();
     } else if (json_obj[0].is_number_float()) {
       return json_obj.get<std::vector<double>>();
     } else if (json_obj[0].is_string()) {
@@ -411,26 +397,19 @@ void Settings::save_setting_value_to_hdf5(H5::Group& group,
               dataset.createAttribute("type", str_type, attr_space);
           attr.write(str_type, type_cstr);
 
-        } else if constexpr (std::is_same_v<ValueType, int>) {
+        } else if constexpr (std::is_same_v<ValueType, int64_t>) {
           hsize_t dims[1] = {1};
           H5::DataSpace dataspace(1, dims);
           H5::DataSet dataset =
-              group.createDataSet(name, H5::PredType::NATIVE_INT, dataspace);
-          dataset.write(&variant_value, H5::PredType::NATIVE_INT);
+              group.createDataSet(name, H5::PredType::NATIVE_INT64, dataspace);
+          dataset.write(&variant_value, H5::PredType::NATIVE_INT64);
 
-        } else if constexpr (std::is_same_v<ValueType, long>) {
+        } else if constexpr (std::is_same_v<ValueType, uint64_t>) {
           hsize_t dims[1] = {1};
           H5::DataSpace dataspace(1, dims);
           H5::DataSet dataset =
-              group.createDataSet(name, H5::PredType::NATIVE_LONG, dataspace);
-          dataset.write(&variant_value, H5::PredType::NATIVE_LONG);
-
-        } else if constexpr (std::is_same_v<ValueType, size_t>) {
-          hsize_t dims[1] = {1};
-          H5::DataSpace dataspace(1, dims);
-          H5::DataSet dataset =
-              group.createDataSet(name, H5::PredType::NATIVE_HSIZE, dataspace);
-          dataset.write(&variant_value, H5::PredType::NATIVE_HSIZE);
+              group.createDataSet(name, H5::PredType::NATIVE_UINT64, dataspace);
+          dataset.write(&variant_value, H5::PredType::NATIVE_UINT64);
 
         } else if constexpr (std::is_same_v<ValueType, float>) {
           hsize_t dims[1] = {1};
@@ -454,51 +433,34 @@ void Settings::save_setting_value_to_hdf5(H5::Group& group,
               group.createDataSet(name, string_type, dataspace);
           dataset.write(variant_value.c_str(), string_type);
 
-        } else if constexpr (std::is_same_v<ValueType, std::vector<bool>>) {
-          // Store vector<bool> as vector<int> for HDF5 compatibility
-          if (!variant_value.empty()) {
-            std::vector<int> bool_as_int(variant_value.size());
-            for (size_t i = 0; i < variant_value.size(); ++i) {
-              bool_as_int[i] = variant_value[i] ? 1 : 0;
-            }
-            hsize_t dims[1] = {bool_as_int.size()};
-            H5::DataSpace dataspace(1, dims);
-            H5::DataSet dataset =
-                group.createDataSet(name, H5::PredType::NATIVE_INT, dataspace);
-            dataset.write(bool_as_int.data(), H5::PredType::NATIVE_INT);
-            // Add type attribute to indicate this is a vector<bool>
-            H5::StrType str_type(H5::PredType::C_S1, 12);
-            H5::DataSpace attr_space(H5S_SCALAR);
-            H5::Attribute attr =
-                dataset.createAttribute("type", str_type, attr_space);
-            attr.write(str_type, "vector<bool>");
-          } else {
-            // Handle empty vector
-            hsize_t dims[1] = {0};
-            H5::DataSpace dataspace(1, dims);
-            H5::DataSet dataset =
-                group.createDataSet(name, H5::PredType::NATIVE_INT, dataspace);
-            // Add type attribute
-            H5::StrType str_type(H5::PredType::C_S1, 12);
-            H5::DataSpace attr_space(H5S_SCALAR);
-            H5::Attribute attr =
-                dataset.createAttribute("type", str_type, attr_space);
-            attr.write(str_type, "vector<bool>");
-          }
-
-        } else if constexpr (std::is_same_v<ValueType, std::vector<int>>) {
+        } else if constexpr (std::is_same_v<ValueType, std::vector<int64_t>>) {
           if (!variant_value.empty()) {
             hsize_t dims[1] = {variant_value.size()};
             H5::DataSpace dataspace(1, dims);
-            H5::DataSet dataset =
-                group.createDataSet(name, H5::PredType::NATIVE_INT, dataspace);
-            dataset.write(variant_value.data(), H5::PredType::NATIVE_INT);
+            H5::DataSet dataset = group.createDataSet(
+                name, H5::PredType::NATIVE_INT64, dataspace);
+            dataset.write(variant_value.data(), H5::PredType::NATIVE_INT64);
           } else {
             // Handle empty vector
             hsize_t dims[1] = {0};
             H5::DataSpace dataspace(1, dims);
-            H5::DataSet dataset =
-                group.createDataSet(name, H5::PredType::NATIVE_INT, dataspace);
+            H5::DataSet dataset = group.createDataSet(
+                name, H5::PredType::NATIVE_INT64, dataspace);
+          }
+
+        } else if constexpr (std::is_same_v<ValueType, std::vector<uint64_t>>) {
+          if (!variant_value.empty()) {
+            hsize_t dims[1] = {variant_value.size()};
+            H5::DataSpace dataspace(1, dims);
+            H5::DataSet dataset = group.createDataSet(
+                name, H5::PredType::NATIVE_UINT64, dataspace);
+            dataset.write(variant_value.data(), H5::PredType::NATIVE_UINT64);
+          } else {
+            // Handle empty vector
+            hsize_t dims[1] = {0};
+            H5::DataSpace dataspace(1, dims);
+            H5::DataSet dataset = group.createDataSet(
+                name, H5::PredType::NATIVE_UINT64, dataspace);
           }
 
         } else if constexpr (std::is_same_v<ValueType, std::vector<double>>) {
@@ -583,11 +545,7 @@ SettingValue Settings::parse_string_to_setting_value(
           try {
             nlohmann::json json_obj;
 
-            if constexpr (std::is_same_v<CurrentType, std::vector<bool>> ||
-                          std::is_same_v<CurrentType, std::vector<int>> ||
-                          std::is_same_v<CurrentType, std::vector<double>> ||
-                          std::is_same_v<CurrentType,
-                                         std::vector<std::string>>) {
+            if constexpr (is_vector_v<CurrentType>) {
               // Vectors must be JSON arrays
               json_obj = nlohmann::json::parse(str_value);
               if (!json_obj.is_array()) {
@@ -807,19 +765,6 @@ SettingValue Settings::load_setting_value_from_hdf5(H5::Group& group,
         int bool_val;
         dataset.read(&bool_val, H5::PredType::NATIVE_INT);
         return static_cast<bool>(bool_val);
-      } else if (type_str == "vector<bool>") {
-        // Read as int vector and convert to bool vector
-        if (ndims == 1 && dims[0] > 0) {
-          std::vector<int> int_vector(dims[0]);
-          dataset.read(int_vector.data(), H5::PredType::NATIVE_INT);
-          std::vector<bool> bool_vector(dims[0]);
-          for (size_t i = 0; i < dims[0]; ++i) {
-            bool_vector[i] = (int_vector[i] != 0);
-          }
-          return bool_vector;
-        } else {
-          return std::vector<bool>();
-        }
       }
     } catch (const H5::Exception& hdf5_exception) {
       std::cerr << "Warning: Failed to read attribute 'type' for dataset '"
@@ -837,32 +782,32 @@ SettingValue Settings::load_setting_value_from_hdf5(H5::Group& group,
     bool is_signed = (int_type.getSign() == H5T_SGN_2);
 
     if (ndims == 0 || (ndims == 1 && dims[0] == 1)) {
-      // Scalar value
-      if (type_size == sizeof(int) && is_signed) {
-        int int_value;
-        dataset.read(&int_value, H5::PredType::NATIVE_INT);
-        return int_value;
-      } else if (type_size == sizeof(long) && is_signed) {
-        long long_value;
-        dataset.read(&long_value, H5::PredType::NATIVE_LONG);
-        return long_value;
-      } else if (type_size == sizeof(size_t) && !is_signed) {
-        size_t size_value;
-        dataset.read(&size_value, H5::PredType::NATIVE_HSIZE);
-        return size_value;
+      // Scalar value - map to int64_t or uint64_t based on signedness
+      if (is_signed) {
+        int64_t int64_value;
+        dataset.read(&int64_value, H5::PredType::NATIVE_INT64);
+        return int64_value;
       } else {
-        // Default to int
-        int default_value;
-        dataset.read(&default_value, H5::PredType::NATIVE_INT);
-        return default_value;
+        uint64_t uint64_value;
+        dataset.read(&uint64_value, H5::PredType::NATIVE_UINT64);
+        return uint64_value;
       }
     } else {
-      // Vector of integers
-      std::vector<int> int_vector(dims[0]);
-      if (dims[0] > 0) {
-        dataset.read(int_vector.data(), H5::PredType::NATIVE_INT);
+      // Vector of integers - return signed or unsigned vector based on
+      // signedness
+      if (is_signed) {
+        std::vector<int64_t> int_vector(dims[0]);
+        if (dims[0] > 0) {
+          dataset.read(int_vector.data(), H5::PredType::NATIVE_INT64);
+        }
+        return int_vector;
+      } else {
+        std::vector<uint64_t> uint_vector(dims[0]);
+        if (dims[0] > 0) {
+          dataset.read(uint_vector.data(), H5::PredType::NATIVE_UINT64);
+        }
+        return uint_vector;
       }
-      return int_vector;
     }
 
   } else if (type_class == H5T_FLOAT) {

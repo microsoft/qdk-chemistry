@@ -42,7 +42,7 @@ def _pauli_label_to_map(label: str) -> dict[int, str]:
 
 
 def pauli_evolution_terms(pauli_op: SparsePauliOp, *, atol: float = 1e-12) -> list[PauliEvolutionTerm]:
-    """Convert a :class:`SparsePauliOp` into rotation data for time evolution.
+    """Convert a ``SparsePauliOp`` into rotation data for time evolution.
 
     Args:
         pauli_op: Operator to decompose.

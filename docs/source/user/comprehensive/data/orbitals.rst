@@ -1,7 +1,7 @@
 Orbitals
 ========
 
-The ``Orbitals`` class in QDK/Chemistry represents a set of molecular orbitals.
+The :class:`~qdk_chemistry.data.Orbitals` class in QDK/Chemistry represents a set of molecular orbitals.
 This class stores orbital coefficients, energies, and other properties necessary for quantum chemical calculations.
 
 Overview
@@ -9,12 +9,12 @@ Overview
 
 Molecular orbitals are a fundamental concept in quantum chemistry.
 They are formed through linear combinations of atomic orbitals and provide a framework for understanding chemical bonding and electronic structure.
-In QDK/Chemistry, the ``Orbitals`` class encapsulates all relevant information about these orbitals, including their coefficients, energies, and occupation numbers.
+In QDK/Chemistry, the :class:`~qdk_chemistry.data.Orbitals` class encapsulates all relevant information about these orbitals, including their coefficients, energies, and occupation numbers.
 
 Restricted vs. unrestricted calculations
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-The ``Orbitals`` class supports both restricted and unrestricted calculations:
+The :class:`~qdk_chemistry.data.Orbitals` class supports both restricted and unrestricted calculations:
 
 - **Restricted**: Alpha and beta electrons share the same spatial orbitals (:term:`RHF`, :term:`RKS`)
 - **Unrestricted**: Alpha and beta electrons have separate spatial orbitals (:term:`UHF`, :term:`UKS`)
@@ -38,13 +38,13 @@ Properties
 Usage
 -----
 
-The ``Orbitals`` class is typically created as the output of an :doc:`SCF calculation <../algorithms/scf_solver>` or :doc:`orbital transformation <../algorithms/localizer>`.
+The :class:`~qdk_chemistry.data.Orbitals` class is typically created as the output of an :doc:`SCF calculation <../algorithms/scf_solver>` or :doc:`orbital transformation <../algorithms/localizer>`.
 It serves as input to various post-:term:`HF` methods such as :doc:`active space selection <../algorithms/active_space>` and :doc:`Hamiltonian construction <../algorithms/hamiltonian_constructor>`.
 
 Creating an Orbitals object
 ---------------------------
 
-The ``Orbitals`` object is typically created by algorithms rather than manually.
+The :class:`~qdk_chemistry.data.Orbitals` object is typically created by algorithms rather than manually.
 However, for advanced use cases, you can create and populate orbitals directly:
 
 .. note::
@@ -82,8 +82,8 @@ However, for advanced use cases, you can create and populate orbitals directly:
 Accessing Orbital Data
 ----------------------
 
-The ``Orbitals`` class provides methods to access orbital coefficients, energies, and other properties.
-Following the :doc:`immutable design principle <../advanced/design_principles>` used throughout QDK/Chemistry, all getter methods return const references or copies of the data.
+The :class:`~qdk_chemistry.data.Orbitals` class provides methods to access orbital coefficients, energies, and other properties.
+Following the :doc:`immutable design principle <../design/index>` used throughout QDK/Chemistry, all getter methods return const references or copies of the data.
 For spin-dependent properties, methods return pairs of (alpha, beta) data.
 
 .. tab:: C++ API
@@ -129,8 +129,8 @@ For spin-dependent properties, methods return pairs of (alpha, beta) data.
 Serialization
 -------------
 
-The ``Orbitals`` class supports serialization to and from JSON and HDF5 formats.
-For detailed information about serialization in QDK/Chemistry, see the :doc:`Serialization <../advanced/serialization>` documentation.
+The :class:`~qdk_chemistry.data.Orbitals` class supports serialization to and from JSON and HDF5 formats.
+For detailed information about serialization in QDK/Chemistry, see the :doc:`Serialization <../data/serialization>` documentation.
 
 .. note::
    All orbitals-related files require the ``.orbitals`` suffix before the file type extension, for example ``molecule.orbitals.json`` and ``h2.orbitals.h5`` for JSON and HDF5 files respectively.
@@ -145,10 +145,10 @@ JSON format
 ^^^^^^^^^^^
 
 .. note::
-   The ``basis_set`` field in the JSON representation contains a complete serialization of the ``BasisSet`` object.
+   The ``basis_set`` field in the JSON representation contains a complete serialization of the :class:`~qdk_chemistry.data.BasisSet` object.
    For details on how basis sets are serialized, see the :ref:`JSON Format section in the Basis Set documentation <json-format>`.
 
-JSON representation of an ``Orbitals`` object has the following structure (showing simplified content):
+JSON representation of an :class:`~qdk_chemistry.data.Orbitals` object has the following structure (showing simplified content):
 
 .. code-block:: json
 
@@ -178,10 +178,10 @@ HDF5 format
 ^^^^^^^^^^^
 
 .. note::
-   The ``basis_set/`` group in the HDF5 representation contains a complete serialization of the ``BasisSet`` object.
+   The ``basis_set/`` group in the HDF5 representation contains a complete serialization of the :class:`~qdk_chemistry.data.BasisSet` object.
    For details on the HDF5 structure of basis sets, see the :ref:`HDF5 Format section in the Basis Set documentation <hdf5-format>`.
 
-HDF5 representation of an ``Orbitals`` object has the following structure (showing groups and datasets):
+HDF5 representation of an :class:`~qdk_chemistry.data.Orbitals` object has the following structure (showing groups and datasets):
 
 .. code-block:: text
 
@@ -236,7 +236,7 @@ HDF5 representation of an ``Orbitals`` object has the following structure (showi
 Orbital transformations and applications
 ----------------------------------------
 
-The ``Orbitals`` class serves as a foundation for several important quantum chemical applications and transformations:
+The :class:`~qdk_chemistry.data.Orbitals` class serves as a foundation for several important quantum chemical applications and transformations:
 
 - **Orbital Localization**: Transform delocalized :term:`SCF` orbitals into localized representations for better chemical interpretation and more efficient correlation methods.
   See :doc:`Localizer <../algorithms/localizer>` for details.
@@ -261,5 +261,5 @@ Related classes
 Related topics
 --------------
 
-- :doc:`Serialization <../advanced/serialization>`: Data serialization and deserialization
-- :doc:`Settings <../advanced/settings>`: Configuration settings for algorithms
+- :doc:`Serialization <../data/serialization>`: Data serialization and deserialization
+- :doc:`Settings <../design/settings>`: Configuration settings for algorithms
