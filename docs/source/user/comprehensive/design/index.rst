@@ -1,5 +1,5 @@
 Design principles of QDK/Chemistry
-==================================
+##################################
 
 This document outlines the core architectural design principles of QDK/Chemistry, explaining the conceptual framework that guides the library's organization and implementation.
 For a complete overview of QDK/Chemistry's documentation, see the :doc:`comprehensive documentation index <../index>`.
@@ -7,7 +7,8 @@ For a complete overview of QDK/Chemistry's documentation, see the :doc:`comprehe
 QDK/Chemistry is designed with a clear separation between **data containers** and **algorithms**.
 This fundamental design choice enables flexibility, extensibility, and maintainability of the codebase, while providing users with a consistent and intuitive API.
 
-.. rubric:: Separation of data and algorithms
+Separation of data and algorithms
+=================================
 
 QDK/Chemistry follows a design pattern that strictly separates:
 
@@ -19,7 +20,8 @@ workflows.
 
 .. graphviz:: /_static/diagrams/data_flow.dot
 
-.. rubric:: Data classes
+Data classes
+------------
 
 Data classes in QDK/Chemistry are designed to be:
 
@@ -36,7 +38,8 @@ QDK/Chemistry includes the following data classes:
 - :doc:`Hamiltonian <../data/hamiltonian>`: Molecular Hamiltonian
 - :class:`~qdk_chemistry.data.Wavefunction`: Wavefunction representation
 
-.. rubric:: Algorithm classes
+Algorithm classes
+-----------------
 
 Algorithm classes in QDK/Chemistry are designed to be:
 
@@ -59,7 +62,8 @@ QDK/Chemistry includes the following algorithm classes:
 Each algorithm class can leverage both Microsoft-developed implementations (developed within QDK/Chemistry) and :doc:`interfaces <interfaces>` to established third-party electronic structure packages.
 This design allows users to benefit from specialized capabilities of external software while maintaining a consistent API.
 
-.. rubric:: Factory pattern
+Factory pattern
+===============
 
 QDK/Chemistry implements the :doc:`factory pattern <factory_pattern>` for algorithm creation:
 
@@ -85,7 +89,8 @@ This pattern allows:
 
 Read more in the :doc:`Factory Pattern <factory_pattern>` documentation.
 
-.. rubric:: Settings pattern
+Settings pattern
+================
 
 Algorithm configuration is managed through a consistent :doc:`Settings <settings>` interface:
 
@@ -112,7 +117,8 @@ This approach provides:
 
 Read more in the :doc:`Settings <settings>` documentation.
 
-.. rubric:: Data flow example
+Data flow example
+=================
 
 A typical workflow in QDK/Chemistry demonstrates the data-algorithm separation:
 
@@ -130,7 +136,8 @@ A typical workflow in QDK/Chemistry demonstrates the data-algorithm separation:
       :start-after: # start-cell-data-flow
       :end-before: # end-cell-data-flow
 
-.. rubric:: Interface architecture
+Interface architecture (plugins)
+================================
 
 QDK/Chemistry is designed with a plugin architecture that allows for consistent :doc:`interfaces <interfaces>` to various external packages:
 
@@ -143,7 +150,8 @@ This design provides several advantages:
 3. **Best-of-Breed Approach**: Leverage strengths of different packages while maintaining consistent data structures
 4. **Future-Proofing**: New implementations can be added without changing the user-facing API
 
-.. rubric:: Further reading
+Further reading
+===============
 
 - The above examples can be downloaded as complete `C++ <../../../_static/examples/cpp/design_principles.cpp>`_ and `Python <../../../_static/examples/python/design_principles.py>`_ scripts.
 - :doc:`Factory Pattern <factory_pattern>`: Details on QDK/Chemistry's implementation of the factory pattern
