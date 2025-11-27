@@ -28,26 +28,18 @@ def generate_cubefiles_from_orbitals(
     This method creates cube files containing the spatial distribution of molecular
     orbitals on a 3D grid. It supports both canonical and localized orbitals.
 
-    Parameters
-    ----------
-    orbitals : Orbitals
-        The orbitals object containing the molecular orbital coefficients and basis set
-    output_folder : str or Path, optional
-        The folder where the cube files will be saved. If None, files are not saved to temporary storage.
-    indices: list[int] | None = None, optional
-        Specific molecular orbital indices to generate cube files for. If None, all orbitals are processed.
-    grid_size : tuple, optional
-        The size of the grid in each dimension (nx, ny, nz). Default is (40, 40, 40).
-    margin : float, optional
-        The margin (in Bohr radii) to extend around molecule. Default is 3.
-    label_maker : Callable[[int], str], optional
-        A function that takes an orbital index and returns a string label for the cube file. If None, a default
-        labeling scheme is used.
+    Args:
+        orbitals:  The orbitals object containing the molecular orbital coefficients and basis set
+        output_folder:  The folder where the cube files will be saved. If None, files are not saved to temporary
+            storage.
+        indices: Specific molecular orbital indices to generate cube files for. If None, all orbitals are processed.
+        grid_size: The size of the grid in each dimension (nx, ny, nz). Default is (40, 40, 40).
+        margin: The margin (in Bohr radii) to extend around molecule. Default is 3.
+        label_maker: A function that takes an orbital index and returns a string label for the cube file.
+            If None, a default labeling scheme is used.
 
-    Returns
-    -------
-    cubefile_paths : list of str
-        A list of file paths to the generated cube files.
+    Returns:
+        list[str] | dict[str, str]: Paths or contents of the generated cube files.
 
     """
     if output_folder is not None:

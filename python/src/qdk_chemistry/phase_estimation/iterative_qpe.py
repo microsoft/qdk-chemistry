@@ -296,7 +296,7 @@ class IterativePhaseEstimation(PhaseEstimation):
 
     @staticmethod
     def phase_feedback_from_bits(bits_msb_first: Sequence[int]) -> float:
-        """Convenience helper that wraps :func:`accumulated_phase_from_bits`.
+        """Convenience helper that wraps :func:`~qdk_chemistry.utils.phase.accumulated_phase_from_bits`.
 
         Args:
             bits_msb_first: Sequence of measured bits ordered from most-significant
