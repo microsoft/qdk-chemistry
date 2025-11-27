@@ -299,57 +299,6 @@ class BasisSet : public DataClass,
            AOType basis_type = AOType::Spherical);
 
   /**
-   * @brief Constructor with element-to-basis mapping and structure
-   * @param element_to_basis_map Mapping from element symbols to basis set names
-   * @param structure The molecular structure
-   * @param atomic_orbital_type Whether to use spherical or cartesian atomic
-   * orbitals
-   */
-  BasisSet(const std::map<std::string, std::string>& element_to_basis_map,
-           const Structure& structure,
-           AOType atomic_orbital_type = AOType::Spherical);
-
-  /**
-   * @brief Constructor with element-to-basis mapping and structure shared
-   * pointer
-   * @param element_to_basis_map Mapping from element symbols to basis set names
-   * @param structure Shared pointer to the molecular structure
-   * @param atomic_orbital_type Whether to use spherical or cartesian atomic
-   * orbitals
-   */
-  BasisSet(const std::map<std::string, std::string>& element_to_basis_map,
-           std::shared_ptr<Structure> structure,
-           AOType atomic_orbital_type = AOType::Spherical);
-
-  /**
-   * @brief Constructor with index-to-basis mapping and structure
-   * @param index_to_basis_map Mapping from atom indices to basis set names
-   * @param structure The molecular structure
-   * @param atomic_orbital_type Whether to use spherical or cartesian atomic
-   * orbitals
-   */
-  BasisSet(const std::map<size_t, std::string>& index_to_basis_map,
-           const Structure& structure,
-           AOType atomic_orbital_type = AOType::Spherical);
-
-  /**
-   * @brief Constructor with index-to-basis mapping and structure shared
-   * pointer
-   * @param index_to_basis_map Mapping from atom indices to basis set names
-   * @param structure Shared pointer to the molecular structure
-   * @param atomic_orbital_type Whether to use spherical or cartesian atomic
-   * orbitals
-   */
-  BasisSet(const std::map<size_t, std::string>& index_to_basis_map,
-           std::shared_ptr<Structure> structure,
-           AOType atomic_orbital_type = AOType::Spherical);
-
-  /*
-   * @brief Name for custom basis sets
-   */
-  inline const static std::string custom_name = "custom_basis_set";
-
-  /**
    * @brief Default destructor
    */
   virtual ~BasisSet() = default;
@@ -377,6 +326,89 @@ class BasisSet : public DataClass,
    * @brief Move assignment operator
    */
   BasisSet& operator=(BasisSet&& other) noexcept = default;
+
+  /*
+   * @brief Name for custom basis sets
+   */
+  inline const static std::string custom_name = "custom_basis_set";
+
+  /**
+   * @brief Constructor with basis set name and structure
+   * @param basis_name Name of the basis set (e.g., "6-31G", "cc-pVDZ")
+   * @param structure The molecular structure
+   * @param atomic_orbital_type Whether to use spherical or cartesian atomic
+   * orbitals
+   * @return Shared pointer to the created BasisSet
+   */
+  static std::shared_ptr<BasisSet> from_basis_name(
+      const std::string& basis_name, const Structure& structure,
+      AOType atomic_orbital_type = AOType::Spherical);
+
+  /**
+   * @brief Constructor with basis set name and structure
+   * @param basis_name Name of the basis set (e.g., "6-31G", "cc-pVDZ")
+   * @param structure Shared pointer to the molecular structure
+   * @param atomic_orbital_type Whether to use spherical or cartesian atomic
+   * orbitals
+   * @return Shared pointer to the created BasisSet
+   */
+  static std::shared_ptr<BasisSet> from_basis_name(
+      const std::string& basis_name, std::shared_ptr<Structure> structure,
+      AOType atomic_orbital_type = AOType::Spherical);
+
+  /**
+   * @brief Constructor with basis set name and structure
+   * @param element_to_basis_map Mapping from element symbols to basis set names
+   * @param structure The molecular structure
+   * @param atomic_orbital_type Whether to use spherical or cartesian atomic
+   * orbitals
+   * @return Shared pointer to the created BasisSet
+   */
+  static std::shared_ptr<BasisSet> from_element_map(
+      const std::map<std::string, std::string>& element_to_basis_map,
+      const Structure& structure,
+      AOType atomic_orbital_type = AOType::Spherical);
+
+  /**
+   * @brief Constructor with basis set name and structure
+   * @param element_to_basis_map Mapping from element symbols to basis set names
+   * @param structure Shared pointer to the molecular structure
+   * @param atomic_orbital_type Whether to use spherical or cartesian atomic
+   * orbitals
+   * @return Shared pointer to the created BasisSet
+   */
+  static std::shared_ptr<BasisSet> from_element_map(
+      const std::map<std::string, std::string>& element_to_basis_map,
+      std::shared_ptr<Structure> structure,
+      AOType atomic_orbital_type = AOType::Spherical);
+
+  /**
+   * @brief Constructor with basis set name and structure
+   * @param index_to_basis_map Mapping from atom indices (as strings) to basis
+   * set names
+   * @param structure The molecular structure
+   * @param atomic_orbital_type Whether to use spherical or cartesian atomic
+   * orbitals
+   * @return Shared pointer to the created BasisSet
+   */
+  static std::shared_ptr<BasisSet> from_index_map(
+      const std::map<size_t, std::string>& index_to_basis_map,
+      const Structure& structure,
+      AOType atomic_orbital_type = AOType::Spherical);
+
+  /**
+   * @brief Constructor with basis set name and structure
+   * @param index_to_basis_map Mapping from atom indices (as strings) to basis
+   * set names
+   * @param structure Shared pointer to the molecular structure
+   * @param atomic_orbital_type Whether to use spherical or cartesian atomic
+   * orbitals
+   * @return Shared pointer to the created BasisSet
+   */
+  static std::shared_ptr<BasisSet> from_index_map(
+      const std::map<size_t, std::string>& index_to_basis_map,
+      std::shared_ptr<Structure> structure,
+      AOType atomic_orbital_type = AOType::Spherical);
 
   /**
    * @brief Get the basis type

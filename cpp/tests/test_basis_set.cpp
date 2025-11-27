@@ -1458,7 +1458,7 @@ TEST_F(BasisSetTest, SameBasisSetCheck) {
 
   // create custom basis set object
   std::shared_ptr<BasisSet> basis =
-      std::make_shared<BasisSet>(basis_set, structure);
+      BasisSet::from_basis_name(basis_set, structure);
 
   // run hartree fock with both basis sets to ensure they are valid
   auto scf_solver = qdk::chemistry::algorithms::ScfSolverFactory::create();
@@ -1483,7 +1483,7 @@ TEST_F(BasisSetTest, CustomBasisSetPerAtomCheck) {
   custom_basis_map[1] = basis_set;
   custom_basis_map[2] = basis_set;
   std::shared_ptr<BasisSet> basis =
-      std::make_shared<BasisSet>(custom_basis_map, structure);
+      BasisSet::from_index_map(custom_basis_map, structure);
 
   // run hartree fock with both basis sets to ensure they are valid
   auto scf_solver = qdk::chemistry::algorithms::ScfSolverFactory::create();
@@ -1508,7 +1508,7 @@ TEST_F(BasisSetTest, CustomBasisSetPerElementCheck) {
   custom_basis_map["O"] = basis_set;
 
   std::shared_ptr<BasisSet> basis =
-      std::make_shared<BasisSet>(custom_basis_map, structure);
+      BasisSet::from_element_map(custom_basis_map, structure);
 
   // run hartree fock with both basis sets to ensure they are valid
   auto scf_solver = qdk::chemistry::algorithms::ScfSolverFactory::create();

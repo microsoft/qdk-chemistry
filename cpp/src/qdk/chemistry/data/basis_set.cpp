@@ -243,55 +243,19 @@ BasisSet::BasisSet(const std::string& name, const Structure& structure,
 BasisSet::BasisSet(const std::string& name,
                    std::shared_ptr<Structure> structure,
                    AOType atomic_orbital_type)
-    : _atomic_orbital_type(atomic_orbital_type),
+    : _name(name),
+      _atomic_orbital_type(atomic_orbital_type),
       _structure(structure),
       _ecp_name("none") {
-  if (!structure) {
-    throw std::invalid_argument("Structure shared_ptr cannot be nullptr");
-  }
-  // convert basis_set_name to lowercase
-  _name = name;
-  std::transform(_name.begin(), _name.end(), _name.begin(), ::tolower);
-
   if (_name.empty()) {
     throw std::invalid_argument("BasisSet name cannot be empty");
   }
-
-  std::vector<Shell> all_shells;
-  // loop over each atom in the structure and get basis set shells
-  auto nuclear_charges = _structure->get_nuclear_charges();
-  for (size_t atom_index = 0; atom_index < nuclear_charges.size();
-       ++atom_index) {
-    double nuclear_charge = nuclear_charges[atom_index];
-
-    auto [shells, ecp_shells, ecp_electrons] =
-        detail::get_basis_for_nuclear_charge(nuclear_charge, _name, atom_index);
-
-    std::vector<Shell> sorted_shells;
-    stable_sort(shells.begin(), shells.end(), [](const auto& x, const auto& y) {
-      return x.orbital_type == y.orbital_type
-                 ? x.exponents.size() > y.exponents.size()
-                 : x.orbital_type < y.orbital_type;
-    });
-
-    sorted_shells.insert(sorted_shells.end(), shells.begin(), shells.end());
-    for (const auto& sh : sorted_shells) {
-      all_shells.push_back(sh);
-    }
+  if (!structure) {
+    throw std::invalid_argument("Structure shared_ptr cannot be nullptr");
   }
 
-  // Organize shells by atom index
-  for (const auto& shell : all_shells) {
-    size_t atom_index = shell.atom_index;
-    // Ensure we have enough space for this atom
-    if (atom_index >= _shells_per_atom.size()) {
-      _shells_per_atom.resize(atom_index + 1);
-    }
-    _shells_per_atom[atom_index].push_back(shell);
-
-    // Initialize ECP electrons vector with zeros for each atom
-    _ecp_electrons.resize(structure->get_num_atoms(), 0);
-  }
+  // Initialize ECP electrons vector with zeros for each atom
+  _ecp_electrons.resize(structure->get_num_atoms(), 0);
 
   if (!_is_valid()) {
     throw std::invalid_argument("Tried to generate invalid BasisSet");
@@ -436,59 +400,33 @@ BasisSet::BasisSet(const std::string& name, const std::vector<Shell>& shells,
   }
 }
 
-BasisSet::BasisSet(
-    const std::map<std::string, std::string>& element_to_basis_map,
-    const Structure& structure, AOType atomic_orbital_type)
-    : BasisSet(element_to_basis_map, std::make_shared<Structure>(structure),
-               atomic_orbital_type) {}
+std::shared_ptr<BasisSet> BasisSet::from_basis_name(
+    const std::string& name, const Structure& structure,
+    AOType atomic_orbital_type) {
+  return BasisSet::from_basis_name(name, std::make_shared<Structure>(structure),
+                                   atomic_orbital_type);
+}
 
-BasisSet::BasisSet(
-    const std::map<std::string, std::string>& element_to_basis_map,
-    std::shared_ptr<Structure> structure, AOType atomic_orbital_type)
-    : _name(BasisSet::custom_name),
-      _atomic_orbital_type(atomic_orbital_type),
-      _structure(structure),
-      _ecp_name("none") {
+std::shared_ptr<BasisSet> BasisSet::from_basis_name(
+    const std::string& name, std::shared_ptr<Structure> structure,
+    AOType atomic_orbital_type) {
   if (!structure) {
     throw std::invalid_argument("Structure shared_ptr cannot be nullptr");
   }
-
-  // sanitize element_to_basis_map keys to lowercase
-  // -> first char of elment is uppercase, rest are lowercase
-  std::map<std::string, std::string> sanitized_element_to_basis_map;
-  for (const auto& [element, basis_set] : element_to_basis_map) {
-    std::string sanitized_element = element;
-    if (!sanitized_element.empty()) {
-      for (size_t i = 0; i < sanitized_element.size(); ++i) {
-        sanitized_element[i] = std::tolower(sanitized_element[i]);
-      }
-    }
-    std::string sanitized_basis_set = basis_set;
-    std::transform(sanitized_basis_set.begin(), sanitized_basis_set.end(),
-                   sanitized_basis_set.begin(), ::tolower);
-    sanitized_element_to_basis_map[sanitized_element] = sanitized_basis_set;
-  }
+  // convert basis_set_name to lowercase
+  std::string name_copy = name;
+  std::transform(name_copy.begin(), name_copy.end(), name_copy.begin(),
+                 ::tolower);
 
   std::vector<Shell> all_shells;
   // loop over each atom in the structure and get basis set shells
-  auto nuclear_charges = _structure->get_nuclear_charges();
+  auto nuclear_charges = structure->get_nuclear_charges();
   for (size_t atom_index = 0; atom_index < nuclear_charges.size();
        ++atom_index) {
     double nuclear_charge = nuclear_charges[atom_index];
-    // get element symbol for atom index and convert to lowercase
-    std::string element_symbol = _structure->get_atom_symbol(atom_index);
-    std::transform(element_symbol.begin(), element_symbol.end(),
-                   element_symbol.begin(), ::tolower);
-    // find basis set name for this element
-    auto it = sanitized_element_to_basis_map.find(element_symbol);
-    if (it == sanitized_element_to_basis_map.end()) {
-      throw std::invalid_argument("No basis set specified for element: " +
-                                  element_symbol);
-    }
-    std::string tmp_basis_set_name = it->second;
 
     auto [shells, ecp_shells, ecp_electrons] =
-        detail::get_basis_for_nuclear_charge(nuclear_charge, tmp_basis_set_name,
+        detail::get_basis_for_nuclear_charge(nuclear_charge, name_copy,
                                              atom_index);
 
     std::vector<Shell> sorted_shells;
@@ -504,43 +442,75 @@ BasisSet::BasisSet(
     }
   }
 
-  // Organize shells by atom index
-  for (const auto& shell : all_shells) {
-    size_t atom_index = shell.atom_index;
-    // Ensure we have enough space for this atom
-    if (atom_index >= _shells_per_atom.size()) {
-      _shells_per_atom.resize(atom_index + 1);
-    }
-    _shells_per_atom[atom_index].push_back(shell);
-
-    // Initialize ECP electrons vector with zeros for each atom
-    _ecp_electrons.resize(structure->get_num_atoms(), 0);
-  }
-
-  if (!_is_valid()) {
-    throw std::invalid_argument("Tried to generate invalid BasisSet");
-  }
+  // TODO: handle ECPs
+  // size_t ecp_electrons = 0;
+  // std::vector<Shell> ecp_shells;
+  // std::string ecp_name = "none";
+  // return std::make_shared<BasisSet>(BasisSet::custom_name, all_shells,
+  // ecp_name,
+  //                                   ecp_shells, ecp_electrons, structure,
+  //                                   atomic_orbital_type);
+  return std::make_shared<BasisSet>(name_copy, all_shells, structure,
+                                    atomic_orbital_type);
 }
 
-BasisSet::BasisSet(const std::map<size_t, std::string>& index_to_basis_map,
-                   const Structure& structure, AOType atomic_orbital_type)
-    : BasisSet(index_to_basis_map, std::make_shared<Structure>(structure),
-               atomic_orbital_type) {}
+std::shared_ptr<BasisSet> BasisSet::from_element_map(
+    const std::map<std::string, std::string>& element_to_basis_map,
+    const Structure& structure, AOType atomic_orbital_type) {
+  return BasisSet::from_element_map(element_to_basis_map,
+                                    std::make_shared<Structure>(structure),
+                                    atomic_orbital_type);
+}
 
-BasisSet::BasisSet(const std::map<size_t, std::string>& index_to_basis_map,
-                   std::shared_ptr<Structure> structure,
-                   AOType atomic_orbital_type)
-    : _name("custom_basis_set"),
-      _atomic_orbital_type(atomic_orbital_type),
-      _structure(structure),
-      _ecp_name("none") {
-  if (!_structure) {
+std::shared_ptr<BasisSet> BasisSet::from_element_map(
+    const std::map<std::string, std::string>& element_to_basis_map,
+    std::shared_ptr<Structure> structure, AOType atomic_orbital_type) {
+  if (!structure) {
+    throw std::invalid_argument("Structure shared_ptr cannot be nullptr");
+  }
+
+  // convert element_map to index_map
+  std::map<size_t, std::string> tmp_index_map;
+  auto elements = structure->get_atomic_symbols();
+  for (size_t atom_index = 0; atom_index < elements.size(); ++atom_index) {
+    auto it = element_to_basis_map.find(elements[atom_index]);
+    if (it == element_to_basis_map.end()) {
+      throw std::invalid_argument("No basis set specified for element: " +
+                                  elements[atom_index]);
+    }
+    tmp_index_map[atom_index] = it->second;
+  }
+
+  // TODO: handle ECPs
+  // size_t ecp_electrons = 0;
+  // std::vector<Shell> ecp_shells;
+  // std::string ecp_name = "none";
+  // return std::make_shared<BasisSet>(BasisSet::custom_name, all_shells,
+  // ecp_name,
+  //                                   ecp_shells, ecp_electrons, structure,
+  //                                   atomic_orbital_type);
+  return BasisSet::from_index_map(tmp_index_map, structure,
+                                  atomic_orbital_type);
+}
+
+std::shared_ptr<BasisSet> BasisSet::from_index_map(
+    const std::map<size_t, std::string>& index_to_basis_map,
+    const Structure& structure, AOType atomic_orbital_type) {
+  return BasisSet::from_index_map(index_to_basis_map,
+                                  std::make_shared<Structure>(structure),
+                                  atomic_orbital_type);
+}
+
+std::shared_ptr<BasisSet> BasisSet::from_index_map(
+    const std::map<size_t, std::string>& index_to_basis_map,
+    std::shared_ptr<Structure> structure, AOType atomic_orbital_type) {
+  if (!structure) {
     throw std::invalid_argument("Structure shared_ptr cannot be nullptr");
   }
 
   std::vector<Shell> all_shells;
   // loop over each atom in the structure and get basis set shells
-  auto nuclear_charges = _structure->get_nuclear_charges();
+  auto nuclear_charges = structure->get_nuclear_charges();
   for (size_t atom_index = 0; atom_index < nuclear_charges.size();
        ++atom_index) {
     double nuclear_charge = nuclear_charges[atom_index];
@@ -571,22 +541,16 @@ BasisSet::BasisSet(const std::map<size_t, std::string>& index_to_basis_map,
     }
   }
 
-  // Organize shells by atom index
-  for (const auto& shell : all_shells) {
-    size_t atom_index = shell.atom_index;
-    // Ensure we have enough space for this atom
-    if (atom_index >= _shells_per_atom.size()) {
-      _shells_per_atom.resize(atom_index + 1);
-    }
-    _shells_per_atom[atom_index].push_back(shell);
-
-    // Initialize ECP electrons vector with zeros for each atom
-    _ecp_electrons.resize(structure->get_num_atoms(), 0);
-  }
-
-  if (!_is_valid()) {
-    throw std::invalid_argument("Tried to generate invalid BasisSet");
-  }
+  // TODO: handle ECPs
+  // size_t ecp_electrons = 0;
+  // std::vector<Shell> ecp_shells;
+  // std::string ecp_name = "none";
+  // return std::make_shared<BasisSet>(BasisSet::custom_name, all_shells,
+  // ecp_name,
+  //                                   ecp_shells, ecp_electrons, structure,
+  //                                   atomic_orbital_type);
+  return std::make_shared<BasisSet>(BasisSet::custom_name, all_shells,
+                                    structure, atomic_orbital_type);
 }
 
 BasisSet::BasisSet(const BasisSet& other)
