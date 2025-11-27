@@ -20,6 +20,7 @@ from qdk_chemistry.plugins.qiskit._interop.transpiler import (
     RemoveZBasisOnZeroState,
     SubstituteCliffordRz,
 )
+from qdk_chemistry.plugins.qiskit.conversion import create_statevector_from_wavefunction
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -46,22 +47,14 @@ class RegularIsometryStatePreparation(StatePreparation):
             A QASM string representation of the quantum circuit.
 
         """
-        # Active Space Consistency Check
-        alpha_indices, beta_indices = wavefunction.get_orbitals().get_active_space_indices()
-        if alpha_indices != beta_indices:
-            raise ValueError(
-                f"Active space contains {len(alpha_indices)} alpha orbitals and "
-                f"{len(beta_indices)} beta orbitals. Asymmetric active spaces for "
-                "alpha and beta orbitals are not supported for state preparation."
-            )
-
-        num_orbitals = len(alpha_indices)
+        indices, _ = wavefunction.get_orbitals().get_active_space_indices()
+        num_orbitals = len(indices)
         n_qubits = num_orbitals * 2
         num_dets = wavefunction.size()
         _LOGGER.debug(f"Using {num_dets} determinants for state preparation")
 
-        # Create statevector using efficient C++ implementation
-        statevector_data = wavefunction.to_statevector(normalize=True)
+        # Create statevector using Python conversion function
+        statevector_data = create_statevector_from_wavefunction(wavefunction, normalize=True)
 
         # Create the circuit
         circuit = QuantumCircuit(n_qubits, name=f"regular_isometry_{num_dets}_det")

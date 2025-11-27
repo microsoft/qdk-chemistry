@@ -924,37 +924,4 @@ std::string Wavefunction::get_summary() const {
 
   return oss.str();
 }
-
-Eigen::VectorXcd Wavefunction::to_statevector(bool normalize) const {
-  const auto& orbitals = get_orbitals();
-  auto [alpha_indices, beta_indices] = orbitals->get_active_space_indices();
-  size_t num_orbs = alpha_indices.size();
-  size_t num_qubits = num_orbs * 2;
-  size_t dim = 1ULL << num_qubits;
-
-  Eigen::VectorXcd statevector = Eigen::VectorXcd::Zero(dim);
-
-  const auto& dets = get_active_determinants();
-  const auto& coeffs_variant = get_coefficients();
-  bool is_complex = detail::is_vector_variant_complex(coeffs_variant);
-
-  for (size_t i = 0; i < dets.size(); ++i) {
-    size_t idx = dets[i].to_statevector_index(num_orbs);
-
-    if (is_complex) {
-      statevector[idx] = std::get<Eigen::VectorXcd>(coeffs_variant)[i];
-    } else {
-      statevector[idx] = std::get<Eigen::VectorXd>(coeffs_variant)[i];
-    }
-  }
-
-  if (normalize) {
-    double norm = statevector.norm();
-    if (norm > 1e-15) {
-      statevector /= norm;
-    }
-  }
-
-  return statevector;
-}
 }  // namespace qdk::chemistry::data

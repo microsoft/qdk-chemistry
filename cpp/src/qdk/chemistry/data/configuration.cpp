@@ -374,32 +374,4 @@ std::pair<std::string, std::string> Configuration::to_binary_strings(
   }
   return {result_alpha, result_beta};
 }
-
-size_t Configuration::to_statevector_index(size_t num_orbitals) const {
-  size_t index = 0;
-  size_t capacity = get_orbital_capacity();
-
-  if (num_orbitals == 0) {
-    num_orbitals = capacity;
-  }
-
-  if (num_orbitals > capacity) {
-    throw std::runtime_error(
-        "Requested more orbitals than configuration capacity");
-  }
-
-  for (size_t i = 0; i < num_orbitals; ++i) {
-    OccupationState state = _get_orbital(i);
-
-    // Little-endian: alpha in lower bits, beta in upper bits
-    if (state == ALPHA || state == DOUBLY) {
-      index |= (1ULL << i);
-    }
-    if (state == BETA || state == DOUBLY) {
-      index |= (1ULL << (num_orbitals + i));
-    }
-  }
-
-  return index;
-}
 }  // namespace qdk::chemistry::data

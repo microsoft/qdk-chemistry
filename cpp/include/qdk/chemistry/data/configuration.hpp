@@ -305,25 +305,6 @@ class Configuration : public DataClass {
   std::pair<std::string, std::string> to_binary_strings(
       size_t num_orbitals = 0) const;
 
-  /**
-   * @brief Convert configuration to corresponding integer index in statevector
-   * array
-   * @param num_orbitals Number of spatial orbitals to use from the
-   * configuration (default = 0, use all)
-   * @return Corresponding index in statevector
-   * @details Takes configuration like "2ud0" and computes which position in the
-   * 2^8=256 - element statevector array this determinant corresponds to.
-   * Configuration "2ud0" has a total of 8 qubits (2 per spatial orbital):
-   * 7 6 5 4 | 3 2 1 0
-   * beta    | alpha
-   * 3 2 1 0 | 3 2 1 0
-   * 0 1 0 1 | 0 0 1 1
-   * as binary number (little-endian) we get
-   * 128x0 + 64x1 + 32x0 + 16x1 + 8x0 + 4x0 + 2x1 + 1x1 = 83
-   * @throws std::runtime_error If num_orbitals exceeds configuration capacity
-   */
-  size_t to_statevector_index(size_t num_orbitals = 0) const;
-
  private:
   // Friend classes that need direct access to packed data for efficient
   // serialization

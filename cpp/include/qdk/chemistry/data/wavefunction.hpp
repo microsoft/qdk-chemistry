@@ -780,33 +780,6 @@ class Wavefunction : public DataClass,
    */
   bool is_complex() const;
 
-  /**
-   * @brief Convert wavefunction to dense statevector representation for quantum
-   * simulation
-   *
-   * @param normalize Whether to normalize the resulting statevector (default:
-   * true)
-   * @return Dense complex statevector as Eigen::VectorXcd of size
-   * 2^(2*num_active_orbitals)
-   *
-   * @details Creates a dense statevector representation suitable for quantum
-   * circuit simulation frameworks. The statevector is a complex
-   * vector of size 2^n where n is the number of qubits (2 qubits per spatial
-   * orbital: one for alpha spin, one for beta spin).
-   *
-   * The encoding uses little-endian convention:
-   * - Lower qubits (0 to num_orbitals-1): alpha spin orbitals
-   * - Upper qubits (num_orbitals to 2*num_orbitals-1): beta spin orbitals
-   *
-   * Each determinant in the wavefunction is mapped to its corresponding basis
-   * state index, and the wavefunction coefficient is placed at that index in
-   * the statevector.
-   *
-   * @throws std::runtime_error If active space is not defined or is asymmetric
-   * (different number of alpha and beta active orbitals)
-   */
-  Eigen::VectorXcd to_statevector(bool normalize = true) const;
-
  private:
   /// Container holding the wavefunction implementation
   std::unique_ptr<const WavefunctionContainer> _container;
