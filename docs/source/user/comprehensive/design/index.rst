@@ -65,14 +65,14 @@ QDK/Chemistry implements the :doc:`factory pattern <factory_pattern>` for algori
 
 .. tab:: C++ API
 
-   .. literalinclude:: ../../../../examples/cpp/design_principles.cpp
+   .. literalinclude:: ../../../_static/examples/cpp/design_principles.cpp
       :language: cpp
       :start-after: // start-cell-scf-create
       :end-before: // end-cell-scf-create
 
 .. tab:: Python API
 
-   .. literalinclude:: ../../../../examples/python/design_principles.py
+   .. literalinclude:: ../../../_static/examples/python/design_principles.py
       :language: python
       :start-after: # start-cell-scf-create
       :end-before: # end-cell-scf-create
@@ -91,14 +91,14 @@ Algorithm configuration is managed through a consistent :doc:`Settings <settings
 
 .. tab:: C++ API
 
-   .. literalinclude:: ../../../../examples/cpp/design_principles.cpp
+   .. literalinclude:: ../../../_static/examples/cpp/design_principles.cpp
       :language: cpp
       :start-after: // start-cell-scf-settings
       :end-before: // end-cell-scf-settings
 
 .. tab:: Python API
 
-   .. literalinclude:: ../../../../examples/python/design_principles.py
+   .. literalinclude:: ../../../_static/examples/python/design_principles.py
       :language: python
       :start-after: # start-cell-scf-settings
       :end-before: # end-cell-scf-settings
@@ -118,14 +118,14 @@ A typical workflow in QDK/Chemistry demonstrates the data-algorithm separation:
 
 .. tab:: C++ API
 
-   .. literalinclude:: ../../../../examples/cpp/design_principles.cpp
+   .. literalinclude:: ../../../_static/examples/cpp/design_principles.cpp
       :language: cpp
       :start-after: // start-cell-data-flow
       :end-before: // end-cell-data-flow
 
 .. tab:: Python API
 
-   .. literalinclude:: ../../../../examples/python/design_principles.py
+   .. literalinclude:: ../../../_static/examples/python/design_principles.py
       :language: python
       :start-after: # start-cell-data-flow
       :end-before: # end-cell-data-flow
@@ -143,8 +143,9 @@ This design provides several advantages:
 3. **Best-of-Breed Approach**: Leverage strengths of different packages while maintaining consistent data structures
 4. **Future-Proofing**: New implementations can be added without changing the user-facing API
 
-.. rubric:: Related topics
+.. rubric:: Further reading
 
+- The above examples can be downloaded as complete `C++ <../../../_static/examples/cpp/design_principles.cpp>`_ and `Python <../../../_static/examples/python/design_principles.py>`_ scripts.
 - :doc:`Factory Pattern <factory_pattern>`: Details on QDK/Chemistry's implementation of the factory pattern
 - :doc:`Settings <settings>`: How to configure algorithms through the Settings interface
 - :doc:`Interfaces <interfaces>`: QDK/Chemistry's interface system to external packages
