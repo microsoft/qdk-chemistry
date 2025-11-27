@@ -2,7 +2,7 @@
 // Licensed under the MIT License. See LICENSE.txt in the project root for
 // license information.
 
-#include "element_data.hpp"
+#include <qdk/chemistry/data/element_data.hpp>
 
 namespace qdk::chemistry::data {
 

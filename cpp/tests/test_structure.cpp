@@ -683,17 +683,17 @@ TEST_F(StructureBasicTest, UtilityFunctionsAndEdgeCases) {
   EXPECT_NO_THROW(Structure::nuclear_charge_to_element(118));      // Oganesson
   EXPECT_EQ(Structure::nuclear_charge_to_element(6), Element::C);  // Carbon
 
-  // Test get_standard_atomic_mass with invalid element
+  // Test get_default_atomic_mass with invalid element
   // This is harder to test directly since Element enum only contains valid
   // elements But we can test it indirectly by using an extreme value
   Element invalid_element = static_cast<Element>(999);  // Invalid element
-  EXPECT_THROW(Structure::get_standard_atomic_mass(invalid_element),
+  EXPECT_THROW(Structure::get_default_atomic_mass(invalid_element),
                std::invalid_argument);
 
-  // Test get_standard_nuclear_charge
-  EXPECT_EQ(Structure::get_standard_nuclear_charge(Element::H), 1);
-  EXPECT_EQ(Structure::get_standard_nuclear_charge(Element::C), 6);
-  EXPECT_EQ(Structure::get_standard_nuclear_charge(Element::O), 8);
+  // Test get_default_nuclear_charge
+  EXPECT_EQ(Structure::get_default_nuclear_charge(Element::H), 1);
+  EXPECT_EQ(Structure::get_default_nuclear_charge(Element::C), 6);
+  EXPECT_EQ(Structure::get_default_nuclear_charge(Element::O), 8);
 
   // Test _validate_dimensions with inconsistent empty structure
   // This function is private, so we test it indirectly through constructor

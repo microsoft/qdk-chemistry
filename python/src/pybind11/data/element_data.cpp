@@ -11,18 +11,19 @@ using namespace qdk::chemistry::data;
 
 void bind_element_data(py::module &m) {
   // Bind Element enum
-  py::enum_<Element>(m, "Element", R"(
-    Chemical elements enumeration.
+  py::enum_<Element>(m, "Element",
+                     R"(
+Chemical elements enumeration.
 
-    This enum represents all chemical elements from hydrogen (1) to oganesson (118).
-    Each element is represented by its atomic number.
+This enum represents all chemical elements from hydrogen (1) to oganesson (118).
+Each element is represented by its atomic number.
 
 Examples:
     >>> from qdk_chemistry.data import Element
     >>> Element.H  # Hydrogen
     >>> Element.C  # Carbon
     >>> Element.O  # Oxygen
-    )")
+)")
       // Period 1
       .value("H", Element::H, "Hydrogen")
       .value("He", Element::He, "Helium")
@@ -151,21 +152,21 @@ Examples:
       .export_values();
 
   // Bind Isotope enum
-  py::enum_<Isotope> isotope_enum(m, "Isotope", R"(
-    Isotope enumeration.
+  py::enum_<Isotope> isotope_enum(m, "Isotope",
+                                  R"(
+Isotope enumeration.
 
-    This enum represents all stable and commonly studied isotopes for elements 1-118.
-    Each isotope is represented by its element symbol followed by the mass number.
-    Using the element symbol without mass number yields the standard atomic weights.
+This enum represents all stable and commonly studied isotopes for elements 1-118.
+Each isotope is represented by its element symbol followed by the mass number.
+Using the element symbol without mass number yields the standard atomic weights.
 
-    Examples
-    --------
+Examples:
     >>> from qdk_chemistry.data import Isotope
     >>> Isotope.H1    # Protium
     >>> Isotope.H2    # Deuterium
     >>> Isotope.C12   # Carbon-12
     >>> Isotope.C13   # Carbon-13
-    )");
+)");
 
   // Elements (standard atomic weights)
   // Period 1
@@ -3976,17 +3977,14 @@ Examples:
   // Expose current CIAAW version
   m.def("get_current_ciaaw_version", &get_current_ciaaw_version,
         R"(
-    Get the current CIAAW version being used for atomic weights.
+Get the current CIAAW version being used for atomic weights.
 
-    Returns
-    -------
-    str
-        The CIAAW version string (e.g., 'CIAAW 2024')
+Returns:
+    str: The CIAAW version string (e.g., 'CIAAW 2024').
 
-    Examples
-    --------
+Examples:
     >>> from qdk_chemistry.data import get_current_ciaaw_version
     >>> version = get_current_ciaaw_version()
     >>> print(f"Using {version} atomic weights")
-    )");
+)");
 }

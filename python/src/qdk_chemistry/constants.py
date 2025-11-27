@@ -222,6 +222,7 @@ __all__ = [
     "find_constant",
     "get_constant_info",
     "get_constants_info",
+    "get_current_codata_version",
     "list_constants",
     "show_constant_details",
 ]

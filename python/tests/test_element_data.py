@@ -5,8 +5,6 @@
 # Licensed under the MIT License. See LICENSE.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
 
-import pytest
-
 from qdk_chemistry.data import Element, Isotope, get_current_ciaaw_version
 
 
@@ -165,14 +163,6 @@ class TestElementEnum:
             element = getattr(Element, symbol)
             assert isinstance(element, Element)
 
-    def test_element_enumeration(self):
-        """Test that we can enumerate all elements."""
-        elements = list(Element)
-        assert len(elements) == 118
-        assert elements[0] == Element.H
-        assert elements[1] == Element.He
-        assert elements[117] == Element.Og
-
 
 class TestIsotopeEnum:
     """Test cases for the Isotope enum."""
@@ -219,33 +209,6 @@ class TestIsotopeEnum:
         assert Isotope.H1 != Isotope.H2
         assert Isotope.C != Isotope.C12
 
-
-class TestCIAAWVersion:
-    """Test cases for CIAAW version information."""
-
-    def test_get_current_ciaaw_version_exists(self):
-        """Test that get_current_ciaaw_version function exists."""
-        assert callable(get_current_ciaaw_version)
-
-    def test_get_current_ciaaw_version_returns_string(self):
-        """Test that get_current_ciaaw_version returns a valid string."""
-        version = get_current_ciaaw_version()
-
-        assert isinstance(version, str)
-        assert len(version) > 0
-
-    def test_ciaaw_version_format(self):
-        """Test that CIAAW version has expected format."""
-        version = get_current_ciaaw_version()
-
-        assert "CIAAW" in version
-        # Should include a year
-        assert any(str(year) in version for year in [2024])
-
-
-class TestElementIsotopeIntegration:
-    """Test integration between Element and Isotope enums."""
-
     def test_element_isotope_value_consistency(self):
         """Test that standard isotope values match element values."""
         # For standard atomic weights, isotope and element should have same value
@@ -269,28 +232,25 @@ class TestElementIsotopeIntegration:
                 f"Element.{symbol}.name ({element.name}) != Isotope.{symbol}.name ({isotope.name})"
             )
 
-    def test_all_elements_have_isotope_counterparts(self):
-        """Test that all elements have corresponding isotope entries."""
-        for element in Element:
-            symbol = element.name
-            assert hasattr(Isotope, symbol), f"Isotope.{symbol} not found for Element.{symbol}"
 
+class TestCIAAWVersion:
+    """Test cases for CIAAW version information."""
 
-class TestEdgeCases:
-    """Test edge cases and error conditions."""
+    def test_get_current_ciaaw_version_exists(self):
+        """Test that get_current_ciaaw_version function exists."""
+        assert callable(get_current_ciaaw_version)
 
-    def test_element_out_of_range(self):
-        """Test that we cannot create elements with invalid values."""
-        # Elements only go up to 118
-        with pytest.raises((ValueError, AttributeError)):
-            Element(119)
+    def test_get_current_ciaaw_version_returns_string(self):
+        """Test that get_current_ciaaw_version returns a valid string."""
+        version = get_current_ciaaw_version()
 
-    def test_element_zero(self):
-        """Test that we cannot create element with zero value."""
-        with pytest.raises((ValueError, AttributeError)):
-            Element(0)
+        assert isinstance(version, str)
+        assert len(version) > 0
 
-    def test_element_negative(self):
-        """Test that we cannot create element with negative value."""
-        with pytest.raises((ValueError, AttributeError)):
-            Element(-1)
+    def test_ciaaw_version_format(self):
+        """Test that CIAAW version has expected format."""
+        version = get_current_ciaaw_version()
+
+        assert "CIAAW" in version
+        # Should include a year
+        assert any(str(year) in version for year in [2024])

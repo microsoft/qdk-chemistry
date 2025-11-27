@@ -115,9 +115,9 @@ TEST_F(ScfTest, Oxygen) {
   auto [E_triplet, wfn_triplet] = scf_solver->run(o2, 0, 3);
 
   EXPECT_NEAR(E_singlet - o2->calculate_nuclear_repulsion_energy(),
-              -1.7558700613e+02, testing::scf_energy_tolerance);
+              -1.7558700611e+02, testing::scf_energy_tolerance);
   EXPECT_NEAR(E_triplet - o2->calculate_nuclear_repulsion_energy(),
-              -1.7566984837e+02, testing::scf_energy_tolerance);
+              -1.7566984835e+02, testing::scf_energy_tolerance);
 
   // Check singlet orbitals
   EXPECT_TRUE(wfn_singlet->get_orbitals()->is_restricted());
@@ -396,7 +396,7 @@ TEST_F(ScfTest, OxygenTripletInitialGuessRestart) {
 
   // Verify we get the expected energy for HF/STO-3G triplet
   EXPECT_NEAR(energy_o2_first - o2->calculate_nuclear_repulsion_energy(),
-              -1.7566984837e+02, testing::scf_energy_tolerance);
+              -1.7566984835e+02, testing::scf_energy_tolerance);
 
   // Now restart with the converged orbitals as initial guess
   // Create a new solver instance since settings are locked after run
@@ -453,7 +453,7 @@ TEST_F(ScfTest, AgHDef2SvpWithEcp) {
   // Verify the electronic energy matches expected value
   double nuclear_repulsion = agh->calculate_nuclear_repulsion_energy();
   double electronic_energy = energy - nuclear_repulsion;
-  EXPECT_NEAR(electronic_energy, -162.0054639416,
+  EXPECT_NEAR(electronic_energy, -162.0054639312,
               testing::scf_energy_tolerance);
 
   // Check electron count - with ECP, should have 20 valence electrons

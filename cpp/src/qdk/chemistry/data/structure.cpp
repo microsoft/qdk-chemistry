@@ -366,77 +366,6 @@ Structure::Structure(const std::vector<Eigen::Vector3d>& coordinates,
   }
 }
 
-Structure::Structure(const std::vector<Eigen::Vector3d>& coordinates,
-                     const std::vector<Isotope>& isotopes,
-                     const std::vector<double>& masses,
-                     const std::vector<double>& nuclear_charges)
-    : _coordinates([&]() {
-        if (coordinates.empty()) {
-          return Eigen::MatrixXd();  // Create completely empty matrix (0x0)
-        } else {
-          Eigen::MatrixXd coords(coordinates.size(), 3);
-          for (size_t i = 0; i < coordinates.size(); ++i) {
-            coords.row(i) = coordinates[i];
-          }
-          return coords;
-        }
-      }()),
-      _elements([&]() {
-        std::vector<Element> elements;
-        elements.reserve(isotopes.size());
-        for (const auto& isotope : isotopes) {
-          // Extract atomic number from isotope
-          unsigned Z = static_cast<unsigned>(isotope) & 0x7F;
-          elements.push_back(static_cast<Element>(Z));
-        }
-        return elements;
-      }()),
-      _masses([&]() {
-        if (masses.empty()) {
-          if (isotopes.empty()) {
-            return Eigen::VectorXd();  // Create completely empty vector
-          } else {
-            Eigen::VectorXd default_masses(isotopes.size());
-            for (size_t i = 0; i < isotopes.size(); ++i) {
-              default_masses[i] = get_default_atomic_mass(isotopes[i]);
-            }
-            return default_masses;
-          }
-        } else {
-          Eigen::VectorXd masses_vec(masses.size());
-          for (size_t i = 0; i < masses.size(); ++i) {
-            masses_vec[i] = masses[i];
-          }
-          return masses_vec;
-        }
-      }()),
-      _nuclear_charges([&]() {
-        if (nuclear_charges.empty()) {
-          if (isotopes.empty()) {
-            return Eigen::VectorXd();  // Create completely empty vector
-          } else {
-            Eigen::VectorXd default_charges(isotopes.size());
-            for (size_t i = 0; i < isotopes.size(); ++i) {
-              // Extract atomic number from isotope
-              unsigned Z = static_cast<unsigned>(isotopes[i]) & 0x7F;
-              default_charges[i] = static_cast<double>(Z);
-            }
-            return default_charges;
-          }
-        } else {
-          Eigen::VectorXd charges_vec(nuclear_charges.size());
-          for (size_t i = 0; i < nuclear_charges.size(); ++i) {
-            charges_vec[i] = nuclear_charges[i];
-          }
-          return charges_vec;
-        }
-      }()) {
-  if (!_is_valid()) {
-    throw std::invalid_argument(
-        "Invalid structure: inconsistent dimensions or invalid data");
-  }
-}
-
 Eigen::Vector3d Structure::get_atom_coordinates(size_t atom_index) const {
   if (atom_index >= get_num_atoms()) {
     throw std::out_of_range("Atom index out of range");
@@ -480,7 +409,8 @@ std::vector<std::string> Structure::get_atomic_symbols() const {
 
 bool Structure::_is_valid() const {
   if (_elements.empty()) {
-    return _coordinates.rows() == 0 && _coordinates.cols() == 0 &&
+    return _coordinates.rows() == 0 &&
+           (_coordinates.cols() == 0 || _coordinates.cols() == 3) &&
            _masses.size() == 0 && _nuclear_charges.size() == 0;
   }
 
@@ -980,6 +910,9 @@ Isotope Structure::symbol_to_isotope(const std::string& symbol) {
   std::string fixed_symbol = _fix_symbol_capitalization(letters_only);
   unsigned atomic_number = symbol_to_nuclear_charge(fixed_symbol);
   std::string numbers_only = _extract_numbers_from_symbol(symbol);
+  if (numbers_only.empty()) {
+    return static_cast<Isotope>(atomic_number);
+  }
   unsigned mass_number = std::stoul(numbers_only);
   return static_cast<Isotope>(isotope(atomic_number, mass_number));
 }
