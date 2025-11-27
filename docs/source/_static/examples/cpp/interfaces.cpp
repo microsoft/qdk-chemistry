@@ -39,55 +39,6 @@ std::cout << ScfSolverFactory::get_docstring("default") << std::endl;
 // -----------------------------------------------------------------------------
 
 // -----------------------------------------------------------------------------
-// start-cell-custom-scf
-#include <qdk/chemistry.hpp>
-
-#include "custom_chemistry_package.hpp"
-
-namespace qdk::chemistry {
-namespace algorithms {
-
-class CustomScfSolver : public ScfSolver {
- public:
-  CustomScfSolver() = default;
-
-  std::tuple<double, data::Orbitals> solve(
-      const data::Structure& structure) override {
-    // Convert QDK/Chemistry structure to custom package format
-    auto custom_mol = convert_to_custom_format(structure);
-
-    // Run calculation with custom package
-    auto result = custom_chemistry::run_scf(
-        custom_mol, settings().get<std::string>("basis_set"),
-        settings().get<std::string>("method"));
-
-    // Convert results back to QDK/Chemistry format
-    double energy = result.energy;
-    data::Orbitals orbitals = convert_from_custom_format(result.orbitals);
-
-    return {energy, orbitals};
-  }
-
- private:
-  custom_chemistry::Molecule convert_to_custom_format(
-      const data::Structure& structure);
-  data::Orbitals convert_from_custom_format(
-      const custom_chemistry::Orbitals& orbitals);
-};
-
-// Register in a static initializer block
-namespace {
-bool registered = ScfSolverFactory::register_implementation(
-    "custom", []() { return std::make_unique<CustomScfSolver>(); },
-    "Interface to Custom Chemistry Package");
-}  // anonymous namespace
-
-}  // namespace algorithms
-}  // namespace qdk::chemistry
-// end-cell-custom-scf
-// -----------------------------------------------------------------------------
-
-// -----------------------------------------------------------------------------
 // start-cell-settings
 // Set general options that work across all backends
 scf->settings().set("basis_set", "cc-pvdz");

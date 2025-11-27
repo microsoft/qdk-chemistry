@@ -47,14 +47,14 @@ This pattern is implemented across all major algorithm types in QDK/Chemistry.
 
 .. tab:: C++ API
 
-   .. literalinclude:: ../../../../examples/cpp/interfaces.cpp
+   .. literalinclude:: ../../../_static/examples/cpp/interfaces.cpp
       :language: cpp
       :start-after: // start-cell-scf
       :end-before: // end-cell-scf
 
 .. tab:: Python API
 
-   .. literalinclude:: ../../../../examples/python/interfaces.py
+   .. literalinclude:: ../../../_static/examples/python/interfaces.py
       :language: python
       :start-after: # start-cell-scf
       :end-before: # end-cell-scf
@@ -66,14 +66,14 @@ You can discover what implementations are available for each algorithm type:
 
 .. tab:: C++ API
 
-   .. literalinclude:: ../../../../examples/cpp/interfaces.cpp
+   .. literalinclude:: ../../../_static/examples/cpp/interfaces.cpp
       :language: cpp
       :start-after: // start-cell-list-methods
       :end-before: // end-cell-list-methods
 
 .. tab:: Python API
 
-   .. literalinclude:: ../../../../examples/python/interfaces.py
+   .. literalinclude:: ../../../_static/examples/python/interfaces.py
       :language: python
       :start-after: # start-cell-list-methods
       :end-before: # end-cell-list-methods
@@ -92,10 +92,52 @@ To create a new interface:
 
 .. tab:: C++ API
 
-   .. literalinclude:: ../../../../examples/cpp/interfaces.cpp
-      :language: cpp
-      :start-after: // start-cell-custom-scf
-      :end-before: // end-cell-custom-scf
+   .. code-block:: cpp
+
+      #include <qdk/chemistry.hpp>
+
+      #include "custom_chemistry_package.hpp"
+
+      namespace qdk::chemistry {
+      namespace algorithms {
+
+      class CustomScfSolver : public ScfSolver {
+      public:
+      CustomScfSolver() = default;
+
+      std::tuple<double, data::Orbitals> solve(
+            const data::Structure& structure) override {
+         // Convert QDK/Chemistry structure to custom package format
+         auto custom_mol = convert_to_custom_format(structure);
+
+         // Run calculation with custom package
+         auto result = custom_chemistry::run_scf(
+            custom_mol, settings().get<std::string>("basis_set"),
+            settings().get<std::string>("method"));
+
+         // Convert results back to QDK/Chemistry format
+         double energy = result.energy;
+         data::Orbitals orbitals = convert_from_custom_format(result.orbitals);
+
+         return {energy, orbitals};
+      }
+
+      private:
+      custom_chemistry::Molecule convert_to_custom_format(
+            const data::Structure& structure);
+      data::Orbitals convert_from_custom_format(
+            const custom_chemistry::Orbitals& orbitals);
+      };
+
+      // Register in a static initializer block
+      namespace {
+      bool registered = ScfSolverFactory::register_implementation(
+         "custom", []() { return std::make_unique<CustomScfSolver>(); },
+         "Interface to Custom Chemistry Package");
+      }  // anonymous namespace
+
+      }  // namespace algorithms
+      }  // namespace qdk::chemistry
 
 .. tab:: Python API
 
@@ -140,14 +182,14 @@ This approach leverages the flexibility of QDK/Chemistry's :doc:`settings system
 
 .. tab:: C++ API
 
-   .. literalinclude:: ../../../../examples/cpp/interfaces.cpp
+   .. literalinclude:: ../../../_static/examples/cpp/interfaces.cpp
       :language: cpp
       :start-after: // start-cell-settings
       :end-before: // end-cell-settings
 
 .. tab:: Python API
 
-   .. literalinclude:: ../../../../examples/python/interfaces.py
+   .. literalinclude:: ../../../_static/examples/python/interfaces.py
       :language: python
       :start-after: # start-cell-settings
       :end-before: # end-cell-settings
@@ -172,7 +214,7 @@ The data types that are automatically converted include:
    Coefficients, occupations, and energies
 :doc:`Hamiltonians <../data/hamiltonian>`:
    One and two-electron integrals, core Hamiltonians
-:doc:`Calculation results <../data/wavefunction>`:
+Calculation results (see :class:`~qdk_chemistry.data.Wavefunction`):
    Energies, gradients, properties
 
 The conversion process is optimized to minimize data copying when possible, especially for large data structures like electron repulsion integrals (:term:`ERIs`).
@@ -224,9 +266,10 @@ Each algorithm class is implemented through the factory pattern, allowing you to
 .. TODO: fix the function names below in this commented-out text.
 .. You can discover all available implementations for a particular algorithm using the appropriate listing function (e.g., ``list_scf_solvers()`` in Python or ``ScfSolverFactory::available()`` in C++).
 
-Related topics
---------------
+Further reading
+---------------
 
+- Some of the above examples can be downloaded as complete `C++ <../../../_static/examples/cpp/interfaces.cpp>`_ and `Python <../../../_static/examples/python/interfaces.py>`_ scripts.
 - :doc:`Design principles <index>`: Core architectural principles of QDK/Chemistry
 - :doc:`Factory pattern <factory_pattern>`: How to extend QDK/Chemistry with new algorithms and interfaces
 - :doc:`Settings <settings>`: Configuring algorithm behavior consistently across implementations
