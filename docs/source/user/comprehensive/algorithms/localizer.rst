@@ -2,7 +2,7 @@ Orbital localization
 ====================
 
 The ``Localizer`` algorithm in QDK/Chemistry performs various orbital transformations to create localized or otherwise transformed molecular orbitals.
-Following QDK/Chemistry's :doc:`algorithm design principles <../advanced/design_principles>`, it takes an :doc:`Orbitals <../data/orbitals>` instance as input and produces a new :doc:`Orbitals <../data/orbitals>` instance as output.
+Following QDK/Chemistry's :doc:`algorithm design principles <../design/index>`, it takes an :doc:`Orbitals <../data/orbitals>` instance as input and produces a new :doc:`Orbitals <../data/orbitals>` instance as output.
 These transformations preserve the overall electronic state but provide orbitals with different properties that are useful for chemical analysis or subsequent calculations.
 
 Overview
@@ -24,9 +24,9 @@ QDK/Chemistry provides several orbital transformation methods through the ``Loca
 Creating a localizer
 --------------------
 
-As an algorithm class in QDK/Chemistry, the ``Localizer`` follows the :doc:`factory pattern design principle <../advanced/design_principles>`.
+As an algorithm class in QDK/Chemistry, the ``Localizer`` follows the :doc:`factory pattern design principle <../design/index>`.
 It is created using its corresponding factory, which provides a unified interface for different localization method implementations.
-For more information about this pattern, see the :doc:`Factory Pattern <../advanced/factory_pattern>` documentation.
+For more information about this pattern, see the :doc:`Factory Pattern <../design/factory_pattern>` documentation.
 
 .. tab:: C++ API
 
@@ -37,7 +37,7 @@ For more information about this pattern, see the :doc:`Factory Pattern <../advan
 
 .. tab:: Python API
 
-   .. literalinclude:: ../../../examples/python/localizer.py
+   .. literalinclude:: ../../../../examples/python/localizer.py
       :language: python
       :start-after: # start-cell-1
       :end-before: # end-cell-1
@@ -57,7 +57,7 @@ The ``Localizer`` can be configured using the ``Settings`` object:
 
 .. tab:: Python API
 
-   .. literalinclude:: ../../../examples/python/localizer.py
+   .. literalinclude:: ../../../../examples/python/localizer.py
       :language: python
       :start-after: # start-cell-2
       :end-before: # end-cell-2
@@ -67,7 +67,7 @@ Performing orbital localization
 
 Before performing localization, you need an :doc:`Orbitals <../data/orbitals>` instance as input.
 This is typically obtained from an :doc:`ScfSolver <scf_solver>` calculation, as localization is usually applied to converged :term:`SCF` orbitals.
-Following QDK/Chemistry's :doc:`algorithm design principles <../advanced/design_principles>`, the ``Localizer`` algorithm takes an ``Orbitals`` object as input and produces a new ``Orbitals`` object as output, preserving the original orbitals while creating a transformed representation.
+Following QDK/Chemistry's :doc:`algorithm design principles <../design/index>`, the ``Localizer`` algorithm takes an ``Orbitals`` object as input and produces a new ``Orbitals`` object as output, preserving the original orbitals while creating a transformed representation.
 
 The ``run`` method requires three parameters:
 
@@ -93,7 +93,7 @@ Once configured, the localization can be performed on a set of orbitals:
    .. note::
       This example shows the API pattern. For complete working examples, see the test suite.
 
-   .. literalinclude:: ../../../examples/python/localizer.py
+   .. literalinclude:: ../../../../examples/python/localizer.py
       :language: python
       :start-after: # start-cell-3
       :end-before: # end-cell-3
@@ -207,7 +207,7 @@ Third-party interfaces
 
 The factory pattern allows seamless selection between these implementations.
 
-For more details on how QDK/Chemistry interfaces with external packages, see the :doc:`Interfaces <../advanced/interfaces>` documentation.
+For more details on how QDK/Chemistry interfaces with external packages, see the :doc:`Interfaces <../design/interfaces>` documentation.
 
 Related classes
 ---------------

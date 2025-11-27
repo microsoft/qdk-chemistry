@@ -68,7 +68,7 @@ The ``ScfSolver`` in QDK/Chemistry provides the following calculation types for 
 
 - **Basis set support**:
 
-  - Extensive library of standard quantum chemistry :doc:`basis sets <../data/basis_sets>` including Pople (STO-nG, 3-21G,
+  - Extensive library of standard quantum chemistry :doc:`basis sets <../basis_functionals>` including Pople (STO-nG, 3-21G,
     6-31G, etc.), Dunning (cc-pVDZ, cc-pVTZ, etc.), and Karlsruhe (def2-SVP, def2-TZVP, etc.) families
   - Support for custom basis sets and effective core potentials (ECPs)
 
@@ -98,14 +98,14 @@ QDK/Chemistry currently provides the following registered solvers:
 
 .. tab:: C++ API
 
-   .. literalinclude:: ../../../../examples/cpp/scf_solver.cpp
+   .. literalinclude:: ../../../_static/examples/cpp/scf_solver.cpp
       :language: cpp
       :start-after: // start-cell-1
       :end-before: // end-cell-1
 
 .. tab:: Python API
 
-   .. literalinclude:: ../../../examples/python/factory_pattern.py
+   .. literalinclude:: ../../../_static/examples/python/factory_pattern.py
       :language: python
       :start-after: # start-cell-1
       :end-before: # end-cell-1
@@ -125,14 +125,14 @@ See the `Available Settings`_ section below for a complete list of configuration
 
 .. tab:: C++ API
 
-   .. literalinclude:: ../../../../examples/cpp/scf_solver.cpp
+   .. literalinclude:: ../../../_static/examples/cpp/scf_solver.cpp
       :language: cpp
       :start-after: // start-cell-2
       :end-before: // end-cell-2
 
 .. tab:: Python API
 
-   .. literalinclude:: ../../../examples/python/settings.py
+   .. literalinclude:: ../../../_static/examples/python/settings.py
       :language: python
       :start-after: # start-cell-1
       :end-before: # end-cell-1
@@ -155,7 +155,7 @@ The ``solve`` method returns two values:
 
 .. tab:: Python API
 
-   .. literalinclude:: ../../../examples/python/scf_solver.py
+   .. literalinclude:: ../../../../examples/python/scf_solver.py
       :language: python
       :start-after: # start-cell-3
       :end-before: # end-cell-3

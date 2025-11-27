@@ -25,7 +25,7 @@ The :class:`~qdk_chemistry.algorithms.EnergyEstimator` provides the following ca
 Creating an Energy Estimator
 ----------------------------
 
-The :class:`~qdk_chemistry.algorithms.EnergyEstimator` is created using the :doc:`factory pattern <../advanced/factory_pattern>`.
+The :class:`~qdk_chemistry.algorithms.EnergyEstimator` is created using the :doc:`factory pattern <../design/factory_pattern>`.
 
 .. tab:: Python API
 
@@ -37,8 +37,8 @@ The :class:`~qdk_chemistry.algorithms.EnergyEstimator` is created using the :doc
 Configuring the Energy Estimator
 --------------------------------
 
-Qsharp Backend
-~~~~~~~~~~
+Qsharp backend
+~~~~~~~~~~~~~~
 
 The Qsharp implementation of the :class:`~qdk_chemistry.algorithms.EnergyEstimator` leverages the QDK simulator to execute quantum circuits. Key features include:
 
