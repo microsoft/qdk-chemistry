@@ -72,20 +72,20 @@ Creating a basis set
 
 .. tab:: C++ API
 
-   .. literalinclude:: ../../../../examples/cpp/basis_set.cpp
+   .. literalinclude:: ../../../_static/examples/cpp/basis_set.cpp
       :language: cpp
-      :start-after: // start-cell-1
-      :end-before: // end-cell-1
+      :start-after: // start-cell-basis-set-create
+      :end-before: // end-cell-basis-set-create
 
 .. tab:: Python API
 
    .. note::
       This example shows the API pattern. For complete working examples, see the test suite.
 
-   .. literalinclude:: ../../../examples/python/basis_set.py
+   .. literalinclude:: ../../../_static/examples/python/basis_set.py
       :language: python
-      :start-after: # start-cell-1
-      :end-before: # end-cell-1
+      :start-after: # start-cell-basis-set-create
+      :end-before: # end-cell-basis-set-create
 
 Accessing basis set data
 ------------------------
@@ -99,20 +99,20 @@ This ensures that the basis set data remains consistent and prevents accidental 
 
 .. tab:: C++ API
 
-   .. literalinclude:: ../../../../examples/cpp/basis_set.cpp
+   .. literalinclude:: ../../../_static/examples/cpp/basis_set.cpp
       :language: cpp
-      :start-after: // start-cell-2
-      :end-before: // end-cell-2
+      :start-after: // start-cell-basis-set-get
+      :end-before: // end-cell-basis-set-get
 
 .. tab:: Python API
 
    .. note::
       This example shows the API pattern. For complete working examples, see the test suite.
 
-   .. literalinclude:: ../../../examples/python/basis_set.py
+   .. literalinclude:: ../../../_static/examples/python/basis_set.py
       :language: python
-      :start-after: # start-cell-2
-      :end-before: # end-cell-2
+      :start-after: # start-cell-basis-set-get
+      :end-before: # end-cell-basis-set-get
 
 Working with shells
 -------------------
@@ -121,20 +121,20 @@ The ``Shell`` structure contains information about a group of basis functions:
 
 .. tab:: C++ API
 
-   .. literalinclude:: ../../../../examples/cpp/basis_set.cpp
+   .. literalinclude:: ../../../_static/examples/cpp/basis_set.cpp
       :language: cpp
-      :start-after: // start-cell-3
-      :end-before: // end-cell-3
+      :start-after: // start-cell-shells
+      :end-before: // end-cell-shells
 
 .. tab:: Python API
 
    .. note::
       This example shows the API pattern. For complete working examples, see the test suite.
 
-   .. literalinclude:: ../../../examples/python/basis_set.py
+   .. literalinclude:: ../../../_static/examples/python/basis_set.py
       :language: python
-      :start-after: # start-cell-3
-      :end-before: # end-cell-3
+      :start-after: # start-cell-shells
+      :end-before: # end-cell-shells
 
 Serialization
 -------------
@@ -206,20 +206,20 @@ HDF5 representation of a :class:`~qdk_chemistry.data.BasisSet` has the following
 
 .. tab:: C++ API
 
-   .. literalinclude:: ../../../../examples/cpp/basis_set.cpp
+   .. literalinclude:: ../../../_static/examples/cpp/basis_set.cpp
       :language: cpp
-      :start-after: // start-cell-4
-      :end-before: // end-cell-4
+      :start-after: // start-cell-serialization
+      :end-before: // end-cell-serialization
 
 .. tab:: Python API
 
    .. note::
       This example shows the API pattern. For complete working examples, see the test suite.
 
-   .. literalinclude:: ../../../examples/python/basis_set.py
+   .. literalinclude:: ../../../_static/examples/python/basis_set.py
       :language: python
-      :start-after: # start-cell-4
-      :end-before: # end-cell-4
+      :start-after: # start-cell-serialization
+      :end-before: # end-cell-serialization
 
 Utility functions
 -----------------
@@ -228,20 +228,20 @@ The :class:`~qdk_chemistry.data.BasisSet` class provides several static utility 
 
 .. tab:: C++ API
 
-   .. literalinclude:: ../../../../examples/cpp/basis_set.cpp
+   .. literalinclude:: ../../../_static/examples/cpp/basis_set.cpp
       :language: cpp
-      :start-after: // start-cell-5
-      :end-before: // end-cell-5
+      :start-after: // start-cell-utility-functions
+      :end-before: // end-cell-utility-functions
 
 .. tab:: Python API
 
    .. note::
       This example shows the API pattern. For complete working examples, see the test suite.
 
-   .. literalinclude:: ../../../examples/python/basis_set.py
+   .. literalinclude:: ../../../_static/examples/python/basis_set.py
       :language: python
-      :start-after: # start-cell-5
-      :end-before: # end-cell-5
+      :start-after: # start-cell-utility-functions
+      :end-before: # end-cell-utility-functions
 
 Predefined basis sets
 ---------------------
@@ -252,20 +252,20 @@ For a complete list of available basis sets and their specifications, see the :d
 
 .. tab:: C++ API
 
-   .. literalinclude:: ../../../../examples/cpp/basis_set.cpp
+   .. literalinclude:: ../../../_static/examples/cpp/basis_set.cpp
       :language: cpp
-      :start-after: // start-cell-6
-      :end-before: // end-cell-6
+      :start-after: // start-cell-library
+      :end-before: // end-cell-library
 
 .. tab:: Python API
 
    .. note::
       This example shows the API pattern. For complete working examples, see the test suite.
 
-   .. literalinclude:: ../../../examples/python/basis_set.py
+   .. literalinclude:: ../../../_static/examples/python/basis_set.py
       :language: python
-      :start-after: # start-cell-6
-      :end-before: # end-cell-6
+      :start-after: # start-cell-library
+      :end-before: # end-cell-library
 
 .. note::
    The basis set library includes popular basis sets such as STO-nG, Pople basis sets (3-21G, 6-31G, etc.), correlation-consistent basis sets (cc-pVDZ, cc-pVTZ, etc.), and more.
@@ -278,9 +278,10 @@ Related classes
 - :doc:`Orbitals <orbitals>`: Molecular orbitals constructed using the basis set
 - :doc:`ScfSolver <../algorithms/scf_solver>`: Algorithm that uses basis sets to produce orbitals
 
-Related topics
---------------
+Further reading
+---------------
 
+- The above examples can be downloaded as complete `C++ <../../../_static/examples/cpp/basis_set.cpp>`_ and `Python <../../../_static/examples/python/basis_set.py>`_ scripts.
 - :doc:`Serialization <../data/serialization>`: Data serialization and deserialization
 - :doc:`Settings <../design/settings>`: Configuration settings for algorithms
 - :doc:`Supported basis sets <../basis_functionals>`: List of pre-defined basis sets available in QDK/Chemistry
