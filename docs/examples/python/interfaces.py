@@ -8,6 +8,7 @@
 ################################################################################
 # start-cell-scf
 import numpy as np
+
 from qdk_chemistry.algorithms import available, create
 from qdk_chemistry.data import Structure
 
@@ -32,10 +33,14 @@ print(f"SCF Energy: {energy:.10f} Hartree")
 ################################################################################
 # start-cell-list-methods
 # List available implementations for each algorithm type
-print("Available SCF solvers:", available("scf_solver"))
-print("Available Hamiltonian constructors:", available("hamiltonian_constructor"))
-print("Available orbital localizers:", available("orbital_localizer"))
-print("Available MC calculators:", available("multi_configuration_calculator"))
+for algorithm_name in available():
+    print(f"{algorithm_name} has methods:")
+    for method_name in available(algorithm_name):
+        print(f"  {method_name} has settings:")
+        method = create(algorithm_name, method_name)
+        settings = method.settings()
+        for key, value in settings.items():
+            print(f"    {key}: {value}")
 # end-cell-list-methods
 ################################################################################
 

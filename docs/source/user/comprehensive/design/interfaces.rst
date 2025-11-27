@@ -164,11 +164,16 @@ This capability is built on QDK/Chemistry's robust :doc:`serialization <../data/
 
 The data types that are automatically converted include:
 
-- **:doc:`Molecular structures <../data/structure>`**: Atoms, coordinates, charges, and multiplicity
-- **:doc:`Basis sets <../data/basis_set>`**: Basis set specifications, primitive and contracted functions
-- **:doc:`Orbitals and wavefunctions <../data/orbitals>`**: Coefficients, occupations, and energies
-- **:doc:`Hamiltonians <../data/hamiltonian>`**: One and two-electron integrals, core Hamiltonians
-- **Calculation results** (see :class:`~qdk_chemistry.data.Wavefunction`): Energies, gradients, properties
+:doc:`Molecular structures <../data/structure>`:
+   Atoms, coordinates, charges, and multiplicity
+:doc:`Basis sets <../data/basis_set>`:
+   Basis set specifications, primitive and contracted functions
+:doc:`Orbitals and wavefunctions <../data/orbitals>`:
+   Coefficients, occupations, and energies
+:doc:`Hamiltonians <../data/hamiltonian>`:
+   One and two-electron integrals, core Hamiltonians
+:doc:`Calculation results <../data/wavefunction>`:
+   Energies, gradients, properties
 
 The conversion process is optimized to minimize data copying when possible, especially for large data structures like electron repulsion integrals (:term:`ERIs`).
 When working with large systems, QDK/Chemistry may use direct algorithms or disk-based approaches to manage memory usage efficiently.
