@@ -34,13 +34,6 @@ struct h5_pred_type;
 // Specializations for common types
 DECLARE_H5_PRED_TYPE(int, H5::PredType::NATIVE_INT)
 DECLARE_H5_PRED_TYPE(unsigned int, H5::PredType::NATIVE_UINT)
-DECLARE_H5_PRED_TYPE(long, H5::PredType::NATIVE_LONG)
-DECLARE_H5_PRED_TYPE(unsigned long, H5::PredType::NATIVE_ULONG)
-DECLARE_H5_PRED_TYPE(long long, H5::PredType::NATIVE_LLONG)
-DECLARE_H5_PRED_TYPE(unsigned long long, H5::PredType::NATIVE_ULLONG)
-#if !defined(__APPLE__) && (SIZE_MAX != ULONG_MAX)
-DECLARE_H5_PRED_TYPE(size_t, H5::PredType::NATIVE_ULLONG)
-#endif
 DECLARE_H5_PRED_TYPE(char, H5::PredType::NATIVE_CHAR)
 DECLARE_H5_PRED_TYPE(float, H5::PredType::NATIVE_FLOAT)
 DECLARE_H5_PRED_TYPE(double, H5::PredType::NATIVE_DOUBLE)
