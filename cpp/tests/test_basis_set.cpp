@@ -1518,3 +1518,50 @@ TEST_F(BasisSetTest, CustomBasisSetPerElementCheck) {
 
   EXPECT_NEAR(e_scf_custom, e_scf_default, testing::scf_energy_tolerance);
 }
+
+TEST_F(BasisSetTest, CustomMixedBasisSetCheck) {
+  // Compare energies from standard basis set string vs custom BasisSet object
+  std::string basis_set = "sto-3g";
+  std::shared_ptr<Structure> structure = std::make_shared<Structure>(
+      std::vector<Eigen::Vector3d>{
+          {0.0, 0.0, 0.0}, {1.0, 0.0, 0.0}, {0.0, 1.0, 0.0}},
+      std::vector<std::string>{"H", "O", "H"});
+
+  // create map of elements with basis sets
+  std::map<std::string, std::string> custom_element_basis_map;
+  custom_element_basis_map["H"] = "cc-pvdz";
+  custom_element_basis_map["O"] = "sto-3g";
+
+  // create map of atoms with basis sets
+  std::map<size_t, std::string> custom_atom_basis_map;
+  custom_atom_basis_map[0] = "cc-pvtz";
+  custom_atom_basis_map[1] = "sto-3g";
+  custom_atom_basis_map[2] = "def2-SVP";
+
+  std::shared_ptr<BasisSet> element_basis =
+      BasisSet::from_element_map(custom_element_basis_map, structure);
+  std::shared_ptr<BasisSet> atom_basis =
+      BasisSet::from_index_map(custom_atom_basis_map, structure);
+
+  // run hartree fock with both basis sets to ensure they are valid
+  auto scf_solver = qdk::chemistry::algorithms::ScfSolverFactory::create();
+
+  auto [e_scf_default, hf_det_default] =
+      scf_solver->run(structure, 0, 1, basis_set);
+  auto [e_scf_element, hf_det_element] =
+      scf_solver->run(structure, 0, 1, element_basis);
+  auto [e_scf_atom, hf_det_atom] = scf_solver->run(structure, 0, 1, atom_basis);
+
+  // all three energies should be different
+  EXPECT_FALSE(std::abs(e_scf_element - e_scf_default) <
+               testing::scf_energy_tolerance);
+  EXPECT_FALSE(std::abs(e_scf_atom - e_scf_default) <
+               testing::scf_energy_tolerance);
+  EXPECT_FALSE(std::abs(e_scf_atom - e_scf_element) <
+               testing::scf_energy_tolerance);
+
+  // check number of orbitals in determinant
+  EXPECT_EQ(hf_det_default->get_orbitals()->get_num_molecular_orbitals(), 7);
+  EXPECT_EQ(hf_det_element->get_orbitals()->get_num_molecular_orbitals(), 15);
+  EXPECT_EQ(hf_det_atom->get_orbitals()->get_num_molecular_orbitals(), 24);
+}
