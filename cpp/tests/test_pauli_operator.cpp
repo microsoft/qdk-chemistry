@@ -505,37 +505,37 @@ TEST(PauliOperatorExpressionTest, ProductPauliOperatorSimplify) {
   // OP = X(0) * Y(0) -> i * Z(0)
   auto prod7 = PauliOperator::X(0) * PauliOperator::Y(0);
   simplified_expr = prod7.simplify();
-  EXPECT_EQ(simplified_expr->to_string(), "(0+1i) * Z(0)");
+  EXPECT_EQ(simplified_expr->to_string(), "i * Z(0)");
 
   // Y * X = -iZ
   // OP = Y(0) * X(0) -> -i * Z(0)
   auto prod8 = PauliOperator::Y(0) * PauliOperator::X(0);
   simplified_expr = prod8.simplify();
-  EXPECT_EQ(simplified_expr->to_string(), "(0-1i) * Z(0)");
+  EXPECT_EQ(simplified_expr->to_string(), "-i * Z(0)");
 
   // Y * Z = iX
   // OP = 3 * Y(2) * Z(2) -> 3i * X(2)
   auto prod9 = 3 * PauliOperator::Y(2) * PauliOperator::Z(2);
   simplified_expr = prod9.simplify();
-  EXPECT_EQ(simplified_expr->to_string(), "(0+3i) * X(2)");
+  EXPECT_EQ(simplified_expr->to_string(), "3i * X(2)");
 
   // Z * X = iY
   // OP = Z(0) * X(0) -> i * Y(0)
   auto prod10 = PauliOperator::Z(0) * PauliOperator::X(0);
   simplified_expr = prod10.simplify();
-  EXPECT_EQ(simplified_expr->to_string(), "(0+1i) * Y(0)");
+  EXPECT_EQ(simplified_expr->to_string(), "i * Y(0)");
 
   // Multiple operators on the same qubit with reordering
   // OP = X(0) * Z(1) * Y(0) -> i * Z(0) * Z(1)  (X * Y = iZ)
   auto prod11 = PauliOperator::X(0) * PauliOperator::Z(1) * PauliOperator::Y(0);
   simplified_expr = prod11.simplify();
-  EXPECT_EQ(simplified_expr->to_string(), "(0+1i) * Z(0) * Z(1)");
+  EXPECT_EQ(simplified_expr->to_string(), "i * Z(0) * Z(1)");
 
   // Three operators on same qubit: X * Y * Z = iZ * Z = i * I = i
   // OP = X(0) * Y(0) * Z(0) -> i
   auto prod12 = PauliOperator::X(0) * PauliOperator::Y(0) * PauliOperator::Z(0);
   simplified_expr = prod12.simplify();
-  EXPECT_EQ(simplified_expr->to_string(), "(0+1i) * I(0)");
+  EXPECT_EQ(simplified_expr->to_string(), "i * I(0)");
 
   // I * P = P
   // OP = I(0) * X(0) -> X(0)

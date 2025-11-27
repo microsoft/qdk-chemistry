@@ -19,6 +19,13 @@ std::string pauli_operator_scalar_to_string(std::complex<double> coefficient) {
       return "-";
     }
     oss << coefficient.real();
+  } else if (coefficient.real() == 0.0) {
+    if (std::abs(coefficient.imag() - 1.0) < 1e-10) {
+      return "i";
+    } else if (std::abs(coefficient.imag() + 1.0) < 1e-10) {
+      return "-i";
+    }
+    oss << coefficient.imag() << "i";
   } else {
     oss << "(" << coefficient.real();
     if (coefficient.imag() >= 0) oss << "+";
