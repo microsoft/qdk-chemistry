@@ -54,6 +54,17 @@ std::shared_ptr<Structure> structure_from_file_wrapper(
       qdk::chemistry::python::utils::to_string_path(filename), format_type);
 }
 
+void structure_to_hdf5_file_wrapper(Structure &self,
+                                    const py::object &filename) {
+  self.to_hdf5_file(qdk::chemistry::python::utils::to_string_path(filename));
+}
+
+std::shared_ptr<Structure> structure_from_hdf5_file_wrapper(
+    const py::object &filename) {
+  return Structure::from_hdf5_file(
+      qdk::chemistry::python::utils::to_string_path(filename));
+}
+
 }  // namespace
 
 void bind_structure(py::module &m) {
@@ -771,6 +782,49 @@ Examples:
     >>> water = Structure.from_file(Path("water.structure.json"), "json")
 )",
                        py::arg("filename"), py::arg("format_type"));
+
+  structure.def("to_hdf5_file", structure_to_hdf5_file_wrapper,
+                R"(
+Save structure to HDF5 file.
+
+Args:
+    filename (str | pathlib.Path): Path to output file.
+        Must have '.structure' before the file extension (e.g., "water.structure.h5", "molecule.structure.hdf5")
+
+Raises:
+    ValueError: If filename doesn't follow the required naming convention
+    RuntimeError: If the file cannot be opened or written
+
+Examples:
+    >>> structure.to_hdf5_file("water.structure.h5")
+    >>> structure.to_hdf5_file("molecule.structure.hdf5")
+    >>> from pathlib import Path
+    >>> structure.to_hdf5_file(Path("water.structure.h5"))
+)",
+                py::arg("filename"));
+
+  structure.def_static("from_hdf5_file", structure_from_hdf5_file_wrapper,
+                       R"(
+Load structure from HDF5 file (static method).
+
+Args:
+    filename (str | pathlib.Path): Path to input file.
+        Must have '.structure' before the file extension (e.g., "water.structure.h5", "molecule.structure.hdf5")
+
+Returns:
+    Structure: New Structure object loaded from the file
+
+Raises:
+    ValueError: If filename doesn't follow the required naming convention
+    RuntimeError: If the file cannot be opened, read, or contains invalid structure data
+
+Examples:
+    >>> water = Structure.from_hdf5_file("water.structure.h5")
+    >>> molecule = Structure.from_hdf5_file("molecule.structure.hdf5")
+    >>> from pathlib import Path
+    >>> water = Structure.from_hdf5_file(Path("water.structure.h5"))
+)",
+                       py::arg("filename"));
 
   // Utility functions
   bind_getter_as_property(structure, "get_summary", &Structure::get_summary,
