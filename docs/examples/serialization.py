@@ -12,38 +12,23 @@ import tempfile
 import numpy as np
 from qdk_chemistry.data import Structure
 
+# =============================================================================
+# Serialization for structure objects
+# =============================================================================
+
 # Create a structure (coordinates in Bohr/atomic units)
 coords = np.array([[0.0, 0.0, 0.0], [0.0, 0.0, 1.4]])
-structure = Structure(coords, ["H", "H"])
+symbols = ["H", "H"]
+custom_masses = [1.001, 0.999]
+custom_charges = [0.9, 1.1]
+structure = Structure(coords, symbols=symbols, masses=custom_masses, nuclear_charges=custom_charges)
 
-# Serialize to JSON object
-json_data = structure.to_json()
-print("Serialized to JSON:", type(json_data))
-
-# Deserialize from JSON object
-structure_from_json = Structure.from_json(json_data)
-print(f"Deserialized structure has {structure_from_json.get_num_atoms()} atoms")
-
-# Serialize to/from file using temporary directory
-tmpdir = tempfile.mkdtemp()
-json_file = os.path.join(tmpdir, "molecule.structure.json")
-
-# Serialize to JSON file
-structure.to_json_file(json_file)
-print(f"Saved to {json_file}")
-
-# Deserialize from JSON file
-structure_from_file = Structure.from_json_file(json_file)
-print(f"Loaded structure from file: {structure_from_file.get_num_atoms()} atoms")
-
-hdf5_file = os.path.join(tmpdir, "molecule.structure.h5")
 # Serialize to HDF5 file
-# structure.to_hdf5_file(hdf5_file)
-# print(f"Saved to {hdf5_file}")
+structure.to_hdf5_file("h2_molecule.structure.h5")
 
 # Deserialize from HDF5 file
-# structure_from_hdf5 = Structure.from_hdf5_file(hdf5_file)
-# print(f"Loaded structure from HDF5: {structure_from_hdf5.get_num_atoms()} atoms")
+structure_from_hdf5 = Structure.from_hdf5_file("h2_molecule.structure.h5")
 
-# Clean up
-shutil.rmtree(tmpdir)
+# Verify the loaded structure
+print(f"Number of atoms: {structure_from_hdf5.get_num_atoms()}")
+print(f"Symbols: {[structure_from_hdf5.get_atom_symbol(i) for i in range(structure_from_hdf5.get_num_atoms())]}")

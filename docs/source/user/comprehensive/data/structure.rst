@@ -18,6 +18,13 @@ Properties
 - **Masses**: Atomic masses of each of the atoms 
 - **Nuclear charges**: Nuclear charges (atomic numbers) of each of the atoms
 
+Units
+-----
+
+All internal coordinates in the :class:`~qdk_chemistry.data.Structure` class are in Bohr by default.
+This applies to all methods that return or accept coordinates.
+The only time Angstrom units can be found by default, are in the *xyz* file format, where Angstrom is default (see below).
+
 Usage
 -----
 
@@ -40,7 +47,7 @@ A :class:`~qdk_chemistry.data.Structure` object can be created manually as follo
       using namespace qdk::chemistry::data;
 
       // Specify a structure using coordinates, and either symbols or elements
-      std::vector<Eigen::Vector3d> coords = {{0.0, 0.0, 0.0}, {0.0, 0.0, 0.74}};
+      std::vector<Eigen::Vector3d> coords = {{0.0, 0.0, 0.0}, {0.0, 0.0, 1.4}}; // Bohr 
       std::vector<std::string> symbols = {"H", "H"};
 
       Structure structure(coords, symbols);
@@ -59,58 +66,28 @@ A :class:`~qdk_chemistry.data.Structure` object can be created manually as follo
 
    .. literalinclude:: ../../../../examples/structure.py
       :language: python
-      :lines: 15-28
-
-Loading from files
-------------------
-
-The :class:`~qdk_chemistry.data.Structure` class can load molecular structures from various file formats.
-For detailed format specifications, see the `File Formats`_ section below.
-
-.. note::
-   All structure-related files require the ``.structure`` suffix before the file type extension, for example
-   ``molecule.structure.xyz`` and ``h2.structure.json`` for XYZ and JSON files respectively.
-
-.. tab:: C++ API
-
-   .. code-block:: cpp
-
-      // Load from XYZ file
-      auto structure = Structure::from_xyz_file("molecule.structure.xyz"); // Required .structure.xyz suffix
-
-      // Load from JSON file
-      auto structure = Structure::from_json_file("molecule.structure.json"); // Required .structure.json suffix
-
-.. tab:: Python API
-
-   .. note::
-      These examples show the API pattern. For complete working examples, see the test suite.
-
-   .. literalinclude:: ../../../../examples/structure.py
-      :language: python
-      :lines: 13-17
+      :lines: 15-27
 
 Accessing structure data
 ------------------------
 
 The :class:`~qdk_chemistry.data.Structure` class provides methods to access atomic data:
 
-.. note::
-   Functions that deal with specific atoms include the word "atom" in their name (e.g., ``get_atom_coordinates``), while functions that return properties for all atoms omit this word (e.g., ``get_coordinates``).
-   All atomic data is const and immutable once set, following QDK/Chemistry's :doc:`immutable data pattern <../design/index>`.
-   If you need to modify coordinates or other properties, you must create a new Structure object with the desired changes.
+Functions that deal with specific atoms include the word "atom" in their name (e.g., ``get_atom_coordinates``), while functions that return properties for all atoms omit this word (e.g., ``get_coordinates``).
+All atomic data is const and immutable once set, following QDK/Chemistry's :doc:`immutable data pattern <../design/index>`.
+If you need to modify coordinates or other properties, you must create a new Structure object with the desired changes.
 
 .. tab:: C++ API
 
    .. code-block:: cpp
 
-      // Get coordinates of a specific atom in angstrom
+      // Get coordinates of a specific atom
       Eigen::Vector3d coords = structure.get_atom_coordinates(0);  // First atom
 
       // Get element of a specific atom
       std::string element = structure.get_atom_element(0);  // First atom
 
-      // Get all coordinates (in angstrom) as a matrix
+      // Get all coordinates as a matrix
       Eigen::MatrixXd all_coords = structure.get_coordinates();
 
       // Get all elements as a vector
@@ -120,17 +97,7 @@ The :class:`~qdk_chemistry.data.Structure` class provides methods to access atom
 
    .. literalinclude:: ../../../../examples/structure.py
       :language: python
-      :lines: 13-23
-
-Serialization
--------------
-
-The :class:`~qdk_chemistry.data.Structure` class supports serialization to and from various formats.
-For detailed information about serialization in QDK/Chemistry, see the :doc:`Serialization <../data/serialization>` documentation.
-
-.. note::
-   All structure-related files require the ``.structure`` suffix before the file type extension, for example ``molecule.structure.xyz`` and ``h2.structure.json`` for XYZ and JSON files respectively.
-   This naming convention is enforced to maintain consistency across the QDK/Chemistry ecosystem.
+      :lines: 33-43
 
 File formats
 ~~~~~~~~~~~~
@@ -147,12 +114,12 @@ JSON representation of a :class:`~qdk_chemistry.data.Structure` looks like:
     {
       "coordinates":[[0.0,0.0,0.0],[0.0,0.0,1.4]],
       "elements":[1,1],
-      "masses":[1.008,1.008],
-      "nuclear_charges":[1.0,1.0],
+      "masses":[1.001,0.999],
+      "nuclear_charges":[0.9,1.1],
       "num_atoms":2,
       "symbols":["H","H"],
-      "total_charge":0,  // TODO: Verify these field names
-      "spin_multiplicity":1  // TODO: Verify these field names
+      "units":"bohr",
+      "version":"0.1.0",
     }
 
 XYZ format
@@ -160,15 +127,14 @@ XYZ format
 
 `XYZ representation <https://en.wikipedia.org/wiki/XYZ_file_format>`_ of the same :class:`~qdk_chemistry.data.Structure`:
 
-.. note::
-   QDK/Chemistry uses the comment field (second line) of the XYZ format to store the charge and spin multiplicity information, as this data is not part of the standard XYZ specification.
-
 .. code-block:: text
 
     2
-    charge = 0, spin_multiplicity = 1  (TODO)
+
     H      0.000000    0.000000    0.000000
     H      0.000000    0.000000    1.400000
+
+Note that here the coordinates are in Angstrom, since this is the standard in xyz files. 
 
 .. tab:: C++ API
 
@@ -221,14 +187,6 @@ The :class:`~qdk_chemistry.data.Structure` class provides methods for basic mole
    .. literalinclude:: ../../../../examples/structure.py
       :language: python
       :lines: 19-24
-
-Units
------
-
-All internal coordinates in the :class:`~qdk_chemistry.data.Structure` class are in Bohr by default.
-This applies to all methods that return or accept coordinates.
-
-.. TODO:  restore the code snippets with working examples.
 
 Related classes
 ---------------
