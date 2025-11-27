@@ -65,9 +65,8 @@ class SCFImpl {
    * (default: false)
    */
   SCFImpl(std::shared_ptr<Molecule> mol, const SCFConfig& cfg,
-    std::shared_ptr<BasisSet> basis_set,
-    std::shared_ptr<BasisSet> raw_basis_set,
-          bool delay_eri = false);
+          std::shared_ptr<BasisSet> basis_set,
+          std::shared_ptr<BasisSet> raw_basis_set, bool delay_eri = false);
 
   /**
    * @brief Virtual destructor

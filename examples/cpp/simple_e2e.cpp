@@ -119,7 +119,8 @@ int main(int argc, char** argv) {
   // Run the SCF optimization
   // Returns the HF energy and wavefunction (single Slater determinant)
   std::cout << "Running SCF optimization...\n";
-  auto [E_hf, wfn_hf] = scf_solver->run(structure, charge, spin_multiplicity, basis_set);
+  auto [E_hf, wfn_hf] =
+      scf_solver->run(structure, charge, spin_multiplicity, basis_set);
 
   // Display SCF results
   std::cout << "\nSCF Results:\n";

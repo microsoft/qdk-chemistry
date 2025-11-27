@@ -178,9 +178,8 @@ class SCF {
    */
   static std::unique_ptr<SCF> make_hf_solver(
       std::shared_ptr<Molecule> mol, const SCFConfig& cfg,
-        std::shared_ptr<BasisSet> basis_set,
-        std::shared_ptr<BasisSet> raw_basis_set
-    );
+      std::shared_ptr<BasisSet> basis_set,
+      std::shared_ptr<BasisSet> raw_basis_set);
 
   /**
    * @brief Create a Kohn-Sham DFT solver
@@ -215,9 +214,8 @@ class SCF {
    */
   static std::unique_ptr<SCF> make_ks_solver(
       std::shared_ptr<Molecule> mol, const SCFConfig& cfg,
-        std::shared_ptr<BasisSet> basis_set,
-        std::shared_ptr<BasisSet> raw_basis_set
-    );
+      std::shared_ptr<BasisSet> basis_set,
+      std::shared_ptr<BasisSet> raw_basis_set);
 
  private:
   /**
