@@ -232,7 +232,7 @@ The data types that are automatically converted include:
    Coefficients, occupations, and energies
 :doc:`Hamiltonians <../data/hamiltonian>`:
    One and two-electron integrals, core Hamiltonians
-**Calculation results** (see :class:`~qdk_chemistry.data.Wavefunction`):
+Calculation results (see :class:`~qdk_chemistry.data.Wavefunction`):
    Energies, gradients, properties
 
 The conversion process is optimized to minimize data copying when possible, especially for large data structures like electron repulsion integrals (:term:`ERIs`).
