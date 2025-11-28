@@ -2,6 +2,8 @@
 // Licensed under the MIT License. See LICENSE.txt in the project root for
 // license information.
 
+#include "qdk/chemistry/algorithms/microsoft/hamiltonian.hpp"
+
 #include <pybind11/pybind11.h>
 #include <pybind11/stl.h>
 
@@ -52,17 +54,16 @@ This class defines the interface for constructing Hamiltonian matrices from orbi
 Concrete implementations should inherit from this class and implement the construct method.
 
 Examples:
-    To create a custom Hamiltonian constructor, inherit from this class:
+    >>> import qdk_chemistry.algorithms as alg
+    >>> import qdk_chemistry.data as data
+    >>> class MyHamiltonianConstructor(alg.HamiltonianConstructor):
+    ...     def __init__(self):
+    ...         super().__init__()  # Call the base class constructor
+    ...     # Implement the _run_impl method
+    ...     def _run_impl(self, orbitals: data.Orbitals) -> data.Hamiltonian:
+    ...         # Custom Hamiltonian construction implementation
+    ...         return hamiltonian
 
-        >>> import qdk_chemistry.algorithms as alg
-        >>> import qdk_chemistry.data as data
-        >>> class MyHamiltonianConstructor(alg.HamiltonianConstructor):
-        ...     def __init__(self):
-        ...         super().__init__()  # Call the base class constructor
-        ...     # Implement the _run_impl method
-        ...     def _run_impl(self, orbitals: data.Orbitals) -> data.Hamiltonian:
-        ...         # Custom Hamiltonian construction implementation
-        ...         return hamiltonian
 )");
 
   hamiltonian_constructor.def(py::init<>(),
@@ -77,6 +78,7 @@ Examples:
     >>> class MyConstructor(alg.HamiltonianConstructor):
     ...     def __init__(self):
     ...         super().__init__()  # Calls this constructor
+
 )");
 
   hamiltonian_constructor.def("run", &HamiltonianConstructor::run,
@@ -94,6 +96,7 @@ Returns:
 
 Raises:
     SettingsAreLocked: If attempting to modify settings after run() is called
+
 )",
                               py::arg("orbitals"));
 
@@ -103,6 +106,7 @@ Access the constructor's configuration settings.
 
 Returns:
     qdk_chemistry.data.Settings: Reference to the settings object for configuring the constructor
+
 )",
                               py::return_value_policy::reference_internal);
 
@@ -128,6 +132,7 @@ Examples:
     ...         super().__init__()
     ...         from qdk_chemistry.data import ElectronicStructureSettings
     ...         self._settings = ElectronicStructureSettings()
+
 )");
 
   hamiltonian_constructor.def("type_name", &HamiltonianConstructor::type_name,
@@ -136,6 +141,7 @@ The algorithm's type name.
 
 Returns:
     str: The type name of the algorithm
+
 )");
 
   // Factory class binding - creates HamiltonianConstructorFactory class with
@@ -148,4 +154,42 @@ Returns:
   hamiltonian_constructor.def("__repr__", [](const HamiltonianConstructor &) {
     return "<qdk_chemistry.algorithms.HamiltonianConstructor>";
   });
+
+  // Bind concrete microsoft::HamiltonianConstructor implementation
+  py::class_<microsoft::HamiltonianConstructor, HamiltonianConstructor,
+             py::smart_holder>(m, "QdkHamiltonianConstructor", R"(
+QDK implementation of the Hamiltonian constructor.
+
+This class provides a concrete implementation of the Hamiltonian constructor
+using the internal backend. It constructs molecular Hamiltonian matrices from
+orbital data, computing the necessary one- and two-electron integrals.
+
+Typical usage:
+
+.. code-block:: python
+
+    import qdk_chemistry.algorithms as alg
+    import qdk_chemistry.data as data
+
+    # Assuming you have orbitals from an SCF calculation
+    constructor = alg.QdkHamiltonianConstructor()
+
+    # Configure settings if needed
+    constructor.settings().set("eri_method", "direct")
+
+    # Construct Hamiltonian
+    hamiltonian = constructor.run(orbitals)
+
+See Also:
+    :class:`HamiltonianConstructor`
+    :class:`qdk_chemistry.data.Orbitals`
+    :class:`qdk_chemistry.data.Hamiltonian`
+
+)")
+      .def(py::init<>(), R"(
+Default constructor.
+
+Initializes a Hamiltonian constructor with default settings.
+
+)");
 }

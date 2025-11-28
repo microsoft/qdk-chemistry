@@ -266,7 +266,7 @@ Each algorithm class is implemented through the factory pattern, allowing you to
    * - :class:`~qdk_chemistry.algorithms.ScfSolver`
      - "qdk"
      - "pyscf"
-   * - :class:`~qdk_chemistry.algorithms.Localizer`
+   * - :class:`~qdk_chemistry.algorithms.OrbitalLocalizer`
      - "qdk"
      - "pyscf"
    * - :class:`~qdk_chemistry.algorithms.MultiConfigurationCalculator`

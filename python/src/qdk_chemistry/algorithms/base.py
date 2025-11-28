@@ -25,8 +25,7 @@ class Algorithm(ABC):
     defined in this base class.
 
     Examples:
-        Creating a custom SCF solver algorithm:
-
+        >>> # Creating a custom SCF solver algorithm
         >>> from qdk_chemistry.algorithms import Algorithm, registry
         >>> from qdk_chemistry.data import Structure, Wavefunction, ElectronicStructureSettings
         >>>
@@ -89,7 +88,7 @@ class Algorithm(ABC):
             kwargs: The keyword arguments required to run the algorithm.
 
         Returns:
-            * The results of the algorithm
+            Any: The results of the algorithm
 
         """
 
@@ -104,7 +103,7 @@ class Algorithm(ABC):
             kwargs: The keyword arguments required to run the algorithm.
 
         Returns:
-            * The results of the algorithm
+            Any: The results of the algorithm
 
         """
         self._settings.lock()
@@ -114,7 +113,7 @@ class Algorithm(ABC):
         """Get the settings for this algorithm.
 
         Returns:
-            The settings object associated with this algorithm.
+            Settings:The settings object associated with this algorithm.
 
         """
         return self._settings
@@ -134,7 +133,7 @@ class Algorithm(ABC):
         indicating the specific algorithm name and origin.
 
         Returns:
-            * The main name of the algorithm type.
+            str: The main name of the algorithm type.
 
         """
 
@@ -153,7 +152,7 @@ class Algorithm(ABC):
         indicating the specific algorithm name and origin.
 
         Returns:
-            * The main name of the algorithm
+            str: The main name of the algorithm
 
         """
 
@@ -166,7 +165,7 @@ class Algorithm(ABC):
         By default, this method returns a list containing only the main name.
 
         Returns:
-            * All aliases of the algorithm's name including the main name.
+            list[str]: All aliases of the algorithm's name including the main name.
 
         """
         return [self.name()]
@@ -189,8 +188,7 @@ class AlgorithmFactory(ABC):
         creating and registering algorithms.
 
     Examples:
-        Creating a custom factory for a new algorithm type:
-
+        >>> # Creating a custom factory for a new algorithm type
         >>> from qdk_chemistry.algorithms.base import AlgorithmFactory, Algorithm
         >>> import qdk_chemistry.algorithms.registry as registry
         >>> import qdk_chemistry.algorithms as algorithms
@@ -231,8 +229,9 @@ class AlgorithmFactory(ABC):
         {'geometry_optimizer': ['bfgs']}
 
     See Also:
-        qdk_chemistry.algorithms.registry: Higher-level registry functions for
-            creating and managing algorithms across all types.
+        qdk_chemistry.algorithms.registry:
+
+            Higher-level registry functions for creating and managing algorithms across all types.
 
     """
 
@@ -272,14 +271,14 @@ class AlgorithmFactory(ABC):
 
         Args:
             name (Optional[str]): The name of the algorithm to create.
+
                 If None or empty, creates the default algorithm.
 
         Returns:
             Algorithm: A new instance of the requested algorithm.
 
         Raises:
-            RuntimeError: If the requested algorithm name is not registered
-                in this factory.
+            RuntimeError: If the requested algorithm name is not registered in this factory.
 
         Examples:
             >>> factory = ScfSolverFactory()
@@ -305,8 +304,9 @@ class AlgorithmFactory(ABC):
         will be called each time an instance of this algorithm is requested.
 
         Args:
-            generator (Callable[[], Algorithm]): A callable that returns a new
-                instance of the algorithm. Must return an Algorithm whose name()
+            generator (Callable[[], Algorithm]): A callable that returns a new instance of the algorithm.
+
+                Must return an Algorithm whose name()
                 will be used as the registration key.
 
         Examples:

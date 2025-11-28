@@ -39,9 +39,9 @@ using SettingValue =
 /**
  * @brief Exception thrown when modification of locked settings is requested
  */
-class SettingAreLocked : public std::runtime_error {
+class SettingsAreLocked : public std::runtime_error {
  public:
-  explicit SettingAreLocked()
+  explicit SettingsAreLocked()
       : std::runtime_error("Settings are locked: please modify a copy.") {}
 };
 

@@ -65,6 +65,30 @@ std::shared_ptr<Structure> structure_from_hdf5_file_wrapper(
       qdk::chemistry::python::utils::to_string_path(filename));
 }
 
+std::shared_ptr<Structure> structure_from_hdf5_wrapper(
+    const py::object &h5py_group) {
+  // Get h5py module
+  py::module_ h5py = py::module_::import("h5py");
+
+  // Check if this is an h5py Group or File
+  if (!py::isinstance(h5py_group, h5py.attr("Group")) &&
+      !py::isinstance(h5py_group, h5py.attr("File"))) {
+    throw std::runtime_error(
+        "from_hdf5() expects an h5py.Group or h5py.File object");
+  }
+
+  // Get the low-level HDF5 ID from the h5py object
+  py::object id_obj = h5py_group.attr("id");
+  py::object id_attr = id_obj.attr("id");
+  hid_t group_id = id_attr.cast<hid_t>();
+
+  // Open the H5::Group from the ID
+  H5::Group cpp_group(group_id);
+
+  // Call the C++ from_hdf5 method
+  return Structure::from_hdf5(cpp_group);
+}
+
 }  // namespace
 
 void bind_structure(py::module &m) {
@@ -72,17 +96,18 @@ void bind_structure(py::module &m) {
 
   // Bind Element enum
   py::enum_<Element>(m, "Element", R"(
-    Chemical elements enumeration.
+Chemical elements enumeration.
 
-    This enum represents all chemical elements from hydrogen (1) to oganesson (118).
-    Each element is represented by its atomic number.
+This enum represents all chemical elements from hydrogen (1) to oganesson (118).
+Each element is represented by its atomic number.
 
 Examples:
     >>> from qdk_chemistry.data import Element
     >>> Element.H  # Hydrogen
     >>> Element.C  # Carbon
     >>> Element.O  # Oxygen
-    )")
+
+)")
       // Period 1
       .value("H", Element::H, "Hydrogen")
       .value("He", Element::He, "Helium")
@@ -268,6 +293,7 @@ Examples:
         >>> water.to_json_file("water.json")
         >>> water_copy = Structure()
         >>> water_copy.from_xyz_file("water.xyz")
+
 )");
 
   // Constructors
@@ -409,6 +435,7 @@ Returns:
 Examples:
     >>> masses = structure.get_masses()
     >>> print(f"Total mass: {masses.sum()} AMU")
+
 )",
                           py::return_value_policy::reference_internal);
 
@@ -423,6 +450,7 @@ Returns:
 Examples:
     >>> charges = structure.get_nuclear_charges()
     >>> print(f"Total charge: {charges.sum()}")
+
 )",
                           py::return_value_policy::reference_internal);
 
@@ -439,6 +467,7 @@ Returns:
 Examples:
     >>> coords = structure.get_atom_coordinates(0)
     >>> print(f"Atom 0 position: {coords}")
+
 )",
                 py::arg("atom_index"));
 
@@ -455,6 +484,7 @@ Returns:
 Examples:
     >>> element = structure.get_atom_element(0)
     >>> print(f"Atom 0 element: {element}")
+
 )",
                 py::arg("atom_index"));
 
@@ -471,6 +501,7 @@ Returns:
 Examples:
     >>> mass = structure.get_atom_mass(0)
     >>> print(f"Atom 0 mass: {mass} AMU")
+
 )",
                 py::arg("atom_index"));
 
@@ -487,6 +518,7 @@ Returns:
 Examples:
     >>> charge = structure.get_atom_nuclear_charge(0)
     >>> print(f"Atom 0 charge: {charge}")
+
 )",
                 py::arg("atom_index"));
 
@@ -503,6 +535,7 @@ Returns:
 Examples:
     >>> symbol = structure.get_atom_symbol(0)
     >>> print(f"Atom 0 symbol: {symbol}")
+
 )",
                 py::arg("atom_index"));
 
@@ -517,6 +550,7 @@ Returns:
 Examples:
     >>> symbols = structure.get_atomic_symbols()
     >>> print(f"Molecule formula: {''.join(symbols)}")
+
 )");
 
   // Structure properties
@@ -530,6 +564,7 @@ Returns:
 Examples:
     >>> num_atoms = structure.get_num_atoms()
     >>> print(f"Structure has {num_atoms} atoms")
+
 )");
 
   structure.def("is_empty", &Structure::is_empty,
@@ -542,6 +577,7 @@ Returns:
 Examples:
     >>> if structure.is_empty():
     ...     print("Structure is empty")
+
 )");
 
   bind_getter_as_property(structure, "get_total_mass",
@@ -555,6 +591,7 @@ Returns:
 Examples:
     >>> total_mass = structure.get_total_mass()
     >>> print(f"Total mass: {total_mass} AMU")
+
 )");
 
   structure.def(
@@ -575,6 +612,7 @@ Returns:
 Examples:
     >>> total_charge = structure.get_total_nuclear_charge()
     >>> print(f"Total nuclear charge: {total_charge}")
+
 )");
 
   // Serialization
@@ -592,6 +630,7 @@ Returns:
 Examples:
     >>> json_str = structure.to_json()
     >>> print(json_str)
+
 )");
 
   structure.def_static(
@@ -614,6 +653,7 @@ Raises:
 Examples:
     >>> json_str = '{"num_atoms": 2, "symbols": ["H", "H"], ...}'
     >>> h2 = Structure.from_json(json_str)
+
 )",
       py::arg("json_data"));
 
@@ -623,6 +663,7 @@ Save structure to JSON file.
 
 Args:
     filename (str | pathlib.Path): Path to output file.
+
         Must have '.structure' before the file extension (e.g., "water.structure.json", "molecule.structure.json")
 
 Raises:
@@ -634,6 +675,7 @@ Examples:
     >>> structure.to_json_file("molecule.structure.json")
     >>> from pathlib import Path
     >>> structure.to_json_file(Path("water.structure.json"))
+
 )",
                 py::arg("filename"));
 
@@ -643,6 +685,7 @@ Load structure from JSON file (static method).
 
 Args:
     filename (str | pathlib.Path): Path to input file.
+
         Must have '.structure' before the file extension (e.g., "water.structure.json", "molecule.structure.json")
 
 Returns:
@@ -657,6 +700,7 @@ Examples:
     >>> molecule = Structure.from_json_file("molecule.structure.json")
     >>> from pathlib import Path
     >>> water = Structure.from_json_file(Path("water.structure.json"))
+
 )",
                        py::arg("filename"));
 
@@ -705,7 +749,9 @@ Save structure to XYZ file.
 
 Args:
     filename (str | pathlib.Path): Path to output file.
+
         Must have '.structure.xyz' extension (e.g., "water.structure.xyz", "molecule.structure.xyz")
+
     comment (str, optional): Comment line for XYZ format
 
 Raises:
@@ -716,6 +762,7 @@ Examples:
     >>> structure.to_xyz_file("water.structure.xyz", "Water molecule")
     >>> from pathlib import Path
     >>> structure.to_xyz_file(Path("water.structure.xyz"), "Water molecule")
+
 )",
                 py::arg("filename"), py::arg("comment") = "");
 
@@ -725,6 +772,7 @@ Load structure from XYZ file (static method).
 
 Args:
     filename (str | pathlib.Path): Path to input file.
+
         Must have '.structure.xyz' extension (e.g., "water.structure.xyz", "molecule.structure.xyz")
 
 Returns:
@@ -738,6 +786,7 @@ Examples:
     >>> water = Structure.from_xyz_file("water.structure.xyz")
     >>> from pathlib import Path
     >>> water = Structure.from_xyz_file(Path("water.structure.xyz"))
+
 )",
                        py::arg("filename"));
 
@@ -757,6 +806,7 @@ Examples:
     >>> structure.to_file("water.structure.xyz", "xyz")
     >>> from pathlib import Path
     >>> structure.to_file(Path("water.structure.json"), "json")
+
 )",
                 py::arg("filename"), py::arg("format_type"));
 
@@ -780,6 +830,7 @@ Examples:
     >>> h2 = Structure.from_file("h2.structure.xyz", "xyz")
     >>> from pathlib import Path
     >>> water = Structure.from_file(Path("water.structure.json"), "json")
+
 )",
                        py::arg("filename"), py::arg("format_type"));
 
@@ -802,6 +853,29 @@ Examples:
     >>> structure.to_hdf5_file(Path("water.structure.h5"))
 )",
                 py::arg("filename"));
+
+  structure.def_static("from_hdf5", structure_from_hdf5_wrapper,
+                       R"(
+Load structure from HDF5 group (static method).
+
+Args:
+    group (h5py.Group | h5py.File): HDF5 group or file object to load data from
+
+Returns:
+    Structure: New Structure object loaded from the group
+
+Raises:
+    RuntimeError: If the group cannot be read or contains invalid structure data
+
+Examples:
+    >>> import h5py
+    >>> with h5py.File("data.structure.h5", "r") as f:
+    ...     water = Structure.from_hdf5(f)
+    >>> with h5py.File("data.structure.h5", "r") as f:
+    ...     group = f["structure"]
+    ...     water = Structure.from_hdf5(group)
+)",
+                       py::arg("group"));
 
   structure.def_static("from_hdf5_file", structure_from_hdf5_file_wrapper,
                        R"(
@@ -837,6 +911,7 @@ Returns:
 Examples:
     >>> summary = structure.get_summary()
     >>> print(summary)
+
 )");
 
   structure.def("calculate_nuclear_repulsion_energy",
@@ -848,11 +923,15 @@ Returns:
     float: Nuclear repulsion energy in atomic units (Hartree)
 
 Notes:
-    This function calculates the Coulombic repulsion energy between all nuclei in the structure using the formula: :math:`E_{nn} = \sum_{i<j} Z_i \cdot Z_j / |R_i - R_j|` where Z_i is the nuclear charge of atom i and R_i is its position vector.
+    This function calculates the Coulombic repulsion energy between all nuclei
+    in the structure using the formula:
+    :math:`E_{nn} = \sum_{i<j} Z_i \cdot Z_j / |R_i - R_j|` where Z_i is the
+    nuclear charge of atom i and R_i is its position vector.
 
 Examples:
     >>> energy = structure.calculate_nuclear_repulsion_energy()
     >>> print(f'Nuclear repulsion energy: {energy:.6f} hartree')
+
 )");
 
   // Static methods
@@ -869,6 +948,7 @@ Returns:
 Examples:
     >>> element = Structure.symbol_to_element("C")
     >>> assert element == Element.C
+
 )",
                        py::arg("symbol"));
 
@@ -885,6 +965,7 @@ Returns:
 Examples:
     >>> symbol = Structure.element_to_symbol(Element.C)
     >>> assert symbol == "C"
+
 )",
                        py::arg("element"));
 
@@ -902,6 +983,7 @@ Returns:
 Examples:
     >>> charge = Structure.symbol_to_nuclear_charge("C")
     >>> assert charge == 6
+
 )",
                        py::arg("symbol"));
 
@@ -919,6 +1001,7 @@ Returns:
 Examples:
     >>> symbol = Structure.nuclear_charge_to_symbol(6)
     >>> assert symbol == "C"
+
 )",
                        py::arg("nuclear_charge"));
 
@@ -936,6 +1019,7 @@ Returns:
 Examples:
     >>> charge = Structure.element_to_nuclear_charge(Element.C)
     >>> assert charge == 6
+
 )",
                        py::arg("element"));
 
@@ -953,6 +1037,7 @@ Returns:
 Examples:
     >>> element = Structure.nuclear_charge_to_element(6)
     >>> assert element == Element.C
+
 )",
                        py::arg("nuclear_charge"));
 
@@ -970,6 +1055,7 @@ Returns:
 Examples:
     >>> mass = Structure.get_standard_atomic_mass(Element.C)
     >>> print(f"Carbon mass: {mass} AMU")
+
 )",
                        py::arg("element"));
 
@@ -987,6 +1073,7 @@ Returns:
 Examples:
     >>> charge = Structure.get_standard_nuclear_charge(Element.C)
     >>> assert charge == 6
+
 )",
                        py::arg("element"));
   // String representation - bind summary to __repr__
@@ -1035,6 +1122,7 @@ Returns:
 Examples:
     >>> atom = structure[0]
     >>> print(f"Atom 0: {atom['symbol']} at {atom['coordinates']}")
+
 )");
 
   // Iteration support
@@ -1064,6 +1152,7 @@ Yields:
 Examples:
     >>> for atom in structure:
     ...     print(f"Atom {atom['index']}: {atom['symbol']}")
+
 )");
 
   // Pickling support using JSON serialization

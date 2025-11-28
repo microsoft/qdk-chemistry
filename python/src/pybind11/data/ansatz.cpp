@@ -104,6 +104,7 @@ Examples:
     >>> ansatz.to_hdf5_file("ansatz.h5")
     >>> ansatz2 = data.Ansatz.from_json_file("ansatz.json")
     >>> ansatz3 = data.Ansatz.from_hdf5_file("ansatz.h5")
+
 )");
 
   // Constructors
@@ -117,6 +118,7 @@ Args:
 
 Raises:
     ValueError: If orbital dimensions are inconsistent between Hamiltonian and wavefunction
+
 )",
              py::arg("hamiltonian"), py::arg("wavefunction"));
 
@@ -131,6 +133,7 @@ Args:
 
 Raises:
     ValueError: If pointers are None or orbital dimensions are inconsistent
+
 )",
       py::arg("hamiltonian"), py::arg("wavefunction"));
 
@@ -147,6 +150,7 @@ Returns:
 
 Raises:
     RuntimeError: If Hamiltonian is not set
+
 )",
                           py::return_value_policy::reference_internal);
 
@@ -168,6 +172,7 @@ Returns:
 
 Raises:
     RuntimeError: If wavefunction is not set
+
 )",
                           py::return_value_policy::reference_internal);
 
@@ -177,6 +182,7 @@ Check if wavefunction is available.
 
 Returns:
     bool: True if wavefunction is set
+
 )");
 
   // Orbital Information
@@ -189,6 +195,7 @@ Returns:
 
 Raises:
     RuntimeError: If orbitals are not available
+
 )",
                           py::return_value_policy::reference_internal);
 
@@ -198,6 +205,7 @@ Check if orbital data is available.
 
 Returns:
     bool: True if orbitals are set in both Hamiltonian and wavefunction
+
 )");
 
   // Energy Calculations
@@ -213,6 +221,7 @@ Raises:
 
 Notes:
     This method will be implemented once energy calculation algorithms are available.
+
 )");
 
   ansatz.def("validate_orbital_consistency",
@@ -222,6 +231,7 @@ Validate orbital consistency between Hamiltonian and wavefunction.
 
 Raises:
     RuntimeError: If orbital dimensions are inconsistent
+
 )");
 
   // Summary
@@ -231,6 +241,7 @@ Get a summary string describing the Ansatz object.
 
 Returns:
     str: Human-readable summary of the Ansatz object
+
 )");
 
   // Generic File I/O
@@ -244,6 +255,7 @@ Args:
 
 Raises:
     RuntimeError: If unsupported type or I/O error occurs
+
 )",
              py::arg("filename"), py::arg("type"));
 
@@ -260,6 +272,7 @@ Returns:
 
 Raises:
     RuntimeError: If file doesn't exist, unsupported type, or I/O error occurs
+
 )",
                     py::arg("filename"), py::arg("type"));
 
@@ -273,6 +286,7 @@ Args:
 
 Raises:
     RuntimeError: If I/O error occurs
+
 )",
              py::arg("filename"));
 
@@ -288,6 +302,7 @@ Returns:
 
 Raises:
     RuntimeError: If file doesn't exist or I/O error occurs
+
 )",
                     py::arg("filename"));
 
@@ -301,6 +316,7 @@ Args:
 
 Raises:
     RuntimeError: If I/O error occurs
+
 )",
              py::arg("filename"));
 
@@ -316,6 +332,7 @@ Returns:
 
 Raises:
     RuntimeError: If file doesn't exist or I/O error occurs
+
 )",
                     py::arg("filename"));
 
@@ -328,6 +345,7 @@ Convert Ansatz to JSON string format.
 
 Returns:
     str: JSON string containing Ansatz data
+
 )");
 
   ansatz.def_static(
@@ -346,6 +364,7 @@ Returns:
 
 Raises:
     RuntimeError: If JSON string is malformed
+
 )",
       py::arg("json_str"));
 

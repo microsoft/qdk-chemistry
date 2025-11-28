@@ -6,18 +6,17 @@ basis sets, and Hamiltonians.
 
 The main functionality includes:
 
-* Converting QDK/Chemistry Structure objects to PySCF atom format
-* Converting QDK/Chemistry BasisSet objects to PySCF Mole objects
-* Converting PySCF Mole objects back to QDK/Chemistry BasisSet objects
-* Converting QDK/Chemistry Hamiltonian objects to PySCF SCF objects
+* Converting QDK/Chemistry Structure objects to PySCF atom format.
+* Converting QDK/Chemistry BasisSet objects to PySCF Mole objects.
+* Converting PySCF Mole objects back to QDK/Chemistry BasisSet objects.
+* Converting QDK/Chemistry Hamiltonian objects to PySCF SCF objects.
 
 These utilities are essential for workflows that need to leverage both QDK/Chemistry's data management capabilities and
 PySCF's quantum chemistry calculations.
 
 Note:
-    * Currently supports spherical atomic orbitals only
-    * Cartesian basis set support is planned for future versions
-    * Assumes atomic numbers do not exceed 200
+    Currently supports spherical atomic orbitals only. Cartesian basis set support is planned for future versions,
+    and the helper routines assume atomic numbers do not exceed 200.
 
 Examples:
     >>> from qdk_chemistry.plugins.pyscf.utils import structure_to_pyscf_atom_labels, basis_to_pyscf_mol
@@ -36,9 +35,16 @@ Examples:
 from collections import Counter
 
 import numpy as np
-from pyscf import gto, scf
+import pyscf
 
 from qdk_chemistry.data import AOType, BasisSet, Hamiltonian, Orbitals, Shell, Structure
+
+__all__ = [
+    "basis_to_pyscf_mol",
+    "hamiltonian_to_scf",
+    "pyscf_mol_to_qdk_basis",
+    "structure_to_pyscf_atom_labels",
+]
 
 
 def structure_to_pyscf_atom_labels(structure: Structure) -> tuple:
@@ -90,7 +96,7 @@ def structure_to_pyscf_atom_labels(structure: Structure) -> tuple:
     return atoms, pyscf_symbols, elements
 
 
-def basis_to_pyscf_mol(basis: BasisSet, charge: int = 0, multiplicity: int = 1) -> gto.Mole:
+def basis_to_pyscf_mol(basis: BasisSet, charge: int = 0, multiplicity: int = 1) -> pyscf.gto.mole.Mole:
     """Convert QDK/Chemistry BasisSet instance to PySCF Mole object.
 
     This function extracts the structure and basis information from the QDK/Chemistry
@@ -129,11 +135,11 @@ def basis_to_pyscf_mol(basis: BasisSet, charge: int = 0, multiplicity: int = 1) 
             coefficients = shell.coefficients
             for j in range(len(exponents)):
                 shell_rec += f"{exponents[j]:16.8f} {coefficients[j]:16.8f}\n"
-            atom_basis.append(gto.parse(shell_rec))
+            atom_basis.append(pyscf.gto.parse(shell_rec))
         basis_dict[pyscf_symbols[i]] = atom_basis
 
     # TODO Handle Cartesian basis sets, workitem: 41406
-    mol = gto.Mole(atom=atoms, basis=basis_dict, unit="Bohr", charge=charge, spin=multiplicity - 1)
+    mol = pyscf.gto.mole.Mole(atom=atoms, basis=basis_dict, unit="Bohr", charge=charge, spin=multiplicity - 1)
 
     # Store the original QDK/Chemistry basis name as an attribute for round-trip conversion
     mol.qdk_basis_name = basis.get_name()
@@ -202,7 +208,9 @@ def basis_to_pyscf_mol(basis: BasisSet, charge: int = 0, multiplicity: int = 1) 
     return mol
 
 
-def pyscf_mol_to_qdk_basis(pyscf_mol: gto.Mole, structure: Structure, basis_name: str | None = None) -> BasisSet:
+def pyscf_mol_to_qdk_basis(
+    pyscf_mol: pyscf.gto.mole.Mole, structure: Structure, basis_name: str | None = None
+) -> BasisSet:
     """Convert PySCF Mole object to QDK/Chemistry BasisSet instance.
 
     This function extracts the basis set information from a PySCF Mole object
@@ -213,8 +221,9 @@ def pyscf_mol_to_qdk_basis(pyscf_mol: gto.Mole, structure: Structure, basis_name
     Args:
         pyscf_mol: PySCF Mole object with basis set data.
         structure: QDK/Chemistry Structure instance that defines the atomic positions and types.
-        basis_name: Name for the basis set. If None, attempts to derive from the PySCF
-            molecule's basis set or defaults to "pyscf_basis".
+        basis_name: Name for the basis set.
+
+            If None, attempts to derive from the PySCF molecule's basis set or defaults to "pyscf_basis".
 
     Returns:
         QDK/Chemistry BasisSet instance initialized with the PySCF basis set data,
@@ -381,12 +390,15 @@ def orbitals_to_scf(
     PySCF self-consistent field (SCF) object based on the orbital characteristics.
 
     Args:
-        orbitals: The QDK/Chemistry Orbitals object containing molecular orbital information including basis set,
-            coefficients, occupations, and energies.
+        orbitals: The QDK/Chemistry Orbitals object containing molecular orbital information.
+
+            Includes basis set, coefficients, occupations, and energies.
+
         occ_alpha: Occupation numbers for alpha (spin-up) electrons.
         occ_beta: Occupation numbers for beta (spin-down) electrons.
-        force_restricted: If True, forces the creation of a restricted SCF object (RHF or ROHF) even if the orbitals
-            are unrestricted. Default is False.
+        force_restricted: If True, forces the creation of a restricted SCF object (RHF or ROHF).
+
+            Applies even if the input orbitals are unrestricted. Default is False.
 
     Returns:
         A PySCF SCF object (RHF, ROHF, or UHF) populated with the molecular orbital data from the input ``Orbitals``
@@ -434,17 +446,17 @@ def orbitals_to_scf(
         # so total occupancy per MO is occ_a + occ_b
         total_occ = occ_alpha + occ_beta
         if np.any(occ_alpha != occ_beta):
-            mf = scf.ROHF(mol)
+            mf = pyscf.scf.ROHF(mol)
             mf.mo_coeff = coeff_a
             mf.mo_energy = energy_a
             mf.mo_occ = total_occ
         else:
-            mf = scf.RHF(mol)
+            mf = pyscf.scf.RHF(mol)
             mf.mo_coeff = coeff_a
             mf.mo_energy = energy_a
             mf.mo_occ = total_occ
     else:
-        mf = scf.UHF(mol)
+        mf = pyscf.scf.UHF(mol)
         mf.mo_coeff = (coeff_a, coeff_b)
         mf.mo_energy = (energy_a, energy_b)
         mf.mo_occ = (occ_alpha, occ_beta)
@@ -464,12 +476,15 @@ def orbitals_to_scf_from_n_electrons_and_multiplicity(
     occupation arrays from the total number of electrons and spin multiplicity.
 
     Args:
-        orbitals: The QDK/Chemistry Orbitals object containing molecular orbital information including basis set,
-            coefficients, occupations, and energies.
+        orbitals: The QDK/Chemistry Orbitals object containing molecular orbital information.
+
+            Includes basis set, coefficients, occupations, and energies.
+
         n_electrons: Total number of electrons in the system.
         multiplicity: Spin multiplicity (2S + 1), where S is the total spin. Default is 1 (singlet).
-        force_restricted: If True, forces the creation of a restricted SCF object (RHF or ROHF) even if the orbitals
-            are unrestricted. Default is False.
+        force_restricted: If True, forces the creation of a restricted SCF object (RHF or ROHF).
+
+            Applies even if the input orbitals are unrestricted. Default is False.
 
     Returns:
         A PySCF SCF object (RHF, ROHF, or UHF) populated with the molecular orbital data from the input ``Orbitals``
@@ -493,7 +508,7 @@ def orbitals_to_scf_from_n_electrons_and_multiplicity(
     return orbitals_to_scf(orbitals, alpha_occ, beta_occ, force_restricted)
 
 
-def hamiltonian_to_scf(hamiltonian: Hamiltonian, alpha_occ: np.ndarray, beta_occ: np.ndarray) -> scf.RHF:
+def hamiltonian_to_scf(hamiltonian: Hamiltonian, alpha_occ: np.ndarray, beta_occ: np.ndarray) -> pyscf.scf.RHF:
     """Convert QDK/Chemistry Hamiltonian to PySCF SCF object.
 
     This function creates a PySCF SCF object from a QDK/Chemistry Hamiltonian object, making it possible to use
@@ -502,8 +517,11 @@ def hamiltonian_to_scf(hamiltonian: Hamiltonian, alpha_occ: np.ndarray, beta_occ
     performing an actual SCF calculation.
 
     Args:
-        hamiltonian: QDK/Chemistry Hamiltonian object containing the electronic structure information including one- and
-            two-body integrals, core energy, and orbital data.
+        hamiltonian: QDK/Chemistry Hamiltonian object.
+
+            Contains the electronic structure information including one- and two-body integrals,
+            core energy, and orbital data.
+
         alpha_occ: Occupation numbers for alpha (spin-up) electrons.
         beta_occ: Occupation numbers for beta (spin-down) electrons.
 
@@ -512,8 +530,9 @@ def hamiltonian_to_scf(hamiltonian: Hamiltonian, alpha_occ: np.ndarray, beta_occ
         object that provides the necessary interfaces for post-HF methods without having performed an SCF calculation.
 
     Raises:
-        ValueError: If the Hamiltonian uses unsupported features like unrestricted orbitals, open-shell systems, or
-            active spaces.
+        ValueError: If the Hamiltonian uses unsupported features.
+
+            Examples are: unrestricted orbitals, open-shell systems, or active spaces.
 
     Note:
         * Currently only supports restricted, closed-shell calculations without active spaces.
@@ -558,7 +577,7 @@ def hamiltonian_to_scf(hamiltonian: Hamiltonian, alpha_occ: np.ndarray, beta_occ
         raise ValueError("Active space is not supported.")
 
     # Dummy molecule
-    mol = gto.M()
+    mol = pyscf.gto.M()
 
     # Calculate electron numbers from occupation arrays
     nalpha = int(np.sum(alpha_occ))
@@ -566,7 +585,7 @@ def hamiltonian_to_scf(hamiltonian: Hamiltonian, alpha_occ: np.ndarray, beta_occ
 
     # Create a fake SCF object
     # TODO: Handle unrestricted / open-shell
-    fake_scf = scf.RHF(mol)
+    fake_scf = pyscf.scf.RHF(mol)
     fake_scf.mol.nelectron = nalpha + nbeta
 
     # Store integrals in the SCF object
@@ -595,7 +614,7 @@ def hamiltonian_to_scf_from_n_electrons_and_multiplicity(
     hamiltonian: Hamiltonian,
     n_electrons: int,
     multiplicity: int = 1,
-) -> scf.RHF:
+) -> pyscf.scf.RHF:
     """Convert QDK/Chemistry Hamiltonian to PySCF SCF object using electron count and spin multiplicity.
 
     This is a convenience wrapper around :func:`hamiltonian_to_scf` that automatically constructs

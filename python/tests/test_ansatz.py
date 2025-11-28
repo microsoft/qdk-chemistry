@@ -310,7 +310,9 @@ class TestAnsatzSerialization:
     def test_restricted_open_shell_energy(self):
         """Test the energy evaluation for a restricted open-shell system."""
         try:
-            import qdk_chemistry.plugins.pyscf  # noqa: F401 PLC0415
+            import qdk_chemistry.plugins.pyscf as pyscf_plugin  # noqa: PLC0415
+
+            pyscf_plugin.load()
         except ImportError:
             pytest.skip("pyscf not available, skipping O2 triplet Ansatz test")
 

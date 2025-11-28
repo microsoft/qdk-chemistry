@@ -49,6 +49,8 @@ from qdk_chemistry.utils.bitstring import bitstrings_to_binary_matrix, separate_
 
 _LOGGER = logging.getLogger(__name__)
 
+__all__: list[str] = []
+
 
 class SparseIsometryGF2XStatePreparation(StatePreparation):
     """State preparation using sparse isometry with enhanced GF2+X elimination.
@@ -246,7 +248,8 @@ def _prepare_single_reference_state(bitstring: str) -> QuantumCircuit:
 
     Args:
         bitstring: Binary string representing the occupation of qubits.
-                  '1' means apply X gate, '0' means leave in |0⟩ state.
+
+            '1' means apply X gate, '0' means leave in |0⟩ state.
 
     Returns:
         OpenQASM with the prepared single reference state
@@ -637,9 +640,10 @@ def _eliminate_column(
         cnot_ops: List to record CNOT operations (copied, not modified)
 
     Returns:
-        A tuple containing:
-            - updated_matrix: Matrix after column elimination
-            - updated_cnot_ops: Updated list of CNOT operations
+        tuple[np.ndarray, list[tuple[int, int]]]: Tuple containing:
+
+            * ``updated_matrix``: Matrix after column elimination.
+            * ``updated_cnot_ops``: Updated list of CNOT operations.
 
     """
     matrix_work = matrix.copy()
@@ -665,11 +669,11 @@ def _remove_zero_rows(matrix: np.ndarray, row_map: list[int]) -> tuple[np.ndarra
         row_map: Current mapping from matrix rows to original indices (read-only)
 
     Returns:
-        A tuple containing:
-            * M_reduced: New matrix with only non-zero rows
-            * reduced_row_map: Updated mapping from reduced matrix
-              rows to original row indices
-            * rank: Number of non-zero rows (matrix rank)
+        tuple[np.ndarray, list[int], int]: Tuple containing:
+
+            * ``matrix_reduced``: New matrix with only non-zero rows.
+            * ``reduced_row_map``: Updated mapping from reduced matrix rows to original indices.
+            * ``rank``: Number of non-zero rows (matrix rank).
 
     Note:
         This function does not modify its input arguments. It creates and returns
