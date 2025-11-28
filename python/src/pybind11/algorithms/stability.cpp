@@ -129,6 +129,15 @@ Internal settings object property.
 This property allows derived classes to replace the settings object with a specialized Settings subclass in their constructors.
 )");
 
+  stability_checker.def("name", &StabilityChecker::name,
+                        R"(
+The algorithm's name.
+
+Returns:
+    str: The name of the algorithm
+
+)");
+
   stability_checker.def("type_name", &StabilityChecker::type_name,
                         R"(
 The algorithm's type name.

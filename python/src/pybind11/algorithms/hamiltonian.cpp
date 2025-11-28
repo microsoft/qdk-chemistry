@@ -137,6 +137,15 @@ Examples:
 
 )");
 
+  hamiltonian_constructor.def("name", &HamiltonianConstructor::name,
+                              R"(
+The algorithm's name.
+
+Returns:
+    str: The name of the algorithm
+
+)");
+
   hamiltonian_constructor.def("type_name", &HamiltonianConstructor::type_name,
                               R"(
 The algorithm's type name.
