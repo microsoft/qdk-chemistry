@@ -7,7 +7,7 @@ As a core :doc:`data class <../design/index>`, it follows QDK/Chemistry's immuta
 Overview
 --------
 
-The ``Structure`` class is a fundamental data container in QDK/Chemistry that represents the geometric arrangement of atoms in a molecular system.
+The :class:`~qdk_chemistry.data.Structure` class is a fundamental data container in QDK/Chemistry that represents the geometric arrangement of atoms in a molecular system.
 It provides the foundation for all quantum chemistry calculations by defining the nuclear framework on which electronic structure calculations are performed.
 
 Properties
@@ -23,7 +23,7 @@ Properties
 Usage
 -----
 
-The ``Structure`` class is typically the starting point for any calculation workflow in QDK/Chemistry.
+The :class:`~qdk_chemistry.data.Structure` class is typically the starting point for any calculation workflow in QDK/Chemistry.
 It is used to define the molecular system before performing electronic structure calculations.
 
 .. note::
@@ -32,26 +32,26 @@ It is used to define the molecular system before performing electronic structure
 Creating a structure object manually
 ------------------------------------
 
-A ``Structure`` object can be created manually by adding atoms one by one:
+A :class:`~qdk_chemistry.data.Structure` object can be created manually by adding atoms one by one:
 
 .. tab:: C++ API
 
-   .. literalinclude:: ../../../../examples/cpp/structure.cpp
+   .. literalinclude:: ../../../_static/examples/cpp/structure.cpp
       :language: cpp
-      :start-after: // start-cell-1
-      :end-before: // end-cell-1
+      :start-after: // start-cell-create
+      :end-before: // end-cell-create
 
 .. tab:: Python API
 
-   .. literalinclude:: ../../../examples/python/structure.py
+   .. literalinclude:: ../../../_static/examples/python/structure.py
       :language: python
-      :start-after: # start-cell-1
-      :end-before: # end-cell-1
+      :start-after: # start-cell-create
+      :end-before: # end-cell-create
 
 Loading from files
 ------------------
 
-The ``Structure`` class can load molecular structures from various file formats.
+The :class:`~qdk_chemistry.data.Structure` class can load molecular structures from various file formats.
 For detailed format specifications, see the `File Formats`_ section below.
 
 .. note::
@@ -60,25 +60,25 @@ For detailed format specifications, see the `File Formats`_ section below.
 
 .. tab:: C++ API
 
-   .. literalinclude:: ../../../../examples/cpp/structure.cpp
+   .. literalinclude:: ../../../_static/examples/cpp/structure.cpp
       :language: cpp
-      :start-after: // start-cell-2
-      :end-before: // end-cell-2
+      :start-after: // start-cell-load
+      :end-before: // end-cell-load
 
 .. tab:: Python API
 
    .. note::
       These examples show the API pattern. For complete working examples, see the test suite.
 
-   .. literalinclude:: ../../../examples/python/structure.py
+   .. literalinclude:: ../../../_static/examples/python/structure.py
       :language: python
-      :start-after: # start-cell-2
-      :end-before: # end-cell-2
+      :start-after: # start-cell-load
+      :end-before: # end-cell-load
 
 Accessing structure data
 ------------------------
 
-The ``Structure`` class provides methods to access atomic data:
+The :class:`~qdk_chemistry.data.Structure` class provides methods to access atomic data:
 
 .. note::
    Functions that deal with specific atoms include the word "atom" in their name (e.g., ``get_atom_coordinates``), while functions that return properties for all atoms omit this word (e.g., ``get_coordinates``).
@@ -87,17 +87,17 @@ The ``Structure`` class provides methods to access atomic data:
 
 .. tab:: C++ API
 
-   .. literalinclude:: ../../../../examples/cpp/structure.cpp
+   .. literalinclude:: ../../../_static/examples/cpp/structure.cpp
       :language: cpp
-      :start-after: // start-cell-3
-      :end-before: // end-cell-3
+      :start-after: // start-cell-data
+      :end-before: // end-cell-data
 
 .. tab:: Python API
 
-   .. literalinclude:: ../../../examples/python/structure.py
+   .. literalinclude:: ../../../_static/examples/python/structure.py
       :language: python
-      :start-after: # start-cell-3
-      :end-before: # end-cell-3
+      :start-after: # start-cell-data
+      :end-before: # end-cell-data
 
 Serialization
 -------------
@@ -117,7 +117,7 @@ QDK/Chemistry supports multiple serialization formats for molecular structures:
 JSON format
 ^^^^^^^^^^^
 
-JSON representation of a ``Structure`` looks like:
+JSON representation of a :class:`~qdk_chemistry.data.Structure` looks like:
 
 .. code-block:: json
 
@@ -135,7 +135,7 @@ JSON representation of a ``Structure`` looks like:
 XYZ format
 ^^^^^^^^^^
 
-`XYZ representation <https://en.wikipedia.org/wiki/XYZ_file_format>`_ of the same ``Structure``:
+`XYZ representation <https://en.wikipedia.org/wiki/XYZ_file_format>`_ of the same :class:`~qdk_chemistry.data.Structure`:
 
 .. note::
    QDK/Chemistry uses the comment field (second line) of the XYZ format to store the charge and spin multiplicity information, as this data is not part of the standard XYZ specification.
@@ -149,44 +149,44 @@ XYZ format
 
 .. tab:: C++ API
 
-   .. literalinclude:: ../../../../examples/cpp/structure.cpp
+   .. literalinclude:: ../../../_static/examples/cpp/structure.cpp
       :language: cpp
-      :start-after: // start-cell-4
-      :end-before: // end-cell-4
+      :start-after: // start-cell-serialize
+      :end-before: // end-cell-serialize
 
 .. tab:: Python API
 
-   .. literalinclude:: ../../../examples/python/serialization.py
+   .. literalinclude:: ../../../_static/examples/python/structure.py
       :language: python
-      :start-after: # start-cell-1
-      :end-before: # end-cell-1
+      :start-after: # start-cell-serialize
+      :end-before: # end-cell-serialize
 
 Molecular manipulation
 ----------------------
 
-The ``Structure`` class provides methods for basic molecular manipulations:
+The :class:`~qdk_chemistry.data.Structure` class provides methods for basic molecular manipulations:
 
 .. tab:: C++ API
 
-   .. literalinclude:: ../../../../examples/cpp/structure.cpp
+   .. literalinclude:: ../../../_static/examples/cpp/structure.cpp
       :language: cpp
-      :start-after: // start-cell-5
-      :end-before: // end-cell-5
+      :start-after: // start-cell-manip
+      :end-before: // end-cell-manip
 
 .. tab:: Python API
 
    .. note::
       This example shows the API pattern. For complete working examples, see the test suite.
 
-   .. literalinclude:: ../../../examples/python/structure.py
+   .. literalinclude:: ../../../_static/examples/python/structure.py
       :language: python
-      :start-after: # start-cell-5
-      :end-before: # end-cell-5
+      :start-after: # start-cell-manip
+      :end-before: # end-cell-manip
 
 Units
 -----
 
-All internal coordinates in the ``Structure`` class are in Bohr by default.
+All internal coordinates in the :class:`~qdk_chemistry.data.Structure` class are in Bohr by default.
 This applies to all methods that return or accept coordinates.
 
 .. TODO:  restore the code snippets with working examples.
