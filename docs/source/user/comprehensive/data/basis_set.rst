@@ -79,9 +79,6 @@ Creating a basis set
 
 .. tab:: Python API
 
-   .. note::
-      This example shows the API pattern. For complete working examples, see the test suite.
-
    .. literalinclude:: ../../../_static/examples/python/basis_set.py
       :language: python
       :start-after: # start-cell-basis-set-create
@@ -106,9 +103,6 @@ This ensures that the basis set data remains consistent and prevents accidental 
 
 .. tab:: Python API
 
-   .. note::
-      This example shows the API pattern. For complete working examples, see the test suite.
-
    .. literalinclude:: ../../../_static/examples/python/basis_set.py
       :language: python
       :start-after: # start-cell-basis-set-get
@@ -127,9 +121,6 @@ The ``Shell`` structure contains information about a group of basis functions:
       :end-before: // end-cell-shells
 
 .. tab:: Python API
-
-   .. note::
-      This example shows the API pattern. For complete working examples, see the test suite.
 
    .. literalinclude:: ../../../_static/examples/python/basis_set.py
       :language: python
@@ -213,9 +204,6 @@ HDF5 representation of a :class:`~qdk_chemistry.data.BasisSet` has the following
 
 .. tab:: Python API
 
-   .. note::
-      This example shows the API pattern. For complete working examples, see the test suite.
-
    .. literalinclude:: ../../../_static/examples/python/basis_set.py
       :language: python
       :start-after: # start-cell-serialization
@@ -234,9 +222,6 @@ The :class:`~qdk_chemistry.data.BasisSet` class provides several static utility 
       :end-before: // end-cell-utility-functions
 
 .. tab:: Python API
-
-   .. note::
-      This example shows the API pattern. For complete working examples, see the test suite.
 
    .. literalinclude:: ../../../_static/examples/python/basis_set.py
       :language: python
@@ -258,9 +243,6 @@ For a complete list of available basis sets and their specifications, see the :d
       :end-before: // end-cell-library
 
 .. tab:: Python API
-
-   .. note::
-      This example shows the API pattern. For complete working examples, see the test suite.
 
    .. literalinclude:: ../../../_static/examples/python/basis_set.py
       :language: python
