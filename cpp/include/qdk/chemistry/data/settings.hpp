@@ -27,14 +27,20 @@ namespace qdk::chemistry::data {
  * @brief Type-safe variant for storing different setting value types
  *
  * This variant can hold common types used in settings configurations.
- * Note: All integer types are stored internally as int64_t (signed) or uint64_t
- * (unsigned) for simplicity. Other integer types can be requested via get()
+ * Note: All integer types are stored internally as int64_t (signed).
+ * Other integer types can be requested via get()
  * with automatic conversion.
  */
 using SettingValue =
-    std::variant<bool, int64_t, uint64_t, float, double, std::string,
-                 std::vector<int64_t>, std::vector<uint64_t>,
+    std::variant<bool, int64_t, double, std::string, std::vector<int64_t>,
                  std::vector<double>, std::vector<std::string>>;
+
+/**
+ * @brief Type for specifying limits on setting values
+ */
+using LimitValue =
+    std::variant<std::pair<int64_t, int64_t>, std::vector<int64_t>,
+                 std::pair<double, double>, std::vector<std::string>>;
 
 /**
  * @brief Exception thrown when modification of locked settings is requested
@@ -524,6 +530,44 @@ class Settings : public DataClass,
   std::string get_type_name(const std::string& key) const;
 
   /**
+   * @brief Check if a setting has a description
+   * @param key The setting key
+   * @return true if the setting has a description
+   */
+  bool has_description(const std::string& key) const;
+
+  /**
+   * @brief Get the description of a setting
+   * @param key The setting key
+   * @return The description string
+   * @throws SettingNotFound if key doesn't exist or has no description
+   */
+  std::string get_description(const std::string& key) const;
+
+  /**
+   * @brief Check if a setting has defined limits
+   * @param key The setting key
+   * @return true if the setting has limits defined
+   */
+  bool has_limits(const std::string& key) const;
+
+  /**
+   * @brief Get the limits of a setting
+   * @param key The setting key
+   * @return The limit value (can be range or enumeration)
+   * @throws SettingNotFound if key doesn't exist or has no limits
+   */
+  LimitValue get_limits(const std::string& key) const;
+
+  /**
+   * @brief Check if a setting is documented
+   * @param key The setting key
+   * @return true if the setting is marked as documented
+   * @throws SettingNotFound if key doesn't exist
+   */
+  bool is_documented(const std::string& key) const;
+
+  /**
    * @brief Update a setting value, throwing if key doesn't exist
    * @param key The setting key
    * @param value The new value
@@ -601,6 +645,22 @@ class Settings : public DataClass,
    */
   void lock() const;
 
+  /**
+   * @brief Print settings as a formatted table
+   * @param max_width Maximum total width of the table (default: 120)
+   * @param show_undocumented Whether to show undocumented settings (default:
+   * false)
+   * @return Formatted table string
+   *
+   * Prints all documented settings in a table format with columns:
+   * Key, Value, Limits, Description
+   *
+   * The table fits within the specified width with multi-line descriptions
+   * as needed. Non-integer numeric values are displayed in scientific notation.
+   */
+  std::string as_table(size_t max_width = 120,
+                       bool show_undocumented = false) const;
+
  protected:
   /**
    * @brief Set a default value for a setting (only if not already set) -
@@ -613,7 +673,10 @@ class Settings : public DataClass,
    * @param key The setting key
    * @param value The default value
    */
-  void set_default(const std::string& key, const SettingValue& value);
+  void set_default(const std::string& key, const SettingValue& value,
+                   std::optional<std::string> description = std::nullopt,
+                   std::optional<LimitValue> limit = std::nullopt,
+                   bool documented = true);
 
   /**
    * @brief Set a default value for a setting (only if not already set) -
@@ -627,20 +690,52 @@ class Settings : public DataClass,
    * @param value The default value
    */
   template <typename T>
-  void set_default(const std::string& key, const T& value) {
+  void set_default(const std::string& key, const T& value,
+                   std::optional<std::string> description = std::nullopt,
+                   std::optional<std::variant<std::pair<T, T>, std::vector<T>>>
+                       limit = std::nullopt,
+                   bool documented = true) {
     if (!has(key)) {
       // If the type is directly in the variant, use it as-is
       if constexpr (is_variant_member_v<T, SettingValue>) {
         settings_[key] = value;
-      }
-      // Handle integral types - store as int64_t (signed) or uint64_t
-      // (unsigned)
-      else if constexpr (is_non_bool_integral_v<T>) {
-        if constexpr (std::is_signed_v<T>) {
-          settings_[key] = static_cast<int64_t>(value);
-        } else {
-          settings_[key] = static_cast<uint64_t>(value);
+        if (description.has_value()) {
+          descriptions_[key] = *description;
         }
+        if (limit.has_value()) {
+          // Convert template limit variant to LimitValue variant
+          std::visit(
+              [this, &key](const auto& limit_val) {
+                using LimitValType = std::decay_t<decltype(limit_val)>;
+                // Convert to the appropriate LimitValue type
+                if constexpr (std::is_same_v<LimitValType,
+                                             std::pair<int64_t, int64_t>>) {
+                  limits_[key] = limit_val;
+                } else if constexpr (std::is_same_v<LimitValType,
+                                                    std::vector<int64_t>>) {
+                  limits_[key] = limit_val;
+                } else if constexpr (std::is_same_v<
+                                         LimitValType,
+                                         std::pair<double, double>>) {
+                  limits_[key] = limit_val;
+                } else if constexpr (std::is_same_v<LimitValType,
+                                                    std::vector<double>>) {
+                  // vector<double> is not in LimitValue, but we don't use it
+                  // for limits anyway
+                  throw std::invalid_argument(
+                      "vector<double> limits are not supported");
+                } else if constexpr (std::is_same_v<LimitValType,
+                                                    std::vector<std::string>>) {
+                  limits_[key] = limit_val;
+                }
+              },
+              *limit);
+        }
+        documented_[key] = documented;
+      }
+      // Handle integral types - store as int64_t (signed)
+      else if constexpr (is_non_bool_integral_v<T>) {
+        settings_[key] = static_cast<int64_t>(value);
       }
       // Handle integer vector types
       else if constexpr (is_non_bool_integral_vector_v<T>) {
@@ -669,7 +764,10 @@ class Settings : public DataClass,
    * @param value The default value to associate with the key, as a C-style
    * string.
    */
-  void set_default(const std::string& key, const char* value);
+  void set_default(const std::string& key, const char* value,
+                   std::optional<const char*> description = std::nullopt,
+                   std::optional<std::vector<const char*>> limit = std::nullopt,
+                   bool documented = true);
 
  private:
   /// Serialization version
@@ -797,6 +895,9 @@ class Settings : public DataClass,
 
   /// Storage for all settings
   std::map<std::string, SettingValue> settings_;
+  std::map<std::string, std::string> descriptions_;
+  std::map<std::string, LimitValue> limits_;
+  std::map<std::string, bool> documented_;
 
   /// Flag to indicate if settings are locked
   mutable bool _locked = false;

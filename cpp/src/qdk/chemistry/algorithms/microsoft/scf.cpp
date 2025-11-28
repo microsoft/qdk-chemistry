@@ -77,7 +77,7 @@ std::pair<double, std::shared_ptr<data::Wavefunction>> ScfSolver::_run_impl(
   std::transform(method.begin(), method.end(), method.begin(), ::tolower);
 
   double tolerance = _settings->get<double>("tolerance");
-  int max_iterations = _settings->get<int>("max_iterations");
+  int64_t max_iterations = _settings->get<int64_t>("max_iterations");
 
   // Create Molecule object
   auto ms_mol = qdk::chemistry::utils::microsoft::convert_to_molecule(

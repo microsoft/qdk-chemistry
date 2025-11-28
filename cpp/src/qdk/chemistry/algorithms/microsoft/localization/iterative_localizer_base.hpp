@@ -19,7 +19,7 @@ class IterativeOrbitalLocalizationSettings : public data::Settings {
  public:
   IterativeOrbitalLocalizationSettings() {
     set_default("tolerance", 1e-6);
-    set_default("max_iterations", size_t(10000));
+    set_default("max_iterations", 10000);
     set_default("small_rotation_tolerance", 1e-12);
   }
 };

@@ -41,9 +41,9 @@ struct pmc_helper {
     double H_thresh = macis_pmc_settings.get<double>("H_thresh");
     double davidson_res_tol =
         macis_pmc_settings.get<double>("davidson_res_tol");
-    size_t iterative_solver_dimension_cutoff =
-        macis_pmc_settings.get<size_t>("iterative_solver_dimension_cutoff");
-    size_t davidson_max_m = macis_pmc_settings.get<size_t>("davidson_max_m");
+    int64_t iterative_solver_dimension_cutoff =
+        macis_pmc_settings.get<int64_t>("iterative_solver_dimension_cutoff");
+    int64_t davidson_max_m = macis_pmc_settings.get<int64_t>("davidson_max_m");
 
     using wfn_type = macis::wfn_t<N>;
     using wfn_traits = macis::wavefunction_traits<wfn_type>;

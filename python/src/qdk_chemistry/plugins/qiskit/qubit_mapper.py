@@ -31,12 +31,20 @@ class QiskitQubitMapperSettings(Settings):
     QiskitQubitMapper-specific settings:
         encoding (string, default="jordan-wigner"): Qubit mapping strategy to use.
 
+            Valid options: "jordan-wigner", "bravyi-kitaev", "parity"
+
     """
 
     def __init__(self):
         """Initialize QiskitQubitMapperSettings."""
         super().__init__()
-        self._set_default("encoding", "string", "jordan-wigner")
+        self._set_default(
+            "encoding",
+            "string",
+            "jordan-wigner",
+            "Qubit mapping strategy to use",
+            ["jordan-wigner", "bravyi-kitaev", "parity"],
+        )
 
 
 class QiskitQubitMapper(QubitMapper):

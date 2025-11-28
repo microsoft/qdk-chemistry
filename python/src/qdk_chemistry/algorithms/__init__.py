@@ -36,6 +36,7 @@ from qdk_chemistry.algorithms.orbital_localizer import (
     OrbitalLocalizer,
     QdkMP2NaturalOrbitalLocalizer,
     QdkPipekMezeyLocalizer,
+    QdkVVHVLocalizer,
 )
 from qdk_chemistry.algorithms.projected_multi_configuration_calculator import (
     ProjectedMultiConfigurationCalculator,
@@ -78,6 +79,7 @@ __all__ = [
     "QdkOccupationActiveSpaceSelector",
     "QdkPipekMezeyLocalizer",
     "QdkScfSolver",
+    "QdkVVHVLocalizer",
     "QdkValenceActiveSpaceSelector",
     "QubitMapper",
     "ScfSolver",
