@@ -5,7 +5,8 @@
 # Licensed under the MIT License. See LICENSE.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
 
-# start-cell-1
+################################################################################
+# start-cell-create-hubbard
 import numpy as np
 import qdk_chemistry.algorithms as algorithms
 from qdk_chemistry.data import Hamiltonian, ModelOrbitals
@@ -44,8 +45,11 @@ inactive_fock = np.zeros((0, 0))
 hamiltonian = Hamiltonian(
     one_body, two_body, model_orbitals, core_energy, inactive_fock
 )
-# end-cell-1
-# start-cell-2
+# end-cell-create-hubbard
+################################################################################
+
+################################################################################
+# start-cell-solve-hubbard
 # Create a multi-configuration calculator
 mc_calculator = algorithms.create("multi_configuration_calculator", "macis_cas")
 
@@ -53,4 +57,5 @@ mc_calculator = algorithms.create("multi_configuration_calculator", "macis_cas")
 energy, wavefunction = mc_calculator.run(hamiltonian, 2, 2)
 
 print(f"Ground state energy: {energy} a.u.")
-# end-cell-2
+# end-cell-solve-hubbard
+################################################################################
