@@ -19,11 +19,6 @@ from .iterative_qpe import IterativePhaseEstimation, IterativePhaseEstimationIte
 from .traditional_qpe import TraditionalPhaseEstimation
 
 __all__ = [
-    "IterativePhaseEstimation",
-    "IterativePhaseEstimationIteration",
-    "PhaseEstimation",
-    "PhaseEstimationAlgorithm",
-    "TraditionalPhaseEstimation",
     "accumulated_phase_from_bits",
     "energy_alias_candidates",
     "energy_from_phase",

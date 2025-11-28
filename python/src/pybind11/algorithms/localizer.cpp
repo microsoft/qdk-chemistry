@@ -8,6 +8,8 @@
 #include <qdk/chemistry.hpp>
 
 #include "factory_bindings.hpp"
+#include "qdk/chemistry/algorithms/microsoft/localization/mp2_natural_orbitals.hpp"
+#include "qdk/chemistry/algorithms/microsoft/localization/pipek_mezey.hpp"
 
 namespace py = pybind11;
 using namespace qdk::chemistry::algorithms;
@@ -44,7 +46,7 @@ class LocalizerBase : public Localizer,
 void bind_localizer(py::module &m) {
   // Localizer abstract base class
   py::class_<Localizer, LocalizerBase, py::smart_holder> localizer(
-      m, "Localizer", R"(
+      m, "OrbitalLocalizer", R"(
 Abstract base class for orbital localizers.
 
 This class defines the interface for localizing molecular orbitals.
@@ -52,17 +54,16 @@ Localization transforms canonical molecular orbitals into localized orbitals tha
 Concrete implementations should inherit from this class and implement the localize method.
 
 Examples:
-    To create a custom orbital localizer, inherit from this class:
-
-        >>> import qdk_chemistry.algorithms as alg
-        >>> import qdk_chemistry.data as data
-        >>> class MyLocalizer(alg.Localizer):
-        ...     def __init__(self):
-        ...         super().__init__()  # Call the base class constructor
-        ...     # Implement the _run_impl method
-        ...     def _run_impl(self, wavefunction: data.Wavefunction, loc_indices_a: list, loc_indices_b: list) -> data.Wavefunction:
-        ...         # Custom localization implementation
-        ...         return localized_wavefunction
+    >>> # To create a custom orbital localizer, inherit from this class.
+    >>> import qdk_chemistry.algorithms as alg
+    >>> import qdk_chemistry.data as data
+    >>> class MyLocalizer(alg.Localizer):
+    ...     def __init__(self):
+    ...         super().__init__()  # Call the base class constructor
+    ...     # Implement the _run_impl method
+    ...     def _run_impl(self, wavefunction: data.Wavefunction, loc_indices_a: list, loc_indices_b: list) -> data.Wavefunction:
+    ...         # Custom localization implementation
+    ...         return localized_wavefunction
 )");
 
   localizer.def(py::init<>(),
@@ -77,17 +78,20 @@ Examples:
     >>> class MyLocalizer(alg.Localizer):
     ...     def __init__(self):
     ...         super().__init__()  # Calls this constructor
+
 )");
 
   localizer.def("run", &Localizer::run,
                 R"(
-        Localize molecular orbitals in the given wavefunction.
+Localize molecular orbitals in the given wavefunction.
 
 Args:
     wavefunction (qdk_chemistry.data.Wavefunction): The canonical molecular wavefunction to localize
     loc_indices_a (list[int]): Indices of alpha orbitals to localize (empty for no localization)
     loc_indices_b (list[int]): Indices of beta orbitals to localize (empty for no localization)
-        Note: For restricted orbitals, must be identical to loc_indices_a
+
+Notes:
+    For restricted orbitals, ``loc_indices_b`` must match ``loc_indices_a``.
 
 Returns:
     qdk_chemistry.data.Wavefunction: The localized molecular wavefunction
@@ -95,6 +99,7 @@ Returns:
 Raises:
     ValueError: If orbital indices are invalid or inconsistent
     RuntimeError: If localization fails due to numerical issues
+
 )",
                 py::arg("wavefunction"), py::arg("loc_indices_a"),
                 py::arg("loc_indices_b"));
@@ -105,6 +110,7 @@ Access the localizer's configuration settings.
 
 Returns:
     qdk_chemistry.data.Settings: Reference to the settings object for configuring the localizer
+
 )",
                 py::return_value_policy::reference_internal);
 
@@ -128,6 +134,7 @@ Examples:
     ...         super().__init__()
     ...         from qdk_chemistry.data import ElectronicStructureSettings
     ...         self._settings = ElectronicStructureSettings()
+
 )");
 
   localizer.def("type_name", &Localizer::type_name,
@@ -138,10 +145,6 @@ Returns:
     str: The type name of the algorithm
 )");
 
-  localizer.def("__repr__", [](const Localizer &) {
-    return "<qdk_chemistry.algorithms.Localizer>";
-  });
-
   // Factory class binding - creates LocalizerFactory class
   // with static methods
   qdk::chemistry::python::bind_algorithm_factory<LocalizerFactory, Localizer,
@@ -149,6 +152,88 @@ Returns:
       m, "LocalizerFactory");
 
   localizer.def("__repr__", [](const Localizer &) {
-    return "<qdk_chemistry.algorithms.Localizer>";
+    return "<qdk_chemistry.algorithms.OrbitalLocalizer>";
   });
+
+  // Bind concrete microsoft::PipekMezeyLocalizer implementation
+  py::class_<microsoft::PipekMezeyLocalizer, Localizer, py::smart_holder>(
+      m, "QdkPipekMezeyLocalizer", R"(
+QDK Pipek-Mezey orbital localizer.
+
+This class provides a concrete implementation of the orbital localizer using
+the Pipek-Mezey localization algorithm. The Pipek-Mezey algorithm maximizes
+the sum of squares of atomic orbital populations on atoms, resulting in
+orbitals that are more localized to individual atoms or bonds.
+
+This implementation separately localizes occupied and virtual orbitals to
+maintain the occupied-virtual separation.
+
+Typical usage:
+
+.. code-block:: python
+
+    import qdk_chemistry.algorithms as alg
+
+    # Create a Pipek-Mezey localizer
+    localizer = alg.QdkPipekMezeyLocalizer()
+
+    # Configure settings if needed
+    localizer.settings().set("max_iterations", 100)
+    localizer.settings().set("convergence_tolerance", 1e-8)
+
+    # Localize orbitals
+    localized_wfn = localizer.run(wavefunction, loc_indices_a, loc_indices_b)
+
+See Also:
+    :class:`OrbitalLocalizer`
+    :class:`qdk_chemistry.data.Wavefunction`
+
+)")
+      .def(py::init<>(), R"(
+Default constructor.
+
+Initializes a Pipek-Mezey localizer with default settings.
+
+)");
+
+  // Bind concrete microsoft::MP2NaturalOrbitalLocalizer implementation
+  py::class_<microsoft::MP2NaturalOrbitalLocalizer, Localizer,
+             py::smart_holder>(m, "QdkMP2NaturalOrbitalLocalizer", R"(
+QDK MP2 natural orbital transformer.
+
+This class provides a concrete implementation that transforms canonical
+molecular orbitals into natural orbitals derived from second-order
+Møller-Plesset perturbation theory (MP2). Natural orbitals are eigenfunctions
+of the first-order reduced density matrix.
+
+MP2 natural orbitals often provide a more compact representation of the
+electronic wavefunction, which can improve computational efficiency in
+correlation methods.
+
+.. note::
+    Only supports restricted orbitals and closed-shell systems.
+
+Typical usage:
+
+.. code-block:: python
+
+    import qdk_chemistry.algorithms as alg
+
+    # Create an MP2 natural orbital localizer
+    localizer = alg.QdkMP2NaturalOrbitalLocalizer()
+
+    # Transform to MP2 natural orbitals
+    no_wfn = localizer.run(wavefunction, loc_indices_a, loc_indices_b)
+
+See Also:
+    :class:`OrbitalLocalizer`
+    :class:`qdk_chemistry.data.Wavefunction`
+
+)")
+      .def(py::init<>(), R"(
+Default constructor.
+
+Initializes an MP2 natural orbital transformer with default settings.
+
+)");
 }

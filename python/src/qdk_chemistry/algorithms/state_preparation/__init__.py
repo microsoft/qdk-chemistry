@@ -19,7 +19,6 @@ from qdk_chemistry.algorithms.state_preparation.state_preparation import (
 
 __all__ = [
     "SparseIsometryGF2XStatePreparation",
-    "StatePreparation",
     "StatePreparationFactory",
     "StatePreparationSettings",
 ]

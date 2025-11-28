@@ -5,10 +5,18 @@
 # Licensed under the MIT License. See LICENSE.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
 
+from __future__ import annotations
+
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from qdk_chemistry.data import Wavefunction
+
 import numpy as np
 
-from qdk_chemistry.data import Wavefunction
 from qdk_chemistry.utils.bitstring import binary_to_decimal, separate_alpha_beta_to_binary_string
+
+__all__ = ["create_statevector_from_wavefunction"]
 
 
 def _create_statevector_from_coeffs_and_dets_string(

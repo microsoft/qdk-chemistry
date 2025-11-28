@@ -22,6 +22,8 @@ from qdk_chemistry.algorithms import register
 from qdk_chemistry.algorithms.qubit_mapper import QubitMapper
 from qdk_chemistry.data import Hamiltonian, QubitHamiltonian, Settings
 
+__all__ = ["QiskitQubitMapper", "QiskitQubitMapperSettings"]
+
 
 class QiskitQubitMapperSettings(Settings):
     """Settings configuration for a QiskitQubitMapper.

@@ -18,6 +18,8 @@ from pathlib import Path
 # Import some tools for convenience
 from qdk_chemistry._core import QDKChemistryConfig
 
+_DOCS_MODE = os.getenv("QDK_CHEMISTRY_DOCS", "0") == "1"
+
 
 def _setup_resources() -> None:
     """Set the QDKChemistryConfig resources directory using the runtime helper.
@@ -79,9 +81,13 @@ _setup_resources()
 def _import_plugins() -> None:
     """Import pre-packaged plugins after module initialization."""
     with contextlib.suppress(ImportError):
-        import qdk_chemistry.plugins.pyscf  # noqa: PLC0415
+        import qdk_chemistry.plugins.pyscf as pyscf_plugin  # noqa: PLC0415
+
+        pyscf_plugin.load()
     with contextlib.suppress(ImportError):
-        import qdk_chemistry.plugins.qiskit  # noqa: PLC0415
+        import qdk_chemistry.plugins.qiskit as qiskit_plugin  # noqa: PLC0415
+
+        qiskit_plugin.load()
 
 
 def _is_placeholder_stub(stub_file: Path) -> bool:
@@ -261,7 +267,7 @@ def _generate_registry_stubs() -> None:
 
                     # Special case: replace internal _core._algorithms with public algorithms API
                     if class_module == "qdk_chemistry._core._algorithms":
-                        class_module = "qdk_chemistry.algorithms"
+                        class_module = f"qdk_chemistry.algorithms.{algorithm_type}"
 
                     # Use the full module path for the return type
                     full_class_path = f"{class_module}.{class_name}"
@@ -323,29 +329,30 @@ def _generate_registry_stubs() -> None:
         )
 
 
-try:
-    _generate_stubs_on_first_import()
-    del _generate_stubs_on_first_import  # Prevent re-execution
-except (ImportError, AttributeError, RuntimeError, OSError, subprocess.SubprocessError) as e:
-    warnings.warn(
-        f"Failed to generate type stubs: {e}. Type hints may be incomplete.",
-        UserWarning,
-        stacklevel=2,
-    )
+if not _DOCS_MODE:
+    try:
+        _generate_stubs_on_first_import()
+        del _generate_stubs_on_first_import  # Prevent re-execution
+    except (ImportError, AttributeError, RuntimeError, OSError, subprocess.SubprocessError) as e:
+        warnings.warn(
+            f"Failed to generate type stubs: {e}. Type hints may be incomplete.",
+            UserWarning,
+            stacklevel=2,
+        )
 
-# Generate registry stubs after all imports are complete
-try:
-    _generate_registry_stubs()
-    del _generate_registry_stubs  # Prevent re-execution
-except (ImportError, AttributeError, RuntimeError, OSError) as e:
-    warnings.warn(
-        f"Failed to generate registry type stubs: {e}. Type hints may be incomplete.",
-        UserWarning,
-        stacklevel=2,
-    )
+    # Generate registry stubs after all imports are complete
+    try:
+        _generate_registry_stubs()
+        del _generate_registry_stubs  # Prevent re-execution
+    except (ImportError, AttributeError, RuntimeError, OSError) as e:
+        warnings.warn(
+            f"Failed to generate registry type stubs: {e}. Type hints may be incomplete.",
+            UserWarning,
+            stacklevel=2,
+        )
 
-# Import plugins last to avoid circular imports
-try:
-    _import_plugins()
-except (ImportError, AttributeError) as e:
-    warnings.warn(f"Failed to import plugins: {e}", UserWarning, stacklevel=2)
+    # Import plugins last to avoid circular imports
+    try:
+        _import_plugins()
+    except (ImportError, AttributeError) as e:
+        warnings.warn(f"Failed to import plugins: {e}", UserWarning, stacklevel=2)

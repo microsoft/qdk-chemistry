@@ -26,10 +26,10 @@ default: check
 
 check:
 	@if [ "$(shell pwd)" = "$(abspath $(dir $(lastword $(MAKEFILE_LIST))))" ]; then \
-		echo "Running in correct directory: $(abspath $(dir $(lastword $(MAKEFILE_LIST))))"; \
+	    echo "Running in correct directory: $(abspath $(dir $(lastword $(MAKEFILE_LIST))))"; \
 	else \
-		echo "Error: Please run 'make' from the docs directory: \
-		$(abspath $(dir $(lastword $(MAKEFILE_LIST))))" && exit 1; \
+	    echo "Error: Please run 'make' from the docs directory: \
+	    $(abspath $(dir $(lastword $(MAKEFILE_LIST))))" && exit 1; \
 	fi
 
 clean: check clean-doxygen clean-breathe clean-sphinx-api clean-sphinx-autosummary clean-sphinx-docs
@@ -74,7 +74,7 @@ BREATHE_EXTRA_OPTIONS ?=
 breathe: doxygen
 	@echo "** Generating Breathe API documentation..."
 	breathe-apidoc $(BREATHE_OPTIONS) $(BREATHE_EXTRA_OPTIONS) \
-		-o $(BREATHE_API_DIR) $(DOXYGEN_API_DIR)/xml > $(BREATHE_DEBUG) 2>&1
+	    -o $(BREATHE_API_DIR) $(DOXYGEN_API_DIR)/xml > $(BREATHE_DEBUG) 2>&1
 	@echo "** Breathe API documentation generated."
 	@echo "** Saved output to $(BREATHE_DEBUG)."
 	@echo
@@ -98,7 +98,7 @@ SPHINX_API_EXTRA_OPTIONS ?=
 sphinx-api:
 	@echo "** Building Sphinx API documentation..."
 	sphinx-apidoc $(SPHINX_API_OPTIONS) $(SPHINX_API_EXTRA_OPTIONS) \
-		-o $(SPHINX_API_DIR) $(PYTHON_SRC_DIR)/qdk_chemistry | tee $(SPHINX_API_DEBUG) 2>&1
+	    -o $(SPHINX_API_DIR) $(PYTHON_SRC_DIR)/qdk_chemistry | tee $(SPHINX_API_DEBUG) 2>&1
 	@echo "** Sphinx API documentation generated."
 	@echo "** Saved output to $(SPHINX_API_DEBUG)."
 	@count=$$(grep -E "WARNING|ERROR" $(SPHINX_API_DEBUG) | wc -l); \
@@ -117,32 +117,32 @@ clean-sphinx-api: check
 
 SPHINX_SUMMARY_DEBUG = sphinx-autosummary-output.txt
 SPHINX_SUMMARY_WARNINGS = sphinx-autosummary-warnings.txt
-SPHINX_SUMMARY_WARNINGS_FILTERED = sphinx-autosummary-warnings-filtered.txt
 SPHINX_REGEX_FILE = ignore-sphinx-regex.txt
 # Using more than one thread can cause issues interpreting the output
-SPHINX_SUMMARY_OPTIONS = -j 1 -n -w $(SPHINX_SUMMARY_WARNINGS)
+SPHINX_SUMMARY_OPTIONS = -T -v -j 1 -n -w $(SPHINX_SUMMARY_WARNINGS)
 # Extra options for Sphinx command (can be specified in environment)
 SPHINX_SUMMARY_EXTRA_OPTIONS ?=
 
 sphinx-autosummary: breathe sphinx-api $(SOURCE_DIR)/conf.py $(SOURCE_DIR)/index.rst
 	@echo "** Building Sphinx autosummary documentation..."
 	sphinx-build -M $(SPHINX_FORMAT) $(SOURCE_DIR) $(BUILD_DIR) \
-		$(SPHINX_SUMMARY_OPTIONS) $(SPHINX_SUMMARY_EXTRA_OPTIONS) > $(SPHINX_SUMMARY_DEBUG) 2>&1
+	    $(SPHINX_SUMMARY_OPTIONS) $(SPHINX_SUMMARY_EXTRA_OPTIONS) > $(SPHINX_SUMMARY_DEBUG) 2>&1
 	@echo "** Sphinx autosummary documentation generated."
 	@echo "** Saved output to $(SPHINX_SUMMARY_DEBUG)."
 	@echo "** Warnings saved to $(SPHINX_SUMMARY_WARNINGS)."
 	@count=$$(grep -E "WARNING|ERROR|CRITICAL" $(SPHINX_SUMMARY_DEBUG) | wc -l); \
-	echo "** Found $$count warnings/errors in the Sphinx autosummary output."
-	@echo "** Filtering warnings for autosummary entries..."
-	@echo "** TODO: this grep sequence should be replaced by proper Sphinx configuration."
-	cat $(SPHINX_SUMMARY_WARNINGS) | \
-		grep -v -E "WARNING: duplicate object description.*use :no-index: for one of them" | \
-		grep -v -E "pybind11.*detail.*function.*libstdcpp.*ERROR: Unexpected indentation." | \
-		grep -v -E "pybind11.*detail.*function.*libstdcpp.*WARNING: Block quote ends without a blank line; unexpected unindent" | \
-		grep -v -E "WARNING: more than one target found for cross-reference" \
-		> $(SPHINX_SUMMARY_WARNINGS_FILTERED) || true
-	@filtered_count=$$(grep -E "WARNING|ERROR|CRITICAL" $(SPHINX_SUMMARY_WARNINGS_FILTERED) | wc -l); \
-	echo "** Found $$filtered_count unexpected autosummary warnings. See $(SPHINX_SUMMARY_WARNINGS_FILTERED) for details."
+	echo "** Found $$count warnings/errors in the Sphinx autosummary output."; \
+	if [ "$$count" -ne 0 ]; then \
+	    echo "** ERROR: Autosummary warnings detected. Failing build."; \
+	    cat $(SPHINX_SUMMARY_DEBUG); \
+	    exit 1; \
+	fi
+	@if [ -s $(SPHINX_SUMMARY_WARNINGS) ]; then \
+	    filtered_count=$$(grep -E "WARNING|ERROR|CRITICAL" $(SPHINX_SUMMARY_WARNINGS) | wc -l); \
+	    echo "** Found $$filtered_count autosummary warnings. Failing build."; \
+	    cat $(SPHINX_SUMMARY_WARNINGS); \
+	    exit 1; \
+	fi
 	@echo
 
 clean-sphinx-autosummary: check
@@ -150,7 +150,6 @@ clean-sphinx-autosummary: check
 	rm -rf $(BUILD_DIR)
 	rm -f $(SPHINX_SUMMARY_DEBUG)
 	rm -f $(SPHINX_SUMMARY_WARNINGS)
-	rm -f $(SPHINX_SUMMARY_WARNINGS_FILTERED)
 	@echo
 
 ###############################################################################
@@ -167,12 +166,17 @@ SPHINX_DOCS_EXTRA_OPTIONS ?=
 sphinx-docs: sphinx-autosummary
 	@echo "** Building Sphinx documentation..."
 	sphinx-build -M $(SPHINX_FORMAT) $(SOURCE_DIR) $(BUILD_DIR) \
-		$(SPHINX_DOCS_OPTIONS) $(SPHINX_DOCS_EXTRA_OPTIONS) > $(SPHINX_DOCS_DEBUG) 2>&1
+	    $(SPHINX_DOCS_OPTIONS) $(SPHINX_DOCS_EXTRA_OPTIONS) > $(SPHINX_DOCS_DEBUG) 2>&1
 	@echo "** Sphinx documentation generated."
 	@echo "** Saved output to $(SPHINX_DOCS_DEBUG)."
 	@echo "** Warnings saved to $(SPHINX_DOCS_WARNINGS)."
 	@count=$$(grep -E "WARNING|ERROR|CRITICAL" $(SPHINX_DOCS_DEBUG) | wc -l); \
-	echo "** Found $$count warnings/errors in the Sphinx documentation output."
+	echo "** Found $$count warnings/errors in the Sphinx documentation output."; \
+	if [ "$$count" -ne 0 ]; then \
+	    echo "** ERROR: Documentation warnings detected. Failing build."; \
+	    cat $(SPHINX_DOCS_WARNINGS); \
+	    exit 1; \
+	fi
 	@echo
 
 clean-sphinx-docs: check

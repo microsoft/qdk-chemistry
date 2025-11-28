@@ -7,9 +7,12 @@
 #include <algorithm>
 #include <qdk/chemistry/utils/valence_space.hpp>
 
-using namespace qdk::chemistry::data;
-
 namespace qdk::chemistry::utils {
+
+using Element = qdk::chemistry::data::Element;
+using Orbitals = qdk::chemistry::data::Orbitals;
+using Structure = qdk::chemistry::data::Structure;
+using Wavefunction = qdk::chemistry::data::Wavefunction;
 
 // Noble gas elements and their atomic numbers
 static const std::vector<std::pair<Element, size_t>> NOBLE_GASES = {
