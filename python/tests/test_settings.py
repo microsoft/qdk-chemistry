@@ -136,6 +136,9 @@ class _TestSettingsContainer(Settings):
         self._set_default("first_int_list", "vector<int>", [])
         self._set_default("first_float_list", "vector<double>", [])
         self._set_default("first_str_list", "vector<string>", [])
+        # Settings for uint64_t type (e.g., size_t)
+        self._set_default("uint64_val", "uint64_t", 0)
+        self._set_default("uint64_vector", "vector<uint64_t>", [])
 
 
 class TestSettings:
@@ -1206,6 +1209,34 @@ class TestSettings:
         assert "tolerance" in all_settings
         assert "use_symmetry" in all_settings
         assert "active_orbitals" in all_settings
+
+    def test_uint64_type_handling(self):
+        """Test that uint64_t settings (like size_t) are handled correctly.
+
+        This tests the fix for the 'davidson_iterations' setting type mismatch
+        issue where settings defined with size_t (stored as uint64_t) were
+        incorrectly handled when set from Python.
+        """
+        settings = _TestSettingsContainer()
+
+        # Test setting uint64_t value
+        settings["uint64_val"] = 200
+        assert settings["uint64_val"] == 200
+        assert isinstance(settings["uint64_val"], int)
+
+        # Test setting uint64_t with large values
+        settings["uint64_val"] = 2**32  # Larger than 32-bit
+        assert settings["uint64_val"] == 2**32
+
+        # Test setting uint64_t vector
+        settings["uint64_vector"] = [1, 2, 3, 4]
+        assert settings["uint64_vector"] == [1, 2, 3, 4]
+        assert isinstance(settings["uint64_vector"], list)
+        assert all(isinstance(x, int) for x in settings["uint64_vector"])
+
+        # Test that the type is correctly reported
+        assert "uint64" in settings.get_type_name("uint64_val").lower()
+        assert "uint64" in settings.get_type_name("uint64_vector").lower()
 
 
 class TestSettingsCustomClass:
