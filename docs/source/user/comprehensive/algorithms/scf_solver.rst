@@ -91,7 +91,7 @@ Below is an example of how to run SCF using the default (Microsoft) QDK/Chemistr
       // Create default ScfSolver instance (HF)
       auto scf_solver = ScfSolverFactory::create();
 
-      // Set basis set 
+      // Set basis set
       scf_solver->settings().set("basis_set", "sto-3g");
       const auto& [E_scf, wfn_scf] = scf_solver->run(structure, 0, 1);
 
@@ -102,16 +102,16 @@ Below is an example of how to run SCF using the default (Microsoft) QDK/Chemistr
       :language: python
       :lines: 16-28
 
-Likewise for DFT: 
+Likewise for DFT:
 
 .. tab:: C++ API
 
    .. code-block:: cpp
 
-      // Create default ScfSolver instance 
+      // Create default ScfSolver instance
       auto scf_solver_dft = ScfSolverFactory::create();
 
-      // Set DFT method via functional name 
+      // Set DFT method via functional name
       scf_solver_dft->settings().set("method", "b3lyp");
       const auto& [E_dft, wfn_dft] = scf_solver_dft->run(structure, 0, 1);
 

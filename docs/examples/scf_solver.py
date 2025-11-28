@@ -13,7 +13,7 @@ from qdk_chemistry.data import Structure
 # Default SCF solver
 # =============================================================================
 
-# Create a Structure 
+# Create a Structure
 coords = np.array([[0.0, 0.0, 0.0], [0.0, 0.0, 1.4]])
 symbols = ["H", "H"]
 structure = Structure(coords, symbols=symbols)
