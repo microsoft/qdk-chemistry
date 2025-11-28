@@ -29,7 +29,7 @@ from pyscf.soscf import newton_ah
 
 from qdk_chemistry.algorithms import StabilityChecker, register
 from qdk_chemistry.data import Settings, StabilityResult, Wavefunction
-from qdk_chemistry.plugins.pyscf.utils import orbitals_to_scf
+from qdk_chemistry.plugins.pyscf.conversion import orbitals_to_scf
 
 
 def _stability_preconditioner(dx: np.ndarray, e: float, hdiag: np.ndarray) -> np.ndarray:

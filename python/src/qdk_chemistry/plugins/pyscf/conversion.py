@@ -20,7 +20,7 @@ Note:
     * Assumes atomic numbers do not exceed 200
 
 Examples:
-    >>> from qdk_chemistry.plugins.pyscf.utils import structure_to_pyscf_atom_labels, basis_to_pyscf_mol
+    >>> from qdk_chemistry.plugins.pyscf.conversion import structure_to_pyscf_atom_labels, basis_to_pyscf_mol
     >>> # Convert structure to PySCF format
     >>> atoms, pyscf_symbols, elements = structure_to_pyscf_atom_labels(structure)
     >>> # Convert basis set to PySCF Mole object
@@ -527,7 +527,7 @@ def hamiltonian_to_scf(hamiltonian: Hamiltonian, alpha_occ: np.ndarray, beta_occ
 
     Examples:
         >>> import numpy as np
-        >>> from qdk_chemistry.plugins.pyscf.utils import hamiltonian_to_scf
+        >>> from qdk_chemistry.plugins.pyscf.conversion import hamiltonian_to_scf
         >>> # Convert a QDK/Chemistry Hamiltonian to a PySCF SCF object
         >>> # Example for 10-electron system with 5 doubly occupied orbitals
         >>> norb = hamiltonian.get_orbitals().get_num_molecular_orbitals()
@@ -613,7 +613,7 @@ def hamiltonian_to_scf_from_n_electrons_and_multiplicity(
         ValueError: If the electron count or multiplicity is invalid.
 
     Examples:
-        >>> from qdk_chemistry.plugins.pyscf.utils import hamiltonian_to_scf_from_n_electrons_and_multiplicity
+        >>> from qdk_chemistry.plugins.pyscf.conversion import hamiltonian_to_scf_from_n_electrons_and_multiplicity
         >>> # Convert a QDK/Chemistry Hamiltonian to a PySCF SCF object
         >>> # Example for a 10-electron singlet system
         >>> pyscf_scf = hamiltonian_to_scf_from_n_electrons_and_multiplicity(

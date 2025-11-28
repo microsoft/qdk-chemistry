@@ -13,7 +13,7 @@ from qdk_chemistry.plugins.qiskit.conversion import (
     _configuration_to_statevector_index,
     create_statevector_from_wavefunction,
 )
-from tests.conftest import create_test_basis_set
+from tests.test_helpers import create_test_basis_set
 
 from .reference_tolerances import (
     float_comparison_absolute_tolerance,
@@ -25,17 +25,17 @@ class TestConfigurationToStatevectorIndex:
     """Test the _configuration_to_statevector_index helper function."""
 
     def test_basic_index_calculation(self):
-        """Test the canonical example from C++ documentation.
+        """Test the canonical example
 
         Configuration "2ud0" with 4 orbitals:
-        - Orbital 0: doubly occupied (α=1, β=1)
-        - Orbital 1: alpha electron (α=1, β=0)
-        - Orbital 2: beta electron (α=0, β=1)
-        - Orbital 3: empty (α=0, β=0)
+        - Orbital 0: doubly occupied (alpha=1, beta=1)
+        - Orbital 1: alpha electron (alpha=1, beta=0)
+        - Orbital 2: beta electron (alpha=0, beta=1)
+        - Orbital 3: empty (alpha=0, beta=0)
 
         Qubit layout:
         Qubits: 7 6 5 4 | 3 2 1 0
-                β-orbs  | α-orbs
+                beta-orbs  | alpha-orbs
                 3 2 1 0 | 3 2 1 0
                 0 1 0 1 | 0 0 1 1
         Binary: 01010011 = 64 + 16 + 2 + 1 = 83
@@ -84,9 +84,9 @@ class TestConfigurationToStatevectorIndex:
         """Test using only a subset of orbitals from configuration.
 
         Configuration "2ud000" using first 3 orbitals:
-        - Orbital 0: doubly (α=1, β=1)
-        - Orbital 1: alpha (α=1, β=0)
-        - Orbital 2: beta (α=0, β=1)
+        - Orbital 0: doubly 
+        - Orbital 1: alpha
+        - Orbital 2: beta
 
         Qubits: 5 4 3 | 2 1 0
                 2 1 0 | 2 1 0
@@ -188,14 +188,6 @@ class TestCreateStatevectorFromWavefunction:
         """Test that determinants map to correct indices."""
         sv = create_statevector_from_wavefunction(simple_wavefunction, normalize=False)
 
-        # Configuration "20" -> index for doubly occupied first orbital
-        # Orbital 0: α=1, β=1; Orbital 1: α=0, β=0
-        # Qubits: 3 2 1 0 -> beta1 beta0 alpha1 alpha0 -> 0 0 0 1 | 0 0 1 0 -> ... wait
-        # Actually: lower 2 bits are alpha orbitals, upper 2 bits are beta orbitals
-        # "20": orbital 0 doubly, orbital 1 empty
-        # Alpha: 1 0, Beta: 1 0
-        # Qubits [3 2 | 1 0] = [beta1 beta0 | alpha1 alpha0] = [0 1 | 0 1] = binary 0101 = 5
-        # Wait, let me recalculate using the helper function
         det1_index = _configuration_to_statevector_index(Configuration("20"), 2)
         det2_index = _configuration_to_statevector_index(Configuration("ud"), 2)
 
@@ -398,9 +390,4 @@ class TestStatevectorIndexBinaryEncoding:
         # Orbitals 0 and 2 with alpha, orbital 1 with beta
         config = Configuration("udu0")
         index = _configuration_to_statevector_index(config, 4)
-
-        # Expected bits set:
-        # Alpha: bit 0 (orbital 0), bit 2 (orbital 2) -> 0101
-        # Beta: bit 5 (orbital 1) -> 0010 in beta range -> 00100000
-        # Combined: 00100101 = 32 + 4 + 1 = 37
         assert index == 37

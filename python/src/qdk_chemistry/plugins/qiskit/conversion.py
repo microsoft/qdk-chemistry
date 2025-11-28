@@ -93,14 +93,14 @@ def _configuration_to_statevector_index(configuration: Configuration, num_orbita
 
     Example:
         Configuration "2ud0" with 4 orbitals maps to:
-        - Orbital 0: doubly occupied (α=1, β=1)
-        - Orbital 1: alpha electron (α=1, β=0)
-        - Orbital 2: beta electron (α=0, β=1)
-        - Orbital 3: empty (α=0, β=0)
+        - Orbital 0: doubly occupied
+        - Orbital 1: alpha
+        - Orbital 2: beta
+        - Orbital 3: empty
 
         Qubit layout:
         Qubits: 7 6 5 4 | 3 2 1 0
-                β-orbs  | α-orbs
+                beta    | alpha
                 3 2 1 0 | 3 2 1 0
                 0 1 0 1 | 0 0 1 1
 

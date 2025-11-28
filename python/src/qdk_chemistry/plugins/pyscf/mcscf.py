@@ -61,7 +61,7 @@ from qdk_chemistry.data import (
     Settings,
     Wavefunction,
 )
-from qdk_chemistry.plugins.pyscf.utils import orbitals_to_scf
+from qdk_chemistry.plugins.pyscf.conversion import orbitals_to_scf
 
 
 class _QdkMcSolverWrapper:

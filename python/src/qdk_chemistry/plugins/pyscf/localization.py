@@ -31,7 +31,7 @@ from pyscf import lo
 
 from qdk_chemistry.algorithms import Localizer, register
 from qdk_chemistry.data import Orbitals, SciWavefunctionContainer, Settings, SlaterDeterminantContainer, Wavefunction
-from qdk_chemistry.plugins.pyscf.utils import basis_to_pyscf_mol
+from qdk_chemistry.plugins.pyscf.conversion import basis_to_pyscf_mol
 
 
 class PyscfLocalizerSettings(Settings):
