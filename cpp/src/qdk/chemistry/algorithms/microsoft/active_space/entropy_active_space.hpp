@@ -9,7 +9,7 @@
 namespace qdk::chemistry::algorithms::microsoft {
 
 /**
- * @class YetAnotherActiveSpaceSettings
+ * @class AutocasEosSettings
  * @brief Settings container for the entropy-based active space selection
  * algorithm
  *
@@ -32,14 +32,14 @@ namespace qdk::chemistry::algorithms::microsoft {
  * @see qdk::chemistry::data::Settings
  * @see qdk::chemistry::algorithms::microsoft::AutocasEosActiveSpaceSelector
  */
-class YetAnotherActiveSpaceSettings : public data::Settings {
+class AutocasEosSettings : public data::Settings {
  public:
   /**
    * @brief Constructor that initializes default occupation-based active space
    * settings
    *
    */
-  YetAnotherActiveSpaceSettings() {
+  AutocasEosSettings() {
     set_default<bool>("normalize_entropies", true);
     set_default<double>("diff_threshold", 0.1);
     set_default<double>("entropy_threshold", 0.14);
@@ -74,7 +74,7 @@ class YetAnotherActiveSpaceSettings : public data::Settings {
  *
  * @see qdk::chemistry::algorithms::WavefunctionBasedActiveSpaceSelector
  * @see qdk::chemistry::data::Orbitals
- * @see YetAnotherActiveSpaceSettings
+ * @see AutocasEosSettings
  */
 class AutocasEosActiveSpaceSelector : public ActiveSpaceSelector {
  public:
@@ -85,7 +85,7 @@ class AutocasEosActiveSpaceSelector : public ActiveSpaceSelector {
    * settings.
    */
   AutocasEosActiveSpaceSelector() {
-    _settings = std::make_unique<YetAnotherActiveSpaceSettings>();
+    _settings = std::make_unique<AutocasEosSettings>();
   }
   /**
    * @brief Virtual destructor

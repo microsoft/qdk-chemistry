@@ -38,7 +38,7 @@ The :class:`~qdk_chemistry.algorithms.QubitMapper` is created using the :doc:`fa
 Mapping a Hamiltonian
 ----------------------
 
-This mapper is used to create a :class:`~qdk_chemistry.data.QubitHamiltonian` object from a :doc:`Hamiltonian <../data/hamiltonian>`.
+This mapper is used to create a :class:`~qdk_chemistry.data.QubitHamiltonian` object from a :class:`~qdk_chemistry.data.Hamiltonian`.
 
 .. tab:: Python API
 

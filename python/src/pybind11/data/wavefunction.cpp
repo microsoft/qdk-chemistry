@@ -297,7 +297,7 @@ Examples:
   wavefunction.def("get_total_determinants",
                    &Wavefunction::get_total_determinants,
                    R"(
-    Get all determinants in the wavefunction with full orbital space.
+Get all determinants in the wavefunction with full orbital space.
 
 Returns:
     list[Configuration]: Vector of all configurations/determinants including inactive and virtual orbitals
@@ -510,7 +510,7 @@ Examples:
   wavefunction.def("has_one_rdm_spin_traced",
                    &Wavefunction::has_one_rdm_spin_traced,
                    R"(
-    Check if spin-traced one-particle RDM for active orbitals is available.
+Check if spin-traced one-particle RDM for active orbitals is available.
 
 Returns:
     bool: True if available
@@ -562,7 +562,7 @@ Examples:
   // Type access methods
   wavefunction.def("get_type", &Wavefunction::get_type,
                    R"(
-    Get the wavefunction type (Bra, Ket, or Both).
+Get the wavefunction type (Bra, Ket, or Both).
 
 Returns:
     WavefunctionType: Enum value representing the wavefunction type

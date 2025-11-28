@@ -5,15 +5,29 @@
 # Licensed under the MIT License. See LICENSE.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
 
-from collections.abc import Iterable, Sequence
+from __future__ import annotations
+
 from dataclasses import dataclass
+from typing import TYPE_CHECKING
 
 import numpy as np
-from qiskit import QuantumCircuit
-from qiskit.circuit import Qubit
-from qiskit.quantum_info import SparsePauliOp
 
-from qdk_chemistry.data import QubitHamiltonian
+if TYPE_CHECKING:
+    from collections.abc import Iterable, Sequence
+
+    from qiskit import QuantumCircuit
+    from qiskit.circuit import Qubit
+    from qiskit.quantum_info import SparsePauliOp
+
+    from qdk_chemistry.data.qubit_hamiltonian import QubitHamiltonian
+
+__all__ = [
+    "PauliEvolutionTerm",
+    "append_controlled_time_evolution",
+    "controlled_pauli_rotation",
+    "extract_terms_from_hamiltonian",
+    "pauli_evolution_terms",
+]
 
 
 @dataclass(frozen=True)
@@ -42,20 +56,19 @@ def _pauli_label_to_map(label: str) -> dict[int, str]:
 
 
 def pauli_evolution_terms(pauli_op: SparsePauliOp, *, atol: float = 1e-12) -> list[PauliEvolutionTerm]:
-    """Convert a ``SparsePauliOp`` into rotation data for time evolution.
+    """Convert a :class:`~qiskit.quantum_info.SparsePauliOp` into rotation data for time evolution.
 
     Args:
-        pauli_op: Operator to decompose.
-        atol: Absolute tolerance used to discard negligible coefficients and to
-            detect unwanted imaginary components.
+        pauli_op (:class:`~qiskit.quantum_info.SparsePauliOp`): Operator to decompose.
+        atol (float): Absolute tolerance used to discard negligible coefficients
+
+            and to detect unwanted imaginary components.
 
     Returns:
-        Ordered list of :class:`PauliEvolutionTerm` entries describing each
-        non-identity component of ``pauli_op``.
+        Ordered list of :class:`PauliEvolutionTerm` entries describing each non-identity component of ``pauli_op``.
 
     Raises:
-        ValueError: If a coefficient has an imaginary part whose magnitude
-            exceeds ``atol``.
+        ValueError: If a coefficient has an imaginary part whose magnitude exceeds ``atol``.
 
     """
     terms: list[PauliEvolutionTerm] = []
@@ -171,7 +184,7 @@ def append_controlled_time_evolution(
 
 
 def extract_terms_from_hamiltonian(hamiltonian: QubitHamiltonian) -> list[PauliEvolutionTerm]:
-    """Compute the cached Pauli decomposition for a :class:`QubitHamiltonian`.
+    """Compute the cached Pauli decomposition for a :class:`qdk_chemistry.data.QubitHamiltonian`.
 
     Args:
         hamiltonian: Hamiltonian whose Pauli terms are required.

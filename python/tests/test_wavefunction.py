@@ -877,7 +877,9 @@ class TestWavefunctionRdmIntegraion:
             import pyscf  # noqa: PLC0415, F401
         except ImportError:
             pytest.skip("pyscf not available, skipping O2 triplet RDM test")
-        import qdk_chemistry.plugins.pyscf  # noqa: PLC0415
+        import qdk_chemistry.plugins.pyscf as pyscf_plugin  # noqa: PLC0415
+
+        pyscf_plugin.load()
 
         nelec_alpha = 5
         nelec_beta = 3

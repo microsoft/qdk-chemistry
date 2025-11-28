@@ -37,7 +37,7 @@ The :class:`~qdk_chemistry.algorithms.EnergyEstimator` is created using the :doc
 Configuring the Energy Estimator
 --------------------------------
 
-Qsharp backend
+Qsharp Backend
 ~~~~~~~~~~~~~~
 
 The Qsharp implementation of the :class:`~qdk_chemistry.algorithms.EnergyEstimator` leverages the QDK simulator to execute quantum circuits. Key features include:
@@ -64,7 +64,7 @@ The Qiskit implementation uses the Aer simulator to execute quantum circuits. Ke
 
    .. literalinclude:: ../../../../examples/energy_estimator.py
       :language: python
-      :lines: 3-7,70-86
+      :lines: 3-7,70-85
 
 Implemented interface
 ---------------------

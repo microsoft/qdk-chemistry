@@ -11,7 +11,7 @@ from collections.abc import Iterable, Sequence
 import h5py
 import numpy as np
 
-from qdk_chemistry.data import DataClass
+from qdk_chemistry.data.base import DataClass
 from qdk_chemistry.phase_estimation.base import PhaseEstimationAlgorithm
 from qdk_chemistry.utils.phase import energy_alias_candidates, energy_from_phase, resolve_energy_aliases
 
@@ -19,6 +19,8 @@ try:
     from qdk_chemistry.phase_estimation.base import PhaseEstimationAlgorithm as _PhaseEstimationAlgorithm
 except ImportError:  # pragma: no cover - optional dependency at runtime
     _PhaseEstimationAlgorithm = None  # type: ignore[assignment]
+
+__all__: list[str] = []
 
 
 class QpeResult(DataClass):

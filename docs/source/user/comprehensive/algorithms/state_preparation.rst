@@ -34,7 +34,8 @@ The :class:`~qdk_chemistry.algorithms.StatePreparation` created using the :doc:`
 Configuring the StatePreparation
 --------------------------------
 
-The :class:`~qdk_chemistry.algorithms.StatePreparation` can be configured using the ``Settings`` object with the following parameters.
+The :class:`~qdk_chemistry.algorithms.StatePreparation` can be configured using the ``Settings``
+object with the following parameters.
 
 .. tab:: Python API
 
@@ -46,7 +47,8 @@ The :class:`~qdk_chemistry.algorithms.StatePreparation` can be configured using 
 Preparing a Quantum State
 --------------------------
 
-Once configured, the :class:`~qdk_chemistry.algorithms.StatePreparation` can be used to generate a quantum circuit in OpenQASM format from a :class:`~qdk_chemistry.data.Wavefunction`.
+Once configured, the :class:`~qdk_chemistry.algorithms.StatePreparation` can be used to generate
+a quantum circuit in OpenQASM format from a :class:`~qdk_chemistry.data.Wavefunction`.
 
 .. tab:: Python API
 

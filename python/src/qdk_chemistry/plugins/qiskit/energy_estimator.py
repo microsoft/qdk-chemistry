@@ -17,30 +17,34 @@ Key Features:
 # Licensed under the MIT License. See LICENSE.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
 
+from __future__ import annotations
+
 import logging
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from qiskit import qasm3, transpile
-from qiskit.circuit import QuantumCircuit
-from qiskit.providers.backend import BackendV2
 from qiskit_aer import AerSimulator
 from qiskit_aer.noise import NoiseModel
+
+if TYPE_CHECKING:
+    import qiskit
+    from qiskit.circuit import QuantumCircuit
 
 from qdk_chemistry.algorithms import register
 from qdk_chemistry.algorithms.energy_estimator import (
     EnergyEstimator,
-    compute_energy_expectation_from_bitstrings,
-    create_measurement_circuits,
 )
 from qdk_chemistry.data import EnergyExpectationResult, MeasurementData, QubitHamiltonian
 
 _LOGGER = logging.getLogger(__name__)
 
+__all__ = ["QiskitEnergyEstimator"]
+
 
 class QiskitEnergyEstimator(EnergyEstimator):
     """Custom Estimator to estimate expectation values of quantum circuits with respect to a given observable."""
 
-    def __init__(self, backend: BackendV2 | None = None, seed: int = 42):
+    def __init__(self, backend: qiskit.providers.backend.BackendV2 | None = None, seed: int = 42):
         """Initialize the Estimator with a backend and optional transpilation settings.
 
         Args:
@@ -59,7 +63,7 @@ class QiskitEnergyEstimator(EnergyEstimator):
                 self.backend.set_options(seed_simulator=seed)
 
     @classmethod
-    def from_backend_options(cls, seed: int = 42, backend_options: dict[str, Any] | None = None) -> "EnergyEstimator":
+    def from_backend_options(cls, seed: int = 42, backend_options: dict[str, Any] | None = None) -> EnergyEstimator:
         """Create an EnergyEstimator from specified backend options for Aer simulator.
 
         Args:
@@ -168,7 +172,7 @@ class QiskitEnergyEstimator(EnergyEstimator):
             basis_gates = self.backend.options.noise_model.basis_gates
 
         # Create measurement circuits
-        measurement_circuits_qasm = create_measurement_circuits(
+        measurement_circuits_qasm = self._create_measurement_circuits(
             circuit_qasm=circuit_qasm,
             grouped_hamiltonians=qubit_hamiltonians,
         )
@@ -187,7 +191,7 @@ class QiskitEnergyEstimator(EnergyEstimator):
             shots_list=shots_list,
         )
 
-        return compute_energy_expectation_from_bitstrings(
+        return self._compute_energy_expectation_from_bitstrings(
             qubit_hamiltonians, measurement_data.bitstring_counts, energy_offset
         ), measurement_data
 

@@ -21,8 +21,6 @@ from qdk_chemistry.algorithms.energy_estimator.energy_estimator import (
     _determine_measurement_basis,
     _parity,
     _paulis_to_indices,
-    compute_energy_expectation_from_bitstrings,
-    create_measurement_circuits,
 )
 from qdk_chemistry.data import QubitHamiltonian
 from qdk_chemistry.data.estimator_data import MeasurementData
@@ -153,7 +151,7 @@ def test_create_measurement_circuits_basic():
     ]
 
     # Call function
-    circuits = create_measurement_circuits(circuit_qasm, observable)
+    circuits = EnergyEstimator._create_measurement_circuits(circuit_qasm, observable)
 
     # There should be one measurement circuit per observable
     assert isinstance(circuits, list)
@@ -195,7 +193,7 @@ def test_create_measurement_circuits_qubit_mismatch():
             r"the number of qubits in the Hamiltonian \(3\)\."
         ),
     ):
-        create_measurement_circuits(circuit_qasm, observable)
+        EnergyEstimator._create_measurement_circuits(circuit_qasm, observable)
 
 
 @pytest.mark.parametrize(
@@ -284,7 +282,7 @@ def test_compute_energy_expectation_from_bitstrings_mismatched_lengths():
     observables = [QubitHamiltonian(["Z"], [1.0]), QubitHamiltonian(["X"], [1.0])]  # Extra observable
 
     with pytest.raises(ValueError, match="Expected 2 bitstring result sets, got 1"):
-        compute_energy_expectation_from_bitstrings(observables, bitstring_counts)
+        EnergyEstimator._compute_energy_expectation_from_bitstrings(observables, bitstring_counts)
 
 
 def test_calculate_energy_expval_variance_none_counts():
@@ -292,7 +290,7 @@ def test_calculate_energy_expval_variance_none_counts():
     bitstring_counts = [None, {"0": 50, "1": 50}]
     observables = [QubitHamiltonian(["Z"], [1.0]), QubitHamiltonian(["X"], [1.0])]
 
-    result = compute_energy_expectation_from_bitstrings(observables, bitstring_counts)
+    result = EnergyEstimator._compute_energy_expectation_from_bitstrings(observables, bitstring_counts)
 
     # Should handle None entries gracefully
     assert np.isclose(

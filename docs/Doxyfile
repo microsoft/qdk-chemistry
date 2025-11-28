@@ -4,8 +4,8 @@ PROJECT_BRIEF          = "A quantum development kit for chemistry applications."
 OUTPUT_DIRECTORY       = source/api/doxygen
 
 # Input files and directories
-INPUT                  = ../cpp/include ../cpp/src
-FILE_PATTERNS          = *.hpp *.cpp *.h
+INPUT                  = ../cpp/include
+FILE_PATTERNS          = *.hpp *.h
 RECURSIVE              = YES
 
 # Output formats
@@ -30,10 +30,10 @@ INCLUDE_PATH           = ../cpp/include
 INCLUDE_FILE_PATTERNS  = *.hpp
 
 # Dot tool settings for diagrams
-HAVE_DOT               = YES
-TEMPLATE_RELATIONS     = YES
-INCLUDE_GRAPH          = YES
-INCLUDED_BY_GRAPH      = YES
+HAVE_DOT               = NO
+TEMPLATE_RELATIONS     = NO
+INCLUDE_GRAPH          = NO
+INCLUDED_BY_GRAPH      = NO
 CALL_GRAPH             = NO
 CALLER_GRAPH           = NO
 
