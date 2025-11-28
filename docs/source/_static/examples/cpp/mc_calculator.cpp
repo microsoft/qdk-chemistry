@@ -6,7 +6,8 @@
 // license information.
 // --------------------------------------------------------------------------------------------
 
-// start-cell-1
+// --------------------------------------------------------------------------------------------
+// start-cell-create
 #include <qdk/chemistry.hpp>
 using namespace qdk::chemistry::algorithms;
 
@@ -16,9 +17,11 @@ auto mc_calculator = MultiConfigurationCalculatorFactory::create();
 
 // Create a specific type of CI calculator
 auto selected_ci = MultiConfigurationCalculatorFactory::create("macis_cas");
-// end-cell-1
+// end-cell-create
+// --------------------------------------------------------------------------------------------
 
-// start-cell-2
+// --------------------------------------------------------------------------------------------
+// start-cell-configure
 // Set the number of states to solve for (ground state + two excited states)
 mc_calculator->settings().set("num_roots", 3);
 
@@ -30,9 +33,11 @@ mc_calculator->settings().set("davidson_iterations", 200);
 
 // Calculate one-electron reduced density matrix
 mc_calculator->settings().set("calculate_one_rdm", true);
-// end-cell-2
+// end-cell-configure
+// --------------------------------------------------------------------------------------------
 
-// start-cell-3
+// --------------------------------------------------------------------------------------------
+// start-cell-run
 // Obtain a valid Hamiltonian
 Hamiltonian hamiltonian;
 /* hamiltonian = ... */
@@ -43,4 +48,5 @@ auto [E_ci, wavefunction] = mc_calculator->calculate(hamiltonian);
 // For multiple states, access the energies and wavefunctions
 auto energies = mc_calculator->get_energies();
 auto wavefunctions = mc_calculator->get_wavefunctions();
-// end-cell-3
+// end-cell-run
+// --------------------------------------------------------------------------------------------

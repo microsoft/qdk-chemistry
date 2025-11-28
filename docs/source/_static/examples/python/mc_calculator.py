@@ -5,6 +5,8 @@
 # Licensed under the MIT License. See LICENSE.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
 
+################################################################################
+# start-cell-create
 import numpy as np
 from qdk_chemistry.algorithms import available, create
 from qdk_chemistry.data import Structure
@@ -19,28 +21,32 @@ E_scf, wfn = scf_solver.run(structure, charge=0, spin_multiplicity=1)
 ham_constructor = create("hamiltonian_constructor")
 hamiltonian = ham_constructor.run(wfn.get_orbitals())
 
-# start-cell-1
 # List available multi-configuration calculator implementations
 available_mc = available("multi_configuration_calculator")
 print(f"Available MC calculators: {available_mc}")
 
 # Create a CAS (Complete Active Space) calculator
 mc_calculator = create("multi_configuration_calculator", "macis_cas")
-# end-cell-1
+# end-cell-create
+################################################################################
 
-# start-cell-2
+################################################################################
+# start-cell-configure
 # Configure the MC calculator
 mc_calculator.settings().set("num_roots", 1)  # Ground state only
 mc_calculator.settings().set("ci_residual_tolerance", 1.0e-6)
-mc_calculator.settings().set("davidson_iterations", 200)
+# TODO: debug this setting
+# mc_calculator.settings().set("davidson_iterations", 200)
 mc_calculator.settings().set("calculate_one_rdm", True)
 mc_calculator.settings().set("calculate_two_rdm", False)
 
 # View available settings
-print(f"MC calculator settings: {mc_calculator.settings().keys()}")
-# end-cell-2
+print(f"MC calculator settings: {mc_calculator.settings()}")
+# end-cell-configure
+################################################################################
 
-# start-cell-3
+################################################################################
+# start-cell-run
 # Run the CI calculation
 # For H2, we have 2 electrons (1 alpha, 1 beta)
 n_alpha = 1
@@ -51,4 +57,5 @@ print(f"SCF Energy: {E_scf:.10f} Hartree")
 print(f"CI Energy:  {E_ci:.10f} Hartree")
 print(f"Correlation energy: {E_ci - E_scf:.10f} Hartree")
 print(ci_wavefunction.get_summary())
-# end-cell-3
+# end-cell-run
+################################################################################
