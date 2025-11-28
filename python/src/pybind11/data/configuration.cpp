@@ -82,9 +82,11 @@ Returns:
                 and '0' indicates unoccupied for each spin channel
 
 Examples:
+
     >>> config = qdk_chemistry.Configuration("2du0")
     >>> print(config.to_binary_strings())
     ("1010", "1100")
+
 )");
 
   bind_getter_as_property(configuration, "get_n_electrons",

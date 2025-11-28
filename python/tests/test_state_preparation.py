@@ -31,7 +31,6 @@ from qdk_chemistry.algorithms.state_preparation.sparse_isometry import (
     _remove_duplicate_rows_with_cnot,
     _remove_zero_rows,
     gf2x_with_tracking,
-    prepare_single_reference_state,
 )
 from qdk_chemistry.data import CasWavefunctionContainer, Configuration, Wavefunction
 
@@ -262,10 +261,10 @@ def test_gf2x_bitstrings_to_binary_matrix_additional_validation():
 def test_prepare_single_reference_state_error_cases():
     """Test error handling for invalid inputs."""
     with pytest.raises(ValueError, match="Bitstring cannot be empty"):
-        prepare_single_reference_state("")
+        SparseIsometryGF2XStatePreparation._prepare_single_reference_state("")
 
     with pytest.raises(ValueError, match="Bitstring must contain only '0' and '1' characters"):
-        prepare_single_reference_state("1012")
+        SparseIsometryGF2XStatePreparation._prepare_single_reference_state("1012")
 
 
 def test_asymmetric_active_space_error():

@@ -299,7 +299,7 @@ def filter_and_group_pauli_ops_from_wavefunction(
             * A list of classical coefficients for terms that were reduced to classical contributions.
 
     """
-    from qdk_chemistry.plugins.qiskit.conversion import create_statevector_from_wavefunction  # noqa
+    from qdk_chemistry.plugins.qiskit.conversion import create_statevector_from_wavefunction  # noqa: PLC0415
 
     psi = create_statevector_from_wavefunction(wavefunction, normalize=True)
     return _filter_and_group_pauli_ops_from_statevector(
