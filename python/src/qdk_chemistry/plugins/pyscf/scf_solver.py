@@ -48,6 +48,8 @@ from qdk_chemistry.data import (
 )
 from qdk_chemistry.plugins.pyscf.utils import orbitals_to_scf, pyscf_mol_to_qdk_basis, structure_to_pyscf_atom_labels
 
+__all__ = ["PyscfScfSettings", "PyscfScfSolver"]
+
 
 class PyscfScfSettings(ElectronicStructureSettings):
     """Settings configuration for the PySCF SCF solver.

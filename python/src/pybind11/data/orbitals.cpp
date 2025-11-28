@@ -91,6 +91,7 @@ Examples:
     >>> original_orbitals = Orbitals(...)
     >>> copied_orbitals = Orbitals(original_orbitals)
     >>> print(f"Copied {copied_orbitals.get_num_molecular_orbitals()} orbitals")
+
 )");
 
   // Constructor for restricted orbitals
@@ -118,6 +119,7 @@ Examples:
     >>> coeffs = np.random.random((4, 3))
     >>> basis_set = BasisSet(...)
     >>> orbitals = Orbitals(coeffs, None, None, basis_set, None)
+
 )",
       py::arg("coefficients"),
       py::arg("energies") = std::optional<Eigen::VectorXd>{},
@@ -143,13 +145,31 @@ Constructor for unrestricted orbitals.
 the number of molecular orbitals.
 
 Args:
-    coefficients_alpha (numpy.ndarray): The alpha molecular orbital coefficients matrix (``num_atomic_orbitals`` × ``num_molecular_orbitals``)
-    coefficients_beta (numpy.ndarray): The beta molecular orbital coefficients matrix (``num_atomic_orbitals`` × ``num_molecular_orbitals``)
-    energies_alpha (Optional[numpy.ndarray]): The alpha orbital energies (``num_molecular_orbitals``), can be None
-    energies_beta (Optional[numpy.ndarray]): The beta orbital energies (``num_molecular_orbitals``), can be None
-    ao_overlap (Optional[numpy.ndarray]): The atomic orbital overlap matrix (``num_atomic_orbitals`` × ``num_atomic_orbitals``), can be None
+    coefficients_alpha (numpy.ndarray): The alpha molecular orbital coefficients matrix
+
+        (``num_atomic_orbitals`` × ``num_molecular_orbitals``)
+
+    coefficients_beta (numpy.ndarray): The beta molecular orbital coefficients matrix
+
+        (``num_atomic_orbitals`` × ``num_molecular_orbitals``)
+
+    energies_alpha (Optional[numpy.ndarray]): The alpha orbital energies
+
+        (``num_molecular_orbitals``), can be None
+
+    energies_beta (Optional[numpy.ndarray]): The beta orbital energies
+
+        (``num_molecular_orbitals``), can be None
+
+    ao_overlap (Optional[numpy.ndarray]): The atomic orbital overlap matrix
+
+        (``num_atomic_orbitals`` × ``num_atomic_orbitals``), can be None
+
     basis_set (BasisSet): The basis set
-    indices (Optional[tuple[list[int], list[int], list[int], list[int]]]): Tuple of (``active_alpha``, ``active_beta``, ``inactive_alpha``, ``inactive_beta``), can be ``None``
+
+    indices (Optional[tuple[list[int], list[int], list[int], list[int]]]): Tuple of
+
+        (``active_alpha``, ``active_beta``, ``inactive_alpha``, ``inactive_beta``), can be ``None``
 
 Examples:
     >>> import numpy as np
@@ -157,6 +177,7 @@ Examples:
     >>> beta_coeffs = np.random.random((4, 3))
     >>> basis_set = BasisSet(...)
     >>> orbitals = Orbitals(alpha_coeffs, beta_coeffs, None, None, None, basis_set, None)
+
 )",
       py::arg("coefficients_alpha"), py::arg("coefficients_beta"),
       py::arg("energies_alpha") = std::optional<Eigen::VectorXd>{},
@@ -176,11 +197,14 @@ Get orbital coefficients as pair of (alpha, beta) matrices.
 the number of molecular orbitals.
 
 Returns:
-    tuple[numpy.ndarray]: Pair of ``(alpha_coeffs, beta_coeffs)`` matrices, each with shape ``(num_atomic_orbitals, num_molecular_orbitals)``
+    tuple[numpy.ndarray]: Pair of ``(alpha_coeffs, beta_coeffs)`` matrices,
+
+        each with shape ``(num_atomic_orbitals, num_molecular_orbitals)``
 
 Examples:
     >>> alpha_coeffs, beta_coeffs = orbitals.get_coefficients()
     >>> print(f'Alpha coefficients shape: {alpha_coeffs.shape}')
+
 )");
 
   // Energy access (read-only)
@@ -197,6 +221,7 @@ Raises:
 Examples:
     >>> alpha_energies, beta_energies = orbitals.get_energies()
     >>> print(f'HOMO energy: {alpha_energies[homo_index]}')
+
 )");
 
   orbitals.def("has_energies", &Orbitals::has_energies,
@@ -211,6 +236,7 @@ Examples:
     ...     alpha_e, beta_e = orbitals.get_energies()
     ... else:
     ...     print("Energies not yet set")
+
 )");
 
   orbitals.def(
@@ -234,6 +260,7 @@ Examples:
     >>> alpha_occ = np.array([1.0, 1.0, 0.0])
     >>> beta_occ = np.array([1.0, 0.0, 0.0])
     >>> P_alpha, P_beta = orbitals.calculate_ao_density_matrix(alpha_occ, beta_occ)
+
 )",
       py::arg("occupations_alpha"), py::arg("occupations_beta"));
 
@@ -255,6 +282,7 @@ Raises:
 Examples:
     >>> occupations = np.array([2.0, 0.0, 0.0])  # 2 electrons in first MO
     >>> P_total = orbitals.calculate_ao_density_matrix(occupations)
+
 )",
                py::arg("occupations"));
 
@@ -279,6 +307,7 @@ Examples:
     >>> rdm_alpha = np.eye(3)  # Simple example with identity matrix
     >>> rdm_beta = np.zeros((3, 3))
     >>> P_alpha, P_beta = orbitals.calculate_ao_density_matrix_from_rdm(rdm_alpha, rdm_beta)
+
 )",
       py::arg("rdm_alpha"), py::arg("rdm_beta"));
 
@@ -300,6 +329,7 @@ Raises:
 Examples:
     >>> rdm = np.eye(3)  # Simple example with identity matrix
     >>> P_total = orbitals.calculate_ao_density_matrix_from_rdm(rdm)
+
 )",
                py::arg("rdm"));
 
@@ -314,6 +344,7 @@ Returns:
 Examples:
     >>> overlap = orbitals.get_overlap_matrix()
     >>> print(f"Overlap matrix shape: {overlap.shape}")
+
 )");
 
   orbitals.def("has_overlap_matrix", &Orbitals::has_overlap_matrix,
@@ -328,6 +359,7 @@ Examples:
     ...     overlap = orbitals.get_overlap_matrix()
     ... else:
     ...     print("Overlap matrix not available")
+
 )");
 
   // Basis set information (read-only)
@@ -344,6 +376,7 @@ Raises:
 Examples:
     >>> basis_set = orbitals.get_basis_set()
     >>> print(f"Basis set name: {basis_set.get_name()}")
+
 )",
                           py::return_value_policy::reference_internal);
 
@@ -359,6 +392,7 @@ Examples:
     ...     basis = orbitals.get_basis_set()
     ... else:
     ...     print("Basis set not available")
+
 )");
 
   // Size and dimension queries
@@ -373,6 +407,7 @@ Returns:
 Examples:
     >>> num_molecular_orbitals = orbitals.get_num_molecular_orbitals()
     >>> print(f'Number of MOs: {num_molecular_orbitals}')
+
 )");
 
   orbitals.def("get_num_atomic_orbitals", &Orbitals::get_num_atomic_orbitals,
@@ -385,6 +420,7 @@ Returns:
 Examples:
     >>> num_atomic_orbitals = orbitals.get_num_atomic_orbitals()
     >>> print(f'Basis set size: {num_atomic_orbitals}')
+
 )");
 
   orbitals.def("is_restricted", &Orbitals::is_restricted,
@@ -399,6 +435,7 @@ Returns:
 Examples:
     >>> is_rhf = orbitals.is_restricted()
     >>> print(f"Restricted calculation: {is_rhf}")
+
 )");
 
   orbitals.def("is_unrestricted", &Orbitals::is_unrestricted,
@@ -413,6 +450,7 @@ Returns:
 Examples:
     >>> is_uhf = orbitals.is_unrestricted()
     >>> print(f"Unrestricted calculation: {is_uhf}")
+
 )");
 
   // Individual alpha/beta access
@@ -427,6 +465,7 @@ Returns:
 Examples:
     >>> alpha_coeffs = orbitals.get_coefficients_alpha()
     >>> print(f"Alpha coefficients shape: {alpha_coeffs.shape}")
+
 )",
                           py::return_value_policy::reference_internal);
 
@@ -441,6 +480,7 @@ Returns:
 Examples:
     >>> beta_coeffs = orbitals.get_coefficients_beta()
     >>> print(f"Beta coefficients shape: {beta_coeffs.shape}")
+
 )",
                           py::return_value_policy::reference_internal);
 
@@ -455,6 +495,7 @@ Returns:
 Examples:
     >>> alpha_energies = orbitals.get_energies_alpha()
     >>> homo_energy = alpha_energies[homo_index]
+
 )",
                           py::return_value_policy::reference_internal);
 
@@ -469,6 +510,7 @@ Returns:
 Examples:
     >>> beta_energies = orbitals.get_energies_beta()
     >>> homo_energy = beta_energies[homo_index]
+
 )",
                           py::return_value_policy::reference_internal);
 
@@ -482,6 +524,7 @@ Returns:
 Examples:
     >>> summary = orbitals.get_summary()
     >>> print(summary)
+
 )");
 
   // Active space information (read-only)
@@ -495,6 +538,7 @@ Returns:
 Examples:
     >>> alpha_active, beta_active = orbitals.get_active_space_indices()
     >>> print(f"Active space size: {len(alpha_active)}")
+
 )");
 
   orbitals.def("get_inactive_space_indices",
@@ -508,6 +552,7 @@ Returns:
 Examples:
     >>> alpha_inactive, beta_inactive = orbitals.get_inactive_space_indices()
     >>> print(f"Inactive space size: {len(alpha_inactive)}")
+
 )");
 
   orbitals.def("get_inactive_space_indices",
@@ -520,7 +565,8 @@ Returns:
 
 Examples:
     >>> alpha_inactive, beta_inactive = orbitals.get_inactive_space_indices()
-    >>> print(f"Inactive space size: {len(inalpha_active)}")
+    >>> print(f"Inactive space size: {len(alpha_inactive)}")
+
 )");
 
   orbitals.def("get_virtual_space_indices",
@@ -534,6 +580,7 @@ Returns:
 Examples:
     >>> alpha_virtual, beta_virtual = orbitals.get_virtual_space_indices()
     >>> print(f"Virtual space size: {len(alpha_virtual)}")
+
 )");
 
   orbitals.def("has_active_space", &Orbitals::has_active_space,
@@ -548,6 +595,7 @@ Examples:
     ...     active_indices = orbitals.get_active_space_indices()
     ... else:
     ...     print("No active space defined")
+
 )");
 
   // Serialization
@@ -569,6 +617,7 @@ Examples:
     >>> orbitals.to_file("molecule.orbitals.h5", "hdf5")
     >>> from pathlib import Path
     >>> orbitals.to_file(Path("water.orbitals.json"), "json")
+
 )",
                py::arg("filename"), py::arg("type"));
 
@@ -594,6 +643,7 @@ Examples:
     >>> orbitals = Orbitals.from_file("molecule.orbitals.h5", "hdf5")
     >>> from pathlib import Path
     >>> orbitals = Orbitals.from_file(Path("water.orbitals.json"), "json")
+
 )",
                       py::arg("filename"), py::arg("type"));
 
@@ -607,6 +657,7 @@ data structures, making it ideal for storing molecular orbital information.
 
 Args:
     filename (str | pathlib.Path): Path to the HDF5 file to write.
+
         Must have '.orbitals' before the file extension (e.g., ``water.orbitals.h5``, ``molecule.orbitals.hdf5``)
 
 Raises:
@@ -618,6 +669,7 @@ Examples:
     >>> orbitals.to_hdf5_file("molecule.orbitals.hdf5")
     >>> from pathlib import Path
     >>> orbitals.to_hdf5_file(Path("water.orbitals.h5"))
+
 )",
                py::arg("filename"));
 
@@ -630,6 +682,7 @@ The file should contain data in the format produced by ``to_hdf5_file()``.
 
 Args:
     filename (str | pathlib.Path): Path to the HDF5 file to read.
+
         Must have '.orbitals' before the file extension (e.g., ``water.orbitals.h5``, ``molecule.orbitals.hdf5``)
 
 Returns:
@@ -644,6 +697,7 @@ Examples:
     >>> orbitals = Orbitals.from_hdf5_file("molecule.orbitals.hdf5")
     >>> from pathlib import Path
     >>> orbitals = Orbitals.from_hdf5_file(Path("water.orbitals.h5"))
+
 )",
                       py::arg("filename"));
 
@@ -665,6 +719,7 @@ Raises:
 Examples:
     >>> json_str = orbitals.to_json()
     >>> print(json_str)  # Pretty-printed JSON
+
 )");
 
   orbitals.def_static(
@@ -689,6 +744,7 @@ Raises:
 
 Examples:
     >>> orbitals = Orbitals.from_json('{"num_atomic_orbitals": 4, "num_molecular_orbitals": 3, ...}')
+
 )",
       py::arg("json_str"));
 
@@ -701,6 +757,7 @@ The file will be created or overwritten if it already exists.
 
 Args:
     filename (str | pathlib.Path): Path to the JSON file to write.
+
         Must have '.orbitals' before the file extension (e.g., ``water.orbitals.json``, ``molecule.orbitals.json``)
 
 Raises:
@@ -712,6 +769,7 @@ Examples:
     >>> orbitals.to_json_file("molecule.orbitals.json")
     >>> from pathlib import Path
     >>> orbitals.to_json_file(Path("water.orbitals.json"))
+
 )",
                py::arg("filename"));
 
@@ -725,6 +783,7 @@ The file should contain JSON data in the format produced by ``to_json_file()``.
 
 Args:
     filename (str | pathlib.Path): Path to the JSON file to read.
+
         Must have '.orbitals' before the file extension (e.g., ``water.orbitals.json``, ``molecule.orbitals.json``)
 
 Returns:
@@ -739,6 +798,7 @@ Examples:
     >>> orbitals = Orbitals.from_json_file("molecule.orbitals.json")
     >>> from pathlib import Path
     >>> orbitals = Orbitals.from_json_file(Path("water.orbitals.json"))
+
 )",
                   py::arg("filename"))
 
@@ -785,6 +845,7 @@ Examples:
     >>> active_indices = [1, 2]
     >>> inactive_indices = [0, 3]
     >>> model_orb = ModelOrbitals(4, active_indices, inactive_indices)
+
 )");
 
   // Basic constructor
@@ -804,6 +865,7 @@ Examples:
     >>> # Unrestricted calculation with 4 orbitals
     >>> model_orb = ModelOrbitals(4, False)
     >>> print(f"Is unrestricted: {model_orb.is_unrestricted()}")
+
 )",
                      py::arg("basis_size"), py::arg("restricted"));
 
@@ -830,6 +892,7 @@ Examples:
     >>> indices = (active, inactive)
     >>> model_orb = ModelOrbitals(6, indices)
     >>> print(f"Active space size: {len(model_orb.get_active_space_indices()[0])}")
+
 )",
       py::arg("basis_size"), py::arg("indices"));
 
@@ -845,7 +908,9 @@ For unrestricted calculations, separate active and inactive space indices can be
 
 Args:
     basis_size (int): Number of atomic orbitals (and molecular orbitals)
-    indices (tuple[list[int], list[int], list[int], list[int]]): Tuple of ``(active_alpha, active_beta, inactive_alpha, inactive_beta)``
+    indices (tuple[list[int], list[int], list[int], list[int]]): Tuple of
+
+        ``(active_alpha, active_beta, inactive_alpha, inactive_beta)``
 
 Raises:
     ValueError: If indices are >= basis_size or if active and inactive spaces overlap
@@ -859,6 +924,7 @@ Examples:
     >>> indices = (alpha_active, beta_active, alpha_inactive, beta_inactive)
     >>> model_orb = ModelOrbitals(5, indices)
     >>> print(f"Is unrestricted: {model_orb.is_unrestricted()}")
+
 )",
       py::arg("basis_size"), py::arg("indices"));
 
@@ -888,6 +954,7 @@ Examples:
     >>> json_str = '{"num_orbitals": 4, "is_restricted": true, ...}'
     >>> model_orb = ModelOrbitals.from_json(json_str)
     >>> print(f"Loaded {model_orb.get_num_molecular_orbitals()} orbitals")
+
 )",
           py::arg("json_str"))
 

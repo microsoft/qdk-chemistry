@@ -8,6 +8,7 @@
 #include <qdk/chemistry.hpp>
 
 #include "factory_bindings.hpp"
+#include "qdk/chemistry/algorithms/microsoft/macis_pmc.hpp"
 
 namespace py = pybind11;
 using namespace qdk::chemistry::algorithms;
@@ -59,17 +60,18 @@ In this manner, the high-performance solvers which underly other MC algorithms c
 
 The calculator takes a Hamiltonian and a set of configurations as input and returns both the calculated total energy and the corresponding multi-configurational wavefunction.
 
-Examples:
-    To create a custom PMC calculator, inherit from this class:
+To create a custom PMC calculator, inherit from this class.
 
-        >>> import qdk_chemistry.algorithms as alg
-        >>> import qdk_chemistry.data as data
-        >>> class MyProjectedMultiConfigurationCalculator(alg.ProjectedMultiConfigurationCalculator):
-        ...     def __init__(self):
-        ...         super().__init__()  # Call the base class constructor
-        ...     def _run_impl(self, hamiltonian: data.Hamiltonian, configurations: list[data.Configuration]) -> tuple[float, data.Wavefunction]:
-        ...         # Custom PMC implementation
-        ...         return energy, wavefunction
+Examples:
+    >>> import qdk_chemistry.algorithms as alg
+    >>> import qdk_chemistry.data as data
+    >>> class MyProjectedMultiConfigurationCalculator(alg.ProjectedMultiConfigurationCalculator):
+    ...     def __init__(self):
+    ...         super().__init__()  # Call the base class constructor
+    ...     def _run_impl(self, hamiltonian: data.Hamiltonian, configurations: list[data.Configuration]) -> tuple[float, data.Wavefunction]:
+    ...         # Custom PMC implementation
+    ...         return energy, wavefunction
+
 )");
 
   pmc_calculator.def(py::init<>(),
@@ -84,6 +86,7 @@ Examples:
     >>> class MyPMC(alg.ProjectedMultiConfigurationCalculator):
     ...     def __init__(self):
     ...         super().__init__()  # Calls this constructor
+
 )");
 
   pmc_calculator.def("run", &ProjectedMultiConfigurationCalculator::run,
@@ -104,6 +107,7 @@ Returns:
 Raises:
     RuntimeError: If the calculation fails
     ValueError: If hamiltonian or configurations are invalid
+
 )",
                      py::arg("hamiltonian"), py::arg("configurations"));
 
@@ -139,6 +143,7 @@ Examples:
     ...         super().__init__()
     ...         from qdk_chemistry.data import ElectronicStructureSettings
     ...         self._settings = ElectronicStructureSettings()
+
 )");
 
   pmc_calculator.def("type_name",
@@ -148,6 +153,7 @@ The algorithm's type name.
 
 Returns:
     str: The type name of the algorithm
+
 )");
 
   // Factory class binding - creates
@@ -162,4 +168,52 @@ Returns:
                                         &) {
     return "<qdk_chemistry.algorithms.ProjectedMultiConfigurationCalculator>";
   });
+
+  // Bind concrete microsoft::MacisPmc implementation
+  py::class_<microsoft::MacisPmc, ProjectedMultiConfigurationCalculator,
+             py::smart_holder>(m, "QdkMacisPmc", R"(
+QDK MACIS-based Projected Multi-Configuration (PMC) calculator.
+
+This class provides a concrete implementation of the projected multi-configuration
+calculator using the MACIS library. It performs projections of the Hamiltonian
+onto a specified set of determinants to compute energies and wavefunctions for
+strongly correlated molecular systems.
+
+The calculator inherits from :class:`ProjectedMultiConfigurationCalculator` and uses
+MACIS library routines to perform the actual projected calculations where
+the determinant space is provided as input rather than generated adaptively.
+
+Typical usage:
+
+.. code-block:: python
+
+    import qdk_chemistry.algorithms as alg
+    import qdk_chemistry.data as data
+
+    # Create a PMC calculator
+    pmc = alg.QdkMacisPmc()
+
+    # Configure PMC-specific settings
+    pmc.settings().set("davidson_res_tol", 1e-8)
+    pmc.settings().set("davidson_max_m", 200)
+
+    # Prepare configurations
+    configurations = [...]  # Your list of Configuration objects
+
+    # Run calculation
+    energy, wavefunction = pmc.run(hamiltonian, configurations)
+
+See Also:
+    :class:`ProjectedMultiConfigurationCalculator`
+    :class:`qdk_chemistry.data.Hamiltonian`
+    :class:`qdk_chemistry.data.Configuration`
+    :class:`qdk_chemistry.data.Wavefunction`
+
+)")
+      .def(py::init<>(), R"(
+Default constructor.
+
+Initializes a MACIS PMC calculator with default settings.
+
+)");
 }

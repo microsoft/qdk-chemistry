@@ -8,6 +8,8 @@
 #include <qdk/chemistry.hpp>
 
 #include "factory_bindings.hpp"
+#include "qdk/chemistry/algorithms/microsoft/macis_asci.hpp"
+#include "qdk/chemistry/algorithms/microsoft/macis_cas.hpp"
 
 namespace py = pybind11;
 using namespace qdk::chemistry::algorithms;
@@ -56,17 +58,17 @@ This class defines the interface for multi configuration-based quantum chemistry
 Concrete implementations should inherit from this class and implement the ``calculate`` method.
 
 Examples:
-    To create a custom MC calculator, inherit from this class:
+    >>> # To create a custom multi-configuration calculator, inherit from this class.
+    >>> import qdk_chemistry.algorithms as alg
+    >>> import qdk_chemistry.data as data
+    >>> class MyMultiConfigurationCalculator(alg.MultiConfigurationCalculator):
+    ...     def __init__(self):
+    ...         super().__init__()  # Call the base class constructor
+    ...     # Implement the _run_impl method (called by run())
+    ...     def _run_impl(self, hamiltonian: data.Hamiltonian, n_active_alpha_electrons: int, n_active_beta_electrons: int) -> tuple[float, data.Wavefunction]:
+    ...         # Custom MC implementation
+    ...         return energy, wavefunction
 
-        >>> import qdk_chemistry.algorithms as alg
-        >>> import qdk_chemistry.data as data
-        >>> class MyMultiConfigurationCalculator(alg.MultiConfigurationCalculator):
-        ...     def __init__(self):
-        ...         super().__init__()  # Call the base class constructor
-        ...     # Implement the _run_impl method (called by run())
-        ...     def _run_impl(self, hamiltonian: data.Hamiltonian, n_active_alpha_electrons: int, n_active_beta_electrons: int) -> tuple[float, data.Wavefunction]:
-        ...         # Custom MC implementation
-        ...         return energy, wavefunction
 )");
 
   mc_calculator.def(py::init<>(),
@@ -81,11 +83,12 @@ Examples:
     >>> class MyCalculator(alg.MultiConfigurationCalculator):
     ...     def __init__(self):
     ...         super().__init__()  # Calls this constructor
+
 )");
 
   mc_calculator.def("run", &MultiConfigurationCalculator::run,
                     R"(
-        Perform multi configuration calculation on the given Hamiltonian.
+Perform multi-configuration calculation on the given Hamiltonian.
 
 Args:
     hamiltonian (qdk_chemistry.data.Hamiltonian): The Hamiltonian to perform the calculation on
@@ -97,6 +100,7 @@ Returns:
 
 Raises:
     SettingsAreLocked: If attempting to modify settings after run() is called
+
 )",
                     py::arg("hamiltonian"), py::arg("n_active_alpha_electrons"),
                     py::arg("n_active_beta_electrons"));
@@ -107,6 +111,7 @@ Access the calculator's configuration settings.
 
 Returns:
     qdk_chemistry.data.Settings: Reference to the settings object for configuring the calculator
+
 )",
                     py::return_value_policy::reference_internal);
 
@@ -132,6 +137,7 @@ Examples:
     ...         super().__init__()
     ...         from qdk_chemistry.data import ElectronicStructureSettings
     ...         self._settings = ElectronicStructureSettings()
+
 )");
 
   mc_calculator.def("type_name", &MultiConfigurationCalculator::type_name,
@@ -140,6 +146,7 @@ The algorithm's type name.
 
 Returns:
     str: The type name of the algorithm
+
 )");
 
   // Factory class binding - creates MultiConfigurationCalculatorFactory class
@@ -152,4 +159,80 @@ Returns:
   mc_calculator.def("__repr__", [](const MultiConfigurationCalculator &) {
     return "<qdk_chemistry.algorithms.MultiConfigurationCalculator>";
   });
+
+  // Bind concrete microsoft::MacisCas implementation
+  py::class_<microsoft::MacisCas, MultiConfigurationCalculator,
+             py::smart_holder>(m, "QdkMacisCas", R"(
+QDK MACIS-based Complete Active Space (CAS) calculator.
+
+This class provides a concrete implementation of the multi-configuration
+calculator using the MACIS library for Complete Active Space Configuration
+Interaction (CASCI) calculations.
+
+Typical usage:
+
+.. code-block:: python
+
+    import qdk_chemistry.algorithms as alg
+
+    # Create a CASCI calculator
+    casci = alg.QdkMacisCas()
+
+    # Configure settings if needed
+    casci.settings().set("max_iterations", 100)
+
+    # Run calculation
+    energy, wavefunction = casci.run(hamiltonian, n_alpha, n_beta)
+
+See Also:
+    :class:`MultiConfigurationCalculator`
+    :class:`qdk_chemistry.data.Hamiltonian`
+    :class:`qdk_chemistry.data.Wavefunction`
+
+)")
+      .def(py::init<>(), R"(
+Default constructor.
+
+Initializes a MACIS CAS calculator with default settings.
+
+)");
+
+  // Bind concrete microsoft::MacisAsci implementation
+  py::class_<microsoft::MacisAsci, MultiConfigurationCalculator,
+             py::smart_holder>(m, "QdkMacisAsci", R"(
+QDK MACIS-based Adaptive Sampling Configuration Interaction (ASCI) calculator.
+
+This class provides a concrete implementation of the multi-configuration
+calculator using the MACIS library for Adaptive Sampling Configuration
+Interaction (ASCI) calculations, which adaptively selects the most important
+configurations.
+
+Typical usage:
+
+.. code-block:: python
+
+    import qdk_chemistry.algorithms as alg
+
+    # Create an ASCI calculator
+    asci = alg.QdkMacisAsci()
+
+    # Configure ASCI-specific settings
+    asci.settings().set("ntdets_max", 1000)
+    asci.settings().set("h_el_tol", 1e-6)
+
+    # Run calculation
+    energy, wavefunction = asci.run(hamiltonian, n_alpha, n_beta)
+
+See Also:
+    :class:`MultiConfigurationCalculator`
+    :class:`qdk_chemistry.data.Hamiltonian`
+    :class:`qdk_chemistry.data.Wavefunction`
+
+)")
+      .def(py::init<>(), R"(
+Default constructor.
+
+Initializes a MACIS ASCI calculator with default settings.
+
+)");
 }

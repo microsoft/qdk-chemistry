@@ -17,7 +17,7 @@ Supported localization methods (selected via the settings `method`):
 
 This module registers a ``pyscf`` localizer with the QDK/Chemistry localizer registry at
 import time, making the functionality available via
-``qdk_chemistry.algorithms.create("localizer", "pyscf")``.
+``qdk_chemistry.algorithms.create("orbital_localizer", "pyscf")``.
 
 Requires: PySCF (the code uses the ``pyscf.lo`` localization routines).
 """
@@ -29,9 +29,11 @@ Requires: PySCF (the code uses the ``pyscf.lo`` localization routines).
 
 from pyscf import lo
 
-from qdk_chemistry.algorithms import Localizer, register
+from qdk_chemistry.algorithms import OrbitalLocalizer, register
 from qdk_chemistry.data import Orbitals, SciWavefunctionContainer, Settings, SlaterDeterminantContainer, Wavefunction
 from qdk_chemistry.plugins.pyscf.utils import basis_to_pyscf_mol
+
+__all__ = ["PyscfLocalizer", "PyscfLocalizerSettings"]
 
 
 class PyscfLocalizerSettings(Settings):
@@ -70,7 +72,7 @@ class PyscfLocalizerSettings(Settings):
         self._set_default("population_method", "string", "mulliken")
 
 
-class PyscfLocalizer(Localizer):
+class PyscfLocalizer(OrbitalLocalizer):
     """PySCF-based orbital localizer for quantum chemistry calculations.
 
     This class implements orbital localization using routines from PySCF.

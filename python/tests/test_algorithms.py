@@ -13,9 +13,9 @@ from qdk_chemistry.algorithms import (
     ActiveSpaceSelector,
     CoupledClusterCalculator,
     HamiltonianConstructor,
-    Localizer,
     MultiConfigurationCalculator,
     MultiConfigurationScf,
+    OrbitalLocalizer,
     ProjectedMultiConfigurationCalculator,
     ScfSolver,
     StabilityChecker,
@@ -38,7 +38,7 @@ from qdk_chemistry.data import (
 from .test_helpers import create_test_basis_set, create_test_hamiltonian, create_test_orbitals
 
 
-class MockLocalizationPy(Localizer):
+class MockLocalizationPy(OrbitalLocalizer):
     """A dummy localizer for testing purposes in Python."""
 
     def __init__(self):
@@ -878,9 +878,9 @@ class TestAlgorithmClasses:
 
     def test_localizer_comprehensive(self):
         """Test comprehensive Localizer functionality including trampoline methods."""
-        # Test MockLocalizationPy which inherits from Localizer
+        # Test MockLocalizationPy which inherits from OrbitalLocalizer
         localizer = MockLocalizationPy()
-        assert isinstance(localizer, Localizer)
+        assert isinstance(localizer, OrbitalLocalizer)
 
         # Test trampoline methods are properly overridden
         # Test localize method
@@ -899,7 +899,7 @@ class TestAlgorithmClasses:
 
         # Test __repr__ method
         repr_str = repr(localizer)
-        assert "<qdk_chemistry.algorithms.Localizer>" in repr_str
+        assert "<qdk_chemistry.algorithms.OrbitalLocalizer>" in repr_str
 
     def test_localizer_factory_functions(self):
         """Test Localizer factory functions and unregistration."""
@@ -924,12 +924,11 @@ class TestAlgorithmClasses:
         # Test that base Localizer can be instantiated (though it's abstract)
         try:
             # This might not work if the class is properly abstract
-            localizer = Localizer()
+            localizer = OrbitalLocalizer()
 
             # Test __repr__ method
             repr_str = repr(localizer)
-            assert "<qdk_chemistry.algorithms.Localizer>" in repr_str
-
+            assert "<qdk_chemistry.algorithms.OrbitalLocalizer>" in repr_str
         except TypeError:
             # Expected behavior for abstract classes
             pass

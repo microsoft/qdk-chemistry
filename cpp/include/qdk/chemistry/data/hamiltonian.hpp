@@ -17,8 +17,16 @@
 
 namespace qdk::chemistry::data {
 
+/**
+ * @enum HamiltonianType
+ * @brief Types of Hamiltonians supported
+ */
 enum class HamiltonianType { Hermitian, NonHermitian };
 
+/**
+ * @enum SpinChannel
+ * @brief Spin channels for two-electron integrals
+ */
 enum class SpinChannel { aaaa, aabb, bbbb };
 
 /**

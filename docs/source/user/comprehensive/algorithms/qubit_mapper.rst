@@ -27,7 +27,7 @@ The :class:`~qdk_chemistry.algorithms.QubitMapper` in QDK/Chemistry provides:
 Creating a QubitMapper
 ----------------------
 
-The :class:`~qdk_chemistry.algorithms.QubitMapper` is created using the :doc:`factory pattern <../advanced/factory_pattern>`.
+The :class:`~qdk_chemistry.algorithms.QubitMapper` is created using the :doc:`factory pattern <../design/factory_pattern>`.
 
 .. tab:: Python API
 
@@ -38,7 +38,7 @@ The :class:`~qdk_chemistry.algorithms.QubitMapper` is created using the :doc:`fa
 Mapping a Hamiltonian
 ----------------------
 
-This mapper is used to create a :doc:`QubitHamiltonian <../data/qubit_hamiltonian>` object from a :doc:`Hamiltonian <../data/hamiltonian>`.
+This mapper is used to create a :class:`~qdk_chemistry.data.QubitHamiltonian` object from a :class:`~qdk_chemistry.data.Hamiltonian`.
 
 .. tab:: Python API
 
