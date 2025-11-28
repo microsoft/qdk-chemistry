@@ -6,20 +6,25 @@
 // license information.
 // --------------------------------------------------------------------------------------------
 
-// start-cell-1
+// --------------------------------------------------------------------------------------------
+// start-cell-create
 #include <qdk/chemistry.hpp>
 using namespace qdk::chemistry::algorithms;
 
 // Create an MP2 natural orbital localizer
 auto mp2_localizer = LocalizerFactory::create("mp2_natural_orbitals");
-// end-cell-1
+// end-cell-create
+// --------------------------------------------------------------------------------------------
 
-// start-cell-2
+// --------------------------------------------------------------------------------------------
+// start-cell-configure
 // Set the convergence threshold
 localizer->settings().set("tolerance", 1.0e-6);
-// end-cell-2
+// end-cell-configure
+// --------------------------------------------------------------------------------------------
 
-// start-cell-3
+// --------------------------------------------------------------------------------------------
+// start-cell-localize
 // Obtain a valid Orbitals instance
 Orbitals orbitals;
 /* orbitals = ... */
@@ -35,4 +40,5 @@ std::vector<size_t> loc_indices_b = {0, 1, 2, 3};  // Beta orbital indices
 // Localize the specified orbitals
 auto localized_orbitals =
     localizer->run(orbitals, loc_indices_a, loc_indices_b);
-// end-cell-3
+// end-cell-localize
+// --------------------------------------------------------------------------------------------
