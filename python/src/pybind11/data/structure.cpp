@@ -783,6 +783,51 @@ Examples:
 )",
                        py::arg("filename"), py::arg("format_type"));
 
+  structure.def(
+      "to_hdf5",
+      [](const Structure &self, const std::string &group_path) {
+        H5::H5File file(group_path, H5F_ACC_TRUNC);
+        H5::Group group = file.openGroup("/");
+        self.to_hdf5(group);
+      },
+      R"(
+Convert structure to HDF5 format and write to group path.
+
+Args:
+    group_path (str): Path to HDF5 file to create/overwrite
+
+Raises:
+    RuntimeError: If HDF5 write operation fails
+
+Examples:
+    >>> structure.to_hdf5("structure.h5")
+)",
+      py::arg("group_path"));
+
+  structure.def_static(
+      "from_hdf5",
+      [](const std::string &group_path) {
+        H5::H5File file(group_path, H5F_ACC_RDONLY);
+        H5::Group group = file.openGroup("/");
+        return *Structure::from_hdf5(group);
+      },
+      R"(
+Load structure from HDF5 format (static method).
+
+Args:
+    group_path (str): Path to HDF5 file to read from
+
+Returns:
+    Structure: New Structure object created from HDF5 data
+
+Raises:
+    RuntimeError: If HDF5 read operation fails or data is invalid
+
+Examples:
+    >>> h2 = Structure.from_hdf5("structure.h5")
+)",
+      py::arg("group_path"));
+
   structure.def("to_hdf5_file", structure_to_hdf5_file_wrapper,
                 R"(
 Save structure to HDF5 file.

@@ -26,6 +26,7 @@ from qdk_chemistry.algorithms.registry import (
     available,
     create,
     register,
+    show_default,
     show_settings,
     unregister,
 )
@@ -63,6 +64,7 @@ __all__ = [
     "create",
     "energy_from_phase",
     "register",
+    "show_default",
     "show_settings",
     "unregister",
 ]

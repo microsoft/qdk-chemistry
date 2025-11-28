@@ -167,6 +167,17 @@ Examples:
 Returns:
     str: The type name of the created algorithms
 )");
+  factory.def_static("default_algorithm_name",
+                     &FactoryType::default_algorithm_name,
+                     R"(
+Return the default algorithm name for this factory.
+
+Returns:
+    str: The name of the default algorithm implementation
+
+Examples:
+    >>> default_name = Factory.default_algorithm_name()
+)");
   factory.def_static("clear", &FactoryType::clear,
                      R"(Clear all registered algorithm implementations.
 )");
