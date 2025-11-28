@@ -197,7 +197,8 @@ Related classes
 - :doc:`Orbitals <orbitals>`: Molecular orbitals calculated from the structure
 - :doc:`ScfSolver <../algorithms/scf_solver>`: Algorithm that performs calculations on the structure
 
-Related topics
---------------
+Further reading
+---------------
 
+- The above examples can be downloaded as complete `C++ <../../../_static/examples/cpp/structure.cpp>`_ and `Python <../../../_static/examples/python/structure.py>`_ scripts.
 - :doc:`Serialization <../data/serialization>`: Data serialization and deserialization
