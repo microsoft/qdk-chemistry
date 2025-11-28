@@ -123,7 +123,7 @@ class SparseIsometryGF2XStatePreparation(StatePreparation):
         # Check for single determinant case after filtering
         if len(bitstrings) == 1:
             _LOGGER.info("After filtering, only 1 determinant remains, using single reference state preparation")
-            return self.__class__._prepare_single_reference_state(bitstrings[0])
+            return self._prepare_single_reference_state(bitstrings[0])
 
         n_qubits = len(bitstrings[0])
         _LOGGER.debug(f"Using {len(bitstrings)} determinants for state preparation")
@@ -264,7 +264,6 @@ class SparseIsometryGF2XStatePreparation(StatePreparation):
             when converting to a column in the matrix.
 
         Example:
-
             >>> bitstrings = ["101", "010"]  # q[2]q[1]q[0] format
             >>> matrix = _bitstrings_to_binary_matrix(bitstrings)
             >>> print(matrix)
@@ -296,30 +295,29 @@ class SparseIsometryGF2XStatePreparation(StatePreparation):
             bitstring_matrix[:, i] = np.array(list(map(int, reversed_bitstring)), dtype=np.int8)
 
         return bitstring_matrix
-    
-    @staticmethod
-    def _prepare_single_reference_state(bitstring: str) -> QuantumCircuit:
+
+    def _prepare_single_reference_state(self, bitstring: str) -> QuantumCircuit:
         r"""Prepare a single reference state on a quantum circuit based on a bitstring.
 
-    Args:
-        bitstring: Binary string representing the occupation of qubits.
+        Args:
+            bitstring: Binary string representing the occupation of qubits.
 
-            '1' means apply X gate, '0' means leave in |0⟩ state.
+                '1' means apply X gate, '0' means leave in |0⟩ state.
 
         Returns:
-            OpenQASM with the prepared single reference state
+                OpenQASM with the prepared single reference state
 
         Example:
-            bitstring = "1010" creates a circuit with X gates on qubits 1 and 3:
+                bitstring = "1010" creates a circuit with X gates on qubits 1 and 3:
 
-            * :math:`\left| 0 \right\rangle \rightarrow I \rightarrow \left| 0 \right\rangle`
-            (qubit 0, corresponds to rightmost bit '0')
-            * :math:`\left| 0 \right\rangle \rightarrow X \rightarrow \left| 1 \right\rangle`
-            (qubit 1, corresponds to bit '1')
-            * :math:`\left| 0 \right\rangle \rightarrow I \rightarrow \left| 0 \right\rangle`
-            (qubit 2, corresponds to bit '0')
-            * :math:`\left| 0 \right\rangle \rightarrow X \rightarrow \left| 1 \right\rangle`
-            (qubit 3, corresponds to leftmost bit '1')
+                * :math:`\left| 0 \right\rangle \rightarrow I \rightarrow \left| 0 \right\rangle`
+                (qubit 0, corresponds to rightmost bit '0')
+                * :math:`\left| 0 \right\rangle \rightarrow X \rightarrow \left| 1 \right\rangle`
+                (qubit 1, corresponds to bit '1')
+                * :math:`\left| 0 \right\rangle \rightarrow I \rightarrow \left| 0 \right\rangle`
+                (qubit 2, corresponds to bit '0')
+                * :math:`\left| 0 \right\rangle \rightarrow X \rightarrow \left| 1 \right\rangle`
+                (qubit 3, corresponds to leftmost bit '1')
 
         """
         # Input validation

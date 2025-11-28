@@ -83,13 +83,13 @@ Examples:
 Convert configuration to separate alpha and beta binary strings.
 
 Parameters:
-    num_orbitals (int, default=0): 
-    
+    num_orbitals (int, default=0):
+
         Number of spatial orbitals to use from the configuration (default = 0, use all)
 
 Returns:
     [str, str]
-    
+
         Tuple of binary strings (alpha, beta) where '1' indicates occupied
         and '0' indicates unoccupied for each spin channel
 

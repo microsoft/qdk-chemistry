@@ -153,6 +153,7 @@ def get_bitstring(circuit: QuantumCircuit) -> str:
 @pytest.mark.parametrize("bitstring", ["1010", "0000", "1111", "101001", "1", "0"])
 def test_single_reference_state_basic(bitstring):
     """Test basic single reference state preparation with various bitstrings."""
-    circuit = SparseIsometryGF2XStatePreparation._prepare_single_reference_state(bitstring)
+    test_cls = SparseIsometryGF2XStatePreparation()
+    circuit = test_cls._prepare_single_reference_state(bitstring)
     result_bitstring = get_bitstring(circuit)
     assert result_bitstring == bitstring, f"Expected {bitstring}, got {result_bitstring}"
