@@ -44,20 +44,17 @@ Hamiltonian object should be considered constant and not modified:
 
 .. tab:: C++ API
 
-   .. literalinclude:: ../../../../examples/cpp/hamiltonian.cpp
+   .. literalinclude:: ../../../_static/examples/cpp/hamiltonian.cpp
       :language: cpp
-      :start-after: // start-cell-1
-      :end-before: // end-cell-1
+      :start-after: // start-cell-hamiltonian-creation
+      :end-before: // end-cell-hamiltonian-creation
 
 .. tab:: Python API
 
-   .. note::
-      This example shows the API pattern. For complete working examples, see the test suite.
-
-   .. literalinclude:: ../../../examples/python/hamiltonian.py
+   .. literalinclude:: ../../../_static/examples/python/hamiltonian.py
       :language: python
-      :start-after: # start-cell-1
-      :end-before: # end-cell-1
+      :start-after: # start-cell-hamiltonian-creation
+      :end-before: # end-cell-hamiltonian-creation
 
 Accessing Hamiltonian data
 --------------------------
@@ -65,7 +62,7 @@ Accessing Hamiltonian data
 The :class:`~qdk_chemistry.data.Hamiltonian` class provides methods to access the one- and two-electron integrals and other properties. In line
 with its immutable design principle, these methods return const references or copies of the internal data:
 
-Two-Electron Integral Storage and Notation
+Two-electron integral storage and notation
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 Two-electron integrals in quantum chemistry can be represented using different notations and storage formats.
@@ -97,29 +94,17 @@ When accessing specific elements with ``get_two_body_element(i, j, k, l)``, the 
 
 .. tab:: C++ API
 
-   .. literalinclude:: ../../../../examples/cpp/hamiltonian.cpp
+   .. literalinclude:: ../../../_static/examples/cpp/hamiltonian.cpp
       :language: cpp
-      :start-after: // start-cell-2
-      :end-before: // end-cell-2
+      :start-after: // start-cell-properties
+      :end-before: // end-cell-properties
 
 .. tab:: Python API
 
-   .. note::
-      This example shows the API pattern. For complete working examples, see the test suite.
-
-   .. literalinclude:: ../../../examples/python/hamiltonian.py
+   .. literalinclude:: ../../../_static/examples/python/hamiltonian.py
       :language: python
-      :start-after: # start-cell-2
-      :end-before: # end-cell-2
-
-.. TODO: this was old example data that should be removed.
-.. # Get orbital data
-.. orbitals = hamiltonian.get_orbitals()
-
-.. # Get active space information
-.. active_indices = hamiltonian.get_selected_orbital_indices()
-.. num_electrons = hamiltonian.get_num_electrons()
-.. num_orbitals = hamiltonian.get_num_orbitals()
+      :start-after: # start-cell-properties
+      :end-before: # end-cell-properties
 
 Serialization
 -------------
@@ -186,28 +171,17 @@ HDF5 representation of a :class:`~qdk_chemistry.data.Hamiltonian` object has the
 
 .. tab:: C++ API
 
-   .. literalinclude:: ../../../../examples/cpp/hamiltonian.cpp
+   .. literalinclude:: ../../../_static/examples/cpp/hamiltonian.cpp
       :language: cpp
-      :start-after: // start-cell-3
-      :end-before: // end-cell-3
+      :start-after: // start-cell-serialization
+      :end-before: // end-cell-serialization
 
 .. tab:: Python API
 
-   .. note::
-      This example shows the API pattern.
-      For complete working examples, see the test suite.
-
-   .. literalinclude:: ../../../examples/python/hamiltonian.py
+   .. literalinclude:: ../../../_static/examples/python/hamiltonian.py
       :language: python
-      :start-after: # start-cell-3
-      :end-before: # end-cell-3
-
-.. TODO: this was old example data that should be removed.
-.. # Convert to/from JSON in Python
-.. import json
-.. j = hamiltonian.to_json()
-.. j_str = json.dumps(j)
-.. hamiltonian_from_json = Hamiltonian.from_json(json.loads(j_str))
+      :start-after: # start-cell-serialization
+      :end-before: # end-cell-serialization
 
 Active space Hamiltonian
 ------------------------
@@ -223,20 +197,20 @@ The :class:`~qdk_chemistry.data.Hamiltonian` class provides methods to check the
 
 .. tab:: C++ API
 
-   .. literalinclude:: ../../../../examples/cpp/hamiltonian.cpp
+   .. literalinclude:: ../../../_static/examples/cpp/hamiltonian.cpp
       :language: cpp
-      :start-after: // start-cell-4
-      :end-before: // end-cell-4
+      :start-after: // start-cell-validation
+      :end-before: // end-cell-validation
 
 .. tab:: Python API
 
    .. note::
       This example shows the API pattern. For complete working examples, see the test suite.
 
-   .. literalinclude:: ../../../examples/python/hamiltonian.py
+   .. literalinclude:: ../../../_static/examples/python/hamiltonian.py
       :language: python
-      :start-after: # start-cell-4
-      :end-before: # end-cell-4
+      :start-after: # start-cell-validation
+      :end-before: # end-cell-validation
 
 Related classes
 ---------------
@@ -248,9 +222,10 @@ Related classes
 - :class:`~qdk_chemistry.data.Wavefunction`: Represents the solution of the Hamiltonian eigenvalue problem
 - :doc:`Active space methods <../algorithms/active_space>`: Selection and use of active spaces with the Hamiltonian
 
-Related topics
---------------
+Further reading
+---------------
 
+- The above examples can be downloaded as complete `C++ <../../../_static/examples/cpp/hamiltonian.cpp>`_ and `Python <../../../_static/examples/python/hamiltonian.py>`_ scripts.
 - :doc:`Serialization <../data/serialization>`: Data serialization and deserialization in QDK/Chemistry
 - :doc:`Design principles <../design/index>`: Design principles for data classes in QDK/Chemistry
 - :doc:`Settings <../design/index>`: Configuration options for algorithms operating on Hamiltonians

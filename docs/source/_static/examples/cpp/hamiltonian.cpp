@@ -6,7 +6,8 @@
 // license information.
 // --------------------------------------------------------------------------------------------
 
-// start-cell-1
+// --------------------------------------------------------------------------------------------
+// start-cell-hamiltonian-creation
 // Create a Hamiltonian constructor
 // Returns std::shared_ptr<HamiltonianConstructor>
 auto hamiltonian_constructor = HamiltonianConstructorFactory::create();
@@ -23,9 +24,11 @@ auto hamiltonian = hamiltonian_constructor->run(orbitals);
 Hamiltonian direct_hamiltonian(one_body_integrals, two_body_integrals, orbitals,
                                selected_orbital_indices, num_electrons,
                                core_energy);
-// end-cell-1
+// end-cell-hamiltonian-creation
+// --------------------------------------------------------------------------------------------
 
-// start-cell-2
+// --------------------------------------------------------------------------------------------
+// start-cell-properties
 // Access one-electron integrals, returns const Eigen::MatrixXd&
 auto h1 = hamiltonian.get_one_body_integrals();
 
@@ -52,9 +55,11 @@ auto active_indices = hamiltonian.get_selected_orbital_indices();
 auto num_electrons = hamiltonian.get_num_electrons();
 // Returns size_t
 auto num_orbitals = hamiltonian.get_num_orbitals();
-// end-cell-2
+// end-cell-properties
+// --------------------------------------------------------------------------------------------
 
-// start-cell-3
+// --------------------------------------------------------------------------------------------
+// start-cell-serialization
 // Serialize to JSON file
 hamiltonian.to_json_file("molecule.hamiltonian.json");
 
@@ -80,9 +85,11 @@ nlohmann::json j = hamiltonian.to_json();
 
 // Load from JSON object
 auto hamiltonian_from_json = Hamiltonian::from_json(j);
-// end-cell-3
+// end-cell-serialization
+// --------------------------------------------------------------------------------------------
 
-// start-cell-4
+// --------------------------------------------------------------------------------------------
+// start-cell-validation
 // Check if the Hamiltonian data is complete and consistent
 // Returns bool
 bool valid = hamiltonian.is_valid();
@@ -93,4 +100,5 @@ bool has_one_body = hamiltonian.has_one_body_integrals();
 bool has_two_body = hamiltonian.has_two_body_integrals();
 bool has_orbitals = hamiltonian.has_orbitals();
 bool has_inactive_fock = hamiltonian.has_inactive_fock_matrix();
-// end-cell-4
+// end-cell-validation
+// --------------------------------------------------------------------------------------------
