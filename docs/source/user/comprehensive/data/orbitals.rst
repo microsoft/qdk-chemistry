@@ -124,8 +124,6 @@ The below example illustrates the typical access to Orbitals (via an SCF):
       const Eigen::MatrixXd& = orbitals->get_overlap_matrix();
 
 
-
-
 .. tab:: Python API
 
    .. literalinclude:: ../../../../examples/orbitals.py
@@ -137,13 +135,26 @@ Below demonstrates the simple construction of ModelOrbitals, which can then be p
 .. tab:: C++ API
 
    .. code-block:: cpp
+   
+   // Set basis set size 
+   size_t basis_size = 6; 
+
+   // Set active orbitals
+   std::vector<size_t> alpha_active = {1,2};
+   std::vector<size_t> beta_active = {2,3,4};
+   std::vector<size_t> alpha_inactive = {0,3,4,5};
+   std::vector<size_t> beta_inactive = {0,1,5};
+
+   ModelOrbitals model_orbitals(basis_size, std::make_tuple(alpha_active, beta_active, alpha_inactive, beta_inactive));
+
+   // We can then pass this object to a custom Hamiltonian constructor
 
 
 .. tab:: Python API
 
    .. literalinclude:: ../../../../examples/orbitals.py
       :language: python
-      :lines: 40-50
+      :lines: 40-51
 
 
 Related classes

@@ -24,11 +24,11 @@ scf_solver.settings().set("basis_set", "sto-3g")
 E_scf, wfn = scf_solver.run(structure, charge=0, spin_multiplicity=1)
 orbitals = wfn.get_orbitals()
 
-# Access orbital coefficients (returns tuple of alpha/beta matrices)
-coeffs_alpha, coeffs_beta = orbitals.get_coefficients()
+# Access orbital coefficients
+coeffs, _ = orbitals.get_coefficients()
 
-# Access orbital energies (returns tuple of alpha/beta vectors)
-energies_alpha, energies_beta = orbitals.get_energies()
+# Access orbital energies
+energies, _ = orbitals.get_energies()
 
 # Access atomic orbital overlap matrix
 ao_overlap = orbitals.get_overlap_matrix()
@@ -39,6 +39,7 @@ ao_overlap = orbitals.get_overlap_matrix()
 
 # Set basis set size 
 basis_size = 6 
+
 # Set active orbitals
 alpha_active = [1,2]
 beta_active = [2,3,4]
@@ -47,4 +48,4 @@ beta_inactive = [0,1,5]
 
 model_orbitals = ModelOrbitals(basis_size, (alpha_active, beta_active, alpha_inactive, beta_inactive))
 
-# we can then pass this object to a custom Hamiltonian constructor
+# We can then pass this object to a custom Hamiltonian constructor
