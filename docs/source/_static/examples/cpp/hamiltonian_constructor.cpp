@@ -6,12 +6,12 @@
 // license information.
 // --------------------------------------------------------------------------------------------
 
-#include <qdk/chemistry.hpp>
-using namespace qdk::chemistry::algorithms;
-
 // --------------------------------------------------------------------------------------------
 // start-cell-create
 // Create the default HamiltonianConstructor instance
+#include <qdk/chemistry.hpp>
+using namespace qdk::chemistry::algorithms;
+
 auto hamiltonian_constructor = HamiltonianConstructorFactory::create();
 // end-cell-create
 // --------------------------------------------------------------------------------------------

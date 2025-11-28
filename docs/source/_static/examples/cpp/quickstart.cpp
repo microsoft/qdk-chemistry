@@ -23,6 +23,7 @@
 #include <vector>
 
 using namespace qdk::chemistry;
+
 // -----------------------------------------------------------------------------
 // start-cell-wfn-fn-select-configs
 /**
