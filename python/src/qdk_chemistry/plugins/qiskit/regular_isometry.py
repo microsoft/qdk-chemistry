@@ -55,7 +55,7 @@ class RegularIsometryStatePreparation(StatePreparation):
                 f"{len(beta_indices)} beta orbitals. Asymmetric active spaces for "
                 "alpha and beta orbitals are not supported for state preparation."
             )
-    
+
         num_orbitals = len(alpha_indices)
         n_qubits = num_orbitals * 2
         num_dets = wavefunction.size()
