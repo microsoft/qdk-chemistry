@@ -17,6 +17,10 @@ API.
 
    Placeholder target for documents that refer to ``int64_t``.
 
+.. cpp:type:: uint64_t
+
+   Placeholder target for documents that refer to ``uint64_t``.
+
 .. cpp:type:: ReturnType
 
    Placeholder target for documents that refer to ``ReturnType``.
