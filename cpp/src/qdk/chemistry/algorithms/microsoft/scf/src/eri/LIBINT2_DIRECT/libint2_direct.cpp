@@ -327,16 +327,21 @@ class ERI {
     if (K) std::memset(K, 0, mat_size * sizeof(double));
 
     // Thread-local accumulation buffers for reproducibility
-    std::vector<std::vector<double>> J_local(nthreads);
-    std::vector<std::vector<double>> K_local(nthreads);
-    if (J) {
-      for (int t = 0; t < nthreads; ++t) {
-        J_local[t].resize(mat_size, 0.0);
+    std::vector<std::vector<double>> J_local(0);
+    std::vector<std::vector<double>> K_local(0);
+
+    if (use_thread_local_buffers_) {
+      J_local.resize(nthreads);
+      K_local.resize(nthreads);
+      if (J) {
+        for (int t = 0; t < nthreads; ++t) {
+          J_local[t].resize(mat_size, 0.0);
+        }
       }
-    }
-    if (K) {
-      for (int t = 0; t < nthreads; ++t) {
-        K_local[t].resize(mat_size, 0.0);
+      if (K) {
+        for (int t = 0; t < nthreads; ++t) {
+          K_local[t].resize(mat_size, 0.0);
+        }
       }
     }
 
@@ -353,8 +358,12 @@ class ERI {
       const auto& buf = engine.results();
 
       // Get pointers to thread-local buffers
-      double* J_thread = J ? J_local[thread_id].data() : nullptr;
-      double* K_thread = K ? K_local[thread_id].data() : nullptr;
+      double* J_thread = nullptr;
+      double* K_thread = nullptr;
+      if (use_thread_local_buffers_) {
+        J_thread = J ? J_local[thread_id].data() : nullptr;
+        K_thread = K ? K_local[thread_id].data() : nullptr;
+      }
 
       for (size_t s1 = 0ul, s1234 = 0ul; s1 < nsh; ++s1) {
         const auto bf1_st = shell2bf_[s1];
@@ -684,9 +693,12 @@ class ERI {
     for (int i = 1; i < nthreads; ++i) engines_coulomb[i] = engines_coulomb[0];
 
     // Thread-local accumulation buffers for reproducibility
-    std::vector<std::vector<double>> out_local(nthreads);
-    for (int t = 0; t < nthreads; ++t) {
-      out_local[t].resize(out_size, 0.0);
+    std::vector<std::vector<double>> out_local(0);
+    if (use_thread_local_buffers_) {
+      out_local.resize(nthreads);
+      for (int t = 0; t < nthreads; ++t) {
+        out_local[t].resize(out_size, 0.0);
+      }
     }
 
 #ifdef _OPENMP
@@ -702,7 +714,10 @@ class ERI {
       const auto& buf = engine.results();
 
       // Get pointer to thread-local buffer
-      double* out_thread = out_local[thread_id].data();
+      double* out_thread = nullptr;
+      if (use_thread_local_buffers_) {
+        out_thread = out_local[thread_id].data();
+      }
 
       for (size_t s1 = 0ul, s1234 = 0ul; s1 < nsh; ++s1) {
         const auto bf1_st = shell2bf_[s1];

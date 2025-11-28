@@ -40,7 +40,7 @@ DIIS_GDM::DIIS_GDM(const SCFContext& ctx, const size_t subspace_size,
   gdm_algorithm_ = std::make_unique<GDM>(ctx, gdm_config_);
 
   // Log initialization parameters
-  spdlog::info(
+  spdlog::debug(
       "DIIS_GDM initialized: subspace_size={}, max_diis_step={}, "
       "energy_thresh_diis_switch={}",
       subspace_size, gdm_config_.gdm_max_diis_iteration,

@@ -542,9 +542,12 @@ void SCFImpl::iterate_() {
   // update eigenvalues for GDM as GDM never updates eigenvalues_
   if (ctx_.cfg->scf_algorithm.method == SCFAlgorithmName::GDM ||
       ctx_.cfg->scf_algorithm.method == SCFAlgorithmName::DIIS_GDM) {
-    P_diff = P_ - P_last;
+    if (cfg->mpi.world_rank == 0) {
+      spdlog::info("Reset incremental Fock matrix");
+      reset_fock_();
+    }
     auto [alpha, beta, omega] = get_hyb_coeff_();
-    eri_->build_JK(P_diff.data(), J_.data(), K_.data(), alpha, beta, omega);
+    eri_->build_JK(P_.data(), J_.data(), K_.data(), alpha, beta, omega);
     update_fock_();
     for (int i = 0; i < num_density_matrices_; ++i) {
       scf_algorithm_->solve_fock_eigenproblem(
