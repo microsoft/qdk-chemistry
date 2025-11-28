@@ -25,7 +25,7 @@ class TestConfigurationToStatevectorIndex:
     """Test the _configuration_to_statevector_index helper function."""
 
     def test_basic_index_calculation(self):
-        """Test the canonical example
+        """Test the canonical example.
 
         Configuration "2ud0" with 4 orbitals:
         - Orbital 0: doubly occupied (alpha=1, beta=1)
@@ -84,7 +84,7 @@ class TestConfigurationToStatevectorIndex:
         """Test using only a subset of orbitals from configuration.
 
         Configuration "2ud000" using first 3 orbitals:
-        - Orbital 0: doubly 
+        - Orbital 0: doubly
         - Orbital 1: alpha
         - Orbital 2: beta
 

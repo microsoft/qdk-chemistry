@@ -37,7 +37,6 @@ if PYSCF_AVAILABLE:
     import qdk_chemistry.plugins.pyscf
     from qdk_chemistry.constants import ANGSTROM_TO_BOHR
     from qdk_chemistry.data import AOType, BasisSet, OrbitalType, Shell
-    from qdk_chemistry.plugins.pyscf.mcscf import mcsolver_to_fcisolver
     from qdk_chemistry.plugins.pyscf.conversion import (
         basis_to_pyscf_mol,
         hamiltonian_to_scf,
@@ -47,6 +46,7 @@ if PYSCF_AVAILABLE:
         pyscf_mol_to_qdk_basis,
         structure_to_pyscf_atom_labels,
     )
+    from qdk_chemistry.plugins.pyscf.mcscf import mcsolver_to_fcisolver
 
 
 pytestmark = pytest.mark.skipif(not PYSCF_AVAILABLE, reason="PySCF not available")
