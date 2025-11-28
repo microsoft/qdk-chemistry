@@ -122,7 +122,9 @@ Likewise for DFT:
       :language: python
       :lines: 34-41
 
-The PyScf solver class is available only in python (for more details regarding 3rd party implementations, refer to :doc:`Interfaces <../design/interfaces>`
+For a complete list of functionals and settings that are available in QDK/Chemistry please refer to :doc:`Functionals and Basis Sets <../basis_functionals>`/
+
+The PyScf solver class is available only in python (for more details regarding 3rd party implementations, refer to :doc:`Interfaces <../design/interfaces>`).
 .. tab:: Python API
 
    .. literalinclude:: ../../../../examples/scf_solver.py
