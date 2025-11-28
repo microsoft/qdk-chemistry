@@ -40,6 +40,7 @@ Default constructor for an empty configuration.
 
 Examples:
     >>> config = qdk_chemistry.Configuration()
+
 )");
 
   configuration.def(py::init<const std::string &>(),
@@ -47,10 +48,14 @@ Examples:
 Constructs a configuration from a string representation.
 
 Parameters:
-    str (str): String representation of the configuration where '0' = unoccupied orbital, '1' = alpha-occupied orbital, '2' = beta-occupied orbital, '3' = doubly-occupied orbital
+    str (str): String representation of the configuration
+
+        Where '0' = unoccupied orbital, '1' = alpha-occupied orbital,
+        '2' = beta-occupied orbital, '3' = doubly-occupied orbital
 
 Examples:
     >>> config = qdk_chemistry.Configuration("3322110")  # 7 orbitals with different occupations
+
 )",
                     py::arg("str"));
 
@@ -60,12 +65,16 @@ Examples:
 Convert the configuration to a string representation.
 
 Returns:
-    str: String representation where '0' = unoccupied orbital, '1' = alpha-occupied orbital, '2' = beta-occupied orbital, '3' = doubly-occupied orbital
+    str: String representation
+
+        where '0' = unoccupied orbital, '1' = alpha-occupied orbital,
+        '2' = beta-occupied orbital, '3' = doubly-occupied orbital
 
 Examples:
     >>> config = qdk_chemistry.Configuration("3322110")
     >>> print(config.to_string())
     3322110
+
 )");
 
   configuration.def("to_binary_strings", &Configuration::to_binary_strings,
@@ -73,16 +82,18 @@ Examples:
                     R"(
 Convert configuration to separate alpha and beta binary strings.
 
-Args:
-    num_orbitals (int, default=0): Number of spatial orbitals to use from the
-    configuration (default = 0, use all)
+Parameters:
+    num_orbitals (int, default=0): 
+    
+        Number of spatial orbitals to use from the configuration (default = 0, use all)
 
 Returns:
-    [str, str]: Tuple of binary strings (alpha, beta) where '1' indicates occupied
-                and '0' indicates unoccupied for each spin channel
+    [str, str]
+    
+        Tuple of binary strings (alpha, beta) where '1' indicates occupied
+        and '0' indicates unoccupied for each spin channel
 
 Examples:
-
     >>> config = qdk_chemistry.Configuration("2du0")
     >>> print(config.to_binary_strings())
     ("1010", "1100")
@@ -101,6 +112,7 @@ Examples:
     >>> config = qdk_chemistry.Configuration("3322110")
     >>> n_alpha, n_beta = config.get_n_electrons()
     >>> print(f"Alpha electrons: {n_alpha}, Beta electrons: {n_beta}")
+
 )");
 
   configuration.def("__eq__", &Configuration::operator==,
@@ -118,6 +130,7 @@ Examples:
     >>> config2 = qdk_chemistry.Configuration("3322110")
     >>> print(config1 == config2)
     True
+
 )",
                     py::arg("other"));
 
@@ -136,6 +149,7 @@ Examples:
     >>> config2 = qdk_chemistry.Configuration("3322111")
     >>> print(config1 != config2)
     True
+
 )",
                     py::arg("other"));
 
@@ -175,6 +189,7 @@ Examples:
     >>> config = qdk_chemistry.Configuration.canonical_hf_configuration(3, 2, 5)
     >>> print(config.to_string())
     22u00
+
 )",
       py::arg("n_alpha"), py::arg("n_beta"), py::arg("n_orbitals"));
 
@@ -188,6 +203,7 @@ Returns a string representation of the Configuration.
 
 Returns:
     str: String representation of the Configuration object
+
 )");
 
   configuration.def(
@@ -197,5 +213,6 @@ Returns a string representation of the Configuration.
 
 Returns:
     str: String representation of the Configuration as a orbital occupation string
+
 )");
 }

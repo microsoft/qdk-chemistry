@@ -51,27 +51,26 @@ This class defines the interface for checking the stability of wavefunctions in 
 Stability checking examines the second-order response of a wavefunction to determine if it corresponds to a true minimum or if there are directions in which the energy can be lowered.
 
 Examples:
-    To create a custom stability checker, inherit from this class:
-
-        >>> import qdk_chemistry.algorithms as alg
-        >>> import qdk_chemistry.data as data
-        >>> class MyStabilityChecker(alg.StabilityChecker):
-        ...     def __init__(self):
-        ...         super().__init__()  # Call the base class constructor
-        ...     # Implement the _run_impl method
-        ...     def _run_impl(self, wavefunction: data.Wavefunction) -> tuple[bool, data.StabilityResult]:
-        ...         # Custom stability checking implementation
-        ...         import numpy as np
-        ...         internal_eigenvalues = np.array([1.0, 2.0, 3.0])
-        ...         external_eigenvalues = np.array([0.5, 1.5])
-        ...         internal_eigenvectors = np.eye(3)
-        ...         external_eigenvectors = np.eye(2)
-        ...         internal_stable = np.all(internal_eigenvalues > 0)
-        ...         external_stable = np.all(external_eigenvalues > 0)
-        ...         result = data.StabilityResult(internal_stable, external_stable,
-        ...                                       internal_eigenvalues, internal_eigenvectors,
-        ...                                       external_eigenvalues, external_eigenvectors)
-        ...         return (result.is_stable(), result)
+    >>> # To create a custom stability checker, inherit from this class.
+    >>> import qdk_chemistry.algorithms as alg
+    >>> import qdk_chemistry.data as data
+    >>> class MyStabilityChecker(alg.StabilityChecker):
+    ...     def __init__(self):
+    ...         super().__init__()  # Call the base class constructor
+    ...     # Implement the _run_impl method
+    ...     def _run_impl(self, wavefunction: data.Wavefunction) -> tuple[bool, data.StabilityResult]:
+    ...         # Custom stability checking implementation
+    ...         import numpy as np
+    ...         internal_eigenvalues = np.array([1.0, 2.0, 3.0])
+    ...         external_eigenvalues = np.array([0.5, 1.5])
+    ...         internal_eigenvectors = np.eye(3)
+    ...         external_eigenvectors = np.eye(2)
+    ...         internal_stable = np.all(internal_eigenvalues > 0)
+    ...         external_stable = np.all(external_eigenvalues > 0)
+    ...         result = data.StabilityResult(internal_stable, external_stable,
+    ...                                       internal_eigenvalues, internal_eigenvectors,
+    ...                                       external_eigenvalues, external_eigenvectors)
+    ...         return (result.is_stable(), result)
 )");
 
   stability_checker.def(py::init<>(),
@@ -98,14 +97,8 @@ Args:
     wavefunction (qdk_chemistry.data.Wavefunction): The wavefunction to analyze for stability
 
 Returns:
-    tuple[bool, qdk_chemistry.data.StabilityResult]: A tuple containing
-        - bool: Overall stability status (True if stable, False if unstable)
-        - qdk_chemistry.data.StabilityResult: Detailed stability information containing:
-            - internal and external stability status (accessible via is_internal_stable(), is_external_stable())
-            - overall stability status (accessible via is_stable(), requires both internal and external to be stable)
-            - internal eigenvalues and eigenvectors (accessible via get_internal_eigenvalues(), get_internal_eigenvectors())
-            - external eigenvalues and eigenvectors (accessible via get_external_eigenvalues(), get_external_eigenvectors())
-            - overall smallest eigenvalue methods (accessible via get_smallest_eigenvalue())
+  tuple[bool, qdk_chemistry.data.StabilityResult]: Tuple of the overall stability flag and the detailed stability information (eigenvalues, eigenvectors, and helper accessors).
+
 )",
                         py::arg("wavefunction"));
 
@@ -115,6 +108,7 @@ Access the stability checker's configuration settings.
 
 Returns:
     qdk_chemistry.data.Settings: Reference to the settings object for configuring the stability checker
+
 )",
                         py::return_value_policy::reference_internal);
 

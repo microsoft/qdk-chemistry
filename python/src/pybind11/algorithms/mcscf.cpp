@@ -59,21 +59,20 @@ This class defines the interface for MultiConfigurationScf calculations that sim
 Concrete implementations should inherit from this class and implement the ``solve`` method.
 
 Examples:
-    To create a custom MultiConfigurationScf solver, inherit from this class:
-
-        >>> import qdk_chemistry.algorithms as alg
-        >>> import qdk_chemistry.data as data
-        >>> class MyMCSCF(alg.MultiConfigurationScf):
-        ...     def __init__(self):
-        ...         super().__init__()  # Call the base class constructor
-        ...     def _run_impl(self,
-        ...                   orbitals : data.Orbitals,
-        ...                   ham_ctor : alg.HamiltonianConstructor,
-        ...                   mc_calculator : alg.MultiConfigurationCalculator,
-        ...                   n_active_alpha_electrons : int,
-        ...                   n_active_beta_electrons : int) ->tuple[float, data.Wavefunction] :
-        ...         # Custom MCSCF implementation
-        ...         return -1.0, data.Wavefunction()
+    >>> # To create a custom MultiConfigurationScf algorithm, inherit from this class.
+    >>> import qdk_chemistry.algorithms as alg
+    >>> import qdk_chemistry.data as data
+    >>> class MyMCSCF(alg.MultiConfigurationScf):
+    ...     def __init__(self):
+    ...         super().__init__()  # Call the base class constructor
+    ...     def _run_impl(self,
+    ...                   orbitals : data.Orbitals,
+    ...                   ham_ctor : alg.HamiltonianConstructor,
+    ...                   mc_calculator : alg.MultiConfigurationCalculator,
+    ...                   n_active_alpha_electrons : int,
+    ...                   n_active_beta_electrons : int) ->tuple[float, data.Wavefunction] :
+    ...         # Custom MCSCF implementation
+    ...         return -1.0, data.Wavefunction()
 )");
 
   multi_configuration_scf.def(py::init<>(),
@@ -106,6 +105,7 @@ Args:
 
 Returns:
     tuple[float, qdk_chemistry.data.Wavefunction]: A tuple containing the calculated energy and the resulting wavefunction
+
 )",
       py::arg("orbitals"), py::arg("ham_ctor"), py::arg("mc_calculator"),
       py::arg("n_active_alpha_electrons"), py::arg("n_active_beta_electrons"));
@@ -116,6 +116,7 @@ Access the MultiConfigurationScf calculation settings.
 
 Returns:
     qdk_chemistry.data.Settings: Reference to the settings object for configuring the MultiConfigurationScf calculation
+
 )",
                               py::return_value_policy::reference_internal);
 
@@ -141,6 +142,7 @@ Examples:
     ...         super().__init__()
     ...         from qdk_chemistry.data import ElectronicStructureSettings
     ...         self._settings = ElectronicStructureSettings()
+
 )");
 
   multi_configuration_scf.def("type_name", &MultiConfigurationScf::type_name,
@@ -149,6 +151,7 @@ The algorithm's type name.
 
 Returns:
     str: The type name of the algorithm
+
 )");
 
   multi_configuration_scf.def("__repr__", [](const MultiConfigurationScf&) {

@@ -397,16 +397,16 @@ void bind_settings(pybind11::module &data) {
 
   // Bind SettingValue variant
   py::class_<SettingValue> setting_value(data, "SettingValue", R"(
-    Type-safe variant for storing different setting value types.
+Type-safe variant for storing different setting value types.
 
-    This variant can hold common types used in settings configurations:
-    bool, int, float, double, string, vector<int>, vector<float>, vector<double>, vector<string>
-    )");
+This variant can hold common types used in settings configurations:
+bool, int, long, size_t, float, double, string, vector<int>, vector<double>, vector<string>
+)");
 
   // Bind exception classes
   py::register_exception<SettingNotFound>(data, "SettingNotFound");
   py::register_exception<SettingTypeMismatch>(data, "SettingTypeMismatch");
-  py::register_exception<SettingAreLocked>(data, "SettingAreLocked");
+  py::register_exception<SettingsAreLocked>(data, "SettingsAreLocked");
 
   // Utility functions for conversion
   data.def("setting_value_to_python", &setting_value_to_python,
@@ -929,8 +929,8 @@ Examples:
     >>> settings["method"] = "hf"
     >>> settings["max_iterations"] = 100
     >>> settings.lock()
-    >>> # Any further modifications will raise SettingAreLocked exception
-    >>> settings["method"] = "dft"  # Raises SettingAreLocked
+    >>> # Any further modifications will raise SettingsAreLocked exception
+    >>> settings["method"] = "dft"  # Raises SettingsAreLocked
 )");
 
   settings.def(
@@ -2214,12 +2214,12 @@ This class extends the base Settings class with default values commonly used in 
 
 The default settings include:
 
-    * method: "hf" - The electronic structure method (Hartree-Fock)
-    * charge: 0 - Molecular charge
-    * spin_multiplicity: 1 - Spin multiplicity (2S+1)
-    * basis_set: "def2-svp" - Default basis set
-    * tolerance: 1e-6 - Convergence tolerance
-    * max_iterations: 50 - Maximum number of iterations
+- method: "hf" - The electronic structure method (Hartree-Fock)
+- charge: 0 - Molecular charge
+- spin_multiplicity: 1 - Spin multiplicity (2S+1)
+- basis_set: "def2-svp" - Default basis set
+- tolerance: 1e-6 - Convergence tolerance
+- max_iterations: 50 - Maximum number of iterations
 
 These defaults can be overridden by setting new values after instantiation.
 
@@ -2233,9 +2233,9 @@ Examples:
     >>> settings.max_iterations = 100  # Increase max iterations
 )")
       .def(py::init<>(), R"(
-    Create ElectronicStructureSettings with default values.
+Create ElectronicStructureSettings with default values.
 
-    Initializes settings with sensible defaults for electronic structure
-    calculations. All defaults can be modified after construction.
+Initializes settings with sensible defaults for electronic structure
+calculations. All defaults can be modified after construction.
 )");
 }

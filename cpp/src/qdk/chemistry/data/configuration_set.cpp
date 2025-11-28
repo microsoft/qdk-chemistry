@@ -51,19 +51,19 @@ const Configuration& ConfigurationSet::at(size_t idx) const {
   return _configurations.at(idx);
 }
 
-ConfigurationSet::const_iterator ConfigurationSet::begin() const {
+std::vector<Configuration>::const_iterator ConfigurationSet::begin() const {
   return _configurations.begin();
 }
 
-ConfigurationSet::const_iterator ConfigurationSet::end() const {
+std::vector<Configuration>::const_iterator ConfigurationSet::end() const {
   return _configurations.end();
 }
 
-ConfigurationSet::const_iterator ConfigurationSet::cbegin() const {
+std::vector<Configuration>::const_iterator ConfigurationSet::cbegin() const {
   return _configurations.cbegin();
 }
 
-ConfigurationSet::const_iterator ConfigurationSet::cend() const {
+std::vector<Configuration>::const_iterator ConfigurationSet::cend() const {
   return _configurations.cend();
 }
 

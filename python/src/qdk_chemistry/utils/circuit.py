@@ -5,15 +5,22 @@
 # Licensed under the MIT License. See LICENSE.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
 
+from __future__ import annotations
+
 import logging
+from typing import TYPE_CHECKING
 
 from qiskit import QuantumCircuit, qasm3
-from qsharp._native import Circuit
 from qsharp.openqasm import circuit
 
 from qdk_chemistry.plugins.qiskit._interop.circuit import analyze_qubit_status
 
+if TYPE_CHECKING:
+    import qsharp
+
 _LOGGER = logging.getLogger(__name__)
+
+__all__ = ["qasm_to_qdk_circuit"]
 
 
 def _trim_circuit(circuit_qasm: str, remove_idle_qubits: bool = True, remove_classical_qubits: bool = True) -> str:
@@ -81,7 +88,7 @@ def _trim_circuit(circuit_qasm: str, remove_idle_qubits: bool = True, remove_cla
 
 def qasm_to_qdk_circuit(
     circuit_qasm: str, remove_idle_qubits: bool = True, remove_classical_qubits: bool = True
-) -> Circuit:
+) -> qsharp._native.Circuit:
     """Parse a QASM circuit into a QDK Circuit object with trimming options.
 
     Args:

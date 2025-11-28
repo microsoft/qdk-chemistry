@@ -20,6 +20,8 @@ from qiskit.quantum_info import SparsePauliOp
 from qdk_chemistry.data import Wavefunction
 from qdk_chemistry.data.base import DataClass
 
+__all__ = ["filter_and_group_pauli_ops_from_wavefunction"]
+
 
 class QubitHamiltonian(DataClass):
     """Data class for representing chemical electronic Hamiltonians in qubits.

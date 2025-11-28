@@ -54,17 +54,17 @@ This class defines the interface for coupled cluster-based quantum chemistry cal
 Concrete implementations should inherit from this class and implement the ``calculate`` method.
 
 Examples:
-    To create a custom coupled cluster calculator, inherit from this class:
+    >>> # To create a custom coupled cluster calculator, inherit from this class.
+    >>> import qdk_chemistry.algorithms as alg
+    >>> import qdk_chemistry.data as data
+    >>> class MyCCCalculator(alg.CoupledClusterCalculator):
+    ...     def __init__(self):
+    ...         super().__init__()  # Call the base class constructor
+    ...     # Implement the _run_impl method (called by calculate())
+    ...     def _run_impl(self, ansatz: data.Ansatz) -> tuple[float, data.CoupledClusterAmplitudes]:
+    ...         # Custom CC implementation
+    ...         return energy, coupled_cluster_amplitudes
 
-        >>> import qdk_chemistry.algorithms as alg
-        >>> import qdk_chemistry.data as data
-        >>> class MyCCCalculator(alg.CoupledClusterCalculator):
-        ...     def __init__(self):
-        ...         super().__init__()  # Call the base class constructor
-        ...     # Implement the _run_impl method (called by calculate())
-        ...     def _run_impl(self, ansatz: data.Ansatz) -> tuple[float, data.CoupledClusterAmplitudes]:
-            ...         # Custom CC implementation
-            ...         return energy, coupled_cluster_amplitudes
 )");
 
   cc_calculator.def(py::init<>(),
@@ -78,6 +78,7 @@ Examples:
     >>> cc = alg.CoupledClusterCalculator()
     >>> cc.settings().set("max_iterations", 50)
     >>> cc.settings().set("energy_threshold", 1e-8)
+
 )");
 
   cc_calculator.def("run", &CoupledClusterCalculator::run,
@@ -92,6 +93,7 @@ Returns:
 
 Raises:
     SettingsAreLocked: If attempting to modify settings after run() is called
+
 )",
                     py::arg("ansatz"));
 
@@ -101,6 +103,7 @@ Access the calculator's configuration settings.
 
 Returns:
     qdk_chemistry.data.Settings: Reference to the settings object for configuring the calculator
+
 )",
                     py::return_value_policy::reference_internal);
 
@@ -126,6 +129,7 @@ Examples:
     ...         super().__init__()
     ...         from qdk_chemistry.data import ElectronicStructureSettings
     ...         self._settings = ElectronicStructureSettings()
+
 )");
 
   cc_calculator.def("type_name", &CoupledClusterCalculator::type_name,
@@ -134,6 +138,7 @@ The algorithm's type name.
 
 Returns:
     str: The type name of the algorithm
+
 )");
 
   // Factory class binding - creates CoupledClusterCalculatorFactory class

@@ -7,6 +7,7 @@ add and remove custom algorithms at runtime.
 
 Algorithm Lifecycle Management
 ------------------------------
+
 The registry system handles the lifecycle of algorithm instances to prevent memory issues. When
 Python-implemented algorithms are registered, they need special handling during Python interpreter
 shutdown to avoid "double-free" errors that can occur when C++ static deinitialization runs after
@@ -15,10 +16,13 @@ Python's garbage collection.
 This module automatically registers cleanup handlers (via `atexit`) that unregister all custom
 algorithms before Python shuts down. Users should never need to call the cleanup functions directly.
 
-Important Notes:
-- All registration functions in this module provide automatic cleanup
-- Custom Python algorithms are automatically unregistered during interpreter shutdown
-- The cleanup functions are NOT intended to be called by users
+Important Notes
+---------------
+
+* All registration functions in this module provide automatic cleanup.
+* Custom Python algorithms are automatically unregistered during interpreter shutdown.
+* The cleanup functions are **not** intended to be called by users.
+
 """
 
 # --------------------------------------------------------------------------------------------
@@ -26,26 +30,25 @@ Important Notes:
 # Licensed under the MIT License. See LICENSE.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
 
+from __future__ import annotations
+
 import atexit
-from collections.abc import Callable
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
-from qdk_chemistry._core._algorithms import (
-    ActiveSpaceSelectorFactory,
-    CoupledClusterCalculatorFactory,
-    HamiltonianConstructorFactory,
-    LocalizerFactory,
-    MultiConfigurationCalculatorFactory,
-    MultiConfigurationScfFactory,
-    ProjectedMultiConfigurationCalculatorFactory,
-    ScfSolverFactory,
-    StabilityCheckerFactory,
-)
-from qdk_chemistry.algorithms.energy_estimator import EnergyEstimatorFactory, QDKEnergyEstimator
-from qdk_chemistry.algorithms.qubit_mapper import QubitMapperFactory
-from qdk_chemistry.algorithms.state_preparation import SparseIsometryGF2XStatePreparation, StatePreparationFactory
+if TYPE_CHECKING:
+    from collections.abc import Callable
 
-from .base import Algorithm, AlgorithmFactory
+    from qdk_chemistry.algorithms.base import Algorithm, AlgorithmFactory
+
+__all__ = [
+    "available",
+    "create",
+    "register",
+    "register_factory",
+    "show_settings",
+    "unregister",
+    "unregister_factory",
+]
 
 # Universal cleanup solution for all algorithms
 __cleanup_registered: bool = False
@@ -57,27 +60,27 @@ def create(algorithm_type: str, algorithm_name: str | None = None, **kwargs) -> 
     """Create an algorithm instance by type and name.
 
     This function creates an algorithm instance from the registry using the specified
-    algorithm type and name. If no name is provided, the default algorithm for that
+    algorithm type and name. If no name is provided, the default implementation for that
     type is created.
 
-    Available algorithm types and algorithms are dependent on the QDK/Chemistry installation
-    but importantly also the loaded plugins and registered custom algorithms. If an
-    expected algorithm is not found, ensure that the corresponding plugin is loaded
-    or that the custom algorithm is registered.
-
-    The currently loaded algorithms can be queried using the `available()` function.
-    Which lists the available algorithms by type for all currently loaded plugins and
-    registered custom algorithms.
+    Available algorithm types depend on the installed plugins and any user-registered
+    algorithms. Use :func:`available` to inspect what is currently loaded before calling
+    :func:`create`.
 
     Args:
-        algorithm_type (str): The type of algorithm to create (e.g., "scf_solver",
-            "active_space_selector", "coupled_cluster_calculator").
-        algorithm_name (Optional[str]): The specific name of the algorithm implementation
-            to create. If None or empty string, creates the default algorithm for that type.
-        **kwargs: Optional keyword arguments to configure the algorithm's settings.
-            These are passed directly to the algorithm's settings via `settings().update()`.
-            Available settings depend on the specific algorithm type and implementation
-            and can be looked up with show_settings() method in .
+        algorithm_type (str): The type of algorithm to create.
+
+            (e.g., "scf_solver", "active_space_selector", "coupled_cluster_calculator").
+
+        algorithm_name (Optional[str]): The specific name of the algorithm implementation to create.
+
+            If None or empty string, creates the default algorithm for that type.
+
+        kwargs: Optional keyword arguments (passed via ``**kwargs``).
+
+            These configure the algorithm's settings. These are forwarded directly to the algorithm's settings
+            via `settings().update()`. Available settings depend on the specific algorithm
+            type and implementation and can be looked up with show_settings().
 
     Returns:
         Algorithm: The created algorithm instance.
@@ -133,8 +136,10 @@ def show_settings(algorithm_type: str, algorithm_name: str) -> list[tuple[str, s
     algorithm, including their names, expected Python types, and default values.
 
     Args:
-        algorithm_type (str): The type of algorithm (e.g., "scf_solver",
-            "active_space_selector", "coupled_cluster_calculator").
+        algorithm_type (str): The type of algorithm.
+
+            (e.g., "scf_solver", "active_space_selector", "coupled_cluster_calculator").
+
         algorithm_name (str): The specific name of the algorithm implementation.
 
     Returns:
@@ -187,8 +192,10 @@ def register(generator: Callable[[], Algorithm]) -> None:
     the returned instance.
 
     Args:
-        generator (Callable[[], Algorithm]): A callable that returns a new instance of
-            the custom algorithm. This will be called each time the algorithm is created
+        generator (Callable[[], Algorithm]): A callable that returns a new instance.
+
+            Need to reurn an instance of the custom algorithm.
+            This will be called each time the algorithm is created
             from the factory.
 
     Raises:
@@ -232,10 +239,13 @@ def available(algorithm_type: str | None = None) -> dict[str, list[str]] | list[
 
     Args:
         algorithm_type (Optional[str]): If provided, only list algorithms of this type.
+
             If None, list all algorithms across all types.
 
     Returns:
-        dict[str, list[str]] | list[str]: When algorithm_type is None, returns a dictionary
+        dict[str, list[str]] | list[str]: Information on available algorithms.
+
+            When algorithm_type is None, returns a dictionary
             where keys are algorithm type names and values are lists of available algorithm
             names for that type. When algorithm_type is specified, returns a list of available
             algorithm names for that specific type (empty list if type not found or no
@@ -274,10 +284,11 @@ def unregister(algorithm_type: str, algorithm_name: str) -> None:
     This function removes a previously registered algorithm from the registry.
 
     Args:
-        algorithm_type (str): The type of algorithm to unregister
+        algorithm_type (str): The type of algorithm to unregister.
+
             (e.g., "scf_solver", "active_space_selector").
-        algorithm_name (str): The name of the specific algorithm implementation
-            to unregister.
+
+        algorithm_name (str): The name of the specific algorithm implementation to unregister.
 
     Raises:
         KeyError: If the specified algorithm type is not registered in the system.
@@ -339,6 +350,18 @@ def unregister_factory(algorithm_type: str) -> None:
 
 
 def _register_cpp_factories():
+    from qdk_chemistry._core._algorithms import (  # noqa: PLC0415
+        ActiveSpaceSelectorFactory,
+        CoupledClusterCalculatorFactory,
+        HamiltonianConstructorFactory,
+        LocalizerFactory,
+        MultiConfigurationCalculatorFactory,
+        MultiConfigurationScfFactory,
+        ProjectedMultiConfigurationCalculatorFactory,
+        ScfSolverFactory,
+        StabilityCheckerFactory,
+    )
+
     register_factory(ActiveSpaceSelectorFactory)
     register_factory(CoupledClusterCalculatorFactory)
     register_factory(HamiltonianConstructorFactory)
@@ -351,6 +374,10 @@ def _register_cpp_factories():
 
 
 def _register_python_factories():
+    from qdk_chemistry.algorithms.energy_estimator import EnergyEstimatorFactory  # noqa: PLC0415
+    from qdk_chemistry.algorithms.qubit_mapper import QubitMapperFactory  # noqa: PLC0415
+    from qdk_chemistry.algorithms.state_preparation import StatePreparationFactory  # noqa: PLC0415
+
     register_factory(EnergyEstimatorFactory())
     register_factory(StatePreparationFactory())
     register_factory(QubitMapperFactory())
@@ -395,6 +422,13 @@ def _cleanup_algorithms():
         factory.clear()
 
 
-# Register built-in Python energy estimators
-register(lambda: QDKEnergyEstimator())
-register(lambda: SparseIsometryGF2XStatePreparation())
+def _register_python_algorithms():
+    from qdk_chemistry.algorithms.energy_estimator import QDKEnergyEstimator  # noqa: PLC0415
+    from qdk_chemistry.algorithms.state_preparation import SparseIsometryGF2XStatePreparation  # noqa: PLC0415
+
+    # Register built-in Python energy estimators
+    register(lambda: QDKEnergyEstimator())
+    register(lambda: SparseIsometryGF2XStatePreparation())
+
+
+_register_python_algorithms()
