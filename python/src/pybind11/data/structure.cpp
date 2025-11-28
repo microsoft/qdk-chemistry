@@ -65,6 +65,30 @@ std::shared_ptr<Structure> structure_from_hdf5_file_wrapper(
       qdk::chemistry::python::utils::to_string_path(filename));
 }
 
+std::shared_ptr<Structure> structure_from_hdf5_wrapper(
+    const py::object &h5py_group) {
+  // Get h5py module
+  py::module_ h5py = py::module_::import("h5py");
+
+  // Check if this is an h5py Group or File
+  if (!py::isinstance(h5py_group, h5py.attr("Group")) &&
+      !py::isinstance(h5py_group, h5py.attr("File"))) {
+    throw std::runtime_error(
+        "from_hdf5() expects an h5py.Group or h5py.File object");
+  }
+
+  // Get the low-level HDF5 ID from the h5py object
+  py::object id_obj = h5py_group.attr("id");
+  py::object id_attr = id_obj.attr("id");
+  hid_t group_id = id_attr.cast<hid_t>();
+
+  // Open the H5::Group from the ID
+  H5::Group cpp_group(group_id);
+
+  // Call the C++ from_hdf5 method
+  return Structure::from_hdf5(cpp_group);
+}
+
 }  // namespace
 
 void bind_structure(py::module &m) {
@@ -829,6 +853,29 @@ Examples:
     >>> structure.to_hdf5_file(Path("water.structure.h5"))
 )",
                 py::arg("filename"));
+
+  structure.def_static("from_hdf5", structure_from_hdf5_wrapper,
+                       R"(
+Load structure from HDF5 group (static method).
+
+Args:
+    group (h5py.Group | h5py.File): HDF5 group or file object to load data from
+
+Returns:
+    Structure: New Structure object loaded from the group
+
+Raises:
+    RuntimeError: If the group cannot be read or contains invalid structure data
+
+Examples:
+    >>> import h5py
+    >>> with h5py.File("data.structure.h5", "r") as f:
+    ...     water = Structure.from_hdf5(f)
+    >>> with h5py.File("data.structure.h5", "r") as f:
+    ...     group = f["structure"]
+    ...     water = Structure.from_hdf5(group)
+)",
+                       py::arg("group"));
 
   structure.def_static("from_hdf5_file", structure_from_hdf5_file_wrapper,
                        R"(
