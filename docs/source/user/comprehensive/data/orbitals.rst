@@ -53,20 +53,17 @@ However, for advanced use cases, you can create and populate orbitals directly:
 
 .. tab:: C++ API
 
-   .. literalinclude:: ../../../../examples/cpp/orbitals.cpp
+   .. literalinclude:: ../../../_static/examples/cpp/orbitals.cpp
       :language: cpp
-      :start-after: // start-cell-1
-      :end-before: // end-cell-1
+      :start-after: // start-cell-create
+      :end-before: // end-cell-create
 
 .. tab:: Python API
 
-   .. note::
-      This example shows the API pattern. For complete working examples, see the test suite.
-
-   .. literalinclude:: ../../../examples/python/orbitals.py
+   .. literalinclude:: ../../../_static/examples/python/orbitals.py
       :language: python
-      :start-after: # start-cell-1
-      :end-before: # end-cell-1
+      :start-after: # start-cell-create
+      :end-before: # end-cell-create
 
 Accessing Orbital Data
 ----------------------
@@ -77,20 +74,17 @@ For spin-dependent properties, methods return pairs of (alpha, beta) data.
 
 .. tab:: C++ API
 
-   .. literalinclude:: ../../../../examples/cpp/orbitals.cpp
+   .. literalinclude:: ../../../_static/examples/cpp/orbitals.cpp
       :language: cpp
-      :start-after: // start-cell-2
-      :end-before: // end-cell-2
+      :start-after: // start-cell-access
+      :end-before: // end-cell-access
 
 .. tab:: Python API
 
-   .. note::
-      This example shows the API pattern. For complete working examples, see the test suite.
-
-   .. literalinclude:: ../../../examples/python/orbitals.py
+   .. literalinclude:: ../../../_static/examples/python/orbitals.py
       :language: python
-      :start-after: # start-cell-2
-      :end-before: # end-cell-2
+      :start-after: # start-cell-access
+      :end-before: # end-cell-access
 
 Serialization
 -------------
@@ -172,20 +166,17 @@ HDF5 representation of an :class:`~qdk_chemistry.data.Orbitals` object has the f
 
 .. tab:: C++ API
 
-   .. literalinclude:: ../../../../examples/cpp/orbitals.cpp
+   .. literalinclude:: ../../../_static/examples/cpp/orbitals.cpp
       :language: cpp
-      :start-after: // start-cell-3
-      :end-before: // end-cell-3
+      :start-after: // start-cell-serialization
+      :end-before: // end-cell-serialization
 
 .. tab:: Python API
 
-   .. note::
-      This example shows the API pattern. For complete working examples, see the test suite.
-
-   .. literalinclude:: ../../../examples/python/orbitals.py
+   .. literalinclude:: ../../../_static/examples/python/orbitals.py
       :language: python
-      :start-after: # start-cell-3
-      :end-before: # end-cell-3
+      :start-after: # start-cell-serialization
+      :end-before: # end-cell-serialization
 
 Orbital transformations and applications
 ----------------------------------------
@@ -212,8 +203,9 @@ Related classes
 - :doc:`ScfSolver <../algorithms/scf_solver>`: Algorithm that produces orbitals
 - :doc:`Localizer <../algorithms/localizer>`: Algorithms for orbital transformations
 
-Related topics
---------------
+Further reading
+---------------
 
+- The above examples can be downloaded as complete `C++ <../../../_static/examples/cpp/orbitals.cpp>`_ and `Python <../../../_static/examples/python/orbitals.py>`_ scripts.
 - :doc:`Serialization <../data/serialization>`: Data serialization and deserialization
 - :doc:`Settings <../design/settings>`: Configuration settings for algorithms
