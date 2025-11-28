@@ -25,7 +25,7 @@ void bind_coupled_cluster(pybind11::module& data) {
   py::class_<CoupledClusterAmplitudes, DataClass, py::smart_holder>
       coupled_cluster(data, "CoupledClusterAmplitudes",
                       R"(
-    Represents coupled cluster amplitudes.
+Represents coupled cluster amplitudes.
 
 This class stores the coupled cluster amplitudes and associated orbital information:
 
@@ -46,6 +46,7 @@ Args:
 Examples:
     >>> original = CoupledClusterAmplitudes(...)
     >>> copy = CoupledClusterAmplitudes(original)
+
 )");
   coupled_cluster.def(
       py::init<
@@ -64,6 +65,7 @@ Args:
     t2_amplitudes (numpy.ndarray): The T2 amplitudes vector (flattened from 4D tensor)
     n_alpha_electrons (int): The number of alpha electrons
     n_beta_electrons (int): The number of beta electrons
+
 )");
 
   // Amplitude Management
@@ -82,6 +84,7 @@ Examples:
     >>> cc = CoupledClusterAmplitudes(...)
     >>> t1 = cc.get_t1_amplitudes()
     >>> print(f"T1 shape: {t1.shape}")
+
 )",
                           py::return_value_policy::reference_internal);
 
@@ -98,6 +101,7 @@ Examples:
     ...     t1 = cc.get_t1_amplitudes()
     ... else:
     ...     print("T1 amplitudes not available")
+
 )");
 
   bind_getter_as_property(coupled_cluster, "get_t2_amplitudes",
@@ -115,6 +119,7 @@ Examples:
     >>> cc = CoupledClusterAmplitudes(...)
     >>> t2 = cc.get_t2_amplitudes()
     >>> print(f"T2 vector length: {len(t2)}")
+
 )",
                           py::return_value_policy::reference_internal);
 
@@ -131,6 +136,7 @@ Examples:
     ...     t2 = cc.get_t2_amplitudes()
     ... else:
     ...     print("T2 amplitudes not available")
+
 )");
 
   coupled_cluster.def("get_num_occupied",
@@ -139,12 +145,14 @@ Examples:
 Get number of occupied orbitals.
 
 Returns:
-    tuple: A tuple of two integers ``(alpha_count, beta_count)`` containing the
-    number of occupied orbitals for each spin channel.
+    tuple: A tuple of two integers ``(alpha_count, beta_count)``
+
+        containing the number of occupied orbitals for each spin channel.
 
 Examples:
     >>> num_alpha_occupied_orbitals, num_beta_occupied_orbitals = cc.get_num_occupied()
     >>> print(f"Occupied orbitals: α={num_alpha_occupied_orbitals}, β={num_beta_occupied_orbitals}")
+
 )");
 
   coupled_cluster.def("get_num_virtual",
@@ -153,10 +161,13 @@ Examples:
 Get number of virtual orbitals.
 
 Returns:
-    tuple: A tuple of two integers ``(alpha_count, beta_count)`` containing the number of virtual orbitals for each spin channel.
+    tuple: A tuple of two integers ``(alpha_count, beta_count)``
+
+        containing the number of virtual orbitals for each spin channel.
 
 Examples:
     >>> num_alpha_virtual_orbitals, num_beta_virtual_orbitals = cc.get_num_virtual()
     >>> print(f"Virtual orbitals: α={num_alpha_virtual_orbitals}, β={num_beta_virtual_orbitals}")
+
 )");
 }

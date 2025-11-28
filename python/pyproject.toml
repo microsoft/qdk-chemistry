@@ -241,7 +241,8 @@ install-dir = "qdk_chemistry"
 [tool.scikit-build.cmake.define]
 BUILD_SHARED_LIBS = "OFF"
 QDK_CHEMISTRY_ENABLE_COVERAGE = {env="QDK_CHEMISTRY_ENABLE_COVERAGE", default="OFF"}
-QDK_UARCH = {env="QDK_UARCH", default="x86-64"}
+QDK_UARCH = {env="QDK_UARCH", default="native"}
+QDK_ENABLE_OPENMP = {env="QDK_ENABLE_OPENMP"}
 CMAKE_BUILD_PARALLEL_LEVEL = {env="CMAKE_BUILD_PARALLEL_LEVEL", default="4"}
 
 [[tool.scikit-build.overrides]]

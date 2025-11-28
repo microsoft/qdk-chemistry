@@ -59,8 +59,8 @@ class HamiltonianConstructor
    *
    * @throw std::runtime_error if Hamiltonian construction fails
    * @throw std::invalid_argument if orbital data is incomplete or invalid
-   * @throws SettingsAreLocked if attempting to modify settings after
-   * run) is called
+   * @throws qdk::chemistry::data::SettingsAreLocked if attempting to modify
+   * settings after run) is called
    *
    * @note Settings are automatically locked when this method is called and
    * cannot be modified during or after execution.

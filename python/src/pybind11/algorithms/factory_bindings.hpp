@@ -53,22 +53,25 @@ This class provides static methods for creating, listing, and managing algorithm
 
 All methods are static and the class cannot be instantiated.
 
-See also:
-    create : Create an algorithm instance by name
-    available : List all registered algorithm names
-    register_instance : Register a new algorithm implementation
-    unregister_instance : Remove an algorithm from the registry
-    has : Check if an algorithm name is registered
+See Also:
+    :meth:`create` : Create an algorithm instance by name
+    :meth:`available` : List all registered algorithm names
+    :meth:`register_instance` : Register a new algorithm implementation
+    :meth:`unregister_instance` : Remove an algorithm from the registry
+    :meth:`has` : Check if an algorithm name is registered
+
 )");
 
   // Bind create static method
   factory.def_static("create", &FactoryType::create, py::arg("name") = "",
-                     R"(Create an algorithm instance by name.
+                     R"(
+Create an algorithm instance by name.
 
 If no name is provided or the name is empty, returns the default implementation.
 
 Args:
     name (Optional[str]): Name identifying which algorithm implementation to create.
+
         If empty string (default), returns the default implementation.
 
 Returns:
@@ -80,11 +83,13 @@ Raises:
 Examples:
     >>> algo = Factory.create("implementation_name")
     >>> default_algo = Factory.create()
+
 )");
 
   // Bind available static method
   factory.def_static("available", &FactoryType::available,
-                     R"(Get a list of all registered algorithm names.
+                     R"(
+Get a list of all registered algorithm names.
 
 Returns:
     list[str]: List of all registered algorithm implementation names
@@ -92,6 +97,7 @@ Returns:
 Examples:
     >>> names = Factory.available()
     >>> print(f"Available implementations: {names}")
+
 )");
 
   // Bind register_instance static method with conditional compilation
@@ -107,12 +113,14 @@ Examples:
               });
         },
         py::arg("func"),
-        R"(Register a new algorithm implementation.
+        R"(
+Register a new algorithm implementation.
 
 The algorithm is registered under its primary name and all aliases as determined by the instance's name() and aliases() methods.
 
 Args:
     func (callable): Function that returns an algorithm instance.
+
         The instance must implement the required algorithm interface.
 
 Raises:
@@ -122,6 +130,7 @@ Examples:
     >>> def create_custom():
     ...     return MyCustomAlgorithm()
     >>> Factory.register_instance(create_custom)
+
 )");
   } else {
     // No trampoline - C++ only
@@ -135,20 +144,23 @@ Examples:
               });
         },
         py::arg("func"),
-        R"(Register a new algorithm implementation.
+        R"(
+Register a new algorithm implementation.
 
 Args:
     func (callable): Function that returns an algorithm instance
 
 Raises:
     RuntimeError: If registration fails due to name conflicts or type validation
+
 )");
   }
 
   // Bind unregister_instance static method
   factory.def_static("unregister_instance", &FactoryType::unregister_instance,
                      py::arg("key"),
-                     R"(Unregister an algorithm implementation.
+                     R"(
+Unregister an algorithm implementation.
 
 Args:
     key (str): Name or alias identifying the algorithm to remove
@@ -159,19 +171,24 @@ Returns:
 Examples:
     >>> Factory.unregister_instance("my_custom")
     True
+
 )");
   // Bind has static method
   factory.def_static("algorithm_type_name", &FactoryType::algorithm_type_name,
-                     R"(Return the type name of the created algorithms.
+                     R"(
+Return the type name of the created algorithms.
 
 Returns:
     str: The type name of the created algorithms
+
 )");
   factory.def_static("clear", &FactoryType::clear,
-                     R"(Clear all registered algorithm implementations.
+                     R"(
+Clear all registered algorithm implementations.
 )");
   factory.def_static("has", &FactoryType::has, py::arg("key"),
-                     R"(Check if an algorithm name exists in the registry.
+                     R"(
+Check if an algorithm name exists in the registry.
 
 Args:
     key (str): Name or alias to check
@@ -182,6 +199,7 @@ Returns:
 Examples:
     >>> if Factory.has("implementation_name"):
     ...     algo = Factory.create("implementation_name")
+
 )");
 
   // Add __repr__ for the class (though it can't be instantiated)

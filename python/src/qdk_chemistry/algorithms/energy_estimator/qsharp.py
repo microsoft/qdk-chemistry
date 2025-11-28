@@ -8,17 +8,15 @@
 import logging
 from collections import Counter
 
-from qsharp import BitFlipNoise, DepolarizingNoise, PauliNoise, PhaseFlipNoise
+import qsharp
 from qsharp.openqasm import run
 
-from qdk_chemistry.algorithms.energy_estimator.energy_estimator import (
-    EnergyEstimator,
-    compute_energy_expectation_from_bitstrings,
-    create_measurement_circuits,
-)
+from qdk_chemistry.algorithms.energy_estimator.energy_estimator import EnergyEstimator
 from qdk_chemistry.data import EnergyExpectationResult, MeasurementData, QubitHamiltonian
 
 _LOGGER = logging.getLogger(__name__)
+
+__all__: list[str] = []
 
 
 class QDKEnergyEstimator(EnergyEstimator):
@@ -31,7 +29,11 @@ class QDKEnergyEstimator(EnergyEstimator):
     def __init__(
         self,
         seed: int = 42,
-        noise_model: DepolarizingNoise | BitFlipNoise | PauliNoise | PhaseFlipNoise | None = None,
+        noise_model: qsharp.DepolarizingNoise
+        | qsharp.BitFlipNoise
+        | qsharp.PauliNoise
+        | qsharp.PhaseFlipNoise
+        | None = None,
         qubit_loss: float = 0.0,
     ):
         """Initialize the Estimator with a backend and optional transpilation settings.
@@ -92,7 +94,7 @@ class QDKEnergyEstimator(EnergyEstimator):
             shots_list: A list of shots allocated for each measurement circuit.
 
         Returns:
-            ``MeasurementData`` containing the measurement counts and Hamiltonian data.
+            MeasurementData: Measurement counts paired with their corresponding ``QubitHamiltonian`` objects.
 
         """
         counts = self._run_measurement_circuits_and_get_bitstring_counts(measurement_circuits, shots_list)
@@ -114,7 +116,10 @@ class QDKEnergyEstimator(EnergyEstimator):
             classical_coeffs: Optional list of coefficients for classical Pauli terms to calculate energy offset.
 
         Returns:
-            ``EnergyExpectationResult`` containing the energy expectation value and variance.
+            tuple[EnergyExpectationResult, MeasurementData]: Tuple containing:
+
+                * ``energy_result``: Energy expectation value and variance for the provided Hamiltonians.
+                * ``measurement_data``: Raw measurement counts and metadata used to compute the expectation value.
 
         Note:
             * Measurement circuits are generated for each QubitHamiltonian term.
@@ -136,7 +141,7 @@ class QDKEnergyEstimator(EnergyEstimator):
         energy_offset = sum(classical_coeffs) if classical_coeffs else 0.0
 
         # Create measurement circuits
-        measurement_circuits_qasm = create_measurement_circuits(
+        measurement_circuits_qasm = self._create_measurement_circuits(
             circuit_qasm=circuit_qasm,
             grouped_hamiltonians=qubit_hamiltonians,
         )
@@ -147,48 +152,10 @@ class QDKEnergyEstimator(EnergyEstimator):
             shots_list=shots_list,
         )
 
-        return compute_energy_expectation_from_bitstrings(
+        return self._compute_energy_expectation_from_bitstrings(
             qubit_hamiltonians, measurement_data.bitstring_counts, energy_offset
         ), measurement_data
 
     def name(self) -> str:
         """Get the name of the estimator for registry purposes."""
         return "qdk_base_simulator"
-
-
-if __name__ == "__main__":
-    """Example usage of the Estimator from different backends."""
-    import logging
-
-    import numpy as np
-
-    logging.basicConfig(level=logging.WARNING)
-    _LOGGER = logging.getLogger(__name__)
-    _LOGGER.setLevel(logging.INFO)
-
-    circuit_qasm = """
-        include "stdgates.inc";
-        qubit[2] q;
-        rz(pi) q[0];
-        x q[0];
-        cx q[0], q[1];
-        """
-    qubit_hamiltonians = [QubitHamiltonian(["ZZ"], np.array([1.0]))]
-
-    # Example usage: qsharp simulator
-    estimator = QDKEnergyEstimator()
-    results = estimator.run(circuit_qasm, qubit_hamiltonians, total_shots=1000)
-    _LOGGER.info(f"Energy expectation value from QDK Simulator: {results['energy_expectation_value']}")
-
-    # Example usage: qsharp simulator with depolarizing noise
-    noise_model = DepolarizingNoise(0.01)
-    estimator = QDKEnergyEstimator(noise_model=noise_model)
-    results = estimator.run(circuit_qasm, qubit_hamiltonians, total_shots=1000)
-    _LOGGER.info(
-        f"Energy expectation value from QDK Simulator with depolarizing noise: {results['energy_expectation_value']}"
-    )
-
-    # Example usage: qsharp simulator with qubit loss
-    estimator = QDKEnergyEstimator(qubit_loss=0.05)
-    results = estimator.run(circuit_qasm, qubit_hamiltonians, total_shots=1000)
-    _LOGGER.info(f"Energy expectation value from QDK Simulator with qubit loss: {results['energy_expectation_value']}")
