@@ -1,20 +1,22 @@
-"""Orbitals usage examples."""
+"""Orbitals and model orbitals usage examples."""
 
 # --------------------------------------------------------------------------------------------
 # Copyright (c) Microsoft Corporation. All rights reserved.
 # Licensed under the MIT License. See LICENSE.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
 
-import tempfile
-from pathlib import Path
-
 import numpy as np
 from qdk_chemistry.algorithms import create
-from qdk_chemistry.data import Structure
+from qdk_chemistry.data import Structure, ModelOrbitals
+
+# =============================================================================
+# Orbitals usage example
+# =============================================================================
 
 # Create H2 molecule
 coords = np.array([[0.0, 0.0, 0.0], [0.0, 0.0, 1.4]])
-structure = Structure(coords, ["H", "H"])
+symbols = ["H", "H"]
+structure = Structure(coords, symbols=symbols)
 
 # Obtain orbitals from an SCF calculation
 scf_solver = create("scf_solver")
@@ -22,51 +24,27 @@ scf_solver.settings().set("basis_set", "sto-3g")
 E_scf, wfn = scf_solver.run(structure, charge=0, spin_multiplicity=1)
 orbitals = wfn.get_orbitals()
 
-print(f"SCF Energy: {E_scf:.6f} Hartree")
-
-# set coefficients manually example (restricted)
-# orbs_manual = Orbitals()
-# coeffs = # coefficient matrix
-# orbs_manual.set_coefficients(coeffs)            # Same for alpha and beta
-
-# set coefficients manually example (unrestricted)
-# orbs_unrestricted = Orbitals()
-# coeffs_alpha = # alpha coefficients
-# coeffs_beta = # beta coefficients
-# orbs_unrestricted.set_coefficients(coeffs_alpha, coeffs_beta)
-
 # Access orbital coefficients (returns tuple of alpha/beta matrices)
 coeffs_alpha, coeffs_beta = orbitals.get_coefficients()
-print(f"Orbital coefficients shape: {coeffs_alpha.shape}")
 
 # Access orbital energies (returns tuple of alpha/beta vectors)
 energies_alpha, energies_beta = orbitals.get_energies()
-print(f"Orbital energies: {energies_alpha}")
 
 # Access atomic orbital overlap matrix
 ao_overlap = orbitals.get_overlap_matrix()
-print(f"AO overlap matrix shape: {ao_overlap.shape}")
 
-# Access basis set information
-basis_set = orbitals.get_basis_set()
-print(f"Basis set: {basis_set.get_name()}")
+# =============================================================================
+# Model Orbitals creation example
+# =============================================================================
 
-# Use a temporary directory for any file I/O
-with tempfile.TemporaryDirectory() as tmpdir:
-    tmpdir_path = Path(tmpdir)
-    orbitals_file = tmpdir_path / "molecule.orbitals.json"
+# Set basis set size 
+basis_size = 6 
+# Set active orbitals
+alpha_active = [1,2]
+beta_active = [2,3,4]
+alpha_inactive = [0,3,4,5]
+beta_inactive = [0,1,5]
 
-    # Generic serialization with format specification
-    orbitals.to_file(str(orbitals_file), "json")
-    orbitals_from_file = orbitals.from_file(str(orbitals_file), "json")
+model_orbitals = ModelOrbitals(basis_size, (alpha_active, beta_active, alpha_inactive, beta_inactive))
 
-    # JSON serialization
-    orbitals.to_json_file(str(orbitals_file))
-    orbitals_from_json_file = orbitals.from_json_file(str(orbitals_file))
-
-# Direct JSON conversion
-j = orbitals.to_json()
-orbitals_from_json = orbitals.from_json(j)
-# HDF5 serialization (commented out - has bugs)
-# orbitals.to_hdf5_file("molecule.orbitals.h5")
-# orbitals_from_hdf5 = Orbitals.from_hdf5_file("molecule.orbitals.h5")
+# we can then pass this object to a custom Hamiltonian constructor
