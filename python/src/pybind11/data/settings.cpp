@@ -208,13 +208,13 @@ SettingValue python_to_setting_value_with_type(const py::object &obj,
         for (size_t i = 0; i < seq.size(); ++i) {
           py::object elem = seq[i];
           if (py::isinstance<py::bool_>(elem)) {
-            throw SettingTypeMismatch(key, "vector<int> (element " +
+            throw SettingTypeMismatch(key, "vector<uint64_t> (element " +
                                                std::to_string(i) +
                                                " is bool, expected int)");
           }
           if (!is_integer_like(elem)) {
             throw SettingTypeMismatch(
-                key, "vector<int> (element " + std::to_string(i) + " is " +
+                key, "vector<uint64_t> (element " + std::to_string(i) + " is " +
                          std::string(py::str(py::type::of(elem))) +
                          ", expected int)");
           }
@@ -223,7 +223,7 @@ SettingValue python_to_setting_value_with_type(const py::object &obj,
             result.push_back(value);
           } catch (const py::cast_error &e) {
             throw SettingTypeMismatch(
-                key, "vector<int> (element " + std::to_string(i) +
+                key, "vector<uint64_t> (element " + std::to_string(i) +
                          " cast failed: " + std::string(e.what()) + ")");
           }
         }
@@ -234,13 +234,13 @@ SettingValue python_to_setting_value_with_type(const py::object &obj,
         for (size_t i = 0; i < arr.size(); ++i) {
           py::object elem = arr[py::int_(i)];
           if (py::isinstance<py::bool_>(elem)) {
-            throw SettingTypeMismatch(key, "vector<int> (array element " +
+            throw SettingTypeMismatch(key, "vector<uint64_t> (array element " +
                                                std::to_string(i) +
                                                " is bool, expected int)");
           }
           if (!is_integer_like(elem)) {
             throw SettingTypeMismatch(
-                key, "vector<int> (array element " + std::to_string(i) +
+                key, "vector<uint64_t> (array element " + std::to_string(i) +
                          " is " + std::string(py::str(py::type::of(elem))) +
                          ", expected int)");
           }
@@ -249,15 +249,16 @@ SettingValue python_to_setting_value_with_type(const py::object &obj,
             result.push_back(value);
           } catch (const py::cast_error &e) {
             throw SettingTypeMismatch(
-                key, "vector<int> (array element " + std::to_string(i) +
+                key, "vector<uint64_t> (array element " + std::to_string(i) +
                          " cast failed: " + std::string(e.what()) + ")");
           }
         }
         return result;
       } else {
         throw SettingTypeMismatch(
-            key, "vector<int> (got " + std::string(py::str(py::type::of(obj))) +
-                     ", expected list, tuple, or numpy array)");
+            key,
+            "vector<uint64_t> (got " + std::string(py::str(py::type::of(obj))) +
+                ", expected list, tuple, or numpy array)");
       }
     } else if (expected_type == "vector<double>") {
       std::vector<double> result;
