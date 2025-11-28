@@ -5,6 +5,8 @@
 # Licensed under the MIT License. See LICENSE.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
 
+################################################################################
+# start-cell-create
 import numpy as np
 from qdk_chemistry.algorithms import available, create
 from qdk_chemistry.data import Structure
@@ -17,24 +19,27 @@ scf_solver.settings().set("basis_set", "sto-3g")
 E_scf, wfn = scf_solver.run(structure, charge=0, spin_multiplicity=1)
 orbitals = wfn.get_orbitals()
 
-# start-cell-1
 # List available Hamiltonian constructor implementations
 available_constructors = available("hamiltonian_constructor")
 print(f"Available Hamiltonian constructors: {available_constructors}")
 
 # Create the default HamiltonianConstructor instance
 hamiltonian_constructor = create("hamiltonian_constructor")
-# end-cell-1
+# end-cell-create
+################################################################################
 
-# start-cell-2
+################################################################################
+# start-cell-configure
 # Configure settings (check available options)
 print(f"Available settings: {hamiltonian_constructor.settings().keys()}")
 
 # Set ERI method if needed
-# hamiltonian_constructor.settings().set("eri_method", "direct")
-# end-cell-2
+hamiltonian_constructor.settings().set("eri_method", "direct")
+# end-cell-configure
+################################################################################
 
-# start-cell-3
+################################################################################
+# start-cell-construct
 # Construct the Hamiltonian from orbitals
 hamiltonian = hamiltonian_constructor.run(orbitals)
 
@@ -47,4 +52,5 @@ print(f"One-body integrals shape: {h1.shape}")
 print(f"Two-body integrals shape: {h2.shape}")
 print(f"Core energy: {core_energy:.10f} Hartree")
 print(hamiltonian.get_summary())
-# end-cell-3
+# end-cell-construct
+################################################################################

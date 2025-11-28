@@ -34,17 +34,17 @@ The orbitals provide the necessary information about the molecular system includ
 
 .. tab:: C++ API
 
-   .. literalinclude:: ../../../../examples/cpp/hamiltonian_constructor.cpp
+   .. literalinclude:: ../../../_static/examples/cpp/hamiltonian_constructor.cpp
       :language: cpp
-      :start-after: // start-cell-1
-      :end-before: // end-cell-1
+      :start-after: // start-cell-create
+      :end-before: // end-cell-create
 
 .. tab:: Python API
 
-   .. literalinclude:: ../../../../examples/python/hamiltonian_constructor.py
+   .. literalinclude:: ../../../_static/examples/python/hamiltonian_constructor.py
       :language: python
-      :start-after: # start-cell-1
-      :end-before: # end-cell-1
+      :start-after: # start-cell-create
+      :end-before: # end-cell-create
 
 Configuring the Hamiltonian construction
 ----------------------------------------
@@ -55,25 +55,25 @@ The ``HamiltonianConstructor`` can be configured using the ``Settings`` object w
    All orbital indices in QDK/Chemistry are 0-based, following the convention used in most programming languages.
 
 .. note::
-   **Note on active orbitals:** When specifying active orbitals, the indices must be unique (no duplicates).
+   **Active orbitals:** When specifying active orbitals, the indices must be unique (no duplicates).
 
 .. note::
-   **Note on orbital spaces:** If no active orbitals are specified, the entire orbital space is used.
+   **Orbital spaces:** If no active orbitals are specified, the entire orbital space is used.
    If no inactive orbitals are specified and active orbitals are provided, orbitals from index 0 up to the first active orbital are considered inactive.
 
 .. tab:: C++ API
 
-   .. literalinclude:: ../../../../examples/cpp/hamiltonian_constructor.cpp
+   .. literalinclude:: ../../../_static/examples/cpp/hamiltonian_constructor.cpp
       :language: cpp
-      :start-after: // start-cell-2
-      :end-before: // end-cell-2
+      :start-after: // start-cell-configure
+      :end-before: // end-cell-configure
 
 .. tab:: Python API
 
-   .. literalinclude:: ../../../../examples/python/hamiltonian_constructor.py
+   .. literalinclude:: ../../../_static/examples/python/hamiltonian_constructor.py
       :language: python
-      :start-after: # start-cell-2
-      :end-before: # end-cell-2
+      :start-after: # start-cell-configure
+      :end-before: # end-cell-configure
 
 Constructing the Hamiltonian
 ----------------------------
@@ -82,10 +82,10 @@ Once configured, the Hamiltonian can be constructed from a set of orbitals:
 
 .. tab:: C++ API
 
-   .. literalinclude:: ../../../../examples/cpp/hamiltonian_constructor.cpp
+   .. literalinclude:: ../../../_static/examples/cpp/hamiltonian_constructor.cpp
       :language: cpp
-      :start-after: // start-cell-3
-      :end-before: // end-cell-3
+      :start-after: // start-cell-construct
+      :end-before: // end-cell-construct
 
 .. tab:: Python API
 
@@ -93,19 +93,16 @@ Once configured, the Hamiltonian can be constructed from a set of orbitals:
       This example shows the API pattern.
       For complete working examples, see the test suite.
 
-   .. literalinclude:: ../../../../examples/python/hamiltonian_constructor.py
+   .. literalinclude:: ../../../_static/examples/python/hamiltonian_constructor.py
       :language: python
-      :start-after: # start-cell-3
-      :end-before: # end-cell-3
+      :start-after: # start-cell-construct
+      :end-before: # end-cell-construct
 
 Available settings
 ------------------
 
 The ``HamiltonianConstructor`` accepts a range of settings to control its behavior.
 These settings are divided into base settings (common to all Hamiltonian construction) and specialized settings (specific to certain construction variants).
-
-Available settings
-~~~~~~~~~~~~~~~~~~
 
 These settings are available in the default ``HamiltonianConstructor``:
 
@@ -123,9 +120,10 @@ These settings are available in the default ``HamiltonianConstructor``:
      - vector<int>
      - Indices of inactive orbitals (0-based, empty for automatic detection)
 
-Related classes
+Further reading
 ---------------
 
+- The above examples can be downloaded as complete `Python <../../../_static/examples/python/hamiltonian_constructor.py>`_ or `C++ <../../../_static/examples/cpp/hamiltonian_constructor.cpp>`_ scripts.
 - :doc:`Orbitals <../data/orbitals>`: Input orbitals for Hamiltonian construction
 - :doc:`Hamiltonian <../data/hamiltonian>`: Output Hamiltonian representation
 - :doc:`ActiveSpaceSelector <active_space>`: Provides active orbital indices

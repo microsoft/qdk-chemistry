@@ -6,21 +6,26 @@
 // license information.
 // --------------------------------------------------------------------------------------------
 
-// start-cell-1
 #include <qdk/chemistry.hpp>
 using namespace qdk::chemistry::algorithms;
 
+// --------------------------------------------------------------------------------------------
+// start-cell-create
 // Create the default HamiltonianConstructor instance
 auto hamiltonian_constructor = HamiltonianConstructorFactory::create();
-// end-cell-1
+// end-cell-create
+// --------------------------------------------------------------------------------------------
 
-// start-cell-2
+// --------------------------------------------------------------------------------------------
+// start-cell-configure
 // Specify active orbitals for active space Hamiltonian
 std::vector<int> active_orbitals = {4, 5, 6, 7};  // Example indices (0-based)
 hamiltonian_constructor->settings().set("active_orbitals", active_orbitals);
-// end-cell-2
+// end-cell-configure
+// --------------------------------------------------------------------------------------------
 
-// start-cell-3
+// --------------------------------------------------------------------------------------------
+// start-cell-construct
 // Obtain a valid Orbitals instance
 Orbitals orbitals;
 /* orbitals = ... */
@@ -31,4 +36,5 @@ auto hamiltonian = hamiltonian_constructor->run(orbitals);
 // Access the resulting integrals
 auto h1 = hamiltonian.get_one_body_integrals();
 auto h2 = hamiltonian.get_two_body_integrals();
-// end-cell-3
+// end-cell-construct
+// --------------------------------------------------------------------------------------------
