@@ -21,7 +21,9 @@
 #include <lapack.hh>
 #include <nlohmann/json.hpp>
 #include <numeric>
-#include <qdk/chemistry/utils/omp_utils.hpp>
+#ifdef _OPENMP
+#include <omp.h>
+#endif
 #include <sstream>
 #include <thread>
 
@@ -126,8 +128,13 @@ SCFImpl::SCFImpl(std::shared_ptr<Molecule> mol_ptr, const SCFConfig& cfg,
     spdlog::info("qmmm={}", add_mm_charge_);
 #endif
 
+#ifdef _OPENMP
+    int nthreads = omp_get_max_threads();
+#else
+    int nthreads = 1;
+#endif
     spdlog::info("world_size={}, omp_get_max_threads={}", cfg.mpi.world_size,
-                 omp_get_max_threads());
+                 nthreads);
   }
   if (cfg.verbose > 5) {
     spdlog::info("eri_method={}, exc_method={}", to_string(cfg.eri.method),

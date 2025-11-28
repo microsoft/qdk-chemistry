@@ -7,7 +7,9 @@
 #include <qdk/chemistry/scf/core/types.h>
 #include <qdk/chemistry/scf/util/libint2_util.h>
 
-#include <qdk/chemistry/utils/omp_utils.hpp>
+#ifdef _OPENMP
+#include <omp.h>
+#endif
 #include <stdexcept>
 
 #include "util/timer.h"
@@ -73,7 +75,11 @@ std::tuple<shellpair_list_t, shellpair_data_t> compute_shellpairs(
     const ::libint2::BasisSet& obs, double threshold = 1e-12) {
   const auto ln_max_engine_precision = std::log(max_engine_precision);
   const size_t nsh = obs.size();
+#ifdef _OPENMP
   const int nthreads = omp_get_max_threads();
+#else
+  const int nthreads = 1;
+#endif
   std::vector<::libint2::Engine> engines(
       nthreads, ::libint2::Engine(::libint2::Operator::overlap, obs.max_nprim(),
                                   obs.max_l(), 0));
@@ -86,12 +92,20 @@ std::tuple<shellpair_list_t, shellpair_data_t> compute_shellpairs(
     splist.insert(std::make_pair(i, std::vector<size_t>()));
   }
 
+#ifdef _OPENMP
 #pragma omp parallel
+#endif
   {
+#ifdef _OPENMP
     const int thread_id = omp_get_thread_num();
+#else
+    const int thread_id = 0;
+#endif
     auto& engine = engines[thread_id];
     const auto& buf = engine.results();
+#ifdef _OPENMP
 #pragma omp for schedule(dynamic)
+#endif
     for (size_t s1 = 0; s1 < nsh; ++s1) {
       const auto n1 = obs[s1].size();
       for (size_t s2 = 0; s2 <= s1; ++s2) {
@@ -112,7 +126,9 @@ std::tuple<shellpair_list_t, shellpair_data_t> compute_shellpairs(
 
   shellpair_data_t spdata(splist.size());
 
+#ifdef _OPENMP
 #pragma omp parallel for schedule(dynamic)
+#endif
   for (size_t s1 = 0; s1 < nsh; ++s1)
     for (size_t s2 : splist[s1]) {
       spdata[s1].emplace_back(std::make_shared<::libint2::ShellPair>(
@@ -143,18 +159,30 @@ RowMajorMatrix compute_schwarz_ints(const ::libint2::BasisSet& obs,
   const size_t nsh = obs.size();
 
   // Setup the engine
+#ifdef _OPENMP
   const int nthreads = omp_get_max_threads();
+#else
+  const int nthreads = 1;
+#endif
   std::vector<::libint2::Engine> engines(nthreads);
   engines[0] = ::libint2::Engine(::libint2::Operator::coulomb, obs.max_nprim(),
                                  obs.max_l(), 0, 0.0);
   for (int i = 1; i < nthreads; ++i) engines[i] = engines[0];
 
   RowMajorMatrix K(nsh, nsh);
+#ifdef _OPENMP
 #pragma omp parallel
+#endif
   {
+#ifdef _OPENMP
     auto& engine = engines[omp_get_thread_num()];
+#else
+    auto& engine = engines[0];
+#endif
     const auto& buf = engine.results();
+#ifdef _OPENMP
 #pragma omp for collapse(2)
+#endif
     for (auto i = 0; i < nsh; ++i) {
       for (auto j = 0; j <= i; ++j) {
         const size_t ni = obs[i].size();
@@ -280,7 +308,11 @@ class ERI {
     const auto engine_precision = precision / P_shmax;
 
     // Setup the engine
+#ifdef _OPENMP
     const int nthreads = omp_get_max_threads();
+#else
+    const int nthreads = 1;
+#endif
     std::vector<::libint2::Engine> engines_coulomb(nthreads);
     engines_coulomb[0] = ::libint2::Engine(::libint2::Operator::coulomb,
                                            obs_.max_nprim(), obs_.max_l(), 0);
@@ -291,9 +323,15 @@ class ERI {
     if (J) std::memset(J, 0, mat_size * sizeof(double));
     if (K) std::memset(K, 0, mat_size * sizeof(double));
 
+#ifdef _OPENMP
 #pragma omp parallel
+#endif
     {
+#ifdef _OPENMP
       const auto thread_id = omp_get_thread_num();
+#else
+      const auto thread_id = 0;
+#endif
       auto& engine = engines_coulomb[thread_id];
       const auto& buf = engine.results();
 
@@ -386,7 +424,9 @@ class ERI {
                           // J contractions
                           J_ij +=
                               P_cur[bf3 * num_atomic_orbitals + bf4] * value;
+#ifdef _OPENMP
 #pragma omp atomic update relaxed
+#endif
                           J_cur[bf3 * num_atomic_orbitals + bf4] +=
                               P_ij * value;
 
@@ -394,7 +434,9 @@ class ERI {
                       }  // k
 
 // Update J
+#ifdef _OPENMP
 #pragma omp atomic update relaxed
+#endif
                       J_cur[bf1 * num_atomic_orbitals + bf2] += J_ij;
                     }  // j
                   }  // i
@@ -431,19 +473,27 @@ class ERI {
                           K_jk += 0.25 *
                                   P_cur[bf1 * num_atomic_orbitals + bf4] *
                                   value;
+#ifdef _OPENMP
 #pragma omp atomic update relaxed
+#endif
                           K_cur[bf1 * num_atomic_orbitals + bf4] +=
                               P_jk * value;
+#ifdef _OPENMP
 #pragma omp atomic update relaxed
+#endif
                           K_cur[bf2 * num_atomic_orbitals + bf4] +=
                               P_ik * value;
 
                         }  // l
 
 // Update K
+#ifdef _OPENMP
 #pragma omp atomic update relaxed
+#endif
                         K_cur[bf1 * num_atomic_orbitals + bf3] += K_ik;
+#ifdef _OPENMP
 #pragma omp atomic update relaxed
+#endif
                         K_cur[bf2 * num_atomic_orbitals + bf3] += K_jk;
                       }  // k
                     }  // j
@@ -555,7 +605,11 @@ class ERI {
     const auto engine_precision = precision;
 
     // Setup the engine
+#ifdef _OPENMP
     const int nthreads = omp_get_max_threads();
+#else
+    const int nthreads = 1;
+#endif
     std::vector<::libint2::Engine> engines_coulomb(nthreads);
     engines_coulomb[0] = ::libint2::Engine(::libint2::Operator::coulomb,
                                            obs_.max_nprim(), obs_.max_l(), 0);
@@ -563,9 +617,15 @@ class ERI {
     engines_coulomb[0].set_precision(engine_precision);
     for (int i = 1; i < nthreads; ++i) engines_coulomb[i] = engines_coulomb[0];
 
+#ifdef _OPENMP
 #pragma omp parallel
+#endif
     {
+#ifdef _OPENMP
       const auto thread_id = omp_get_thread_num();
+#else
+      const auto thread_id = 0;
+#endif
       auto& engine = engines_coulomb[thread_id];
       const auto& buf = engine.results();
 
@@ -637,14 +697,18 @@ class ERI {
                       // p and l are fast indices separately
                       for (size_t p = 0; p < nt; ++p) {
 // (ij|kp) = \sum_l (ij|kl) * C(l,p)
+#ifdef _OPENMP
 #pragma omp atomic update relaxed
+#endif
                         out[(bf1 * num_atomic_orbitals + bf2) * inner_size +
                             bf3 * nt + p] += C[bf4 * nt + p] * value * s12_deg;
 
                         // (ij|lp) = \sum_k (ij|lk) * C(k,p) = \sum_l (ij|kl) *
                         // C(k,p)
                         if (s3 != s4) {
+#ifdef _OPENMP
 #pragma omp atomic update relaxed
+#endif
                           out[(bf1 * num_atomic_orbitals + bf2) * inner_size +
                               bf4 * nt + p] +=
                               C[bf3 * nt + p] * value * s12_deg;
@@ -676,7 +740,9 @@ class ERI {
 
 // Symmetrize the first and second index: (ij|kp) = 0.5 * ( (ji|kp) + (ij|kp) ),
 // then cut half due to s12_34_deg
+#ifdef _OPENMP
 #pragma omp parallel for collapse(2)
+#endif
     for (size_t i = 0; i < num_atomic_orbitals; ++i)
       for (size_t j = 0; j <= i; ++j) {
         for (size_t k = 0; k < num_atomic_orbitals; ++k) {

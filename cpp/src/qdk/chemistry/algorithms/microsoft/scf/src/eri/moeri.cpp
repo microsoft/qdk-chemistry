@@ -47,15 +47,15 @@ void MOERI::compute(size_t nb, size_t nt, const double* C, double* out) {
                         tmp1.size() * sizeof(double), cudaMemcpyHostToDevice));
 
   // Compute remaining transformations via cuTensor
-  std::vector<int64_t> extents_q1 = {(long int)nb, (long int)nb, (long int)nb,
-                                     (long int)nt},
-                       extents_q2 = {(long int)nb, (long int)nb, (long int)nt,
-                                     (long int)nt},
-                       extents_q3 = {(long int)nb, (long int)nt, (long int)nt,
-                                     (long int)nt},
-                       extents_q4 = {(long int)nt, (long int)nt, (long int)nt,
-                                     (long int)nt},
-                       extents_mat = {(long int)nb, (long int)nt};
+  std::vector<int64_t> extents_q1 = {(int64_t)nb, (int64_t)nb, (int64_t)nb,
+                                     (int64_t)nt},
+                       extents_q2 = {(int64_t)nb, (int64_t)nb, (int64_t)nt,
+                                     (int64_t)nt},
+                       extents_q3 = {(int64_t)nb, (int64_t)nt, (int64_t)nt,
+                                     (int64_t)nt},
+                       extents_q4 = {(int64_t)nt, (int64_t)nt, (int64_t)nt,
+                                     (int64_t)nt},
+                       extents_mat = {(int64_t)nb, (int64_t)nt};
 
   auto q1desc = std::make_shared<cutensor::TensorDesc>(
       *handle_, 4, extents_q1.data(), CUTENSOR_R_64F);

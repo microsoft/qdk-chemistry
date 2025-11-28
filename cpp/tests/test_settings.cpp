@@ -27,7 +27,6 @@ class BasicTestSettings : public Settings {
     set_default("bool_val", false);
     set_default("int_val", 0);
     set_default("int64_val", int64_t(0));
-    set_default("long_val", 0L);
     set_default("size_t_val", size_t(0));
     set_default("float_val", 0.0f);
     set_default("double_val", 0.0);
@@ -54,7 +53,7 @@ class BasicTestSettings : public Settings {
     set_default("modes", std::vector<std::string>{});
 
     // Keys for JSONTypeConversionEdgeCases test
-    set_default("large_int", 0L);
+    set_default("large_int", int64_t(0));
     set_default("empty_array", std::vector<int>{});
     set_default("unsupported", std::string(""));
     set_default("unsupported_array", std::vector<int>{});
@@ -72,8 +71,7 @@ class BasicTestSettings : public Settings {
     set_default("empty_string_vector", std::vector<std::string>{});
 
     // Keys for HDF5SpecializedNumericTypes test
-    set_default("negative_long", 0L);
-    set_default("positive_long", 0L);
+    set_default("negative_int64", int64_t(0));
     set_default("small_size_t", size_t(0));
     set_default("large_size_t", size_t(0));
     set_default("small_float", 0.0f);
@@ -121,7 +119,7 @@ class BasicTestSettings : public Settings {
     // Keys for CompleteVariantTypeCoverage test
     set_default("bool_type", false);
     set_default("int_type", 0);
-    set_default("long_type", 0L);
+    set_default("int64_type", int64_t(0));
     set_default("size_t_type", size_t(0));
     set_default("float_type", 0.0f);
     set_default("double_type", 0.0);
@@ -131,7 +129,7 @@ class BasicTestSettings : public Settings {
     set_default("vector_string_type", std::vector<std::string>{});
     set_default("variant_bool", false);
     set_default("variant_int", 0);
-    set_default("variant_long", 0L);
+    set_default("variant_int64", int64_t(0));
     set_default("variant_size_t", size_t(0));
     set_default("variant_float", 0.0f);
     set_default("variant_double", 0.0);
@@ -141,9 +139,9 @@ class BasicTestSettings : public Settings {
     set_default("variant_string_vec", std::vector<std::string>{});
 
     // Keys for HDF5TypeDetectionEdgeCases test
-    set_default("max_long", 0L);
+    set_default("max_int64", int64_t(0));
     set_default("max_size_t", size_t(0));
-    set_default("min_long", 0L);
+    set_default("min_int64", int64_t(0));
     set_default("min_size_t", size_t(0));
     set_default("empty_string_vec", std::vector<std::string>{});
     set_default("empty_double_vec", std::vector<double>{});
@@ -151,20 +149,20 @@ class BasicTestSettings : public Settings {
     set_default("single_string_vec", std::vector<std::string>{});
     set_default("small_int_vec", std::vector<int>{});
     set_default("edge_case_int", 0);
-    set_default("edge_case_long", 0L);
+    set_default("edge_case_int64", int64_t(0));
     set_default("edge_case_size_t", size_t(0));
     set_default("edge_case_float", 0.0f);
     set_default("edge_case_double", 0.0);
 
     // Keys for HDF5CrossPlatformCompatibility test
     set_default("platform_int", 0);
-    set_default("platform_long", 0L);
+    set_default("platform_int64", int64_t(0));
     set_default("platform_size_t", size_t(0));
     set_default("platform_float", 0.0f);
     set_default("platform_double", 0.0);
     set_default("cross_platform_bool", false);
     set_default("cross_platform_int", 0);
-    set_default("cross_platform_long", 0L);
+    set_default("cross_platform_int64", int64_t(0));
     set_default("cross_platform_size_t", size_t(0));
     set_default("cross_platform_float", 0.0f);
     set_default("cross_platform_double", 0.0);
@@ -253,7 +251,7 @@ TEST_F(SettingsTest, SetAndGetVariantTypes) {
   auto string_variant = settings.get("string_val");
 
   EXPECT_TRUE(std::get<bool>(bool_variant));
-  EXPECT_EQ(std::get<int>(int_variant), 42);
+  EXPECT_EQ(std::get<int64_t>(int_variant), 42);
   EXPECT_EQ(std::get<std::string>(string_variant), "hello");
 
   // Test template interface still works
@@ -266,7 +264,7 @@ TEST_F(SettingsTest, SetAndGetBasicTypes) {
   // Test different types
   settings.set("bool_val", true);
   settings.set("int_val", 42);
-  settings.set("long_val", 123456789L);
+  settings.set("int64_val", int64_t(123456789));
   settings.set("size_t_val", size_t(999));
   settings.set("float_val", 3.14f);
   settings.set("double_val", 2.718281828);
@@ -274,14 +272,14 @@ TEST_F(SettingsTest, SetAndGetBasicTypes) {
 
   EXPECT_TRUE(settings.get<bool>("bool_val"));
   EXPECT_EQ(settings.get<int>("int_val"), 42);
-  EXPECT_EQ(settings.get<long>("long_val"), 123456789L);
+  EXPECT_EQ(settings.get<int64_t>("int64_val"), int64_t(123456789));
   EXPECT_EQ(settings.get<size_t>("size_t_val"), 999);
   EXPECT_FLOAT_EQ(settings.get<float>("float_val"), 3.14f);
   EXPECT_DOUBLE_EQ(settings.get<double>("double_val"), 2.718281828);
   EXPECT_EQ(settings.get<std::string>("string_val"), "hello");
 
   EXPECT_EQ(settings.size(),
-            123);  // Should contain all 123 default keys
+            121);  // Should contain all 121 default keys
   EXPECT_FALSE(settings.empty());
 }
 
@@ -319,8 +317,8 @@ TEST_F(SettingsTest, GetOrDefaultVariant) {
   auto result1 = settings.get_or_default("existing_key", SettingValue(999));
   auto result2 = settings.get_or_default("nonexistent_key", SettingValue(999));
 
-  EXPECT_EQ(std::get<int>(result1), 42);
-  EXPECT_EQ(std::get<int>(result2), 999);
+  EXPECT_EQ(std::get<int64_t>(result1), 42);
+  EXPECT_EQ(std::get<int64_t>(result2), 999);
 
   // Test template interface still works
   EXPECT_EQ(settings.get_or_default("existing_key", 999), 42);
@@ -337,7 +335,7 @@ TEST_F(SettingsTest, Keys) {
   settings.set("key3", 3);
 
   auto keys = settings.keys();
-  EXPECT_EQ(keys.size(), 123);
+  EXPECT_EQ(keys.size(), 121);
 
   // Check that the specific keys we set are present
   std::sort(keys.begin(), keys.end());
@@ -349,7 +347,7 @@ TEST_F(SettingsTest, Keys) {
 TEST_F(SettingsTest, NewInstance) {
   // Create a new instance to get fresh defaults
   BasicTestSettings fresh_settings;
-  EXPECT_EQ(fresh_settings.size(), 123);
+  EXPECT_EQ(fresh_settings.size(), 121);
   EXPECT_FALSE(fresh_settings.empty());  // Should have default values
 
   // Verify the defaults are correct
@@ -455,13 +453,12 @@ TEST_F(SettingsTest, JSONValidationErrors) {
 }
 
 TEST_F(SettingsTest, JSONTypeConversionEdgeCases) {
-  // Test large integer casting to long
+  // Test large integer casting to int64_t
   nlohmann::json large_int_json = nlohmann::json::object();
   large_int_json["version"] = "0.1.0";
-  large_int_json["large_int"] =
-      static_cast<long>(2147483648L);  // Larger than int
+  large_int_json["large_int"] = int64_t(2147483648);  // Larger than int
   auto large_int_settings = Settings::from_json(large_int_json);
-  EXPECT_EQ(large_int_settings->get<long>("large_int"), 2147483648L);
+  EXPECT_EQ(large_int_settings->get<int64_t>("large_int"), int64_t(2147483648));
 
   // Test empty JSON array default to vector<int>
   nlohmann::json empty_array_json = nlohmann::json::object();
@@ -666,8 +663,8 @@ TEST_F(SettingsTest, RoundtripDataIntegrity) {
 // Comprehensive HDF5 type coverage tests
 TEST_F(SettingsTest, HDF5ComprehensiveTypeCoverage) {
   // Test all scalar types for HDF5 serialization
-  settings.set("long_val", 9223372036854775807L);
-  settings.set("size_t_val", static_cast<size_t>(18446744073709551615ULL));
+  settings.set("int64_val", INT64_MAX);
+  settings.set("size_t_val", SIZE_MAX);
   settings.set("float_val", 3.14159f);
   settings.set("double_val", 2.718281828459045);
 
@@ -691,9 +688,8 @@ TEST_F(SettingsTest, HDF5ComprehensiveTypeCoverage) {
                       "comprehensive_types.settings.h5"));
 
   // Verify scalar types
-  EXPECT_EQ(loaded_settings->get<long>("long_val"), 9223372036854775807L);
-  EXPECT_EQ(loaded_settings->get<size_t>("size_t_val"),
-            static_cast<size_t>(18446744073709551615ULL));
+  EXPECT_EQ(loaded_settings->get<int64_t>("int64_val"), INT64_MAX);
+  EXPECT_EQ(loaded_settings->get<size_t>("size_t_val"), SIZE_MAX);
   EXPECT_FLOAT_EQ(loaded_settings->get<float>("float_val"), 3.14159f);
   EXPECT_DOUBLE_EQ(loaded_settings->get<double>("double_val"),
                    2.718281828459045);
@@ -719,9 +715,9 @@ TEST_F(SettingsTest, HDF5ComprehensiveTypeCoverage) {
 TEST_F(SettingsTest, HDF5SpecializedNumericTypes) {
   // Test specific coverage for numeric type paths
 
-  // Test long type serialization
-  settings.set("negative_long", LONG_MIN);
-  settings.set("positive_long", LONG_MAX);
+  // Test int64_t negative boundary (positive boundary tested in
+  // HDF5ComprehensiveTypeCoverage)
+  settings.set("negative_int64", INT64_MIN);
 
   // Test size_t type serialization
   settings.set("small_size_t", static_cast<size_t>(0));
@@ -743,8 +739,7 @@ TEST_F(SettingsTest, HDF5SpecializedNumericTypes) {
                       Settings::from_hdf5_file("numeric_types.settings.h5"));
 
   // Verify all numeric types preserved correctly
-  EXPECT_EQ(loaded_settings->get<long>("negative_long"), LONG_MIN);
-  EXPECT_EQ(loaded_settings->get<long>("positive_long"), LONG_MAX);
+  EXPECT_EQ(loaded_settings->get<int64_t>("negative_int64"), INT64_MIN);
   EXPECT_EQ(loaded_settings->get<size_t>("small_size_t"),
             static_cast<size_t>(0));
   EXPECT_EQ(loaded_settings->get<size_t>("large_size_t"),
@@ -912,4 +907,109 @@ TEST_F(SettingsTest, FromHdf5IgnoresUnknownKeys) {
 
   // Clean up
   std::filesystem::remove("test_known_keys.settings.h5");
+}
+
+// Test integer overflow detection
+TEST_F(SettingsTest, IntegerOverflowDetection) {
+  // Store value larger than INT32_MAX as int64_t
+  settings.set("int64_val", static_cast<int64_t>(INT32_MAX) + 1);
+
+  // Should throw when trying to retrieve as int32_t (overflow)
+  EXPECT_THROW(settings.get<int32_t>("int64_val"), SettingTypeMismatch);
+
+  // Should succeed when retrieving as int64_t
+  EXPECT_NO_THROW(settings.get<int64_t>("int64_val"));
+  EXPECT_EQ(settings.get<int64_t>("int64_val"),
+            static_cast<int64_t>(INT32_MAX) + 1);
+
+  // Store value smaller than INT32_MIN as int64_t
+  settings.set("int64_val", static_cast<int64_t>(INT32_MIN) - 1);
+
+  // Should throw when trying to retrieve as int32_t (underflow)
+  EXPECT_THROW(settings.get<int32_t>("int64_val"), SettingTypeMismatch);
+}
+
+// Test unsigned integer underflow detection
+TEST_F(SettingsTest, UnsignedIntegerUnderflowDetection) {
+  // Store negative value as int64_t
+  settings.set("int64_val", static_cast<int64_t>(-1));
+
+  // Should throw when trying to retrieve as uint32_t (negative value)
+  EXPECT_THROW(settings.get<uint32_t>("int64_val"), SettingTypeMismatch);
+  EXPECT_THROW(settings.get<uint64_t>("int64_val"), SettingTypeMismatch);
+
+  // Should succeed when retrieving as signed type
+  EXPECT_NO_THROW(settings.get<int64_t>("int64_val"));
+  EXPECT_EQ(settings.get<int64_t>("int64_val"), -1);
+}
+
+// Test vector element out-of-range errors
+TEST_F(SettingsTest, VectorElementOutOfRangeErrors) {
+  // Create vector with values that exceed int32_t range
+  std::vector<int64_t> large_vec = {
+      INT32_MAX,
+      static_cast<int64_t>(INT32_MAX) + 1,  // This will overflow
+      INT32_MAX};
+
+  settings.set("int_vector", large_vec);
+
+  // Should throw when trying to convert to vector<int32_t>
+  EXPECT_THROW(
+      { auto result = settings.get<std::vector<int32_t>>("int_vector"); },
+      SettingTypeMismatch);
+
+  // Should succeed with vector<int64_t>
+  EXPECT_NO_THROW({
+    auto result = settings.get<std::vector<int64_t>>("int_vector");
+    EXPECT_EQ(result, large_vec);
+  });
+
+  // Test with unsigned overflow
+  std::vector<uint64_t> large_uint_vec = {
+      UINT32_MAX,
+      static_cast<uint64_t>(UINT32_MAX) + 1,  // This will overflow
+      UINT32_MAX};
+
+  settings.set("int_vector", large_uint_vec);
+
+  // Should throw when trying to convert to vector<uint32_t>
+  EXPECT_THROW(
+      { auto result = settings.get<std::vector<uint32_t>>("int_vector"); },
+      SettingTypeMismatch);
+}
+
+// Test cross-signedness conversion edge cases
+TEST_F(SettingsTest, CrossSignednessConversionEdgeCases) {
+  // Store uint64_t value that's too large for int64_t
+  settings.set("size_t_val", static_cast<uint64_t>(INT64_MAX) + 1);
+
+  // Should throw when trying to retrieve as int64_t
+  EXPECT_THROW(settings.get<int64_t>("size_t_val"), SettingTypeMismatch);
+
+  // Should succeed when retrieving as uint64_t
+  EXPECT_NO_THROW(settings.get<uint64_t>("size_t_val"));
+
+  // Store negative int64_t
+  settings.set("int64_val", static_cast<int64_t>(-100));
+
+  // Should throw when trying to retrieve as any unsigned type
+  EXPECT_THROW(settings.get<uint64_t>("int64_val"), SettingTypeMismatch);
+  EXPECT_THROW(settings.get<uint32_t>("int64_val"), SettingTypeMismatch);
+  EXPECT_THROW(settings.get<size_t>("int64_val"), SettingTypeMismatch);
+}
+
+// Test that vector conversion provides clear error messages
+TEST_F(SettingsTest, VectorConversionErrorMessages) {
+  std::vector<int64_t> vec_with_overflow = {1, 2, INT64_MAX};
+  settings.set("int_vector", vec_with_overflow);
+
+  try {
+    auto result = settings.get<std::vector<int32_t>>("int_vector");
+    FAIL() << "Expected SettingTypeMismatch exception";
+  } catch (const SettingTypeMismatch& e) {
+    std::string error_msg = e.what();
+    // Check that error message mentions "vector element out of range"
+    EXPECT_TRUE(error_msg.find("vector element out of range") !=
+                std::string::npos);
+  }
 }
