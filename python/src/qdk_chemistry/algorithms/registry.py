@@ -288,7 +288,7 @@ def show_default(algorithm_type: str | None = None) -> dict[str, str] | str:
 
     Examples:
         >>> from qdk_chemistry.algorithms import registry
-        >>> # List the default algorithms accross all types
+        >>> # List the default algorithms across all types
         >>> default_algorithms = registry.show_default()
         >>> print(default_algorithms)
         {'scf_solver': 'qdk', 'active_space_selector': 'qdk_autocas_eos', ...}

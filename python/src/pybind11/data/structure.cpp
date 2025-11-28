@@ -785,37 +785,54 @@ Examples:
 
   structure.def(
       "to_hdf5",
-      [](const Structure &self, const std::string &group_path) {
-        H5::H5File file(group_path, H5F_ACC_TRUNC);
-        H5::Group group = file.openGroup("/");
+      [](const Structure &self, const py::object &h5py_group) {
+        // Extract HDF5 group ID from h5py Group/File object
+        hid_t group_id = h5py_group.attr("id").attr("id").cast<hid_t>();
+
+        // Open the HDF5 group using the extracted ID
+        H5::Group group(group_id);
+
+        // Call the C++ to_hdf5 method
         self.to_hdf5(group);
       },
       R"(
-Convert structure to HDF5 format and write to group path.
+Serialize structure to HDF5 group.
 
 Args:
-    group_path (str): Path to HDF5 file to create/overwrite
+    group (h5py.Group | h5py.File): HDF5 group or file object to save data to
 
 Raises:
     RuntimeError: If HDF5 write operation fails
 
 Examples:
-    >>> structure.to_hdf5("structure.h5")
+    >>> import h5py
+    >>> with h5py.File("structure.h5", "w") as f:
+    ...     structure.to_hdf5(f)
+
+    >>> # Or write to a specific group
+    >>> with h5py.File("data.h5", "w") as f:
+    ...     grp = f.create_group("structures")
+    ...     structure.to_hdf5(grp)
 )",
-      py::arg("group_path"));
+      py::arg("group"));
 
   structure.def_static(
       "from_hdf5",
-      [](const std::string &group_path) {
-        H5::H5File file(group_path, H5F_ACC_RDONLY);
-        H5::Group group = file.openGroup("/");
+      [](const py::object &h5py_group) {
+        // Extract HDF5 group ID from h5py Group/File object
+        hid_t group_id = h5py_group.attr("id").attr("id").cast<hid_t>();
+
+        // Open the HDF5 group using the extracted ID
+        H5::Group group(group_id);
+
+        // Call the C++ from_hdf5 method
         return *Structure::from_hdf5(group);
       },
       R"(
-Load structure from HDF5 format (static method).
+Deserialize structure from HDF5 group (static method).
 
 Args:
-    group_path (str): Path to HDF5 file to read from
+    group (h5py.Group | h5py.File): HDF5 group or file object to load data from
 
 Returns:
     Structure: New Structure object created from HDF5 data
@@ -824,9 +841,16 @@ Raises:
     RuntimeError: If HDF5 read operation fails or data is invalid
 
 Examples:
-    >>> h2 = Structure.from_hdf5("structure.h5")
+    >>> import h5py
+    >>> with h5py.File("structure.h5", "r") as f:
+    ...     h2 = Structure.from_hdf5(f)
+
+    >>> # Or read from a specific group
+    >>> with h5py.File("data.h5", "r") as f:
+    ...     grp = f["structures"]
+    ...     structure = Structure.from_hdf5(grp)
 )",
-      py::arg("group_path"));
+      py::arg("group"));
 
   structure.def("to_hdf5_file", structure_to_hdf5_file_wrapper,
                 R"(
