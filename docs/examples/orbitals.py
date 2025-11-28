@@ -37,15 +37,17 @@ ao_overlap = orbitals.get_overlap_matrix()
 # Model Orbitals creation example
 # =============================================================================
 
-# Set basis set size 
-basis_size = 6 
+# Set basis set size
+basis_size = 6
 
 # Set active orbitals
-alpha_active = [1,2]
-beta_active = [2,3,4]
-alpha_inactive = [0,3,4,5]
-beta_inactive = [0,1,5]
+alpha_active = [1, 2]
+beta_active = [2, 3, 4]
+alpha_inactive = [0, 3, 4, 5]
+beta_inactive = [0, 1, 5]
 
-model_orbitals = ModelOrbitals(basis_size, (alpha_active, beta_active, alpha_inactive, beta_inactive))
+model_orbitals = ModelOrbitals(
+    basis_size, (alpha_active, beta_active, alpha_inactive, beta_inactive)
+)
 
 # We can then pass this object to a custom Hamiltonian constructor

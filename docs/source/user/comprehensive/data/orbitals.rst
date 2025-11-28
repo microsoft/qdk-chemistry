@@ -26,7 +26,7 @@ Model Orbitals
 ~~~~~~~~~~~~~~
 
 Model orbitals are a simpler subclass of Orbitals in QDK/Chemistry, for model systems without any basis set information.
-This class allows to fully specify model Hamiltonians and Wavefunctions. 
+This class allows to fully specify model Hamiltonians and Wavefunctions.
 Several properties present for the Orbitals subclass are missing for Model Orbitals: coefficients, energies, etc. These are summarized in the properties table below.
 
 Properties
@@ -47,7 +47,7 @@ The following table summarizes the properties available for the different orbita
      - ✓
      - ✗
    * - **Energies**
-     - Vector of orbital energies for alpha and beta spin channels  
+     - Vector of orbital energies for alpha and beta spin channels
      - ✓
      - ✗
    * - **Active space indices**
@@ -104,11 +104,11 @@ The below example illustrates the typical access to Orbitals (via an SCF):
    .. code-block:: cpp
 
       // Create H2 molecule
-      std::vector<Eigen::Vector3d> coords = {{0.0, 0.0, 0.0}, {0.0, 0.0, 1.4}}; 
+      std::vector<Eigen::Vector3d> coords = {{0.0, 0.0, 0.0}, {0.0, 0.0, 1.4}};
       std::vector<std::string> symbols = {"H", "H"};
       Structure structure(coords, symbols);
 
-      // Obtain orbitals from an SCF calculation 
+      // Obtain orbitals from an SCF calculation
       auto scf_solver = ScfSolverFactory::create();
       scf_solver->settings().set("basis_set", "sto-3g");
       auto [E_scf, wfn] = scf_solver->run(structure, 0, 1);
@@ -120,7 +120,7 @@ The below example illustrates the typical access to Orbitals (via an SCF):
       // Access orbital energies
       auto [energies, energies_beta] = orbitals->get_energies();
 
-      // Access atomic orbital overlap matrix 
+      // Access atomic orbital overlap matrix
       const Eigen::MatrixXd& = orbitals->get_overlap_matrix();
 
 
@@ -135,9 +135,9 @@ Below demonstrates the simple construction of ModelOrbitals, which can then be p
 .. tab:: C++ API
 
    .. code-block:: cpp
-   
-   // Set basis set size 
-   size_t basis_size = 6; 
+
+   // Set basis set size
+   size_t basis_size = 6;
 
    // Set active orbitals
    std::vector<size_t> alpha_active = {1,2};
