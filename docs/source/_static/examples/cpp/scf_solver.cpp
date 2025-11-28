@@ -6,7 +6,8 @@
 // license information.
 // --------------------------------------------------------------------------------------------
 
-// start-cell-1
+// --------------------------------------------------------------------------------------------
+// start-cell-create
 #include <qdk/chemistry.hpp>
 using namespace qdk::chemistry::algorithms;
 
@@ -15,9 +16,11 @@ auto scf_solver = ScfSolverFactory::create();
 
 // Or specify a particular solver implementation
 auto pyscf_solver = ScfSolverFactory::create("pyscf");
-// end-cell-1
+// end-cell-create
+// --------------------------------------------------------------------------------------------
 
-// start-cell-2
+// --------------------------------------------------------------------------------------------
+// start-cell-configure
 // Standard settings that work with all solvers
 // Set the method
 scf_solver.settings()
@@ -28,9 +31,11 @@ scf_solver.settings()
 
 // For DFT calculations, set the exchange-correlation functional
 scf_solver->settings().set("functional", "B3LYP");
-// end-cell-2
+// end-cell-configure
+// --------------------------------------------------------------------------------------------
 
-// start-cell-3
+// --------------------------------------------------------------------------------------------
+// start-cell-run
 // Create a structure (or load from a file)
 Structure structure;
 // configuring structure ...
@@ -39,4 +44,5 @@ Structure structure;
 // Return types are: std::tuple<double, Orbitals>
 auto [E_scf, scf_orbitals] = scf_solver->solve(structure);
 std::cout << "SCF Energy: " << E_scf << " Hartree" << std::endl;
-// end-cell-3
+// end-cell-run
+// --------------------------------------------------------------------------------------------

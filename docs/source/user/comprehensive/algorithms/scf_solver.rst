@@ -45,7 +45,7 @@ The orbitals from :term:`SCF` calculations typically serve as input for post-:te
 Capabilities
 ------------
 
-The ``ScfSolver`` in QDK/Chemistry provides the following calculation types for both :term:`HF` and :term:`DFT` methods:
+The :class:`~qdk_chemistry.algorithms.ScfSolver` in QDK/Chemistry provides the following calculation types for both :term:`HF` and :term:`DFT` methods:
 
 - **Restricted calculations**: For closed-shell systems with paired electrons
 
@@ -100,15 +100,15 @@ QDK/Chemistry currently provides the following registered solvers:
 
    .. literalinclude:: ../../../_static/examples/cpp/scf_solver.cpp
       :language: cpp
-      :start-after: // start-cell-1
-      :end-before: // end-cell-1
+      :start-after: // start-cell-create
+      :end-before: // end-cell-create
 
 .. tab:: Python API
 
-   .. literalinclude:: ../../../_static/examples/python/factory_pattern.py
+   .. literalinclude:: ../../../_static/examples/python/scf_solver.py
       :language: python
-      :start-after: # start-cell-1
-      :end-before: # end-cell-1
+      :start-after: # start-cell-create
+      :end-before: # end-cell-create
 
 Configuring the :term:`SCF` calculation
 ---------------------------------------
@@ -127,15 +127,15 @@ See the `Available Settings`_ section below for a complete list of configuration
 
    .. literalinclude:: ../../../_static/examples/cpp/scf_solver.cpp
       :language: cpp
-      :start-after: // start-cell-2
-      :end-before: // end-cell-2
+      :start-after: // start-cell-configure
+      :end-before: // end-cell-configure
 
 .. tab:: Python API
 
-   .. literalinclude:: ../../../_static/examples/python/settings.py
+   .. literalinclude:: ../../../_static/examples/python/scf_solver.py
       :language: python
-      :start-after: # start-cell-1
-      :end-before: # end-cell-1
+      :start-after: # start-cell-configure
+      :end-before: # end-cell-configure
 
 Running an :term:`SCF` calculation
 ----------------------------------
@@ -148,17 +148,17 @@ The ``solve`` method returns two values:
 
 .. tab:: C++ API
 
-   .. literalinclude:: ../../../../examples/cpp/scf_solver.cpp
+   .. literalinclude:: ../../../_static/examples/cpp/scf_solver.cpp
       :language: cpp
-      :start-after: // start-cell-3
-      :end-before: // end-cell-3
+      :start-after: // start-cell-run
+      :end-before: // end-cell-run
 
 .. tab:: Python API
 
-   .. literalinclude:: ../../../../examples/python/scf_solver.py
+   .. literalinclude:: ../../../_static/examples/python/scf_solver.py
       :language: python
-      :start-after: # start-cell-3
-      :end-before: # end-cell-3
+      :start-after: # start-cell-run
+      :end-before: # end-cell-run
 
 Available settings
 ------------------
@@ -261,9 +261,10 @@ Related classes
 - :doc:`Structure <../data/structure>`: Input molecular structure
 - :doc:`Orbitals <../data/orbitals>`: Output optimized molecular orbitals
 
-Related topics
---------------
+Further reading
+---------------
 
+- The above examples can be downloaded as a complete `Python <../../../_static/examples/python/scf_solver.py>`_ script or `C++ <../../../_static/examples/cpp/scf_solver.cpp>`_ source file.
 - :doc:`Settings <../design/settings>`: Configuration settings for algorithms
 - :doc:`Factory Pattern <../design/factory_pattern>`: Understanding algorithm creation
 - :doc:`../basis_functionals`: Exchange-correlation functionals for DFT calculations
