@@ -11,7 +11,7 @@ representations, particularly for quantum circuit simulation and state preparati
 
 import numpy as np
 
-from qdk_chemistry import Configuration, Wavefunction
+from qdk_chemistry.data import Configuration, Wavefunction
 
 
 def create_statevector_from_wavefunction(wavefunction: Wavefunction, normalize: bool = True) -> np.ndarray:
