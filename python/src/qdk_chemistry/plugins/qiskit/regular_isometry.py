@@ -47,8 +47,16 @@ class RegularIsometryStatePreparation(StatePreparation):
             A QASM string representation of the quantum circuit.
 
         """
-        indices, _ = wavefunction.get_orbitals().get_active_space_indices()
-        num_orbitals = len(indices)
+        # Active Space Consistency Check
+        alpha_indices, beta_indices = wavefunction.get_orbitals().get_active_space_indices()
+        if alpha_indices != beta_indices:
+            raise ValueError(
+                f"Active space contains {len(alpha_indices)} alpha orbitals and "
+                f"{len(beta_indices)} beta orbitals. Asymmetric active spaces for "
+                "alpha and beta orbitals are not supported for state preparation."
+            )
+    
+        num_orbitals = len(alpha_indices)
         n_qubits = num_orbitals * 2
         num_dets = wavefunction.size()
         _LOGGER.debug(f"Using {num_dets} determinants for state preparation")

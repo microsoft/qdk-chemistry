@@ -293,6 +293,14 @@ def test_asymmetric_active_space_error():
             """Return mock coefficient."""
             return 1.0
 
+        def get_coefficients(self):
+            """Return coefficients for all determinants."""
+            return [1.0, 0.5]  # Two coefficients for the two determinants
+
+        def size(self):
+            """Return the number of determinants."""
+            return len(self.get_active_determinants())
+
     mock_wfn = MockWavefunction()
     for sp_key in available("state_prep"):
         prep = create("state_prep", sp_key)
@@ -752,7 +760,7 @@ def test_is_diagonal_matrix():
     pseudo_diagonal_matrices = [
         # Example: 3x4 matrix (3 rows = odd, 3x3 square part is diagonal, remaining column all 1s)
         np.array([[1, 0, 0, 1], [0, 1, 0, 1], [0, 0, 1, 1]], dtype=np.int8),  # VALID: odd rows + all-1s remaining
-        # 3x5 matrix with multiple remaining columns (all must be all 1s)
+        # 3x5 matrix with multiple remaining columns (all must be all-1s)
         np.array([[1, 0, 0, 1, 1], [0, 1, 0, 1, 1], [0, 0, 1, 1, 1]], dtype=np.int8),
     ]
 
