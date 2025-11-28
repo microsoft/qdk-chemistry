@@ -8,11 +8,7 @@
 import numpy as np
 from qdk_chemistry.algorithms import create
 from qdk_chemistry.data import (
-    CasWavefunctionContainer,
-    Configuration,
-    SlaterDeterminantContainer,
     Structure,
-    Wavefunction,
 )
 
 # =============================================================================
@@ -31,7 +27,9 @@ E_scf, wavefunction = scf_solver.run(structure, charge=0, spin_multiplicity=1)
 
 # Access wavefunction properties
 orbitals = wavefunction.get_orbitals()
-container_type = wavefunction.get_container_type()  # Returns "sd" for Slater determinant
+container_type = (
+    wavefunction.get_container_type()
+)  # Returns "sd" for Slater determinant
 wf_type = wavefunction.get_type()  # WavefunctionType.SelfDual
 
 # Get determinant information

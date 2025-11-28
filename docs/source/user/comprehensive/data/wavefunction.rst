@@ -21,7 +21,7 @@ QDK/Chemistry supports multiple wavefunction representations through different c
 - **CAS (Complete Active Space)**: Multi-determinant wavefunctions with full CI in the active space
 - **SCI (Selected Configuration Interaction)**: Sparse multi-determinant wavefunctions
 
-#TODO PVG once the unrestricted PR goes in, we need to add containers for CC and MP2. 
+#TODO PVG once the unrestricted PR goes in, we need to add containers for CC and MP2.
 
 Properties
 ~~~~~~~~~~
@@ -29,7 +29,7 @@ Properties
 The :class:`~qdk_chemistry.data.Wavefunction` class provides access to:
 
 - **Coefficients**: Expansion coefficients for each determinant
-- **Determinants**: Electronic configurations 
+- **Determinants**: Electronic configurations
 - **Electron counts**: Total and active space electron numbers
 - **Orbital occupations**: Natural orbital occupations for all and active orbitals
 - **Reduced Density Matrices (RDMs)**: One- and two-particle density matrices
@@ -73,7 +73,7 @@ Most commonly, wavefunctions are obtained from :doc:`SCF calculations <../algori
       std::string container_type = wavefunction->get_container_type(); // "sd"
       WavefunctionType wf_type = wavefunction->get_type();
 
-      // Get determinant information 
+      // Get determinant information
       auto determinants = wavefunction->get_active_determinants();
       auto coefficients = wavefunction->get_coefficients();
       size_t num_dets = wavefunction->size();
@@ -125,7 +125,7 @@ For selected configuration interaction:
 - Optimized for large configuration spaces
 - Supports incremental determinant selection
 
-#TODO PVG once the unrestricted PR goes in, we need to add containers for CC and MP2. 
+#TODO PVG once the unrestricted PR goes in, we need to add containers for CC and MP2.
 
 
 Related classes
