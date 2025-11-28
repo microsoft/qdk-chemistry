@@ -20,7 +20,7 @@ QDK/Chemistry provides several orbital transformation methods through the :class
 **Pipek-Mezey Localization**
    Maximizes the sum of squared Mulliken charges on each atom for each orbital, creating orbitals that are maximally localized on specific atoms or bonds.
 
-**MP2 Natural Orbitals** 
+**MP2 Natural Orbitals**
    Transforms canonical orbitals into natural orbitals based on MP2 density matrices, providing orbitals that diagonalize the correlation effects.
 
 **Valence Virtual Hard Virtual (VVHV) Orbitals**
