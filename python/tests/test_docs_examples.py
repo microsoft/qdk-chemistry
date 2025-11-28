@@ -12,7 +12,7 @@ from pathlib import Path
 from typing import ClassVar
 
 # Get the examples directory
-EXAMPLES_DIR = Path(__file__).parent.parent.parent / "docs" / "examples"
+EXAMPLES_DIR = Path(__file__).parent.parent.parent / "docs" / "source" / "_static" / "examples"
 PYTHON_EXAMPLES_DIR = EXAMPLES_DIR / "python"
 
 

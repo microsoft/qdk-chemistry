@@ -54,9 +54,9 @@ for algorithm_name in available():
     print(f"{algorithm_name} has methods:")
     for method_name in available(algorithm_name):
         print(f"  {method_name} has settings:")
-        method = create(algorithm_name, method_name)
-        settings = method.settings()
-        for key, value in settings.items():
+        method_ = create(algorithm_name, method_name)
+        settings_ = method_.settings()
+        for key, value in settings_.items():
             print(f"    {key}: {value}")
 # end-cell-get-settings
 ################################################################################
@@ -72,6 +72,9 @@ if settings.has("basis_set"):
 if settings.has("tolerance"):
     # Use the setting
     print(f"Convergence threshold: {settings.get('tolerance')}")
+
+# List the available settings
+print("Available settings:", settings)
 
 # Try to get a value (Python uses get_or_default or try/except)
 try:
