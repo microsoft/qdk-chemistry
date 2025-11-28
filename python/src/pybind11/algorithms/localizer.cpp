@@ -8,6 +8,8 @@
 #include <qdk/chemistry.hpp>
 
 #include "factory_bindings.hpp"
+#include "qdk/chemistry/algorithms/microsoft/localization/mp2_natural_orbitals.hpp"
+#include "qdk/chemistry/algorithms/microsoft/localization/pipek_mezey.hpp"
 
 namespace py = pybind11;
 using namespace qdk::chemistry::algorithms;
@@ -143,10 +145,6 @@ Returns:
     str: The type name of the algorithm
 )");
 
-  localizer.def("__repr__", [](const Localizer &) {
-    return "<qdk_chemistry.algorithms.OrbitalLocalizer>";
-  });
-
   // Factory class binding - creates LocalizerFactory class
   // with static methods
   qdk::chemistry::python::bind_algorithm_factory<LocalizerFactory, Localizer,
@@ -156,4 +154,86 @@ Returns:
   localizer.def("__repr__", [](const Localizer &) {
     return "<qdk_chemistry.algorithms.OrbitalLocalizer>";
   });
+
+  // Bind concrete microsoft::PipekMezeyLocalizer implementation
+  py::class_<microsoft::PipekMezeyLocalizer, Localizer, py::smart_holder>(
+      m, "QdkPipekMezeyLocalizer", R"(
+QDK Pipek-Mezey orbital localizer.
+
+This class provides a concrete implementation of the orbital localizer using
+the Pipek-Mezey localization algorithm. The Pipek-Mezey algorithm maximizes
+the sum of squares of atomic orbital populations on atoms, resulting in
+orbitals that are more localized to individual atoms or bonds.
+
+This implementation separately localizes occupied and virtual orbitals to
+maintain the occupied-virtual separation.
+
+Typical usage:
+
+.. code-block:: python
+
+    import qdk_chemistry.algorithms as alg
+
+    # Create a Pipek-Mezey localizer
+    localizer = alg.QdkPipekMezeyLocalizer()
+
+    # Configure settings if needed
+    localizer.settings().set("max_iterations", 100)
+    localizer.settings().set("convergence_tolerance", 1e-8)
+
+    # Localize orbitals
+    localized_wfn = localizer.run(wavefunction, loc_indices_a, loc_indices_b)
+
+See Also:
+    :class:`OrbitalLocalizer`
+    :class:`qdk_chemistry.data.Wavefunction`
+
+)")
+      .def(py::init<>(), R"(
+Default constructor.
+
+Initializes a Pipek-Mezey localizer with default settings.
+
+)");
+
+  // Bind concrete microsoft::MP2NaturalOrbitalLocalizer implementation
+  py::class_<microsoft::MP2NaturalOrbitalLocalizer, Localizer,
+             py::smart_holder>(m, "QdkMP2NaturalOrbitalLocalizer", R"(
+QDK MP2 natural orbital transformer.
+
+This class provides a concrete implementation that transforms canonical
+molecular orbitals into natural orbitals derived from second-order
+Møller-Plesset perturbation theory (MP2). Natural orbitals are eigenfunctions
+of the first-order reduced density matrix.
+
+MP2 natural orbitals often provide a more compact representation of the
+electronic wavefunction, which can improve computational efficiency in
+correlation methods.
+
+.. note::
+    Only supports restricted orbitals and closed-shell systems.
+
+Typical usage:
+
+.. code-block:: python
+
+    import qdk_chemistry.algorithms as alg
+
+    # Create an MP2 natural orbital localizer
+    localizer = alg.QdkMP2NaturalOrbitalLocalizer()
+
+    # Transform to MP2 natural orbitals
+    no_wfn = localizer.run(wavefunction, loc_indices_a, loc_indices_b)
+
+See Also:
+    :class:`OrbitalLocalizer`
+    :class:`qdk_chemistry.data.Wavefunction`
+
+)")
+      .def(py::init<>(), R"(
+Default constructor.
+
+Initializes an MP2 natural orbital transformer with default settings.
+
+)");
 }

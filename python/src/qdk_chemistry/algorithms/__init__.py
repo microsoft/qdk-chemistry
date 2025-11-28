@@ -13,18 +13,36 @@ import importlib
 from types import ModuleType
 from typing import TYPE_CHECKING, Any
 
-from qdk_chemistry.algorithms.active_space_selector import ActiveSpaceSelector
+from qdk_chemistry.algorithms.active_space_selector import (
+    ActiveSpaceSelector,
+    QdkAutocasActiveSpaceSelector,
+    QdkAutocasEosActiveSpaceSelector,
+    QdkOccupationActiveSpaceSelector,
+    QdkValenceActiveSpaceSelector,
+)
 from qdk_chemistry.algorithms.coupled_cluster_calculator import CoupledClusterCalculator
 from qdk_chemistry.algorithms.energy_estimator import EnergyEstimator
-from qdk_chemistry.algorithms.hamiltonian_constructor import HamiltonianConstructor
-from qdk_chemistry.algorithms.multi_configuration_calculator import MultiConfigurationCalculator
+from qdk_chemistry.algorithms.hamiltonian_constructor import (
+    HamiltonianConstructor,
+    QdkHamiltonianConstructor,
+)
+from qdk_chemistry.algorithms.multi_configuration_calculator import (
+    MultiConfigurationCalculator,
+    QdkMacisAsci,
+    QdkMacisCas,
+)
 from qdk_chemistry.algorithms.multi_configuration_scf import MultiConfigurationScf
-from qdk_chemistry.algorithms.orbital_localizer import OrbitalLocalizer
+from qdk_chemistry.algorithms.orbital_localizer import (
+    OrbitalLocalizer,
+    QdkMP2NaturalOrbitalLocalizer,
+    QdkPipekMezeyLocalizer,
+)
 from qdk_chemistry.algorithms.projected_multi_configuration_calculator import (
     ProjectedMultiConfigurationCalculator,
+    QdkMacisPmc,
 )
 from qdk_chemistry.algorithms.qubit_mapper import QubitMapper
-from qdk_chemistry.algorithms.scf_solver import ScfSolver
+from qdk_chemistry.algorithms.scf_solver import QdkScfSolver, ScfSolver
 from qdk_chemistry.algorithms.stability_checker import StabilityChecker
 from qdk_chemistry.algorithms.state_preparation import StatePreparation
 from qdk_chemistry.phase_estimation import (
@@ -50,6 +68,17 @@ __all__ = [
     "PhaseEstimation",
     "PhaseEstimationAlgorithm",
     "ProjectedMultiConfigurationCalculator",
+    "QdkAutocasActiveSpaceSelector",
+    "QdkAutocasEosActiveSpaceSelector",
+    "QdkHamiltonianConstructor",
+    "QdkMP2NaturalOrbitalLocalizer",
+    "QdkMacisAsci",
+    "QdkMacisCas",
+    "QdkMacisPmc",
+    "QdkOccupationActiveSpaceSelector",
+    "QdkPipekMezeyLocalizer",
+    "QdkScfSolver",
+    "QdkValenceActiveSpaceSelector",
     "QubitMapper",
     "ScfSolver",
     "StabilityChecker",

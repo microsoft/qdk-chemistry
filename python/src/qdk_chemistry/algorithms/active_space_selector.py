@@ -10,4 +10,10 @@ internal package paths.
 # Licensed under the MIT License. See LICENSE.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
 
-from qdk_chemistry._core._algorithms import ActiveSpaceSelector  # noqa: F401 - re-export
+from qdk_chemistry._core._algorithms import (
+    ActiveSpaceSelector,  # noqa: F401 - re-export
+    QdkAutocasActiveSpaceSelector,  # noqa: F401 - re-export
+    QdkAutocasEosActiveSpaceSelector,  # noqa: F401 - re-export
+    QdkOccupationActiveSpaceSelector,  # noqa: F401 - re-export
+    QdkValenceActiveSpaceSelector,  # noqa: F401 - re-export
+)

@@ -10,4 +10,7 @@ internal package paths.
 # Licensed under the MIT License. See LICENSE.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
 
-from qdk_chemistry._core._algorithms import ProjectedMultiConfigurationCalculator  # noqa: F401 - re-export
+from qdk_chemistry._core._algorithms import (
+    ProjectedMultiConfigurationCalculator,  # noqa: F401 - re-export
+    QdkMacisPmc,  # noqa: F401 - re-export
+)

@@ -8,6 +8,8 @@
 #include <qdk/chemistry.hpp>
 
 #include "factory_bindings.hpp"
+#include "qdk/chemistry/algorithms/microsoft/macis_asci.hpp"
+#include "qdk/chemistry/algorithms/microsoft/macis_cas.hpp"
 
 namespace py = pybind11;
 using namespace qdk::chemistry::algorithms;
@@ -157,4 +159,80 @@ Returns:
   mc_calculator.def("__repr__", [](const MultiConfigurationCalculator &) {
     return "<qdk_chemistry.algorithms.MultiConfigurationCalculator>";
   });
+
+  // Bind concrete microsoft::MacisCas implementation
+  py::class_<microsoft::MacisCas, MultiConfigurationCalculator,
+             py::smart_holder>(m, "QdkMacisCas", R"(
+QDK MACIS-based Complete Active Space (CAS) calculator.
+
+This class provides a concrete implementation of the multi-configuration
+calculator using the MACIS library for Complete Active Space Configuration
+Interaction (CASCI) calculations.
+
+Typical usage:
+
+.. code-block:: python
+
+    import qdk_chemistry.algorithms as alg
+
+    # Create a CASCI calculator
+    casci = alg.QdkMacisCas()
+
+    # Configure settings if needed
+    casci.settings().set("max_iterations", 100)
+
+    # Run calculation
+    energy, wavefunction = casci.run(hamiltonian, n_alpha, n_beta)
+
+See Also:
+    :class:`MultiConfigurationCalculator`
+    :class:`qdk_chemistry.data.Hamiltonian`
+    :class:`qdk_chemistry.data.Wavefunction`
+
+)")
+      .def(py::init<>(), R"(
+Default constructor.
+
+Initializes a MACIS CAS calculator with default settings.
+
+)");
+
+  // Bind concrete microsoft::MacisAsci implementation
+  py::class_<microsoft::MacisAsci, MultiConfigurationCalculator,
+             py::smart_holder>(m, "QdkMacisAsci", R"(
+QDK MACIS-based Adaptive Sampling Configuration Interaction (ASCI) calculator.
+
+This class provides a concrete implementation of the multi-configuration
+calculator using the MACIS library for Adaptive Sampling Configuration
+Interaction (ASCI) calculations, which adaptively selects the most important
+configurations.
+
+Typical usage:
+
+.. code-block:: python
+
+    import qdk_chemistry.algorithms as alg
+
+    # Create an ASCI calculator
+    asci = alg.QdkMacisAsci()
+
+    # Configure ASCI-specific settings
+    asci.settings().set("ntdets_max", 1000)
+    asci.settings().set("h_el_tol", 1e-6)
+
+    # Run calculation
+    energy, wavefunction = asci.run(hamiltonian, n_alpha, n_beta)
+
+See Also:
+    :class:`MultiConfigurationCalculator`
+    :class:`qdk_chemistry.data.Hamiltonian`
+    :class:`qdk_chemistry.data.Wavefunction`
+
+)")
+      .def(py::init<>(), R"(
+Default constructor.
+
+Initializes a MACIS ASCI calculator with default settings.
+
+)");
 }

@@ -8,6 +8,10 @@
 #include <qdk/chemistry.hpp>
 
 #include "factory_bindings.hpp"
+#include "qdk/chemistry/algorithms/microsoft/active_space/autocas_active_space.hpp"
+#include "qdk/chemistry/algorithms/microsoft/active_space/entropy_active_space.hpp"
+#include "qdk/chemistry/algorithms/microsoft/active_space/occupation_active_space.hpp"
+#include "qdk/chemistry/algorithms/microsoft/active_space/valence_active_space.hpp"
 
 namespace py = pybind11;
 using namespace qdk::chemistry::algorithms;
@@ -161,4 +165,143 @@ Returns:
   selector.def("__repr__", [](const ActiveSpaceSelector&) {
     return "<qdk_chemistry.algorithms.ActiveSpaceSelector>";
   });
+
+  // Bind concrete microsoft::OccupationActiveSpaceSelector implementation
+  py::class_<microsoft::OccupationActiveSpaceSelector, ActiveSpaceSelector,
+             py::smart_holder>(m, "QdkOccupationActiveSpaceSelector", R"(
+QDK occupation-based active space selector.
+
+This class selects active space orbitals based on their occupation numbers.
+It identifies orbitals that have partial occupations (not close to 0 or 2
+electrons), which typically indicates significant multi-reference character
+and strong electron correlation.
+
+Typical usage:
+
+.. code-block:: python
+
+    import qdk_chemistry.algorithms as alg
+
+    # Create an occupation-based selector
+    selector = alg.QdkOccupationActiveSpaceSelector()
+
+    # Configure occupation threshold
+    selector.settings().set("occupation_threshold", 0.1)
+
+    # Select active space
+    active_wfn = selector.run(wavefunction)
+
+See Also:
+    :class:`ActiveSpaceSelector`
+    :class:`qdk_chemistry.data.Wavefunction`
+
+)")
+      .def(py::init<>(), R"(
+Default constructor.
+
+Initializes an occupation-based active space selector with default settings.
+
+)");
+
+  // Bind concrete microsoft::ValenceActiveSpaceSelector implementation
+  py::class_<microsoft::ValenceActiveSpaceSelector, ActiveSpaceSelector,
+             py::smart_holder>(m, "QdkValenceActiveSpaceSelector", R"(
+QDK valence-based active space selector.
+
+This class selects active space orbitals based on valence orbital criteria.
+It identifies valence orbitals that are chemically significant for the
+molecular system under study.
+
+Typical usage:
+
+.. code-block:: python
+
+    import qdk_chemistry.algorithms as alg
+
+    # Create a valence-based selector
+    selector = alg.QdkValenceActiveSpaceSelector()
+
+    # Select active space
+    active_wfn = selector.run(wavefunction)
+
+See Also:
+    :class:`ActiveSpaceSelector`
+    :class:`qdk_chemistry.data.Wavefunction`
+
+)")
+      .def(py::init<>(), R"(
+Default constructor.
+
+Initializes a valence-based active space selector with default settings.
+
+)");
+
+  // Bind concrete microsoft::AutocasEosActiveSpaceSelector implementation
+  py::class_<microsoft::AutocasEosActiveSpaceSelector, ActiveSpaceSelector,
+             py::smart_holder>(m, "QdkAutocasEosActiveSpaceSelector", R"(
+QDK entropy-based active space selector.
+
+This class selects active space orbitals based on orbital entropy measures.
+It identifies orbitals with high entropy, which indicates strong electron
+correlation and multi-reference character.
+
+Typical usage:
+
+.. code-block:: python
+
+    import qdk_chemistry.algorithms as alg
+
+    # Create an entropy-based selector
+    selector = alg.QdkAutocasEosActiveSpaceSelector()
+
+    # Configure entropy threshold
+    selector.settings().set("entropy_threshold", 0.1)
+
+    # Select active space
+    active_wfn = selector.run(wavefunction)
+
+See Also:
+    :class:`ActiveSpaceSelector`
+    :class:`qdk_chemistry.data.Wavefunction`
+
+)")
+      .def(py::init<>(), R"(
+Default constructor.
+
+Initializes an entropy-based active space selector with default settings.
+
+)");
+
+  // Bind concrete microsoft::AutocasActiveSpaceSelector implementation
+  py::class_<microsoft::AutocasActiveSpaceSelector, ActiveSpaceSelector,
+             py::smart_holder>(m, "QdkAutocasActiveSpaceSelector", R"(
+QDK Automated Complete Active Space (AutoCAS) selector.
+
+This class provides an automated approach to selecting active space orbitals
+based on various criteria including occupation numbers, orbital energies,
+and other chemical information.
+
+Typical usage:
+
+.. code-block:: python
+
+    import qdk_chemistry.algorithms as alg
+
+    # Create an AutoCAS selector
+    selector = alg.QdkAutocasActiveSpaceSelector()
+
+    # Select active space automatically
+    active_wfn = selector.run(wavefunction)
+
+See Also:
+    :class:`ActiveSpaceSelector`
+    :class:`qdk_chemistry.data.Wavefunction`
+
+)")
+      .def(py::init<>(), R"(
+Default constructor.
+
+Initializes an AutoCAS selector with default settings.
+
+)");
 }

@@ -2,6 +2,8 @@
 // Licensed under the MIT License. See LICENSE.txt in the project root for
 // license information.
 
+#include "qdk/chemistry/algorithms/microsoft/scf.hpp"
+
 #include <pybind11/pybind11.h>
 #include <pybind11/stl.h>
 
@@ -179,4 +181,50 @@ Returns:
   scf_solver.def("__repr__", [](const ScfSolver &) {
     return "<qdk_chemistry.algorithms.ScfSolver>";
   });
+
+  // Bind concrete microsoft::ScfSolver implementation
+  py::class_<microsoft::ScfSolver, ScfSolver, py::smart_holder>(
+      m, "QdkScfSolver", R"(
+QDK implementation of the SCF solver.
+
+This class provides a concrete implementation of the SCF (Self-Consistent
+Field) solver using the internal backend.
+It inherits from the base :class:`ScfSolver` class and implements the
+``solve`` method to perform self-consistent field calculations on molecular
+structures.
+
+Typical usage:
+
+.. code-block:: python
+
+    import qdk_chemistry.algorithms as alg
+    import qdk_chemistry.data as data
+
+    # Create a molecular structure
+    water = data.Structure(
+        positions=[[0.0, 0.0, 0.0], [0.0, 0.76, 0.59], [0.0, -0.76, 0.59]],
+        elements=[data.Element.O, data.Element.H, data.Element.H]
+    )
+
+    # Create an SCF solver instance
+    scf_solver = alg.QdkScfSolver()
+
+    # Configure settings if needed
+    scf_solver.settings().set("basis_set", "sto-3g")
+
+    # Perform SCF calculation
+    energy, wavefunction = scf_solver.run(water, 0, 1)
+
+See Also:
+    :class:`ScfSolver`
+    :class:`qdk_chemistry.data.Structure`
+    :class:`qdk_chemistry.data.Orbitals`
+
+)")
+      .def(py::init<>(), R"(
+Default constructor.
+
+Initializes an SCF solver with default settings.
+
+)");
 }
