@@ -5,6 +5,8 @@
 # Licensed under the MIT License. See LICENSE.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
 
+################################################################################
+# start-cell-create
 import numpy as np
 
 # Import noise models for QDK simulator examples
@@ -18,6 +20,16 @@ from qdk_chemistry.algorithms.energy_estimator.qsharp import QDKEnergyEstimator
 from qdk_chemistry.data import QubitHamiltonian
 from qdk_chemistry.plugins.qiskit.energy_estimator import QiskitEnergyEstimator
 
+# Create energy estimator using Qsharp simulator as backend
+qdk_estimator = create("energy_estimator", "qdk_base_simulator")
+
+# Create energy estimator using Qiskit Aer simulator as backend
+qiskit_estimator = create("energy_estimator", "qiskit_aer_simulator")
+# end-cell-create
+################################################################################
+
+################################################################################
+# start-cell-qdk
 # Define a simple quantum circuit in QASM and a qubit Hamiltonian
 circuit_qasm = """
     include "stdgates.inc";
@@ -28,13 +40,13 @@ circuit_qasm = """
     """
 qubit_hamiltonians = [QubitHamiltonian(["ZZ"], np.array([1.0]))]
 
-# Create energy estimator using Qsharp simulator as backend
-qdk_estimator = create("energy_estimator", "qdk_base_simulator")
+# Run energy estimation using Qsharp simulator without noise
 energy_expectation_results, measurement_data = qdk_estimator.run(
     circuit_qasm, qubit_hamiltonians, total_shots=1000
 )
 print(
-    f"Energy expectation value from QDK Simulator: {energy_expectation_results.energy_expectation_value}"
+    "Energy expectation value from noiseless QDK Simulator: "
+    f"{energy_expectation_results.energy_expectation_value}"
 )
 
 # Create energy estimator using Qsharp simulator with depolarizing noise
@@ -57,9 +69,12 @@ print(
     "Energy expectation value from QDK Simulator with qubit loss: "
     f"{energy_expectation_results.energy_expectation_value}"
 )
+# end-cell-qdk
+################################################################################
 
-# Create energy estimator using Qiskit Aer simulator as backend
-qiskit_estimator = create("energy_estimator", "qiskit_aer_simulator")
+################################################################################
+# start-cell-qiskit
+# Run energy estimation using Qiskit Aer simulator without noise
 energy_expectation_results, measurement_data = qiskit_estimator.run(
     circuit_qasm, qubit_hamiltonians, total_shots=1000
 )
@@ -83,3 +98,5 @@ print(
     "Energy expectation value from Qiskit Aer Simulator with noise: "
     f"{energy_expectation_results.energy_expectation_value}"
 )
+# end-cell-qiskit
+################################################################################
