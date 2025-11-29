@@ -87,7 +87,6 @@ class PyscfScfSettings(ElectronicStructureSettings):
         super().__init__()  # This sets up all the base class defaults
         # Add PySCF-specific settings
         self._set_default("force_restricted", "bool", False)
-        self.set("convergence_threshold", 1e-8)  # Override default convergence threshold
 
 
 class PyscfScfSolver(ScfSolver):

@@ -130,7 +130,6 @@ class SCFTest
     cfg.scf_algorithm.max_iteration = 100;
     cfg.scf_algorithm.og_threshold = json.value("og_threshold", 1e-6);
     cfg.scf_algorithm.density_threshold = json.value("density_threshold", 1e-5);
-    cfg.scf_algorithm.og_threshold = json.value("og_threshold", 1e-6);
     cfg.lindep_threshold = json.value("lindep_threshold", 1e-6);
     cfg.fock_reset_steps = 9999;
     cfg.incremental_fock_start_step = 3;
