@@ -1062,7 +1062,7 @@ TEST_F(MacisPmcTest, BasicPMCCalculation) {
       calculator->run(hamiltonian, test_configurations_);
 
   // Verify basic properties of the result
-  EXPECT_NEAR(energy - hamiltonian->get_core_energy(), -1.242393352624e+01,
+  EXPECT_NEAR(energy - hamiltonian->get_core_energy(), -1.2423933526242593e+01,
               macis_params::energy_tol);
   EXPECT_EQ(wavefunction->size(), test_configurations_.size());
 

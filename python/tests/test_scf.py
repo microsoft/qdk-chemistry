@@ -241,8 +241,6 @@ class TestScfSolver:
         scf_solver.settings().set("method", "pbe")
         scf_solver.settings().set("basis_set", "cc-pvdz")
         scf_solver.settings().set("enable_gdm", True)
-        scf_solver.settings().set("max_scf_steps", 200)
-        scf_solver.settings().set("energy_thresh_diis_switch", 1e-3)
 
         energy, wavefunction = scf_solver.run(oxygen, 0, 1)
         orbitals = wavefunction.get_orbitals()
@@ -255,15 +253,13 @@ class TestScfSolver:
         assert abs(energy - (-74.873106298)) < scf_energy_tolerance
 
     def test_scf_solver_oxygen_atom_history_size_limit_gdm(self):
-        """Test SCF solver on oxygen atom with GDM and history size limit."""
+        """Test SCF solver on oxygen atom with GDM and history size limit 20."""
         oxygen = create_oxygen_structure()
         scf_solver = algorithms.create("scf_solver")
 
         scf_solver.settings().set("method", "pbe")
         scf_solver.settings().set("basis_set", "cc-pvdz")
         scf_solver.settings().set("enable_gdm", True)
-        scf_solver.settings().set("max_scf_steps", 200)
-        scf_solver.settings().set("energy_thresh_diis_switch", 1e-3)
         scf_solver.settings().set("gdm_bfgs_history_size_limit", 20)
 
         energy, wavefunction = scf_solver.run(oxygen, 0, 1)
@@ -277,7 +273,7 @@ class TestScfSolver:
         assert abs(energy - (-74.873106298)) < scf_energy_tolerance
 
     def test_scf_solver_oxygen_atom_one_diis_step_gdm(self):
-        """Test SCF solver on oxygen atom with PBE/cc-pvdz."""
+        """Test SCF solver on oxygen atom with PBE/cc-pvdz, with only 1 diis step."""
         oxygen = create_oxygen_structure()
         scf_solver = algorithms.create("scf_solver")
 
@@ -285,7 +281,6 @@ class TestScfSolver:
         scf_solver.settings().set("method", "pbe")
         scf_solver.settings().set("basis_set", "cc-pvdz")
         scf_solver.settings().set("enable_gdm", True)
-        scf_solver.settings().set("max_scf_steps", 200)
         scf_solver.settings().set("gdm_max_diis_iteration", 1)
 
         energy, wavefunction = scf_solver.run(oxygen, 0, 1)
@@ -306,8 +301,6 @@ class TestScfSolver:
         # Set method and basis set to match C++ test
         scf_solver.settings().set("method", "pbe")
         scf_solver.settings().set("enable_gdm", True)
-        scf_solver.settings().set("max_scf_steps", 150)
-        scf_solver.settings().set("gdm_bfgs_history_size_limit", 60)
 
         energy, wavefunction = scf_solver.run(water, 0, 3)  # triplet state
         orbitals = wavefunction.get_orbitals()
@@ -332,9 +325,6 @@ class TestScfSolver:
         scf_solver.settings().set("method", "pbe")
         scf_solver.settings().set("basis_set", "cc-pvdz")
         scf_solver.settings().set("enable_gdm", True)
-        scf_solver.settings().set("energy_thresh_diis_switch", 1e-4)
-        scf_solver.settings().set("max_scf_steps", 150)
-        scf_solver.settings().set("gdm_bfgs_history_size_limit", 60)
 
         energy, wavefunction = scf_solver.run(oxygen, 1, 2)  # +1 charge, doublet state
         orbitals = wavefunction.get_orbitals()
@@ -349,7 +339,7 @@ class TestScfSolver:
         assert not orbitals.is_restricted()
 
     def test_scf_solver_oxygen_atom_invalid_energy_thresh_diis_switch_gdm(self):
-        """Test SCF solver on oxygen atom with GDM - invalid open shell configuration."""
+        """Test SCF solver on oxygen atom with GDM - invalid energy_thresh_diis_switch."""
         oxygen = create_oxygen_structure()
         scf_solver = algorithms.create("scf_solver")
 

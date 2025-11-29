@@ -128,8 +128,6 @@ TEST_F(ScfTest, Oxygen_atom_gdm) {
   scf_solver->settings().set("method", "pbe");
   scf_solver->settings().set("basis_set", "cc-pvdz");
   scf_solver->settings().set("enable_gdm", true);
-  scf_solver->settings().set("max_scf_steps", 200);
-  scf_solver->settings().set("energy_thresh_diis_switch", 1e-3);
   // Default should be a singlet
   auto [E_singlet, wfn_singlet] = scf_solver->run(oxygen, 0, 1);
   EXPECT_NEAR(E_singlet, -74.873106298, testing::scf_energy_tolerance);
@@ -144,8 +142,6 @@ TEST_F(ScfTest, Oxygen_atom_history_size_limit_gdm) {
   scf_solver->settings().set("method", "pbe");
   scf_solver->settings().set("basis_set", "cc-pvdz");
   scf_solver->settings().set("enable_gdm", true);
-  scf_solver->settings().set("max_scf_steps", 200);
-  scf_solver->settings().set("energy_thresh_diis_switch", 1e-3);
   scf_solver->settings().set("gdm_bfgs_history_size_limit", 20);
   // Default should be a singlet
   auto [E_singlet, wfn_singlet] = scf_solver->run(oxygen, 0, 1);
@@ -161,7 +157,6 @@ TEST_F(ScfTest, Oxygen_atom_one_diis_step_gdm) {
   scf_solver->settings().set("method", "pbe");
   scf_solver->settings().set("basis_set", "cc-pvdz");
   scf_solver->settings().set("enable_gdm", true);
-  scf_solver->settings().set("max_scf_steps", 200);
   scf_solver->settings().set("gdm_max_diis_iteration", 1);
 
   auto [E_singlet, wfn_singlet] = scf_solver->run(oxygen, 0, 1);
@@ -176,8 +171,6 @@ TEST_F(ScfTest, Water_triplet_gdm) {
   // Default settings
   scf_solver->settings().set("method", "pbe");
   scf_solver->settings().set("enable_gdm", true);
-  scf_solver->settings().set("max_scf_steps", 150);
-  scf_solver->settings().set("gdm_bfgs_history_size_limit", 60);
   auto [E_default, wfn_default] = scf_solver->run(water, 0, 3);
   auto orbitals_default = wfn_default->get_orbitals();
   EXPECT_NEAR(E_default, -76.0343083322644, testing::scf_energy_tolerance);
@@ -191,9 +184,6 @@ TEST_F(ScfTest, Oxygen_atom_charged_doublet_gdm) {
   scf_solver->settings().set("method", "pbe");
   scf_solver->settings().set("basis_set", "cc-pvdz");
   scf_solver->settings().set("enable_gdm", true);
-  scf_solver->settings().set("energy_thresh_diis_switch", 1e-4);
-  scf_solver->settings().set("max_scf_steps", 150);
-  scf_solver->settings().set("gdm_bfgs_history_size_limit", 60);
 
   auto [E_doublet, wfn_doublet] = scf_solver->run(oxygen, 1, 2);
   EXPECT_NEAR(E_doublet, -74.416994299, testing::scf_energy_tolerance);

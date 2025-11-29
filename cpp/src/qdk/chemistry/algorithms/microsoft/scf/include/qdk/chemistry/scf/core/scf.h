@@ -103,7 +103,7 @@ struct GDMConfig {
                                     ///< to GDM (for DIIS_GDM method)
   int gdm_max_diis_iteration = 50;  ///< Maximum DIIS iterations before
                                     ///< switching to GDM (for DIIS_GDM method)
-  int gdm_bfgs_history_size_limit = 40;  ///< History size limit for BFGS in GDM
+  int gdm_bfgs_history_size_limit = 50;  ///< History size limit for BFGS in GDM
                                          ///< (number of stored steps)
 };
 
