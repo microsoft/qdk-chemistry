@@ -12,7 +12,7 @@ Canonical molecular orbitals from :term:`SCF` calculations are often delocalized
 The :class:`~qdk_chemistry.algorithms.OrbitalLocalizer` algorithm applies unitary transformations to these orbitals to obtain alternative representations that may be more physically intuitive or computationally advantageous.
 Multiple localization methods are available through a unified interface, each optimizing different criteria to achieve localization.
 
-Localization Methods
+Localization methods
 --------------------
 
 QDK/Chemistry provides several orbital transformation methods through the :class:`~qdk_chemistry.algorithms.OrbitalLocalizer` interface:
@@ -30,19 +30,17 @@ For more information about this pattern, see the :doc:`Factory Pattern <../desig
 
 .. tab:: C++ API
 
-   .. code-block:: cpp
-
-      #include <qdk/chemistry.hpp>
-      using namespace qdk::chemistry::algorithms;
-
-      // Create an MP2 natural orbital localizer
-      auto mp2_localizer = LocalizerFactory::create("mp2_natural_orbitals");
+   .. literalinclude:: ../../../_static/examples/cpp/localizer.cpp
+      :language: cpp
+      :start-after: // start-cell-create
+      :end-before: // end-cell-create
 
 .. tab:: Python API
 
-   .. literalinclude:: ../../../../examples/localizer.py
+   .. literalinclude:: ../../../_static/examples/python/localizer.py
       :language: python
-      :lines: 3-6
+      :start-after: # start-cell-create
+      :end-before: # end-cell-create
 
 
 Configuring the localizer
@@ -52,16 +50,17 @@ The :class:`~qdk_chemistry.algorithms.OrbitalLocalizer` can be configured using 
 
 .. tab:: C++ API
 
-   .. code-block:: cpp
-
-      // Set the convergence threshold
-      localizer->settings().set("tolerance", 1.0e-6);
+   .. literalinclude:: ../../../_static/examples/cpp/localizer.cpp
+      :language: cpp
+      :start-after: // start-cell-configure
+      :end-before: // end-cell-configure
 
 .. tab:: Python API
 
-   .. literalinclude:: ../../../../examples/localizer.py
+   .. literalinclude:: ../../../_static/examples/python/localizer.py
       :language: python
-      :lines: 10-10
+      :start-after: # start-cell-configure
+      :end-before: # end-cell-configure
 
 Performing orbital localization
 -------------------------------
@@ -84,31 +83,20 @@ Once configured, the localization can be performed on a set of orbitals:
 
 .. tab:: C++ API
 
-   .. code-block:: cpp
-
-      // Obtain a valid Orbitals instance
-      Orbitals orbitals;
-      /* orbitals = ... */
-
-      // Configure electron counts in settings for methods that require them
-      localizer->settings().set("n_alpha_electrons", n_alpha);
-      localizer->settings().set("n_beta_electrons", n_beta);
-
-      // Create indices for orbitals to localize
-      std::vector<size_t> loc_indices_a = {0, 1, 2, 3}; // Alpha orbital indices
-      std::vector<size_t> loc_indices_b = {0, 1, 2, 3}; // Beta orbital indices
-
-      // Localize the specified orbitals
-      auto localized_orbitals = localizer->run(orbitals, loc_indices_a, loc_indices_b);
+   .. literalinclude:: ../../../_static/examples/cpp/localizer.cpp
+      :language: cpp
+      :start-after: // start-cell-localize
+      :end-before: // end-cell-localize
 
 .. tab:: Python API
 
    .. note::
       This example shows the API pattern. For complete working examples, see the test suite.
 
-   .. literalinclude:: ../../../../examples/factory_pattern.py
+   .. literalinclude:: ../../../_static/examples/python/localizer.py
       :language: python
-      :lines: 1-9
+      :start-after: # start-cell-localize
+      :end-before: # end-cell-localize
 
 Available localization methods
 ------------------------------
@@ -221,9 +209,10 @@ The factory pattern allows seamless selection between these implementations.
 
 For more details on how QDK/Chemistry interfaces with external packages, see the :doc:`Interfaces <../design/interfaces>` documentation.
 
-Related classes
+Further reading
 ---------------
 
+- The above examples can be downloaded as complete `Python <../../../_static/examples/python/localizer.py>`_ or `C++ <../../../_static/examples/cpp/localizer.cpp>`_ code.
 - :doc:`Orbitals <../data/orbitals>`: Input and output orbitals
 - :doc:`ScfSolver <scf_solver>`: Produces initial orbitals for localization
 - :doc:`ActiveSpaceSelector <active_space>`: Often used with localized orbitals

@@ -12,7 +12,8 @@ from pathlib import Path
 from typing import ClassVar
 
 # Get the examples directory
-EXAMPLES_DIR = Path(__file__).parent.parent.parent / "docs" / "examples"
+EXAMPLES_DIR = Path(__file__).parent.parent.parent / "docs" / "source" / "_static" / "examples"
+PYTHON_EXAMPLES_DIR = EXAMPLES_DIR / "python"
 
 
 class TestExampleScripts(unittest.TestCase):
@@ -23,13 +24,13 @@ class TestExampleScripts(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
         """Collect all .py files from the examples directory."""
-        if not EXAMPLES_DIR.exists():
-            raise FileNotFoundError(f"Examples directory not found: {EXAMPLES_DIR}")
+        if not PYTHON_EXAMPLES_DIR.exists():
+            raise FileNotFoundError(f"Python examples directory not found: {PYTHON_EXAMPLES_DIR}")
 
-        cls.py_example_files = sorted(EXAMPLES_DIR.glob("*.py"))
+        cls.py_example_files = sorted(PYTHON_EXAMPLES_DIR.glob("*.py"))
 
         if not cls.py_example_files:
-            raise FileNotFoundError(f"No Python example files found in {EXAMPLES_DIR}")
+            raise FileNotFoundError(f"No Python example files found in {PYTHON_EXAMPLES_DIR}")
 
     def _run_python_example(self, example_file: Path):
         """Helper method to run a Python example file."""
@@ -50,9 +51,9 @@ class TestExampleScripts(unittest.TestCase):
 # Dynamically create test methods for each example file
 def _create_test_methods():
     """Create individual test methods for each example file."""
-    if EXAMPLES_DIR.exists():
+    if PYTHON_EXAMPLES_DIR.exists():
         # Python examples
-        py_example_files = sorted(EXAMPLES_DIR.glob("*.py"))
+        py_example_files = sorted(PYTHON_EXAMPLES_DIR.glob("*.py"))
 
         for example_file in py_example_files:
             # Create a test method name from the file name
@@ -61,7 +62,10 @@ def _create_test_methods():
 
             # Create the test method
             def make_test(filepath):
+                """Create a test method for the given example file."""
+
                 def test_method(self):
+                    """Test the example file runs without errors."""
                     self._run_python_example(filepath)
 
                 return test_method
