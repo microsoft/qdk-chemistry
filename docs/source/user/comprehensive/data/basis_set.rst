@@ -1,24 +1,24 @@
 Basis set
 =========
 
-The :class:`~qdk_chemistry.data.BasisSet` class in QDK/Chemistry represents a collection of atomic orbital used to describe the electronic structure of molecules.
+The :class:`~qdk_chemistry.data.BasisSet` class in QDK/Chemistry rrepresents a collection of basis functions used to describe the electronic structure of molecules.
 It organizes atomic orbitals into shells and provides methods for managing, querying, and serializing basis set data.
 
 Overview
 --------
 
-In quantum chemistry, a basis set is a collection of atomic orbitals used to represent molecular orbitals.
-The :class:`~qdk_chemistry.data.BasisSet` class in QDK/Chemistry uses a shell-based organization, where each shell contains atomic orbitals with the same atom, angular momentum, and primitive Gaussian functions.
+In quantum chemistry, a basis set is a collection of mathematical functions used to represent molecular orbitals.
+The :class:`~qdk_chemistry.data.BasisSet` class in QDK/Chemistry uses a shell-based organization, where each shell contains basis functions with the same atom, angular momentum, and primitive Gaussian functions.
 
 Key features of the :class:`~qdk_chemistry.data.BasisSet` class include:
 
 - Shell-based storage for memory efficiency
-- Support for both spherical and Cartesian atomic orbitals
-- Mapping between shells/atomic orbitals and atoms
-- Mapping between shells/atomic orbitals and orbital types
+- Support for both spherical and Cartesian basis functions
+- Mapping between shells/basis functions and atoms
+- Mapping between shells/basis functions and orbital types
 - Basis set metadata (name, parameters)
 - Integration with molecular structure information
-- On-demand expansion of shells to individual atomic orbitals
+- On-demand expansion of shells to individual basis functions
 
 Usage
 -----
@@ -36,7 +36,7 @@ Core concepts
 Shells and primitives
 ~~~~~~~~~~~~~~~~~~~~~
 
-A shell represents a group of atomic orbitals that share the same atom, angular momentum, and primitive functions, but differ in magnetic quantum numbers.
+A shell represents a group of basis functions that share the same atom, angular momentum, and primitive functions, but differ in magnetic quantum numbers.
 For example, a :math:`p`-shell contains :math:`p_x, p_y, p_z` functions.
 
 Shells contain primitives, which are Gaussian functions defined by:
@@ -58,7 +58,7 @@ The :class:`~qdk_chemistry.data.BasisSet` class supports various orbital types w
 Basis types
 ~~~~~~~~~~~
 
-The :class:`~qdk_chemistry.data.BasisSet` class supports two types of atomic orbitals:
+The :class:`~qdk_chemistry.data.BasisSet` class supports two types of basis functions:
 
 - **Spherical**: Uses spherical harmonics with :math:`2l+1` functions per shell
 - **Cartesian**: Uses Cartesian coordinates with :math:`(l+1)(l+2)/2` functions per shell
@@ -72,34 +72,17 @@ Creating a basis set
 
 .. tab:: C++ API
 
-   .. code-block:: cpp
-
-      // Create an empty basis set with a name
-      BasisSet basis_set("6-31G", AOType::Spherical);
-
-      // Add a shell with multiple primitives
-      size_t atom_index = 0;  // First atom
-      OrbitalType orbital_type = OrbitalType::P;  // p orbital
-      Eigen::VectorXd exponents(2);
-      exponents << 0.16871439, 0.62391373;
-      Eigen::VectorXd coefficients(2);
-      coefficients << 0.43394573, 0.56604777;
-      basis_set.add_shell(atom_index, orbital_type, exponents, coefficients);
-
-      // Add a shell with a single primitive
-      basis_set.add_shell(1, OrbitalType::S, 0.5, 1.0);
-
-      // Set molecular structure
-      basis_set.set_structure(structure);
+   .. literalinclude:: ../../../_static/examples/cpp/basis_set.cpp
+      :language: cpp
+      :start-after: // start-cell-basis-set-create
+      :end-before: // end-cell-basis-set-create
 
 .. tab:: Python API
 
-   .. note::
-      This example shows the API pattern. For complete working examples, see the test suite.
-
-   .. literalinclude:: ../../../../examples/basis_set.py
+   .. literalinclude:: ../../../_static/examples/python/basis_set.py
       :language: python
-      :lines: 7-20
+      :start-after: # start-cell-basis-set-create
+      :end-before: # end-cell-basis-set-create
 
 Accessing basis set data
 ------------------------
@@ -113,81 +96,36 @@ This ensures that the basis set data remains consistent and prevents accidental 
 
 .. tab:: C++ API
 
-   .. code-block:: cpp
-
-      // Get basis set type and name (returns AOType)
-      auto atomic_orbital_type = basis_set.get_atomic_orbital_type();
-      // Get basis set name (returns std::string)
-      auto name = basis_set.get_name();
-
-      // Get all shells (returns const std::vector<Shell>&)
-      auto all_shells = basis_set.get_shells();
-      // Get shells for specific atom (returns const std::vector<const Shell>&)
-      auto shells_for_atom = basis_set.get_shells_for_atom(0);
-      // Get specific shell by index (returns const Shell&)
-      const Shell& specific_shell = basis_set.get_shell(3);
-
-      // Get counts
-      size_t num_shells = basis_set.get_num_shells();
-      size_t num_atomic_orbitals = basis_set.get_num_atomic_orbitals();
-      size_t num_atoms = basis_set.get_num_atoms();
-
-      // Get atomic orbital information (returns std::pair<size_t, int>)
-      auto [shell_index, m_quantum_number] = basis_set.get_atomic_orbital_info(5);
-      size_t atom_index = basis_set.get_atom_index_for_atomic_orbital(5);
-
-      // Get indices for specific atoms or orbital types
-      // Returns std::vector<size_t>
-      auto atomic_orbital_indices = basis_set.get_atomic_orbital_indices_for_atom(1);
-      // Returns std::vector<size_t>
-      auto shell_indices = basis_set.get_shell_indices_for_orbital_type(OrbitalType::P);
-      // Returns std::vector<size_t>
-      auto shell_indices_specific = basis_set.get_shell_indices_for_atom_and_orbital_type(0, OrbitalType::D);
-
-      // Validation
-      bool is_valid = basis_set.is_valid();
-      bool is_consistent = basis_set.is_consistent_with_structure();
+   .. literalinclude:: ../../../_static/examples/cpp/basis_set.cpp
+      :language: cpp
+      :start-after: // start-cell-basis-set-get
+      :end-before: // end-cell-basis-set-get
 
 .. tab:: Python API
 
-   .. note::
-      This example shows the API pattern. For complete working examples, see the test suite.
-
-   .. literalinclude:: ../../../../examples/basis_set.py
+   .. literalinclude:: ../../../_static/examples/python/basis_set.py
       :language: python
-      :lines: 22-45
+      :start-after: # start-cell-basis-set-get
+      :end-before: # end-cell-basis-set-get
 
 Working with shells
 -------------------
 
-The ``Shell`` structure contains information about a group of atomic orbitals:
+The ``Shell`` structure contains information about a group of basis functions:
 
 .. tab:: C++ API
 
-   .. code-block:: cpp
-
-      // Get shell by index (returns const Shell&)
-      const Shell& shell = basis_set.get_shell(0);
-      size_t atom_idx = shell.atom_index;
-      OrbitalType orb_type = shell.orbital_type;
-      // Get exponents (returns const Eigen::VectorXd&)
-      const Eigen::VectorXd& exps = shell.exponents;
-      // Get coefficients (returns const Eigen::VectorXd&)
-      const Eigen::VectorXd& coeffs = shell.coefficients;
-
-      // Get information from shell
-      size_t num_primitives = shell.get_num_primitives();
-      size_t num_atomic_orbitals = shell.get_num_atomic_orbitals(AOType::Spherical);
-      int angular_momentum = shell.get_angular_momentum();
+   .. literalinclude:: ../../../_static/examples/cpp/basis_set.cpp
+      :language: cpp
+      :start-after: // start-cell-shells
+      :end-before: // end-cell-shells
 
 .. tab:: Python API
 
-   .. note::
-      This example shows the API pattern. For complete working examples, see the test suite.
-
-   .. literalinclude:: ../../../../examples/basis_set.py
+   .. literalinclude:: ../../../_static/examples/python/basis_set.py
       :language: python
-      :lines: 47-61
+      :start-after: # start-cell-shells
+      :end-before: # end-cell-shells
 
 Serialization
 -------------
@@ -233,10 +171,10 @@ JSON representation of a :class:`~qdk_chemistry.data.BasisSet` has the following
          "shells": ["..."]
        }
      ],
-     "atomic_orbital_type": "spherical",
+     "basis_type": "spherical",
      "name": "6-31G",
      "num_atoms": 2,
-     "num_atomic_orbitals": 9,
+     "num_basis_functions": 9,
      "num_shells": 3
    }
 
@@ -259,32 +197,17 @@ HDF5 representation of a :class:`~qdk_chemistry.data.BasisSet` has the following
 
 .. tab:: C++ API
 
-   .. code-block:: cpp
-
-      // Generic serialization with format specification
-      basis_set.to_file("molecule.basis.json", "json");
-      basis_set.from_file("molecule.basis.json", "json");
-
-      // JSON serialization
-      basis_set.to_json_file("molecule.basis.json");
-      basis_set.from_json_file("molecule.basis.json");
-
-      // Direct JSON conversion
-      nlohmann::json j = basis_set.to_json();
-      basis_set.from_json(j);
-
-      // HDF5 serialization
-      basis_set.to_hdf5_file("molecule.basis.h5");
-      basis_set.from_hdf5_file("molecule.basis.h5");
+   .. literalinclude:: ../../../_static/examples/cpp/basis_set.cpp
+      :language: cpp
+      :start-after: // start-cell-serialization
+      :end-before: // end-cell-serialization
 
 .. tab:: Python API
 
-   .. note::
-      This example shows the API pattern. For complete working examples, see the test suite.
-
-   .. literalinclude:: ../../../../examples/basis_set.py
+   .. literalinclude:: ../../../_static/examples/python/basis_set.py
       :language: python
-      :lines: 63-79
+      :start-after: # start-cell-serialization
+      :end-before: # end-cell-serialization
 
 Utility functions
 -----------------
@@ -293,60 +216,38 @@ The :class:`~qdk_chemistry.data.BasisSet` class provides several static utility 
 
 .. tab:: C++ API
 
-   .. code-block:: cpp
-
-      // Convert orbital type to string (returns std::string)
-      std::string orbital_str = BasisSet::orbital_type_to_string(OrbitalType::D);  // "d"
-      // Convert string to orbital type (returns OrbitalType)
-      OrbitalType orbital_type = BasisSet::string_to_orbital_type("f");  // OrbitalType::F
-
-      // Get angular momentum (returns int)
-      int l_value = BasisSet::get_angular_momentum(OrbitalType::P);  // 1
-      // Get number of orbitals for angular momentum (returns int)
-      int num_orbitals = BasisSet::get_num_orbitals_for_l(2, AOType::Spherical);  // 5
-
-      // Convert basis type to string (returns std::string)
-      std::string basis_str = BasisSet::atomic_orbital_type_to_string(AOType::Cartesian);  // "cartesian"
-      // Convert string to basis type (returns AOType)
-      AOType atomic_orbital_type = BasisSet::string_to_atomic_orbital_type("spherical");  // AOType::Spherical
+   .. literalinclude:: ../../../_static/examples/cpp/basis_set.cpp
+      :language: cpp
+      :start-after: // start-cell-utility-functions
+      :end-before: // end-cell-utility-functions
 
 .. tab:: Python API
 
-   .. note::
-      This example shows the API pattern. For complete working examples, see the test suite.
-
-   .. literalinclude:: ../../../../examples/basis_set.py
+   .. literalinclude:: ../../../_static/examples/python/basis_set.py
       :language: python
-      :lines: 88-95
+      :start-after: # start-cell-utility-functions
+      :end-before: # end-cell-utility-functions
 
 Predefined basis sets
 ---------------------
 
 QDK/Chemistry provides access to a library of standard basis sets commonly used in quantum chemistry calculations.
-These predefined basis sets can be easily loaded without having to manually specify the atomic orbitals.
+These predefined basis sets can be easily loaded without having to manually specify the basis functions.
 For a complete list of available basis sets and their specifications, see the :doc:`Supported Basis Sets <../basis_functionals>` documentation.
 
 .. tab:: C++ API
 
-   .. code-block:: cpp
-
-      // Create a basis set from a predefined library (returns std::unique_ptr<BasisSet>)
-      auto basis_set = BasisSet::create("6-31G");
-
-      // List all available basis sets (returns std::vector<std::string>)
-      auto available_basis_sets = BasisSet::get_available_basis_sets();
-
-      // Check if a basis set exists in the library (returns bool)
-      bool has_basis = BasisSet::has_basis_set("cc-pvdz");
+   .. literalinclude:: ../../../_static/examples/cpp/basis_set.cpp
+      :language: cpp
+      :start-after: // start-cell-library
+      :end-before: // end-cell-library
 
 .. tab:: Python API
 
-   .. note::
-      This example shows the API pattern. For complete working examples, see the test suite.
-
-   .. literalinclude:: ../../../../examples/basis_set.py
+   .. literalinclude:: ../../../_static/examples/python/basis_set.py
       :language: python
-      :lines: 81-90
+      :start-after: # start-cell-library
+      :end-before: # end-cell-library
 
 .. note::
    The basis set library includes popular basis sets such as STO-nG, Pople basis sets (3-21G, 6-31G, etc.), correlation-consistent basis sets (cc-pVDZ, cc-pVTZ, etc.), and more.
@@ -359,9 +260,10 @@ Related classes
 - :doc:`Orbitals <orbitals>`: Molecular orbitals constructed using the basis set
 - :doc:`ScfSolver <../algorithms/scf_solver>`: Algorithm that uses basis sets to produce orbitals
 
-Related topics
---------------
+Further reading
+---------------
 
+- The above examples can be downloaded as complete `C++ <../../../_static/examples/cpp/basis_set.cpp>`_ and `Python <../../../_static/examples/python/basis_set.py>`_ scripts.
 - :doc:`Serialization <../data/serialization>`: Data serialization and deserialization
 - :doc:`Settings <../design/settings>`: Configuration settings for algorithms
 - :doc:`Supported basis sets <../basis_functionals>`: List of pre-defined basis sets available in QDK/Chemistry

@@ -23,7 +23,9 @@
 #include <vector>
 
 using namespace qdk::chemistry;
-// start-cell-6-fn
+
+// -----------------------------------------------------------------------------
+// start-cell-wfn-fn-select-configs
 /**
  * @brief Get top N determinants from a wavefunction sorted by coefficient
  * magnitude
@@ -62,10 +64,12 @@ std::vector<data::Configuration> get_top_determinants(
 
   return top_dets;
 }
+// end-cell-wfn-fn-select-configs
+// -----------------------------------------------------------------------------
 
-// end-cell-6-fn
 int main() {
-  // start-cell-1
+  // ---------------------------------------------------------------------------
+  // start-cell-structure
   // Define benzene diradical structure directly using coordinates
   Eigen::MatrixXd coords(10, 3);
   coords << 0.000000, 1.396000, 0.000000, 1.209077, 0.698000, 0.000000,
@@ -86,8 +90,11 @@ int main() {
     std::cout << data::Structure::element_to_symbol(elem) << " ";
   }
   std::cout << std::endl;
-  // end-cell-1
-  // start-cell-2
+  // end-cell-structure
+  // ---------------------------------------------------------------------------
+
+  // ---------------------------------------------------------------------------
+  // start-cell-scf
   // Perform an SCF calculation
   auto scf_solver = algorithms::ScfSolverFactory::create();
   scf_solver->settings().set("basis_set", "cc-pvdz");
@@ -98,8 +105,11 @@ int main() {
   // Display a summary of the molecular orbitals
   std::cout << "SCF Orbitals:\n"
             << wfn_hf->get_orbitals()->get_summary() << std::endl;
-  // end-cell-2
-  // start-cell-3
+  // end-cell-scf
+  // ---------------------------------------------------------------------------
+
+  // ---------------------------------------------------------------------------
+  // start-cell-active-space
   // Select active space (6 electrons in 6 orbitals)
   auto active_space_selector =
       algorithms::ActiveSpaceSelectorFactory::create("qdk_valence");
@@ -112,28 +122,39 @@ int main() {
   // Print a summary of the active space orbitals
   std::cout << "Active Space Orbitals:\n"
             << active_orbitals->get_summary() << std::endl;
-  // end-cell-3
-  // start-cell-4
+  // end-cell-active-space
+  // ---------------------------------------------------------------------------
+
+  // ---------------------------------------------------------------------------
+  // start-cell-hamiltonian-constructor
   // Construct Hamiltonian in the active space
   auto hamiltonian_constructor =
       algorithms::HamiltonianConstructorFactory::create();
   auto hamiltonian = hamiltonian_constructor->run(active_orbitals);
   std::cout << "Active Space Hamiltonian:\n"
             << hamiltonian->get_summary() << std::endl;
-  // end-cell-4
-  // start-cell-5
+  // end-cell-hamiltonian-constructor
+  // ---------------------------------------------------------------------------
+
+  // ---------------------------------------------------------------------------
+  // start-cell-mc-compute
   // Perform CASCI calculation
   auto mc = algorithms::MultiConfigurationCalculatorFactory::create();
   auto [E_cas, wfn_cas] = mc->run(hamiltonian, 3, 3);
   std::cout << "CASCI energy is " << E_cas
             << " Hartree, and the electron correlation energy is "
             << (E_cas - E_hf) << " Hartree" << std::endl;
-  // end-cell-5
-  // start-cell-6
+  // end-cell-mc-compute
+  // ---------------------------------------------------------------------------
+
+  // ---------------------------------------------------------------------------
+  // start-cell-wfn-select-configs
   // Get top 2 determinants from the CASCI wavefunction
   auto top_configurations = get_top_determinants(wfn_cas, 2);
   std::cout << "Selected " << top_configurations.size() << " top determinants"
             << std::endl;
-  // end-cell-6
+  // end-cell-wfn-select-configs
+  // ---------------------------------------------------------------------------
+
   return 0;
 }
