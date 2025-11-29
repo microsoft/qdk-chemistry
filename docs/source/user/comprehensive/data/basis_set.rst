@@ -1,7 +1,7 @@
 Basis set
 =========
 
-The :class:`~qdk_chemistry.data.BasisSet` class in QDK/Chemistry rrepresents a collection of basis functions used to describe the electronic structure of molecules.
+The :class:`~qdk_chemistry.data.BasisSet` class in QDK/Chemistry represents a collection of basis functions used to describe the electronic structure of molecules.
 It organizes atomic orbitals into shells and provides methods for managing, querying, and serializing basis set data.
 
 Overview
