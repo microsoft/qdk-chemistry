@@ -165,6 +165,15 @@ Examples:
 
 )");
 
+  scf_solver.def("name", &ScfSolver::name,
+                 R"(
+The algorithm's name.
+
+Returns:
+    str: The name of the algorithm
+
+)");
+
   scf_solver.def("type_name", &ScfSolver::type_name,
                  R"(
 The algorithm's type name.
