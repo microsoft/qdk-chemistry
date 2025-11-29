@@ -8,6 +8,11 @@
 
 // -----------------------------------------------------------------------------
 // start-cell-scf-create
+#include <qdk/chemistry.hpp>
+
+using namespace qdk::chemistry::data;
+using namespace qdk::chemistry::algorithms;
+
 auto scf = ScfSolverFactory::create();
 // end-cell-scf-create
 // -----------------------------------------------------------------------------
@@ -20,11 +25,6 @@ scf_solver->settings().set("max_iterations", 100);
 
 // -----------------------------------------------------------------------------
 // start-cell-data-flow
-#include <qdk/chemistry.hpp>
-
-using namespace qdk::chemistry::data;
-using namespace qdk::chemistry::algorithms;
-
 int main() {
   // Create molecular structure from an XYZ file
   Structure molecule;

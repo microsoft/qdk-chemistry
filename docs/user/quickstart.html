@@ -193,11 +193,11 @@ See below for language specific examples of creating and serializing <a class="r
 <section id="run-a-self-consistent-field-scf-calculation">
 <h3>Run a self-consistent field (SCF) calculation<a class="headerlink" href="#run-a-self-consistent-field-scf-calculation" title="Link to this heading"></a></h3>
 <p>Once a <a class="reference internal" href="comprehensive/data/structure.html"><span class="doc">Structure</span></a> is created, an <a class="reference internal" href="../glossary.html#term-SCF"><span class="xref std std-term">SCF</span></a> calculation can be performed to produce an initial <a class="reference internal" href="../api/api_autogen/qdk_chemistry.data.html#qdk_chemistry.data.Wavefunction" title="qdk_chemistry.data.Wavefunction"><code class="xref py py-class docutils literal notranslate"><span class="pre">Wavefunction</span></code></a> as well as an <a class="reference internal" href="../glossary.html#term-SCF"><span class="xref std std-term">SCF</span></a> energy.
-QDK/Chemistry performs <a class="reference internal" href="../glossary.html#term-SCF"><span class="xref std std-term">SCF</span></a> calculations via instantiations of a <a class="reference internal" href="comprehensive/algorithms/scf_solver.html"><span class="doc">Self-consistent field solver</span></a> algorithm.
-Instantiations of the <a class="reference internal" href="comprehensive/algorithms/scf_solver.html"><span class="doc">Self-consistent field solver</span></a> algorithm (and all other <code class="docutils literal notranslate"><span class="pre">Algorithm</span></code> classes) are managed by a factory.
+QDK/Chemistry performs <a class="reference internal" href="../glossary.html#term-SCF"><span class="xref std std-term">SCF</span></a> calculations via instantiations of a <a class="reference internal" href="comprehensive/algorithms/scf_solver.html"><span class="doc">Self-consistent field solving</span></a> algorithm.
+Instantiations of the <a class="reference internal" href="comprehensive/algorithms/scf_solver.html"><span class="doc">Self-consistent field solving</span></a> algorithm (and all other <code class="docutils literal notranslate"><span class="pre">Algorithm</span></code> classes) are managed by a factory.
 See the <a class="reference internal" href="comprehensive/design/factory_pattern.html"><span class="doc">Factory pattern</span></a> documentation for more information on how it is used in the QDK/Chemistry.</p>
 <p>The inputs for an <a class="reference internal" href="../glossary.html#term-SCF"><span class="xref std std-term">SCF</span></a> calculation are a <a class="reference internal" href="comprehensive/data/structure.html"><span class="doc">Structure</span></a> object, the charge and multiplicity of the molecular system, and information about the single-particle basis to be used.
-Optionally, <a class="reference internal" href="comprehensive/design/settings.html"><span class="doc">Settings</span></a> specific to the particular <a class="reference internal" href="comprehensive/algorithms/scf_solver.html"><span class="doc">Self-consistent field solver</span></a> can be configured by accessing the <code class="docutils literal notranslate"><span class="pre">settings()</span></code> method.
+Optionally, <a class="reference internal" href="comprehensive/design/settings.html"><span class="doc">Settings</span></a> specific to the particular <a class="reference internal" href="comprehensive/algorithms/scf_solver.html"><span class="doc">Self-consistent field solving</span></a> can be configured by accessing the <code class="docutils literal notranslate"><span class="pre">settings()</span></code> method.
 The basis for the <a class="reference internal" href="../glossary.html#term-SCF"><span class="xref std std-term">SCF</span></a> calculation can be set via a string input, a custom basis set or initial orbitals can also be provided.
 See below for language-specific examples.</p>
 <div class="tab-set docutils container">
@@ -253,10 +253,6 @@ See the <a class="reference internal" href="comprehensive/algorithms/active_spac
 </div>
 </div>
 <input class="tab-input" id="tab-set--2-input--2" name="tab-set--2" type="radio"><label class="tab-label" for="tab-set--2-input--2">Python API</label><div class="tab-content docutils container">
-<div class="admonition note">
-<p class="admonition-title">Note</p>
-<p>This example shows the API pattern. For complete working examples, see <a class="reference internal" href="comprehensive/algorithms/active_space.html"><span class="doc">Active space selection</span></a>.</p>
-</div>
 <div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="c1"># Select active space (6 electrons in 6 orbitals for the benzene diradical)</span>
 <span class="c1">#   to choose most chemically relevant orbitals</span>
 <span class="n">active_space_selector</span> <span class="o">=</span> <span class="n">create</span><span class="p">(</span>
@@ -292,10 +288,6 @@ The Hamiltonian constructor can generate the one- and two-electron integrals nee
 </div>
 </div>
 <input class="tab-input" id="tab-set--3-input--2" name="tab-set--3" type="radio"><label class="tab-label" for="tab-set--3-input--2">Python API</label><div class="tab-content docutils container">
-<div class="admonition note">
-<p class="admonition-title">Note</p>
-<p>This example shows the API pattern. For complete working examples, see <a class="reference internal" href="comprehensive/algorithms/hamiltonian_constructor.html"><span class="doc">Classical Hamiltonian construction</span></a>.</p>
-</div>
 <div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="c1"># Construct Hamiltonian in the active space and print its summary</span>
 <span class="n">hamiltonian_constructor</span> <span class="o">=</span> <span class="n">create</span><span class="p">(</span><span class="s2">&quot;hamiltonian_constructor&quot;</span><span class="p">)</span>
 <span class="n">hamiltonian</span> <span class="o">=</span> <span class="n">hamiltonian_constructor</span><span class="o">.</span><span class="n">run</span><span class="p">(</span><span class="n">active_orbitals</span><span class="p">)</span>
@@ -324,10 +316,6 @@ Configuration Interaction (CI) and selected <a class="reference internal" href="
 </div>
 </div>
 <input class="tab-input" id="tab-set--4-input--2" name="tab-set--4" type="radio"><label class="tab-label" for="tab-set--4-input--2">Python API</label><div class="tab-content docutils container">
-<div class="admonition note">
-<p class="admonition-title">Note</p>
-<p>This example shows the API pattern. For complete working examples, see <a class="reference internal" href="comprehensive/algorithms/mc_calculator.html"><span class="doc">Multi-configuration calculations</span></a>.</p>
-</div>
 <div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="c1"># Perform CASCI calculation to get the wavefunction and exact energy for the active space</span>
 <span class="n">mc</span> <span class="o">=</span> <span class="n">create</span><span class="p">(</span><span class="s2">&quot;multi_configuration_calculator&quot;</span><span class="p">)</span>
 <span class="n">E_cas</span><span class="p">,</span> <span class="n">wfn_cas</span> <span class="o">=</span> <span class="n">mc</span><span class="o">.</span><span class="n">run</span><span class="p">(</span>
@@ -388,6 +376,12 @@ This truncation is characterized by computing the overlap between the truncated 
 <span class="p">}</span>
 </pre></div>
 </div>
+<div class="highlight-cpp notranslate"><div class="highlight"><pre><span></span><span class="w">  </span><span class="c1">// Get top 2 determinants from the CASCI wavefunction</span>
+<span class="w">  </span><span class="k">auto</span><span class="w"> </span><span class="n">top_configurations</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">get_top_determinants</span><span class="p">(</span><span class="n">wfn_cas</span><span class="p">,</span><span class="w"> </span><span class="mi">2</span><span class="p">);</span>
+<span class="w">  </span><span class="n">std</span><span class="o">::</span><span class="n">cout</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="s">&quot;Selected &quot;</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="n">top_configurations</span><span class="p">.</span><span class="n">size</span><span class="p">()</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="s">&quot; top determinants&quot;</span>
+<span class="w">            </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="n">std</span><span class="o">::</span><span class="n">endl</span><span class="p">;</span>
+</pre></div>
+</div>
 </div>
 <input class="tab-input" id="tab-set--5-input--2" name="tab-set--5" type="radio"><label class="tab-label" for="tab-set--5-input--2">Python API</label><div class="tab-content docutils container">
 <div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="c1"># Get top 2 determinants from the CASCI wavefunction to form a sparse wavefunction</span>
@@ -398,10 +392,6 @@ This truncation is characterized by computing the overlap between the truncated 
 <span class="n">E_sparse</span><span class="p">,</span> <span class="n">wfn_sparse</span> <span class="o">=</span> <span class="n">pmc_calculator</span><span class="o">.</span><span class="n">run</span><span class="p">(</span><span class="n">hamiltonian</span><span class="p">,</span> <span class="nb">list</span><span class="p">(</span><span class="n">top_configurations</span><span class="o">.</span><span class="n">keys</span><span class="p">()))</span>
 
 <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Reference energy for top 2 determinants is </span><span class="si">{</span><span class="n">E_sparse</span><span class="si">:</span><span class="s2">.6f</span><span class="si">}</span><span class="s2"> Hartree&quot;</span><span class="p">)</span>
-
-<span class="c1"># Generate state preparation circuit for the sparse state via sparse isometry (GF2 + X)</span>
-<span class="n">state_prep</span> <span class="o">=</span> <span class="n">create</span><span class="p">(</span><span class="s2">&quot;state_prep&quot;</span><span class="p">,</span> <span class="s2">&quot;sparse_isometry_gf2x&quot;</span><span class="p">)</span>
-<span class="n">sparse_isometry_circuit</span> <span class="o">=</span> <span class="n">state_prep</span><span class="o">.</span><span class="n">run</span><span class="p">(</span><span class="n">wfn_sparse</span><span class="p">)</span>
 </pre></div>
 </div>
 </div>
@@ -417,7 +407,7 @@ First, by filtering out terms that have negligible expectation values given the 
 Second, by grouping the remaining Pauli operators into commuting sets that can be measured simultaneously, significantly reducing the number of measurement circuits required on the quantum device.</p>
 <div class="tab-set docutils container">
 <input checked="True" class="tab-input" id="tab-set--6-input--1" name="tab-set--6" type="radio"><label class="tab-label" for="tab-set--6-input--1">C++ API</label><div class="tab-content docutils container">
-<div class="highlight-cpp notranslate"><div class="highlight"><pre><span></span><span class="c1">// This step only available in Python API currently.</span>
+<div class="highlight-cpp notranslate"><div class="highlight"><pre><span></span><span class="c1">// This step is currently only available in the Python API.</span>
 </pre></div>
 </div>
 </div>
@@ -455,7 +445,7 @@ The measurement outcomes are repeated many times (shots) to build up statistics 
 The statistical nature of quantum measurements introduces variance in the energy estimate, which decreases as the number of shots is increased.</p>
 <div class="tab-set docutils container">
 <input checked="True" class="tab-input" id="tab-set--7-input--1" name="tab-set--7" type="radio"><label class="tab-label" for="tab-set--7-input--1">C++ API</label><div class="tab-content docutils container">
-<div class="highlight-cpp notranslate"><div class="highlight"><pre><span></span><span class="c1">// This step only available in Python API currently.</span>
+<div class="highlight-cpp notranslate"><div class="highlight"><pre><span></span><span class="c1">// This step is currently only available in the Python API.</span>
 </pre></div>
 </div>
 </div>
@@ -474,7 +464,7 @@ The statistical nature of quantum measurements introduces variance in the energy
         <span class="sa">f</span><span class="s2">&quot;Measurement Results for Hamiltonian Group </span><span class="si">{</span><span class="n">i</span><span class="w"> </span><span class="o">+</span><span class="w"> </span><span class="mi">1</span><span class="si">}</span><span class="s2">: </span><span class="si">{</span><span class="n">simulation_data</span><span class="o">.</span><span class="n">hamiltonians</span><span class="p">[</span><span class="n">i</span><span class="p">]</span><span class="o">.</span><span class="n">pauli_strings</span><span class="si">}</span><span class="s2">&quot;</span>
     <span class="p">)</span>
 
-<span class="c1"># Print statistic for measured energy</span>
+<span class="c1"># Print statistics for the measured energy</span>
 <span class="n">energy_mean</span> <span class="o">=</span> <span class="n">energy_results</span><span class="o">.</span><span class="n">energy_expectation_value</span> <span class="o">+</span> <span class="n">hamiltonian</span><span class="o">.</span><span class="n">get_core_energy</span><span class="p">()</span>
 <span class="n">energy_stddev</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">sqrt</span><span class="p">(</span><span class="n">energy_results</span><span class="o">.</span><span class="n">energy_variance</span><span class="p">)</span>
 <span class="nb">print</span><span class="p">(</span>
@@ -491,8 +481,12 @@ The statistical nature of quantum measurements introduces variance in the energy
 </section>
 <section id="additional-examples">
 <h2>Additional examples<a class="headerlink" href="#additional-examples" title="Link to this heading"></a></h2>
-<p>Additional examples of workflows using QDK/Chemistry can be found in the <code class="docutils literal notranslate"><span class="pre">examples</span></code> directory of the source repository.
-See the <a class="reference internal" href="comprehensive/index.html"><span class="doc">In-depth user guide</span></a> for links to more detailed documentation on specific components of QDK/Chemistry.</p>
+<p>For more information, see:</p>
+<ul class="simple">
+<li><p>Above examples as complete <a class="reference external" href="../_static/examples/cpp/quickstart.cpp">C++</a> and <a class="reference external" href="../_static/examples/python/quickstart.py">Python</a> scripts.</p></li>
+<li><p>Additional examples of workflows using QDK/Chemistry in the <a class="reference external" href="https://github.com/microsoft/qdk-chemistry/tree/main/examples">examples</a> directory of the source repository.</p></li>
+<li><p><a class="reference internal" href="comprehensive/index.html"><span class="doc">In-depth user guide</span></a> for links to more detailed documentation on specific components of QDK/Chemistry.</p></li>
+</ul>
 </section>
 </section>
 

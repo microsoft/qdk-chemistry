@@ -1,0 +1,8 @@
+qdk\_chemistry.algorithms.coupled\_cluster\_calculator module
+=============================================================
+
+.. automodule:: qdk_chemistry.algorithms.coupled_cluster_calculator
+   :members:
+   :private-members:
+   :show-inheritance:
+   :undoc-members:

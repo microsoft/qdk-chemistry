@@ -77,6 +77,7 @@
   <ul class="wy-breadcrumbs">
       <li><a href="../../../../index.html" class="icon icon-home" aria-label="Home"></a></li>
           <li class="breadcrumb-item"><a href="../../../index.html">Module code</a></li>
+          <li class="breadcrumb-item"><a href="../qiskit.html">qdk_chemistry.plugins.qiskit</a></li>
       <li class="breadcrumb-item active">qdk_chemistry.plugins.qiskit.energy_estimator</li>
       <li class="wy-breadcrumbs-aside">
       </li>
@@ -106,25 +107,28 @@
 <span class="c1"># Licensed under the MIT License. See LICENSE.txt in the project root for license information.</span>
 <span class="c1"># --------------------------------------------------------------------------------------------</span>
 
-<span class="kn">import</span><span class="w"> </span><span class="nn">logging</span>
-<span class="kn">from</span><span class="w"> </span><span class="nn">typing</span><span class="w"> </span><span class="kn">import</span> <span class="n">Any</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">__future__</span><span class="w"> </span><span class="kn">import</span> <span class="n">annotations</span>
 
-<span class="kn">import</span><span class="w"> </span><span class="nn">numpy</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">np</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">logging</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">typing</span><span class="w"> </span><span class="kn">import</span> <span class="n">TYPE_CHECKING</span><span class="p">,</span> <span class="n">Any</span>
+
 <span class="kn">from</span><span class="w"> </span><span class="nn">qiskit</span><span class="w"> </span><span class="kn">import</span> <span class="n">qasm3</span><span class="p">,</span> <span class="n">transpile</span>
-<span class="kn">from</span><span class="w"> </span><span class="nn">qiskit.circuit</span><span class="w"> </span><span class="kn">import</span> <span class="n">QuantumCircuit</span>
-<span class="kn">from</span><span class="w"> </span><span class="nn">qiskit.providers.backend</span><span class="w"> </span><span class="kn">import</span> <span class="n">BackendV2</span>
 <span class="kn">from</span><span class="w"> </span><span class="nn">qiskit_aer</span><span class="w"> </span><span class="kn">import</span> <span class="n">AerSimulator</span>
 <span class="kn">from</span><span class="w"> </span><span class="nn">qiskit_aer.noise</span><span class="w"> </span><span class="kn">import</span> <span class="n">NoiseModel</span>
+
+<span class="k">if</span> <span class="n">TYPE_CHECKING</span><span class="p">:</span>
+    <span class="kn">import</span><span class="w"> </span><span class="nn">qiskit</span>
+    <span class="kn">from</span><span class="w"> </span><span class="nn">qiskit.circuit</span><span class="w"> </span><span class="kn">import</span> <span class="n">QuantumCircuit</span>
 
 <span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.algorithms</span><span class="w"> </span><span class="kn">import</span> <span class="n">register</span>
 <span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.algorithms.energy_estimator</span><span class="w"> </span><span class="kn">import</span> <span class="p">(</span>
     <span class="n">EnergyEstimator</span><span class="p">,</span>
-    <span class="n">compute_energy_expectation_from_bitstrings</span><span class="p">,</span>
-    <span class="n">create_measurement_circuits</span><span class="p">,</span>
 <span class="p">)</span>
 <span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.data</span><span class="w"> </span><span class="kn">import</span> <span class="n">EnergyExpectationResult</span><span class="p">,</span> <span class="n">MeasurementData</span><span class="p">,</span> <span class="n">QubitHamiltonian</span>
 
 <span class="n">_LOGGER</span> <span class="o">=</span> <span class="n">logging</span><span class="o">.</span><span class="n">getLogger</span><span class="p">(</span><span class="vm">__name__</span><span class="p">)</span>
+
+<span class="n">__all__</span> <span class="o">=</span> <span class="p">[</span><span class="s2">&quot;QiskitEnergyEstimator&quot;</span><span class="p">]</span>
 
 
 <div class="viewcode-block" id="QiskitEnergyEstimator">
@@ -134,7 +138,7 @@
 
 <div class="viewcode-block" id="QiskitEnergyEstimator.__init__">
 <a class="viewcode-back" href="../../../../api/api_autogen/qdk_chemistry.plugins.qiskit.energy_estimator.html#qdk_chemistry.plugins.qiskit.energy_estimator.QiskitEnergyEstimator.__init__">[docs]</a>
-    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">backend</span><span class="p">:</span> <span class="n">BackendV2</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span> <span class="n">seed</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">42</span><span class="p">):</span>
+    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">backend</span><span class="p">:</span> <span class="n">qiskit</span><span class="o">.</span><span class="n">providers</span><span class="o">.</span><span class="n">backend</span><span class="o">.</span><span class="n">BackendV2</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span> <span class="n">seed</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">42</span><span class="p">):</span>
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;Initialize the Estimator with a backend and optional transpilation settings.</span>
 
 <span class="sd">        Args:</span>
@@ -156,7 +160,7 @@
 <div class="viewcode-block" id="QiskitEnergyEstimator.from_backend_options">
 <a class="viewcode-back" href="../../../../api/api_autogen/qdk_chemistry.plugins.qiskit.energy_estimator.html#qdk_chemistry.plugins.qiskit.energy_estimator.QiskitEnergyEstimator.from_backend_options">[docs]</a>
     <span class="nd">@classmethod</span>
-    <span class="k">def</span><span class="w"> </span><span class="nf">from_backend_options</span><span class="p">(</span><span class="bp">cls</span><span class="p">,</span> <span class="n">seed</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">42</span><span class="p">,</span> <span class="n">backend_options</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="s2">&quot;EnergyEstimator&quot;</span><span class="p">:</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">from_backend_options</span><span class="p">(</span><span class="bp">cls</span><span class="p">,</span> <span class="n">seed</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">42</span><span class="p">,</span> <span class="n">backend_options</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">EnergyEstimator</span><span class="p">:</span>
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;Create an EnergyEstimator from specified backend options for Aer simulator.</span>
 
 <span class="sd">        Args:</span>
@@ -266,7 +270,7 @@
             <span class="n">basis_gates</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">backend</span><span class="o">.</span><span class="n">options</span><span class="o">.</span><span class="n">noise_model</span><span class="o">.</span><span class="n">basis_gates</span>
 
         <span class="c1"># Create measurement circuits</span>
-        <span class="n">measurement_circuits_qasm</span> <span class="o">=</span> <span class="n">create_measurement_circuits</span><span class="p">(</span>
+        <span class="n">measurement_circuits_qasm</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_create_measurement_circuits</span><span class="p">(</span>
             <span class="n">circuit_qasm</span><span class="o">=</span><span class="n">circuit_qasm</span><span class="p">,</span>
             <span class="n">grouped_hamiltonians</span><span class="o">=</span><span class="n">qubit_hamiltonians</span><span class="p">,</span>
         <span class="p">)</span>
@@ -285,7 +289,7 @@
             <span class="n">shots_list</span><span class="o">=</span><span class="n">shots_list</span><span class="p">,</span>
         <span class="p">)</span>
 
-        <span class="k">return</span> <span class="n">compute_energy_expectation_from_bitstrings</span><span class="p">(</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_compute_energy_expectation_from_bitstrings</span><span class="p">(</span>
             <span class="n">qubit_hamiltonians</span><span class="p">,</span> <span class="n">measurement_data</span><span class="o">.</span><span class="n">bitstring_counts</span><span class="p">,</span> <span class="n">energy_offset</span>
         <span class="p">),</span> <span class="n">measurement_data</span>
 
@@ -299,38 +303,6 @@
 
 
 <span class="n">register</span><span class="p">(</span><span class="k">lambda</span><span class="p">:</span> <span class="n">QiskitEnergyEstimator</span><span class="p">())</span>
-
-<span class="k">if</span> <span class="vm">__name__</span> <span class="o">==</span> <span class="s2">&quot;__main__&quot;</span><span class="p">:</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;Example usage of the Estimator from different backends.&quot;&quot;&quot;</span>
-    <span class="kn">from</span><span class="w"> </span><span class="nn">qiskit</span><span class="w"> </span><span class="kn">import</span> <span class="n">qasm3</span>
-    <span class="kn">from</span><span class="w"> </span><span class="nn">qiskit_aer.noise</span><span class="w"> </span><span class="kn">import</span> <span class="n">NoiseModel</span><span class="p">,</span> <span class="n">depolarizing_error</span>
-
-    <span class="n">logging</span><span class="o">.</span><span class="n">basicConfig</span><span class="p">(</span><span class="n">level</span><span class="o">=</span><span class="n">logging</span><span class="o">.</span><span class="n">WARNING</span><span class="p">)</span>
-    <span class="n">_LOGGER</span> <span class="o">=</span> <span class="n">logging</span><span class="o">.</span><span class="n">getLogger</span><span class="p">(</span><span class="vm">__name__</span><span class="p">)</span>
-    <span class="n">_LOGGER</span><span class="o">.</span><span class="n">setLevel</span><span class="p">(</span><span class="n">logging</span><span class="o">.</span><span class="n">INFO</span><span class="p">)</span>
-
-    <span class="n">circuit_qasm</span> <span class="o">=</span> <span class="s2">&quot;&quot;&quot;</span>
-<span class="s2">        include &quot;stdgates.inc&quot;;</span>
-<span class="s2">        qubit[2] q;</span>
-<span class="s2">        rz(pi) q[0];</span>
-<span class="s2">        x q[0];</span>
-<span class="s2">        cx q[0], q[1];</span>
-<span class="s2">        &quot;&quot;&quot;</span>
-    <span class="n">qubit_hamiltonians</span> <span class="o">=</span> <span class="p">[</span><span class="n">QubitHamiltonian</span><span class="p">([</span><span class="s2">&quot;ZZ&quot;</span><span class="p">],</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">([</span><span class="mf">1.0</span><span class="p">]))]</span>
-
-    <span class="c1"># Example usage: qiskit aer simulator</span>
-    <span class="n">estimator</span> <span class="o">=</span> <span class="n">QiskitEnergyEstimator</span><span class="p">()</span>
-    <span class="n">results</span> <span class="o">=</span> <span class="n">estimator</span><span class="o">.</span><span class="n">run</span><span class="p">(</span><span class="n">circuit_qasm</span><span class="p">,</span> <span class="n">qubit_hamiltonians</span><span class="p">,</span> <span class="n">total_shots</span><span class="o">=</span><span class="mi">1000</span><span class="p">)</span>
-    <span class="n">_LOGGER</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Energy expectation value from AerSimulator: </span><span class="si">{</span><span class="n">results</span><span class="p">[</span><span class="s1">&#39;energy_expectation_value&#39;</span><span class="p">]</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
-
-    <span class="c1"># Example usage: qiskit aer simulator with noise model</span>
-    <span class="n">noise_model</span> <span class="o">=</span> <span class="n">NoiseModel</span><span class="p">(</span><span class="n">basis_gates</span><span class="o">=</span><span class="p">[</span><span class="s2">&quot;rz&quot;</span><span class="p">,</span> <span class="s2">&quot;sx&quot;</span><span class="p">,</span> <span class="s2">&quot;cx&quot;</span><span class="p">,</span> <span class="s2">&quot;measure&quot;</span><span class="p">])</span>
-    <span class="n">noise_model</span><span class="o">.</span><span class="n">add_all_qubit_quantum_error</span><span class="p">(</span><span class="n">depolarizing_error</span><span class="p">(</span><span class="mf">0.001</span><span class="p">,</span> <span class="mi">1</span><span class="p">),</span> <span class="p">[</span><span class="s2">&quot;rz&quot;</span><span class="p">,</span> <span class="s2">&quot;sx&quot;</span><span class="p">])</span>
-    <span class="n">noise_model</span><span class="o">.</span><span class="n">add_all_qubit_quantum_error</span><span class="p">(</span><span class="n">depolarizing_error</span><span class="p">(</span><span class="mf">0.007</span><span class="p">,</span> <span class="mi">2</span><span class="p">),</span> <span class="p">[</span><span class="s2">&quot;cx&quot;</span><span class="p">])</span>
-    <span class="n">backend_options</span> <span class="o">=</span> <span class="p">{</span><span class="s2">&quot;noise_model&quot;</span><span class="p">:</span> <span class="n">noise_model</span><span class="p">}</span>  <span class="c1"># add noise</span>
-    <span class="n">estimator</span> <span class="o">=</span> <span class="n">QiskitEnergyEstimator</span><span class="o">.</span><span class="n">from_backend_options</span><span class="p">(</span><span class="n">backend_options</span><span class="o">=</span><span class="n">backend_options</span><span class="p">)</span>
-    <span class="n">results</span> <span class="o">=</span> <span class="n">estimator</span><span class="o">.</span><span class="n">run</span><span class="p">(</span><span class="n">circuit_qasm</span><span class="p">,</span> <span class="n">qubit_hamiltonians</span><span class="p">,</span> <span class="n">total_shots</span><span class="o">=</span><span class="mi">1000</span><span class="p">)</span>
-    <span class="n">_LOGGER</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Energy expectation value from AerSimulator with noise: </span><span class="si">{</span><span class="n">results</span><span class="p">[</span><span class="s1">&#39;energy_expectation_value&#39;</span><span class="p">]</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
 </pre></div>
 
            </div>

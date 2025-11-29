@@ -96,6 +96,7 @@
 
 <span class="sd">Algorithm Lifecycle Management</span>
 <span class="sd">------------------------------</span>
+
 <span class="sd">The registry system handles the lifecycle of algorithm instances to prevent memory issues. When</span>
 <span class="sd">Python-implemented algorithms are registered, they need special handling during Python interpreter</span>
 <span class="sd">shutdown to avoid &quot;double-free&quot; errors that can occur when C++ static deinitialization runs after</span>
@@ -104,10 +105,13 @@
 <span class="sd">This module automatically registers cleanup handlers (via `atexit`) that unregister all custom</span>
 <span class="sd">algorithms before Python shuts down. Users should never need to call the cleanup functions directly.</span>
 
-<span class="sd">Important Notes:</span>
-<span class="sd">- All registration functions in this module provide automatic cleanup</span>
-<span class="sd">- Custom Python algorithms are automatically unregistered during interpreter shutdown</span>
-<span class="sd">- The cleanup functions are NOT intended to be called by users</span>
+<span class="sd">Important Notes</span>
+<span class="sd">---------------</span>
+
+<span class="sd">* All registration functions in this module provide automatic cleanup.</span>
+<span class="sd">* Custom Python algorithms are automatically unregistered during interpreter shutdown.</span>
+<span class="sd">* The cleanup functions are **not** intended to be called by users.</span>
+
 <span class="sd">&quot;&quot;&quot;</span>
 
 <span class="c1"># --------------------------------------------------------------------------------------------</span>
@@ -115,26 +119,25 @@
 <span class="c1"># Licensed under the MIT License. See LICENSE.txt in the project root for license information.</span>
 <span class="c1"># --------------------------------------------------------------------------------------------</span>
 
+<span class="kn">from</span><span class="w"> </span><span class="nn">__future__</span><span class="w"> </span><span class="kn">import</span> <span class="n">annotations</span>
+
 <span class="kn">import</span><span class="w"> </span><span class="nn">atexit</span>
-<span class="kn">from</span><span class="w"> </span><span class="nn">collections.abc</span><span class="w"> </span><span class="kn">import</span> <span class="n">Callable</span>
-<span class="kn">from</span><span class="w"> </span><span class="nn">typing</span><span class="w"> </span><span class="kn">import</span> <span class="n">Any</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">typing</span><span class="w"> </span><span class="kn">import</span> <span class="n">TYPE_CHECKING</span><span class="p">,</span> <span class="n">Any</span>
 
-<span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry._core._algorithms</span><span class="w"> </span><span class="kn">import</span> <span class="p">(</span>
-    <span class="n">ActiveSpaceSelectorFactory</span><span class="p">,</span>
-    <span class="n">CoupledClusterCalculatorFactory</span><span class="p">,</span>
-    <span class="n">HamiltonianConstructorFactory</span><span class="p">,</span>
-    <span class="n">LocalizerFactory</span><span class="p">,</span>
-    <span class="n">MultiConfigurationCalculatorFactory</span><span class="p">,</span>
-    <span class="n">MultiConfigurationScfFactory</span><span class="p">,</span>
-    <span class="n">ProjectedMultiConfigurationCalculatorFactory</span><span class="p">,</span>
-    <span class="n">ScfSolverFactory</span><span class="p">,</span>
-    <span class="n">StabilityCheckerFactory</span><span class="p">,</span>
-<span class="p">)</span>
-<span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.algorithms.energy_estimator</span><span class="w"> </span><span class="kn">import</span> <span class="n">EnergyEstimatorFactory</span><span class="p">,</span> <span class="n">QDKEnergyEstimator</span>
-<span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.algorithms.qubit_mapper</span><span class="w"> </span><span class="kn">import</span> <span class="n">QubitMapperFactory</span>
-<span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.algorithms.state_preparation</span><span class="w"> </span><span class="kn">import</span> <span class="n">SparseIsometryGF2XStatePreparation</span><span class="p">,</span> <span class="n">StatePreparationFactory</span>
+<span class="k">if</span> <span class="n">TYPE_CHECKING</span><span class="p">:</span>
+    <span class="kn">from</span><span class="w"> </span><span class="nn">collections.abc</span><span class="w"> </span><span class="kn">import</span> <span class="n">Callable</span>
 
-<span class="kn">from</span><span class="w"> </span><span class="nn">.base</span><span class="w"> </span><span class="kn">import</span> <span class="n">Algorithm</span><span class="p">,</span> <span class="n">AlgorithmFactory</span>
+    <span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.algorithms.base</span><span class="w"> </span><span class="kn">import</span> <span class="n">Algorithm</span><span class="p">,</span> <span class="n">AlgorithmFactory</span>
+
+<span class="n">__all__</span> <span class="o">=</span> <span class="p">[</span>
+    <span class="s2">&quot;available&quot;</span><span class="p">,</span>
+    <span class="s2">&quot;create&quot;</span><span class="p">,</span>
+    <span class="s2">&quot;register&quot;</span><span class="p">,</span>
+    <span class="s2">&quot;register_factory&quot;</span><span class="p">,</span>
+    <span class="s2">&quot;show_settings&quot;</span><span class="p">,</span>
+    <span class="s2">&quot;unregister&quot;</span><span class="p">,</span>
+    <span class="s2">&quot;unregister_factory&quot;</span><span class="p">,</span>
+<span class="p">]</span>
 
 <span class="c1"># Universal cleanup solution for all algorithms</span>
 <span class="n">__cleanup_registered</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span>
@@ -148,27 +151,27 @@
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;Create an algorithm instance by type and name.</span>
 
 <span class="sd">    This function creates an algorithm instance from the registry using the specified</span>
-<span class="sd">    algorithm type and name. If no name is provided, the default algorithm for that</span>
+<span class="sd">    algorithm type and name. If no name is provided, the default implementation for that</span>
 <span class="sd">    type is created.</span>
 
-<span class="sd">    Available algorithm types and algorithms are dependent on the QDK/Chemistry installation</span>
-<span class="sd">    but importantly also the loaded plugins and registered custom algorithms. If an</span>
-<span class="sd">    expected algorithm is not found, ensure that the corresponding plugin is loaded</span>
-<span class="sd">    or that the custom algorithm is registered.</span>
-
-<span class="sd">    The currently loaded algorithms can be queried using the `available()` function.</span>
-<span class="sd">    Which lists the available algorithms by type for all currently loaded plugins and</span>
-<span class="sd">    registered custom algorithms.</span>
+<span class="sd">    Available algorithm types depend on the installed plugins and any user-registered</span>
+<span class="sd">    algorithms. Use :func:`available` to inspect what is currently loaded before calling</span>
+<span class="sd">    :func:`create`.</span>
 
 <span class="sd">    Args:</span>
-<span class="sd">        algorithm_type (str): The type of algorithm to create (e.g., &quot;scf_solver&quot;,</span>
-<span class="sd">            &quot;active_space_selector&quot;, &quot;coupled_cluster_calculator&quot;).</span>
-<span class="sd">        algorithm_name (Optional[str]): The specific name of the algorithm implementation</span>
-<span class="sd">            to create. If None or empty string, creates the default algorithm for that type.</span>
-<span class="sd">        **kwargs: Optional keyword arguments to configure the algorithm&#39;s settings.</span>
-<span class="sd">            These are passed directly to the algorithm&#39;s settings via `settings().update()`.</span>
-<span class="sd">            Available settings depend on the specific algorithm type and implementation</span>
-<span class="sd">            and can be looked up with show_settings() method in .</span>
+<span class="sd">        algorithm_type (str): The type of algorithm to create.</span>
+
+<span class="sd">            (e.g., &quot;scf_solver&quot;, &quot;active_space_selector&quot;, &quot;coupled_cluster_calculator&quot;).</span>
+
+<span class="sd">        algorithm_name (Optional[str]): The specific name of the algorithm implementation to create.</span>
+
+<span class="sd">            If None or empty string, creates the default algorithm for that type.</span>
+
+<span class="sd">        kwargs: Optional keyword arguments (passed via ``**kwargs``).</span>
+
+<span class="sd">            These configure the algorithm&#39;s settings. These are forwarded directly to the algorithm&#39;s settings</span>
+<span class="sd">            via `settings().update()`. Available settings depend on the specific algorithm</span>
+<span class="sd">            type and implementation and can be looked up with show_settings().</span>
 
 <span class="sd">    Returns:</span>
 <span class="sd">        Algorithm: The created algorithm instance.</span>
@@ -227,8 +230,10 @@
 <span class="sd">    algorithm, including their names, expected Python types, and default values.</span>
 
 <span class="sd">    Args:</span>
-<span class="sd">        algorithm_type (str): The type of algorithm (e.g., &quot;scf_solver&quot;,</span>
-<span class="sd">            &quot;active_space_selector&quot;, &quot;coupled_cluster_calculator&quot;).</span>
+<span class="sd">        algorithm_type (str): The type of algorithm.</span>
+
+<span class="sd">            (e.g., &quot;scf_solver&quot;, &quot;active_space_selector&quot;, &quot;coupled_cluster_calculator&quot;).</span>
+
 <span class="sd">        algorithm_name (str): The specific name of the algorithm implementation.</span>
 
 <span class="sd">    Returns:</span>
@@ -284,8 +289,10 @@
 <span class="sd">    the returned instance.</span>
 
 <span class="sd">    Args:</span>
-<span class="sd">        generator (Callable[[], Algorithm]): A callable that returns a new instance of</span>
-<span class="sd">            the custom algorithm. This will be called each time the algorithm is created</span>
+<span class="sd">        generator (Callable[[], Algorithm]): A callable that returns a new instance.</span>
+
+<span class="sd">            Need to reurn an instance of the custom algorithm.</span>
+<span class="sd">            This will be called each time the algorithm is created</span>
 <span class="sd">            from the factory.</span>
 
 <span class="sd">    Raises:</span>
@@ -332,10 +339,13 @@
 
 <span class="sd">    Args:</span>
 <span class="sd">        algorithm_type (Optional[str]): If provided, only list algorithms of this type.</span>
+
 <span class="sd">            If None, list all algorithms across all types.</span>
 
 <span class="sd">    Returns:</span>
-<span class="sd">        dict[str, list[str]] | list[str]: When algorithm_type is None, returns a dictionary</span>
+<span class="sd">        dict[str, list[str]] | list[str]: Information on available algorithms.</span>
+
+<span class="sd">            When algorithm_type is None, returns a dictionary</span>
 <span class="sd">            where keys are algorithm type names and values are lists of available algorithm</span>
 <span class="sd">            names for that type. When algorithm_type is specified, returns a list of available</span>
 <span class="sd">            algorithm names for that specific type (empty list if type not found or no</span>
@@ -377,10 +387,11 @@
 <span class="sd">    This function removes a previously registered algorithm from the registry.</span>
 
 <span class="sd">    Args:</span>
-<span class="sd">        algorithm_type (str): The type of algorithm to unregister</span>
+<span class="sd">        algorithm_type (str): The type of algorithm to unregister.</span>
+
 <span class="sd">            (e.g., &quot;scf_solver&quot;, &quot;active_space_selector&quot;).</span>
-<span class="sd">        algorithm_name (str): The name of the specific algorithm implementation</span>
-<span class="sd">            to unregister.</span>
+
+<span class="sd">        algorithm_name (str): The name of the specific algorithm implementation to unregister.</span>
 
 <span class="sd">    Raises:</span>
 <span class="sd">        KeyError: If the specified algorithm type is not registered in the system.</span>
@@ -449,6 +460,18 @@
 
 
 <span class="k">def</span><span class="w"> </span><span class="nf">_register_cpp_factories</span><span class="p">():</span>
+    <span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry._core._algorithms</span><span class="w"> </span><span class="kn">import</span> <span class="p">(</span>  <span class="c1"># noqa: PLC0415</span>
+        <span class="n">ActiveSpaceSelectorFactory</span><span class="p">,</span>
+        <span class="n">CoupledClusterCalculatorFactory</span><span class="p">,</span>
+        <span class="n">HamiltonianConstructorFactory</span><span class="p">,</span>
+        <span class="n">LocalizerFactory</span><span class="p">,</span>
+        <span class="n">MultiConfigurationCalculatorFactory</span><span class="p">,</span>
+        <span class="n">MultiConfigurationScfFactory</span><span class="p">,</span>
+        <span class="n">ProjectedMultiConfigurationCalculatorFactory</span><span class="p">,</span>
+        <span class="n">ScfSolverFactory</span><span class="p">,</span>
+        <span class="n">StabilityCheckerFactory</span><span class="p">,</span>
+    <span class="p">)</span>
+
     <span class="n">register_factory</span><span class="p">(</span><span class="n">ActiveSpaceSelectorFactory</span><span class="p">)</span>
     <span class="n">register_factory</span><span class="p">(</span><span class="n">CoupledClusterCalculatorFactory</span><span class="p">)</span>
     <span class="n">register_factory</span><span class="p">(</span><span class="n">HamiltonianConstructorFactory</span><span class="p">)</span>
@@ -461,6 +484,10 @@
 
 
 <span class="k">def</span><span class="w"> </span><span class="nf">_register_python_factories</span><span class="p">():</span>
+    <span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.algorithms.energy_estimator</span><span class="w"> </span><span class="kn">import</span> <span class="n">EnergyEstimatorFactory</span>  <span class="c1"># noqa: PLC0415</span>
+    <span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.algorithms.qubit_mapper</span><span class="w"> </span><span class="kn">import</span> <span class="n">QubitMapperFactory</span>  <span class="c1"># noqa: PLC0415</span>
+    <span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.algorithms.state_preparation</span><span class="w"> </span><span class="kn">import</span> <span class="n">StatePreparationFactory</span>  <span class="c1"># noqa: PLC0415</span>
+
     <span class="n">register_factory</span><span class="p">(</span><span class="n">EnergyEstimatorFactory</span><span class="p">())</span>
     <span class="n">register_factory</span><span class="p">(</span><span class="n">StatePreparationFactory</span><span class="p">())</span>
     <span class="n">register_factory</span><span class="p">(</span><span class="n">QubitMapperFactory</span><span class="p">())</span>
@@ -505,9 +532,16 @@
         <span class="n">factory</span><span class="o">.</span><span class="n">clear</span><span class="p">()</span>
 
 
-<span class="c1"># Register built-in Python energy estimators</span>
-<span class="n">register</span><span class="p">(</span><span class="k">lambda</span><span class="p">:</span> <span class="n">QDKEnergyEstimator</span><span class="p">())</span>
-<span class="n">register</span><span class="p">(</span><span class="k">lambda</span><span class="p">:</span> <span class="n">SparseIsometryGF2XStatePreparation</span><span class="p">())</span>
+<span class="k">def</span><span class="w"> </span><span class="nf">_register_python_algorithms</span><span class="p">():</span>
+    <span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.algorithms.energy_estimator</span><span class="w"> </span><span class="kn">import</span> <span class="n">QDKEnergyEstimator</span>  <span class="c1"># noqa: PLC0415</span>
+    <span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.algorithms.state_preparation</span><span class="w"> </span><span class="kn">import</span> <span class="n">SparseIsometryGF2XStatePreparation</span>  <span class="c1"># noqa: PLC0415</span>
+
+    <span class="c1"># Register built-in Python energy estimators</span>
+    <span class="n">register</span><span class="p">(</span><span class="k">lambda</span><span class="p">:</span> <span class="n">QDKEnergyEstimator</span><span class="p">())</span>
+    <span class="n">register</span><span class="p">(</span><span class="k">lambda</span><span class="p">:</span> <span class="n">SparseIsometryGF2XStatePreparation</span><span class="p">())</span>
+
+
+<span class="n">_register_python_algorithms</span><span class="p">()</span>
 </pre></div>
 
            </div>

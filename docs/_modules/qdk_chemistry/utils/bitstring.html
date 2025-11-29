@@ -117,13 +117,24 @@
 <span class="c1"># Licensed under the MIT License. See LICENSE.txt in the project root for license information.</span>
 <span class="c1"># --------------------------------------------------------------------------------------------</span>
 
+<span class="kn">from</span><span class="w"> </span><span class="nn">__future__</span><span class="w"> </span><span class="kn">import</span> <span class="n">annotations</span>
+
 <span class="kn">import</span><span class="w"> </span><span class="nn">logging</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">typing</span><span class="w"> </span><span class="kn">import</span> <span class="n">TYPE_CHECKING</span>
 
 <span class="kn">import</span><span class="w"> </span><span class="nn">numpy</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">np</span>
 
-<span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.data</span><span class="w"> </span><span class="kn">import</span> <span class="n">Configuration</span>
+<span class="k">if</span> <span class="n">TYPE_CHECKING</span><span class="p">:</span>
+    <span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.data</span><span class="w"> </span><span class="kn">import</span> <span class="n">Configuration</span>
 
 <span class="n">_LOGGER</span> <span class="o">=</span> <span class="n">logging</span><span class="o">.</span><span class="n">getLogger</span><span class="p">(</span><span class="vm">__name__</span><span class="p">)</span>
+
+<span class="n">__all__</span> <span class="o">=</span> <span class="p">[</span>
+    <span class="s2">&quot;binary_string_to_configuration&quot;</span><span class="p">,</span>
+    <span class="s2">&quot;binary_to_decimal&quot;</span><span class="p">,</span>
+    <span class="s2">&quot;bitstrings_to_binary_matrix&quot;</span><span class="p">,</span>
+    <span class="s2">&quot;separate_alpha_beta_to_binary_string&quot;</span><span class="p">,</span>
+<span class="p">]</span>
 
 
 <div class="viewcode-block" id="separate_alpha_beta_to_binary_string">
@@ -182,6 +193,8 @@
 <span class="sd">        Configuration object corresponding to the binary string.</span>
 
 <span class="sd">    &quot;&quot;&quot;</span>
+    <span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.data</span><span class="w"> </span><span class="kn">import</span> <span class="n">Configuration</span>  <span class="c1"># noqa: PLC0415</span>
+
     <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">bitstring</span><span class="p">)</span> <span class="o">%</span> <span class="mi">2</span> <span class="o">!=</span> <span class="mi">0</span><span class="p">:</span>
         <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;Bitstring length must be even to represent alpha and beta electrons.&quot;</span><span class="p">)</span>
     <span class="n">n</span> <span class="o">=</span> <span class="nb">len</span><span class="p">(</span><span class="n">bitstring</span><span class="p">)</span> <span class="o">//</span> <span class="mi">2</span>

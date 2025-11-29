@@ -100,6 +100,15 @@
 
 <span class="kn">import</span><span class="w"> </span><span class="nn">numpy</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">np</span>
 
+<span class="n">__all__</span> <span class="o">=</span> <span class="p">[</span>
+    <span class="s2">&quot;accumulated_phase_from_bits&quot;</span><span class="p">,</span>
+    <span class="s2">&quot;energy_alias_candidates&quot;</span><span class="p">,</span>
+    <span class="s2">&quot;energy_from_phase&quot;</span><span class="p">,</span>
+    <span class="s2">&quot;iterative_phase_feedback_update&quot;</span><span class="p">,</span>
+    <span class="s2">&quot;phase_fraction_from_feedback&quot;</span><span class="p">,</span>
+    <span class="s2">&quot;resolve_energy_aliases&quot;</span><span class="p">,</span>
+<span class="p">]</span>
+
 
 <div class="viewcode-block" id="energy_from_phase">
 <a class="viewcode-back" href="../../../api/api_autogen/qdk_chemistry.utils.phase.html#qdk_chemistry.utils.phase.energy_from_phase">[docs]</a>
@@ -134,8 +143,9 @@
 <span class="sd">    Args:</span>
 <span class="sd">        raw_energy: Energy derived from the measured phase.</span>
 <span class="sd">        evolution_time: Evolution time ``t`` used by the unitary.</span>
-<span class="sd">        shift_range: Integer shifts (in multiples of ``2π / t``) to explore. The</span>
-<span class="sd">            default ``range(-2, 3)`` checks ``k = -2, -1, 0, 1, 2``—a pragmatic</span>
+<span class="sd">        shift_range: Integer shifts (in multiples of ``2π / t``) to explore.</span>
+
+<span class="sd">            The default ``range(-2, 3)`` checks ``k = -2, -1, 0, 1, 2``—a pragmatic</span>
 <span class="sd">            window that typically covers chemical-energy estimates because they</span>
 <span class="sd">            rarely deviate by more than one or two ``2π / t`` periods from the</span>
 <span class="sd">            raw measurement.</span>
@@ -171,12 +181,13 @@
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;Select the alias energy closest to a known reference value.</span>
 
 <span class="sd">    Args:</span>
-<span class="sd">        raw_energy: Energy derived from the measured phase.</span>
-<span class="sd">        evolution_time: Evolution time ``t`` used by the unitary.</span>
-<span class="sd">        reference_energy: External reference guiding alias selection.</span>
-<span class="sd">        shift_range: Integer shifts (in multiples of ``2π / t``) to explore. Use</span>
-<span class="sd">            a wider window when the true value may sit multiple periods away</span>
-<span class="sd">            from the raw estimate.</span>
+<span class="sd">        raw_energy (float): Energy derived from the measured phase.</span>
+<span class="sd">        evolution_time (float): Evolution time ``t`` used by the unitary.</span>
+<span class="sd">        reference_energy (float): External reference guiding alias selection.</span>
+<span class="sd">        shift_range (Iterable[int]): Integer shifts (in multiples of ``2π / t``) to explore.</span>
+
+<span class="sd">            Use a wider window when the true value may sit multiple</span>
+<span class="sd">            periods away from the raw estimate.</span>
 
 <span class="sd">    Returns:</span>
 <span class="sd">        Alias energy closest to ``reference_energy``.</span>

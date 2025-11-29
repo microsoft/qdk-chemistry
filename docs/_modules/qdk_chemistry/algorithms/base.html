@@ -116,8 +116,7 @@
 <span class="sd">    defined in this base class.</span>
 
 <span class="sd">    Examples:</span>
-<span class="sd">        Creating a custom SCF solver algorithm:</span>
-
+<span class="sd">        &gt;&gt;&gt; # Creating a custom SCF solver algorithm</span>
 <span class="sd">        &gt;&gt;&gt; from qdk_chemistry.algorithms import Algorithm, registry</span>
 <span class="sd">        &gt;&gt;&gt; from qdk_chemistry.data import Structure, Wavefunction, ElectronicStructureSettings</span>
 <span class="sd">        &gt;&gt;&gt;</span>
@@ -183,7 +182,7 @@
 <span class="sd">            kwargs: The keyword arguments required to run the algorithm.</span>
 
 <span class="sd">        Returns:</span>
-<span class="sd">            * The results of the algorithm</span>
+<span class="sd">            Any: The results of the algorithm</span>
 
 <span class="sd">        &quot;&quot;&quot;</span>
 
@@ -200,7 +199,7 @@
 <span class="sd">            kwargs: The keyword arguments required to run the algorithm.</span>
 
 <span class="sd">        Returns:</span>
-<span class="sd">            * The results of the algorithm</span>
+<span class="sd">            Any: The results of the algorithm</span>
 
 <span class="sd">        &quot;&quot;&quot;</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">_settings</span><span class="o">.</span><span class="n">lock</span><span class="p">()</span>
@@ -213,7 +212,7 @@
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;Get the settings for this algorithm.</span>
 
 <span class="sd">        Returns:</span>
-<span class="sd">            The settings object associated with this algorithm.</span>
+<span class="sd">            Settings:The settings object associated with this algorithm.</span>
 
 <span class="sd">        &quot;&quot;&quot;</span>
         <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_settings</span></div>
@@ -236,7 +235,7 @@
 <span class="sd">        indicating the specific algorithm name and origin.</span>
 
 <span class="sd">        Returns:</span>
-<span class="sd">            * The main name of the algorithm type.</span>
+<span class="sd">            str: The main name of the algorithm type.</span>
 
 <span class="sd">        &quot;&quot;&quot;</span></div>
 
@@ -258,7 +257,7 @@
 <span class="sd">        indicating the specific algorithm name and origin.</span>
 
 <span class="sd">        Returns:</span>
-<span class="sd">            * The main name of the algorithm</span>
+<span class="sd">            str: The main name of the algorithm</span>
 
 <span class="sd">        &quot;&quot;&quot;</span></div>
 
@@ -274,7 +273,7 @@
 <span class="sd">        By default, this method returns a list containing only the main name.</span>
 
 <span class="sd">        Returns:</span>
-<span class="sd">            * All aliases of the algorithm&#39;s name including the main name.</span>
+<span class="sd">            list[str]: All aliases of the algorithm&#39;s name including the main name.</span>
 
 <span class="sd">        &quot;&quot;&quot;</span>
         <span class="k">return</span> <span class="p">[</span><span class="bp">self</span><span class="o">.</span><span class="n">name</span><span class="p">()]</span></div>
@@ -301,8 +300,7 @@
 <span class="sd">        creating and registering algorithms.</span>
 
 <span class="sd">    Examples:</span>
-<span class="sd">        Creating a custom factory for a new algorithm type:</span>
-
+<span class="sd">        &gt;&gt;&gt; # Creating a custom factory for a new algorithm type</span>
 <span class="sd">        &gt;&gt;&gt; from qdk_chemistry.algorithms.base import AlgorithmFactory, Algorithm</span>
 <span class="sd">        &gt;&gt;&gt; import qdk_chemistry.algorithms.registry as registry</span>
 <span class="sd">        &gt;&gt;&gt; import qdk_chemistry.algorithms as algorithms</span>
@@ -343,8 +341,9 @@
 <span class="sd">        {&#39;geometry_optimizer&#39;: [&#39;bfgs&#39;]}</span>
 
 <span class="sd">    See Also:</span>
-<span class="sd">        qdk_chemistry.algorithms.registry: Higher-level registry functions for</span>
-<span class="sd">            creating and managing algorithms across all types.</span>
+<span class="sd">        qdk_chemistry.algorithms.registry:</span>
+
+<span class="sd">            Higher-level registry functions for creating and managing algorithms across all types.</span>
 
 <span class="sd">    &quot;&quot;&quot;</span>
 
@@ -395,14 +394,14 @@
 
 <span class="sd">        Args:</span>
 <span class="sd">            name (Optional[str]): The name of the algorithm to create.</span>
+
 <span class="sd">                If None or empty, creates the default algorithm.</span>
 
 <span class="sd">        Returns:</span>
 <span class="sd">            Algorithm: A new instance of the requested algorithm.</span>
 
 <span class="sd">        Raises:</span>
-<span class="sd">            RuntimeError: If the requested algorithm name is not registered</span>
-<span class="sd">                in this factory.</span>
+<span class="sd">            RuntimeError: If the requested algorithm name is not registered in this factory.</span>
 
 <span class="sd">        Examples:</span>
 <span class="sd">            &gt;&gt;&gt; factory = ScfSolverFactory()</span>
@@ -412,7 +411,7 @@
 <span class="sd">            &gt;&gt;&gt; pyscf_solver = factory.create(&quot;pyscf&quot;)</span>
 
 <span class="sd">        &quot;&quot;&quot;</span>
-        <span class="k">if</span> <span class="n">name</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="k">if</span> <span class="n">name</span> <span class="ow">is</span> <span class="kc">None</span> <span class="ow">or</span> <span class="n">name</span> <span class="o">==</span> <span class="s2">&quot;&quot;</span><span class="p">:</span>
             <span class="n">name</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">default_algorithm_name</span><span class="p">()</span>
         <span class="k">if</span> <span class="n">name</span> <span class="ow">not</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">_registry</span><span class="p">:</span>
             <span class="k">raise</span> <span class="ne">RuntimeError</span><span class="p">(</span>
@@ -431,8 +430,9 @@
 <span class="sd">        will be called each time an instance of this algorithm is requested.</span>
 
 <span class="sd">        Args:</span>
-<span class="sd">            generator (Callable[[], Algorithm]): A callable that returns a new</span>
-<span class="sd">                instance of the algorithm. Must return an Algorithm whose name()</span>
+<span class="sd">            generator (Callable[[], Algorithm]): A callable that returns a new instance of the algorithm.</span>
+
+<span class="sd">                Must return an Algorithm whose name()</span>
 <span class="sd">                will be used as the registration key.</span>
 
 <span class="sd">        Examples:</span>

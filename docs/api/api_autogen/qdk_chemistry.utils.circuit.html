@@ -108,49 +108,13 @@
   <section id="module-qdk_chemistry.utils.circuit">
 <span id="qdk-chemistry-utils-circuit-module"></span><h1>qdk_chemistry.utils.circuit module<a class="headerlink" href="#module-qdk_chemistry.utils.circuit" title="Link to this heading"></a></h1>
 <p>Utilities for visualizing circuits with QDK widgets.</p>
-<dl class="py class">
-<dt class="sig sig-object py" id="qdk_chemistry.utils.circuit.Circuit">
-<em class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">Circuit</span></span><a class="headerlink" href="#qdk_chemistry.utils.circuit.Circuit" title="Link to this definition"></a></dt>
-<dd><p>Bases: <a class="reference external" href="https://docs.python.org/3/library/functions.html#object" title="(in Python v3.14)"><code class="xref py py-class docutils literal notranslate"><span class="pre">object</span></code></a></p>
-<dl class="py method">
-<dt class="sig sig-object py" id="qdk_chemistry.utils.circuit.Circuit.json">
-<span class="sig-name descname"><span class="pre">json</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#qdk_chemistry.utils.circuit.Circuit.json" title="Link to this definition"></a></dt>
-<dd></dd></dl>
-
-</dd></dl>
-
-<dl class="py function">
-<dt class="sig sig-object py" id="qdk_chemistry.utils.circuit.analyze_qubit_status">
-<span class="sig-name descname"><span class="pre">analyze_qubit_status</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">circuit</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#qdk_chemistry.utils.circuit.analyze_qubit_status" title="Link to this definition"></a></dt>
-<dd><p>Analyze the status of qubits in a quantum circuit.</p>
-<p>Note: The gate classification logic depends on the settings defined in
-definitions.py. Please modify gate sets to ensure gate consistency.</p>
-<p>This function inspects the quantum circuit to determine the role of each qubit:</p>
-<ul class="simple">
-<li><p>“quantum”: has a quantum gate applied</p></li>
-<li><p>“classical”: touched by gates but bitstring outputs are deterministic</p></li>
-<li><p>“idle”: has no gates applied</p></li>
-</ul>
-<dl class="field-list simple">
-<dt class="field-odd">Parameters<span class="colon">:</span></dt>
-<dd class="field-odd"><p><strong>circuit</strong> (<a class="reference external" href="https://quantum.cloud.ibm.com/docs/api/qiskit/qiskit.circuit.QuantumCircuit" title="(in Qiskit v2.2)"><em>QuantumCircuit</em></a>) – The quantum circuit to analyze.</p>
-</dd>
-<dt class="field-even">Returns<span class="colon">:</span></dt>
-<dd class="field-even"><p>A summary of qubit roles indexed by qubit index.</p>
-</dd>
-<dt class="field-odd">Return type<span class="colon">:</span></dt>
-<dd class="field-odd"><p><span class="sphinx_autodoc_typehints-type"><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#dict" title="(in Python v3.14)"><code class="xref py py-class docutils literal notranslate"><span class="pre">dict</span></code></a>[<a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(in Python v3.14)"><code class="xref py py-class docutils literal notranslate"><span class="pre">int</span></code></a>, <a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)"><code class="xref py py-class docutils literal notranslate"><span class="pre">str</span></code></a>]</span></p>
-</dd>
-</dl>
-</dd></dl>
-
 <dl class="py function">
 <dt class="sig sig-object py" id="qdk_chemistry.utils.circuit.qasm_to_qdk_circuit">
-<span class="sig-name descname"><span class="pre">qasm_to_qdk_circuit</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">circuit_qasm</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">remove_idle_qubits</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">True</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">remove_classical_qubits</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">True</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../../_modules/qdk_chemistry/utils/circuit.html#qasm_to_qdk_circuit"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#qdk_chemistry.utils.circuit.qasm_to_qdk_circuit" title="Link to this definition"></a></dt>
+<span class="sig-prename descclassname"><span class="pre">qdk_chemistry.utils.circuit.</span></span><span class="sig-name descname"><span class="pre">qasm_to_qdk_circuit</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">circuit_qasm</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">remove_idle_qubits</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">True</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">remove_classical_qubits</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">True</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../../_modules/qdk_chemistry/utils/circuit.html#qasm_to_qdk_circuit"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#qdk_chemistry.utils.circuit.qasm_to_qdk_circuit" title="Link to this definition"></a></dt>
 <dd><p>Parse a QASM circuit into a QDK Circuit object with trimming options.</p>
 <dl class="field-list simple">
 <dt class="field-odd">Return type<span class="colon">:</span></dt>
-<dd class="field-odd"><p><span class="sphinx_autodoc_typehints-type"><a class="reference internal" href="#qdk_chemistry.utils.circuit.Circuit" title="qdk_chemistry.utils.circuit.Circuit"><code class="xref py py-class docutils literal notranslate"><span class="pre">Circuit</span></code></a></span></p>
+<dd class="field-odd"><p><span class="sphinx_autodoc_typehints-type"><code class="xref py py-class docutils literal notranslate"><span class="pre">Circuit</span></code></span></p>
 </dd>
 <dt class="field-even">Parameters<span class="colon">:</span></dt>
 <dd class="field-even"><ul class="simple">

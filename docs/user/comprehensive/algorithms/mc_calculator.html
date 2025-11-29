@@ -70,16 +70,16 @@
 <li class="toctree-l4"><a class="reference internal" href="#available-settings">Available settings</a></li>
 <li class="toctree-l4"><a class="reference internal" href="#implemented-interface">Implemented interface</a></li>
 <li class="toctree-l4"><a class="reference internal" href="#macis-implementation"><span class="xref std std-term">MACIS</span> implementation</a></li>
-<li class="toctree-l4"><a class="reference internal" href="#related-classes">Related classes</a></li>
+<li class="toctree-l4"><a class="reference internal" href="#further-reading">Further reading</a></li>
 </ul>
 </li>
 <li class="toctree-l3"><a class="reference internal" href="mcscf.html">Multi-configuration <span class="xref std std-term">SCF</span></a></li>
 <li class="toctree-l3"><a class="reference internal" href="pmc.html">Projected multi-configuration calculations</a></li>
 <li class="toctree-l3"><a class="reference internal" href="qubit_mapper.html">Qubit mapping</a></li>
 <li class="toctree-l3"><a class="reference internal" href="reference_derived.html">Reference-derived calculations</a></li>
-<li class="toctree-l3"><a class="reference internal" href="scf_solver.html">Self-consistent field solver</a></li>
+<li class="toctree-l3"><a class="reference internal" href="scf_solver.html">Self-consistent field solving</a></li>
 <li class="toctree-l3"><a class="reference internal" href="stability_checker.html">Self-consistent field stability checks</a></li>
-<li class="toctree-l3"><a class="reference internal" href="state_preparation.html">State preparation</a></li>
+<li class="toctree-l3"><a class="reference internal" href="state_preparation.html">State Preparation</a></li>
 </ul>
 </li>
 <li class="toctree-l2"><a class="reference internal" href="../basis_functionals.html">Functionals and basis sets</a></li>
@@ -127,18 +127,18 @@
              
   <section id="multi-configuration-calculations">
 <h1>Multi-configuration calculations<a class="headerlink" href="#multi-configuration-calculations" title="Link to this heading"></a></h1>
-<p>The <code class="docutils literal notranslate"><span class="pre">MultiConfigurationCalculator</span></code> algorithm in QDK/Chemistry performs Multi-Configurational (MC) calculations to solve the electronic structure problem beyond the mean-field approximation.
+<p>The <a class="reference internal" href="../../../api/api_autogen/qdk_chemistry.algorithms.html#qdk_chemistry.algorithms.MultiConfigurationCalculator" title="qdk_chemistry.algorithms.MultiConfigurationCalculator"><code class="xref py py-class docutils literal notranslate"><span class="pre">MultiConfigurationCalculator</span></code></a> algorithm in QDK/Chemistry performs Multi-Configurational (MC) calculations to solve the electronic structure problem beyond the mean-field approximation.
 It provides access to various Configuration Interaction (CI) methods to account for static electron correlation effects, which are critical for accurately describing systems with near-degenerate electronic states.</p>
 <section id="overview">
 <h2>Overview<a class="headerlink" href="#overview" title="Link to this heading"></a></h2>
 <p><a class="reference internal" href="../../../glossary.html#term-MC"><span class="xref std std-term">MC</span></a> methods represent the electronic wavefunction as a linear combination of many electron configurations (Slater determinants).
 These methods can accurately describe systems with strong static correlation effects where single-reference methods like Hartree-Fock are inadequate.
 Static correlation arises when multiple electronic configurations contribute significantly to the wavefunction, such as in bond-breaking processes, transition states, excited states, and open-shell systems.
-The <code class="docutils literal notranslate"><span class="pre">MultiConfigurationCalculator</span></code> algorithm implements various <a class="reference internal" href="../../../glossary.html#term-CI"><span class="xref std std-term">CI</span></a> approaches, from full CI (FCI) to selected <a class="reference internal" href="../../../glossary.html#term-CI"><span class="xref std std-term">CI</span></a> methods that focus on the most important configurations.</p>
+The <a class="reference internal" href="../../../api/api_autogen/qdk_chemistry.algorithms.html#qdk_chemistry.algorithms.MultiConfigurationCalculator" title="qdk_chemistry.algorithms.MultiConfigurationCalculator"><code class="xref py py-class docutils literal notranslate"><span class="pre">MultiConfigurationCalculator</span></code></a> algorithm implements various <a class="reference internal" href="../../../glossary.html#term-CI"><span class="xref std std-term">CI</span></a> approaches, from full CI (FCI) to selected <a class="reference internal" href="../../../glossary.html#term-CI"><span class="xref std std-term">CI</span></a> methods that focus on the most important configurations.</p>
 </section>
 <section id="capabilities">
 <h2>Capabilities<a class="headerlink" href="#capabilities" title="Link to this heading"></a></h2>
-<p>The <code class="docutils literal notranslate"><span class="pre">MultiConfigurationCalculator</span></code> in QDK/Chemistry provides:</p>
+<p>The <a class="reference internal" href="../../../api/api_autogen/qdk_chemistry.algorithms.html#qdk_chemistry.algorithms.MultiConfigurationCalculator" title="qdk_chemistry.algorithms.MultiConfigurationCalculator"><code class="xref py py-class docutils literal notranslate"><span class="pre">MultiConfigurationCalculator</span></code></a> in QDK/Chemistry provides:</p>
 <ul class="simple">
 <li><p><strong>Full Configuration Interaction (FCI)</strong>: Exact solution within a given orbital space, also known as Complete Active
 Space (<strong>CAS</strong>) when performed within a selected active space of orbitals</p></li>
@@ -147,13 +147,14 @@ Space (<strong>CAS</strong>) when performed within a selected active space of or
 </section>
 <section id="creating-an-multiconfigurationcalculator">
 <h2>Creating an MultiConfigurationCalculator<a class="headerlink" href="#creating-an-multiconfigurationcalculator" title="Link to this heading"></a></h2>
-<p>The <code class="docutils literal notranslate"><span class="pre">MultiConfigurationCalculator</span></code> is created using the <a class="reference internal" href="../design/factory_pattern.html"><span class="doc">factory pattern</span></a>.</p>
+<p>The <a class="reference internal" href="../../../api/api_autogen/qdk_chemistry.algorithms.html#qdk_chemistry.algorithms.MultiConfigurationCalculator" title="qdk_chemistry.algorithms.MultiConfigurationCalculator"><code class="xref py py-class docutils literal notranslate"><span class="pre">MultiConfigurationCalculator</span></code></a> is created using the <a class="reference internal" href="../design/factory_pattern.html"><span class="doc">factory pattern</span></a>.</p>
 <div class="tab-set docutils container">
 <input checked="True" class="tab-input" id="tab-set--0-input--1" name="tab-set--0" type="radio"><label class="tab-label" for="tab-set--0-input--1">C++ API</label><div class="tab-content docutils container">
 <div class="highlight-cpp notranslate"><div class="highlight"><pre><span></span><span class="cp">#include</span><span class="w"> </span><span class="cpf">&lt;qdk/chemistry.hpp&gt;</span>
 <span class="k">using</span><span class="w"> </span><span class="k">namespace</span><span class="w"> </span><span class="nn">qdk</span><span class="o">::</span><span class="nn">chemistry</span><span class="o">::</span><span class="nn">algorithms</span><span class="p">;</span>
 
-<span class="c1">// Create the default MultiConfigurationCalculator instance (MACIS implementation)</span>
+<span class="c1">// Create the default MultiConfigurationCalculator instance (MACIS</span>
+<span class="c1">// implementation)</span>
 <span class="k">auto</span><span class="w"> </span><span class="n">mc_calculator</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">MultiConfigurationCalculatorFactory</span><span class="o">::</span><span class="n">create</span><span class="p">();</span>
 
 <span class="c1">// Create a specific type of CI calculator</span>
@@ -162,18 +163,26 @@ Space (<strong>CAS</strong>) when performed within a selected active space of or
 </div>
 </div>
 <input class="tab-input" id="tab-set--0-input--2" name="tab-set--0" type="radio"><label class="tab-label" for="tab-set--0-input--2">Python API</label><div class="tab-content docutils container">
-<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="c1"># --------------------------------------------------------------------------------------------</span>
-<span class="c1"># Copyright (c) Microsoft Corporation. All rights reserved.</span>
-<span class="c1"># Licensed under the MIT License. See LICENSE.txt in the project root for license information.</span>
-<span class="c1"># --------------------------------------------------------------------------------------------</span>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span><span class="w"> </span><span class="nn">numpy</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">np</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.algorithms</span><span class="w"> </span><span class="kn">import</span> <span class="n">available</span><span class="p">,</span> <span class="n">create</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.data</span><span class="w"> </span><span class="kn">import</span> <span class="n">Structure</span>
 
-<span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.algorithms</span><span class="w"> </span><span class="kn">import</span> <span class="n">create</span>
+<span class="c1"># First run an SCF calculation and build a Hamiltonian</span>
+<span class="n">coords</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">([[</span><span class="mf">0.0</span><span class="p">,</span> <span class="mf">0.0</span><span class="p">,</span> <span class="mf">0.0</span><span class="p">],</span> <span class="p">[</span><span class="mf">0.0</span><span class="p">,</span> <span class="mf">0.0</span><span class="p">,</span> <span class="mf">1.4</span><span class="p">]])</span>
+<span class="n">structure</span> <span class="o">=</span> <span class="n">Structure</span><span class="p">(</span><span class="n">coords</span><span class="p">,</span> <span class="p">[</span><span class="s2">&quot;H&quot;</span><span class="p">,</span> <span class="s2">&quot;H&quot;</span><span class="p">])</span>
+<span class="n">scf_solver</span> <span class="o">=</span> <span class="n">create</span><span class="p">(</span><span class="s2">&quot;scf_solver&quot;</span><span class="p">)</span>
+<span class="n">scf_solver</span><span class="o">.</span><span class="n">settings</span><span class="p">()</span><span class="o">.</span><span class="n">set</span><span class="p">(</span><span class="s2">&quot;basis_set&quot;</span><span class="p">,</span> <span class="s2">&quot;sto-3g&quot;</span><span class="p">)</span>
+<span class="n">E_scf</span><span class="p">,</span> <span class="n">wfn</span> <span class="o">=</span> <span class="n">scf_solver</span><span class="o">.</span><span class="n">run</span><span class="p">(</span><span class="n">structure</span><span class="p">,</span> <span class="n">charge</span><span class="o">=</span><span class="mi">0</span><span class="p">,</span> <span class="n">spin_multiplicity</span><span class="o">=</span><span class="mi">1</span><span class="p">)</span>
 
-<span class="c1"># Create the default MCCalculator instance (MACIS implementation)</span>
-<span class="n">mc_calculator</span> <span class="o">=</span> <span class="n">create</span><span class="p">(</span><span class="s2">&quot;multi_configuration_calculator&quot;</span><span class="p">)</span>
+<span class="n">ham_constructor</span> <span class="o">=</span> <span class="n">create</span><span class="p">(</span><span class="s2">&quot;hamiltonian_constructor&quot;</span><span class="p">)</span>
+<span class="n">hamiltonian</span> <span class="o">=</span> <span class="n">ham_constructor</span><span class="o">.</span><span class="n">run</span><span class="p">(</span><span class="n">wfn</span><span class="o">.</span><span class="n">get_orbitals</span><span class="p">())</span>
 
-<span class="c1"># Create a specific type of CI calculator</span>
-<span class="n">selected_ci</span> <span class="o">=</span> <span class="n">create</span><span class="p">(</span><span class="s2">&quot;multi_configuration_calculator&quot;</span><span class="p">,</span> <span class="s2">&quot;macis_cas&quot;</span><span class="p">)</span>
+<span class="c1"># List available multi-configuration calculator implementations</span>
+<span class="n">available_mc</span> <span class="o">=</span> <span class="n">available</span><span class="p">(</span><span class="s2">&quot;multi_configuration_calculator&quot;</span><span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Available MC calculators: </span><span class="si">{</span><span class="n">available_mc</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+
+<span class="c1"># Create a CAS (Complete Active Space) calculator</span>
+<span class="n">mc_calculator</span> <span class="o">=</span> <span class="n">create</span><span class="p">(</span><span class="s2">&quot;multi_configuration_calculator&quot;</span><span class="p">,</span> <span class="s2">&quot;macis_cas&quot;</span><span class="p">)</span>
 </pre></div>
 </div>
 </div>
@@ -181,7 +190,7 @@ Space (<strong>CAS</strong>) when performed within a selected active space of or
 </section>
 <section id="configuring-the-mc-calculation">
 <h2>Configuring the <a class="reference internal" href="../../../glossary.html#term-MC"><span class="xref std std-term">MC</span></a> calculation<a class="headerlink" href="#configuring-the-mc-calculation" title="Link to this heading"></a></h2>
-<p>The <code class="docutils literal notranslate"><span class="pre">MultiConfigurationCalculator</span></code> can be configured using the <code class="docutils literal notranslate"><span class="pre">Settings</span></code> object:</p>
+<p>The <a class="reference internal" href="../../../api/api_autogen/qdk_chemistry.algorithms.html#qdk_chemistry.algorithms.MultiConfigurationCalculator" title="qdk_chemistry.algorithms.MultiConfigurationCalculator"><code class="xref py py-class docutils literal notranslate"><span class="pre">MultiConfigurationCalculator</span></code></a> can be configured using the <code class="docutils literal notranslate"><span class="pre">Settings</span></code> object:</p>
 <div class="admonition note">
 <p class="admonition-title">Note</p>
 <p>The examples below show commonly used settings.
@@ -204,15 +213,16 @@ For a complete list of available settings with descriptions, see the <a class="r
 </div>
 </div>
 <input class="tab-input" id="tab-set--1-input--2" name="tab-set--1" type="radio"><label class="tab-label" for="tab-set--1-input--2">Python API</label><div class="tab-content docutils container">
-<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="c1"># Copyright (c) Microsoft Corporation. All rights reserved.</span>
-<span class="c1"># Licensed under the MIT License. See LICENSE.txt in the project root for license information.</span>
-<span class="c1"># --------------------------------------------------------------------------------------------</span>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="c1"># Configure the MC calculator</span>
+<span class="n">mc_calculator</span><span class="o">.</span><span class="n">settings</span><span class="p">()</span><span class="o">.</span><span class="n">set</span><span class="p">(</span><span class="s2">&quot;num_roots&quot;</span><span class="p">,</span> <span class="mi">1</span><span class="p">)</span>  <span class="c1"># Ground state only</span>
+<span class="n">mc_calculator</span><span class="o">.</span><span class="n">settings</span><span class="p">()</span><span class="o">.</span><span class="n">set</span><span class="p">(</span><span class="s2">&quot;ci_residual_tolerance&quot;</span><span class="p">,</span> <span class="mf">1.0e-6</span><span class="p">)</span>
+<span class="c1"># TODO: debug this setting</span>
+<span class="c1"># mc_calculator.settings().set(&quot;davidson_iterations&quot;, 200)</span>
+<span class="n">mc_calculator</span><span class="o">.</span><span class="n">settings</span><span class="p">()</span><span class="o">.</span><span class="n">set</span><span class="p">(</span><span class="s2">&quot;calculate_one_rdm&quot;</span><span class="p">,</span> <span class="kc">True</span><span class="p">)</span>
+<span class="n">mc_calculator</span><span class="o">.</span><span class="n">settings</span><span class="p">()</span><span class="o">.</span><span class="n">set</span><span class="p">(</span><span class="s2">&quot;calculate_two_rdm&quot;</span><span class="p">,</span> <span class="kc">False</span><span class="p">)</span>
 
-<span class="kn">import</span><span class="w"> </span><span class="nn">os</span>
-<span class="kn">import</span><span class="w"> </span><span class="nn">tempfile</span>
-
-<span class="kn">import</span><span class="w"> </span><span class="nn">qdk_chemistry</span>
-<span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry._core.data</span><span class="w"> </span><span class="kn">import</span> <span class="n">Settings</span>
+<span class="c1"># View available settings</span>
+<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;MC calculator settings: </span><span class="si">{</span><span class="n">mc_calculator</span><span class="o">.</span><span class="n">settings</span><span class="p">()</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
 </pre></div>
 </div>
 </div>
@@ -241,15 +251,16 @@ For a complete list of available settings with descriptions, see the <a class="r
 <p class="admonition-title">Note</p>
 <p>This example shows the API pattern. For complete working examples, see the test suite.</p>
 </div>
-<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="sd">&quot;&quot;&quot;Factory pattern usage examples.&quot;&quot;&quot;</span>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="c1"># Run the CI calculation</span>
+<span class="c1"># For H2, we have 2 electrons (1 alpha, 1 beta)</span>
+<span class="n">n_alpha</span> <span class="o">=</span> <span class="mi">1</span>
+<span class="n">n_beta</span> <span class="o">=</span> <span class="mi">1</span>
+<span class="n">E_ci</span><span class="p">,</span> <span class="n">ci_wavefunction</span> <span class="o">=</span> <span class="n">mc_calculator</span><span class="o">.</span><span class="n">run</span><span class="p">(</span><span class="n">hamiltonian</span><span class="p">,</span> <span class="n">n_alpha</span><span class="p">,</span> <span class="n">n_beta</span><span class="p">)</span>
 
-<span class="c1"># --------------------------------------------------------------------------------------------</span>
-<span class="c1"># Copyright (c) Microsoft Corporation. All rights reserved.</span>
-<span class="c1"># Licensed under the MIT License. See LICENSE.txt in the project root for license information.</span>
-<span class="c1"># --------------------------------------------------------------------------------------------</span>
-
-<span class="kn">import</span><span class="w"> </span><span class="nn">numpy</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">np</span>
-<span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.algorithms</span><span class="w"> </span><span class="kn">import</span> <span class="n">available</span><span class="p">,</span> <span class="n">create</span>
+<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;SCF Energy: </span><span class="si">{</span><span class="n">E_scf</span><span class="si">:</span><span class="s2">.10f</span><span class="si">}</span><span class="s2"> Hartree&quot;</span><span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;CI Energy:  </span><span class="si">{</span><span class="n">E_ci</span><span class="si">:</span><span class="s2">.10f</span><span class="si">}</span><span class="s2"> Hartree&quot;</span><span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Correlation energy: </span><span class="si">{</span><span class="n">E_ci</span><span class="w"> </span><span class="o">-</span><span class="w"> </span><span class="n">E_scf</span><span class="si">:</span><span class="s2">.10f</span><span class="si">}</span><span class="s2"> Hartree&quot;</span><span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="n">ci_wavefunction</span><span class="o">.</span><span class="n">get_summary</span><span class="p">())</span>
 </pre></div>
 </div>
 </div>
@@ -283,7 +294,7 @@ For a complete list of available settings with descriptions, see the <a class="r
 </section>
 <section id="available-settings">
 <h2>Available settings<a class="headerlink" href="#available-settings" title="Link to this heading"></a></h2>
-<p>The <code class="docutils literal notranslate"><span class="pre">MultiConfigurationCalculator</span></code> accepts a range of settings to control its behavior.
+<p>The <a class="reference internal" href="../../../api/api_autogen/qdk_chemistry.algorithms.html#qdk_chemistry.algorithms.MultiConfigurationCalculator" title="qdk_chemistry.algorithms.MultiConfigurationCalculator"><code class="xref py py-class docutils literal notranslate"><span class="pre">MultiConfigurationCalculator</span></code></a> accepts a range of settings to control its behavior.
 These settings are divided into base settings (common to all <a class="reference internal" href="../../../glossary.html#term-MC"><span class="xref std std-term">MC</span></a> calculations) and specialized settings (specific to certain <a class="reference internal" href="../../../glossary.html#term-MC"><span class="xref std std-term">MC</span></a> variants).</p>
 <section id="base-settings">
 <h3>Base settings<a class="headerlink" href="#base-settings" title="Link to this heading"></a></h3>
@@ -329,7 +340,7 @@ These settings are divided into base settings (common to all <a class="reference
 </section>
 <section id="implemented-interface">
 <h2>Implemented interface<a class="headerlink" href="#implemented-interface" title="Link to this heading"></a></h2>
-<p>QDK/Chemistry’s <code class="docutils literal notranslate"><span class="pre">MultiConfigurationCalculator</span></code> provides a unified interface for <a class="reference internal" href="../../../glossary.html#term-MC"><span class="xref std std-term">MC</span></a> calculations.</p>
+<p>QDK/Chemistry’s <a class="reference internal" href="../../../api/api_autogen/qdk_chemistry.algorithms.html#qdk_chemistry.algorithms.MultiConfigurationCalculator" title="qdk_chemistry.algorithms.MultiConfigurationCalculator"><code class="xref py py-class docutils literal notranslate"><span class="pre">MultiConfigurationCalculator</span></code></a> provides a unified interface for <a class="reference internal" href="../../../glossary.html#term-MC"><span class="xref std std-term">MC</span></a> calculations.</p>
 <ul class="simple">
 <li><p><strong>MACIS</strong>: QDK/Chemistry’s native Many-body Adaptive Configuration Interaction Solver library</p></li>
 <li><p><strong>PySCF</strong>: Interface to PySCF’s <a class="reference internal" href="../../../glossary.html#term-FCI"><span class="xref std std-term">FCI</span></a> and <a class="reference internal" href="../../../glossary.html#term-CAS"><span class="xref std std-term">CAS</span></a>-<a class="reference internal" href="../../../glossary.html#term-CI"><span class="xref std std-term">CI</span></a> implementations</p></li>
@@ -340,12 +351,13 @@ based on the calculation requirements and available packages.</p>
 </section>
 <section id="macis-implementation">
 <h2><a class="reference internal" href="../../../glossary.html#term-MACIS"><span class="xref std std-term">MACIS</span></a> implementation<a class="headerlink" href="#macis-implementation" title="Link to this heading"></a></h2>
-<p>The default <code class="docutils literal notranslate"><span class="pre">MultiConfigurationCalculator</span></code> implementation in QDK/Chemistry is based on the <a class="reference internal" href="../../../glossary.html#term-MACIS"><span class="xref std std-term">MACIS</span></a> library, which provides efficient algorithms for <a class="reference internal" href="../../../glossary.html#term-SCI"><span class="xref std std-term">SCI</span></a> calculations.
+<p>The default <a class="reference internal" href="../../../api/api_autogen/qdk_chemistry.algorithms.html#qdk_chemistry.algorithms.MultiConfigurationCalculator" title="qdk_chemistry.algorithms.MultiConfigurationCalculator"><code class="xref py py-class docutils literal notranslate"><span class="pre">MultiConfigurationCalculator</span></code></a> implementation in QDK/Chemistry is based on the <a class="reference internal" href="../../../glossary.html#term-MACIS"><span class="xref std std-term">MACIS</span></a> library, which provides efficient algorithms for <a class="reference internal" href="../../../glossary.html#term-SCI"><span class="xref std std-term">SCI</span></a> calculations.
 The <a class="reference internal" href="../../../glossary.html#term-MACIS"><span class="xref std std-term">MACIS</span></a> implementation automatically determines electron numbers from the orbital occupations in the Hamiltonian.</p>
 </section>
-<section id="related-classes">
-<h2>Related classes<a class="headerlink" href="#related-classes" title="Link to this heading"></a></h2>
+<section id="further-reading">
+<h2>Further reading<a class="headerlink" href="#further-reading" title="Link to this heading"></a></h2>
 <ul class="simple">
+<li><p>The above examples can be downloaded as complete <a class="reference external" href="../../../_static/examples/python/mc_calculator.py">Python</a> or <a class="reference external" href="../../../_static/examples/cpp/mc_calculator.cpp">C++</a> code.</p></li>
 <li><p><a class="reference internal" href="../data/hamiltonian.html"><span class="doc">Hamiltonian</span></a>: Input Hamiltonian for CI calculation</p></li>
 <li><p><a class="reference internal" href="../../../api/api_autogen/qdk_chemistry.data.html#qdk_chemistry.data.Wavefunction" title="qdk_chemistry.data.Wavefunction"><code class="xref py py-class docutils literal notranslate"><span class="pre">qdk_chemistry.data.Wavefunction</span></code></a>: Output CI wavefunction</p></li>
 <li><p><a class="reference internal" href="hamiltonian_constructor.html"><span class="doc">HamiltonianConstructor</span></a>: Produces the Hamiltonian for CI</p></li>

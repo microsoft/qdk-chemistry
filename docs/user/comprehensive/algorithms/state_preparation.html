@@ -6,7 +6,7 @@
   <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
 
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>State preparation &mdash; qdk-chemistry 1.0.0-rc1 documentation</title>
+  <title>State Preparation &mdash; qdk-chemistry 1.0.0-rc1 documentation</title>
       <link rel="stylesheet" type="text/css" href="../../../_static/pygments.css?v=b86133f3" />
       <link rel="stylesheet" type="text/css" href="../../../_static/css/theme.css?v=e59714d7" />
       <link rel="stylesheet" type="text/css" href="../../../_static/tabs.css?v=4c969af8" />
@@ -65,9 +65,18 @@
 <li class="toctree-l3"><a class="reference internal" href="pmc.html">Projected multi-configuration calculations</a></li>
 <li class="toctree-l3"><a class="reference internal" href="qubit_mapper.html">Qubit mapping</a></li>
 <li class="toctree-l3"><a class="reference internal" href="reference_derived.html">Reference-derived calculations</a></li>
-<li class="toctree-l3"><a class="reference internal" href="scf_solver.html">Self-consistent field solver</a></li>
+<li class="toctree-l3"><a class="reference internal" href="scf_solver.html">Self-consistent field solving</a></li>
 <li class="toctree-l3"><a class="reference internal" href="stability_checker.html">Self-consistent field stability checks</a></li>
-<li class="toctree-l3 current"><a class="current reference internal" href="#">State preparation</a></li>
+<li class="toctree-l3 current"><a class="current reference internal" href="#">State Preparation</a><ul>
+<li class="toctree-l4"><a class="reference internal" href="#overview">Overview</a></li>
+<li class="toctree-l4"><a class="reference internal" href="#capabilities">Capabilities</a></li>
+<li class="toctree-l4"><a class="reference internal" href="#creating-and-configuring-a-statepreparation-object">Creating and configuring a StatePreparation object</a></li>
+<li class="toctree-l4"><a class="reference internal" href="#preparing-a-quantum-state">Preparing a quantum state</a></li>
+<li class="toctree-l4"><a class="reference internal" href="#available-settings">Available settings</a></li>
+<li class="toctree-l4"><a class="reference internal" href="#implemented-interface">Implemented interface</a></li>
+<li class="toctree-l4"><a class="reference internal" href="#further-reading">Further reading</a></li>
+</ul>
+</li>
 </ul>
 </li>
 <li class="toctree-l2"><a class="reference internal" href="../basis_functionals.html">Functionals and basis sets</a></li>
@@ -103,7 +112,7 @@
       <li><a href="../../../index.html" class="icon icon-home" aria-label="Home"></a></li>
           <li class="breadcrumb-item"><a href="../index.html">In-depth user guide</a></li>
           <li class="breadcrumb-item"><a href="index.html">Available algorithms</a></li>
-      <li class="breadcrumb-item active">State preparation</li>
+      <li class="breadcrumb-item active">State Preparation</li>
       <li class="wy-breadcrumbs-aside">
             <a href="../../../_sources/user/comprehensive/algorithms/state_preparation.rst.txt" rel="nofollow"> View page source</a>
       </li>
@@ -114,12 +123,148 @@
            <div itemprop="articleBody">
              
   <section id="state-preparation">
-<h1>State preparation<a class="headerlink" href="#state-preparation" title="Link to this heading"></a></h1>
-<div class="admonition note">
-<p class="admonition-title">Note</p>
-<p>The state preparation documentation is currently under construction.
-In the meantime, please refer to <a class="reference internal" href="../../../api/api_autogen/qdk_chemistry.algorithms.html#qdk_chemistry.algorithms.StatePreparation" title="qdk_chemistry.algorithms.StatePreparation"><code class="xref py py-class docutils literal notranslate"><span class="pre">qdk_chemistry.algorithms.StatePreparation</span></code></a> for more information.</p>
+<h1>State Preparation<a class="headerlink" href="#state-preparation" title="Link to this heading"></a></h1>
+<p>The <a class="reference internal" href="../../../api/api_autogen/qdk_chemistry.algorithms.html#qdk_chemistry.algorithms.StatePreparation" title="qdk_chemistry.algorithms.StatePreparation"><code class="xref py py-class docutils literal notranslate"><span class="pre">StatePreparation</span></code></a> algorithm in QDK/Chemistry constructs quantum circuits that prepare target wavefunctions on quantum hardware.</p>
+<section id="overview">
+<h2>Overview<a class="headerlink" href="#overview" title="Link to this heading"></a></h2>
+<p>State preparation is a critical step in quantum algorithms, where a quantum state is initialized to represent a specific wavefunction.
+The <a class="reference internal" href="../../../api/api_autogen/qdk_chemistry.algorithms.html#qdk_chemistry.algorithms.StatePreparation" title="qdk_chemistry.algorithms.StatePreparation"><code class="xref py py-class docutils literal notranslate"><span class="pre">StatePreparation</span></code></a> module provides two complementary approaches for constructing circuits:</p>
+<ul class="simple">
+<li><p><strong>Regular Isometry</strong>: Isometry-based state preparation proposed by Matthias Christandl <span id="id1">[<a class="reference internal" href="../../../references.html#id8" title="Raban Iten, Roger Colbeck, Ivan Kukuljan, Jonathan Home, and Matthias Christandl. Quantum circuits for isometries. Phys. Rev. A, 93:032318, Mar 2016. URL: https://link.aps.org/doi/10.1103/PhysRevA.93.032318, doi:10.1103/PhysRevA.93.032318.">ICK+16</a>]</span>, with circuit synthesis integrated through the Qiskit plugin</p></li>
+<li><p><strong>Sparse Isometry</strong>: An optimized approach that leverages sparsity in the target wavefunction. This method applies GF(2) Gaussian elimination to the binary matrix representation of the state, while removing duplicate rows, all-ones rows, and reducing the rank of the diagonal matrix. These reductions correspond to implementing CNOT and X gates that simplify the preparation basis. By performing this GF(2)+X elimination, the algorithm constructs circuits that prepare only the non-zero amplitudes, substantially reducing circuit depth and gate count compared with dense isometry methods.</p></li>
+</ul>
+</section>
+<section id="capabilities">
+<h2>Capabilities<a class="headerlink" href="#capabilities" title="Link to this heading"></a></h2>
+<p>The <a class="reference internal" href="../../../api/api_autogen/qdk_chemistry.algorithms.html#qdk_chemistry.algorithms.StatePreparation" title="qdk_chemistry.algorithms.StatePreparation"><code class="xref py py-class docutils literal notranslate"><span class="pre">StatePreparation</span></code></a> in QDK/Chemistry provides:</p>
+<ul class="simple">
+<li><p><strong>Efficient Circuit Construction</strong>: Leveraging GF(2) elimination to optimize quantum circuits for sparse wavefunctions.</p></li>
+<li><p><strong>Circuit Transpilation Options</strong>: Configurable transpilation settings to optimize circuits for specific quantum hardware backends.</p></li>
+</ul>
+</section>
+<section id="creating-and-configuring-a-statepreparation-object">
+<h2>Creating and configuring a StatePreparation object<a class="headerlink" href="#creating-and-configuring-a-statepreparation-object" title="Link to this heading"></a></h2>
+<p>The <a class="reference internal" href="../../../api/api_autogen/qdk_chemistry.algorithms.html#qdk_chemistry.algorithms.StatePreparation" title="qdk_chemistry.algorithms.StatePreparation"><code class="xref py py-class docutils literal notranslate"><span class="pre">StatePreparation</span></code></a> is created using the <a class="reference internal" href="../design/factory_pattern.html"><span class="doc">factory pattern</span></a>.
+The resulting <a class="reference internal" href="../../../api/api_autogen/qdk_chemistry.algorithms.html#qdk_chemistry.algorithms.StatePreparation" title="qdk_chemistry.algorithms.StatePreparation"><code class="xref py py-class docutils literal notranslate"><span class="pre">StatePreparation</span></code></a> object can be configured using the <a class="reference internal" href="../design/settings.html"><span class="doc">Settings</span></a> object.</p>
+<div class="tab-set docutils container">
+<input checked="True" class="tab-input" id="tab-set--0-input--1" name="tab-set--0" type="radio"><label class="tab-label" for="tab-set--0-input--1">Python API</label><div class="tab-content docutils container">
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span><span class="w"> </span><span class="nn">numpy</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">np</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.algorithms</span><span class="w"> </span><span class="kn">import</span> <span class="n">create</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.data</span><span class="w"> </span><span class="kn">import</span> <span class="p">(</span>
+    <span class="n">BasisSet</span><span class="p">,</span>
+    <span class="n">CasWavefunctionContainer</span><span class="p">,</span>
+    <span class="n">Configuration</span><span class="p">,</span>
+    <span class="n">Orbitals</span><span class="p">,</span>
+    <span class="n">OrbitalType</span><span class="p">,</span>
+    <span class="n">Shell</span><span class="p">,</span>
+    <span class="n">Wavefunction</span><span class="p">,</span>
+<span class="p">)</span>
+
+<span class="n">regular_prep</span> <span class="o">=</span> <span class="n">create</span><span class="p">(</span><span class="s2">&quot;state_prep&quot;</span><span class="p">,</span> <span class="s2">&quot;regular_isometry&quot;</span><span class="p">)</span>
+<span class="n">sparse_prep</span> <span class="o">=</span> <span class="n">create</span><span class="p">(</span><span class="s2">&quot;state_prep&quot;</span><span class="p">,</span> <span class="s2">&quot;sparse_isometry_gf2x&quot;</span><span class="p">)</span>
+<span class="n">sparse_prep</span><span class="o">.</span><span class="n">settings</span><span class="p">()</span><span class="o">.</span><span class="n">set</span><span class="p">(</span><span class="s2">&quot;transpile&quot;</span><span class="p">,</span> <span class="kc">True</span><span class="p">)</span>
+<span class="n">sparse_prep</span><span class="o">.</span><span class="n">settings</span><span class="p">()</span><span class="o">.</span><span class="n">set</span><span class="p">(</span><span class="s2">&quot;basis_gates&quot;</span><span class="p">,</span> <span class="p">[</span><span class="s2">&quot;rz&quot;</span><span class="p">,</span> <span class="s2">&quot;cz&quot;</span><span class="p">,</span> <span class="s2">&quot;sdg&quot;</span><span class="p">,</span> <span class="s2">&quot;h&quot;</span><span class="p">])</span>
+<span class="n">sparse_prep</span><span class="o">.</span><span class="n">settings</span><span class="p">()</span><span class="o">.</span><span class="n">set</span><span class="p">(</span><span class="s2">&quot;transpile_optimization_level&quot;</span><span class="p">,</span> <span class="mi">3</span><span class="p">)</span>
+</pre></div>
 </div>
+</div>
+</div>
+</section>
+<section id="preparing-a-quantum-state">
+<h2>Preparing a quantum state<a class="headerlink" href="#preparing-a-quantum-state" title="Link to this heading"></a></h2>
+<p>Once configured, the <a class="reference internal" href="../../../api/api_autogen/qdk_chemistry.algorithms.html#qdk_chemistry.algorithms.StatePreparation" title="qdk_chemistry.algorithms.StatePreparation"><code class="xref py py-class docutils literal notranslate"><span class="pre">StatePreparation</span></code></a> can be used to generate
+a quantum circuit in OpenQASM format from a <a class="reference internal" href="../../../api/api_autogen/qdk_chemistry.data.html#qdk_chemistry.data.Wavefunction" title="qdk_chemistry.data.Wavefunction"><code class="xref py py-class docutils literal notranslate"><span class="pre">Wavefunction</span></code></a>.</p>
+<div class="tab-set docutils container">
+<input checked="True" class="tab-input" id="tab-set--1-input--1" name="tab-set--1" type="radio"><label class="tab-label" for="tab-set--1-input--1">Python API</label><div class="tab-content docutils container">
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="c1"># Create a basis set</span>
+<span class="n">shells</span> <span class="o">=</span> <span class="p">[]</span>
+<span class="k">for</span> <span class="n">_</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="mi">3</span><span class="p">):</span>
+    <span class="n">exps</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">([</span><span class="mf">1.0</span><span class="p">])</span>
+    <span class="n">coefs</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">([</span><span class="mf">1.0</span><span class="p">])</span>
+    <span class="n">shell</span> <span class="o">=</span> <span class="n">Shell</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="n">OrbitalType</span><span class="o">.</span><span class="n">S</span><span class="p">,</span> <span class="n">exps</span><span class="p">,</span> <span class="n">coefs</span><span class="p">)</span>
+    <span class="n">shells</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">shell</span><span class="p">)</span>
+<span class="n">basis_set</span> <span class="o">=</span> <span class="n">BasisSet</span><span class="p">(</span><span class="s2">&quot;foo&quot;</span><span class="p">,</span> <span class="n">shells</span><span class="p">)</span>
+
+<span class="c1"># Create orbitals</span>
+<span class="n">coeffs</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">([[</span><span class="mf">0.9</span><span class="p">,</span> <span class="mf">0.1</span><span class="p">],</span> <span class="p">[</span><span class="mf">0.1</span><span class="p">,</span> <span class="o">-</span><span class="mf">0.9</span><span class="p">],</span> <span class="p">[</span><span class="mf">0.0</span><span class="p">,</span> <span class="mf">0.0</span><span class="p">]])</span>
+<span class="n">orbitals</span> <span class="o">=</span> <span class="n">Orbitals</span><span class="p">(</span><span class="n">coeffs</span><span class="p">,</span> <span class="kc">None</span><span class="p">,</span> <span class="kc">None</span><span class="p">,</span> <span class="n">basis_set</span><span class="p">)</span>
+
+<span class="c1"># Construct a wavefunction</span>
+<span class="n">dets</span> <span class="o">=</span> <span class="p">[</span><span class="n">Configuration</span><span class="p">(</span><span class="s2">&quot;200&quot;</span><span class="p">),</span> <span class="n">Configuration</span><span class="p">(</span><span class="s2">&quot;ud0&quot;</span><span class="p">)]</span>
+<span class="n">coeffs</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">([</span><span class="mf">0.9</span><span class="p">,</span> <span class="mf">0.1</span><span class="p">])</span>
+<span class="n">container</span> <span class="o">=</span> <span class="n">CasWavefunctionContainer</span><span class="p">(</span><span class="n">coeffs</span><span class="p">,</span> <span class="n">dets</span><span class="p">,</span> <span class="n">orbitals</span><span class="p">)</span>
+<span class="n">wavefunction</span> <span class="o">=</span> <span class="n">Wavefunction</span><span class="p">(</span><span class="n">container</span><span class="p">)</span>
+
+<span class="c1"># Construct the circuit</span>
+<span class="n">regular_qasm</span> <span class="o">=</span> <span class="n">regular_prep</span><span class="o">.</span><span class="n">run</span><span class="p">(</span><span class="n">wavefunction</span><span class="p">)</span>
+<span class="n">sparse_qasm</span> <span class="o">=</span> <span class="n">sparse_prep</span><span class="o">.</span><span class="n">run</span><span class="p">(</span><span class="n">wavefunction</span><span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Regular isometry QASM:</span><span class="se">\n</span><span class="si">{</span><span class="n">regular_qasm</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Sparse isometry QASM:</span><span class="se">\n</span><span class="si">{</span><span class="n">sparse_qasm</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+</pre></div>
+</div>
+</div>
+</div>
+</section>
+<section id="available-settings">
+<h2>Available settings<a class="headerlink" href="#available-settings" title="Link to this heading"></a></h2>
+<p>The <a class="reference internal" href="../../../api/api_autogen/qdk_chemistry.algorithms.html#qdk_chemistry.algorithms.StatePreparation" title="qdk_chemistry.algorithms.StatePreparation"><code class="xref py py-class docutils literal notranslate"><span class="pre">StatePreparation</span></code></a> accepts a range of settings to control its behavior.</p>
+<section id="base-settings">
+<h3>Base settings<a class="headerlink" href="#base-settings" title="Link to this heading"></a></h3>
+<table class="docutils align-default">
+<colgroup>
+<col style="width: 25.0%" />
+<col style="width: 25.0%" />
+<col style="width: 50.0%" />
+</colgroup>
+<thead>
+<tr class="row-odd"><th class="head"><p>Setting</p></th>
+<th class="head"><p>Type</p></th>
+<th class="head"><p>Description</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">basis_gates</span></code></p></td>
+<td><p>list[str]</p></td>
+<td><p>Basis gates for transpilation. Default is [“x”, “y”, “z”, “cx”, “cz”, “id”, “h”, “s”, “sdg”, “rz”].</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">transpile</span></code></p></td>
+<td><p>bool</p></td>
+<td><p>Whether to transpile the circuit. Default is True.</p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">transpile_optimization_level</span></code></p></td>
+<td><p>int</p></td>
+<td><p>Optimization level for transpilation (0-3). Default is 1.</p></td>
+</tr>
+</tbody>
+</table>
+</section>
+</section>
+<section id="implemented-interface">
+<h2>Implemented interface<a class="headerlink" href="#implemented-interface" title="Link to this heading"></a></h2>
+<p>QDK/Chemistry’s <a class="reference internal" href="../../../api/api_autogen/qdk_chemistry.algorithms.html#qdk_chemistry.algorithms.StatePreparation" title="qdk_chemistry.algorithms.StatePreparation"><code class="xref py py-class docutils literal notranslate"><span class="pre">StatePreparation</span></code></a> provides a unified interface for state preparation methods.</p>
+<section id="qdk-chemistry-implementations">
+<h3>QDK/Chemistry implementations<a class="headerlink" href="#qdk-chemistry-implementations" title="Link to this heading"></a></h3>
+<ul class="simple">
+<li><p><strong>sparse_isometry_gf2x</strong>: Native implementation of sparse isometry state preparation using GF(2)+X elimination</p></li>
+</ul>
+</section>
+<section id="third-party-interfaces">
+<h3>Third-party interfaces<a class="headerlink" href="#third-party-interfaces" title="Link to this heading"></a></h3>
+<ul class="simple">
+<li><p><strong>regular_isometry</strong>: State preparation using regular isometry synthesis via Qiskit</p></li>
+</ul>
+<p>The factory pattern allows seamless selection between these implementations, with the most appropriate option chosen
+based on the calculation requirements and available packages.</p>
+<p>For more details on how QDK/Chemistry interfaces with external packages, see the <a class="reference internal" href="../design/interfaces.html"><span class="doc">Interfaces</span></a> documentation.</p>
+</section>
+</section>
+<section id="further-reading">
+<h2>Further reading<a class="headerlink" href="#further-reading" title="Link to this heading"></a></h2>
+<ul class="simple">
+<li><p>The above examples can be downloaded as a complete <a class="reference external" href="../../../_static/examples/python/state_preparation.py">Python</a> script.</p></li>
+<li><p><a class="reference internal" href="energy_estimator.html"><span class="doc">EnergyEstimator</span></a>: Estimate the energy of prepared states</p></li>
+</ul>
+</section>
 </section>
 
 

@@ -63,7 +63,7 @@
 </ul>
 </li>
 <li class="toctree-l3"><a class="reference internal" href="#using-model-hamiltonians-with-algorithms">Using model Hamiltonians with algorithms</a></li>
-<li class="toctree-l3"><a class="reference internal" href="#see-also">See also</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#further-reading">Further reading</a></li>
 </ul>
 </li>
 <li class="toctree-l2"><a class="reference internal" href="plugins.html">Plugins</a></li>
@@ -115,11 +115,11 @@ Hence, they also do not require the use of integrals derived from quantum chemis
 Instead, model Hamiltonians are defined directly in terms of their parameters.</p>
 <section id="creating-model-hamiltonians">
 <h2>Creating model Hamiltonians<a class="headerlink" href="#creating-model-hamiltonians" title="Link to this heading"></a></h2>
-<p>To define a model Hamiltonian in QDK/Chemistry, users can utilize the <code class="docutils literal notranslate"><span class="pre">ModelOrbitals</span></code> class, which is a simplified version of the <a class="reference internal" href="data/orbitals.html"><span class="doc">Orbitals</span></a> class that doesn’t require basis set information or molecular orbital coefficients.
+<p>To define a model Hamiltonian in QDK/Chemistry, users can utilize the <a class="reference internal" href="../../api/api_autogen/qdk_chemistry.data.html#qdk_chemistry.data.ModelOrbitals" title="qdk_chemistry.data.ModelOrbitals"><code class="xref py py-class docutils literal notranslate"><span class="pre">ModelOrbitals</span></code></a> class, which is a simplified version of the <a class="reference internal" href="data/orbitals.html"><span class="doc">Orbitals</span></a> class that doesn’t require basis set information or molecular orbital coefficients.
 This is particularly useful for studying model systems like Hubbard models, Heisenberg models, or other phenomenological Hamiltonians.</p>
 <section id="example-hubbard-model-hamiltonian">
 <h3>Example: Hubbard model Hamiltonian<a class="headerlink" href="#example-hubbard-model-hamiltonian" title="Link to this heading"></a></h3>
-<p>The following example demonstrates how to create a simple Hubbard model Hamiltonian using <code class="docutils literal notranslate"><span class="pre">ModelOrbitals</span></code> and the <code class="docutils literal notranslate"><span class="pre">Hamiltonian</span></code> class:</p>
+<p>The following example demonstrates how to create a simple Hubbard model Hamiltonian using <a class="reference internal" href="../../api/api_autogen/qdk_chemistry.data.html#qdk_chemistry.data.ModelOrbitals" title="qdk_chemistry.data.ModelOrbitals"><code class="xref py py-class docutils literal notranslate"><span class="pre">ModelOrbitals</span></code></a> and the <a class="reference internal" href="../../api/api_autogen/qdk_chemistry.data.html#qdk_chemistry.data.Hamiltonian" title="qdk_chemistry.data.Hamiltonian"><code class="xref py py-class docutils literal notranslate"><span class="pre">Hamiltonian</span></code></a> class:</p>
 <div class="tab-set docutils container">
 <input checked="True" class="tab-input" id="tab-set--0-input--1" name="tab-set--0" type="radio"><label class="tab-label" for="tab-set--0-input--1">Python API</label><div class="tab-content docutils container">
 <div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span><span class="w"> </span><span class="nn">numpy</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">np</span>
@@ -168,7 +168,7 @@ This is particularly useful for studying model systems like Hubbard models, Heis
 </section>
 <section id="using-model-hamiltonians-with-algorithms">
 <h2>Using model Hamiltonians with algorithms<a class="headerlink" href="#using-model-hamiltonians-with-algorithms" title="Link to this heading"></a></h2>
-<p>Model Hamiltonians created with <code class="docutils literal notranslate"><span class="pre">ModelOrbitals</span></code> can be used with any QDK/Chemistry algorithm that accepts <a class="reference internal" href="data/hamiltonian.html"><span class="doc">Hamiltonian</span></a> objects, including:</p>
+<p>Model Hamiltonians created with <a class="reference internal" href="../../api/api_autogen/qdk_chemistry.data.html#qdk_chemistry.data.ModelOrbitals" title="qdk_chemistry.data.ModelOrbitals"><code class="xref py py-class docutils literal notranslate"><span class="pre">ModelOrbitals</span></code></a> can be used with any QDK/Chemistry algorithm that accepts <a class="reference internal" href="data/hamiltonian.html"><span class="doc">Hamiltonian</span></a> objects, including:</p>
 <ul class="simple">
 <li><p><a class="reference internal" href="algorithms/mc_calculator.html"><span class="doc">Multi-configuration calculators</span></a> (<a class="reference internal" href="../../glossary.html#term-FCI"><span class="xref std std-term">FCI</span></a>, <a class="reference internal" href="../../glossary.html#term-ASCI"><span class="xref std std-term">ASCI</span></a>, etc.)</p></li>
 <li><p><a class="reference internal" href="../../api/api_autogen/qdk_chemistry.algorithms.html#qdk_chemistry.algorithms.CoupledClusterCalculator" title="qdk_chemistry.algorithms.CoupledClusterCalculator"><code class="xref py py-class docutils literal notranslate"><span class="pre">CoupledClusterCalculator</span></code></a> (<a class="reference internal" href="../../glossary.html#term-CCSD"><span class="xref std std-term">CCSD</span></a>, <a class="reference internal" href="../../glossary.html#term-CCSD-T"><span class="xref std std-term">CCSD(T)</span></a>, etc.)</p></li>
@@ -189,9 +189,10 @@ This is particularly useful for studying model systems like Hubbard models, Heis
 </div>
 </div>
 </section>
-<section id="see-also">
-<h2>See also<a class="headerlink" href="#see-also" title="Link to this heading"></a></h2>
+<section id="further-reading">
+<h2>Further reading<a class="headerlink" href="#further-reading" title="Link to this heading"></a></h2>
 <ul class="simple">
+<li><p>The above examples can be downloaded as a complete <a class="reference external" href="../../_static/examples/python/model_hamiltonians.py">Python</a> script.</p></li>
 <li><p><a class="reference internal" href="data/orbitals.html"><span class="doc">Orbitals</span></a> - Full Orbitals class documentation</p></li>
 <li><p><a class="reference internal" href="data/hamiltonian.html"><span class="doc">Hamiltonian</span></a> - Hamiltonian class documentation</p></li>
 <li><p><a class="reference internal" href="algorithms/mc_calculator.html"><span class="doc">Multi-configuration calculations</span></a> - Multi-configuration calculator usage</p></li>

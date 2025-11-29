@@ -60,7 +60,7 @@
 <li class="toctree-l4"><a class="reference internal" href="#supported-formats">Supported formats</a></li>
 <li class="toctree-l4"><a class="reference internal" href="#common-serialization-interface">Common serialization interface</a></li>
 <li class="toctree-l4"><a class="reference internal" href="#file-extensions">File extensions</a></li>
-<li class="toctree-l4"><a class="reference internal" href="#related-topics">Related topics</a></li>
+<li class="toctree-l4"><a class="reference internal" href="#further-reading">Further reading</a></li>
 </ul>
 </li>
 <li class="toctree-l3"><a class="reference internal" href="basis_set.html">Basis set</a></li>
@@ -157,7 +157,7 @@ Each data class page includes examples of the JSON and HDF5 schema used for seri
 <span class="k">auto</span><span class="w"> </span><span class="n">object_from_json</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">ObjectType</span><span class="o">::</span><span class="n">from_json</span><span class="p">(</span><span class="n">json_data</span><span class="p">);</span>
 
 <span class="c1">// Serialize to JSON file</span>
-<span class="n">object</span><span class="p">.</span><span class="n">to_json_file</span><span class="p">(</span><span class="s">&quot;filename.ext.json&quot;</span><span class="p">);</span><span class="w"> </span><span class="c1">// Extension depends on object type</span>
+<span class="n">object</span><span class="p">.</span><span class="n">to_json_file</span><span class="p">(</span><span class="s">&quot;filename.ext.json&quot;</span><span class="p">);</span><span class="w">  </span><span class="c1">// Extension depends on object type</span>
 
 <span class="c1">// Deserialize from JSON file</span>
 <span class="k">auto</span><span class="w"> </span><span class="n">object_from_json_file</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">ObjectType</span><span class="o">::</span><span class="n">from_json_file</span><span class="p">(</span><span class="s">&quot;filename.ext.json&quot;</span><span class="p">);</span>
@@ -165,7 +165,16 @@ Each data class page includes examples of the JSON and HDF5 schema used for seri
 </div>
 </div>
 <input class="tab-input" id="tab-set--0-input--2" name="tab-set--0" type="radio"><label class="tab-label" for="tab-set--0-input--2">Python API</label><div class="tab-content docutils container">
-<div class="highlight-python notranslate"><div class="highlight"><pre><span></span>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span><span class="w"> </span><span class="nn">os</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">shutil</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">tempfile</span>
+
+<span class="kn">import</span><span class="w"> </span><span class="nn">numpy</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">np</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.data</span><span class="w"> </span><span class="kn">import</span> <span class="n">Structure</span>
+
+<span class="n">tmpdir</span> <span class="o">=</span> <span class="n">tempfile</span><span class="o">.</span><span class="n">mkdtemp</span><span class="p">()</span>
+<span class="n">json_file</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">tmpdir</span><span class="p">,</span> <span class="s2">&quot;molecule.structure.json&quot;</span><span class="p">)</span>
+
 <span class="c1"># Create a structure (coordinates in Bohr/atomic units)</span>
 <span class="n">coords</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">([[</span><span class="mf">0.0</span><span class="p">,</span> <span class="mf">0.0</span><span class="p">,</span> <span class="mf">0.0</span><span class="p">],</span> <span class="p">[</span><span class="mf">0.0</span><span class="p">,</span> <span class="mf">0.0</span><span class="p">,</span> <span class="mf">1.4</span><span class="p">]])</span>
 <span class="n">structure</span> <span class="o">=</span> <span class="n">Structure</span><span class="p">(</span><span class="n">coords</span><span class="p">,</span> <span class="p">[</span><span class="s2">&quot;H&quot;</span><span class="p">,</span> <span class="s2">&quot;H&quot;</span><span class="p">])</span>
@@ -173,12 +182,14 @@ Each data class page includes examples of the JSON and HDF5 schema used for seri
 <span class="c1"># Serialize to JSON object</span>
 <span class="n">json_data</span> <span class="o">=</span> <span class="n">structure</span><span class="o">.</span><span class="n">to_json</span><span class="p">()</span>
 
-<span class="c1"># Serialize to/from file using temporary directory</span>
-<span class="n">tmpdir</span> <span class="o">=</span> <span class="n">tempfile</span><span class="o">.</span><span class="n">mkdtemp</span><span class="p">()</span>
-<span class="n">json_file</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">tmpdir</span><span class="p">,</span> <span class="s2">&quot;molecule.structure.json&quot;</span><span class="p">)</span>
+<span class="c1"># Deserialize from JSON object</span>
+<span class="n">structure_from_json</span> <span class="o">=</span> <span class="n">structure</span><span class="o">.</span><span class="n">from_json</span><span class="p">(</span><span class="n">json_data</span><span class="p">)</span>
 
 <span class="c1"># Serialize to JSON file</span>
 <span class="n">structure</span><span class="o">.</span><span class="n">to_json_file</span><span class="p">(</span><span class="n">json_file</span><span class="p">)</span>
+
+<span class="c1"># Deserialize from JSON file</span>
+<span class="n">structure_from_file</span> <span class="o">=</span> <span class="n">structure</span><span class="o">.</span><span class="n">from_json_file</span><span class="p">(</span><span class="n">json_file</span><span class="p">)</span>
 </pre></div>
 </div>
 </div>
@@ -189,7 +200,7 @@ Each data class page includes examples of the JSON and HDF5 schema used for seri
 <div class="tab-set docutils container">
 <input checked="True" class="tab-input" id="tab-set--1-input--1" name="tab-set--1" type="radio"><label class="tab-label" for="tab-set--1-input--1">C++ API</label><div class="tab-content docutils container">
 <div class="highlight-cpp notranslate"><div class="highlight"><pre><span></span><span class="c1">// Serialize to HDF5 file</span>
-<span class="n">object</span><span class="p">.</span><span class="n">to_hdf5_file</span><span class="p">(</span><span class="s">&quot;filename.ext.h5&quot;</span><span class="p">);</span><span class="w"> </span><span class="c1">// Extension depends on object type</span>
+<span class="n">object</span><span class="p">.</span><span class="n">to_hdf5_file</span><span class="p">(</span><span class="s">&quot;filename.ext.h5&quot;</span><span class="p">);</span><span class="w">  </span><span class="c1">// Extension depends on object type</span>
 
 <span class="c1">// Deserialize from HDF5 file</span>
 <span class="k">auto</span><span class="w"> </span><span class="n">object_from_hdf5_file</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">ObjectType</span><span class="o">::</span><span class="n">from_hdf5_file</span><span class="p">(</span><span class="s">&quot;filename.ext.h5&quot;</span><span class="p">);</span>
@@ -197,13 +208,14 @@ Each data class page includes examples of the JSON and HDF5 schema used for seri
 </div>
 </div>
 <input class="tab-input" id="tab-set--1-input--2" name="tab-set--1" type="radio"><label class="tab-label" for="tab-set--1-input--2">Python API</label><div class="tab-content docutils container">
-<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="c1"># Deserialize from JSON file</span>
-<span class="n">structure_from_file</span> <span class="o">=</span> <span class="n">Structure</span><span class="o">.</span><span class="n">from_json_file</span><span class="p">(</span><span class="n">json_file</span><span class="p">)</span>
-<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Loaded structure from file: </span><span class="si">{</span><span class="n">structure_from_file</span><span class="o">.</span><span class="n">get_num_atoms</span><span class="p">()</span><span class="si">}</span><span class="s2"> atoms&quot;</span><span class="p">)</span>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">hdf5_file</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">tmpdir</span><span class="p">,</span> <span class="s2">&quot;molecule.structure.h5&quot;</span><span class="p">)</span>
 
-<span class="n">hdf5_file</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">tmpdir</span><span class="p">,</span> <span class="s2">&quot;molecule.structure.h5&quot;</span><span class="p">)</span>
 <span class="c1"># Serialize to HDF5 file</span>
-<span class="c1"># structure.to_hdf5_file(hdf5_file)</span>
+<span class="n">structure</span><span class="o">.</span><span class="n">to_hdf5_file</span><span class="p">(</span><span class="n">hdf5_file</span><span class="p">)</span>
+
+<span class="c1"># Deserialize from HDF5 file</span>
+<span class="n">structure_from_hdf5</span> <span class="o">=</span> <span class="n">structure</span><span class="o">.</span><span class="n">from_hdf5_file</span><span class="p">(</span><span class="n">hdf5_file</span><span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="n">structure_from_hdf5</span><span class="p">)</span>
 </pre></div>
 </div>
 </div>
@@ -265,9 +277,10 @@ Each data class page includes examples of the JSON and HDF5 schema used for seri
 </tbody>
 </table>
 </section>
-<section id="related-topics">
-<h2>Related topics<a class="headerlink" href="#related-topics" title="Link to this heading"></a></h2>
+<section id="further-reading">
+<h2>Further reading<a class="headerlink" href="#further-reading" title="Link to this heading"></a></h2>
 <ul class="simple">
+<li><p>The above examples can be downloaded as complete <a class="reference external" href="../../../_static/examples/cpp/serialization.cpp">C++</a> and <a class="reference external" href="../../../_static/examples/python/serialization.py">Python</a> scripts.</p></li>
 <li><p><a class="reference internal" href="structure.html"><span class="doc">Structure</span></a>: Molecular geometry and atomic information</p></li>
 <li><p><a class="reference internal" href="basis_set.html"><span class="doc">BasisSet</span></a>: Quantum chemistry basis set definitions</p></li>
 <li><p><a class="reference internal" href="orbitals.html"><span class="doc">Orbitals</span></a>: Molecular orbital coefficients and properties</p></li>

@@ -11,8 +11,8 @@ import os
 import tempfile
 
 import qdk_chemistry
-from qdk_chemistry._core.data import Settings
 from qdk_chemistry.algorithms import create, available
+from qdk_chemistry.data import Settings
 
 # Create an algorithm
 scf_solver = create("scf_solver")
@@ -54,9 +54,9 @@ for algorithm_name in available():
     print(f"{algorithm_name} has methods:")
     for method_name in available(algorithm_name):
         print(f"  {method_name} has settings:")
-        method = create(algorithm_name, method_name)
-        settings = method.settings()
-        for key, value in settings.items():
+        method_ = create(algorithm_name, method_name)
+        settings_ = method_.settings()
+        for key, value in settings_.items():
             print(f"    {key}: {value}")
 # end-cell-get-settings
 ################################################################################
@@ -72,6 +72,9 @@ if settings.has("basis_set"):
 if settings.has("tolerance"):
     # Use the setting
     print(f"Convergence threshold: {settings.get('tolerance')}")
+
+# List the available settings
+print("Available settings:", settings)
 
 # Try to get a value (Python uses get_or_default or try/except)
 try:
@@ -159,7 +162,7 @@ class MySettings(Settings):
 # Error handling example
 try:
     value = settings.get("non_existent_setting")
-except qdk_chemistry._core.data.SettingNotFound as e:
+except qdk_chemistry.data.SettingNotFound as e:
     print(e)  # "Setting not found: non_existent_setting"
     # Don't exit; use a fallback and continue execution
     value = settings.get_or_default("non_existent_setting", None)

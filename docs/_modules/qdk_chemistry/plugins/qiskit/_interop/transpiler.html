@@ -77,6 +77,7 @@
   <ul class="wy-breadcrumbs">
       <li><a href="../../../../../index.html" class="icon icon-home" aria-label="Home"></a></li>
           <li class="breadcrumb-item"><a href="../../../../index.html">Module code</a></li>
+          <li class="breadcrumb-item"><a href="../../qiskit.html">qdk_chemistry.plugins.qiskit</a></li>
       <li class="breadcrumb-item active">qdk_chemistry.plugins.qiskit._interop.transpiler</li>
       <li class="wy-breadcrumbs-aside">
       </li>
@@ -112,6 +113,12 @@
 <span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.definitions</span><span class="w"> </span><span class="kn">import</span> <span class="n">DIAGONAL_Z_1Q_GATES</span>
 
 <span class="n">_LOGGER</span> <span class="o">=</span> <span class="n">logging</span><span class="o">.</span><span class="n">getLogger</span><span class="p">(</span><span class="vm">__name__</span><span class="p">)</span>
+
+<span class="n">__all__</span> <span class="o">=</span> <span class="p">[</span>
+    <span class="s2">&quot;MergeZBasisRotations&quot;</span><span class="p">,</span>
+    <span class="s2">&quot;RemoveZBasisOnZeroState&quot;</span><span class="p">,</span>
+    <span class="s2">&quot;SubstituteCliffordRz&quot;</span><span class="p">,</span>
+<span class="p">]</span>
 
 
 <div class="viewcode-block" id="MergeZBasisRotations">
@@ -221,8 +228,6 @@
 
 
 
-<div class="viewcode-block" id="SubstituteCliffordRzSettings">
-<a class="viewcode-back" href="../../../../../api/api_autogen/qdk_chemistry.plugins.qiskit._interop.transpiler.html#qdk_chemistry.plugins.qiskit._interop.transpiler.SubstituteCliffordRzSettings">[docs]</a>
 <span class="k">class</span><span class="w"> </span><span class="nc">SubstituteCliffordRzSettings</span><span class="p">(</span><span class="n">Settings</span><span class="p">):</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;Settings configuration for SubstituteCliffordRz.</span>
 
@@ -232,17 +237,12 @@
 
 <span class="sd">    &quot;&quot;&quot;</span>
 
-<div class="viewcode-block" id="SubstituteCliffordRzSettings.__init__">
-<a class="viewcode-back" href="../../../../../api/api_autogen/qdk_chemistry.plugins.qiskit._interop.transpiler.html#qdk_chemistry.plugins.qiskit._interop.transpiler.SubstituteCliffordRzSettings.__init__">[docs]</a>
     <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;Initialize SubstituteCliffordRzSettings.&quot;&quot;&quot;</span>
         <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">()</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">_set_default</span><span class="p">(</span><span class="s2">&quot;equivalent_gate_set&quot;</span><span class="p">,</span> <span class="s2">&quot;vector&lt;string&gt;&quot;</span><span class="p">,</span> <span class="p">[</span><span class="s2">&quot;id&quot;</span><span class="p">,</span> <span class="s2">&quot;s&quot;</span><span class="p">,</span> <span class="s2">&quot;sdg&quot;</span><span class="p">,</span> <span class="s2">&quot;z&quot;</span><span class="p">])</span>
-        <span class="bp">self</span><span class="o">.</span><span class="n">_set_default</span><span class="p">(</span><span class="s2">&quot;tolerance&quot;</span><span class="p">,</span> <span class="s2">&quot;float&quot;</span><span class="p">,</span> <span class="nb">float</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">finfo</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">float64</span><span class="p">)</span><span class="o">.</span><span class="n">eps</span><span class="p">))</span></div>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_set_default</span><span class="p">(</span><span class="s2">&quot;tolerance&quot;</span><span class="p">,</span> <span class="s2">&quot;float&quot;</span><span class="p">,</span> <span class="nb">float</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">finfo</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">float64</span><span class="p">)</span><span class="o">.</span><span class="n">eps</span><span class="p">))</span>
 
-
-<div class="viewcode-block" id="SubstituteCliffordRzSettings.set">
-<a class="viewcode-back" href="../../../../../api/api_autogen/qdk_chemistry.plugins.qiskit._interop.transpiler.html#qdk_chemistry.plugins.qiskit._interop.transpiler.SubstituteCliffordRzSettings.set">[docs]</a>
     <span class="k">def</span><span class="w"> </span><span class="nf">set</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">key</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">value</span><span class="p">):</span>
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;Override set to ensure &#39;id&#39; is always in equivalent_gate_set and duplicates are removed.</span>
 
@@ -254,11 +254,8 @@
         <span class="c1"># Ensure &#39;id&#39; is present in equivalent_gate_set and remove duplicates</span>
         <span class="k">if</span> <span class="n">key</span> <span class="o">==</span> <span class="s2">&quot;equivalent_gate_set&quot;</span> <span class="ow">and</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">value</span><span class="p">,</span> <span class="nb">list</span><span class="p">):</span>
             <span class="n">value</span> <span class="o">=</span> <span class="nb">list</span><span class="p">({</span><span class="o">*</span><span class="n">value</span><span class="p">,</span> <span class="s2">&quot;id&quot;</span><span class="p">})</span>
-        <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="n">set</span><span class="p">(</span><span class="n">key</span><span class="p">,</span> <span class="n">value</span><span class="p">)</span></div>
+        <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="n">set</span><span class="p">(</span><span class="n">key</span><span class="p">,</span> <span class="n">value</span><span class="p">)</span>
 
-
-<div class="viewcode-block" id="SubstituteCliffordRzSettings.update">
-<a class="viewcode-back" href="../../../../../api/api_autogen/qdk_chemistry.plugins.qiskit._interop.transpiler.html#qdk_chemistry.plugins.qiskit._interop.transpiler.SubstituteCliffordRzSettings.update">[docs]</a>
     <span class="k">def</span><span class="w"> </span><span class="nf">update</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">settings_dict</span><span class="p">:</span> <span class="nb">dict</span><span class="p">):</span>
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;Override update to ensure &#39;id&#39; is always in equivalent_gate_set and duplicates are removed.</span>
 
@@ -272,9 +269,7 @@
                 <span class="o">**</span><span class="n">settings_dict</span><span class="p">,</span>
                 <span class="s2">&quot;equivalent_gate_set&quot;</span><span class="p">:</span> <span class="nb">list</span><span class="p">({</span><span class="o">*</span><span class="n">settings_dict</span><span class="p">[</span><span class="s2">&quot;equivalent_gate_set&quot;</span><span class="p">],</span> <span class="s2">&quot;id&quot;</span><span class="p">}),</span>
             <span class="p">}</span>
-        <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="n">update</span><span class="p">(</span><span class="n">settings_dict</span><span class="p">)</span></div>
-</div>
-
+        <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="n">update</span><span class="p">(</span><span class="n">settings_dict</span><span class="p">)</span>
 
 
 <div class="viewcode-block" id="SubstituteCliffordRz">

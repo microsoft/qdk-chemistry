@@ -66,12 +66,23 @@
 <li class="toctree-l4"><a class="reference internal" href="qdk_chemistry.algorithms.html#qdk_chemistry.algorithms.HamiltonianConstructor"><code class="docutils literal notranslate"><span class="pre">HamiltonianConstructor</span></code></a></li>
 <li class="toctree-l4"><a class="reference internal" href="qdk_chemistry.algorithms.html#qdk_chemistry.algorithms.IterativePhaseEstimation"><code class="docutils literal notranslate"><span class="pre">IterativePhaseEstimation</span></code></a></li>
 <li class="toctree-l4"><a class="reference internal" href="qdk_chemistry.algorithms.html#qdk_chemistry.algorithms.IterativePhaseEstimationIteration"><code class="docutils literal notranslate"><span class="pre">IterativePhaseEstimationIteration</span></code></a></li>
-<li class="toctree-l4"><a class="reference internal" href="qdk_chemistry.algorithms.html#qdk_chemistry.algorithms.Localizer"><code class="docutils literal notranslate"><span class="pre">Localizer</span></code></a></li>
 <li class="toctree-l4"><a class="reference internal" href="qdk_chemistry.algorithms.html#qdk_chemistry.algorithms.MultiConfigurationCalculator"><code class="docutils literal notranslate"><span class="pre">MultiConfigurationCalculator</span></code></a></li>
 <li class="toctree-l4"><a class="reference internal" href="qdk_chemistry.algorithms.html#qdk_chemistry.algorithms.MultiConfigurationScf"><code class="docutils literal notranslate"><span class="pre">MultiConfigurationScf</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="qdk_chemistry.algorithms.html#qdk_chemistry.algorithms.OrbitalLocalizer"><code class="docutils literal notranslate"><span class="pre">OrbitalLocalizer</span></code></a></li>
 <li class="toctree-l4"><a class="reference internal" href="qdk_chemistry.algorithms.html#qdk_chemistry.algorithms.PhaseEstimation"><code class="docutils literal notranslate"><span class="pre">PhaseEstimation</span></code></a></li>
 <li class="toctree-l4"><a class="reference internal" href="qdk_chemistry.algorithms.html#qdk_chemistry.algorithms.PhaseEstimationAlgorithm"><code class="docutils literal notranslate"><span class="pre">PhaseEstimationAlgorithm</span></code></a></li>
 <li class="toctree-l4"><a class="reference internal" href="qdk_chemistry.algorithms.html#qdk_chemistry.algorithms.ProjectedMultiConfigurationCalculator"><code class="docutils literal notranslate"><span class="pre">ProjectedMultiConfigurationCalculator</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="qdk_chemistry.algorithms.html#qdk_chemistry.algorithms.QdkAutocasActiveSpaceSelector"><code class="docutils literal notranslate"><span class="pre">QdkAutocasActiveSpaceSelector</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="qdk_chemistry.algorithms.html#qdk_chemistry.algorithms.QdkAutocasEosActiveSpaceSelector"><code class="docutils literal notranslate"><span class="pre">QdkAutocasEosActiveSpaceSelector</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="qdk_chemistry.algorithms.html#qdk_chemistry.algorithms.QdkHamiltonianConstructor"><code class="docutils literal notranslate"><span class="pre">QdkHamiltonianConstructor</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="qdk_chemistry.algorithms.html#qdk_chemistry.algorithms.QdkMP2NaturalOrbitalLocalizer"><code class="docutils literal notranslate"><span class="pre">QdkMP2NaturalOrbitalLocalizer</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="qdk_chemistry.algorithms.html#qdk_chemistry.algorithms.QdkMacisAsci"><code class="docutils literal notranslate"><span class="pre">QdkMacisAsci</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="qdk_chemistry.algorithms.html#qdk_chemistry.algorithms.QdkMacisCas"><code class="docutils literal notranslate"><span class="pre">QdkMacisCas</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="qdk_chemistry.algorithms.html#qdk_chemistry.algorithms.QdkMacisPmc"><code class="docutils literal notranslate"><span class="pre">QdkMacisPmc</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="qdk_chemistry.algorithms.html#qdk_chemistry.algorithms.QdkOccupationActiveSpaceSelector"><code class="docutils literal notranslate"><span class="pre">QdkOccupationActiveSpaceSelector</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="qdk_chemistry.algorithms.html#qdk_chemistry.algorithms.QdkPipekMezeyLocalizer"><code class="docutils literal notranslate"><span class="pre">QdkPipekMezeyLocalizer</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="qdk_chemistry.algorithms.html#qdk_chemistry.algorithms.QdkScfSolver"><code class="docutils literal notranslate"><span class="pre">QdkScfSolver</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="qdk_chemistry.algorithms.html#qdk_chemistry.algorithms.QdkValenceActiveSpaceSelector"><code class="docutils literal notranslate"><span class="pre">QdkValenceActiveSpaceSelector</span></code></a></li>
 <li class="toctree-l4"><a class="reference internal" href="qdk_chemistry.algorithms.html#qdk_chemistry.algorithms.QubitMapper"><code class="docutils literal notranslate"><span class="pre">QubitMapper</span></code></a></li>
 <li class="toctree-l4"><a class="reference internal" href="qdk_chemistry.algorithms.html#qdk_chemistry.algorithms.ScfSolver"><code class="docutils literal notranslate"><span class="pre">ScfSolver</span></code></a></li>
 <li class="toctree-l4"><a class="reference internal" href="qdk_chemistry.algorithms.html#qdk_chemistry.algorithms.StabilityChecker"><code class="docutils literal notranslate"><span class="pre">StabilityChecker</span></code></a></li>
@@ -134,62 +145,8 @@
 <p>This module provides quantum state preparation algorithms for preparing
 quantum states from classical wavefunctions.</p>
 <dl class="py class">
-<dt class="sig sig-object py" id="qdk_chemistry.algorithms.energy_estimator.EnergyEstimator">
-<em class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">EnergyEstimator</span></span><a class="headerlink" href="#qdk_chemistry.algorithms.energy_estimator.EnergyEstimator" title="Link to this definition"></a></dt>
-<dd><p>Bases: <a class="reference internal" href="qdk_chemistry.algorithms.base.html#qdk_chemistry.algorithms.base.Algorithm" title="qdk_chemistry.algorithms.base.Algorithm"><code class="xref py py-class docutils literal notranslate"><span class="pre">Algorithm</span></code></a></p>
-<p>Abstract base class for energy estimator algorithms.</p>
-<dl class="py method">
-<dt class="sig sig-object py" id="qdk_chemistry.algorithms.energy_estimator.EnergyEstimator.__init__">
-<span class="sig-name descname"><span class="pre">__init__</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#qdk_chemistry.algorithms.energy_estimator.EnergyEstimator.__init__" title="Link to this definition"></a></dt>
-<dd><p>Initialize the EnergyEstimator.</p>
-</dd></dl>
-
-<dl class="py method">
-<dt class="sig sig-object py" id="qdk_chemistry.algorithms.energy_estimator.EnergyEstimator.run">
-<span class="sig-name descname"><span class="pre">run</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">circuit_qasm</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">qubit_hamiltonians</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">total_shots</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">classical_coeffs</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#qdk_chemistry.algorithms.energy_estimator.EnergyEstimator.run" title="Link to this definition"></a></dt>
-<dd><p>Estimate the expectation value and variance of Hamiltonians.</p>
-<dl class="field-list simple">
-<dt class="field-odd">Return type<span class="colon">:</span></dt>
-<dd class="field-odd"><p><span class="sphinx_autodoc_typehints-type"><a class="reference internal" href="qdk_chemistry.data.estimator_data.html#qdk_chemistry.data.estimator_data.EnergyExpectationResult" title="qdk_chemistry.data.estimator_data.EnergyExpectationResult"><code class="xref py py-class docutils literal notranslate"><span class="pre">EnergyExpectationResult</span></code></a></span></p>
-</dd>
-<dt class="field-even">Parameters<span class="colon">:</span></dt>
-<dd class="field-even"><ul class="simple">
-<li><p><strong>circuit_qasm</strong> (<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)"><em>str</em></a>) – OpenQASM3 string of the quantum circuit to be evaluated.</p></li>
-<li><p><strong>qubit_hamiltonians</strong> (<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#list" title="(in Python v3.14)"><em>list</em></a><em>[</em><a class="reference internal" href="qdk_chemistry.data.qubit_hamiltonian.html#qdk_chemistry.data.qubit_hamiltonian.QubitHamiltonian" title="qdk_chemistry.data.qubit_hamiltonian.QubitHamiltonian"><em>QubitHamiltonian</em></a><em>]</em>) – List of <code class="docutils literal notranslate"><span class="pre">QubitHamiltonian</span></code> to estimate.</p></li>
-<li><p><strong>total_shots</strong> (<a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(in Python v3.14)"><em>int</em></a>) – Total number of shots to allocate across the observable terms.</p></li>
-<li><p><strong>classical_coeffs</strong> (<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#list" title="(in Python v3.14)"><em>list</em></a><em> | </em><em>None</em>) – Optional list of coefficients for classical Pauli terms to calculate energy offset.</p></li>
-</ul>
-</dd>
-<dt class="field-odd">Returns<span class="colon">:</span></dt>
-<dd class="field-odd"><p><code class="docutils literal notranslate"><span class="pre">EnergyExpectationResult</span></code> containing the energy expectation value and variance.</p>
-</dd>
-</dl>
-<div class="admonition note">
-<p class="admonition-title">Note</p>
-<ul class="simple">
-<li><p>Measurement circuits are generated for each QubitHamiltonian term.</p></li>
-<li><p>Parameterized circuits are not supported.</p></li>
-<li><p>Only one circuit is supported per run.</p></li>
-</ul>
-</div>
-</dd></dl>
-
-<dl class="py method">
-<dt class="sig sig-object py" id="qdk_chemistry.algorithms.energy_estimator.EnergyEstimator.type_name">
-<span class="sig-name descname"><span class="pre">type_name</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#qdk_chemistry.algorithms.energy_estimator.EnergyEstimator.type_name" title="Link to this definition"></a></dt>
-<dd><p>Return <code class="docutils literal notranslate"><span class="pre">energy_estimator</span></code> as the algorithm type name.</p>
-<dl class="field-list simple">
-<dt class="field-odd">Return type<span class="colon">:</span></dt>
-<dd class="field-odd"><p><span class="sphinx_autodoc_typehints-type"><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)"><code class="xref py py-class docutils literal notranslate"><span class="pre">str</span></code></a></span></p>
-</dd>
-</dl>
-</dd></dl>
-
-</dd></dl>
-
-<dl class="py class">
 <dt class="sig sig-object py" id="qdk_chemistry.algorithms.energy_estimator.EnergyEstimatorFactory">
-<em class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">EnergyEstimatorFactory</span></span><a class="headerlink" href="#qdk_chemistry.algorithms.energy_estimator.EnergyEstimatorFactory" title="Link to this definition"></a></dt>
+<em class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">qdk_chemistry.algorithms.energy_estimator.</span></span><span class="sig-name descname"><span class="pre">EnergyEstimatorFactory</span></span><a class="headerlink" href="#qdk_chemistry.algorithms.energy_estimator.EnergyEstimatorFactory" title="Link to this definition"></a></dt>
 <dd><p>Bases: <a class="reference internal" href="qdk_chemistry.algorithms.base.html#qdk_chemistry.algorithms.base.AlgorithmFactory" title="qdk_chemistry.algorithms.base.AlgorithmFactory"><code class="xref py py-class docutils literal notranslate"><span class="pre">AlgorithmFactory</span></code></a></p>
 <p>Factory class for creating EnergyEstimator instances.</p>
 <dl class="field-list simple">
@@ -220,8 +177,8 @@ quantum states from classical wavefunctions.</p>
 
 <dl class="py class">
 <dt class="sig sig-object py" id="qdk_chemistry.algorithms.energy_estimator.QDKEnergyEstimator">
-<em class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">QDKEnergyEstimator</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">seed</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">42</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">noise_model</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">qubit_loss</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">0.0</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#qdk_chemistry.algorithms.energy_estimator.QDKEnergyEstimator" title="Link to this definition"></a></dt>
-<dd><p>Bases: <a class="reference internal" href="qdk_chemistry.algorithms.energy_estimator.energy_estimator.html#qdk_chemistry.algorithms.energy_estimator.energy_estimator.EnergyEstimator" title="qdk_chemistry.algorithms.energy_estimator.energy_estimator.EnergyEstimator"><code class="xref py py-class docutils literal notranslate"><span class="pre">EnergyEstimator</span></code></a></p>
+<em class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">qdk_chemistry.algorithms.energy_estimator.</span></span><span class="sig-name descname"><span class="pre">QDKEnergyEstimator</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">seed</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">42</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">noise_model</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">qubit_loss</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">0.0</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#qdk_chemistry.algorithms.energy_estimator.QDKEnergyEstimator" title="Link to this definition"></a></dt>
+<dd><p>Bases: <a class="reference internal" href="qdk_chemistry.algorithms.html#qdk_chemistry.algorithms.EnergyEstimator" title="qdk_chemistry.algorithms.energy_estimator.energy_estimator.EnergyEstimator"><code class="xref py py-class docutils literal notranslate"><span class="pre">EnergyEstimator</span></code></a></p>
 <p>Energy Estimator to estimate expectation values of quantum circuits with respect to a given observable.</p>
 <p>This class uses a QDK base simulator backend to run quantum circuits and estimate
 the expectation values of qubit Hamiltonians. It supports optional noise models for noise simulation.</p>
@@ -262,172 +219,12 @@ the expectation values of qubit Hamiltonians. It supports optional noise models 
 
 </dd></dl>
 
-<dl class="py function">
-<dt class="sig sig-object py" id="qdk_chemistry.algorithms.energy_estimator.compute_energy_expectation_from_bitstrings">
-<span class="sig-name descname"><span class="pre">compute_energy_expectation_from_bitstrings</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">hamiltonians</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">bitstring_counts_list</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">energy_offset</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">0.0</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#qdk_chemistry.algorithms.energy_estimator.compute_energy_expectation_from_bitstrings" title="Link to this definition"></a></dt>
-<dd><p>Compute total energy expectation value and variance for a QubitHamiltonian.</p>
-<dl class="field-list simple">
-<dt class="field-odd">Return type<span class="colon">:</span></dt>
-<dd class="field-odd"><p><span class="sphinx_autodoc_typehints-type"><a class="reference internal" href="qdk_chemistry.data.estimator_data.html#qdk_chemistry.data.estimator_data.EnergyExpectationResult" title="qdk_chemistry.data.estimator_data.EnergyExpectationResult"><code class="xref py py-class docutils literal notranslate"><span class="pre">EnergyExpectationResult</span></code></a></span></p>
-</dd>
-<dt class="field-even">Parameters<span class="colon">:</span></dt>
-<dd class="field-even"><ul class="simple">
-<li><p><strong>hamiltonians</strong> (<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#list" title="(in Python v3.14)"><em>list</em></a><em>[</em><a class="reference internal" href="qdk_chemistry.data.qubit_hamiltonian.html#qdk_chemistry.data.qubit_hamiltonian.QubitHamiltonian" title="qdk_chemistry.data.qubit_hamiltonian.QubitHamiltonian"><em>QubitHamiltonian</em></a><em>]</em>) – List of <code class="docutils literal notranslate"><span class="pre">QubitHamiltonian</span></code> defining Pauli terms and coefficients.</p></li>
-<li><p><strong>bitstring_counts_list</strong> (<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#list" title="(in Python v3.14)"><em>list</em></a><em>[</em><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#dict" title="(in Python v3.14)"><em>dict</em></a><em>[</em><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)"><em>str</em></a><em>, </em><a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(in Python v3.14)"><em>int</em></a><em>] </em><em>| </em><em>None</em><em>]</em>) – List of bitstring count dictionaries corresponding to each QubitHamiltonian.</p></li>
-<li><p><strong>energy_offset</strong> (<a class="reference external" href="https://docs.python.org/3/library/functions.html#float" title="(in Python v3.14)"><em>float</em></a>) – Optional energy shift to include.</p></li>
-</ul>
-</dd>
-<dt class="field-odd">Returns<span class="colon">:</span></dt>
-<dd class="field-odd"><p><code class="docutils literal notranslate"><span class="pre">EnergyExpectationResult</span></code> containing the energy expectation value and variance.</p>
-</dd>
-</dl>
-</dd></dl>
-
-<dl class="py function">
-<dt class="sig sig-object py" id="qdk_chemistry.algorithms.energy_estimator.create_measurement_circuits">
-<span class="sig-name descname"><span class="pre">create_measurement_circuits</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">circuit_qasm</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">grouped_hamiltonians</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#qdk_chemistry.algorithms.energy_estimator.create_measurement_circuits" title="Link to this definition"></a></dt>
-<dd><p>Create measurement circuits for each QubitHamiltonian.</p>
-<dl class="field-list simple">
-<dt class="field-odd">Return type<span class="colon">:</span></dt>
-<dd class="field-odd"><p><span class="sphinx_autodoc_typehints-type"><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#list" title="(in Python v3.14)"><code class="xref py py-class docutils literal notranslate"><span class="pre">list</span></code></a>[<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)"><code class="xref py py-class docutils literal notranslate"><span class="pre">str</span></code></a>]</span></p>
-</dd>
-<dt class="field-even">Parameters<span class="colon">:</span></dt>
-<dd class="field-even"><ul class="simple">
-<li><p><strong>circuit_qasm</strong> (<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)"><em>str</em></a>) – OpenQASM3 string of the base circuit.</p></li>
-<li><p><strong>grouped_hamiltonians</strong> (<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#list" title="(in Python v3.14)"><em>list</em></a><em>[</em><a class="reference internal" href="qdk_chemistry.data.qubit_hamiltonian.html#qdk_chemistry.data.qubit_hamiltonian.QubitHamiltonian" title="qdk_chemistry.data.qubit_hamiltonian.QubitHamiltonian"><em>QubitHamiltonian</em></a><em>]</em>) – List of <code class="docutils literal notranslate"><span class="pre">QubitHamiltonian</span></code> grouped in qubit-wise commuting sets.</p></li>
-</ul>
-</dd>
-<dt class="field-odd">Returns<span class="colon">:</span></dt>
-<dd class="field-odd"><p>List of measurement circuits in OpenQASM3 format.</p>
-</dd>
-</dl>
-</dd></dl>
-
 <section id="submodules">
 <h2>Submodules<a class="headerlink" href="#submodules" title="Link to this heading"></a></h2>
 <div class="toctree-wrapper compound">
 <ul>
-<li class="toctree-l1"><a class="reference internal" href="qdk_chemistry.algorithms.energy_estimator.energy_estimator.html">qdk_chemistry.algorithms.energy_estimator.energy_estimator module</a><ul>
-<li class="toctree-l2"><a class="reference internal" href="qdk_chemistry.algorithms.energy_estimator.energy_estimator.html#qdk_chemistry.algorithms.energy_estimator.energy_estimator.Algorithm"><code class="docutils literal notranslate"><span class="pre">Algorithm</span></code></a><ul>
-<li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.algorithms.energy_estimator.energy_estimator.html#qdk_chemistry.algorithms.energy_estimator.energy_estimator.Algorithm.__init__"><code class="docutils literal notranslate"><span class="pre">Algorithm.__init__()</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.algorithms.energy_estimator.energy_estimator.html#qdk_chemistry.algorithms.energy_estimator.energy_estimator.Algorithm.aliases"><code class="docutils literal notranslate"><span class="pre">Algorithm.aliases()</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.algorithms.energy_estimator.energy_estimator.html#qdk_chemistry.algorithms.energy_estimator.energy_estimator.Algorithm.name"><code class="docutils literal notranslate"><span class="pre">Algorithm.name()</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.algorithms.energy_estimator.energy_estimator.html#qdk_chemistry.algorithms.energy_estimator.energy_estimator.Algorithm.run"><code class="docutils literal notranslate"><span class="pre">Algorithm.run()</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.algorithms.energy_estimator.energy_estimator.html#qdk_chemistry.algorithms.energy_estimator.energy_estimator.Algorithm.settings"><code class="docutils literal notranslate"><span class="pre">Algorithm.settings()</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.algorithms.energy_estimator.energy_estimator.html#qdk_chemistry.algorithms.energy_estimator.energy_estimator.Algorithm.type_name"><code class="docutils literal notranslate"><span class="pre">Algorithm.type_name()</span></code></a></li>
-</ul>
-</li>
-<li class="toctree-l2"><a class="reference internal" href="qdk_chemistry.algorithms.energy_estimator.energy_estimator.html#qdk_chemistry.algorithms.energy_estimator.energy_estimator.AlgorithmFactory"><code class="docutils literal notranslate"><span class="pre">AlgorithmFactory</span></code></a><ul>
-<li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.algorithms.energy_estimator.energy_estimator.html#qdk_chemistry.algorithms.energy_estimator.energy_estimator.AlgorithmFactory.__init__"><code class="docutils literal notranslate"><span class="pre">AlgorithmFactory.__init__()</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.algorithms.energy_estimator.energy_estimator.html#qdk_chemistry.algorithms.energy_estimator.energy_estimator.AlgorithmFactory.algorithm_type_name"><code class="docutils literal notranslate"><span class="pre">AlgorithmFactory.algorithm_type_name()</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.algorithms.energy_estimator.energy_estimator.html#qdk_chemistry.algorithms.energy_estimator.energy_estimator.AlgorithmFactory.available"><code class="docutils literal notranslate"><span class="pre">AlgorithmFactory.available()</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.algorithms.energy_estimator.energy_estimator.html#qdk_chemistry.algorithms.energy_estimator.energy_estimator.AlgorithmFactory.clear"><code class="docutils literal notranslate"><span class="pre">AlgorithmFactory.clear()</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.algorithms.energy_estimator.energy_estimator.html#qdk_chemistry.algorithms.energy_estimator.energy_estimator.AlgorithmFactory.create"><code class="docutils literal notranslate"><span class="pre">AlgorithmFactory.create()</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.algorithms.energy_estimator.energy_estimator.html#qdk_chemistry.algorithms.energy_estimator.energy_estimator.AlgorithmFactory.default_algorithm_name"><code class="docutils literal notranslate"><span class="pre">AlgorithmFactory.default_algorithm_name()</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.algorithms.energy_estimator.energy_estimator.html#qdk_chemistry.algorithms.energy_estimator.energy_estimator.AlgorithmFactory.has"><code class="docutils literal notranslate"><span class="pre">AlgorithmFactory.has()</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.algorithms.energy_estimator.energy_estimator.html#qdk_chemistry.algorithms.energy_estimator.energy_estimator.AlgorithmFactory.register_instance"><code class="docutils literal notranslate"><span class="pre">AlgorithmFactory.register_instance()</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.algorithms.energy_estimator.energy_estimator.html#qdk_chemistry.algorithms.energy_estimator.energy_estimator.AlgorithmFactory.unregister_instance"><code class="docutils literal notranslate"><span class="pre">AlgorithmFactory.unregister_instance()</span></code></a></li>
-</ul>
-</li>
-<li class="toctree-l2"><a class="reference internal" href="qdk_chemistry.algorithms.energy_estimator.energy_estimator.html#qdk_chemistry.algorithms.energy_estimator.energy_estimator.EnergyExpectationResult"><code class="docutils literal notranslate"><span class="pre">EnergyExpectationResult</span></code></a><ul>
-<li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.algorithms.energy_estimator.energy_estimator.html#qdk_chemistry.algorithms.energy_estimator.energy_estimator.EnergyExpectationResult.energy_expectation_value"><code class="docutils literal notranslate"><span class="pre">EnergyExpectationResult.energy_expectation_value</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.algorithms.energy_estimator.energy_estimator.html#qdk_chemistry.algorithms.energy_estimator.energy_estimator.EnergyExpectationResult.energy_variance"><code class="docutils literal notranslate"><span class="pre">EnergyExpectationResult.energy_variance</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.algorithms.energy_estimator.energy_estimator.html#qdk_chemistry.algorithms.energy_estimator.energy_estimator.EnergyExpectationResult.expvals_each_term"><code class="docutils literal notranslate"><span class="pre">EnergyExpectationResult.expvals_each_term</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.algorithms.energy_estimator.energy_estimator.html#qdk_chemistry.algorithms.energy_estimator.energy_estimator.EnergyExpectationResult.variances_each_term"><code class="docutils literal notranslate"><span class="pre">EnergyExpectationResult.variances_each_term</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.algorithms.energy_estimator.energy_estimator.html#qdk_chemistry.algorithms.energy_estimator.energy_estimator.EnergyExpectationResult.__init__"><code class="docutils literal notranslate"><span class="pre">EnergyExpectationResult.__init__()</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.algorithms.energy_estimator.energy_estimator.html#qdk_chemistry.algorithms.energy_estimator.energy_estimator.EnergyExpectationResult.from_hdf5"><code class="docutils literal notranslate"><span class="pre">EnergyExpectationResult.from_hdf5()</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.algorithms.energy_estimator.energy_estimator.html#qdk_chemistry.algorithms.energy_estimator.energy_estimator.EnergyExpectationResult.from_json"><code class="docutils literal notranslate"><span class="pre">EnergyExpectationResult.from_json()</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.algorithms.energy_estimator.energy_estimator.html#qdk_chemistry.algorithms.energy_estimator.energy_estimator.EnergyExpectationResult.get_summary"><code class="docutils literal notranslate"><span class="pre">EnergyExpectationResult.get_summary()</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.algorithms.energy_estimator.energy_estimator.html#qdk_chemistry.algorithms.energy_estimator.energy_estimator.EnergyExpectationResult.to_hdf5"><code class="docutils literal notranslate"><span class="pre">EnergyExpectationResult.to_hdf5()</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.algorithms.energy_estimator.energy_estimator.html#qdk_chemistry.algorithms.energy_estimator.energy_estimator.EnergyExpectationResult.to_json"><code class="docutils literal notranslate"><span class="pre">EnergyExpectationResult.to_json()</span></code></a></li>
-</ul>
-</li>
-<li class="toctree-l2"><a class="reference internal" href="qdk_chemistry.algorithms.energy_estimator.energy_estimator.html#qdk_chemistry.algorithms.energy_estimator.energy_estimator.QubitHamiltonian"><code class="docutils literal notranslate"><span class="pre">QubitHamiltonian</span></code></a><ul>
-<li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.algorithms.energy_estimator.energy_estimator.html#qdk_chemistry.algorithms.energy_estimator.energy_estimator.QubitHamiltonian.pauli_strings"><code class="docutils literal notranslate"><span class="pre">QubitHamiltonian.pauli_strings</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.algorithms.energy_estimator.energy_estimator.html#qdk_chemistry.algorithms.energy_estimator.energy_estimator.QubitHamiltonian.coefficients"><code class="docutils literal notranslate"><span class="pre">QubitHamiltonian.coefficients</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.algorithms.energy_estimator.energy_estimator.html#qdk_chemistry.algorithms.energy_estimator.energy_estimator.QubitHamiltonian.__init__"><code class="docutils literal notranslate"><span class="pre">QubitHamiltonian.__init__()</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.algorithms.energy_estimator.energy_estimator.html#qdk_chemistry.algorithms.energy_estimator.energy_estimator.QubitHamiltonian.exact_energy"><code class="docutils literal notranslate"><span class="pre">QubitHamiltonian.exact_energy</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.algorithms.energy_estimator.energy_estimator.html#qdk_chemistry.algorithms.energy_estimator.energy_estimator.QubitHamiltonian.from_hdf5"><code class="docutils literal notranslate"><span class="pre">QubitHamiltonian.from_hdf5()</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.algorithms.energy_estimator.energy_estimator.html#qdk_chemistry.algorithms.energy_estimator.energy_estimator.QubitHamiltonian.from_json"><code class="docutils literal notranslate"><span class="pre">QubitHamiltonian.from_json()</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.algorithms.energy_estimator.energy_estimator.html#qdk_chemistry.algorithms.energy_estimator.energy_estimator.QubitHamiltonian.get_summary"><code class="docutils literal notranslate"><span class="pre">QubitHamiltonian.get_summary()</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.algorithms.energy_estimator.energy_estimator.html#qdk_chemistry.algorithms.energy_estimator.energy_estimator.QubitHamiltonian.group_commuting"><code class="docutils literal notranslate"><span class="pre">QubitHamiltonian.group_commuting()</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.algorithms.energy_estimator.energy_estimator.html#qdk_chemistry.algorithms.energy_estimator.energy_estimator.QubitHamiltonian.num_qubits"><code class="docutils literal notranslate"><span class="pre">QubitHamiltonian.num_qubits</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.algorithms.energy_estimator.energy_estimator.html#qdk_chemistry.algorithms.energy_estimator.energy_estimator.QubitHamiltonian.pauli_ops"><code class="docutils literal notranslate"><span class="pre">QubitHamiltonian.pauli_ops</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.algorithms.energy_estimator.energy_estimator.html#qdk_chemistry.algorithms.energy_estimator.energy_estimator.QubitHamiltonian.to_hdf5"><code class="docutils literal notranslate"><span class="pre">QubitHamiltonian.to_hdf5()</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.algorithms.energy_estimator.energy_estimator.html#qdk_chemistry.algorithms.energy_estimator.energy_estimator.QubitHamiltonian.to_json"><code class="docutils literal notranslate"><span class="pre">QubitHamiltonian.to_json()</span></code></a></li>
-</ul>
-</li>
-<li class="toctree-l2"><a class="reference internal" href="qdk_chemistry.algorithms.energy_estimator.energy_estimator.html#qdk_chemistry.algorithms.energy_estimator.energy_estimator.create_measurement_circuits"><code class="docutils literal notranslate"><span class="pre">create_measurement_circuits()</span></code></a></li>
-<li class="toctree-l2"><a class="reference internal" href="qdk_chemistry.algorithms.energy_estimator.energy_estimator.html#qdk_chemistry.algorithms.energy_estimator.energy_estimator.compute_energy_expectation_from_bitstrings"><code class="docutils literal notranslate"><span class="pre">compute_energy_expectation_from_bitstrings()</span></code></a></li>
-<li class="toctree-l2"><a class="reference internal" href="qdk_chemistry.algorithms.energy_estimator.energy_estimator.html#qdk_chemistry.algorithms.energy_estimator.energy_estimator.EnergyEstimator"><code class="docutils literal notranslate"><span class="pre">EnergyEstimator</span></code></a><ul>
-<li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.algorithms.energy_estimator.energy_estimator.html#qdk_chemistry.algorithms.energy_estimator.energy_estimator.EnergyEstimator.__init__"><code class="docutils literal notranslate"><span class="pre">EnergyEstimator.__init__()</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.algorithms.energy_estimator.energy_estimator.html#qdk_chemistry.algorithms.energy_estimator.energy_estimator.EnergyEstimator.type_name"><code class="docutils literal notranslate"><span class="pre">EnergyEstimator.type_name()</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.algorithms.energy_estimator.energy_estimator.html#qdk_chemistry.algorithms.energy_estimator.energy_estimator.EnergyEstimator.run"><code class="docutils literal notranslate"><span class="pre">EnergyEstimator.run()</span></code></a></li>
-</ul>
-</li>
-<li class="toctree-l2"><a class="reference internal" href="qdk_chemistry.algorithms.energy_estimator.energy_estimator.html#qdk_chemistry.algorithms.energy_estimator.energy_estimator.EnergyEstimatorFactory"><code class="docutils literal notranslate"><span class="pre">EnergyEstimatorFactory</span></code></a><ul>
-<li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.algorithms.energy_estimator.energy_estimator.html#qdk_chemistry.algorithms.energy_estimator.energy_estimator.EnergyEstimatorFactory.algorithm_type_name"><code class="docutils literal notranslate"><span class="pre">EnergyEstimatorFactory.algorithm_type_name()</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.algorithms.energy_estimator.energy_estimator.html#qdk_chemistry.algorithms.energy_estimator.energy_estimator.EnergyEstimatorFactory.default_algorithm_name"><code class="docutils literal notranslate"><span class="pre">EnergyEstimatorFactory.default_algorithm_name()</span></code></a></li>
-</ul>
-</li>
-</ul>
-</li>
-<li class="toctree-l1"><a class="reference internal" href="qdk_chemistry.algorithms.energy_estimator.qsharp.html">qdk_chemistry.algorithms.energy_estimator.qsharp module</a><ul>
-<li class="toctree-l2"><a class="reference internal" href="qdk_chemistry.algorithms.energy_estimator.qsharp.html#qdk_chemistry.algorithms.energy_estimator.qsharp.EnergyEstimator"><code class="docutils literal notranslate"><span class="pre">EnergyEstimator</span></code></a><ul>
-<li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.algorithms.energy_estimator.qsharp.html#qdk_chemistry.algorithms.energy_estimator.qsharp.EnergyEstimator.__init__"><code class="docutils literal notranslate"><span class="pre">EnergyEstimator.__init__()</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.algorithms.energy_estimator.qsharp.html#qdk_chemistry.algorithms.energy_estimator.qsharp.EnergyEstimator.run"><code class="docutils literal notranslate"><span class="pre">EnergyEstimator.run()</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.algorithms.energy_estimator.qsharp.html#qdk_chemistry.algorithms.energy_estimator.qsharp.EnergyEstimator.type_name"><code class="docutils literal notranslate"><span class="pre">EnergyEstimator.type_name()</span></code></a></li>
-</ul>
-</li>
-<li class="toctree-l2"><a class="reference internal" href="qdk_chemistry.algorithms.energy_estimator.qsharp.html#qdk_chemistry.algorithms.energy_estimator.qsharp.compute_energy_expectation_from_bitstrings"><code class="docutils literal notranslate"><span class="pre">compute_energy_expectation_from_bitstrings()</span></code></a></li>
-<li class="toctree-l2"><a class="reference internal" href="qdk_chemistry.algorithms.energy_estimator.qsharp.html#qdk_chemistry.algorithms.energy_estimator.qsharp.create_measurement_circuits"><code class="docutils literal notranslate"><span class="pre">create_measurement_circuits()</span></code></a></li>
-<li class="toctree-l2"><a class="reference internal" href="qdk_chemistry.algorithms.energy_estimator.qsharp.html#qdk_chemistry.algorithms.energy_estimator.qsharp.EnergyExpectationResult"><code class="docutils literal notranslate"><span class="pre">EnergyExpectationResult</span></code></a><ul>
-<li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.algorithms.energy_estimator.qsharp.html#qdk_chemistry.algorithms.energy_estimator.qsharp.EnergyExpectationResult.energy_expectation_value"><code class="docutils literal notranslate"><span class="pre">EnergyExpectationResult.energy_expectation_value</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.algorithms.energy_estimator.qsharp.html#qdk_chemistry.algorithms.energy_estimator.qsharp.EnergyExpectationResult.energy_variance"><code class="docutils literal notranslate"><span class="pre">EnergyExpectationResult.energy_variance</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.algorithms.energy_estimator.qsharp.html#qdk_chemistry.algorithms.energy_estimator.qsharp.EnergyExpectationResult.expvals_each_term"><code class="docutils literal notranslate"><span class="pre">EnergyExpectationResult.expvals_each_term</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.algorithms.energy_estimator.qsharp.html#qdk_chemistry.algorithms.energy_estimator.qsharp.EnergyExpectationResult.variances_each_term"><code class="docutils literal notranslate"><span class="pre">EnergyExpectationResult.variances_each_term</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.algorithms.energy_estimator.qsharp.html#qdk_chemistry.algorithms.energy_estimator.qsharp.EnergyExpectationResult.__init__"><code class="docutils literal notranslate"><span class="pre">EnergyExpectationResult.__init__()</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.algorithms.energy_estimator.qsharp.html#qdk_chemistry.algorithms.energy_estimator.qsharp.EnergyExpectationResult.from_hdf5"><code class="docutils literal notranslate"><span class="pre">EnergyExpectationResult.from_hdf5()</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.algorithms.energy_estimator.qsharp.html#qdk_chemistry.algorithms.energy_estimator.qsharp.EnergyExpectationResult.from_json"><code class="docutils literal notranslate"><span class="pre">EnergyExpectationResult.from_json()</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.algorithms.energy_estimator.qsharp.html#qdk_chemistry.algorithms.energy_estimator.qsharp.EnergyExpectationResult.get_summary"><code class="docutils literal notranslate"><span class="pre">EnergyExpectationResult.get_summary()</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.algorithms.energy_estimator.qsharp.html#qdk_chemistry.algorithms.energy_estimator.qsharp.EnergyExpectationResult.to_hdf5"><code class="docutils literal notranslate"><span class="pre">EnergyExpectationResult.to_hdf5()</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.algorithms.energy_estimator.qsharp.html#qdk_chemistry.algorithms.energy_estimator.qsharp.EnergyExpectationResult.to_json"><code class="docutils literal notranslate"><span class="pre">EnergyExpectationResult.to_json()</span></code></a></li>
-</ul>
-</li>
-<li class="toctree-l2"><a class="reference internal" href="qdk_chemistry.algorithms.energy_estimator.qsharp.html#qdk_chemistry.algorithms.energy_estimator.qsharp.MeasurementData"><code class="docutils literal notranslate"><span class="pre">MeasurementData</span></code></a><ul>
-<li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.algorithms.energy_estimator.qsharp.html#qdk_chemistry.algorithms.energy_estimator.qsharp.MeasurementData.hamiltonians"><code class="docutils literal notranslate"><span class="pre">MeasurementData.hamiltonians</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.algorithms.energy_estimator.qsharp.html#qdk_chemistry.algorithms.energy_estimator.qsharp.MeasurementData.bitstring_counts"><code class="docutils literal notranslate"><span class="pre">MeasurementData.bitstring_counts</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.algorithms.energy_estimator.qsharp.html#qdk_chemistry.algorithms.energy_estimator.qsharp.MeasurementData.shots_list"><code class="docutils literal notranslate"><span class="pre">MeasurementData.shots_list</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.algorithms.energy_estimator.qsharp.html#qdk_chemistry.algorithms.energy_estimator.qsharp.MeasurementData.__init__"><code class="docutils literal notranslate"><span class="pre">MeasurementData.__init__()</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.algorithms.energy_estimator.qsharp.html#qdk_chemistry.algorithms.energy_estimator.qsharp.MeasurementData.from_hdf5"><code class="docutils literal notranslate"><span class="pre">MeasurementData.from_hdf5()</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.algorithms.energy_estimator.qsharp.html#qdk_chemistry.algorithms.energy_estimator.qsharp.MeasurementData.from_json"><code class="docutils literal notranslate"><span class="pre">MeasurementData.from_json()</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.algorithms.energy_estimator.qsharp.html#qdk_chemistry.algorithms.energy_estimator.qsharp.MeasurementData.get_summary"><code class="docutils literal notranslate"><span class="pre">MeasurementData.get_summary()</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.algorithms.energy_estimator.qsharp.html#qdk_chemistry.algorithms.energy_estimator.qsharp.MeasurementData.to_hdf5"><code class="docutils literal notranslate"><span class="pre">MeasurementData.to_hdf5()</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.algorithms.energy_estimator.qsharp.html#qdk_chemistry.algorithms.energy_estimator.qsharp.MeasurementData.to_json"><code class="docutils literal notranslate"><span class="pre">MeasurementData.to_json()</span></code></a></li>
-</ul>
-</li>
-<li class="toctree-l2"><a class="reference internal" href="qdk_chemistry.algorithms.energy_estimator.qsharp.html#qdk_chemistry.algorithms.energy_estimator.qsharp.QubitHamiltonian"><code class="docutils literal notranslate"><span class="pre">QubitHamiltonian</span></code></a><ul>
-<li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.algorithms.energy_estimator.qsharp.html#qdk_chemistry.algorithms.energy_estimator.qsharp.QubitHamiltonian.pauli_strings"><code class="docutils literal notranslate"><span class="pre">QubitHamiltonian.pauli_strings</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.algorithms.energy_estimator.qsharp.html#qdk_chemistry.algorithms.energy_estimator.qsharp.QubitHamiltonian.coefficients"><code class="docutils literal notranslate"><span class="pre">QubitHamiltonian.coefficients</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.algorithms.energy_estimator.qsharp.html#qdk_chemistry.algorithms.energy_estimator.qsharp.QubitHamiltonian.__init__"><code class="docutils literal notranslate"><span class="pre">QubitHamiltonian.__init__()</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.algorithms.energy_estimator.qsharp.html#qdk_chemistry.algorithms.energy_estimator.qsharp.QubitHamiltonian.exact_energy"><code class="docutils literal notranslate"><span class="pre">QubitHamiltonian.exact_energy</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.algorithms.energy_estimator.qsharp.html#qdk_chemistry.algorithms.energy_estimator.qsharp.QubitHamiltonian.from_hdf5"><code class="docutils literal notranslate"><span class="pre">QubitHamiltonian.from_hdf5()</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.algorithms.energy_estimator.qsharp.html#qdk_chemistry.algorithms.energy_estimator.qsharp.QubitHamiltonian.from_json"><code class="docutils literal notranslate"><span class="pre">QubitHamiltonian.from_json()</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.algorithms.energy_estimator.qsharp.html#qdk_chemistry.algorithms.energy_estimator.qsharp.QubitHamiltonian.get_summary"><code class="docutils literal notranslate"><span class="pre">QubitHamiltonian.get_summary()</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.algorithms.energy_estimator.qsharp.html#qdk_chemistry.algorithms.energy_estimator.qsharp.QubitHamiltonian.group_commuting"><code class="docutils literal notranslate"><span class="pre">QubitHamiltonian.group_commuting()</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.algorithms.energy_estimator.qsharp.html#qdk_chemistry.algorithms.energy_estimator.qsharp.QubitHamiltonian.num_qubits"><code class="docutils literal notranslate"><span class="pre">QubitHamiltonian.num_qubits</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.algorithms.energy_estimator.qsharp.html#qdk_chemistry.algorithms.energy_estimator.qsharp.QubitHamiltonian.pauli_ops"><code class="docutils literal notranslate"><span class="pre">QubitHamiltonian.pauli_ops</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.algorithms.energy_estimator.qsharp.html#qdk_chemistry.algorithms.energy_estimator.qsharp.QubitHamiltonian.to_hdf5"><code class="docutils literal notranslate"><span class="pre">QubitHamiltonian.to_hdf5()</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.algorithms.energy_estimator.qsharp.html#qdk_chemistry.algorithms.energy_estimator.qsharp.QubitHamiltonian.to_json"><code class="docutils literal notranslate"><span class="pre">QubitHamiltonian.to_json()</span></code></a></li>
-</ul>
-</li>
-<li class="toctree-l2"><a class="reference internal" href="qdk_chemistry.algorithms.energy_estimator.qsharp.html#qdk_chemistry.algorithms.energy_estimator.qsharp.QDKEnergyEstimator"><code class="docutils literal notranslate"><span class="pre">QDKEnergyEstimator</span></code></a><ul>
-<li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.algorithms.energy_estimator.qsharp.html#qdk_chemistry.algorithms.energy_estimator.qsharp.QDKEnergyEstimator.__init__"><code class="docutils literal notranslate"><span class="pre">QDKEnergyEstimator.__init__()</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.algorithms.energy_estimator.qsharp.html#qdk_chemistry.algorithms.energy_estimator.qsharp.QDKEnergyEstimator.name"><code class="docutils literal notranslate"><span class="pre">QDKEnergyEstimator.name()</span></code></a></li>
-</ul>
-</li>
-</ul>
-</li>
+<li class="toctree-l1"><a class="reference internal" href="qdk_chemistry.algorithms.energy_estimator.energy_estimator.html">qdk_chemistry.algorithms.energy_estimator.energy_estimator module</a></li>
+<li class="toctree-l1"><a class="reference internal" href="qdk_chemistry.algorithms.energy_estimator.qsharp.html">qdk_chemistry.algorithms.energy_estimator.qsharp module</a></li>
 </ul>
 </div>
 </section>

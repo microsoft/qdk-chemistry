@@ -103,6 +103,12 @@
 
 <span class="n">LOGGER</span> <span class="o">=</span> <span class="n">getLogger</span><span class="p">(</span><span class="vm">__name__</span><span class="p">)</span>
 
+<span class="n">__all__</span> <span class="o">=</span> <span class="p">[</span>
+    <span class="s2">&quot;calculate_sparse_wavefunction&quot;</span><span class="p">,</span>
+    <span class="s2">&quot;get_active_determinants_info&quot;</span><span class="p">,</span>
+    <span class="s2">&quot;get_top_determinants&quot;</span><span class="p">,</span>
+<span class="p">]</span>
+
 
 <div class="viewcode-block" id="get_top_determinants">
 <a class="viewcode-back" href="../../../api/api_autogen/qdk_chemistry.utils.wavefunction.html#qdk_chemistry.utils.wavefunction.get_top_determinants">[docs]</a>
@@ -135,8 +141,7 @@
 
 <span class="sd">    Args:</span>
 <span class="sd">        wavefunction: The Wavefunction object.</span>
-<span class="sd">        max_determinants: Maximum number of determinants to include in the summary.</span>
-<span class="sd">                          If None, include all determinants.</span>
+<span class="sd">        max_determinants: Maximum number of determinants to include in the summary. If None, include all determinants.</span>
 
 <span class="sd">    Returns:</span>
 <span class="sd">        A formatted string listing CI coefficients and their corresponding configurations.</span>

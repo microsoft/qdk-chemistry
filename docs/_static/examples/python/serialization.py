@@ -39,12 +39,12 @@ structure_from_file = structure.from_json_file(json_file)
 # start-cell-hdf5
 hdf5_file = os.path.join(tmpdir, "molecule.structure.h5")
 
-# Serialize to HDF5 file (TODO: HDF5 not yet implemented for Structure)
+# Serialize to HDF5 file
 structure.to_hdf5_file(hdf5_file)
 
 # Deserialize from HDF5 file
-# TODO: fix HDF5 example
-# structure_from_hdf5 = structure.from_hdf5_file(hdf5_file)
+structure_from_hdf5 = structure.from_hdf5_file(hdf5_file)
+print(structure_from_hdf5)
 # end-cell-hdf5
 ################################################################################
 

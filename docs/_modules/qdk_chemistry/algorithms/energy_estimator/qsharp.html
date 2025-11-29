@@ -252,44 +252,6 @@
         <span class="k">return</span> <span class="s2">&quot;qdk_base_simulator&quot;</span></div>
 </div>
 
-
-
-<span class="k">if</span> <span class="vm">__name__</span> <span class="o">==</span> <span class="s2">&quot;__main__&quot;</span><span class="p">:</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;Example usage of the Estimator from different backends.&quot;&quot;&quot;</span>
-    <span class="kn">import</span><span class="w"> </span><span class="nn">logging</span>
-
-    <span class="kn">import</span><span class="w"> </span><span class="nn">numpy</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">np</span>
-
-    <span class="n">logging</span><span class="o">.</span><span class="n">basicConfig</span><span class="p">(</span><span class="n">level</span><span class="o">=</span><span class="n">logging</span><span class="o">.</span><span class="n">WARNING</span><span class="p">)</span>
-    <span class="n">_LOGGER</span> <span class="o">=</span> <span class="n">logging</span><span class="o">.</span><span class="n">getLogger</span><span class="p">(</span><span class="vm">__name__</span><span class="p">)</span>
-    <span class="n">_LOGGER</span><span class="o">.</span><span class="n">setLevel</span><span class="p">(</span><span class="n">logging</span><span class="o">.</span><span class="n">INFO</span><span class="p">)</span>
-
-    <span class="n">circuit_qasm</span> <span class="o">=</span> <span class="s2">&quot;&quot;&quot;</span>
-<span class="s2">        include &quot;stdgates.inc&quot;;</span>
-<span class="s2">        qubit[2] q;</span>
-<span class="s2">        rz(pi) q[0];</span>
-<span class="s2">        x q[0];</span>
-<span class="s2">        cx q[0], q[1];</span>
-<span class="s2">        &quot;&quot;&quot;</span>
-    <span class="n">qubit_hamiltonians</span> <span class="o">=</span> <span class="p">[</span><span class="n">QubitHamiltonian</span><span class="p">([</span><span class="s2">&quot;ZZ&quot;</span><span class="p">],</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">([</span><span class="mf">1.0</span><span class="p">]))]</span>
-
-    <span class="c1"># Example usage: qsharp simulator</span>
-    <span class="n">estimator</span> <span class="o">=</span> <span class="n">QDKEnergyEstimator</span><span class="p">()</span>
-    <span class="n">results</span> <span class="o">=</span> <span class="n">estimator</span><span class="o">.</span><span class="n">run</span><span class="p">(</span><span class="n">circuit_qasm</span><span class="p">,</span> <span class="n">qubit_hamiltonians</span><span class="p">,</span> <span class="n">total_shots</span><span class="o">=</span><span class="mi">1000</span><span class="p">)</span>
-    <span class="n">_LOGGER</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Energy expectation value from QDK Simulator: </span><span class="si">{</span><span class="n">results</span><span class="p">[</span><span class="s1">&#39;energy_expectation_value&#39;</span><span class="p">]</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
-
-    <span class="c1"># Example usage: qsharp simulator with depolarizing noise</span>
-    <span class="n">noise_model</span> <span class="o">=</span> <span class="n">DepolarizingNoise</span><span class="p">(</span><span class="mf">0.01</span><span class="p">)</span>
-    <span class="n">estimator</span> <span class="o">=</span> <span class="n">QDKEnergyEstimator</span><span class="p">(</span><span class="n">noise_model</span><span class="o">=</span><span class="n">noise_model</span><span class="p">)</span>
-    <span class="n">results</span> <span class="o">=</span> <span class="n">estimator</span><span class="o">.</span><span class="n">run</span><span class="p">(</span><span class="n">circuit_qasm</span><span class="p">,</span> <span class="n">qubit_hamiltonians</span><span class="p">,</span> <span class="n">total_shots</span><span class="o">=</span><span class="mi">1000</span><span class="p">)</span>
-    <span class="n">_LOGGER</span><span class="o">.</span><span class="n">info</span><span class="p">(</span>
-        <span class="sa">f</span><span class="s2">&quot;Energy expectation value from QDK Simulator with depolarizing noise: </span><span class="si">{</span><span class="n">results</span><span class="p">[</span><span class="s1">&#39;energy_expectation_value&#39;</span><span class="p">]</span><span class="si">}</span><span class="s2">&quot;</span>
-    <span class="p">)</span>
-
-    <span class="c1"># Example usage: qsharp simulator with qubit loss</span>
-    <span class="n">estimator</span> <span class="o">=</span> <span class="n">QDKEnergyEstimator</span><span class="p">(</span><span class="n">qubit_loss</span><span class="o">=</span><span class="mf">0.05</span><span class="p">)</span>
-    <span class="n">results</span> <span class="o">=</span> <span class="n">estimator</span><span class="o">.</span><span class="n">run</span><span class="p">(</span><span class="n">circuit_qasm</span><span class="p">,</span> <span class="n">qubit_hamiltonians</span><span class="p">,</span> <span class="n">total_shots</span><span class="o">=</span><span class="mi">1000</span><span class="p">)</span>
-    <span class="n">_LOGGER</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Energy expectation value from QDK Simulator with qubit loss: </span><span class="si">{</span><span class="n">results</span><span class="p">[</span><span class="s1">&#39;energy_expectation_value&#39;</span><span class="p">]</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
 </pre></div>
 
            </div>

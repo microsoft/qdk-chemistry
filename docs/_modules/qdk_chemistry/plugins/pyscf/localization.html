@@ -77,6 +77,7 @@
   <ul class="wy-breadcrumbs">
       <li><a href="../../../../index.html" class="icon icon-home" aria-label="Home"></a></li>
           <li class="breadcrumb-item"><a href="../../../index.html">Module code</a></li>
+          <li class="breadcrumb-item"><a href="../pyscf.html">qdk_chemistry.plugins.pyscf</a></li>
       <li class="breadcrumb-item active">qdk_chemistry.plugins.pyscf.localization</li>
       <li class="wy-breadcrumbs-aside">
       </li>
@@ -106,7 +107,7 @@
 
 <span class="sd">This module registers a ``pyscf`` localizer with the QDK/Chemistry localizer registry at</span>
 <span class="sd">import time, making the functionality available via</span>
-<span class="sd">``qdk_chemistry.algorithms.create(&quot;localizer&quot;, &quot;pyscf&quot;)``.</span>
+<span class="sd">``qdk_chemistry.algorithms.create(&quot;orbital_localizer&quot;, &quot;pyscf&quot;)``.</span>
 
 <span class="sd">Requires: PySCF (the code uses the ``pyscf.lo`` localization routines).</span>
 <span class="sd">&quot;&quot;&quot;</span>
@@ -118,9 +119,11 @@
 
 <span class="kn">from</span><span class="w"> </span><span class="nn">pyscf</span><span class="w"> </span><span class="kn">import</span> <span class="n">lo</span>
 
-<span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.algorithms</span><span class="w"> </span><span class="kn">import</span> <span class="n">Localizer</span><span class="p">,</span> <span class="n">register</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.algorithms</span><span class="w"> </span><span class="kn">import</span> <span class="n">OrbitalLocalizer</span><span class="p">,</span> <span class="n">register</span>
 <span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.data</span><span class="w"> </span><span class="kn">import</span> <span class="n">Orbitals</span><span class="p">,</span> <span class="n">SciWavefunctionContainer</span><span class="p">,</span> <span class="n">Settings</span><span class="p">,</span> <span class="n">SlaterDeterminantContainer</span><span class="p">,</span> <span class="n">Wavefunction</span>
 <span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.plugins.pyscf.utils</span><span class="w"> </span><span class="kn">import</span> <span class="n">basis_to_pyscf_mol</span>
+
+<span class="n">__all__</span> <span class="o">=</span> <span class="p">[</span><span class="s2">&quot;PyscfLocalizer&quot;</span><span class="p">,</span> <span class="s2">&quot;PyscfLocalizerSettings&quot;</span><span class="p">]</span>
 
 
 <div class="viewcode-block" id="PyscfLocalizerSettings">
@@ -167,7 +170,7 @@
 
 <div class="viewcode-block" id="PyscfLocalizer">
 <a class="viewcode-back" href="../../../../api/api_autogen/qdk_chemistry.plugins.pyscf.localization.html#qdk_chemistry.plugins.pyscf.localization.PyscfLocalizer">[docs]</a>
-<span class="k">class</span><span class="w"> </span><span class="nc">PyscfLocalizer</span><span class="p">(</span><span class="n">Localizer</span><span class="p">):</span>
+<span class="k">class</span><span class="w"> </span><span class="nc">PyscfLocalizer</span><span class="p">(</span><span class="n">OrbitalLocalizer</span><span class="p">):</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;PySCF-based orbital localizer for quantum chemistry calculations.</span>
 
 <span class="sd">    This class implements orbital localization using routines from PySCF.</span>

@@ -63,8 +63,7 @@
 <li class="toctree-l2"><a class="reference internal" href="../python_api.html#utilities">Utilities</a></li>
 <li class="toctree-l2 current"><a class="reference internal" href="../python_api.html#constants">Constants</a><ul class="current">
 <li class="toctree-l3 current"><a class="current reference internal" href="#">qdk_chemistry.constants module</a><ul>
-<li class="toctree-l4"><a class="reference internal" href="#data-source">Data Source</a></li>
-<li class="toctree-l4"><a class="reference internal" href="#constants-documentation">Constants Documentation</a></li>
+<li class="toctree-l4"><a class="reference internal" href="#qdk_chemistry.constants.ConstantInfo"><code class="docutils literal notranslate"><span class="pre">ConstantInfo</span></code></a></li>
 <li class="toctree-l4"><a class="reference internal" href="#qdk_chemistry.constants.find_constant"><code class="docutils literal notranslate"><span class="pre">find_constant()</span></code></a></li>
 <li class="toctree-l4"><a class="reference internal" href="#qdk_chemistry.constants.get_constant_info"><code class="docutils literal notranslate"><span class="pre">get_constant_info()</span></code></a></li>
 <li class="toctree-l4"><a class="reference internal" href="#qdk_chemistry.constants.get_constants_info"><code class="docutils literal notranslate"><span class="pre">get_constants_info()</span></code></a></li>
@@ -121,20 +120,19 @@ with conversion factors available for different unit systems.</p>
 <p>The constants include fundamental physical constants, particle masses,
 and energy conversion factors commonly used in computational chemistry
 and quantum mechanics.</p>
-<section id="data-source">
-<h2>Data Source<a class="headerlink" href="#data-source" title="Link to this heading"></a></h2>
-<p>CODATA recommended values of the fundamental physical constants
+<dl class="simple">
+<dt>Data Source:</dt><dd><p>CODATA recommended values of the fundamental physical constants
 Currently using: CODATA 2018 (default)
 Also available: CODATA 2014 (via C++ preprocessor directives)
 <a class="reference external" href="https://physics.nist.gov/cuu/Constants/">https://physics.nist.gov/cuu/Constants/</a></p>
-</section>
-<section id="constants-documentation">
-<h2>Constants Documentation<a class="headerlink" href="#constants-documentation" title="Link to this heading"></a></h2>
-<p>Each constant includes detailed documentation about its physical meaning,
+</dd>
+<dt>Constants Documentation:</dt><dd><p>Each constant includes detailed documentation about its physical meaning,
 units, mathematical symbol, and provenance. The documentation automatically
 reflects the CODATA version currently in use. You can access this information
 using the <code class="docutils literal notranslate"><span class="pre">get_constant_info()</span></code> function or by examining the <code class="docutils literal notranslate"><span class="pre">__doc__</span></code> attribute
 of individual constants.</p>
+</dd>
+</dl>
 <p class="rubric">Examples</p>
 <div class="doctest highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.constants</span><span class="w"> </span><span class="kn">import</span> <span class="n">ANGSTROM_TO_BOHR</span><span class="p">,</span> <span class="n">HARTREE_TO_EV</span>
 <span class="gp">&gt;&gt;&gt; </span><span class="n">length_angstrom</span> <span class="o">=</span> <span class="mf">1.5</span>
@@ -157,10 +155,57 @@ of individual constants.</p>
 <span class="gp">&gt;&gt;&gt; </span><span class="n">list_constants</span><span class="p">()</span>
 </pre></div>
 </div>
-</section>
+<dl class="py class">
+<dt class="sig sig-object py" id="qdk_chemistry.constants.ConstantInfo">
+<em class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">qdk_chemistry.constants.</span></span><span class="sig-name descname"><span class="pre">ConstantInfo</span></span><a class="headerlink" href="#qdk_chemistry.constants.ConstantInfo" title="Link to this definition"></a></dt>
+<dd><p>Bases: <a class="reference internal" href="../_py_placeholders.html#pybind11_builtins.pybind11_object" title="pybind11_builtins.pybind11_object"><code class="xref py py-class docutils literal notranslate"><span class="pre">pybind11_object</span></code></a></p>
+<p>Documentation information for a physical constant</p>
+<dl class="py method">
+<dt class="sig sig-object py" id="qdk_chemistry.constants.ConstantInfo.__init__">
+<span class="sig-name descname"><span class="pre">__init__</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="o"><span class="pre">*</span></span><span class="n"><span class="pre">args</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">kwargs</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#qdk_chemistry.constants.ConstantInfo.__init__" title="Link to this definition"></a></dt>
+<dd></dd></dl>
+
+<dl class="py property">
+<dt class="sig sig-object py" id="qdk_chemistry.constants.ConstantInfo.description">
+<em class="property"><span class="k"><span class="pre">property</span></span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">description</span></span><a class="headerlink" href="#qdk_chemistry.constants.ConstantInfo.description" title="Link to this definition"></a></dt>
+<dd><p>Description of the physical meaning</p>
+</dd></dl>
+
+<dl class="py property">
+<dt class="sig sig-object py" id="qdk_chemistry.constants.ConstantInfo.name">
+<em class="property"><span class="k"><span class="pre">property</span></span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">name</span></span><a class="headerlink" href="#qdk_chemistry.constants.ConstantInfo.name" title="Link to this definition"></a></dt>
+<dd><p>Name of the constant</p>
+</dd></dl>
+
+<dl class="py property">
+<dt class="sig sig-object py" id="qdk_chemistry.constants.ConstantInfo.source">
+<em class="property"><span class="k"><span class="pre">property</span></span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">source</span></span><a class="headerlink" href="#qdk_chemistry.constants.ConstantInfo.source" title="Link to this definition"></a></dt>
+<dd><p>Data source (e.g., ‘CODATA 2018’)</p>
+</dd></dl>
+
+<dl class="py property">
+<dt class="sig sig-object py" id="qdk_chemistry.constants.ConstantInfo.symbol">
+<em class="property"><span class="k"><span class="pre">property</span></span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">symbol</span></span><a class="headerlink" href="#qdk_chemistry.constants.ConstantInfo.symbol" title="Link to this definition"></a></dt>
+<dd><p>Mathematical symbol</p>
+</dd></dl>
+
+<dl class="py property">
+<dt class="sig sig-object py" id="qdk_chemistry.constants.ConstantInfo.units">
+<em class="property"><span class="k"><span class="pre">property</span></span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">units</span></span><a class="headerlink" href="#qdk_chemistry.constants.ConstantInfo.units" title="Link to this definition"></a></dt>
+<dd><p>Units of measurement</p>
+</dd></dl>
+
+<dl class="py property">
+<dt class="sig sig-object py" id="qdk_chemistry.constants.ConstantInfo.value">
+<em class="property"><span class="k"><span class="pre">property</span></span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">value</span></span><a class="headerlink" href="#qdk_chemistry.constants.ConstantInfo.value" title="Link to this definition"></a></dt>
+<dd><p>Numerical value</p>
+</dd></dl>
+
+</dd></dl>
+
 <dl class="py function">
 <dt class="sig sig-object py" id="qdk_chemistry.constants.find_constant">
-<span class="sig-name descname"><span class="pre">find_constant</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">search_term</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../../_modules/qdk_chemistry/constants.html#find_constant"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#qdk_chemistry.constants.find_constant" title="Link to this definition"></a></dt>
+<span class="sig-prename descclassname"><span class="pre">qdk_chemistry.constants.</span></span><span class="sig-name descname"><span class="pre">find_constant</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">search_term</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../../_modules/qdk_chemistry/constants.html#find_constant"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#qdk_chemistry.constants.find_constant" title="Link to this definition"></a></dt>
 <dd><p>Find constants matching a search term.</p>
 <dl class="field-list simple">
 <dt class="field-odd">Return type<span class="colon">:</span></dt>
@@ -183,19 +228,19 @@ of individual constants.</p>
 
 <dl class="py function">
 <dt class="sig sig-object py" id="qdk_chemistry.constants.get_constant_info">
-<span class="sig-name descname"><span class="pre">get_constant_info</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">name</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)"><span class="pre">str</span></a></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">qdk_chemistry._core.constants.ConstantInfo</span></span></span><a class="headerlink" href="#qdk_chemistry.constants.get_constant_info" title="Link to this definition"></a></dt>
+<span class="sig-prename descclassname"><span class="pre">qdk_chemistry.constants.</span></span><span class="sig-name descname"><span class="pre">get_constant_info</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">name</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)"><span class="pre">str</span></a></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><a class="reference internal" href="#qdk_chemistry.constants.ConstantInfo" title="qdk_chemistry.constants.ConstantInfo"><span class="pre">qdk_chemistry.constants.ConstantInfo</span></a></span></span><a class="headerlink" href="#qdk_chemistry.constants.get_constant_info" title="Link to this definition"></a></dt>
 <dd><p>Get documentation information for a specific constant</p>
 </dd></dl>
 
 <dl class="py function">
 <dt class="sig sig-object py" id="qdk_chemistry.constants.get_constants_info">
-<span class="sig-name descname"><span class="pre">get_constants_info</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#dict" title="(in Python v3.14)"><span class="pre">dict</span></a><span class="p"><span class="pre">[</span></span><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)"><span class="pre">str</span></a><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">qdk_chemistry._core.constants.ConstantInfo</span><span class="p"><span class="pre">]</span></span></span></span><a class="headerlink" href="#qdk_chemistry.constants.get_constants_info" title="Link to this definition"></a></dt>
+<span class="sig-prename descclassname"><span class="pre">qdk_chemistry.constants.</span></span><span class="sig-name descname"><span class="pre">get_constants_info</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#dict" title="(in Python v3.14)"><span class="pre">dict</span></a><span class="p"><span class="pre">[</span></span><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)"><span class="pre">str</span></a><span class="p"><span class="pre">,</span></span><span class="w"> </span><a class="reference internal" href="#qdk_chemistry.constants.ConstantInfo" title="qdk_chemistry.constants.ConstantInfo"><span class="pre">qdk_chemistry.constants.ConstantInfo</span></a><span class="p"><span class="pre">]</span></span></span></span><a class="headerlink" href="#qdk_chemistry.constants.get_constants_info" title="Link to this definition"></a></dt>
 <dd><p>Get documentation information for all available constants</p>
 </dd></dl>
 
 <dl class="py function">
 <dt class="sig sig-object py" id="qdk_chemistry.constants.list_constants">
-<span class="sig-name descname"><span class="pre">list_constants</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">show_values</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">True</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">show_units</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">True</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../../_modules/qdk_chemistry/constants.html#list_constants"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#qdk_chemistry.constants.list_constants" title="Link to this definition"></a></dt>
+<span class="sig-prename descclassname"><span class="pre">qdk_chemistry.constants.</span></span><span class="sig-name descname"><span class="pre">list_constants</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">show_values</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">True</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">show_units</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">True</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../../_modules/qdk_chemistry/constants.html#list_constants"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#qdk_chemistry.constants.list_constants" title="Link to this definition"></a></dt>
 <dd><p>List all available constants with their documentation.</p>
 <dl class="field-list simple">
 <dt class="field-odd">Return type<span class="colon">:</span></dt>
@@ -217,7 +262,7 @@ of individual constants.</p>
 
 <dl class="py function">
 <dt class="sig sig-object py" id="qdk_chemistry.constants.show_constant_details">
-<span class="sig-name descname"><span class="pre">show_constant_details</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">name</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../../_modules/qdk_chemistry/constants.html#show_constant_details"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#qdk_chemistry.constants.show_constant_details" title="Link to this definition"></a></dt>
+<span class="sig-prename descclassname"><span class="pre">qdk_chemistry.constants.</span></span><span class="sig-name descname"><span class="pre">show_constant_details</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">name</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../../_modules/qdk_chemistry/constants.html#show_constant_details"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#qdk_chemistry.constants.show_constant_details" title="Link to this definition"></a></dt>
 <dd><p>Print detailed information about a specific constant.</p>
 <dl class="field-list simple">
 <dt class="field-odd">Return type<span class="colon">:</span></dt>

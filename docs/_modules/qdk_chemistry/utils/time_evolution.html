@@ -94,15 +94,29 @@
 <span class="c1"># Licensed under the MIT License. See LICENSE.txt in the project root for license information.</span>
 <span class="c1"># --------------------------------------------------------------------------------------------</span>
 
-<span class="kn">from</span><span class="w"> </span><span class="nn">collections.abc</span><span class="w"> </span><span class="kn">import</span> <span class="n">Iterable</span><span class="p">,</span> <span class="n">Sequence</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">__future__</span><span class="w"> </span><span class="kn">import</span> <span class="n">annotations</span>
+
 <span class="kn">from</span><span class="w"> </span><span class="nn">dataclasses</span><span class="w"> </span><span class="kn">import</span> <span class="n">dataclass</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">typing</span><span class="w"> </span><span class="kn">import</span> <span class="n">TYPE_CHECKING</span>
 
 <span class="kn">import</span><span class="w"> </span><span class="nn">numpy</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">np</span>
-<span class="kn">from</span><span class="w"> </span><span class="nn">qiskit</span><span class="w"> </span><span class="kn">import</span> <span class="n">QuantumCircuit</span>
-<span class="kn">from</span><span class="w"> </span><span class="nn">qiskit.circuit</span><span class="w"> </span><span class="kn">import</span> <span class="n">Qubit</span>
-<span class="kn">from</span><span class="w"> </span><span class="nn">qiskit.quantum_info</span><span class="w"> </span><span class="kn">import</span> <span class="n">SparsePauliOp</span>
 
-<span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.data</span><span class="w"> </span><span class="kn">import</span> <span class="n">QubitHamiltonian</span>
+<span class="k">if</span> <span class="n">TYPE_CHECKING</span><span class="p">:</span>
+    <span class="kn">from</span><span class="w"> </span><span class="nn">collections.abc</span><span class="w"> </span><span class="kn">import</span> <span class="n">Iterable</span><span class="p">,</span> <span class="n">Sequence</span>
+
+    <span class="kn">from</span><span class="w"> </span><span class="nn">qiskit</span><span class="w"> </span><span class="kn">import</span> <span class="n">QuantumCircuit</span>
+    <span class="kn">from</span><span class="w"> </span><span class="nn">qiskit.circuit</span><span class="w"> </span><span class="kn">import</span> <span class="n">Qubit</span>
+    <span class="kn">from</span><span class="w"> </span><span class="nn">qiskit.quantum_info</span><span class="w"> </span><span class="kn">import</span> <span class="n">SparsePauliOp</span>
+
+    <span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.data.qubit_hamiltonian</span><span class="w"> </span><span class="kn">import</span> <span class="n">QubitHamiltonian</span>
+
+<span class="n">__all__</span> <span class="o">=</span> <span class="p">[</span>
+    <span class="s2">&quot;PauliEvolutionTerm&quot;</span><span class="p">,</span>
+    <span class="s2">&quot;append_controlled_time_evolution&quot;</span><span class="p">,</span>
+    <span class="s2">&quot;controlled_pauli_rotation&quot;</span><span class="p">,</span>
+    <span class="s2">&quot;extract_terms_from_hamiltonian&quot;</span><span class="p">,</span>
+    <span class="s2">&quot;pauli_evolution_terms&quot;</span><span class="p">,</span>
+<span class="p">]</span>
 
 
 <div class="viewcode-block" id="PauliEvolutionTerm">
@@ -136,20 +150,19 @@
 <div class="viewcode-block" id="pauli_evolution_terms">
 <a class="viewcode-back" href="../../../api/api_autogen/qdk_chemistry.utils.time_evolution.html#qdk_chemistry.utils.time_evolution.pauli_evolution_terms">[docs]</a>
 <span class="k">def</span><span class="w"> </span><span class="nf">pauli_evolution_terms</span><span class="p">(</span><span class="n">pauli_op</span><span class="p">:</span> <span class="n">SparsePauliOp</span><span class="p">,</span> <span class="o">*</span><span class="p">,</span> <span class="n">atol</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="mf">1e-12</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">list</span><span class="p">[</span><span class="n">PauliEvolutionTerm</span><span class="p">]:</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;Convert a ``SparsePauliOp`` into rotation data for time evolution.</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Convert a :class:`~qiskit.quantum_info.SparsePauliOp` into rotation data for time evolution.</span>
 
 <span class="sd">    Args:</span>
-<span class="sd">        pauli_op: Operator to decompose.</span>
-<span class="sd">        atol: Absolute tolerance used to discard negligible coefficients and to</span>
-<span class="sd">            detect unwanted imaginary components.</span>
+<span class="sd">        pauli_op (:class:`~qiskit.quantum_info.SparsePauliOp`): Operator to decompose.</span>
+<span class="sd">        atol (float): Absolute tolerance used to discard negligible coefficients</span>
+
+<span class="sd">            and to detect unwanted imaginary components.</span>
 
 <span class="sd">    Returns:</span>
-<span class="sd">        Ordered list of :class:`PauliEvolutionTerm` entries describing each</span>
-<span class="sd">        non-identity component of ``pauli_op``.</span>
+<span class="sd">        Ordered list of :class:`PauliEvolutionTerm` entries describing each non-identity component of ``pauli_op``.</span>
 
 <span class="sd">    Raises:</span>
-<span class="sd">        ValueError: If a coefficient has an imaginary part whose magnitude</span>
-<span class="sd">            exceeds ``atol``.</span>
+<span class="sd">        ValueError: If a coefficient has an imaginary part whose magnitude exceeds ``atol``.</span>
 
 <span class="sd">    &quot;&quot;&quot;</span>
     <span class="n">terms</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="n">PauliEvolutionTerm</span><span class="p">]</span> <span class="o">=</span> <span class="p">[]</span>
@@ -274,7 +287,7 @@
 <div class="viewcode-block" id="extract_terms_from_hamiltonian">
 <a class="viewcode-back" href="../../../api/api_autogen/qdk_chemistry.utils.time_evolution.html#qdk_chemistry.utils.time_evolution.extract_terms_from_hamiltonian">[docs]</a>
 <span class="k">def</span><span class="w"> </span><span class="nf">extract_terms_from_hamiltonian</span><span class="p">(</span><span class="n">hamiltonian</span><span class="p">:</span> <span class="n">QubitHamiltonian</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">list</span><span class="p">[</span><span class="n">PauliEvolutionTerm</span><span class="p">]:</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;Compute the cached Pauli decomposition for a :class:`QubitHamiltonian`.</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Compute the cached Pauli decomposition for a :class:`qdk_chemistry.data.QubitHamiltonian`.</span>
 
 <span class="sd">    Args:</span>
 <span class="sd">        hamiltonian: Hamiltonian whose Pauli terms are required.</span>

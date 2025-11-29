@@ -1,0 +1,8 @@
+qdk\_chemistry.algorithms.multi\_configuration\_scf module
+==========================================================
+
+.. automodule:: qdk_chemistry.algorithms.multi_configuration_scf
+   :members:
+   :private-members:
+   :show-inheritance:
+   :undoc-members:

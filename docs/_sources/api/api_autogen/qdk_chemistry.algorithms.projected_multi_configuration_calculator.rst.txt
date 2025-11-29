@@ -1,0 +1,8 @@
+qdk\_chemistry.algorithms.projected\_multi\_configuration\_calculator module
+============================================================================
+
+.. automodule:: qdk_chemistry.algorithms.projected_multi_configuration_calculator
+   :members:
+   :private-members:
+   :show-inheritance:
+   :undoc-members:

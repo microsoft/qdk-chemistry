@@ -1,0 +1,8 @@
+qdk\_chemistry.algorithms.scf\_solver module
+============================================
+
+.. automodule:: qdk_chemistry.algorithms.scf_solver
+   :members:
+   :private-members:
+   :show-inheritance:
+   :undoc-members:

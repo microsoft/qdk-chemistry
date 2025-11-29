@@ -6,7 +6,7 @@
   <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
 
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Self-consistent field solver &mdash; qdk-chemistry 1.0.0-rc1 documentation</title>
+  <title>Self-consistent field solving &mdash; qdk-chemistry 1.0.0-rc1 documentation</title>
       <link rel="stylesheet" type="text/css" href="../../../_static/pygments.css?v=b86133f3" />
       <link rel="stylesheet" type="text/css" href="../../../_static/css/theme.css?v=e59714d7" />
       <link rel="stylesheet" type="text/css" href="../../../_static/tabs.css?v=4c969af8" />
@@ -65,7 +65,7 @@
 <li class="toctree-l3"><a class="reference internal" href="pmc.html">Projected multi-configuration calculations</a></li>
 <li class="toctree-l3"><a class="reference internal" href="qubit_mapper.html">Qubit mapping</a></li>
 <li class="toctree-l3"><a class="reference internal" href="reference_derived.html">Reference-derived calculations</a></li>
-<li class="toctree-l3 current"><a class="current reference internal" href="#">Self-consistent field solver</a><ul>
+<li class="toctree-l3 current"><a class="current reference internal" href="#">Self-consistent field solving</a><ul>
 <li class="toctree-l4"><a class="reference internal" href="#overview">Overview</a></li>
 <li class="toctree-l4"><a class="reference internal" href="#capabilities">Capabilities</a></li>
 <li class="toctree-l4"><a class="reference internal" href="#creating-an-scf-solver">Creating an <span class="xref std std-term">SCF</span> solver</a></li>
@@ -74,11 +74,11 @@
 <li class="toctree-l4"><a class="reference internal" href="#available-settings">Available settings</a></li>
 <li class="toctree-l4"><a class="reference internal" href="#implemented-interface">Implemented interface</a></li>
 <li class="toctree-l4"><a class="reference internal" href="#related-classes">Related classes</a></li>
-<li class="toctree-l4"><a class="reference internal" href="#related-topics">Related topics</a></li>
+<li class="toctree-l4"><a class="reference internal" href="#further-reading">Further reading</a></li>
 </ul>
 </li>
 <li class="toctree-l3"><a class="reference internal" href="stability_checker.html">Self-consistent field stability checks</a></li>
-<li class="toctree-l3"><a class="reference internal" href="state_preparation.html">State preparation</a></li>
+<li class="toctree-l3"><a class="reference internal" href="state_preparation.html">State Preparation</a></li>
 </ul>
 </li>
 <li class="toctree-l2"><a class="reference internal" href="../basis_functionals.html">Functionals and basis sets</a></li>
@@ -114,7 +114,7 @@
       <li><a href="../../../index.html" class="icon icon-home" aria-label="Home"></a></li>
           <li class="breadcrumb-item"><a href="../index.html">In-depth user guide</a></li>
           <li class="breadcrumb-item"><a href="index.html">Available algorithms</a></li>
-      <li class="breadcrumb-item active">Self-consistent field solver</li>
+      <li class="breadcrumb-item active">Self-consistent field solving</li>
       <li class="wy-breadcrumbs-aside">
             <a href="../../../_sources/user/comprehensive/algorithms/scf_solver.rst.txt" rel="nofollow"> View page source</a>
       </li>
@@ -124,8 +124,8 @@
           <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
            <div itemprop="articleBody">
              
-  <section id="self-consistent-field-solver">
-<h1>Self-consistent field solver<a class="headerlink" href="#self-consistent-field-solver" title="Link to this heading"></a></h1>
+  <section id="self-consistent-field-solving">
+<h1>Self-consistent field solving<a class="headerlink" href="#self-consistent-field-solving" title="Link to this heading"></a></h1>
 <p>The <a class="reference internal" href="../../../api/api_autogen/qdk_chemistry.algorithms.html#qdk_chemistry.algorithms.ScfSolver" title="qdk_chemistry.algorithms.ScfSolver"><code class="xref py py-class docutils literal notranslate"><span class="pre">ScfSolver</span></code></a> algorithm in QDK/Chemistry performs Self-Consistent Field (SCF) calculations to optimize molecular orbitals for a given molecular structure.
 Following QDK/Chemistry’s <a class="reference internal" href="../design/index.html"><span class="doc">algorithm design principles</span></a>, it takes a <a class="reference internal" href="../data/structure.html"><span class="doc">Structure</span></a> instance as input and produces an <a class="reference internal" href="../data/orbitals.html"><span class="doc">Orbitals</span></a> instance as output.
 Its primary purpose is to find the best single-particle orbitals within a mean-field approximation.
@@ -193,7 +193,7 @@ See <a class="reference internal" href="mc_calculator.html"><span class="doc">MC
 </li>
 <li><p><strong>Basis set support</strong>:</p>
 <ul>
-<li><p>Extensive library of standard quantum chemistry basis sets including Pople (STO-nG, 3-21G,
+<li><p>Extensive library of standard quantum chemistry <a class="reference internal" href="../basis_functionals.html"><span class="doc">basis sets</span></a> including Pople (STO-nG, 3-21G,
 6-31G, etc.), Dunning (cc-pVDZ, cc-pVTZ, etc.), and Karlsruhe (def2-SVP, def2-TZVP, etc.) families</p></li>
 <li><p>Support for custom basis sets and effective core potentials (ECPs)</p></li>
 </ul>
@@ -243,40 +243,20 @@ See <a class="reference internal" href="mc_calculator.html"><span class="doc">MC
 </div>
 </div>
 <input class="tab-input" id="tab-set--0-input--2" name="tab-set--0" type="radio"><label class="tab-label" for="tab-set--0-input--2">Python API</label><div class="tab-content docutils container">
-<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="sd">&quot;&quot;&quot;Factory pattern usage examples.&quot;&quot;&quot;</span>
-
-<span class="c1"># --------------------------------------------------------------------------------------------</span>
-<span class="c1"># Copyright (c) Microsoft Corporation. All rights reserved.</span>
-<span class="c1"># Licensed under the MIT License. See LICENSE.txt in the project root for license information.</span>
-<span class="c1"># --------------------------------------------------------------------------------------------</span>
-
-<span class="kn">import</span><span class="w"> </span><span class="nn">numpy</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">np</span>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span><span class="w"> </span><span class="nn">numpy</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">np</span>
 <span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.algorithms</span><span class="w"> </span><span class="kn">import</span> <span class="n">available</span><span class="p">,</span> <span class="n">create</span>
 <span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.data</span><span class="w"> </span><span class="kn">import</span> <span class="n">Structure</span>
 
-<span class="c1"># Create a simple molecule for testing</span>
+<span class="c1"># Create a Structure (coordinates in Bohr/atomic units)</span>
 <span class="n">coords</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">([[</span><span class="mf">0.0</span><span class="p">,</span> <span class="mf">0.0</span><span class="p">,</span> <span class="mf">0.0</span><span class="p">],</span> <span class="p">[</span><span class="mf">0.0</span><span class="p">,</span> <span class="mf">0.0</span><span class="p">,</span> <span class="mf">1.4</span><span class="p">]])</span>
-<span class="n">molecule</span> <span class="o">=</span> <span class="n">Structure</span><span class="p">(</span><span class="n">coords</span><span class="p">,</span> <span class="p">[</span><span class="s2">&quot;H&quot;</span><span class="p">,</span> <span class="s2">&quot;H&quot;</span><span class="p">])</span>
+<span class="n">structure</span> <span class="o">=</span> <span class="n">Structure</span><span class="p">(</span><span class="n">coords</span><span class="p">,</span> <span class="p">[</span><span class="s2">&quot;H&quot;</span><span class="p">,</span> <span class="s2">&quot;H&quot;</span><span class="p">])</span>
 
-<span class="c1"># Create algorithms using the factory</span>
+<span class="c1"># List available SCF solver implementations</span>
+<span class="n">available_solvers</span> <span class="o">=</span> <span class="n">available</span><span class="p">(</span><span class="s2">&quot;scf_solver&quot;</span><span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Available SCF solvers: </span><span class="si">{</span><span class="n">available_solvers</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+
+<span class="c1"># Create the default ScfSolver instance</span>
 <span class="n">scf_solver</span> <span class="o">=</span> <span class="n">create</span><span class="p">(</span><span class="s2">&quot;scf_solver&quot;</span><span class="p">)</span>
-<span class="n">hamiltonian_constructor</span> <span class="o">=</span> <span class="n">create</span><span class="p">(</span><span class="s2">&quot;hamiltonian_constructor&quot;</span><span class="p">)</span>
-<span class="n">orbital_localizer</span> <span class="o">=</span> <span class="n">create</span><span class="p">(</span><span class="s2">&quot;orbital_localizer&quot;</span><span class="p">)</span>
-
-<span class="c1"># List available algorithms</span>
-<span class="nb">print</span><span class="p">(</span><span class="s2">&quot;Available SCF solvers:&quot;</span><span class="p">,</span> <span class="n">available</span><span class="p">(</span><span class="s2">&quot;scf_solver&quot;</span><span class="p">))</span>
-<span class="nb">print</span><span class="p">(</span><span class="s2">&quot;Available Hamiltonian constructors:&quot;</span><span class="p">,</span> <span class="n">available</span><span class="p">(</span><span class="s2">&quot;hamiltonian_constructor&quot;</span><span class="p">))</span>
-<span class="nb">print</span><span class="p">(</span><span class="s2">&quot;Available orbital localizers:&quot;</span><span class="p">,</span> <span class="n">available</span><span class="p">(</span><span class="s2">&quot;orbital_localizer&quot;</span><span class="p">))</span>
-
-<span class="c1"># Example of creating with custom settings</span>
-<span class="n">scf_solver</span> <span class="o">=</span> <span class="n">create</span><span class="p">(</span><span class="s2">&quot;scf_solver&quot;</span><span class="p">)</span>
-<span class="n">scf_solver</span><span class="o">.</span><span class="n">settings</span><span class="p">()</span><span class="o">.</span><span class="n">set</span><span class="p">(</span><span class="s2">&quot;max_iterations&quot;</span><span class="p">,</span> <span class="mi">100</span><span class="p">)</span>
-<span class="n">scf_solver</span><span class="o">.</span><span class="n">settings</span><span class="p">()</span><span class="o">.</span><span class="n">set</span><span class="p">(</span><span class="s2">&quot;basis_set&quot;</span><span class="p">,</span> <span class="s2">&quot;sto-3g&quot;</span><span class="p">)</span>
-<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Set max_iterations to: </span><span class="si">{</span><span class="n">scf_solver</span><span class="o">.</span><span class="n">settings</span><span class="p">()</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;max_iterations&#39;</span><span class="p">)</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
-
-<span class="c1"># Run the SCF solver with the molecule (requires resources directory)</span>
-<span class="c1"># E_scf, wfn = scf_solver.run(molecule, charge=0, spin_multiplicity=1)</span>
-<span class="c1"># print(f&quot;SCF Energy: {E_scf}&quot;)</span>
 </pre></div>
 </div>
 </div>
@@ -298,9 +278,11 @@ This reference provides detailed information about all pre-defined basis sets yo
 <input checked="True" class="tab-input" id="tab-set--1-input--1" name="tab-set--1" type="radio"><label class="tab-label" for="tab-set--1-input--1">C++ API</label><div class="tab-content docutils container">
 <div class="highlight-cpp notranslate"><div class="highlight"><pre><span></span><span class="c1">// Standard settings that work with all solvers</span>
 <span class="c1">// Set the method</span>
-<span class="n">scf_solver</span><span class="p">.</span><span class="n">settings</span><span class="p">().</span><span class="n">set</span><span class="p">(</span><span class="s">&quot;method&quot;</span><span class="p">,</span><span class="w"> </span><span class="s">&quot;dft&quot;</span><span class="p">)</span>
-<span class="c1">// Set the basis set</span>
-<span class="n">scf_solver</span><span class="o">-&gt;</span><span class="n">settings</span><span class="p">().</span><span class="n">set</span><span class="p">(</span><span class="s">&quot;basis_set&quot;</span><span class="p">,</span><span class="w"> </span><span class="s">&quot;def2-tzvpp&quot;</span><span class="p">);</span>
+<span class="n">scf_solver</span><span class="p">.</span><span class="n">settings</span><span class="p">()</span>
+<span class="w">    </span><span class="p">.</span><span class="n">set</span><span class="p">(</span><span class="s">&quot;method&quot;</span><span class="p">,</span><span class="w"> </span><span class="s">&quot;dft&quot;</span><span class="p">)</span>
+<span class="w">    </span><span class="c1">// Set the basis set</span>
+<span class="w">    </span><span class="n">scf_solver</span><span class="o">-&gt;</span><span class="n">settings</span><span class="p">()</span>
+<span class="w">    </span><span class="p">.</span><span class="n">set</span><span class="p">(</span><span class="s">&quot;basis_set&quot;</span><span class="p">,</span><span class="w"> </span><span class="s">&quot;def2-tzvpp&quot;</span><span class="p">);</span>
 
 <span class="c1">// For DFT calculations, set the exchange-correlation functional</span>
 <span class="n">scf_solver</span><span class="o">-&gt;</span><span class="n">settings</span><span class="p">().</span><span class="n">set</span><span class="p">(</span><span class="s">&quot;functional&quot;</span><span class="p">,</span><span class="w"> </span><span class="s">&quot;B3LYP&quot;</span><span class="p">);</span>
@@ -308,15 +290,11 @@ This reference provides detailed information about all pre-defined basis sets yo
 </div>
 </div>
 <input class="tab-input" id="tab-set--1-input--2" name="tab-set--1" type="radio"><label class="tab-label" for="tab-set--1-input--2">Python API</label><div class="tab-content docutils container">
-<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="c1"># Copyright (c) Microsoft Corporation. All rights reserved.</span>
-<span class="c1"># Licensed under the MIT License. See LICENSE.txt in the project root for license information.</span>
-<span class="c1"># --------------------------------------------------------------------------------------------</span>
-
-<span class="kn">import</span><span class="w"> </span><span class="nn">os</span>
-<span class="kn">import</span><span class="w"> </span><span class="nn">tempfile</span>
-
-<span class="kn">import</span><span class="w"> </span><span class="nn">qdk_chemistry</span>
-<span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry._core.data</span><span class="w"> </span><span class="kn">import</span> <span class="n">Settings</span>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="c1"># Configure the SCF solver using the settings interface</span>
+<span class="n">scf_solver</span><span class="o">.</span><span class="n">settings</span><span class="p">()</span><span class="o">.</span><span class="n">set</span><span class="p">(</span><span class="s2">&quot;basis_set&quot;</span><span class="p">,</span> <span class="s2">&quot;sto-3g&quot;</span><span class="p">)</span>
+<span class="n">scf_solver</span><span class="o">.</span><span class="n">settings</span><span class="p">()</span><span class="o">.</span><span class="n">set</span><span class="p">(</span><span class="s2">&quot;method&quot;</span><span class="p">,</span> <span class="s2">&quot;hf&quot;</span><span class="p">)</span>
+<span class="n">scf_solver</span><span class="o">.</span><span class="n">settings</span><span class="p">()</span><span class="o">.</span><span class="n">set</span><span class="p">(</span><span class="s2">&quot;max_iterations&quot;</span><span class="p">,</span> <span class="mi">100</span><span class="p">)</span>
+<span class="n">scf_solver</span><span class="o">.</span><span class="n">settings</span><span class="p">()</span><span class="o">.</span><span class="n">set</span><span class="p">(</span><span class="s2">&quot;tolerance&quot;</span><span class="p">,</span> <span class="mf">1.0e-8</span><span class="p">)</span>
 </pre></div>
 </div>
 </div>
@@ -344,23 +322,13 @@ The <code class="docutils literal notranslate"><span class="pre">solve</span></c
 </div>
 </div>
 <input class="tab-input" id="tab-set--2-input--2" name="tab-set--2" type="radio"><label class="tab-label" for="tab-set--2-input--2">Python API</label><div class="tab-content docutils container">
-<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="sd">&quot;&quot;&quot;Complete SCF workflow example with settings.&quot;&quot;&quot;</span>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="c1"># Run the SCF calculation</span>
+<span class="n">E_scf</span><span class="p">,</span> <span class="n">wfn</span> <span class="o">=</span> <span class="n">scf_solver</span><span class="o">.</span><span class="n">run</span><span class="p">(</span><span class="n">structure</span><span class="p">,</span> <span class="n">charge</span><span class="o">=</span><span class="mi">0</span><span class="p">,</span> <span class="n">spin_multiplicity</span><span class="o">=</span><span class="mi">1</span><span class="p">)</span>
+<span class="n">scf_orbitals</span> <span class="o">=</span> <span class="n">wfn</span><span class="o">.</span><span class="n">get_orbitals</span><span class="p">()</span>
 
-<span class="c1"># --------------------------------------------------------------------------------------------</span>
-<span class="c1"># Copyright (c) Microsoft Corporation. All rights reserved.</span>
-<span class="c1"># Licensed under the MIT License. See LICENSE.txt in the project root for license information.</span>
-<span class="c1"># --------------------------------------------------------------------------------------------</span>
-
-<span class="kn">import</span><span class="w"> </span><span class="nn">numpy</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">np</span>
-<span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.algorithms</span><span class="w"> </span><span class="kn">import</span> <span class="n">create</span>
-<span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.data</span><span class="w"> </span><span class="kn">import</span> <span class="n">Structure</span>
-
-<span class="c1"># Create a Structure (coordinates in Bohr/atomic units)</span>
-<span class="n">coords</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">([[</span><span class="mf">0.0</span><span class="p">,</span> <span class="mf">0.0</span><span class="p">,</span> <span class="mf">0.0</span><span class="p">],</span> <span class="p">[</span><span class="mf">0.0</span><span class="p">,</span> <span class="mf">0.0</span><span class="p">,</span> <span class="mf">1.4</span><span class="p">]])</span>
-<span class="n">structure</span> <span class="o">=</span> <span class="n">Structure</span><span class="p">(</span><span class="n">coords</span><span class="p">,</span> <span class="p">[</span><span class="s2">&quot;H&quot;</span><span class="p">,</span> <span class="s2">&quot;H&quot;</span><span class="p">])</span>
-
-<span class="c1"># Create the default ScfSolver instance</span>
-<span class="n">scf_solver</span> <span class="o">=</span> <span class="n">create</span><span class="p">(</span><span class="s2">&quot;scf_solver&quot;</span><span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;SCF Energy: </span><span class="si">{</span><span class="n">E_scf</span><span class="si">:</span><span class="s2">.10f</span><span class="si">}</span><span class="s2"> Hartree&quot;</span><span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Number of molecular orbitals: </span><span class="si">{</span><span class="n">scf_orbitals</span><span class="o">.</span><span class="n">get_num_molecular_orbitals</span><span class="p">()</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Is restricted: </span><span class="si">{</span><span class="n">scf_orbitals</span><span class="o">.</span><span class="n">is_restricted</span><span class="p">()</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
 </pre></div>
 </div>
 </div>
@@ -491,9 +459,10 @@ based on the calculation requirements and available packages.</p>
 <li><p><a class="reference internal" href="../data/orbitals.html"><span class="doc">Orbitals</span></a>: Output optimized molecular orbitals</p></li>
 </ul>
 </section>
-<section id="related-topics">
-<h2>Related topics<a class="headerlink" href="#related-topics" title="Link to this heading"></a></h2>
+<section id="further-reading">
+<h2>Further reading<a class="headerlink" href="#further-reading" title="Link to this heading"></a></h2>
 <ul class="simple">
+<li><p>The above examples can be downloaded as a complete <a class="reference external" href="../../../_static/examples/python/scf_solver.py">Python</a> script or <a class="reference external" href="../../../_static/examples/cpp/scf_solver.cpp">C++</a> source file.</p></li>
 <li><p><a class="reference internal" href="../design/settings.html"><span class="doc">Settings</span></a>: Configuration settings for algorithms</p></li>
 <li><p><a class="reference internal" href="../design/factory_pattern.html"><span class="doc">Factory Pattern</span></a>: Understanding algorithm creation</p></li>
 <li><p><a class="reference internal" href="../basis_functionals.html"><span class="doc">Functionals and basis sets</span></a>: Exchange-correlation functionals for DFT calculations</p></li>

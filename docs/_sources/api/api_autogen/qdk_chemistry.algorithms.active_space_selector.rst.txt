@@ -1,0 +1,8 @@
+qdk\_chemistry.algorithms.active\_space\_selector module
+========================================================
+
+.. automodule:: qdk_chemistry.algorithms.active_space_selector
+   :members:
+   :private-members:
+   :show-inheritance:
+   :undoc-members:

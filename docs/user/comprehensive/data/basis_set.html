@@ -68,7 +68,7 @@
 <li class="toctree-l4"><a class="reference internal" href="#utility-functions">Utility functions</a></li>
 <li class="toctree-l4"><a class="reference internal" href="#predefined-basis-sets">Predefined basis sets</a></li>
 <li class="toctree-l4"><a class="reference internal" href="#related-classes">Related classes</a></li>
-<li class="toctree-l4"><a class="reference internal" href="#related-topics">Related topics</a></li>
+<li class="toctree-l4"><a class="reference internal" href="#further-reading">Further reading</a></li>
 </ul>
 </li>
 <li class="toctree-l3"><a class="reference internal" href="hamiltonian.html">Hamiltonian</a></li>
@@ -122,21 +122,21 @@
              
   <section id="basis-set">
 <h1>Basis set<a class="headerlink" href="#basis-set" title="Link to this heading"></a></h1>
-<p>The <a class="reference internal" href="../../../api/api_autogen/qdk_chemistry.data.html#qdk_chemistry.data.BasisSet" title="qdk_chemistry.data.BasisSet"><code class="xref py py-class docutils literal notranslate"><span class="pre">BasisSet</span></code></a> class in QDK/Chemistry represents a collection of atomic orbital used to describe the electronic structure of molecules.
+<p>The <a class="reference internal" href="../../../api/api_autogen/qdk_chemistry.data.html#qdk_chemistry.data.BasisSet" title="qdk_chemistry.data.BasisSet"><code class="xref py py-class docutils literal notranslate"><span class="pre">BasisSet</span></code></a> class in QDK/Chemistry rrepresents a collection of basis functions used to describe the electronic structure of molecules.
 It organizes atomic orbitals into shells and provides methods for managing, querying, and serializing basis set data.</p>
 <section id="overview">
 <h2>Overview<a class="headerlink" href="#overview" title="Link to this heading"></a></h2>
-<p>In quantum chemistry, a basis set is a collection of atomic orbitals used to represent molecular orbitals.
-The <a class="reference internal" href="../../../api/api_autogen/qdk_chemistry.data.html#qdk_chemistry.data.BasisSet" title="qdk_chemistry.data.BasisSet"><code class="xref py py-class docutils literal notranslate"><span class="pre">BasisSet</span></code></a> class in QDK/Chemistry uses a shell-based organization, where each shell contains atomic orbitals with the same atom, angular momentum, and primitive Gaussian functions.</p>
+<p>In quantum chemistry, a basis set is a collection of mathematical functions used to represent molecular orbitals.
+The <a class="reference internal" href="../../../api/api_autogen/qdk_chemistry.data.html#qdk_chemistry.data.BasisSet" title="qdk_chemistry.data.BasisSet"><code class="xref py py-class docutils literal notranslate"><span class="pre">BasisSet</span></code></a> class in QDK/Chemistry uses a shell-based organization, where each shell contains basis functions with the same atom, angular momentum, and primitive Gaussian functions.</p>
 <p>Key features of the <a class="reference internal" href="../../../api/api_autogen/qdk_chemistry.data.html#qdk_chemistry.data.BasisSet" title="qdk_chemistry.data.BasisSet"><code class="xref py py-class docutils literal notranslate"><span class="pre">BasisSet</span></code></a> class include:</p>
 <ul class="simple">
 <li><p>Shell-based storage for memory efficiency</p></li>
-<li><p>Support for both spherical and Cartesian atomic orbitals</p></li>
-<li><p>Mapping between shells/atomic orbitals and atoms</p></li>
-<li><p>Mapping between shells/atomic orbitals and orbital types</p></li>
+<li><p>Support for both spherical and Cartesian basis functions</p></li>
+<li><p>Mapping between shells/basis functions and atoms</p></li>
+<li><p>Mapping between shells/basis functions and orbital types</p></li>
 <li><p>Basis set metadata (name, parameters)</p></li>
 <li><p>Integration with molecular structure information</p></li>
-<li><p>On-demand expansion of shells to individual atomic orbitals</p></li>
+<li><p>On-demand expansion of shells to individual basis functions</p></li>
 </ul>
 </section>
 <section id="usage">
@@ -153,7 +153,7 @@ For common calculations, you typically won’t need to construct basis sets manu
 <h2>Core concepts<a class="headerlink" href="#core-concepts" title="Link to this heading"></a></h2>
 <section id="shells-and-primitives">
 <h3>Shells and primitives<a class="headerlink" href="#shells-and-primitives" title="Link to this heading"></a></h3>
-<p>A shell represents a group of atomic orbitals that share the same atom, angular momentum, and primitive functions, but differ in magnetic quantum numbers.
+<p>A shell represents a group of basis functions that share the same atom, angular momentum, and primitive functions, but differ in magnetic quantum numbers.
 For example, a <span class="math notranslate nohighlight">\(p\)</span>-shell contains <span class="math notranslate nohighlight">\(p_x, p_y, p_z\)</span> functions.</p>
 <p>Shells contain primitives, which are Gaussian functions defined by:</p>
 <ul class="simple">
@@ -174,7 +174,7 @@ For example, a <span class="math notranslate nohighlight">\(p\)</span>-shell con
 </section>
 <section id="basis-types">
 <h3>Basis types<a class="headerlink" href="#basis-types" title="Link to this heading"></a></h3>
-<p>The <a class="reference internal" href="../../../api/api_autogen/qdk_chemistry.data.html#qdk_chemistry.data.BasisSet" title="qdk_chemistry.data.BasisSet"><code class="xref py py-class docutils literal notranslate"><span class="pre">BasisSet</span></code></a> class supports two types of atomic orbitals:</p>
+<p>The <a class="reference internal" href="../../../api/api_autogen/qdk_chemistry.data.html#qdk_chemistry.data.BasisSet" title="qdk_chemistry.data.BasisSet"><code class="xref py py-class docutils literal notranslate"><span class="pre">BasisSet</span></code></a> class supports two types of basis functions:</p>
 <ul class="simple">
 <li><p><strong>Spherical</strong>: Uses spherical harmonics with <span class="math notranslate nohighlight">\(2l+1\)</span> functions per shell</p></li>
 <li><p><strong>Cartesian</strong>: Uses Cartesian coordinates with <span class="math notranslate nohighlight">\((l+1)(l+2)/2\)</span> functions per shell</p></li>
@@ -194,7 +194,7 @@ Manual creation is primarily for advanced use cases or when working with custom 
 <span class="n">BasisSet</span><span class="w"> </span><span class="n">basis_set</span><span class="p">(</span><span class="s">&quot;6-31G&quot;</span><span class="p">,</span><span class="w"> </span><span class="n">AOType</span><span class="o">::</span><span class="n">Spherical</span><span class="p">);</span>
 
 <span class="c1">// Add a shell with multiple primitives</span>
-<span class="kt">size_t</span><span class="w"> </span><span class="n">atom_index</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">0</span><span class="p">;</span><span class="w">  </span><span class="c1">// First atom</span>
+<span class="kt">size_t</span><span class="w"> </span><span class="n">atom_index</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">0</span><span class="p">;</span><span class="w">                      </span><span class="c1">// First atom</span>
 <span class="n">OrbitalType</span><span class="w"> </span><span class="n">orbital_type</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">OrbitalType</span><span class="o">::</span><span class="n">P</span><span class="p">;</span><span class="w">  </span><span class="c1">// p orbital</span>
 <span class="n">Eigen</span><span class="o">::</span><span class="n">VectorXd</span><span class="w"> </span><span class="nf">exponents</span><span class="p">(</span><span class="mi">2</span><span class="p">);</span>
 <span class="n">exponents</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="mf">0.16871439</span><span class="p">,</span><span class="w"> </span><span class="mf">0.62391373</span><span class="p">;</span>
@@ -211,23 +211,16 @@ Manual creation is primarily for advanced use cases or when working with custom 
 </div>
 </div>
 <input class="tab-input" id="tab-set--0-input--2" name="tab-set--0" type="radio"><label class="tab-label" for="tab-set--0-input--2">Python API</label><div class="tab-content docutils container">
-<div class="admonition note">
-<p class="admonition-title">Note</p>
-<p>This example shows the API pattern. For complete working examples, see the test suite.</p>
-</div>
-<div class="highlight-python notranslate"><div class="highlight"><pre><span></span>
-<span class="c1"># import numpy as np</span>
-<span class="c1"># from qdk_chemistry.data import BasisSet, AOType, OrbitalType, Structure</span>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span><span class="w"> </span><span class="nn">tempfile</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">numpy</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">np</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.data</span><span class="w"> </span><span class="kn">import</span> <span class="n">AOType</span><span class="p">,</span> <span class="n">BasisSet</span><span class="p">,</span> <span class="n">OrbitalType</span><span class="p">,</span> <span class="n">Shell</span><span class="p">,</span> <span class="n">Structure</span>
 
-<span class="c1"># # Create an empty basis set with a name</span>
-<span class="c1"># basis_set = BasisSet(&quot;6-31G&quot;, AOType.SPHERICAL)</span>
+<span class="c1"># Create a spherical basis set from a single S shell</span>
+<span class="n">shell</span> <span class="o">=</span> <span class="n">Shell</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="n">OrbitalType</span><span class="o">.</span><span class="n">S</span><span class="p">,</span> <span class="p">[</span><span class="mf">1.0</span><span class="p">],</span> <span class="p">[</span><span class="mf">1.0</span><span class="p">])</span>
+<span class="n">basis_spherical</span> <span class="o">=</span> <span class="n">BasisSet</span><span class="p">(</span><span class="s2">&quot;spherical example&quot;</span><span class="p">,</span> <span class="p">[</span><span class="n">shell</span><span class="p">])</span>
 
-<span class="c1"># # Add a shell with multiple primitives</span>
-<span class="c1"># atom_index = 0  # First atom</span>
-<span class="c1"># orbital_type = OrbitalType.P  # p orbital</span>
-<span class="c1"># exponents = np.array([1.0, 0.5])</span>
-<span class="c1"># coefficients = np.array([0.6, 0.4])</span>
-<span class="c1"># basis_set.add_shell(atom_index, orbital_type, exponents, coefficients)</span>
+<span class="c1"># Create a Cartesian basis set</span>
+<span class="n">basis_cartesian</span> <span class="o">=</span> <span class="n">BasisSet</span><span class="p">(</span><span class="s2">&quot;6-31G&quot;</span><span class="p">,</span> <span class="p">[</span><span class="n">shell</span><span class="p">],</span> <span class="n">AOType</span><span class="o">.</span><span class="n">Cartesian</span><span class="p">)</span>
 
 </pre></div>
 </div>
@@ -270,9 +263,11 @@ changes rather than trying to modify an existing one.</p>
 <span class="c1">// Returns std::vector&lt;size_t&gt;</span>
 <span class="k">auto</span><span class="w"> </span><span class="n">atomic_orbital_indices</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">basis_set</span><span class="p">.</span><span class="n">get_atomic_orbital_indices_for_atom</span><span class="p">(</span><span class="mi">1</span><span class="p">);</span>
 <span class="c1">// Returns std::vector&lt;size_t&gt;</span>
-<span class="k">auto</span><span class="w"> </span><span class="n">shell_indices</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">basis_set</span><span class="p">.</span><span class="n">get_shell_indices_for_orbital_type</span><span class="p">(</span><span class="n">OrbitalType</span><span class="o">::</span><span class="n">P</span><span class="p">);</span>
+<span class="k">auto</span><span class="w"> </span><span class="n">shell_indices</span><span class="w"> </span><span class="o">=</span>
+<span class="w">    </span><span class="n">basis_set</span><span class="p">.</span><span class="n">get_shell_indices_for_orbital_type</span><span class="p">(</span><span class="n">OrbitalType</span><span class="o">::</span><span class="n">P</span><span class="p">);</span>
 <span class="c1">// Returns std::vector&lt;size_t&gt;</span>
-<span class="k">auto</span><span class="w"> </span><span class="n">shell_indices_specific</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">basis_set</span><span class="p">.</span><span class="n">get_shell_indices_for_atom_and_orbital_type</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span><span class="w"> </span><span class="n">OrbitalType</span><span class="o">::</span><span class="n">D</span><span class="p">);</span>
+<span class="k">auto</span><span class="w"> </span><span class="n">shell_indices_specific</span><span class="w"> </span><span class="o">=</span>
+<span class="w">    </span><span class="n">basis_set</span><span class="p">.</span><span class="n">get_shell_indices_for_atom_and_orbital_type</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span><span class="w"> </span><span class="n">OrbitalType</span><span class="o">::</span><span class="n">D</span><span class="p">);</span>
 
 <span class="c1">// Validation</span>
 <span class="kt">bool</span><span class="w"> </span><span class="n">is_valid</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">basis_set</span><span class="p">.</span><span class="n">is_valid</span><span class="p">();</span>
@@ -281,34 +276,46 @@ changes rather than trying to modify an existing one.</p>
 </div>
 </div>
 <input class="tab-input" id="tab-set--1-input--2" name="tab-set--1" type="radio"><label class="tab-label" for="tab-set--1-input--2">Python API</label><div class="tab-content docutils container">
-<div class="admonition note">
-<p class="admonition-title">Note</p>
-<p>This example shows the API pattern. For complete working examples, see the test suite.</p>
-</div>
-<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="c1"># basis_set.add_shell(1, OrbitalType.S, 0.5, 1.0)</span>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="c1"># Create a water molecule structure</span>
+<span class="n">coords</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">([[</span><span class="mf">0.0</span><span class="p">,</span> <span class="mf">0.0</span><span class="p">,</span> <span class="mf">0.0</span><span class="p">],</span> <span class="p">[</span><span class="mf">0.757</span><span class="p">,</span> <span class="mf">0.586</span><span class="p">,</span> <span class="mf">0.0</span><span class="p">],</span> <span class="p">[</span><span class="o">-</span><span class="mf">0.757</span><span class="p">,</span> <span class="mf">0.586</span><span class="p">,</span> <span class="mf">0.0</span><span class="p">]])</span>
+<span class="n">nuclear_charges</span> <span class="o">=</span> <span class="p">[</span><span class="mi">8</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="mi">1</span><span class="p">]</span>
+<span class="n">structure</span> <span class="o">=</span> <span class="n">Structure</span><span class="p">(</span><span class="n">coords</span><span class="p">,</span> <span class="n">nuclear_charges</span><span class="p">)</span>
 
-<span class="c1"># # Set structure associated with the basis set</span>
-<span class="c1"># coords = np.array([[0.0, 0.0, 0.0], [0.0, 0.0, 1.4]])</span>
-<span class="c1"># structure = Structure(coords, [&quot;H&quot;, &quot;H&quot;])</span>
-<span class="c1"># basis_set.set_structure(structure)</span>
+<span class="c1"># Create shells consistent with structure</span>
+<span class="n">shells</span> <span class="o">=</span> <span class="p">[</span>
+    <span class="n">Shell</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="n">OrbitalType</span><span class="o">.</span><span class="n">S</span><span class="p">,</span> <span class="p">[</span><span class="mf">1.0</span><span class="p">],</span> <span class="p">[</span><span class="mf">1.0</span><span class="p">]),</span>  <span class="c1"># O 1s</span>
+    <span class="n">Shell</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="n">OrbitalType</span><span class="o">.</span><span class="n">S</span><span class="p">,</span> <span class="p">[</span><span class="mf">1.0</span><span class="p">],</span> <span class="p">[</span><span class="mf">1.0</span><span class="p">]),</span>  <span class="c1"># H 1s</span>
+    <span class="n">Shell</span><span class="p">(</span><span class="mi">2</span><span class="p">,</span> <span class="n">OrbitalType</span><span class="o">.</span><span class="n">S</span><span class="p">,</span> <span class="p">[</span><span class="mf">1.0</span><span class="p">],</span> <span class="p">[</span><span class="mf">1.0</span><span class="p">]),</span>  <span class="c1"># H 1s</span>
+<span class="p">]</span>
+<span class="n">basis</span> <span class="o">=</span> <span class="n">BasisSet</span><span class="p">(</span><span class="s2">&quot;STO-3G&quot;</span><span class="p">,</span> <span class="n">shells</span><span class="p">,</span> <span class="n">structure</span><span class="p">)</span>
 
-<span class="c1"># # Access basic properties</span>
-<span class="c1"># basis_type = basis_set.get_basis_type()</span>
-<span class="c1"># name = basis_set.get_name()</span>
+<span class="c1"># Access basic properties</span>
+<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Basis set name: </span><span class="si">{</span><span class="n">basis</span><span class="o">.</span><span class="n">get_name</span><span class="p">()</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Atomic orbital type: </span><span class="si">{</span><span class="n">basis</span><span class="o">.</span><span class="n">get_atomic_orbital_type</span><span class="p">()</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
 
-<span class="c1"># # Access shell information</span>
-<span class="c1"># all_shells = basis_set.get_shells()</span>
-<span class="c1"># shells_for_atom = basis_set.get_shells_for_atom(0)</span>
-<span class="c1"># specific_shell = basis_set.get_shell(0)</span>
+<span class="c1"># Access shell information</span>
+<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Number of atomic orbitals: </span><span class="si">{</span><span class="n">basis</span><span class="o">.</span><span class="n">get_num_atomic_orbitals</span><span class="p">()</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Number of shells: </span><span class="si">{</span><span class="n">basis</span><span class="o">.</span><span class="n">get_num_shells</span><span class="p">()</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+<span class="k">for</span> <span class="n">ishell</span><span class="p">,</span> <span class="n">shell</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="n">basis</span><span class="o">.</span><span class="n">get_shells</span><span class="p">()):</span>
+    <span class="nb">print</span><span class="p">(</span>
+        <span class="sa">f</span><span class="s2">&quot;Shell </span><span class="si">{</span><span class="n">ishell</span><span class="si">}</span><span class="s2">: type=</span><span class="si">{</span><span class="n">shell</span><span class="o">.</span><span class="n">orbital_type</span><span class="si">}</span><span class="s2">, l=</span><span class="si">{</span><span class="n">shell</span><span class="o">.</span><span class="n">get_angular_momentum</span><span class="p">()</span><span class="si">}</span><span class="s2">, &quot;</span>
+        <span class="sa">f</span><span class="s2">&quot;num_primitives=</span><span class="si">{</span><span class="n">shell</span><span class="o">.</span><span class="n">get_num_primitives</span><span class="p">()</span><span class="si">}</span><span class="s2">&quot;</span>
+    <span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Shells for atom 0: </span><span class="si">{</span><span class="n">basis</span><span class="o">.</span><span class="n">get_shells_for_atom</span><span class="p">(</span><span class="mi">0</span><span class="p">)</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Specific shell = </span><span class="si">{</span><span class="n">basis</span><span class="o">.</span><span class="n">get_shell</span><span class="p">(</span><span class="mi">0</span><span class="p">)</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
 
-<span class="c1"># # Get counts</span>
-<span class="c1"># num_shells = basis_set.get_num_shells()</span>
-<span class="c1"># num_atomic_orbitals = basis_set.get_num_atomic_orbitals()</span>
-<span class="c1"># num_atoms = basis_set.get_num_atoms()</span>
+<span class="c1"># Get counts</span>
+<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;num_shells = </span><span class="si">{</span><span class="n">basis</span><span class="o">.</span><span class="n">get_num_shells</span><span class="p">()</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;num_atomic_orbitals = </span><span class="si">{</span><span class="n">basis</span><span class="o">.</span><span class="n">get_num_atomic_orbitals</span><span class="p">()</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;num_atoms = </span><span class="si">{</span><span class="n">basis</span><span class="o">.</span><span class="n">get_num_atoms</span><span class="p">()</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
 
-<span class="c1"># # Get mapping information</span>
-<span class="c1"># shell_index, m_quantum_number = basis_set.get_atomic_orbital_info(0)</span>
-<span class="c1"># atom_index = basis_set.get_atom_index_for_atomic_orbital(0)</span>
+<span class="c1"># Get mapping information</span>
+<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;shell_index, m_quantum_number = </span><span class="si">{</span><span class="n">basis</span><span class="o">.</span><span class="n">get_atomic_orbital_info</span><span class="p">(</span><span class="mi">0</span><span class="p">)</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;atom_index = </span><span class="si">{</span><span class="n">basis</span><span class="o">.</span><span class="n">get_atom_index_for_atomic_orbital</span><span class="p">(</span><span class="mi">0</span><span class="p">)</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+
+<span class="c1"># Get indices for specific atoms/orbitals</span>
+<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;atomic_orbital_indices = </span><span class="si">{</span><span class="n">basis</span><span class="o">.</span><span class="n">get_atomic_orbital_indices_for_atom</span><span class="p">(</span><span class="mi">0</span><span class="p">)</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;shell_indices = </span><span class="si">{</span><span class="n">basis</span><span class="o">.</span><span class="n">get_shell_indices_for_orbital_type</span><span class="p">(</span><span class="n">OrbitalType</span><span class="o">.</span><span class="n">P</span><span class="p">)</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
 </pre></div>
 </div>
 </div>
@@ -316,7 +323,7 @@ changes rather than trying to modify an existing one.</p>
 </section>
 <section id="working-with-shells">
 <h2>Working with shells<a class="headerlink" href="#working-with-shells" title="Link to this heading"></a></h2>
-<p>The <code class="docutils literal notranslate"><span class="pre">Shell</span></code> structure contains information about a group of atomic orbitals:</p>
+<p>The <code class="docutils literal notranslate"><span class="pre">Shell</span></code> structure contains information about a group of basis functions:</p>
 <div class="tab-set docutils container">
 <input checked="True" class="tab-input" id="tab-set--2-input--1" name="tab-set--2" type="radio"><label class="tab-label" for="tab-set--2-input--1">C++ API</label><div class="tab-content docutils container">
 <div class="highlight-cpp notranslate"><div class="highlight"><pre><span></span><span class="c1">// Get shell by index (returns const Shell&amp;)</span>
@@ -336,25 +343,17 @@ changes rather than trying to modify an existing one.</p>
 </div>
 </div>
 <input class="tab-input" id="tab-set--2-input--2" name="tab-set--2" type="radio"><label class="tab-label" for="tab-set--2-input--2">Python API</label><div class="tab-content docutils container">
-<div class="admonition note">
-<p class="admonition-title">Note</p>
-<p>This example shows the API pattern. For complete working examples, see the test suite.</p>
-</div>
-<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="c1"># # Get indices for specific atoms/orbitals</span>
-<span class="c1"># atomic_orbital_indices = basis_set.get_atomic_orbital_indices_for_atom(0)</span>
-<span class="c1"># shell_indices = basis_set.get_shell_indices_for_orbital_type(OrbitalType.P)</span>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="c1"># Access individual shell properties</span>
+<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;shell_atom_idx = </span><span class="si">{</span><span class="n">shell</span><span class="o">.</span><span class="n">atom_index</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;shell_orb_type = </span><span class="si">{</span><span class="n">shell</span><span class="o">.</span><span class="n">orbital_type</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+<span class="n">shell</span> <span class="o">=</span> <span class="n">basis</span><span class="o">.</span><span class="n">get_shell</span><span class="p">(</span><span class="mi">0</span><span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;shell_l = </span><span class="si">{</span><span class="n">shell</span><span class="o">.</span><span class="n">get_angular_momentum</span><span class="p">()</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;shell_num_primitives = </span><span class="si">{</span><span class="n">shell</span><span class="o">.</span><span class="n">get_num_primitives</span><span class="p">()</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;shell_num_atomic_orbitals = </span><span class="si">{</span><span class="n">shell</span><span class="o">.</span><span class="n">get_num_atomic_orbitals</span><span class="p">()</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
 
-<span class="c1"># # Check validity</span>
-<span class="c1"># is_valid = basis_set.is_valid()</span>
-
-<span class="c1"># # Access individual shell properties</span>
-<span class="c1"># shell = basis_set.get_shell(0)</span>
-<span class="c1"># shell_atom_idx = shell.get_atom_index()</span>
-<span class="c1"># shell_orb_type = shell.get_orbital_type()</span>
-<span class="c1"># shell_l = shell.get_l()</span>
-<span class="c1"># shell_num_primitives = shell.get_num_primitives()</span>
-<span class="c1"># shell_num_atomic_orbitals = shell.get_num_atomic_orbitals()</span>
-
+<span class="c1"># Access shell primitive data</span>
+<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;shell_exponents = </span><span class="si">{</span><span class="n">shell</span><span class="o">.</span><span class="n">exponents</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;shell_coefficients = </span><span class="si">{</span><span class="n">shell</span><span class="o">.</span><span class="n">coefficients</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
 </pre></div>
 </div>
 </div>
@@ -397,10 +396,10 @@ This naming convention is enforced to maintain consistency across the QDK/Chemis
 <span class="w">      </span><span class="nt">&quot;shells&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">[</span><span class="s2">&quot;...&quot;</span><span class="p">]</span>
 <span class="w">    </span><span class="p">}</span>
 <span class="w">  </span><span class="p">],</span>
-<span class="w">  </span><span class="nt">&quot;atomic_orbital_type&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;spherical&quot;</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;basis_type&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;spherical&quot;</span><span class="p">,</span>
 <span class="w">  </span><span class="nt">&quot;name&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;6-31G&quot;</span><span class="p">,</span>
 <span class="w">  </span><span class="nt">&quot;num_atoms&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">2</span><span class="p">,</span>
-<span class="w">  </span><span class="nt">&quot;num_atomic_orbitals&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">9</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;num_basis_functions&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">9</span><span class="p">,</span>
 <span class="w">  </span><span class="nt">&quot;num_shells&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">3</span>
 <span class="p">}</span>
 </pre></div>
@@ -441,27 +440,41 @@ This naming convention is enforced to maintain consistency across the QDK/Chemis
 </div>
 </div>
 <input class="tab-input" id="tab-set--3-input--2" name="tab-set--3" type="radio"><label class="tab-label" for="tab-set--3-input--2">Python API</label><div class="tab-content docutils container">
-<div class="admonition note">
-<p class="admonition-title">Note</p>
-<p>This example shows the API pattern. For complete working examples, see the test suite.</p>
-</div>
-<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="c1"># shell_exponents = shell.get_exponents()</span>
-<span class="c1"># shell_coefficients = shell.get_coefficients()</span>
-<span class="c1"># single_exponent = shell.get_exponent(0)</span>
-<span class="c1"># single_coeff = shell.get_coefficient(0)</span>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="c1"># Create a new basis set with data</span>
+<span class="n">shells</span> <span class="o">=</span> <span class="p">[</span>
+    <span class="n">Shell</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="n">OrbitalType</span><span class="o">.</span><span class="n">S</span><span class="p">,</span> <span class="p">[</span><span class="mf">1.0</span><span class="p">],</span> <span class="p">[</span><span class="mf">1.0</span><span class="p">]),</span>
+    <span class="n">Shell</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="n">OrbitalType</span><span class="o">.</span><span class="n">P</span><span class="p">,</span> <span class="p">[</span><span class="mf">0.5</span><span class="p">],</span> <span class="p">[</span><span class="mf">1.0</span><span class="p">]),</span>
+<span class="p">]</span>
+<span class="n">basis_out</span> <span class="o">=</span> <span class="n">BasisSet</span><span class="p">(</span><span class="s2">&quot;STO-3G&quot;</span><span class="p">,</span> <span class="n">shells</span><span class="p">)</span>
 
-<span class="c1"># # Serialize to JSON</span>
-<span class="c1"># json_str = basis_set.to_json()</span>
-<span class="c1"># basis_set.to_json_file(&quot;molecule.basis.json&quot;)</span>
+<span class="c1"># Demonstrate and test JSON conversion</span>
+<span class="n">json_data</span> <span class="o">=</span> <span class="n">basis_out</span><span class="o">.</span><span class="n">to_json</span><span class="p">()</span>
+<span class="k">assert</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">json_data</span><span class="p">,</span> <span class="nb">str</span><span class="p">)</span>
+<span class="k">assert</span> <span class="s2">&quot;STO-3G&quot;</span> <span class="ow">in</span> <span class="n">json_data</span>
 
-<span class="c1"># # Deserialize from JSON</span>
-<span class="c1"># basis_set_from_json_file = BasisSet.from_json_file(&quot;molecule.basis.json&quot;)</span>
+<span class="n">basis_in</span> <span class="o">=</span> <span class="n">BasisSet</span><span class="o">.</span><span class="n">from_json</span><span class="p">(</span><span class="n">json_data</span><span class="p">)</span>
+<span class="k">assert</span> <span class="n">basis_in</span><span class="o">.</span><span class="n">get_name</span><span class="p">()</span> <span class="o">==</span> <span class="s2">&quot;STO-3G&quot;</span>
+<span class="k">assert</span> <span class="n">basis_in</span><span class="o">.</span><span class="n">get_num_shells</span><span class="p">()</span> <span class="o">==</span> <span class="mi">2</span>
+<span class="k">assert</span> <span class="n">basis_in</span><span class="o">.</span><span class="n">get_num_atomic_orbitals</span><span class="p">()</span> <span class="o">==</span> <span class="mi">4</span>
 
-<span class="c1"># # Direct JSON conversion</span>
-<span class="c1"># j = basis_set.to_json()</span>
-<span class="c1"># basis_set_from_json = BasisSet.from_json(j)</span>
+<span class="k">with</span> <span class="n">tempfile</span><span class="o">.</span><span class="n">NamedTemporaryFile</span><span class="p">(</span>
+    <span class="n">suffix</span><span class="o">=</span><span class="s2">&quot;.basis_set.json&quot;</span><span class="p">,</span> <span class="n">mode</span><span class="o">=</span><span class="s2">&quot;w&quot;</span><span class="p">,</span> <span class="n">delete</span><span class="o">=</span><span class="kc">False</span>
+<span class="p">)</span> <span class="k">as</span> <span class="n">tmp</span><span class="p">:</span>
+    <span class="n">filename</span> <span class="o">=</span> <span class="n">tmp</span><span class="o">.</span><span class="n">name</span>
+    <span class="n">basis_out</span><span class="o">.</span><span class="n">to_json_file</span><span class="p">(</span><span class="n">filename</span><span class="p">)</span>
+    <span class="n">basis_file</span> <span class="o">=</span> <span class="n">BasisSet</span><span class="o">.</span><span class="n">from_json_file</span><span class="p">(</span><span class="n">filename</span><span class="p">)</span>
+    <span class="k">assert</span> <span class="n">basis_file</span><span class="o">.</span><span class="n">get_name</span><span class="p">()</span> <span class="o">==</span> <span class="s2">&quot;STO-3G&quot;</span>
+    <span class="k">assert</span> <span class="n">basis_file</span><span class="o">.</span><span class="n">get_num_shells</span><span class="p">()</span> <span class="o">==</span> <span class="mi">2</span>
+    <span class="k">assert</span> <span class="n">basis_file</span><span class="o">.</span><span class="n">get_num_atomic_orbitals</span><span class="p">()</span> <span class="o">==</span> <span class="mi">4</span>
 
-<span class="c1"># # HDF5 serialization (commented out - has bugs)</span>
+<span class="c1"># Demonstrate and test HDF5 conversion</span>
+<span class="k">with</span> <span class="n">tempfile</span><span class="o">.</span><span class="n">NamedTemporaryFile</span><span class="p">(</span><span class="n">suffix</span><span class="o">=</span><span class="s2">&quot;.basis_set.h5&quot;</span><span class="p">,</span> <span class="n">delete</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span> <span class="k">as</span> <span class="n">tmp</span><span class="p">:</span>
+    <span class="n">filename</span> <span class="o">=</span> <span class="n">tmp</span><span class="o">.</span><span class="n">name</span>
+    <span class="n">basis_out</span><span class="o">.</span><span class="n">to_hdf5_file</span><span class="p">(</span><span class="n">filename</span><span class="p">)</span>
+    <span class="n">basis_in</span> <span class="o">=</span> <span class="n">BasisSet</span><span class="o">.</span><span class="n">from_hdf5_file</span><span class="p">(</span><span class="n">filename</span><span class="p">)</span>
+    <span class="k">assert</span> <span class="n">basis_in</span><span class="o">.</span><span class="n">get_name</span><span class="p">()</span> <span class="o">==</span> <span class="s2">&quot;STO-3G&quot;</span>
+    <span class="k">assert</span> <span class="n">basis_in</span><span class="o">.</span><span class="n">get_num_shells</span><span class="p">()</span> <span class="o">==</span> <span class="mi">2</span>
+    <span class="k">assert</span> <span class="n">basis_in</span><span class="o">.</span><span class="n">get_num_atomic_orbitals</span><span class="p">()</span> <span class="o">==</span> <span class="mi">4</span>
 </pre></div>
 </div>
 </div>
@@ -475,9 +488,11 @@ This naming convention is enforced to maintain consistency across the QDK/Chemis
 <div class="tab-set docutils container">
 <input checked="True" class="tab-input" id="tab-set--4-input--1" name="tab-set--4" type="radio"><label class="tab-label" for="tab-set--4-input--1">C++ API</label><div class="tab-content docutils container">
 <div class="highlight-cpp notranslate"><div class="highlight"><pre><span></span><span class="c1">// Convert orbital type to string (returns std::string)</span>
-<span class="n">std</span><span class="o">::</span><span class="n">string</span><span class="w"> </span><span class="n">orbital_str</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">BasisSet</span><span class="o">::</span><span class="n">orbital_type_to_string</span><span class="p">(</span><span class="n">OrbitalType</span><span class="o">::</span><span class="n">D</span><span class="p">);</span><span class="w">  </span><span class="c1">// &quot;d&quot;</span>
+<span class="n">std</span><span class="o">::</span><span class="n">string</span><span class="w"> </span><span class="n">orbital_str</span><span class="w"> </span><span class="o">=</span>
+<span class="w">    </span><span class="n">BasisSet</span><span class="o">::</span><span class="n">orbital_type_to_string</span><span class="p">(</span><span class="n">OrbitalType</span><span class="o">::</span><span class="n">D</span><span class="p">);</span><span class="w">  </span><span class="c1">// &quot;d&quot;</span>
 <span class="c1">// Convert string to orbital type (returns OrbitalType)</span>
-<span class="n">OrbitalType</span><span class="w"> </span><span class="n">orbital_type</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">BasisSet</span><span class="o">::</span><span class="n">string_to_orbital_type</span><span class="p">(</span><span class="s">&quot;f&quot;</span><span class="p">);</span><span class="w">  </span><span class="c1">// OrbitalType::F</span>
+<span class="n">OrbitalType</span><span class="w"> </span><span class="n">orbital_type</span><span class="w"> </span><span class="o">=</span>
+<span class="w">    </span><span class="n">BasisSet</span><span class="o">::</span><span class="n">string_to_orbital_type</span><span class="p">(</span><span class="s">&quot;f&quot;</span><span class="p">);</span><span class="w">  </span><span class="c1">// OrbitalType::F</span>
 
 <span class="c1">// Get angular momentum (returns int)</span>
 <span class="kt">int</span><span class="w"> </span><span class="n">l_value</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">BasisSet</span><span class="o">::</span><span class="n">get_angular_momentum</span><span class="p">(</span><span class="n">OrbitalType</span><span class="o">::</span><span class="n">P</span><span class="p">);</span><span class="w">  </span><span class="c1">// 1</span>
@@ -485,25 +500,22 @@ This naming convention is enforced to maintain consistency across the QDK/Chemis
 <span class="kt">int</span><span class="w"> </span><span class="n">num_orbitals</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">BasisSet</span><span class="o">::</span><span class="n">get_num_orbitals_for_l</span><span class="p">(</span><span class="mi">2</span><span class="p">,</span><span class="w"> </span><span class="n">AOType</span><span class="o">::</span><span class="n">Spherical</span><span class="p">);</span><span class="w">  </span><span class="c1">// 5</span>
 
 <span class="c1">// Convert basis type to string (returns std::string)</span>
-<span class="n">std</span><span class="o">::</span><span class="n">string</span><span class="w"> </span><span class="n">basis_str</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">BasisSet</span><span class="o">::</span><span class="n">atomic_orbital_type_to_string</span><span class="p">(</span><span class="n">AOType</span><span class="o">::</span><span class="n">Cartesian</span><span class="p">);</span><span class="w">  </span><span class="c1">// &quot;cartesian&quot;</span>
+<span class="n">std</span><span class="o">::</span><span class="n">string</span><span class="w"> </span><span class="n">basis_str</span><span class="w"> </span><span class="o">=</span>
+<span class="w">    </span><span class="n">BasisSet</span><span class="o">::</span><span class="n">atomic_orbital_type_to_string</span><span class="p">(</span><span class="n">AOType</span><span class="o">::</span><span class="n">Cartesian</span><span class="p">);</span><span class="w">  </span><span class="c1">// &quot;cartesian&quot;</span>
 <span class="c1">// Convert string to basis type (returns AOType)</span>
-<span class="n">AOType</span><span class="w"> </span><span class="n">atomic_orbital_type</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">BasisSet</span><span class="o">::</span><span class="n">string_to_atomic_orbital_type</span><span class="p">(</span><span class="s">&quot;spherical&quot;</span><span class="p">);</span><span class="w">  </span><span class="c1">// AOType::Spherical</span>
+<span class="n">AOType</span><span class="w"> </span><span class="n">atomic_orbital_type</span><span class="w"> </span><span class="o">=</span>
+<span class="w">    </span><span class="n">BasisSet</span><span class="o">::</span><span class="n">string_to_atomic_orbital_type</span><span class="p">(</span><span class="s">&quot;spherical&quot;</span><span class="p">);</span><span class="w">  </span><span class="c1">// AOType::Spherical</span>
 </pre></div>
 </div>
 </div>
 <input class="tab-input" id="tab-set--4-input--2" name="tab-set--4" type="radio"><label class="tab-label" for="tab-set--4-input--2">Python API</label><div class="tab-content docutils container">
-<div class="admonition note">
-<p class="admonition-title">Note</p>
-<p>This example shows the API pattern. For complete working examples, see the test suite.</p>
-</div>
-<div class="highlight-python notranslate"><div class="highlight"><pre><span></span>
-<span class="c1"># # Static utility functions for type conversions</span>
-<span class="c1"># orbital_str = BasisSet.orbital_type_to_string(OrbitalType.D)  # &quot;d&quot;</span>
-<span class="c1"># orbital_type = BasisSet.string_to_orbital_type(&quot;f&quot;)  # OrbitalType.F</span>
-
-<span class="c1"># l_value = BasisSet.get_angular_momentum(OrbitalType.P)  # 1</span>
-<span class="c1"># num_orbitals = BasisSet.get_num_orbitals_for_l(2, AOType.SPHERICAL)  # 5</span>
-
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="c1"># Static utility functions for type conversions</span>
+<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;orbital_str = </span><span class="si">{</span><span class="n">BasisSet</span><span class="o">.</span><span class="n">orbital_type_to_string</span><span class="p">(</span><span class="n">OrbitalType</span><span class="o">.</span><span class="n">D</span><span class="p">)</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;orbital_type = </span><span class="si">{</span><span class="n">BasisSet</span><span class="o">.</span><span class="n">string_to_orbital_type</span><span class="p">(</span><span class="s1">&#39;f&#39;</span><span class="p">)</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;l_value = </span><span class="si">{</span><span class="n">BasisSet</span><span class="o">.</span><span class="n">get_angular_momentum</span><span class="p">(</span><span class="n">OrbitalType</span><span class="o">.</span><span class="n">P</span><span class="p">)</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;num_orbitals = </span><span class="si">{</span><span class="n">BasisSet</span><span class="o">.</span><span class="n">get_num_orbitals_for_l</span><span class="p">(</span><span class="mi">2</span><span class="p">,</span><span class="w"> </span><span class="n">AOType</span><span class="o">.</span><span class="n">Spherical</span><span class="p">)</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;basis_str = </span><span class="si">{</span><span class="n">BasisSet</span><span class="o">.</span><span class="n">atomic_orbital_type_to_string</span><span class="p">(</span><span class="n">AOType</span><span class="o">.</span><span class="n">Cartesian</span><span class="p">)</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;atomic_orbital_type = </span><span class="si">{</span><span class="n">BasisSet</span><span class="o">.</span><span class="n">string_to_atomic_orbital_type</span><span class="p">(</span><span class="s1">&#39;spherical&#39;</span><span class="p">)</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
 </pre></div>
 </div>
 </div>
@@ -512,11 +524,12 @@ This naming convention is enforced to maintain consistency across the QDK/Chemis
 <section id="predefined-basis-sets">
 <h2>Predefined basis sets<a class="headerlink" href="#predefined-basis-sets" title="Link to this heading"></a></h2>
 <p>QDK/Chemistry provides access to a library of standard basis sets commonly used in quantum chemistry calculations.
-These predefined basis sets can be easily loaded without having to manually specify the atomic orbitals.
+These predefined basis sets can be easily loaded without having to manually specify the basis functions.
 For a complete list of available basis sets and their specifications, see the <a class="reference internal" href="../basis_functionals.html"><span class="doc">Supported Basis Sets</span></a> documentation.</p>
 <div class="tab-set docutils container">
 <input checked="True" class="tab-input" id="tab-set--5-input--1" name="tab-set--5" type="radio"><label class="tab-label" for="tab-set--5-input--1">C++ API</label><div class="tab-content docutils container">
-<div class="highlight-cpp notranslate"><div class="highlight"><pre><span></span><span class="c1">// Create a basis set from a predefined library (returns std::unique_ptr&lt;BasisSet&gt;)</span>
+<div class="highlight-cpp notranslate"><div class="highlight"><pre><span></span><span class="c1">// Create a basis set from a predefined library (returns</span>
+<span class="c1">// std::unique_ptr&lt;BasisSet&gt;)</span>
 <span class="k">auto</span><span class="w"> </span><span class="n">basis_set</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">BasisSet</span><span class="o">::</span><span class="n">create</span><span class="p">(</span><span class="s">&quot;6-31G&quot;</span><span class="p">);</span>
 
 <span class="c1">// List all available basis sets (returns std::vector&lt;std::string&gt;)</span>
@@ -528,20 +541,9 @@ For a complete list of available basis sets and their specifications, see the <a
 </div>
 </div>
 <input class="tab-input" id="tab-set--5-input--2" name="tab-set--5" type="radio"><label class="tab-label" for="tab-set--5-input--2">Python API</label><div class="tab-content docutils container">
-<div class="admonition note">
-<p class="admonition-title">Note</p>
-<p>This example shows the API pattern. For complete working examples, see the test suite.</p>
-</div>
-<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="c1"># # basis_set.from_hdf5_file(&quot;molecule.basis.h5&quot;)</span>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span>
+<span class="c1"># TODO: add example of listing available basis sets in the library and loading one</span>
 
-<span class="c1"># # Create a basis set from a predefined library</span>
-<span class="c1"># basis_set_from_lib = BasisSet.create(&quot;6-31G&quot;)</span>
-
-<span class="c1"># # List all available basis sets</span>
-<span class="c1"># available_basis_sets = BasisSet.get_available_basis_sets()</span>
-
-<span class="c1"># # Static utility functions for type conversions</span>
-<span class="c1"># orbital_str = BasisSet.orbital_type_to_string(OrbitalType.D)  # &quot;d&quot;</span>
 </pre></div>
 </div>
 </div>
@@ -560,9 +562,10 @@ The availability may depend on your QDK/Chemistry installation.</p>
 <li><p><a class="reference internal" href="../algorithms/scf_solver.html"><span class="doc">ScfSolver</span></a>: Algorithm that uses basis sets to produce orbitals</p></li>
 </ul>
 </section>
-<section id="related-topics">
-<h2>Related topics<a class="headerlink" href="#related-topics" title="Link to this heading"></a></h2>
+<section id="further-reading">
+<h2>Further reading<a class="headerlink" href="#further-reading" title="Link to this heading"></a></h2>
 <ul class="simple">
+<li><p>The above examples can be downloaded as complete <a class="reference external" href="../../../_static/examples/cpp/basis_set.cpp">C++</a> and <a class="reference external" href="../../../_static/examples/python/basis_set.py">Python</a> scripts.</p></li>
 <li><p><a class="reference internal" href="serialization.html"><span class="doc">Serialization</span></a>: Data serialization and deserialization</p></li>
 <li><p><a class="reference internal" href="../design/settings.html"><span class="doc">Settings</span></a>: Configuration settings for algorithms</p></li>
 <li><p><a class="reference internal" href="../basis_functionals.html"><span class="doc">Supported basis sets</span></a>: List of pre-defined basis sets available in QDK/Chemistry</p></li>

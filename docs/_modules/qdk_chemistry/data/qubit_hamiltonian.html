@@ -110,9 +110,9 @@
 <span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.data.base</span><span class="w"> </span><span class="kn">import</span> <span class="n">DataClass</span>
 <span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.utils.statevector</span><span class="w"> </span><span class="kn">import</span> <span class="n">create_statevector_from_wavefunction</span>
 
+<span class="n">__all__</span> <span class="o">=</span> <span class="p">[</span><span class="s2">&quot;filter_and_group_pauli_ops_from_wavefunction&quot;</span><span class="p">]</span>
 
-<div class="viewcode-block" id="QubitHamiltonian">
-<a class="viewcode-back" href="../../../api/api_autogen/qdk_chemistry.data.qubit_hamiltonian.html#qdk_chemistry.data.qubit_hamiltonian.QubitHamiltonian">[docs]</a>
+
 <span class="k">class</span><span class="w"> </span><span class="nc">QubitHamiltonian</span><span class="p">(</span><span class="n">DataClass</span><span class="p">):</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;Data class for representing chemical electronic Hamiltonians in qubits.</span>
 
@@ -125,8 +125,6 @@
     <span class="c1"># Class attribute for filename validation</span>
     <span class="n">_data_type_name</span> <span class="o">=</span> <span class="s2">&quot;qubit_hamiltonian&quot;</span>
 
-<div class="viewcode-block" id="QubitHamiltonian.__init__">
-<a class="viewcode-back" href="../../../api/api_autogen/qdk_chemistry.data.qubit_hamiltonian.html#qdk_chemistry.data.qubit_hamiltonian.QubitHamiltonian.__init__">[docs]</a>
     <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">pauli_strings</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="nb">str</span><span class="p">],</span> <span class="n">coefficients</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">):</span>
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;Initialize a QubitHamiltonian.</span>
 
@@ -151,11 +149,8 @@
             <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Invalid Pauli strings or coefficients: </span><span class="si">{</span><span class="n">e</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span> <span class="kn">from</span><span class="w"> </span><span class="nn">e</span>
 
         <span class="c1"># Make instance immutable after construction (handled by base class)</span>
-        <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">()</span></div>
+        <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">()</span>
 
-
-<div class="viewcode-block" id="QubitHamiltonian.num_qubits">
-<a class="viewcode-back" href="../../../api/api_autogen/qdk_chemistry.data.qubit_hamiltonian.html#qdk_chemistry.data.qubit_hamiltonian.QubitHamiltonian.num_qubits">[docs]</a>
     <span class="nd">@property</span>
     <span class="k">def</span><span class="w"> </span><span class="nf">num_qubits</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">int</span><span class="p">:</span>
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;Get the number of qubits in the Hamiltonian.</span>
@@ -164,11 +159,8 @@
 <span class="sd">            int: The number of qubits.</span>
 
 <span class="sd">        &quot;&quot;&quot;</span>
-        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">pauli_ops</span><span class="o">.</span><span class="n">num_qubits</span></div>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">pauli_ops</span><span class="o">.</span><span class="n">num_qubits</span>
 
-
-<div class="viewcode-block" id="QubitHamiltonian.pauli_ops">
-<a class="viewcode-back" href="../../../api/api_autogen/qdk_chemistry.data.qubit_hamiltonian.html#qdk_chemistry.data.qubit_hamiltonian.QubitHamiltonian.pauli_ops">[docs]</a>
     <span class="nd">@cached_property</span>
     <span class="k">def</span><span class="w"> </span><span class="nf">pauli_ops</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">SparsePauliOp</span><span class="p">:</span>
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;Get the Hamiltonian as a ``SparsePauliOp``.</span>
@@ -177,11 +169,8 @@
 <span class="sd">            The Hamiltonian represented as a ``SparsePauliOp``.</span>
 
 <span class="sd">        &quot;&quot;&quot;</span>
-        <span class="k">return</span> <span class="n">SparsePauliOp</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">pauli_strings</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">coefficients</span><span class="p">)</span></div>
+        <span class="k">return</span> <span class="n">SparsePauliOp</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">pauli_strings</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">coefficients</span><span class="p">)</span>
 
-
-<div class="viewcode-block" id="QubitHamiltonian.group_commuting">
-<a class="viewcode-back" href="../../../api/api_autogen/qdk_chemistry.data.qubit_hamiltonian.html#qdk_chemistry.data.qubit_hamiltonian.QubitHamiltonian.group_commuting">[docs]</a>
     <span class="k">def</span><span class="w"> </span><span class="nf">group_commuting</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">qubit_wise</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">True</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">list</span><span class="p">[</span><span class="s2">&quot;QubitHamiltonian&quot;</span><span class="p">]:</span>
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;Group the Hamiltonian into commuting subsets.</span>
 
@@ -196,11 +185,8 @@
         <span class="k">return</span> <span class="p">[</span>
             <span class="n">QubitHamiltonian</span><span class="p">(</span><span class="n">pauli_strings</span><span class="o">=</span><span class="n">group</span><span class="o">.</span><span class="n">paulis</span><span class="o">.</span><span class="n">to_labels</span><span class="p">(),</span> <span class="n">coefficients</span><span class="o">=</span><span class="n">group</span><span class="o">.</span><span class="n">coeffs</span><span class="p">)</span>
             <span class="k">for</span> <span class="n">group</span> <span class="ow">in</span> <span class="n">sparse_pauli_ops</span>
-        <span class="p">]</span></div>
+        <span class="p">]</span>
 
-
-<div class="viewcode-block" id="QubitHamiltonian.exact_energy">
-<a class="viewcode-back" href="../../../api/api_autogen/qdk_chemistry.data.qubit_hamiltonian.html#qdk_chemistry.data.qubit_hamiltonian.QubitHamiltonian.exact_energy">[docs]</a>
     <span class="nd">@property</span>
     <span class="k">def</span><span class="w"> </span><span class="nf">exact_energy</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">float</span> <span class="o">|</span> <span class="kc">None</span><span class="p">:</span>
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;Compute the exact ground state energy via matrix diagonalization.</span>
@@ -209,12 +195,9 @@
 <span class="sd">            float | None: The minimum eigenvalue if qubit count is small enough, else None.</span>
 
 <span class="sd">        &quot;&quot;&quot;</span>
-        <span class="k">return</span> <span class="n">np</span><span class="o">.</span><span class="n">linalg</span><span class="o">.</span><span class="n">eigvalsh</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">pauli_ops</span><span class="o">.</span><span class="n">to_matrix</span><span class="p">())</span><span class="o">.</span><span class="n">min</span><span class="p">()</span></div>
-
+        <span class="k">return</span> <span class="n">np</span><span class="o">.</span><span class="n">linalg</span><span class="o">.</span><span class="n">eigvalsh</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">pauli_ops</span><span class="o">.</span><span class="n">to_matrix</span><span class="p">())</span><span class="o">.</span><span class="n">min</span><span class="p">()</span>
 
     <span class="c1"># DataClass interface implementation</span>
-<div class="viewcode-block" id="QubitHamiltonian.get_summary">
-<a class="viewcode-back" href="../../../api/api_autogen/qdk_chemistry.data.qubit_hamiltonian.html#qdk_chemistry.data.qubit_hamiltonian.QubitHamiltonian.get_summary">[docs]</a>
     <span class="k">def</span><span class="w"> </span><span class="nf">get_summary</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;Get a human-readable summary of the Hamiltonian.&quot;&quot;&quot;</span>
         <span class="k">return</span> <span class="p">(</span>
@@ -222,21 +205,15 @@
             <span class="sa">f</span><span class="s2">&quot;  Number of qubits: </span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">num_qubits</span><span class="si">}</span><span class="se">\n</span><span class="s2">&quot;</span>
             <span class="sa">f</span><span class="s2">&quot;  Number of terms: </span><span class="si">{</span><span class="nb">len</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">pauli_strings</span><span class="p">)</span><span class="si">}</span><span class="se">\n</span><span class="s2">&quot;</span>
             <span class="sa">f</span><span class="s2">&quot;  Exact energy: </span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">exact_energy</span><span class="si">:</span><span class="s2">.6f</span><span class="si">}</span><span class="s2">&quot;</span>
-        <span class="p">)</span></div>
+        <span class="p">)</span>
 
-
-<div class="viewcode-block" id="QubitHamiltonian.to_json">
-<a class="viewcode-back" href="../../../api/api_autogen/qdk_chemistry.data.qubit_hamiltonian.html#qdk_chemistry.data.qubit_hamiltonian.QubitHamiltonian.to_json">[docs]</a>
     <span class="k">def</span><span class="w"> </span><span class="nf">to_json</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]:</span>
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;Convert the Hamiltonian to a dictionary for JSON serialization.&quot;&quot;&quot;</span>
         <span class="k">return</span> <span class="p">{</span>
             <span class="s2">&quot;pauli_strings&quot;</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">pauli_strings</span><span class="p">,</span>
             <span class="s2">&quot;coefficients&quot;</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">coefficients</span><span class="o">.</span><span class="n">tolist</span><span class="p">(),</span>
-        <span class="p">}</span></div>
+        <span class="p">}</span>
 
-
-<div class="viewcode-block" id="QubitHamiltonian.to_hdf5">
-<a class="viewcode-back" href="../../../api/api_autogen/qdk_chemistry.data.qubit_hamiltonian.html#qdk_chemistry.data.qubit_hamiltonian.QubitHamiltonian.to_hdf5">[docs]</a>
     <span class="k">def</span><span class="w"> </span><span class="nf">to_hdf5</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">group</span><span class="p">:</span> <span class="n">h5py</span><span class="o">.</span><span class="n">Group</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;Save the Hamiltonian to an HDF5 group.</span>
 
@@ -246,11 +223,8 @@
 
 <span class="sd">        &quot;&quot;&quot;</span>
         <span class="n">group</span><span class="o">.</span><span class="n">create_dataset</span><span class="p">(</span><span class="s2">&quot;pauli_strings&quot;</span><span class="p">,</span> <span class="n">data</span><span class="o">=</span><span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">pauli_strings</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="s2">&quot;S&quot;</span><span class="p">))</span>
-        <span class="n">group</span><span class="o">.</span><span class="n">create_dataset</span><span class="p">(</span><span class="s2">&quot;coefficients&quot;</span><span class="p">,</span> <span class="n">data</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">coefficients</span><span class="p">)</span></div>
+        <span class="n">group</span><span class="o">.</span><span class="n">create_dataset</span><span class="p">(</span><span class="s2">&quot;coefficients&quot;</span><span class="p">,</span> <span class="n">data</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">coefficients</span><span class="p">)</span>
 
-
-<div class="viewcode-block" id="QubitHamiltonian.from_json">
-<a class="viewcode-back" href="../../../api/api_autogen/qdk_chemistry.data.qubit_hamiltonian.html#qdk_chemistry.data.qubit_hamiltonian.QubitHamiltonian.from_json">[docs]</a>
     <span class="nd">@classmethod</span>
     <span class="k">def</span><span class="w"> </span><span class="nf">from_json</span><span class="p">(</span><span class="bp">cls</span><span class="p">,</span> <span class="n">json_data</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="s2">&quot;QubitHamiltonian&quot;</span><span class="p">:</span>
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;Create a QubitHamiltonian from a JSON dictionary.</span>
@@ -265,11 +239,8 @@
         <span class="k">return</span> <span class="bp">cls</span><span class="p">(</span>
             <span class="n">pauli_strings</span><span class="o">=</span><span class="n">json_data</span><span class="p">[</span><span class="s2">&quot;pauli_strings&quot;</span><span class="p">],</span>
             <span class="n">coefficients</span><span class="o">=</span><span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">(</span><span class="n">json_data</span><span class="p">[</span><span class="s2">&quot;coefficients&quot;</span><span class="p">]),</span>
-        <span class="p">)</span></div>
+        <span class="p">)</span>
 
-
-<div class="viewcode-block" id="QubitHamiltonian.from_hdf5">
-<a class="viewcode-back" href="../../../api/api_autogen/qdk_chemistry.data.qubit_hamiltonian.html#qdk_chemistry.data.qubit_hamiltonian.QubitHamiltonian.from_hdf5">[docs]</a>
     <span class="nd">@classmethod</span>
     <span class="k">def</span><span class="w"> </span><span class="nf">from_hdf5</span><span class="p">(</span><span class="bp">cls</span><span class="p">,</span> <span class="n">group</span><span class="p">:</span> <span class="n">h5py</span><span class="o">.</span><span class="n">Group</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="s2">&quot;QubitHamiltonian&quot;</span><span class="p">:</span>
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;Load a QubitHamiltonian from an HDF5 group.</span>
@@ -283,9 +254,7 @@
 <span class="sd">        &quot;&quot;&quot;</span>
         <span class="n">pauli_strings</span> <span class="o">=</span> <span class="p">[</span><span class="n">s</span><span class="o">.</span><span class="n">decode</span><span class="p">()</span> <span class="k">for</span> <span class="n">s</span> <span class="ow">in</span> <span class="n">group</span><span class="p">[</span><span class="s2">&quot;pauli_strings&quot;</span><span class="p">][:]]</span>
         <span class="n">coefficients</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">(</span><span class="n">group</span><span class="p">[</span><span class="s2">&quot;coefficients&quot;</span><span class="p">])</span>
-        <span class="k">return</span> <span class="bp">cls</span><span class="p">(</span><span class="n">pauli_strings</span><span class="o">=</span><span class="n">pauli_strings</span><span class="p">,</span> <span class="n">coefficients</span><span class="o">=</span><span class="n">coefficients</span><span class="p">)</span></div>
-</div>
-
+        <span class="k">return</span> <span class="bp">cls</span><span class="p">(</span><span class="n">pauli_strings</span><span class="o">=</span><span class="n">pauli_strings</span><span class="p">,</span> <span class="n">coefficients</span><span class="o">=</span><span class="n">coefficients</span><span class="p">)</span>
 
 
 <span class="k">def</span><span class="w"> </span><span class="nf">_filter_and_group_pauli_ops_from_statevector</span><span class="p">(</span>
