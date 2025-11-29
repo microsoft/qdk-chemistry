@@ -55,7 +55,8 @@ size_t num_atomic_orbitals = orbitals.get_num_atomic_orbitals();
 auto [n_electrons_alpha, n_electrons_beta] =
     orbitals.get_num_electrons();  // returns std::pair<double, double>
 
-std::string summary = orbitals.get_summary() std::cout << summary << std::endl;
+std::string summary = orbitals.get_summary();
+std::cout << summary << std::endl;
 // end-cell-access
 // --------------------------------------------------------------------------------------------
 
