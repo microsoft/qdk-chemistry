@@ -54,15 +54,17 @@ This class defines the interface for constructing Hamiltonian matrices from orbi
 Concrete implementations should inherit from this class and implement the construct method.
 
 Examples:
-    >>> import qdk_chemistry.algorithms as alg
-    >>> import qdk_chemistry.data as data
-    >>> class MyHamiltonianConstructor(alg.HamiltonianConstructor):
-    ...     def __init__(self):
-    ...         super().__init__()  # Call the base class constructor
-    ...     # Implement the _run_impl method
-    ...     def _run_impl(self, orbitals: data.Orbitals) -> data.Hamiltonian:
-    ...         # Custom Hamiltonian construction implementation
-    ...         return hamiltonian
+    To create a custom Hamiltonian constructor, inherit from this class::
+
+        >>> import qdk_chemistry.algorithms as alg
+        >>> import qdk_chemistry.data as data
+        >>> class MyHamiltonianConstructor(alg.HamiltonianConstructor):
+        ...     def __init__(self):
+        ...         super().__init__()  # Call the base class constructor
+        ...     # Implement the _run_impl method
+        ...     def _run_impl(self, orbitals: data.Orbitals) -> data.Hamiltonian:
+        ...         # Custom Hamiltonian construction implementation
+        ...         return hamiltonian
 
 )");
 
@@ -132,6 +134,15 @@ Examples:
     ...         super().__init__()
     ...         from qdk_chemistry.data import ElectronicStructureSettings
     ...         self._settings = ElectronicStructureSettings()
+
+)");
+
+  hamiltonian_constructor.def("name", &HamiltonianConstructor::name,
+                              R"(
+The algorithm's name.
+
+Returns:
+    str: The name of the algorithm
 
 )");
 
