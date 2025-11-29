@@ -147,6 +147,15 @@ Examples:
 
 )");
 
+  selector.def("name", &ActiveSpaceSelector::name,
+               R"(
+The algorithm's name.
+
+Returns:
+    str: The name of the algorithm
+
+)");
+
   selector.def("type_name", &ActiveSpaceSelector::type_name,
                R"(
 The algorithm's type name.

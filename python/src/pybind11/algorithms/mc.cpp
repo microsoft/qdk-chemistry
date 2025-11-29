@@ -140,6 +140,15 @@ Examples:
 
 )");
 
+  mc_calculator.def("name", &MultiConfigurationCalculator::name,
+                    R"(
+The algorithm's name.
+
+Returns:
+    str: The name of the algorithm
+
+)");
+
   mc_calculator.def("type_name", &MultiConfigurationCalculator::type_name,
                     R"(
 The algorithm's type name.
