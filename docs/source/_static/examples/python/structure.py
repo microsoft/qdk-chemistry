@@ -26,7 +26,7 @@ print(f"Elements: {structure.get_elements()}")
 ################################################################################
 # start-cell-load
 # Load from XYZ file
-structure = Structure.from_xyz_file(Path("../data/water.structure.xyz"))
+structure_xyz = Structure.from_xyz_file(Path("../data/water.structure.xyz"))
 
 # Load from JSON file
 structure = Structure.from_json_file(Path("../data/water.structure.json"))
