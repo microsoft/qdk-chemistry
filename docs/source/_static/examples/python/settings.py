@@ -42,7 +42,7 @@ settings.set("max_iterations", 100)
 settings.set("basis_set", "def2-tzvp")
 
 # Set a numeric value
-settings.set("tolerance", 1.0e-8)
+settings.set("convergence_threshold", 1.0e-8)
 # end-cell-set-settings
 ################################################################################
 
@@ -69,20 +69,20 @@ if settings.has("basis_set"):
     print(f"Basis set is configured: {settings.get('basis_set')}")
 
 # Check if a setting exists (Python duck typing, no type check needed)
-if settings.has("tolerance"):
+if settings.has("convergence_threshold"):
     # Use the setting
-    print(f"Convergence threshold: {settings.get('tolerance')}")
+    print(f"Convergence threshold: {settings.get('convergence_threshold')}")
 
 # List the available settings
 print("Available settings:", settings)
 
 # Try to get a value (Python uses get_or_default or try/except)
 try:
-    value = settings.get("tolerance")
+    value = settings.get("convergence_threshold")
     # Use the value
     print(f"Got convergence threshold: {value}")
 except KeyError:
-    print("tolerance not found")
+    print("convergence_threshold not found")
 
 # Check if settings exist
 if settings.has("max_iterations"):
@@ -105,16 +105,16 @@ is_empty = settings.empty()
 settings = scf_solver.settings()  # Re-initialize to clear
 
 # Validate that required settings exist
-settings.validate_required(["basis_set", "tolerance"])
+settings.validate_required(["basis_set", "convergence_threshold"])
 
 # Get a setting as a string representation
-value_str = settings.get_as_string("tolerance")
+value_str = settings.get_as_string("convergence_threshold")
 
 # Update an existing setting (throws if key doesn't exist)
-settings.update("tolerance", 1.0e-9)
+settings.update("convergence_threshold", 1.0e-9)
 
 # Get the type name of a setting
-type_name = settings.get_type_name("tolerance")
+type_name = settings.get_type_name("convergence_threshold")
 # end-cell-misc-settings
 ################################################################################
 
@@ -150,7 +150,7 @@ class MySettings(Settings):
         super().__init__()
         # Set default values during initialization
         self.set_default("max_iterations", 100)
-        self.set_default("tolerance", 1e-6)
+        self.set_default("convergence_threshold", 1e-6)
         self.set_default("method", "default")
 
 
