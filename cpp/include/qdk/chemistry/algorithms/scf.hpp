@@ -100,8 +100,8 @@ class ScfSolver
    *
    * @throws std::runtime_error If SCF fails to converge
    * @throws std::invalid_argument If the input structure is invalid
-   * @throws SettingsAreLocked If attempting to modify settings after run() is
-   *         called
+   * @throws qdk::chemistry::data::SettingsAreLocked If attempting to modify
+   * settings after run() is called
    *
    * @note Settings are automatically locked when this method is called and
    *       cannot be modified during or after execution.

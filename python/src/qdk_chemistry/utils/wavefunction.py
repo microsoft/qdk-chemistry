@@ -14,6 +14,12 @@ from qdk_chemistry.data import Configuration, Hamiltonian, SciWavefunctionContai
 
 LOGGER = getLogger(__name__)
 
+__all__ = [
+    "calculate_sparse_wavefunction",
+    "get_active_determinants_info",
+    "get_top_determinants",
+]
+
 
 def get_top_determinants(
     wavefunction: Wavefunction, max_determinants: int | None = None
@@ -41,8 +47,7 @@ def get_active_determinants_info(wavefunction: Wavefunction, max_determinants: i
 
     Args:
         wavefunction: The Wavefunction object.
-        max_determinants: Maximum number of determinants to include in the summary.
-                          If None, include all determinants.
+        max_determinants: Maximum number of determinants to include in the summary. If None, include all determinants.
 
     Returns:
         A formatted string listing CI coefficients and their corresponding configurations.

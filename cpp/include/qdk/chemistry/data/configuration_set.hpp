@@ -33,11 +33,6 @@ namespace qdk::chemistry::data {
  */
 class ConfigurationSet : public DataClass {
  public:
-  // Type aliases
-  using ConfigVector = std::vector<Configuration>;
-  using iterator = ConfigVector::const_iterator;
-  using const_iterator = ConfigVector::const_iterator;
-
   /**
    * @brief Construct a ConfigurationSet from configurations and orbital
    * information
@@ -112,10 +107,10 @@ class ConfigurationSet : public DataClass {
   const Configuration& at(size_t idx) const;
 
   // Iterator support
-  const_iterator begin() const;
-  const_iterator end() const;
-  const_iterator cbegin() const;
-  const_iterator cend() const;
+  std::vector<Configuration>::const_iterator begin() const;
+  std::vector<Configuration>::const_iterator end() const;
+  std::vector<Configuration>::const_iterator cbegin() const;
+  std::vector<Configuration>::const_iterator cend() const;
 
   /**
    * @brief Check equality with another ConfigurationSet
