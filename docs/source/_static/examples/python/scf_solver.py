@@ -30,7 +30,7 @@ scf_solver = create("scf_solver")
 scf_solver.settings().set("basis_set", "sto-3g")
 scf_solver.settings().set("method", "hf")
 scf_solver.settings().set("max_iterations", 100)
-scf_solver.settings().set("tolerance", 1.0e-8)
+scf_solver.settings().set("convergence_threshold", 1.0e-8)
 # end-cell-configure
 ################################################################################
 
