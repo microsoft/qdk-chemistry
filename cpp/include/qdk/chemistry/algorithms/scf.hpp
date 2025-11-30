@@ -25,7 +25,7 @@ class ElectronicStructureSettings : public data::Settings {
   ElectronicStructureSettings() {
     set_default("method", "hf");
     set_default("basis_set", "def2-svp");
-    set_default("convergence_threshold", 1e-8);
+    set_default("convergence_threshold", 1e-7);
     set_default("max_iterations", 50);
   }
 };
