@@ -89,6 +89,7 @@ class PyscfScfSettings(ElectronicStructureSettings):
         super().__init__()  # This sets up all the base class defaults
         # Add PySCF-specific settings
         self._set_default("force_restricted", "bool", False)
+        self._set_default("convergence_threshold", 1e-7)  # Override default convergence threshold
 
 
 class PyscfScfSolver(ScfSolver):
@@ -209,7 +210,10 @@ class PyscfScfSolver(ScfSolver):
             mf.xc = method
 
         # Configure convergence settings
-        mf.conv_tol = convergence_threshold
+
+        # conv_tol in PySCF is tolerance for dE, convergence_threshold is for
+        # orbital gradient, so 0.1 is added here
+        mf.conv_tol = convergence_threshold * 0.1
         mf.max_cycle = max_iterations
 
         # Set initial guess if provided
