@@ -80,6 +80,7 @@ pybind11_add_module(_core
     src/pybind11/data/configuration.cpp
     src/pybind11/data/ansatz.cpp
     src/pybind11/data/stability_result.cpp
+    src/pybind11/data/pauli_operator.cpp
     src/pybind11/algorithms/cc.cpp
     src/pybind11/algorithms/localizer.cpp
     src/pybind11/algorithms/stability.cpp

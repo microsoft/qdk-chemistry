@@ -231,8 +231,14 @@ ProductPauliOperatorExpression::distribute() const {
 
 std::unique_ptr<PauliOperatorExpression>
 ProductPauliOperatorExpression::simplify() const {
+  // If the product contains sums, distribute first and simplify the result
+  if (!this->is_distributed()) {
+    auto distributed = this->distribute();
+    return distributed->simplify();
+  }
+
   std::complex<double> new_coefficient = coefficient_;
-  for (auto& factor : factors_) {
+  for (const auto& factor : factors_) {
     auto simplified_factor = factor->simplify();
     if (auto* prod = dynamic_cast<const ProductPauliOperatorExpression*>(
             simplified_factor.get())) {
@@ -243,7 +249,7 @@ ProductPauliOperatorExpression::simplify() const {
   // Create new ProductPauliOperatorExpression with combined factor
   auto simplified_product =
       std::make_unique<ProductPauliOperatorExpression>(new_coefficient);
-  for (auto& factor : factors_) {
+  for (const auto& factor : factors_) {
     auto simplified_factor = factor->simplify();
     if (auto* prod = dynamic_cast<ProductPauliOperatorExpression*>(
             simplified_factor.get())) {
@@ -252,10 +258,8 @@ ProductPauliOperatorExpression::simplify() const {
     simplified_product->add_factor(std::move(simplified_factor));
   }
 
-  // If distributed, stable sort factors and perform qubit-wise product
-  // simplification
-  if (simplified_product->is_distributed() and
-      simplified_product->factors_.size() > 1) {
+  // stable sort factors and perform qubit-wise product simplification
+  if (simplified_product->factors_.size() > 1) {
     // First unroll the products into a single product with all factors
     // Since is_distributed() is true, all factors are either PauliOperators
     // or ProductPauliOperatorExpressions containing only PauliOperators
@@ -417,13 +421,24 @@ std::unique_ptr<PauliOperatorExpression> SumPauliOperatorExpression::clone()
 
 std::unique_ptr<SumPauliOperatorExpression>
 SumPauliOperatorExpression::distribute() const {
-  return std::make_unique<SumPauliOperatorExpression>(*this);
+  auto result = std::make_unique<SumPauliOperatorExpression>();
+  for (const auto& term : terms_) {
+    auto distributed_term = term->distribute();
+    // Add all terms from the distributed result to our result
+    for (const auto& dist_term : distributed_term->get_terms()) {
+      result->add_term(dist_term->clone());
+    }
+  }
+  return result;
 }
 
 std::unique_ptr<PauliOperatorExpression> SumPauliOperatorExpression::simplify()
     const {
+  // First distribute to get a sum of products
+  auto distributed = this->distribute();
+
   auto simplified_sum = std::make_unique<SumPauliOperatorExpression>();
-  for (const auto& term : terms_) {
+  for (const auto& term : distributed->get_terms()) {
     auto simplified_term = term->simplify();
     simplified_sum->add_term(std::move(simplified_term));
   }
