@@ -81,8 +81,8 @@ std::pair<double, std::shared_ptr<data::Wavefunction>> ScfSolver::_run_impl(
   int max_iterations = _settings->get<int>("max_iterations");
 
   // Set different convergence threshold according to tolerance
-  // when convergence_threshold = 1e-8, og_threshold = 5e-7
-  double orbital_gradient_threshold = convergence_threshold * 5e1;
+  // when convergence_threshold = 1e-8, og_threshold = 2e-7
+  double orbital_gradient_threshold = convergence_threshold * 2e1;
   // when convergence_threshold = 1e-8, density_threshold = 1e-5
   double density_threshold = convergence_threshold * 1e3;
 

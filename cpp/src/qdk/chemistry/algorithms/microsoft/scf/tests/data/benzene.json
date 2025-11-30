@@ -7,8 +7,7 @@
     "cart": false,
     "functional": "pbe",
     "method": "RKS",
-    "og_threshold": 1e-7,
     "level_shift": 0.8,
-    "energy": -231.95053822539427
+    "energy": -231.9505381194623
   }
 }
