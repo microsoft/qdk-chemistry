@@ -128,7 +128,7 @@ class SCFTest
     cfg.cartesian = json.value("cart", true);
     cfg.unrestricted = scf_type == "uhf" || scf_type == "uks";
     cfg.scf_algorithm.max_iteration = 100;
-    cfg.scf_algorithm.og_threshold = json.value("og_threshold", 5e-7);
+    cfg.scf_algorithm.og_threshold = json.value("og_threshold", 2e-7);
     cfg.scf_algorithm.density_threshold = json.value("density_threshold", 1e-5);
     cfg.lindep_threshold = json.value("lindep_threshold", 1e-6);
     cfg.fock_reset_steps = 9999;
