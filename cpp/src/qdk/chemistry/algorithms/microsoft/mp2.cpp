@@ -216,15 +216,23 @@ void MP2Calculator::compute_opposite_spin_t2(
     const Eigen::VectorXd& moeri, size_t n_occ_i, size_t n_occ_j,
     size_t n_vir_i, size_t n_vir_j, size_t stride_i, size_t stride_j,
     size_t stride_k, Eigen::VectorXd& t2, double* energy) {
+  // Precompute T2 tensor strides for flattened indexing
+  const size_t t2_stride_i = n_occ_j * n_vir_i * n_vir_j;
+  const size_t t2_stride_j = n_vir_i * n_vir_j;
+  const size_t t2_stride_a = n_vir_j;
+
   for (size_t i = 0; i < n_occ_i; ++i) {
     const double eps_i = eps_i_spin[i];
+    const size_t t2_i_base = i * t2_stride_i;
 
     for (size_t a = 0; a < n_vir_i; ++a) {
       const size_t a_idx = a + n_occ_i;
       const double eps_ia = eps_i - eps_i_spin[a_idx];
+      const size_t t2_ia_base = t2_i_base + a * t2_stride_a;
 
       for (size_t j = 0; j < n_occ_j; ++j) {
         const double eps_ija = eps_ia + eps_j_spin[j];
+        const size_t t2_ija_base = t2_ia_base + j * t2_stride_j;
 
         for (size_t b = 0; b < n_vir_j; ++b) {
           const size_t b_idx = b + n_occ_j;
@@ -239,8 +247,7 @@ void MP2Calculator::compute_opposite_spin_t2(
           const double t2_iajb = eri_iajb / denom;
 
           // Store T2 amplitude
-          size_t t2_flat_idx = i * n_occ_j * n_vir_i * n_vir_j +
-                               j * n_vir_i * n_vir_j + a * n_vir_j + b;
+          const size_t t2_flat_idx = t2_ija_base + b;
           t2[t2_flat_idx] = t2_iajb;
 
           // Energy contribution (if requested)
@@ -259,16 +266,24 @@ void MP2Calculator::compute_restricted_t2(const Eigen::VectorXd& eps,
                                           size_t stride_i, size_t stride_j,
                                           size_t stride_k, Eigen::VectorXd& t2,
                                           double* energy) {
+  // Precompute T2 tensor strides for flattened indexing
+  const size_t t2_stride_i = n_occ * n_vir * n_vir;
+  const size_t t2_stride_j = n_vir * n_vir;
+  const size_t t2_stride_a = n_vir;
+
   for (size_t i = 0; i < n_occ; ++i) {
     const size_t i_base = i * stride_i;
+    const size_t t2_i_base = i * t2_stride_i;
 
     for (size_t j = 0; j < n_occ; ++j) {
       const double eps_ij = eps[i] + eps[j];
+      const size_t t2_ij_base = t2_i_base + j * t2_stride_j;
 
       for (size_t a = 0; a < n_vir; ++a) {
         const size_t a_idx = a + n_occ;
         const size_t ia_base = i_base + a_idx * stride_j;
         const double eps_ija = eps_ij - eps[a_idx];
+        const size_t t2_ija_base = t2_ij_base + a * t2_stride_a;
 
         for (size_t b = 0; b < n_vir; ++b) {
           const size_t b_idx = b + n_occ;
@@ -284,8 +299,7 @@ void MP2Calculator::compute_restricted_t2(const Eigen::VectorXd& eps,
           const double t2_iajb = eri_iajb / denom;
 
           // Store T2 amplitude
-          size_t t2_flat_idx =
-              i * n_occ * n_vir * n_vir + j * n_vir * n_vir + a * n_vir + b;
+          const size_t t2_flat_idx = t2_ija_base + b;
           t2[t2_flat_idx] = t2_iajb;
 
           // MP2 energy: E_MP2 += T_iajb * (2*(ia|jb) - (ib|ja))
@@ -307,16 +321,24 @@ void MP2Calculator::compute_same_spin_t2(const Eigen::VectorXd& eps,
                                          size_t stride_i, size_t stride_j,
                                          size_t stride_k, Eigen::VectorXd& t2,
                                          double* energy) {
+  // Precompute T2 tensor strides for flattened indexing
+  const size_t t2_stride_i = n_occ * n_vir * n_vir;
+  const size_t t2_stride_j = n_vir * n_vir;
+  const size_t t2_stride_a = n_vir;
+
   for (size_t i = 0; i < n_occ; ++i) {
     const size_t i_base = i * stride_i;
+    const size_t t2_i_base = i * t2_stride_i;
 
     for (size_t a = 0; a < n_vir; ++a) {
       const size_t a_idx = a + n_occ;
       const size_t ia_base = i_base + a_idx * stride_j;
       const double eps_ia = eps[i] - eps[a_idx];
+      const size_t t2_ia_base = t2_i_base + a * t2_stride_a;
 
       for (size_t j = i + 1; j < n_occ; ++j) {
         const double eps_ija = eps_ia + eps[j];
+        const size_t t2_ija_base = t2_ia_base + j * t2_stride_j;
 
         for (size_t b = a + 1; b < n_vir; ++b) {
           const size_t b_idx = b + n_occ;
@@ -334,8 +356,7 @@ void MP2Calculator::compute_same_spin_t2(const Eigen::VectorXd& eps,
           const double t2_iajb = antisym_integral / denom;
 
           // Store T2 amplitude
-          size_t t2_flat_idx =
-              i * n_occ * n_vir * n_vir + j * n_vir * n_vir + a * n_vir + b;
+          const size_t t2_flat_idx = t2_ija_base + b;
           t2[t2_flat_idx] = t2_iajb;
 
           // Energy contribution (if requested)
