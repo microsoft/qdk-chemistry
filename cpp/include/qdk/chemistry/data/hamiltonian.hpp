@@ -25,7 +25,7 @@ enum class HamiltonianType { Hermitian, NonHermitian };
 
 /**
  * @enum SpinChannel
- * @brief Spin channels for two-electron integrals
+ * @brief Spin channels for one and two-electron integrals
  */
 enum class SpinChannel { aa, bb, aaaa, aabb, bbbb };
 

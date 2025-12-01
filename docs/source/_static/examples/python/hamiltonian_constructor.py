@@ -4,11 +4,12 @@
 # Copyright (c) Microsoft Corporation. All rights reserved.
 # Licensed under the MIT License. See LICENSE.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
+from qdk_chemistry.algorithms import available, create
+import numpy as np
+from qdk_chemistry.data import Structure
 
 ################################################################################
 # start-cell-create
-from qdk_chemistry.algorithms import available, create
-
 # List available Hamiltonian constructor implementations
 available_constructors = available("hamiltonian_constructor")
 print(f"Available Hamiltonian constructors: {available_constructors}")
@@ -30,9 +31,6 @@ hamiltonian_constructor.settings().set("eri_method", "direct")
 
 ################################################################################
 # start-cell-construct
-import numpy as np
-from qdk_chemistry.data import Structure
-
 # Create a structure
 coords = np.array([[0.0, 0.0, 0.0], [0.0, 0.0, 1.4]])
 symbols = ["H", "H"]

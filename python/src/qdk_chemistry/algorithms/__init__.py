@@ -20,7 +20,6 @@ from qdk_chemistry.algorithms.active_space_selector import (
     QdkOccupationActiveSpaceSelector,
     QdkValenceActiveSpaceSelector,
 )
-from qdk_chemistry.algorithms.reference_derived_calculator import ReferenceDerivedCalculator
 from qdk_chemistry.algorithms.energy_estimator import EnergyEstimator
 from qdk_chemistry.algorithms.hamiltonian_constructor import (
     HamiltonianConstructor,
@@ -42,6 +41,7 @@ from qdk_chemistry.algorithms.projected_multi_configuration_calculator import (
     QdkMacisPmc,
 )
 from qdk_chemistry.algorithms.qubit_mapper import QubitMapper
+from qdk_chemistry.algorithms.reference_derived_calculator import ReferenceDerivedCalculator
 from qdk_chemistry.algorithms.scf_solver import QdkScfSolver, ScfSolver
 from qdk_chemistry.algorithms.stability_checker import StabilityChecker
 from qdk_chemistry.algorithms.state_preparation import StatePreparation

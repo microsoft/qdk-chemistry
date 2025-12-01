@@ -51,7 +51,9 @@ h2_aaaa, h2_aabb, h2_bbbb = hamiltonian.get_two_body_integrals()
 one_body_element = hamiltonian.get_one_body_element(i_int, j_int, SpinChannel.aa)
 
 # Access a specific two-electron integral <ij|kl> (for aaaa spin channel)
-two_body_element = hamiltonian.get_two_body_element(i_int, j_int, k_int, l_int, SpinChannel.aaaa)
+two_body_element = hamiltonian.get_two_body_element(
+    i_int, j_int, k_int, l_int, SpinChannel.aaaa
+)
 
 # Get core energy (nuclear repulsion + inactive orbital energy)
 core_energy = hamiltonian.get_core_energy()

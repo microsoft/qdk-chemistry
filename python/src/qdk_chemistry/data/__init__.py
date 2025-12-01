@@ -19,7 +19,7 @@ Exposed classes are:
 - ``Hamiltonian``: Quantum mechanical Hamiltonian operator representation.
 - ``MeasurementData``: Measurement bitstring data and metadata for ``QubitHamiltonian`` objects.
 - ``ModelOrbitals``: Simple orbital representation for model systems without full basis set information.
-- ``MP2Container``: Container for MP2 wavefunction with Hamiltonian reference and optional amplitudes.        
+- ``MP2Container``: Container for MP2 wavefunction with Hamiltonian reference and optional amplitudes.
 - ``Orbitals``: Molecular orbital information and properties.
 - ``OrbitalType``: Enumeration of orbital angular momentum types (s, p, d, f, etc.).
 - ``QpeResult``: Result of quantum phase estimation workflows, including phase, energy, and metadata.
@@ -102,8 +102,8 @@ __all__ = [
     "Element",
     "EnergyExpectationResult",
     "Hamiltonian",
-    "MP2Container",
     "HamiltonianType",
+    "MP2Container",
     "MeasurementData",
     "ModelOrbitals",
     "OrbitalType",

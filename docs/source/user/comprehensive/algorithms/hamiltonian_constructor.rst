@@ -52,7 +52,7 @@ The ``HamiltonianConstructor`` can be configured using the ``Settings`` object t
 
 .. note::
    All orbital indices in QDK/Chemistry are 0-based, following the convention used in most programming languages.
-   
+
 .. tab:: C++ API
 
    .. literalinclude:: ../../../_static/examples/cpp/hamiltonian_constructor.cpp
