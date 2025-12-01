@@ -229,14 +229,14 @@ void MP2Calculator::compute_opposite_spin_t2(
         for (size_t b = 0; b < n_vir_j; ++b) {
           const size_t b_idx = b + n_occ_j;
 
-          const size_t idx_ijab =
+          const size_t idx_iajb =
               i * stride_i + a_idx * stride_j + j * stride_k + b_idx;
 
-          const double eri_ijab = moeri[idx_ijab];
+          const double eri_iajb = moeri[idx_iajb];
           const double denom = eps_ija - eps_j_spin[b_idx];
 
           // T2 amplitude
-          const double t2_ijab = eri_ijab / denom;
+          const double t2_ijab = eri_iajb / denom;
 
           // Store T2 amplitude
           size_t t2_flat_idx = i * n_occ_j * n_vir_i * n_vir_j +
@@ -245,7 +245,7 @@ void MP2Calculator::compute_opposite_spin_t2(
 
           // Energy contribution (if requested)
           if (energy) {
-            *energy += t2_ijab * eri_ijab;
+            *energy += t2_ijab * eri_iajb;
           }
         }
       }
@@ -273,27 +273,27 @@ void MP2Calculator::compute_restricted_t2(const Eigen::VectorXd& eps,
         for (size_t b = 0; b < n_vir; ++b) {
           const size_t b_idx = b + n_occ;
 
-          // Get integrals <ij|ab> and <ij|ba>
-          const size_t idx_ijab = ia_base + j * stride_k + b_idx;
-          const double eri_ijab = moeri[idx_ijab];
+          // Get integrals (ia|jb) and (ib|ja) in Mulliken notation
+          const size_t idx_iajb = ia_base + j * stride_k + b_idx;
+          const double eri_iajb = moeri[idx_iajb];
 
           // Energy denominator
           const double denom = eps_ija - eps[b_idx];
 
-          // T2 amplitude: T_ijab = <ij|ab> / denominator
-          const double t2_ijab = eri_ijab / denom;
+          // T2 amplitude: T_ijab = (ia|jb) / denominator
+          const double t2_ijab = eri_iajb / denom;
 
           // Store T2 amplitude
           size_t t2_flat_idx =
               i * n_occ * n_vir * n_vir + j * n_vir * n_vir + a * n_vir + b;
           t2[t2_flat_idx] = t2_ijab;
 
-          // MP2 energy: E_MP2 += T_ijab * (2*<ij|ab> - <ij|ba>)
+          // MP2 energy: E_MP2 += T_ijab * (2*(ia|jb) - (ib|ja))
           if (energy) {
-            const size_t idx_ijba =
+            const size_t idx_ibja =
                 i_base + b_idx * stride_j + j * stride_k + a_idx;
-            const double eri_ijba = moeri[idx_ijba];
-            *energy += t2_ijab * (2.0 * eri_ijab - eri_ijba);
+            const double eri_ibja = moeri[idx_ibja];
+            *energy += t2_ijab * (2.0 * eri_iajb - eri_ibja);
           }
         }
       }
@@ -321,13 +321,13 @@ void MP2Calculator::compute_same_spin_t2(const Eigen::VectorXd& eps,
         for (size_t b = a + 1; b < n_vir; ++b) {
           const size_t b_idx = b + n_occ;
 
-          const size_t idx_ijab = ia_base + j * stride_k + b_idx;
-          const size_t idx_ijba =
+          const size_t idx_iajb = ia_base + j * stride_k + b_idx;
+          const size_t idx_ibja =
               i_base + b_idx * stride_j + j * stride_k + a_idx;
 
-          const double eri_ijab = moeri[idx_ijab];
-          const double eri_ijba = moeri[idx_ijba];
-          const double antisym_integral = eri_ijab - eri_ijba;
+          const double eri_iajb = moeri[idx_iajb];
+          const double eri_ibja = moeri[idx_ibja];
+          const double antisym_integral = eri_iajb - eri_ibja;
           const double denom = eps_ija - eps[b_idx];
 
           // T2 amplitude
