@@ -97,9 +97,17 @@ CoupledClusterContainer::CoupledClusterContainer(
     const std::optional<VectorVariant>& two_rdm_aabb,
     const std::optional<VectorVariant>& two_rdm_aaaa,
     const std::optional<VectorVariant>& two_rdm_bbbb, WavefunctionType type)
-    : WavefunctionContainer(type),
+    : WavefunctionContainer(
+          WavefunctionType::NotSelfDual),  // Always force NotSelfDual for CC
       _references(references, orbitals),
       _orbitals(orbitals) {
+  // Coupled cluster wavefunctions can never be self-dual
+  if (type == WavefunctionType::SelfDual) {
+    throw std::invalid_argument(
+        "Coupled cluster wavefunctions cannot be self-dual. "
+        "They must always be WavefunctionType::NotSelfDual.");
+  }
+
   if (!orbitals) {
     throw std::invalid_argument("Orbitals cannot be null");
   }
@@ -331,7 +339,7 @@ std::unique_ptr<WavefunctionContainer> CoupledClusterContainer::clone() const {
       _orbitals, _references.get_configurations(), t1_aa, t1_bb, t2_abab,
       t2_aaaa, t2_bbbb, one_rdm_spin_traced, one_rdm_aa, one_rdm_bb,
       two_rdm_spin_traced, two_rdm_aabb, two_rdm_aaaa, two_rdm_bbbb,
-      get_type());
+      WavefunctionType::NotSelfDual);
 }
 
 std::shared_ptr<Orbitals> CoupledClusterContainer::get_orbitals() const {
@@ -440,9 +448,8 @@ nlohmann::json CoupledClusterContainer::to_json() const {
 
   j["version"] = SERIALIZATION_VERSION;
   j["container_type"] = get_container_type();
-  j["wavefunction_type"] = (get_type() == WavefunctionType::SelfDual)
-                               ? "self_dual"
-                               : "not_self_dual";
+  // CC wavefunctions are always NotSelfDual
+  j["wavefunction_type"] = "not_self_dual";
 
   // Serialize orbitals
   if (_orbitals) {
@@ -512,12 +519,17 @@ std::unique_ptr<CoupledClusterContainer> CoupledClusterContainer::from_json(
     }
     validate_serialization_version(SERIALIZATION_VERSION, j["version"]);
 
-    // Load wavefunction type
+    // CC wavefunctions are always NotSelfDual - throw if SelfDual is specified
     WavefunctionType wf_type = WavefunctionType::NotSelfDual;
     if (j.contains("wavefunction_type")) {
       std::string type_str = j["wavefunction_type"];
-      type_str == "self_dual" ? wf_type = WavefunctionType::SelfDual
-                              : wf_type = WavefunctionType::NotSelfDual;
+      if (type_str == "self_dual") {
+        throw std::invalid_argument(
+            "Invalid JSON data: Coupled cluster wavefunctions cannot be "
+            "self-dual. "
+            "Found 'self_dual' wavefunction_type, but CC containers must be "
+            "'not_self_dual'.");
+      }
     }
 
     auto orbitals = Orbitals::from_json(j["orbitals"]);
@@ -552,7 +564,7 @@ std::unique_ptr<CoupledClusterContainer> CoupledClusterContainer::from_json(
         wf_type);
   } catch (const std::exception& e) {
     throw std::runtime_error(
-        "Failed to parse CasWavefunctionContainer from JSON: " +
+        "Failed to parse CoupledClusterContainer from JSON: " +
         std::string(e.what()));
   }
 }
@@ -574,10 +586,8 @@ void CoupledClusterContainer::to_hdf5(H5::Group& group) const {
         "container_type", string_type, H5::DataSpace(H5S_SCALAR));
     container_type_attr.write(string_type, container_type);
 
-    // wavefunction type
-    std::string wf_type_str = (get_type() == WavefunctionType::SelfDual)
-                                  ? "self_dual"
-                                  : "not_self_dual";
+    // CC wavefunctions are always NotSelfDual
+    std::string wf_type_str = "not_self_dual";
     H5::Attribute wf_type_attr = group.createAttribute(
         "wavefunction_type", string_type, H5::DataSpace(H5S_SCALAR));
     wf_type_attr.write(string_type, wf_type_str);
@@ -630,15 +640,19 @@ std::unique_ptr<CoupledClusterContainer> CoupledClusterContainer::from_hdf5(
     version_attr.read(string_type, version_str);
     validate_serialization_version(SERIALIZATION_VERSION, version_str);
 
-    // wavefunction type
+    // CC wavefunctions are always NotSelfDual - throw if SelfDual is specified
     WavefunctionType wf_type = WavefunctionType::NotSelfDual;
     if (group.attrExists("wavefunction_type")) {
       H5::Attribute wf_type_attr = group.openAttribute("wavefunction_type");
       std::string wf_type_str;
       wf_type_attr.read(string_type, wf_type_str);
-      WavefunctionType wf_type = WavefunctionType::NotSelfDual;
-      wf_type_str == "self_dual" ? wf_type = WavefunctionType::SelfDual
-                                 : wf_type = WavefunctionType::NotSelfDual;
+      if (wf_type_str == "self_dual") {
+        throw std::invalid_argument(
+            "Invalid HDF5 data: Coupled cluster wavefunctions cannot be "
+            "self-dual. "
+            "Found 'self_dual' wavefunction_type, but CC containers must be "
+            "'not_self_dual'.");
+      }
     }
 
     // complex flag
@@ -651,7 +665,6 @@ std::unique_ptr<CoupledClusterContainer> CoupledClusterContainer::from_hdf5(
     }
 
     // Load configuration set (delegates to ConfigurationSet deserialization)
-    // ConfigurationSet now deserializes orbitals internally
     if (!group.nameExists("reference_configurations")) {
       throw std::runtime_error(
           "HDF5 group missing required 'reference_configurations' subgroup");
