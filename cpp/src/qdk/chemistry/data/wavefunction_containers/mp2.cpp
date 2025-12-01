@@ -44,14 +44,24 @@ std::shared_ptr<Hamiltonian> MP2Container::get_hamiltonian() const {
 }
 
 const MP2Container::VectorVariant& MP2Container::get_coefficients() const {
-  throw std::runtime_error(
-      "get_coefficients() is not implemented for MP2 wavefunctions.");
+  // Coefficients are 1.0 for each reference determinant
+  // Check if we need to initialize (default state is empty VectorXd)
+  if (std::holds_alternative<Eigen::VectorXd>(_cached_coefficients) &&
+      std::get<Eigen::VectorXd>(_cached_coefficients).size() == 0) {
+    // Initialize with real coefficients of 1.0 for each reference
+    size_t num_refs = _references.size();
+    Eigen::VectorXd coeffs = Eigen::VectorXd::Ones(num_refs);
+    _cached_coefficients = std::move(coeffs);
+  }
+  return _cached_coefficients;
 }
 
 MP2Container::ScalarVariant MP2Container::get_coefficient(
     const Configuration& det) const {
-  throw std::runtime_error(
-      "get_coefficient() is not implemented for MP2 wavefunctions.");
+  // Return 1.0 if det is a reference determinant, 0.0 otherwise
+  const auto& references = _references.get_configurations();
+  auto it = std::find(references.begin(), references.end(), det);
+  return (it != references.end()) ? 1.0 : 0.0;
 }
 
 const MP2Container::DeterminantVector& MP2Container::get_references() const {
@@ -60,8 +70,8 @@ const MP2Container::DeterminantVector& MP2Container::get_references() const {
 
 const MP2Container::DeterminantVector& MP2Container::get_active_determinants()
     const {
-  throw std::runtime_error(
-      "get_active_determinants() is not implemented for MP2 wavefunctions.");
+  // The active determinants are the reference determinants
+  return _references.get_configurations();
 }
 
 void MP2Container::_compute_t1_amplitudes() const {
@@ -84,7 +94,7 @@ void MP2Container::_compute_t1_amplitudes() const {
   const size_t n_vir_alpha = active_space_size - n_alpha;
   const size_t n_vir_beta = active_space_size - n_beta;
 
-  // For MP2, T1 amplitudes are always zero
+  // T1 amplitudes are always zero
   Eigen::VectorXd t1_aa_vec = Eigen::VectorXd::Zero(n_alpha * n_vir_alpha);
   Eigen::VectorXd t1_bb_vec = Eigen::VectorXd::Zero(n_beta * n_vir_beta);
 
@@ -233,7 +243,8 @@ bool MP2Container::has_t2_amplitudes() const {
 }
 
 size_t MP2Container::size() const {
-  throw std::runtime_error("size() is not meaningful for MP2 wavefunctions.");
+  // Size is the number of reference determinants
+  return _references.size();
 }
 
 MP2Container::ScalarVariant MP2Container::overlap(
@@ -247,8 +258,7 @@ double MP2Container::norm() const {
 }
 
 bool MP2Container::contains_determinant(const Configuration& det) const {
-  throw std::runtime_error(
-      "contains_determinant() is not implemented for MP2 wavefunctions.");
+  return contains_reference(det);
 }
 
 bool MP2Container::contains_reference(const Configuration& det) const {
@@ -261,6 +271,10 @@ bool MP2Container::contains_reference(const Configuration& det) const {
 }
 
 void MP2Container::clear_caches() const {
+  // Clear cached coefficients by resetting to empty VectorXd
+  _cached_coefficients = Eigen::VectorXd();
+
+  // Clear T1 and T2 amplitudes
   _t1_amplitudes_aa = nullptr;
   _t1_amplitudes_bb = nullptr;
   _t2_amplitudes_abab = nullptr;
@@ -269,7 +283,6 @@ void MP2Container::clear_caches() const {
 
   _determinant_vector_cache = nullptr;
 }
-
 nlohmann::json MP2Container::to_json() const {
   nlohmann::json j;
   j["type"] = "mp2";
