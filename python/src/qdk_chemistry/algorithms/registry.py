@@ -88,23 +88,31 @@ class _TelemetryWrapper:
         >>> settings = scf.settings()  # Delegates to wrapped algorithm
     """    
     def __init__(self, wrapped_algorithm: Algorithm, algorithm_type: str, algorithm_name: str):
-        self._wrapped = wrapped_algorithm
-        self._algorithm_type = algorithm_type
-        self._algorithm_name = algorithm_name
+        object.__setattr__(self, '_wrapped', wrapped_algorithm)
+        object.__setattr__(self, '_algorithm_type', algorithm_type)
+        object.__setattr__(self, '_algorithm_name', algorithm_name)
     
+    @property
+    def __class__(self):
+        """Return the wrapped algorithm's class for isinstance checks."""
+        return object.__getattribute__(self, '_wrapped').__class__
+
     def run(self, *args, **kwargs):
         """Run the wrapped algorithm with telemetry tracking."""
         start_time = time.perf_counter()
+        wrapped = object.__getattribute__(self, '_wrapped')
+        algorithm_type = object.__getattribute__(self, '_algorithm_type')
+        algorithm_name = object.__getattribute__(self, '_algorithm_name')
 
         try:
-            result = self._wrapped.run(*args, **kwargs)
+            result = wrapped.run(*args, **kwargs)
             duration = time.perf_counter() - start_time
 
-            mol_formula, n_basis = telemetry_events.extract_wavefunction_data(result)
+            mol_formula, n_basis = telemetry_events.extract_data(result)
 
             telemetry_events.on_algorithm_end(
-                algorithm_type=self._algorithm_type,
-                algorithm_name=self._algorithm_name,
+                algorithm_type=algorithm_type,
+                algorithm_name=algorithm_name,
                 duration_sec=duration,
                 status="success",
                 num_basis_functions=n_basis,
@@ -115,34 +123,18 @@ class _TelemetryWrapper:
         except Exception as e:
             duration = time.perf_counter() - start_time
             telemetry_events.on_algorithm_end(
-                algorithm_type=self._algorithm_type,
-                algorithm_name=self._algorithm_name,
+                algorithm_type=algorithm_type,
+                algorithm_name=algorithm_name,
                 duration_sec=duration,
                 status="failed",
                 error_type=type(e).__name__,
-                molecular_formula=mol_formula
             )
             raise
-    
-    def settings(self):
-        """Delegate to wrapped algorithm."""
-        return self._wrapped.settings()
-    
-    def name(self):
-        """Delegate to wrapped algorithm."""
-        return self._wrapped.name()
-    
-    def type_name(self):
-        """Delegate to wrapped algorithm."""
-        return self._wrapped.type_name()
-    
-    def aliases(self):
-        """Delegate to wrapped algorithm."""
-        return self._wrapped.aliases()
-    
+        
     def __getattr__(self, name):
         """Delegate any other attribute access to the wrapped algorithm."""
-        return getattr(self._wrapped, name)
+        wrapped = object.__getattribute__(self, '_wrapped')
+        return getattr(wrapped, name)
     
 def create(algorithm_type: str, algorithm_name: str | None = None, **kwargs) -> Algorithm:
     """Create an algorithm instance by type and name.
