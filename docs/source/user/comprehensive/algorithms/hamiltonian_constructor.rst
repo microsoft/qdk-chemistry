@@ -48,18 +48,11 @@ The orbitals provide the necessary information about the molecular system includ
 Configuring the Hamiltonian construction
 ----------------------------------------
 
-The ``HamiltonianConstructor`` can be configured using the ``Settings`` object with the following parameters.
+The ``HamiltonianConstructor`` can be configured using the ``Settings`` object to control how integrals are computed.
 
 .. note::
    All orbital indices in QDK/Chemistry are 0-based, following the convention used in most programming languages.
-
-.. note::
-   **Active orbitals:** When specifying active orbitals, the indices must be unique (no duplicates).
-
-.. note::
-   **Orbital spaces:** If no active orbitals are specified, the entire orbital space is used.
-   If no inactive orbitals are specified and active orbitals are provided, orbitals from index 0 up to the first active orbital are considered inactive.
-
+   
 .. tab:: C++ API
 
    .. literalinclude:: ../../../_static/examples/cpp/hamiltonian_constructor.cpp
@@ -89,8 +82,7 @@ Once configured, the Hamiltonian can be constructed from a set of orbitals:
 .. tab:: Python API
 
    .. note::
-      This example shows the API pattern.
-      For complete working examples, see the test suite.
+      This example shows a complete working workflow including structure creation, SCF calculation, and Hamiltonian construction.
 
    .. literalinclude:: ../../../_static/examples/python/hamiltonian_constructor.py
       :language: python
@@ -112,12 +104,12 @@ These settings are available in the default ``HamiltonianConstructor``:
    * - Setting
      - Type
      - Description
-   * - ``active_orbitals``
-     - vector<int>
-     - Indices of active orbitals (0-based, empty for full space)
-   * - ``inactive_orbitals``
-     - vector<int>
-     - Indices of inactive orbitals (0-based, empty for automatic detection)
+   * - ``eri_method``
+     - string
+     - Method for computing electron repulsion integrals ("direct" or "incore")
+   * - ``force_unrestricted``
+     - bool
+     - Force unrestricted calculation even for closed-shell systems (default: false)
 
 Further reading
 ---------------
