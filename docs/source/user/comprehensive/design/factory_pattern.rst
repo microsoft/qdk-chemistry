@@ -19,7 +19,7 @@ This approach has several advantages:
 Factory pattern in QDK/Chemistry
 --------------------------------
 
-In QDK/Chemistry, algorithm classes like ``ScfSolver``, ``Localizer``, and ``MCCalculator`` are instantiated through factory classes rather than direct constructors.
+In QDK/Chemistry, algorithm classes like :doc:`ScfSolver <../algorithms/scf_solver>`, :doc:`Localizer <../algorithms/localizer>`, and :doc:`MCCalculator <../algorithms/mc_calculator>` are instantiated through factory classes rather than direct constructors.
 This design allows QDK/Chemistry to:
 
 - Support multiple implementations of the same algorithm interface
@@ -54,6 +54,7 @@ QDK/Chemistry provides factory classes for each algorithm type:
    * - :doc:`MCCalculator <../algorithms/mc_calculator>`
      - ``MCCalculatorFactory``
      - ``create_mc_calculator()``
+
 ..   * - :doc:`DynamicalCorrelation <../algorithms/dynamical_correlation>`
 ..     - ``DynamicalCorrelationFactory``
 ..     - ``create_dynamical_correlation()``
@@ -67,27 +68,17 @@ These factory methods allow users to create default implementations or specific 
 
 .. tab:: C++ API
 
-   .. code-block:: cpp
-
-      #include <qdk/chemistry.hpp>
-
-      using namespace qdk::chemistry::algorithms;
-
-      // Create default implementation
-      auto scf_solver = ScfSolverFactory::create();
-
-      // Create specific implementation by name
-      auto localizer = LocalizerFactory::create("pipek-mezey");
-
-      // Configure and use the instance
-      scf_solver->settings().set("basis_set", "def2-tzvp");
-      auto [E_scf, orbitals] = scf_solver->solve(structure);
+   .. literalinclude:: ../../../_static/examples/cpp/factory_pattern.cpp
+      :language: cpp
+      :start-after: // start-cell-scf-localizer
+      :end-before: // end-cell-scf-localizer
 
 .. tab:: Python API
 
-   .. literalinclude:: ../../../../examples/factory_pattern.py
+   .. literalinclude:: ../../../_static/examples/python/factory_pattern.py
       :language: python
-      :lines: 4,19-29
+      :start-after: # start-cell-scf-localizer
+      :end-before: # end-cell-scf-localizer
 
 Extending QDK/Chemistry
 -----------------------
@@ -115,38 +106,44 @@ To create a new interface to an external program in C++:
 
    .. code-block:: cpp
 
-      #include <qdk/chemistry/algorithms/scf_solver.hpp>
       #include <external_program/api.h>  // Your external program's API
+
+      #include <qdk/chemistry/algorithms/scf_solver.hpp>
 
       namespace my_namespace {
 
       class ExternalProgramScfSolver : public qdk::chemistry::algorithms::ScfSolver {
       public:
-          ExternalProgramScfSolver() = default;
-          ~ExternalProgramScfSolver() override = default;
+      ExternalProgramScfSolver() = default;
+      ~ExternalProgramScfSolver() override = default;
 
-          // Implement the interface method that connects to your external program
-          std::tuple<double, qdk::chemistry::data::Orbitals> solve(const qdk::chemistry::data::Structure& structure) override {
-              // Convert QDK/Chemistry structure to external program format
-              auto ext_molecule = convert_to_external_format(structure);
+      // Implement the interface method that connects to your external program
+      std::tuple<double, qdk::chemistry::data::Orbitals> solve(
+            const qdk::chemistry::data::Structure& structure) override {
+         // Convert QDK/Chemistry structure to external program format
+         auto ext_molecule = convert_to_external_format(structure);
 
-              // Run calculation using external program's API
-              auto ext_results = external_program::run_scf(ext_molecule, settings().get_all());
+         // Run calculation using external program's API
+         auto ext_results =
+            external_program::run_scf(ext_molecule, settings().get_all());
 
-              // Convert results back to QDK/Chemistry format
-              double energy = ext_results.energy;
-              qdk::chemistry::data::Orbitals orbitals = convert_from_external_format(ext_results.orbitals);
+         // Convert results back to QDK/Chemistry format
+         double energy = ext_results.energy;
+         qdk::chemistry::data::Orbitals orbitals =
+            convert_from_external_format(ext_results.orbitals);
 
-              return {energy, orbitals};
-          }
+         return {energy, orbitals};
+      }
 
       private:
-          // Helper functions for format conversion
-          external_program::Molecule convert_to_external_format(const qdk::chemistry::data::Structure& structure);
-          qdk::chemistry::data::Orbitals convert_from_external_format(const external_program::Orbitals& ext_orbitals);
+      // Helper functions for format conversion
+      external_program::Molecule convert_to_external_format(
+            const qdk::chemistry::data::Structure& structure);
+      qdk::chemistry::data::Orbitals convert_from_external_format(
+            const external_program::Orbitals& ext_orbitals);
       };
 
-      } // namespace my_namespace
+      }  // namespace my_namespace
 
 1. **Register with the factory**:
 
@@ -234,7 +231,7 @@ To create a new interface to an external program in Python:
    solver = create_scf_solver("external-program")
 
 Connection to the interface system
-------------------------------
+----------------------------------
 
 The factory pattern serves as the foundation for QDK/Chemistry's :doc:`Interface System <interfaces>`.
 In QDK/Chemistry, factories enable the registration and instantiation of interface implementations that connect to external quantum chemistry programs.
@@ -250,8 +247,9 @@ This design enables several key capabilities:
 
 For detailed information about implementing interfaces to external programs, including data conversion, error handling, resource management, and settings translation, see the :doc:`Interfaces <interfaces>` documentation.
 
-Related topics
---------------
+Further reading
+---------------
 
+- Some of the above examples can be downloaded as complete `C++ <../../../_static/examples/cpp/factory_pattern.cpp>`_ and `Python <../../../_static/examples/python/factory_pattern.py>`_ scripts.
 - :doc:`Settings <settings>`: Configuration of algorithm instances
 - :doc:`Interfaces <interfaces>`: QDK/Chemistry's interface system to external packages

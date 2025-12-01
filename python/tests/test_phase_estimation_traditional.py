@@ -18,7 +18,11 @@ from qiskit_aer import AerSimulator
 from qdk_chemistry.algorithms import TraditionalPhaseEstimation, energy_from_phase
 from qdk_chemistry.data import QubitHamiltonian
 
-from .reference_tolerances import qpe_energy_tolerance, qpe_phase_fraction_tolerance
+from .reference_tolerances import (
+    float_comparison_relative_tolerance,
+    qpe_energy_tolerance,
+    qpe_phase_fraction_tolerance,
+)
 
 _SEED = 42
 
@@ -111,8 +115,18 @@ def test_traditional_phase_estimation_extracts_phase_and_energy(two_qubit_phase_
     dominant_bitstring, phase_fraction, energy = _extract_traditional_results(two_qubit_phase_problem)
 
     assert dominant_bitstring == two_qubit_phase_problem.expected_bitstring
-    assert phase_fraction == pytest.approx(two_qubit_phase_problem.expected_phase, abs=qpe_phase_fraction_tolerance)
-    assert energy == pytest.approx(two_qubit_phase_problem.expected_energy, abs=qpe_energy_tolerance)
+    assert np.isclose(
+        phase_fraction,
+        two_qubit_phase_problem.expected_phase,
+        rtol=float_comparison_relative_tolerance,
+        atol=qpe_phase_fraction_tolerance,
+    )
+    assert np.isclose(
+        energy,
+        two_qubit_phase_problem.expected_energy,
+        rtol=float_comparison_relative_tolerance,
+        atol=qpe_energy_tolerance,
+    )
 
 
 def test_traditional_phase_estimation_four_qubit_problem(four_qubit_phase_problem: TraditionalProblem) -> None:
@@ -120,5 +134,15 @@ def test_traditional_phase_estimation_four_qubit_problem(four_qubit_phase_proble
     dominant_bitstring, phase_fraction, energy = _extract_traditional_results(four_qubit_phase_problem)
 
     assert dominant_bitstring == four_qubit_phase_problem.expected_bitstring
-    assert phase_fraction == pytest.approx(four_qubit_phase_problem.expected_phase, abs=qpe_phase_fraction_tolerance)
-    assert energy == pytest.approx(four_qubit_phase_problem.expected_energy, abs=qpe_energy_tolerance)
+    assert np.isclose(
+        phase_fraction,
+        four_qubit_phase_problem.expected_phase,
+        rtol=float_comparison_relative_tolerance,
+        atol=qpe_phase_fraction_tolerance,
+    )
+    assert np.isclose(
+        energy,
+        four_qubit_phase_problem.expected_energy,
+        rtol=float_comparison_relative_tolerance,
+        atol=qpe_energy_tolerance,
+    )

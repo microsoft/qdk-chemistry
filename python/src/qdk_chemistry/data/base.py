@@ -13,6 +13,8 @@ import h5py
 
 from qdk_chemistry._core.data import DataClass as _CoreDataClass
 
+__all__: list[str] = []
+
 
 def _validate_filename_suffix(filename: str | Path, data_type: str, operation: str) -> str:
     """Validate that filename has the correct data type suffix.
@@ -30,9 +32,10 @@ def _validate_filename_suffix(filename: str | Path, data_type: str, operation: s
 
     Examples:
         Valid filenames:
-        - "example.structure.json" for data_type="structure"
-        - "data.wavefunction.h5" for data_type="wavefunction"
-        - "result.qpe_result.json" for data_type="qpe_result"
+
+        - ``example.structure.json`` when ``data_type="structure"``
+        - ``data.wavefunction.h5`` when ``data_type="wavefunction"``
+        - ``result.qpe_result.json`` when ``data_type="qpe_result"``
 
     """
     # Convert Path to string if needed
@@ -70,33 +73,33 @@ class DataClass(_CoreDataClass):
     """Base class for immutable data classes with common serialization methods.
 
     This abstract base class provides:
+
     - Immutability after construction (__setattr__ and __delattr__ protection)
     - Common implementations of to_json_file, to_hdf5_file, and to_file
     - Filename validation to enforce naming convention (.<data_type>.<extension>)
     - Requires derived classes to implement abstract methods
 
     Derived classes MUST implement:
+
     1. get_summary() -> str
         Return a human-readable summary string of the object
-
     2. to_json() -> dict
         Return a dictionary representation suitable for JSON serialization
-
     3. to_hdf5(group: h5py.Group) -> None
         Write the object's data to an HDF5 group
-
     4. to_file(filename: str, format_type: str) -> None
         Save the object to a file with the specified format
         (default implementation provided, but can be overridden)
 
     Derived classes should:
+
     - Set all attributes before calling super().__init__()
     - Call super().__init__() at the end of __init__ to enable immutability
     - Set the _data_type_name class attribute (e.g., "structure", "wavefunction")
 
-    Note:
-        These methods are pure virtual in the C++ base class and MUST be
-        overridden. The C++ binding will enforce this at runtime.
+    Notes:
+        These methods are pure virtual in the C++ base class and MUST be overridden.
+        The C++ binding will enforce this at runtime.
 
         Filename validation enforces the convention that filenames must include
         the data type, e.g., "example.structure.json" or "data.wavefunction.h5"
@@ -120,6 +123,7 @@ class DataClass(_CoreDataClass):
 
         Args:
             name: Attribute name
+
         Returns:
             Any: Value returned by the corresponding 'get_' method
 
@@ -222,7 +226,8 @@ class DataClass(_CoreDataClass):
 
         Args:
             filename: Path to the output JSON file
-                      Must match pattern: <name>.<data_type>.json
+
+                Must match pattern: <name>.<data_type>.json
 
         Raises:
             ValueError: If filename doesn't match required pattern
@@ -238,7 +243,8 @@ class DataClass(_CoreDataClass):
 
         Args:
             filename: Path to the output HDF5 file
-                      Must match pattern: <name>.<data_type>.h5 or <name>.<data_type>.hdf5
+
+                Must match pattern: <name>.<data_type>.h5 or <name>.<data_type>.hdf5
 
         Raises:
             ValueError: If filename doesn't match required pattern
@@ -254,7 +260,9 @@ class DataClass(_CoreDataClass):
 
         Args:
             filename: Path to the output file
-                      Must match pattern: <name>.<data_type>.<extension>
+
+                Must match pattern: <name>.<data_type>.<extension>
+
             format_type: Format type ("json", "hdf5", or "h5")
 
         Raises:
@@ -306,7 +314,8 @@ class DataClass(_CoreDataClass):
 
         Args:
             filename: Path to the input JSON file
-                      Must match pattern: <name>.<data_type>.json
+
+                Must match pattern: <name>.<data_type>.json
 
         Returns:
             DataClass: New instance of the derived class
@@ -346,7 +355,8 @@ class DataClass(_CoreDataClass):
 
         Args:
             filename: Path to the input HDF5 file
-                      Must match pattern: <name>.<data_type>.h5 or <name>.<data_type>.hdf5
+
+                Must match pattern: <name>.<data_type>.h5 or <name>.<data_type>.hdf5
 
         Returns:
             DataClass: New instance of the derived class
@@ -366,7 +376,9 @@ class DataClass(_CoreDataClass):
 
         Args:
             filename: Path to the input file
-                      Must match pattern: <name>.<data_type>.<extension>
+
+                Must match pattern: <name>.<data_type>.<extension>
+
             format_type: Format type ("json", "hdf5", or "h5")
 
         Returns:

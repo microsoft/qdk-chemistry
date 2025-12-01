@@ -174,7 +174,7 @@ qdk::chemistry::data::BasisSet convert_basis_set_to_qdk(
   if (not basis_set.pure) {
     // TODO (NAB):  is basis_set.pure always false for cartesian basis sets?
     // Does it mean anything else? Work item: 41332
-    throw std::runtime_error("QDK Does Not Support Cartesian Basis Functions");
+    throw std::runtime_error("QDK Does Not Support Cartesian Atomic Orbitals");
   }
 
   // Convert the BasisSet to a qdk::chemistry::data::BasisSet
@@ -342,7 +342,7 @@ nlohmann::ordered_json convert_to_json(
        {"pure", true},
        {"mode", "RAW"},
        {"atoms", nuclear_charges_unsigned},
-       {"num_basis_funcs", basis_set.get_num_basis_functions()},
+       {"num_atomic_orbitals", basis_set.get_num_atomic_orbitals()},
        {"electron_shells", json_shells},
        {"ecp_shells", json_ecp_shells},
        {"element_ecp_electrons", json_element_ecp_electrons}});

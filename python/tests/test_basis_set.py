@@ -14,7 +14,7 @@ from pathlib import Path
 import numpy as np
 import pytest
 
-from qdk_chemistry.data import BasisSet, BasisType, OrbitalType, Shell, Structure
+from qdk_chemistry.data import AOType, BasisSet, OrbitalType, Shell, Structure
 
 from .reference_tolerances import float_comparison_absolute_tolerance, float_comparison_relative_tolerance
 
@@ -27,25 +27,25 @@ def test_basis_set_construction():
     # Test constructor with name and shells (minimal)
     basis = BasisSet("", [shell])
     assert basis.get_name() == ""
-    assert basis.get_basis_type() == BasisType.Spherical
+    assert basis.get_atomic_orbital_type() == AOType.Spherical
     assert basis.get_num_shells() == 1
-    assert basis.get_num_basis_functions() == 1
+    assert basis.get_num_atomic_orbitals() == 1
 
     # Test constructor with name and shells
     basis_named = BasisSet("6-31G", [shell])
     assert basis_named.get_name() == "6-31G"
-    assert basis_named.get_basis_type() == BasisType.Spherical
+    assert basis_named.get_atomic_orbital_type() == AOType.Spherical
     assert basis_named.get_num_shells() == 1
 
     # Test constructor with name, shells, and basis type
-    basis_cartesian = BasisSet("6-31G", [shell], BasisType.Cartesian)
+    basis_cartesian = BasisSet("6-31G", [shell], AOType.Cartesian)
     assert basis_cartesian.get_name() == "6-31G"
-    assert basis_cartesian.get_basis_type() == BasisType.Cartesian
+    assert basis_cartesian.get_atomic_orbital_type() == AOType.Cartesian
 
     # Test copy constructor
     basis_copy = BasisSet(basis_cartesian)
     assert basis_copy.get_name() == "6-31G"
-    assert basis_copy.get_basis_type() == BasisType.Cartesian
+    assert basis_copy.get_atomic_orbital_type() == AOType.Cartesian
 
 
 def test_shell_management():
@@ -59,7 +59,7 @@ def test_shell_management():
 
     assert basis.get_num_shells() == 2
     assert basis.get_num_atoms() == 1
-    assert basis.get_num_basis_functions() == 4  # 1 s + 3 p
+    assert basis.get_num_atomic_orbitals() == 4  # 1 s + 3 p
 
     # Test get_shells method - flattened from per-atom storage
     all_shells = basis.get_shells()
@@ -96,27 +96,27 @@ def test_shell_management():
     assert basis_extended.get_num_atoms() == 2  # Now we have atoms 0 and 1
 
 
-def test_basis_type_management():
+def test_atomic_orbital_type_management():
     """Test basis type management."""
     # Create a valid shell for testing
     shell = Shell(0, OrbitalType.S, [1.0], [1.0])
 
     # Test default is spherical
     basis_spherical = BasisSet("test", [shell])
-    assert basis_spherical.get_basis_type() == BasisType.Spherical
+    assert basis_spherical.get_atomic_orbital_type() == AOType.Spherical
 
     # Test cartesian basis type with d orbital shell
     shells = [Shell(0, OrbitalType.D, [1.0], [2.0])]
-    basis_cartesian = BasisSet("test", shells, BasisType.Cartesian)
-    assert basis_cartesian.get_basis_type() == BasisType.Cartesian
+    basis_cartesian = BasisSet("test", shells, AOType.Cartesian)
+    assert basis_cartesian.get_atomic_orbital_type() == AOType.Cartesian
 
     # For cartesian d orbitals: 6 functions
-    assert basis_cartesian.get_num_basis_functions() == 6
+    assert basis_cartesian.get_num_atomic_orbitals() == 6
 
     # Create spherical basis set with same shell
-    basis_sph_test = BasisSet("test", shells, BasisType.Spherical)
+    basis_sph_test = BasisSet("test", shells, AOType.Spherical)
     # For spherical d orbitals: 5 functions
-    assert basis_sph_test.get_num_basis_functions() == 5
+    assert basis_sph_test.get_num_atomic_orbitals() == 5
 
 
 def test_shell_with_raw_primitives():
@@ -149,7 +149,7 @@ def test_shell_with_raw_primitives():
 
     # Test extended basis has both shells
     assert basis_extended.get_num_shells() == 2
-    assert basis_extended.get_num_basis_functions() == 4  # 1 s + 3 p functions
+    assert basis_extended.get_num_atomic_orbitals() == 4  # 1 s + 3 p functions
 
 
 def test_orbital_type_enum():
@@ -186,24 +186,24 @@ def test_orbital_type_enum():
     assert BasisSet.get_angular_momentum(OrbitalType.I) == 6
 
     # Test orbital sizes for different basis types
-    assert BasisSet.get_num_orbitals_for_l(0, BasisType.Spherical) == 1
-    assert BasisSet.get_num_orbitals_for_l(1, BasisType.Spherical) == 3
-    assert BasisSet.get_num_orbitals_for_l(2, BasisType.Spherical) == 5
+    assert BasisSet.get_num_orbitals_for_l(0, AOType.Spherical) == 1
+    assert BasisSet.get_num_orbitals_for_l(1, AOType.Spherical) == 3
+    assert BasisSet.get_num_orbitals_for_l(2, AOType.Spherical) == 5
 
-    assert BasisSet.get_num_orbitals_for_l(0, BasisType.Cartesian) == 1
-    assert BasisSet.get_num_orbitals_for_l(1, BasisType.Cartesian) == 3
-    assert BasisSet.get_num_orbitals_for_l(2, BasisType.Cartesian) == 6
+    assert BasisSet.get_num_orbitals_for_l(0, AOType.Cartesian) == 1
+    assert BasisSet.get_num_orbitals_for_l(1, AOType.Cartesian) == 3
+    assert BasisSet.get_num_orbitals_for_l(2, AOType.Cartesian) == 6
 
     # Test basis type string conversion
-    assert BasisSet.basis_type_to_string(BasisType.Spherical) == "spherical"
-    assert BasisSet.basis_type_to_string(BasisType.Cartesian) == "cartesian"
+    assert BasisSet.atomic_orbital_type_to_string(AOType.Spherical) == "spherical"
+    assert BasisSet.atomic_orbital_type_to_string(AOType.Cartesian) == "cartesian"
 
-    assert BasisSet.string_to_basis_type("spherical") == BasisType.Spherical
-    assert BasisSet.string_to_basis_type("cartesian") == BasisType.Cartesian
+    assert BasisSet.string_to_atomic_orbital_type("spherical") == AOType.Spherical
+    assert BasisSet.string_to_atomic_orbital_type("cartesian") == AOType.Cartesian
 
 
-def test_basis_function_queries():
-    """Test basis function indexing and queries."""
+def test_atomic_orbital_queries():
+    """Test atomic orbital indexing and queries."""
     # Create shells for different atoms
     shells = [
         Shell(0, OrbitalType.S, [1.0], [1.0]),  # atom 0: 1 s orbital
@@ -212,19 +212,19 @@ def test_basis_function_queries():
     ]
     basis = BasisSet("Test", shells)
 
-    # Total: 5 basis functions (1s + 3p + 1s)
-    assert basis.get_num_basis_functions() == 5
+    # Total: 5 atomic orbitals (1s + 3p + 1s)
+    assert basis.get_num_atomic_orbitals() == 5
 
     # Test atom indexing
-    assert basis.get_atom_index_for_basis_function(0) == 0  # First s orbital on atom 0
-    assert basis.get_atom_index_for_basis_function(1) == 0  # First p orbital on atom 0
-    assert basis.get_atom_index_for_basis_function(4) == 1  # s orbital on atom 1
+    assert basis.get_atom_index_for_atomic_orbital(0) == 0  # First s orbital on atom 0
+    assert basis.get_atom_index_for_atomic_orbital(1) == 0  # First p orbital on atom 0
+    assert basis.get_atom_index_for_atomic_orbital(4) == 1  # s orbital on atom 1
 
-    # Test basis function indices for atom
-    atom0_indices = basis.get_basis_function_indices_for_atom(0)
+    # Test atomic orbital indices for atom
+    atom0_indices = basis.get_atomic_orbital_indices_for_atom(0)
     assert atom0_indices == [0, 1, 2, 3]  # 1s + 3p
 
-    atom1_indices = basis.get_basis_function_indices_for_atom(1)
+    atom1_indices = basis.get_atomic_orbital_indices_for_atom(1)
     assert atom1_indices == [4]  # 1s
 
 
@@ -252,22 +252,22 @@ def test_shell_queries():
     p_shells = basis.get_shell_indices_for_orbital_type(OrbitalType.P)
     assert p_shells == [1]
 
-    # Test get_num_basis_functions_for_atom
-    assert basis.get_num_basis_functions_for_atom(0) == 4  # 1s + 3p
-    assert basis.get_num_basis_functions_for_atom(1) == 1  # 1s
+    # Test get_num_atomic_orbitals_for_atom
+    assert basis.get_num_atomic_orbitals_for_atom(0) == 4  # 1s + 3p
+    assert basis.get_num_atomic_orbitals_for_atom(1) == 1  # 1s
 
-    # Test get_num_basis_functions_for_orbital_type
-    assert basis.get_num_basis_functions_for_orbital_type(OrbitalType.S) == 2  # 2 s orbitals
-    assert basis.get_num_basis_functions_for_orbital_type(OrbitalType.P) == 3  # 3 p orbitals
+    # Test get_num_atomic_orbitals_for_orbital_type
+    assert basis.get_num_atomic_orbitals_for_orbital_type(OrbitalType.S) == 2  # 2 s orbitals
+    assert basis.get_num_atomic_orbitals_for_orbital_type(OrbitalType.P) == 3  # 3 p orbitals
 
 
-def test_basis_function_info():
-    """Test basis function info functionality."""
+def test_atomic_orbital_info():
+    """Test atomic orbital info functionality."""
     shells = [Shell(0, OrbitalType.P, [1.0], [1.0])]  # 3 p orbitals
     basis = BasisSet("Test", shells)
 
-    # Test getting basis function info (now returns tuple)
-    shell_idx, m_l = basis.get_basis_function_info(1)  # Second p orbital
+    # Test getting atomic orbital info (now returns tuple)
+    shell_idx, m_l = basis.get_atomic_orbital_info(1)  # Second p orbital
     assert shell_idx == 0
     assert m_l == 0  # py orbital (m_l = 0)
 
@@ -276,12 +276,12 @@ def test_basis_function_info():
     assert shell_idx2 == 0
     assert m_l2 == 0
 
-    # Test additional basis function queries
-    shell_idx3, m_l3 = basis.get_basis_function_info(0)  # First p orbital
+    # Test additional atomic orbital queries
+    shell_idx3, m_l3 = basis.get_atomic_orbital_info(0)  # First p orbital
     assert shell_idx3 == 0
     assert m_l3 == -1  # px orbital (m_l = -1)
 
-    shell_idx4, m_l4 = basis.get_basis_function_info(2)  # Third p orbital
+    shell_idx4, m_l4 = basis.get_atomic_orbital_info(2)  # Third p orbital
     assert shell_idx4 == 0
     assert m_l4 == 1  # pz orbital (m_l = 1)
 
@@ -318,7 +318,7 @@ def test_summary():
     assert isinstance(summary, str)
     assert "6-31G" in summary
     assert "shells: 2" in summary
-    assert "basis functions: 4" in summary
+    assert "atomic orbitals: 4" in summary
 
 
 def test_json_serialization():
@@ -340,7 +340,7 @@ def test_json_serialization():
     # Verify data was transferred correctly
     assert basis_in.get_name() == "STO-3G"
     assert basis_in.get_num_shells() == 2
-    assert basis_in.get_num_basis_functions() == 4
+    assert basis_in.get_num_atomic_orbitals() == 4
 
     # Test file-based serialization
     with tempfile.NamedTemporaryFile(suffix=".basis_set.json", mode="w", delete=False) as tmp:
@@ -354,7 +354,7 @@ def test_json_serialization():
         # Verify file-based serialization
         assert basis_file.get_name() == "STO-3G"
         assert basis_file.get_num_shells() == 2
-        assert basis_file.get_num_basis_functions() == 4
+        assert basis_file.get_num_atomic_orbitals() == 4
     finally:
         Path(filename).unlink()
 
@@ -366,7 +366,7 @@ def test_hdf5_serialization():
         Shell(0, OrbitalType.S, [1.0], [1.0]),
         Shell(0, OrbitalType.P, [0.5], [1.0]),
     ]
-    basis_out = BasisSet("cc-pVDZ", shells, BasisType.Spherical)
+    basis_out = BasisSet("cc-pVDZ", shells, AOType.Spherical)
 
     try:
         with tempfile.NamedTemporaryFile(suffix=".basis_set.h5", delete=False) as tmp:
@@ -379,7 +379,7 @@ def test_hdf5_serialization():
         # Verify data transfer
         assert basis_in.get_name() == "cc-pVDZ"
         assert basis_in.get_num_shells() == 2
-        assert basis_in.get_num_basis_functions() == 4
+        assert basis_in.get_num_atomic_orbitals() == 4
 
     except RuntimeError as e:
         pytest.skip(f"HDF5 test skipped - {e!s}")
@@ -397,13 +397,13 @@ def test_error_handling():
 
     # Test invalid indices on basis set - expect IndexError not RuntimeError
     with pytest.raises(IndexError):
-        basis.get_atom_index_for_basis_function(10)  # Out of range
+        basis.get_atom_index_for_atomic_orbital(10)  # Out of range
 
     with pytest.raises(IndexError):  # Also expect IndexError here
         basis.get_shell(10)  # Out of range
 
     with pytest.raises(IndexError):  # Also expect IndexError here
-        basis.get_basis_function_info(10)  # Out of range
+        basis.get_atomic_orbital_info(10)  # Out of range
 
     # Test invalid string to orbital type conversion - expect ValueError
     with pytest.raises(ValueError):  # noqa: PT011
@@ -432,7 +432,7 @@ def test_complete_basis_set_workflow():
     # Verify properties
     assert basis.get_num_atoms() == 2
     assert basis.get_num_shells() == 2
-    assert basis.get_num_basis_functions() == 2
+    assert basis.get_num_atomic_orbitals() == 2
 
     # Test serialization round-trip
     with tempfile.NamedTemporaryFile(suffix=".basis_set.json", mode="w", delete=False) as tmp:
@@ -448,7 +448,7 @@ def test_complete_basis_set_workflow():
         # Check equality of key properties
         assert basis2.get_name() == basis.get_name()
         assert basis2.get_num_shells() == basis.get_num_shells()
-        assert basis2.get_num_basis_functions() == basis.get_num_basis_functions()
+        assert basis2.get_num_atomic_orbitals() == basis.get_num_atomic_orbitals()
 
     finally:
         Path(json_filename).unlink()
@@ -471,35 +471,35 @@ def test_shell_creation():
     assert shell2.get_num_primitives() == 2
     assert len(shell2.exponents) == 2
     assert len(shell2.coefficients) == 2
-    assert shell2.get_num_basis_functions() == 1  # s orbital (spherical)
+    assert shell2.get_num_atomic_orbitals() == 1  # s orbital (spherical)
     assert shell2.get_angular_momentum() == 0
 
     # Test p shell with different basis types
     p_shell = Shell(1, OrbitalType.P, [1.0], [1.0])
-    assert p_shell.get_num_basis_functions(BasisType.Spherical) == 3  # px, py, pz
-    assert p_shell.get_num_basis_functions(BasisType.Cartesian) == 3  # same for p
+    assert p_shell.get_num_atomic_orbitals(AOType.Spherical) == 3  # px, py, pz
+    assert p_shell.get_num_atomic_orbitals(AOType.Cartesian) == 3  # same for p
     assert p_shell.get_angular_momentum() == 1
 
     # Test d shell with different basis types
     d_shell = Shell(2, OrbitalType.D, [1.0], [1.0])
-    assert d_shell.get_num_basis_functions(BasisType.Spherical) == 5  # spherical d
-    assert d_shell.get_num_basis_functions(BasisType.Cartesian) == 6  # cartesian d
+    assert d_shell.get_num_atomic_orbitals(AOType.Spherical) == 5  # spherical d
+    assert d_shell.get_num_atomic_orbitals(AOType.Cartesian) == 6  # cartesian d
 
     # Test shell creation with raw primitive data
     exponents = [1.0, 2.0, 3.0]
     coefficients = [0.1, 0.2, 0.3]
     contracted_shell = Shell(0, OrbitalType.S, exponents, coefficients)
     assert contracted_shell.get_num_primitives() == 3
-    np.testing.assert_array_equal(contracted_shell.exponents, exponents)
-    np.testing.assert_array_equal(contracted_shell.coefficients, coefficients)
+    assert np.array_equal(contracted_shell.exponents, exponents)
+    assert np.array_equal(contracted_shell.coefficients, coefficients)
 
     # Test with explicit numpy arrays to ensure Eigen::VectorXd overload is called
     exponents_np = np.array([4.0, 5.0])
     coefficients_np = np.array([0.4, 0.6])
     contracted_shell_np = Shell(1, OrbitalType.P, exponents_np, coefficients_np)
     assert contracted_shell_np.get_num_primitives() == 2
-    np.testing.assert_array_equal(contracted_shell_np.exponents, exponents_np)
-    np.testing.assert_array_equal(contracted_shell_np.coefficients, coefficients_np)
+    assert np.array_equal(contracted_shell_np.exponents, exponents_np)
+    assert np.array_equal(contracted_shell_np.coefficients, coefficients_np)
 
 
 def test_utility_functions():
@@ -512,10 +512,10 @@ def test_utility_functions():
     assert BasisSet.get_num_orbitals_for_l(3) == 7  # f: 7 orbitals
 
     # Cartesian
-    assert BasisSet.get_num_orbitals_for_l(0, BasisType.Cartesian) == 1  # s: 1 orbital
-    assert BasisSet.get_num_orbitals_for_l(1, BasisType.Cartesian) == 3  # p: 3 orbitals
-    assert BasisSet.get_num_orbitals_for_l(2, BasisType.Cartesian) == 6  # d: 6 orbitals
-    assert BasisSet.get_num_orbitals_for_l(3, BasisType.Cartesian) == 10  # f: 10 orbitals
+    assert BasisSet.get_num_orbitals_for_l(0, AOType.Cartesian) == 1  # s: 1 orbital
+    assert BasisSet.get_num_orbitals_for_l(1, AOType.Cartesian) == 3  # p: 3 orbitals
+    assert BasisSet.get_num_orbitals_for_l(2, AOType.Cartesian) == 6  # d: 6 orbitals
+    assert BasisSet.get_num_orbitals_for_l(3, AOType.Cartesian) == 10  # f: 10 orbitals
 
 
 def test_basis_set_file_io_generic():
@@ -551,7 +551,7 @@ def test_basis_set_file_io_generic():
         # Check equality
         assert basis2.get_name() == basis.get_name()
         assert basis2.get_num_shells() == basis.get_num_shells()
-        assert basis2.get_num_basis_functions() == basis.get_num_basis_functions()
+        assert basis2.get_num_atomic_orbitals() == basis.get_num_atomic_orbitals()
         assert basis2.get_num_atoms() == basis.get_num_atoms()
 
     # Test HDF5 file I/O
@@ -567,7 +567,7 @@ def test_basis_set_file_io_generic():
         # Check equality
         assert basis3.get_name() == basis.get_name()
         assert basis3.get_num_shells() == basis.get_num_shells()
-        assert basis3.get_num_basis_functions() == basis.get_num_basis_functions()
+        assert basis3.get_num_atomic_orbitals() == basis.get_num_atomic_orbitals()
         assert basis3.get_num_atoms() == basis.get_num_atoms()
 
     # Test unsupported file type
@@ -609,7 +609,7 @@ def test_basis_set_hdf5_specific():
         # Check equality
         assert basis2.get_name() == basis.get_name()
         assert basis2.get_num_shells() == basis.get_num_shells()
-        assert basis2.get_num_basis_functions() == basis.get_num_basis_functions()
+        assert basis2.get_num_atomic_orbitals() == basis.get_num_atomic_orbitals()
         assert basis2.get_num_atoms() == basis.get_num_atoms()
 
         # Check shells are preserved
@@ -650,7 +650,7 @@ def test_basis_set_json_specific():
     shells.append(p_shell)
 
     # Create a basis set with multiple shells
-    basis = BasisSet("cc-pVDZ", shells, BasisType.Cartesian)
+    basis = BasisSet("cc-pVDZ", shells, AOType.Cartesian)
 
     # Test updated JSON file I/O methods
     with tempfile.NamedTemporaryFile(suffix=".basis_set.json") as tmp_json:
@@ -664,9 +664,9 @@ def test_basis_set_json_specific():
 
         # Check equality
         assert basis2.get_name() == basis.get_name()
-        assert basis2.get_basis_type() == basis.get_basis_type()
+        assert basis2.get_atomic_orbital_type() == basis.get_atomic_orbital_type()
         assert basis2.get_num_shells() == basis.get_num_shells()
-        assert basis2.get_num_basis_functions() == basis.get_num_basis_functions()
+        assert basis2.get_num_atomic_orbitals() == basis.get_num_atomic_orbitals()
         assert basis2.get_num_atoms() == basis.get_num_atoms()
 
         # Check shells are preserved
@@ -714,7 +714,7 @@ def test_basis_set_file_io_validation():
         basis = BasisSet.from_hdf5_file("test.h5")
 
     # Test non-existent file
-    with pytest.raises(RuntimeError, match="Cannot open file for reading"):
+    with pytest.raises(RuntimeError, match="Unable to open BasisSet JSON file"):
         basis = BasisSet.from_json_file("nonexistent.basis_set.json")
 
     with pytest.raises(RuntimeError):
@@ -751,7 +751,7 @@ def test_basis_set_file_io_round_trip():
     shells.append(d_shell1)
 
     # Create a complex basis set with all shells
-    basis = BasisSet("complex-basis", shells, BasisType.Spherical)
+    basis = BasisSet("complex-basis", shells, AOType.Spherical)
 
     # Test JSON round-trip
     with tempfile.NamedTemporaryFile(suffix=".basis_set.json") as tmp_json:
@@ -763,9 +763,9 @@ def test_basis_set_file_io_round_trip():
 
         # Check all properties are preserved
         assert basis_json.get_name() == basis.get_name()
-        assert basis_json.get_basis_type() == basis.get_basis_type()
+        assert basis_json.get_atomic_orbital_type() == basis.get_atomic_orbital_type()
         assert basis_json.get_num_shells() == basis.get_num_shells()
-        assert basis_json.get_num_basis_functions() == basis.get_num_basis_functions()
+        assert basis_json.get_num_atomic_orbitals() == basis.get_num_atomic_orbitals()
         assert basis_json.get_num_atoms() == basis.get_num_atoms()
 
         # Check shells in detail
@@ -800,7 +800,7 @@ def test_basis_set_file_io_round_trip():
         # Check all properties are preserved
         assert basis_hdf5.get_name() == basis.get_name()
         assert basis_hdf5.get_num_shells() == basis.get_num_shells()
-        assert basis_hdf5.get_num_basis_functions() == basis.get_num_basis_functions()
+        assert basis_hdf5.get_num_atomic_orbitals() == basis.get_num_atomic_orbitals()
         assert basis_hdf5.get_num_atoms() == basis.get_num_atoms()
 
         # Check shells in detail
@@ -855,7 +855,7 @@ def test_basis_set_consistency_between_methods():
         # Check both loaded basis sets are equivalent
         assert basis1.get_name() == basis2.get_name()
         assert basis1.get_num_shells() == basis2.get_num_shells()
-        assert basis1.get_num_basis_functions() == basis2.get_num_basis_functions()
+        assert basis1.get_num_atomic_orbitals() == basis2.get_num_atomic_orbitals()
 
         # Test HDF5 consistency
         hdf5_file1 = tmpdir_path / "test1.basis_set.h5"
@@ -873,7 +873,7 @@ def test_basis_set_consistency_between_methods():
         # Check both loaded basis sets are equivalent
         assert basis3.get_name() == basis4.get_name()
         assert basis3.get_num_shells() == basis4.get_num_shells()
-        assert basis3.get_num_basis_functions() == basis4.get_num_basis_functions()
+        assert basis3.get_num_atomic_orbitals() == basis4.get_num_atomic_orbitals()
 
 
 def test_basis_set_metadata_management():
@@ -894,14 +894,14 @@ def test_basis_set_metadata_management():
     assert basis_named.get_name() == "Custom-Basis"
 
     # Test constructor with name and basis type
-    basis_with_type = BasisSet("6-31G", shells, BasisType.Cartesian)
+    basis_with_type = BasisSet("6-31G", shells, AOType.Cartesian)
     assert basis_with_type.get_name() == "6-31G"
-    assert basis_with_type.get_basis_type() == BasisType.Cartesian
+    assert basis_with_type.get_atomic_orbital_type() == AOType.Cartesian
 
     # Test copy constructor
     basis_copy = BasisSet(basis_with_type)
     assert basis_copy.get_name() == "6-31G"
-    assert basis_copy.get_basis_type() == BasisType.Cartesian
+    assert basis_copy.get_atomic_orbital_type() == AOType.Cartesian
 
     # Test structure management - create a minimal structure first
     coords = np.array([[0.0, 0.0, 0.0]])
@@ -941,15 +941,15 @@ def test_keyword_arguments():
     basis1 = BasisSet(name="STO-3G", shells=shells)
     assert basis1.get_name() == "STO-3G"
 
-    # Test BasisSet constructor with name and basis_type using keyword args
-    basis2 = BasisSet(name="6-31G", shells=shells, basis_type=BasisType.Cartesian)
+    # Test BasisSet constructor with name and atomic_orbital_type using keyword args
+    basis2 = BasisSet(name="6-31G", shells=shells, atomic_orbital_type=AOType.Cartesian)
     assert basis2.get_name() == "6-31G"
-    assert basis2.get_basis_type() == BasisType.Cartesian
+    assert basis2.get_atomic_orbital_type() == AOType.Cartesian
 
-    # Note: set_basis_type and add_shell methods don't exist on BasisSet
-    # Test get_basis_type instead
-    assert basis1.get_basis_type() == BasisType.Spherical  # Default
-    assert basis2.get_basis_type() == BasisType.Cartesian
+    # Note: set_atomic_orbital_type and add_shell methods don't exist on BasisSet
+    # Test get_atomic_orbital_type instead
+    assert basis1.get_atomic_orbital_type() == AOType.Spherical  # Default
+    assert basis2.get_atomic_orbital_type() == AOType.Cartesian
 
     # Test shell count
     assert basis1.get_num_shells() == 1
@@ -978,8 +978,8 @@ def test_explicit_pyarg_coverage():
     shells = [shell_basic]
     basis1 = BasisSet(name="Test-Basis", shells=shells)
 
-    # BasisSet(name, shells, basis_type) py::arg
-    basis2 = BasisSet(name="Test-Basis-2", shells=shells, basis_type=BasisType.Cartesian)
+    # BasisSet(name, shells, atomic_orbital_type) py::arg
+    basis2 = BasisSet(name="Test-Basis-2", shells=shells, atomic_orbital_type=AOType.Cartesian)
 
     # Verify the objects were created correctly
     assert basis1.get_name() == "Test-Basis"
@@ -1030,8 +1030,8 @@ def test_basis_set_pickling_and_repr():
     # Verify basis set is preserved
     assert unpickled.get_name() == original.get_name()
     assert unpickled.get_num_shells() == original.get_num_shells()
-    assert unpickled.get_num_basis_functions() == original.get_num_basis_functions()
-    assert unpickled.get_basis_type() == original.get_basis_type()
+    assert unpickled.get_num_atomic_orbitals() == original.get_num_atomic_orbitals()
+    assert unpickled.get_atomic_orbital_type() == original.get_atomic_orbital_type()
 
     # Verify shells are preserved
     original_shells = original.get_shells()
@@ -1064,7 +1064,7 @@ def test_basis_set_pickling_and_repr():
         # Verify data integrity after each round trip
         assert current.get_name() == original.get_name()
         assert current.get_num_shells() == original.get_num_shells()
-        assert current.get_num_basis_functions() == original.get_num_basis_functions()
+        assert current.get_num_atomic_orbitals() == original.get_num_atomic_orbitals()
 
     # Test __repr__ uses summary function
     repr_output = repr(original)
@@ -1207,8 +1207,8 @@ def test_basis_set_ecp_shells():
     assert shell_s.has_radial_powers()
     assert len(shell_s.rpowers) == 3
     assert np.array_equal(shell_s.rpowers, [0, 1, 2])
-    assert np.allclose(shell_s.exponents, [10.0, 5.0, 2.0])
-    assert np.allclose(shell_s.coefficients, [50.0, 20.0, 10.0])
+    assert np.array_equal(shell_s.exponents, [10.0, 5.0, 2.0])
+    assert np.array_equal(shell_s.coefficients, [50.0, 20.0, 10.0])
 
     # Test ECP shell without radial powers (regular shell)
     regular_shell = shells[0]
@@ -1242,8 +1242,8 @@ def test_basis_set_ecp_shells_serialization():
         loaded_shell = loaded_basis.get_ecp_shell(0)
         assert loaded_shell.has_radial_powers()
         assert np.array_equal(loaded_shell.rpowers, [0, 2])
-        assert np.allclose(loaded_shell.exponents, [10.0, 5.0])
-        assert np.allclose(loaded_shell.coefficients, [50.0, 20.0])
+        assert np.array_equal(loaded_shell.exponents, [10.0, 5.0])
+        assert np.array_equal(loaded_shell.coefficients, [50.0, 20.0])
 
     # Test HDF5 serialization
     with tempfile.TemporaryDirectory() as tmpdir:
@@ -1282,8 +1282,8 @@ def test_basis_set_ecp_shells_copy():
     copy_shell = basis_copy.get_ecp_shell(0)
     assert copy_shell.has_radial_powers() == orig_shell.has_radial_powers()
     assert np.array_equal(copy_shell.rpowers, orig_shell.rpowers)
-    assert np.allclose(copy_shell.exponents, orig_shell.exponents)
-    assert np.allclose(copy_shell.coefficients, orig_shell.coefficients)
+    assert np.array_equal(copy_shell.exponents, orig_shell.exponents)
+    assert np.array_equal(copy_shell.coefficients, orig_shell.coefficients)
 
 
 def test_basis_set_ecp_shells_multi_atom():

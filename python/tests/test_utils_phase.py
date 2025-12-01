@@ -21,21 +21,27 @@ from qdk_chemistry.utils.phase import (
     resolve_energy_aliases,
 )
 
+from .reference_tolerances import (
+    float_comparison_relative_tolerance,
+    qpe_energy_tolerance,
+    qpe_phase_fraction_tolerance,
+)
+
 
 def test_energy_from_phase_wraps_into_branch() -> None:
     """Energy calculation should unwrap angles greater than π."""
     energy = energy_from_phase(0.75, evolution_time=0.5)
     expected_angle = -0.5 * np.pi  # 1.5π wraps to -0.5π
     expected_energy = expected_angle / 0.5
-    assert energy == pytest.approx(expected_energy)
+    assert np.allclose(energy, expected_energy, rtol=float_comparison_relative_tolerance, atol=qpe_energy_tolerance)
 
 
 def test_energy_alias_candidates_default_window() -> None:
     """Default shift range should produce the expected alias values."""
     candidates = energy_alias_candidates(raw_energy=1.0, evolution_time=0.5)
-    period = 2 * np.pi / 0.5
+    period = 2.0 * np.pi / 0.5
     expected = sorted({1.0 + period * k for k in range(-2, 3)} | {-1.0 + period * k for k in range(-2, 3)})
-    assert candidates == pytest.approx(expected)
+    assert np.allclose(candidates, expected, rtol=float_comparison_relative_tolerance, atol=qpe_energy_tolerance)
 
 
 def test_resolve_energy_aliases_selects_closest_branch() -> None:
@@ -45,7 +51,9 @@ def test_resolve_energy_aliases_selects_closest_branch() -> None:
     period = 2 * np.pi / evolution_time
     reference = raw_energy + 1.2 * period
     resolved = resolve_energy_aliases(raw_energy, evolution_time=evolution_time, reference_energy=reference)
-    assert resolved == pytest.approx(raw_energy + period)
+    assert np.allclose(
+        resolved, raw_energy + period, rtol=float_comparison_relative_tolerance, atol=qpe_energy_tolerance
+    )
 
 
 def test_iterative_phase_feedback_update_rejects_invalid_bit() -> None:
@@ -56,9 +64,9 @@ def test_iterative_phase_feedback_update_rejects_invalid_bit() -> None:
 
 def test_phase_fraction_from_feedback_matches_manual_integral() -> None:
     """Final feedback phase converts back into the expected fraction."""
-    feedback_phase = math.pi / 3
+    feedback_phase = math.pi / 3.0
     fraction = phase_fraction_from_feedback(feedback_phase)
-    assert fraction == pytest.approx(1 / 3)
+    assert np.isclose(fraction, 1.0 / 3.0, rtol=float_comparison_relative_tolerance, atol=qpe_phase_fraction_tolerance)
 
 
 def test_accumulated_phase_from_bits_matches_recursive_update() -> None:
@@ -70,4 +78,6 @@ def test_accumulated_phase_from_bits_matches_recursive_update() -> None:
     for bit in reversed(bits):
         recursive_phase = iterative_phase_feedback_update(recursive_phase, bit)
 
-    assert phase == pytest.approx(recursive_phase)
+    assert np.allclose(
+        phase, recursive_phase, rtol=float_comparison_relative_tolerance, atol=qpe_phase_fraction_tolerance
+    )

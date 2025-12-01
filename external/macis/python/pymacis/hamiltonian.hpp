@@ -16,7 +16,7 @@ struct Hamiltonian {
   std::vector<double> _V;  ///< 2-body integrals (electron-electron repulsion)
   std::vector<double> _F_inactive;  ///< Inactive Fock matrix contributions
   size_t norb = 0;                  ///< Number of orbitals
-  size_t nbasis = 0;                ///< Number of basis functions
+  size_t nbasis = 0;                ///< Number of atomic orbitals
   double core_energy = 0.0;         ///< Core energy contribution
 };
 

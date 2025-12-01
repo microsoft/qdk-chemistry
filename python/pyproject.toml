@@ -21,7 +21,6 @@ classifiers = [
   "Programming Language :: Python :: 3.11",
   "Programming Language :: Python :: 3.12",
   "Programming Language :: Python :: 3.13",
-  "Programming Language :: Python :: 3.14",
   "Programming Language :: C++",
   "Topic :: Scientific/Engineering",
   "Topic :: Scientific/Engineering :: Quantum",
@@ -147,6 +146,10 @@ addopts = [
   "-ra ",  # show extra summary info for skipped, failed, and xfailed tests
   "-v"  # verbose output
 ]
+filterwarnings = [
+  "ignore::DeprecationWarning:qiskit",
+  "ignore::DeprecationWarning:qiskit_aer"
+]
 testpaths = ["tests"]
 
 [tool.ruff]
@@ -158,16 +161,13 @@ quote-style = 'double'
 
 [tool.ruff.lint]
 ignore = [
-  'D100',  # undocumented-public-module
-  'D104',  # undocumented-public-package
   'D203',  # Incompatible with D211 `no-blank-line-before-class`
   'D213',  # Incompatible with D212 `multi-line-summary-second-line`
   'D401',  # non-imperative-mood
   'PLR0912',  # too-many-branches
-  'PLR0913',  # Too many argumentsS
+  'PLR0913',  # too-many-arguments
   'PLR0915',  # too-many-statements
   'PLR2004',  # magic-value-comparison
-  'UP038',     # Deprecated 'non-pep604-isinstance' check
   'INP001'  # Allow __init__.py files without PEP 420 compliance
 ]
 select = [
@@ -210,7 +210,6 @@ select = [
   "D101",  # undocumented-public-class
   "D102",  # Missing docstring in public method
   "D103",  # Missing docstring in public function
-  "D106",  # Missing docstring in public nested class
   "D107",  # Missing docstring in `__init__`
   "SLF001"  # Private member accessed
 ]
@@ -241,12 +240,18 @@ install-dir = "qdk_chemistry"
 
 [tool.scikit-build.cmake.define]
 BUILD_SHARED_LIBS = "OFF"
-QDK_ENABLE_COVERAGE = {env="QDK_COVERAGE_BUILD", default="OFF"}
-QDK_UARCH = {env="QDK_UARCH", default="x86-64"}
+QDK_CHEMISTRY_ENABLE_COVERAGE = {env="QDK_CHEMISTRY_ENABLE_COVERAGE", default="OFF"}
+QDK_UARCH = {env="QDK_UARCH", default="native"}
+QDK_ENABLE_OPENMP = {env="QDK_ENABLE_OPENMP"}
+CMAKE_BUILD_PARALLEL_LEVEL = {env="CMAKE_BUILD_PARALLEL_LEVEL", default="4"}
 
 [[tool.scikit-build.overrides]]
 if.env.CMAKE_BUILD_TYPE = "Debug"
 cmake.build-type = "Debug"
+
+[[tool.scikit-build.overrides]]
+if.env.CMAKE_BUILD_TYPE = "RelWithDebInfo"
+cmake.build-type = "RelWithDebInfo"
 
 # Use setuptools_scm to get version from git tags
 [tool.setuptools_scm]

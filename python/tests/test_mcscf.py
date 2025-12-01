@@ -6,12 +6,25 @@
 # --------------------------------------------------------------------------------------------
 
 import numpy as np
+import pytest
 
 from qdk_chemistry import algorithms as alg
 from qdk_chemistry.constants import ANGSTROM_TO_BOHR
 from qdk_chemistry.data import Structure
 
-from .reference_tolerances import mcscf_energy_tolerance
+from .reference_tolerances import float_comparison_relative_tolerance, mcscf_energy_tolerance
+
+# Check if PySCF is available and import the plugin
+try:
+    import pyscf  # noqa: F401
+
+    import qdk_chemistry.plugins.pyscf as pyscf_plugin
+
+    pyscf_plugin.load()
+
+    PYSCF_AVAILABLE = True
+except ImportError:
+    PYSCF_AVAILABLE = False
 
 
 def create_n2_structure():
@@ -28,6 +41,7 @@ def create_o2_structure():
     return Structure(symbols, coords)
 
 
+@pytest.mark.skipif(not PYSCF_AVAILABLE, reason="PySCF not available")
 class TestMCSCF:
     """Test class MCSCF functionality."""
 
@@ -59,7 +73,9 @@ class TestMCSCF:
         mcscf = alg.create("multi_configuration_scf", "pyscf")
         mcscf_energy, _ = mcscf.run(active_orbitals_sd.get_orbitals(), ham_calculator, macis_calc, 3, 3)
 
-        assert np.isclose(mcscf_energy, -108.78966139913287, atol=mcscf_energy_tolerance)
+        assert np.isclose(
+            mcscf_energy, -108.78966139913287, rtol=float_comparison_relative_tolerance, atol=mcscf_energy_tolerance
+        )
 
     def test_o2_6_6_ccpvdz_casscf_triplet(self):
         """Test PySCF MCSCF for o2 with cc-pvdz basis and CAS(6,6)."""
@@ -91,4 +107,6 @@ class TestMCSCF:
         mcscf = alg.create("multi_configuration_scf", "pyscf")
         mcscf_energy, _ = mcscf.run(active_orbitals_sd.get_orbitals(), ham_calculator, macis_calc, 4, 2)
 
-        assert np.isclose(mcscf_energy, -149.68131616317658, atol=mcscf_energy_tolerance)
+        assert np.isclose(
+            mcscf_energy, -149.68131616317658, rtol=float_comparison_relative_tolerance, atol=mcscf_energy_tolerance
+        )

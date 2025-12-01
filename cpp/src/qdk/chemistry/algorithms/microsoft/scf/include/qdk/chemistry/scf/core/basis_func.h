@@ -8,14 +8,14 @@
 
 namespace qdk::chemistry::scf {
 /**
- * @brief Maximum number of primitive Gaussians in a contracted basis function
+ * @brief Maximum number of primitive Gaussians in a contracted atomic orbital
  */
 inline static constexpr size_t MAX_CONTRACTION = 64;
 
 /**
- * @brief Represents a single contracted Gaussian basis function
+ * @brief Represents a single contracted Gaussian atomic orbital
  *
- * A basis function is a linear combination of primitive Gaussian functions
+ * A atomic orbital is a linear combination of primitive Gaussian functions
  * (Gaussian-Type Orbitals, GTOs) centered at a specific atomic position.
  * The functional form is:
  *
@@ -35,8 +35,8 @@ struct BasisFunc {
   double exponents[MAX_CONTRACTION];     ///< Gaussian exponents
   double coefficients[MAX_CONTRACTION];  ///< Contraction coefficients
 
-  double x0;  ///< x-coordinate of basis function center
-  double y0;  ///< y-coordinate of basis function center
-  double z0;  ///< z-coordinate of basis function center
+  double x0;  ///< x-coordinate of atomic orbital center
+  double y0;  ///< y-coordinate of atomic orbital center
+  double z0;  ///< z-coordinate of atomic orbital center
 };
 }  // namespace qdk::chemistry::scf

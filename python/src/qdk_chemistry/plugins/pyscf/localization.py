@@ -17,7 +17,7 @@ Supported localization methods (selected via the settings `method`):
 
 This module registers a ``pyscf`` localizer with the QDK/Chemistry localizer registry at
 import time, making the functionality available via
-``qdk_chemistry.algorithms.create("localizer", "pyscf")``.
+``qdk_chemistry.algorithms.create("orbital_localizer", "pyscf")``.
 
 Requires: PySCF (the code uses the ``pyscf.lo`` localization routines).
 """
@@ -29,9 +29,11 @@ Requires: PySCF (the code uses the ``pyscf.lo`` localization routines).
 
 from pyscf import lo
 
-from qdk_chemistry.algorithms import Localizer, register
+from qdk_chemistry.algorithms import OrbitalLocalizer, register
 from qdk_chemistry.data import Orbitals, SciWavefunctionContainer, Settings, SlaterDeterminantContainer, Wavefunction
 from qdk_chemistry.plugins.pyscf.utils import basis_to_pyscf_mol
+
+__all__ = ["PyscfLocalizer", "PyscfLocalizerSettings"]
 
 
 class PyscfLocalizerSettings(Settings):
@@ -42,16 +44,16 @@ class PyscfLocalizerSettings(Settings):
     configurable options used by :class:`PyscfLocalizer`.
 
     Attributes:
-        method (str, default = "pipek-mezey"): The localization algorithm to use.
-        Supported values (case-insensitive) include "pipek-mezey", "foster-boys", "edmiston-ruedenberg",
-        and "cholesky".
+        method (str): The localization algorithm to use (default = "pipek-mezey").
+            Supported values (case-insensitive) include "pipek-mezey", "foster-boys", "edmiston-ruedenberg", and
+            "cholesky".
 
-    population_method (str, default = "mulliken"): The population analysis used for the Pipek-Mezey localization.
-        Passed through to PySCF's PM implementation (for example, "mulliken").
+        population_method (str): The population analysis used for the Pipek-Mezey localization (default = "mulliken").
+            Passed through to PySCF's PM implementation (for example, "mulliken").
 
-    occupation_threshold (float, default = 1e-10): Tolerance threshold used to classify orbitals as occupied,
-        singly-occupied (for ROHF/UHF), or virtual. Orbitals with occupations below this threshold are considered
-        unoccupied.
+        occupation_threshold (float): Tolerance threshold used to classify orbitals as occupied,
+            singly-occupied (for ROHF/UHF), or virtual (default = 1e-10). Orbitals with occupations below this
+            threshold are considered unoccupied.
 
     Examples:
         >>> settings = PyscfLocalizerSettings()
@@ -70,7 +72,7 @@ class PyscfLocalizerSettings(Settings):
         self._set_default("population_method", "string", "mulliken")
 
 
-class PyscfLocalizer(Localizer):
+class PyscfLocalizer(OrbitalLocalizer):
     """PySCF-based orbital localizer for quantum chemistry calculations.
 
     This class implements orbital localization using routines from PySCF.
@@ -78,10 +80,11 @@ class PyscfLocalizer(Localizer):
     restricted (closed-shell) and unrestricted (open-shell) orbital inputs.
 
     Key behavior:
-    - Supported algorithms: Pipek-Mezey (PM), Foster-Boys (FB),
-      Edmiston-Ruedenberg (ER), and a Cholesky-based localizer.
-    - It is the user's responsibility to provide appropriate orbital indices
-      (e.g., only occupied orbitals or only virtual orbitals).
+
+        - Supported algorithms: Pipek-Mezey (PM), Foster-Boys (FB), Edmiston-Ruedenberg (ER), and a Cholesky-based
+          localizer.
+        - It is the user's responsibility to provide appropriate orbital indices (e.g., only occupied orbitals or only
+          virtual orbitals).
 
     Examples:
         >>> localizer = PyscfLocalizer()
@@ -137,12 +140,7 @@ class PyscfLocalizer(Localizer):
         # If both index vectors are empty, return original orbitals unchanged
         if len(loc_indices_a) == 0 and len(loc_indices_b) == 0:
             return wavefunction
-        # TODO (NAB): fix TODO above
-        # 41404
 
-        # TODO assumes aufbau filling
-        # TODO (NAB): fix TODO above
-        # 41404
         pop_method = self._settings.get("population_method")
         loc_method = self._settings.get("method").lower()
 

@@ -41,11 +41,14 @@ class LIBINT2_DIRECT : public ERI {
    * calculation
    * @param basis_set Atomic orbital basis set for molecular orbitals
    * @param mpi MPI parallelization configuration
+   * @param use_atomics Use atomic operations (true) or thread-local buffers
+   * (false)
    *
    * @throws std::runtime_error if Libint2 initialization fails
    * @throws std::runtime_error if screening matrix computation fails
    */
-  LIBINT2_DIRECT(bool unrestricted, BasisSet& basis_set, ParallelConfig mpi);
+  LIBINT2_DIRECT(bool unrestricted, BasisSet& basis_set, ParallelConfig mpi,
+                 bool use_atomics);
 
   /**
    * @brief Destructor

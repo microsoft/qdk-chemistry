@@ -50,6 +50,8 @@ from qdk_chemistry.data import (
 )
 from qdk_chemistry.plugins.pyscf.utils import orbitals_to_scf, pyscf_mol_to_qdk_basis, structure_to_pyscf_atom_labels
 
+__all__ = ["PyscfScfSettings", "PyscfScfSolver"]
+
 
 class PyscfScfSettings(ElectronicStructureSettings):
     """Settings configuration for the PySCF SCF solver.
@@ -59,15 +61,16 @@ class PyscfScfSettings(ElectronicStructureSettings):
     ElectronicStructureSettings and adding PySCF-specific customizations.
 
     Inherits from ElectronicStructureSettings:
-        method (str, default="hf"): The electronic structure method (Hartree-Fock).
-        basis_set (str, default="def2-svp"): The basis set used for quantum chemistry calculations.
-            Common options include "def2-svp", "def2-tzvp", "cc-pvdz", etc.
-        tolerance (float, default=1e-6): Convergence tolerance.
-        max_iterations (int, default=50): Maximum number of iterations.
-        reference_type (str, default="auto"): Reference type selection - "auto", "restricted", or "unrestricted".
-            "auto" uses restricted for closed-shell and unrestricted for open-shell systems.
-            "restricted" uses ROHF/ROKS (restricted open-shell Hartree-Fock/Kohn-Sham) for open-shell systems.
-            "unrestricted" always uses UHF/UKS.
+
+    - method (str, default="hf"): The electronic structure method (Hartree-Fock).
+    - basis_set (str, default="def2-svp"): The basis set used for quantum chemistry calculations.
+      Common options include "def2-svp", "def2-tzvp", "cc-pvdz", etc.
+    - convergence_threshold (float, default=1e-7): Convergence tolerance for orbital gradient norm.
+    - max_iterations (int, default=50): Maximum number of iterations.
+    - reference_type (str, default="auto"): Reference type selection - "auto", "restricted", or "unrestricted".
+      "auto" uses restricted for closed-shell and unrestricted for open-shell systems.
+      "restricted" uses ROHF/ROKS (restricted open-shell Hartree-Fock/Kohn-Sham) for open-shell systems.
+      "unrestricted" always uses UHF/UKS.
 
     Examples:
         >>> settings = PyscfScfSettings()
@@ -161,7 +164,7 @@ class PyscfScfSolver(ScfSolver):
         atoms, _, _ = structure_to_pyscf_atom_labels(structure)
         basis_name = self._settings["basis_set"]
         method = self._settings["method"].lower()
-        tolerance = self._settings["tolerance"]
+        convergence_threshold = self._settings["convergence_threshold"]
         max_iterations = self._settings["max_iterations"]
 
         # The PySCF convention is 2S not 2S+1
@@ -227,7 +230,10 @@ class PyscfScfSolver(ScfSolver):
             mf.xc = method
 
         # Configure convergence settings
-        mf.conv_tol = tolerance
+
+        # conv_tol in PySCF is tolerance for dE, convergence_threshold is for
+        # orbital gradient, so 0.1 is added here
+        mf.conv_tol = convergence_threshold * 0.1
         mf.max_cycle = max_iterations
 
         # Set initial guess if provided

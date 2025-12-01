@@ -13,9 +13,9 @@ from qdk_chemistry.algorithms import (
     ActiveSpaceSelector,
     CoupledClusterCalculator,
     HamiltonianConstructor,
-    Localizer,
     MultiConfigurationCalculator,
     MultiConfigurationScf,
+    OrbitalLocalizer,
     ProjectedMultiConfigurationCalculator,
     ScfSolver,
     StabilityChecker,
@@ -38,7 +38,7 @@ from qdk_chemistry.data import (
 from .test_helpers import create_test_basis_set, create_test_hamiltonian, create_test_orbitals
 
 
-class MockLocalizationPy(Localizer):
+class MockLocalizationPy(OrbitalLocalizer):
     """A dummy localizer for testing purposes in Python."""
 
     def __init__(self):
@@ -47,8 +47,6 @@ class MockLocalizationPy(Localizer):
 
     def _run_impl(self, orbitals, loc_indices_a, loc_indices_b):  # noqa: ARG002
         """Fake localize orbitals in Python."""
-        # TODO (NAB):  change output to logger rather than print() here and elsewhere, workitem: 41426
-        print("MockLocalization: Localizing orbitals in python...")
         return orbitals
 
     def name(self) -> str:
@@ -63,7 +61,7 @@ class MockStabilityChecker(StabilityChecker):
         super().__init__()
         self._settings = Settings()
         # Define default settings for stability checking
-        self._settings._set_default("tolerance", "double", 1e-6)
+        self._settings._set_default("convergence_threshold", "double", 1e-6)
         self._settings._set_default("max_iterations", "int", 100)
 
     def _run_impl(self, wavefunction: Wavefunction) -> tuple[bool, StabilityResult]:  # noqa: ARG002
@@ -801,7 +799,7 @@ class TestAlgorithmClasses:
         assert "CoupledClusterCalculator" in repr(cc)
         assert "StatePreparation" in repr(sp)
 
-    def test_settings_interface(self):
+    def test_settings_interface(self) -> None:
         """Test that all algorithms provide settings interface."""
         # Test all algorithm types have settings
         algorithms: list[
@@ -880,9 +878,9 @@ class TestAlgorithmClasses:
 
     def test_localizer_comprehensive(self):
         """Test comprehensive Localizer functionality including trampoline methods."""
-        # Test MockLocalizationPy which inherits from Localizer
+        # Test MockLocalizationPy which inherits from OrbitalLocalizer
         localizer = MockLocalizationPy()
-        assert isinstance(localizer, Localizer)
+        assert isinstance(localizer, OrbitalLocalizer)
 
         # Test trampoline methods are properly overridden
         # Test localize method
@@ -901,7 +899,7 @@ class TestAlgorithmClasses:
 
         # Test __repr__ method
         repr_str = repr(localizer)
-        assert "<qdk_chemistry.algorithms.Localizer>" in repr_str
+        assert "<qdk_chemistry.algorithms.OrbitalLocalizer>" in repr_str
 
     def test_localizer_factory_functions(self):
         """Test Localizer factory functions and unregistration."""
@@ -926,12 +924,11 @@ class TestAlgorithmClasses:
         # Test that base Localizer can be instantiated (though it's abstract)
         try:
             # This might not work if the class is properly abstract
-            localizer = Localizer()
+            localizer = OrbitalLocalizer()
 
             # Test __repr__ method
             repr_str = repr(localizer)
-            assert "<qdk_chemistry.algorithms.Localizer>" in repr_str
-
+            assert "<qdk_chemistry.algorithms.OrbitalLocalizer>" in repr_str
         except TypeError:
             # Expected behavior for abstract classes
             pass
@@ -1037,12 +1034,12 @@ class TestAlgorithmClasses:
         # Test eigenvalue setters
         new_internal_eigenvals = np.array([0.2, 0.6, 1.2])
         unstable_result.set_internal_eigenvalues(new_internal_eigenvals)
-        np.testing.assert_array_equal(unstable_result.get_internal_eigenvalues(), new_internal_eigenvals)
+        assert np.array_equal(unstable_result.get_internal_eigenvalues(), new_internal_eigenvals)
         assert unstable_result.get_smallest_internal_eigenvalue() == 0.2
 
         new_external_eigenvals = np.array([0.4, 0.9])
         unstable_result.set_external_eigenvalues(new_external_eigenvals)
-        np.testing.assert_array_equal(unstable_result.get_external_eigenvalues(), new_external_eigenvals)
+        assert np.array_equal(unstable_result.get_external_eigenvalues(), new_external_eigenvals)
         assert unstable_result.get_smallest_external_eigenvalue() == 0.4
         assert unstable_result.get_smallest_eigenvalue() == 0.2  # Overall smallest
 
@@ -1050,11 +1047,11 @@ class TestAlgorithmClasses:
         rng = np.random.default_rng(42)
         new_internal_eigenvecs = rng.random((3, 3))
         unstable_result.set_internal_eigenvectors(new_internal_eigenvecs)
-        np.testing.assert_array_equal(unstable_result.get_internal_eigenvectors(), new_internal_eigenvecs)
+        assert np.array_equal(unstable_result.get_internal_eigenvectors(), new_internal_eigenvecs)
 
         new_external_eigenvecs = rng.random((2, 2))
         unstable_result.set_external_eigenvectors(new_external_eigenvecs)
-        np.testing.assert_array_equal(unstable_result.get_external_eigenvectors(), new_external_eigenvecs)
+        assert np.array_equal(unstable_result.get_external_eigenvectors(), new_external_eigenvecs)
 
         # Test eigenvalue-eigenvector pair methods
         internal_val, internal_vec = unstable_result.get_smallest_internal_eigenvalue_and_vector()

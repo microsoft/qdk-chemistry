@@ -8,9 +8,9 @@
 
 # Import C++ utilities from the compiled extension
 from qdk_chemistry._core.utils import (
-    compute_valence_space,
+    compute_valence_space_parameters,
     rotate_orbitals,
     run_scf_with_stability_workflow,
 )
 
-__all__ = ["compute_valence_space", "rotate_orbitals", "run_scf_with_stability_workflow"]
+__all__ = ["compute_valence_space_parameters", "rotate_orbitals", "run_scf_with_stability_workflow"]

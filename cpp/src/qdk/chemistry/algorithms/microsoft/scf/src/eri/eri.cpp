@@ -57,7 +57,7 @@ std::shared_ptr<ERI> ERI::create(BasisSet& basis_set, const SCFConfig& cfg,
                                    cfg.exc.xc_name, cfg.mpi);
     case ERIMethod::Libint2Direct:
       return std::make_shared<LIBINT2_DIRECT>(cfg.unrestricted, basis_set,
-                                              cfg.mpi);
+                                              cfg.mpi, cfg.eri.use_atomics);
     default:
       throw std::runtime_error("Invalid ERI Method");
   }
@@ -96,8 +96,8 @@ void ERI::build_JK(const double* P, double* J, double* K, double alpha,
 
 #ifdef QDK_CHEMISTRY_ENABLE_MPI
   int num_density_matrices = unrestricted_ ? 2 : 1;
-  int size = num_density_matrices * basis_set_.num_basis_funcs *
-             basis_set_.num_basis_funcs;
+  int size = num_density_matrices * basis_set_.num_atomic_orbitals *
+             basis_set_.num_atomic_orbitals;
   if (mpi_.world_size > 1) {
     MPI_Barrier(MPI_COMM_WORLD);
     AutoTimer t("ERI::build_JK->MPI_Reduce");
