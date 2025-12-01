@@ -87,6 +87,8 @@ class _TelemetryWrapper:
         >>> energy, wfn = scf.run(structure, 0, 1)  # Telemetry logged automatically
         >>> settings = scf.settings()  # Delegates to wrapped algorithm
     """    
+    __slots__ = ("_wrapped", "_algorithm_type", "_algorithm_name")
+
     def __init__(self, wrapped_algorithm: Algorithm, algorithm_type: str, algorithm_name: str):
         object.__setattr__(self, '_wrapped', wrapped_algorithm)
         object.__setattr__(self, '_algorithm_type', algorithm_type)
@@ -95,7 +97,8 @@ class _TelemetryWrapper:
     @property
     def __class__(self):
         """Return the wrapped algorithm's class for isinstance checks."""
-        return object.__getattribute__(self, '_wrapped').__class__
+        #return object.__getattribute__(self, '_wrapped').__class__
+        return type(self._wrapped)
 
     def run(self, *args, **kwargs):
         """Run the wrapped algorithm with telemetry tracking."""
@@ -108,16 +111,26 @@ class _TelemetryWrapper:
             result = wrapped.run(*args, **kwargs)
             duration = time.perf_counter() - start_time
 
-            mol_formula, n_basis = telemetry_events.extract_data(result)
-
-            telemetry_events.on_algorithm_end(
-                algorithm_type=algorithm_type,
-                algorithm_name=algorithm_name,
-                duration_sec=duration,
-                status="success",
-                num_basis_functions=n_basis,
-                molecular_formula=mol_formula
-            )
+            # Only extract molecular data for algorithms that return it
+            try:
+                mol_formula, n_basis = telemetry_events.extract_data(result)
+                telemetry_events.on_algorithm_end(
+                    algorithm_type=algorithm_type,
+                    algorithm_name=algorithm_name,
+                    duration_sec=duration,
+                    status="success",
+                    num_basis_functions=n_basis,
+                    molecular_formula=mol_formula
+                )
+            except (AttributeError, TypeError, IndexError):
+                # If we can't extract molecular data, just log basic telemetry
+                telemetry_events.on_algorithm_end(
+                    algorithm_type=algorithm_type,
+                    algorithm_name=algorithm_name,
+                    duration_sec=duration,
+                    status="success"
+                )
+            
             return result
         
         except Exception as e:
@@ -130,10 +143,16 @@ class _TelemetryWrapper:
                 error_type=type(e).__name__,
             )
             raise
+
+    def __dir__(self):
+        return dir(self._wrapped)
+
+    def __repr__(self):
+        return repr(self._wrapped)
         
     def __getattr__(self, name):
         """Delegate any other attribute access to the wrapped algorithm."""
-        wrapped = object.__getattribute__(self, '_wrapped')
+        wrapped = object.__getattribute__(self, "_wrapped")
         return getattr(wrapped, name)
     
 def create(algorithm_type: str, algorithm_name: str | None = None, **kwargs) -> Algorithm:
@@ -184,19 +203,26 @@ def create(algorithm_type: str, algorithm_name: str | None = None, **kwargs) -> 
         if factory.algorithm_type_name() == algorithm_type:
             try:
                 instance = factory.create(algorithm_name)
+                instance.settings().update(kwargs or {})
+
+                # TODO: mcscf fails when macis_calculator is wrapped - investigate further
+                if algorithm_type == 'multi_configuration_calculator':
+                    # For MCSCF, do not wrap to avoid issues with multiple inheritance
+                    return instance
+
                 # Wrap the instance in a telemetry-tracking proxy
                 wrapped_instance = _TelemetryWrapper(
                     instance, 
                     algorithm_type, 
                     algorithm_name
                 )
-                
-                wrapped_instance.settings().update(kwargs or {})
+
                 telemetry_events.on_algorithm(
                     algorithm_type, 
                     algorithm_name 
                     )
-                return wrapped_instance
+                return wrapped_instance 
+            
             except (KeyError, RuntimeError, ValueError) as e:
                 available_algorithms = factory.available()
                 if not available_algorithms:
