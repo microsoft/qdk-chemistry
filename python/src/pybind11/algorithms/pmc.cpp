@@ -8,6 +8,7 @@
 #include <qdk/chemistry.hpp>
 
 #include "factory_bindings.hpp"
+#include "qdk/chemistry/algorithms/microsoft/macis_pmc.hpp"
 
 namespace py = pybind11;
 using namespace qdk::chemistry::algorithms;
@@ -47,30 +48,21 @@ class ProjectedMultiConfigurationCalculatorBase
 
 void bind_pmc(py::module &m) {
   // ProjectedMultiConfigurationCalculator abstract base class
-  // TODO (NAB):  I don't understand the wording in the docstring about
-  // "This contracts the..." 41394
   py::class_<ProjectedMultiConfigurationCalculator,
              ProjectedMultiConfigurationCalculatorBase, py::smart_holder>
       pmc_calculator(m, "ProjectedMultiConfigurationCalculator",
                      R"(
-    Abstract base class for projected multi-configurational (PMC) calculations
-    in quantum chemistry.
+Abstract base class for projected multi-configurational (PMC) calculations in quantum chemistry.
 
-    This class provides the interface for projected multi-configurational-based
-    quantum chemistry calculations. This contracts the ``MultiConfigurationCalculator``
-    in that the space of determinants upon which the Hamltonian is projected is
-    taken to be a *free parameter* and must be specified. In this manner, the
-    high-performance solvers which underly other MC algorithms can be interfaced
-    with external methods for selecting important determinants.
+This class provides the interface for projected multi-configurational-based quantum chemistry calculations.
+This contrasts the ``MultiConfigurationCalculator`` in that the space of determinants upon which the Hamiltonian is projected is taken to be a *free parameter* and must be specified.
+In this manner, the high-performance solvers which underly other MC algorithms can be interfaced with external methods for selecting important determinants.
 
-    The calculator takes a Hamiltonian and a set of configurations as input and
-    returns both the calculated total energy and the corresponding
-    multi-configurational wavefunction.
+The calculator takes a Hamiltonian and a set of configurations as input and returns both the calculated total energy and the corresponding multi-configurational wavefunction.
 
-    Examples
-    --------
-    To create a custom PMC calculator, inherit from this class:
+To create a custom PMC calculator, inherit from this class.
 
+Examples:
     >>> import qdk_chemistry.algorithms as alg
     >>> import qdk_chemistry.data as data
     >>> class MyProjectedMultiConfigurationCalculator(alg.ProjectedMultiConfigurationCalculator):
@@ -79,65 +71,54 @@ void bind_pmc(py::module &m) {
     ...     def _run_impl(self, hamiltonian: data.Hamiltonian, configurations: list[data.Configuration]) -> tuple[float, data.Wavefunction]:
     ...         # Custom PMC implementation
     ...         return energy, wavefunction
-    )");
+
+)");
 
   pmc_calculator.def(py::init<>(),
                      R"(
-        Create a ProjectedMultiConfigurationCalculator instance.
+Create a ProjectedMultiConfigurationCalculator instance.
 
-        Default constructor for the abstract base class.
-        This should typically be called from derived class constructors.
+Default constructor for the abstract base class.
+This should typically be called from derived class constructors.
 
-        Examples
-        --------
-        >>> # In a derived class:
-        >>> class MyPMC(alg.ProjectedMultiConfigurationCalculator):
-        ...     def __init__(self):
-        ...         super().__init__()  # Calls this constructor
-        )");
+Examples:
+    >>> # In a derived class:
+    >>> class MyPMC(alg.ProjectedMultiConfigurationCalculator):
+    ...     def __init__(self):
+    ...         super().__init__()  # Calls this constructor
+
+)");
 
   pmc_calculator.def("run", &ProjectedMultiConfigurationCalculator::run,
                      R"(
-        Perform projected multi-configurational calculation.
+Perform projected multi-configurational calculation.
 
-        This method automatically locks settings before execution.
+This method automatically locks settings before execution.
 
-        This method takes a Hamiltonian describing the quantum system and a set of
-        configurations/determinants to project the Hamiltonian onto, and returns
-        both the calculated energy and the optimized multi-configurational wavefunction.
+This method takes a Hamiltonian describing the quantum system and a set of configurations/determinants to project the Hamiltonian onto, and returns both the calculated energy and the optimized multi-configurational wavefunction.
 
-        Parameters
-        ----------
-        hamiltonian : qdk_chemistry.data.Hamiltonian
-            The Hamiltonian operator describing the quantum system
-        configurations : list[qdk_chemistry.data.Configuration]
-            The set of configurations/determinants to project the Hamiltonian onto
+Args:
+    hamiltonian (qdk_chemistry.data.Hamiltonian): The Hamiltonian operator describing the quantum system
+    configurations (list[qdk_chemistry.data.Configuration]): The set of configurations/determinants to project the Hamiltonian onto
 
-        Returns
-        -------
-        tuple[float, qdk_chemistry.data.Wavefunction]
-            A tuple containing the calculated total energy (active + core) and the resulting
-            multi-configurational wavefunction
+Returns:
+    tuple[float, qdk_chemistry.data.Wavefunction]: A tuple containing the calculated total energy (active + core) and the resulting multi-configurational wavefunction
 
-        Raises
-        ------
-        RuntimeError
-            If the calculation fails
-        ValueError
-            If hamiltonian or configurations are invalid
-        )",
+Raises:
+    RuntimeError: If the calculation fails
+    ValueError: If hamiltonian or configurations are invalid
+
+)",
                      py::arg("hamiltonian"), py::arg("configurations"));
 
   pmc_calculator.def("settings",
                      &ProjectedMultiConfigurationCalculator::settings,
                      R"(
-        Access the calculator's configuration settings.
+Access the calculator's configuration settings.
 
-        Returns
-        -------
-        qdk_chemistry.data.Settings
-            Reference to the settings object for configuring the calculator
-        )",
+Returns:
+    qdk_chemistry.data.Settings: Reference to the settings object for configuring the calculator
+)",
                      py::return_value_policy::reference_internal);
 
   // Expose _settings as a writable property for derived classes
@@ -152,30 +133,37 @@ void bind_pmc(py::module &m) {
       },
       py::return_value_policy::reference_internal,
       R"(
-        Internal settings object property.
+Internal settings object property.
 
-        This property allows derived classes to replace the settings object with
-        a specialized Settings subclass in their constructors.
+This property allows derived classes to replace the settings object with a specialized Settings subclass in their constructors.
 
-        Examples
-        --------
-        >>> class MyPMC(alg.ProjectedMultiConfigurationCalculator):
-        ...     def __init__(self):
-        ...         super().__init__()
-        ...         from qdk_chemistry.data import ElectronicStructureSettings
-        ...         self._settings = ElectronicStructureSettings()
-        )");
+Examples:
+    >>> class MyPMC(alg.ProjectedMultiConfigurationCalculator):
+    ...     def __init__(self):
+    ...         super().__init__()
+    ...         from qdk_chemistry.data import ElectronicStructureSettings
+    ...         self._settings = ElectronicStructureSettings()
+
+)");
+
+  pmc_calculator.def("name", &ProjectedMultiConfigurationCalculator::name,
+                     R"(
+The algorithm's name.
+
+Returns:
+    str: The name of the algorithm
+
+)");
 
   pmc_calculator.def("type_name",
                      &ProjectedMultiConfigurationCalculator::type_name,
                      R"(
-        The algorithm's type name.
+The algorithm's type name.
 
-        Returns
-        -------
-        str
-            The type name of the algorithm
-        )");
+Returns:
+    str: The type name of the algorithm
+
+)");
 
   // Factory class binding - creates
   // ProjectedMultiConfigurationCalculatorFactory class with static methods
@@ -189,4 +177,52 @@ void bind_pmc(py::module &m) {
                                         &) {
     return "<qdk_chemistry.algorithms.ProjectedMultiConfigurationCalculator>";
   });
+
+  // Bind concrete microsoft::MacisPmc implementation
+  py::class_<microsoft::MacisPmc, ProjectedMultiConfigurationCalculator,
+             py::smart_holder>(m, "QdkMacisPmc", R"(
+QDK MACIS-based Projected Multi-Configuration (PMC) calculator.
+
+This class provides a concrete implementation of the projected multi-configuration
+calculator using the MACIS library. It performs projections of the Hamiltonian
+onto a specified set of determinants to compute energies and wavefunctions for
+strongly correlated molecular systems.
+
+The calculator inherits from :class:`ProjectedMultiConfigurationCalculator` and uses
+MACIS library routines to perform the actual projected calculations where
+the determinant space is provided as input rather than generated adaptively.
+
+Typical usage:
+
+.. code-block:: python
+
+    import qdk_chemistry.algorithms as alg
+    import qdk_chemistry.data as data
+
+    # Create a PMC calculator
+    pmc = alg.QdkMacisPmc()
+
+    # Configure PMC-specific settings
+    pmc.settings().set("davidson_res_tol", 1e-8)
+    pmc.settings().set("davidson_max_m", 200)
+
+    # Prepare configurations
+    configurations = [...]  # Your list of Configuration objects
+
+    # Run calculation
+    energy, wavefunction = pmc.run(hamiltonian, configurations)
+
+See Also:
+    :class:`ProjectedMultiConfigurationCalculator`
+    :class:`qdk_chemistry.data.Hamiltonian`
+    :class:`qdk_chemistry.data.Configuration`
+    :class:`qdk_chemistry.data.Wavefunction`
+
+)")
+      .def(py::init<>(), R"(
+Default constructor.
+
+Initializes a MACIS PMC calculator with default settings.
+
+)");
 }

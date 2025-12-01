@@ -25,7 +25,7 @@ void assert_basis_file_existing(std::shared_ptr<Molecule> mol,
   try {
     auto bs = BasisSet::from_database_json(mol, basis, BasisMode::PSI4,
                                            true /*pure*/);
-    ASSERT_TRUE(bs->num_basis_funcs > 0);
+    ASSERT_TRUE(bs->num_atomic_orbitals > 0);
   } catch (std::exception& e) {
     spdlog::error("Failed to load basis set {}: {}", basis, e.what());
   }

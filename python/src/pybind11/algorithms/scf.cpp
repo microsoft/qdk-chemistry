@@ -2,6 +2,8 @@
 // Licensed under the MIT License. See LICENSE.txt in the project root for
 // license information.
 
+#include "qdk/chemistry/algorithms/microsoft/scf.hpp"
+
 #include <pybind11/pybind11.h>
 #include <pybind11/stl.h>
 
@@ -47,16 +49,13 @@ void bind_scf(py::module &m) {
   // ScfSolver abstract base class
   py::class_<ScfSolver, ScfSolverBase, py::smart_holder> scf_solver(
       m, "ScfSolver", R"(
-    Abstract base class for Self-Consistent Field (SCF) solvers.
+Abstract base class for Self-Consistent Field (SCF) solvers.
 
-    This class defines the interface for SCF calculations that compute
-    molecular orbitals from a molecular structure. Concrete implementations
-    should inherit from this class and implement the solve method.
+This class defines the interface for SCF calculations that compute molecular orbitals from a molecular structure.
+Concrete implementations should inherit from this class and implement the solve method.
 
-    Examples
-    --------
-    To create a custom SCF solver, inherit from this class:
-
+Examples:
+    >>> # To create a custom SCF solver, inherit from this class:
     >>> import qdk_chemistry.algorithms as alg
     >>> import qdk_chemistry.data as data
     >>> class MyScfSolver(alg.ScfSolver):
@@ -66,21 +65,22 @@ void bind_scf(py::module &m) {
     ...     def _run_impl(self, structure: data.Structure, charge: int, spin_multiplicity: int, initial_guess=None) -> tuple[float, data.Wavefunction]:
     ...         # Custom SCF implementation
     ...         return energy, wavefunction
+
 )");
 
   scf_solver.def(py::init<>(),
                  R"(
-        Create an ScfSolver instance.
+Create an ScfSolver instance.
 
-        Initializes a new Self-Consistent Field (SCF) solver with default settings.
-        Configuration options can be modified through the ``settings()`` method.
+Initializes a new Self-Consistent Field (SCF) solver with default settings.
+Configuration options can be modified through the ``settings()`` method.
 
-        Examples
-        --------
-        >>> scf = alg.ScfSolver()
-        >>> scf.settings().set("max_iterations", 100)
-        >>> scf.settings().set("convergence_threshold", 1e-8)
-        )");
+Examples:
+    >>> scf = alg.ScfSolver()
+    >>> scf.settings().set("max_iterations", 100)
+    >>> scf.settings().set("convergence_threshold", 1e-8)
+
+)");
 
   scf_solver.def(
       "run",
@@ -92,26 +92,20 @@ void bind_scf(py::module &m) {
         return solver.run(structure, charge, spin_multiplicity, initial_guess);
       },
       R"(
-        Perform SCF calculation on the given molecular structure.
+Perform SCF calculation on the given molecular structure.
 
-        This method automatically locks settings before execution.
+This method automatically locks settings before execution.
 
-        Parameters
-        ----------
-        structure : qdk_chemistry.data.Structure
-            The molecular structure to solve
-        charge : int
-            The molecular charge
-        spin_multiplicity : int
-            The spin multiplicity of the molecular system
-        initial_guess : qdk_chemistry.data.Orbitals, optional
-            Initial orbital guess for the SCF calculation (optional, defaults to no guess)
+Args:
+    structure (qdk_chemistry.data.Structure): The molecular structure to solve
+    charge (int): The molecular charge
+    spin_multiplicity (int): The spin multiplicity of the molecular system
+    initial_guess (Optional[qdk_chemistry.data.Orbitals]): Initial orbital guess for the SCF calculation. Defaults to ``None``.
 
-        Returns
-        -------
-        tuple[float, qdk_chemistry.data.Wavefunction]
-            A tuple containing the converged total energy (nuclear + electronic) and wavefunction
-        )",
+Returns:
+    tuple[float, qdk_chemistry.data.Wavefunction]: Converged total energy (nuclear + electronic) and the resulting wavefunction.
+
+)",
       py::arg("structure"), py::arg("charge"), py::arg("spin_multiplicity"),
       py::arg("initial_guess") = std::nullopt);
 
@@ -123,35 +117,29 @@ void bind_scf(py::module &m) {
         return solver.run(structure, charge, spin_multiplicity);
       },
       R"(
-        Perform SCF calculation on the given molecular structure (without initial guess).
+Perform SCF calculation on the given molecular structure (without initial guess).
 
-        This method automatically locks settings before execution.
+This method automatically locks settings before execution.
 
-        Parameters
-        ----------
-        structure : qdk_chemistry.data.Structure
-            The molecular structure to solve
-        charge : int
-            The molecular charge
-        spin_multiplicity : int
-            The spin multiplicity of the molecular system
+Args:
+    structure (qdk_chemistry.data.Structure): The molecular structure to solve
+    charge (int): The molecular charge
+    spin_multiplicity (int): The spin multiplicity of the molecular system
 
-        Returns
-        -------
-        tuple[float, qdk_chemistry.data.Wavefunction]
-            A tuple containing the converged total energy (nuclear + electronic) and wavefunction
-        )",
+Returns:
+    tuple[float, qdk_chemistry.data.Wavefunction]: Converged total energy (nuclear + electronic) and the resulting wavefunction
+
+)",
       py::arg("structure"), py::arg("charge"), py::arg("spin_multiplicity"));
 
   scf_solver.def("settings", &ScfSolver::settings,
                  R"(
-        Access the solver's configuration settings.
+Access the solver's configuration settings.
 
-        Returns
-        -------
-        qdk_chemistry.data.Settings
-            Reference to the settings object for configuring the solver
-        )",
+Returns:
+    qdk_chemistry.data.Settings: Reference to the settings object for configuring the solver
+
+)",
                  py::return_value_policy::reference_internal);
 
   // Expose _settings as a writable property for derived classes
@@ -164,29 +152,36 @@ void bind_scf(py::module &m) {
       },
       py::return_value_policy::reference_internal,
       R"(
-        Internal settings object property.
+Internal settings object property.
 
-        This property allows derived classes to replace the settings object with
-        a specialized Settings subclass in their constructors.
+This property allows derived classes to replace the settings object with a specialized Settings subclass in their constructors.
 
-        Examples
-        --------
-        >>> class MyScfSolver(alg.ScfSolver):
-        ...     def __init__(self):
-        ...         super().__init__()
-        ...         from qdk_chemistry.data import ElectronicStructureSettings
-        ...         self._settings = ElectronicStructureSettings()
-        )");
+Examples:
+    >>> class MyScfSolver(alg.ScfSolver):
+    ...     def __init__(self):
+    ...         super().__init__()
+    ...         from qdk_chemistry.data import ElectronicStructureSettings
+    ...         self._settings = ElectronicStructureSettings()
+
+)");
+
+  scf_solver.def("name", &ScfSolver::name,
+                 R"(
+The algorithm's name.
+
+Returns:
+    str: The name of the algorithm
+
+)");
 
   scf_solver.def("type_name", &ScfSolver::type_name,
                  R"(
-        The algorithm's type name.
+The algorithm's type name.
 
-        Returns
-        -------
-        str
-            The type name of the algorithm
-        )");
+Returns:
+    str: The type name of the algorithm
+
+)");
 
   // Factory class binding - creates ScfSolverFactory class with static methods
   bind_algorithm_factory<ScfSolverFactory, ScfSolver, ScfSolverBase>(
@@ -195,4 +190,50 @@ void bind_scf(py::module &m) {
   scf_solver.def("__repr__", [](const ScfSolver &) {
     return "<qdk_chemistry.algorithms.ScfSolver>";
   });
+
+  // Bind concrete microsoft::ScfSolver implementation
+  py::class_<microsoft::ScfSolver, ScfSolver, py::smart_holder>(
+      m, "QdkScfSolver", R"(
+QDK implementation of the SCF solver.
+
+This class provides a concrete implementation of the SCF (Self-Consistent
+Field) solver using the internal backend.
+It inherits from the base :class:`ScfSolver` class and implements the
+``solve`` method to perform self-consistent field calculations on molecular
+structures.
+
+Typical usage:
+
+.. code-block:: python
+
+    import qdk_chemistry.algorithms as alg
+    import qdk_chemistry.data as data
+
+    # Create a molecular structure
+    water = data.Structure(
+        positions=[[0.0, 0.0, 0.0], [0.0, 0.76, 0.59], [0.0, -0.76, 0.59]],
+        elements=[data.Element.O, data.Element.H, data.Element.H]
+    )
+
+    # Create an SCF solver instance
+    scf_solver = alg.QdkScfSolver()
+
+    # Configure settings if needed
+    scf_solver.settings().set("basis_set", "sto-3g")
+
+    # Perform SCF calculation
+    energy, wavefunction = scf_solver.run(water, 0, 1)
+
+See Also:
+    :class:`ScfSolver`
+    :class:`qdk_chemistry.data.Structure`
+    :class:`qdk_chemistry.data.Orbitals`
+
+)")
+      .def(py::init<>(), R"(
+Default constructor.
+
+Initializes an SCF solver with default settings.
+
+)");
 }

@@ -20,7 +20,11 @@ from qdk_chemistry.utils.time_evolution import (
     pauli_evolution_terms,
 )
 
-from .reference_tolerances import pauli_coefficient_imaginary_tolerance
+from .reference_tolerances import (
+    float_comparison_absolute_tolerance,
+    float_comparison_relative_tolerance,
+    pauli_coefficient_imaginary_tolerance,
+)
 
 
 def test_pauli_evolution_terms_extracts_mapping() -> None:
@@ -54,8 +58,10 @@ def test_controlled_pauli_rotation_identity_adds_phase_gate() -> None:
 
     ops = circuit.count_ops()
     assert ops == {"p": 1}
-    phase_param = float(circuit.data[0][0].params[0])
-    assert phase_param == pytest.approx(-np.pi / 4)
+    phase_param = float(circuit.data[0].operation.params[0])
+    assert np.isclose(
+        phase_param, -np.pi / 4, rtol=float_comparison_relative_tolerance, atol=float_comparison_absolute_tolerance
+    )
 
 
 def test_append_controlled_time_evolution_repeats_for_power() -> None:
@@ -69,9 +75,15 @@ def test_append_controlled_time_evolution_repeats_for_power() -> None:
 
     ops = circuit.count_ops()
     assert ops == {"crz": 2}
-    for instruction, _, _ in circuit.data:
+    for data in circuit.data:
+        instruction = data.operation
         assert instruction.name == "crz"
-        assert float(instruction.params[0]) == pytest.approx(np.pi)
+        assert np.isclose(
+            float(instruction.params[0]),
+            np.pi,
+            rtol=float_comparison_relative_tolerance,
+            atol=float_comparison_absolute_tolerance,
+        )
 
 
 def test_append_controlled_time_evolution_rejects_invalid_power() -> None:

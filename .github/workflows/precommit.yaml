@@ -1,0 +1,38 @@
+name: Pre-commit
+
+on:
+  push:
+    branches:
+    - main
+  pull_request:
+    branches:
+    - '**'
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  precommit:
+    name: Run pre-commit
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+
+    - name: Set up Python 3.13
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.13'
+        cache: pip
+
+    - name: Install pre-commit
+      run: pip install pre-commit
+
+    - name: Execute pre-commit hooks
+      run: pre-commit run --all-files || ( git status --short && git diff && exit 1 )

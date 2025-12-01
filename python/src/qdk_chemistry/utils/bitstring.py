@@ -2,14 +2,13 @@
 
 This module provides comprehensive utilities for working with bitstrings:
 
-* **Quantum State Representation**:  Functions for converting between different quantum state representations
-  including binary strings, decimal numbers, and statevectors.
-* **Format Conversions**:
-  Utilities for converting between different bitstring formats.
-    * Compact format (2=doubly occupied, u=up, d=down, 0=empty)
-    * Binary format (1=occupied, 0=empty)
-* **Matrix Operations**: Functions for converting bitstrings to binary matrices and performing operations on them,
-  particularly useful for quantum circuit optimization and state preparation.
+    * **Quantum State Representation**:  Functions for converting between different quantum state representations
+        including binary strings, decimal numbers, and statevectors.
+    * **Format Conversions**: Utilities for converting between different bitstring formats.
+        * Compact format (2=doubly occupied, u=up, d=down, 0=empty)
+        * Binary format (1=occupied, 0=empty)
+    * **Matrix Operations**: Functions for converting bitstrings to binary matrices and performing operations on them,
+        particularly useful for quantum circuit optimization and state preparation.
 
 Key Features:
 
@@ -29,13 +28,24 @@ The module is particularly useful for:
 # Licensed under the MIT License. See LICENSE.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
 
+from __future__ import annotations
+
 import logging
+from typing import TYPE_CHECKING
 
 import numpy as np
 
-from qdk_chemistry.data import Configuration
+if TYPE_CHECKING:
+    from qdk_chemistry.data import Configuration
 
 _LOGGER = logging.getLogger(__name__)
+
+__all__ = [
+    "binary_string_to_configuration",
+    "binary_to_decimal",
+    "bitstrings_to_binary_matrix",
+    "separate_alpha_beta_to_binary_string",
+]
 
 
 def separate_alpha_beta_to_binary_string(input_string: str) -> tuple[str, str]:
@@ -89,6 +99,8 @@ def binary_string_to_configuration(bitstring: str) -> Configuration:
         Configuration object corresponding to the binary string.
 
     """
+    from qdk_chemistry.data import Configuration  # noqa: PLC0415
+
     if len(bitstring) % 2 != 0:
         raise ValueError("Bitstring length must be even to represent alpha and beta electrons.")
     n = len(bitstring) // 2

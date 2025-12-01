@@ -14,10 +14,11 @@ from qdk_chemistry.algorithms.state_preparation.sparse_isometry import (
 from qdk_chemistry.algorithms.state_preparation.state_preparation import (
     StatePreparation,
     StatePreparationFactory,
+    StatePreparationSettings,
 )
 
 __all__ = [
     "SparseIsometryGF2XStatePreparation",
-    "StatePreparation",
     "StatePreparationFactory",
+    "StatePreparationSettings",
 ]

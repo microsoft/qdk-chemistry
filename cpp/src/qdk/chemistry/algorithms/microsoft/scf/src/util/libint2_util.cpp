@@ -4,6 +4,10 @@
 
 #include <qdk/chemistry/scf/util/libint2_util.h>
 
+#ifdef _OPENMP
+#include <omp.h>
+#endif
+
 namespace qdk::chemistry::scf::libint2_util {
 
 libint2::Shell convert_to_libint_shell(const Shell& o, bool pure) {
@@ -31,10 +35,11 @@ libint2::BasisSet convert_to_libint_basisset(const BasisSet& o) {
 std::unique_ptr<double[]> debug_eri(BasisMode basis_mode,
                                     const libint2::BasisSet& obs, double omega,
                                     size_t i_lo, size_t i_hi) {
-  const size_t num_basis_funcs = obs.nbf();
-  const size_t num_basis_funcs2 = num_basis_funcs * num_basis_funcs;
-  const size_t num_basis_funcs3 = num_basis_funcs2 * num_basis_funcs;
-  const size_t eri_sz = num_basis_funcs3 * (i_hi - i_lo);
+  const size_t num_atomic_orbitals = obs.nbf();
+  const size_t num_atomic_orbitals2 = num_atomic_orbitals * num_atomic_orbitals;
+  const size_t num_atomic_orbitals3 =
+      num_atomic_orbitals2 * num_atomic_orbitals;
+  const size_t eri_sz = num_atomic_orbitals3 * (i_hi - i_lo);
 
   auto h_eri = std::make_unique<double[]>(eri_sz);
   auto* h_eri_ptr = h_eri.get();
@@ -96,16 +101,17 @@ std::unique_ptr<double[]> debug_eri(BasisMode basis_mode,
             const size_t nk = obs[k].size();
             const size_t nl = obs[l].size();
 
-            auto* h_eri_loc = h_eri_ptr + (i_st - i_lo) * num_basis_funcs3 +
-                              j_st * num_basis_funcs2 + k_st * num_basis_funcs +
-                              l_st;
+            auto* h_eri_loc = h_eri_ptr + (i_st - i_lo) * num_atomic_orbitals3 +
+                              j_st * num_atomic_orbitals2 +
+                              k_st * num_atomic_orbitals + l_st;
             for (size_t ii = 0, int_ijkl = 0; ii < ni; ++ii)
               for (size_t jj = 0; jj < nj; ++jj)
                 for (size_t kk = 0; kk < nk; ++kk)
                   for (size_t ll = 0; ll < nl; ++ll, int_ijkl++) {
                     if (i_st + ii >= i_lo and i_st + ii < i_hi) {
-                      h_eri_loc[ii * num_basis_funcs3 + jj * num_basis_funcs2 +
-                                kk * num_basis_funcs + ll] = data[int_ijkl];
+                      h_eri_loc[ii * num_atomic_orbitals3 +
+                                jj * num_atomic_orbitals2 +
+                                kk * num_atomic_orbitals + ll] = data[int_ijkl];
                     }
                   }
           }
@@ -117,10 +123,11 @@ std::unique_ptr<double[]> debug_eri(BasisMode basis_mode,
 std::unique_ptr<double[]> opt_eri(BasisMode basis_mode,
                                   const libint2::BasisSet& obs, double omega,
                                   size_t i_lo, size_t i_hi) {
-  const size_t num_basis_funcs = obs.nbf();
-  const size_t num_basis_funcs2 = num_basis_funcs * num_basis_funcs;
-  const size_t num_basis_funcs3 = num_basis_funcs2 * num_basis_funcs;
-  const size_t eri_sz = num_basis_funcs3 * (i_hi - i_lo);
+  const size_t num_atomic_orbitals = obs.nbf();
+  const size_t num_atomic_orbitals2 = num_atomic_orbitals * num_atomic_orbitals;
+  const size_t num_atomic_orbitals3 =
+      num_atomic_orbitals2 * num_atomic_orbitals;
+  const size_t eri_sz = num_atomic_orbitals3 * (i_hi - i_lo);
 
   auto h_eri = std::make_unique<double[]>(eri_sz);
   auto* h_eri_ptr = h_eri.get();
@@ -142,16 +149,26 @@ std::unique_ptr<double[]> opt_eri(BasisMode basis_mode,
                                   obs.max_l(), 0);
   }
 
+#ifdef _OPENMP
   int nthreads = omp_get_max_threads();
+#else
+  int nthreads = 1;
+#endif
   std::vector<libint2::Engine> engines(nthreads, base_engine);
 
   auto range_intersect = [](int x_st, int x_en, int y_st, int y_en) {
     return x_st <= (y_en - 1) and y_st <= (x_en - 1);
   };
 
+#ifdef _OPENMP
 #pragma omp parallel
+#endif
   {
+#ifdef _OPENMP
     int thread_id = omp_get_thread_num();
+#else
+    int thread_id = 0;
+#endif
     auto& engine = engines[thread_id];
     auto& buf = engine.results();
     for (size_t i = 0, ijkl = 0; i < nshells; ++i) {
@@ -188,31 +205,39 @@ std::unique_ptr<double[]> opt_eri(BasisMode basis_mode,
 
               auto data = buf[0];
               if (data) {
-                auto* h_eri_ijkl =
-                    h_eri_ptr + (i_st - i_lo) * num_basis_funcs3 +
-                    j_st * num_basis_funcs2 + k_st * num_basis_funcs + l_st;
-                auto* h_eri_ijlk =
-                    h_eri_ptr + (i_st - i_lo) * num_basis_funcs3 +
-                    j_st * num_basis_funcs2 + l_st * num_basis_funcs + k_st;
-                auto* h_eri_jikl =
-                    h_eri_ptr + (j_st - i_lo) * num_basis_funcs3 +
-                    i_st * num_basis_funcs2 + k_st * num_basis_funcs + l_st;
-                auto* h_eri_jilk =
-                    h_eri_ptr + (j_st - i_lo) * num_basis_funcs3 +
-                    i_st * num_basis_funcs2 + l_st * num_basis_funcs + k_st;
+                auto* h_eri_ijkl = h_eri_ptr +
+                                   (i_st - i_lo) * num_atomic_orbitals3 +
+                                   j_st * num_atomic_orbitals2 +
+                                   k_st * num_atomic_orbitals + l_st;
+                auto* h_eri_ijlk = h_eri_ptr +
+                                   (i_st - i_lo) * num_atomic_orbitals3 +
+                                   j_st * num_atomic_orbitals2 +
+                                   l_st * num_atomic_orbitals + k_st;
+                auto* h_eri_jikl = h_eri_ptr +
+                                   (j_st - i_lo) * num_atomic_orbitals3 +
+                                   i_st * num_atomic_orbitals2 +
+                                   k_st * num_atomic_orbitals + l_st;
+                auto* h_eri_jilk = h_eri_ptr +
+                                   (j_st - i_lo) * num_atomic_orbitals3 +
+                                   i_st * num_atomic_orbitals2 +
+                                   l_st * num_atomic_orbitals + k_st;
 
-                auto* h_eri_klij =
-                    h_eri_ptr + (k_st - i_lo) * num_basis_funcs3 +
-                    l_st * num_basis_funcs2 + i_st * num_basis_funcs + j_st;
-                auto* h_eri_klji =
-                    h_eri_ptr + (k_st - i_lo) * num_basis_funcs3 +
-                    l_st * num_basis_funcs2 + j_st * num_basis_funcs + i_st;
-                auto* h_eri_lkij =
-                    h_eri_ptr + (l_st - i_lo) * num_basis_funcs3 +
-                    k_st * num_basis_funcs2 + i_st * num_basis_funcs + j_st;
-                auto* h_eri_lkji =
-                    h_eri_ptr + (l_st - i_lo) * num_basis_funcs3 +
-                    k_st * num_basis_funcs2 + j_st * num_basis_funcs + i_st;
+                auto* h_eri_klij = h_eri_ptr +
+                                   (k_st - i_lo) * num_atomic_orbitals3 +
+                                   l_st * num_atomic_orbitals2 +
+                                   i_st * num_atomic_orbitals + j_st;
+                auto* h_eri_klji = h_eri_ptr +
+                                   (k_st - i_lo) * num_atomic_orbitals3 +
+                                   l_st * num_atomic_orbitals2 +
+                                   j_st * num_atomic_orbitals + i_st;
+                auto* h_eri_lkij = h_eri_ptr +
+                                   (l_st - i_lo) * num_atomic_orbitals3 +
+                                   k_st * num_atomic_orbitals2 +
+                                   i_st * num_atomic_orbitals + j_st;
+                auto* h_eri_lkji = h_eri_ptr +
+                                   (l_st - i_lo) * num_atomic_orbitals3 +
+                                   k_st * num_atomic_orbitals2 +
+                                   j_st * num_atomic_orbitals + i_st;
 
                 for (size_t ii = 0; ii < ni; ++ii)
                   for (size_t jj = 0; jj < nj; ++jj)
@@ -221,46 +246,46 @@ std::unique_ptr<double[]> opt_eri(BasisMode basis_mode,
                         const auto integral = *data++;
 
                         if (i_st + ii >= i_lo and i_st + ii < i_hi) {
-                          h_eri_ijkl[ii * num_basis_funcs3 +
-                                     jj * num_basis_funcs2 +
-                                     kk * num_basis_funcs + ll] =
+                          h_eri_ijkl[ii * num_atomic_orbitals3 +
+                                     jj * num_atomic_orbitals2 +
+                                     kk * num_atomic_orbitals + ll] =
                               integral;  // (ij|kl)
-                          h_eri_ijlk[ii * num_basis_funcs3 +
-                                     jj * num_basis_funcs2 +
-                                     ll * num_basis_funcs + kk] =
+                          h_eri_ijlk[ii * num_atomic_orbitals3 +
+                                     jj * num_atomic_orbitals2 +
+                                     ll * num_atomic_orbitals + kk] =
                               integral;  // (ij|lk)
                         }
 
                         if (j_st + jj >= i_lo and j_st + jj < i_hi) {
-                          h_eri_jikl[jj * num_basis_funcs3 +
-                                     ii * num_basis_funcs2 +
-                                     kk * num_basis_funcs + ll] =
+                          h_eri_jikl[jj * num_atomic_orbitals3 +
+                                     ii * num_atomic_orbitals2 +
+                                     kk * num_atomic_orbitals + ll] =
                               integral;  // (ji|kl)
-                          h_eri_jilk[jj * num_basis_funcs3 +
-                                     ii * num_basis_funcs2 +
-                                     ll * num_basis_funcs + kk] =
+                          h_eri_jilk[jj * num_atomic_orbitals3 +
+                                     ii * num_atomic_orbitals2 +
+                                     ll * num_atomic_orbitals + kk] =
                               integral;  // (ji|lk)
                         }
 
                         if (k_st + kk >= i_lo and k_st + kk < i_hi) {
-                          h_eri_klij[kk * num_basis_funcs3 +
-                                     ll * num_basis_funcs2 +
-                                     ii * num_basis_funcs + jj] =
+                          h_eri_klij[kk * num_atomic_orbitals3 +
+                                     ll * num_atomic_orbitals2 +
+                                     ii * num_atomic_orbitals + jj] =
                               integral;  // (kl|ij)
-                          h_eri_klji[kk * num_basis_funcs3 +
-                                     ll * num_basis_funcs2 +
-                                     jj * num_basis_funcs + ii] =
+                          h_eri_klji[kk * num_atomic_orbitals3 +
+                                     ll * num_atomic_orbitals2 +
+                                     jj * num_atomic_orbitals + ii] =
                               integral;  // (kl|ji)
                         }
 
                         if (l_st + ll >= i_lo and l_st + ll < i_hi) {
-                          h_eri_lkij[ll * num_basis_funcs3 +
-                                     kk * num_basis_funcs2 +
-                                     ii * num_basis_funcs + jj] =
+                          h_eri_lkij[ll * num_atomic_orbitals3 +
+                                     kk * num_atomic_orbitals2 +
+                                     ii * num_atomic_orbitals + jj] =
                               integral;  // (lk|ij)
-                          h_eri_lkji[ll * num_basis_funcs3 +
-                                     kk * num_basis_funcs2 +
-                                     jj * num_basis_funcs + ii] =
+                          h_eri_lkji[ll * num_atomic_orbitals3 +
+                                     kk * num_atomic_orbitals2 +
+                                     jj * num_atomic_orbitals + ii] =
                               integral;  // (lk|ji)
                         }
                       }
@@ -280,10 +305,10 @@ std::unique_ptr<double[]> eri_df(BasisMode basis_mode,
                                  const libint2::BasisSet& obs,
                                  const libint2::BasisSet& abs, size_t i_lo,
                                  size_t i_hi) {
-  const size_t num_basis_funcs = obs.nbf();
+  const size_t num_atomic_orbitals = obs.nbf();
   const size_t naux = abs.nbf();
-  const size_t num_basis_funcs2 = num_basis_funcs * num_basis_funcs;
-  const size_t eri_sz = num_basis_funcs2 * (i_hi - i_lo);
+  const size_t num_atomic_orbitals2 = num_atomic_orbitals * num_atomic_orbitals;
+  const size_t eri_sz = num_atomic_orbitals2 * (i_hi - i_lo);
 
   auto h_eri = std::make_unique<double[]>(eri_sz);
   auto* h_eri_ptr = h_eri.get();
@@ -315,13 +340,23 @@ std::unique_ptr<double[]> eri_df(BasisMode basis_mode,
                               std::max(abs.max_l(), obs.max_l()), 0);
   base_engine.set(libint2::BraKet::xs_xx);
 
+#ifdef _OPENMP
   int nthreads = omp_get_max_threads();
+#else
+  int nthreads = 1;
+#endif
   std::vector<libint2::Engine> engines(nthreads, base_engine);
   const auto& unitshell = libint2::Shell::unit();
 
+#ifdef _OPENMP
 #pragma omp parallel
+#endif
   {
+#ifdef _OPENMP
     int thread_id = omp_get_thread_num();
+#else
+    int thread_id = 0;
+#endif
     auto& engine = engines[thread_id];
     auto& buf = engine.results();
 
@@ -341,18 +376,20 @@ std::unique_ptr<double[]> eri_df(BasisMode basis_mode,
                   abs[i], unitshell, obs[p], obs[q]);
           auto data = engine.results()[0];
           if (data) {
-            auto* h_eri_loc_pq = h_eri_ptr + (i_st - i_lo) * num_basis_funcs2 +
-                                 p_st * num_basis_funcs + q_st;
-            auto* h_eri_loc_qp = h_eri_ptr + (i_st - i_lo) * num_basis_funcs2 +
-                                 q_st * num_basis_funcs + p_st;
+            auto* h_eri_loc_pq = h_eri_ptr +
+                                 (i_st - i_lo) * num_atomic_orbitals2 +
+                                 p_st * num_atomic_orbitals + q_st;
+            auto* h_eri_loc_qp = h_eri_ptr +
+                                 (i_st - i_lo) * num_atomic_orbitals2 +
+                                 q_st * num_atomic_orbitals + p_st;
             for (size_t ii = 0, int_ipq = 0; ii < ni; ++ii)
               for (size_t pp = 0; pp < np; ++pp)
                 for (size_t qq = 0; qq < nq; ++qq, int_ipq++) {
                   if (i_st + ii >= i_lo and i_st + ii < i_hi) {
-                    h_eri_loc_pq[ii * num_basis_funcs2 + pp * num_basis_funcs +
-                                 qq] = data[int_ipq];
-                    h_eri_loc_qp[ii * num_basis_funcs2 + qq * num_basis_funcs +
-                                 pp] = data[int_ipq];
+                    h_eri_loc_pq[ii * num_atomic_orbitals2 +
+                                 pp * num_atomic_orbitals + qq] = data[int_ipq];
+                    h_eri_loc_qp[ii * num_atomic_orbitals2 +
+                                 qq * num_atomic_orbitals + pp] = data[int_ipq];
                   }
                 }
           }
@@ -381,12 +418,22 @@ std::unique_ptr<double[]> metric_df(BasisMode basis_mode,
                               abs.max_l(), 0);
   base_engine.set(libint2::BraKet::xs_xs);
 
+#ifdef _OPENMP
   int nthreads = omp_get_max_threads();
+#else
+  int nthreads = 1;
+#endif
   std::vector<libint2::Engine> engines(nthreads, base_engine);
   const auto& unitshell = libint2::Shell::unit();
+#ifdef _OPENMP
 #pragma omp parallel
+#endif
   {
+#ifdef _OPENMP
     int thread_id = omp_get_thread_num();
+#else
+    int thread_id = 0;
+#endif
     auto& engine = engines[thread_id];
     auto& buf = engine.results();
 
@@ -425,9 +472,9 @@ void eri_df_grad(double* dJ, const double* P, const double* X,
                  const std::vector<int>& obs_sh2atom,
                  const std::vector<int>& abs_sh2atom, size_t n_atoms,
                  ParallelConfig mpi) {
-  const size_t num_basis_funcs = obs.nbf();
+  const size_t num_atomic_orbitals = obs.nbf();
   const size_t naux = abs.nbf();
-  const size_t num_basis_funcs2 = num_basis_funcs * num_basis_funcs;
+  const size_t num_atomic_orbitals2 = num_atomic_orbitals * num_atomic_orbitals;
   const size_t nshells_obs = obs.size();
   const size_t nshells_abs = abs.size();
   auto shell2bf_obs = obs.shell2bf();
@@ -439,12 +486,22 @@ void eri_df_grad(double* dJ, const double* P, const double* X,
   base_engine.set(libint2::BraKet::xs_xx);
 
   const auto& unitshell = libint2::Shell::unit();
+#ifdef _OPENMP
   int nthreads = omp_get_max_threads();
+#else
+  int nthreads = 1;
+#endif
   int total_threads = mpi.world_size * nthreads;
   std::vector<libint2::Engine> engines(nthreads, base_engine);
+#ifdef _OPENMP
 #pragma omp parallel reduction(+ : dJ[ : 3 * n_atoms])
+#endif
   {
+#ifdef _OPENMP
     int thread_id = omp_get_thread_num();
+#else
+    int thread_id = 0;
+#endif
     int world_thread_id = mpi.world_rank * nthreads + thread_id;
     auto& engine = engines[thread_id];
 
@@ -482,7 +539,7 @@ void eri_df_grad(double* dJ, const double* P, const double* X,
               for (size_t pp = p_st; pp < p_st + np; ++pp)
                 for (size_t qq = q_st; qq < q_st + nq; ++qq, int_ipq++)
                   dJ_coord +=
-                      P[pp * num_basis_funcs + qq] * shset[int_ipq] * X[ii];
+                      P[pp * num_atomic_orbitals + qq] * shset[int_ipq] * X[ii];
             if (q > p) dJ_coord *= 2.0;  // use symmetry of (I|pq) D(p,q)
             dJ[coord] += dJ_coord;
           }
@@ -505,13 +562,23 @@ void metric_df_grad(double* dJ, const double* X, BasisMode basis_mode,
                               abs.max_l(), 1);
   base_engine.set(libint2::BraKet::xs_xs);
 
+#ifdef _OPENMP
   int nthreads = omp_get_max_threads();
+#else
+  int nthreads = 1;
+#endif
   int total_threads = mpi.world_size * nthreads;
   std::vector<libint2::Engine> engines(nthreads, base_engine);
   const auto& unitshell = libint2::Shell::unit();
+#ifdef _OPENMP
 #pragma omp parallel reduction(+ : dJ[ : 3 * n_atoms])
+#endif
   {
+#ifdef _OPENMP
     int thread_id = omp_get_thread_num();
+#else
+    int thread_id = 0;
+#endif
     int world_thread_id = mpi.world_rank * nthreads + thread_id;
     auto& engine = engines[thread_id];
     auto& buf = engine.results();

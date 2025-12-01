@@ -87,7 +87,7 @@ TEST_F(BasisSetTest, Constructors) {
 
   // Constructor with name, structure and basis type should throw (empty basis
   // invalid)
-  EXPECT_THROW(BasisSet basis3("6-31G", structure, BasisType::Cartesian),
+  EXPECT_THROW(BasisSet basis3("6-31G", structure, AOType::Cartesian),
                std::invalid_argument);
 
   // Constructor with shells should work
@@ -96,13 +96,13 @@ TEST_F(BasisSetTest, Constructors) {
       Shell(0, OrbitalType::S, std::vector{1.0}, std::vector{2.0}));
   BasisSet basis4("6-31G", shells, structure);
   EXPECT_EQ(std::string("6-31G"), basis4.get_name());
-  EXPECT_EQ(BasisType::Spherical, basis4.get_basis_type());
+  EXPECT_EQ(AOType::Spherical, basis4.get_atomic_orbital_type());
   EXPECT_EQ(1u, basis4.get_num_shells());
 
   // Copy constructor
   BasisSet basis5(basis4);
   EXPECT_EQ(std::string("6-31G"), basis5.get_name());
-  EXPECT_EQ(BasisType::Spherical, basis5.get_basis_type());
+  EXPECT_EQ(AOType::Spherical, basis5.get_atomic_orbital_type());
 }
 
 TEST_F(BasisSetTest, CopyConstructorAndAssignment) {
@@ -126,14 +126,14 @@ TEST_F(BasisSetTest, CopyConstructorAndAssignment) {
   shells.emplace_back(0, OrbitalType::P, p_exp, p_coeff);
 
   // Create source basis set with data and structure
-  BasisSet source("cc-pVDZ", shells, structure, BasisType::Cartesian);
+  BasisSet source("cc-pVDZ", shells, structure, AOType::Cartesian);
 
   // Test copy constructor
   BasisSet copy_constructed(source);
   EXPECT_EQ(std::string("cc-pVDZ"), copy_constructed.get_name());
-  EXPECT_EQ(BasisType::Cartesian, copy_constructed.get_basis_type());
+  EXPECT_EQ(AOType::Cartesian, copy_constructed.get_atomic_orbital_type());
   EXPECT_EQ(2u, copy_constructed.get_num_shells());
-  EXPECT_EQ(4u, copy_constructed.get_num_basis_functions());  // 1 s + 3 p
+  EXPECT_EQ(4u, copy_constructed.get_num_atomic_orbitals());  // 1 s + 3 p
 
   // Verify shells were copied
   const auto& atom_shells = copy_constructed.get_shells_for_atom(0);
@@ -150,21 +150,21 @@ TEST_F(BasisSetTest, CopyConstructorAndAssignment) {
   std::vector<Shell> different_shells;
   different_shells.emplace_back(
       Shell(1, OrbitalType::D, std::vector{2.0}, std::vector{3.0}));
-  BasisSet target("STO-3G", different_shells, BasisType::Spherical);
+  BasisSet target("STO-3G", different_shells, AOType::Spherical);
 
   target = source;
 
   // Verify all properties were copied correctly
   EXPECT_EQ(std::string("cc-pVDZ"), target.get_name());
-  EXPECT_EQ(BasisType::Cartesian, target.get_basis_type());
+  EXPECT_EQ(AOType::Cartesian, target.get_atomic_orbital_type());
   EXPECT_EQ(2u, target.get_num_shells());
-  EXPECT_EQ(4u, target.get_num_basis_functions());  // 1 s + 3 p
+  EXPECT_EQ(4u, target.get_num_atomic_orbitals());  // 1 s + 3 p
 
   // Test self-assignment (should be no-op)
   BasisSet& self_ref = target;
   self_ref = target;
   EXPECT_EQ(std::string("cc-pVDZ"), target.get_name());
-  EXPECT_EQ(BasisType::Cartesian, target.get_basis_type());
+  EXPECT_EQ(AOType::Cartesian, target.get_atomic_orbital_type());
 
   // Test assignment from basis set without structure
   std::vector<Shell> minimal_shells;
@@ -209,7 +209,7 @@ TEST_F(BasisSetTest, ShellManagement) {
   // Create basis set with shells
   BasisSet basis("test", shells);
   EXPECT_EQ(2u, basis.get_num_shells());
-  EXPECT_EQ(4u, basis.get_num_basis_functions());  // 1 s + 3 p
+  EXPECT_EQ(4u, basis.get_num_atomic_orbitals());  // 1 s + 3 p
 
   // Get shells for atom 0
   const auto& atom_shells = basis.get_shells_for_atom(0);
@@ -223,7 +223,7 @@ TEST_F(BasisSetTest, ShellManagement) {
   EXPECT_EQ(0u, shell_0.atom_index);
 }
 
-TEST_F(BasisSetTest, BasisTypeManagement) {
+TEST_F(BasisSetTest, AOTypeManagement) {
   // Create a structure for testing
   std::vector<Eigen::Vector3d> coords = {{0.0, 0.0, 0.0}};
   std::vector<std::string> symbols = {"H"};
@@ -238,16 +238,16 @@ TEST_F(BasisSetTest, BasisTypeManagement) {
   shells.emplace_back(
       Shell(0, OrbitalType::D, std::vector{1.0}, std::vector{2.0}));
 
-  BasisSet basis_cartesian("test", shells, structure, BasisType::Cartesian);
-  EXPECT_EQ(BasisType::Cartesian, basis_cartesian.get_basis_type());
+  BasisSet basis_cartesian("test", shells, structure, AOType::Cartesian);
+  EXPECT_EQ(AOType::Cartesian, basis_cartesian.get_atomic_orbital_type());
 
   // For cartesian d orbitals: 6 functions (dx2, dy2, dz2, dxy, dxz, dyz)
-  EXPECT_EQ(6u, basis_cartesian.get_num_basis_functions());
+  EXPECT_EQ(6u, basis_cartesian.get_num_atomic_orbitals());
 
   // Create spherical basis set with same shell
-  BasisSet basis_sph_test("test", shells, structure, BasisType::Spherical);
+  BasisSet basis_sph_test("test", shells, structure, AOType::Spherical);
   // For spherical d orbitals: 5 functions (d-2, d-1, d0, d1, d2)
-  EXPECT_EQ(5u, basis_sph_test.get_num_basis_functions());
+  EXPECT_EQ(5u, basis_sph_test.get_num_atomic_orbitals());
 }
 
 TEST_F(BasisSetTest, ShellWithRawPrimitives) {
@@ -277,16 +277,16 @@ TEST_F(BasisSetTest, ShellWithRawPrimitives) {
 
 TEST_F(BasisSetTest, OrbitalTypeUtilities) {
   // Test orbital type sizes - spherical
-  EXPECT_EQ(1u, BasisSet::get_num_orbitals_for_l(0, BasisType::Spherical));
-  EXPECT_EQ(3u, BasisSet::get_num_orbitals_for_l(1, BasisType::Spherical));
-  EXPECT_EQ(5u, BasisSet::get_num_orbitals_for_l(2, BasisType::Spherical));
-  EXPECT_EQ(7u, BasisSet::get_num_orbitals_for_l(3, BasisType::Spherical));
+  EXPECT_EQ(1u, BasisSet::get_num_orbitals_for_l(0, AOType::Spherical));
+  EXPECT_EQ(3u, BasisSet::get_num_orbitals_for_l(1, AOType::Spherical));
+  EXPECT_EQ(5u, BasisSet::get_num_orbitals_for_l(2, AOType::Spherical));
+  EXPECT_EQ(7u, BasisSet::get_num_orbitals_for_l(3, AOType::Spherical));
 
   // Test orbital type sizes - cartesian
-  EXPECT_EQ(1u, BasisSet::get_num_orbitals_for_l(0, BasisType::Cartesian));
-  EXPECT_EQ(3u, BasisSet::get_num_orbitals_for_l(1, BasisType::Cartesian));
-  EXPECT_EQ(6u, BasisSet::get_num_orbitals_for_l(2, BasisType::Cartesian));
-  EXPECT_EQ(10u, BasisSet::get_num_orbitals_for_l(3, BasisType::Cartesian));
+  EXPECT_EQ(1u, BasisSet::get_num_orbitals_for_l(0, AOType::Cartesian));
+  EXPECT_EQ(3u, BasisSet::get_num_orbitals_for_l(1, AOType::Cartesian));
+  EXPECT_EQ(6u, BasisSet::get_num_orbitals_for_l(2, AOType::Cartesian));
+  EXPECT_EQ(10u, BasisSet::get_num_orbitals_for_l(3, AOType::Cartesian));
 
   // Test string conversion
   EXPECT_EQ("s", BasisSet::orbital_type_to_string(OrbitalType::S));
@@ -317,15 +317,19 @@ TEST_F(BasisSetTest, OrbitalTypeUtilities) {
   EXPECT_EQ(6, BasisSet::get_angular_momentum(OrbitalType::I));
 
   // Test basis type string conversion
-  EXPECT_EQ("spherical", BasisSet::basis_type_to_string(BasisType::Spherical));
-  EXPECT_EQ("cartesian", BasisSet::basis_type_to_string(BasisType::Cartesian));
+  EXPECT_EQ("spherical",
+            BasisSet::atomic_orbital_type_to_string(AOType::Spherical));
+  EXPECT_EQ("cartesian",
+            BasisSet::atomic_orbital_type_to_string(AOType::Cartesian));
 
   // Test default case - this requires casting an invalid enum value
   EXPECT_EQ("unknown",
-            BasisSet::basis_type_to_string(static_cast<BasisType>(999)));
+            BasisSet::atomic_orbital_type_to_string(static_cast<AOType>(999)));
 
-  EXPECT_EQ(BasisType::Spherical, BasisSet::string_to_basis_type("spherical"));
-  EXPECT_EQ(BasisType::Cartesian, BasisSet::string_to_basis_type("cartesian"));
+  EXPECT_EQ(AOType::Spherical,
+            BasisSet::string_to_atomic_orbital_type("spherical"));
+  EXPECT_EQ(AOType::Cartesian,
+            BasisSet::string_to_atomic_orbital_type("cartesian"));
 }
 
 TEST_F(BasisSetTest, BasisFunctionQueries) {
@@ -341,22 +345,22 @@ TEST_F(BasisSetTest, BasisFunctionQueries) {
   BasisSet basis("test", shells);
 
   EXPECT_EQ(3u, basis.get_num_shells());
-  EXPECT_EQ(5u, basis.get_num_basis_functions());  // 1+3+1
+  EXPECT_EQ(5u, basis.get_num_atomic_orbitals());  // 1+3+1
 
-  // Test basis function info (now returns pair instead of BasisFunctionInfo)
-  auto info_0 = basis.get_basis_function_info(0);
+  // Test atomic orbital info (now returns pair instead of BasisFunctionInfo)
+  auto info_0 = basis.get_atomic_orbital_info(0);
   EXPECT_EQ(0u, info_0.first);  // shell index
 
-  auto info_1 = basis.get_basis_function_info(1);
+  auto info_1 = basis.get_atomic_orbital_info(1);
   EXPECT_EQ(1u, info_1.first);  // shell index
 
   // Test basis indices for atoms
-  auto indices_0 = basis.get_basis_function_indices_for_atom(0);
+  auto indices_0 = basis.get_atomic_orbital_indices_for_atom(0);
   EXPECT_EQ(4u, indices_0.size());  // s + p = 1 + 3 = 4
   EXPECT_EQ(0u, indices_0[0]);
   EXPECT_EQ(3u, indices_0[3]);
 
-  auto indices_1 = basis.get_basis_function_indices_for_atom(1);
+  auto indices_1 = basis.get_atomic_orbital_indices_for_atom(1);
   EXPECT_EQ(1u, indices_1.size());  // s = 1
   EXPECT_EQ(4u, indices_1[0]);
 }
@@ -369,7 +373,7 @@ TEST_F(BasisSetTest, StructureIntegration) {
 
   Structure structure(coords, symbols);
 
-  // Add basis functions for each hydrogen
+  // Add atomic orbitals for each hydrogen
   std::vector<Shell> shells;
   shells.emplace_back(
       Shell(0, OrbitalType::S, std::vector{3.425251}, std::vector{0.154329}));
@@ -379,7 +383,7 @@ TEST_F(BasisSetTest, StructureIntegration) {
   BasisSet basis("STO-3G", shells, structure);
 
   EXPECT_EQ(2u, basis.get_num_shells());
-  EXPECT_EQ(2u, basis.get_num_basis_functions());
+  EXPECT_EQ(2u, basis.get_num_atomic_orbitals());
 }
 
 TEST_F(BasisSetTest, Validation) {
@@ -420,7 +424,7 @@ TEST_F(BasisSetTest, Summary) {
   EXPECT_FALSE(summary.empty());
   EXPECT_NE(std::string::npos, summary.find("6-31G"));
   EXPECT_NE(std::string::npos, summary.find("2"));  // 2 shells
-  EXPECT_NE(std::string::npos, summary.find("4"));  // 4 basis functions
+  EXPECT_NE(std::string::npos, summary.find("4"));  // 4 atomic orbitals
 }
 
 TEST_F(BasisSetTest, JSONSerialization) {
@@ -440,7 +444,7 @@ TEST_F(BasisSetTest, JSONSerialization) {
   auto basis2 = BasisSet::from_json(json_data);
   EXPECT_EQ(basis.get_name(), basis2->get_name());
   EXPECT_EQ(basis.get_num_shells(), basis2->get_num_shells());
-  EXPECT_EQ(basis.get_num_basis_functions(), basis2->get_num_basis_functions());
+  EXPECT_EQ(basis.get_num_atomic_orbitals(), basis2->get_num_atomic_orbitals());
 
   // Test file I/O
   basis.to_json_file("test.basis_set.json");
@@ -1040,7 +1044,7 @@ TEST_F(BasisSetTest, IndexConversion) {
 
   BasisSet basis("test", shells);
 
-  // Test basis function to shell conversion using new return type (pair)
+  // Test atomic orbital to shell conversion using new return type (pair)
   auto info_0 = basis.basis_to_shell_index(0);
   EXPECT_EQ(0u, info_0.first);  // shell index
 
@@ -1094,10 +1098,10 @@ TEST_F(BasisSetTest, ShellQueries) {
   EXPECT_EQ(1u, atom2_shells.size());
   EXPECT_EQ(4u, atom2_shells[0]);  // Fifth shell overall
 
-  // Test get_num_basis_functions_for_atom
-  EXPECT_EQ(4u, basis.get_num_basis_functions_for_atom(0));  // S(1) + P(3) = 4
-  EXPECT_EQ(6u, basis.get_num_basis_functions_for_atom(1));  // S(1) + D(5) = 6
-  EXPECT_EQ(3u, basis.get_num_basis_functions_for_atom(2));  // P(3) = 3
+  // Test get_num_atomic_orbitals_for_atom
+  EXPECT_EQ(4u, basis.get_num_atomic_orbitals_for_atom(0));  // S(1) + P(3) = 4
+  EXPECT_EQ(6u, basis.get_num_atomic_orbitals_for_atom(1));  // S(1) + D(5) = 6
+  EXPECT_EQ(3u, basis.get_num_atomic_orbitals_for_atom(2));  // P(3) = 3
 }
 
 TEST_F(BasisSetTest, OrbitalTypeQueries) {
@@ -1138,24 +1142,24 @@ TEST_F(BasisSetTest, OrbitalTypeQueries) {
   auto f_shells = basis.get_shell_indices_for_orbital_type(OrbitalType::F);
   EXPECT_EQ(0u, f_shells.size());
 
-  // Test get_num_basis_functions_for_orbital_type (spherical basis)
-  EXPECT_EQ(2u, basis.get_num_basis_functions_for_orbital_type(
+  // Test get_num_atomic_orbitals_for_orbital_type (spherical basis)
+  EXPECT_EQ(2u, basis.get_num_atomic_orbitals_for_orbital_type(
                     OrbitalType::S));  // 2 S shells, 1 function each
-  EXPECT_EQ(6u, basis.get_num_basis_functions_for_orbital_type(
+  EXPECT_EQ(6u, basis.get_num_atomic_orbitals_for_orbital_type(
                     OrbitalType::P));  // 2 P shells, 3 functions each
-  EXPECT_EQ(10u, basis.get_num_basis_functions_for_orbital_type(
+  EXPECT_EQ(10u, basis.get_num_atomic_orbitals_for_orbital_type(
                      OrbitalType::D));  // 2 D shells, 5 functions each
-  EXPECT_EQ(0u, basis.get_num_basis_functions_for_orbital_type(
+  EXPECT_EQ(0u, basis.get_num_atomic_orbitals_for_orbital_type(
                     OrbitalType::F));  // No F shells
 
   // Test with Cartesian basis type
-  BasisSet cartesian_basis("test", shells, BasisType::Cartesian);
-  EXPECT_EQ(2u, cartesian_basis.get_num_basis_functions_for_orbital_type(
+  BasisSet cartesian_basis("test", shells, AOType::Cartesian);
+  EXPECT_EQ(2u, cartesian_basis.get_num_atomic_orbitals_for_orbital_type(
                     OrbitalType::S));  // 2 S shells, 1 function each
-  EXPECT_EQ(6u, cartesian_basis.get_num_basis_functions_for_orbital_type(
+  EXPECT_EQ(6u, cartesian_basis.get_num_atomic_orbitals_for_orbital_type(
                     OrbitalType::P));  // 2 P shells, 3 functions each
   EXPECT_EQ(12u,
-            cartesian_basis.get_num_basis_functions_for_orbital_type(
+            cartesian_basis.get_num_atomic_orbitals_for_orbital_type(
                 OrbitalType::D));  // 2 D shells, 6 functions each (cartesian)
 }
 
@@ -1253,7 +1257,7 @@ TEST_F(BasisSetTest, ErrorHandling) {
   EXPECT_THROW(BasisSet::string_to_orbital_type("X"), std::invalid_argument);
 
   // Test invalid basis type string
-  EXPECT_THROW(BasisSet::string_to_basis_type("unknown"),
+  EXPECT_THROW(BasisSet::string_to_atomic_orbital_type("unknown"),
                std::invalid_argument);
 
   // Test mismatched primitive sizes in Shell constructor
@@ -1267,13 +1271,13 @@ TEST_F(BasisSetTest, ErrorHandling) {
 
   // Test invalid atom index for new query functions
   EXPECT_THROW(basis.get_shell_indices_for_atom(10), std::out_of_range);
-  EXPECT_THROW(basis.get_num_basis_functions_for_atom(10), std::out_of_range);
+  EXPECT_THROW(basis.get_num_atomic_orbitals_for_atom(10), std::out_of_range);
   EXPECT_THROW(
       basis.get_shell_indices_for_atom_and_orbital_type(10, OrbitalType::S),
       std::out_of_range);
 
-  // Test _validate_basis_index (via get_basis_function_info)
-  EXPECT_THROW(basis.get_basis_function_info(100), std::out_of_range);
+  // Test _validate_atomic_orbital_index (via get_atomic_orbital_info)
+  EXPECT_THROW(basis.get_atomic_orbital_info(100), std::out_of_range);
 
   // Test _validate_shell_index error message formatting
   try {
@@ -1299,13 +1303,13 @@ TEST_F(BasisSetTest, ErrorHandling) {
     EXPECT_STRING_CONTAINS(error_msg, "Maximum index");
   }
 
-  // Test _validate_basis_index error message formatting
+  // Test _validate_atomic_orbital_index error message formatting
   try {
-    basis.get_basis_function_info(75);
+    basis.get_atomic_orbital_info(75);
     FAIL() << "Expected std::out_of_range";
   } catch (const std::out_of_range& e) {
     std::string error_msg(e.what());
-    EXPECT_STRING_CONTAINS(error_msg, "Basis function index");
+    EXPECT_STRING_CONTAINS(error_msg, "atomic orbital index");
     EXPECT_STRING_CONTAINS(error_msg, "75");
     EXPECT_STRING_CONTAINS(error_msg, "out of range");
     EXPECT_STRING_CONTAINS(error_msg, "Maximum index");
@@ -1353,7 +1357,7 @@ TEST_F(BasisSetTest, HDF5Comprehensive) {
   f1_coeff << 0.123456, 0.654321;
   complex_shells.emplace_back(2, OrbitalType::F, f1_exp, f1_coeff);
 
-  BasisSet complex_basis("cc-pVDZ", complex_shells, BasisType::Spherical);
+  BasisSet complex_basis("cc-pVDZ", complex_shells, AOType::Spherical);
 
   std::string complex_filename = tmp_dir + "/complex.basis_set.h5";
   complex_basis.to_hdf5_file(complex_filename);
@@ -1362,10 +1366,11 @@ TEST_F(BasisSetTest, HDF5Comprehensive) {
 
   // Verify comprehensive data integrity
   EXPECT_EQ(complex_basis.get_name(), loaded_complex->get_name());
-  EXPECT_EQ(complex_basis.get_basis_type(), loaded_complex->get_basis_type());
+  EXPECT_EQ(complex_basis.get_atomic_orbital_type(),
+            loaded_complex->get_atomic_orbital_type());
   EXPECT_EQ(complex_basis.get_num_shells(), loaded_complex->get_num_shells());
-  EXPECT_EQ(complex_basis.get_num_basis_functions(),
-            loaded_complex->get_num_basis_functions());
+  EXPECT_EQ(complex_basis.get_num_atomic_orbitals(),
+            loaded_complex->get_num_atomic_orbitals());
   EXPECT_EQ(complex_basis.get_num_atoms(), loaded_complex->get_num_atoms());
 
   // Verify shell-by-shell data integrity
@@ -1406,7 +1411,7 @@ TEST_F(BasisSetTest, HDF5Comprehensive) {
 
   EXPECT_EQ(single_prim.get_name(), loaded_single->get_name());
   EXPECT_EQ(2u, loaded_single->get_num_shells());
-  EXPECT_EQ(4u, loaded_single->get_num_basis_functions());
+  EXPECT_EQ(4u, loaded_single->get_num_atomic_orbitals());
 
   // 4. Test HDF5 format structure verification - check metadata group exists
   std::vector<Shell> verify_shells;
@@ -1426,15 +1431,15 @@ TEST_F(BasisSetTest, HDF5Comprehensive) {
   cartesian_shells.push_back(
       Shell(0, OrbitalType::D, std::vector{1.0}, std::vector{1.0}));
   BasisSet cartesian_basis("cartesian_test", cartesian_shells,
-                           BasisType::Cartesian);
+                           AOType::Cartesian);
 
   std::string cartesian_filename = tmp_dir + "/cartesian.basis_set.h5";
   cartesian_basis.to_hdf5_file(cartesian_filename);
 
   auto loaded_cartesian = BasisSet::from_hdf5_file(cartesian_filename);
 
-  // Verify that basis_type is correctly preserved in HDF5
-  EXPECT_EQ(BasisType::Cartesian, loaded_cartesian->get_basis_type());
+  // Verify that atomic_orbital_type is correctly preserved in HDF5
+  EXPECT_EQ(AOType::Cartesian, loaded_cartesian->get_atomic_orbital_type());
   EXPECT_EQ(1u, loaded_cartesian->get_num_shells());
 
   // Clean up the temporary directory

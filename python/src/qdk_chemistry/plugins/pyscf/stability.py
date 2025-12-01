@@ -5,6 +5,7 @@ and integrates PySCF stability algorithms into the QDK framework.
 
 The implementation supports both restricted (RHF, ROHF) and unrestricted (UHF)
 wavefunction stability analysis including:
+
 - Internal stability analysis (within the same wavefunction type)
 - RHF external stability analysis (RHF -> UHF instabilities)
 
@@ -13,7 +14,7 @@ import time, making the functionality available via
 `qdk_chemistry.algorithms.create('stability_checker', 'pyscf')`.
 
 Requires: PySCF (the code uses `pyscf.lib`, `pyscf.scf`, `pyscf.soscf`,
-          and `pyscf.scf.stability` routines).
+and `pyscf.scf.stability` routines).
 """
 
 # --------------------------------------------------------------------------------------------
@@ -29,6 +30,8 @@ from pyscf.soscf import newton_ah
 from qdk_chemistry.algorithms import StabilityChecker, register
 from qdk_chemistry.data import Settings, StabilityResult, Wavefunction
 from qdk_chemistry.plugins.pyscf.utils import orbitals_to_scf
+
+__all__ = ["PyscfStabilityChecker", "PyscfStabilitySettings"]
 
 
 def _stability_preconditioner(dx: np.ndarray, e: float, hdiag: np.ndarray) -> np.ndarray:
@@ -156,12 +159,13 @@ class PyscfStabilitySettings(Settings):
     configurable options used by :class:`PyscfStabilityChecker`.
 
     Available settings:
-        internal: Whether to perform internal stability analysis (within the same wavefunction type).
-        external: Whether to perform external stability analysis (RHF -> UHF instabilities).
-            Only supported for RHF wavefunctions. Will raise an error if enabled for ROHF or UHF.
-        with_symmetry: Whether to respect point group symmetry during stability analysis.
-        nroots: Number of eigenvalue roots to compute in the Davidson solver.
-        tolerance: Convergence threshold for the Davidson eigenvalue solver.
+
+    - internal: Whether to perform internal stability analysis (within the same wavefunction type).
+    - external: Whether to perform external stability analysis (RHF -> UHF instabilities).
+        Only supported for RHF wavefunctions. Will raise an error if enabled for ROHF or UHF.
+    - with_symmetry: Whether to respect point group symmetry during stability analysis.
+    - nroots: Number of eigenvalue roots to compute in the Davidson solver.
+    - tolerance: Convergence threshold for the Davidson eigenvalue solver.
 
     Examples:
         >>> settings = PyscfStabilitySettings()
@@ -274,8 +278,8 @@ class PyscfStabilityChecker(StabilityChecker):
             # ROHF stability analysis
             if do_internal:
                 e, v = _rohf_internal(mf, with_symmetry=with_symmetry, nroots=nroots, tol=alg_tol)
-                internal_eigenvalues_list.extend(e if isinstance(e, (list, tuple, np.ndarray)) else [e])
-                internal_eigenvectors_list.extend(v if isinstance(v, (list, tuple, np.ndarray)) else [v])
+                internal_eigenvalues_list.extend(e if isinstance(e, list | tuple | np.ndarray) else [e])
+                internal_eigenvectors_list.extend(v if isinstance(v, list | tuple | np.ndarray) else [v])
             # Raise error if external stability is requested for ROHF
             if do_external:
                 raise ValueError(
@@ -287,8 +291,8 @@ class PyscfStabilityChecker(StabilityChecker):
             # UHF stability analysis
             if do_internal:
                 e, v = _uhf_internal(mf, with_symmetry=with_symmetry, nroots=nroots, tol=alg_tol)
-                internal_eigenvalues_list.extend(e if isinstance(e, (list, tuple, np.ndarray)) else [e])
-                internal_eigenvectors_list.extend(v if isinstance(v, (list, tuple, np.ndarray)) else [v])
+                internal_eigenvalues_list.extend(e if isinstance(e, list | tuple | np.ndarray) else [e])
+                internal_eigenvectors_list.extend(v if isinstance(v, list | tuple | np.ndarray) else [v])
             # Raise error if external stability is requested for UHF
             if do_external:
                 raise ValueError(
@@ -300,12 +304,12 @@ class PyscfStabilityChecker(StabilityChecker):
             # RHF stability analysis (default)
             if do_internal:
                 e, v = _rhf_internal(mf, with_symmetry=with_symmetry, nroots=nroots, tol=alg_tol)
-                internal_eigenvalues_list.extend(e if isinstance(e, (list, tuple, np.ndarray)) else [e])
-                internal_eigenvectors_list.extend(v if isinstance(v, (list, tuple, np.ndarray)) else [v])
+                internal_eigenvalues_list.extend(e if isinstance(e, list | tuple | np.ndarray) else [e])
+                internal_eigenvectors_list.extend(v if isinstance(v, list | tuple | np.ndarray) else [v])
             if do_external:
                 e, v = _rhf_external(mf, with_symmetry=with_symmetry, nroots=nroots, tol=alg_tol)
-                external_eigenvalues_list.extend(e if isinstance(e, (list, tuple, np.ndarray)) else [e])
-                external_eigenvectors_list.extend(v if isinstance(v, (list, tuple, np.ndarray)) else [v])
+                external_eigenvalues_list.extend(e if isinstance(e, list | tuple | np.ndarray) else [e])
+                external_eigenvectors_list.extend(v if isinstance(v, list | tuple | np.ndarray) else [v])
 
         # Process results and create StabilityResult
         internal_stable = True

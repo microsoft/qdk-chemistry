@@ -545,7 +545,7 @@ class ModelOrbitals : public Orbitals {
 
   /**
    * @brief Constructor with active and inactive space indices (restricted)
-   * @param basis_size Number of basis functions (and molecular orbitals)
+   * @param basis_size Number of atomic orbitals (and molecular orbitals)
    * @param indices Orbital indices (shared for alpha/beta)
    * @todo TODO (NAB):  need to clarify the purpose/scope of these indices
    * 41469
@@ -556,7 +556,7 @@ class ModelOrbitals : public Orbitals {
 
   /**
    * @brief Constructor with active and inactive space indices (unrestricted)
-   * @param basis_size Number of basis functions (and molecular orbitals)
+   * @param basis_size Number of atomic orbitals (and molecular orbitals)
    * @param indices Orbital indices (shared for alpha/beta)
    * @todo TODO (NAB):  need to clarify the purpose/scope of these indices
    * 41469

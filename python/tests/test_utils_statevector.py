@@ -77,7 +77,7 @@ def test_create_statevector_edge_cases():
 
     result = _create_statevector_from_coeffs_and_dets_string(coeffs, dets, num_qubits)
     expected = np.array([0.0, 1.0, 0.0, 0.0], dtype=complex)
-    np.testing.assert_array_equal(result, expected)
+    assert np.array_equal(result, expected)
 
     # Test with complex coefficients
     coeffs = np.array([1 + 1j, 0.5 - 0.5j], dtype=complex)
@@ -86,7 +86,7 @@ def test_create_statevector_edge_cases():
 
     result = _create_statevector_from_coeffs_and_dets_string(coeffs, dets, num_qubits, normalize=False)
     expected = np.array([1 + 1j, 0.0, 0.0, 0.5 - 0.5j], dtype=complex)
-    np.testing.assert_array_equal(result, expected)
+    assert np.array_equal(result, expected)
 
     # Test with numpy array coefficients
     coeffs = np.array([0.7, 0.3])
@@ -95,7 +95,7 @@ def test_create_statevector_edge_cases():
 
     result = _create_statevector_from_coeffs_and_dets_string(coeffs, dets, num_qubits, normalize=False)
     expected = np.array([0.0, 0.3, 0.7, 0.0], dtype=complex)
-    np.testing.assert_array_equal(result, expected)
+    assert np.array_equal(result, expected)
 
 
 def test_create_statevector_normalization():
