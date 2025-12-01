@@ -47,8 +47,8 @@ struct cas_helper {
     }
     const size_t num_molecular_orbitals = active_indices.size();
 
-    const auto& [T, T_b] = hamiltonian.get_one_body_integrals();
-    const auto& [V, V_aabb, V_bbbb] = hamiltonian.get_two_body_integrals();
+    const auto& [T_a, T_b] = hamiltonian.get_one_body_integrals();
+    const auto& [V_aaaa, V_aabb, V_bbbb] = hamiltonian.get_two_body_integrals();
 
     // get settings
     macis::MCSCFSettings mcscf_settings = get_mcscf_settings_(settings_);
@@ -60,8 +60,8 @@ struct cas_helper {
 
     E_casci = macis::CASRDMFunctor<generator_t>::rdms(
         mcscf_settings, macis::NumOrbital(num_molecular_orbitals), nalpha,
-        nbeta, const_cast<double*>(T.data()), const_cast<double*>(V.data()),
-        nullptr, nullptr, C_casci);
+        nbeta, const_cast<double*>(T_a.data()),
+        const_cast<double*>(V_aaaa.data()), nullptr, nullptr, C_casci);
     // Generate determinant basis for RDM calculation
     dets = macis::generate_hilbert_space<typename generator_t::full_det_t>(
         num_molecular_orbitals, nalpha, nbeta);
@@ -69,10 +69,10 @@ struct cas_helper {
     // Build Hamiltonian generator and delegate wavefunction construction via
     // unified builder
     generator_t ham_gen(macis::matrix_span<double>(
-                            const_cast<double*>(T.data()),
+                            const_cast<double*>(T_a.data()),
                             num_molecular_orbitals, num_molecular_orbitals),
                         macis::rank4_span<double>(
-                            const_cast<double*>(V.data()),
+                            const_cast<double*>(V_aaaa.data()),
                             num_molecular_orbitals, num_molecular_orbitals,
                             num_molecular_orbitals, num_molecular_orbitals));
 

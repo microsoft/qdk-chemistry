@@ -61,7 +61,6 @@ class MP2Calculator : public DynamicalCorrelationCalculator {
       std::shared_ptr<data::Ansatz> ansatz) const override;
 
  public:
-  // Static helper methods for computing T2 amplitudes
   /**
    * @brief Compute same-spin (antisymmetric) T2 amplitudes
    *
@@ -132,7 +131,6 @@ class MP2Calculator : public DynamicalCorrelationCalculator {
                                     Eigen::VectorXd& t2,
                                     double* energy = nullptr);
 
- private:
   /**
    * @brief Calculate restricted MP2 correlation energy
    *
@@ -142,7 +140,7 @@ class MP2Calculator : public DynamicalCorrelationCalculator {
    * case)
    * @return MP2 correlation energy
    */
-  double _calculate_restricted_mp2_energy(
+  double calculate_restricted_mp2_energy(
       std::shared_ptr<qdk::chemistry::data::Hamiltonian> ham,
       std::shared_ptr<qdk::chemistry::data::Orbitals> orbitals,
       size_t n_occ) const;
@@ -156,7 +154,7 @@ class MP2Calculator : public DynamicalCorrelationCalculator {
    * @param n_beta Number of beta electrons
    * @return Total MP2 correlation energy
    */
-  double _calculate_unrestricted_mp2_energy(
+  double calculate_unrestricted_mp2_energy(
       std::shared_ptr<qdk::chemistry::data::Hamiltonian> ham,
       std::shared_ptr<qdk::chemistry::data::Orbitals> orbitals, size_t n_alpha,
       size_t n_beta) const;

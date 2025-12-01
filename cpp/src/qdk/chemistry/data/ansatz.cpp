@@ -102,11 +102,12 @@ double Ansatz::calculate_energy() const {
         _wavefunction->get_active_one_rdm_spin_traced());
 
     // get integrals from hamiltonian
-    const auto& [h1, h1_b] = _hamiltonian->get_one_body_integrals();
+    const auto& [h1_a, h1_b] = _hamiltonian->get_one_body_integrals();
     // get_two_body_integrals returns (aaaa, aabb, bbbb) tuple
     const auto& [h2_aaaa, h2_aabb, h2_bbbb] =
         _hamiltonian->get_two_body_integrals();
-    // For restricted case, all components are the same; use aaaa
+    // For restricted case, all components are the same; use a and aaaa
+    const auto& h1 = h1_a;
     const auto& h2 = h2_aaaa;
 
     // check that active space indices are consistent

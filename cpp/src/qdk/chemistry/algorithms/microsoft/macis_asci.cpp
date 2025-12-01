@@ -49,8 +49,8 @@ struct asci_helper {
 
     const size_t num_molecular_orbitals = active_indices.size();
 
-    const auto& [T, T_b] = hamiltonian.get_one_body_integrals();
-    const auto& [V, V_aabb, V_bbbb] = hamiltonian.get_two_body_integrals();
+    const auto& [T_a, T_b] = hamiltonian.get_one_body_integrals();
+    const auto& [V_aaaa, V_aabb, V_bbbb] = hamiltonian.get_two_body_integrals();
 
     // get settings
     macis::MCSCFSettings mcscf_settings = get_mcscf_settings_(settings_);
@@ -61,10 +61,10 @@ struct asci_helper {
     double E_casci = 0.0;
 
     generator_t ham_gen(macis::matrix_span<double>(
-                            const_cast<double*>(T.data()),
+                            const_cast<double*>(T_a.data()),
                             num_molecular_orbitals, num_molecular_orbitals),
                         macis::rank4_span<double>(
-                            const_cast<double*>(V.data()),
+                            const_cast<double*>(V_aaaa.data()),
                             num_molecular_orbitals, num_molecular_orbitals,
                             num_molecular_orbitals, num_molecular_orbitals));
     // HF Guess

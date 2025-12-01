@@ -79,32 +79,6 @@ class TestHamiltonianConstructor : public HamiltonianConstructor {
   }
 };
 
-double _calculate_restricted_mp2_energy_algorithm(
-    std::shared_ptr<Hamiltonian> ham,
-    std::shared_ptr<Wavefunction> wavefunction, double reference_energy) {
-  // Create ansatz from Hamiltonian and wavefunction
-  auto ansatz = std::make_shared<Ansatz>(*ham, *wavefunction);
-
-  auto mp2_calculator =
-      DynamicalCorrelationCalculatorFactory::create("qdk_mp2_calculator");
-
-  auto [rmp2_total_energy, final_wavefunction] = mp2_calculator->run(ansatz);
-  return rmp2_total_energy;
-}
-
-double _calculate_unrestricted_mp2_energy_algorithm(
-    std::shared_ptr<Hamiltonian> ham,
-    std::shared_ptr<Wavefunction> wavefunction, double reference_energy) {
-  // Create ansatz from Hamiltonian and wavefunction
-  auto ansatz = std::make_shared<Ansatz>(*ham, *wavefunction);
-
-  auto mp2_calculator =
-      DynamicalCorrelationCalculatorFactory::create("qdk_mp2_calculator");
-
-  auto [ump2_total_energy, final_wavefunction] = mp2_calculator->run(ansatz);
-  return ump2_total_energy;
-}
-
 TEST_F(HamiltonianTest, Constructor) {
   // Test the constructor with all required data
   Hamiltonian h(one_body, two_body, orbitals, core_energy, inactive_fock);
@@ -1188,11 +1162,12 @@ TEST_F(HamiltonianTest, IntegralSymmetriesEnergiesO2Singlet) {
   auto ham_factory = HamiltonianConstructorFactory::create("qdk");
   auto rhf_hamiltonian = ham_factory->run(rhf_orbitals);
 
-  // Calculate restricted MP2 energy using algorithms
-  auto [n_alpha_active, n_beta_active] =
-      rhf_wavefunction->get_active_num_electrons();
-  double rmp2_energy = _calculate_restricted_mp2_energy_algorithm(
-      rhf_hamiltonian, rhf_wavefunction, rhf_energy);
+  // Calculate restricted MP2 energy using factory
+  auto rhf_ansatz =
+      std::make_shared<Ansatz>(*rhf_hamiltonian, *rhf_wavefunction);
+  auto mp2_calculator =
+      DynamicalCorrelationCalculatorFactory::create("qdk_mp2_calculator");
+  auto [rmp2_energy, rhf_mp2_wavefunction] = mp2_calculator->run(rhf_ansatz);
 
   // Create unrestricted orbitals from restricted ones
   // Get restricted coefficients and energies
@@ -1215,7 +1190,7 @@ TEST_F(HamiltonianTest, IntegralSymmetriesEnergiesO2Singlet) {
   // Create unrestricted Hamiltonian
   auto uhf_hamiltonian = ham_factory->run(unrestricted_orbitals);
 
-  // Calculate unrestricted MP2 energy
+  // Calculate unrestricted MP2 energy using factory
   // Need to create a UHF wavefunction with the unrestricted orbitals
   // Get the determinant from the RHF wavefunction
   const auto& rhf_sd_container =
@@ -1229,8 +1204,12 @@ TEST_F(HamiltonianTest, IntegralSymmetriesEnergiesO2Singlet) {
   auto uhf_wavefunction =
       std::make_shared<Wavefunction>(std::move(uhf_container));
 
-  double ump2_energy = _calculate_unrestricted_mp2_energy_algorithm(
-      uhf_hamiltonian, uhf_wavefunction, rhf_energy);
+  auto uhf_ansatz =
+      std::make_shared<Ansatz>(*uhf_hamiltonian, *uhf_wavefunction);
+  auto [ump2_total_energy, uhf_mp2_wavefunction] =
+      mp2_calculator->run(uhf_ansatz);
+  double ump2_correlation = ump2_total_energy - rhf_energy;
+  double ump2_energy = rhf_energy + ump2_correlation;
 
   // MP2 energies should be identical for RMP2/UMP2
   EXPECT_NEAR(rmp2_energy, ump2_energy, tolerance)

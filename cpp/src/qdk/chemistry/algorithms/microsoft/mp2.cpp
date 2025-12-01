@@ -44,8 +44,8 @@ std::pair<double, std::shared_ptr<data::Wavefunction>> MP2Calculator::_run_impl(
   bool use_unrestricted = hamiltonian->is_unrestricted() || (n_alpha != n_beta);
 
   if (use_unrestricted) {
-    E_corr = _calculate_unrestricted_mp2_energy(hamiltonian, orbitals, n_alpha,
-                                                n_beta);
+    E_corr = calculate_unrestricted_mp2_energy(hamiltonian, orbitals, n_alpha,
+                                               n_beta);
   } else {
     // For restricted case, use number of occupied orbitals (doubly occupied)
     if (n_alpha != n_beta) {
@@ -53,7 +53,7 @@ std::pair<double, std::shared_ptr<data::Wavefunction>> MP2Calculator::_run_impl(
           "Restricted MP2 requires equal alpha and beta electrons");
     }
 
-    E_corr = _calculate_restricted_mp2_energy(hamiltonian, orbitals, n_alpha);
+    E_corr = calculate_restricted_mp2_energy(hamiltonian, orbitals, n_alpha);
   }
 
   // Create MP2Container
@@ -69,7 +69,7 @@ std::pair<double, std::shared_ptr<data::Wavefunction>> MP2Calculator::_run_impl(
   return std::make_pair(total_energy, mp2_wavefunction);
 }
 
-double MP2Calculator::_calculate_restricted_mp2_energy(
+double MP2Calculator::calculate_restricted_mp2_energy(
     std::shared_ptr<qdk::chemistry::data::Hamiltonian> ham,
     std::shared_ptr<qdk::chemistry::data::Orbitals> orbitals,
     size_t n_occ) const {
@@ -132,7 +132,7 @@ double MP2Calculator::_calculate_restricted_mp2_energy(
   return E_MP2;
 }
 
-double MP2Calculator::_calculate_unrestricted_mp2_energy(
+double MP2Calculator::calculate_unrestricted_mp2_energy(
     std::shared_ptr<qdk::chemistry::data::Hamiltonian> ham,
     std::shared_ptr<qdk::chemistry::data::Orbitals> orbitals, size_t n_alpha,
     size_t n_beta) const {
