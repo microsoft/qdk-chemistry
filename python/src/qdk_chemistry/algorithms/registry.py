@@ -113,14 +113,13 @@ class _TelemetryWrapper:
 
             # Only extract molecular data for algorithms that return it
             try:
-                mol_formula, n_basis = telemetry_events.extract_data(result)
+                n_basis = telemetry_events.extract_data(result)
                 telemetry_events.on_algorithm_end(
                     algorithm_type=algorithm_type,
                     algorithm_name=algorithm_name,
                     duration_sec=duration,
                     status="success",
                     num_basis_functions=n_basis,
-                    molecular_formula=mol_formula
                 )
             except (AttributeError, TypeError, IndexError):
                 # If we can't extract molecular data, just log basic telemetry
