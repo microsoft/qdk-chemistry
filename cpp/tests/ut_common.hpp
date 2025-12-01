@@ -49,7 +49,7 @@ inline static constexpr double small_value_lower_bound_tolerance = 1e-16;
 inline static constexpr double small_value_upper_bound_tolerance = 1e-14;
 
 ///@brief Tolerance for per-element double comparisons
-inline static constexpr double double_tolerance = 1e-10;
+inline static constexpr double double_tolerance = 1e-13;
 
 using namespace qdk::chemistry::data;
 
