@@ -12,6 +12,7 @@ from qsharp import BitFlipNoise, DepolarizingNoise, PauliNoise, PhaseFlipNoise
 from qsharp.openqasm import run
 
 from qdk_chemistry.algorithms.energy_estimator.energy_estimator import (
+    Circuit,
     EnergyEstimator,
     compute_energy_expectation_from_bitstrings,
     create_measurement_circuits,
@@ -49,13 +50,13 @@ class QDKEnergyEstimator(EnergyEstimator):
 
     def _run_measurement_circuits_and_get_bitstring_counts(
         self,
-        measurement_circuits: list[str],
+        measurement_circuits: list[Circuit],
         shots_list: list[int],
     ) -> list[dict[str, int]]:
         """Run the measurement circuits and return the bitstring counts.
 
         Args:
-            measurement_circuits: A list of measurement circuits in OpenQASM3 format to run.
+            measurement_circuits: A list of Circuits that provide measurement circuits in OpenQASM3 format to run.
             shots_list: A list of shots allocated for each measurement circuit.
 
         Returns:
@@ -63,9 +64,9 @@ class QDKEnergyEstimator(EnergyEstimator):
 
         """
         all_bitstring_counts: list[dict[str, int]] = []
-        for circuit_qasm, shots in zip(measurement_circuits, shots_list, strict=True):
+        for circuit, shots in zip(measurement_circuits, shots_list, strict=True):
             result = run(
-                circuit_qasm,
+                circuit.get_circuit_qasm(),
                 shots=shots,
                 noise=self.noise_model,
                 qubit_loss=self.qubit_loss,
@@ -80,7 +81,7 @@ class QDKEnergyEstimator(EnergyEstimator):
 
     def _get_measurement_data(
         self,
-        measurement_circuits: list[str],
+        measurement_circuits: list[Circuit],
         qubit_hamiltonians: list[QubitHamiltonian],
         shots_list: list[int],
     ) -> MeasurementData:
@@ -100,7 +101,7 @@ class QDKEnergyEstimator(EnergyEstimator):
 
     def _run_impl(
         self,
-        circuit_qasm: str,
+        circuit: Circuit,
         qubit_hamiltonians: list[QubitHamiltonian],
         total_shots: int,
         classical_coeffs: list | None = None,
@@ -108,7 +109,7 @@ class QDKEnergyEstimator(EnergyEstimator):
         """Estimate the expectation value and variance of Hamiltonians.
 
         Args:
-            circuit_qasm: OpenQASM3 string of the quantum circuit to be evaluated.
+            circuit: Circuit that provides an OpenQASM3 string of the quantum circuit to be evaluated.
             qubit_hamiltonians: List of ``QubitHamiltonian`` to estimate.
             total_shots: Total number of shots to allocate across the observable terms.
             classical_coeffs: Optional list of coefficients for classical Pauli terms to calculate energy offset.
@@ -136,13 +137,13 @@ class QDKEnergyEstimator(EnergyEstimator):
         energy_offset = sum(classical_coeffs) if classical_coeffs else 0.0
 
         # Create measurement circuits
-        measurement_circuits_qasm = create_measurement_circuits(
-            circuit_qasm=circuit_qasm,
+        measurement_circuits = create_measurement_circuits(
+            circuit=circuit,
             grouped_hamiltonians=qubit_hamiltonians,
         )
 
         measurement_data = self._get_measurement_data(
-            measurement_circuits=measurement_circuits_qasm,
+            measurement_circuits=measurement_circuits,
             qubit_hamiltonians=qubit_hamiltonians,
             shots_list=shots_list,
         )

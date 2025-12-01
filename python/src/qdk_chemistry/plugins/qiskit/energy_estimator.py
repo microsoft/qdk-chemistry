@@ -32,7 +32,7 @@ from qdk_chemistry.algorithms.energy_estimator import (
     compute_energy_expectation_from_bitstrings,
     create_measurement_circuits,
 )
-from qdk_chemistry.data import EnergyExpectationResult, MeasurementData, QubitHamiltonian
+from qdk_chemistry.data import Circuit, EnergyExpectationResult, MeasurementData, QubitHamiltonian
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -120,7 +120,7 @@ class QiskitEnergyEstimator(EnergyEstimator):
 
     def _run_impl(
         self,
-        circuit_qasm: str,
+        circuit: Circuit,
         qubit_hamiltonians: list[QubitHamiltonian],
         total_shots: int,
         classical_coeffs: list | None = None,
@@ -128,7 +128,7 @@ class QiskitEnergyEstimator(EnergyEstimator):
         """Estimate the expectation value and variance of Hamiltonians.
 
         Args:
-            circuit_qasm: OpenQASM3 string of the quantum circuit to be evaluated.
+            circuit: Circuit that provides an OpenQASM3 string of the quantum circuit to be evaluated.
             qubit_hamiltonians: A list of ``QubitHamiltonian`` to estimate.
             total_shots: Total number of shots to allocate across Hamiltonian terms.
             classical_coeffs: Optional list of coefficients for classical Pauli terms to calculate energy offset.
@@ -168,21 +168,21 @@ class QiskitEnergyEstimator(EnergyEstimator):
             basis_gates = self.backend.options.noise_model.basis_gates
 
         # Create measurement circuits
-        measurement_circuits_qasm = create_measurement_circuits(
-            circuit_qasm=circuit_qasm,
+        measurement_circuits = create_measurement_circuits(
+            circuit=circuit,
             grouped_hamiltonians=qubit_hamiltonians,
         )
 
         # Load and optionally transpile circuits into basis gates defined by noise model
-        measurement_circuits = []
-        for qasm in measurement_circuits_qasm:
-            circuit = qasm3.loads(qasm)
+        measurement_circuits_qiskit = []
+        for measurement_circuit in measurement_circuits:
+            circuit = qasm3.loads(measurement_circuit.get_circuit_qasm())
             if basis_gates is not None:
                 circuit = transpile(circuit, basis_gates=basis_gates)
-            measurement_circuits.append(circuit)
+            measurement_circuits_qiskit.append(circuit)
 
         measurement_data = self._get_measurement_data(
-            measurement_circuits=measurement_circuits,
+            measurement_circuits=measurement_circuits_qiskit,
             qubit_hamiltonians=qubit_hamiltonians,
             shots_list=shots_list,
         )

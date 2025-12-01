@@ -9,12 +9,13 @@ from itertools import combinations
 
 import numpy as np
 import pytest
-from qiskit import QuantumCircuit, qasm3, transpile
+from qiskit import qasm3, transpile
 from qiskit_aer import AerSimulator
 from qiskit_aer.primitives import EstimatorV2 as AerEstimator
 
 from qdk_chemistry.algorithms import create
 from qdk_chemistry.algorithms.state_preparation.sparse_isometry import _prepare_single_reference_state
+from qdk_chemistry.data import Circuit
 
 from .reference_tolerances import float_comparison_absolute_tolerance, float_comparison_relative_tolerance
 
@@ -33,8 +34,8 @@ def test_energy_agreement_between_state_prep_methods(wavefunction_4e4o, hamilton
         "state_prep", algorithm_name="regular_isometry", transpile_optimization_level=1, basis_gates=basis_gates
     )
 
-    sparse_gf2x_circuit = qasm3.loads(sparse_prep_gf2x.run(wavefunction_4e4o))
-    regular_circuit = qasm3.loads(regular_prep.run(wavefunction_4e4o))
+    sparse_gf2x_circuit = qasm3.loads(sparse_prep_gf2x.run(wavefunction_4e4o).get_circuit_qasm())
+    regular_circuit = qasm3.loads(regular_prep.run(wavefunction_4e4o).get_circuit_qasm())
 
     # Create estimator and calculate energy for both circuits
     estimator = AerEstimator()
@@ -66,7 +67,7 @@ def test_sparse_isometry_gf2x_energy_validation(wavefunction_10e6o, hamiltonian_
     )
 
     # Create circuit qasm and convert to QuantumCircuit
-    circuit = qasm3.loads(sparse_prep.run(wavefunction_10e6o))
+    circuit = qasm3.loads(sparse_prep.run(wavefunction_10e6o).get_circuit_qasm())
 
     # Calculate circuit energy using the estimator
     estimator = AerEstimator()
@@ -101,8 +102,8 @@ def test_sparse_isometry_gf2x_circuit_efficiency(wavefunction_4e4o):
     )
 
     # Create circuits using both methods
-    transpiled_sparse_circuit = qasm3.loads(sparse_prep.run(wavefunction_4e4o))
-    transpiled_regular_circuit = qasm3.loads(regular_prep.run(wavefunction_4e4o))
+    transpiled_sparse_circuit = qasm3.loads(sparse_prep.run(wavefunction_4e4o).get_circuit_qasm())
+    transpiled_regular_circuit = qasm3.loads(regular_prep.run(wavefunction_4e4o).get_circuit_qasm())
 
     # Compare circuit metrics
     sparse_depth = transpiled_sparse_circuit.depth()
@@ -121,7 +122,7 @@ def test_sparse_isometry_gf2x_circuit_efficiency(wavefunction_4e4o):
     )
 
 
-def get_bitstring(circuit: QuantumCircuit) -> str:
+def get_bitstring(circuit: Circuit) -> str:
     """Get the measurement result bitstring from a quantum circuit.
 
     Args:
@@ -132,7 +133,7 @@ def get_bitstring(circuit: QuantumCircuit) -> str:
 
     """
     # Add measurements
-    meas_circuit = qasm3.loads(circuit)
+    meas_circuit = qasm3.loads(circuit.get_circuit_qasm())
     meas_circuit.measure_all()
 
     # Simulate

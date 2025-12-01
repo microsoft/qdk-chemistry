@@ -84,9 +84,10 @@ class DataClass(_CoreDataClass):
         Return a dictionary representation suitable for JSON serialization
     3. to_hdf5(group: h5py.Group) -> None
         Write the object's data to an HDF5 group
-    4. to_file(filename: str, format_type: str) -> None
-        Save the object to a file with the specified format
-        (default implementation provided, but can be overridden)
+    4. from_json(json_data: dict[str, Any]) -> DataClass
+        Create an instance from a JSON dictionary
+    5. from_hdf5(group: h5py.Group) -> DataClass
+        Load an instance from an HDF5 group.
 
     Derived classes should:
 

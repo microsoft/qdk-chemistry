@@ -90,7 +90,7 @@ E_sparse, sparse_wavefunction = pmc.run(
 )
 
 sparse_state_prep = create("state_prep", algorithm_name="sparse_isometry_gf2x")
-state_prep = qasm3.loads(sparse_state_prep.run(sparse_wavefunction))
+state_prep = qasm3.loads(sparse_state_prep.run(sparse_wavefunction).get_circuit_qasm())
 state_prep = transpile(
     state_prep,
     basis_gates=["cx", "rz", "h", "x", "s", "sdg"],

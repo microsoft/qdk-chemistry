@@ -5,14 +5,16 @@ structures, basis sets, wavefunctions, and computational settings. It serves as 
 primary interface for managing quantum chemical data within the QDK/Chemistry framework.
 
 Classes:
+    AOType
+        Enumeration of basis set types (STO-3G, 6-31G, etc.).
     Ansatz
         Quantum chemical ansatz combining a Hamiltonian and wavefunction for energy calculations.
     BasisSet
         Gaussian basis set definitions for quantum calculations.
-    AOType
-        Enumeration of basis set types (STO-3G, 6-31G, etc.).
     CasWavefunctionContainer
         Complete Active Space (CAS) wavefunction with CI coefficients and determinants.
+    Circuit
+        Quantum circuit information.
     Configuration
         Electronic configuration state information.
     CoupledClusterAmplitudes
@@ -100,6 +102,7 @@ from qdk_chemistry._core.data import (
     WavefunctionType,
 )
 from qdk_chemistry.data.base import DataClass
+from qdk_chemistry.data.circuit import Circuit
 from qdk_chemistry.data.estimator_data import EnergyExpectationResult, MeasurementData
 from qdk_chemistry.data.qpe_result import QpeResult
 from qdk_chemistry.data.qubit_hamiltonian import QubitHamiltonian
@@ -114,6 +117,7 @@ __all__ = [
     "Ansatz",
     "BasisSet",
     "CasWavefunctionContainer",
+    "Circuit",
     "Configuration",
     "CoupledClusterAmplitudes",
     "DataClass",

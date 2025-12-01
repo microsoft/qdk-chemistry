@@ -1,4 +1,4 @@
-"""QDK/Chemistry Qubit Hamiltonian Module.
+"""QDK/Chemistry data class for qubit Hamiltonians.
 
 This module provides the QubitHamiltonian dataclass for electronic structure problems. It bridges fermionic Hamiltonians
 and quantum circuit construction or measurement workflows.

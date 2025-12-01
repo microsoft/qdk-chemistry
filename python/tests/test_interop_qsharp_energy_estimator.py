@@ -10,6 +10,7 @@ import pytest
 from qsharp import BitFlipNoise, DepolarizingNoise, PauliNoise
 
 from qdk_chemistry.algorithms.energy_estimator import QDKEnergyEstimator
+from qdk_chemistry.data import Circuit
 from qdk_chemistry.data.qubit_hamiltonian import QubitHamiltonian, filter_and_group_pauli_ops_from_wavefunction
 
 from .reference_tolerances import (
@@ -23,7 +24,7 @@ from .reference_tolerances import (
 def circuit_4e4o(test_data_files_path):
     """Fixture to create the test circuit for 4e4o ethylene problem."""
     with open(test_data_files_path / "4e4o-ethylene_2det-can-7967f80e_2_1.qasm") as f:
-        return f.read()
+        return Circuit(circuit_qasm=f.read())
 
 
 class TestQSharpEnergyEstimator:
@@ -74,6 +75,7 @@ class TestQSharpEnergyEstimator:
         h q[0];
         cx q[0], q[1];
         """
+        circuit = Circuit(circuit_qasm=circuit_qasm)
 
         simple_observable = [
             QubitHamiltonian(["ZZ"], np.array([2])),
@@ -83,7 +85,7 @@ class TestQSharpEnergyEstimator:
 
         estimator = QDKEnergyEstimator()
         with pytest.raises(ValueError, match=r"Total shots .* is less than the number of observables .*"):
-            estimator.run(circuit_qasm, simple_observable, total_shots=1)  # Only 1 shot for 3 observables
+            estimator.run(circuit, simple_observable, total_shots=1)  # Only 1 shot for 3 observables
 
     def test_simulate_with_noise(self):
         """Test estimator with different noise models."""
@@ -92,13 +94,14 @@ class TestQSharpEnergyEstimator:
         qubit[2] q;
         x q[0];
         """
+        circuit = Circuit(circuit_qasm=circuit_qasm)
 
         simple_observable = [QubitHamiltonian(["ZZ"], np.array([1]))]
         expected_expectation_noiseless = -1.0  # expected value is -1
 
         # Test without noise
         noiseless_estimator = QDKEnergyEstimator()
-        noiseless_results, _ = noiseless_estimator.run(circuit_qasm, simple_observable, total_shots=10000)
+        noiseless_results, _ = noiseless_estimator.run(circuit, simple_observable, total_shots=10000)
 
         # Verify noiseless case is close to theoretical value
         noiseless_error = abs(noiseless_results.energy_expectation_value - expected_expectation_noiseless)
@@ -113,7 +116,7 @@ class TestQSharpEnergyEstimator:
             atol=float_comparison_absolute_tolerance,
             rtol=float_comparison_relative_tolerance,
         )
-        qubit_loss_results, _ = qubit_loss_estimator.run(circuit_qasm, simple_observable, total_shots=10000)
+        qubit_loss_results, _ = qubit_loss_estimator.run(circuit, simple_observable, total_shots=10000)
         qubit_loss_error = abs(qubit_loss_results.energy_expectation_value - expected_expectation_noiseless)
         assert qubit_loss_error > noiseless_error
 
@@ -126,7 +129,7 @@ class TestQSharpEnergyEstimator:
 
         for noise_model in noise_models:
             noisy_estimator = QDKEnergyEstimator(noise_model=noise_model)
-            noisy_results, _ = noisy_estimator.run(circuit_qasm, simple_observable, total_shots=10000)
+            noisy_results, _ = noisy_estimator.run(circuit, simple_observable, total_shots=10000)
             noisy_error = abs(noisy_results.energy_expectation_value - expected_expectation_noiseless)
 
             # Noise should increase the error (with some tolerance for statistical fluctuations)
@@ -140,11 +143,12 @@ class TestQSharpEnergyEstimator:
         h q[0];
         cx q[0], q[1];
         """
+        circuit = Circuit(circuit_qasm=circuit_qasm)
 
         simple_observable = [QubitHamiltonian(["ZZ"], np.array([1])), QubitHamiltonian(["IX"], np.array([1]))]
 
         estimator = QDKEnergyEstimator()
-        _, measurement_data = estimator.run(circuit_qasm, simple_observable, total_shots=1000)
+        _, measurement_data = estimator.run(circuit, simple_observable, total_shots=1000)
 
         json_file = tmp_path / "test.measurement_data.json"
         measurement_data.to_json_file(json_file)

@@ -24,8 +24,7 @@ from qdk_chemistry.algorithms.energy_estimator.energy_estimator import (
     compute_energy_expectation_from_bitstrings,
     create_measurement_circuits,
 )
-from qdk_chemistry.data import QubitHamiltonian
-from qdk_chemistry.data.estimator_data import MeasurementData
+from qdk_chemistry.data import Circuit, MeasurementData, QubitHamiltonian
 
 from .reference_tolerances import float_comparison_absolute_tolerance, float_comparison_relative_tolerance
 
@@ -144,6 +143,7 @@ def test_create_measurement_circuits_basic():
         x q[0];
         cx q[0], q[1];
         """
+    circuit = Circuit(circuit_qasm=circuit_qasm)
 
     # Define observable
     observable = [
@@ -153,23 +153,24 @@ def test_create_measurement_circuits_basic():
     ]
 
     # Call function
-    circuits = create_measurement_circuits(circuit_qasm, observable)
+    circuits = create_measurement_circuits(circuit, observable)
 
     # There should be one measurement circuit per observable
     assert isinstance(circuits, list)
     assert len(circuits) == 3
-    assert all(isinstance(circ, str) for circ in circuits)
-    assert "measure" in circuits[0]  # Z basis
-    assert circuits[0].count("measure") == 2
-    assert "h q" not in circuits[0]  # No basis change for Z
-    assert "h q" in circuits[1]  # X basis change
-    assert circuits[1].count("h q") == 2  # One H gate added for X basis for each qubit
-    assert circuits[0].count("measure") == 2
-    assert "sdg q" in circuits[2]  # Y basis change
-    assert circuits[2].count("sdg q") == 2  # One Sdg gate added for Y basis for each qubit
-    assert "h q" in circuits[2]  # Y basis change
-    assert circuits[2].count("h q") == 2  # One H gate added for Y basis for each qubit
-    assert circuits[0].count("measure") == 2
+    assert all(isinstance(circ, Circuit) for circ in circuits)
+    assert all(isinstance(circ.get_circuit_qasm(), str) for circ in circuits)
+    assert "measure" in circuits[0].circuit_qasm  # Z basis
+    assert circuits[0].circuit_qasm.count("measure") == 2
+    assert "h q" not in circuits[0].circuit_qasm  # No basis change for Z
+    assert "h q" in circuits[1].circuit_qasm  # X basis change
+    assert circuits[1].circuit_qasm.count("h q") == 2  # One H gate added for X basis for each qubit
+    assert circuits[0].circuit_qasm.count("measure") == 2
+    assert "sdg q" in circuits[2].circuit_qasm  # Y basis change
+    assert circuits[2].circuit_qasm.count("sdg q") == 2  # One Sdg gate added for Y basis for each qubit
+    assert "h q" in circuits[2].circuit_qasm  # Y basis change
+    assert circuits[2].circuit_qasm.count("h q") == 2  # One H gate added for Y basis for each qubit
+    assert circuits[0].circuit_qasm.count("measure") == 2
 
 
 def test_create_measurement_circuits_qubit_mismatch():
@@ -181,6 +182,7 @@ def test_create_measurement_circuits_qubit_mismatch():
         x q[0];
         cx q[0], q[1];
         """
+    circuit = Circuit(circuit_qasm=circuit_qasm)
 
     # Define observable with 3 qubits
     observable = [
@@ -195,7 +197,7 @@ def test_create_measurement_circuits_qubit_mismatch():
             r"the number of qubits in the Hamiltonian \(3\)\."
         ),
     ):
-        create_measurement_circuits(circuit_qasm, observable)
+        create_measurement_circuits(circuit, observable)
 
 
 @pytest.mark.parametrize(
