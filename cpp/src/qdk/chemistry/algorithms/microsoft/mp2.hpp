@@ -39,7 +39,7 @@ class MP2Calculator : public ReferenceDerivedCalculator {
    *
    * @return The algorithm's name
    */
-  std::string name() const override final { return "microsoft_mp2_calculator"; }
+  std::string name() const override final { return "qdk_mp2_calculator"; }
 
  protected:
   /**
@@ -165,6 +165,6 @@ class MP2Calculator : public ReferenceDerivedCalculator {
 /**
  * @brief Factory function to create Microsoft MP2 calculator
  */
-std::unique_ptr<ReferenceDerivedCalculator> make_microsoft_mp2_calculator();
+std::unique_ptr<ReferenceDerivedCalculator> make_qdk_mp2_calculator();
 
 }  // namespace qdk::chemistry::algorithms::microsoft

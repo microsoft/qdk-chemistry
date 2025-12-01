@@ -97,7 +97,7 @@ def create(algorithm_type: str, algorithm_name: str | None = None, **kwargs) -> 
         >>> # Create an SCF solver with custom settings
         >>> scf = registry.create("scf_solver", "pyscf", max_iterations=100, convergence_threshold=1e-8)
         >>> # Create an MP2 calculator
-        >>> mp2_calc = registry.create("reference_derived_calculator", "microsoft_mp2_calculator")
+        >>> mp2_calc = registry.create("reference_derived_calculator", "qdk_mp2_calculator")
         >>> # Create the default reference-derived calculator (MP2)
         >>> default_calc = registry.create("reference_derived_calculator")
 

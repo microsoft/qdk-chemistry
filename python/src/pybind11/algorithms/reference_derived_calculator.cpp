@@ -71,7 +71,7 @@ Examples:
   >>> ansatz = qdk.chemistry.data.Ansatz(hamiltonian, wavefunction)
   >>>
   >>> # Create calculator (e.g., MP2) using the registry
-  >>> calculator = qdk.chemistry.algorithms.create("reference_derived_calculator", "microsoft_mp2_calculator")
+  >>> calculator = qdk.chemistry.algorithms.create("reference_derived_calculator", "qdk_mp2_calculator")
   >>>
   >>> # Run calculation
   >>> total_energy, result_wavefunction = calculator.run(ansatz)

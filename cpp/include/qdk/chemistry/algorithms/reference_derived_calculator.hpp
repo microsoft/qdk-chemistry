@@ -95,9 +95,7 @@ struct ReferenceDerivedCalculatorFactory
     return "reference_derived_calculator";
   }
   static void register_default_instances();
-  static std::string default_algorithm_name() {
-    return "microsoft_mp2_calculator";
-  }
+  static std::string default_algorithm_name() { return "qdk_mp2_calculator"; }
 };
 
 }  // namespace qdk::chemistry::algorithms

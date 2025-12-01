@@ -86,7 +86,7 @@ double _calculate_restricted_mp2_energy_algorithm(
   auto ansatz = std::make_shared<Ansatz>(*ham, *wavefunction);
 
   auto mp2_calculator =
-      ReferenceDerivedCalculatorFactory::create("microsoft_mp2_calculator");
+      ReferenceDerivedCalculatorFactory::create("qdk_mp2_calculator");
 
   auto [rmp2_total_energy, final_wavefunction] = mp2_calculator->run(ansatz);
   return rmp2_total_energy;
@@ -99,7 +99,7 @@ double _calculate_unrestricted_mp2_energy_algorithm(
   auto ansatz = std::make_shared<Ansatz>(*ham, *wavefunction);
 
   auto mp2_calculator =
-      ReferenceDerivedCalculatorFactory::create("microsoft_mp2_calculator");
+      ReferenceDerivedCalculatorFactory::create("qdk_mp2_calculator");
 
   auto [ump2_total_energy, final_wavefunction] = mp2_calculator->run(ansatz);
   return ump2_total_energy;

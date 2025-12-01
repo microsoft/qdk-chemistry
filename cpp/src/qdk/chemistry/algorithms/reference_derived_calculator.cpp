@@ -12,7 +12,7 @@ namespace qdk::chemistry::algorithms {
 /**
  * @brief Factory function to create Microsoft MP2 calculator
  */
-std::unique_ptr<ReferenceDerivedCalculator> make_microsoft_mp2_calculator() {
+std::unique_ptr<ReferenceDerivedCalculator> make_qdk_mp2_calculator() {
   return std::make_unique<
       qdk::chemistry::algorithms::microsoft::MP2Calculator>();
 }
@@ -21,8 +21,7 @@ std::unique_ptr<ReferenceDerivedCalculator> make_microsoft_mp2_calculator() {
  */
 void ReferenceDerivedCalculatorFactory::register_default_instances() {
   // Register MP2 algorithms
-  ReferenceDerivedCalculatorFactory::register_instance(
-      make_microsoft_mp2_calculator);
+  ReferenceDerivedCalculatorFactory::register_instance(make_qdk_mp2_calculator);
 }
 
 }  // namespace qdk::chemistry::algorithms

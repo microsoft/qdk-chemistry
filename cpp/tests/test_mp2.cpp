@@ -56,7 +56,7 @@ TEST_F(MP2Test, UMP2Energies_CCPVDZ) {
   auto ansatz = std::make_shared<Ansatz>(*hf_hamiltonian, *hf_wavefunction);
 
   auto mp2_calculator =
-      ReferenceDerivedCalculatorFactory::create("microsoft_mp2_calculator");
+      ReferenceDerivedCalculatorFactory::create("qdk_mp2_calculator");
 
   auto [mp2_total_energy, final_wavefunction] = mp2_calculator->run(ansatz);
 
@@ -105,7 +105,7 @@ TEST_F(MP2Test, RMP2Energies_CCPVDZ) {
 
   // Use MP2 calculator
   auto mp2_calculator =
-      ReferenceDerivedCalculatorFactory::create("microsoft_mp2_calculator");
+      ReferenceDerivedCalculatorFactory::create("qdk_mp2_calculator");
 
   // MP2 returns total energy, subtract reference to get correlation energy
   auto [mp2_total_energy, final_wavefunction] = mp2_calculator->run(ansatz);
