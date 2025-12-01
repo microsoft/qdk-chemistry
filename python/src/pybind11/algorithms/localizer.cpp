@@ -138,6 +138,15 @@ Examples:
 
 )");
 
+  localizer.def("name", &Localizer::name,
+                R"(
+The algorithm's name.
+
+Returns:
+    str: The name of the algorithm
+
+)");
+
   localizer.def("type_name", &Localizer::type_name,
                 R"(
 The algorithm's type name.

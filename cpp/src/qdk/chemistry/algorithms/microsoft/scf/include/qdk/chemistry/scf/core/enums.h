@@ -80,4 +80,11 @@ enum class DensityInitializationMethod {
   File,          ///< User-provided density matrix (file)
   Atom,          ///< Atom-by-atom guess
 };
+
+/// An enum to classify the available SCF algorithm methods
+enum class SCFAlgorithmName {
+  DIIS,     ///< DIIS (Direct Inversion in Iterative Subspace) only
+  GDM,      ///< GDM (Geometric Direct Minimization) only
+  DIIS_GDM  ///< DIIS followed by GDM when convergence criteria are met
+};
 }  // namespace qdk::chemistry::scf

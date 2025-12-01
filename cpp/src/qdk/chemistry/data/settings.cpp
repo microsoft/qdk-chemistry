@@ -905,6 +905,22 @@ nlohmann::json Settings::convert_setting_value_to_json(
           for (const auto& elem : variant_value) {
             json_array.push_back(elem);
           }
+          // For empty arrays, add type metadata to preserve type information
+          if (json_array.empty()) {
+            nlohmann::json typed_array = nlohmann::json::object();
+            typed_array["__type__"] = "array";
+            if constexpr (std::is_same_v<ValueType, std::vector<int64_t>>) {
+              typed_array["__element_type__"] = "int64";
+            } else if constexpr (std::is_same_v<ValueType,
+                                                std::vector<double>>) {
+              typed_array["__element_type__"] = "double";
+            } else if constexpr (std::is_same_v<ValueType,
+                                                std::vector<std::string>>) {
+              typed_array["__element_type__"] = "string";
+            }
+            typed_array["__value__"] = json_array;
+            return typed_array;
+          }
           return json_array;
         } else {
           return nlohmann::json(variant_value);
@@ -923,6 +939,20 @@ SettingValue Settings::convert_json_to_setting_value(
     return json_obj.get<double>();
   } else if (json_obj.is_string()) {
     return json_obj.get<std::string>();
+  } else if (json_obj.is_object() && json_obj.contains("__type__") &&
+             json_obj["__type__"] == "array") {
+    // Handle typed empty arrays
+    std::string elem_type = json_obj["__element_type__"];
+    if (elem_type == "int64") {
+      return std::vector<int64_t>();
+    } else if (elem_type == "double") {
+      return std::vector<double>();
+    } else if (elem_type == "string") {
+      return std::vector<std::string>();
+    } else {
+      throw std::runtime_error("Unsupported typed array element type: " +
+                               elem_type);
+    }
   } else if (json_obj.is_array()) {
     if (json_obj.empty()) {
       return std::vector<int64_t>();  // Default to int64_t vector for empty
@@ -1258,6 +1288,9 @@ void Settings::_to_hdf5_file(const std::string& filename) const {
 
 std::shared_ptr<Settings> Settings::_from_hdf5_file(
     const std::string& filename) {
+  // Disable HDF5 automatic error printing to stderr
+  H5::Exception::dontPrint();
+
   H5::H5File file;
   try {
     file.openFile(filename, H5F_ACC_RDONLY);

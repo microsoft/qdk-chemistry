@@ -9,7 +9,7 @@ It is designed to support multiple backend simulators.
 Overview
 --------
 
-The :class:`~qdk_chemistry.algorithms.EnergyEstimator` evaluates the expectation value of a qubit Hamiltonian with respect to a given quantum circuit.
+The :class:`~qdk_chemistry.algorithms.EnergyEstimator` evaluates the expectation value of a :class:`~qdk_chemistry.data.QubitHamiltonian` with respect to a given quantum circuit.
 It takes a circuit in OpenQASM format with target qubit Hamiltonians, automatically generates the corresponding measurement circuits.
 These circuits are executed on a selected backend simulator with the user-specified number of shots, and the resulting bitstring statistics are used to calculate per-term expectation values and the total energy.
 
@@ -22,22 +22,23 @@ The :class:`~qdk_chemistry.algorithms.EnergyEstimator` provides the following ca
 - **Expectation Value and Variance Calculation**: Computes the energy expectation value and variance for a given quantum circuit and Hamiltonians. It supports multiple Hamiltonians for simultaneous evaluation.
 - **Backend Flexibility**: Allows users to choose between Qsharp and Qiskit backends, each with unique features and configurations, such as noise modeling.
 
-Creating an Energy Estimator
+Creating an energy estimator
 ----------------------------
 
 The :class:`~qdk_chemistry.algorithms.EnergyEstimator` is created using the :doc:`factory pattern <../design/factory_pattern>`.
 
 .. tab:: Python API
 
-   .. literalinclude:: ../../../../examples/energy_estimator.py
+   .. literalinclude:: ../../../_static/examples/python/energy_estimator.py
       :language: python
-      :lines: 3-7,31-32,60-62
+      :start-after: # start-cell-create
+      :end-before: # end-cell-create
 
 
-Configuring the Energy Estimator
+Configuring the energy estimator
 --------------------------------
 
-Qsharp Backend
+Qsharp backend
 ~~~~~~~~~~~~~~
 
 The Qsharp implementation of the :class:`~qdk_chemistry.algorithms.EnergyEstimator` leverages the QDK simulator to execute quantum circuits. Key features include:
@@ -47,11 +48,12 @@ The Qsharp implementation of the :class:`~qdk_chemistry.algorithms.EnergyEstimat
 
 .. tab:: Python API
 
-   .. literalinclude:: ../../../../examples/energy_estimator.py
+   .. literalinclude:: ../../../_static/examples/python/energy_estimator.py
       :language: python
-      :lines: 3-7,40-60
+      :start-after: # start-cell-qdk
+      :end-before: # end-cell-qdk
 
-Qiskit Backend
+Qiskit backend
 ~~~~~~~~~~~~~~~
 
 The Qiskit implementation uses the Aer simulator to execute quantum circuits. Key features include:
@@ -59,12 +61,12 @@ The Qiskit implementation uses the Aer simulator to execute quantum circuits. Ke
 - Support for custom noise models.
 - Support for other configurations of Aer simulator backends.
 
-
 .. tab:: Python API
 
-   .. literalinclude:: ../../../../examples/energy_estimator.py
+   .. literalinclude:: ../../../_static/examples/python/energy_estimator.py
       :language: python
-      :lines: 3-7,70-85
+      :start-after: # start-cell-qiskit
+      :end-before: # end-cell-qiskit
 
 Implemented interface
 ---------------------
@@ -74,20 +76,21 @@ QDK/Chemistry's :class:`~qdk_chemistry.algorithms.EnergyEstimator` provides a un
 QDK/Chemistry implementations
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-- **qdk_base_simulator**: Native implementation with support for Qsharp simulator backends
+- ``qdk_base_simulator``: Native implementation with support for Qsharp simulator backends
 
 Third-party interfaces
 ~~~~~~~~~~~~~~~~~~~~~~
 
-- **qiskit_aer_simulator**: Qiskit Aer simulator backend with customizable noise models and configurations
+- ``qiskit_aer_simulator``: Qiskit Aer simulator backend with customizable noise models and configurations
 
 The factory pattern allows seamless selection between these implementations, with the most appropriate option chosen
 based on the calculation requirements and available packages.
 
 For more details on how QDK/Chemistry interfaces with external packages, see the :doc:`Interfaces <../design/interfaces>` documentation.
 
-Related Topics
---------------
+Further reading
+---------------
 
+- The above examples can be downloaded as a complete `Python <../../../_static/examples/python/energy_estimator.py>`_ script.
 - :doc:`StatePreparation <state_preparation>`: Prepare molecule wavefunctions into quantum circuits.
 - :doc:`QubitMapper <qubit_mapper>`: Prepare qubit Hamiltonians.

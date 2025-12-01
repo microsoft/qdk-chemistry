@@ -134,13 +134,13 @@ sphinx-autosummary: breathe sphinx-api $(SOURCE_DIR)/conf.py $(SOURCE_DIR)/index
 	echo "** Found $$count warnings/errors in the Sphinx autosummary output."; \
 	if [ "$$count" -ne 0 ]; then \
 	    echo "** ERROR: Autosummary warnings detected. Failing build."; \
-	    cat $(SPHINX_SUMMARY_DEBUG); \
+	    echo "** See $(SPHINX_SUMMARY_DEBUG) for more information."; \
 	    exit 1; \
 	fi
 	@if [ -s $(SPHINX_SUMMARY_WARNINGS) ]; then \
 	    filtered_count=$$(grep -E "WARNING|ERROR|CRITICAL" $(SPHINX_SUMMARY_WARNINGS) | wc -l); \
 	    echo "** Found $$filtered_count autosummary warnings. Failing build."; \
-	    cat $(SPHINX_SUMMARY_WARNINGS); \
+	    echo "** See $(SPHINX_SUMMARY_WARNINGS) for more information."; \
 	    exit 1; \
 	fi
 	@echo

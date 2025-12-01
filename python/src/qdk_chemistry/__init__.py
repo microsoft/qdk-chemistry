@@ -280,8 +280,13 @@ def _generate_registry_stubs() -> None:
                     overload_lines.append(f"    algorithm_type: Literal['{algorithm_type}'],")
                     overload_lines.append(f"    algorithm_name: Literal['{algorithm_name}'] | None = None,")
 
-                    for setting_name, setting_type, default in settings:
-                        overload_lines.append(f"    {setting_name}: {setting_type} = {default},")
+                    for setting_name, setting_type, default, _, _ in settings:
+                        if setting_type == "str":
+                            overload_lines.append(f'    {setting_name}: {setting_type} = "{default}",')
+                        elif "int" in setting_type:
+                            overload_lines.append(f'    {setting_name}: int = "{default}",')
+                        else:
+                            overload_lines.append(f"    {setting_name}: {setting_type} = {default},")
 
                     overload_lines.append(f") -> {full_class_path}: ...")
                     overload_lines.append("")
@@ -330,6 +335,12 @@ def _generate_registry_stubs() -> None:
 
 
 if not _DOCS_MODE:
+    # Import plugins to have their content registered in the stubs
+    try:
+        _import_plugins()
+    except (ImportError, AttributeError) as e:
+        warnings.warn(f"Failed to import plugins: {e}", UserWarning, stacklevel=2)
+
     try:
         _generate_stubs_on_first_import()
         del _generate_stubs_on_first_import  # Prevent re-execution
@@ -350,9 +361,3 @@ if not _DOCS_MODE:
             UserWarning,
             stacklevel=2,
         )
-
-    # Import plugins last to avoid circular imports
-    try:
-        _import_plugins()
-    except (ImportError, AttributeError) as e:
-        warnings.warn(f"Failed to import plugins: {e}", UserWarning, stacklevel=2)

@@ -93,19 +93,19 @@ class SettingTypeMismatch : public std::runtime_error {
  *     MySettings() {
  *         // Can only call set_default during construction
  *         set_default("max_iterations", 100);
- *         set_default("tolerance", 1e-6);
+ *         set_default("convergence_threshold", 1e-6);
  *         set_default("method", std::string("default"));
  *     }
  *
  *     // Convenience getters with validation (optional)
  *     int32_t get_max_iterations() const { return
  * get<int32_t>("max_iterations"); } double get_tolerance() const { return
- * get<double>("tolerance"); } std::string get_method() const { return
- * get<std::string>("method"); }
+ * get<double>("convergence_threshold"); } std::string get_method() const {
+ * return get<std::string>("method"); }
  *
  *     // After construction, only existing settings can be modified
  *     void set_max_iterations(int32_t value) { set("max_iterations", value); }
- *     void set_tolerance(double value) { set("tolerance", value); }
+ *     void set_tolerance(double value) { set("convergence_threshold", value); }
  * };
  * ```
  */
@@ -736,6 +736,28 @@ class Settings : public DataClass,
       // Handle integral types - store as int64_t (signed)
       else if constexpr (is_non_bool_integral_v<T>) {
         settings_[key] = static_cast<int64_t>(value);
+        if (description.has_value()) {
+          descriptions_[key] = *description;
+        }
+        if (limit.has_value()) {
+          std::visit(
+              [this, &key](const auto& limit_val) {
+                using LimitValType = std::decay_t<decltype(limit_val)>;
+                if constexpr (std::is_same_v<LimitValType, std::pair<T, T>>) {
+                  limits_[key] =
+                      std::make_pair(static_cast<int64_t>(limit_val.first),
+                                     static_cast<int64_t>(limit_val.second));
+                } else {
+                  std::vector<int64_t> discrete_limits(limit_val.size());
+                  for (size_t idx = 0; idx < limit_val.size(); ++idx) {
+                    discrete_limits[idx] = static_cast<int64_t>(limit_val[idx]);
+                  }
+                  limits_[key] = std::move(discrete_limits);
+                }
+              },
+              *limit);
+        }
+        documented_[key] = documented;
       }
       // Handle integer vector types
       else if constexpr (is_non_bool_integral_vector_v<T>) {
@@ -746,8 +768,26 @@ class Settings : public DataClass,
           // Unsigned integer vectors -> vector<uint64_t>
           settings_[key] = _convert_to_uint64_vector(value);
         }
+        if (description.has_value()) {
+          descriptions_[key] = *description;
+        }
+        if (limit.has_value()) {
+          throw std::invalid_argument(
+              "Limits are not supported for integral vector defaults when "
+              "implicit conversions are required. Use SettingValue types "
+              "directly instead.");
+        }
+        documented_[key] = documented;
       } else {
         settings_[key] = value;
+        if (description.has_value()) {
+          descriptions_[key] = *description;
+        }
+        if (limit.has_value()) {
+          throw std::invalid_argument(
+              "Unsupported limit type for the provided default value");
+        }
+        documented_[key] = documented;
       }
     }
   }

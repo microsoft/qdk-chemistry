@@ -979,6 +979,9 @@ void BasisSet::to_hdf5(H5::Group& group) const {
 
 std::shared_ptr<BasisSet> BasisSet::_from_hdf5_file(
     const std::string& filename) {
+  // Disable HDF5 automatic error printing to stderr
+  H5::Exception::dontPrint();
+
   H5::H5File file;
   try {
     file.openFile(filename, H5F_ACC_RDONLY);
