@@ -1,8 +1,6 @@
-# Copyright (c) Microsoft Corporation.
-# Licensed under the MIT License.
+"""Telemetry module for QDK Chemistry.
 
-"""
-This module sends telemetry directly to Azure Monitor using a similar mechanism and
+Module sends telemetry directly to Azure Monitor using a similar mechanism and
 format to the Azure Monitor OpenTelemetry Python SDK. It only supports custom metrics of
 type "counter" and "histogram" for now. It's goal is to be minimal in size and dependencies,
 and easy to read to understand exactly what data is being sent.
@@ -14,6 +12,11 @@ and when the process is about to exit.
 Disable qdk_chemistry Python telemetry by setting the environment variable `QDK_CHEMISTRY_PYTHON_TELEMETRY=none`.
 """
 
+# --------------------------------------------------------------------------------------------
+# Copyright (c) Microsoft Corporation. All rights reserved.
+# Licensed under the MIT License. See LICENSE.txt in the project root for license information.
+# --------------------------------------------------------------------------------------------
+
 import atexit
 import json
 import locale
@@ -21,19 +24,19 @@ import logging
 import os
 import platform
 import time
+import urllib.error
 import urllib.request
 import warnings
-
-from datetime import datetime, timezone
-from queue import SimpleQueue, Empty
+from datetime import UTC, datetime
+from importlib.metadata import PackageNotFoundError, version
+from queue import Empty, SimpleQueue
 from threading import Thread
-from typing import Any, Dict, Literal, List, TypedDict, Union
-from importlib.metadata import version, PackageNotFoundError
+from typing import Any, Literal, TypedDict
 
 logger = logging.getLogger(__name__)
 
 try:
-    # Define the package version 
+    # Define the package version
     QDK_CHEMISTRY_VERSION = version("qdk-chemistry")
 except PackageNotFoundError:
     # Fallback if package not installed
@@ -42,8 +45,7 @@ except PackageNotFoundError:
 # Application Insights configuration
 AIKEY = os.environ.get("QDK_CHEMISTRY_PYTHON_AI_KEY") or "95d25b22-8b6d-448e-9677-78ad4047a95a"
 AIURL = (
-    os.environ.get("QDK_CHEMISTRY_PYTHON_AI_URL")
-    or "https://westus2-2.in.applicationinsights.azure.com//v2.1/track"
+    os.environ.get("QDK_CHEMISTRY_PYTHON_AI_URL") or "https://westus2-2.in.applicationinsights.azure.com//v2.1/track"
 )
 
 # Environment variables take precedence, else disable telemetry for non 'stable' builds
@@ -54,7 +56,7 @@ TELEMETRY_ENABLED = (
     else (
         False
         if QDK_CHEMISTRY_PYTHON_TELEMETRY in ["0", "false", "disabled", "none"]
-        else (not "dev" in QDK_CHEMISTRY_VERSION)  # Auto-disable for dev builds
+        else ("dev" not in QDK_CHEMISTRY_VERSION)  # Auto-disable for dev builds
     )
 )
 
@@ -65,7 +67,8 @@ BATCH_INTERVAL_SEC = int(os.environ.get("QDK_CHEMISTRY_PYTHON_TELEMETRY_INTERVAL
 def _getlocale() -> str:
     try:
         with warnings.catch_warnings():
-            # Workaround for https://github.com/python/cpython/issues/82986 by continuing to use getdefaultlocale() even though it has been deprecated.
+            # Workaround for https://github.com/python/cpython/issues/82986
+            # by continuing to use getdefaultlocale() even though it has been deprecated.
             # Ignore the deprecation warnings to reduce noise
             warnings.simplefilter("ignore", category=DeprecationWarning)
             return locale.getdefaultlocale()[0] or ""
@@ -80,17 +83,17 @@ AI_DEVICE_OS_VERSION = platform.version()
 
 
 class Metric(TypedDict):
-    """Used internally for objects in the telemetry queue"""
+    """Used internally for objects in the telemetry queue."""
 
     name: str
     value: float
     count: int
-    properties: Dict[str, Any]
+    properties: dict[str, Any]
     type: str
 
 
 class PendingMetric(Metric):
-    """Used internally to aggregate metrics before sending"""
+    """Used internally to aggregate metrics before sending."""
 
     min: float
     max: float
@@ -98,7 +101,7 @@ class PendingMetric(Metric):
 
 # Maintain a collection of custom metrics to log, stored by metric name with a list entry
 # for each unique set of properties per metric name
-pending_metrics: Dict[str, List[PendingMetric]] = {}
+pending_metrics: dict[str, list[PendingMetric]] = {}
 
 # The telemetry queue is used to send telemetry from the main thread to the telemetry thread
 # This simplifies any thread-safety concerns, and avoids the need for locks, etc.
@@ -109,21 +112,26 @@ def log_telemetry(
     name: str,
     value: float,
     count: int = 1,
-    properties: Dict[str, Any] = {},
-    type: Literal["counter", "histogram"] = "counter",
+    properties: dict[str, Any] | None = None,
+    type: Literal["counter", "histogram"] = "counter",  # noqa: A002
 ) -> None:
-    """
-    Logs a custom metric with the name provided. Properties are optional and can be used to
-    capture additional context about the metric (but should be a relatively static set of values, as
-    each unique set of properties will be sent as a separate metric and creates a separate 'dimension'
-    in the backend telemetry store).
+    """Log a custom telemetry metric.
 
-    The type can be either 'counter' or 'histogram'. A 'counter' is a simple value that is summed
-    over time, such as how many times an event occurs, while a 'histogram' is used to track 'quantative'
-    values, such as the distribution of values over time, e.g., the duration of an operation.
+    Logs a custom metric with the name provided. Properties are optional and can be used to
+    capture additional context about the metric (but should be a relatively static set of
+    values, as each unique set of properties will be sent as a separate metric and creates
+    a separate 'dimension' in the backend telemetry store).
+
+    The type can be either 'counter' or 'histogram'. A 'counter' is a simple value
+    that is summed over time, such as how many times an event occurs, while a
+    'histogram' is used to track 'quantative' values, such as the distribution of values
+    over time, e.g., the duration of an operation.
     """
     if not TELEMETRY_ENABLED:
         return
+
+    if properties is None:
+        properties = {}
 
     obj: Metric = {
         "name": name,
@@ -138,8 +146,7 @@ def log_telemetry(
 
 
 def _add_to_pending(metric: Metric):
-    """Used by the telemetry thread to aggregate metrics before sending"""
-
+    """Used by the telemetry thread to aggregate metrics before sending."""
     if metric["type"] not in ["counter", "histogram"]:
         raise Exception("Metric must be of type counter or histogram")
 
@@ -149,11 +156,7 @@ def _add_to_pending(metric: Metric):
     # Try to find the entry with matching properties
     # This relies on the fact dicts with matching keys/values compare equal in Python
     prop_entry = next(
-        (
-            entry
-            for entry in name_entries
-            if entry["properties"] == metric["properties"]
-        ),
+        (entry for entry in name_entries if entry["properties"] == metric["properties"]),
         None,
     )
     if prop_entry is None:
@@ -172,19 +175,14 @@ def _add_to_pending(metric: Metric):
         prop_entry["max"] = max(prop_entry["max"], metric["value"])
 
 
-def _pending_to_payload() -> List[Dict[str, Any]]:
-    """Converts the pending metrics to the JSON payload for Azure Monitor"""
-
-    result_array: List[Dict[str, Any]] = []
-    formatted_time = (
-        datetime.now(timezone.utc)
-        .isoformat(timespec="microseconds")
-        .replace("+00:00", "Z")
-    )
-    for name in pending_metrics:
-        for unique_props in pending_metrics[name]:
+def _pending_to_payload() -> list[dict[str, Any]]:
+    """Converts the pending metrics to the JSON payload for Azure Monitor."""
+    result_array: list[dict[str, Any]] = []
+    formatted_time = datetime.now(UTC).isoformat(timespec="microseconds").replace("+00:00", "Z")
+    for metric_list in pending_metrics.values():
+        for unique_props in metric_list:
             # The below matches the entry format for Azure Monitor REST API
-            entry: Dict[str, Any] = {
+            entry: dict[str, Any] = {
                 "ver": 1,
                 "name": "Microsoft.ApplicationInsights.Metric",
                 "time": formatted_time,
@@ -220,8 +218,7 @@ def _pending_to_payload() -> List[Dict[str, Any]]:
 
 
 def _post_telemetry() -> bool:
-    """Posts the pending telemetry to Azure Monitor"""
-
+    """Posts the pending telemetry to Azure Monitor."""
     if len(pending_metrics) == 0:
         return True
 
@@ -236,17 +233,24 @@ def _post_telemetry() -> bool:
             pending_metrics.clear()
             return True
 
-    except Exception:
-        logger.debug(
-            "Failed to post telemetry. Pending metrics will be retried at the next interval."
-        )
+    except urllib.error.HTTPError as e:
+        logger.debug("HTTP error posting telemetry (status %d): %s", e.code, e.reason)
+        return False
+    except urllib.error.URLError as e:
+        logger.debug("URL error posting telemetry: %s", e.reason)
+        return False
+    except OSError as e:
+        logger.debug("Network/system error posting telemetry: %s", e)
+        return False
+    except (ValueError, TypeError) as e:
+        logger.debug("Data serialization error in telemetry: %s", e)
         return False
 
 
 # This thread aggregates and posts telemetry at regular intervals.
 # The main thread will signal the thread loop to exit when the process is about to exit.
 def _telemetry_thread_start():
-    next_post_sec: Union[float, None] = None
+    next_post_sec: float | None = None
 
     def on_metric(msg: Metric):
         nonlocal next_post_sec
@@ -255,13 +259,13 @@ def _telemetry_thread_start():
         _add_to_pending(msg)
 
         # Schedule the next post if one is not scheduled
-        if next_post_sec == None:
+        if next_post_sec is None:
             next_post_sec = time.monotonic() + BATCH_INTERVAL_SEC
 
     while True:
         try:
             # Block if no timeout, else wait a maximum of time until the next post is due
-            timeout: Union[float, None] = None
+            timeout: float | None = None
             if next_post_sec:
                 timeout = max(next_post_sec - time.monotonic(), 0)
             msg = telemetry_queue.get(timeout=timeout)
@@ -271,21 +275,17 @@ def _telemetry_thread_start():
                 if not _post_telemetry():
                     logger.debug("Failed to post telemetry on exit")
                 return
-            else:
-                on_metric(msg)
-                # Loop until the queue has been drained. This will cause the 'Empty' exception
-                # below once the queue is empty and it's time to post
-                continue
+            on_metric(msg)
+            # Loop until the queue has been drained. This will cause the 'Empty' exception
+            # below once the queue is empty and it's time to post
+            continue
         except Empty:
             # No more telemetry within timeout, so write what we have pending
             _ = _post_telemetry()
 
         # If we get here, it's after a post attempt. Pending will still have items if the attempt
         # failed, so updated the time for the next attempt in that case.
-        if len(pending_metrics) == 0:
-            next_post_sec = None
-        else:
-            next_post_sec = time.monotonic() + BATCH_INTERVAL_SEC
+        next_post_sec = None if not pending_metrics else time.monotonic() + BATCH_INTERVAL_SEC
 
 
 # When the process is about to exit, notify the telemetry thread to flush, and wait max 3 sec before exiting anyway
