@@ -1,7 +1,7 @@
 Plugins
 =======
 
-Besides the core functionality provided by QDK/Chemistry, included and compiled into the library by default, such :term:`MACIS` :cite:`Williams-Young2023`, there is also a plugin system that allows for extending the functionality of QDK/Chemistry by adding custom algorithms, data structures, and interfaces.
+Besides the core functionality provided by QDK/Chemistry, included and compiled into the library by default, such :term:`MACIS`, there is also a plugin system that allows for extending the functionality of QDK/Chemistry by adding custom algorithms, data structures, and interfaces.
 Some plugins for popular quantum chemistry packages and quantum computing packages are provided with QDK/Chemistry, while others can be found in community repositories.
 
 Core plugins

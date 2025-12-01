@@ -14,7 +14,7 @@ namespace qdk::chemistry::data {
 
 void Settings::set(const std::string& key, const SettingValue& value) {
   if (_locked) {
-    throw SettingAreLocked();
+    throw SettingsAreLocked();
   }
   auto it = settings_.find(key);
   if (it == settings_.end()) {
@@ -25,7 +25,7 @@ void Settings::set(const std::string& key, const SettingValue& value) {
 
 void Settings::set(const std::string& key, const char* value) {
   if (_locked) {
-    throw SettingAreLocked();
+    throw SettingsAreLocked();
   }
   auto it = settings_.find(key);
   if (it == settings_.end()) {
@@ -112,7 +112,7 @@ const std::map<std::string, SettingValue>& Settings::get_all_settings() const {
 void Settings::set_from_map(
     const std::map<std::string, SettingValue>& settings_map) {
   if (_locked) {
-    throw SettingAreLocked();
+    throw SettingsAreLocked();
   }
   // First, validate that all keys exist to ensure atomicity
   for (const auto& [key, value] : settings_map) {
@@ -214,7 +214,7 @@ std::string Settings::get_type_name(const std::string& key) const {
 
 void Settings::update(const std::string& key, const SettingValue& value) {
   if (_locked) {
-    throw SettingAreLocked();
+    throw SettingsAreLocked();
   }
   if (!has(key)) {
     throw SettingNotFound(key);
@@ -224,14 +224,14 @@ void Settings::update(const std::string& key, const SettingValue& value) {
 
 void Settings::update(const std::map<std::string, SettingValue>& updates_map) {
   if (_locked) {
-    throw SettingAreLocked();
+    throw SettingsAreLocked();
   }
   set_from_map(updates_map);
 }
 
 void Settings::update(const std::map<std::string, std::string>& updates_map) {
   if (_locked) {
-    throw SettingAreLocked();
+    throw SettingsAreLocked();
   }
   // First, validate that all keys exist and convert string values
   std::map<std::string, SettingValue> converted_updates;
@@ -259,7 +259,7 @@ void Settings::update(const std::map<std::string, std::string>& updates_map) {
 
 void Settings::update(const Settings& other_settings) {
   if (_locked) {
-    throw SettingAreLocked();
+    throw SettingsAreLocked();
   }
 
   // Get all settings from the other object

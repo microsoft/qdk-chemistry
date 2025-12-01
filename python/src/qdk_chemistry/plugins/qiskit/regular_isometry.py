@@ -25,6 +25,8 @@ from qdk_chemistry.utils.statevector import _create_statevector_from_coeffs_and_
 
 _LOGGER = logging.getLogger(__name__)
 
+__all__ = ["RegularIsometryStatePreparation"]
+
 
 class RegularIsometryStatePreparation(StatePreparation):
     """State preparation using a regular isometry approach.

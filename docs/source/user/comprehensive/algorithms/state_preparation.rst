@@ -20,50 +20,31 @@ The :class:`~qdk_chemistry.algorithms.StatePreparation` in QDK/Chemistry provide
 - **Efficient Circuit Construction**: Leveraging GF(2) elimination to optimize quantum circuits for sparse wavefunctions.
 - **Circuit Transpilation Options**: Configurable transpilation settings to optimize circuits for specific quantum hardware backends.
 
-Creating a StatePreparation
-----------------------------
+Creating and configuring a StatePreparation object
+--------------------------------------------------
 
-The :class:`~qdk_chemistry.algorithms.StatePreparation` created using the :doc:`factory pattern <../advanced/factory_pattern>`.
-
-.. tab:: Python API
-
-   .. literalinclude:: ../../../../examples/state_preparation.py
-      :language: python
-      :lines: 3-10
-
-Configuring the StatePreparation
---------------------------------
-
-The :class:`~qdk_chemistry.algorithms.StatePreparation` can be configured using the ``Settings`` object with the following parameters.
+The :class:`~qdk_chemistry.algorithms.StatePreparation` is created using the :doc:`factory pattern <../design/factory_pattern>`.
+The resulting :class:`~qdk_chemistry.algorithms.StatePreparation` object can be configured using the :doc:`Settings <../design/settings>` object.
 
 .. tab:: Python API
 
-   .. literalinclude:: ../../../../examples/state_preparation.py
+   .. literalinclude:: ../../../_static/examples/python/state_preparation.py
       :language: python
-      :lines: 3-7, 11-13
+      :start-after: # start-cell-create
+      :end-before: # end-cell-create
 
-
-Preparing a Quantum State
+Preparing a quantum state
 --------------------------
 
-Once configured, the :class:`~qdk_chemistry.algorithms.StatePreparation` can be used to generate a quantum circuit from a :doc:`Wavefunction <../data/wavefunction>`.
+Once configured, the :class:`~qdk_chemistry.algorithms.StatePreparation` can be used to generate
+a quantum circuit from a :class:`~qdk_chemistry.data.Wavefunction`.
 
 .. tab:: Python API
 
-   .. code-block:: python
-
-      # --------------------------------------------------------------------------------------------
-      # Copyright (c) Microsoft Corporation. All rights reserved.
-      # Licensed under the MIT License. See LICENSE.txt in the project root for license information.
-      # --------------------------------------------------------------------------------------------
-
-      from qdk_chemistry.data import Wavefunction
-
-      # Obtain a valid Wavefunction instance
-      wavefunction = Wavefunction.from_json_file("molecule.wavefunction.json")
-
-      # Generate the quantum circuit
-      circuit = state_prep.run(wavefunction)
+   .. literalinclude:: ../../../_static/examples/python/state_preparation.py
+      :language: python
+      :start-after: # start-cell-run
+      :end-before: # end-cell-run
 
 Available settings
 ------------------
@@ -110,7 +91,8 @@ based on the calculation requirements and available packages.
 
 For more details on how QDK/Chemistry interfaces with external packages, see the :doc:`Interfaces <../design/interfaces>` documentation.
 
-Related classes
+Further reading
 ---------------
 
+- The above examples can be downloaded as a complete `Python <../../../_static/examples/python/state_preparation.py>`_ script.
 - :doc:`EnergyEstimator <./energy_estimator>`: Estimate the energy of prepared states

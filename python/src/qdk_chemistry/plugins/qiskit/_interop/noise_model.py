@@ -11,6 +11,8 @@ from qiskit_aer.noise import NoiseModel, depolarizing_error
 
 from qdk_chemistry.noise_models import QuantumErrorProfile, SupportedErrorTypes
 
+__all__ = ["get_noise_model_from_profile"]
+
 
 def get_noise_model_from_profile(
     quantum_error_profile: QuantumErrorProfile, exclude_gates: list | None = None

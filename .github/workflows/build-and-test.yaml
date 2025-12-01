@@ -347,12 +347,6 @@ jobs:
         # Add to job summary
         cat coverage-summary.md >> $GITHUB_STEP_SUMMARY
 
-    - name: Reinstall Python package to remove stubs
-      working-directory: python
-      run: |
-        # TODO, this should be removed once pybind11 docs pass thorugh sphinx cleanly
-        pip install --prefix=${{ github.workspace }}/install .[docs,plugins] --verbose
-
     - name: Build documentation
       working-directory: docs
       run: |

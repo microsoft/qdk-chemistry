@@ -17,9 +17,9 @@ from qiskit import QuantumCircuit, qasm3
 
 from qdk_chemistry.data import DataClass
 
-__all__: list[str] = []
-
 _LOGGER = logging.getLogger(__name__)
+
+__all__: list[str] = []
 
 
 class Circuit(DataClass):

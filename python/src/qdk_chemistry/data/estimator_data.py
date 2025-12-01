@@ -10,8 +10,10 @@ from typing import Any
 import h5py
 import numpy as np
 
-from qdk_chemistry.data import DataClass
+from qdk_chemistry.data.base import DataClass
 from qdk_chemistry.data.qubit_hamiltonian import QubitHamiltonian
+
+__all__: list[str] = []
 
 
 class EnergyExpectationResult(DataClass):

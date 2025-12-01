@@ -11,6 +11,15 @@ from collections.abc import Iterable, Sequence
 
 import numpy as np
 
+__all__ = [
+    "accumulated_phase_from_bits",
+    "energy_alias_candidates",
+    "energy_from_phase",
+    "iterative_phase_feedback_update",
+    "phase_fraction_from_feedback",
+    "resolve_energy_aliases",
+]
+
 
 def energy_from_phase(phase_fraction: float, *, evolution_time: float) -> float:
     """Convert a measured phase fraction to energy using ``E = angle / t``.
@@ -40,8 +49,9 @@ def energy_alias_candidates(
     Args:
         raw_energy: Energy derived from the measured phase.
         evolution_time: Evolution time ``t`` used by the unitary.
-        shift_range: Integer shifts (in multiples of ``2π / t``) to explore. The
-            default ``range(-2, 3)`` checks ``k = -2, -1, 0, 1, 2``—a pragmatic
+        shift_range: Integer shifts (in multiples of ``2π / t``) to explore.
+
+            The default ``range(-2, 3)`` checks ``k = -2, -1, 0, 1, 2``—a pragmatic
             window that typically covers chemical-energy estimates because they
             rarely deviate by more than one or two ``2π / t`` periods from the
             raw measurement.
@@ -74,12 +84,13 @@ def resolve_energy_aliases(
     """Select the alias energy closest to a known reference value.
 
     Args:
-        raw_energy: Energy derived from the measured phase.
-        evolution_time: Evolution time ``t`` used by the unitary.
-        reference_energy: External reference guiding alias selection.
-        shift_range: Integer shifts (in multiples of ``2π / t``) to explore. Use
-            a wider window when the true value may sit multiple periods away
-            from the raw estimate.
+        raw_energy (float): Energy derived from the measured phase.
+        evolution_time (float): Evolution time ``t`` used by the unitary.
+        reference_energy (float): External reference guiding alias selection.
+        shift_range (Iterable[int]): Integer shifts (in multiples of ``2π / t``) to explore.
+
+            Use a wider window when the true value may sit multiple
+            periods away from the raw estimate.
 
     Returns:
         Alias energy closest to ``reference_energy``.

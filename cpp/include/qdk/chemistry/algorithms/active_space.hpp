@@ -153,8 +153,8 @@ class ActiveSpaceSelector
    *         are not modified.
    * @throws std::runtime_error if the active space selection fails or if the
    *         input orbitals already have an active space defined.
-   * @throws SettingsAreLocked if attempting to modify settings after
-   *         run) is called
+   * @throws qdk::chemistry::data::SettingsAreLocked if attempting to modify
+   * settings after run) is called
    * @note Settings are automatically locked when this method is called and
    *       cannot be modified during or after execution.
    * @note The specific criteria and side effects (such as unitary rotations)

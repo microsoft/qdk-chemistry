@@ -3,8 +3,11 @@
 # Licensed under the MIT License. See LICENSE.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
 
+import importlib
+import os
 import shutil
 import sys
+from contextlib import suppress
 from pathlib import Path
 
 # -----------------------------------------------------------------------------
@@ -19,6 +22,9 @@ release = "1.0.0-rc1"
 # -----------------------------------------------------------------------------
 # Perform initial setup and tests
 # -----------------------------------------------------------------------------
+
+# Signal to qdk_chemistry that we're in a docs build so runtime hooks stay idle
+os.environ.setdefault("QDK_CHEMISTRY_DOCS", "1")
 
 # Add path to the Python package
 sys.path.insert(
@@ -89,14 +95,18 @@ autodoc_mock_imports = [  # Configure autodoc to handle C++ extension modules an
     "qdk_chemistry.libmacis",
     "qdk_chemistry.libchemistry",
     "qdk_chemistry.libsparsexx",
+    "pybind11_builtins",
+    "qiskit_nature",
+    "qiskit_aer",
+    "h5py",
 ]
 
 # Autosummary settings
 autosummary_generate = True  # Automatically generate stub pages for API
 autosummary_imported_members = False  # Don't include imported members in autosummaries
 autosummary_generate_overwrite = True  # Overwrite existing generated files
-autosummary_ignore_module_all = True  # Don't respect __all__ when generating summaries
-add_module_names = False  # Don't prepend module names to object names in output
+autosummary_ignore_module_all = False  # Respect __all__ when generating summaries
+add_module_names = True  # Don't prepend module names to object names in output
 
 # Breathe configuration for C++ documentation
 breathe_projects = {
@@ -127,62 +137,35 @@ primary_domain = "py"  # Set Python as the primary documentation domain
 intersphinx_mapping = {
     "python": ("https://docs.python.org/3", None),
     "numpy": ("https://numpy.org/doc/stable/", None),
-    "qiskit": ("https://docs.quantum.ibm.com/api/qiskit/", None),
+    "qiskit": ("https://quantum.cloud.ibm.com/docs/api/qiskit/", None),
 }
 
 # Exclude patterns for documentation build
 exclude_patterns = ["_build"]  # Directories to exclude from build
 
 # Suppress specific warnings that don't affect the documentation quality
-# TODO: update this list
 show_warning_types = True  # Show types of warnings in output
 suppress_warnings = [
     "duplicate_declaration.cpp",  # Suppress warnings about duplicate C++ declarations, this happens due to nested namespaces
     "ref.ref",  # sphinx does not like bools for some reason
     "ref.identifier:*breathe_api_autogen*",  # Suppress warnings about duplicate object descriptions from imported classes
     "toc.not_included",  # Suppress warnings about toctree entries not included in the documentation
+    "*pybind11_detail*",  # Suppress warnings about pybind11 internal implementation details
 ]
 nitpicky = True  # Enable nitpicky mode to catch all warnings/errors
-nitpick_ignore = [
-    ("cpp:identifier", "int64_t"),
-    ("cpp:identifier", "size_t"),
-    ("py:class", "callable"),
-    ("py:class", "optional"),
-    ("py:class", "qdk_chemistry.plugins.pyscf.mcscf._QdkMcSolverWrapper"),
-    ("py:class", "HamiltonianType"),  # TODO: figure out how to resolve this reference
-    ("py:exc", "SettingsAreLocked"),  # TODO: figure out how to resolve this reference
-]
 nitpick_ignore_regex = [
-    (
-        r"cpp:identifier",
-        r"AlgorithmFactory.*",
-    ),  # TODO: figure out how to resolve this reference
-    (r"cpp:identifier", r"Args.*"),  # TODO: figure out how to resolve this reference
-    (
-        r"cpp:identifier",
-        r"ConfigVector.*",
-    ),  # TODO: figure out how to resolve this reference
     (r"cpp:identifier", r"Eigen.*"),
-    (r"cpp:identifier", r"Element.*"),  # TODO: figure out how to resolve this reference
     (r"cpp:identifier", r"H5.*"),
-    (
-        r"cpp:identifier",
-        r"ReturnType.*",
-    ),  # TODO: figure out how to resolve this reference
-    (
-        r"cpp:identifier",
-        r"SettingsAreLocked.*",
-    ),  # TODO: figure out how to resolve this reference
     (r"cpp:identifier", r"macis.*"),
     (r"cpp:identifier", r"nlohmann.*"),
     (r"cpp:identifier", r"qcs.*"),
-    (r"py:class", r"qsharp.*"),
+    (r"py:class", r"qsharp._qsharp.*"),
     (r"py:class", r"h5py.*"),
     (r"py:class", r"numpy.*"),
-    (r"py:class", r"pybind11_builtins.*"),
+    (r"py:class", r"qiskit_aer.*"),
+    (r"py:class", r"Circuit"),
     (r"py:class", r"pyscf.*"),
-    (r"py:class", r"qiskit.*"),
-    (r"py:class", r"qdk_chemistry._core.*"),  # Ignore internal base class
+    (r"py:class", r"qdk_chemistry._core.data.DataClass"),
 ]
 
 # Configure output for to-dos
@@ -204,6 +187,18 @@ def autodoc_skip_imports(app, what, name, obj, skip, options):
     # Get the module where the object is defined
     if hasattr(obj, "__module__"):
         module = obj.__module__
+        target_module = name.rsplit(".", 1)[0] if what != "module" else name
+
+        # Skip re-exported members (e.g., qdk_chemistry.algorithms re-exporting data types)
+        if (
+            module
+            and target_module
+            and module != target_module
+            and module.startswith("qdk_chemistry")
+            and target_module.startswith("qdk_chemistry")
+        ):
+            return True
+
         # Skip standard library modules (pathlib, typing, etc.)
         if module and any(
             module.startswith(prefix)
@@ -213,23 +208,96 @@ def autodoc_skip_imports(app, what, name, obj, skip, options):
                 "collections",
                 "abc",
                 "enum",
+                "numpy",
                 "pydantic_settings",
-                "pyscf",
                 "qiskit",
                 "qiskit_aer",
-                "qsharp",
                 "ruamel",
                 "dataclasses",
+                "pybind11_builtins",
+                "qiskit_nature",
+                "h5py",
             ]
         ):
             return True
     return skip
 
 
+_MODULE_ALIAS_RULES: tuple[tuple[str, str], ...] = (
+    ("qdk_chemistry._core._algorithms", "qdk_chemistry.algorithms"),
+    ("qdk_chemistry._core.data", "qdk_chemistry.data"),
+    ("qdk_chemistry._core.", "qdk_chemistry."),
+    ("qdk_chemistry._algorithms", "qdk_chemistry.algorithms"),
+)
+
+
+def _rewrite_internal_module_path(text: str) -> str:
+    """Map internal module paths to their public equivalents."""
+
+    rewritten = text
+    for old, new in _MODULE_ALIAS_RULES:
+        if old in rewritten:
+            rewritten = rewritten.replace(old, new)
+    return rewritten
+
+
+def normalize_autodoc_signature(
+    app, what, name, obj, options, signature, return_annotation
+):
+    """Rewrite signatures/annotations pointing to internal modules."""
+
+    new_signature = signature
+    new_return = return_annotation
+
+    if isinstance(signature, str):
+        rewritten = _rewrite_internal_module_path(signature)
+        if rewritten != signature:
+            new_signature = rewritten
+
+    if isinstance(return_annotation, str):
+        rewritten = _rewrite_internal_module_path(return_annotation)
+        if rewritten != return_annotation:
+            new_return = rewritten
+
+    if new_signature is not signature or new_return is not return_annotation:
+        return new_signature, new_return
+    return None
+
+
+def normalize_autodoc_docstring(app, what, name, obj, options, lines):
+    """Rewrite internal module references that appear inside docstrings."""
+
+    for idx, line in enumerate(lines):
+        rewritten = _rewrite_internal_module_path(line)
+        if rewritten != line:
+            lines[idx] = rewritten
+    if options is not None and "._core." in name:
+        options["noindex"] = True
+
+
+def on_builder_inited(app):
+    for internal_mod, public_mod in _MODULE_ALIAS_RULES:
+        if internal_mod.endswith("."):
+            continue  # prefix-only rewrite, nothing to alias
+        if internal_mod not in sys.modules:
+            continue  # nothing imported yet
+        pub = importlib.import_module(public_mod)
+        exports = getattr(pub, "__all__", ())
+        for name in exports:
+            obj = getattr(pub, name, None)
+            module_name = getattr(obj, "__module__", "")
+            if isinstance(module_name, str) and module_name.startswith(internal_mod):
+                with suppress(AttributeError):
+                    obj.__module__ = public_mod  # docs-only shim
+
+
 def setup(app):
     """Setup function to connect autodoc-skip-member and viewcode filters."""
-    import typing
     import sys
+    import typing
 
     sys.modules["typing"] = typing  # Ensure typing module is available to pybind
     app.connect("autodoc-skip-member", autodoc_skip_imports)
+    app.connect("autodoc-process-signature", normalize_autodoc_signature)
+    app.connect("autodoc-process-docstring", normalize_autodoc_docstring)
+    app.connect("builder-inited", on_builder_inited)
