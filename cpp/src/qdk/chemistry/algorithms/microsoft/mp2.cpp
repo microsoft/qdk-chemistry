@@ -236,16 +236,16 @@ void MP2Calculator::compute_opposite_spin_t2(
           const double denom = eps_ija - eps_j_spin[b_idx];
 
           // T2 amplitude
-          const double t2_ijab = eri_iajb / denom;
+          const double t2_iajb = eri_iajb / denom;
 
           // Store T2 amplitude
           size_t t2_flat_idx = i * n_occ_j * n_vir_i * n_vir_j +
                                j * n_vir_i * n_vir_j + a * n_vir_j + b;
-          t2[t2_flat_idx] = t2_ijab;
+          t2[t2_flat_idx] = t2_iajb;
 
           // Energy contribution (if requested)
           if (energy) {
-            *energy += t2_ijab * eri_iajb;
+            *energy += t2_iajb * eri_iajb;
           }
         }
       }
@@ -280,20 +280,20 @@ void MP2Calculator::compute_restricted_t2(const Eigen::VectorXd& eps,
           // Energy denominator
           const double denom = eps_ija - eps[b_idx];
 
-          // T2 amplitude: T_ijab = (ia|jb) / denominator
-          const double t2_ijab = eri_iajb / denom;
+          // T2 amplitude: T_iajb = (ia|jb) / denominator
+          const double t2_iajb = eri_iajb / denom;
 
           // Store T2 amplitude
           size_t t2_flat_idx =
               i * n_occ * n_vir * n_vir + j * n_vir * n_vir + a * n_vir + b;
-          t2[t2_flat_idx] = t2_ijab;
+          t2[t2_flat_idx] = t2_iajb;
 
-          // MP2 energy: E_MP2 += T_ijab * (2*(ia|jb) - (ib|ja))
+          // MP2 energy: E_MP2 += T_iajb * (2*(ia|jb) - (ib|ja))
           if (energy) {
             const size_t idx_ibja =
                 i_base + b_idx * stride_j + j * stride_k + a_idx;
             const double eri_ibja = moeri[idx_ibja];
-            *energy += t2_ijab * (2.0 * eri_iajb - eri_ibja);
+            *energy += t2_iajb * (2.0 * eri_iajb - eri_ibja);
           }
         }
       }
@@ -331,16 +331,16 @@ void MP2Calculator::compute_same_spin_t2(const Eigen::VectorXd& eps,
           const double denom = eps_ija - eps[b_idx];
 
           // T2 amplitude
-          const double t2_ijab = antisym_integral / denom;
+          const double t2_iajb = antisym_integral / denom;
 
           // Store T2 amplitude
           size_t t2_flat_idx =
               i * n_occ * n_vir * n_vir + j * n_vir * n_vir + a * n_vir + b;
-          t2[t2_flat_idx] = t2_ijab;
+          t2[t2_flat_idx] = t2_iajb;
 
           // Energy contribution (if requested)
           if (energy) {
-            *energy += t2_ijab * antisym_integral;
+            *energy += t2_iajb * antisym_integral;
           }
         }
       }
