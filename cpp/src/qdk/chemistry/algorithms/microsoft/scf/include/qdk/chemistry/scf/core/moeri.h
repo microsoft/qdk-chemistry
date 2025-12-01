@@ -59,14 +59,14 @@ class MOERI {
    *
    *  @param[in]  nao  Number of atomic orbitals
    *  @param[in]  nt  Number of vectors in the MO space
-   *  @param[in]  Ca  First quarter transformation coefficients (row major)
-   *  @param[in]  Cb  Second quarter transformation coefficients (row major)
-   *  @param[in]  Cc  Third quarter transformation coefficients (row major)
-   *  @param[in]  Cd  Fourth quarter transformation coefficients (row major)
+   *  @param[in]  Ci  First quarter transformation coefficients (row major)
+   *  @param[in]  Cj  Second quarter transformation coefficients (row major)
+   *  @param[in]  Ck  Third quarter transformation coefficients (row major)
+   *  @param[in]  Cl  Fourth quarter transformation coefficients (row major)
    *  @param[out] out Output MO ERIs (row major)
    */
-  void compute(size_t nao, size_t nt, const double* Ca, const double* Cb,
-               const double* Cc, const double* Cd, double* out);
+  void compute(size_t nao, size_t nt, const double* Ci, const double* Cj,
+               const double* Ck, const double* Cl, double* out);
 
  private:
   std::shared_ptr<ERI> eri_;  ///< ERI instance

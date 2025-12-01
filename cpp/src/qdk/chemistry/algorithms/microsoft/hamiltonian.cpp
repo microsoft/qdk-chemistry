@@ -23,7 +23,7 @@ namespace qdk::chemistry::algorithms::microsoft {
 
 namespace qcs = qdk::chemistry::scf;
 
-namespace {
+namespace detail {
 /**
  * @brief Validate active orbital indices
  * @param indices The indices to validate
@@ -31,9 +31,9 @@ namespace {
  * @param num_molecular_orbitals Total number of molecular orbitals
  * @return true if the indices are contiguous, false otherwise
  */
-bool validate_active_continguous_indices(const std::vector<size_t>& indices,
-                                         const std::string& spin_label,
-                                         size_t num_molecular_orbitals) {
+bool validate_active_contiguous_indices(const std::vector<size_t>& indices,
+                                        const std::string& spin_label,
+                                        size_t num_molecular_orbitals) {
   if (indices.empty()) return true;
 
   // Cannot contain more than the total number of MOs
@@ -75,7 +75,7 @@ bool validate_active_continguous_indices(const std::vector<size_t>& indices,
 
   return true;
 }
-}  // namespace
+}  // namespace detail
 
 std::shared_ptr<data::Hamiltonian> HamiltonianConstructor::_run_impl(
     std::shared_ptr<data::Orbitals> orbitals) const {
@@ -104,14 +104,14 @@ std::shared_ptr<data::Hamiltonian> HamiltonianConstructor::_run_impl(
   const size_t nactive_beta = active_indices_beta.size();
 
   // Validate alpha active orbitals and check contiguity
-  bool alpha_space_is_contiguous = validate_active_continguous_indices(
+  bool alpha_space_is_contiguous = detail::validate_active_contiguous_indices(
       active_indices_alpha, "Alpha", num_molecular_orbitals);
 
   // Validate beta active orbitals (if different from alpha) and check
   // contiguity
   bool beta_space_is_contiguous = true;
   if (active_indices_beta != active_indices_alpha) {
-    beta_space_is_contiguous = validate_active_continguous_indices(
+    beta_space_is_contiguous = detail::validate_active_contiguous_indices(
         active_indices_beta, "Beta", num_molecular_orbitals);
   } else {
     beta_space_is_contiguous = alpha_space_is_contiguous;
@@ -217,16 +217,24 @@ std::shared_ptr<data::Hamiltonian> HamiltonianConstructor::_run_impl(
 
   // Compute integrals (same size for alpha and beta)
   const size_t nactive = nactive_alpha;
-  Eigen::VectorXd moeri_aaaa(nactive * nactive * nactive * nactive);
-  Eigen::VectorXd moeri_aabb(nactive * nactive * nactive * nactive);
-  Eigen::VectorXd moeri_bbbb(nactive * nactive * nactive * nactive);
+
+  // Declare MOERI vectors
+  Eigen::VectorXd moeri_aaaa;
+  Eigen::VectorXd moeri_aabb;
+  Eigen::VectorXd moeri_bbbb;
+
+  const size_t moeri_size = nactive * nactive * nactive * nactive;
 
   if (is_restricted_calc) {
-    // Only compute (αα|αα) integrals - the others will be identical
+    // Only allocate and compute (αα|αα) integrals - the others are identical
+    moeri_aaaa.resize(moeri_size);
     moeri_c.compute(num_atomic_orbitals, nactive, Ca_active_rm.data(),
                     moeri_aaaa.data());
   } else {
-    // Unrestricted case - compute all three types
+    // Unrestricted case - allocate and compute all three types of integrals
+    moeri_aaaa.resize(moeri_size);
+    moeri_aabb.resize(moeri_size);
+    moeri_bbbb.resize(moeri_size);
 
     // (αα|αα) integrals
     moeri_c.compute(num_atomic_orbitals, nactive,
