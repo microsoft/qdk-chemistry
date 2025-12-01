@@ -16,7 +16,7 @@ from qdk_chemistry.algorithms import (
     MultiConfigurationScf,
     OrbitalLocalizer,
     ProjectedMultiConfigurationCalculator,
-    ReferenceDerivedCalculator,
+    DynamicalCorrelationCalculator,
     ScfSolver,
     StabilityChecker,
     StatePreparation,
@@ -25,7 +25,6 @@ from qdk_chemistry.data import (
     Ansatz,
     CasWavefunctionContainer,
     Configuration,
-    CoupledClusterContainer,
     Hamiltonian,
     Orbitals,
     Settings,
@@ -303,7 +302,7 @@ class MockMultiConfigurationScf(MultiConfigurationScf):
         return "mock_mcscf_solver"
 
 
-class MockCoupledClusterCalculator(ReferenceDerivedCalculator):
+class MockCoupledClusterCalculator(DynamicalCorrelationCalculator):
     """A test calculator for coupled cluster methods."""
 
     def __init__(self):
@@ -568,10 +567,10 @@ class TestAlgorithmClasses:
         assert isinstance(wavefunction, Wavefunction)
 
     def test_coupled_cluster_calculator_inheritance(self, test_ansatz):
-        """Test that MockCoupledClusterCalculator can be used as a ReferenceDerivedCalculator."""
+        """Test that MockCoupledClusterCalculator can be used as a DynamicalCorrelationCalculator."""
         # Create instance
         coupled_cluster_calculator = MockCoupledClusterCalculator()
-        assert isinstance(coupled_cluster_calculator, ReferenceDerivedCalculator)
+        assert isinstance(coupled_cluster_calculator, DynamicalCorrelationCalculator)
 
         # Test settings method
         settings = coupled_cluster_calculator.settings()
@@ -767,7 +766,7 @@ class TestAlgorithmClasses:
         assert isinstance(mcscf_solver, MockMultiConfigurationScf)
 
     def test_coupled_cluster_calculator_registration(self):
-        """Test that MockCoupledClusterCalculator can be registered and used as a ReferenceDerivedCalculator."""
+        """Test that MockCoupledClusterCalculator can be registered and used as a DynamicalCorrelationCalculator."""
 
         def _test_register_coupled_cluster_calculator():
             """Dummy function to simulate registration."""
@@ -775,16 +774,16 @@ class TestAlgorithmClasses:
 
         # Register the calculator
         key = "mock_coupled_cluster_calculator"
-        if key in algorithms.available("reference_derived_calculator"):
-            algorithms.unregister("reference_derived_calculator", key)  # Ensure clean state
-        assert key not in algorithms.available("reference_derived_calculator")
+        if key in algorithms.available("dynamical_correlation_calculator"):
+            algorithms.unregister("dynamical_correlation_calculator", key)  # Ensure clean state
+        assert key not in algorithms.available("dynamical_correlation_calculator")
         algorithms.register(_test_register_coupled_cluster_calculator)
 
         # Verify registration worked
-        assert key in algorithms.available("reference_derived_calculator")
+        assert key in algorithms.available("dynamical_correlation_calculator")
 
         # Test that the correct instance is created
-        coupled_cluster_calculator = algorithms.create("reference_derived_calculator", key)
+        coupled_cluster_calculator = algorithms.create("dynamical_correlation_calculator", key)
         assert isinstance(coupled_cluster_calculator, MockCoupledClusterCalculator)
 
     def test_algorithm_repr(self):
@@ -802,7 +801,7 @@ class TestAlgorithmClasses:
         assert "ScfSolver" in repr(scf)
         assert "ActiveSpaceSelector" in repr(selector)
         assert "MultiConfigurationScf" in repr(mcscf)
-        assert "ReferenceDerivedCalculator" in repr(cc)
+        assert "DynamicalCorrelationCalculator" in repr(cc)
         assert "StatePreparation" in repr(sp)
 
     def test_settings_interface(self) -> None:

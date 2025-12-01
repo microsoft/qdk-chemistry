@@ -3,12 +3,12 @@
 // license information.
 
 #include <qdk/chemistry/algorithms/active_space.hpp>
+#include <qdk/chemistry/algorithms/dynamical_correlation_calculator.hpp>
 #include <qdk/chemistry/algorithms/hamiltonian.hpp>
 #include <qdk/chemistry/algorithms/localization.hpp>
 #include <qdk/chemistry/algorithms/mc.hpp>
 #include <qdk/chemistry/algorithms/mcscf.hpp>
 #include <qdk/chemistry/algorithms/pmc.hpp>
-#include <qdk/chemistry/algorithms/reference_derived_calculator.hpp>
 #include <qdk/chemistry/algorithms/scf.hpp>
 #include <qdk/chemistry/algorithms/stability.hpp>
 #include <qdk/chemistry/data/hamiltonian.hpp>

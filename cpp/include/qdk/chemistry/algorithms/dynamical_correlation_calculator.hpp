@@ -13,7 +13,7 @@
 namespace qdk::chemistry::algorithms {
 
 /**
- * @class ReferenceDerivedCalculator
+ * @class DynamicalCorrelationCalculator
  * @brief Base class for reference-derived quantum chemistry methods
  *
  * This abstract base class provides a unified interface for quantum chemistry
@@ -24,20 +24,20 @@ namespace qdk::chemistry::algorithms {
  * @see data::Wavefunction
  * @see MP2Calculator
  */
-class ReferenceDerivedCalculator
-    : public Algorithm<ReferenceDerivedCalculator,
+class DynamicalCorrelationCalculator
+    : public Algorithm<DynamicalCorrelationCalculator,
                        std::pair<double, std::shared_ptr<data::Wavefunction>>,
                        std::shared_ptr<data::Ansatz>> {
  public:
   /**
    * @brief Default constructor
    */
-  ReferenceDerivedCalculator() = default;
+  DynamicalCorrelationCalculator() = default;
 
   /**
    * @brief Virtual destructor
    */
-  virtual ~ReferenceDerivedCalculator() = default;
+  virtual ~DynamicalCorrelationCalculator() = default;
 
   /**
    * @brief Run main calculation
@@ -68,7 +68,7 @@ class ReferenceDerivedCalculator
    * @return The algorithm's type name
    */
   std::string type_name() const override {
-    return "reference_derived_calculator";
+    return "dynamical_correlation_calculator";
   }
 
  protected:
@@ -88,11 +88,11 @@ class ReferenceDerivedCalculator
 /**
  * @brief Factory class for creating reference-derived calculator instances.
  */
-struct ReferenceDerivedCalculatorFactory
-    : public AlgorithmFactory<ReferenceDerivedCalculator,
-                              ReferenceDerivedCalculatorFactory> {
+struct DynamicalCorrelationCalculatorFactory
+    : public AlgorithmFactory<DynamicalCorrelationCalculator,
+                              DynamicalCorrelationCalculatorFactory> {
   static std::string algorithm_type_name() {
-    return "reference_derived_calculator";
+    return "dynamical_correlation_calculator";
   }
   static void register_default_instances();
   static std::string default_algorithm_name() { return "qdk_mp2_calculator"; }

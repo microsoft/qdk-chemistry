@@ -97,9 +97,9 @@ def create(algorithm_type: str, algorithm_name: str | None = None, **kwargs) -> 
         >>> # Create an SCF solver with custom settings
         >>> scf = registry.create("scf_solver", "pyscf", max_iterations=100, convergence_threshold=1e-8)
         >>> # Create an MP2 calculator
-        >>> mp2_calc = registry.create("reference_derived_calculator", "qdk_mp2_calculator")
+        >>> mp2_calc = registry.create("dynamical_correlation_calculator", "qdk_mp2_calculator")
         >>> # Create the default reference-derived calculator (MP2)
-        >>> default_calc = registry.create("reference_derived_calculator")
+        >>> default_calc = registry.create("dynamical_correlation_calculator")
 
     """
     if algorithm_name is None:
@@ -360,7 +360,7 @@ def _register_cpp_factories():
         MultiConfigurationCalculatorFactory,
         MultiConfigurationScfFactory,
         ProjectedMultiConfigurationCalculatorFactory,
-        ReferenceDerivedCalculatorFactory,
+        DynamicalCorrelationCalculatorFactory,
         ScfSolverFactory,
         StabilityCheckerFactory,
     )
@@ -371,7 +371,7 @@ def _register_cpp_factories():
     register_factory(MultiConfigurationCalculatorFactory)
     register_factory(MultiConfigurationScfFactory)
     register_factory(ProjectedMultiConfigurationCalculatorFactory)
-    register_factory(ReferenceDerivedCalculatorFactory)
+    register_factory(DynamicalCorrelationCalculatorFactory)
     register_factory(ScfSolverFactory)
     register_factory(StabilityCheckerFactory)
 

@@ -87,7 +87,7 @@ pybind11_add_module(_core
     src/pybind11/algorithms/hamiltonian.cpp
     src/pybind11/algorithms/scf.cpp
     src/pybind11/algorithms/active_space.cpp
-    src/pybind11/algorithms/reference_derived_calculator.cpp
+    src/pybind11/algorithms/dynamical_correlation_calculator.cpp
     src/pybind11/utils/valence_space.cpp
     src/pybind11/constants.cpp
     src/pybind11/qdk_scf_config.cpp

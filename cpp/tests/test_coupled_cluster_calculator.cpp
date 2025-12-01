@@ -6,7 +6,7 @@
 #include <gtest/gtest.h>
 
 #include <optional>
-#include <qdk/chemistry/algorithms/reference_derived_calculator.hpp>
+#include <qdk/chemistry/algorithms/dynamical_correlation_calculator.hpp>
 #include <qdk/chemistry/data/ansatz.hpp>
 #include <qdk/chemistry/data/hamiltonian.hpp>
 #include <qdk/chemistry/data/orbitals.hpp>
@@ -21,14 +21,15 @@
 using namespace qdk::chemistry::algorithms;
 using namespace qdk::chemistry::data;
 
-// Mock implementation of a ReferenceDerivedCalculator that produces CC results
-class MockCoupledClusterCalculator : public ReferenceDerivedCalculator {
+// Mock implementation of a DynamicalCorrelationCalculator that produces CC
+// results
+class MockCoupledClusterCalculator : public DynamicalCorrelationCalculator {
  public:
   MockCoupledClusterCalculator() {}
   ~MockCoupledClusterCalculator() override = default;
   std::string name() const override { return "mock_cc"; }
   std::string type_name() const override {
-    return "reference_derived_calculator";
+    return "dynamical_correlation_calculator";
   }
 
  protected:
@@ -63,26 +64,26 @@ class MockCoupledClusterCalculator : public ReferenceDerivedCalculator {
 };
 
 TEST(CoupledClusterCalculatorTest, Factory) {
-  // Register a mock implementation with ReferenceDerivedCalculatorFactory
+  // Register a mock implementation with DynamicalCorrelationCalculatorFactory
   const std::string key = "mock_cc";
 
-  ReferenceDerivedCalculatorFactory::register_instance(
+  DynamicalCorrelationCalculatorFactory::register_instance(
       []() { return std::make_unique<MockCoupledClusterCalculator>(); });
 
   // Check if the mock implementation is available
-  auto available = ReferenceDerivedCalculatorFactory::available();
+  auto available = DynamicalCorrelationCalculatorFactory::available();
   ASSERT_TRUE(std::find(available.begin(), available.end(), key) !=
               available.end());
 
   // Create a calculator using the factory
-  auto calculator = ReferenceDerivedCalculatorFactory::create(key);
+  auto calculator = DynamicalCorrelationCalculatorFactory::create(key);
   ASSERT_NE(calculator, nullptr);
 
   // Unregister the implementation
-  EXPECT_TRUE(ReferenceDerivedCalculatorFactory::unregister_instance(key));
+  EXPECT_TRUE(DynamicalCorrelationCalculatorFactory::unregister_instance(key));
 
   // Verify it was removed
-  available = ReferenceDerivedCalculatorFactory::available();
+  available = DynamicalCorrelationCalculatorFactory::available();
   EXPECT_TRUE(std::find(available.begin(), available.end(), key) ==
               available.end());
 }

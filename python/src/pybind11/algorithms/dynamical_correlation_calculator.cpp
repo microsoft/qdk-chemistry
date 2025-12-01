@@ -19,16 +19,16 @@ using namespace qdk::chemistry::python;
 using RefDerivedReturnType = std::pair<double, std::shared_ptr<Wavefunction>>;
 
 // Trampoline class for python inheritance
-class ReferenceDerivedCalculatorBase
-    : public ReferenceDerivedCalculator,
+class DynamicalCorrelationCalculatorBase
+    : public DynamicalCorrelationCalculator,
       public pybind11::trampoline_self_life_support {
  public:
   std::string name() const override {
-    PYBIND11_OVERRIDE_PURE(std::string, ReferenceDerivedCalculator, name);
+    PYBIND11_OVERRIDE_PURE(std::string, DynamicalCorrelationCalculator, name);
   }
 
   std::vector<std::string> aliases() const override {
-    PYBIND11_OVERRIDE(std::vector<std::string>, ReferenceDerivedCalculator,
+    PYBIND11_OVERRIDE(std::vector<std::string>, DynamicalCorrelationCalculator,
                       aliases);
   }
 
@@ -41,20 +41,20 @@ class ReferenceDerivedCalculatorBase
  protected:
   RefDerivedReturnType _run_impl(
       std::shared_ptr<Ansatz> ansatz) const override {
-    PYBIND11_OVERRIDE_PURE(RefDerivedReturnType, ReferenceDerivedCalculator,
+    PYBIND11_OVERRIDE_PURE(RefDerivedReturnType, DynamicalCorrelationCalculator,
                            _run_impl, ansatz);
   }
 };
 
-void bind_reference_derived_calculator(py::module &m) {
+void bind_dynamical_correlation_calculator(py::module &m) {
   // Default implementations are automatically registered by the
   // AlgorithmFactory base class when the registry is first accessed, so no need
   // to call register_default_instances() here
 
-  // ReferenceDerivedCalculator abstract base class
-  py::class_<ReferenceDerivedCalculator, ReferenceDerivedCalculatorBase,
+  // DynamicalCorrelationCalculator abstract base class
+  py::class_<DynamicalCorrelationCalculator, DynamicalCorrelationCalculatorBase,
              py::smart_holder>
-      ref_calc(m, "ReferenceDerivedCalculator", R"(
+      ref_calc(m, "DynamicalCorrelationCalculator", R"(
 Abstract base class for reference-derived quantum chemistry methods.
 
 This class provides a unified interface for quantum chemistry methods that derive
@@ -71,7 +71,7 @@ Examples:
   >>> ansatz = qdk.chemistry.data.Ansatz(hamiltonian, wavefunction)
   >>>
   >>> # Create calculator (e.g., MP2) using the registry
-  >>> calculator = qdk.chemistry.algorithms.create("reference_derived_calculator", "qdk_mp2_calculator")
+  >>> calculator = qdk.chemistry.algorithms.create("dynamical_correlation_calculator", "qdk_mp2_calculator")
   >>>
   >>> # Run calculation
   >>> total_energy, result_wavefunction = calculator.run(ansatz)
@@ -79,22 +79,22 @@ Examples:
 
   ref_calc.def(py::init<>(),
                R"(
-  Create a ReferenceDerivedCalculator instance.
+  Create a DynamicalCorrelationCalculator instance.
 
   Initializes a new reference-derived calculator with default settings.
   Configuration options can be modified through the ``settings()`` method.
 
   Examples:
-    >>> calc = alg.ReferenceDerivedCalculator()
+    >>> calc = alg.DynamicalCorrelationCalculator()
     >>> calc.settings().set("max_iterations", 100)
     >>> calc.settings().set("convergence_threshold", 1e-8)
         )");
 
-  ref_calc.def("__repr__", [](const ReferenceDerivedCalculator &) {
-    return "<qdk.chemistry.algorithms.ReferenceDerivedCalculator>";
+  ref_calc.def("__repr__", [](const DynamicalCorrelationCalculator &) {
+    return "<qdk.chemistry.algorithms.DynamicalCorrelationCalculator>";
   });
 
-  ref_calc.def("run", &ReferenceDerivedCalculator::run, py::arg("ansatz"),
+  ref_calc.def("run", &DynamicalCorrelationCalculator::run, py::arg("ansatz"),
                R"(
   Perform reference-derived calculation.
 
@@ -105,10 +105,10 @@ Examples:
     tuple[float, Wavefunction]: A tuple containing the total energy and the resulting wavefunction
               )");
 
-  ref_calc.def("name", &ReferenceDerivedCalculator::name,
+  ref_calc.def("name", &DynamicalCorrelationCalculator::name,
                "Get the algorithm name");
 
-  ref_calc.def("type_name", &ReferenceDerivedCalculator::type_name,
+  ref_calc.def("type_name", &DynamicalCorrelationCalculator::type_name,
                R"(
 The algorithm's type name.
 
@@ -116,7 +116,7 @@ Returns:
   str: The type name of the algorithm
         )");
 
-  ref_calc.def("settings", &ReferenceDerivedCalculator::settings,
+  ref_calc.def("settings", &DynamicalCorrelationCalculator::settings,
                R"(
 Access the calculator's configuration settings.
 
@@ -128,10 +128,10 @@ Returns:
   // Expose _settings as a writable property for derived classes
   ref_calc.def_property(
       "_settings",
-      [](ReferenceDerivedCalculatorBase &calculator) -> Settings & {
+      [](DynamicalCorrelationCalculatorBase &calculator) -> Settings & {
         return calculator.settings();
       },
-      [](ReferenceDerivedCalculatorBase &calculator,
+      [](DynamicalCorrelationCalculatorBase &calculator,
          std::unique_ptr<qdk::chemistry::data::Settings> new_settings) {
         calculator.replace_settings(std::move(new_settings));
       },
@@ -143,7 +143,7 @@ This property allows derived classes to replace the settings object with
 a specialized Settings subclass in their constructors.
 
 Examples:
-  >>> class MyReferenceDerivedCalculator(alg.ReferenceDerivedCalculator):
+  >>> class MyDynamicalCorrelationCalculator(alg.DynamicalCorrelationCalculator):
   ...     def __init__(self):
   ...         super().__init__()
   ...         from qdk.chemistry.data import ElectronicStructureSettings
@@ -151,8 +151,8 @@ Examples:
         )");
 
   // Factory bindings
-  bind_algorithm_factory<ReferenceDerivedCalculatorFactory,
-                         ReferenceDerivedCalculator,
-                         ReferenceDerivedCalculatorBase>(
-      m, "ReferenceDerivedCalculatorFactory");
+  bind_algorithm_factory<DynamicalCorrelationCalculatorFactory,
+                         DynamicalCorrelationCalculator,
+                         DynamicalCorrelationCalculatorBase>(
+      m, "DynamicalCorrelationCalculatorFactory");
 }

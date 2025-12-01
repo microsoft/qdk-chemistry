@@ -6,7 +6,7 @@
 
 #pragma once
 #include <memory>
-#include <qdk/chemistry/algorithms/reference_derived_calculator.hpp>
+#include <qdk/chemistry/algorithms/dynamical_correlation_calculator.hpp>
 #include <qdk/chemistry/data/ansatz.hpp>
 #include <qdk/chemistry/data/wavefunction.hpp>
 
@@ -18,11 +18,11 @@ namespace qdk::chemistry::algorithms::microsoft {
  *
  * This class implements Møller-Plesset second-order perturbation theory (MP2)
  * calculations with automatic R/UMP2 selection based on the input ansatz.
- * It inherits from ReferenceDerivedCalculator and provides a unified interface
- * for MP2 calculations.
+ * It inherits from DynamicalCorrelationCalculator and provides a unified
+ * interface for MP2 calculations.
  *
  */
-class MP2Calculator : public ReferenceDerivedCalculator {
+class MP2Calculator : public DynamicalCorrelationCalculator {
  public:
   /**
    * @brief Default constructor
@@ -165,6 +165,6 @@ class MP2Calculator : public ReferenceDerivedCalculator {
 /**
  * @brief Factory function to create Microsoft MP2 calculator
  */
-std::unique_ptr<ReferenceDerivedCalculator> make_qdk_mp2_calculator();
+std::unique_ptr<DynamicalCorrelationCalculator> make_qdk_mp2_calculator();
 
 }  // namespace qdk::chemistry::algorithms::microsoft

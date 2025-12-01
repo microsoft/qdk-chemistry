@@ -9,8 +9,8 @@
 #include <fstream>
 #include <nlohmann/json.hpp>
 #include <optional>
+#include <qdk/chemistry/algorithms/dynamical_correlation_calculator.hpp>
 #include <qdk/chemistry/algorithms/hamiltonian.hpp>
-#include <qdk/chemistry/algorithms/reference_derived_calculator.hpp>
 #include <qdk/chemistry/algorithms/scf.hpp>
 #include <qdk/chemistry/data/ansatz.hpp>
 #include <qdk/chemistry/data/hamiltonian.hpp>
@@ -86,7 +86,7 @@ double _calculate_restricted_mp2_energy_algorithm(
   auto ansatz = std::make_shared<Ansatz>(*ham, *wavefunction);
 
   auto mp2_calculator =
-      ReferenceDerivedCalculatorFactory::create("qdk_mp2_calculator");
+      DynamicalCorrelationCalculatorFactory::create("qdk_mp2_calculator");
 
   auto [rmp2_total_energy, final_wavefunction] = mp2_calculator->run(ansatz);
   return rmp2_total_energy;
@@ -99,7 +99,7 @@ double _calculate_unrestricted_mp2_energy_algorithm(
   auto ansatz = std::make_shared<Ansatz>(*ham, *wavefunction);
 
   auto mp2_calculator =
-      ReferenceDerivedCalculatorFactory::create("qdk_mp2_calculator");
+      DynamicalCorrelationCalculatorFactory::create("qdk_mp2_calculator");
 
   auto [ump2_total_energy, final_wavefunction] = mp2_calculator->run(ansatz);
   return ump2_total_energy;

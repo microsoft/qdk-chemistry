@@ -168,7 +168,7 @@ class TestPyscfPlugin:
 
     def test_pyscf_cc_calculator(self):
         """Test creating PySCF Coupled Cluster module."""
-        cc = algorithms.create("reference_derived_calculator", "pyscf_coupled_cluster")
+        cc = algorithms.create("dynamical_correlation_calculator", "pyscf_coupled_cluster")
         assert cc is not None
 
     def test_pyscf_stability_checker_creation(self):
@@ -235,7 +235,7 @@ class TestPyscfPlugin:
 
     def test_pyscf_cc_settings(self):
         """Test PySCF Coupled Cluster settings interface."""
-        cc = algorithms.create("reference_derived_calculator", "pyscf_coupled_cluster")
+        cc = algorithms.create("dynamical_correlation_calculator", "pyscf_coupled_cluster")
         settings = cc.settings()
 
         # Test that settings object exists
@@ -1407,7 +1407,7 @@ class TestPyscfPlugin:
         hamiltonian = ham_calculator.run(wavefunction.get_orbitals())
 
         # Compute CC energy
-        cc_calculator = algorithms.create("reference_derived_calculator", "pyscf_coupled_cluster")
+        cc_calculator = algorithms.create("dynamical_correlation_calculator", "pyscf_coupled_cluster")
         cc_calculator.settings().set("store_amplitudes", True)
         ansatz_object = Ansatz(hamiltonian, wavefunction)
         cc_energy, updated_wavefunction = cc_calculator.run(ansatz_object)
@@ -1441,7 +1441,7 @@ class TestPyscfPlugin:
         hamiltonian = ham_calculator.run(orbitals)
 
         # Compute UCCSD energy
-        cc_calculator = algorithms.create("reference_derived_calculator", "pyscf_coupled_cluster")
+        cc_calculator = algorithms.create("dynamical_correlation_calculator", "pyscf_coupled_cluster")
         cc_calculator.settings().set("store_amplitudes", True)
         ansatz_object = Ansatz(hamiltonian, wavefunction)
         cc_energy, updated_wavefunction = cc_calculator.run(ansatz_object)

@@ -11,8 +11,8 @@
 #include <fstream>
 #include <nlohmann/json.hpp>
 #include <optional>
+#include <qdk/chemistry/algorithms/dynamical_correlation_calculator.hpp>
 #include <qdk/chemistry/algorithms/hamiltonian.hpp>
-#include <qdk/chemistry/algorithms/reference_derived_calculator.hpp>
 #include <qdk/chemistry/algorithms/scf.hpp>
 #include <qdk/chemistry/data/ansatz.hpp>
 #include <qdk/chemistry/data/hamiltonian.hpp>
@@ -56,7 +56,7 @@ TEST_F(MP2Test, UMP2Energies_CCPVDZ) {
   auto ansatz = std::make_shared<Ansatz>(*hf_hamiltonian, *hf_wavefunction);
 
   auto mp2_calculator =
-      ReferenceDerivedCalculatorFactory::create("qdk_mp2_calculator");
+      DynamicalCorrelationCalculatorFactory::create("qdk_mp2_calculator");
 
   auto [mp2_total_energy, final_wavefunction] = mp2_calculator->run(ansatz);
 
@@ -105,7 +105,7 @@ TEST_F(MP2Test, RMP2Energies_CCPVDZ) {
 
   // Use MP2 calculator
   auto mp2_calculator =
-      ReferenceDerivedCalculatorFactory::create("qdk_mp2_calculator");
+      DynamicalCorrelationCalculatorFactory::create("qdk_mp2_calculator");
 
   // MP2 returns total energy, subtract reference to get correlation energy
   auto [mp2_total_energy, final_wavefunction] = mp2_calculator->run(ansatz);

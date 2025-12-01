@@ -26,7 +26,7 @@ void bind_constants(py::module& m);
 void bind_pmc(py::module& m);
 void bind_configuration(py::module& m);
 void bind_qdk_chemistry_config(py::module& m);
-void bind_reference_derived_calculator(py::module& m);
+void bind_dynamical_correlation_calculator(py::module& m);
 void bind_utils(py::module& m);
 
 PYBIND11_MODULE(_core, m) {
@@ -59,7 +59,7 @@ PYBIND11_MODULE(_core, m) {
   bind_hamiltonian_constructor(algorithms);
   bind_scf(algorithms);
   bind_active_space(algorithms);
-  bind_reference_derived_calculator(algorithms);
+  bind_dynamical_correlation_calculator(algorithms);
   bind_pmc(algorithms);
   bind_stability(algorithms);
 

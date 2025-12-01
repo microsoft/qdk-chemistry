@@ -52,7 +52,7 @@ class TestMP2Validation:
         # Create ansatz from Hamiltonian and wavefunction
         ansatz = Ansatz(qdk_hamiltonian, hf_wavefunction)
 
-        mp2_calculator = create("reference_derived_calculator", "qdk_mp2_calculator")
+        mp2_calculator = create("dynamical_correlation_calculator", "qdk_mp2_calculator")
 
         qdk_mp2_total_energy, _ = mp2_calculator.run(ansatz)
 
@@ -74,7 +74,7 @@ class TestMP2Validation:
         o2_molecule = create_o2_molecule(bond_length=2.3)
 
         # Create MP2 calculator
-        mp2_calculator = create("reference_derived_calculator", "qdk_mp2_calculator")
+        mp2_calculator = create("dynamical_correlation_calculator", "qdk_mp2_calculator")
 
         # Restricted calculation
         qdk_scf_solver = create("scf_solver")

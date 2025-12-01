@@ -34,7 +34,7 @@ This module requires both QDK/Chemistry and PySCF to be installed.
 import numpy as np
 from pyscf import cc
 
-from qdk_chemistry.algorithms import ReferenceDerivedCalculator, register
+from qdk_chemistry.algorithms import DynamicalCorrelationCalculator, register
 from qdk_chemistry.data import CoupledClusterContainer, Settings, Wavefunction
 from qdk_chemistry.plugins.pyscf.utils import hamiltonian_to_scf
 
@@ -83,7 +83,7 @@ class PyscfCoupledClusterSettings(Settings):
         self._set_default("store_amplitudes", "bool", False)
 
 
-class PyscfCoupledClusterCalculator(ReferenceDerivedCalculator):
+class PyscfCoupledClusterCalculator(DynamicalCorrelationCalculator):
     """PySCF-based Coupled Cluster calculator for quantum chemistry calculations.
 
     This class provides an interface between QDK/Chemistry and PySCF for performing

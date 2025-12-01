@@ -41,7 +41,7 @@ from qdk_chemistry.algorithms.projected_multi_configuration_calculator import (
     QdkMacisPmc,
 )
 from qdk_chemistry.algorithms.qubit_mapper import QubitMapper
-from qdk_chemistry.algorithms.reference_derived_calculator import ReferenceDerivedCalculator
+from qdk_chemistry.algorithms.dynamical_correlation_calculator import DynamicalCorrelationCalculator
 from qdk_chemistry.algorithms.scf_solver import QdkScfSolver, ScfSolver
 from qdk_chemistry.algorithms.stability_checker import StabilityChecker
 from qdk_chemistry.algorithms.state_preparation import StatePreparation
@@ -79,7 +79,7 @@ __all__ = [
     "QdkScfSolver",
     "QdkValenceActiveSpaceSelector",
     "QubitMapper",
-    "ReferenceDerivedCalculator",
+    "DynamicalCorrelationCalculator",
     "ScfSolver",
     "StabilityChecker",
     "StatePreparation",
