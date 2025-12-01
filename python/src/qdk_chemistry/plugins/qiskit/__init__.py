@@ -6,11 +6,13 @@
 
 import warnings
 
-# Import necessary modules
-import qdk_chemistry.plugins.qiskit.energy_estimator
-import qdk_chemistry.plugins.qiskit.qubit_mapper
-import qdk_chemistry.plugins.qiskit.regular_isometry
-
 # Suppress deprecation warnings from Qiskit and Aer dependencies
 warnings.filterwarnings("ignore", category=DeprecationWarning, module="qiskit.*")
 warnings.filterwarnings("ignore", category=DeprecationWarning, module="qiskit_aer.*")
+
+
+def load():
+    """Load the Qiskit plugin into QDK/Chemistry."""
+    import qdk_chemistry.plugins.qiskit.energy_estimator  # noqa: PLC0415
+    import qdk_chemistry.plugins.qiskit.qubit_mapper  # noqa: PLC0415
+    import qdk_chemistry.plugins.qiskit.regular_isometry  # noqa: PLC0415

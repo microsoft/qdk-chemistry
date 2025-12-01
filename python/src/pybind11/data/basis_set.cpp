@@ -684,11 +684,8 @@ Examples:
 Get ECP shell indices for a specific atom and orbital type.
 
 Args:
-
-atom_index : int
-    Index of the atom
-orbital_type : OrbitalType
-    Type of orbital (S, P, D, F, etc.)
+    atom_index (int): Index of the atom
+    orbital_type (OrbitalType): Type of orbital (S, P, D, F, etc.)
 
 Returns:
     list[int]: Vector of ECP shell indices matching both criteria

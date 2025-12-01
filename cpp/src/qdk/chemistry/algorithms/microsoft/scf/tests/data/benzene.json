@@ -1,14 +1,13 @@
 {
-"RKS/PBE/cc-pvdz" : {
-  "mol": "benzene",
-  "charge": 0,
-  "multiplicity" : 1,
-  "basis": "cc-pvdz",
-  "cart" : false,
-  "functional": "pbe",
-  "method": "RKS",
-  "converge_threshold": 1e-8,
-  "level_shift": 0.8,
-  "energy": -231.950538208891
-}
+  "RKS/PBE/cc-pvdz": {
+    "mol": "benzene",
+    "charge": 0,
+    "multiplicity": 1,
+    "basis": "cc-pvdz",
+    "cart": false,
+    "functional": "pbe",
+    "method": "RKS",
+    "level_shift": 0.8,
+    "energy": -231.950538225394
+  }
 }

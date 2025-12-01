@@ -24,6 +24,8 @@ References
 # Licensed under the MIT License. See LICENSE.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
 
+from __future__ import annotations
+
 import re
 
 import numpy as np
@@ -32,6 +34,8 @@ from pyscf.mcscf import avas
 from qdk_chemistry.algorithms import ActiveSpaceSelector, register
 from qdk_chemistry.data import Configuration, Orbitals, Settings, SlaterDeterminantContainer, Wavefunction
 from qdk_chemistry.plugins.pyscf.utils import orbitals_to_scf
+
+__all__ = ["PyscfAVAS", "PyscfAVASSettings"]
 
 
 class PyscfAVASSettings(Settings):

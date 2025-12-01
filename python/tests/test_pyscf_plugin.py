@@ -36,7 +36,7 @@ except ImportError:
 if PYSCF_AVAILABLE:
     from qdk_chemistry.constants import ANGSTROM_TO_BOHR
     from qdk_chemistry.data import AOType, BasisSet, OrbitalType, Shell
-    from qdk_chemistry.plugins.pyscf.mcscf import mcsolver_to_fcisolver
+    from qdk_chemistry.plugins.pyscf.mcscf import _mcsolver_to_fcisolver
     from qdk_chemistry.plugins.pyscf.utils import (
         basis_to_pyscf_mol,
         hamiltonian_to_scf,
@@ -1578,7 +1578,7 @@ class TestPyscfPlugin:
 
         # Create PySCF CASCI calculation with macis
         casci = pyscf.mcscf.CASCI(pyscf_scf, 6, 6)
-        casci.fcisolver = mcsolver_to_fcisolver(pyscf_mol, macis_calc)
+        casci.fcisolver = _mcsolver_to_fcisolver(pyscf_mol, macis_calc)
         casci.verbose = 0
         casci_energy = casci.kernel()[0]
 
@@ -1608,7 +1608,7 @@ class TestPyscfPlugin:
 
         # Create PySCF CASCI calculation with macis
         casci = pyscf.mcscf.CASCI(pyscf_scf, 8, 6)
-        casci.fcisolver = mcsolver_to_fcisolver(pyscf_mol, macis_calc)
+        casci.fcisolver = _mcsolver_to_fcisolver(pyscf_mol, macis_calc)
         casci.verbose = 0
         casci_energy = casci.kernel()[0]
 
@@ -1640,7 +1640,7 @@ class TestPyscfPlugin:
 
         # Create PySCF CASSCF calculation with macis
         casscf = pyscf.mcscf.CASSCF(pyscf_scf, 6, 6)
-        casscf.fcisolver = mcsolver_to_fcisolver(pyscf_mol, macis_calc)
+        casscf.fcisolver = _mcsolver_to_fcisolver(pyscf_mol, macis_calc)
         casscf.verbose = 0
         casscf_energy = casscf.kernel()[0]
 
@@ -1672,7 +1672,7 @@ class TestPyscfPlugin:
 
         # Create PySCF CASSCF calculation with macis
         casscf = pyscf.mcscf.CASSCF(pyscf_scf, 6, 6)
-        casscf.fcisolver = mcsolver_to_fcisolver(pyscf_mol, macis_calc)
+        casscf.fcisolver = _mcsolver_to_fcisolver(pyscf_mol, macis_calc)
         casscf.verbose = 0
         casscf_energy = casscf.kernel()[0]
 

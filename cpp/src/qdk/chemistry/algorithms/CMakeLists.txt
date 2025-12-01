@@ -4,7 +4,6 @@ target_sources(chemistry PRIVATE
     localization.cpp
     mc.cpp
     pmc.cpp
-    mcscf.cpp
     reference_derived_calculator.cpp
     scf.cpp
 )

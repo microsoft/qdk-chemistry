@@ -15,7 +15,6 @@
 #include <spdlog/spdlog.h>
 
 #include <blas.hh>
-#include <qdk/chemistry/utils/omp_utils.hpp>
 
 #define INCORE_ERI_GEN_DEBUG 0xF00
 #define INCORE_ERI_CON_HOST 0x0F0

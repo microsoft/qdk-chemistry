@@ -38,6 +38,8 @@ from qdk_chemistry.algorithms import ReferenceDerivedCalculator, register
 from qdk_chemistry.data import CoupledClusterContainer, Settings, Wavefunction
 from qdk_chemistry.plugins.pyscf.utils import hamiltonian_to_scf
 
+__all__ = ["PyscfCoupledClusterCalculator", "PyscfCoupledClusterSettings"]
+
 
 class PyscfCoupledClusterSettings(Settings):
     """Settings configuration for the PySCF Coupled Cluster calculator.

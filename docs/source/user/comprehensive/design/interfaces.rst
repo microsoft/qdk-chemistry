@@ -30,7 +30,7 @@ The interface system is built on the following principles:
 Supported interfaces
 --------------------
 
-QDK/Chemistry provides interfaces to many popular quantum chemistry packages, each carefully integrated to preserve their strengths while presenting a unified API to the user.
+QDK/Chemistry provides interfaces to other popular quantum chemistry packages, each carefully integrated to preserve their strengths while presenting a unified API to the user.
 These include:
 
 - **PySCF**: Python-based Simulations of Chemistry Framework
@@ -47,25 +47,17 @@ This pattern is implemented across all major algorithm types in QDK/Chemistry.
 
 .. tab:: C++ API
 
-   .. code-block:: cpp
-
-      #include <qdk/chemistry.hpp>
-
-      // Create an SCF solver that uses the QDK/Chemistry library as solver
-      auto scf = ScfSolverFactory::create();
-
-      // Configure it using the standard settings interface
-      scf->settings().set("basis_set", "cc-pvdz");
-      scf->settings().set("method", "hf");
-
-      // Run calculation with the same API as native implementations
-      auto [energy, orbitals] = scf->solve(structure);
+   .. literalinclude:: ../../../_static/examples/cpp/interfaces.cpp
+      :language: cpp
+      :start-after: // start-cell-scf
+      :end-before: // end-cell-scf
 
 .. tab:: Python API
 
-   .. literalinclude:: ../../../../examples/interfaces.py
+   .. literalinclude:: ../../../_static/examples/python/interfaces.py
       :language: python
-      :lines: 1-14
+      :start-after: # start-cell-scf
+      :end-before: # end-cell-scf
 
 Listing available implementations
 ---------------------------------
@@ -74,25 +66,17 @@ You can discover what implementations are available for each algorithm type:
 
 .. tab:: C++ API
 
-   .. code-block:: cpp
-
-      #include <qdk/chemistry.hpp>
-      #include <iostream>
-
-      // Get a list of available SCF solver implementations
-      auto available_solvers = ScfSolverFactory::available();
-      for (const auto& solver : available_solvers) {
-        std::cout << solver << std::endl;
-      }
-
-      // Get documentation for a specific implementation
-      std::cout << ScfSolverFactory::get_docstring("default") << std::endl;
+   .. literalinclude:: ../../../_static/examples/cpp/interfaces.cpp
+      :language: cpp
+      :start-after: // start-cell-list-methods
+      :end-before: // end-cell-list-methods
 
 .. tab:: Python API
 
-   .. literalinclude:: ../../../../examples/factory_pattern.py
+   .. literalinclude:: ../../../_static/examples/python/interfaces.py
       :language: python
-      :lines: 1-13
+      :start-after: # start-cell-list-methods
+      :end-before: # end-cell-list-methods
 
 Adding new interfaces
 ---------------------
@@ -111,6 +95,7 @@ To create a new interface:
    .. code-block:: cpp
 
       #include <qdk/chemistry.hpp>
+
       #include "custom_chemistry_package.hpp"
 
       namespace qdk::chemistry {
@@ -118,38 +103,37 @@ To create a new interface:
 
       class CustomScfSolver : public ScfSolver {
       public:
-        CustomScfSolver() = default;
+      CustomScfSolver() = default;
 
-        std::tuple<double, data::Orbitals> solve(
+      std::tuple<double, data::Orbitals> solve(
             const data::Structure& structure) override {
-          // Convert QDK/Chemistry structure to custom package format
-          auto custom_mol = convert_to_custom_format(structure);
+         // Convert QDK/Chemistry structure to custom package format
+         auto custom_mol = convert_to_custom_format(structure);
 
-          // Run calculation with custom package
-          auto result = custom_chemistry::run_scf(
-              custom_mol,
-              settings().get<std::string>("basis_set"),
-              settings().get<std::string>("method")
-          );
+         // Run calculation with custom package
+         auto result = custom_chemistry::run_scf(
+            custom_mol, settings().get<std::string>("basis_set"),
+            settings().get<std::string>("method"));
 
-          // Convert results back to QDK/Chemistry format
-          double energy = result.energy;
-          data::Orbitals orbitals = convert_from_custom_format(result.orbitals);
+         // Convert results back to QDK/Chemistry format
+         double energy = result.energy;
+         data::Orbitals orbitals = convert_from_custom_format(result.orbitals);
 
-          return {energy, orbitals};
-        }
+         return {energy, orbitals};
+      }
 
       private:
-        custom_chemistry::Molecule convert_to_custom_format(const data::Structure& structure);
-        data::Orbitals convert_from_custom_format(const custom_chemistry::Orbitals& orbitals);
+      custom_chemistry::Molecule convert_to_custom_format(
+            const data::Structure& structure);
+      data::Orbitals convert_from_custom_format(
+            const custom_chemistry::Orbitals& orbitals);
       };
 
       // Register in a static initializer block
       namespace {
       bool registered = ScfSolverFactory::register_implementation(
-          "custom",
-          []() { return std::make_unique<CustomScfSolver>(); },
-          "Interface to Custom Chemistry Package");
+         "custom", []() { return std::make_unique<CustomScfSolver>(); },
+         "Interface to Custom Chemistry Package");
       }  // anonymous namespace
 
       }  // namespace algorithms
@@ -198,19 +182,17 @@ This approach leverages the flexibility of QDK/Chemistry's :doc:`settings system
 
 .. tab:: C++ API
 
-   .. code-block:: cpp
-
-      // Set general options that work across all backends
-      scf->settings().set("basis_set", "cc-pvdz");
-      scf->settings().set("max_iterations", 100);
+   .. literalinclude:: ../../../_static/examples/cpp/interfaces.cpp
+      :language: cpp
+      :start-after: // start-cell-settings
+      :end-before: // end-cell-settings
 
 .. tab:: Python API
 
-   .. code-block:: python
-
-      # Set general options that work across all backends
-      scf.settings().set("basis_set", "cc-pvdz")
-      scf.settings().set("max_iterations", 100)
+   .. literalinclude:: ../../../_static/examples/python/interfaces.py
+      :language: python
+      :start-after: # start-cell-settings
+      :end-before: # end-cell-settings
 
 Each interface implementation typically documents its specific settings, including both the common settings that are
 translated to the backend and the backend-specific settings that are passed through directly.
@@ -224,11 +206,16 @@ This capability is built on QDK/Chemistry's robust :doc:`serialization <../data/
 
 The data types that are automatically converted include:
 
-- **:doc:`Molecular structures <../data/structure>`**: Atoms, coordinates, charges, and multiplicity
-- **:doc:`Basis sets <../data/basis_set>`**: Basis set specifications, primitive and contracted functions
-- **:doc:`Orbitals and wavefunctions <../data/orbitals>`**: Coefficients, occupations, and energies
-- **:doc:`Hamiltonians <../data/hamiltonian>`**: One and two-electron integrals, core Hamiltonians
-- **Calculation results** (see :class:`~qdk_chemistry.data.Wavefunction`): Energies, gradients, properties
+:doc:`Molecular structures <../data/structure>`:
+   Atoms, coordinates, charges, and multiplicity
+:doc:`Basis sets <../data/basis_set>`:
+   Basis set specifications, primitive and contracted functions
+:doc:`Orbitals and wavefunctions <../data/orbitals>`:
+   Coefficients, occupations, and energies
+:doc:`Hamiltonians <../data/hamiltonian>`:
+   One and two-electron integrals, core Hamiltonians
+Calculation results (see :class:`~qdk_chemistry.data.Wavefunction`):
+   Energies, gradients, properties
 
 The conversion process is optimized to minimize data copying when possible, especially for large data structures like electron repulsion integrals (:term:`ERIs`).
 When working with large systems, QDK/Chemistry may use direct algorithms or disk-based approaches to manage memory usage efficiently.
@@ -266,7 +253,7 @@ Each algorithm class is implemented through the factory pattern, allowing you to
    * - :class:`~qdk_chemistry.algorithms.ScfSolver`
      - "qdk"
      - "pyscf"
-   * - :class:`~qdk_chemistry.algorithms.Localizer`
+   * - :class:`~qdk_chemistry.algorithms.OrbitalLocalizer`
      - "qdk"
      - "pyscf"
    * - :class:`~qdk_chemistry.algorithms.MultiConfigurationCalculator`
@@ -279,9 +266,10 @@ Each algorithm class is implemented through the factory pattern, allowing you to
 .. TODO: fix the function names below in this commented-out text.
 .. You can discover all available implementations for a particular algorithm using the appropriate listing function (e.g., ``list_scf_solvers()`` in Python or ``ScfSolverFactory::available()`` in C++).
 
-Related topics
---------------
+Further reading
+---------------
 
+- Some of the above examples can be downloaded as complete `C++ <../../../_static/examples/cpp/interfaces.cpp>`_ and `Python <../../../_static/examples/python/interfaces.py>`_ scripts.
 - :doc:`Design principles <index>`: Core architectural principles of QDK/Chemistry
 - :doc:`Factory pattern <factory_pattern>`: How to extend QDK/Chemistry with new algorithms and interfaces
 - :doc:`Settings <settings>`: Configuring algorithm behavior consistently across implementations

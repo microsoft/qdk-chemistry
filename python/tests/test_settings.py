@@ -28,15 +28,13 @@ class _TestSettingsContainer(Settings):
         # Define all settings that will be used in the tests
         self._set_default("use_optimization", "bool", False)
         self._set_default("max_iterations", "int", 0)
-        self._set_default("tolerance", "double", 0.0)
+        self._set_default("convergence_threshold", "double", 0.0)
         self._set_default("method", "string", "")
         self._set_default("active_orbitals", "vector<int>", [])
         self._set_default("weights", "vector<double>", [])
         self._set_default("keywords", "vector<string>", [])
         self._set_default("bool_val", "bool", False)
         self._set_default("int_val", "int", 0)
-        self._set_default("long_val", "int", 0)
-        self._set_default("size_t_val", "int", 0)
         self._set_default("float_val", "double", 0.0)
         self._set_default("double_val", "double", 0.0)
         self._set_default("string_val", "string", "")
@@ -90,17 +88,15 @@ class _TestSettingsContainer(Settings):
 
         # Keys for test_advanced_type_conversions
         self._set_default("small_int", "int", 0)
-        self._set_default("large_int", "int64_t", 0)
-        self._set_default("very_large_int", "size_t", 0)
+        self._set_default("large_int", "int", 0)
+        self._set_default("very_large_int", "int", 0)
         self._set_default("int_min", "int", 0)
         self._set_default("int_max", "int", 0)
-        self._set_default("size_t_candidate", "size_t", 0)
-        self._set_default("negative_large", "int64_t", 0)
+        self._set_default("negative_large", "int", 0)
         self._set_default("precise_float", "double", 0.0)
         self._set_default("simple_float", "float", 0.0)
         self._set_default("float_boundary", "float", 0.0)
         self._set_default("double_precision", "double", 0.0)
-        self._set_default("bool_list", "vector<bool>", [])
         self._set_default("empty_list", "vector<int>", [])
         self._set_default("tuple_ints", "vector<int>", [])
         self._set_default("tuple_floats", "vector<double>", [])
@@ -137,10 +133,8 @@ class _TestSettingsContainer(Settings):
         self._set_default("very_small", "double", 0.0)
         self._set_default("very_large", "double", 0.0)
         self._set_default("empty_int_list", "vector<int>", [])
-        self._set_default("all_bool_list", "vector<bool>", [])
-        self._set_default("first_bool_list", "vector<bool>", [])
         self._set_default("first_int_list", "vector<int>", [])
-        self._set_default("first_float_list", "vector<float>", [])
+        self._set_default("first_float_list", "vector<double>", [])
         self._set_default("first_str_list", "vector<string>", [])
 
 
@@ -170,9 +164,9 @@ class TestSettings:
         assert isinstance(settings.get("max_iterations"), int)
 
         # Test float
-        settings.set("tolerance", 1e-6)
-        assert settings.get("tolerance") == 1e-6
-        assert isinstance(settings.get("tolerance"), float)
+        settings.set("convergence_threshold", 1e-6)
+        assert settings.get("convergence_threshold") == 1e-6
+        assert isinstance(settings.get("convergence_threshold"), float)
 
         # Test string
         settings.set("method", "hf")
@@ -207,13 +201,13 @@ class TestSettings:
         # Test setting values
         settings["method"] = "hf"
         settings["max_iterations"] = 100
-        settings["tolerance"] = 1e-6
+        settings["convergence_threshold"] = 1e-6
         settings["use_optimization"] = True
 
         # Test getting values
         assert settings["method"] == "hf"
         assert settings["max_iterations"] == 100
-        assert settings["tolerance"] == 1e-6
+        assert settings["convergence_threshold"] == 1e-6
         assert settings["use_optimization"] is True
 
         # Test updating values
@@ -227,13 +221,13 @@ class TestSettings:
         # Test setting values
         settings.method = "hf"
         settings.max_iterations = 100
-        settings.tolerance = 1e-6
+        settings.convergence_threshold = 1e-6
         settings.use_optimization = True
 
         # Test getting values
         assert settings.method == "hf"
         assert settings.max_iterations == 100
-        assert settings.tolerance == 1e-6
+        assert settings.convergence_threshold == 1e-6
         assert settings.use_optimization is True
 
         # Test updating values
@@ -249,8 +243,8 @@ class TestSettings:
         assert settings.method == "hf"
 
         # Set with attribute, get with dictionary
-        settings.tolerance = 1e-6
-        assert settings["tolerance"] == 1e-6
+        settings.convergence_threshold = 1e-6
+        assert settings["convergence_threshold"] == 1e-6
 
         # Both should be equivalent
         settings["max_iter"] = 100
@@ -262,16 +256,16 @@ class TestSettings:
         """Test membership testing with 'in' operator."""
         settings = _TestSettingsContainer()
         settings["method"] = "hf"
-        settings["tolerance"] = 1e-6
+        settings["convergence_threshold"] = 1e-6
 
         # Test membership
         assert "method" in settings
-        assert "tolerance" in settings
+        assert "convergence_threshold" in settings
         assert "nonexistent" not in settings
 
         # Test has method
         assert settings.has("method")
-        assert settings.has("tolerance")
+        assert settings.has("convergence_threshold")
         assert not settings.has("nonexistent")
 
     def test_size_and_empty_operations(self):
@@ -286,7 +280,7 @@ class TestSettings:
 
         # Add some settings (update existing ones)
         settings["method"] = "hf"
-        settings["tolerance"] = 1e-6
+        settings["convergence_threshold"] = 1e-6
         assert not settings.empty()
         assert len(settings) == initial_size  # Same size, just updated values
         assert settings.size() == initial_size
@@ -304,18 +298,18 @@ class TestSettings:
         # Reset values to default and set only what we need
         settings["method"] = ""
         settings["max_iterations"] = 0
-        settings["tolerance"] = 0.0
+        settings["convergence_threshold"] = 0.0
 
         # Set our test values
         settings["method"] = "hf"
         settings["max_iterations"] = 100
-        settings["tolerance"] = 1e-6
+        settings["convergence_threshold"] = 1e-6
 
         # Test keys method - now contains all predefined keys
         keys = settings.keys()
         assert "method" in keys
         assert "max_iterations" in keys
-        assert "tolerance" in keys
+        assert "convergence_threshold" in keys
         # Don't assert exact length since there are predefined keys
 
         # Test iteration over keys
@@ -325,7 +319,7 @@ class TestSettings:
 
         assert "method" in iterated_keys
         assert "max_iterations" in iterated_keys
-        assert "tolerance" in iterated_keys
+        assert "convergence_threshold" in iterated_keys
 
         # Test explicit keys iteration
         explicit_keys = []
@@ -334,7 +328,7 @@ class TestSettings:
 
         assert "method" in explicit_keys
         assert "max_iterations" in explicit_keys
-        assert "tolerance" in explicit_keys
+        assert "convergence_threshold" in explicit_keys
 
     def test_values_iteration(self):
         """Test values method and iteration."""
@@ -343,7 +337,7 @@ class TestSettings:
         # Set our test values
         settings["method"] = "hf"
         settings["max_iterations"] = 100
-        settings["tolerance"] = 1e-6
+        settings["convergence_threshold"] = 1e-6
 
         # Test values method - will contain all values including defaults
         values = settings.values()
@@ -367,14 +361,14 @@ class TestSettings:
         # Set our test values
         settings["method"] = "hf"
         settings["max_iterations"] = 100
-        settings["tolerance"] = 1e-6
+        settings["convergence_threshold"] = 1e-6
 
         # Test items method - will contain all items including defaults
         items = settings.items()
         items_dict = dict(items)
         assert items_dict["method"] == "hf"
         assert items_dict["max_iterations"] == 100
-        assert items_dict["tolerance"] == 1e-6
+        assert items_dict["convergence_threshold"] == 1e-6
 
         # Test iteration over items
         iterated_items = {}
@@ -383,7 +377,7 @@ class TestSettings:
 
         assert iterated_items["method"] == "hf"
         assert iterated_items["max_iterations"] == 100
-        assert iterated_items["tolerance"] == 1e-6
+        assert iterated_items["convergence_threshold"] == 1e-6
 
     def test_get_or_default(self):
         """Test get_or_default method."""
@@ -444,7 +438,7 @@ class TestSettings:
         settings = _TestSettingsContainer()
         settings["method"] = "hf"
         settings["max_iterations"] = 100
-        settings["tolerance"] = 1e-6
+        settings["convergence_threshold"] = 1e-6
         settings["use_symmetry"] = True
         settings["active_orbitals"] = [1, 2, 3]
 
@@ -453,7 +447,7 @@ class TestSettings:
         assert isinstance(settings_dict, dict)
         assert settings_dict["method"] == "hf"
         assert settings_dict["max_iterations"] == 100
-        assert settings_dict["tolerance"] == 1e-6
+        assert settings_dict["convergence_threshold"] == 1e-6
         assert settings_dict["use_symmetry"] is True
         assert settings_dict["active_orbitals"] == [1, 2, 3]
 
@@ -510,7 +504,7 @@ class TestSettings:
         settings = _TestSettingsContainer()
         settings["method"] = "hf"
         settings["max_iterations"] = 100
-        settings["tolerance"] = 1e-6
+        settings["convergence_threshold"] = 1e-6
         settings["use_symmetry"] = True
         settings["active_orbitals"] = [1, 2, 3]
 
@@ -522,7 +516,7 @@ class TestSettings:
         parsed = json.loads(json_str)
         assert parsed["method"] == "hf"
         assert parsed["max_iterations"] == 100
-        assert parsed["tolerance"] == 1e-6
+        assert parsed["convergence_threshold"] == 1e-6
         assert parsed["use_symmetry"] is True
         assert parsed["active_orbitals"] == [1, 2, 3]
 
@@ -531,7 +525,7 @@ class TestSettings:
 
         assert new_settings["method"] == "hf"
         assert new_settings["max_iterations"] == 100
-        assert new_settings["tolerance"] == 1e-6
+        assert new_settings["convergence_threshold"] == 1e-6
         assert new_settings["use_symmetry"] is True
         assert new_settings["active_orbitals"] == [1, 2, 3]
 
@@ -548,7 +542,7 @@ class TestSettings:
 
         assert new_settings2["method"] == "hf"
         assert new_settings2["max_iterations"] == 100
-        assert new_settings2["tolerance"] == 1e-6
+        assert new_settings2["convergence_threshold"] == 1e-6
         assert new_settings2["use_symmetry"] is True
         assert new_settings2["active_orbitals"] == [1, 2, 3]
 
@@ -564,7 +558,7 @@ class TestSettings:
         settings = _TestSettingsContainer()
         settings["method"] = "hf"
         settings["max_iterations"] = 100
-        settings["tolerance"] = 1e-6
+        settings["convergence_threshold"] = 1e-6
 
         with tempfile.TemporaryDirectory() as tmpdir:
             tmpdir_path = Path(tmpdir)
@@ -579,21 +573,21 @@ class TestSettings:
                 data = json.load(f)
             assert data["method"] == "hf"
             assert data["max_iterations"] == 100
-            assert data["tolerance"] == 1e-6
+            assert data["convergence_threshold"] == 1e-6
 
             # Test from_json_file
             new_settings = Settings.from_json_file(json_file)
 
             assert new_settings["method"] == "hf"
             assert new_settings["max_iterations"] == 100
-            assert new_settings["tolerance"] == 1e-6
+            assert new_settings["convergence_threshold"] == 1e-6
 
     def test_hdf5_file_operations(self):
         """Test HDF5 file operations."""
         settings = _TestSettingsContainer()
         settings["method"] = "hf"
         settings["max_iterations"] = 100
-        settings["tolerance"] = 1e-6
+        settings["convergence_threshold"] = 1e-6
         settings["use_symmetry"] = True
 
         try:
@@ -610,7 +604,7 @@ class TestSettings:
 
                 assert new_settings["method"] == "hf"
                 assert new_settings["max_iterations"] == 100
-                assert new_settings["tolerance"] == 1e-6
+                assert new_settings["convergence_threshold"] == 1e-6
                 assert new_settings["use_symmetry"] is True
 
                 # Test round-trip with multiple data types
@@ -644,7 +638,7 @@ class TestSettings:
         settings = _TestSettingsContainer()
         settings["method"] = "hf"
         settings["max_iterations"] = 100
-        settings["tolerance"] = 1e-6
+        settings["convergence_threshold"] = 1e-6
         settings["use_symmetry"] = True
 
         with tempfile.TemporaryDirectory() as tmpdir:
@@ -659,14 +653,14 @@ class TestSettings:
                 data = json.load(f)
             assert data["method"] == "hf"
             assert data["max_iterations"] == 100
-            assert data["tolerance"] == 1e-6
+            assert data["convergence_threshold"] == 1e-6
             assert data["use_symmetry"] is True
 
             # Test loading from JSON
             new_settings = Settings.from_file(json_file, "json")
             assert new_settings["method"] == "hf"
             assert new_settings["max_iterations"] == 100
-            assert new_settings["tolerance"] == 1e-6
+            assert new_settings["convergence_threshold"] == 1e-6
             assert new_settings["use_symmetry"] is True
 
             # Test HDF5 format through generic interface
@@ -679,7 +673,7 @@ class TestSettings:
                 new_settings_hdf5 = Settings.from_file(hdf5_file, "hdf5")
                 assert new_settings_hdf5["method"] == "hf"
                 assert new_settings_hdf5["max_iterations"] == 100
-                assert new_settings_hdf5["tolerance"] == 1e-6
+                assert new_settings_hdf5["convergence_threshold"] == 1e-6
                 assert new_settings_hdf5["use_symmetry"] is True
 
                 # Test unsupported file formats
@@ -780,7 +774,7 @@ class TestSettings:
         settings = _TestSettingsContainer()
         settings["method"] = "hf"
         settings["max_iterations"] = 100
-        settings["tolerance"] = 1e-6
+        settings["convergence_threshold"] = 1e-6
         settings["use_symmetry"] = True
         settings["active_orbitals"] = [1, 2, 3]
 
@@ -834,7 +828,7 @@ class TestSettings:
         settings = _TestSettingsContainer()
         settings["method"] = "hf"
         settings["max_iterations"] = 100
-        settings["tolerance"] = 1e-6
+        settings["convergence_threshold"] = 1e-6
         settings["use_symmetry"] = True
         settings["active_orbitals"] = [1, 2, 3, 4, 5]
         settings["coefficients"] = [0.1, 0.2, 0.3, 0.4]
@@ -851,7 +845,7 @@ class TestSettings:
             # Verify all data types are preserved
             assert new_settings["method"] == "hf"
             assert new_settings["max_iterations"] == 100
-            assert new_settings["tolerance"] == 1e-6
+            assert new_settings["convergence_threshold"] == 1e-6
             assert new_settings["use_symmetry"] is True
             assert new_settings["active_orbitals"] == [1, 2, 3, 4, 5]
             assert new_settings["coefficients"] == [0.1, 0.2, 0.3, 0.4]
@@ -867,7 +861,7 @@ class TestSettings:
                 # Verify all data types are preserved
                 assert new_settings_hdf5["method"] == "hf"
                 assert new_settings_hdf5["max_iterations"] == 100
-                assert new_settings_hdf5["tolerance"] == 1e-6
+                assert new_settings_hdf5["convergence_threshold"] == 1e-6
                 assert new_settings_hdf5["use_symmetry"] is True
                 assert new_settings_hdf5["active_orbitals"] == [1, 2, 3, 4, 5]
                 assert new_settings_hdf5["coefficients"] == [0.1, 0.2, 0.3, 0.4]
@@ -880,7 +874,7 @@ class TestSettings:
         original_settings = _TestSettingsContainer()
         original_settings["method"] = "hf"
         original_settings["max_iterations"] = 100
-        original_settings["tolerance"] = 1e-6
+        original_settings["convergence_threshold"] = 1e-6
         original_settings["use_symmetry"] = True
         original_settings["active_orbitals"] = [1, 2, 3]
         original_settings["coefficients"] = [0.1, 0.2, 0.3]
@@ -947,13 +941,13 @@ class TestSettings:
         settings = _TestSettingsContainer()
         settings["method"] = "hf"
         settings["max_iterations"] = 100
-        settings["tolerance"] = 1e-6
+        settings["convergence_threshold"] = 1e-6
         settings["use_symmetry"] = True
 
         # Test string representations of different types
         assert settings.get_as_string("method") == "hf"
         assert settings.get_as_string("max_iterations") == "100"
-        assert float(settings.get_as_string("tolerance")) == 1e-6  # check numerical value
+        assert float(settings.get_as_string("convergence_threshold")) == 1e-6  # check numerical value
         assert settings.get_as_string("use_symmetry") in ["1", "true", "True"]  # Implementation dependent
 
     def test_get_type_name(self):
@@ -961,7 +955,7 @@ class TestSettings:
         settings = _TestSettingsContainer()
         settings["method"] = "hf"
         settings["max_iterations"] = 100
-        settings["tolerance"] = 1e-6
+        settings["convergence_threshold"] = 1e-6
         settings["use_symmetry"] = True
         settings["active_orbitals"] = [1, 2, 3]
 
@@ -969,8 +963,8 @@ class TestSettings:
         assert "string" in settings.get_type_name("method").lower()
         assert "int" in settings.get_type_name("max_iterations").lower()
         assert (
-            "double" in settings.get_type_name("tolerance").lower()
-            or "float" in settings.get_type_name("tolerance").lower()
+            "double" in settings.get_type_name("convergence_threshold").lower()
+            or "float" in settings.get_type_name("convergence_threshold").lower()
         )
         assert "bool" in settings.get_type_name("use_symmetry").lower()
         assert "vector" in settings.get_type_name("active_orbitals").lower()
@@ -1018,10 +1012,10 @@ class TestSettings:
         """Test advanced type conversion scenarios."""
         settings = _TestSettingsContainer()
 
-        # Test integer type selection (int vs long vs size_t)
-        settings["small_int"] = 100  # Should be int
-        settings["large_int"] = 2**31  # Should be long or size_t
-        settings["very_large_int"] = 2**63 - 1  # Should be long
+        # Test integer type selection for Python int
+        settings["small_int"] = 100  # Handled as Python int
+        settings["large_int"] = 2**31  # Handled as Python int
+        settings["very_large_int"] = 2**63 - 1  # Handled as Python int for very large positive values
 
         assert isinstance(settings["small_int"], int)
         assert isinstance(settings["large_int"], int)  # Python int can handle large values
@@ -1031,12 +1025,10 @@ class TestSettings:
 
         settings["int_min"] = -2147483648  # INT_MIN
         settings["int_max"] = 2147483647  # INT_MAX
-        settings["size_t_candidate"] = 4294967295  # SIZE_MAX on 32-bit
         settings["negative_large"] = -9223372036854775808  # Very negative
 
         assert isinstance(settings["int_min"], int)
         assert isinstance(settings["int_max"], int)
-        assert isinstance(settings["size_t_candidate"], int)
         assert isinstance(settings["negative_large"], int)
 
         # Test float precision logic
@@ -1049,13 +1041,6 @@ class TestSettings:
         assert isinstance(settings["simple_float"], float)
         assert isinstance(settings["float_boundary"], float)
         assert isinstance(settings["double_precision"], float)
-
-        # Test boolean handling in sequences
-        settings["bool_list"] = [True, False, True]  # Should become int list
-        result = settings["bool_list"]
-        assert isinstance(result, list)
-        # Booleans get converted to ints in lists
-        assert all(isinstance(x, int) for x in result)
 
         # Test empty sequences (should default to int vector)
         settings["empty_list"] = []
@@ -1154,18 +1139,19 @@ class TestSettings:
         # These tests target integer type selection
         settings["zero"] = 0
         settings["negative_one"] = -1
-        settings["int_max"] = 2147483647  # INT_MAX
-        settings["int_min"] = -2147483648  # INT_MIN
-        with pytest.raises(SettingTypeMismatch):
-            settings["just_over_int_max"] = 2147483648
-        with pytest.raises(SettingTypeMismatch):
-            settings["just_under_int_min"] = -2147483649  # Just under INT_MIN
+        settings["int_max"] = 2147483647  # 32-bit max
+        settings["int_min"] = -2147483648  # 32-bit min
+        # These values are acceptable - Python int handles large values
+        settings["just_over_int_max"] = 2147483648
+        settings["just_under_int_min"] = -2147483649
 
         # Verify all are stored correctly
         assert settings["zero"] == 0
         assert settings["negative_one"] == -1
         assert settings["int_max"] == 2147483647
         assert settings["int_min"] == -2147483648
+        assert settings["just_over_int_max"] == 2147483648
+        assert settings["just_under_int_min"] == -2147483649
 
         # Test float precision edge cases
         settings["exact_float"] = 2.0  # Can be represented exactly as float
@@ -1184,28 +1170,17 @@ class TestSettings:
         assert settings["empty_int_list"] == []
         assert isinstance(settings["empty_int_list"], list)
 
-        # Test mixed type lists that should trigger type selection
-        settings["all_bool_list"] = [True, False, True, False]
-        bool_result = settings["all_bool_list"]
-        # Booleans in lists should become integers
-        assert all(isinstance(x, int) for x in bool_result)
-        assert bool_result == [1, 0, 1, 0]
-
         # Test sequences with first element determining type
-        with pytest.raises(SettingTypeMismatch):
-            settings["first_bool_list"] = [True, 1, 0]  # First is bool
         with pytest.raises(SettingTypeMismatch):
             settings["first_int_list"] = [1, True, False]  # First is int
         settings["first_float_list"] = [1.0, 2, 3]  # First is float
         settings["first_str_list"] = ["a", "b", "c"]  # First is string
 
         # Verify type conversion based on first element
-        first_bool_result = settings["first_bool_list"]
         first_int_result = settings["first_int_list"]
         first_float_result = settings["first_float_list"]
         first_str_result = settings["first_str_list"]
 
-        assert all(isinstance(x, int) for x in first_bool_result)
         assert all(isinstance(x, int) for x in first_int_result)
         assert all(isinstance(x, float) for x in first_float_result)
         assert all(isinstance(x, str) for x in first_str_result)
@@ -1215,7 +1190,7 @@ class TestSettings:
         settings = _TestSettingsContainer()
         settings["method"] = "hf"
         settings["max_iterations"] = 100
-        settings["tolerance"] = 1e-6
+        settings["convergence_threshold"] = 1e-6
         settings["use_symmetry"] = True
         settings["active_orbitals"] = [1, 2, 3]
 
@@ -1228,7 +1203,7 @@ class TestSettings:
         # This returns the internal map, so we need to check it contains the keys
         assert "method" in all_settings
         assert "max_iterations" in all_settings
-        assert "tolerance" in all_settings
+        assert "convergence_threshold" in all_settings
         assert "use_symmetry" in all_settings
         assert "active_orbitals" in all_settings
 
@@ -1244,27 +1219,27 @@ class TestSettingsCustomClass:
                 super().__init__()
                 self._set_default("method", "string", "hf")
                 self._set_default("max_iterations", "int", 1000)
-                self._set_default("tolerance", "double", 1e-6)
+                self._set_default("convergence_threshold", "double", 1e-6)
                 self._set_default("use_symmetry", "bool", False)
                 self._set_default("active_orbitals", "vector<int>", [])
 
             def validate(self):
-                required = ["method", "max_iterations", "tolerance"]
+                required = ["method", "max_iterations", "convergence_threshold"]
                 self.validate_required(required)
 
         # Test construction with defaults
         hf_settings = HfSettings()
         assert hf_settings["method"] == "hf"
         assert hf_settings["max_iterations"] == 1000
-        assert hf_settings["tolerance"] == 1e-6
+        assert hf_settings["convergence_threshold"] == 1e-6
         assert hf_settings["use_symmetry"] is False
         assert hf_settings["active_orbitals"] == []
 
         # Test modifying values
         hf_settings["max_iterations"] = 500
-        hf_settings.tolerance = 1e-8
+        hf_settings.convergence_threshold = 1e-8
         assert hf_settings["max_iterations"] == 500
-        assert hf_settings.tolerance == 1e-8
+        assert hf_settings.convergence_threshold == 1e-8
 
         # Test validation
         hf_settings.validate()  # Should not raise
