@@ -70,21 +70,17 @@ class MP2Container : public WavefunctionContainer {
   std::shared_ptr<Hamiltonian> get_hamiltonian() const;
 
   /**
-   * @brief Get coefficients for all reference determinants (always 1.0)
-   * @return Vector of coefficients (1.0 for each reference determinant)
+   * @brief Not implemented for MP2 wavefunctions
    */
   const VectorVariant& get_coefficients() const override;
 
   /**
-   * @brief Get coefficient for a specific determinant
-   * @param det Configuration to check
-   * @return 1.0 if det is a reference determinant, 0.0 otherwise
+   * @brief Not implemented for MP2 wavefunctions
    */
   ScalarVariant get_coefficient(const Configuration& det) const override;
 
   /**
-   * @brief Get reference determinants as active determinants
-   * @return Vector of reference configurations/determinants
+   * @brief Not implemented for MP2 wavefunctions
    */
   const DeterminantVector& get_active_determinants() const override;
 
@@ -123,8 +119,9 @@ class MP2Container : public WavefunctionContainer {
   bool has_t2_amplitudes() const;
 
   /**
-   * @brief Get number of reference determinants
-   * @return Number of reference determinants in the MP2 wavefunction
+   * @brief Get number of determinants
+   * @throws std::runtime_error Always throws as this is not meaningful for MP2
+   * wavefunctions
    */
   size_t size() const override;
 
@@ -221,7 +218,7 @@ class MP2Container : public WavefunctionContainer {
 
  private:
   /** @brief Cached coefficients */
-  mutable VectorVariant _cached_coefficients;
+  VectorVariant _cached_coefficients;
   /** @brief Cached determinants */
   DeterminantVector _cached_determinants;
   /** @brief Reference determinants for the MP2 wavefunction */
