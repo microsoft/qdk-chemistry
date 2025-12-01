@@ -24,6 +24,7 @@ from qdk_chemistry.algorithms import (
 from qdk_chemistry.data import (
     Ansatz,
     CasWavefunctionContainer,
+    CoupledClusterContainer,
     Configuration,
     Hamiltonian,
     Orbitals,
