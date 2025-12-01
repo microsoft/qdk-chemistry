@@ -16,7 +16,8 @@
 namespace qdk::chemistry::data {
 
 MP2Container::MP2Container(std::shared_ptr<Hamiltonian> hamiltonian,
-                           const DeterminantVector& references)
+                           const DeterminantVector& references,
+                           const std::string& partitioning)
     // Mp2 is always not self dual
     : WavefunctionContainer(WavefunctionType::NotSelfDual),
       _references(references, hamiltonian->get_orbitals()),
@@ -27,6 +28,11 @@ MP2Container::MP2Container(std::shared_ptr<Hamiltonian> hamiltonian,
 
   if (references.empty()) {
     throw std::invalid_argument("Reference determinants cannot be empty");
+  }
+
+  if (partitioning != "mp") {
+    throw std::runtime_error(
+        "Only Moeller-Plesset Hamiltonian partitioning is implemented");
   }
 }
 
