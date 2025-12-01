@@ -193,33 +193,37 @@ class PyscfScfSolver(ScfSolver):
         )
         mol.build()
 
+        # Determine SCF type from settings
         scf_type = self._settings["scf_type"]
         if isinstance(scf_type, str):
             scf_type = SCFType(scf_type.lower())
 
-        # Determine if we should force restricted or unrestricted based on scf_type
-        force_restricted = scf_type == SCFType.RESTRICTED
-        force_unrestricted = scf_type == SCFType.UNRESTRICTED
-
         # Select the appropriate SCF method based on the method setting
         if method == "hf":
             # Hartree-Fock methods
-            if mol.spin == 0 and not force_unrestricted:
-                mf = scf.RHF(mol)
-            elif force_restricted:
-                mf = scf.ROHF(mol)
-            else:  # force_unrestricted or (AUTO and mol.spin != 0)
+            if scf_type == SCFType.RESTRICTED:
+                mf = scf.ROHF(mol) if mol.spin != 0 else scf.RHF(mol)
+            elif scf_type == SCFType.UNRESTRICTED:
                 mf = scf.UHF(mol)
-        # DFT methods (Kohn-Sham)
-        elif mol.spin == 0 and not force_unrestricted:
-            mf = scf.RKS(mol)
-            mf.xc = method
-        elif force_restricted:
-            mf = scf.ROKS(mol)
-            mf.xc = method
-        else:  # force_unrestricted or (AUTO and mol.spin != 0)
-            mf = scf.UKS(mol)
-            mf.xc = method
+            else:  # SCFType.AUTO
+                if mol.spin == 0:
+                    mf = scf.RHF(mol)
+                else:
+                    mf = scf.UHF(mol)
+        else:
+            # DFT methods (Kohn-Sham)
+            if scf_type == SCFType.RESTRICTED:
+                mf = scf.ROKS(mol) if mol.spin != 0 else scf.RKS(mol)
+                mf.xc = method
+            elif scf_type == SCFType.UNRESTRICTED:
+                mf = scf.UKS(mol)
+                mf.xc = method
+            else:  # SCFType.AUTO
+                if mol.spin == 0:
+                    mf = scf.RKS(mol)
+                else:
+                    mf = scf.UKS(mol)
+                mf.xc = method
 
         # Configure convergence settings
 
@@ -253,15 +257,8 @@ class PyscfScfSolver(ScfSolver):
         basis_set = pyscf_mol_to_qdk_basis(mf.mol, structure, basis_name)
         _ovlp = mf.get_ovlp()
 
-        if mol.spin == 0 and not force_unrestricted:
-            orbitals = Orbitals(
-                mf.mo_coeff,
-                mf.mo_energy,
-                ao_overlap=_ovlp,
-                basis_set=basis_set,
-            )
-        elif force_restricted:
-            # Create unrestricted-style orbitals but with same coefficients
+        if scf_type == SCFType.RESTRICTED and mol.spin != 0:
+            # ROHF/ROKS case - create unrestricted-style orbitals but with same coefficients
             orbitals = Orbitals(
                 mf.mo_coeff,  # Same coefficients for alpha and beta
                 mf.mo_coeff,
@@ -270,16 +267,24 @@ class PyscfScfSolver(ScfSolver):
                 ao_overlap=_ovlp,
                 basis_set=basis_set,
             )
-        else:  # force_unrestricted or (AUTO and mol.spin != 0)
+        elif scf_type == SCFType.UNRESTRICTED or (scf_type == SCFType.AUTO and mol.spin != 0):
+            # UHF/UKS case - alpha and beta orbitals are different
             energy_a, energy_b = mf.mo_energy
             coeff_a, coeff_b = mf.mo_coeff
 
-            # Unrestricted case - create Orbitals with alpha/beta arguments
             orbitals = Orbitals(
                 coeff_a,
                 coeff_b,
                 energy_a,
                 energy_b,
+                ao_overlap=_ovlp,
+                basis_set=basis_set,
+            )
+        else:
+            # RHF/RKS case - restricted closed-shell
+            orbitals = Orbitals(
+                mf.mo_coeff,
+                mf.mo_energy,
                 ao_overlap=_ovlp,
                 basis_set=basis_set,
             )
