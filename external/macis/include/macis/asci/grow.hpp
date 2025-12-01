@@ -89,9 +89,9 @@ auto asci_grow(ASCISettings asci_settings, MCSCFSettings mcscf_settings,
             static_cast<size_t>(std::ceil(wfn.size() * current_grow_factor))),
         asci_settings.ntdets_max);
 
-    // Ensure we're actually trying to grow (handle truncation issues)
+    // Force +1 growth if ndets_new <= wfn.size() (can happen if grow_factor
+    // hits 1.0 or constraints clamp the value) to avoid stalling.
     if (ndets_new <= wfn.size()) {
-      // Try to force at least minimal growth if we haven't reached the target
       ndets_new = std::min(wfn.size() + 1, asci_settings.ntdets_max);
       if (ndets_new <= wfn.size()) {
         logger->info("Cannot grow further, reached target at {} determinants",
@@ -126,7 +126,9 @@ auto asci_grow(ASCISettings asci_settings, MCSCFSettings mcscf_settings,
         break;
       }
     } else {
-      // Recovery: gradually restore grow_factor on successful growth
+      // Recovery: gradually restore grow_factor on successful growth.
+      // Clamped to asci_settings.grow_factor to prevent overshoot even if
+      // growth_recovery_rate is set very high.
       current_grow_factor =
           std::min(asci_settings.grow_factor,
                    current_grow_factor * growth_recovery_rate);
