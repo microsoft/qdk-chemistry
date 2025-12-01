@@ -43,13 +43,11 @@ class CoupledClusterContainer : public WavefunctionContainer {
    * @param references Reference determinant(s) for the wavefunction
    * @param t1_amplitudes T1 amplitudes (optional)
    * @param t2_amplitudes T2 amplitudes (optional)
-   * @param type Wavefunction type (SelfDual or NotSelfDual)
    */
-  CoupledClusterContainer(
-      std::shared_ptr<Orbitals> orbitals, const DeterminantVector& references,
-      const std::optional<VectorVariant>& t1_amplitudes,
-      const std::optional<VectorVariant>& t2_amplitudes,
-      WavefunctionType type = WavefunctionType::NotSelfDual);
+  CoupledClusterContainer(std::shared_ptr<Orbitals> orbitals,
+                          const DeterminantVector& references,
+                          const std::optional<VectorVariant>& t1_amplitudes,
+                          const std::optional<VectorVariant>& t2_amplitudes);
 
   /**
    * @brief Constructs a coupled cluster wavefunction with spin-separated
@@ -64,7 +62,6 @@ class CoupledClusterContainer : public WavefunctionContainer {
    * @param t2_amplitudes_abab Alpha-beta T2 amplitudes (optional)
    * @param t2_amplitudes_aaaa Alpha-alpha T2 amplitudes (optional)
    * @param t2_amplitudes_bbbb Beta-beta T2 amplitudes (optional)
-   * @param type Wavefunction type (SelfDual or NotSelfDual)
    */
   CoupledClusterContainer(
       std::shared_ptr<Orbitals> orbitals, const DeterminantVector& references,
@@ -72,8 +69,7 @@ class CoupledClusterContainer : public WavefunctionContainer {
       const std::optional<VectorVariant>& t1_amplitudes_bb,
       const std::optional<VectorVariant>& t2_amplitudes_abab,
       const std::optional<VectorVariant>& t2_amplitudes_aaaa,
-      const std::optional<VectorVariant>& t2_amplitudes_bbbb,
-      WavefunctionType type = WavefunctionType::NotSelfDual);
+      const std::optional<VectorVariant>& t2_amplitudes_bbbb);
 
   /**
    * @brief Constructs a coupled cluster wavefunction with amplitudes and
@@ -87,15 +83,13 @@ class CoupledClusterContainer : public WavefunctionContainer {
    * @param t2_amplitudes T2 amplitudes (optional)
    * @param one_rdm_spin_traced Spin-traced 1-RDM for active orbitals (optional)
    * @param two_rdm_spin_traced Spin-traced 2-RDM for active orbitals (optional)
-   * @param type Wavefunction type (SelfDual or NotSelfDual)
    */
   CoupledClusterContainer(
       std::shared_ptr<Orbitals> orbitals, const DeterminantVector& references,
       const std::optional<VectorVariant>& t1_amplitudes,
       const std::optional<VectorVariant>& t2_amplitudes,
       const std::optional<MatrixVariant>& one_rdm_spin_traced,
-      const std::optional<VectorVariant>& two_rdm_spin_traced,
-      WavefunctionType type = WavefunctionType::NotSelfDual);
+      const std::optional<VectorVariant>& two_rdm_spin_traced);
 
   /**
    * @brief Constructs a coupled cluster wavefunction with spin-separated
@@ -112,7 +106,6 @@ class CoupledClusterContainer : public WavefunctionContainer {
    * @param t2_amplitudes_bbbb Beta-beta T2 amplitudes (optional)
    * @param one_rdm_spin_traced Spin-traced 1-RDM for active orbitals (optional)
    * @param two_rdm_spin_traced Spin-traced 2-RDM for active orbitals (optional)
-   * @param type Wavefunction type (SelfDual or NotSelfDual)
    */
   CoupledClusterContainer(
       std::shared_ptr<Orbitals> orbitals, const DeterminantVector& references,
@@ -122,8 +115,7 @@ class CoupledClusterContainer : public WavefunctionContainer {
       const std::optional<VectorVariant>& t2_amplitudes_aaaa,
       const std::optional<VectorVariant>& t2_amplitudes_bbbb,
       const std::optional<MatrixVariant>& one_rdm_spin_traced,
-      const std::optional<VectorVariant>& two_rdm_spin_traced,
-      WavefunctionType type = WavefunctionType::NotSelfDual);
+      const std::optional<VectorVariant>& two_rdm_spin_traced);
 
   /**
    * @brief Constructs a coupled cluster wavefunction with amplitudes and full
@@ -145,7 +137,6 @@ class CoupledClusterContainer : public WavefunctionContainer {
    * orbitals (optional)
    * @param two_rdm_bbbb Beta-beta-beta-beta block of 2-RDM for active orbitals
    * (optional)
-   * @param type Wavefunction type (SelfDual or NotSelfDual)
    */
   CoupledClusterContainer(
       std::shared_ptr<Orbitals> orbitals, const DeterminantVector& references,
@@ -157,8 +148,7 @@ class CoupledClusterContainer : public WavefunctionContainer {
       const std::optional<VectorVariant>& two_rdm_spin_traced,
       const std::optional<VectorVariant>& two_rdm_aabb,
       const std::optional<VectorVariant>& two_rdm_aaaa,
-      const std::optional<VectorVariant>& two_rdm_bbbb,
-      WavefunctionType type = WavefunctionType::NotSelfDual);
+      const std::optional<VectorVariant>& two_rdm_bbbb);
 
   /**
    * @brief Constructs a coupled cluster wavefunction with spin-separated
@@ -183,7 +173,6 @@ class CoupledClusterContainer : public WavefunctionContainer {
    * orbitals (optional)
    * @param two_rdm_bbbb Beta-beta-beta-beta block of 2-RDM for active orbitals
    * (optional)
-   * @param type Wavefunction type (SelfDual or NotSelfDual)
    */
   CoupledClusterContainer(
       std::shared_ptr<Orbitals> orbitals, const DeterminantVector& references,
@@ -198,8 +187,7 @@ class CoupledClusterContainer : public WavefunctionContainer {
       const std::optional<VectorVariant>& two_rdm_spin_traced,
       const std::optional<VectorVariant>& two_rdm_aabb,
       const std::optional<VectorVariant>& two_rdm_aaaa,
-      const std::optional<VectorVariant>& two_rdm_bbbb,
-      WavefunctionType type = WavefunctionType::NotSelfDual);
+      const std::optional<VectorVariant>& two_rdm_bbbb);
 
   /** @brief Destructor */
   ~CoupledClusterContainer() override = default;

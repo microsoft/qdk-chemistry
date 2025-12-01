@@ -44,7 +44,7 @@ class MP2Container : public WavefunctionContainer {
    *
    * @param hamiltonian Shared pointer to the Hamiltonian
    * @param references Reference determinant(s) for the wavefunction
-   * @param type Wavefunction type (SelfDual or NotSelfDual)
+   * @param type Wavefunction type (always SelfDual)
    */
   MP2Container(std::shared_ptr<Hamiltonian> hamiltonian,
                const DeterminantVector& references,
