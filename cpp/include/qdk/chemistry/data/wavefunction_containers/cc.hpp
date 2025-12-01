@@ -316,13 +316,14 @@ class CoupledClusterContainer : public WavefunctionContainer {
       const override;
 
   /**
-   * @brief Check if a determinant matches the stored one
-   * @throws std::runtime_error Always throws as this is not meaningful for CC
+   * @brief Check if a determinant is in the reference wavefunction
+   * @param det Configuration/determinant to check
+   * @return True if determinant matches any reference determinant
    */
   bool contains_determinant(const Configuration& det) const;
 
   /**
-   * @brief Check if a determinant matches the reference determinants
+   * @brief Check if a determinant is in the reference wavefunction
    * @param det Configuration/determinant to check
    * @return True if determinant matches any reference determinant
    */
@@ -375,7 +376,7 @@ class CoupledClusterContainer : public WavefunctionContainer {
 
   /**
    * @brief Get container type identifier for serialization
-   * @return String "cc"
+   * @return String "coupled_cluster"
    */
   std::string get_container_type() const override;
 

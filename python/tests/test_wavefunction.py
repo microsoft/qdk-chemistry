@@ -1095,7 +1095,7 @@ class TestCCContainer:
         wf = Wavefunction(cc_container)
 
         # Test container type checking
-        assert wf.get_container_type() == "cc"
+        assert wf.get_container_type() == "coupled_cluster"
 
         # Test getting the container back
         retrieved_container = wf.get_container()

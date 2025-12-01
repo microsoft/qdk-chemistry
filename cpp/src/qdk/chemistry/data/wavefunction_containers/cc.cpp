@@ -420,9 +420,7 @@ double CoupledClusterContainer::norm() const {
 
 bool CoupledClusterContainer::contains_determinant(
     const Configuration& det) const {
-  throw std::runtime_error(
-      "contains_determinant() is not implemented for coupled cluster "
-      "wavefunctions. ");
+  return contains_reference(det);
 }
 
 bool CoupledClusterContainer::contains_reference(
@@ -882,7 +880,9 @@ CoupledClusterContainer::get_active_orbital_occupations() const {
   return {alpha_occupations, beta_occupations};
 }
 
-std::string CoupledClusterContainer::get_container_type() const { return "cc"; }
+std::string CoupledClusterContainer::get_container_type() const {
+  return "coupled_cluster";
+}
 
 bool CoupledClusterContainer::is_complex() const {
   // Check if any amplitude is complex
