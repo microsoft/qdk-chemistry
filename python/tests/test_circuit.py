@@ -476,7 +476,7 @@ class TestCircuitSummary:
         summary = circuit.get_summary()
 
         assert "Circuit" in summary
-        assert "QAMS string" in summary
+        assert "QASM string" in summary
         assert qasm in summary
 
     def test_get_summary_format(self):

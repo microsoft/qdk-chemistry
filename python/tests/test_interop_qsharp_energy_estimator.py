@@ -10,8 +10,8 @@ import pytest
 from qsharp import BitFlipNoise, DepolarizingNoise, PauliNoise
 
 from qdk_chemistry.algorithms.energy_estimator import QDKEnergyEstimator
-from qdk_chemistry.data import Circuit
-from qdk_chemistry.data.qubit_hamiltonian import QubitHamiltonian, filter_and_group_pauli_ops_from_wavefunction
+from qdk_chemistry.data import Circuit, QubitHamiltonian
+from qdk_chemistry.data.qubit_hamiltonian import filter_and_group_pauli_ops_from_wavefunction
 
 from .reference_tolerances import (
     estimator_energy_tolerance,

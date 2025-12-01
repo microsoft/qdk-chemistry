@@ -158,7 +158,7 @@ class Circuit(DataClass):
         """
         lines = ["Circuit"]
         if self.circuit_qasm is not None:
-            lines.append(f"  QAMS string: {self.circuit_qasm}")
+            lines.append(f"  QASM string: {self.circuit_qasm}")
         return "\n".join(lines)
 
     def to_json(self) -> dict:

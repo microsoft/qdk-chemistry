@@ -14,8 +14,8 @@ import pytest
 from qiskit_aer import AerSimulator
 from qiskit_aer.noise import NoiseModel, depolarizing_error
 
-from qdk_chemistry.data import Circuit
-from qdk_chemistry.data.qubit_hamiltonian import QubitHamiltonian, filter_and_group_pauli_ops_from_wavefunction
+from qdk_chemistry.data import Circuit, QubitHamiltonian
+from qdk_chemistry.data.qubit_hamiltonian import filter_and_group_pauli_ops_from_wavefunction
 from qdk_chemistry.plugins.qiskit.energy_estimator import QiskitEnergyEstimator
 
 from .reference_tolerances import estimator_energy_tolerance, float_comparison_relative_tolerance
