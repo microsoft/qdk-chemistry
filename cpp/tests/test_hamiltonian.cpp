@@ -1047,37 +1047,6 @@ TEST_F(HamiltonianTest, FCIDUMPSerializationUnrestrictedThrowsError) {
                std::runtime_error);
 }
 
-TEST_F(HamiltonianTest, FCIDUMPSerializationUnrestrictedMismatchedActiveSpace) {
-  // Test error handling when alpha and beta active spaces have different sizes
-  auto unrestricted_orbitals = std::make_shared<ModelOrbitals>(3, false);
-
-  // Manually set different active space sizes for alpha and beta
-  std::vector<size_t> alpha_active = {0, 1};  // 2 orbitals
-  std::vector<size_t> beta_active = {0, 1,
-                                     2};  // 3 orbitals - should cause error
-
-  // Create matrices with mismatched dimensions
-  Eigen::MatrixXd one_body_alpha = Eigen::MatrixXd::Identity(2, 2);
-  Eigen::MatrixXd one_body_beta = Eigen::MatrixXd::Identity(3, 3);
-
-  Eigen::VectorXd two_body_aaaa = Eigen::VectorXd::Ones(16);  // 2^4
-  Eigen::VectorXd two_body_aabb =
-      Eigen::VectorXd::Ones(81);  // 3^4 - mismatched
-  Eigen::VectorXd two_body_bbbb = Eigen::VectorXd::Ones(81);  // 3^4
-
-  Eigen::MatrixXd empty_fock = Eigen::MatrixXd::Zero(0, 0);
-
-  // This should throw during construction due to dimension mismatch
-  EXPECT_THROW(
-      {
-        Hamiltonian h_mismatched(one_body_alpha, one_body_beta, two_body_aaaa,
-                                 two_body_aabb, two_body_bbbb,
-                                 unrestricted_orbitals, core_energy, empty_fock,
-                                 empty_fock);
-      },
-      std::invalid_argument);
-}
-
 TEST_F(HamiltonianTest, FCIDUMPActiveSpaceConsistency) {
   // Test that FCIDUMP correctly handles the active space indices properly
   // Create orbitals with a specific active space setup
@@ -1142,6 +1111,37 @@ class ForceUnrestrictedOrbitals : public Orbitals {
     _active_space_indices = {alpha_active, beta_active};
   }
 };
+
+TEST_F(HamiltonianTest, ErrorHandlingUnrestrictedMismatchedActiveSpace) {
+  // Test error handling when alpha and beta active spaces have different sizes
+  auto unrestricted_orbitals = std::make_shared<ModelOrbitals>(3, false);
+
+  // Manually set different active space sizes for alpha and beta
+  std::vector<size_t> alpha_active = {0, 1};  // 2 orbitals
+  std::vector<size_t> beta_active = {0, 1,
+                                     2};  // 3 orbitals - should cause error
+
+  // Create matrices with mismatched dimensions
+  Eigen::MatrixXd one_body_alpha = Eigen::MatrixXd::Identity(2, 2);
+  Eigen::MatrixXd one_body_beta = Eigen::MatrixXd::Identity(3, 3);
+
+  Eigen::VectorXd two_body_aaaa = Eigen::VectorXd::Ones(16);  // 2^4
+  Eigen::VectorXd two_body_aabb =
+      Eigen::VectorXd::Ones(81);  // 3^4 - mismatched
+  Eigen::VectorXd two_body_bbbb = Eigen::VectorXd::Ones(81);  // 3^4
+
+  Eigen::MatrixXd empty_fock = Eigen::MatrixXd::Zero(0, 0);
+
+  // This should throw during construction due to dimension mismatch
+  EXPECT_THROW(
+      {
+        Hamiltonian h_mismatched(one_body_alpha, one_body_beta, two_body_aaaa,
+                                 two_body_aabb, two_body_bbbb,
+                                 unrestricted_orbitals, core_energy, empty_fock,
+                                 empty_fock);
+      },
+      std::invalid_argument);
+}
 
 TEST_F(HamiltonianTest, IntegralSymmetriesEnergiesO2Singlet) {
   // Restricted and unrestricted calculations
