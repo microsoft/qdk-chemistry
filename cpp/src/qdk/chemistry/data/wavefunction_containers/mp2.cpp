@@ -16,9 +16,9 @@
 namespace qdk::chemistry::data {
 
 MP2Container::MP2Container(std::shared_ptr<Hamiltonian> hamiltonian,
-                           const DeterminantVector& references,
-                           WavefunctionType type)
-    : WavefunctionContainer(type),
+                           const DeterminantVector& references)
+    // Mp2 is always not self dual
+    : WavefunctionContainer(WavefunctionType::NotSelfDual),
       _references(references, hamiltonian->get_orbitals()),
       _hamiltonian(hamiltonian) {
   if (!hamiltonian) {
@@ -31,8 +31,8 @@ MP2Container::MP2Container(std::shared_ptr<Hamiltonian> hamiltonian,
 }
 
 std::unique_ptr<WavefunctionContainer> MP2Container::clone() const {
-  return std::make_unique<MP2Container>(
-      _hamiltonian, _references.get_configurations(), _type);
+  return std::make_unique<MP2Container>(_hamiltonian,
+                                        _references.get_configurations());
 }
 
 std::shared_ptr<Orbitals> MP2Container::get_orbitals() const {
@@ -274,9 +274,6 @@ nlohmann::json MP2Container::to_json() const {
   nlohmann::json j;
   j["type"] = "mp2";
   j["version"] = SERIALIZATION_VERSION;
-  j["wavefunction_type"] = (get_type() == WavefunctionType::SelfDual)
-                               ? "self_dual"
-                               : "not_self_dual";
 
   // Serialize references
   j["references"] = nlohmann::json::array();
@@ -297,10 +294,6 @@ nlohmann::json MP2Container::to_json() const {
 }
 
 std::unique_ptr<MP2Container> MP2Container::from_json(const nlohmann::json& j) {
-  // Deserialize basic fields
-  auto wf_type =
-      static_cast<WavefunctionType>(j.at("wavefunction_type").get<int>());
-
   // Deserialize references
   DeterminantVector references;
   for (const auto& ref_json : j.at("references")) {
@@ -316,7 +309,7 @@ std::unique_ptr<MP2Container> MP2Container::from_json(const nlohmann::json& j) {
     hamiltonian = Hamiltonian::from_json(j.at("hamiltonian"));
   }
 
-  return std::make_unique<MP2Container>(hamiltonian, references, wf_type);
+  return std::make_unique<MP2Container>(hamiltonian, references);
 }
 
 void MP2Container::to_hdf5(H5::Group& group) const {
@@ -335,14 +328,6 @@ void MP2Container::to_hdf5(H5::Group& group) const {
     H5::Attribute container_type_attr = group.createAttribute(
         "container_type", string_type, H5::DataSpace(H5S_SCALAR));
     container_type_attr.write(string_type, container_type);
-
-    // wavefunction type
-    std::string wf_type_str = (get_type() == WavefunctionType::SelfDual)
-                                  ? "self_dual"
-                                  : "not_self_dual";
-    H5::Attribute wf_type_attr = group.createAttribute(
-        "wavefunction_type", string_type, H5::DataSpace(H5S_SCALAR));
-    wf_type_attr.write(string_type, wf_type_str);
 
     // complex flag
     bool is_complex_flag = this->is_complex();
@@ -380,16 +365,6 @@ std::unique_ptr<MP2Container> MP2Container::from_hdf5(H5::Group& group) {
     version_attr.read(string_type, version_str);
     validate_serialization_version(SERIALIZATION_VERSION, version_str);
 
-    // wavefunction type
-    WavefunctionType wf_type = WavefunctionType::NotSelfDual;
-    if (group.attrExists("wavefunction_type")) {
-      H5::Attribute wf_type_attr = group.openAttribute("wavefunction_type");
-      std::string wf_type_str;
-      wf_type_attr.read(string_type, wf_type_str);
-      wf_type = (wf_type_str == "self_dual") ? WavefunctionType::SelfDual
-                                             : WavefunctionType::NotSelfDual;
-    }
-
     // Load configuration set
     if (!group.nameExists("reference_configurations")) {
       throw std::runtime_error(
@@ -409,7 +384,7 @@ std::unique_ptr<MP2Container> MP2Container::from_hdf5(H5::Group& group) {
       hamiltonian = Hamiltonian::from_hdf5(hamiltonian_group);
     }
 
-    return std::make_unique<MP2Container>(hamiltonian, determinants, wf_type);
+    return std::make_unique<MP2Container>(hamiltonian, determinants);
   } catch (const H5::Exception& e) {
     throw std::runtime_error("HDF5 error: " + std::string(e.getCDetailMsg()));
   }

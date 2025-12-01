@@ -435,8 +435,6 @@ nlohmann::json CoupledClusterContainer::to_json() const {
 
   j["version"] = SERIALIZATION_VERSION;
   j["container_type"] = get_container_type();
-  // CC wavefunctions are always NotSelfDual
-  j["wavefunction_type"] = "not_self_dual";
 
   // Serialize orbitals
   if (_orbitals) {
@@ -506,17 +504,6 @@ std::unique_ptr<CoupledClusterContainer> CoupledClusterContainer::from_json(
     }
     validate_serialization_version(SERIALIZATION_VERSION, j["version"]);
 
-    // CC wavefunctions are always NotSelfDual - throw if SelfDual is specified
-    if (j.contains("wavefunction_type")) {
-      std::string type_str = j["wavefunction_type"];
-      if (type_str == "self_dual") {
-        throw std::invalid_argument(
-            "Invalid JSON data: Found 'self_dual' wavefunction_type, but CC "
-            "containers must be "
-            "'not_self_dual'.");
-      }
-    }
-
     auto orbitals = Orbitals::from_json(j["orbitals"]);
     DeterminantVector references;
     for (const auto& ref_json : j["references"]) {
@@ -570,12 +557,6 @@ void CoupledClusterContainer::to_hdf5(H5::Group& group) const {
         "container_type", string_type, H5::DataSpace(H5S_SCALAR));
     container_type_attr.write(string_type, container_type);
 
-    // CC wavefunctions are always NotSelfDual
-    std::string wf_type_str = "not_self_dual";
-    H5::Attribute wf_type_attr = group.createAttribute(
-        "wavefunction_type", string_type, H5::DataSpace(H5S_SCALAR));
-    wf_type_attr.write(string_type, wf_type_str);
-
     // complex flag
     bool is_complex = this->is_complex();
     H5::Attribute is_complex_attr = group.createAttribute(
@@ -623,19 +604,6 @@ std::unique_ptr<CoupledClusterContainer> CoupledClusterContainer::from_hdf5(
     std::string version_str;
     version_attr.read(string_type, version_str);
     validate_serialization_version(SERIALIZATION_VERSION, version_str);
-
-    // CC wavefunctions are always NotSelfDual - throw if SelfDual is specified
-    if (group.attrExists("wavefunction_type")) {
-      H5::Attribute wf_type_attr = group.openAttribute("wavefunction_type");
-      std::string wf_type_str;
-      wf_type_attr.read(string_type, wf_type_str);
-      if (wf_type_str == "self_dual") {
-        throw std::invalid_argument(
-            "Invalid HDF5 data: Found 'self_dual' wavefunction_type, but CC "
-            "containers must be "
-            "'not_self_dual'.");
-      }
-    }
 
     // complex flag
     bool is_complex = false;
