@@ -90,8 +90,9 @@ __all__ = [
     "available",
     "create",
     "energy_from_phase",
+    "inspect_settings",
+    "print_settings",
     "register",
-    "show_settings",
     "unregister",
 ]
 
@@ -100,8 +101,9 @@ _REGISTRY_EXPORTS = frozenset(
     {
         "available",
         "create",
+        "inspect_settings",
+        "print_settings",
         "register",
-        "show_settings",
         "unregister",
     }
 )
@@ -113,8 +115,9 @@ if TYPE_CHECKING:  # pragma: no cover - typing-only imports
 
     available = _registry_type.available
     create = _registry_type.create
+    inspect_settings = _registry_type.inspect_settings
+    print_settings = _registry_type.print_settings
     register = _registry_type.register
-    show_settings = _registry_type.show_settings
     unregister = _registry_type.unregister
 
 

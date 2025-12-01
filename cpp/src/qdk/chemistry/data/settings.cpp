@@ -22,70 +22,60 @@ void Settings::set(const std::string& key, const SettingValue& value) {
   if (it == settings_.end()) {
     throw SettingNotFound(key);
   }
+
+  // Check if types match
+  if (value.index() != settings_[key].index()) {
+    throw std::invalid_argument("Setting '" + key +
+                                "' does not match type of given argument.");
+  }
+
+  // If limits exist, validate against them
   if (limits_.find(key) != limits_.end()) {
-    if (std::holds_alternative<bool>(value) &&
-        std::holds_alternative<bool>(settings_[key])) {
-      settings_[key] = value;
-      return;
-    }
-    if (std::holds_alternative<std::string>(value) &&
-        std::holds_alternative<std::string>(settings_[key])) {
-      if (limits_.find(key) != limits_.end()) {
-        if (std::holds_alternative<std::vector<std::string>>(limits_[key])) {
-          auto options = std::get<std::vector<std::string>>(limits_[key]);
-          if (std::find(options.begin(), options.end(),
-                        std::get<std::string>(value)) == options.end()) {
-            std::string options_str = "[";
-            for (size_t i = 0; i < options.size(); ++i) {
-              if (i > 0) options_str += ", ";
-              options_str += "\"" + options[i] + "\"";
-            }
-            options_str += "]";
-            throw std::invalid_argument(
-                "Value for setting '" + key +
-                "' is out of allowed options. Allowed options: " + options_str);
+    if (std::holds_alternative<std::string>(value)) {
+      if (std::holds_alternative<std::vector<std::string>>(limits_[key])) {
+        auto options = std::get<std::vector<std::string>>(limits_[key]);
+        if (std::find(options.begin(), options.end(),
+                      std::get<std::string>(value)) == options.end()) {
+          std::string options_str = "[";
+          for (size_t i = 0; i < options.size(); ++i) {
+            if (i > 0) options_str += ", ";
+            options_str += "\"" + options[i] + "\"";
           }
+          options_str += "]";
+          throw std::invalid_argument(
+              "Value for setting '" + key +
+              "' is out of allowed options. Allowed options: " + options_str);
         }
       }
-      settings_[key] = value;
-      return;
-    }
-    if (std::holds_alternative<int64_t>(value) &&
-        std::holds_alternative<int64_t>(settings_[key])) {
-      if (limits_.find(key) != limits_.end()) {
-        if (std::holds_alternative<std::vector<int64_t>>(limits_[key])) {
-          auto options = std::get<std::vector<int64_t>>(limits_[key]);
-          if (std::find(options.begin(), options.end(),
-                        std::get<int64_t>(value)) == options.end()) {
-            std::string options_str = "[";
-            for (size_t i = 0; i < options.size(); ++i) {
-              if (i > 0) options_str += ", ";
-              options_str += "\"" + std::to_string(options[i]) + "\"";
-            }
-            options_str += "]";
-            throw std::invalid_argument(
-                "Value for setting '" + key +
-                "' is out of allowed options. Allowed options: " + options_str);
+    } else if (std::holds_alternative<int64_t>(value)) {
+      if (std::holds_alternative<std::vector<int64_t>>(limits_[key])) {
+        auto options = std::get<std::vector<int64_t>>(limits_[key]);
+        if (std::find(options.begin(), options.end(),
+                      std::get<int64_t>(value)) == options.end()) {
+          std::string options_str = "[";
+          for (size_t i = 0; i < options.size(); ++i) {
+            if (i > 0) options_str += ", ";
+            options_str += "\"" + std::to_string(options[i]) + "\"";
           }
+          options_str += "]";
+          throw std::invalid_argument(
+              "Value for setting '" + key +
+              "' is out of allowed options. Allowed options: " + options_str);
         }
-        if (std::holds_alternative<std::pair<int64_t, int64_t>>(limits_[key])) {
-          auto options = std::get<std::pair<int64_t, int64_t>>(limits_[key]);
-          if (std::get<0>(options) > std::get<int64_t>(value) ||
-              std::get<int64_t>(value) > std::get<1>(options)) {
-            std::string options_str =
-                "[" + std::to_string(std::get<0>(options)) + ", " +
-                std::to_string(std::get<1>(options)) + "]";
-            throw std::invalid_argument(
-                "Value for setting '" + key +
-                "' is out of allowed range. Allowed range: " + options_str);
-          }
+      } else if (std::holds_alternative<std::pair<int64_t, int64_t>>(
+                     limits_[key])) {
+        auto options = std::get<std::pair<int64_t, int64_t>>(limits_[key]);
+        if (std::get<0>(options) > std::get<int64_t>(value) ||
+            std::get<int64_t>(value) > std::get<1>(options)) {
+          std::string options_str = "[" + std::to_string(std::get<0>(options)) +
+                                    ", " +
+                                    std::to_string(std::get<1>(options)) + "]";
+          throw std::invalid_argument(
+              "Value for setting '" + key +
+              "' is out of allowed range. Allowed range: " + options_str);
         }
       }
-      settings_[key] = value;
-      return;
-    }
-    if (std::holds_alternative<double>(value) &&
-        std::holds_alternative<double>(settings_[key])) {
+    } else if (std::holds_alternative<double>(value)) {
       if (std::holds_alternative<std::pair<double, double>>(limits_[key])) {
         auto options = std::get<std::pair<double, double>>(limits_[key]);
         if (std::get<0>(options) > std::get<double>(value) ||
@@ -98,75 +88,57 @@ void Settings::set(const std::string& key, const SettingValue& value) {
               "' is out of allowed range. Allowed range: " + options_str);
         }
       }
-      settings_[key] = value;
-      return;
-    }
-    if (std::holds_alternative<std::vector<std::string>>(value) &&
-        std::holds_alternative<std::vector<std::string>>(settings_[key])) {
-      if (limits_.find(key) != limits_.end()) {
-        if (std::holds_alternative<std::vector<std::string>>(limits_[key])) {
-          auto options = std::get<std::vector<std::string>>(limits_[key]);
-          for (auto& test_value : std::get<std::vector<std::string>>(value)) {
-            if (std::find(options.begin(), options.end(), test_value) ==
-                options.end()) {
-              std::string options_str = "[";
-              for (size_t i = 0; i < options.size(); ++i) {
-                if (i > 0) options_str += ", ";
-                options_str += "\"" + options[i] + "\"";
-              }
-              options_str += "]";
-              throw std::invalid_argument(
-                  "Value for setting '" + key +
-                  "' is out of allowed options. Allowed options: " +
-                  options_str);
+    } else if (std::holds_alternative<std::vector<std::string>>(value)) {
+      if (std::holds_alternative<std::vector<std::string>>(limits_[key])) {
+        auto options = std::get<std::vector<std::string>>(limits_[key]);
+        for (auto& test_value : std::get<std::vector<std::string>>(value)) {
+          if (std::find(options.begin(), options.end(), test_value) ==
+              options.end()) {
+            std::string options_str = "[";
+            for (size_t i = 0; i < options.size(); ++i) {
+              if (i > 0) options_str += ", ";
+              options_str += "\"" + options[i] + "\"";
             }
+            options_str += "]";
+            throw std::invalid_argument(
+                "Value for setting '" + key +
+                "' is out of allowed options. Allowed options: " + options_str);
           }
         }
       }
-      settings_[key] = value;
-      return;
-    }
-    if (std::holds_alternative<std::vector<int64_t>>(value) &&
-        std::holds_alternative<std::vector<int64_t>>(settings_[key])) {
-      if (limits_.find(key) != limits_.end()) {
-        if (std::holds_alternative<std::vector<int64_t>>(limits_[key])) {
-          auto options = std::get<std::vector<int64_t>>(limits_[key]);
-          for (auto& test_value : std::get<std::vector<int64_t>>(value)) {
-            if (std::find(options.begin(), options.end(), test_value) ==
-                options.end()) {
-              std::string options_str = "[";
-              for (size_t i = 0; i < options.size(); ++i) {
-                if (i > 0) options_str += ", ";
-                options_str += "\"" + std::to_string(options[i]) + "\"";
-              }
-              options_str += "]";
-              throw std::invalid_argument(
-                  "Value for setting '" + key +
-                  "' is out of allowed options. Allowed options: " +
-                  options_str);
+    } else if (std::holds_alternative<std::vector<int64_t>>(value)) {
+      if (std::holds_alternative<std::vector<int64_t>>(limits_[key])) {
+        auto options = std::get<std::vector<int64_t>>(limits_[key]);
+        for (auto& test_value : std::get<std::vector<int64_t>>(value)) {
+          if (std::find(options.begin(), options.end(), test_value) ==
+              options.end()) {
+            std::string options_str = "[";
+            for (size_t i = 0; i < options.size(); ++i) {
+              if (i > 0) options_str += ", ";
+              options_str += "\"" + std::to_string(options[i]) + "\"";
             }
+            options_str += "]";
+            throw std::invalid_argument(
+                "Value for setting '" + key +
+                "' is out of allowed options. Allowed options: " + options_str);
           }
         }
-        if (std::holds_alternative<std::pair<int64_t, int64_t>>(limits_[key])) {
-          auto options = std::get<std::pair<int64_t, int64_t>>(limits_[key]);
-          for (auto& test_value : std::get<std::vector<int64_t>>(value)) {
-            if (std::get<0>(options) > test_value ||
-                test_value > std::get<1>(options)) {
-              std::string options_str =
-                  "[" + std::to_string(std::get<0>(options)) + ", " +
-                  std::to_string(std::get<1>(options)) + "]";
-              throw std::invalid_argument(
-                  "Value for setting '" + key +
-                  "' is out of allowed range. Allowed range: " + options_str);
-            }
+      } else if (std::holds_alternative<std::pair<int64_t, int64_t>>(
+                     limits_[key])) {
+        auto options = std::get<std::pair<int64_t, int64_t>>(limits_[key]);
+        for (auto& test_value : std::get<std::vector<int64_t>>(value)) {
+          if (std::get<0>(options) > test_value ||
+              test_value > std::get<1>(options)) {
+            std::string options_str =
+                "[" + std::to_string(std::get<0>(options)) + ", " +
+                std::to_string(std::get<1>(options)) + "]";
+            throw std::invalid_argument(
+                "Value for setting '" + key +
+                "' is out of allowed range. Allowed range: " + options_str);
           }
         }
       }
-      settings_[key] = value;
-      return;
-    }
-    if (std::holds_alternative<std::vector<double>>(value) &&
-        std::holds_alternative<std::vector<double>>(settings_[key])) {
+    } else if (std::holds_alternative<std::vector<double>>(value)) {
       if (std::holds_alternative<std::pair<double, double>>(limits_[key])) {
         auto options = std::get<std::pair<double, double>>(limits_[key]);
         for (auto& test_value : std::get<std::vector<double>>(value)) {
@@ -181,12 +153,11 @@ void Settings::set(const std::string& key, const SettingValue& value) {
           }
         }
       }
-      settings_[key] = value;
-      return;
     }
   }
-  throw std::invalid_argument("Setting '" + key +
-                              "' does not match type of given argument.");
+
+  // Set the value (types already validated)
+  settings_[key] = value;
 }
 
 void Settings::set(const std::string& key, const char* value) {
@@ -577,7 +548,7 @@ std::string Settings::as_table(size_t max_width, bool show_undocumented) const {
   };
 
   // Column widths (will be adjusted)
-  size_t key_width = 20;
+  size_t key_width = 25;
   size_t value_width = 15;
   size_t limits_width = 20;
   size_t desc_width = max_width - key_width - value_width - limits_width -
