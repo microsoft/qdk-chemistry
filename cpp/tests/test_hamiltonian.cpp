@@ -1290,7 +1290,7 @@ TEST_F(HamiltonianTest, IntegralSymmetriesEnergiesO2Singlet) {
 
 TEST_F(HamiltonianTest, MixedIntegralSymmetriesO2Triplet) {
   // Test mixed integral symmetries for unrestricted O2 open shell
-  // ijab == jiab == ijba == jiba
+  // (ia|jb) == (ja|ib) == (ib|ja) == (jb|ia)
 
   // Create o2 molecule structure
   std::vector<Eigen::Vector3d> coordinates = {Eigen::Vector3d(0.0, 0.0, 0.0),
@@ -1325,21 +1325,21 @@ TEST_F(HamiltonianTest, MixedIntegralSymmetriesO2Triplet) {
            l;
   };
 
-  // Test mixed integral symmetries: ijab == jiab == ijba == jiba
+  // Test mixed integral symmetries: (ia|jb) == (ja|ib) == (ib|ja) == (jb|ia)
   for (size_t i = 0; i < active_space_size; i++) {
     for (size_t j = 0; j < active_space_size; j++) {
       for (size_t a = 0; a < active_space_size; a++) {
         for (size_t b = 0; b < active_space_size; b++) {
           // Get the four symmetry-related integrals
-          double ijab = aabb_integrals[get_index(i, j, a, b)];
-          double jiab = aabb_integrals[get_index(j, i, a, b)];
-          double ijba = aabb_integrals[get_index(i, j, b, a)];
-          double jiba = aabb_integrals[get_index(j, i, b, a)];
+          double iajb = aabb_integrals[get_index(i, j, a, b)];
+          double jaib = aabb_integrals[get_index(j, i, a, b)];
+          double ibja = aabb_integrals[get_index(i, j, b, a)];
+          double jbia = aabb_integrals[get_index(j, i, b, a)];
 
           // Test all symmetries
-          double diff1 = std::abs(ijab - jiab);
-          double diff2 = std::abs(ijab - ijba);
-          double diff3 = std::abs(ijab - jiba);
+          double diff1 = std::abs(iajb - jaib);
+          double diff2 = std::abs(iajb - ibja);
+          double diff3 = std::abs(iajb - jbia);
 
           EXPECT_LT(diff1, testing::double_tolerance)
               << "Symmetry violation."
