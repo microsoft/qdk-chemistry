@@ -82,10 +82,12 @@ auto asci_grow(ASCISettings asci_settings, MCSCFSettings mcscf_settings,
 
   auto grow_st = hrt_t::now();
   while (wfn.size() < asci_settings.ntdets_max) {
-    size_t ndets_new =
-        std::min(std::max(asci_settings.ntdets_min,
-                          size_t(wfn.size() * current_grow_factor)),
-                 asci_settings.ntdets_max);
+    // Use std::ceil to avoid truncation when grow_factor is close to 1.0
+    size_t ndets_new = std::min(
+        std::max(
+            asci_settings.ntdets_min,
+            static_cast<size_t>(std::ceil(wfn.size() * current_grow_factor))),
+        asci_settings.ntdets_max);
 
     // Ensure we're actually trying to grow (handle truncation issues)
     if (ndets_new <= wfn.size()) {
