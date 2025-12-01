@@ -981,10 +981,9 @@ spin-separated amplitudes as well as reduced density matrices (RDMs).
       .def(
           py::init<std::shared_ptr<Orbitals>, const std::vector<Configuration>&,
                    const std::optional<CoupledClusterContainer::VectorVariant>&,
-                   const std::optional<CoupledClusterContainer::VectorVariant>&,
-                   WavefunctionType>(),
+                   const std::optional<CoupledClusterContainer::VectorVariant>&>(),
           R"(
-Constructs a coupled cluster wavefunction container with restricted-like interface.
+Constructs a coupled cluster wavefunction container with amplitudes.
 
 Parameters:
     orbitals (Orbitals): Shared pointer to orbital basis set
@@ -994,8 +993,6 @@ Parameters:
     both alpha and beta in restricted case)
     t2_amplitudes (numpy.ndarray, optional): T2 amplitudes (will be used for
     alpha-beta coupling)
-    type (WavefunctionType, optional): Type of wavefunction (default:
-    NotSelfDual)
 
 Examples:
     >>> ref = qdk.chemistry.Configuration("33221100")
@@ -1006,16 +1003,14 @@ Examples:
         )",
           py::arg("orbitals"), py::arg("references"),
           py::arg("t1_amplitudes") = std::nullopt,
-          py::arg("t2_amplitudes") = std::nullopt,
-          py::arg("type") = WavefunctionType::NotSelfDual)
+          py::arg("t2_amplitudes") = std::nullopt)
       .def(
           py::init<std::shared_ptr<Orbitals>, const std::vector<Configuration>&,
                    const std::optional<CoupledClusterContainer::VectorVariant>&,
                    const std::optional<CoupledClusterContainer::VectorVariant>&,
                    const std::optional<CoupledClusterContainer::VectorVariant>&,
                    const std::optional<CoupledClusterContainer::VectorVariant>&,
-                   const std::optional<CoupledClusterContainer::VectorVariant>&,
-                   WavefunctionType>(),
+                   const std::optional<CoupledClusterContainer::VectorVariant>&>(),
           R"(
 Constructs a coupled cluster wavefunction container with spin-separated amplitudes.
 
@@ -1028,8 +1023,6 @@ Parameters:
     t2_amplitudes_abab (numpy.ndarray, optional): Alpha-beta T2 amplitudes
     t2_amplitudes_aaaa (numpy.ndarray, optional): Alpha-alpha T2 amplitudes
     t2_amplitudes_bbbb (numpy.ndarray, optional): Beta-beta T2 amplitudes
-    type (WavefunctionType, optional): Type of wavefunction (default:
-    NotSelfDual)
 
 Examples:
     >>> ref = qdk.chemistry.Configuration("33221100")
@@ -1044,8 +1037,7 @@ Examples:
           py::arg("t1_amplitudes_bb") = std::nullopt,
           py::arg("t2_amplitudes_abab") = std::nullopt,
           py::arg("t2_amplitudes_aaaa") = std::nullopt,
-          py::arg("t2_amplitudes_bbbb") = std::nullopt,
-          py::arg("type") = WavefunctionType::NotSelfDual)
+          py::arg("t2_amplitudes_bbbb") = std::nullopt)
       .def(
           py::init<std::shared_ptr<Orbitals>, const std::vector<Configuration>&,
                    const std::optional<CoupledClusterContainer::VectorVariant>&,
@@ -1054,8 +1046,7 @@ Examples:
                    const std::optional<CoupledClusterContainer::VectorVariant>&,
                    const std::optional<CoupledClusterContainer::VectorVariant>&,
                    const std::optional<CoupledClusterContainer::MatrixVariant>&,
-                   const std::optional<CoupledClusterContainer::VectorVariant>&,
-                   WavefunctionType>(),
+                   const std::optional<CoupledClusterContainer::VectorVariant>&>(),
           R"(
 Constructs a coupled cluster wavefunction container with amplitudes and RDMs.
 
@@ -1070,8 +1061,6 @@ Parameters:
     t2_amplitudes_bbbb (numpy.ndarray, optional): Beta-beta T2 amplitudes
     one_rdm_spin_traced (numpy.ndarray, optional): Spin-traced one-particle RDM
     two_rdm_spin_traced (numpy.ndarray, optional): Spin-traced two-particle RDM
-    type (WavefunctionType, optional): Type of wavefunction (default:
-    NotSelfDual)
 
 Examples:
     >>> ref = qdk.chemistry.Configuration("33221100")
@@ -1079,7 +1068,7 @@ Examples:
     >>> t2_abab = np.array([...])
     >>> one_rdm = np.array([...])
     >>> container = qdk.chemistry.CoupledClusterContainer(
-...     orbitals, [ref], t1_aa, None, t2_abab, None, None, one_rdm, None)
+    ...     orbitals, [ref], t1_aa, None, t2_abab, None, None, one_rdm, None)
         )",
           py::arg("orbitals"), py::arg("references"),
           py::arg("t1_amplitudes_aa") = std::nullopt,
@@ -1088,8 +1077,7 @@ Examples:
           py::arg("t2_amplitudes_aaaa") = std::nullopt,
           py::arg("t2_amplitudes_bbbb") = std::nullopt,
           py::arg("one_rdm_spin_traced") = std::nullopt,
-          py::arg("two_rdm_spin_traced") = std::nullopt,
-          py::arg("type") = WavefunctionType::NotSelfDual)
+          py::arg("two_rdm_spin_traced") = std::nullopt)
 
       .def("get_references", &CoupledClusterContainer::get_references,
            R"(
@@ -1170,7 +1158,7 @@ Examples:
     MP2 wavefunction container implementation.
     )")
       .def(py::init<std::shared_ptr<Hamiltonian>,
-                    const std::vector<Configuration>&, WavefunctionType>(),
+                    const std::vector<Configuration>&, const std::string&>(),
            R"(
 Constructs an MP2 wavefunction container.
 
@@ -1178,16 +1166,15 @@ Parameters:
     hamiltonian (Hamiltonian): Shared pointer to the Hamiltonian
     references (list of Configuration): Reference determinant(s) for the MP2
     wavefunction
-    type (WavefunctionType, optional): Type of wavefunction (default:
-    NotSelfDual)
+    partitioning (str, optional): Choice of partitioning in perturbation theory (default: "mp")
 
 Examples:
     >>> ref = qdk.chemistry.Configuration("33221100")
     >>> container = qdk.chemistry.MP2Container(
-    ...     hamiltonian, [ref])
+    ...     hamiltonian, [ref], "mp")
         )",
            py::arg("hamiltonian"), py::arg("references"),
-           py::arg("type") = WavefunctionType::NotSelfDual)
+           py::arg("partitioning") = "mp")
       .def("get_references", &MP2Container::get_references,
            R"(
 Get all reference determinants.

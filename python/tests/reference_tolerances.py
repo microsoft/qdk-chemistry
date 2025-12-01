@@ -70,4 +70,4 @@ unitarity_error_tolerance = 1e-10
 xyz_file_structure_tolerance = 1e-6
 
 # This is the tolerance to check the mp2 energies against pyscf
-mp2_energy_tolerance = 1e-7
+mp2_energy_tolerance = 1e-8

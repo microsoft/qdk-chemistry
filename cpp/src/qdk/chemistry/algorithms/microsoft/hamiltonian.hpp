@@ -15,7 +15,7 @@ class HamiltonianSettings : public qdk::chemistry::data::Settings {
     // TODO enable and use
     // set_default("integral_threshold", 1e-12);
     set_default("eri_method", "direct");
-    set_default("force_unrestricted", false);
+    set_default("scf_type", "auto");
   }
   ~HamiltonianSettings() override = default;
 };

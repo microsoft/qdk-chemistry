@@ -11,7 +11,6 @@ import pickle
 import numpy as np
 import pytest
 
-import qdk_chemistry
 from qdk_chemistry.data import (
     CasWavefunctionContainer,
     Configuration,
@@ -24,6 +23,7 @@ from qdk_chemistry.data import (
     Wavefunction,
     WavefunctionType,
 )
+from qdk_chemistry import algorithms
 
 from .reference_tolerances import (
     float_comparison_absolute_tolerance,
@@ -810,19 +810,19 @@ class TestWavefunctionRdmIntegraion:
         ntot = nelec_alpha + nelec_beta
 
         mol = Structure(["N", "N"], [[0.0, 0.0, 2.0], [0.0, 0.0, 0.0]])
-        scf_solver = qdk_chemistry.algorithms.create("scf_solver")
+        scf_solver = algorithms.create("scf_solver")
         scf_solver.settings().set("basis_set", "def2-svp")
         sd_wf = scf_solver.run(mol, 0, np.abs(nelec_alpha - nelec_beta) + 1)[1]
 
-        active_space_selector = qdk_chemistry.algorithms.create("active_space_selector", "qdk_valence")
+        active_space_selector = algorithms.create("active_space_selector", "qdk_valence")
         active_space_selector.settings().set("num_active_electrons", ntot)
         active_space_selector.settings().set("num_active_orbitals", norb)
         active_orbs_sd = active_space_selector.run(sd_wf)
 
-        hamil_ctor = qdk_chemistry.algorithms.create("hamiltonian_constructor")
+        hamil_ctor = algorithms.create("hamiltonian_constructor")
         hamiltonian = hamil_ctor.run(active_orbs_sd.get_orbitals())
 
-        macis_calc = qdk_chemistry.algorithms.create("multi_configuration_calculator", "macis_cas")
+        macis_calc = algorithms.create("multi_configuration_calculator", "macis_cas")
         macis_calc.settings().set("calculate_one_rdm", True)
         macis_calc.settings().set("calculate_two_rdm", True)
         wfn = macis_calc.run(hamiltonian, nelec_alpha, nelec_beta)[1]
@@ -890,20 +890,20 @@ class TestWavefunctionRdmIntegraion:
         ntot = nelec_alpha + nelec_beta
 
         mol = Structure(["O", "O"], [[0.0, 0.0, 2.0], [0.0, 0.0, 0.0]])
-        scf_solver = qdk_chemistry.algorithms.create("scf_solver", "pyscf")
+        scf_solver = algorithms.create("scf_solver", "pyscf")
         scf_solver.settings().set("basis_set", "def2-svp")
         scf_solver.settings().set("scf_type", "restricted")
         sd_wf = scf_solver.run(mol, 0, np.abs(nelec_alpha - nelec_beta) + 1)[1]
 
-        active_space_selector = qdk_chemistry.algorithms.create("active_space_selector", "qdk_valence")
+        active_space_selector = algorithms.create("active_space_selector", "qdk_valence")
         active_space_selector.settings().set("num_active_electrons", ntot)
         active_space_selector.settings().set("num_active_orbitals", norb)
         active_orbs_sd = active_space_selector.run(sd_wf)
 
-        hamil_ctor = qdk_chemistry.algorithms.create("hamiltonian_constructor")
+        hamil_ctor = algorithms.create("hamiltonian_constructor")
         hamiltonian = hamil_ctor.run(active_orbs_sd.get_orbitals())
 
-        macis_calc = qdk_chemistry.algorithms.create("multi_configuration_calculator", "macis_cas")
+        macis_calc = algorithms.create("multi_configuration_calculator", "macis_cas")
         macis_calc.settings().set("calculate_one_rdm", True)
         macis_calc.settings().set("calculate_two_rdm", True)
         wfn = macis_calc.run(hamiltonian, nelec_alpha, nelec_beta)[1]

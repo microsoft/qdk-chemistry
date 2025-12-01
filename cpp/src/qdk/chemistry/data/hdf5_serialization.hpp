@@ -265,6 +265,7 @@ bool group_exists_in_group(H5::Group& group, const std::string& group_name);
 
 // Template implementations
 
+// Save STL vector to HDF5 file
 template <typename T>
 void save_stl_to_hdf5(H5::H5File& file, const std::string& dataset_name,
                       const std::vector<T>& data) {
@@ -277,6 +278,7 @@ void save_stl_to_hdf5(H5::H5File& file, const std::string& dataset_name,
   }
 }
 
+// Load STL vector from HDF5 file
 template <typename T>
 std::vector<T> load_std_vector_from_hdf5(H5::H5File& file,
                                          const std::string& dataset_name) {
@@ -291,6 +293,7 @@ std::vector<T> load_std_vector_from_hdf5(H5::H5File& file,
   return data;
 }
 
+// Save STL vector to HDF5 group
 template <typename T>
 void save_stl_to_group(H5::Group& group, const std::string& dataset_name,
                        const std::vector<T>& data) {
@@ -303,6 +306,7 @@ void save_stl_to_group(H5::Group& group, const std::string& dataset_name,
   }
 }
 
+// Load STL vector from HDF5 group
 template <typename T>
 std::vector<T> load_std_vector_from_group(H5::Group& group,
                                           const std::string& dataset_name) {
