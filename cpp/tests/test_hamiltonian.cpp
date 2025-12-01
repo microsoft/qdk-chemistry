@@ -19,6 +19,8 @@
 #include <qdk/chemistry/data/wavefunction.hpp>
 #include <qdk/chemistry/data/wavefunction_containers/sd.hpp>
 
+#include "ut_common.hpp"
+
 using namespace qdk::chemistry::data;
 using namespace qdk::chemistry::algorithms;
 
@@ -1147,8 +1149,6 @@ TEST_F(HamiltonianTest, IntegralSymmetriesEnergiesO2Singlet) {
   // Restricted and unrestricted calculations
   // should give identical results for closed-shell systems (o2 singlet)
 
-  const double tolerance = 1e-8;
-
   // Create o2 molecule structure
   std::vector<Eigen::Vector3d> coordinates = {Eigen::Vector3d(0.0, 0.0, 0.0),
                                               Eigen::Vector3d(2.3, 0.0, 0.0)};
@@ -1219,7 +1219,7 @@ TEST_F(HamiltonianTest, IntegralSymmetriesEnergiesO2Singlet) {
   double ump2_energy = rhf_energy + ump2_correlation;
 
   // MP2 energies should be identical for RMP2/UMP2
-  EXPECT_NEAR(rmp2_energy, ump2_energy, tolerance)
+  EXPECT_NEAR(rmp2_energy, ump2_energy, testing::scf_energy_tolerance)
       << "Restricted and unrestricted MP2 energies should be identical for "
          "closed-shell O2. "
       << "RMP2=" << rmp2_energy << ", UMP2=" << ump2_energy
@@ -1229,7 +1229,8 @@ TEST_F(HamiltonianTest, IntegralSymmetriesEnergiesO2Singlet) {
   const auto& [aaaa_integrals, aabb_integrals_temp, bbbb_integrals] =
       uhf_hamiltonian->get_two_body_integrals();
 
-  EXPECT_TRUE(aaaa_integrals.isApprox(bbbb_integrals, tolerance))
+  EXPECT_TRUE(
+      aaaa_integrals.isApprox(bbbb_integrals, testing::scf_energy_tolerance))
       << "Alpha-alpha and beta-beta integrals should be identical for "
          "closed-shell O2";
 
@@ -1237,7 +1238,8 @@ TEST_F(HamiltonianTest, IntegralSymmetriesEnergiesO2Singlet) {
   const auto& [alpha_one_body, beta_one_body] =
       uhf_hamiltonian->get_one_body_integrals();
 
-  EXPECT_TRUE(alpha_one_body.isApprox(beta_one_body, tolerance))
+  EXPECT_TRUE(
+      alpha_one_body.isApprox(beta_one_body, testing::scf_energy_tolerance))
       << "Alpha and beta one-body integrals should be identical for "
          "closed-shell O2";
 
@@ -1251,7 +1253,6 @@ TEST_F(HamiltonianTest, IntegralSymmetriesEnergiesO2Singlet) {
   active_space_size = alpha_active.size();
 
   // Test aabb[i,j,k,l] == aabb[k,l,i,j] (particle exchange symmetry)
-  double max_symmetry_violation = 0.0;
   auto get_integral_index = [active_space_size](size_t i, size_t j, size_t k,
                                                 size_t l) -> size_t {
     return i * active_space_size * active_space_size * active_space_size +
@@ -1266,22 +1267,23 @@ TEST_F(HamiltonianTest, IntegralSymmetriesEnergiesO2Singlet) {
           double ijkl = aabb_integrals[get_integral_index(i, j, k, l)];
           double klij = aabb_integrals[get_integral_index(k, l, i, j)];
           double diff = std::abs(ijkl - klij);
-          max_symmetry_violation = std::max(max_symmetry_violation, diff);
+          EXPECT_LT(diff, testing::double_tolerance)
+              << "Symmetry violation for aabb[" << i << "," << j << "," << k
+              << "," << l << "] vs aabb[" << k << "," << l << "," << i << ","
+              << j << "]. "
+              << "Difference: " << diff << " exceeds tolerance "
+              << testing::double_tolerance;
         }
       }
     }
   }
 
-  EXPECT_LT(max_symmetry_violation, tolerance)
-      << "Alpha-beta integrals should satisfy aabb[i,j,k,l] == aabb[k,l,i,j] "
-         "symmetry. "
-      << "Max violation: " << max_symmetry_violation;
-
   // Verify that restricted and unrestricted Hamiltonians are consistent
   // The restricted integrals should match the aabb integrals
   const auto& [restricted_aaaa, restricted_aabb, restricted_bbbb] =
       rhf_hamiltonian->get_two_body_integrals();
-  EXPECT_TRUE(restricted_aaaa.isApprox(aabb_integrals, tolerance))
+  EXPECT_TRUE(
+      restricted_aaaa.isApprox(aabb_integrals, testing::double_tolerance))
       << "aaaa integrals should match aabb integrals for "
          "closed-shell systems";
 }
@@ -1289,8 +1291,6 @@ TEST_F(HamiltonianTest, IntegralSymmetriesEnergiesO2Singlet) {
 TEST_F(HamiltonianTest, MixedIntegralSymmetriesO2Triplet) {
   // Test mixed integral symmetries for unrestricted O2 open shell
   // ijab == jiab == ijba == jiba
-
-  const double tolerance = 1e-8;
 
   // Create o2 molecule structure
   std::vector<Eigen::Vector3d> coordinates = {Eigen::Vector3d(0.0, 0.0, 0.0),
@@ -1326,8 +1326,6 @@ TEST_F(HamiltonianTest, MixedIntegralSymmetriesO2Triplet) {
   };
 
   // Test mixed integral symmetries: ijab == jiab == ijba == jiba
-  double max_symmetry_violation = 0.0;
-
   for (size_t i = 0; i < active_space_size; i++) {
     for (size_t j = 0; j < active_space_size; j++) {
       for (size_t a = 0; a < active_space_size; a++) {
@@ -1343,16 +1341,24 @@ TEST_F(HamiltonianTest, MixedIntegralSymmetriesO2Triplet) {
           double diff2 = std::abs(ijab - ijba);
           double diff3 = std::abs(ijab - jiba);
 
-          max_symmetry_violation =
-              std::max({max_symmetry_violation, diff1, diff2, diff3});
+          EXPECT_LT(diff1, testing::double_tolerance)
+              << "Symmetry violation."
+              << "Difference: " << diff1 << " exceeds tolerance "
+              << testing::double_tolerance;
+
+          EXPECT_LT(diff2, testing::double_tolerance)
+              << "Symmetry violation."
+              << "Difference: " << diff2 << " exceeds tolerance "
+              << testing::double_tolerance;
+
+          EXPECT_LT(diff3, testing::double_tolerance)
+              << "Symmetry violation."
+              << "Difference: " << diff3 << " exceeds tolerance "
+              << testing::double_tolerance;
         }
       }
     }
-  }
-
-  EXPECT_LT(max_symmetry_violation, tolerance)
-      << "Mixed aabb integrals should satisfy ijab == jiab == ijba == jiba."
-      << "Max violation: " << max_symmetry_violation;
+  };
 }
 
 TEST_F(HamiltonianTest, IsValidComprehensive) {
