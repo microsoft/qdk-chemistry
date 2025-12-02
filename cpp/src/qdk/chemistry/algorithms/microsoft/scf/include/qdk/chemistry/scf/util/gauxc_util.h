@@ -63,7 +63,7 @@ std::string to_string(GauXC::RadialQuad type);
  *
  * Parses grid pruning scheme strings (e.g., "Unpruned", "Robust", "Treutler")
  * and returns the corresponding GauXC enumeration value. Pruning reduces the
- * number of grid points in regions where basis functions have small overlap.
+ * number of grid points in regions where atomic orbitals have small overlap.
  *
  * @param str Pruning scheme string
  * @return GauXC::PruningScheme Enumeration value for the pruning scheme

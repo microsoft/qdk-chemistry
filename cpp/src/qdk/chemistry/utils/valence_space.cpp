@@ -7,7 +7,12 @@
 #include <algorithm>
 #include <qdk/chemistry/utils/valence_space.hpp>
 
-using namespace qdk::chemistry::data;
+namespace qdk::chemistry::utils {
+
+using Element = qdk::chemistry::data::Element;
+using Orbitals = qdk::chemistry::data::Orbitals;
+using Structure = qdk::chemistry::data::Structure;
+using Wavefunction = qdk::chemistry::data::Wavefunction;
 
 // Noble gas elements and their atomic numbers
 static const std::vector<std::pair<Element, size_t>> NOBLE_GASES = {
@@ -57,7 +62,7 @@ size_t calculate_valence_orbitals(Element element) {
   return VALENCE_ORBITALS_BY_PERIOD[5];                           // Period 6
 }
 
-std::pair<size_t, size_t> compute_valence_space(
+std::pair<size_t, size_t> compute_valence_space_parameters(
     std::shared_ptr<Wavefunction> wavefunction, int charge) {
   // Extract structure from wavefunction
   std::shared_ptr<Structure> structure =
@@ -101,3 +106,5 @@ std::pair<size_t, size_t> compute_valence_space(
   // Return as pair: [num_active_valence_electrons, num_active_valence_orbitals]
   return {num_active_valence_electrons, num_active_valence_orbitals};
 }
+
+}  // namespace qdk::chemistry::utils

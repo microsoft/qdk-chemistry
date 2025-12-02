@@ -175,7 +175,7 @@ TEST_F(AnsatzEnergyCalculationTest, N2SingletCAS_6e6o) {
   auto ansatz_hf = Ansatz(hamiltonian_hf, wfn_scf);
   double energy_hf = ansatz_hf.calculate_energy();
 
-  EXPECT_NEAR(energy_hf, E_scf, 1e-6);
+  EXPECT_NEAR(energy_hf, E_scf, testing::scf_energy_tolerance);
 
   // select active space
   auto active_space = ActiveSpaceSelectorFactory::create("qdk_valence");
@@ -199,7 +199,7 @@ TEST_F(AnsatzEnergyCalculationTest, N2SingletCAS_6e6o) {
   double energy = ansatz.calculate_energy();
 
   // energy should match SCF energy
-  EXPECT_NEAR(energy, E_cas, 1e-6);
+  EXPECT_NEAR(energy, E_cas, testing::scf_energy_tolerance);
 }
 
 // TODO(MM): Comment in as soon as the unrestricted Hamiltonian is merged
@@ -219,7 +219,7 @@ TEST_F(AnsatzEnergyCalculationTest, N2SingletCAS_6e6o) {
 //   auto ansatz_hf = Ansatz(hamiltonian_hf, wfn_scf);
 //   double energy_hf = ansatz_hf.calculate_energy();
 
-//   EXPECT_NEAR(energy_hf, E_scf, 1e-6);
+//   EXPECT_NEAR(energy_hf, E_scf, testing::scf_energy_tolerance);
 
 //   // select active space
 //   auto active_space = ActiveSpaceSelectorFactory::create("valence");
@@ -241,5 +241,5 @@ TEST_F(AnsatzEnergyCalculationTest, N2SingletCAS_6e6o) {
 //   double energy = ansatz.calculate_energy();
 
 //   // energy should match SCF energy
-//   EXPECT_NEAR(energy, E_cas, 1e-6);
+//   EXPECT_NEAR(energy, E_cas, testing::scf_energy_tolerance);
 // }

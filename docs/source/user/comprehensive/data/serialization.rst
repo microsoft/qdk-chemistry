@@ -39,44 +39,34 @@ JSON serialization
 
 .. tab:: C++ API
 
-   .. code-block:: cpp
-
-      // Serialize to JSON object
-      auto json_data = object.to_json();
-
-      // Deserialize from JSON object
-      auto object_from_json = ObjectType::from_json(json_data);
-
-      // Serialize to JSON file
-      object.to_json_file("filename.ext.json"); // Extension depends on object type
-
-      // Deserialize from JSON file
-      auto object_from_json_file = ObjectType::from_json_file("filename.ext.json");
+   .. literalinclude:: ../../../_static/examples/cpp/serialization.cpp
+      :language: cpp
+      :start-after: // start-cell-json
+      :end-before: // end-cell-json
 
 .. tab:: Python API
 
-   .. literalinclude:: ../../../../examples/serialization.py
+   .. literalinclude:: ../../../_static/examples/python/serialization.py
       :language: python
-      :lines: 14-20,26-32
+      :start-after: # start-cell-json
+      :end-before: # end-cell-json
 
 HDF5 serialization
 ~~~~~~~~~~~~~~~~~~
 
 .. tab:: C++ API
 
-   .. code-block:: cpp
-
-      // Serialize to HDF5 file
-      object.to_hdf5_file("filename.ext.h5"); // Extension depends on object type
-
-      // Deserialize from HDF5 file
-      auto object_from_hdf5_file = ObjectType::from_hdf5_file("filename.ext.h5");
+   .. literalinclude:: ../../../_static/examples/cpp/serialization.cpp
+      :language: cpp
+      :start-after: // start-cell-hdf5
+      :end-before: // end-cell-hdf5
 
 .. tab:: Python API
 
-   .. literalinclude:: ../../../../examples/serialization.py
+   .. literalinclude:: ../../../_static/examples/python/serialization.py
       :language: python
-      :lines: 35-41
+      :start-after: # start-cell-hdf5
+      :end-before: # end-cell-hdf5
 
 File extensions
 ---------------
@@ -107,16 +97,17 @@ QDK/Chemistry enforces specific file extensions to ensure clarity about the cont
      - ``.hamiltonian.json``
      - ``.hamiltonian.h5``
      - ``hamiltonian.fcidump``
-   * - :doc:`Wavefunction <../data/wavefunction>`
+   * - :class:`~qdk_chemistry.data.Wavefunction`
      - ``.wavefunction.json``
      - ``.wavefunction.h5``
      - -
 
-Related topics
---------------
+Further reading
+---------------
 
+- The above examples can be downloaded as complete `C++ <../../../_static/examples/cpp/serialization.cpp>`_ and `Python <../../../_static/examples/python/serialization.py>`_ scripts.
 - :doc:`Structure <../data/structure>`: Molecular geometry and atomic information
 - :doc:`BasisSet <../data/basis_set>`: Quantum chemistry basis set definitions
 - :doc:`Orbitals <../data/orbitals>`: Molecular orbital coefficients and properties
 - :doc:`Hamiltonian <../data/hamiltonian>`: Electronic Hamiltonian operator
-- :doc:`Wavefunction <../data/wavefunction>`: Quantum mechanical wavefunction data
+- :class:`~qdk_chemistry.data.Wavefunction`: Quantum mechanical wavefunction data

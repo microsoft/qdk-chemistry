@@ -17,31 +17,34 @@ Key Features:
 # Licensed under the MIT License. See LICENSE.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
 
-import logging
-from typing import Any
+from __future__ import annotations
 
-import numpy as np
+import logging
+from typing import TYPE_CHECKING, Any
+
 from qiskit import qasm3, transpile
-from qiskit.circuit import QuantumCircuit
-from qiskit.providers.backend import BackendV2
 from qiskit_aer import AerSimulator
 from qiskit_aer.noise import NoiseModel
+
+if TYPE_CHECKING:
+    import qiskit
+    from qiskit.circuit import QuantumCircuit
 
 from qdk_chemistry.algorithms import register
 from qdk_chemistry.algorithms.energy_estimator import (
     EnergyEstimator,
-    compute_energy_expectation_from_bitstrings,
-    create_measurement_circuits,
 )
 from qdk_chemistry.data import EnergyExpectationResult, MeasurementData, QubitHamiltonian
 
 _LOGGER = logging.getLogger(__name__)
 
+__all__ = ["QiskitEnergyEstimator"]
+
 
 class QiskitEnergyEstimator(EnergyEstimator):
     """Custom Estimator to estimate expectation values of quantum circuits with respect to a given observable."""
 
-    def __init__(self, backend: BackendV2 | None = None, seed: int = 42):
+    def __init__(self, backend: qiskit.providers.backend.BackendV2 | None = None, seed: int = 42):
         """Initialize the Estimator with a backend and optional transpilation settings.
 
         Args:
@@ -60,14 +63,14 @@ class QiskitEnergyEstimator(EnergyEstimator):
                 self.backend.set_options(seed_simulator=seed)
 
     @classmethod
-    def from_backend_options(cls, seed: int = 42, backend_options: dict[str, Any] | None = None) -> "EnergyEstimator":
+    def from_backend_options(cls, seed: int = 42, backend_options: dict[str, Any] | None = None) -> EnergyEstimator:
         """Create an EnergyEstimator from specified backend options for Aer simulator.
 
         Args:
             seed: Seed for the simulator to ensure reproducibility. Default is 42.
-            This argument takes priority over the seed specified in the Backend configuration/options.
+                This argument takes priority over the seed specified in the Backend configuration/options.
             backend_options: Backend-specific configuration dictionary. Frequently used options include
-            ``{"seed_simulator": int, "noise_model": NoiseModel, ...}``
+                ``{"seed_simulator": int, "noise_model": NoiseModel, ...}``
 
         References: `Qiskit Aer Simulator <https://github.com/Qiskit/qiskit-aer/blob/main/qiskit_aer/backends/aer_simulator.py>`_.
 
@@ -169,7 +172,7 @@ class QiskitEnergyEstimator(EnergyEstimator):
             basis_gates = self.backend.options.noise_model.basis_gates
 
         # Create measurement circuits
-        measurement_circuits_qasm = create_measurement_circuits(
+        measurement_circuits_qasm = self._create_measurement_circuits(
             circuit_qasm=circuit_qasm,
             grouped_hamiltonians=qubit_hamiltonians,
         )
@@ -188,7 +191,7 @@ class QiskitEnergyEstimator(EnergyEstimator):
             shots_list=shots_list,
         )
 
-        return compute_energy_expectation_from_bitstrings(
+        return self._compute_energy_expectation_from_bitstrings(
             qubit_hamiltonians, measurement_data.bitstring_counts, energy_offset
         ), measurement_data
 
@@ -198,35 +201,3 @@ class QiskitEnergyEstimator(EnergyEstimator):
 
 
 register(lambda: QiskitEnergyEstimator())
-
-if __name__ == "__main__":
-    """Example usage of the Estimator from different backends."""
-    from qiskit import qasm3
-    from qiskit_aer.noise import NoiseModel, depolarizing_error
-
-    logging.basicConfig(level=logging.WARNING)
-    _LOGGER = logging.getLogger(__name__)
-    _LOGGER.setLevel(logging.INFO)
-
-    circuit_qasm = """
-        include "stdgates.inc";
-        qubit[2] q;
-        rz(pi) q[0];
-        x q[0];
-        cx q[0], q[1];
-        """
-    qubit_hamiltonians = [QubitHamiltonian(["ZZ"], np.array([1.0]))]
-
-    # Example usage: qiskit aer simulator
-    estimator = QiskitEnergyEstimator()
-    results = estimator.run(circuit_qasm, qubit_hamiltonians, total_shots=1000)
-    _LOGGER.info(f"Energy expectation value from AerSimulator: {results['energy_expectation_value']}")
-
-    # Example usage: qiskit aer simulator with noise model
-    noise_model = NoiseModel(basis_gates=["rz", "sx", "cx", "measure"])
-    noise_model.add_all_qubit_quantum_error(depolarizing_error(0.001, 1), ["rz", "sx"])
-    noise_model.add_all_qubit_quantum_error(depolarizing_error(0.007, 2), ["cx"])
-    backend_options = {"noise_model": noise_model}  # add noise
-    estimator = QiskitEnergyEstimator.from_backend_options(backend_options=backend_options)
-    results = estimator.run(circuit_qasm, qubit_hamiltonians, total_shots=1000)
-    _LOGGER.info(f"Energy expectation value from AerSimulator with noise: {results['energy_expectation_value']}")

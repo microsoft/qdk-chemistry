@@ -10,7 +10,9 @@
 #include <array>
 #include <functional>
 #include <iostream>
-#include <qdk/chemistry/utils/omp_utils.hpp>
+#ifdef _OPENMP
+#include <omp.h>
+#endif
 #ifdef ENABLE_NVTX3
 #include <nvtx3/nvtx3.hpp>
 #endif
@@ -58,7 +60,7 @@ class Libint2Engine : public OneBodyIntegralEngine {
    * @param op Libint2 operator type (overlap, kinetic, nuclear, etc.)
    * @param obs Basis set in libint2 format
    * @param deriv Derivative order (0=integrals, 1=gradients, 2=hessians)
-   * @param basis_mode Spherical or Cartesian basis function mode
+   * @param basis_mode Spherical or Cartesian atomic orbital mode
    */
   Libint2Engine(libint2::Operator op, const libint2::BasisSet& obs, int deriv,
                 BasisMode basis_mode)
@@ -89,7 +91,7 @@ class Libint2Engine : public OneBodyIntegralEngine {
   /**
    * @brief Compute integrals between two shells
    *
-   * Evaluates integrals between basis function shells i and j using
+   * Evaluates integrals between atomic orbital shells i and j using
    * the configured libint2 engine and operator.
    *
    * @param i Index of first shell
@@ -123,7 +125,7 @@ class Libint2Engine : public OneBodyIntegralEngine {
  * provides derivatives for geometry optimization.
  *
  * @note Requires libecpint library for ECP integral computation
- * @note Pure vs. Cartesian basis function conventions are handled automatically
+ * @note Pure vs. Cartesian atomic orbital conventions are handled automatically
  */
 class ECPIntEngine : public OneBodyIntegralEngine {
   using EigenVector = Eigen::Matrix<double, Eigen::Dynamic, 1>;
@@ -143,7 +145,7 @@ class ECPIntEngine : public OneBodyIntegralEngine {
    * @param natom Total number of atoms in system
    * @param deriv Derivative order (0=integrals, 1=gradients, 2=hessians)
    * @param pure True for spherical harmonics, false for Cartesian
-   * @param basis_mode Basis function convention (spherical/Cartesian)
+   * @param basis_mode atomic orbital convention (spherical/Cartesian)
    */
   ECPIntEngine(const std::vector<libecpint::GaussianShell>& shells,
                const std::vector<libecpint::ECP>& ecps, int maxLB, int maxLU,
@@ -318,7 +320,7 @@ class ECPIntEngine : public OneBodyIntegralEngine {
   const std::vector<libecpint::ECP>&
       ecps_;              ///< Reference to ECP definitions for relevant atoms
   bool pure_;             ///< True for spherical harmonics, false for Cartesian
-  BasisMode basis_mode_;  ///< Basis function convention (spherical/Cartesian)
+  BasisMode basis_mode_;  ///< atomic orbital convention (spherical/Cartesian)
 
   std::vector<EigenVector>
       buf_;  ///< Buffers for storing computed integrals/derivatives
@@ -394,11 +396,21 @@ std::vector<std::pair<int, int>> OneBodyIntegral::compute_shell_pairs(
     return libint2::Engine(libint2::Operator::overlap, obs.max_nprim(),
                            obs.max_l(), 0);
   };
+#ifdef _OPENMP
   int nthreads = omp_get_max_threads();
+#else
+  int nthreads = 1;
+#endif
   std::vector<libint2::Engine> engines(nthreads, engine_fn());
+#ifdef _OPENMP
 #pragma omp parallel num_threads(nthreads)
+#endif
   {
+#ifdef _OPENMP
     int local_thread_id = omp_get_thread_num();
+#else
+    int local_thread_id = 0;
+#endif
     int world_thread_size = mpi::get_world_size() * nthreads;
     int world_thread_id = mpi::get_world_rank() * nthreads + local_thread_id;
     libint2::Engine& engine = engines[local_thread_id];
@@ -440,13 +452,23 @@ std::vector<std::pair<int, int>> OneBodyIntegral::compute_shell_pairs(
 void OneBodyIntegral::integral_(size_t nopers, EngineFactory engine_fn,
                                 RowMajorMatrix* res) {
   const auto& shell2bf = obs_.shell2bf();
+#ifdef _OPENMP
   int nthreads = omp_get_max_threads();
+#else
+  int nthreads = 1;
+#endif
 #ifdef ENABLE_NVTX3
   nvtx3::scoped_range r{"int1e"};
 #endif
+#ifdef _OPENMP
 #pragma omp parallel num_threads(nthreads)
+#endif
   {
+#ifdef _OPENMP
     int local_thread_id = omp_get_thread_num();
+#else
+    int local_thread_id = 0;
+#endif
     int world_thread_size = mpi_.world_size * nthreads;
     int world_thread_id = mpi_.world_rank * nthreads + local_thread_id;
     auto engine = engine_fn();
@@ -649,13 +671,23 @@ void OneBodyIntegral::integral_deriv_(EngineFactory engine_fn,
                                       const RowMajorMatrix& coeff,
                                       AtomCenterFn center_fn, double* res) {
   const auto& shell2bf = obs_.shell2bf();
+#ifdef _OPENMP
   int nthreads = omp_get_max_threads();
+#else
+  int nthreads = 1;
+#endif
 #ifdef ENABLE_NVTX3
   nvtx3::scoped_range r{"int1e_deriv"};
 #endif
+#ifdef _OPENMP
 #pragma omp parallel num_threads(nthreads)
+#endif
   {
+#ifdef _OPENMP
     int local_thread_id = omp_get_thread_num();
+#else
+    int local_thread_id = 0;
+#endif
     int world_thread_size = mpi_.world_size * nthreads;
     int world_thread_id = mpi_.world_rank * nthreads + local_thread_id;
     auto engine = engine_fn();
@@ -673,13 +705,17 @@ void OneBodyIntegral::integral_deriv_(EngineFactory engine_fn,
         for (int xyz = 0; xyz < 3; xyz++) {
           Eigen::Map<const RowMajorMatrix> mat(buf[idx * 3 + xyz], n1, n2);
           double value = coeff.block(bf1, bf2, n1, n2).cwiseProduct(mat).sum();
+#ifdef _OPENMP
 #pragma omp atomic
+#endif
           res[xyz * atoms_.size() + atom] += value;
           if (i != j) {
             value = coeff.block(bf2, bf1, n2, n1)
                         .cwiseProduct(mat.transpose())
                         .sum();
+#ifdef _OPENMP
 #pragma omp atomic
+#endif
             res[xyz * atoms_.size() + atom] += value;
           }
         }
@@ -799,13 +835,23 @@ void OneBodyIntegral::pointcharge_integral_deriv(const double* D, double* res,
   };
   Eigen::Map<const RowMajorMatrix> coeff(D, obs_.nbf(), obs_.nbf());
   const auto& shell2bf = obs_.shell2bf();
+#ifdef _OPENMP
   int nthreads = omp_get_max_threads();
+#else
+  int nthreads = 1;
+#endif
 #ifdef ENABLE_NVTX3
   nvtx3::scoped_range r{"int1e_deriv"};
 #endif
+#ifdef _OPENMP
 #pragma omp parallel num_threads(nthreads)
+#endif
   {
+#ifdef _OPENMP
     int local_thread_id = omp_get_thread_num();
+#else
+    int local_thread_id = 0;
+#endif
     int world_thread_size = mpi_.world_size * nthreads;
     int world_thread_id = mpi_.world_rank * nthreads + local_thread_id;
     auto engine = engine_fn();

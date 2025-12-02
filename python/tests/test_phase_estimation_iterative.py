@@ -21,7 +21,11 @@ from qdk_chemistry.algorithms import (
 )
 from qdk_chemistry.data import QpeResult, QubitHamiltonian
 
-from .reference_tolerances import qpe_energy_tolerance, qpe_phase_fraction_tolerance
+from .reference_tolerances import (
+    float_comparison_relative_tolerance,
+    qpe_energy_tolerance,
+    qpe_phase_fraction_tolerance,
+)
 
 _SEED = 42
 
@@ -240,14 +244,30 @@ def test_iterative_phase_estimation_extracts_phase_and_energy(two_qubit_phase_pr
     result = _run_iterative(two_qubit_phase_problem)
 
     assert list(result.bits_msb_first or []) == two_qubit_phase_problem.expected_bits
-    assert result.phase_fraction == pytest.approx(
-        two_qubit_phase_problem.expected_phase, abs=qpe_phase_fraction_tolerance
+    assert np.isclose(
+        result.phase_fraction,
+        two_qubit_phase_problem.expected_phase,
+        rtol=float_comparison_relative_tolerance,
+        atol=qpe_phase_fraction_tolerance,
     )
-    assert result.canonical_phase_fraction == pytest.approx(
-        two_qubit_phase_problem.expected_phase, abs=qpe_phase_fraction_tolerance
+    assert np.isclose(
+        result.canonical_phase_fraction,
+        two_qubit_phase_problem.expected_phase,
+        rtol=float_comparison_relative_tolerance,
+        atol=qpe_phase_fraction_tolerance,
     )
-    assert result.raw_energy == pytest.approx(two_qubit_phase_problem.expected_energy, abs=qpe_energy_tolerance)
-    assert result.resolved_energy == pytest.approx(two_qubit_phase_problem.expected_energy, abs=qpe_energy_tolerance)
+    assert np.isclose(
+        result.raw_energy,
+        two_qubit_phase_problem.expected_energy,
+        rtol=float_comparison_relative_tolerance,
+        atol=qpe_energy_tolerance,
+    )
+    assert np.isclose(
+        result.resolved_energy,
+        two_qubit_phase_problem.expected_energy,
+        rtol=float_comparison_relative_tolerance,
+        atol=qpe_energy_tolerance,
+    )
 
 
 def test_iterative_and_traditional_results_match(two_qubit_phase_problem: PhaseEstimationProblem) -> None:
@@ -256,21 +276,35 @@ def test_iterative_and_traditional_results_match(two_qubit_phase_problem: PhaseE
     traditional_result = _run_traditional(two_qubit_phase_problem)
 
     assert traditional_result.bitstring_msb_first == two_qubit_phase_problem.expected_bitstring
-    assert iterative_result.phase_fraction == pytest.approx(
-        two_qubit_phase_problem.expected_phase, abs=qpe_phase_fraction_tolerance
+    assert np.isclose(
+        iterative_result.phase_fraction,
+        two_qubit_phase_problem.expected_phase,
+        rtol=float_comparison_relative_tolerance,
+        atol=qpe_phase_fraction_tolerance,
     )
-    assert iterative_result.canonical_phase_fraction == pytest.approx(
-        two_qubit_phase_problem.expected_phase, abs=qpe_phase_fraction_tolerance
+    assert np.isclose(
+        iterative_result.canonical_phase_fraction,
+        two_qubit_phase_problem.expected_phase,
+        rtol=float_comparison_relative_tolerance,
+        atol=qpe_phase_fraction_tolerance,
     )
-    assert iterative_result.resolved_energy == pytest.approx(
-        two_qubit_phase_problem.expected_energy, abs=qpe_energy_tolerance
+    assert np.isclose(
+        iterative_result.resolved_energy,
+        two_qubit_phase_problem.expected_energy,
+        rtol=float_comparison_relative_tolerance,
+        atol=qpe_energy_tolerance,
     )
-    assert iterative_result.canonical_phase_fraction == pytest.approx(
+    assert np.isclose(
+        iterative_result.canonical_phase_fraction,
         traditional_result.canonical_phase_fraction,
-        abs=qpe_energy_tolerance,
+        rtol=float_comparison_relative_tolerance,
+        atol=qpe_phase_fraction_tolerance,
     )
-    assert iterative_result.resolved_energy == pytest.approx(
-        traditional_result.resolved_energy, abs=qpe_energy_tolerance
+    assert np.isclose(
+        iterative_result.resolved_energy,
+        traditional_result.resolved_energy,
+        rtol=float_comparison_relative_tolerance,
+        atol=qpe_energy_tolerance,
     )
 
 
@@ -281,14 +315,30 @@ def test_iterative_phase_estimation_four_qubit_phase_and_energy(
     result = _run_iterative(four_qubit_phase_problem)
 
     assert list(result.bits_msb_first or []) == four_qubit_phase_problem.expected_bits
-    assert result.phase_fraction == pytest.approx(
-        four_qubit_phase_problem.expected_phase, abs=qpe_phase_fraction_tolerance
+    assert np.isclose(
+        result.phase_fraction,
+        four_qubit_phase_problem.expected_phase,
+        rtol=float_comparison_relative_tolerance,
+        atol=qpe_phase_fraction_tolerance,
     )
-    assert result.canonical_phase_fraction == pytest.approx(
-        four_qubit_phase_problem.expected_phase, abs=qpe_phase_fraction_tolerance
+    assert np.isclose(
+        result.canonical_phase_fraction,
+        four_qubit_phase_problem.expected_phase,
+        rtol=float_comparison_relative_tolerance,
+        atol=qpe_phase_fraction_tolerance,
     )
-    assert result.raw_energy == pytest.approx(four_qubit_phase_problem.expected_energy, abs=qpe_energy_tolerance)
-    assert result.resolved_energy == pytest.approx(four_qubit_phase_problem.expected_energy, abs=qpe_energy_tolerance)
+    assert np.isclose(
+        result.raw_energy,
+        four_qubit_phase_problem.expected_energy,
+        rtol=float_comparison_relative_tolerance,
+        atol=qpe_energy_tolerance,
+    )
+    assert np.isclose(
+        result.resolved_energy,
+        four_qubit_phase_problem.expected_energy,
+        rtol=float_comparison_relative_tolerance,
+        atol=qpe_energy_tolerance,
+    )
 
 
 def test_iterative_and_traditional_match_on_four_qubits(four_qubit_phase_problem: PhaseEstimationProblem) -> None:
@@ -297,22 +347,35 @@ def test_iterative_and_traditional_match_on_four_qubits(four_qubit_phase_problem
     traditional_result = _run_traditional(four_qubit_phase_problem)
 
     assert traditional_result.bitstring_msb_first == four_qubit_phase_problem.expected_bitstring
-    assert iterative_result.phase_fraction == pytest.approx(
-        four_qubit_phase_problem.expected_phase, abs=qpe_phase_fraction_tolerance
-    )
-    assert iterative_result.canonical_phase_fraction == pytest.approx(
+    assert np.isclose(
+        iterative_result.phase_fraction,
         four_qubit_phase_problem.expected_phase,
-        abs=qpe_phase_fraction_tolerance,
+        rtol=float_comparison_relative_tolerance,
+        atol=qpe_phase_fraction_tolerance,
     )
-    assert iterative_result.resolved_energy == pytest.approx(
-        four_qubit_phase_problem.expected_energy, abs=qpe_energy_tolerance
+    assert np.isclose(
+        iterative_result.canonical_phase_fraction,
+        four_qubit_phase_problem.expected_phase,
+        rtol=float_comparison_relative_tolerance,
+        atol=qpe_phase_fraction_tolerance,
     )
-    assert iterative_result.canonical_phase_fraction == pytest.approx(
+    assert np.isclose(
+        iterative_result.resolved_energy,
+        four_qubit_phase_problem.expected_energy,
+        rtol=float_comparison_relative_tolerance,
+        atol=qpe_energy_tolerance,
+    )
+    assert np.isclose(
+        iterative_result.canonical_phase_fraction,
         traditional_result.canonical_phase_fraction,
-        abs=qpe_energy_tolerance,
+        rtol=float_comparison_relative_tolerance,
+        atol=qpe_phase_fraction_tolerance,
     )
-    assert iterative_result.resolved_energy == pytest.approx(
-        traditional_result.resolved_energy, abs=qpe_energy_tolerance
+    assert np.isclose(
+        iterative_result.resolved_energy,
+        traditional_result.resolved_energy,
+        rtol=float_comparison_relative_tolerance,
+        atol=qpe_energy_tolerance,
     )
 
 
@@ -332,9 +395,13 @@ def test_iterative_phase_estimation_non_commuting_xi_plus_zz() -> None:
     )
 
     assert list(result.bits_msb_first or []) == [1, 0, 0, 1, 0, 0]
-    assert result.phase_fraction == pytest.approx(0.140625, abs=qpe_phase_fraction_tolerance)
-    assert result.raw_energy == pytest.approx(1.125, abs=qpe_energy_tolerance)
-    assert result.resolved_energy == pytest.approx(1.125, abs=qpe_energy_tolerance)
+    assert np.isclose(
+        result.phase_fraction, 0.140625, rtol=float_comparison_relative_tolerance, atol=qpe_phase_fraction_tolerance
+    )
+    assert np.isclose(result.raw_energy, 1.125, rtol=float_comparison_relative_tolerance, atol=qpe_energy_tolerance)
+    assert np.isclose(
+        result.resolved_energy, 1.125, rtol=float_comparison_relative_tolerance, atol=qpe_energy_tolerance
+    )
 
 
 def test_iterative_phase_estimation_second_non_commuting_example() -> None:
@@ -362,6 +429,12 @@ def test_iterative_phase_estimation_second_non_commuting_example() -> None:
     )
 
     assert list(result.bits_msb_first or []) == [1, 0, 0, 1, 0, 1, 1, 1, 1, 1, 1]
-    assert result.phase_fraction == pytest.approx(0.988770, abs=qpe_phase_fraction_tolerance)
-    assert result.raw_energy == pytest.approx(-0.08984375, abs=qpe_energy_tolerance)
-    assert result.resolved_energy == pytest.approx(-0.08984375, abs=qpe_energy_tolerance)
+    assert np.isclose(
+        result.phase_fraction, 0.988770, rtol=float_comparison_relative_tolerance, atol=qpe_phase_fraction_tolerance
+    )
+    assert np.isclose(
+        result.raw_energy, -0.08984375, rtol=float_comparison_relative_tolerance, atol=qpe_energy_tolerance
+    )
+    assert np.isclose(
+        result.resolved_energy, -0.08984375, rtol=float_comparison_relative_tolerance, atol=qpe_energy_tolerance
+    )

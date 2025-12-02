@@ -26,14 +26,14 @@ auto pipek_mezey_metric(const qdk::chemistry::data::Orbitals& orbitals,
   const auto& S = orbitals.get_overlap_matrix();
   Eigen::MatrixXd SC = S * C;
 
-  const size_t num_basis_funcs = orbitals.get_num_atomic_orbitals();
+  const size_t num_atomic_orbitals = orbitals.get_num_atomic_orbitals();
   const size_t num_molecular_orbitals = orbitals.get_num_molecular_orbitals();
   const size_t natom = structure->get_num_atoms();
 
   Eigen::MatrixXd Xi = Eigen::MatrixXd::Zero(natom, num_molecular_orbitals);
   for (size_t p = 0; p < num_molecular_orbitals; ++p) {
-    for (size_t mu = 0; mu < num_basis_funcs; ++mu) {
-      const auto iA = basis_set->get_atom_index_for_basis_function(mu);
+    for (size_t mu = 0; mu < num_atomic_orbitals; ++mu) {
+      const auto iA = basis_set->get_atom_index_for_atomic_orbital(mu);
       Xi(iA, p) += C(mu, p) * SC(mu, p);
     }
   }

@@ -21,8 +21,6 @@ from qdk_chemistry.algorithms.energy_estimator.energy_estimator import (
     _determine_measurement_basis,
     _parity,
     _paulis_to_indices,
-    compute_energy_expectation_from_bitstrings,
-    create_measurement_circuits,
 )
 from qdk_chemistry.data import QubitHamiltonian
 from qdk_chemistry.data.estimator_data import MeasurementData
@@ -153,7 +151,7 @@ def test_create_measurement_circuits_basic():
     ]
 
     # Call function
-    circuits = create_measurement_circuits(circuit_qasm, observable)
+    circuits = EnergyEstimator._create_measurement_circuits(circuit_qasm, observable)
 
     # There should be one measurement circuit per observable
     assert isinstance(circuits, list)
@@ -195,7 +193,7 @@ def test_create_measurement_circuits_qubit_mismatch():
             r"the number of qubits in the Hamiltonian \(3\)\."
         ),
     ):
-        create_measurement_circuits(circuit_qasm, observable)
+        EnergyEstimator._create_measurement_circuits(circuit_qasm, observable)
 
 
 @pytest.mark.parametrize(
@@ -224,11 +222,11 @@ def test_create_measurement_circuits_qubit_mismatch():
 def test_compute_expval_and_variance_for_paulis_from_bitstring_counts(counts, paulis, expected_expvals, expected_vars):
     """Test the statistics (mean and variance) calculation for Pauli observables."""
     expvals, vars_ = _compute_expval_and_variance_from_bitstrings(counts, paulis)
-    np.testing.assert_allclose(
-        expvals, expected_expvals, atol=float_comparison_absolute_tolerance, rtol=float_comparison_relative_tolerance
+    assert np.allclose(
+        expvals, expected_expvals, rtol=float_comparison_relative_tolerance, atol=float_comparison_absolute_tolerance
     )
-    np.testing.assert_allclose(
-        vars_, expected_vars, atol=float_comparison_absolute_tolerance, rtol=float_comparison_relative_tolerance
+    assert np.allclose(
+        vars_, expected_vars, rtol=float_comparison_relative_tolerance, atol=float_comparison_absolute_tolerance
     )
 
 
@@ -263,7 +261,7 @@ def test_compute_expval_mixed_bitstring_formats():
     )
 
 
-def test_compute_expval_empty_counts():
+def test_compute_expval_empty_counts() -> None:
     """Test _compute_expval_and_variance with empty bitstring counts."""
     counts: dict = {}
     paulis = PauliList(["Z"])
@@ -284,7 +282,7 @@ def test_compute_energy_expectation_from_bitstrings_mismatched_lengths():
     observables = [QubitHamiltonian(["Z"], [1.0]), QubitHamiltonian(["X"], [1.0])]  # Extra observable
 
     with pytest.raises(ValueError, match="Expected 2 bitstring result sets, got 1"):
-        compute_energy_expectation_from_bitstrings(observables, bitstring_counts)
+        EnergyEstimator._compute_energy_expectation_from_bitstrings(observables, bitstring_counts)
 
 
 def test_calculate_energy_expval_variance_none_counts():
@@ -292,7 +290,7 @@ def test_calculate_energy_expval_variance_none_counts():
     bitstring_counts = [None, {"0": 50, "1": 50}]
     observables = [QubitHamiltonian(["Z"], [1.0]), QubitHamiltonian(["X"], [1.0])]
 
-    result = compute_energy_expectation_from_bitstrings(observables, bitstring_counts)
+    result = EnergyEstimator._compute_energy_expectation_from_bitstrings(observables, bitstring_counts)
 
     # Should handle None entries gracefully
     assert np.isclose(

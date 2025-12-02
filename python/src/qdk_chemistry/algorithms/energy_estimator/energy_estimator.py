@@ -5,12 +5,16 @@
 # Licensed under the MIT License. See LICENSE.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
 
+from __future__ import annotations
+
 import numpy as np
 from qiskit import ClassicalRegister, QuantumCircuit, QuantumRegister, qasm3
 from qiskit.quantum_info import Pauli, PauliList
 
 from qdk_chemistry.algorithms.base import Algorithm, AlgorithmFactory
 from qdk_chemistry.data import EnergyExpectationResult, QubitHamiltonian
+
+__all__: list[str] = []
 
 
 def _parity(integer: int) -> int:
@@ -123,79 +127,6 @@ def _build_measurement_circuit(basis: Pauli) -> QuantumCircuit:
     return qc
 
 
-def create_measurement_circuits(circuit_qasm: str, grouped_hamiltonians: list[QubitHamiltonian]) -> list[str]:
-    """Create measurement circuits for each QubitHamiltonian.
-
-    Args:
-        circuit_qasm: OpenQASM3 string of the base circuit.
-        grouped_hamiltonians: List of ``QubitHamiltonian`` grouped in qubit-wise commuting sets.
-
-    Returns:
-        List of measurement circuits in OpenQASM3 format.
-
-    """
-    meas_circuits = []
-    base_circuit = qasm3.loads(circuit_qasm)
-
-    if base_circuit.num_qubits != grouped_hamiltonians[0].num_qubits:
-        raise ValueError(
-            f"Number of qubits in the base circuit ({base_circuit.num_qubits}) does not match "
-            f"the number of qubits in the Hamiltonian ({grouped_hamiltonians[0].num_qubits})."
-        )
-
-    for hamiltonian in grouped_hamiltonians:
-        basis = _determine_measurement_basis(hamiltonian.pauli_ops.paulis)
-        meas_ops = _build_measurement_circuit(basis)
-        full_circ = base_circuit.compose(meas_ops, inplace=False)
-        meas_circuits.append(qasm3.dumps(full_circ))
-
-    return meas_circuits
-
-
-def compute_energy_expectation_from_bitstrings(
-    hamiltonians: list[QubitHamiltonian],
-    bitstring_counts_list: list[dict[str, int] | None],
-    energy_offset: float = 0.0,
-) -> EnergyExpectationResult:
-    """Compute total energy expectation value and variance for a QubitHamiltonian.
-
-    Args:
-        hamiltonians: List of ``QubitHamiltonian`` defining Pauli terms and coefficients.
-        bitstring_counts_list: List of bitstring count dictionaries corresponding to each QubitHamiltonian.
-        energy_offset: Optional energy shift to include.
-
-    Returns:
-        ``EnergyExpectationResult`` containing the energy expectation value and variance.
-
-    """
-    if len(bitstring_counts_list) != len(hamiltonians):
-        raise ValueError(f"Expected {len(hamiltonians)} bitstring result sets, got {len(bitstring_counts_list)}.")
-
-    total_expval = 0.0
-    total_var = 0.0
-    expvals_list, vars_list = [], []
-
-    for counts, group in zip(bitstring_counts_list, hamiltonians, strict=True):
-        if counts is None:
-            continue
-        paulis = group.pauli_ops.paulis
-        coeffs = group.pauli_ops.coeffs
-
-        expvals, variances = _compute_expval_and_variance_from_bitstrings(counts, paulis)
-        expvals_list.append(expvals)
-        vars_list.append(variances)
-
-        total_expval += np.dot(expvals, coeffs)
-        total_var += np.dot(variances, np.abs(coeffs) ** 2)
-
-    return EnergyExpectationResult(
-        energy_expectation_value=float(np.real_if_close(total_expval + energy_offset)),
-        energy_variance=float(np.real_if_close(total_var)),
-        expvals_each_term=expvals_list,
-        variances_each_term=vars_list,
-    )
-
-
 class EnergyEstimator(Algorithm):
     """Abstract base class for energy estimator algorithms."""
 
@@ -234,6 +165,79 @@ class EnergyEstimator(Algorithm):
         # This function definition is not required it is present to add type hints and docstrings
         #  for the derived classes specialized run() method.
         return super().run(circuit_qasm, qubit_hamiltonians, total_shots, classical_coeffs)
+
+    @staticmethod
+    def _create_measurement_circuits(circuit_qasm: str, grouped_hamiltonians: list[QubitHamiltonian]) -> list[str]:
+        """Create measurement circuits for each QubitHamiltonian.
+
+        Args:
+            circuit_qasm: OpenQASM3 string of the base circuit.
+            grouped_hamiltonians: List of ``QubitHamiltonian`` grouped in qubit-wise commuting sets.
+
+        Returns:
+            List of measurement circuits in OpenQASM3 format.
+
+        """
+        meas_circuits = []
+        base_circuit = qasm3.loads(circuit_qasm)
+
+        if base_circuit.num_qubits != grouped_hamiltonians[0].num_qubits:
+            raise ValueError(
+                f"Number of qubits in the base circuit ({base_circuit.num_qubits}) does not match "
+                f"the number of qubits in the Hamiltonian ({grouped_hamiltonians[0].num_qubits})."
+            )
+
+        for hamiltonian in grouped_hamiltonians:
+            basis = _determine_measurement_basis(hamiltonian.pauli_ops.paulis)
+            meas_ops = _build_measurement_circuit(basis)
+            full_circ = base_circuit.compose(meas_ops, inplace=False)
+            meas_circuits.append(qasm3.dumps(full_circ))
+
+        return meas_circuits
+
+    @staticmethod
+    def _compute_energy_expectation_from_bitstrings(
+        hamiltonians: list[QubitHamiltonian],
+        bitstring_counts_list: list[dict[str, int] | None],
+        energy_offset: float = 0.0,
+    ) -> EnergyExpectationResult:
+        """Compute total energy expectation value and variance for a QubitHamiltonian.
+
+        Args:
+            hamiltonians: List of ``QubitHamiltonian`` defining Pauli terms and coefficients.
+            bitstring_counts_list: List of bitstring count dictionaries corresponding to each QubitHamiltonian.
+            energy_offset: Optional energy shift to include.
+
+        Returns:
+            ``EnergyExpectationResult`` containing the energy expectation value and variance.
+
+        """
+        if len(bitstring_counts_list) != len(hamiltonians):
+            raise ValueError(f"Expected {len(hamiltonians)} bitstring result sets, got {len(bitstring_counts_list)}.")
+
+        total_expval = 0.0
+        total_var = 0.0
+        expvals_list, vars_list = [], []
+
+        for counts, group in zip(bitstring_counts_list, hamiltonians, strict=True):
+            if counts is None:
+                continue
+            paulis = group.pauli_ops.paulis
+            coeffs = group.pauli_ops.coeffs
+
+            expvals, variances = _compute_expval_and_variance_from_bitstrings(counts, paulis)
+            expvals_list.append(expvals)
+            vars_list.append(variances)
+
+            total_expval += np.dot(expvals, coeffs)
+            total_var += np.dot(variances, np.abs(coeffs) ** 2)
+
+        return EnergyExpectationResult(
+            energy_expectation_value=float(np.real_if_close(total_expval + energy_offset)),
+            energy_variance=float(np.real_if_close(total_var)),
+            expvals_each_term=expvals_list,
+            variances_each_term=vars_list,
+        )
 
 
 class EnergyEstimatorFactory(AlgorithmFactory):

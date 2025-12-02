@@ -47,9 +47,9 @@ class ProjectedMultiConfigurationSettings : public MultiConfigurationSettings {
  * in quantum chemistry
  *
  * This class provides the interface for projected multi-configurational-based
- * quantum chemistry calculations. This contracts the
+ * quantum chemistry calculations. This contrasts the
  * MultiConfigurationCalculator in that the space of determinants upon which
- * the Hamltonian is projected is taken to be a *free parameter* and must be
+ * the Hamiltonian is projected is taken to be a *free parameter* and must be
  * specified. In this manner, the high-performance solvers which underly other
  * MC algorithms can be interfaced with external methods for selecting
  * important determinants.
@@ -96,11 +96,11 @@ class ProjectedMultiConfigurationCalculator
    * @return A pair containing the calculated energy (first) and the resulting
    *         multi-configurational wavefunction (second)
    *
-   * @throw std::runtime_error if the calculation fails
-   * @throw std::invalid_argument if hamiltonian is invalid
-   * @throw std::invalid_argument if configurations is invalid
-   * @throw SettingsAreLocked if attempting to modify settings after run() is
-   * called
+   * @throws std::runtime_error if the calculation fails
+   * @throws std::invalid_argument if hamiltonian is invalid
+   * @throws std::invalid_argument if configurations is invalid
+   * @throws qdk::chemistry::data::SettingsAreLocked if attempting to modify
+   * settings after run() is called
    *
    * @note Settings are automatically locked when this method is called and
    * cannot be modified during or after execution.

@@ -128,8 +128,8 @@ class VVHVLocalization : public IterativeOrbitalLocalizationScheme {
    * valence virtuals and constructs hard virtual orbitals.
    *
    * @param occupied_orbitals Matrix of occupied orbital coefficients
-   * (num_basis_funcs x num_occupied_orbitals)
-   * @return Localized virtual orbital coefficient matrix (num_basis_funcs x
+   * (num_atomic_orbitals x num_occupied_orbitals)
+   * @return Localized virtual orbital coefficient matrix (num_atomic_orbitals x
    * num_virtual_orbitals)
    */
   Eigen::MatrixXd localize(const Eigen::MatrixXd& occupied_orbitals);
@@ -152,9 +152,10 @@ class VVHVLocalization : public IterativeOrbitalLocalizationScheme {
   // Pre-computed dipole and quadrupole integrals (if weighted_orthogonalization
   // is true)
   std::unique_ptr<qcs::RowMajorMatrix>
-      dipole_integrals_;  // 3*num_basis_funcs x num_basis_funcs matrix
+      dipole_integrals_;  // 3*num_atomic_orbitals x num_atomic_orbitals matrix
   std::unique_ptr<qcs::RowMajorMatrix>
-      quadrupole_integrals_;  // 6*num_basis_funcs x num_basis_funcs matrix
+      quadrupole_integrals_;  // 6*num_atomic_orbitals x num_atomic_orbitals
+                              // matrix
 
   // Basis set data
   std::shared_ptr<qcs::BasisSet>
@@ -169,14 +170,15 @@ class VVHVLocalization : public IterativeOrbitalLocalizationScheme {
    * validates the eigenvalue structure, and transforms the orbitals to be
    * orthonormal with respect to overlap_inp.
    *
-   * @param num_basis_funcs Number of basis functions (rows in C and
+   * @param num_atomic_orbitals Number of atomic orbitals (rows in C and
    * overlap_inp)
    * @param num_orbitals Number of orbitals (columns in C)
-   * @param overlap_inp Overlap matrix (num_basis_funcs x num_basis_funcs) in
-   * the representation which input orbitals C are given
-   * @param C Input orbital coefficient matrix (num_basis_funcs x num_orbitals)
+   * @param overlap_inp Overlap matrix (num_atomic_orbitals x
+   * num_atomic_orbitals) in the representation which input orbitals C are given
+   * @param C Input orbital coefficient matrix (num_atomic_orbitals x
+   * num_orbitals)
    * @param C_out Output orthonormalized orbital coefficient matrix
-   * (num_basis_funcs x num_orbitals_out, num_orbitals_out = num_orbitals -
+   * (num_atomic_orbitals x num_orbitals_out, num_orbitals_out = num_orbitals -
    * expected_near_zero)
    * @param ortho_threshold Threshold for orthonormalization (eigenvalue cutoff)
    * @param expected_near_zero Expected number of near-zero eigenvalues to skip
@@ -185,7 +187,7 @@ class VVHVLocalization : public IterativeOrbitalLocalizationScheme {
    * @param separation_ratio Required ratio of eigenvalue[M+1]/eigenvalue[M] for
    * sufficient separation
    */
-  void orthonormalization(int num_basis_funcs, int num_orbitals,
+  void orthonormalization(int num_atomic_orbitals, int num_orbitals,
                           const double* overlap_inp, double* C, double* C_out,
                           double ortho_threshold = 1e-6,
                           unsigned int expected_near_zero = 0,
@@ -217,7 +219,7 @@ class VVHVLocalization : public IterativeOrbitalLocalizationScheme {
    *
    * Uses the dipole and quadrupole class members to compute orbital spreads.
    *
-   * @param orbitals Matrix of orbital coefficients (num_basis_funcs x
+   * @param orbitals Matrix of orbital coefficients (num_atomic_orbitals x
    * num_orbitals)
    * @param spreads Output vector of orbital spreads
    * :math:`\left( \langle r^2 \rangle -\lvert\langle r \rangle\rvert^2 \right)`
@@ -230,16 +232,16 @@ class VVHVLocalization : public IterativeOrbitalLocalizationScheme {
    * atom+angular momentum block.
    *
    * @param overlap_ori_al Overlap matrix block (original basis) for the atom+l
-   * block (size num_basis_funcs_al_ori x num_basis_funcs_al_ori)
+   * block (size num_atomic_orbitals_al_ori x num_atomic_orbitals_al_ori)
    * @param overlap_mix_al Mixed overlap block between original and minimal
-   * basis (size num_basis_funcs_al_ori x num_basis_funcs_al_min)
+   * basis (size num_atomic_orbitals_al_ori x num_atomic_orbitals_al_min)
    * @param bf_al_ori Index list (global AO indices) for this atom+l in the
    * original basis
    * @param bf_al_min Index list for this atom+l in the minimal basis
-   * @param C_hv_al (Output) Matrix (num_basis_funcs_ori x nhv_al) to receive
-   * hard virtual coefficients (global AO representation)
-   * @param num_basis_funcs_ori Total number of original basis functions (global
-   * row dimension for C_hv_al)
+   * @param C_hv_al (Output) Matrix (num_atomic_orbitals_ori x nhv_al) to
+   * receive hard virtual coefficients (global AO representation)
+   * @param num_atomic_orbitals_ori Total number of original atomic orbitals
+   * (global row dimension for C_hv_al)
    * @param atom_index Atom index (for logging / diagnostics)
    * @param l Angular momentum quantum number (for logging / diagnostics)
    */
@@ -247,7 +249,7 @@ class VVHVLocalization : public IterativeOrbitalLocalizationScheme {
                 const Eigen::MatrixXd& overlap_mix_al,
                 const std::vector<int>& bf_al_ori,
                 const std::vector<int>& bf_al_min, Eigen::MatrixXd& C_hv_al,
-                int num_basis_funcs_ori, int atom_index, int l);
+                int num_atomic_orbitals_ori, int atom_index, int l);
 
   /**
    * @brief Initialize data structures and compute overlap matrices and

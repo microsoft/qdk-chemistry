@@ -64,8 +64,8 @@ class CoupledClusterCalculator
    * @throw std::runtime_error if the calculation fails
    * @throw std::invalid_argument if the Ansatz is invalid or electron counts
    * are invalid
-   * @throws SettingsAreLocked if attempting to modify settings after
-   * calculate() is called
+   * @throws qdk::chemistry::data::SettingsAreLocked if attempting to modify
+   * settings after calculate() is called
    *
    * @note Settings are automatically locked when this method is called and
    * cannot be modified during or after execution.
