@@ -31,7 +31,7 @@ parameters:
 variables:
 - group: QdkChemistry
 extends:
-  template: v1/1ES.Official.PipelineTemplate.yaml@1ESPipelineTemplates
+  template: v1/1ES.Official.PipelineTemplate.yml@1ESPipelineTemplates
   parameters:
     stages:
     - stage: Build
