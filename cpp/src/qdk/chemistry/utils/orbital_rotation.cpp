@@ -212,51 +212,25 @@ std::tuple<double, std::shared_ptr<data::Wavefunction>, bool,
            std::shared_ptr<data::StabilityResult>>
 run_scf_with_stability_workflow(
     std::shared_ptr<data::Structure> structure, int charge,
-    int spin_multiplicity, const std::string& scf_solver_name,
-    const std::string& stability_checker_name,
+    int spin_multiplicity, std::shared_ptr<algorithms::ScfSolver> scf_solver,
+    std::shared_ptr<algorithms::StabilityChecker> stability_checker,
     std::optional<std::shared_ptr<data::Orbitals>> initial_guess,
-    const std::string& reference_type, int max_stability_iterations,
-    double stability_tolerance, double davidson_tolerance, int nroots) {
+    int max_stability_iterations) {
   if (!structure) {
     throw std::invalid_argument("Structure cannot be null");
+  }
+  if (!scf_solver) {
+    throw std::invalid_argument("SCF solver cannot be null");
+  }
+  if (!stability_checker) {
+    throw std::invalid_argument("Stability checker cannot be null");
   }
   if (max_stability_iterations < 1) {
     throw std::invalid_argument("max_stability_iterations must be at least 1");
   }
 
-  // Create SCF solver instance
-  auto scf_solver = algorithms::ScfSolverFactory::create(scf_solver_name);
-  // if (scf_solver_name == "qdk") scf_solver->settings().set("enable_gdm",
-  // true);
-  if (!scf_solver) {
-    throw std::runtime_error("Failed to create SCF solver: " + scf_solver_name);
-  }
-
-  // Configure reference_type
-  if (reference_type != "auto") {
-    scf_solver->settings().set("reference_type", reference_type);
-    spdlog::info(
-        "SCF solver configured with reference_type={} at first iteration",
-        reference_type);
-  }
-
-  // Create stability checker instance
-  auto stability_checker =
-      algorithms::StabilityCheckerFactory::create(stability_checker_name);
-  if (!stability_checker) {
-    throw std::runtime_error("Failed to create stability checker: " +
-                             stability_checker_name);
-  }
-
-  stability_checker->settings().set("stability_tolerance", stability_tolerance);
-  stability_checker->settings().set("davidson_tolerance", davidson_tolerance);
-  stability_checker->settings().set("nroots", nroots);
-
-  spdlog::info(
-      "Starting SCF with stability workflow: scf_solver={}, "
-      "stability_checker={}, max_iterations={}, tolerance={}",
-      scf_solver_name, stability_checker_name, max_stability_iterations,
-      stability_tolerance);
+  spdlog::info("Starting SCF with stability workflow: max_iterations={}",
+               max_stability_iterations);
 
   // Run initial SCF calculation
   auto [energy, wavefunction] =
@@ -363,20 +337,14 @@ run_scf_with_stability_workflow(
           "Breaking spin symmetry: switching to unrestricted calculation. "
           "Stability checker reconfigured for internal-only analysis");
       is_restricted_calculation = false;
-      // Since settings are locked, we create new scf_solver and
-      // stability_checker
-      scf_solver = algorithms::ScfSolverFactory::create(scf_solver_name);
-      scf_solver->settings().set("reference_type", "unrestricted");
-      // if (scf_solver_name == "qdk")
-      //   scf_solver->settings().set("enable_gdm", true);
-      stability_checker =
-          algorithms::StabilityCheckerFactory::create(stability_checker_name);
-      stability_checker->settings().set("external", false);
-      stability_checker->settings().set("stability_tolerance",
-                                        stability_tolerance);
-      stability_checker->settings().set("davidson_tolerance",
-                                        davidson_tolerance);
-      stability_checker->settings().set("nroots", nroots);
+      // Since settings are locked, create new solvers by copying settings
+      auto new_scf_solver = scf_solver->copy();
+      new_scf_solver->settings().set("reference_type", "unrestricted");
+      scf_solver = new_scf_solver;
+
+      auto new_stability_checker = stability_checker->copy();
+      new_stability_checker->settings().set("external", false);
+      stability_checker = new_stability_checker;
     }
 
     // Restart SCF with rotated orbitals

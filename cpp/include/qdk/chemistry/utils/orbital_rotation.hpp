@@ -6,6 +6,8 @@
 
 #include <Eigen/Dense>
 #include <memory>
+#include <qdk/chemistry/algorithms/scf.hpp>
+#include <qdk/chemistry/algorithms/stability.hpp>
 #include <qdk/chemistry/data/orbitals.hpp>
 #include <qdk/chemistry/data/stability_result.hpp>
 #include <qdk/chemistry/data/structure.hpp>
@@ -99,22 +101,14 @@ Eigen::MatrixXd rotate_mo(const Eigen::MatrixXd& mo_coeff,
  * @param structure The molecular structure
  * @param charge The molecular charge
  * @param spin_multiplicity The spin multiplicity
- * @param scf_solver_name Name of the SCF solver algorithm to create (e.g.,
- * "qdk", "pyscf")
- * @param stability_checker_name Name of the stability checker algorithm to
- * create (e.g., "pyscf")
+ * @param scf_solver Pre-configured SCF solver instance (settings should be
+ * configured before passing)
+ * @param stability_checker Pre-configured stability checker instance (settings
+ * should be configured before passing)
  * @param initial_guess Optional initial orbital guess for the first SCF
  * calculation
  * @param max_stability_iterations Maximum number of stability check and
  * rotation cycles (default: 5)
- * @param stability_tolerance Tolerance threshold for considering eigenvalues
- * as indicating instability. Eigenvalues above this threshold are considered
- * stable (default: -1e-4)
- * @param reference_type Reference type for initial SCF calculation: "auto"
- * (default), "restricted" (RHF for closed-shell, ROHF for open-shell), or
- * "unrestricted" (UHF for both closed- and open-shell). Note: if external
- * instability is detected, the workflow will automatically switch to
- * "unrestricted" regardless of this setting (default: "auto")
  *
  * @return A tuple containing:
  *         - double: Final SCF energy in Hartree
@@ -131,15 +125,24 @@ Eigen::MatrixXd rotate_mo(const Eigen::MatrixXd& mo_coeff,
  * stability
  * @note External instabilities trigger automatic RHF→UHF transition
  * @note After switching to unrestricted, only internal stability is checked
+ * @note When external instability is detected and switching to unrestricted,
+ * new solver instances are created by copying the original solvers' settings
  *
- * @throws std::runtime_error If SCF or stability check fails, or if algorithm
- * creation fails
+ * @throws std::runtime_error If SCF or stability check fails
  * @throws std::invalid_argument If input parameters are invalid
  *
  * Example usage:
  * @code
+ * auto scf_solver = algorithms::ScfSolverFactory::create("qdk");
+ * scf_solver->settings().set("reference_type", "auto");
+ * auto stability_checker =
+ * algorithms::StabilityCheckerFactory::create("pyscf");
+ * stability_checker->settings().set("stability_tolerance", -1e-4);
+ * stability_checker->settings().set("davidson_tolerance", 1e-4);
+ * stability_checker->settings().set("nroots", 3);
+ *
  * auto [energy, wfn, is_stable, result] = run_scf_with_stability_workflow(
- *     structure, 0, 1, "qdk", "pyscf", std::nullopt, 5, -1e-4, "auto");
+ *     structure, 0, 1, scf_solver, stability_checker, std::nullopt, 5);
  *
  * if (is_stable) {
  *   std::cout << "Converged to stable wavefunction with energy " << energy <<
@@ -152,12 +155,12 @@ std::tuple<double, std::shared_ptr<qdk::chemistry::data::Wavefunction>, bool,
            std::shared_ptr<qdk::chemistry::data::StabilityResult>>
 run_scf_with_stability_workflow(
     std::shared_ptr<qdk::chemistry::data::Structure> structure, int charge,
-    int spin_multiplicity, const std::string& scf_solver_name,
-    const std::string& stability_checker_name,
+    int spin_multiplicity,
+    std::shared_ptr<qdk::chemistry::algorithms::ScfSolver> scf_solver,
+    std::shared_ptr<qdk::chemistry::algorithms::StabilityChecker>
+        stability_checker,
     std::optional<std::shared_ptr<qdk::chemistry::data::Orbitals>>
         initial_guess = std::nullopt,
-    const std::string& reference_type = "auto",
-    int max_stability_iterations = 5, double stability_tolerance = -1e-4,
-    double davidson_tolerance = 1e-4, int nroots = 3);
+    int max_stability_iterations = 5);
 
 }  // namespace qdk::chemistry::utils

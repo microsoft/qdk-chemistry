@@ -97,29 +97,14 @@ void bind_orbital_rotation(py::module& m) {
                 The molecular charge
             spin_multiplicity : int
                 The spin multiplicity
-            scf_solver_name : str
-                Name of the SCF solver algorithm to create (e.g., "qdk", "pyscf")
-            stability_checker_name : str
-                Name of the stability checker algorithm to create (e.g., "pyscf")
+            scf_solver : qdk_chemistry.algorithms.ScfSolver
+                Pre-configured SCF solver instance (settings should be configured before passing)
+            stability_checker : qdk_chemistry.algorithms.StabilityChecker
+                Pre-configured stability checker instance (settings should be configured before passing)
             initial_guess : qdk_chemistry.data.Orbitals, optional
                 Optional initial orbital guess for the first SCF calculation
-            reference_type : str, optional
-                Reference type for initial SCF calculation: "auto" (default), "restricted"
-                (RHF for closed-shell, ROHF for open-shell), or "unrestricted" (UHF for
-                both closed- and open-shell). Note: if external instability is detected,
-                the workflow will automatically switch to "unrestricted" regardless of
-                this setting (default: "auto")
             max_stability_iterations : int, optional
                 Maximum number of stability check and rotation cycles (default: 5)
-            stability_tolerance : float, optional
-                Tolerance threshold for considering eigenvalues as indicating instability.
-                Eigenvalues above this threshold are considered stable (default: -1e-4)
-            davidson_tolerance : float, optional
-                Convergence threshold for the Davidson eigenvalue solver used in
-                stability analysis (default: 1e-4)
-            nroots : int, optional
-                Number of eigenvalue roots to compute in the Davidson solver for
-                stability analysis (default: 3)
 
             Returns:
                 tuple[float, qdk_chemistry.data.Wavefunction, bool, qdk_chemistry.data.StabilityResult]:
@@ -128,9 +113,7 @@ void bind_orbital_rotation(py::module& m) {
             Raises
             ------
             ValueError
-                If structure is None or max_stability_iterations is less than 1
-            RuntimeError
-                If SCF solver or stability checker creation fails
+                If structure is None, solvers are None, or max_stability_iterations is less than 1
 
             Notes
             -----
@@ -138,26 +121,33 @@ void bind_orbital_rotation(py::module& m) {
             - Internal instabilities are resolved first before checking external stability
             - External instabilities trigger automatic RHF→UHF transition
             - After switching to unrestricted, only internal stability is checked
+            - When external instability is detected, new solver instances are created by copying
+              the original solvers' settings
 
             Examples
             --------
             >>> from qdk_chemistry.data import Structure
+            >>> from qdk_chemistry.algorithms import ScfSolverFactory, StabilityCheckerFactory
             >>> import numpy as np
             >>> # Create a molecular structure
             >>> structure = Structure(["O", "H", "H"], coords)
-            >>> # Run stability workflow (will check external stability for restricted)
+            >>> # Create and configure solvers
+            >>> scf_solver = ScfSolverFactory.create("qdk")
+            >>> scf_solver.settings.set("reference_type", "auto")
+            >>> stability_checker = StabilityCheckerFactory.create("pyscf")
+            >>> stability_checker.settings.set("stability_tolerance", -1e-4)
+            >>> stability_checker.settings.set("davidson_tolerance", 1e-4)
+            >>> stability_checker.settings.set("nroots", 3)
+            >>> # Run stability workflow
             >>> energy, wfn, is_stable, result = run_scf_with_stability_workflow(
-            ...     structure, 0, 1, "qdk", "pyscf",
-            ...     reference_type="auto", max_stability_iterations=5, stability_tolerance=-1e-4)
+            ...     structure, 0, 1, scf_solver, stability_checker,
+            ...     max_stability_iterations=5)
             >>> # Check convergence
             >>> print(f"Stability check converged: {is_stable}")
             >>> print(f"Final energy: {energy} Hartree")
         )",
         py::arg("structure"), py::arg("charge"), py::arg("spin_multiplicity"),
-        py::arg("scf_solver_name"), py::arg("stability_checker_name"),
+        py::arg("scf_solver"), py::arg("stability_checker"),
         py::arg("initial_guess") = std::nullopt,
-        py::arg("reference_type") = "auto",
-        py::arg("max_stability_iterations") = 5,
-        py::arg("stability_tolerance") = -1e-4,
-        py::arg("davidson_tolerance") = 1e-4, py::arg("nroots") = 3);
+        py::arg("max_stability_iterations") = 5);
 }

@@ -672,15 +672,17 @@ class TestStabilityWorkflow:
         """Test stability workflow on ROHF O2 molecule - internal stability only."""
         o2 = create_o2_structure()
 
+        # Create and configure solvers
+        scf_solver = algorithms.create("scf_solver", "pyscf")
+        scf_solver.settings().set("basis_set", "def2-svp")
+        scf_solver.settings().set("reference_type", "restricted")
+
+        stability_checker = algorithms.create("stability_checker", "pyscf")
+        stability_checker.settings().set("internal", True)
+        stability_checker.settings().set("external", True)
+
         # Run workflow with pyscf SCF (required for ROHF) and pyscf stability checker
-        energy, _wfn, _is_stable, result = run_scf_with_stability_workflow(
-            o2,
-            0,
-            3,
-            "pyscf",
-            "pyscf",
-            reference_type="restricted",
-        )
+        energy, _wfn, _is_stable, result = run_scf_with_stability_workflow(o2, 0, 3, scf_solver, stability_checker)
 
         # Check internal stability status
         assert result.is_internal_stable() is True, "Wavefunction should be internally stable"
@@ -694,9 +696,21 @@ class TestStabilityWorkflow:
         """Test stability workflow on N2 at 1.6Å with internal instability."""
         n2 = create_stretched_n2_structure(distance_angstrom=1.6)
 
+        # Create and configure solvers
+        scf_solver = algorithms.create("scf_solver", scf_backend)
+        scf_solver.settings().set("basis_set", "def2-svp")
+        scf_solver.settings().set("reference_type", "auto")
+
+        stability_checker = algorithms.create("stability_checker", "pyscf")
+        stability_checker.settings().set("internal", True)
+        stability_checker.settings().set("external", True)
+        stability_checker.settings().set("stability_tolerance", -1e-4)
+        stability_checker.settings().set("davidson_tolerance", 1e-4)
+        stability_checker.settings().set("nroots", 3)
+
         # Run workflow with pyscf SCF and pyscf stability checker
         # This system may not fully converge but should achieve correct energy
-        energy, _wfn, _is_stable, _result = run_scf_with_stability_workflow(n2, 0, 1, scf_backend, "pyscf")
+        energy, _wfn, _is_stable, _result = run_scf_with_stability_workflow(n2, 0, 1, scf_solver, stability_checker)
         # Check energy matches reference value - workflow should achieve correct energy
         assert abs(energy - (-108.606721153932)) < 1e-6, f"Energy {energy} should match reference -108.606721153932"
 
@@ -705,8 +719,20 @@ class TestStabilityWorkflow:
         """Test stability workflow on N2 at 1.2Å with external instability - should switch to UHF."""
         n2 = create_stretched_n2_structure(distance_angstrom=1.2)
 
+        # Create and configure solvers
+        scf_solver = algorithms.create("scf_solver", scf_backend)
+        scf_solver.settings().set("basis_set", "def2-svp")
+        scf_solver.settings().set("reference_type", "auto")
+
+        stability_checker = algorithms.create("stability_checker", "pyscf")
+        stability_checker.settings().set("internal", True)
+        stability_checker.settings().set("external", True)
+        stability_checker.settings().set("stability_tolerance", -1e-4)
+        stability_checker.settings().set("davidson_tolerance", 1e-4)
+        stability_checker.settings().set("nroots", 3)
+
         # Run workflow - should detect external instability and switch to UHF
-        energy, wfn, is_stable, result = run_scf_with_stability_workflow(n2, 0, 1, scf_backend, "pyscf")
+        energy, wfn, is_stable, result = run_scf_with_stability_workflow(n2, 0, 1, scf_solver, stability_checker)
 
         # Final wavefunction should be unrestricted (switched from RHF to UHF)
         assert not wfn.get_orbitals().is_restricted(), (
@@ -725,16 +751,21 @@ class TestStabilityWorkflow:
         """Test stability workflow on N2 at 1.4Å with external instability - should switch to UHF."""
         n2 = create_stretched_n2_structure(distance_angstrom=1.4)
 
+        # Create and configure solvers
+        scf_solver = algorithms.create("scf_solver", scf_backend)
+        scf_solver.settings().set("basis_set", "def2-svp")
+        scf_solver.settings().set("reference_type", "unrestricted")
+
+        stability_checker = algorithms.create("stability_checker", "pyscf")
+        stability_checker.settings().set("internal", True)
+        stability_checker.settings().set("external", False)
+        stability_checker.settings().set("stability_tolerance", -1e-4)
+        stability_checker.settings().set("davidson_tolerance", 1e-4)
+        stability_checker.settings().set("nroots", 3)
+
         # Run workflow - should detect external instability and switch to UHF
         energy, wfn, is_stable, result = run_scf_with_stability_workflow(
-            n2,
-            0,
-            1,
-            scf_backend,
-            "pyscf",
-            reference_type="unrestricted",
-            max_stability_iterations=10,
-            stability_tolerance=-1e-4,
+            n2, 0, 1, scf_solver, stability_checker, max_stability_iterations=10
         )
         assert result.is_internal_stable() is True, "Final wavefunction should be internally stable"
 
