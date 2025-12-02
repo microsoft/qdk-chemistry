@@ -8,7 +8,7 @@
 import numpy as np
 import scipy.sparse as sp
 
-from qdk_chemistry._core.utils import davidson_solver
+from qdk_chemistry._core._algorithms import davidson_solver
 from qdk_chemistry.data import QubitHamiltonian
 
 from .reference_tolerances import float_comparison_absolute_tolerance, float_comparison_relative_tolerance

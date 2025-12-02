@@ -121,7 +121,7 @@ class DenseMatrixSolver(QubitHamiltonianSolver):
         dense_matrix_real = dense_matrix.real.copy()
         eigenvalues, eigenvectors = syev_solver(dense_matrix_real)
         ground_state_energy = eigenvalues[0]
-        ground_state_vector = eigenvectors[:, 0]
+        ground_state_vector = eigenvectors[0]
         return ground_state_energy, ground_state_vector
 
     def name(self) -> str:
