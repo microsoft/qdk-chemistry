@@ -23,6 +23,7 @@ Examples:
     >>> Element.H  # Hydrogen
     >>> Element.C  # Carbon
     >>> Element.O  # Oxygen
+
 )")
       // Period 1
       .value("H", Element::H, "Hydrogen")

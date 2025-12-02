@@ -69,12 +69,12 @@ class Localizer
    * @throws std::runtime_error If localization fails
    * @throws std::invalid_argument If the input orbitals are invalid for the
    *                               specified instance of the localizer
-   * @throws SettingsAreLocked if attempting to modify settings after
-   *                           run() is called
+   * @throws qdk::chemistry::data::SettingsAreLocked if attempting to modify
+   * settings after run() is called
    * @throws std::invalid_argument If loc_indices_a or loc_indices_b are not
    * sorted
-   * @throws SettingsAreLocked if attempting to modify settings after run() is
-   * called
+   * @throws qdk::chemistry::data::SettingsAreLocked if attempting to modify
+   * settings after run() is called
    *
    * @note Settings are automatically locked when this method is called and
    * cannot be modified during or after execution.

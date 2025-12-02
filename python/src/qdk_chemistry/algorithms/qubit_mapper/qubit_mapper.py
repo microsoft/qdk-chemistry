@@ -5,10 +5,17 @@
 # Licensed under the MIT License. See LICENSE.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
 
+from __future__ import annotations
+
 from abc import abstractmethod
+from typing import TYPE_CHECKING
 
 from qdk_chemistry.algorithms.base import Algorithm, AlgorithmFactory
-from qdk_chemistry.data import Hamiltonian, QubitHamiltonian
+
+if TYPE_CHECKING:  # Only needed for type annotations; avoid importing into module namespace
+    from qdk_chemistry.data import Hamiltonian, QubitHamiltonian
+
+__all__: list[str] = []
 
 
 class QubitMapper(Algorithm):

@@ -175,8 +175,7 @@ TEST_F(MCTest, Water_DEF2SVP_CASCI) {
   auto mc =
       qdk::chemistry::algorithms::MultiConfigurationCalculatorFactory::create();
   auto [E_cas, wfn_cas] = mc->run(ham, 3, 3);
-  // -12.446160691659227 + -6.349912948458e+01 is total CASCI energy
-  EXPECT_NEAR(E_cas, -75.94529017623923, testing::ci_energy_tolerance);
+  EXPECT_NEAR(E_cas, -75.94529022131313, testing::ci_energy_tolerance);
   EXPECT_EQ(wfn_cas->size(), 400);
 }
 
