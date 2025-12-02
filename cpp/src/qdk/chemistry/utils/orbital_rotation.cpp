@@ -276,13 +276,6 @@ run_scf_with_stability_workflow(
     double smallest_eigenvalue = stability_result->get_smallest_eigenvalue();
     spdlog::info("Smallest eigenvalue: {}", smallest_eigenvalue);
 
-    if (smallest_eigenvalue >= stability_tolerance) {
-      spdlog::info("Eigenvalue {} is above tolerance ({}), considering stable",
-                   smallest_eigenvalue, stability_tolerance);
-      is_stable = true;
-      break;
-    }
-
     // Last iteration check - don't rotate if we've reached the limit
     if (iteration >= max_stability_iterations) {
       spdlog::warn(
@@ -337,14 +330,28 @@ run_scf_with_stability_workflow(
           "Breaking spin symmetry: switching to unrestricted calculation. "
           "Stability checker reconfigured for internal-only analysis");
       is_restricted_calculation = false;
-      // Since settings are locked, create new solvers by copying settings
-      auto new_scf_solver = scf_solver->copy();
-      new_scf_solver->settings().set("reference_type", "unrestricted");
-      scf_solver = new_scf_solver;
 
-      auto new_stability_checker = stability_checker->copy();
+      // Create new solver instances
+      std::string scf_solver_name = scf_solver->name();
+      std::string stability_checker_name = stability_checker->name();
+      auto new_scf_solver =
+          algorithms::ScfSolverFactory::create(scf_solver_name);
+      auto new_stability_checker =
+          algorithms::StabilityCheckerFactory::create(stability_checker_name);
+
+      // Copy all settings from original solvers
+      auto scf_settings_map = scf_solver->settings().get_all_settings();
+      auto stability_settings_map =
+          stability_checker->settings().get_all_settings();
+      new_scf_solver->settings().set_from_map(scf_settings_map);
+      new_stability_checker->settings().set_from_map(stability_settings_map);
+
+      // Update specific settings for unrestricted calculation
+      new_scf_solver->settings().set("reference_type", "unrestricted");
       new_stability_checker->settings().set("external", false);
-      stability_checker = new_stability_checker;
+
+      scf_solver = std::move(new_scf_solver);
+      stability_checker = std::move(new_stability_checker);
     }
 
     // Restart SCF with rotated orbitals
