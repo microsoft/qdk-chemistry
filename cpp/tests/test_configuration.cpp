@@ -68,6 +68,18 @@ TEST_F(ConfigurationTest, ToBinaryStrings) {
   EXPECT_THROW(basic_config.to_binary_strings(5), std::runtime_error);
 }
 
+// Test conversion from alpha, beta binary strings
+TEST_F(ConfigurationTest, FromBinaryStrings) {
+  std::string alpha_string = "1010";
+  std::string beta_string = "1100";
+
+  Configuration basic_config =
+      Configuration::from_binary_strings(alpha_string, beta_string);
+
+  // should be 2du0
+  EXPECT_EQ(basic_config.to_string(), "2du0");
+}
+
 // Test construction from bitset and conversion to bitset
 TEST_F(ConfigurationTest, BitsetConversion) {
   // Test with a 8-bit bitset (4 spatial orbitals)

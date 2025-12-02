@@ -374,4 +374,29 @@ std::pair<std::string, std::string> Configuration::to_binary_strings(
   }
   return {result_alpha, result_beta};
 }
+
+Configuration Configuration::from_binary_strings(std::string alpha_string,
+                                                 std::string beta_string) {
+  size_t n_orbitals = alpha_string.size();
+  size_t n_orbitals_beta = beta_string.size();
+  if (n_orbitals != n_orbitals_beta) {
+    throw std::runtime_error(
+        "Should have the same-length string repr for alpha and beta");
+  }
+  char zero_char = '0';
+  std::string orbital_rep(n_orbitals, zero_char);
+
+  for (size_t i = 0; i < n_orbitals; ++i) {
+    char alpha_contents = alpha_string[i];
+    char beta_contents = beta_string[i];
+    if (alpha_contents == '1' && beta_contents == '1') {
+      orbital_rep[i] = '2';
+    } else if (alpha_contents == '1' && beta_contents == '0') {
+      orbital_rep[i] = 'u';
+    } else if (alpha_contents == '0' && beta_contents == '1') {
+      orbital_rep[i] = 'd';
+    }
+  }
+  return Configuration(orbital_rep);
+}
 }  // namespace qdk::chemistry::data
