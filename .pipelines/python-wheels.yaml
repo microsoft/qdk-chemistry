@@ -33,6 +33,10 @@ variables:
 extends:
   template: v1/1ES.Official.PipelineTemplate.yml@1ESPipelineTemplates
   parameters:
+    sourceAnalysisPool:
+      name: "Azure-Pipelines-DevTools-EO"
+      image: windows-2022
+      os: windows
     stages:
     - stage: Build
       displayName: Build C++ Deps and Python Wheels
