@@ -35,6 +35,7 @@ from __future__ import annotations
 import atexit
 import time
 from typing import TYPE_CHECKING, Any
+
 from qdk_chemistry.utils import telemetry_events
 
 if TYPE_CHECKING:
@@ -99,7 +100,6 @@ class _TelemetryWrapper:
     @property
     def __class__(self):
         """Return the wrapped algorithm's class for isinstance checks."""
-        # return object.__getattribute__(self, '_wrapped').__class__
         return type(self._wrapped)
 
     @__class__.setter
