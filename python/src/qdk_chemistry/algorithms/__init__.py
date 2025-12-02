@@ -71,10 +71,10 @@ __all__ = [
     "QdkAutocasActiveSpaceSelector",
     "QdkAutocasEosActiveSpaceSelector",
     "QdkHamiltonianConstructor",
+    "QdkMP2NaturalOrbitalLocalizer",
     "QdkMacisAsci",
     "QdkMacisCas",
     "QdkMacisPmc",
-    "QdkMP2NaturalOrbitalLocalizer",
     "QdkOccupationActiveSpaceSelector",
     "QdkPipekMezeyLocalizer",
     "QdkScfSolver",
@@ -92,7 +92,6 @@ __all__ = [
     "show_settings",
     "unregister",
 ]
-
 
 _REGISTRY_EXPORTS = frozenset(
     {
