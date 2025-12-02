@@ -701,9 +701,9 @@ def occupations_from_n_electrons_and_multiplicity(
 def rotate_orbitals(
     orbitals: Orbitals, rotation_vector: np.ndarray, num_alpha: int, num_beta: int, restricted_external: bool = False
 ) -> Orbitals:
-    """Rotate QATK orbitals using PySCF's rotation vector.
+    """Rotate Orbitals using PySCF's rotation vector.
 
-    This function takes a QATK Orbitals object and applies orbital rotations
+    This function takes an Orbitals object and applies orbital rotations
     using PySCF's _rotate_mo function. The rotation is typically derived from
     stability analysis eigenvectors to generate orbitals closer to a stable
     wavefunction.
@@ -711,7 +711,7 @@ def rotate_orbitals(
     Parameters
     ----------
     orbitals : Orbitals
-        The QATK orbitals to rotate.
+        The Orbitals to rotate.
     rotation_vector : np.ndarray
         The rotation vector from stability analysis (usually the eigenvector
         corresponding to the lowest eigenvalue).
@@ -727,7 +727,7 @@ def rotate_orbitals(
     Returns
     -------
     Orbitals
-        A new QATK Orbitals object with rotated molecular orbital coefficients.
+        A new Orbitals object with rotated molecular orbital coefficients.
 
     Examples
     --------

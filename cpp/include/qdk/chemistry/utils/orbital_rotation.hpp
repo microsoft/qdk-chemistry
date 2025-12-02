@@ -18,7 +18,7 @@ namespace qdk::chemistry::utils {
 /**
  * @brief Rotate molecular orbitals using a rotation vector.
  *
- * This function takes QATK orbitals and applies orbital rotations using a
+ * This function takes Orbitals and applies orbital rotations using a
  * rotation vector, typically taken from stability analysis eigenvectors.
  *
  * The rotation is performed by:
@@ -26,7 +26,7 @@ namespace qdk::chemistry::utils {
  * 2. Computing the unitary rotation matrix via matrix exponential
  * 3. Applying the rotation to the molecular orbital coefficients
  *
- * @param orbitals The QATK orbitals to rotate
+ * @param orbitals The Orbitals to rotate
  * @param rotation_vector The rotation vector (typically from stability
  *                        analysis, corresponding to the lowest eigenvalue)
  * @param num_alpha_occupied_orbitals Number of alpha occupied orbitals
@@ -35,7 +35,7 @@ namespace qdk::chemistry::utils {
  *                            unrestricted orbitals with rotated coefficients
  *                            for alpha spin and unrotated coefficients for
  *                            beta spin. Default is false.
- * @return A new QATK Orbitals object with rotated molecular orbital
+ * @return A new Orbitals object with rotated molecular orbital
  *         coefficients
  *
  * @note restricted_external can break spin symmetry and solve external
@@ -61,24 +61,6 @@ std::shared_ptr<qdk::chemistry::data::Orbitals> rotate_orbitals(
     std::shared_ptr<const qdk::chemistry::data::Orbitals> orbitals,
     const Eigen::VectorXd& rotation_vector, size_t num_alpha_occupied_orbitals,
     size_t num_beta_occupied_orbitals, bool restricted_external = false);
-
-/**
- * @brief Apply orbital rotation to molecular orbital coefficients.
- *
- * This is the core rotation function that:
- * 1. Unpacks the rotation vector into an anti-Hermitian matrix using mask
- * 2. Computes the unitary rotation matrix U = exp(dr)
- * 3. Applies the rotation: mo_coeff_new = mo_coeff * U
- *
- * @param mo_coeff Molecular orbital coefficient matrix [n_ao x n_mo]
- * @param rotation_vector Rotation vector (unique variables)
- * @param mask Double mask indicating which matrix elements to fill from
- * rotation_vector
- * @return Rotated molecular orbital coefficients [n_ao x n_mo]
- */
-Eigen::MatrixXd rotate_mo(const Eigen::MatrixXd& mo_coeff,
-                          const Eigen::VectorXd& rotation_vector,
-                          const Eigen::MatrixXd& mask);
 
 /**
  * @brief Run SCF with iterative stability checking and orbital rotation

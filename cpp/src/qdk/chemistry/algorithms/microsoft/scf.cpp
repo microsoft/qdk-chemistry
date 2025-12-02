@@ -88,7 +88,8 @@ std::pair<double, std::shared_ptr<data::Wavefunction>> ScfSolver::_run_impl(
   } else if (reference_type == "restricted") {
     if (open_shell) {
       throw std::invalid_argument(
-          "Restricted Open-Shell calculation is not supported");
+          "Restricted Open-Shell calculation is not currently supported in the "
+          "QDK/Chemistry SCFSolver");
     }
     unrestricted = false;
   } else {

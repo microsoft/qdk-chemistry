@@ -205,9 +205,11 @@ class OrbitalRotationTest : public ::testing::Test {
     auto [water_e, water_wf] = scf_solver->run(water, 0, 1);
 
     test_orbitals_restricted = water_wf->get_orbitals();
-    // Water has 10 electrons (8 from O, 1 from each H)
-    num_alpha_occupied_orbitals = 5;  // 10 electrons / 2 = 5 alpha, 5 beta
-    num_beta_occupied_orbitals = 5;
+
+    // Get electron counts from wavefunction
+    auto [num_alpha, num_beta] = water_wf->get_total_num_electrons();
+    num_alpha_occupied_orbitals = num_alpha;
+    num_beta_occupied_orbitals = num_beta;
     num_molecular_orbitals =
         test_orbitals_restricted->get_num_molecular_orbitals();
     num_atomic_orbitals = test_orbitals_restricted->get_num_atomic_orbitals();
@@ -218,7 +220,9 @@ class OrbitalRotationTest : public ::testing::Test {
   size_t num_alpha_occupied_orbitals;
   size_t num_beta_occupied_orbitals;
   std::shared_ptr<Orbitals> test_orbitals_restricted;
-};  // Test basic orbital rotation functionality
+};
+
+// Test basic orbital rotation functionality
 TEST_F(OrbitalRotationTest, BasicRotationTest) {
   using namespace qdk::chemistry::utils;
 
@@ -246,7 +250,7 @@ TEST_F(OrbitalRotationTest, BasicRotationTest) {
   EXPECT_FALSE(rotated_orbitals->has_energies());
 }
 
-// Test that identity rotation returns similar orbitals
+// Test that identity rotation returns the same orbitals
 TEST_F(OrbitalRotationTest, IdentityRotationTest) {
   using namespace qdk::chemistry::utils;
 
@@ -264,8 +268,9 @@ TEST_F(OrbitalRotationTest, IdentityRotationTest) {
       test_orbitals_restricted->get_coefficients_alpha();
   const auto& rotated_coeffs = rotated_orbitals->get_coefficients_alpha();
 
-  // With zero rotation, coefficients should be very close to original
-  EXPECT_TRUE(original_coeffs.isApprox(rotated_coeffs, 1e-10));
+  // With zero rotation, coefficients should be the same
+  EXPECT_TRUE(original_coeffs.isApprox(rotated_coeffs,
+                                       testing::numerical_zero_tolerance));
 }
 
 // Test that the rotation produces unitary transformation
@@ -296,5 +301,5 @@ TEST_F(OrbitalRotationTest, UnitaryRotationTest) {
   Eigen::MatrixXd identity = Eigen::MatrixXd::Identity(U.cols(), U.cols());
 
   EXPECT_NEAR(0.0, (should_be_identity - identity).norm(),
-              testing::numerical_zero_tolerance * 10);
+              testing::numerical_zero_tolerance);
 }

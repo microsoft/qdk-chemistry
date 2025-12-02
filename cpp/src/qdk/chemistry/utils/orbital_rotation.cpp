@@ -15,23 +15,24 @@
 namespace qdk::chemistry::utils {
 
 using namespace qdk::chemistry::data;
+using BoolMatrix = Eigen::Array<bool, Eigen::Dynamic, Eigen::Dynamic>;
 
-namespace {
+namespace detail {
+
 // Helper function to create the mask for unique orbital rotation variables
 // Following PySCF's uniq_var_indices logic
-Eigen::MatrixXd create_rotation_mask(size_t num_molecular_orbitals,
-                                     size_t num_alpha_occupied,
-                                     size_t num_beta_occupied) {
-  Eigen::MatrixXd mask =
-      Eigen::MatrixXd::Zero(num_molecular_orbitals, num_molecular_orbitals);
+BoolMatrix create_rotation_mask(size_t num_molecular_orbitals,
+                                size_t num_alpha_occupied,
+                                size_t num_beta_occupied) {
+  BoolMatrix mask =
+      BoolMatrix::Zero(num_molecular_orbitals, num_molecular_orbitals);
 
   // occidxa: orbitals with alpha occupation (0 to num_alpha_occupied-1)
   // viridxa: orbitals without alpha occupation (num_alpha_occupied to
-  // num_molecular_orbitals-1) occidxb: orbitals with beta occupation (0 to
-  // num_beta_occupied-1) viridxb: orbitals without beta occupation
-  // (num_beta_occupied to num_molecular_orbitals-1)
+  // num_molecular_orbitals-1)
 
-  // mask = (viridxa[:,None] & occidxa) | (viridxb[:,None] & occidxb)
+  // It is union of two rectangular blocks if num_alpha_occupied !=
+  // num_beta_occupied
   for (size_t j = 0; j < num_molecular_orbitals; ++j) {
     for (size_t i = 0; i < num_molecular_orbitals; ++i) {
       bool viridxa = (i >= num_alpha_occupied);
@@ -49,12 +50,11 @@ Eigen::MatrixXd create_rotation_mask(size_t num_molecular_orbitals,
 // Unpack rotation vector into full anti-Hermitian matrix using mask
 // Following PySCF's unpack_uniq_var logic
 Eigen::MatrixXd unpack_rotation_vector(const Eigen::VectorXd& rotation_vector,
-                                       const Eigen::MatrixXd& mask) {
+                                       const BoolMatrix& mask) {
   const size_t num_molecular_orbitals = mask.rows();
 
-  // Count expected size from mask (non-zero entries). MatrixXd lacks count(),
-  // so we compare against zero to form a boolean array and count true values.
-  size_t expected_size = (mask.array() != 0.0).count();
+  // Count expected size from mask (true entries)
+  size_t expected_size = mask.count();
   if (static_cast<size_t>(rotation_vector.size()) != expected_size) {
     throw std::runtime_error("Rotation vector size mismatch: expected " +
                              std::to_string(expected_size) + " elements, got " +
@@ -64,29 +64,37 @@ Eigen::MatrixXd unpack_rotation_vector(const Eigen::VectorXd& rotation_vector,
   Eigen::MatrixXd dr =
       Eigen::MatrixXd::Zero(num_molecular_orbitals, num_molecular_orbitals);
 
-  // Fill masked positions with rotation vector elements
+  // Fill masked positions with rotation vector elements and make anti-Hermitian
   // Note rotation_vector from pyscf is in row-major order
   size_t idx = 0;
   for (size_t i = 0; i < num_molecular_orbitals; ++i) {
     for (size_t j = 0; j < num_molecular_orbitals; ++j) {
       if (mask(i, j)) {
-        dr(i, j) = rotation_vector(idx++);
+        double val = rotation_vector(idx++);
+        dr(i, j) = val;
+        dr(j, i) = -val;  // Anti-Hermitian: dr(j,i) = -dr(i,j)
       }
     }
   }
 
-  // Make anti-Hermitian: dr = dr - dr^T
-  dr = (dr - dr.transpose()).eval();
-
   return dr;
 }
-}  // anonymous namespace
+}  // namespace detail
 
-Eigen::MatrixXd rotate_mo(const Eigen::MatrixXd& mo_coeff,
-                          const Eigen::VectorXd& rotation_vector,
-                          const Eigen::MatrixXd& mask) {
+/**
+ * @brief Apply orbital rotation to molecular orbital coefficients.
+ *
+ * @param mo_coeff Molecular orbital coefficient matrix [n_ao x n_mo]
+ * @param rotation_vector Rotation vector (unique variables)
+ * @param mask Boolean mask indicating which matrix elements to fill from
+ * rotation_vector
+ * @return Rotated molecular orbital coefficients [n_ao x n_mo]
+ */
+Eigen::MatrixXd apply_orbital_rotation(const Eigen::MatrixXd& mo_coeff,
+                                       const Eigen::VectorXd& rotation_vector,
+                                       const BoolMatrix& mask) {
   // Unpack rotation vector using mask
-  Eigen::MatrixXd dr = unpack_rotation_vector(rotation_vector, mask);
+  Eigen::MatrixXd dr = detail::unpack_rotation_vector(rotation_vector, mask);
 
   // Compute unitary rotation matrix via matrix exponential
   const int num_molecular_orbitals = static_cast<int>(dr.cols());
@@ -115,14 +123,14 @@ std::shared_ptr<Orbitals> rotate_orbitals(
     const Eigen::MatrixXd& mo_coeff = orbitals->get_coefficients_alpha();
 
     // Create mask for allowed rotations
-    Eigen::MatrixXd mask = create_rotation_mask(num_molecular_orbitals,
-                                                num_alpha_occupied_orbitals,
-                                                num_beta_occupied_orbitals);
+    auto mask = detail::create_rotation_mask(num_molecular_orbitals,
+                                             num_alpha_occupied_orbitals,
+                                             num_beta_occupied_orbitals);
 
     if (restricted_external) {
       // Restricted -> Unrestricted: rotated alpha, unrotated beta
       Eigen::MatrixXd rotated_coeff_alpha =
-          rotate_mo(mo_coeff, rotation_vector, mask);
+          apply_orbital_rotation(mo_coeff, rotation_vector, mask);
       const Eigen::MatrixXd& rotated_coeff_beta = mo_coeff;
 
       // Create new Orbitals object with unrestricted coefficients
@@ -139,7 +147,7 @@ std::shared_ptr<Orbitals> rotate_orbitals(
     } else {
       // Restricted case - single rotation
       Eigen::MatrixXd rotated_coeff =
-          rotate_mo(mo_coeff, rotation_vector, mask);
+          apply_orbital_rotation(mo_coeff, rotation_vector, mask);
 
       // Create new Orbitals object with rotated coefficients
       // Energies are invalidated by rotation
@@ -181,18 +189,18 @@ std::shared_ptr<Orbitals> rotate_orbitals(
     const Eigen::MatrixXd& mo_coeff_beta = orbitals->get_coefficients_beta();
 
     // Create masks for alpha and beta channels (UHF: simple rectangular)
-    Eigen::MatrixXd mask_alpha = create_rotation_mask(
+    auto mask_alpha = detail::create_rotation_mask(
         num_molecular_orbitals, num_alpha_occupied_orbitals,
         num_alpha_occupied_orbitals);  // UHF: alpha electrons only
-    Eigen::MatrixXd mask_beta = create_rotation_mask(
+    auto mask_beta = detail::create_rotation_mask(
         num_molecular_orbitals, num_beta_occupied_orbitals,
         num_beta_occupied_orbitals);  // UHF: beta electrons only
 
     // Rotate both spin channels
     Eigen::MatrixXd rotated_coeff_alpha =
-        rotate_mo(mo_coeff_alpha, rotation_alpha, mask_alpha);
+        apply_orbital_rotation(mo_coeff_alpha, rotation_alpha, mask_alpha);
     Eigen::MatrixXd rotated_coeff_beta =
-        rotate_mo(mo_coeff_beta, rotation_beta, mask_beta);
+        apply_orbital_rotation(mo_coeff_beta, rotation_beta, mask_beta);
 
     // Create new Orbitals object with rotated coefficients
     auto rotated_orbitals = std::make_shared<Orbitals>(

@@ -15,7 +15,7 @@ void bind_orbital_rotation(py::module& m) {
         R"(
             Rotate molecular orbitals using a rotation vector.
 
-            This function takes QATK orbitals and applies orbital rotations using a
+            This function takes Orbitals and applies orbital rotations using a
             rotation vector, typically taken from stability analysis eigenvectors.
 
             The rotation is performed by:
@@ -23,10 +23,10 @@ void bind_orbital_rotation(py::module& m) {
             2. Computing the unitary rotation matrix via matrix exponential
             3. Applying the rotation to the molecular orbital coefficients
 
-            Parameters
-            ----------
+            Args
+            ----
             orbitals : qdk_chemistry.data.Orbitals
-                The QATK orbitals to rotate
+                The Orbitals to rotate
             rotation_vector : numpy.ndarray
                 The rotation vector (typically from stability analysis,
                 corresponding to the lowest eigenvalue)
@@ -42,7 +42,7 @@ void bind_orbital_rotation(py::module& m) {
             Returns
             -------
             qdk_chemistry.data.Orbitals
-                A new QATK Orbitals object with rotated molecular orbital coefficients
+                A new Orbitals object with rotated molecular orbital coefficients
 
             Notes
             -----
