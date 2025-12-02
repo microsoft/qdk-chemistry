@@ -140,16 +140,16 @@ extends:
 
           # Optional Publish Build Artifacts for debugging before release
           # [GMN] Delete this before release
-          - task: TwineAuthenticate@1
-            displayName: Twine Authenticate for wheel upload
-            inputs:
-              $(DEPENDENCIES_ARTIFACT_FEED): $(DEPENDENCIES_ARTIFACT_PROJECT)/$(DEPENDENCIES_ARTIFACT_FEED)
-            condition: and(succeeded(), eq(${{ parameters.forceArtifactUpload }}, true))
+          # - task: TwineAuthenticate@1
+          #   displayName: Twine Authenticate for wheel upload (debug)
+          #   inputs:
+          #     $(DEPENDENCIES_ARTIFACT_FEED): $(DEPENDENCIES_ARTIFACT_PROJECT)/$(DEPENDENCIES_ARTIFACT_FEED)
+          #   condition: and(succeeded(), eq('${{ parameters.forceArtifactUpload }}', 'true'))
 
-          - script: |
-              echo "WARNING: Forcing artifact upload. This is intended for debugging purposes only."
-              cd $(Agent.BuildDirectory)/qdk-chemistry/python
-              pip install --user twine
-              python3 -m twine upload -r $(DEPENDENCIES_ARTIFACT_FEED) repaired_wheelhouse/*.whl --config-file $(PYPIRC_PATH)
-            displayName: Upload wheel with twine
-            condition: and(succeeded(), eq(${{ parameters.forceArtifactUpload }}, true))
+          # - script: |
+          #     echo "WARNING: Forcing artifact upload. This is intended for debugging purposes only."
+          #     cd $(Agent.BuildDirectory)/qdk-chemistry/python
+          #     pip install --user twine
+          #     python3 -m twine upload -r $(DEPENDENCIES_ARTIFACT_FEED) repaired_wheelhouse/*.whl --config-file $(PYPIRC_PATH)
+          #   displayName: Upload wheel with twine (debug)
+          #   condition: and(succeeded(), eq('${{ parameters.forceArtifactUpload }}', 'true'))
