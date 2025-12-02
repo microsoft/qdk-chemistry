@@ -104,6 +104,7 @@ class _TelemetryWrapper:
 
     @__class__.setter
     def __class__(self, value):
+        """Setter for the __class__ attribute, delegates class assignment to the wrapped object."""
         self._wrapped.__class__ = value
 
     def run(self, *args, **kwargs):
@@ -150,9 +151,11 @@ class _TelemetryWrapper:
             raise
 
     def __dir__(self):
+        """Returns the list of valid attributes for the wrapped object."""
         return dir(self._wrapped)
 
     def __repr__(self):
+        """Return the string representation of the wrapped object."""
         return repr(self._wrapped)
 
     def __getattr__(self, name):
