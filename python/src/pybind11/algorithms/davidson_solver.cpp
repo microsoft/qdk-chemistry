@@ -50,10 +50,10 @@ inline sparse_csr from_scipy_csr(const py::object& py_csr) {
 }  // namespace qdk::chemistry::python::utils
 
 /**
- * @brief Bind Davidson solver utilities to Python module.
+ * @brief Bind Davidson solver to Python module.
  *
  */
-void bind_davidson_utils(py::module& m) {
+void bind_davidson_solver(py::module& m) {
   using qdk::chemistry::python::utils::from_scipy_csr;
   using qdk::chemistry::python::utils::sparse_csr;
 

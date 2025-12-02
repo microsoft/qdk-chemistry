@@ -17,7 +17,6 @@ import h5py
 import numpy as np
 from qiskit.quantum_info import SparsePauliOp
 
-from qdk_chemistry._core.utils import davidson_solver, syev_solver
 from qdk_chemistry.data import Wavefunction
 from qdk_chemistry.data.base import DataClass
 from qdk_chemistry.utils.statevector import create_statevector_from_wavefunction
@@ -96,46 +95,6 @@ class QubitHamiltonian(DataClass):
             QubitHamiltonian(pauli_strings=group.paulis.to_labels(), coefficients=group.coeffs)
             for group in sparse_pauli_ops
         ]
-
-    def exact_ground_state(
-        self, use_dense_matrix: bool | None = None, tol: float = 1e-8, max_m: int = 20
-    ) -> tuple[float, np.ndarray] | None:
-        """Compute the exact ground state energy and eigenstate via matrix diagonalization.
-
-        Args:
-            use_dense_matrix: If True, use the LAPACK SYEV solver for dense matrix. If False, use the Davidson solver
-                    for sparse matrix. If None, the solver is chosen based on the number of qubits, for <=10 qubits
-                    the SYEV solver is used, otherwise the Davidson solver is used. Default is None.
-            tol: Tolerance for the Davidson solver. Default is 1e-8.
-            max_m: Maximum subspace size for the Davidson solver. Default is 20.
-
-        Returns:
-            A tuple of (ground state energy, ground state eigenvector) if successful, else None
-
-        """
-        # Determine solver based on the `dense` argument or number of qubits
-        use_dense = use_dense_matrix if use_dense_matrix is not None else self.num_qubits <= 10
-
-        if use_dense:
-            try:
-                dense_matrix = self.pauli_ops.to_matrix()
-                dense_matrix_real = dense_matrix.real.copy()
-                eigenvalues, eigenvectors = syev_solver(dense_matrix_real)
-                ground_state_energy = eigenvalues[0]
-                ground_state_vector = eigenvectors[0, :]
-                return ground_state_energy, ground_state_vector
-            except (RuntimeError, MemoryError):
-                # Fall back to sparse method if dense fails
-                pass
-
-        # Use Davidson solver for larger systems or as fallback
-        try:
-            sparse_matrix = self.pauli_ops.to_matrix(sparse=True)
-            sparse_matrix_real = sparse_matrix.real.copy()
-            eigenvalue, eigenvector = davidson_solver(sparse_matrix_real, tol=tol, max_m=max_m)
-            return eigenvalue, eigenvector
-        except RuntimeError:
-            return None
 
     # DataClass interface implementation
     def get_summary(self) -> str:

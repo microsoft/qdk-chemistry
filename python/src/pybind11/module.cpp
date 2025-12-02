@@ -29,8 +29,8 @@ void bind_pmc(py::module& m);
 void bind_configuration(py::module& m);
 void bind_qdk_chemistry_config(py::module& m);
 void bind_utils(py::module& m);
-void bind_davidson_utils(py::module& m);
-void bind_syev_utils(py::module& m);
+void bind_davidson_solver(py::module& m);
+void bind_syev_solver(py::module& m);
 
 PYBIND11_MODULE(_core, m) {
   m.doc() = "QDK/Chemistry C++ core bindings";
@@ -66,11 +66,11 @@ PYBIND11_MODULE(_core, m) {
   bind_cc(algorithms);
   bind_pmc(algorithms);
   bind_stability(algorithms);
+  bind_davidson_solver(algorithms);
+  bind_syev_solver(algorithms);
 
   // Bind utilities
   bind_utils(utils);
-  bind_davidson_utils(utils);
-  bind_syev_utils(utils);
 
   // Bind constants and config at the top level
   bind_constants(m);

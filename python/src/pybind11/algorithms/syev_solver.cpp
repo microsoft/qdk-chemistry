@@ -6,6 +6,7 @@
 #include <pybind11/pybind11.h>
 #include <pybind11/stl.h>
 
+#include <Eigen/Dense>
 #include <lapack.hh>
 #include <vector>
 
@@ -29,9 +30,10 @@ py::tuple dense_matrix_solver(const py::array_t<double>& matrix) {
   }
 
   int n = shape[0];
-  std::vector<double> a(matrix.data(),
-                        matrix.data() + n * n);  // Copy matrix data
-  std::vector<double> w(n);                      // Eigenvalues
+
+  // Use Eigen types for NumPy conversion
+  Eigen::MatrixXd a = Eigen::Map<const Eigen::MatrixXd>(matrix.data(), n, n);
+  Eigen::VectorXd w(n);
 
   int info = lapack::syev(lapack::Job::Vec, lapack::Uplo::Lower, n, a.data(), n,
                           w.data());
@@ -48,10 +50,10 @@ py::tuple dense_matrix_solver(const py::array_t<double>& matrix) {
 }
 
 /**
- * @brief Bind syev solver utilities to Python module.
+ * @brief Bind syev solver to Python module.
  *
  */
-void bind_syev_utils(py::module& m) {
+void bind_syev_solver(py::module& m) {
   m.def("syev_solver", &dense_matrix_solver,
         R"(
             Solve a dense matrix eigenvalue problem using LAPACK's syev.

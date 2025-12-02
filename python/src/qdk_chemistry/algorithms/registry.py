@@ -42,6 +42,11 @@ from qdk_chemistry._core._algorithms import (
     StabilityCheckerFactory,
 )
 from qdk_chemistry.algorithms.energy_estimator import EnergyEstimatorFactory, QDKEnergyEstimator
+from qdk_chemistry.algorithms.qubit_hamiltonian_solver import (
+    DenseMatrixSolver,
+    QubitHamiltonianSolverFactory,
+    SparseMatrixSolver,
+)
 from qdk_chemistry.algorithms.qubit_mapper import QubitMapperFactory
 from qdk_chemistry.algorithms.state_preparation import SparseIsometryGF2XStatePreparation, StatePreparationFactory
 
@@ -354,6 +359,7 @@ def _register_python_factories():
     register_factory(EnergyEstimatorFactory())
     register_factory(StatePreparationFactory())
     register_factory(QubitMapperFactory())
+    register_factory(QubitHamiltonianSolverFactory())
 
 
 _ = _register_cpp_factories()
@@ -395,6 +401,8 @@ def _cleanup_algorithms():
         factory.clear()
 
 
-# Register built-in Python energy estimators
+# Register built-in Python algorithms classes
 register(lambda: QDKEnergyEstimator())
 register(lambda: SparseIsometryGF2XStatePreparation())
+register(lambda: SparseMatrixSolver())
+register(lambda: DenseMatrixSolver())

@@ -24,6 +24,7 @@ from qdk_chemistry._core._algorithms import (
     StabilityChecker,
 )
 from qdk_chemistry.algorithms.energy_estimator import EnergyEstimator
+from qdk_chemistry.algorithms.qubit_hamiltonian_solver import QubitHamiltonianSolver
 from qdk_chemistry.algorithms.qubit_mapper import QubitMapper
 from qdk_chemistry.algorithms.registry import (
     available,
@@ -56,6 +57,7 @@ __all__ = [
     "PhaseEstimation",
     "PhaseEstimationAlgorithm",
     "ProjectedMultiConfigurationCalculator",
+    "QubitHamiltonianSolver",
     "QubitMapper",
     "ScfSolver",
     "StabilityChecker",
