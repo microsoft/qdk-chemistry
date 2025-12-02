@@ -288,7 +288,7 @@ class AlgorithmFactory(ABC):
             >>> pyscf_solver = factory.create("pyscf")
 
         """
-        if name is None:
+        if name is None or name == "":
             name = self.default_algorithm_name()
         if name not in self._registry:
             raise RuntimeError(

@@ -145,6 +145,15 @@ Examples:
 
 )");
 
+  multi_configuration_scf.def("name", &MultiConfigurationScf::name,
+                              R"(
+The algorithm's name.
+
+Returns:
+    str: The name of the algorithm
+
+)");
+
   multi_configuration_scf.def("type_name", &MultiConfigurationScf::type_name,
                               R"(
 The algorithm's type name.

@@ -83,7 +83,7 @@ Configuration options can be modified through the ``settings()`` method.
 Examples:
     >>> checker = alg.StabilityChecker()
     >>> checker.settings().set("nroots", 5)
-    >>> checker.settings().set("tolerance", 1e-6)
+    >>> checker.settings().set("convergence_threshold", 1e-6)
 )");
 
   stability_checker.def("run", &StabilityChecker::run,
@@ -127,6 +127,15 @@ Returns:
 Internal settings object property.
 
 This property allows derived classes to replace the settings object with a specialized Settings subclass in their constructors.
+)");
+
+  stability_checker.def("name", &StabilityChecker::name,
+                        R"(
+The algorithm's name.
+
+Returns:
+    str: The name of the algorithm
+
 )");
 
   stability_checker.def("type_name", &StabilityChecker::type_name,

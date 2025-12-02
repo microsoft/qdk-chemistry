@@ -70,7 +70,7 @@ Create an algorithm instance by name.
 If no name is provided or the name is empty, returns the default implementation.
 
 Args:
-    name (Optional[str]): Name identifying which algorithm implementation to create.
+    name (str | None): Name identifying which algorithm implementation to create.
 
         If empty string (default), returns the default implementation.
 
@@ -181,6 +181,17 @@ Return the type name of the created algorithms.
 Returns:
     str: The type name of the created algorithms
 
+)");
+  factory.def_static("default_algorithm_name",
+                     &FactoryType::default_algorithm_name,
+                     R"(
+Return the default algorithm name for this factory.
+
+Returns:
+    str: The name of the default algorithm implementation
+
+Examples:
+    >>> default_name = Factory.default_algorithm_name()
 )");
   factory.def_static("clear", &FactoryType::clear,
                      R"(
