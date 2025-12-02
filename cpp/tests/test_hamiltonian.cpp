@@ -66,6 +66,50 @@ class HamiltonianConstructorTest : public ::testing::Test {
   void TearDown() override {}
 };
 
+// Helper lambda to run restricted O2 calculation
+auto run_restricted_o2 = []() {
+  std::vector<Eigen::Vector3d> coordinates = {Eigen::Vector3d(0.0, 0.0, 0.0),
+                                              Eigen::Vector3d(2.3, 0.0, 0.0)};
+  std::vector<std::string> symbols = {"O", "O"};
+  Structure o2_structure(coordinates, symbols);
+
+  auto scf_factory = ScfSolverFactory::create("qdk");
+  scf_factory->settings().set("basis_set", "cc-pvdz");
+  scf_factory->settings().set("method", "hf");
+
+  auto o2_structure_ptr = std::make_shared<Structure>(o2_structure);
+  auto [rhf_energy, rhf_wavefunction] =
+      scf_factory->run(o2_structure_ptr, 0, 1);
+  auto rhf_orbitals = rhf_wavefunction->get_orbitals();
+
+  auto ham_factory = HamiltonianConstructorFactory::create("qdk");
+  auto rhf_hamiltonian = ham_factory->run(rhf_orbitals);
+
+  return std::make_tuple(rhf_energy, rhf_hamiltonian);
+};
+
+// Helper lambda to run unrestricted O2 triplet calculation
+auto run_unrestricted_o2 = []() {
+  std::vector<Eigen::Vector3d> coordinates = {Eigen::Vector3d(0.0, 0.0, 0.0),
+                                              Eigen::Vector3d(2.3, 0.0, 0.0)};
+  std::vector<std::string> symbols = {"O", "O"};
+  Structure o2_structure(coordinates, symbols);
+
+  auto scf_factory = ScfSolverFactory::create("qdk");
+  scf_factory->settings().set("basis_set", "cc-pvdz");
+  scf_factory->settings().set("method", "hf");
+
+  auto o2_structure_ptr = std::make_shared<Structure>(o2_structure);
+  auto [uhf_energy, uhf_wavefunction] =
+      scf_factory->run(o2_structure_ptr, 0, 3);
+  auto uhf_orbitals = uhf_wavefunction->get_orbitals();
+
+  auto ham_factory = HamiltonianConstructorFactory::create("qdk");
+  auto uhf_hamiltonian = ham_factory->run(uhf_orbitals);
+
+  return std::make_tuple(uhf_energy, uhf_hamiltonian);
+};
+
 class TestHamiltonianConstructor : public HamiltonianConstructor {
  public:
   std::string name() const override { return "test-hamiltonian_constructor"; }
@@ -1233,7 +1277,7 @@ TEST_F(HamiltonianTest, IntegralSymmetriesEnergiesO2Singlet) {
       << "Alpha-alpha and beta-beta integral sizes should match";
   for (int i = 0; i < aaaa_integrals.size(); ++i) {
     double diff = std::abs(aaaa_integrals[i] - bbbb_integrals[i]);
-    EXPECT_LT(diff, testing::double_tolerance)
+    EXPECT_LT(diff, std::numeric_limits<double>::epsilon())
         << "Alpha-alpha and beta-beta integrals should be identical."
            ". Difference: "
         << diff;
@@ -1251,7 +1295,7 @@ TEST_F(HamiltonianTest, IntegralSymmetriesEnergiesO2Singlet) {
   for (int i = 0; i < alpha_one_body.rows(); ++i) {
     for (int j = 0; j < alpha_one_body.cols(); ++j) {
       double diff = std::abs(alpha_one_body(i, j) - beta_one_body(i, j));
-      EXPECT_LT(diff, testing::double_tolerance)
+      EXPECT_LT(diff, std::numeric_limits<double>::epsilon())
           << "Alpha and beta one-body integrals should be identical for "
              "closed-shell O2."
              "Difference: "
@@ -1269,7 +1313,7 @@ TEST_F(HamiltonianTest, IntegralSymmetriesEnergiesO2Singlet) {
       << "Restricted aaaa and unrestricted aabb integral sizes should match";
   for (int i = 0; i < restricted_aaaa.size(); ++i) {
     double diff = std::abs(restricted_aaaa[i] - aabb_integrals[i]);
-    EXPECT_LT(diff, testing::double_tolerance)
+    EXPECT_LT(diff, std::numeric_limits<double>::epsilon())
         << "Integrals should be identical. "
            ". Difference: "
         << diff;
@@ -1297,10 +1341,10 @@ TEST_F(HamiltonianTest, IntegralSymmetriesEnergiesO2Singlet) {
           double ijkl = aabb_integrals[get_integral_index(i, j, k, l)];
           double klij = aabb_integrals[get_integral_index(k, l, i, j)];
           double diff = std::abs(ijkl - klij);
-          EXPECT_LT(diff, testing::double_tolerance)
+          EXPECT_LT(diff, testing::integral_tolerance)
               << "Symmetry violation for particle exchange. "
               << "Difference: " << diff << " exceeds tolerance "
-              << testing::double_tolerance;
+              << testing::integral_tolerance;
         }
       }
     }
@@ -1309,7 +1353,7 @@ TEST_F(HamiltonianTest, IntegralSymmetriesEnergiesO2Singlet) {
 
 TEST_F(HamiltonianTest, MixedIntegralSymmetriesO2Triplet) {
   // Test mixed integral symmetries for unrestricted O2 open shell
-  // ijab == jiab == ijba == jiba
+  // ijkl == jikl == ijlk == jilk
 
   // Create o2 molecule structure
   std::vector<Eigen::Vector3d> coordinates = {Eigen::Vector3d(0.0, 0.0, 0.0),
@@ -1337,47 +1381,176 @@ TEST_F(HamiltonianTest, MixedIntegralSymmetriesO2Triplet) {
   auto [alpha_active, beta_active] = orbitals->get_active_space_indices();
   size_t active_space_size = alpha_active.size();
 
-  auto get_index = [active_space_size](size_t i, size_t j, size_t a,
-                                       size_t b) -> size_t {
+  auto get_index = [active_space_size](size_t i, size_t j, size_t k,
+                                       size_t l) -> size_t {
     return i * active_space_size * active_space_size * active_space_size +
-           j * active_space_size * active_space_size + a * active_space_size +
-           b;
+           j * active_space_size * active_space_size + k * active_space_size +
+           l;
   };
 
-  // Test mixed integral symmetries: ijab == jiab == ijba == jiba
+  // Test mixed integral symmetries: ijkl == jikl == ijlk == jilk
   for (size_t i = 0; i < active_space_size; i++) {
     for (size_t j = 0; j < active_space_size; j++) {
-      for (size_t a = 0; a < active_space_size; a++) {
-        for (size_t b = 0; b < active_space_size; b++) {
+      for (size_t k = 0; k < active_space_size; k++) {
+        for (size_t l = 0; l < active_space_size; l++) {
           // Get the four symmetry-related integrals
-          double ijab = aabb_integrals[get_index(i, j, a, b)];
-          double jiab = aabb_integrals[get_index(j, i, a, b)];
-          double ijba = aabb_integrals[get_index(i, j, b, a)];
-          double jiba = aabb_integrals[get_index(j, i, b, a)];
+          double ijkl = aabb_integrals[get_index(i, j, k, l)];
+          double jikl = aabb_integrals[get_index(j, i, k, l)];
+          double ijlk = aabb_integrals[get_index(i, j, l, k)];
+          double jilk = aabb_integrals[get_index(j, i, l, k)];
 
           // Test all symmetries
-          double diff1 = std::abs(ijab - jiab);
-          double diff2 = std::abs(ijab - ijba);
-          double diff3 = std::abs(ijab - jiba);
+          double diff1 = std::abs(ijkl - jikl);
+          double diff2 = std::abs(ijkl - ijlk);
+          double diff3 = std::abs(ijkl - jilk);
 
-          EXPECT_LT(diff1, testing::double_tolerance)
-              << "Symmetry violation for ijab=jiab."
+          EXPECT_LT(diff1, testing::integral_tolerance)
+              << "Symmetry violation for ijkl=jikl."
               << "Difference: " << diff1 << " exceeds tolerance "
-              << testing::double_tolerance;
+              << testing::integral_tolerance;
 
-          EXPECT_LT(diff2, testing::double_tolerance)
-              << "Symmetry violation for ijab=ijba."
+          EXPECT_LT(diff2, testing::integral_tolerance)
+              << "Symmetry violation for ijkl=ijlk."
               << "Difference: " << diff2 << " exceeds tolerance "
-              << testing::double_tolerance;
+              << testing::integral_tolerance;
 
-          EXPECT_LT(diff3, testing::double_tolerance)
-              << "Symmetry violation for ijab=jiba."
+          EXPECT_LT(diff3, testing::integral_tolerance)
+              << "Symmetry violation for ijkl=jikl."
               << "Difference: " << diff3 << " exceeds tolerance "
-              << testing::double_tolerance;
+              << testing::integral_tolerance;
         }
       }
     }
   };
+}
+
+TEST_F(HamiltonianTest, O2DeterministicBehaviorRestrictedUnrestricted) {
+  // Test that repeated calculations give identical integral elements
+  // for both restricted (singlet) and unrestricted (triplet) O2
+
+  // Test restricted O2 deterministic behavior
+  {
+    auto [energy1, hamiltonian1] = run_restricted_o2();
+    auto [energy2, hamiltonian2] = run_restricted_o2();
+
+    // Energies should be identical
+    EXPECT_DOUBLE_EQ(energy1, energy2)
+        << "Restricted O2 energies should be identical across runs. "
+        << "Energy1=" << energy1 << ", Energy2=" << energy2;
+
+    // Core energies should be identical
+    EXPECT_DOUBLE_EQ(hamiltonian1->get_core_energy(),
+                     hamiltonian2->get_core_energy())
+        << "Core energies should be identical across runs";
+
+    // One-body integrals should be identical
+    auto [h1_one_alpha, h1_one_beta] = hamiltonian1->get_one_body_integrals();
+    auto [h2_one_alpha, h2_one_beta] = hamiltonian2->get_one_body_integrals();
+
+    EXPECT_EQ(h1_one_alpha.rows(), h2_one_alpha.rows());
+    EXPECT_EQ(h1_one_alpha.cols(), h2_one_alpha.cols());
+    EXPECT_EQ(h1_one_beta.rows(), h2_one_beta.rows());
+    EXPECT_EQ(h1_one_beta.cols(), h2_one_beta.cols());
+
+    for (int i = 0; i < h1_one_alpha.rows(); ++i) {
+      for (int j = 0; j < h1_one_alpha.cols(); ++j) {
+        EXPECT_DOUBLE_EQ(h1_one_alpha(i, j), h2_one_alpha(i, j))
+            << "Restricted O2 alpha one-body integral (" << i << "," << j
+            << ") differs across runs";
+        EXPECT_DOUBLE_EQ(h1_one_beta(i, j), h2_one_beta(i, j))
+            << "Restricted O2 beta one-body integral (" << i << "," << j
+            << ") differs across runs";
+      }
+    }
+
+    // Two-body integrals should be identical
+    auto [h1_two_aaaa, h1_two_aabb, h1_two_bbbb] =
+        hamiltonian1->get_two_body_integrals();
+    auto [h2_two_aaaa, h2_two_aabb, h2_two_bbbb] =
+        hamiltonian2->get_two_body_integrals();
+
+    EXPECT_EQ(h1_two_aaaa.size(), h2_two_aaaa.size());
+    EXPECT_EQ(h1_two_aabb.size(), h2_two_aabb.size());
+    EXPECT_EQ(h1_two_bbbb.size(), h2_two_bbbb.size());
+
+    for (size_t i = 0; i < h1_two_aaaa.size(); ++i) {
+      EXPECT_DOUBLE_EQ(h1_two_aaaa[i], h2_two_aaaa[i])
+          << "Restricted O2 aaaa two-body integral element " << i
+          << " differs across runs";
+    }
+    for (size_t i = 0; i < h1_two_aabb.size(); ++i) {
+      EXPECT_DOUBLE_EQ(h1_two_aabb[i], h2_two_aabb[i])
+          << "Restricted O2 aabb two-body integral element " << i
+          << " differs across runs";
+    }
+    for (size_t i = 0; i < h1_two_bbbb.size(); ++i) {
+      EXPECT_DOUBLE_EQ(h1_two_bbbb[i], h2_two_bbbb[i])
+          << "Restricted O2 bbbb two-body integral element " << i
+          << " differs across runs";
+    }
+  }
+
+  // Test unrestricted O2 triplet deterministic behavior
+  {
+    auto [energy1, hamiltonian1] = run_unrestricted_o2();
+    auto [energy2, hamiltonian2] = run_unrestricted_o2();
+
+    // Energies should be identical
+    EXPECT_DOUBLE_EQ(energy1, energy2)
+        << "Unrestricted O2 energies should be identical across runs. "
+        << "Energy1=" << energy1 << ", Energy2=" << energy2;
+
+    // Core energies should be identical
+    EXPECT_DOUBLE_EQ(hamiltonian1->get_core_energy(),
+                     hamiltonian2->get_core_energy())
+        << "Core energies should be identical across runs";
+
+    // One-body integrals should be identical
+    auto [h1_one_alpha, h1_one_beta] = hamiltonian1->get_one_body_integrals();
+    auto [h2_one_alpha, h2_one_beta] = hamiltonian2->get_one_body_integrals();
+
+    EXPECT_EQ(h1_one_alpha.rows(), h2_one_alpha.rows());
+    EXPECT_EQ(h1_one_alpha.cols(), h2_one_alpha.cols());
+    EXPECT_EQ(h1_one_beta.rows(), h2_one_beta.rows());
+    EXPECT_EQ(h1_one_beta.cols(), h2_one_beta.cols());
+
+    for (int i = 0; i < h1_one_alpha.rows(); ++i) {
+      for (int j = 0; j < h1_one_alpha.cols(); ++j) {
+        EXPECT_DOUBLE_EQ(h1_one_alpha(i, j), h2_one_alpha(i, j))
+            << "Unrestricted O2 alpha one-body integral (" << i << "," << j
+            << ") differs across runs";
+        EXPECT_DOUBLE_EQ(h1_one_beta(i, j), h2_one_beta(i, j))
+            << "Unrestricted O2 beta one-body integral (" << i << "," << j
+            << ") differs across runs";
+      }
+    }
+
+    // Two-body integrals should be identical
+    auto [h1_two_aaaa, h1_two_aabb, h1_two_bbbb] =
+        hamiltonian1->get_two_body_integrals();
+    auto [h2_two_aaaa, h2_two_aabb, h2_two_bbbb] =
+        hamiltonian2->get_two_body_integrals();
+
+    EXPECT_EQ(h1_two_aaaa.size(), h2_two_aaaa.size());
+    EXPECT_EQ(h1_two_aabb.size(), h2_two_aabb.size());
+    EXPECT_EQ(h1_two_bbbb.size(), h2_two_bbbb.size());
+
+    for (size_t i = 0; i < h1_two_aaaa.size(); ++i) {
+      EXPECT_DOUBLE_EQ(h1_two_aaaa[i], h2_two_aaaa[i])
+          << "Unrestricted O2 aaaa two-body integral element " << i
+          << " differs across runs";
+    }
+    for (size_t i = 0; i < h1_two_aabb.size(); ++i) {
+      EXPECT_DOUBLE_EQ(h1_two_aabb[i], h2_two_aabb[i])
+          << "Unrestricted O2 aabb two-body integral element " << i
+          << " differs across runs";
+    }
+    for (size_t i = 0; i < h1_two_bbbb.size(); ++i) {
+      EXPECT_DOUBLE_EQ(h1_two_bbbb[i], h2_two_bbbb[i])
+          << "Unrestricted O2 bbbb two-body integral element " << i
+          << " differs across runs";
+    }
+  }
 }
 
 TEST_F(HamiltonianTest, IsValidComprehensive) {
