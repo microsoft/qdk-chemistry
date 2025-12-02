@@ -45,6 +45,7 @@ __all__ = [
     "create",
     "register",
     "register_factory",
+    "show_default",
     "show_settings",
     "unregister",
     "unregister_factory",
@@ -72,7 +73,7 @@ def create(algorithm_type: str, algorithm_name: str | None = None, **kwargs) -> 
 
             (e.g., "scf_solver", "active_space_selector", "coupled_cluster_calculator").
 
-        algorithm_name (Optional[str]): The specific name of the algorithm implementation to create.
+        algorithm_name (str | None): The specific name of the algorithm implementation to create.
 
             If None or empty string, creates the default algorithm for that type.
 
@@ -238,7 +239,7 @@ def available(algorithm_type: str | None = None) -> dict[str, list[str]] | list[
     type, it returns only the list of available algorithms for that type.
 
     Args:
-        algorithm_type (Optional[str]): If provided, only list algorithms of this type.
+        algorithm_type (str | None): If provided, only list algorithms of this type.
 
             If None, list all algorithms across all types.
 
@@ -287,7 +288,7 @@ def show_default(algorithm_type: str | None = None) -> dict[str, str] | str:
     a specific algorithm type, it returns only the default algorithm name for that type.
 
     Args:
-        algorithm_type (Optional[str]): If provided, only return the default algorithm
+        algorithm_type (str | None): If provided, only return the default algorithm
             for this type. If None, return default algorithms for all types.
 
     Returns:
@@ -391,6 +392,16 @@ def unregister_factory(algorithm_type: str) -> None:
 
 
 def _register_cpp_factories():
+    """Register all built-in C++ algorithm factories.
+
+    This internal initialization function registers all the C++-implemented
+    algorithm factories provided by the core library. This includes factories
+    for SCF solvers, active space selectors, coupled cluster calculators,
+    localizers, multi-configuration calculators, and other core algorithm types.
+
+    This function is automatically called during module import and should not
+    be called by users.
+    """
     from qdk_chemistry._core._algorithms import (  # noqa: PLC0415
         ActiveSpaceSelectorFactory,
         CoupledClusterCalculatorFactory,
@@ -415,6 +426,15 @@ def _register_cpp_factories():
 
 
 def _register_python_factories():
+    """Register all built-in Python algorithm factories.
+
+    This internal initialization function registers all the Python-implemented
+    algorithm factories. This includes factories for energy estimators, qubit
+    mappers, and state preparation algorithms that are implemented in Python.
+
+    This function is automatically called during module import and should not
+    be called by users.
+    """
     from qdk_chemistry.algorithms.energy_estimator import EnergyEstimatorFactory  # noqa: PLC0415
     from qdk_chemistry.algorithms.qubit_mapper import QubitMapperFactory  # noqa: PLC0415
     from qdk_chemistry.algorithms.state_preparation import StatePreparationFactory  # noqa: PLC0415
@@ -464,6 +484,15 @@ def _cleanup_algorithms():
 
 
 def _register_python_algorithms():
+    """Register all built-in Python algorithm instances.
+
+    This internal initialization function registers specific Python-implemented
+    algorithm instances as built-in algorithms. This includes the default QDK
+    energy estimator and state preparation algorithms.
+
+    This function is automatically called during module import and should not
+    be called by users.
+    """
     from qdk_chemistry.algorithms.energy_estimator import QDKEnergyEstimator  # noqa: PLC0415
     from qdk_chemistry.algorithms.state_preparation import SparseIsometryGF2XStatePreparation  # noqa: PLC0415
 

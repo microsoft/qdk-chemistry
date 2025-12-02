@@ -70,7 +70,7 @@ Create an algorithm instance by name.
 If no name is provided or the name is empty, returns the default implementation.
 
 Args:
-    name (Optional[str]): Name identifying which algorithm implementation to create.
+    name (str | None): Name identifying which algorithm implementation to create.
 
         If empty string (default), returns the default implementation.
 
