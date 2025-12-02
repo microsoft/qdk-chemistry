@@ -25,7 +25,7 @@ void bind_orbital_rotation(py::module& m) {
 
             Parameters
             ----------
-            orbitals : qdk.chemistry.data.Orbitals
+            orbitals : qdk_chemistry.data.Orbitals
                 The QATK orbitals to rotate
             rotation_vector : numpy.ndarray
                 The rotation vector (typically from stability analysis,
@@ -41,7 +41,7 @@ void bind_orbital_rotation(py::module& m) {
 
             Returns
             -------
-            qdk.chemistry.data.Orbitals
+            qdk_chemistry.data.Orbitals
                 A new QATK Orbitals object with rotated molecular orbital coefficients
 
             Notes
@@ -91,7 +91,7 @@ void bind_orbital_rotation(py::module& m) {
 
             Parameters
             ----------
-            structure : qdk.chemistry.data.Structure
+            structure : qdk_chemistry.data.Structure
                 The molecular structure
             charge : int
                 The molecular charge
@@ -101,7 +101,7 @@ void bind_orbital_rotation(py::module& m) {
                 Name of the SCF solver algorithm to create (e.g., "qdk", "pyscf")
             stability_checker_name : str
                 Name of the stability checker algorithm to create (e.g., "pyscf")
-            initial_guess : qdk.chemistry.data.Orbitals, optional
+            initial_guess : qdk_chemistry.data.Orbitals, optional
                 Optional initial orbital guess for the first SCF calculation
             max_stability_iterations : int, optional
                 Maximum number of stability check and rotation cycles (default: 5)
@@ -115,25 +115,16 @@ void bind_orbital_rotation(py::module& m) {
                 the workflow will automatically switch to "unrestricted" regardless of
                 this setting (default: "auto")
 
-            Returns
-            -------
-            tuple
-                A tuple containing:
-                - energy : float
-                    Final SCF energy in Hartree
-                - wavefunction : qdk.chemistry.data.Wavefunction
-                    Final wavefunction from the last SCF cycle
-                - is_stable : bool
-                    Overall stability status (True if stable, False if unstable after max iterations)
-                - stability_result : qdk.chemistry.data.StabilityResult
-                    Detailed stability result from the last cycle
+            Returns:
+                tuple[float, qdk_chemistry.data.Wavefunction, bool, qdk_chemistry.data.StabilityResult]:
+                    Final SCF energy, converged wavefunction, stability status, and detailed stability result.
 
             Raises
             ------
-            RuntimeError
-                If SCF or stability check fails, or if algorithm creation fails
             ValueError
-                If input parameters are invalid
+                If structure is None or max_stability_iterations is less than 1
+            RuntimeError
+                If SCF solver or stability checker creation fails
 
             Notes
             -----
@@ -148,16 +139,13 @@ void bind_orbital_rotation(py::module& m) {
             >>> import numpy as np
             >>> # Create a molecular structure
             >>> structure = Structure(["O", "H", "H"], coords)
-            >>>
             >>> # Run stability workflow (will check external stability for restricted)
             >>> energy, wfn, is_stable, result = run_scf_with_stability_workflow(
             ...     structure, 0, 1, "qdk", "pyscf",
             ...     max_stability_iterations=5, stability_tolerance=-1e-4)
-            >>>
-            >>> if is_stable:
-            ...     print(f"Converged to stable wavefunction with energy {energy} Hartree")
-            ... else:
-            ...     print("Max iterations reached, still unstable")
+            >>> # Check convergence
+            >>> print(f"Stability check converged: {is_stable}")
+            >>> print(f"Final energy: {energy} Hartree")
         )",
         py::arg("structure"), py::arg("charge"), py::arg("spin_multiplicity"),
         py::arg("scf_solver_name"), py::arg("stability_checker_name"),
