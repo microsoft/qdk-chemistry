@@ -40,12 +40,12 @@ class CoupledClusterContainer : public WavefunctionContainer {
    * T1/T2 amplitudes are stored if provided
    *
    * @param orbitals Shared pointer to orbitals
-   * @param references Reference determinant(s) for the wavefunction
+   * @param wavefunction Shared pointer to wavefunction
    * @param t1_amplitudes T1 amplitudes (optional)
    * @param t2_amplitudes T2 amplitudes (optional)
    */
   CoupledClusterContainer(std::shared_ptr<Orbitals> orbitals,
-                          const DeterminantVector& references,
+                          std::shared_ptr<Wavefunction> wavefunction,
                           const std::optional<VectorVariant>& t1_amplitudes,
                           const std::optional<VectorVariant>& t2_amplitudes);
 
@@ -56,7 +56,7 @@ class CoupledClusterContainer : public WavefunctionContainer {
    * T1/T2 amplitudes are stored if provided
    *
    * @param orbitals Shared pointer to orbitals
-   * @param references Reference determinant(s) for the wavefunction
+   * @param wavefunction Shared pointer to wavefunction
    * @param t1_amplitudes_aa Alpha T1 amplitudes (optional)
    * @param t1_amplitudes_bb Beta T1 amplitudes (optional)
    * @param t2_amplitudes_abab Alpha-beta T2 amplitudes (optional)
@@ -64,7 +64,8 @@ class CoupledClusterContainer : public WavefunctionContainer {
    * @param t2_amplitudes_bbbb Beta-beta T2 amplitudes (optional)
    */
   CoupledClusterContainer(
-      std::shared_ptr<Orbitals> orbitals, const DeterminantVector& references,
+      std::shared_ptr<Orbitals> orbitals,
+      std::shared_ptr<Wavefunction> wavefunction,
       const std::optional<VectorVariant>& t1_amplitudes_aa,
       const std::optional<VectorVariant>& t1_amplitudes_bb,
       const std::optional<VectorVariant>& t2_amplitudes_abab,
@@ -78,14 +79,15 @@ class CoupledClusterContainer : public WavefunctionContainer {
    * T1/T2 amplitudes and RDMs are stored if provided
    *
    * @param orbitals Shared pointer to orbitals
-   * @param references Reference determinant(s) for the wavefunction
+   * @param wavefunction Shared pointer to wavefunction
    * @param t1_amplitudes T1 amplitudes (optional)
    * @param t2_amplitudes T2 amplitudes (optional)
    * @param one_rdm_spin_traced Spin-traced 1-RDM for active orbitals (optional)
    * @param two_rdm_spin_traced Spin-traced 2-RDM for active orbitals (optional)
    */
   CoupledClusterContainer(
-      std::shared_ptr<Orbitals> orbitals, const DeterminantVector& references,
+      std::shared_ptr<Orbitals> orbitals,
+      std::shared_ptr<Wavefunction> wavefunction,
       const std::optional<VectorVariant>& t1_amplitudes,
       const std::optional<VectorVariant>& t2_amplitudes,
       const std::optional<MatrixVariant>& one_rdm_spin_traced,
@@ -98,7 +100,7 @@ class CoupledClusterContainer : public WavefunctionContainer {
    * T1/T2 amplitudes and RDMs are stored if provided
    *
    * @param orbitals Shared pointer to orbitals
-   * @param references Reference determinant(s) for the CC wavefunction
+   * @param wavefunction Shared pointer to wavefunction
    * @param t1_amplitudes_aa Alpha T1 amplitudes (optional)
    * @param t1_amplitudes_bb Beta T1 amplitudes (optional)
    * @param t2_amplitudes_abab Alpha-beta T2 amplitudes (optional)
@@ -108,7 +110,8 @@ class CoupledClusterContainer : public WavefunctionContainer {
    * @param two_rdm_spin_traced Spin-traced 2-RDM for active orbitals (optional)
    */
   CoupledClusterContainer(
-      std::shared_ptr<Orbitals> orbitals, const DeterminantVector& references,
+      std::shared_ptr<Orbitals> orbitals,
+      std::shared_ptr<Wavefunction> wavefunction,
       const std::optional<VectorVariant>& t1_amplitudes_aa,
       const std::optional<VectorVariant>& t1_amplitudes_bb,
       const std::optional<VectorVariant>& t2_amplitudes_abab,
@@ -124,7 +127,7 @@ class CoupledClusterContainer : public WavefunctionContainer {
    * T1/T2 amplitudes and RDMs are stored if provided
    *
    * @param orbitals Shared pointer to orbitals
-   * @param references Reference determinant(s) for the CC wavefunction
+   * @param wavefunction Shared pointer to wavefunction
    * @param t1_amplitudes T1 amplitudes (optional)
    * @param t2_amplitudes T2 amplitudes (optional)
    * @param one_rdm_spin_traced Spin-traced 1-RDM for active orbitals (optional)
@@ -139,7 +142,8 @@ class CoupledClusterContainer : public WavefunctionContainer {
    * (optional)
    */
   CoupledClusterContainer(
-      std::shared_ptr<Orbitals> orbitals, const DeterminantVector& references,
+      std::shared_ptr<Orbitals> orbitals,
+      std::shared_ptr<Wavefunction> wavefunction,
       const std::optional<VectorVariant>& t1_amplitudes,
       const std::optional<VectorVariant>& t2_amplitudes,
       const std::optional<MatrixVariant>& one_rdm_spin_traced,
@@ -157,7 +161,7 @@ class CoupledClusterContainer : public WavefunctionContainer {
    * T1/T2 amplitudes and RDMs are stored if provided
    *
    * @param orbitals Shared pointer to orbitals
-   * @param references Reference determinant(s) for the CC wavefunction
+   * @param wavefunction Shared pointer to wavefunction
    * @param t1_amplitudes_aa Alpha T1 amplitudes (optional)
    * @param t1_amplitudes_bb Beta T1 amplitudes (optional)
    * @param t2_amplitudes_abab Alpha-beta T2 amplitudes (optional)
@@ -175,7 +179,8 @@ class CoupledClusterContainer : public WavefunctionContainer {
    * (optional)
    */
   CoupledClusterContainer(
-      std::shared_ptr<Orbitals> orbitals, const DeterminantVector& references,
+      std::shared_ptr<Orbitals> orbitals,
+      std::shared_ptr<Wavefunction> wavefunction,
       const std::optional<VectorVariant>& t1_amplitudes_aa,
       const std::optional<VectorVariant>& t1_amplitudes_bb,
       const std::optional<VectorVariant>& t2_amplitudes_abab,
@@ -375,11 +380,10 @@ class CoupledClusterContainer : public WavefunctionContainer {
   bool is_complex() const override;
 
  private:
-  // Reference determinants for the coupled cluster wavefunction
-  const ConfigurationSet _references;
-
   // Orbital information
   std::shared_ptr<Orbitals> _orbitals;
+  // Wfn
+  std::shared_ptr<Wavefunction> _wavefunction;
 
   std::shared_ptr<VectorVariant> _t1_amplitudes_aa = nullptr;
   std::shared_ptr<VectorVariant> _t1_amplitudes_bb = nullptr;

@@ -10,6 +10,7 @@
 #include <filesystem>
 #include <nlohmann/json.hpp>
 #include <qdk/chemistry/data/wavefunction_containers/cc.hpp>
+#include <qdk/chemistry/data/wavefunction_containers/sd.hpp>
 
 #include "ut_common.hpp"
 
@@ -20,6 +21,14 @@ class CoupledClusterContainerTest : public ::testing::Test {
   void SetUp() override {}
 
   void TearDown() override {}
+
+  // Helper function to create a simple Wavefunction from a Configuration
+  std::shared_ptr<Wavefunction> create_test_wavefunction(
+      const Configuration& ref, std::shared_ptr<Orbitals> orbitals) {
+    auto sd_container =
+        std::make_unique<SlaterDeterminantContainer>(ref, orbitals);
+    return std::make_shared<Wavefunction>(std::move(sd_container));
+  }
 };
 
 TEST_F(CoupledClusterContainerTest, BasicProperties) {
@@ -29,11 +38,14 @@ TEST_F(CoupledClusterContainerTest, BasicProperties) {
 
   auto orbitals = testing::create_test_orbitals(nocc + nvirt, 4, true);
   Configuration ref("2200");
+  auto wavefunction = create_test_wavefunction(ref, orbitals);
+
   Eigen::VectorXd t1_amplitudes = Eigen::VectorXd::Random(nocc * nvirt);
   Eigen::VectorXd t2_amplitudes =
       Eigen::VectorXd::Random(nocc * nocc * nvirt * nvirt);
 
-  CoupledClusterContainer cc(orbitals, {ref}, t1_amplitudes, t2_amplitudes);
+  CoupledClusterContainer cc(orbitals, wavefunction, t1_amplitudes,
+                             t2_amplitudes);
 
   // check amplitudes
   auto [t1_alpha, t1_beta] = cc.get_t1_amplitudes();
@@ -59,43 +71,44 @@ TEST_F(CoupledClusterContainerTest, InvalidAmplitudeSizesThrow) {
 
   auto orbitals = testing::create_test_orbitals(nocc + nvirt, 4, true);
   Configuration ref("2200");
+  auto wavefunction = create_test_wavefunction(ref, orbitals);
 
   // Correct sizes: T1 = nocc * nvirt = 4, T2 = nocc * nocc * nvirt * nvirt = 16
 
   // Test: T1 amplitude with wrong size (too small)
   Eigen::VectorXd t1_wrong_size = Eigen::VectorXd::Random(2);  // Should be 4
   Eigen::VectorXd t2_correct = Eigen::VectorXd::Random(16);
-  EXPECT_THROW(
-      CoupledClusterContainer(orbitals, {ref}, t1_wrong_size, t2_correct),
-      std::invalid_argument);
+  EXPECT_THROW(CoupledClusterContainer(orbitals, wavefunction, t1_wrong_size,
+                                       t2_correct),
+               std::invalid_argument);
 
   // Test: T1 amplitude with wrong size (too large)
   Eigen::VectorXd t1_too_large = Eigen::VectorXd::Random(10);  // Should be 4
   EXPECT_THROW(
-      CoupledClusterContainer(orbitals, {ref}, t1_too_large, t2_correct),
+      CoupledClusterContainer(orbitals, wavefunction, t1_too_large, t2_correct),
       std::invalid_argument);
 
   // Test: T2 amplitude with wrong size (too small)
   Eigen::VectorXd t1_correct = Eigen::VectorXd::Random(4);
   Eigen::VectorXd t2_wrong_size = Eigen::VectorXd::Random(10);  // Should be 16
-  EXPECT_THROW(
-      CoupledClusterContainer(orbitals, {ref}, t1_correct, t2_wrong_size),
-      std::invalid_argument);
+  EXPECT_THROW(CoupledClusterContainer(orbitals, wavefunction, t1_correct,
+                                       t2_wrong_size),
+               std::invalid_argument);
 
   // Test: T2 amplitude with wrong size (too large)
   Eigen::VectorXd t2_too_large = Eigen::VectorXd::Random(20);  // Should be 16
   EXPECT_THROW(
-      CoupledClusterContainer(orbitals, {ref}, t1_correct, t2_too_large),
+      CoupledClusterContainer(orbitals, wavefunction, t1_correct, t2_too_large),
       std::invalid_argument);
 
   // Test: Both amplitudes with wrong sizes
-  EXPECT_THROW(
-      CoupledClusterContainer(orbitals, {ref}, t1_wrong_size, t2_wrong_size),
-      std::invalid_argument);
+  EXPECT_THROW(CoupledClusterContainer(orbitals, wavefunction, t1_wrong_size,
+                                       t2_wrong_size),
+               std::invalid_argument);
 
   // Test: Correct sizes should not throw
   EXPECT_NO_THROW(
-      CoupledClusterContainer(orbitals, {ref}, t1_correct, t2_correct));
+      CoupledClusterContainer(orbitals, wavefunction, t1_correct, t2_correct));
 }
 
 // Test JSON serialization/deserialization
@@ -106,11 +119,13 @@ TEST_F(CoupledClusterContainerTest, JsonSerializationSpatial) {
 
   auto orbitals = testing::create_test_orbitals(nocc + nvirt, 4, true);
   Configuration ref("2200");
+  auto wavefunction = create_test_wavefunction(ref, orbitals);
+
   Eigen::VectorXd t1_amplitudes = Eigen::VectorXd::Random(nocc * nvirt);
   Eigen::VectorXd t2_amplitudes =
       Eigen::VectorXd::Random(nocc * nocc * nvirt * nvirt);
 
-  CoupledClusterContainer original(orbitals, {ref}, t1_amplitudes,
+  CoupledClusterContainer original(orbitals, wavefunction, t1_amplitudes,
                                    t2_amplitudes);
 
   // Serialize to JSON
@@ -150,6 +165,8 @@ TEST_F(CoupledClusterContainerTest, JsonSerializationSpin) {
 
   auto orbitals = testing::create_test_orbitals(nocc + nvirt, 4, true);
   Configuration ref("2200");
+  auto wavefunction = create_test_wavefunction(ref, orbitals);
+
   Eigen::VectorXd t1_aa = Eigen::VectorXd::Random(nocc * nvirt);
   Eigen::VectorXd t1_bb = Eigen::VectorXd::Random(nocc * nvirt);
   Eigen::VectorXd t2_abab =
@@ -159,8 +176,8 @@ TEST_F(CoupledClusterContainerTest, JsonSerializationSpin) {
   Eigen::VectorXd t2_bbbb =
       Eigen::VectorXd::Random(nocc * nocc * nvirt * nvirt);
 
-  CoupledClusterContainer original(orbitals, {ref}, t1_aa, t1_bb, t2_abab,
-                                   t2_aaaa, t2_bbbb);
+  CoupledClusterContainer original(orbitals, wavefunction, t1_aa, t1_bb,
+                                   t2_abab, t2_aaaa, t2_bbbb);
 
   // Serialize to JSON
   nlohmann::json j = original.to_json();
@@ -200,11 +217,13 @@ TEST_F(CoupledClusterContainerTest, Hdf5SerializationSpatial) {
 
   auto orbitals = testing::create_test_orbitals(nocc + nvirt, 4, true);
   Configuration ref("2200");
+  auto wavefunction = create_test_wavefunction(ref, orbitals);
+
   Eigen::VectorXd t1_amplitudes = Eigen::VectorXd::Random(nocc * nvirt);
   Eigen::VectorXd t2_amplitudes =
       Eigen::VectorXd::Random(nocc * nocc * nvirt * nvirt);
 
-  CoupledClusterContainer original(orbitals, {ref}, t1_amplitudes,
+  CoupledClusterContainer original(orbitals, wavefunction, t1_amplitudes,
                                    t2_amplitudes);
 
   std::string filename = "test_cc_spatial_serialization.h5";
@@ -255,6 +274,8 @@ TEST_F(CoupledClusterContainerTest, Hdf5SerializationSpin) {
 
   auto orbitals = testing::create_test_orbitals(nocc + nvirt, 4, true);
   Configuration ref("2200");
+  auto wavefunction = create_test_wavefunction(ref, orbitals);
+
   Eigen::VectorXd t1_aa = Eigen::VectorXd::Random(nocc * nvirt);
   Eigen::VectorXd t1_bb = Eigen::VectorXd::Random(nocc * nvirt);
   Eigen::VectorXd t2_abab =
@@ -264,8 +285,8 @@ TEST_F(CoupledClusterContainerTest, Hdf5SerializationSpin) {
   Eigen::VectorXd t2_bbbb =
       Eigen::VectorXd::Random(nocc * nocc * nvirt * nvirt);
 
-  CoupledClusterContainer original(orbitals, {ref}, t1_aa, t1_bb, t2_abab,
-                                   t2_aaaa, t2_bbbb);
+  CoupledClusterContainer original(orbitals, wavefunction, t1_aa, t1_bb,
+                                   t2_abab, t2_aaaa, t2_bbbb);
 
   std::string filename = "test_cc_serialization.h5";
   {

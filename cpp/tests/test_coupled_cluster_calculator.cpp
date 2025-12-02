@@ -39,9 +39,6 @@ class MockCoupledClusterCalculator : public DynamicalCorrelationCalculator {
     auto original_wfn = ansatz->get_wavefunction();
     auto orbs = original_wfn->get_orbitals();
 
-    // Get reference determinants
-    auto references = original_wfn->get_active_determinants();
-
     // Create dummy T1 and T2 amplitudes
     Eigen::VectorXd t1(1);
     t1(0) = 0.01;
@@ -53,7 +50,7 @@ class MockCoupledClusterCalculator : public DynamicalCorrelationCalculator {
     std::optional<CoupledClusterContainer::VectorVariant> t2_opt = t2;
 
     auto cc_container = std::make_unique<CoupledClusterContainer>(
-        orbs, references, t1_opt, t2_opt);
+        orbs, original_wfn, t1_opt, t2_opt);
 
     // Create wavefunction with CC container
     auto result_wfn = std::make_shared<Wavefunction>(std::move(cc_container));

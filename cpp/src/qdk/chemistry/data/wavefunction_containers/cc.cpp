@@ -15,28 +15,31 @@
 namespace qdk::chemistry::data {
 
 CoupledClusterContainer::CoupledClusterContainer(
-    std::shared_ptr<Orbitals> orbitals, const DeterminantVector& references,
+    std::shared_ptr<Orbitals> orbitals,
+    std::shared_ptr<Wavefunction> wavefunction,
     const std::optional<VectorVariant>& t1_amplitudes,
     const std::optional<VectorVariant>& t2_amplitudes)
     : CoupledClusterContainer(
-          orbitals, references, t1_amplitudes, std::nullopt, t2_amplitudes,
+          orbitals, wavefunction, t1_amplitudes, std::nullopt, t2_amplitudes,
           std::nullopt, std::nullopt, std::nullopt, std::nullopt, std::nullopt,
           std::nullopt, std::nullopt, std::nullopt, std::nullopt) {}
 
 CoupledClusterContainer::CoupledClusterContainer(
-    std::shared_ptr<Orbitals> orbitals, const DeterminantVector& references,
+    std::shared_ptr<Orbitals> orbitals,
+    std::shared_ptr<Wavefunction> wavefunction,
     const std::optional<VectorVariant>& t1_amplitudes,
     const std::optional<VectorVariant>& t2_amplitudes,
     const std::optional<MatrixVariant>& one_rdm_spin_traced,
     const std::optional<VectorVariant>& two_rdm_spin_traced)
-    : CoupledClusterContainer(orbitals, references, t1_amplitudes, std::nullopt,
-                              t2_amplitudes, std::nullopt, std::nullopt,
-                              one_rdm_spin_traced, std::nullopt, std::nullopt,
-                              two_rdm_spin_traced, std::nullopt, std::nullopt,
-                              std::nullopt) {}
+    : CoupledClusterContainer(orbitals, wavefunction, t1_amplitudes,
+                              std::nullopt, t2_amplitudes, std::nullopt,
+                              std::nullopt, one_rdm_spin_traced, std::nullopt,
+                              std::nullopt, two_rdm_spin_traced, std::nullopt,
+                              std::nullopt, std::nullopt) {}
 
 CoupledClusterContainer::CoupledClusterContainer(
-    std::shared_ptr<Orbitals> orbitals, const DeterminantVector& references,
+    std::shared_ptr<Orbitals> orbitals,
+    std::shared_ptr<Wavefunction> wavefunction,
     const std::optional<VectorVariant>& t1_amplitudes,
     const std::optional<VectorVariant>& t2_amplitudes,
     const std::optional<MatrixVariant>& one_rdm_spin_traced,
@@ -46,27 +49,29 @@ CoupledClusterContainer::CoupledClusterContainer(
     const std::optional<VectorVariant>& two_rdm_aabb,
     const std::optional<VectorVariant>& two_rdm_aaaa,
     const std::optional<VectorVariant>& two_rdm_bbbb)
-    : CoupledClusterContainer(orbitals, references, t1_amplitudes, std::nullopt,
-                              t2_amplitudes, std::nullopt, std::nullopt,
-                              one_rdm_spin_traced, one_rdm_aa, one_rdm_bb,
-                              two_rdm_spin_traced, two_rdm_aabb, two_rdm_aaaa,
-                              two_rdm_bbbb) {}
+    : CoupledClusterContainer(orbitals, wavefunction, t1_amplitudes,
+                              std::nullopt, t2_amplitudes, std::nullopt,
+                              std::nullopt, one_rdm_spin_traced, one_rdm_aa,
+                              one_rdm_bb, two_rdm_spin_traced, two_rdm_aabb,
+                              two_rdm_aaaa, two_rdm_bbbb) {}
 
 CoupledClusterContainer::CoupledClusterContainer(
-    std::shared_ptr<Orbitals> orbitals, const DeterminantVector& references,
+    std::shared_ptr<Orbitals> orbitals,
+    std::shared_ptr<Wavefunction> wavefunction,
     const std::optional<VectorVariant>& t1_amplitudes_aa,
     const std::optional<VectorVariant>& t1_amplitudes_bb,
     const std::optional<VectorVariant>& t2_amplitudes_abab,
     const std::optional<VectorVariant>& t2_amplitudes_aaaa,
     const std::optional<VectorVariant>& t2_amplitudes_bbbb)
     : CoupledClusterContainer(
-          orbitals, references, t1_amplitudes_aa, t1_amplitudes_bb,
+          orbitals, wavefunction, t1_amplitudes_aa, t1_amplitudes_bb,
           t2_amplitudes_abab, t2_amplitudes_aaaa, t2_amplitudes_bbbb,
           std::nullopt, std::nullopt, std::nullopt, std::nullopt, std::nullopt,
           std::nullopt, std::nullopt) {}
 
 CoupledClusterContainer::CoupledClusterContainer(
-    std::shared_ptr<Orbitals> orbitals, const DeterminantVector& references,
+    std::shared_ptr<Orbitals> orbitals,
+    std::shared_ptr<Wavefunction> wavefunction,
     const std::optional<VectorVariant>& t1_amplitudes_aa,
     const std::optional<VectorVariant>& t1_amplitudes_bb,
     const std::optional<VectorVariant>& t2_amplitudes_abab,
@@ -75,13 +80,14 @@ CoupledClusterContainer::CoupledClusterContainer(
     const std::optional<MatrixVariant>& one_rdm_spin_traced,
     const std::optional<VectorVariant>& two_rdm_spin_traced)
     : CoupledClusterContainer(
-          orbitals, references, t1_amplitudes_aa, t1_amplitudes_bb,
+          orbitals, wavefunction, t1_amplitudes_aa, t1_amplitudes_bb,
           t2_amplitudes_abab, t2_amplitudes_aaaa, t2_amplitudes_bbbb,
           one_rdm_spin_traced, std::nullopt, std::nullopt, two_rdm_spin_traced,
           std::nullopt, std::nullopt, std::nullopt) {}
 
 CoupledClusterContainer::CoupledClusterContainer(
-    std::shared_ptr<Orbitals> orbitals, const DeterminantVector& references,
+    std::shared_ptr<Orbitals> orbitals,
+    std::shared_ptr<Wavefunction> wavefunction,
     const std::optional<VectorVariant>& t1_amplitudes_aa,
     const std::optional<VectorVariant>& t1_amplitudes_bb,
     const std::optional<VectorVariant>& t2_amplitudes_abab,
@@ -96,15 +102,14 @@ CoupledClusterContainer::CoupledClusterContainer(
     const std::optional<VectorVariant>& two_rdm_bbbb)
     : WavefunctionContainer(
           WavefunctionType::NotSelfDual),  // Always force NotSelfDual for CC
-      _references(references, orbitals),
+      _wavefunction(wavefunction),
       _orbitals(orbitals) {
   if (!orbitals) {
     throw std::invalid_argument("Orbitals cannot be null");
   }
 
-  if (references.empty()) {
-    throw std::invalid_argument(
-        "Must provide at least one reference determinant");
+  if (!wavefunction) {
+    throw std::invalid_argument("Wavefunction cannot be null");
   }
 
   // Validate amplitude inputs
@@ -115,7 +120,8 @@ CoupledClusterContainer::CoupledClusterContainer(
   }
   if (!t2_amplitudes_abab && (t2_amplitudes_aaaa || t2_amplitudes_bbbb)) {
     throw std::invalid_argument(
-        "Cannot provide unrestricted T2 alpha-alpha or beta-beta amplitudes "
+        "Cannot provide unrestricted T2 alpha-alpha or beta-beta "
+        "amplitudes "
         "without "
         "T2 alpha-beta amplitudes");
   }
@@ -145,6 +151,7 @@ CoupledClusterContainer::CoupledClusterContainer(
   };
 
   // Get number of occupied and virtual orbitals from reference determinant
+  const auto& references = _wavefunction->get_total_determinants();
   auto [n_alpha, n_beta] = references[0].get_n_electrons();
   size_t active_space_size = orbitals->get_num_molecular_orbitals();
 
@@ -326,9 +333,9 @@ std::unique_ptr<WavefunctionContainer> CoupledClusterContainer::clone() const {
           : std::nullopt;
 
   return std::make_unique<CoupledClusterContainer>(
-      _orbitals, _references.get_configurations(), t1_aa, t1_bb, t2_abab,
-      t2_aaaa, t2_bbbb, one_rdm_spin_traced, one_rdm_aa, one_rdm_bb,
-      two_rdm_spin_traced, two_rdm_aabb, two_rdm_aaaa, two_rdm_bbbb);
+      _orbitals, _wavefunction, t1_aa, t1_bb, t2_abab, t2_aaaa, t2_bbbb,
+      one_rdm_spin_traced, one_rdm_aa, one_rdm_bb, two_rdm_spin_traced,
+      two_rdm_aabb, two_rdm_aaaa, two_rdm_bbbb);
 }
 
 std::shared_ptr<Orbitals> CoupledClusterContainer::get_orbitals() const {
@@ -351,7 +358,11 @@ CoupledClusterContainer::ScalarVariant CoupledClusterContainer::get_coefficient(
 
 const CoupledClusterContainer::DeterminantVector&
 CoupledClusterContainer::get_references() const {
-  return _references.get_configurations();
+  if (!_determinant_vector_cache) {
+    _determinant_vector_cache = std::make_unique<DeterminantVector>(
+        _wavefunction->get_total_determinants());
+  }
+  return *_determinant_vector_cache;
 }
 
 const CoupledClusterContainer::DeterminantVector&
@@ -414,12 +425,9 @@ bool CoupledClusterContainer::contains_determinant(
 
 bool CoupledClusterContainer::contains_reference(
     const Configuration& det) const {
-  if (std::find(_references.get_configurations().begin(),
-                _references.get_configurations().end(),
-                det) != _references.get_configurations().end()) {
-    return true;
-  }
-  return false;
+  const auto& references = _wavefunction->get_total_determinants();
+  return std::find(references.begin(), references.end(), det) !=
+         references.end();
 }
 
 void CoupledClusterContainer::clear_caches() const {
@@ -441,10 +449,9 @@ nlohmann::json CoupledClusterContainer::to_json() const {
     j["orbitals"] = _orbitals->to_json();
   }
 
-  // Serialize references
-  j["references"] = nlohmann::json::array();
-  for (const auto& ref : _references) {
-    j["references"].push_back(ref.to_json());
+  // Serialize wfn
+  if (_wavefunction) {
+    j["wavefunction"] = _wavefunction->to_json();
   }
 
   bool is_complex = this->is_complex();
@@ -505,14 +512,11 @@ std::unique_ptr<CoupledClusterContainer> CoupledClusterContainer::from_json(
     validate_serialization_version(SERIALIZATION_VERSION, j["version"]);
 
     auto orbitals = Orbitals::from_json(j["orbitals"]);
-    DeterminantVector references;
-    for (const auto& ref_json : j["references"]) {
-      references.push_back(Configuration::from_json(ref_json));
-    }
+    auto wavefunction = Wavefunction::from_json(j["wavefunction"]);
 
     bool is_complex = j.value("is_complex", false);
     return std::make_unique<CoupledClusterContainer>(
-        orbitals, references,
+        orbitals, wavefunction,
         j.contains("t1_amplitudes_aa")
             ? std::optional<VectorVariant>(
                   json_to_vector_variant(j["t1_amplitudes_aa"], is_complex))
@@ -585,10 +589,17 @@ void CoupledClusterContainer::to_hdf5(H5::Group& group) const {
                            is_complex);
     }
 
-    // Store configuration set (delegates to ConfigurationSet serialization)
-    H5::Group reference_configs_group =
-        group.createGroup("reference_configurations");
-    _references.to_hdf5(reference_configs_group);
+    // Store orbitals if available
+    if (_orbitals) {
+      H5::Group orbitals_group = group.createGroup("orbitals");
+      _orbitals->to_hdf5(orbitals_group);
+    }
+
+    // Store wfn if available
+    if (_wavefunction) {
+      H5::Group wavefunction_group = group.createGroup("wavefunction");
+      _wavefunction->to_hdf5(wavefunction_group);
+    }
 
   } catch (const H5::Exception& e) {
     throw std::runtime_error("HDF5 error: " + std::string(e.getCDetailMsg()));
@@ -614,17 +625,19 @@ std::unique_ptr<CoupledClusterContainer> CoupledClusterContainer::from_hdf5(
       is_complex = (is_complex_flag != 0);
     }
 
-    // Load configuration set (delegates to ConfigurationSet deserialization)
-    if (!group.nameExists("reference_configurations")) {
-      throw std::runtime_error(
-          "HDF5 group missing required 'reference_configurations' subgroup");
+    // Load orbitals (if available)
+    std::shared_ptr<Orbitals> orbitals = nullptr;
+    if (group.nameExists("orbitals")) {
+      H5::Group orbitals_group = group.openGroup("orbitals");
+      orbitals = Orbitals::from_hdf5(orbitals_group);
     }
-    H5::Group reference_configs_group =
-        group.openGroup("reference_configurations");
-    auto reference_configs =
-        ConfigurationSet::from_hdf5(reference_configs_group);
-    const auto& determinants = reference_configs.get_configurations();
-    auto orbitals = reference_configs.get_orbitals();
+
+    // Load wavefunction (if available)
+    std::shared_ptr<Wavefunction> wavefunction = nullptr;
+    if (group.nameExists("wavefunction")) {
+      H5::Group wavefunction_group = group.openGroup("wavefunction");
+      wavefunction = Wavefunction::from_hdf5(wavefunction_group);
+    }
 
     auto t1_aa =
         group.nameExists("t1_amplitudes_aa")
@@ -653,7 +666,7 @@ std::unique_ptr<CoupledClusterContainer> CoupledClusterContainer::from_hdf5(
             : std::nullopt;
 
     return std::make_unique<CoupledClusterContainer>(
-        orbitals, determinants, t1_aa, t1_bb, t2_abab, t2_aaaa, t2_bbbb);
+        orbitals, wavefunction, t1_aa, t1_bb, t2_abab, t2_aaaa, t2_bbbb);
   } catch (const H5::Exception& e) {
     throw std::runtime_error("HDF5 error: " + std::string(e.getCDetailMsg()));
   }

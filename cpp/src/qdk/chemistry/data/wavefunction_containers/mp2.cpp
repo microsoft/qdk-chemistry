@@ -16,17 +16,17 @@
 namespace qdk::chemistry::data {
 
 MP2Container::MP2Container(std::shared_ptr<Hamiltonian> hamiltonian,
-                           const DeterminantVector& references,
+                           std::shared_ptr<Wavefunction> wavefunction,
                            const std::string& partitioning)
     // Mp2 is always not self dual
     : WavefunctionContainer(WavefunctionType::NotSelfDual),
-      _references(references, hamiltonian->get_orbitals()),
+      _wavefunction(wavefunction),
       _hamiltonian(hamiltonian) {
   if (!hamiltonian) {
     throw std::invalid_argument("Hamiltonian cannot be null");
   }
 
-  if (references.empty()) {
+  if (wavefunction->get_total_determinants().empty()) {
     throw std::invalid_argument("Reference determinants cannot be empty");
   }
 
@@ -37,8 +37,7 @@ MP2Container::MP2Container(std::shared_ptr<Hamiltonian> hamiltonian,
 }
 
 std::unique_ptr<WavefunctionContainer> MP2Container::clone() const {
-  return std::make_unique<MP2Container>(_hamiltonian,
-                                        _references.get_configurations());
+  return std::make_unique<MP2Container>(_hamiltonian, _wavefunction);
 }
 
 std::shared_ptr<Orbitals> MP2Container::get_orbitals() const {
@@ -61,7 +60,11 @@ MP2Container::ScalarVariant MP2Container::get_coefficient(
 }
 
 const MP2Container::DeterminantVector& MP2Container::get_references() const {
-  return _references.get_configurations();
+  if (!_determinant_vector_cache) {
+    _determinant_vector_cache = std::make_unique<DeterminantVector>(
+        _wavefunction->get_total_determinants());
+  }
+  return *_determinant_vector_cache;
 }
 
 const MP2Container::DeterminantVector& MP2Container::get_active_determinants()
@@ -258,12 +261,9 @@ bool MP2Container::contains_determinant(const Configuration& det) const {
 }
 
 bool MP2Container::contains_reference(const Configuration& det) const {
-  if (std::find(_references.get_configurations().begin(),
-                _references.get_configurations().end(),
-                det) != _references.get_configurations().end()) {
-    return true;
-  }
-  return false;
+  const auto& references = _wavefunction->get_total_determinants();
+  return std::find(references.begin(), references.end(), det) !=
+         references.end();
 }
 
 void MP2Container::clear_caches() const {
@@ -281,17 +281,14 @@ nlohmann::json MP2Container::to_json() const {
   j["type"] = "mp2";
   j["version"] = SERIALIZATION_VERSION;
 
-  // Serialize references
-  j["references"] = nlohmann::json::array();
-  for (const auto& ref : _references.get_configurations()) {
-    j["references"].push_back(ref.to_json());
-  }
-
   // Serialize orbitals
   j["orbitals"] = get_orbitals()->to_json();
 
   // Serialize Hamiltonian
   j["hamiltonian"] = _hamiltonian->to_json();
+
+  // Serialize wavefunction
+  j["wavefunction"] = _wavefunction->to_json();
 
   // Note: We don't serialize amplitudes in JSON - they are computed on
   // demand when Hamiltonian is available
@@ -300,12 +297,6 @@ nlohmann::json MP2Container::to_json() const {
 }
 
 std::unique_ptr<MP2Container> MP2Container::from_json(const nlohmann::json& j) {
-  // Deserialize references
-  DeterminantVector references;
-  for (const auto& ref_json : j.at("references")) {
-    references.push_back(Configuration::from_json(ref_json));
-  }
-
   // Deserialize orbitals
   auto orbitals = Orbitals::from_json(j.at("orbitals"));
 
@@ -315,7 +306,13 @@ std::unique_ptr<MP2Container> MP2Container::from_json(const nlohmann::json& j) {
     hamiltonian = Hamiltonian::from_json(j.at("hamiltonian"));
   }
 
-  return std::make_unique<MP2Container>(hamiltonian, references);
+  // Deserialize Wavefunction (can be null)
+  std::shared_ptr<Wavefunction> wavefunction = nullptr;
+  if (!j.at("wavefunction").is_null()) {
+    wavefunction = Wavefunction::from_json(j.at("wavefunction"));
+  }
+
+  return std::make_unique<MP2Container>(hamiltonian, wavefunction);
 }
 
 void MP2Container::to_hdf5(H5::Group& group) const {
@@ -342,10 +339,11 @@ void MP2Container::to_hdf5(H5::Group& group) const {
     hbool_t is_complex_hbool = is_complex_flag ? 1 : 0;
     is_complex_attr.write(H5::PredType::NATIVE_HBOOL, &is_complex_hbool);
 
-    // Store configuration set
-    H5::Group reference_configs_group =
-        group.createGroup("reference_configurations");
-    _references.to_hdf5(reference_configs_group);
+    // Store wfn if available
+    if (_wavefunction) {
+      H5::Group wavefunction_group = group.createGroup("wavefunction");
+      _wavefunction->to_hdf5(wavefunction_group);
+    }
 
     // Store Hamiltonian if available
     if (_hamiltonian) {
@@ -371,18 +369,6 @@ std::unique_ptr<MP2Container> MP2Container::from_hdf5(H5::Group& group) {
     version_attr.read(string_type, version_str);
     validate_serialization_version(SERIALIZATION_VERSION, version_str);
 
-    // Load configuration set
-    if (!group.nameExists("reference_configurations")) {
-      throw std::runtime_error(
-          "HDF5 group missing required 'reference_configurations' subgroup");
-    }
-    H5::Group reference_configs_group =
-        group.openGroup("reference_configurations");
-    auto reference_configs =
-        ConfigurationSet::from_hdf5(reference_configs_group);
-    const auto& determinants = reference_configs.get_configurations();
-    auto orbitals = reference_configs.get_orbitals();
-
     // Load Hamiltonian (if available)
     std::shared_ptr<Hamiltonian> hamiltonian = nullptr;
     if (group.nameExists("hamiltonian")) {
@@ -390,7 +376,14 @@ std::unique_ptr<MP2Container> MP2Container::from_hdf5(H5::Group& group) {
       hamiltonian = Hamiltonian::from_hdf5(hamiltonian_group);
     }
 
-    return std::make_unique<MP2Container>(hamiltonian, determinants);
+    // Load wavefunction (if available)
+    std::shared_ptr<Wavefunction> wavefunction = nullptr;
+    if (group.nameExists("wavefunction")) {
+      H5::Group wavefunction_group = group.openGroup("wavefunction");
+      wavefunction = Wavefunction::from_hdf5(wavefunction_group);
+    }
+
+    return std::make_unique<MP2Container>(hamiltonian, wavefunction);
   } catch (const H5::Exception& e) {
     throw std::runtime_error("HDF5 error: " + std::string(e.getCDetailMsg()));
   }
@@ -398,10 +391,11 @@ std::unique_ptr<MP2Container> MP2Container::from_hdf5(H5::Group& group) {
 
 std::pair<size_t, size_t> MP2Container::get_total_num_electrons() const {
   // Get from first reference determinant
-  if (_references.size() == 0) {
+  const auto& references = _wavefunction->get_total_determinants();
+  if (references.size() == 0) {
     throw std::runtime_error("No reference determinants available");
   }
-  const auto& first_ref = _references.get_configurations()[0];
+  const auto& first_ref = references[0];
   auto [n_alpha, n_beta] = first_ref.get_n_electrons();
   return std::make_pair(n_alpha, n_beta);
 }

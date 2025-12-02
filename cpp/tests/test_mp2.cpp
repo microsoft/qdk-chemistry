@@ -141,12 +141,9 @@ TEST_F(MP2Test, MP2Container) {
   auto ham_factory = HamiltonianConstructorFactory::create("qdk");
   auto hf_hamiltonian = ham_factory->run(hf_orbitals);
 
-  // Get reference determinant
-  auto reference_determinants = hf_wavefunction->get_total_determinants();
-
   // Create MP2Container
   auto mp2_container_with_amplitudes =
-      std::make_unique<MP2Container>(hf_hamiltonian, reference_determinants);
+      std::make_unique<MP2Container>(hf_hamiltonian, hf_wavefunction);
 
   // Verify Hamiltonian is stored
   EXPECT_NE(mp2_container_with_amplitudes->get_hamiltonian(), nullptr)

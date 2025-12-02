@@ -37,9 +37,6 @@ std::pair<double, std::shared_ptr<data::Wavefunction>> MP2Calculator::_run_impl(
   // Compute correlation energy
   double E_corr = 0.0;
 
-  // Get reference determinant from input wavefunction
-  auto reference_determinants = wavefunction->get_total_determinants();
-
   // Determine whether to use restricted or unrestricted MP2
   bool use_unrestricted = hamiltonian->is_unrestricted() || (n_alpha != n_beta);
 
@@ -58,7 +55,7 @@ std::pair<double, std::shared_ptr<data::Wavefunction>> MP2Calculator::_run_impl(
 
   // Create MP2Container
   auto mp2_container =
-      std::make_unique<data::MP2Container>(hamiltonian, reference_determinants);
+      std::make_unique<data::MP2Container>(hamiltonian, wavefunction);
 
   auto mp2_wavefunction =
       std::make_shared<data::Wavefunction>(std::move(mp2_container));

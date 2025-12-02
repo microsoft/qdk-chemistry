@@ -43,12 +43,12 @@ class MP2Container : public WavefunctionContainer {
    * @brief Constructs an MP2 wavefunction.
    *
    * @param hamiltonian Shared pointer to the Hamiltonian
-   * @param references Reference determinant(s) for the wavefunction
+   * @param wavefunction Shared pointer to the wavefunction
    * @param partitioning Choice of partitioning in perbutation theory: the
    * default is Moeller-Plesset Hamiltonian partitioning, keyword "mp"
    */
   MP2Container(std::shared_ptr<Hamiltonian> hamiltonian,
-               const DeterminantVector& references,
+               std::shared_ptr<Wavefunction> wavefunction,
                const std::string& partitioning = "mp");
 
   /** @brief Destructor */
@@ -224,8 +224,8 @@ class MP2Container : public WavefunctionContainer {
   VectorVariant _cached_coefficients;
   /** @brief Cached determinants */
   DeterminantVector _cached_determinants;
-  /** @brief Reference determinants for the MP2 wavefunction */
-  const ConfigurationSet _references;
+  /** @brief Shared pointer to wavfunction */
+  std::shared_ptr<Wavefunction> _wavefunction;
   /** @brief Shared pointer to Hamiltonian */
   std::shared_ptr<Hamiltonian> _hamiltonian;
 
