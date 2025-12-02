@@ -12,13 +12,6 @@ from pathlib import Path
 
 import numpy as np
 import pytest
-import os
-
-@pytest.fixture(scope="session", autouse=True)
-def disable_telemetry():
-    """Disable telemetry for all tests."""
-    os.environ["QDK_CHEMISTRY_PYTHON_TELEMETRY"] = "none"
-    yield
 
 from qdk_chemistry.algorithms import create
 from qdk_chemistry.data import CasWavefunctionContainer, Configuration, Hamiltonian, Orbitals, Wavefunction

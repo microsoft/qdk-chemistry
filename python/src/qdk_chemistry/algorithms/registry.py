@@ -34,8 +34,8 @@ from __future__ import annotations
 
 import atexit
 import time
-from qdk_chemistry.utils import telemetry_events
 from typing import TYPE_CHECKING, Any
+from qdk_chemistry.utils import telemetry_events
 
 if TYPE_CHECKING:
     from collections.abc import Callable
@@ -57,9 +57,9 @@ __cleanup_registered: bool = False
 
 __factories: list[AlgorithmFactory] = []
 
+
 class _TelemetryWrapper:
-    """
-    Transparent proxy wrapper that adds telemetry tracking to algorithm instances.
+    """Transparent proxy wrapper that adds telemetry tracking to algorithm instances.
 
     This wrapper intercepts calls to algorithm methods, particularly the `run()` method,
     to collect and report telemetry data including execution duration (in seconds),
@@ -86,18 +86,20 @@ class _TelemetryWrapper:
         >>> scf = create("scf_solver", "qdk")  # Returns wrapped instance
         >>> energy, wfn = scf.run(structure, 0, 1)  # Telemetry logged automatically
         >>> settings = scf.settings()  # Delegates to wrapped algorithm
+
     """
-    __slots__ = ("_wrapped", "_algorithm_type", "_algorithm_name")
+
+    __slots__ = ("_algorithm_name", "_algorithm_type", "_wrapped")
 
     def __init__(self, wrapped_algorithm: Algorithm, algorithm_type: str, algorithm_name: str):
-        object.__setattr__(self, '_wrapped', wrapped_algorithm)
-        object.__setattr__(self, '_algorithm_type', algorithm_type)
-        object.__setattr__(self, '_algorithm_name', algorithm_name)
+        object.__setattr__(self, "_wrapped", wrapped_algorithm)
+        object.__setattr__(self, "_algorithm_type", algorithm_type)
+        object.__setattr__(self, "_algorithm_name", algorithm_name)
 
     @property
     def __class__(self):
         """Return the wrapped algorithm's class for isinstance checks."""
-        #return object.__getattribute__(self, '_wrapped').__class__
+        # return object.__getattribute__(self, '_wrapped').__class__
         return type(self._wrapped)
 
     @__class__.setter
@@ -107,9 +109,9 @@ class _TelemetryWrapper:
     def run(self, *args, **kwargs):
         """Run the wrapped algorithm with telemetry tracking."""
         start_time = time.perf_counter()
-        wrapped = object.__getattribute__(self, '_wrapped')
-        algorithm_type = object.__getattribute__(self, '_algorithm_type')
-        algorithm_name = object.__getattribute__(self, '_algorithm_name')
+        wrapped = object.__getattribute__(self, "_wrapped")
+        algorithm_type = object.__getattribute__(self, "_algorithm_type")
+        algorithm_name = object.__getattribute__(self, "_algorithm_name")
 
         try:
             result = wrapped.run(*args, **kwargs)
@@ -131,7 +133,7 @@ class _TelemetryWrapper:
                     algorithm_type=algorithm_type,
                     algorithm_name=algorithm_name,
                     duration_sec=duration,
-                    status="success"
+                    status="success",
                 )
 
             return result
@@ -157,6 +159,7 @@ class _TelemetryWrapper:
         """Delegate any other attribute access to the wrapped algorithm."""
         wrapped = object.__getattribute__(self, "_wrapped")
         return getattr(wrapped, name)
+
 
 def create(algorithm_type: str, algorithm_name: str | None = None, **kwargs) -> Algorithm:
     """Create an algorithm instance by type and name.
@@ -209,21 +212,14 @@ def create(algorithm_type: str, algorithm_name: str | None = None, **kwargs) -> 
                 instance.settings().update(kwargs or {})
 
                 # TODO: mcscf fails when macis_calculator is wrapped - investigate further
-                if algorithm_type == 'multi_configuration_calculator':
+                if algorithm_type == "multi_configuration_calculator":
                     # For MCSCF, do not wrap to avoid issues with multiple inheritance
                     return instance
 
                 # Wrap the instance in a telemetry-tracking proxy
-                wrapped_instance = _TelemetryWrapper(
-                    instance,
-                    algorithm_type,
-                    algorithm_name
-                )
+                wrapped_instance = _TelemetryWrapper(instance, algorithm_type, algorithm_name)
 
-                telemetry_events.on_algorithm(
-                    algorithm_type,
-                    algorithm_name
-                    )
+                telemetry_events.on_algorithm(algorithm_type, algorithm_name)
                 return wrapped_instance
 
             except (KeyError, RuntimeError, ValueError) as e:
