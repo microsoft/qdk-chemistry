@@ -5,6 +5,10 @@
 # Licensed under the MIT License. See LICENSE.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
 
+from __future__ import annotations
+
+from typing import Any
+
 from .telemetry import log_telemetry
 
 
@@ -17,13 +21,13 @@ def get_basis_functions_bucket(basis_functions: str | int) -> str:
     approach provides useful ranges for performance and usage analysis.
 
     Args:
-        basis_functions (Union[str, int]): The number of basis functions in a
+        basis_functions: The number of basis functions in a
         calculation. Can be an integer count or the string "unknown"
         if the count is not available.
 
     Returns:
-        str: A string representation of the bucket that the basis function count
-             falls into.
+        A string representation of the bucket that the basis function count
+        falls into.
 
     Examples:
         >>> get_basis_functions_bucket(7)
@@ -66,7 +70,7 @@ def get_basis_functions_bucket(basis_functions: str | int) -> str:
     return "1500+"
 
 
-def extract_data(result):
+def extract_data(result: Any) -> str:
     """Extract molecular formula and basis function count from algorithm result.
 
     This function handles both single qdk_data objects and tuple results
@@ -79,24 +83,21 @@ def extract_data(result):
             a qdk_data (typically at index 1 for (energy, wavefunction) pairs).
 
     Returns:
-        tuple[str, str]: A tuple containing:
-            - Molecular formula (str): Chemical formula with element counts (e.g., "H2O", "CH4")
-              or "unknown" if no qdk_data data is available.
-            - Basis functions bucket (str): Bucketed count of basis functions (e.g., "10", "50", "100")
-              or "unknown" if no qdk_data data is available.
+        Bucketed count of basis functions (e.g., "10", "50", "100")
+        or "unknown" if no qdk_data is available.
 
     Examples:
         >>> # Single qdk_data result
-        >>> formula, n_basis = extract_qdk_data_data(qdk_data)
-        ('H2O', '50')
+        >>> n_basis = extract_data(qdk_data)
+        '50'
 
         >>> # Tuple result (energy, qdk_data)
-        >>> formula, n_basis = extract_qdk_data_data((energy, qdk_data))
-        ('CH4', '100')
+        >>> n_basis = extract_data((energy, qdk_data))
+        '100'
 
-        >>> # No qdk_data data
-        >>> formula, n_basis = extract_qdk_data_data(some_other_result)
-        ('unknown', 'unknown')
+        >>> # No qdk_data
+        >>> n_basis = extract_data(some_other_result)
+        'unknown'
 
     """
     qdk_data = None
@@ -134,13 +135,11 @@ def on_algorithm(algorithm_type: str, algorithm_name: str) -> None:
     """Logs a telemetry event for the execution of a quantum chemistry algorithm.
 
     Args:
-        algorithm_type (str): The type or category of the algorithm being executed.
-        algorithm_name (str): The specific name of the algorithm.
+        algorithm_type: The type or category of the algorithm being executed.
+        algorithm_name: The specific name of the algorithm.
 
-    Returns:
-        None
-
-    This will run whenever an algorithm is created to track initialization statistics.
+    Note:
+        This will run whenever an algorithm is created to track initialization statistics.
 
     """
     log_telemetry(
@@ -164,21 +163,18 @@ def on_algorithm_end(
     success/failure status, and additional contextual information.
 
     Args:
-        algorithm_type (str): The category of algorithm executed (e.g.,
+        algorithm_type: The category of algorithm executed (e.g.,
             'scf_solver', 'active_space_selector').
-        duration_sec (float): The time taken to execute the algorithm,
+        duration_sec: The time taken to execute the algorithm,
             in seconds.
-        status (str): The result of the execution, typically 'success'
+        status: The result of the execution, typically 'success'
             or 'failed'.
-        algorithm_name (str): The specific implementation or backend
+        algorithm_name: The specific implementation or backend
             used (e.g., 'qdk', 'pyscf').
-        error_type (str | None): The type of error encountered, if
+        error_type: The type of error encountered, if
             any. Defaults to None.
         **properties: Additional contextual information about the
-            execution (e.g., 'num_basis_functions', 'molecular_formula').
-
-    Returns:
-        None
+            execution (e.g., 'num_basis_functions').
 
     Notes:
         This function emits a telemetry event recording the algorithm's
@@ -212,12 +208,10 @@ def on_test_call(name: str) -> None:
     logged as a counter type.
 
     Args:
-        name (str): The name of the test to be logged in the telemetry event.
+        name: The name of the test to be logged in the telemetry event.
 
-    Returns:
-        None
-
-    Used for testing purposes.
+    Notes:
+        Used for testing purposes.
 
     """
     log_telemetry(
