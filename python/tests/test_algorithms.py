@@ -341,10 +341,9 @@ class MockCoupledClusterCalculator(DynamicalCorrelationCalculator):
 
         # Get reference determinants from the original wavefunction
         original_wavefunction = ansatz.get_wavefunction()
-        references = original_wavefunction.get_active_determinants()
 
         # Create CoupledClusterContainer with T1 and T2 amplitudes
-        cc_container = CoupledClusterContainer(orbs, references, t1, t2)
+        cc_container = CoupledClusterContainer(orbs, original_wavefunction, t1, t2)
 
         updated_wavefunction = Wavefunction(cc_container)
 

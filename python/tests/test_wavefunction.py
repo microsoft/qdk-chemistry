@@ -1005,12 +1005,16 @@ class TestMP2Container:
         inactive_fock = np.eye(0)  # Empty inactive Fock matrix
         return Hamiltonian(h1e, h2e.flatten(), basic_orbitals, core_energy, inactive_fock)
 
-    def test_mp2_container_construction(self, basic_hamiltonian):
-        """Test MP2Container construction with lazy evaluation."""
+    @pytest.fixture
+    def reference_wavefunction(self, basic_orbitals):
+        """Create a reference wavefunction for MP2/CC tests."""
         ref = Configuration("220")  # Two electrons in first two orbitals
-        references = [ref]
+        sd_container = SlaterDeterminantContainer(ref, basic_orbitals)
+        return Wavefunction(sd_container)
 
-        mp2_container = MP2Container(basic_hamiltonian, references)
+    def test_mp2_container_construction(self, basic_hamiltonian, reference_wavefunction):
+        """Test MP2Container construction with lazy evaluation."""
+        mp2_container = MP2Container(basic_hamiltonian, reference_wavefunction)
 
         assert mp2_container is not None
 
@@ -1051,11 +1055,15 @@ class TestCCContainer:
         basis_set = create_test_basis_set(3, "test-cc")
         return Orbitals(coeffs, energies, None, basis_set)
 
-    def test_cc_container_construction(self, basic_orbitals):
-        """Test CoupledClusterContainer construction."""
-        ref = Configuration("220")
-        references = [ref]
+    @pytest.fixture
+    def reference_wavefunction(self, basic_orbitals):
+        """Create a reference wavefunction for CC tests."""
+        ref = Configuration("220")  # Two electrons in first two orbitals
+        sd_container = SlaterDeterminantContainer(ref, basic_orbitals)
+        return Wavefunction(sd_container)
 
+    def test_cc_container_construction(self, basic_orbitals, reference_wavefunction):
+        """Test CoupledClusterContainer construction."""
         # Create dummy amplitudes for 2 occupied, 1 virtual orbital
         # T1: nocc * nvir = 2 * 1 = 2
         t1 = np.array([0.01, 0.02])
@@ -1063,35 +1071,29 @@ class TestCCContainer:
         t2 = np.array([0.001, 0.002, 0.003, 0.004])
 
         # Enable amplitude storage
-        cc_container = CoupledClusterContainer(basic_orbitals, references, t1, t2)
+        cc_container = CoupledClusterContainer(basic_orbitals, reference_wavefunction, t1, t2)
 
         assert cc_container is not None
         assert cc_container.has_t1_amplitudes()
         assert cc_container.has_t2_amplitudes()
 
-    def test_cc_container_get_references(self, basic_orbitals):
+    def test_cc_container_get_references(self, basic_orbitals, reference_wavefunction):
         """Test getting reference determinants from CoupledClusterContainer."""
-        ref = Configuration("220")
-        references = [ref]
-
-        cc_container = CoupledClusterContainer(basic_orbitals, references)
+        cc_container = CoupledClusterContainer(basic_orbitals, reference_wavefunction)
         retrieved_refs = cc_container.get_references()
 
         assert len(retrieved_refs) == 1
-        assert retrieved_refs[0].to_string() == ref.to_string()
+        assert retrieved_refs[0].to_string() == "220"
 
-    def test_cc_container_in_wavefunction(self, basic_orbitals):
+    def test_cc_container_in_wavefunction(self, basic_orbitals, reference_wavefunction):
         """Test CoupledClusterContainer within a Wavefunction wrapper."""
-        ref = Configuration("220")
-        references = [ref]
-
         # Create dummy amplitudes
         # T1: nocc * nvir = 2 * 1 = 2
         t1 = np.array([0.01, 0.02])
         # T2: nocc * nocc * nvir * nvir = 2 * 2 * 1 * 1 = 4
         t2 = np.array([0.001, 0.002, 0.003, 0.004])
 
-        cc_container = CoupledClusterContainer(basic_orbitals, references, t1, t2)
+        cc_container = CoupledClusterContainer(basic_orbitals, reference_wavefunction, t1, t2)
         wf = Wavefunction(cc_container)
 
         # Test container type checking
@@ -1103,12 +1105,9 @@ class TestCCContainer:
         assert retrieved_container.has_t1_amplitudes()
         assert retrieved_container.has_t2_amplitudes()
 
-    def test_cc_container_electron_counts(self, basic_orbitals):
+    def test_cc_container_electron_counts(self, basic_orbitals, reference_wavefunction):
         """Test getting electron counts from CoupledClusterContainer."""
-        ref = Configuration("220")  # 2 alpha, 2 beta electrons
-        references = [ref]
-
-        cc_container = CoupledClusterContainer(basic_orbitals, references)
+        cc_container = CoupledClusterContainer(basic_orbitals, reference_wavefunction)
         wf = Wavefunction(cc_container)
 
         n_alpha, n_beta = wf.get_active_num_electrons()

@@ -154,9 +154,6 @@ class PyscfCoupledClusterCalculator(DynamicalCorrelationCalculator):
         orbitals = original_wavefunction.get_orbitals()
         initial_energy = ansatz.calculate_energy()
 
-        # Get reference determinants from the original wavefunction
-        references = original_wavefunction.get_active_determinants()
-
         # Check if this is an unrestricted calculation
         # PySCF returns tuples for UHF/UKS, single arrays for RHF/ROHF
         is_unrestricted = isinstance(pyscf_cc.t1, tuple)
@@ -177,7 +174,7 @@ class PyscfCoupledClusterCalculator(DynamicalCorrelationCalculator):
                 # Create CoupledClusterContainer with spin-separated amplitudes
                 cc_container = CoupledClusterContainer(
                     orbitals,
-                    references,
+                    original_wavefunction,
                     t1_aa,  # Alpha T1 amplitudes
                     t1_bb,  # Beta T1 amplitudes
                     t2_aabb,  # Alpha-beta T2 amplitudes
@@ -188,7 +185,7 @@ class PyscfCoupledClusterCalculator(DynamicalCorrelationCalculator):
                 # Create CoupledClusterContainer without storing amplitudes
                 cc_container = CoupledClusterContainer(
                     orbitals,
-                    references,
+                    original_wavefunction,
                     None,  # No T1 alpha amplitudes
                     None,  # No T1 beta amplitudes
                     None,  # No T2 alpha-beta amplitudes
@@ -208,7 +205,7 @@ class PyscfCoupledClusterCalculator(DynamicalCorrelationCalculator):
                 # Create CoupledClusterContainer with spatial amplitudes
                 cc_container = CoupledClusterContainer(
                     orbitals,
-                    references,
+                    original_wavefunction,
                     t1,  # T1 amplitudes (used for both alpha and beta in restricted case)
                     t2,  # T2 amplitudes (alpha-beta coupling)
                 )
@@ -216,7 +213,7 @@ class PyscfCoupledClusterCalculator(DynamicalCorrelationCalculator):
                 # Create CoupledClusterContainer without storing amplitudes
                 cc_container = CoupledClusterContainer(
                     orbitals,
-                    references,
+                    original_wavefunction,
                     None,  # No T1 amplitudes
                     None,  # No T2 amplitudes
                 )
