@@ -23,7 +23,7 @@ def get_basis_functions_bucket(basis_functions: str | int) -> str:
 
     Returns:
         str: A string representation of the bucket that the basis function count
-             falls into. 
+             falls into.
 
     Examples:
         >>> get_basis_functions_bucket(7)
@@ -46,6 +46,7 @@ def get_basis_functions_bucket(basis_functions: str | int) -> str:
         * Fine granularity (10s) for small molecules (<50 basis functions)
         * Medium granularity (50s) for medium molecules (50-500 basis functions)
         * Coarse granularity (100s) for large molecules (>500 basis functions)
+
     """
     if basis_functions == "unknown":
         return "unknown"
