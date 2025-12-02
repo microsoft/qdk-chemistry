@@ -14,6 +14,7 @@ import pytest
 from qdk_chemistry import algorithms
 from qdk_chemistry.constants import ANGSTROM_TO_BOHR
 from qdk_chemistry.data import StabilityResult, Structure
+from qdk_chemistry.utils import rotate_orbitals
 
 from .reference_tolerances import float_comparison_absolute_tolerance, float_comparison_relative_tolerance
 
@@ -682,8 +683,6 @@ class TestStabilityWorkflow:
         This is a Python-only test utility that implements the stability workflow.
         It performs iterative SCF, stability checks, and orbital rotations until convergence or max iterations.
         """
-        from qdk_chemistry.utils import rotate_orbitals
-
         if max_stability_iterations < 1:
             raise ValueError("max_stability_iterations must be at least 1")
 
