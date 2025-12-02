@@ -247,12 +247,12 @@ def _post_telemetry() -> bool:
         return False
 
 
-# This thread aggregates and posts telemetry at regular intervals.
-# The main thread will signal the thread loop to exit when the process is about to exit.
 def _telemetry_thread_start():
+    """Starts the telemetry background thread that processes and posts telemetry metrics in batches."""
     next_post_sec: float | None = None
 
     def on_metric(msg: Metric):
+        """Handles a new metric message by adding & scheduling it to the pending batch."""
         nonlocal next_post_sec
 
         # Add to the pending batch to send next
@@ -288,8 +288,8 @@ def _telemetry_thread_start():
         next_post_sec = None if not pending_metrics else time.monotonic() + BATCH_INTERVAL_SEC
 
 
-# When the process is about to exit, notify the telemetry thread to flush, and wait max 3 sec before exiting anyway
 def _on_exit():
+    """On exit handler to flush telemetry before process exits."""
     logger.debug("In on_exit handler")
     telemetry_queue.put("exit")
     # Wait at most 3 seconds for the telemetry thread to flush and exit
