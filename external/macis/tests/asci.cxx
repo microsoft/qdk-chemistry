@@ -412,7 +412,9 @@ TEST_CASE("ASCI") {
   std::vector<double> C = {1.0};
   double E0 = ham_gen.matrix_element(dets[0], dets[0]);
 
-  // ASCI Grow
+  // ASCI Grow - use Fixed strategy for this test (Percentage with 1 det HF
+  // start would limit growth)
+  asci_settings.core_selection_strategy = macis::CoreSelectionStrategy::Fixed;
   asci_settings.ntdets_max = 10000;
   std::tie(E0, dets, C) = macis::asci_grow(
       asci_settings, mcscf_settings, E0, std::move(dets), std::move(C), ham_gen,

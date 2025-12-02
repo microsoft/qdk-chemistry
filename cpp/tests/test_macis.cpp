@@ -180,6 +180,36 @@ TEST_F(MacisAsciTest, BasicASCICalculation) {
               macis_params::energy_tol);  // Should be negative for bound system
 }
 
+// Test percentage-based core selection strategy
+TEST_F(MacisAsciTest, PercentageCoreSelectionStrategy) {
+  auto calculator = MultiConfigurationCalculatorFactory::create("macis_asci");
+  ASSERT_NE(calculator, nullptr);
+
+  auto& settings = calculator->settings();
+  // Use a small ntdets_max that the system can actually reach
+  // The test molecule can only generate ~34 determinants from HF
+  settings.set("ntdets_max", static_cast<size_t>(30));
+  settings.set("ntdets_min", static_cast<size_t>(1));
+  settings.set("max_refine_iter", macis_params::refine_off);
+  // Use percentage-based core selection (the default)
+  settings.set("core_selection_strategy", "percentage");
+  // Use a low threshold to include all available core determinants
+  settings.set("core_selection_threshold", 0.99);
+  settings.set("ncdets_max", static_cast<size_t>(200));
+
+  auto hamiltonian = hamiltonian_constructor_->run(orbitals_);
+
+  // Execute ASCI calculation with percentage strategy
+  auto result = calculator->run(hamiltonian, 3, 3);
+  double energy = result.first;
+  const Wavefunction& wavefunction = *result.second;
+
+  // Verify basic properties
+  EXPECT_TRUE(std::isfinite(energy));
+  EXPECT_GT(wavefunction.size(), 0);
+  EXPECT_LT(energy, 0.0);  // Should be negative for bound system
+}
+
 // Test ASCI settings configuration
 TEST_F(MacisAsciTest, ASCISettingsConfiguration) {
   auto calculator = MultiConfigurationCalculatorFactory::create("macis_asci");

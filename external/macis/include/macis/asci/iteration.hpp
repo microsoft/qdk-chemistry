@@ -48,10 +48,19 @@ auto asci_iter(ASCISettings asci_settings, MCSCFSettings mcscf_settings,
                size_t ndets_max, double E0, std::vector<wfn_t<N>> wfn,
                std::vector<double> X, HamiltonianGenerator<wfn_t<N>>& ham_gen,
                size_t norb MACIS_MPI_CODE(, MPI_Comm comm)) {
+  // Validate core_selection_threshold
+  if (asci_settings.core_selection_threshold < 0.0 ||
+      asci_settings.core_selection_threshold > 1.0) {
+    throw std::invalid_argument(
+        "core_selection_threshold must be between 0.0 and 1.0, got " +
+        std::to_string(asci_settings.core_selection_threshold));
+  }
+
   // Sort wfn on coefficient weights
   if (wfn.size() > 1) reorder_ci_on_coeff(wfn, X);
 
   size_t nkeep = 0;
+  double core_weight = 0.0;
   switch (asci_settings.core_selection_strategy) {
     case CoreSelectionStrategy::Fixed:
       // Use fixed number of determinants
@@ -59,11 +68,10 @@ auto asci_iter(ASCISettings asci_settings, MCSCFSettings mcscf_settings,
       break;
     case CoreSelectionStrategy::Percentage: {
       // Use percentage-based selection
-      double running_percentage = 0.0;
       for (size_t i = 0; i < wfn.size(); ++i) {
-        running_percentage += X[i] * X[i];
+        core_weight += X[i] * X[i];
         nkeep++;
-        if (running_percentage >= asci_settings.core_selection_threshold) {
+        if (core_weight >= asci_settings.core_selection_threshold) {
           break;
         }
       }
@@ -72,6 +80,12 @@ auto asci_iter(ASCISettings asci_settings, MCSCFSettings mcscf_settings,
     }
     default:
       throw std::runtime_error("Unknown CoreSelectionStrategy");
+  }
+
+  auto logger = spdlog::get("asci_search");
+  if (logger) {
+    logger->trace("  * Core selection: nkeep={}, weight={:.6f}", nkeep,
+                  core_weight);
   }
 
   // Sort kept dets on alpha string
