@@ -300,7 +300,9 @@ Examples:
   // H isotopes
   isotope_enum.value("H1", Isotope::H1, "H-1");
   isotope_enum.value("H2", Isotope::H2, "H-2");
+  isotope_enum.value("D", Isotope::D, "Deuterium");
   isotope_enum.value("H3", Isotope::H3, "H-3");
+  isotope_enum.value("T", Isotope::T, "Tritium");
   isotope_enum.value("H4", Isotope::H4, "H-4");
   isotope_enum.value("H5", Isotope::H5, "H-5");
   isotope_enum.value("H6", Isotope::H6, "H-6");

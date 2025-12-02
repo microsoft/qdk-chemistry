@@ -193,7 +193,9 @@ const std::unordered_map<Isotope, double> atomic_weights = {
     // Isotope masses
     {Isotope::H1, 1.007825032},
     {Isotope::H2, 2.014101778},
+    {Isotope::D, 2.014101778},
     {Isotope::H3, 3.016049281},
+    {Isotope::T, 3.016049281},
     {Isotope::He3, 3.016029322},
     {Isotope::Li3, 3.030775},
     {Isotope::H4, 4.026431867},

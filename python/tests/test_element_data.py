@@ -183,6 +183,8 @@ class TestIsotopeEnum:
         """Test that specific isotopes are defined."""
         assert hasattr(Isotope, "H1")
         assert hasattr(Isotope, "H2")
+        assert hasattr(Isotope, "D")
+        assert hasattr(Isotope, "T")
         assert hasattr(Isotope, "Og295")
 
     def test_isotope_values_encoded(self):
@@ -201,11 +203,15 @@ class TestIsotopeEnum:
         """Test that Isotope is a proper enum."""
         assert isinstance(Isotope.H, Isotope)
         assert isinstance(Isotope.H1, Isotope)
+        assert isinstance(Isotope.D, Isotope)
+        assert isinstance(Isotope.T, Isotope)
         assert isinstance(Isotope.Og295, Isotope)
 
     def test_isotope_comparison(self):
         """Test that isotopes can be compared."""
         assert Isotope.H1 == Isotope.H1
+        assert Isotope.H2 == Isotope.D
+        assert Isotope.H3 == Isotope.T
         assert Isotope.H1 != Isotope.H2
         assert Isotope.C != Isotope.C12
 

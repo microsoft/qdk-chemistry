@@ -476,13 +476,8 @@ TEST_F(ScfTest, OxygenTripletInitialGuessRestart) {
   auto orbitals_o2_first = wfn_o2_first->get_orbitals();
 
   // Verify we get the expected energy for HF/STO-3G triplet
-<<<<<<< HEAD
-  EXPECT_NEAR(energy_o2_first - o2->calculate_nuclear_repulsion_energy(),
-              -1.7566984835e+02, testing::scf_energy_tolerance);
-=======
   EXPECT_NEAR(energy_o2_first, -147.633969643351,
               testing::scf_energy_tolerance);
->>>>>>> main
 
   // Now restart with the converged orbitals as initial guess
   // Create a new solver instance since settings are locked after run

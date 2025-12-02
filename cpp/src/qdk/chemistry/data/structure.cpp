@@ -901,6 +901,12 @@ std::string Structure::_fix_symbol_capitalization(const std::string& symbol) {
 Element Structure::symbol_to_element(const std::string& symbol) {
   std::string letters_only = _strip_numbers_from_symbol(symbol);
   std::string fixed_symbol = _fix_symbol_capitalization(letters_only);
+
+  // Handle special cases for deuterium (D) and tritium (T)
+  if (fixed_symbol == "D" || fixed_symbol == "T") {
+    return Element::H;
+  }
+
   unsigned charge = symbol_to_nuclear_charge(fixed_symbol);
   return static_cast<Element>(charge);
 }
@@ -908,6 +914,15 @@ Element Structure::symbol_to_element(const std::string& symbol) {
 Isotope Structure::symbol_to_isotope(const std::string& symbol) {
   std::string letters_only = _strip_numbers_from_symbol(symbol);
   std::string fixed_symbol = _fix_symbol_capitalization(letters_only);
+
+  // Handle special cases for deuterium (D) and tritium (T)
+  if (fixed_symbol == "D") {
+    return Isotope::D;
+  }
+  if (fixed_symbol == "T") {
+    return Isotope::T;
+  }
+
   unsigned atomic_number = symbol_to_nuclear_charge(fixed_symbol);
   std::string numbers_only = _extract_numbers_from_symbol(symbol);
   if (numbers_only.empty()) {
@@ -922,6 +937,14 @@ std::string Structure::element_to_symbol(Element element) {
 }
 
 std::string Structure::isotope_to_symbol(Isotope isotope) {
+  // Handle special cases for deuterium (D) and tritium (T)
+  if (isotope == Isotope::D) {
+    return "D";
+  }
+  if (isotope == Isotope::T) {
+    return "T";
+  }
+
   unsigned atomic_number = static_cast<unsigned>(isotope) & 0x7F;
   unsigned mass_number = (static_cast<unsigned>(isotope) >> 7);
   std::string symbol = nuclear_charge_to_symbol(atomic_number);

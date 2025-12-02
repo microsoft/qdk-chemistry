@@ -39,9 +39,17 @@ TEST_F(ElementDataTest, IsotopeHelperFunction) {
   unsigned h1_value = isotope(1, 1);
   EXPECT_EQ(static_cast<unsigned>(Isotope::H1), h1_value);
 
-  // For H-2 (deuterium): Z=1, A=2
+  // For H-2: Z=1, A=2
   unsigned h2_value = isotope(1, 2);
   EXPECT_EQ(static_cast<unsigned>(Isotope::H2), h2_value);
+
+  // For D: Z=1, A=2
+  unsigned d_value = isotope(1, 2);
+  EXPECT_EQ(static_cast<unsigned>(Isotope::D), d_value);
+
+  // For T: Z=1, A=3
+  unsigned t_value = isotope(1, 3);
+  EXPECT_EQ(static_cast<unsigned>(Isotope::T), t_value);
 
   // For Og-295: Z=118, A=295
   unsigned og295_value = isotope(118, 295);
@@ -56,6 +64,12 @@ TEST_F(ElementDataTest, IsotopeEncodingZExtraction) {
 
   unsigned z_h2 = static_cast<unsigned>(Isotope::H2) & 0x7F;
   EXPECT_EQ(z_h2, 1);
+
+  unsigned z_d = static_cast<unsigned>(Isotope::D) & 0x7F;
+  EXPECT_EQ(z_d, 1);
+
+  unsigned z_t = static_cast<unsigned>(Isotope::T) & 0x7F;
+  EXPECT_EQ(z_t, 1);
 
   unsigned z_og295 = static_cast<unsigned>(Isotope::Og295) & 0x7F;
   EXPECT_EQ(z_og295, 118);
@@ -103,6 +117,8 @@ TEST_F(ElementDataTest, SpecificIsotopeMasses) {
   // Test hydrogen isotopes
   EXPECT_DOUBLE_EQ(get_atomic_weight(Isotope::H1), 1.007825032);
   EXPECT_DOUBLE_EQ(get_atomic_weight(Isotope::H2), 2.014101778);
+  EXPECT_DOUBLE_EQ(get_atomic_weight(Isotope::D), 2.014101778);
+  EXPECT_DOUBLE_EQ(get_atomic_weight(Isotope::T), 3.016049281);
   EXPECT_DOUBLE_EQ(get_atomic_weight(Isotope::Og295), 295.216178);
 }
 

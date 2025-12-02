@@ -1048,7 +1048,7 @@ TEST_F(StructureBasicTest, HDF5NumericalPrecision) {
 
 // Test Structure construction with Isotope enum (Eigen::MatrixXd coordinates)
 TEST_F(StructureBasicTest, ConstructorWithIsotopesEigen) {
-  std::vector<Isotope> isotopes = {Isotope::H1, Isotope::H2};
+  std::vector<Isotope> isotopes = {Isotope::H1, Isotope::D};
   Eigen::MatrixXd coords(2, 3);
   coords << 0.0, 0.0, 0.0, 0.0, 0.0, 1.4;
 
@@ -1158,6 +1158,54 @@ TEST_F(StructureBasicTest, SymbolToIsotope) {
   // Test with lowercase
   Isotope h1_lower = Structure::symbol_to_isotope("h1");
   EXPECT_EQ(h1_lower, Isotope::H1);
+
+  // Test special cases: deuterium (D) and tritium (T)
+  Isotope deuterium = Structure::symbol_to_isotope("D");
+  Isotope tritium = Structure::symbol_to_isotope("T");
+  EXPECT_EQ(deuterium, Isotope::D);
+  EXPECT_EQ(deuterium, Isotope::H2);
+  EXPECT_EQ(tritium, Isotope::T);
+  EXPECT_EQ(tritium, Isotope::H3);
+
+  // Test with lowercase
+  Isotope deuterium_lower = Structure::symbol_to_isotope("d");
+  Isotope tritium_lower = Structure::symbol_to_isotope("t");
+  EXPECT_EQ(deuterium_lower, Isotope::D);
+  EXPECT_EQ(tritium_lower, Isotope::T);
+}
+
+// Test isotope_to_symbol function
+TEST_F(StructureBasicTest, IsotopeToSymbol) {
+  // Test regular isotopes
+  std::string h1_symbol = Structure::isotope_to_symbol(Isotope::H1);
+  std::string c12_symbol = Structure::isotope_to_symbol(Isotope::C12);
+  std::string c13_symbol = Structure::isotope_to_symbol(Isotope::C13);
+
+  EXPECT_EQ(h1_symbol, "H1");
+  EXPECT_EQ(c12_symbol, "C12");
+  EXPECT_EQ(c13_symbol, "C13");
+
+  // Test special cases: deuterium (D) and tritium (T)
+  std::string h2_symbol = Structure::isotope_to_symbol(Isotope::H2);
+  std::string d_symbol = Structure::isotope_to_symbol(Isotope::D);
+  std::string h3_symbol = Structure::isotope_to_symbol(Isotope::H3);
+  std::string t_symbol = Structure::isotope_to_symbol(Isotope::T);
+
+  EXPECT_EQ(h2_symbol, "H2");
+  EXPECT_EQ(d_symbol, "D");
+  EXPECT_EQ(h3_symbol, "H3");
+  EXPECT_EQ(t_symbol, "T");
+
+  // Verify round-trip conversion
+  Isotope h2_back = Structure::symbol_to_isotope(h2_symbol);
+  Isotope d_back = Structure::symbol_to_isotope(d_symbol);
+  Isotope h3_back = Structure::symbol_to_isotope(h3_symbol);
+  Isotope t_back = Structure::symbol_to_isotope(t_symbol);
+
+  EXPECT_EQ(h2_back, Isotope::H2);
+  EXPECT_EQ(d_back, Isotope::D);
+  EXPECT_EQ(h3_back, Isotope::H3);
+  EXPECT_EQ(t_back, Isotope::T);
 }
 
 // Test get_default_atomic_mass with Element
@@ -1175,17 +1223,21 @@ TEST_F(StructureBasicTest, GetDefaultAtomicMassIsotope) {
   // Test specific isotopes
   double h1_mass = Structure::get_default_atomic_mass(Isotope::H1);
   double h2_mass = Structure::get_default_atomic_mass(Isotope::H2);
+  double d_mass = Structure::get_default_atomic_mass(Isotope::D);
+  double t_mass = Structure::get_default_atomic_mass(Isotope::T);
   double c12_mass = Structure::get_default_atomic_mass(Isotope::C12);
 
   EXPECT_NEAR(h1_mass, 1.007825032, testing::numerical_zero_tolerance);
   EXPECT_NEAR(h2_mass, 2.014101778, testing::numerical_zero_tolerance);
+  EXPECT_NEAR(d_mass, 2.014101778, testing::numerical_zero_tolerance);
+  EXPECT_NEAR(t_mass, 3.016049281, testing::numerical_zero_tolerance);
   EXPECT_NEAR(c12_mass, 12.0, testing::numerical_zero_tolerance);
 }
 
 // Test Structure with isotope symbols in constructor
 TEST_F(StructureBasicTest, ConstructorWithIsotopeSymbols) {
   // Test with isotope notation in symbols
-  std::vector<std::string> symbols = {"H1", "H2", "C12", "O16"};
+  std::vector<std::string> symbols = {"H1", "D", "C12", "O16"};
   Eigen::MatrixXd coords(4, 3);
   coords << 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 2.0, 0.0, 0.0, 3.0, 0.0, 0.0;
 
@@ -1197,7 +1249,7 @@ TEST_F(StructureBasicTest, ConstructorWithIsotopeSymbols) {
   EXPECT_NEAR(s.get_atom_mass(0), 1.007825032,
               testing::numerical_zero_tolerance);  // H-1
   EXPECT_NEAR(s.get_atom_mass(1), 2.014101778,
-              testing::numerical_zero_tolerance);  // H-2
+              testing::numerical_zero_tolerance);  // D
   EXPECT_NEAR(s.get_atom_mass(2), 12.0,
               testing::numerical_zero_tolerance);  // C-12
   EXPECT_NEAR(s.get_atom_mass(3), 15.99491462,
@@ -1213,7 +1265,7 @@ TEST_F(StructureBasicTest, ConstructorWithIsotopeSymbols) {
 // Test isotope extraction from symbols with mixed notation
 TEST_F(StructureBasicTest, MixedSymbolNotation) {
   // Mix standard element symbols and isotope symbols
-  std::vector<std::string> symbols = {"H", "H2", "C12", "O"};
+  std::vector<std::string> symbols = {"H", "D", "C12", "O"};
   Eigen::MatrixXd coords(4, 3);
   coords << 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 2.0, 0.0, 0.0, 3.0, 0.0, 0.0;
 
@@ -1246,7 +1298,7 @@ TEST_F(StructureBasicTest, EmptyStructureWithIsotopes) {
 
 // Test isotope round-trip through JSON
 TEST_F(StructureBasicTest, IsotopeJSONRoundtrip) {
-  std::vector<Isotope> isotopes = {Isotope::H1, Isotope::H2, Isotope::C12};
+  std::vector<Isotope> isotopes = {Isotope::H1, Isotope::D, Isotope::C12};
   Eigen::MatrixXd coords(3, 3);
   coords << 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 2.0, 0.0, 0.0;
 

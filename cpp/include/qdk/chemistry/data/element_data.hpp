@@ -333,7 +333,9 @@ enum class Isotope : unsigned {
   // Period 1
   H1 = isotope(1, 1),
   H2 = isotope(1, 2),
+  D = isotope(1, 2),  // Deuterium
   H3 = isotope(1, 3),
+  T = isotope(1, 3),  // Tritium
   H4 = isotope(1, 4),
   H5 = isotope(1, 5),
   H6 = isotope(1, 6),
