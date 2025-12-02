@@ -18,18 +18,12 @@ def get_basis_functions_bucket(basis_functions: str | int) -> str:
 
     Args:
         basis_functions (Union[str, int]): The number of basis functions in a
-            calculation. Can be an integer count or the string "unknown"
-            if the count is not available.
+        calculation. Can be an integer count or the string "unknown"
+        if the count is not available.
 
     Returns:
         str: A string representation of the bucket that the basis function count
-             falls into. Possible return values are:
-             - "unknown": When input is "unknown"
-             - "10", "20", "30", "40": For <50 basis functions (intervals of 10)
-             - "50", "100", "150", "200", "250", "300", "350", "400", "450", "500":
-               For 50-500 basis functions (intervals of 50)
-             - "600", "700", "800", "900", "1000": For >500 basis functions (intervals of 100)
-             - "1500+": For 1500+ basis functions
+             falls into. 
 
     Examples:
         >>> get_basis_functions_bucket(7)
@@ -48,10 +42,10 @@ def get_basis_functions_bucket(basis_functions: str | int) -> str:
     Notes:
         The bucketing scheme is designed for typical quantum chemistry calculations
         with varying granularity based on system size:
-        - Fine granularity (10s) for small molecules (<50 basis functions)
-        - Medium granularity (50s) for medium molecules (50-500 basis functions)
-        - Coarse granularity (100s) for large molecules (>500 basis functions)
 
+        * Fine granularity (10s) for small molecules (<50 basis functions)
+        * Medium granularity (50s) for medium molecules (50-500 basis functions)
+        * Coarse granularity (100s) for large molecules (>500 basis functions)
     """
     if basis_functions == "unknown":
         return "unknown"

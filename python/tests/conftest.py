@@ -12,7 +12,7 @@ from pathlib import Path
 
 import numpy as np
 import pytest
-import os 
+import os
 
 @pytest.fixture(scope="session", autouse=True)
 def disable_telemetry():

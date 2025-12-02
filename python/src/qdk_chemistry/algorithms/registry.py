@@ -33,7 +33,7 @@ Important Notes
 from __future__ import annotations
 
 import atexit
-import time 
+import time
 from qdk_chemistry.utils import telemetry_events
 from typing import TYPE_CHECKING, Any
 
@@ -60,45 +60,49 @@ __factories: list[AlgorithmFactory] = []
 class _TelemetryWrapper:
     """
     Transparent proxy wrapper that adds telemetry tracking to algorithm instances.
-    
+
     This wrapper intercepts calls to algorithm methods, particularly the `run()` method,
     to collect and report telemetry data including execution duration (in seconds),
     success/failure status, and error information. The wrapper is transparent to users
     and delegates all non-intercepted method calls to the underlying algorithm instance.
-    
+
     The wrapper is applied automatically by the `create()` function and tracks:
     - Algorithm execution time (duration in seconds)
     - Success or failure status
     - Exception types for failed executions
     - Algorithm type and name metadata
-    
+
     This enables centralized telemetry collection for all algorithms (both C++ and Python
     implementations) without modifying the algorithm implementations themselves.
-    
+
     Args:
         wrapped_algorithm: The algorithm instance to wrap (can be C++ or Python)
         algorithm_type: The type of algorithm (e.g., "scf_solver", "active_space_selector")
         algorithm_name: The specific name of the algorithm implementation (e.g., "qdk", "pyscf")
-        
+
     Examples:
         This wrapper is transparent - users interact with it exactly like the original algorithm:
-        
+
         >>> scf = create("scf_solver", "qdk")  # Returns wrapped instance
         >>> energy, wfn = scf.run(structure, 0, 1)  # Telemetry logged automatically
         >>> settings = scf.settings()  # Delegates to wrapped algorithm
-    """    
+    """
     __slots__ = ("_wrapped", "_algorithm_type", "_algorithm_name")
 
     def __init__(self, wrapped_algorithm: Algorithm, algorithm_type: str, algorithm_name: str):
         object.__setattr__(self, '_wrapped', wrapped_algorithm)
         object.__setattr__(self, '_algorithm_type', algorithm_type)
         object.__setattr__(self, '_algorithm_name', algorithm_name)
-    
+
     @property
     def __class__(self):
         """Return the wrapped algorithm's class for isinstance checks."""
         #return object.__getattribute__(self, '_wrapped').__class__
         return type(self._wrapped)
+
+    @__class__.setter
+    def __class__(self, value):
+        self._wrapped.__class__ = value
 
     def run(self, *args, **kwargs):
         """Run the wrapped algorithm with telemetry tracking."""
@@ -129,9 +133,9 @@ class _TelemetryWrapper:
                     duration_sec=duration,
                     status="success"
                 )
-            
+
             return result
-        
+
         except Exception as e:
             duration = time.perf_counter() - start_time
             telemetry_events.on_algorithm_end(
@@ -148,12 +152,12 @@ class _TelemetryWrapper:
 
     def __repr__(self):
         return repr(self._wrapped)
-        
+
     def __getattr__(self, name):
         """Delegate any other attribute access to the wrapped algorithm."""
         wrapped = object.__getattribute__(self, "_wrapped")
         return getattr(wrapped, name)
-    
+
 def create(algorithm_type: str, algorithm_name: str | None = None, **kwargs) -> Algorithm:
     """Create an algorithm instance by type and name.
 
@@ -211,17 +215,17 @@ def create(algorithm_type: str, algorithm_name: str | None = None, **kwargs) -> 
 
                 # Wrap the instance in a telemetry-tracking proxy
                 wrapped_instance = _TelemetryWrapper(
-                    instance, 
-                    algorithm_type, 
+                    instance,
+                    algorithm_type,
                     algorithm_name
                 )
 
                 telemetry_events.on_algorithm(
-                    algorithm_type, 
-                    algorithm_name 
+                    algorithm_type,
+                    algorithm_name
                     )
-                return wrapped_instance 
-            
+                return wrapped_instance
+
             except (KeyError, RuntimeError, ValueError) as e:
                 available_algorithms = factory.available()
                 if not available_algorithms:
