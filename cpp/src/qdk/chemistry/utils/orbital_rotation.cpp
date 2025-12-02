@@ -85,9 +85,14 @@ Eigen::MatrixXd unpack_rotation_vector(const Eigen::VectorXd& rotation_vector,
  * @brief Apply orbital rotation to molecular orbital coefficients.
  *
  * @param mo_coeff Molecular orbital coefficient matrix [n_ao x n_mo]
- * @param rotation_vector Rotation vector (unique variables)
- * @param mask Boolean mask indicating which matrix elements to fill from
- * rotation_vector
+ * @param rotation_vector Rotation vector containing unique orbital rotation
+ *                        parameters (see documentation of rotate_orbitals for
+ *                        details). The vector is unpacked using the mask to
+ *                        construct an anti-Hermitian rotation matrix. Size must
+ *                        match the number of true elements in mask.
+ * @param mask Boolean mask [n_mo x n_mo] indicating which matrix elements
+ *             to populate from rotation_vector. Typically represents
+ *             occupied-virtual orbital pair indices.
  * @return Rotated molecular orbital coefficients [n_ao x n_mo]
  */
 Eigen::MatrixXd apply_orbital_rotation(const Eigen::MatrixXd& mo_coeff,
