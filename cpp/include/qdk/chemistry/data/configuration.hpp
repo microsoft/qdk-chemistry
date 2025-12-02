@@ -294,7 +294,7 @@ class Configuration : public DataClass {
    * @brief Convert configuration to separate alpha and beta binary strings in
    * little-endian format
    * @param num_orbitals How many orbitals to extract (if we want to slice for
-   * active space) Default is all orbitals
+   * active space)
    * @return Pair of binary strings (alpha, beta) where '1' indicates occupied
    *         and '0' indicates unoccupied for each spin channel, in little
    *         endian format
@@ -305,7 +305,7 @@ class Configuration : public DataClass {
    * @throws std::runtime_error If num_orbitals exceeds configuration capacity
    */
   std::pair<std::string, std::string> to_binary_strings(
-      size_t num_orbitals = 0) const;
+      size_t num_orbitals) const;
 
   /**
    * @brief Convert separate alpha and beta binary strings in little-endian

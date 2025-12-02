@@ -341,14 +341,11 @@ std::pair<std::string, std::string> Configuration::to_binary_strings(
     size_t num_orbitals) const {
   size_t capacity = get_orbital_capacity();
 
-  // If num_orbitals is 0 (default), use full capacity
-  if (num_orbitals == 0) {
-    num_orbitals = capacity;
-  }
   // Throw if we ask for too many orbitals
   if (num_orbitals > capacity) {
     throw std::runtime_error(
-        "Cannot ask for more orbitals than there are in the configuration.");
+        "num_orbitals argument cannot be greater than the number of orbitals "
+        "in the system.");
   }
 
   std::string result_alpha(num_orbitals, '0');

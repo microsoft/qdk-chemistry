@@ -53,7 +53,7 @@ TEST_F(ConfigurationTest, ToStringConversion) {
 TEST_F(ConfigurationTest, ToBinaryStrings) {
   Configuration basic_config("2du0");
 
-  auto [alpha_string, beta_string] = basic_config.to_binary_strings();
+  auto [alpha_string, beta_string] = basic_config.to_binary_strings(4);
 
   EXPECT_EQ(alpha_string, "1010");
   EXPECT_EQ(beta_string, "1100");
