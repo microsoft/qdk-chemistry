@@ -1077,14 +1077,6 @@ class TestCCContainer:
         assert cc_container.has_t1_amplitudes()
         assert cc_container.has_t2_amplitudes()
 
-    def test_cc_container_get_references(self, basic_orbitals, reference_wavefunction):
-        """Test getting reference determinants from CoupledClusterContainer."""
-        cc_container = CoupledClusterContainer(basic_orbitals, reference_wavefunction)
-        retrieved_refs = cc_container.get_references()
-
-        assert len(retrieved_refs) == 1
-        assert retrieved_refs[0].to_string() == "220"
-
     def test_cc_container_in_wavefunction(self, basic_orbitals, reference_wavefunction):
         """Test CoupledClusterContainer within a Wavefunction wrapper."""
         # Create dummy amplitudes

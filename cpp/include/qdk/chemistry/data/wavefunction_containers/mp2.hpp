@@ -73,6 +73,12 @@ class MP2Container : public WavefunctionContainer {
   std::shared_ptr<Hamiltonian> get_hamiltonian() const;
 
   /**
+   * @brief Get reference to Wavefunction
+   * @return Shared pointer to Wavefunction
+   */
+  std::shared_ptr<Wavefunction> get_wavefunction() const;
+
+  /**
    * @brief Not implemented for MP2 wavefunctions
    */
   const VectorVariant& get_coefficients() const override;
@@ -86,12 +92,6 @@ class MP2Container : public WavefunctionContainer {
    * @brief Not implemented for MP2 wavefunctions
    */
   const DeterminantVector& get_active_determinants() const override;
-
-  /**
-   * @brief Get reference determinants of the MP2 wavefunction
-   * @return Vector of reference configurations/determinants
-   */
-  const DeterminantVector& get_references() const;
 
   /**
    * @brief Get T1 amplitudes

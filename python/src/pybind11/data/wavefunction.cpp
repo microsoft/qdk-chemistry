@@ -979,7 +979,7 @@ It supports both restricted and unrestricted coupled cluster methods, optionally
 spin-separated amplitudes as well as reduced density matrices (RDMs).
     )")
       .def(py::init<
-               std::shared_ptr<Orbitals>, const std::vector<Configuration>&,
+               std::shared_ptr<Orbitals>, std::shared_ptr<Wavefunction>,
                const std::optional<CoupledClusterContainer::VectorVariant>&,
                const std::optional<CoupledClusterContainer::VectorVariant>&>(),
            R"(
@@ -987,25 +987,23 @@ Constructs a coupled cluster wavefunction container with amplitudes.
 
 Parameters:
     orbitals (Orbitals): Shared pointer to orbital basis set
-    references (list of Configuration): Reference determinant(s) for the CC
-    wavefunction
+    wavefunction (Wavefunction): Shared pointer to wavefunction
     t1_amplitudes (numpy.ndarray, optional): T1 amplitudes (will be used for
     both alpha and beta in restricted case)
     t2_amplitudes (numpy.ndarray, optional): T2 amplitudes (will be used for
     alpha-beta coupling)
 
 Examples:
-    >>> ref = qdk.chemistry.Configuration("33221100")
     >>> t1 = np.array([...])
     >>> t2 = np.array([...])
     >>> container = qdk.chemistry.CoupledClusterContainer(
-    ...     orbitals, [ref], t1, t2)
+    ...     orbitals, wfn, t1, t2)
         )",
-           py::arg("orbitals"), py::arg("references"),
+           py::arg("orbitals"), py::arg("wavefunction"),
            py::arg("t1_amplitudes") = std::nullopt,
            py::arg("t2_amplitudes") = std::nullopt)
       .def(py::init<
-               std::shared_ptr<Orbitals>, const std::vector<Configuration>&,
+               std::shared_ptr<Orbitals>, std::shared_ptr<Wavefunction>,
                const std::optional<CoupledClusterContainer::VectorVariant>&,
                const std::optional<CoupledClusterContainer::VectorVariant>&,
                const std::optional<CoupledClusterContainer::VectorVariant>&,
@@ -1016,8 +1014,7 @@ Constructs a coupled cluster wavefunction container with spin-separated amplitud
 
 Parameters:
     orbitals (Orbitals): Shared pointer to orbital basis set
-    references (list of Configuration): Reference determinant(s) for the CC
-    wavefunction
+    wavefunction (Wavefunction): Shared pointer to wavefunction
     t1_amplitudes_aa (numpy.ndarray, optional): Alpha T1 amplitudes
     t1_amplitudes_bb (numpy.ndarray, optional): Beta T1 amplitudes
     t2_amplitudes_abab (numpy.ndarray, optional): Alpha-beta T2 amplitudes
@@ -1025,21 +1022,20 @@ Parameters:
     t2_amplitudes_bbbb (numpy.ndarray, optional): Beta-beta T2 amplitudes
 
 Examples:
-    >>> ref = qdk.chemistry.Configuration("33221100")
     >>> t1_aa = np.array([...])
     >>> t1_bb = np.array([...])
     >>> t2_abab = np.array([...])
     >>> container = qdk.chemistry.CoupledClusterContainer(
-    ...     orbitals, [ref], t1_aa, t1_bb, t2_abab, None, None)
+    ...     orbitals, wfn, t1_aa, t1_bb, t2_abab, None, None)
         )",
-           py::arg("orbitals"), py::arg("references"),
+           py::arg("orbitals"), py::arg("wavefunction"),
            py::arg("t1_amplitudes_aa") = std::nullopt,
            py::arg("t1_amplitudes_bb") = std::nullopt,
            py::arg("t2_amplitudes_abab") = std::nullopt,
            py::arg("t2_amplitudes_aaaa") = std::nullopt,
            py::arg("t2_amplitudes_bbbb") = std::nullopt)
       .def(py::init<
-               std::shared_ptr<Orbitals>, const std::vector<Configuration>&,
+               std::shared_ptr<Orbitals>, std::shared_ptr<Wavefunction>,
                const std::optional<CoupledClusterContainer::VectorVariant>&,
                const std::optional<CoupledClusterContainer::VectorVariant>&,
                const std::optional<CoupledClusterContainer::VectorVariant>&,
@@ -1052,8 +1048,7 @@ Constructs a coupled cluster wavefunction container with amplitudes and RDMs.
 
 Parameters:
     orbitals (Orbitals): Shared pointer to orbital basis set
-    references (list of Configuration): Reference determinant(s) for the CC
-    wavefunction
+    wavefunction (Wavefunction): Shared pointer to wavefunction
     t1_amplitudes_aa (numpy.ndarray, optional): Alpha T1 amplitudes
     t1_amplitudes_bb (numpy.ndarray, optional): Beta T1 amplitudes
     t2_amplitudes_abab (numpy.ndarray, optional): Alpha-beta T2 amplitudes
@@ -1063,14 +1058,13 @@ Parameters:
     two_rdm_spin_traced (numpy.ndarray, optional): Spin-traced two-particle RDM
 
 Examples:
-    >>> ref = qdk.chemistry.Configuration("33221100")
     >>> t1_aa = np.array([...])
     >>> t2_abab = np.array([...])
     >>> one_rdm = np.array([...])
     >>> container = qdk.chemistry.CoupledClusterContainer(
-    ...     orbitals, [ref], t1_aa, None, t2_abab, None, None, one_rdm, None)
+    ...     orbitals, wfn, t1_aa, None, t2_abab, None, None, one_rdm, None)
         )",
-           py::arg("orbitals"), py::arg("references"),
+           py::arg("orbitals"), py::arg("wavefunction"),
            py::arg("t1_amplitudes_aa") = std::nullopt,
            py::arg("t1_amplitudes_bb") = std::nullopt,
            py::arg("t2_amplitudes_abab") = std::nullopt,
@@ -1079,15 +1073,15 @@ Examples:
            py::arg("one_rdm_spin_traced") = std::nullopt,
            py::arg("two_rdm_spin_traced") = std::nullopt)
 
-      .def("get_references", &CoupledClusterContainer::get_references,
+      .def("get_wavefunction", &CoupledClusterContainer::get_wavefunction,
            R"(
-Get all reference determinants.
+Get reference to Wavefunction.
 
 Returns:
-    list of Configuration: Vector of all reference determinants
+    Wavefunction: Shared pointer to Wavefunction
 
 Examples:
-    >>> dets = wf.get_references()
+    >>> wfn = cc_container.get_wavefunction()
         )",
            py::return_value_policy::reference_internal)
 
@@ -1157,35 +1151,22 @@ Examples:
       R"(
     MP2 wavefunction container implementation.
     )")
-      .def(py::init<std::shared_ptr<Hamiltonian>,
-                    const std::vector<Configuration>&, const std::string&>(),
+      .def(py::init<std::shared_ptr<Hamiltonian>, std::shared_ptr<Wavefunction>,
+                    const std::string&>(),
            R"(
 Constructs an MP2 wavefunction container.
 
 Parameters:
     hamiltonian (Hamiltonian): Shared pointer to the Hamiltonian
-    references (list of Configuration): Reference determinant(s) for the MP2
-    wavefunction
+    wavefunction (Wavefunction): Shared pointer to the Wavefunction
     partitioning (str, optional): Choice of partitioning in perturbation theory (default: "mp")
 
 Examples:
-    >>> ref = qdk.chemistry.Configuration("33221100")
     >>> container = qdk.chemistry.MP2Container(
-    ...     hamiltonian, [ref], "mp")
+    ...     hamiltonian, wfn, "mp")
         )",
-           py::arg("hamiltonian"), py::arg("references"),
+           py::arg("hamiltonian"), py::arg("wavefunction"),
            py::arg("partitioning") = "mp")
-      .def("get_references", &MP2Container::get_references,
-           R"(
-Get all reference determinants.
-
-Returns:
-    list of Configuration: Vector of all reference determinants
-
-Examples:
-    >>> dets = mp2_container.get_references()
-        )",
-           py::return_value_policy::reference_internal)
 
       .def("get_hamiltonian", &MP2Container::get_hamiltonian,
            R"(
@@ -1196,6 +1177,18 @@ Returns:
 
 Examples:
     >>> ham = mp2_container.get_hamiltonian()
+        )",
+           py::return_value_policy::reference_internal)
+
+      .def("get_wavefunction", &MP2Container::get_wavefunction,
+           R"(
+Get reference to Wavefunction.
+
+Returns:
+    Wavefunction: Shared pointer to Wavefunction
+
+Examples:
+    >>> wfn = mp2_container.get_wavefunction()
         )",
            py::return_value_policy::reference_internal)
 

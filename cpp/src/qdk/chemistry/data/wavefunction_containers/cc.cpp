@@ -342,6 +342,11 @@ std::shared_ptr<Orbitals> CoupledClusterContainer::get_orbitals() const {
   return _orbitals;
 }
 
+std::shared_ptr<Wavefunction> CoupledClusterContainer::get_wavefunction()
+    const {
+  return _wavefunction;
+}
+
 const CoupledClusterContainer::VectorVariant&
 CoupledClusterContainer::get_coefficients() const {
   throw std::runtime_error(
@@ -354,15 +359,6 @@ CoupledClusterContainer::ScalarVariant CoupledClusterContainer::get_coefficient(
   throw std::runtime_error(
       "get_coefficient() is not implemented for coupled cluster "
       "wavefunctions. ");
-}
-
-const CoupledClusterContainer::DeterminantVector&
-CoupledClusterContainer::get_references() const {
-  if (!_determinant_vector_cache) {
-    _determinant_vector_cache = std::make_unique<DeterminantVector>(
-        _wavefunction->get_total_determinants());
-  }
-  return *_determinant_vector_cache;
 }
 
 const CoupledClusterContainer::DeterminantVector&
@@ -689,7 +685,7 @@ std::pair<size_t, size_t> CoupledClusterContainer::get_total_num_electrons()
 
 std::pair<size_t, size_t> CoupledClusterContainer::get_active_num_electrons()
     const {
-  const auto& determinants = get_references();
+  const auto& determinants = _wavefunction->get_total_determinants();
   if (determinants.empty()) {
     throw std::runtime_error("No determinants available");
   }
@@ -699,7 +695,7 @@ std::pair<size_t, size_t> CoupledClusterContainer::get_active_num_electrons()
 
 std::pair<Eigen::VectorXd, Eigen::VectorXd>
 CoupledClusterContainer::get_total_orbital_occupations() const {
-  const auto& determinants = get_references();
+  const auto& determinants = _wavefunction->get_total_determinants();
   if (determinants.empty()) {
     throw std::runtime_error("No determinants available");
   }

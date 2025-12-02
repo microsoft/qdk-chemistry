@@ -48,6 +48,10 @@ std::shared_ptr<Hamiltonian> MP2Container::get_hamiltonian() const {
   return _hamiltonian;
 }
 
+std::shared_ptr<Wavefunction> MP2Container::get_wavefunction() const {
+  return _wavefunction;
+}
+
 const MP2Container::VectorVariant& MP2Container::get_coefficients() const {
   throw std::runtime_error(
       "get_coefficients() is not implemented for MP2 wavefunctions.");
@@ -57,14 +61,6 @@ MP2Container::ScalarVariant MP2Container::get_coefficient(
     const Configuration& det) const {
   throw std::runtime_error(
       "get_coefficient() is not implemented for MP2 wavefunctions.");
-}
-
-const MP2Container::DeterminantVector& MP2Container::get_references() const {
-  if (!_determinant_vector_cache) {
-    _determinant_vector_cache = std::make_unique<DeterminantVector>(
-        _wavefunction->get_total_determinants());
-  }
-  return *_determinant_vector_cache;
 }
 
 const MP2Container::DeterminantVector& MP2Container::get_active_determinants()

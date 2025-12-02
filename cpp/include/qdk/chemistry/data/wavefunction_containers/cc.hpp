@@ -210,6 +210,12 @@ class CoupledClusterContainer : public WavefunctionContainer {
   std::shared_ptr<Orbitals> get_orbitals() const override;
 
   /**
+   * @brief Get reference to wavefunction
+   * @return Shared pointer to wavefunction
+   */
+  std::shared_ptr<Wavefunction> get_wavefunction() const;
+
+  /**
    * @brief Not implemented for CC wavefunctions
    */
   const VectorVariant& get_coefficients() const override;
@@ -223,12 +229,6 @@ class CoupledClusterContainer : public WavefunctionContainer {
    * @brief Not implemented for CC wavefunctions
    */
   const DeterminantVector& get_active_determinants() const override;
-
-  /**
-   * @bref Get reference determinants of the CC wavefunction
-   * @return Vector of reference configurations/determinants
-   */
-  const DeterminantVector& get_references() const;
 
   /**
    * @brief Get T1 amplitudes
