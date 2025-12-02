@@ -1,4 +1,4 @@
-Functionals and basis sets
+Functionals and Basis Sets
 ==========================
 
 In the following sections, we provide lists of the basis sets
@@ -8,7 +8,8 @@ QDK/Chemistry's built-in implementations.
 Additional features may be available through plugins; see the
 :doc:`Plugins <plugins>` documentation for more information.
 
-Available basis sets
+.. _available_basis_sets:
+Available Basis Sets
 --------------------
 
 The following keywords are supported for the corresponding basis sets:

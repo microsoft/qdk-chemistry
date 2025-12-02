@@ -1,4 +1,4 @@
-Basis set
+BasisSet
 =========
 
 The :class:`~qdk_chemistry.data.BasisSet` class in QDK/Chemistry represents a collection of basis functions used to describe the electronic structure of molecules.

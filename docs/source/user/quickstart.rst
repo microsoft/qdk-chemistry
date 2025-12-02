@@ -53,7 +53,7 @@ See the :doc:`comprehensive/design/factory_pattern` documentation for more infor
 
 The inputs for an :term:`SCF` calculation are a :doc:`comprehensive/data/structure` object, the charge and multiplicity of the molecular system, and information about the single-particle basis to be used.
 Optionally, :doc:`comprehensive/design/settings` specific to the particular :doc:`comprehensive/algorithms/scf_solver` can be configured by accessing the ``settings()`` method.
-The basis for the :term:`SCF` calculation can be set via a string input, a custom basis set or initial orbitals can also be provided.
+The basis for the :term:`SCF` calculation can be set via a string input (specifying one of the :ref:`available_basis_sets`), a custom :doc:`comprehensive/data/basis_set` or initial :doc:`comprehensive/data/orbitals` can also be provided.
 See below for language-specific examples.
 
 .. tab:: C++ API
@@ -80,7 +80,8 @@ For this reason, both localization (orbital manipulation) and active space selec
 QDK/Chemistry offers many methods for the selection of active spaces to reduce the problem size:  accurately modeling the quantum many-body problem while avoiding the prohibitive computational scaling of full configuration interaction.
 See the :doc:`comprehensive/algorithms/active_space` documentation for a list of supported methods, along with their associated :doc:`comprehensive/design/settings`, which accompany the standard QDK/Chemistry distribution.
 
-The following are language-specific examples of how to select a so-called "valence" active space containing a subset of only those orbitals surrounding the Fermi level.
+The following are language-specific examples of how to select a so-called "valence" active space containing a subset of only those orbitals surrounding the Fermi level - in this
+case 6 electrons in 6 orbitals (6e, 6o).
 
 .. tab:: C++ API
 
@@ -102,7 +103,8 @@ Calculate the Hamiltonian
 
 Once an active space has been selected, the electronic Hamiltonian can be computed within that active space to describe the energetic interactions between electrons.
 QDK/Chemistry provides flexible Hamiltonian construction capabilities through the :doc:`comprehensive/algorithms/hamiltonian_constructor` algorithm.
-The Hamiltonian constructor can generate the one- and two-electron integrals needed for subsequent quantum many-body calculations.
+The Hamiltonian constructor can generate the one- and two-electron integrals (or factorizations thereof) needed for subsequent quantum
+many-body calculations and quantum algorithms.
 
 .. tab:: C++ API
 
@@ -118,14 +120,20 @@ The Hamiltonian constructor can generate the one- and two-electron integrals nee
       :start-after: # start-cell-hamiltonian-constructor
       :end-before: # end-cell-hamiltonian-constructor
 
-Compute a multi-configuration wavefunction for the active space
+Compute a multi-configurational wavefunction for the active space
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 With the active space Hamiltonian constructed, quantum many-body calculations
 can be performed to obtain accurate electronic energies and wavefunctions.
-QDK/Chemistry supports various Multi-Configuration (MC) methods including full
-Configuration Interaction (CI) and selected :term:`CI` approaches.
-:term:`MC` calculations are performed via instantiations of the :doc:`comprehensive/algorithms/mc_calculator` algorithm.
+QDK/Chemistry supports various Multi-Configuration (MC) methods including Complete Active Space
+Configuration Interaction (CASCI) and selected :term:`CI` approaches.
+:term:`MC` calculations are performed via instantiations of the :doc:`comprehensive/algorithms/mc_calculator` algorithm,
+which takes as input an instance of an active space :doc:`comprehensive/data/hamiltonian`, and the number of alpha and beta
+electrons, and produces as output a :class:`~qdk_chemistry.data.Wavefunction` representing the multi-configurational state
+as well as its associated energy.
+
+In the following example, as the aforementationed (6e, 6o) active space is relatively small, we perform a CASCI calculation to obtain
+the exact ground state wavefunction within the active space.
 
 .. tab:: C++ API
 
@@ -145,8 +153,9 @@ Select important configurations
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 For large active spaces, the multi-configuration :class:`~qdk_chemistry.data.Wavefunction` may contain thousands or millions of configurations, but often only a small subset contributes significantly to the overall state.
-By identifying and retaining only the dominant configurations (those with the largest amplitudes), we can create a sparse wavefunction that maintains high fidelity with the original while dramatically reducing computational requirements for quantum state preparation.
-This truncation is characterized by computing the overlap between the truncated state and the full wavefunction, and by recalculating the energy of the reduced wavefunction using the :doc:`comprehensive/algorithms/pmc`.
+By identifying and retaining only the dominant configurations (those with the largest amplitudes), we can create a sparse wavefunction that maintains high fidelity with respect to the original Wavefunction while dramatically
+reducing computational requirements for quantum state preparation.
+This truncation is characterized by computing the overlap between the truncated state and the full wavefunction, and by recalculating the energy of the sparse wavefunction using the :doc:`comprehensive/algorithms/pmc`.
 
 .. tab:: C++ API
 

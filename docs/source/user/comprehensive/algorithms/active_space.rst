@@ -1,4 +1,4 @@
-Active space selection
+Active Space Selection
 ======================
 
 .. note::
