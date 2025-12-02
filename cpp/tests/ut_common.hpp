@@ -51,8 +51,9 @@ inline static constexpr double small_value_lower_bound_tolerance = 1e-16;
 ///@brief Tolerance upper bound for extremely small values
 inline static constexpr double small_value_upper_bound_tolerance = 1e-14;
 
-///@brief Tolerance for per-element double comparisons
-inline static constexpr double double_tolerance = 1e-13;
+///@brief Tolerance for comparing doubles
+inline static constexpr double double_tolerance =
+    std::numeric_limits<double>::epsilon();
 
 using namespace qdk::chemistry::data;
 

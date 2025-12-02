@@ -20,7 +20,6 @@
 #include <qdk/chemistry/data/wavefunction_containers/sd.hpp>
 
 #include "ut_common.hpp"
-
 using namespace qdk::chemistry::data;
 using namespace qdk::chemistry::algorithms;
 
@@ -1226,26 +1225,57 @@ TEST_F(HamiltonianTest, IntegralSymmetriesEnergiesO2Singlet) {
       << ", diff=" << std::abs(rmp2_energy - ump2_energy);
 
   // Verify integral symmetries aaaa == bbbb
-  const auto& [aaaa_integrals, aabb_integrals_temp, bbbb_integrals] =
+  const auto& [aaaa_integrals, aabb_integrals, bbbb_integrals] =
       uhf_hamiltonian->get_two_body_integrals();
 
-  EXPECT_TRUE(
-      aaaa_integrals.isApprox(bbbb_integrals, testing::scf_energy_tolerance))
-      << "Alpha-alpha and beta-beta integrals should be identical for "
-         "closed-shell O2";
+  // Elementwise comparison for aaaa == bbbb integrals
+  EXPECT_EQ(aaaa_integrals.size(), bbbb_integrals.size())
+      << "Alpha-alpha and beta-beta integral sizes should match";
+  for (int i = 0; i < aaaa_integrals.size(); ++i) {
+    double diff = std::abs(aaaa_integrals[i] - bbbb_integrals[i]);
+    EXPECT_LT(diff, testing::double_tolerance)
+        << "Alpha-alpha and beta-beta integrals should be identical."
+           ". Difference: "
+        << diff;
+  }
 
   // Verify one-body integral symmetries alpha == beta
   const auto& [alpha_one_body, beta_one_body] =
       uhf_hamiltonian->get_one_body_integrals();
 
-  EXPECT_TRUE(
-      alpha_one_body.isApprox(beta_one_body, testing::scf_energy_tolerance))
-      << "Alpha and beta one-body integrals should be identical for "
-         "closed-shell O2";
+  // Elementwise comparison for alpha == beta one-body integrals
+  EXPECT_EQ(alpha_one_body.rows(), beta_one_body.rows())
+      << "Alpha and beta one-body integral dimensions should match";
+  EXPECT_EQ(alpha_one_body.cols(), beta_one_body.cols())
+      << "Alpha and beta one-body integral dimensions should match";
+  for (int i = 0; i < alpha_one_body.rows(); ++i) {
+    for (int j = 0; j < alpha_one_body.cols(); ++j) {
+      double diff = std::abs(alpha_one_body(i, j) - beta_one_body(i, j));
+      EXPECT_LT(diff, testing::double_tolerance)
+          << "Alpha and beta one-body integrals should be identical for "
+             "closed-shell O2."
+             "Difference: "
+          << diff;
+    }
+  }
+
+  // Verify that restricted and unrestricted Hamiltonians are consistent
+  // The restricted integrals should match the aabb integrals
+  const auto& [restricted_aaaa, restricted_aabb, restricted_bbbb] =
+      rhf_hamiltonian->get_two_body_integrals();
+
+  // Elementwise comparison for restricted aaaa == unrestricted aabb integrals
+  EXPECT_EQ(restricted_aaaa.size(), aabb_integrals.size())
+      << "Restricted aaaa and unrestricted aabb integral sizes should match";
+  for (int i = 0; i < restricted_aaaa.size(); ++i) {
+    double diff = std::abs(restricted_aaaa[i] - aabb_integrals[i]);
+    EXPECT_LT(diff, testing::double_tolerance)
+        << "Integrals should be identical. "
+           ". Difference: "
+        << diff;
+  }
 
   // Verify aabb == bbaa symmetry
-  const auto& aabb_integrals = aabb_integrals_temp;
-
   // Get active space size to determine integral tensor dimensions
   size_t active_space_size;
   auto [alpha_active, beta_active] =
@@ -1268,24 +1298,13 @@ TEST_F(HamiltonianTest, IntegralSymmetriesEnergiesO2Singlet) {
           double klij = aabb_integrals[get_integral_index(k, l, i, j)];
           double diff = std::abs(ijkl - klij);
           EXPECT_LT(diff, testing::double_tolerance)
-              << "Symmetry violation for aabb[" << i << "," << j << "," << k
-              << "," << l << "] vs aabb[" << k << "," << l << "," << i << ","
-              << j << "]. "
+              << "Symmetry violation for particle exchange. "
               << "Difference: " << diff << " exceeds tolerance "
               << testing::double_tolerance;
         }
       }
     }
   }
-
-  // Verify that restricted and unrestricted Hamiltonians are consistent
-  // The restricted integrals should match the aabb integrals
-  const auto& [restricted_aaaa, restricted_aabb, restricted_bbbb] =
-      rhf_hamiltonian->get_two_body_integrals();
-  EXPECT_TRUE(
-      restricted_aaaa.isApprox(aabb_integrals, testing::double_tolerance))
-      << "aaaa integrals should match aabb integrals for "
-         "closed-shell systems";
 }
 
 TEST_F(HamiltonianTest, MixedIntegralSymmetriesO2Triplet) {
@@ -1318,11 +1337,11 @@ TEST_F(HamiltonianTest, MixedIntegralSymmetriesO2Triplet) {
   auto [alpha_active, beta_active] = orbitals->get_active_space_indices();
   size_t active_space_size = alpha_active.size();
 
-  auto get_index = [active_space_size](size_t i, size_t j, size_t k,
-                                       size_t l) -> size_t {
+  auto get_index = [active_space_size](size_t i, size_t j, size_t a,
+                                       size_t b) -> size_t {
     return i * active_space_size * active_space_size * active_space_size +
-           j * active_space_size * active_space_size + k * active_space_size +
-           l;
+           j * active_space_size * active_space_size + a * active_space_size +
+           b;
   };
 
   // Test mixed integral symmetries: ijab == jiab == ijba == jiba
@@ -1342,17 +1361,17 @@ TEST_F(HamiltonianTest, MixedIntegralSymmetriesO2Triplet) {
           double diff3 = std::abs(ijab - jiba);
 
           EXPECT_LT(diff1, testing::double_tolerance)
-              << "Symmetry violation."
+              << "Symmetry violation for ijab=jiab."
               << "Difference: " << diff1 << " exceeds tolerance "
               << testing::double_tolerance;
 
           EXPECT_LT(diff2, testing::double_tolerance)
-              << "Symmetry violation."
+              << "Symmetry violation for ijab=ijba."
               << "Difference: " << diff2 << " exceeds tolerance "
               << testing::double_tolerance;
 
           EXPECT_LT(diff3, testing::double_tolerance)
-              << "Symmetry violation."
+              << "Symmetry violation for ijab=jiba."
               << "Difference: " << diff3 << " exceeds tolerance "
               << testing::double_tolerance;
         }
