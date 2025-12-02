@@ -11,27 +11,31 @@ assemble the circuits required by the chosen phase estimation variant.
 # Licensed under the MIT License. See LICENSE.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
 
+from __future__ import annotations
+
 from abc import ABC
-from collections.abc import Iterable
 from enum import StrEnum
 from typing import TYPE_CHECKING, TypeVar, cast
 
-from qiskit import QuantumCircuit
+if TYPE_CHECKING:
+    from collections.abc import Iterable
 
-if TYPE_CHECKING:  # pragma: no cover - import only needed for type checking
+    from qiskit import QuantumCircuit
+
     from qdk_chemistry.data import QubitHamiltonian
 
 AlgorithmT = TypeVar("AlgorithmT", bound="PhaseEstimation")
+
+__all__: list[str] = []
 
 
 class PhaseEstimationAlgorithm(StrEnum):
     """Enumeration of supported phase estimation routines.
 
     References:
-        Iterative QPE: Kitaev, A. (1995). "Quantum measurements and the Abelian
-            Stabilizer Problem." arXiv:quant-ph/9511026.
-            https://arxiv.org/abs/quant-ph/9511026
-        Traditional QPE: Nielsen, M. A., & Chuang, I. L. (2010). "Quantum Computation
+        * Iterative QPE: Kitaev, A. (1995). "Quantum measurements and the Abelian
+            Stabilizer Problem." arXiv:quant-ph/9511026. https://arxiv.org/abs/quant-ph/9511026
+        * Traditional QPE: Nielsen, M. A., & Chuang, I. L. (2010). "Quantum Computation
             and Quantum Information" (10th Anniversary Edition), Ch. 5.2.
 
     """
@@ -45,20 +49,19 @@ class PhaseEstimation(ABC):  # noqa: B024
 
     algorithm: PhaseEstimationAlgorithm | None = None
 
-    def __init__(self, hamiltonian: "QubitHamiltonian", evolution_time: float):
+    def __init__(self, hamiltonian: QubitHamiltonian, evolution_time: float):
         """Store common data for phase estimation routines.
 
         Args:
             hamiltonian: Target Hamiltonian whose eigenvalues are estimated.
-            evolution_time: Time parameter ``t`` used in the time-evolution
-                unitary ``U = exp(-i H t)``.
+            evolution_time: Time parameter ``t`` used in the time-evolution unitary ``U = exp(-i H t)``.
 
         """
         self._hamiltonian = hamiltonian
         self._evolution_time = evolution_time
 
     @property
-    def hamiltonian(self) -> "QubitHamiltonian":
+    def hamiltonian(self) -> QubitHamiltonian:
         """Return the Hamiltonian used by the algorithm."""
         return self._hamiltonian
 
@@ -72,19 +75,20 @@ class PhaseEstimation(ABC):  # noqa: B024
         cls: type[AlgorithmT],
         algorithm: PhaseEstimationAlgorithm | str | None,
         *,
-        hamiltonian: "QubitHamiltonian",
+        hamiltonian: QubitHamiltonian,
         evolution_time: float,
         **kwargs,
     ) -> AlgorithmT:
         """Factory method returning the requested phase estimation strategy.
 
         Args:
-            algorithm: Identifier for the desired algorithm.  ``None`` selects
-                :class:`PhaseEstimationAlgorithm.ITERATIVE`.
+            algorithm: Identifier for the desired algorithm.
+
+                ``None`` selects :class:`PhaseEstimationAlgorithm.ITERATIVE`.
+
             hamiltonian: Target Hamiltonian.
             evolution_time: Time parameter ``t`` for ``U = exp(-i H t)``.
-            **kwargs: Additional options forwarded to the algorithm
-                constructor.
+            kwargs: Additional options forwarded to the algorithm constructor.
 
         Raises:
             ValueError: If the requested algorithm is not registered.
@@ -110,7 +114,7 @@ class PhaseEstimation(ABC):  # noqa: B024
             raise ValueError(f"Unrecognized phase estimation algorithm '{algorithm}'.") from exc
 
     @classmethod
-    def _iter_subclasses(cls) -> Iterable[type["PhaseEstimation"]]:
+    def _iter_subclasses(cls) -> Iterable[type[PhaseEstimation]]:
         for subclass in cls.__subclasses__():
             yield subclass
             yield from subclass._iter_subclasses()  # noqa: SLF001

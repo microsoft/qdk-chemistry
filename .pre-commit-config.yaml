@@ -33,6 +33,10 @@ repos:
     files: *linted_files
   - id: detect-private-key
 
+- repo: https://github.com/sphinx-contrib/sphinx-lint
+  rev: v1.0.2
+  hooks:
+  - id: sphinx-lint
 
 - repo: https://github.com/gitleaks/gitleaks
   rev: v8.24.2

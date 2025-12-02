@@ -42,6 +42,7 @@ Acronym definitions
 
    MACIS
       Many-body Adaptive Configuration Interaction Solver.
+      See :cite:`Williams-Young2023` for more details.
 
    MC
       Multi-Configuration.

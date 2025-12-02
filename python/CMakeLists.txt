@@ -98,6 +98,9 @@ pybind11_add_module(_core
 # Link against the qdk::chemistry library
 target_link_libraries(_core PRIVATE qdk::chemistry)
 
+# Add cpp/src to include path for accessing private implementation headers
+target_include_directories(_core PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/../cpp/src")
+
 # C++20
 target_compile_features(_core PUBLIC cxx_std_20)
 

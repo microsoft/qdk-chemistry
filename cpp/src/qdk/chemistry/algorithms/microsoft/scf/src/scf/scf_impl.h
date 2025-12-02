@@ -7,12 +7,11 @@
 #include <qdk/chemistry/scf/core/eri.h>
 #include <qdk/chemistry/scf/core/molecule.h>
 #include <qdk/chemistry/scf/core/scf.h>
+#include <qdk/chemistry/scf/core/scf_algorithm.h>
 #include <qdk/chemistry/scf/core/types.h>
 #include <qdk/chemistry/scf/util/int1e.h>
 
 #include <memory>
-
-#include "scf/diis.h"
 
 #ifdef QDK_CHEMISTRY_ENABLE_PCM
 #include "pcm/pcm.h"
@@ -21,6 +20,7 @@
 #include "scf/soad.h"
 
 namespace qdk::chemistry::scf {
+
 /**
  * @brief SCF implementation base class
  *
@@ -141,6 +141,31 @@ class SCFImpl {
    */
   int get_num_density_matrices() const { return num_density_matrices_; }
 
+  /**
+   * @brief Get the orthogonalization matrix
+   * @return Reference to the orthogonalization matrix X
+   */
+  const RowMajorMatrix& get_orthogonalization_matrix() const { return X_; }
+
+  /**
+   * @brief Get mutable reference to density matrix for modification
+   * @return Mutable reference to density matrix P
+   */
+  RowMajorMatrix& density_matrix() { return P_; }
+
+  /**
+   * @brief Get mutable reference to molecular orbital coefficients for
+   * modification
+   * @return Mutable reference to coefficient matrix C
+   */
+  RowMajorMatrix& orbitals_matrix() { return C_; }
+
+  /**
+   * @brief Get mutable reference to orbital eigenvalues for modification
+   * @return Mutable reference to eigenvalues
+   */
+  RowMajorMatrix& eigenvalues() { return eigenvalues_; }
+
  protected:
   /**
    * @brief Build one-electron integrals (overlap, kinetic, nuclear attraction)
@@ -169,7 +194,7 @@ class SCFImpl {
   double calc_nuclear_repulsion_energy_();
 
   /**
-   * @brief Perform the SCF optimization
+   * @brief Run SCF iteration using the configured algorithm
    */
   void iterate_();
 
@@ -211,14 +236,6 @@ class SCFImpl {
    * @return Total SCF energy (Hartree)
    */
   virtual double total_energy_();
-
-  /**
-   * @brief Update density matrix from new MOs
-   *
-   * @param F Fock matrix to diagonalize
-   * @param idx Density matrix index (0 for alpha or restricted, 1 for beta)
-   */
-  void update_density_matrix_(const RowMajorMatrix& F, int idx = 0);
 
   /**
    * @brief Get analytical energy gradients
@@ -303,9 +320,9 @@ class SCFImpl {
   SCFContext
       ctx_;  ///< SCF calculation context (config, molecule, basis, results)
   std::unique_ptr<OneBodyIntegral>
-      int1e_;                   ///< One-electron integral calculator
-  std::unique_ptr<DIIS> diis_;  ///< DIIS convergence accelerator
-  std::shared_ptr<ERI> eri_;    ///< Electron repulsion integral calculator
+      int1e_;                 ///< One-electron integral calculator
+  std::shared_ptr<ERI> eri_;  ///< Electron repulsion integral calculator
+  std::shared_ptr<SCFAlgorithm> scf_algorithm_;  ///< SCF convergence algorithm
 
 #ifdef QDK_CHEMISTRY_ENABLE_PCM
   std::unique_ptr<pcm::PCM> pcm_;  ///< Polarizable Continuum Model solver
