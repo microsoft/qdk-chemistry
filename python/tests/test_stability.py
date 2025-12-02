@@ -745,10 +745,10 @@ class TestStabilityWorkflow:
                 new_stability_checker = algorithms.create("stability_checker", stability_checker_name)
 
                 # Copy all settings from original solvers
-                scf_settings_map = scf_solver.settings().get_all_settings()
-                stability_settings_map = stability_checker.settings().get_all_settings()
-                new_scf_solver.settings().set_from_map(scf_settings_map)
-                new_stability_checker.settings().set_from_map(stability_settings_map)
+                scf_settings_map = scf_solver.settings().to_dict()
+                stability_settings_map = stability_checker.settings().to_dict()
+                new_scf_solver.settings().from_dict(scf_settings_map)
+                new_stability_checker.settings().from_dict(stability_settings_map)
 
                 # Update specific settings for unrestricted calculation
                 new_scf_solver.settings().set("reference_type", "unrestricted")
