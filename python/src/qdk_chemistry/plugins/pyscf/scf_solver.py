@@ -217,10 +217,7 @@ class PyscfScfSolver(ScfSolver):
             mf = scf.UKS(mol)
             mf.xc = method
         else:  # SCFType.AUTO
-            if mol.spin == 0:
-                mf = scf.RKS(mol)
-            else:
-                mf = scf.UKS(mol)
+            mf = scf.RKS(mol) if mol.spin == 0 else scf.UKS(mol)
             mf.xc = method
 
         # Configure convergence settings

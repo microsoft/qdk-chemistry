@@ -5,12 +5,9 @@
 # --------------------------------------------------------------------------------------------
 
 import numpy as np
-import pyscf
-from pyscf import mp
 
 from qdk_chemistry.algorithms import create
 from qdk_chemistry.data import Ansatz, Structure
-from qdk_chemistry.plugins.pyscf.utils import hamiltonian_to_scf_from_n_electrons_and_multiplicity
 
 from .reference_tolerances import mp2_energy_tolerance
 
@@ -72,7 +69,7 @@ class TestMP2Validation:
         # Create O2 molecule
         o2_molecule = create_o2_molecule(bond_length=2.3)
 
-        # QDK Chemistry UHF calculation 
+        # QDK Chemistry UHF calculation
         qdk_scf_solver = create("scf_solver")
         qdk_scf_solver.settings().set("basis_set", "cc-pvdz")
         qdk_scf_solver.settings().set("method", "hf")
@@ -86,13 +83,12 @@ class TestMP2Validation:
 
         # Create ansatz and use MP2Calculator
         ansatz = Ansatz(qdk_hamiltonian, hf_wavefunction)
-        
+
         # QDK UMP2 calculation
         mp2_calculator = create("dynamical_correlation_calculator", "qdk_mp2_calculator")
         qdk_ump2_total_energy, _ = mp2_calculator.run(ansatz)
         reference_energy = ansatz.calculate_energy()
         qdk_ump2_corr_energy = qdk_ump2_total_energy - reference_energy
-
 
         # Check energy equality for unrestricted
         assert abs(qdk_ump2_corr_energy - pyscf_ump2_corr_energy) < mp2_energy_tolerance, (
