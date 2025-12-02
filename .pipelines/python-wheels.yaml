@@ -73,9 +73,9 @@ extends:
           templateContext:
             outputs:
             - output: pipelineArtifact
-            - displayName: Upload Linux Python ${{ matrix.pythonVersion }} Wheels for ${{ target.march }}
-            - targetPath: $(System.DefaultWorkingDirectory)/qdk-chemistry/python/repaired_wheelhouse
-            - artifactName: linux-${{ target.arch }}-wheels-python${{ matrix.pythonVersion }}
+              displayName: Upload Linux Python $(pythonVersion) Wheels for ${{ target.march }}
+              targetPath: $(System.DefaultWorkingDirectory)/qdk-chemistry/python/repaired_wheelhouse
+              artifactName: linux-${{ target.arch }}-wheels-python$(pythonVersion)
           steps:
           # Build - x86_64
           - ${{ if eq(target.arch, 'x86_64') }}:
