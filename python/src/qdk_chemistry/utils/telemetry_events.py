@@ -100,7 +100,7 @@ def extract_data(result: Any) -> str:
             orbitals = qdk_data.orbitals
             # Check if get_basis_set method exists
             if hasattr(orbitals, "get_basis_set"):
-                n_basis = get_basis_functions_bucket(orbitals.get_basis_set().get_num_basis_functions())
+                n_basis = get_basis_functions_bucket(orbitals.get_basis_set().get_num_atomic_orbitals())
             else:
                 n_basis = "unknown"
 
