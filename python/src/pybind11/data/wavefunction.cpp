@@ -756,7 +756,7 @@ Args:
     coeffs (numpy.ndarray): The vector of CI coefficients (real or complex)
     dets (list[Configuration]): The vector of determinants
     orbitals (Orbitals): Shared pointer to orbital basis set
-    type (Optional[WavefunctionType]): Type of wavefunction (default: SelfDual)
+    type (WavefunctionType | None): Type of wavefunction (default: SelfDual)
 
 Examples:
     >>> import numpy as np
@@ -781,9 +781,9 @@ Args:
     coeffs (numpy.ndarray): The vector of CI coefficients (real or complex)
     dets (list[Configuration]): The vector of determinants
     orbitals (Orbitals): Shared pointer to orbital basis set
-    one_rdm_spin_traced (Optional[numpy.ndarray]): Spin-traced one-particle reduced density matrix
-    two_rdm_spin_traced (Optional[numpy.ndarray]): Spin-traced two-particle reduced density matrix
-    type (Optional[WavefunctionType]): Type of wavefunction (default: SelfDual)
+    one_rdm_spin_traced (numpy.ndarray | None): Spin-traced one-particle reduced density matrix
+    two_rdm_spin_traced (numpy.ndarray | None): Spin-traced two-particle reduced density matrix
+    type (WavefunctionType | None): Type of wavefunction (default: SelfDual)
 
 Examples:
     >>> import numpy as np
@@ -815,14 +815,14 @@ Args:
     coeffs (numpy.ndarray): The vector of CI coefficients (real or complex)
     dets (list[Configuration]): The vector of determinants
     orbitals (Orbitals): Shared pointer to orbital basis set
-    one_rdm_spin_traced (Optional[numpy.ndarray]): Spin-traced one-particle reduced density matrix
-    one_rdm_aa (Optional[numpy.ndarray]): Alpha-alpha block of one-particle RDM
-    one_rdm_bb (Optional[numpy.ndarray]): Beta-beta block of one-particle RDM
-    two_rdm_spin_traced (Optional[numpy.ndarray]): Spin-traced two-particle reduced density matrix
-    two_rdm_aabb (Optional[numpy.ndarray]): Alpha-beta-beta-alpha block of two-particle RDM
-    two_rdm_aaaa (Optional[numpy.ndarray]): Alpha-alpha-alpha-alpha block of two-particle RDM
-    two_rdm_bbbb (Optional[numpy.ndarray]): Beta-beta-beta-beta block of two-particle RDM
-    type (Optional[WavefunctionType]): Type of wavefunction (default: SelfDual)
+    one_rdm_spin_traced (numpy.ndarray | None): Spin-traced one-particle reduced density matrix
+    one_rdm_aa (numpy.ndarray | None): Alpha-alpha block of one-particle RDM
+    one_rdm_bb (numpy.ndarray | None): Beta-beta block of one-particle RDM
+    two_rdm_spin_traced (numpy.ndarray | None): Spin-traced two-particle reduced density matrix
+    two_rdm_aabb (numpy.ndarray | None): Alpha-beta-beta-alpha block of two-particle RDM
+    two_rdm_aaaa (numpy.ndarray | None): Alpha-alpha-alpha-alpha block of two-particle RDM
+    two_rdm_bbbb (numpy.ndarray | None): Beta-beta-beta-beta block of two-particle RDM
+    type (WavefunctionType | None): Type of wavefunction (default: SelfDual)
 
 Examples:
     >>> import numpy as np
@@ -867,7 +867,7 @@ Args:
     coeffs (numpy.ndarray): The vector of CI coefficients (real or complex)
     dets (list[Configuration]): The vector of determinants
     orbitals (Orbitals): Shared pointer to orbital basis set
-    type (Optional[WavefunctionType]): Type of wavefunction (default: SelfDual)
+    type (WavefunctionType | None): Type of wavefunction (default: SelfDual)
 
 Examples:
     >>> import numpy as np
@@ -892,9 +892,9 @@ Args:
     coeffs (numpy.ndarray): The vector of CI coefficients (real or complex)
     dets (list[Configuration]): The vector of determinants
     orbitals (Orbitals): Shared pointer to orbital basis set
-    one_rdm_spin_traced (Optional[numpy.ndarray]): Spin-traced one-particle reduced density matrix
-    two_rdm_spin_traced (Optional[numpy.ndarray]): Spin-traced two-particle reduced density matrix
-    type (Optional[WavefunctionType]): Type of wavefunction (default: SelfDual)
+    one_rdm_spin_traced (numpy.ndarray | None): Spin-traced one-particle reduced density matrix
+    two_rdm_spin_traced (numpy.ndarray | None): Spin-traced two-particle reduced density matrix
+    type (WavefunctionType | None): Type of wavefunction (default: SelfDual)
 
 Examples:
     >>> import numpy as np
@@ -926,14 +926,14 @@ Args:
     coeffs (numpy.ndarray): The vector of CI coefficients (real or complex)
     dets (list[Configuration]): The vector of determinants
     orbitals (Orbitals): Shared pointer to orbital basis set
-    one_rdm_spin_traced (Optional[numpy.ndarray]): Spin-traced one-particle reduced density matrix
-    one_rdm_aa (Optional[numpy.ndarray]): Alpha-alpha block of one-particle RDM
-    one_rdm_bb (Optional[numpy.ndarray]): Beta-beta block of one-particle RDM
-    two_rdm_spin_traced (Optional[numpy.ndarray]): Spin-traced two-particle reduced density matrix
-    two_rdm_aabb (Optional[numpy.ndarray]): Alpha-beta-beta-alpha block of two-particle RDM
-    two_rdm_aaaa (Optional[numpy.ndarray]): Alpha-alpha-alpha-alpha block of two-particle RDM
-    two_rdm_bbbb (Optional[numpy.ndarray]): Beta-beta-beta-beta block of two-particle RDM
-    type (Optional[WavefunctionType]): Type of wavefunction (default: SelfDual)
+    one_rdm_spin_traced (numpy.ndarray | None): Spin-traced one-particle reduced density matrix
+    one_rdm_aa (numpy.ndarray | None): Alpha-alpha block of one-particle RDM
+    one_rdm_bb (numpy.ndarray | None): Beta-beta block of one-particle RDM
+    two_rdm_spin_traced (numpy.ndarray | None): Spin-traced two-particle reduced density matrix
+    two_rdm_aabb (numpy.ndarray | None): Alpha-beta-beta-alpha block of two-particle RDM
+    two_rdm_aaaa (numpy.ndarray | None): Alpha-alpha-alpha-alpha block of two-particle RDM
+    two_rdm_bbbb (numpy.ndarray | None): Beta-beta-beta-beta block of two-particle RDM
+    type (WavefunctionType | None): Type of wavefunction (default: SelfDual)
 
 Examples:
     >>> import numpy as np
@@ -973,7 +973,7 @@ Constructs a single Slater determinant wavefunction container.
 Args:
     det (Configuration): The single determinant configuration
     orbitals (Orbitals): Shared pointer to orbital basis set
-    type (Optional[WavefunctionType]): Type of wavefunction (default: Both)
+    type (WavefunctionType | None): Type of wavefunction (default: Both)
 
 Examples:
     >>> det = qdk_chemistry.Configuration("33221100")
