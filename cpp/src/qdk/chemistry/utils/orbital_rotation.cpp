@@ -9,7 +9,8 @@
 #include <qdk/chemistry/algorithms/stability.hpp>
 #include <qdk/chemistry/utils/orbital_rotation.hpp>
 #include <stdexcept>
-#include <unsupported/Eigen/MatrixFunctions>
+
+#include "../algorithms/microsoft/scf/src/util/matrix_exp.h"
 
 namespace qdk::chemistry::utils {
 
@@ -88,14 +89,17 @@ Eigen::MatrixXd rotate_mo(const Eigen::MatrixXd& mo_coeff,
   Eigen::MatrixXd dr = unpack_rotation_vector(rotation_vector, mask);
 
   // Compute unitary rotation matrix via matrix exponential
-  Eigen::MatrixXd u = dr.exp();
+  const int num_molecular_orbitals = static_cast<int>(dr.cols());
+  Eigen::MatrixXd u =
+      Eigen::MatrixXd::Zero(num_molecular_orbitals, num_molecular_orbitals);
+  qdk::chemistry::scf::matrix_exp(dr.data(), u.data(), num_molecular_orbitals);
 
   // Apply rotation to MO coefficients using BLAS
-  Eigen::MatrixXd rotated_coeff(mo_coeff.rows(), u.cols());
+  Eigen::MatrixXd rotated_coeff(mo_coeff.rows(), num_molecular_orbitals);
   blas::gemm(blas::Layout::ColMajor, blas::Op::NoTrans, blas::Op::NoTrans,
-             mo_coeff.rows(), u.cols(), mo_coeff.cols(), 1.0, mo_coeff.data(),
-             mo_coeff.rows(), u.data(), u.rows(), 0.0, rotated_coeff.data(),
-             rotated_coeff.rows());
+             mo_coeff.rows(), num_molecular_orbitals, mo_coeff.cols(), 1.0,
+             mo_coeff.data(), mo_coeff.rows(), u.data(), u.rows(), 0.0,
+             rotated_coeff.data(), rotated_coeff.rows());
 
   return rotated_coeff;
 }
@@ -211,8 +215,8 @@ run_scf_with_stability_workflow(
     int spin_multiplicity, const std::string& scf_solver_name,
     const std::string& stability_checker_name,
     std::optional<std::shared_ptr<data::Orbitals>> initial_guess,
-    int max_stability_iterations, double stability_tolerance,
-    const std::string& reference_type) {
+    const std::string& reference_type, int max_stability_iterations,
+    double stability_tolerance, double davidson_tolerance, int nroots) {
   if (!structure) {
     throw std::invalid_argument("Structure cannot be null");
   }
@@ -222,6 +226,8 @@ run_scf_with_stability_workflow(
 
   // Create SCF solver instance
   auto scf_solver = algorithms::ScfSolverFactory::create(scf_solver_name);
+  // if (scf_solver_name == "qdk") scf_solver->settings().set("enable_gdm",
+  // true);
   if (!scf_solver) {
     throw std::runtime_error("Failed to create SCF solver: " + scf_solver_name);
   }
@@ -243,6 +249,8 @@ run_scf_with_stability_workflow(
   }
 
   stability_checker->settings().set("stability_tolerance", stability_tolerance);
+  stability_checker->settings().set("davidson_tolerance", davidson_tolerance);
+  stability_checker->settings().set("nroots", nroots);
 
   spdlog::info(
       "Starting SCF with stability workflow: scf_solver={}, "
@@ -274,9 +282,7 @@ run_scf_with_stability_workflow(
 
   std::shared_ptr<data::StabilityResult> stability_result;
   bool is_stable = false;
-  int iteration = 0;
-
-  // Iterative stability check and orbital rotation
+  int iteration = 0;  // Iterative stability check and orbital rotation
   while (iteration < max_stability_iterations) {
     iteration++;
     spdlog::info("Stability check iteration {}/{}", iteration,
@@ -361,11 +367,16 @@ run_scf_with_stability_workflow(
       // stability_checker
       scf_solver = algorithms::ScfSolverFactory::create(scf_solver_name);
       scf_solver->settings().set("reference_type", "unrestricted");
+      // if (scf_solver_name == "qdk")
+      //   scf_solver->settings().set("enable_gdm", true);
       stability_checker =
           algorithms::StabilityCheckerFactory::create(stability_checker_name);
       stability_checker->settings().set("external", false);
       stability_checker->settings().set("stability_tolerance",
                                         stability_tolerance);
+      stability_checker->settings().set("davidson_tolerance",
+                                        davidson_tolerance);
+      stability_checker->settings().set("nroots", nroots);
     }
 
     // Restart SCF with rotated orbitals

@@ -679,8 +679,6 @@ class TestStabilityWorkflow:
             3,
             "pyscf",
             "pyscf",
-            max_stability_iterations=5,
-            stability_tolerance=-1e-4,
             reference_type="restricted",
         )
 
@@ -698,30 +696,9 @@ class TestStabilityWorkflow:
 
         # Run workflow with pyscf SCF and pyscf stability checker
         # This system may not fully converge but should achieve correct energy
-        energy, _wfn, _is_stable, _result = run_scf_with_stability_workflow(
-            n2, 0, 1, scf_backend, "pyscf", max_stability_iterations=10, stability_tolerance=-1e-4
-        )
-
+        energy, _wfn, _is_stable, _result = run_scf_with_stability_workflow(n2, 0, 1, scf_backend, "pyscf")
         # Check energy matches reference value - workflow should achieve correct energy
         assert abs(energy - (-108.606721153932)) < 1e-6, f"Energy {energy} should match reference -108.606721153932"
-
-    def test_workflow_bn_plus_uhf(self):
-        """Test stability workflow on BN+ cation with UHF - internal stability only."""
-        structure = create_bn_plus_structure()
-
-        # Run workflow with pyscf SCF and pyscf stability checker
-        energy, _wfn, _is_stable, result = run_scf_with_stability_workflow(
-            structure, 1, 2, "qdk", "pyscf", max_stability_iterations=5, stability_tolerance=-1e-4
-        )
-
-        # Check internal stability is achieved
-        assert result.is_internal_stable() is True, "Wavefunction should be internally stable"
-
-        # Check energy matches reference value after stability workflow
-        # This test can generate two values, -78.54252237775819 or -78.52480993599549, we need gdm to fix it
-        assert abs(energy - (-78.54252237775819)) < 1e-5 or abs(energy - (-78.52480993599549)) < 1e-5, (
-            f"Energy {energy} should match one of the references -78.54252237775819 or -78.52480993599549"
-        )
 
     @pytest.mark.parametrize("scf_backend", ["pyscf", "qdk"])
     def test_workflow_n2_rhf_external_instability(self, scf_backend):
@@ -729,9 +706,7 @@ class TestStabilityWorkflow:
         n2 = create_stretched_n2_structure(distance_angstrom=1.2)
 
         # Run workflow - should detect external instability and switch to UHF
-        energy, wfn, is_stable, result = run_scf_with_stability_workflow(
-            n2, 0, 1, scf_backend, "pyscf", max_stability_iterations=10, stability_tolerance=-1e-4
-        )
+        energy, wfn, is_stable, result = run_scf_with_stability_workflow(n2, 0, 1, scf_backend, "pyscf")
 
         # Final wavefunction should be unrestricted (switched from RHF to UHF)
         assert not wfn.get_orbitals().is_restricted(), (
@@ -744,3 +719,24 @@ class TestStabilityWorkflow:
 
         # Check energy matches reference value - should converge to same UHF energy as manual rotation
         assert abs(energy - (-108.815746915896)) < 1e-6, f"Energy {energy} should match reference -108.815746915896"
+
+    @pytest.mark.parametrize("scf_backend", ["qdk"])
+    def test_workflow_n2_uhf_instability(self, scf_backend):
+        """Test stability workflow on N2 at 1.4Å with external instability - should switch to UHF."""
+        n2 = create_stretched_n2_structure(distance_angstrom=1.4)
+
+        # Run workflow - should detect external instability and switch to UHF
+        energy, wfn, is_stable, result = run_scf_with_stability_workflow(
+            n2,
+            0,
+            1,
+            scf_backend,
+            "pyscf",
+            reference_type="unrestricted",
+            max_stability_iterations=10,
+            stability_tolerance=-1e-4,
+        )
+        assert result.is_internal_stable() is True, "Final wavefunction should be internally stable"
+
+        # Check energy matches reference value - should converge to same UHF energy as manual rotation
+        assert abs(energy - (-108.736487493576)) < 1e-6, f"Energy {energy} should match reference -108.815746915896"

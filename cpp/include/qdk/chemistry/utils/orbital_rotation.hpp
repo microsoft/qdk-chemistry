@@ -156,7 +156,8 @@ run_scf_with_stability_workflow(
     const std::string& stability_checker_name,
     std::optional<std::shared_ptr<qdk::chemistry::data::Orbitals>>
         initial_guess = std::nullopt,
+    const std::string& reference_type = "auto",
     int max_stability_iterations = 5, double stability_tolerance = -1e-4,
-    const std::string& reference_type = "auto");
+    double davidson_tolerance = 1e-4, int nroots = 3);
 
 }  // namespace qdk::chemistry::utils
