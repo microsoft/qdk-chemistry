@@ -15,19 +15,16 @@ from .telemetry import log_telemetry
 def get_basis_functions_bucket(basis_functions: str | int) -> str:
     """Categorize the number of basis functions into buckets for telemetry aggregation.
 
-    This function groups basis function counts into discrete buckets to enable
+    This function groups number of basis functions into discrete buckets to enable
     meaningful aggregation and analysis in telemetry data. Rather than tracking
     exact counts (which would result in too many unique values), this bucketing
     approach provides useful ranges for performance and usage analysis.
 
     Args:
-        basis_functions: The number of basis functions in a
-        calculation. Can be an integer count or the string "unknown"
-        if the count is not available.
+        basis_functions: The number of basis functions.
 
     Returns:
-        A string representation of the bucket that the basis function count
-        falls into.
+        The bucket that the basis function count falls into.
 
     Examples:
         >>> get_basis_functions_bucket(7)
@@ -42,14 +39,6 @@ def get_basis_functions_bucket(basis_functions: str | int) -> str:
         "1500+"
         >>> get_basis_functions_bucket("unknown")
         "unknown"
-
-    Notes:
-        The bucketing scheme is designed for typical quantum chemistry calculations
-        with varying granularity based on system size:
-
-        * Fine granularity (10s) for small molecules (<50 basis functions)
-        * Medium granularity (50s) for medium molecules (50-500 basis functions)
-        * Coarse granularity (100s) for large molecules (>500 basis functions)
 
     """
     if basis_functions == "unknown":
@@ -71,7 +60,7 @@ def get_basis_functions_bucket(basis_functions: str | int) -> str:
 
 
 def extract_data(result: Any) -> str:
-    """Extract molecular formula and basis function count from algorithm result.
+    """Extract molecular formula and number of basis functions from algorithm result.
 
     This function handles both single qdk_data objects and tuple results
     (e.g., (energy, qdk_data) pairs) returned by QDK chemistry algorithms.
@@ -83,7 +72,7 @@ def extract_data(result: Any) -> str:
             a qdk_data (typically at index 1 for (energy, wavefunction) pairs).
 
     Returns:
-        Bucketed count of basis functions (e.g., "10", "50", "100")
+        Bucket of basis functions (e.g., "10", "50", "100")
         or "unknown" if no qdk_data is available.
 
     Examples:
@@ -138,9 +127,6 @@ def on_algorithm(algorithm_type: str, algorithm_name: str) -> None:
         algorithm_type: The type or category of the algorithm being executed.
         algorithm_name: The specific name of the algorithm.
 
-    Note:
-        This will run whenever an algorithm is created to track initialization statistics.
-
     """
     log_telemetry(
         "qdk_chemistry.algorithm",
@@ -176,11 +162,6 @@ def on_algorithm_end(
         **properties: Additional contextual information about the
             execution (e.g., 'num_basis_functions').
 
-    Notes:
-        This function emits a telemetry event recording the algorithm's
-        execution time and associated metadata. If an error occurred,
-        the error type is included in the telemetry properties.
-
     """
     telemetry_properties = {
         "algorithm_type": algorithm_type,
@@ -209,9 +190,6 @@ def on_test_call(name: str) -> None:
 
     Args:
         name: The name of the test to be logged in the telemetry event.
-
-    Notes:
-        Used for testing purposes.
 
     """
     log_telemetry(
