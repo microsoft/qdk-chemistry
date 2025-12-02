@@ -14,7 +14,6 @@ import pytest
 from qdk_chemistry import algorithms
 from qdk_chemistry.constants import ANGSTROM_TO_BOHR
 from qdk_chemistry.data import StabilityResult, Structure
-from qdk_chemistry.utils import run_scf_with_stability_workflow
 
 from .reference_tolerances import float_comparison_absolute_tolerance, float_comparison_relative_tolerance
 
@@ -668,6 +667,101 @@ class TestPyscfStabilityChecker:
 class TestStabilityWorkflow:
     """Test class for stability workflow functionality."""
 
+    @staticmethod
+    def _run_scf_with_stability_workflow(
+        structure,
+        charge,
+        spin_multiplicity,
+        scf_solver,
+        stability_checker,
+        initial_guess=None,
+        max_stability_iterations=5,
+    ):
+        """Run SCF with iterative stability checking and orbital rotation workflow.
+
+        This is a Python-only test utility that implements the stability workflow.
+        It performs iterative SCF, stability checks, and orbital rotations until convergence or max iterations.
+        """
+        from qdk_chemistry.utils import rotate_orbitals
+
+        if max_stability_iterations < 1:
+            raise ValueError("max_stability_iterations must be at least 1")
+
+        # Run initial SCF calculation
+        energy, wavefunction = scf_solver.run(structure, charge, spin_multiplicity, initial_guess)
+
+        # Determine if calculation is restricted from initial wavefunction
+        is_restricted_calculation = wavefunction.get_orbitals().is_restricted() and spin_multiplicity == 1
+
+        # Configure stability checker based on calculation type
+        if is_restricted_calculation:
+            stability_checker.settings().set("external", True)
+        else:
+            stability_checker.settings().set("external", False)
+
+        stability_result = None
+        is_stable = False
+        iteration = 0
+
+        while iteration < max_stability_iterations:
+            iteration += 1
+
+            # Perform stability analysis
+            is_stable, result = stability_checker.run(wavefunction)
+            stability_result = result
+
+            if is_stable:
+                break
+
+            # Last iteration check - don't rotate if we've reached the limit
+            if iteration >= max_stability_iterations:
+                break
+
+            # Get the rotation vector corresponding to the smallest eigenvalue
+            do_external = False
+            if not stability_result.is_internal_stable():
+                _, rotation_vector = stability_result.get_smallest_internal_eigenvalue_and_vector()
+            elif not stability_result.is_external_stable() and stability_result.has_external_result():
+                _, rotation_vector = stability_result.get_smallest_external_eigenvalue_and_vector()
+                do_external = True
+
+            # Get occupation numbers from wavefunction
+            orbitals = wavefunction.get_orbitals()
+            num_alpha_electrons, num_beta_electrons = wavefunction.get_total_num_electrons()
+
+            # Rotate the orbitals
+            rotated_orbitals = rotate_orbitals(
+                orbitals, rotation_vector, num_alpha_electrons, num_beta_electrons, do_external
+            )
+
+            # If external instability, switch to unrestricted and disable external checks
+            if do_external:
+                is_restricted_calculation = False
+
+                # Create new solver instances with updated settings
+                scf_solver_name = scf_solver.name()
+                stability_checker_name = stability_checker.name()
+                new_scf_solver = algorithms.create("scf_solver", scf_solver_name)
+                new_stability_checker = algorithms.create("stability_checker", stability_checker_name)
+
+                # Copy all settings from original solvers
+                scf_settings_map = scf_solver.settings().get_all_settings()
+                stability_settings_map = stability_checker.settings().get_all_settings()
+                new_scf_solver.settings().set_from_map(scf_settings_map)
+                new_stability_checker.settings().set_from_map(stability_settings_map)
+
+                # Update specific settings for unrestricted calculation
+                new_scf_solver.settings().set("reference_type", "unrestricted")
+                new_stability_checker.settings().set("external", False)
+
+                scf_solver = new_scf_solver
+                stability_checker = new_stability_checker
+
+            # Restart SCF with rotated orbitals
+            energy, wavefunction = scf_solver.run(structure, charge, spin_multiplicity, rotated_orbitals)
+
+        return energy, wavefunction, is_stable, stability_result
+
     def test_workflow_rohf_o2(self):
         """Test stability workflow on ROHF O2 molecule - internal stability only."""
         o2 = create_o2_structure()
@@ -682,7 +776,9 @@ class TestStabilityWorkflow:
         stability_checker.settings().set("external", True)
 
         # Run workflow with pyscf SCF (required for ROHF) and pyscf stability checker
-        energy, _wfn, _is_stable, result = run_scf_with_stability_workflow(o2, 0, 3, scf_solver, stability_checker)
+        energy, _wfn, _is_stable, result = self._run_scf_with_stability_workflow(
+            o2, 0, 3, scf_solver, stability_checker
+        )
 
         # Check internal stability status
         assert result.is_internal_stable() is True, "Wavefunction should be internally stable"
@@ -710,7 +806,9 @@ class TestStabilityWorkflow:
 
         # Run workflow with pyscf SCF and pyscf stability checker
         # This system may not fully converge but should achieve correct energy
-        energy, _wfn, _is_stable, _result = run_scf_with_stability_workflow(n2, 0, 1, scf_solver, stability_checker)
+        energy, _wfn, _is_stable, _result = self._run_scf_with_stability_workflow(
+            n2, 0, 1, scf_solver, stability_checker
+        )
         # Check energy matches reference value - workflow should achieve correct energy
         assert abs(energy - (-108.606721153932)) < 1e-6, f"Energy {energy} should match reference -108.606721153932"
 
@@ -732,7 +830,7 @@ class TestStabilityWorkflow:
         stability_checker.settings().set("nroots", 3)
 
         # Run workflow - should detect external instability and switch to UHF
-        energy, wfn, is_stable, result = run_scf_with_stability_workflow(n2, 0, 1, scf_solver, stability_checker)
+        energy, wfn, is_stable, result = self._run_scf_with_stability_workflow(n2, 0, 1, scf_solver, stability_checker)
 
         # Final wavefunction should be unrestricted (switched from RHF to UHF)
         assert not wfn.get_orbitals().is_restricted(), (
@@ -764,7 +862,7 @@ class TestStabilityWorkflow:
         stability_checker.settings().set("nroots", 3)
 
         # Run workflow - should detect external instability and switch to UHF
-        energy, wfn, is_stable, result = run_scf_with_stability_workflow(
+        energy, wfn, is_stable, result = self._run_scf_with_stability_workflow(
             n2, 0, 1, scf_solver, stability_checker, max_stability_iterations=10
         )
         assert result.is_internal_stable() is True, "Final wavefunction should be internally stable"
