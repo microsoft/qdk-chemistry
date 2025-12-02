@@ -205,25 +205,23 @@ class PyscfScfSolver(ScfSolver):
                 mf = scf.ROHF(mol) if mol.spin != 0 else scf.RHF(mol)
             elif scf_type == SCFType.UNRESTRICTED:
                 mf = scf.UHF(mol)
-            else:  # SCFType.AUTO
-                if mol.spin == 0:
-                    mf = scf.RHF(mol)
-                else:
-                    mf = scf.UHF(mol)
-        else:
-            # DFT methods (Kohn-Sham)
-            if scf_type == SCFType.RESTRICTED:
-                mf = scf.ROKS(mol) if mol.spin != 0 else scf.RKS(mol)
-                mf.xc = method
-            elif scf_type == SCFType.UNRESTRICTED:
+            elif mol.spin == 0:
+                mf = scf.RHF(mol)
+            else:
+                mf = scf.UHF(mol)
+        # DFT methods (Kohn-Sham)
+        elif scf_type == SCFType.RESTRICTED:
+            mf = scf.ROKS(mol) if mol.spin != 0 else scf.RKS(mol)
+            mf.xc = method
+        elif scf_type == SCFType.UNRESTRICTED:
+            mf = scf.UKS(mol)
+            mf.xc = method
+        else:  # SCFType.AUTO
+            if mol.spin == 0:
+                mf = scf.RKS(mol)
+            else:
                 mf = scf.UKS(mol)
-                mf.xc = method
-            else:  # SCFType.AUTO
-                if mol.spin == 0:
-                    mf = scf.RKS(mol)
-                else:
-                    mf = scf.UKS(mol)
-                mf.xc = method
+            mf.xc = method
 
         # Configure convergence settings
 

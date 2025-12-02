@@ -20,6 +20,8 @@
 #include <qdk/chemistry/data/structure.hpp>
 #include <qdk/chemistry/data/wavefunction_containers/mp2.hpp>
 
+#include "ut_common.hpp"
+
 using namespace qdk::chemistry::data;
 using namespace qdk::chemistry::algorithms;
 
@@ -33,7 +35,6 @@ class MP2Test : public ::testing::Test {
 TEST_F(MP2Test, UMP2Energies_CCPVDZ) {
   // Test the UMP2 energies against reference for cc-pvdz
   float pyscf_mp2_corr_cc_pvdz = -0.3509470131940627;
-  float tolerance = 1e-8;
 
   // o2 structure with 2.3 Bohr bond length
   std::vector<Eigen::Vector3d> coordinates = {Eigen::Vector3d(0.0, 0.0, 0.0),
@@ -63,7 +64,8 @@ TEST_F(MP2Test, UMP2Energies_CCPVDZ) {
   double reference = ansatz->calculate_energy();
   double mp2_corr_energy = mp2_total_energy - reference;
 
-  EXPECT_LT(std::abs(mp2_corr_energy - pyscf_mp2_corr_cc_pvdz), tolerance)
+  EXPECT_LT(std::abs(mp2_corr_energy - pyscf_mp2_corr_cc_pvdz),
+            testing::mp2_tolerance)
       << "UMP2 correlation energy mismatch (cc-pvdz). Calculated: "
       << mp2_corr_energy << ", Reference: " << pyscf_mp2_corr_cc_pvdz
       << ", Difference: " << (mp2_corr_energy - pyscf_mp2_corr_cc_pvdz);
@@ -73,7 +75,6 @@ TEST_F(MP2Test, RMP2Energies_CCPVDZ) {
   // Test the RMP2 energies against PySCF reference for singlet O2 with
   // cc-pvdz
   float pyscf_rmp2_corr_cc_pvdz = -0.38428662586339435;
-  float tolerance = 1e-8;
 
   // O2 structure with 2.3 Bohr bond length
   std::vector<Eigen::Vector3d> coordinates = {Eigen::Vector3d(0.0, 0.0, 0.0),
@@ -113,7 +114,8 @@ TEST_F(MP2Test, RMP2Energies_CCPVDZ) {
   double mp2_corr_energy = mp2_total_energy - hf_reference_energy;
 
   // Verify correlation energy matches PySCF reference
-  EXPECT_LT(std::abs(mp2_corr_energy - pyscf_rmp2_corr_cc_pvdz), tolerance)
+  EXPECT_LT(std::abs(mp2_corr_energy - pyscf_rmp2_corr_cc_pvdz),
+            testing::mp2_tolerance)
       << "RMP2 correlation energy mismatch (cc-pvdz). Calculated: "
       << mp2_corr_energy << ", Reference: " << pyscf_rmp2_corr_cc_pvdz
       << ", Difference: " << (mp2_corr_energy - pyscf_rmp2_corr_cc_pvdz);
@@ -121,9 +123,6 @@ TEST_F(MP2Test, RMP2Energies_CCPVDZ) {
 
 TEST_F(MP2Test, MP2Container) {
   // Test that MP2Container properly computes amplitudes
-  float pyscf_rmp2_corr_cc_pvdz = -0.384286640974813;
-  float tolerance = 1e-7;
-
   // O2 structure with 2.3 Bohr bond length
   std::vector<Eigen::Vector3d> coordinates = {Eigen::Vector3d(0.0, 0.0, 0.0),
                                               Eigen::Vector3d(2.3, 0.0, 0.0)};

@@ -11,6 +11,7 @@ import pickle
 import numpy as np
 import pytest
 
+from qdk_chemistry import algorithms
 from qdk_chemistry.data import (
     CasWavefunctionContainer,
     Configuration,
@@ -23,7 +24,6 @@ from qdk_chemistry.data import (
     Wavefunction,
     WavefunctionType,
 )
-from qdk_chemistry import algorithms
 
 from .reference_tolerances import (
     float_comparison_absolute_tolerance,

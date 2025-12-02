@@ -210,7 +210,7 @@ std::shared_ptr<data::Hamiltonian> HamiltonianConstructor::_run_impl(
 
   // Determine SCF type from settings
   std::string scf_type = _settings->get<std::string>("scf_type");
-  
+
   bool is_restricted_calc;
   if (scf_type == "restricted") {
     is_restricted_calc = true;

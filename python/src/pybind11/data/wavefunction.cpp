@@ -978,11 +978,11 @@ This container represents a coupled cluster wavefunction with T1 and T2 amplitud
 It supports both restricted and unrestricted coupled cluster methods, optionally storing
 spin-separated amplitudes as well as reduced density matrices (RDMs).
     )")
-      .def(
-          py::init<std::shared_ptr<Orbitals>, const std::vector<Configuration>&,
-                   const std::optional<CoupledClusterContainer::VectorVariant>&,
-                   const std::optional<CoupledClusterContainer::VectorVariant>&>(),
-          R"(
+      .def(py::init<
+               std::shared_ptr<Orbitals>, const std::vector<Configuration>&,
+               const std::optional<CoupledClusterContainer::VectorVariant>&,
+               const std::optional<CoupledClusterContainer::VectorVariant>&>(),
+           R"(
 Constructs a coupled cluster wavefunction container with amplitudes.
 
 Parameters:
@@ -1001,17 +1001,17 @@ Examples:
     >>> container = qdk.chemistry.CoupledClusterContainer(
     ...     orbitals, [ref], t1, t2)
         )",
-          py::arg("orbitals"), py::arg("references"),
-          py::arg("t1_amplitudes") = std::nullopt,
-          py::arg("t2_amplitudes") = std::nullopt)
-      .def(
-          py::init<std::shared_ptr<Orbitals>, const std::vector<Configuration>&,
-                   const std::optional<CoupledClusterContainer::VectorVariant>&,
-                   const std::optional<CoupledClusterContainer::VectorVariant>&,
-                   const std::optional<CoupledClusterContainer::VectorVariant>&,
-                   const std::optional<CoupledClusterContainer::VectorVariant>&,
-                   const std::optional<CoupledClusterContainer::VectorVariant>&>(),
-          R"(
+           py::arg("orbitals"), py::arg("references"),
+           py::arg("t1_amplitudes") = std::nullopt,
+           py::arg("t2_amplitudes") = std::nullopt)
+      .def(py::init<
+               std::shared_ptr<Orbitals>, const std::vector<Configuration>&,
+               const std::optional<CoupledClusterContainer::VectorVariant>&,
+               const std::optional<CoupledClusterContainer::VectorVariant>&,
+               const std::optional<CoupledClusterContainer::VectorVariant>&,
+               const std::optional<CoupledClusterContainer::VectorVariant>&,
+               const std::optional<CoupledClusterContainer::VectorVariant>&>(),
+           R"(
 Constructs a coupled cluster wavefunction container with spin-separated amplitudes.
 
 Parameters:
@@ -1032,22 +1032,22 @@ Examples:
     >>> container = qdk.chemistry.CoupledClusterContainer(
     ...     orbitals, [ref], t1_aa, t1_bb, t2_abab, None, None)
         )",
-          py::arg("orbitals"), py::arg("references"),
-          py::arg("t1_amplitudes_aa") = std::nullopt,
-          py::arg("t1_amplitudes_bb") = std::nullopt,
-          py::arg("t2_amplitudes_abab") = std::nullopt,
-          py::arg("t2_amplitudes_aaaa") = std::nullopt,
-          py::arg("t2_amplitudes_bbbb") = std::nullopt)
-      .def(
-          py::init<std::shared_ptr<Orbitals>, const std::vector<Configuration>&,
-                   const std::optional<CoupledClusterContainer::VectorVariant>&,
-                   const std::optional<CoupledClusterContainer::VectorVariant>&,
-                   const std::optional<CoupledClusterContainer::VectorVariant>&,
-                   const std::optional<CoupledClusterContainer::VectorVariant>&,
-                   const std::optional<CoupledClusterContainer::VectorVariant>&,
-                   const std::optional<CoupledClusterContainer::MatrixVariant>&,
-                   const std::optional<CoupledClusterContainer::VectorVariant>&>(),
-          R"(
+           py::arg("orbitals"), py::arg("references"),
+           py::arg("t1_amplitudes_aa") = std::nullopt,
+           py::arg("t1_amplitudes_bb") = std::nullopt,
+           py::arg("t2_amplitudes_abab") = std::nullopt,
+           py::arg("t2_amplitudes_aaaa") = std::nullopt,
+           py::arg("t2_amplitudes_bbbb") = std::nullopt)
+      .def(py::init<
+               std::shared_ptr<Orbitals>, const std::vector<Configuration>&,
+               const std::optional<CoupledClusterContainer::VectorVariant>&,
+               const std::optional<CoupledClusterContainer::VectorVariant>&,
+               const std::optional<CoupledClusterContainer::VectorVariant>&,
+               const std::optional<CoupledClusterContainer::VectorVariant>&,
+               const std::optional<CoupledClusterContainer::VectorVariant>&,
+               const std::optional<CoupledClusterContainer::MatrixVariant>&,
+               const std::optional<CoupledClusterContainer::VectorVariant>&>(),
+           R"(
 Constructs a coupled cluster wavefunction container with amplitudes and RDMs.
 
 Parameters:
@@ -1070,14 +1070,14 @@ Examples:
     >>> container = qdk.chemistry.CoupledClusterContainer(
     ...     orbitals, [ref], t1_aa, None, t2_abab, None, None, one_rdm, None)
         )",
-          py::arg("orbitals"), py::arg("references"),
-          py::arg("t1_amplitudes_aa") = std::nullopt,
-          py::arg("t1_amplitudes_bb") = std::nullopt,
-          py::arg("t2_amplitudes_abab") = std::nullopt,
-          py::arg("t2_amplitudes_aaaa") = std::nullopt,
-          py::arg("t2_amplitudes_bbbb") = std::nullopt,
-          py::arg("one_rdm_spin_traced") = std::nullopt,
-          py::arg("two_rdm_spin_traced") = std::nullopt)
+           py::arg("orbitals"), py::arg("references"),
+           py::arg("t1_amplitudes_aa") = std::nullopt,
+           py::arg("t1_amplitudes_bb") = std::nullopt,
+           py::arg("t2_amplitudes_abab") = std::nullopt,
+           py::arg("t2_amplitudes_aaaa") = std::nullopt,
+           py::arg("t2_amplitudes_bbbb") = std::nullopt,
+           py::arg("one_rdm_spin_traced") = std::nullopt,
+           py::arg("two_rdm_spin_traced") = std::nullopt)
 
       .def("get_references", &CoupledClusterContainer::get_references,
            R"(

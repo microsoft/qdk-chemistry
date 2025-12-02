@@ -36,6 +36,9 @@ inline static constexpr double ci_energy_tolerance = 1e-8;
 /// @brief Tolerance for SCF energies
 inline static constexpr double scf_energy_tolerance = 1e-8;
 
+/// @brief Tolerance for MP2 energy match vs pyscf
+inline static constexpr double mp2_tolerance = 2e-8;
+
 /// @brief Tolerance for wavefunction operations
 inline static constexpr double wf_tolerance = 1e-10;
 

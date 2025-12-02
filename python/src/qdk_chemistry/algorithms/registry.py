@@ -355,12 +355,12 @@ def unregister_factory(algorithm_type: str) -> None:
 def _register_cpp_factories():
     from qdk_chemistry._core._algorithms import (  # noqa: PLC0415
         ActiveSpaceSelectorFactory,
+        DynamicalCorrelationCalculatorFactory,
         HamiltonianConstructorFactory,
         LocalizerFactory,
         MultiConfigurationCalculatorFactory,
         MultiConfigurationScfFactory,
         ProjectedMultiConfigurationCalculatorFactory,
-        DynamicalCorrelationCalculatorFactory,
         ScfSolverFactory,
         StabilityCheckerFactory,
     )

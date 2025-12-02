@@ -11,12 +11,12 @@ import pytest
 from qdk_chemistry import algorithms
 from qdk_chemistry.algorithms import (
     ActiveSpaceSelector,
+    DynamicalCorrelationCalculator,
     HamiltonianConstructor,
     MultiConfigurationCalculator,
     MultiConfigurationScf,
     OrbitalLocalizer,
     ProjectedMultiConfigurationCalculator,
-    DynamicalCorrelationCalculator,
     ScfSolver,
     StabilityChecker,
     StatePreparation,
@@ -24,8 +24,8 @@ from qdk_chemistry.algorithms import (
 from qdk_chemistry.data import (
     Ansatz,
     CasWavefunctionContainer,
-    CoupledClusterContainer,
     Configuration,
+    CoupledClusterContainer,
     Hamiltonian,
     Orbitals,
     Settings,
