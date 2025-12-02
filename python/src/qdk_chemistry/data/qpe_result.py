@@ -1,4 +1,4 @@
-"""QDK/Chemistry data class for quantum phase estimation results."""
+"""QDK/Chemistry Quantum Phase Estimation Results module."""
 
 # --------------------------------------------------------------------------------------------
 # Copyright (c) Microsoft Corporation. All rights reserved.

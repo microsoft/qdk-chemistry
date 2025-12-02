@@ -13,11 +13,10 @@ from qdk_chemistry.algorithms.energy_estimator.energy_estimator import (
     EnergyEstimator,
     EnergyEstimatorFactory,
 )
-from qdk_chemistry.algorithms.energy_estimator.qsharp import (
-    QDKEnergyEstimator,
-)
+from qdk_chemistry.algorithms.energy_estimator.qsharp import QDKEnergyEstimator, QDKEnergyEstimatorSettings
 
 __all__ = [
     "EnergyEstimatorFactory",
     "QDKEnergyEstimator",
+    "QDKEnergyEstimatorSettings",
 ]

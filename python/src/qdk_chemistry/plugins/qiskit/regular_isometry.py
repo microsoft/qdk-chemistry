@@ -98,7 +98,7 @@ class RegularIsometryStatePreparation(StatePreparation):
             )
             circuit = pass_manager.run(circuit)
 
-        return Circuit(circuit_qasm=qasm3.dumps(circuit))
+        return Circuit(qasm=qasm3.dumps(circuit))
 
     def name(self) -> str:
         """Return the name of the state preparation method."""

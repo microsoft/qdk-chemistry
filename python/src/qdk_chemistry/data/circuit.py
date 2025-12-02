@@ -1,4 +1,4 @@
-"""QDK/Chemistry data class for quantum circuits.
+"""QDK/Chemistry Quantum Circuits module.
 
 Includes utilities for visualizing circuits with QDK widgets.
 """
@@ -23,10 +23,10 @@ __all__: list[str] = []
 
 
 class Circuit(DataClass):
-    """Data class for quantum circuits.
+    """Data class for a quantum circuit.
 
     Attributes:
-        circuit_qasm (str): The quantum circuit in QASM format.
+        qasm (str): The quantum circuit in QASM format.
 
     """
 
@@ -36,47 +36,47 @@ class Circuit(DataClass):
     # Use keyword arguments to be future-proof
     def __init__(
         self,
-        circuit_qasm: str | None = None,
+        qasm: str | None = None,
     ) -> None:
         """Initialize a Circuit.
 
         Args:
-            circuit_qasm (str | None): The quantum circuit in QASM format. Defaults to None.
+            qasm (str | None): The quantum circuit in QASM format. Defaults to None.
 
         """
-        self.circuit_qasm = circuit_qasm
+        self.qasm = qasm
 
         # Check that a representation of the quantum circuit is given by the keyword arguments
-        if self.circuit_qasm is None:
+        if self.qasm is None:
             raise RuntimeError("The quantum circuit in QASM format is not set.")
 
         # Make instance immutable after construction (handled by base class)
         super().__init__()
 
-    def get_circuit_qasm(self) -> str:
+    def get_qasm(self) -> str:
         """Get the quantum circuit in QASM format.
 
         Returns:
             str: The quantum circuit in QASM format.
 
         """
-        if self.circuit_qasm is None:
+        if self.qasm is None:
             raise RuntimeError("The quantum circuit in QASM format is not set.")
 
-        return self.circuit_qasm
+        return self.qasm
 
     # Utilities for visualizing circuits with QDK widgets.
-    def qasm_to_qdk_circuit(
+    def get_qsharp(
         self, remove_idle_qubits: bool = True, remove_classical_qubits: bool = True
     ) -> qsharp._native.Circuit:
-        """Parse a QASM circuit into a QDK Circuit object with trimming options.
+        """Parse a Circuit object into a qsharp Circuit object with trimming options.
 
         Args:
             remove_idle_qubits: If True, remove qubits that are idle (no gates applied).
             remove_classical_qubits: If True, remove qubits with gates but bitstring outputs are deterministic (0 or 1).
 
         Returns:
-            A QDK Circuit object representing the trimmed circuit.
+            A qsharp Circuit object representing the trimmed circuit.
 
         """
         circuit_to_visualize = self._trim_circuit(remove_idle_qubits, remove_classical_qubits)
@@ -96,10 +96,10 @@ class Circuit(DataClass):
         """
         from qdk_chemistry.plugins.qiskit._interop.circuit import analyze_qubit_status  # noqa: PLC0415
 
-        if self.circuit_qasm is None:
+        if self.qasm is None:
             raise NotImplementedError("Quantum circuit trimming is only implemented for QASM circuits.")
         try:
-            qc = qasm3.loads(self.circuit_qasm)
+            qc = qasm3.loads(self.qasm)
         except Exception as e:
             raise ValueError("Invalid QASM3 syntax provided.") from e
 
@@ -157,8 +157,8 @@ class Circuit(DataClass):
 
         """
         lines = ["Circuit"]
-        if self.circuit_qasm is not None:
-            lines.append(f"  QASM string: {self.circuit_qasm}")
+        if self.qasm is not None:
+            lines.append(f"  QASM string: {self.qasm}")
         return "\n".join(lines)
 
     def to_json(self) -> dict:
@@ -169,8 +169,8 @@ class Circuit(DataClass):
 
         """
         data: dict = {}
-        if self.circuit_qasm is not None:
-            data["circuit_qasm"] = self.circuit_qasm
+        if self.qasm is not None:
+            data["qasm"] = self.qasm
         return data
 
     def to_hdf5(self, group: h5py.Group) -> None:
@@ -180,8 +180,8 @@ class Circuit(DataClass):
             group: HDF5 group or file to write the quantum circuit to
 
         """
-        if self.circuit_qasm is not None:
-            group.attrs["circuit_qasm"] = self.circuit_qasm
+        if self.qasm is not None:
+            group.attrs["qasm"] = self.qasm
 
     @classmethod
     def from_json(cls, json_data: dict) -> "Circuit":
@@ -195,7 +195,7 @@ class Circuit(DataClass):
 
         """
         return cls(
-            circuit_qasm=json_data.get("circuit_qasm"),
+            qasm=json_data.get("qasm"),
         )
 
     @classmethod
@@ -210,5 +210,5 @@ class Circuit(DataClass):
 
         """
         return cls(
-            circuit_qasm=group.attrs.get("circuit_qasm"),
+            qasm=group.attrs.get("qasm"),
         )

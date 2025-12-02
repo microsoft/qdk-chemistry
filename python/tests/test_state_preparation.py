@@ -47,10 +47,10 @@ def test_regular_isometry_state_prep(wavefunction_4e4o):
 
     # Check that the circuit is valid
     assert isinstance(circuit, Circuit)
-    circuit_qasm = circuit.get_circuit_qasm()
-    assert isinstance(circuit_qasm, str)
+    qasm = circuit.get_qasm()
+    assert isinstance(qasm, str)
     # Count number of qubits from "qubit[x] q;" to ensure 8 qubits (2 * 4 orbitals)
-    qubit_pattern = re.search(r"qubit\[(\d+)\] q;", circuit_qasm)
+    qubit_pattern = re.search(r"qubit\[(\d+)\] q;", qasm)
     assert qubit_pattern is not None
     assert int(qubit_pattern.group(1)) == 2 * 4
 
@@ -61,15 +61,15 @@ def test_sparse_isometry_gf2x_basic(wavefunction_4e4o):
     # Test circuit creation
     circuit = prep.run(wavefunction_4e4o)
     assert isinstance(circuit, Circuit)
-    circuit_qasm = circuit.get_circuit_qasm()
-    assert isinstance(circuit_qasm, str)
-    qubit_pattern = re.search(r"qubit\[(\d+)\] q;", circuit_qasm)
+    qasm = circuit.get_qasm()
+    assert isinstance(qasm, str)
+    qubit_pattern = re.search(r"qubit\[(\d+)\] q;", qasm)
     assert qubit_pattern is not None
     assert int(qubit_pattern.group(1)) == 2 * 4
     # Test composite StatePreparation gate has been correctly decomposed in the qasm str
-    assert "rz(" in circuit_qasm  # decomposed into RZ gate
+    assert "rz(" in qasm  # decomposed into RZ gate
     expected_theta = 2 * np.arctan(9.8379475848252518e-01 / 1.7929827992011016e-01)
-    assert f"{expected_theta:.6f}" in circuit_qasm  # expected angle
+    assert f"{expected_theta:.6f}" in qasm  # expected angle
 
 
 def test_sparse_isometry_gf2x_single_reference_state():
@@ -88,14 +88,14 @@ def test_sparse_isometry_gf2x_single_reference_state():
 
     single_ref_circuit = prep.run(wavefunction)
     assert isinstance(single_ref_circuit, Circuit)
-    single_ref_circuit_qasm = single_ref_circuit.get_circuit_qasm()
-    assert isinstance(single_ref_circuit_qasm, str)
+    single_ref_qasm = single_ref_circuit.get_qasm()
+    assert isinstance(single_ref_qasm, str)
     # Count number of qubits in qasm
-    qubit_pattern = re.search(r"qubit\[(\d+)\] q;", single_ref_circuit_qasm)
+    qubit_pattern = re.search(r"qubit\[(\d+)\] q;", single_ref_qasm)
     assert qubit_pattern is not None
     assert int(qubit_pattern.group(1)) == 4
     # Count x operation on qubit "x q[*]"
-    assert single_ref_circuit_qasm.count("x q[") == 2
+    assert single_ref_qasm.count("x q[") == 2
 
 
 def test_single_reference_state_error_cases():

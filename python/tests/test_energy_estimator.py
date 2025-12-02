@@ -135,13 +135,13 @@ def test_measurement_circuit_mixed_basis():
 def test_create_measurement_circuits_basic():
     """Test measurement circuit generation for a simple observable."""
     # Prepare input circuit
-    circuit_qasm = """
+    qasm = """
         include "stdgates.inc";
         qubit[2] q;
         x q[0];
         cx q[0], q[1];
         """
-    circuit = Circuit(circuit_qasm=circuit_qasm)
+    circuit = Circuit(qasm=qasm)
 
     # Define observable
     observable = [
@@ -157,30 +157,30 @@ def test_create_measurement_circuits_basic():
     assert isinstance(circuits, list)
     assert len(circuits) == 3
     assert all(isinstance(circ, Circuit) for circ in circuits)
-    assert all(isinstance(circ.get_circuit_qasm(), str) for circ in circuits)
-    assert "measure" in circuits[0].circuit_qasm  # Z basis
-    assert circuits[0].circuit_qasm.count("measure") == 2
-    assert "h q" not in circuits[0].circuit_qasm  # No basis change for Z
-    assert "h q" in circuits[1].circuit_qasm  # X basis change
-    assert circuits[1].circuit_qasm.count("h q") == 2  # One H gate added for X basis for each qubit
-    assert circuits[0].circuit_qasm.count("measure") == 2
-    assert "sdg q" in circuits[2].circuit_qasm  # Y basis change
-    assert circuits[2].circuit_qasm.count("sdg q") == 2  # One Sdg gate added for Y basis for each qubit
-    assert "h q" in circuits[2].circuit_qasm  # Y basis change
-    assert circuits[2].circuit_qasm.count("h q") == 2  # One H gate added for Y basis for each qubit
-    assert circuits[0].circuit_qasm.count("measure") == 2
+    assert all(isinstance(circ.get_qasm(), str) for circ in circuits)
+    assert "measure" in circuits[0].qasm  # Z basis
+    assert circuits[0].qasm.count("measure") == 2
+    assert "h q" not in circuits[0].qasm  # No basis change for Z
+    assert "h q" in circuits[1].qasm  # X basis change
+    assert circuits[1].qasm.count("h q") == 2  # One H gate added for X basis for each qubit
+    assert circuits[0].qasm.count("measure") == 2
+    assert "sdg q" in circuits[2].qasm  # Y basis change
+    assert circuits[2].qasm.count("sdg q") == 2  # One Sdg gate added for Y basis for each qubit
+    assert "h q" in circuits[2].qasm  # Y basis change
+    assert circuits[2].qasm.count("h q") == 2  # One H gate added for Y basis for each qubit
+    assert circuits[0].qasm.count("measure") == 2
 
 
 def test_create_measurement_circuits_qubit_mismatch():
     """Test measurement circuit generation raises ValueError on qubit number mismatch."""
     # Prepare input circuit with 2 qubits
-    circuit_qasm = """
+    qasm = """
         include "stdgates.inc";
         qubit[2] q;
         x q[0];
         cx q[0], q[1];
         """
-    circuit = Circuit(circuit_qasm=circuit_qasm)
+    circuit = Circuit(qasm=qasm)
 
     # Define observable with 3 qubits
     observable = [
@@ -331,13 +331,11 @@ def test_measurement_data_to_json():
 
 def test_create_energy_estimator_qiskit():
     """Test factory function for creating Qiskit energy estimator."""
-    estimator = create(
-        "energy_estimator",
-        "qiskit_aer_simulator",
-    )
+    estimator = create("energy_estimator", "qiskit_aer_simulator")
     assert isinstance(estimator, EnergyEstimator)
     assert isinstance(estimator, QiskitEnergyEstimator)
     assert isinstance(estimator.backend, AerSimulator)
+    assert estimator.settings().get("seed") == 42
     assert estimator.backend.options.seed_simulator == 42
 
 
@@ -346,5 +344,5 @@ def test_create_energy_estimator_qdk():
     estimator = create("energy_estimator", "qdk_base_simulator")
     assert isinstance(estimator, EnergyEstimator)
     assert isinstance(estimator, QDKEnergyEstimator)
-    assert estimator.seed == 42
-    assert estimator.noise_model is None
+    assert estimator.settings().get("seed") == 42
+    assert estimator.settings().get("qubit_loss") == 0.0

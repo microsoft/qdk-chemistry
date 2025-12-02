@@ -14,6 +14,7 @@ import pytest
 from qiskit_aer import AerSimulator
 from qiskit_aer.noise import NoiseModel, depolarizing_error
 
+from qdk_chemistry.algorithms import create
 from qdk_chemistry.data import Circuit, QubitHamiltonian
 from qdk_chemistry.data.qubit_hamiltonian import filter_and_group_pauli_ops_from_wavefunction
 from qdk_chemistry.plugins.qiskit.energy_estimator import QiskitEnergyEstimator
@@ -25,31 +26,34 @@ from .reference_tolerances import estimator_energy_tolerance, float_comparison_r
 def circuit_4e4o(test_data_files_path):
     """Fixture to create the test circuit for 4e4o ethylene problem."""
     with open(test_data_files_path / "4e4o-ethylene_2det-can-7967f80e_2_1.qasm") as f:
-        return Circuit(circuit_qasm=f.read())
+        return Circuit(qasm=f.read())
 
 
 def test_estimator_initialize():
     """Test initialization of EnergyEstimator."""
-    estimator = QiskitEnergyEstimator()
+    estimator = create("energy_estimator", "qiskit_aer_simulator")
     assert isinstance(estimator.backend, AerSimulator)
 
     qiskit_aer_backend = AerSimulator()
     estimator_aer = QiskitEnergyEstimator(backend=qiskit_aer_backend)
     assert isinstance(estimator_aer.backend, AerSimulator)
+    assert estimator_aer.settings().get("seed") == 42
     assert estimator_aer.backend.options.seed_simulator == 42
 
 
-def test_estimator_from_backend():
-    """Test EnergyEstimator from backend."""
+def test_estimator_with_backend_options():
+    """Test EnergyEstimator with backend options."""
     # Qiskit AerSimulator
-    estimator = QiskitEnergyEstimator.from_backend_options(backend_options={"shots": 5000})
+    estimator = QiskitEnergyEstimator(backend_options={"shots": 5000})
     assert isinstance(estimator.backend, AerSimulator)
+    assert estimator.settings().get("seed") == 42
     assert estimator.backend.options.seed_simulator == 42
     assert estimator.backend.options.shots == 5000
 
     # No options
-    estimator = QiskitEnergyEstimator.from_backend_options()
+    estimator = QiskitEnergyEstimator()
     assert isinstance(estimator.backend, AerSimulator)
+    assert estimator.settings().get("seed") == 42
     assert estimator.backend.options.shots == 1024  # Default
     assert estimator.backend.options.seed_simulator == 42  # Default
 
@@ -59,19 +63,19 @@ def test_estimator_run():
 
     Bell state test.
     """
-    circuit_qasm = """
+    qasm = """
         include "stdgates.inc";
         qubit[2] q;
         h q[0];
         cx q[0], q[1];
         """
-    circuit = Circuit(circuit_qasm=circuit_qasm)
+    circuit = Circuit(qasm=qasm)
 
     simple_observable = [
         QubitHamiltonian(["ZI", "IZ", "ZZ"], np.array([0.2, 0.3, 0.4])),
         QubitHamiltonian(["XX"], np.array([0.5])),
     ]
-    estimator = QiskitEnergyEstimator.from_backend_options(backend_options={"seed_simulator": 42})
+    estimator = create("energy_estimator", "qiskit_aer_simulator", seed=42)
     results, _ = estimator.run(circuit, simple_observable, 100000)
     # For Bell state, <ZI>=0, <IZ>=0, <ZZ>=1, <XX>=1
     # So expected value = 0.2*0 + 0.3*0 + 0.4*1 + 0.5*1 = 0.9
@@ -91,7 +95,7 @@ def test_estimator_run():
 
 def test_estimator_run_with_noise_model():
     """Test EnergyEstimator.run with a noise model."""
-    circuit_qasm = """
+    qasm = """
         include "stdgates.inc";
         qubit[3] q;
         h q[0];
@@ -99,7 +103,7 @@ def test_estimator_run_with_noise_model():
         cx q[1], q[2];
         x q[2];
         """
-    circuit = Circuit(circuit_qasm=circuit_qasm)
+    circuit = Circuit(qasm=qasm)
 
     observable = [QubitHamiltonian(["IZZ"], np.array([1.0]))]
 
@@ -108,10 +112,8 @@ def test_estimator_run_with_noise_model():
     error = depolarizing_error(0.05, 2)
     noise_model.add_all_qubit_quantum_error(error, ["cx"])
 
-    estimator = QiskitEnergyEstimator.from_backend_options(
-        backend_options={"seed_simulator": 42, "noise_model": noise_model}
-    )
-    estimator.run(circuit, observable, total_shots=10)
+    estimator = create("energy_estimator", "qiskit_aer_simulator", seed=42)
+    estimator.run(circuit, observable, total_shots=10, noise_model=noise_model)
 
 
 def test_estimator_for_4e4o_2det_problem(hamiltonian_4e4o, wavefunction_4e4o, circuit_4e4o, ref_energy_4e4o):
@@ -123,8 +125,7 @@ def test_estimator_for_4e4o_2det_problem(hamiltonian_4e4o, wavefunction_4e4o, ci
     filtered_hamiltonian, classical_coeffs = filter_and_group_pauli_ops_from_wavefunction(
         hamiltonian_4e4o, wavefunction_4e4o
     )
-    backend = AerSimulator(seed_simulator=42)
-    estimator = QiskitEnergyEstimator(backend=backend)
+    estimator = create("energy_estimator", "qiskit_aer_simulator")
     results, _ = estimator.run(
         circuit_4e4o,
         filtered_hamiltonian,
@@ -142,20 +143,20 @@ def test_estimator_for_4e4o_2det_problem(hamiltonian_4e4o, wavefunction_4e4o, ci
 
 def test_energy_estimator_with_fewer_shots_than_observables():
     """Test EnergyEstimator.run with fewer total shots than observables."""
-    circuit_qasm = """
+    qasm = """
         include "stdgates.inc";
         qubit[2] q;
         h q[0];
         cx q[0], q[1];
         """
-    circuit = Circuit(circuit_qasm=circuit_qasm)
+    circuit = Circuit(qasm=qasm)
 
     simple_observable = [
         QubitHamiltonian(["ZZ"], np.array([2])),
         QubitHamiltonian(["XX"], np.array([3])),
         QubitHamiltonian(["YY"], np.array([4])),
     ]
-    estimator = QiskitEnergyEstimator.from_backend_options(backend_options={"seed_simulator": 42})
+    estimator = create("energy_estimator", "qiskit_aer_simulator")
 
     with pytest.raises(ValueError, match=r"Total shots .* is less than the number of observables .*"):
         estimator.run(circuit, simple_observable, total_shots=2)  # Only 2 shots for 3 observables
@@ -163,15 +164,15 @@ def test_energy_estimator_with_fewer_shots_than_observables():
 
 def test_estimator_save_results_to_json(tmp_path):
     """Test saving measurement results to JSON file."""
-    estimator = QiskitEnergyEstimator()
+    estimator = create("energy_estimator", "qiskit_aer_simulator")
 
     # Run a simple estimation first
-    circuit_qasm = """
+    qasm = """
         include "stdgates.inc";
         qubit[1] q;
         h q[0];
         """
-    circuit = Circuit(circuit_qasm=circuit_qasm)
+    circuit = Circuit(qasm=qasm)
     obs = [QubitHamiltonian(["Z"], np.array([1.0]))]
     _, measurement_data = estimator.run(circuit, obs, total_shots=100)
     json_file = tmp_path / "test.measurement_data.json"

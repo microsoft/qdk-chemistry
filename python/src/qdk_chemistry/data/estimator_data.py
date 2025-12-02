@@ -1,4 +1,4 @@
-"""QDK/Chemistry data classes for energy estimation results."""
+"""QDK/Chemistry Energy Estimator Results module."""
 
 # --------------------------------------------------------------------------------------------
 # Copyright (c) Microsoft Corporation. All rights reserved.

@@ -27,34 +27,34 @@ class TestCircuitConstruction:
 
     def test_circuit_construction_with_qasm(self):
         """Test that Circuit can be constructed with QASM string."""
-        circuit_qasm = """
+        qasm = """
         OPENQASM 3.0;
         include "stdgates.inc";
         qubit[2] q;
         h q[0];
         cx q[0], q[1];
         """
-        circuit = Circuit(circuit_qasm=circuit_qasm)
-        assert circuit.circuit_qasm is not None
-        assert "h q[0];" in circuit.circuit_qasm
+        circuit = Circuit(qasm=qasm)
+        assert circuit.qasm is not None
+        assert "h q[0];" in circuit.qasm
 
     def test_circuit_construction_without_qasm_raises(self):
         """Test that Circuit construction without QASM raises RuntimeError."""
         with pytest.raises(RuntimeError, match="The quantum circuit in QASM format is not set"):
-            Circuit(circuit_qasm=None)
+            Circuit(qasm=None)
 
-    def test_get_circuit_qasm(self):
-        """Test get_circuit_qasm method returns the QASM string."""
-        circuit_qasm = """
+    def test_get_qasm(self):
+        """Test get_qasm method returns the QASM string."""
+        qasm = """
         OPENQASM 3.0;
         include "stdgates.inc";
         qubit[1] q;
         h q[0];
         """
-        circuit = Circuit(circuit_qasm=circuit_qasm)
-        retrieved_circuit_qasm = circuit.get_circuit_qasm()
-        assert retrieved_circuit_qasm == circuit_qasm
-        assert "h q[0];" in retrieved_circuit_qasm
+        circuit = Circuit(qasm=qasm)
+        retrieved_qasm = circuit.get_qasm()
+        assert retrieved_qasm == qasm
+        assert "h q[0];" in retrieved_qasm
 
 
 class TestCircuitTrimming:
@@ -62,7 +62,7 @@ class TestCircuitTrimming:
 
     def test_trim_removes_idle_qubits(self):
         """Test that _trim_circuit removes idle qubits correctly."""
-        circuit_qasm = """
+        qasm = """
         OPENQASM 3.0;
         include "stdgates.inc";
         qubit[3] q;
@@ -71,7 +71,7 @@ class TestCircuitTrimming:
         cx q[0], q[2];
         c[0] = measure q[0];
         """
-        circuit = Circuit(circuit_qasm=circuit_qasm)
+        circuit = Circuit(qasm=qasm)
         trimmed = circuit._trim_circuit(remove_idle_qubits=True, remove_classical_qubits=False)
 
         # idle qubit q[1] removed → new indices → q[0], q[1]
@@ -86,7 +86,7 @@ class TestCircuitTrimming:
 
     def test_trim_removes_classical_qubits(self):
         """Test that _trim_circuit removes classical qubits correctly."""
-        circuit_qasm = """
+        qasm = """
         OPENQASM 3.0;
         include "stdgates.inc";
         qubit[3] q;
@@ -95,7 +95,7 @@ class TestCircuitTrimming:
         c[0] = measure q[0];
         c[1] = measure q[1];
         """
-        circuit = Circuit(circuit_qasm=circuit_qasm)
+        circuit = Circuit(qasm=qasm)
         trimmed = circuit._trim_circuit(remove_idle_qubits=True, remove_classical_qubits=True)
         norm = strip_ws(trimmed)
 
@@ -109,7 +109,7 @@ class TestCircuitTrimming:
 
     def test_measurement_dropped_if_qubit_filtered(self):
         """Test that measurements are dropped if the qubit is filtered out."""
-        circuit_qasm = """
+        qasm = """
         OPENQASM 3.0;
         include "stdgates.inc";
         qubit[2] q;
@@ -117,7 +117,7 @@ class TestCircuitTrimming:
         h q[0];
         c[0] = measure q[1];
         """
-        circuit = Circuit(circuit_qasm=circuit_qasm)
+        circuit = Circuit(qasm=qasm)
         trimmed = circuit._trim_circuit(remove_idle_qubits=True, remove_classical_qubits=True)
         norm = strip_ws(trimmed)
 
@@ -126,7 +126,7 @@ class TestCircuitTrimming:
 
     def test_control_gate_removed_if_control_is_classical(self):
         """Test that control gates are removed if control qubit is classical."""
-        circuit_qasm = """
+        qasm = """
         OPENQASM 3.0;
         include "stdgates.inc";
         qubit[3] q;
@@ -135,7 +135,7 @@ class TestCircuitTrimming:
         h q[1];
         cx q[0], q[2];
         """
-        circuit = Circuit(circuit_qasm=circuit_qasm)
+        circuit = Circuit(qasm=qasm)
         trimmed = circuit._trim_circuit(remove_idle_qubits=False, remove_classical_qubits=True)
         norm = strip_ws(trimmed)
 
@@ -145,7 +145,7 @@ class TestCircuitTrimming:
 
     def test_trim_reindexing_correct(self):
         """Test that _trim_circuit reindexes qubits correctly."""
-        circuit_qasm = """
+        qasm = """
         OPENQASM 3.0;
         include "stdgates.inc";
         qubit[4] q;
@@ -154,7 +154,7 @@ class TestCircuitTrimming:
         cx q[1], q[2];
         c[3] = measure q[3];
         """
-        circuit = Circuit(circuit_qasm=circuit_qasm)
+        circuit = Circuit(qasm=qasm)
         trimmed = circuit._trim_circuit(remove_idle_qubits=True, remove_classical_qubits=True)
         norm = strip_ws(trimmed)
 
@@ -165,20 +165,20 @@ class TestCircuitTrimming:
 
     def test_raises_if_all_removed(self):
         """Test that ValueError is raised if all qubits are removed."""
-        circuit_qasm = """
+        qasm = """
         OPENQASM 3.0;
         include "stdgates.inc";
         qubit[2] q;
         bit[2] c;
         c[0] = measure q[0];
         """
-        circuit = Circuit(circuit_qasm=circuit_qasm)
+        circuit = Circuit(qasm=qasm)
         with pytest.raises(ValueError, match="No qubits remain after filtering"):
             circuit._trim_circuit(remove_idle_qubits=True, remove_classical_qubits=True)
 
     def test_no_removal_returns_same_circuit(self):
         """Test that no removal options returns the same circuit structure."""
-        circuit_qasm = """
+        qasm = """
         OPENQASM 3.0;
         include "stdgates.inc";
         bit[1] c;
@@ -187,26 +187,26 @@ class TestCircuitTrimming:
         c[0] = measure q[0];
         x q[1];
         """
-        circuit = Circuit(circuit_qasm=circuit_qasm)
+        circuit = Circuit(qasm=qasm)
         trimmed = circuit._trim_circuit(remove_idle_qubits=False, remove_classical_qubits=False)
 
         # Do whitespace normalization and compare
-        assert strip_ws(trimmed) == strip_ws(circuit_qasm)
+        assert strip_ws(trimmed) == strip_ws(qasm)
 
     def test_trim_circuit_with_invalid_qasm_raises(self):
         """Test that _trim_circuit raises ValueError for invalid QASM."""
         invalid_qasm = "INVALID QASM CODE"
-        circuit = Circuit(circuit_qasm=invalid_qasm)
+        circuit = Circuit(qasm=invalid_qasm)
 
         with pytest.raises(ValueError, match="Invalid QASM3 syntax provided"):
             circuit._trim_circuit(remove_idle_qubits=True, remove_classical_qubits=True)
 
 
-class TestQasmToQdkCircuit:
-    """Test cases for qasm_to_qdk_circuit method."""
+class TestGetQsharpCircuit:
+    """Test cases for get_qsharp method."""
 
-    def test_qasm_to_qdk_circuit_basic(self):
-        circuit_qasm = """
+    def test_get_qsharp_basic(self):
+        qasm = """
         OPENQASM 3.0;
         include "stdgates.inc";
         qubit[3] q;
@@ -217,36 +217,36 @@ class TestQasmToQdkCircuit:
         c[1] = measure q[1];
         x q[2];
         """
-        circuit = Circuit(circuit_qasm=circuit_qasm)
-        qdk_circuit = circuit.qasm_to_qdk_circuit(remove_idle_qubits=True, remove_classical_qubits=True)
+        circuit = Circuit(qasm=qasm)
+        qdk_circuit = circuit.get_qsharp(remove_idle_qubits=True, remove_classical_qubits=True)
 
         # The resulting circuit should have 2 qubits (q0 and q1)
         qdk_circuit_info = json.loads(qdk_circuit.json())
         assert len(qdk_circuit_info["qubits"]) == 2
 
-    def test_qasm_to_qdk_circuit_no_removal(self):
-        """Test qasm_to_qdk_circuit with no removal options."""
+    def test_get_qsharp_no_removal(self):
+        """Test get_qsharp with no removal options."""
         qc = QuantumCircuit(2)
         qc.h(0)
         qc.cx(0, 1)
         qasm = qasm3.dumps(qc)
 
-        circuit = Circuit(circuit_qasm=qasm)
-        qdk_circuit = circuit.qasm_to_qdk_circuit(remove_idle_qubits=False, remove_classical_qubits=False)
+        circuit = Circuit(qasm=qasm)
+        qdk_circuit = circuit.get_qsharp(remove_idle_qubits=False, remove_classical_qubits=False)
 
         circuit_info = json.loads(qdk_circuit.json())
         assert len(circuit_info["qubits"]) == 2
 
-    def test_qasm_to_qdk_circuit_with_idle_removal_only(self):
-        """Test qasm_to_qdk_circuit with only idle qubit removal."""
+    def test_get_qsharp_with_idle_removal_only(self):
+        """Test get_qsharp with only idle qubit removal."""
         qc = QuantumCircuit(3, 1)
         qc.h(0)
         qc.cx(0, 1)
         qc.measure(0, 0)
         qasm = qasm3.dumps(qc)
 
-        circuit = Circuit(circuit_qasm=qasm)
-        qdk_circuit = circuit.qasm_to_qdk_circuit(remove_idle_qubits=True, remove_classical_qubits=False)
+        circuit = Circuit(qasm=qasm)
+        qdk_circuit = circuit.get_qsharp(remove_idle_qubits=True, remove_classical_qubits=False)
 
         circuit_info = json.loads(qdk_circuit.json())
         # Should have 2 qubits (idle q[2] removed)
@@ -265,11 +265,11 @@ class TestCircuitSerialization:
         h q[0];
         cx q[0], q[1];
         """
-        circuit = Circuit(circuit_qasm=qasm)
+        circuit = Circuit(qasm=qasm)
         json_data = circuit.to_json()
 
-        assert "circuit_qasm" in json_data
-        assert json_data["circuit_qasm"] == qasm
+        assert "qasm" in json_data
+        assert json_data["qasm"] == qasm
 
     def test_from_json(self):
         """Test that from_json reconstructs Circuit correctly."""
@@ -280,10 +280,10 @@ class TestCircuitSerialization:
         h q[0];
         cx q[0], q[1];
         """
-        json_data = {"circuit_qasm": qasm}
+        json_data = {"qasm": qasm}
         circuit = Circuit.from_json(json_data)
 
-        assert circuit.circuit_qasm == qasm
+        assert circuit.qasm == qasm
 
     def test_json_roundtrip(self):
         """Test that JSON serialization and deserialization preserves data."""
@@ -294,11 +294,11 @@ class TestCircuitSerialization:
         h q[0];
         cx q[0], q[1];
         """
-        original = Circuit(circuit_qasm=qasm)
+        original = Circuit(qasm=qasm)
         json_data = original.to_json()
         reconstructed = Circuit.from_json(json_data)
 
-        assert reconstructed.circuit_qasm == original.circuit_qasm
+        assert reconstructed.qasm == original.qasm
 
     def test_to_hdf5(self):
         """Test that to_hdf5 saves Circuit correctly."""
@@ -308,7 +308,7 @@ class TestCircuitSerialization:
         qubit[2] q;
         h q[0];
         """
-        circuit = Circuit(circuit_qasm=qasm)
+        circuit = Circuit(qasm=qasm)
 
         with tempfile.NamedTemporaryFile(suffix=".h5", delete=False) as tmp:
             tmp_path = Path(tmp.name)
@@ -320,8 +320,8 @@ class TestCircuitSerialization:
 
             with h5py.File(tmp_path, "r") as f:
                 group = f["circuit"]
-                assert "circuit_qasm" in group.attrs
-                assert group.attrs["circuit_qasm"] == qasm
+                assert "qasm" in group.attrs
+                assert group.attrs["qasm"] == qasm
         finally:
             tmp_path.unlink()
 
@@ -339,13 +339,13 @@ class TestCircuitSerialization:
         try:
             with h5py.File(tmp_path, "w") as f:
                 group = f.create_group("circuit")
-                group.attrs["circuit_qasm"] = qasm
+                group.attrs["qasm"] = qasm
 
             with h5py.File(tmp_path, "r") as f:
                 group = f["circuit"]
                 circuit = Circuit.from_hdf5(group)
 
-            assert circuit.circuit_qasm == qasm
+            assert circuit.qasm == qasm
         finally:
             tmp_path.unlink()
 
@@ -358,7 +358,7 @@ class TestCircuitSerialization:
         h q[0];
         cx q[0], q[1];
         """
-        original = Circuit(circuit_qasm=qasm)
+        original = Circuit(qasm=qasm)
 
         with tempfile.NamedTemporaryFile(suffix=".h5", delete=False) as tmp:
             tmp_path = Path(tmp.name)
@@ -372,7 +372,7 @@ class TestCircuitSerialization:
                 group = f["circuit"]
                 reconstructed = Circuit.from_hdf5(group)
 
-            assert reconstructed.circuit_qasm == original.circuit_qasm
+            assert reconstructed.qasm == original.qasm
         finally:
             tmp_path.unlink()
 
@@ -384,7 +384,7 @@ class TestCircuitSerialization:
         qubit[2] q;
         h q[0];
         """
-        circuit = Circuit(circuit_qasm=qasm)
+        circuit = Circuit(qasm=qasm)
 
         with tempfile.NamedTemporaryFile(suffix=".circuit.json", delete=False) as tmp:
             tmp_path = Path(tmp.name)
@@ -395,8 +395,8 @@ class TestCircuitSerialization:
             with open(tmp_path) as f:
                 loaded_data = json.load(f)
 
-            assert "circuit_qasm" in loaded_data
-            assert loaded_data["circuit_qasm"] == qasm
+            assert "qasm" in loaded_data
+            assert loaded_data["qasm"] == qasm
         finally:
             tmp_path.unlink()
 
@@ -410,11 +410,11 @@ class TestCircuitSerialization:
         """
         with tempfile.NamedTemporaryFile(mode="w", suffix=".circuit.json", delete=False) as tmp:
             tmp_path = Path(tmp.name)
-            json.dump({"circuit_qasm": qasm}, tmp)
+            json.dump({"qasm": qasm}, tmp)
 
         try:
             circuit = Circuit.from_json_file(tmp_path)
-            assert circuit.circuit_qasm == qasm
+            assert circuit.qasm == qasm
         finally:
             tmp_path.unlink()
 
@@ -426,7 +426,7 @@ class TestCircuitSerialization:
         qubit[2] q;
         h q[0];
         """
-        circuit = Circuit(circuit_qasm=qasm)
+        circuit = Circuit(qasm=qasm)
 
         with tempfile.NamedTemporaryFile(suffix=".circuit.h5", delete=False) as tmp:
             tmp_path = Path(tmp.name)
@@ -435,8 +435,8 @@ class TestCircuitSerialization:
             circuit.to_hdf5_file(tmp_path)
 
             with h5py.File(tmp_path, "r") as f:
-                assert "circuit_qasm" in f.attrs
-                assert f.attrs["circuit_qasm"] == qasm
+                assert "qasm" in f.attrs
+                assert f.attrs["qasm"] == qasm
         finally:
             tmp_path.unlink()
 
@@ -453,10 +453,10 @@ class TestCircuitSerialization:
 
         try:
             with h5py.File(tmp_path, "w") as f:
-                f.attrs["circuit_qasm"] = qasm
+                f.attrs["qasm"] = qasm
 
             circuit = Circuit.from_hdf5_file(tmp_path)
-            assert circuit.circuit_qasm == qasm
+            assert circuit.qasm == qasm
         finally:
             tmp_path.unlink()
 
@@ -472,7 +472,7 @@ class TestCircuitSummary:
         qubit[2] q;
         h q[0];
         """
-        circuit = Circuit(circuit_qasm=qasm)
+        circuit = Circuit(qasm=qasm)
         summary = circuit.get_summary()
 
         assert "Circuit" in summary
@@ -487,7 +487,7 @@ class TestCircuitSummary:
         qubit[1] q;
         x q[0];
         """
-        circuit = Circuit(circuit_qasm=qasm)
+        circuit = Circuit(qasm=qasm)
         summary = circuit.get_summary()
 
         lines = summary.split("\n")
@@ -506,11 +506,11 @@ class TestCircuitImmutability:
         qubit[2] q;
         h q[0];
         """
-        circuit = Circuit(circuit_qasm=qasm)
+        circuit = Circuit(qasm=qasm)
 
         # Attempting to modify should raise an error
         with pytest.raises(AttributeError):
-            circuit.circuit_qasm = "modified"
+            circuit.qasm = "modified"
 
     def test_cannot_add_new_attributes(self):
         """Test that new attributes cannot be added to Circuit."""
@@ -520,7 +520,7 @@ class TestCircuitImmutability:
         qubit[2] q;
         h q[0];
         """
-        circuit = Circuit(circuit_qasm=qasm)
+        circuit = Circuit(qasm=qasm)
 
         # Attempting to add a new attribute should raise an error
         with pytest.raises(AttributeError):

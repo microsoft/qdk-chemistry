@@ -51,7 +51,7 @@ wavefunction = Wavefunction(container)
 # Construct the circuit
 regular_circuit = regular_prep.run(wavefunction)
 sparse_circuit = sparse_prep.run(wavefunction)
-print(f"Regular isometry QASM:\n{regular_circuit.get_circuit_qasm()}")
-print(f"Sparse isometry QASM:\n{sparse_circuit.get_circuit_qasm()}")
+print(f"Regular isometry QASM:\n{regular_circuit.get_qasm()}")
+print(f"Sparse isometry QASM:\n{sparse_circuit.get_qasm()}")
 # end-cell-run
 ################################################################################

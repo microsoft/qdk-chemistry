@@ -12,11 +12,27 @@ import qsharp
 from qsharp.openqasm import run
 
 from qdk_chemistry.algorithms.energy_estimator.energy_estimator import EnergyEstimator
-from qdk_chemistry.data import Circuit, EnergyExpectationResult, MeasurementData, QubitHamiltonian
+from qdk_chemistry.data import Circuit, EnergyExpectationResult, MeasurementData, QubitHamiltonian, Settings
 
 _LOGGER = logging.getLogger(__name__)
 
 __all__: list[str] = []
+
+
+class QDKEnergyEstimatorSettings(Settings):
+    """Settings configuration for a QDKEnergyEstimator.
+
+    QDKEnergyEstimator-specific settings:
+        seed (int, default="42"): Random seed for reproducibility.
+        qubit_loss (float, default="0.0"): Probability of qubit loss in simulation.
+
+    """
+
+    def __init__(self):
+        """Initialize QDKEnergyEstimatorSettings."""
+        super().__init__()
+        self._set_default("seed", "int", 42)
+        self._set_default("qubit_loss", "double", 0.0)
 
 
 class QDKEnergyEstimator(EnergyEstimator):
@@ -29,36 +45,36 @@ class QDKEnergyEstimator(EnergyEstimator):
     def __init__(
         self,
         seed: int = 42,
-        noise_model: qsharp.DepolarizingNoise
-        | qsharp.BitFlipNoise
-        | qsharp.PauliNoise
-        | qsharp.PhaseFlipNoise
-        | None = None,
         qubit_loss: float = 0.0,
     ):
-        """Initialize the Estimator with a backend and optional transpilation settings.
+        """Initialize the Estimator with optional settings.
 
         Args:
             seed: Random seed for reproducibility.
-            noise_model: Optional noise model to simulate noise in the quantum circuit.
             qubit_loss: Probability of qubit loss in simulation.
 
         """
         super().__init__()
-        self.seed = seed
-        self.noise_model = noise_model
-        self.qubit_loss = qubit_loss
+        self._settings = QDKEnergyEstimatorSettings()
+        self._settings.set("seed", seed)
+        self._settings.set("qubit_loss", qubit_loss)
 
     def _run_measurement_circuits_and_get_bitstring_counts(
         self,
         measurement_circuits: list[Circuit],
         shots_list: list[int],
+        noise_model: qsharp.DepolarizingNoise
+        | qsharp.BitFlipNoise
+        | qsharp.PauliNoise
+        | qsharp.PhaseFlipNoise
+        | None = None,
     ) -> list[dict[str, int]]:
         """Run the measurement circuits and return the bitstring counts.
 
         Args:
             measurement_circuits: A list of Circuits that provide measurement circuits in OpenQASM3 format to run.
             shots_list: A list of shots allocated for each measurement circuit.
+            noise_model: Optional noise model to simulate noise in the quantum circuit.
 
         Returns:
             A list of dictionaries containing the bitstring counts for each measurement circuit.
@@ -67,12 +83,12 @@ class QDKEnergyEstimator(EnergyEstimator):
         all_bitstring_counts: list[dict[str, int]] = []
         for circuit, shots in zip(measurement_circuits, shots_list, strict=True):
             result = run(
-                circuit.get_circuit_qasm(),
+                circuit.get_qasm(),
                 shots=shots,
-                noise=self.noise_model,
-                qubit_loss=self.qubit_loss,
+                noise=noise_model,
+                qubit_loss=self._settings.qubit_loss,
                 as_bitstring=True,
-                seed=self.seed,
+                seed=self._settings.seed,
             )
             bitstring_count = {
                 bitstring[::-1]: count for bitstring, count in Counter(result).items()
@@ -85,6 +101,11 @@ class QDKEnergyEstimator(EnergyEstimator):
         measurement_circuits: list[Circuit],
         qubit_hamiltonians: list[QubitHamiltonian],
         shots_list: list[int],
+        noise_model: qsharp.DepolarizingNoise
+        | qsharp.BitFlipNoise
+        | qsharp.PauliNoise
+        | qsharp.PhaseFlipNoise
+        | None = None,
     ) -> MeasurementData:
         """Get ``MeasurementData`` from running measurement circuits.
 
@@ -92,12 +113,13 @@ class QDKEnergyEstimator(EnergyEstimator):
             measurement_circuits: A list of measurement circuits to run.
             qubit_hamiltonians: A list of ``QubitHamiltonian`` to be evaluated.
             shots_list: A list of shots allocated for each measurement circuit.
+            noise_model: Optional noise model to simulate noise in the quantum circuit.
 
         Returns:
             MeasurementData: Measurement counts paired with their corresponding ``QubitHamiltonian`` objects.
 
         """
-        counts = self._run_measurement_circuits_and_get_bitstring_counts(measurement_circuits, shots_list)
+        counts = self._run_measurement_circuits_and_get_bitstring_counts(measurement_circuits, shots_list, noise_model)
         return MeasurementData(bitstring_counts=counts, hamiltonians=qubit_hamiltonians, shots_list=shots_list)
 
     def _run_impl(
@@ -105,6 +127,11 @@ class QDKEnergyEstimator(EnergyEstimator):
         circuit: Circuit,
         qubit_hamiltonians: list[QubitHamiltonian],
         total_shots: int,
+        noise_model: qsharp.DepolarizingNoise
+        | qsharp.BitFlipNoise
+        | qsharp.PauliNoise
+        | qsharp.PhaseFlipNoise
+        | None = None,
         classical_coeffs: list | None = None,
     ) -> tuple[EnergyExpectationResult, MeasurementData]:
         """Estimate the expectation value and variance of Hamiltonians.
@@ -113,6 +140,7 @@ class QDKEnergyEstimator(EnergyEstimator):
             circuit: Circuit that provides an OpenQASM3 string of the quantum circuit to be evaluated.
             qubit_hamiltonians: List of ``QubitHamiltonian`` to estimate.
             total_shots: Total number of shots to allocate across the observable terms.
+            noise_model: Optional noise model to simulate noise in the quantum circuit.
             classical_coeffs: Optional list of coefficients for classical Pauli terms to calculate energy offset.
 
         Returns:
@@ -150,6 +178,7 @@ class QDKEnergyEstimator(EnergyEstimator):
             measurement_circuits=measurement_circuits,
             qubit_hamiltonians=qubit_hamiltonians,
             shots_list=shots_list,
+            noise_model=noise_model,
         )
 
         return self._compute_energy_expectation_from_bitstrings(

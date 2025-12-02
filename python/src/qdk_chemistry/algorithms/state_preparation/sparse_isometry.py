@@ -236,7 +236,7 @@ class SparseIsometryGF2XStatePreparation(StatePreparation):
                 f"Final circuit after transpilation: {qc.num_qubits} qubits, depth {qc.depth()}, {qc.size()} gates"
             )
 
-        return Circuit(circuit_qasm=qasm3.dumps(qc))
+        return Circuit(qasm=qasm3.dumps(qc))
 
     def name(self) -> str:
         """Return the name of the state preparation method."""
@@ -283,7 +283,7 @@ def _prepare_single_reference_state(bitstring: str) -> Circuit:
         if bit == "1":
             circuit.x(i)
 
-    return Circuit(circuit_qasm=qasm3.dumps(circuit))
+    return Circuit(qasm=qasm3.dumps(circuit))
 
 
 @dataclass

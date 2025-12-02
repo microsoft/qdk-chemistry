@@ -5,7 +5,7 @@ with respect to Hamiltonian. The estimator leverages Qiskit backends to execute 
 collect bitstring outcomes.
 
 Key Features:
-    - Accepts a quantum circuit (as a QASM string) and observables (as a list of QubitHamiltonian).
+    - Accepts a quantum circuit (as a Circuit) and observables (as a list of QubitHamiltonian).
     - Generates measurement circuits for each observable term.
     - Executes measurement circuits on a simulator backend with a specified number of shots.
     - Collects bitstring counts and computes expectation values and variances.
@@ -34,51 +34,70 @@ from qdk_chemistry.algorithms import register
 from qdk_chemistry.algorithms.energy_estimator import (
     EnergyEstimator,
 )
-from qdk_chemistry.data import Circuit, EnergyExpectationResult, MeasurementData, QubitHamiltonian
+from qdk_chemistry.data import Circuit, EnergyExpectationResult, MeasurementData, QubitHamiltonian, Settings
 
 _LOGGER = logging.getLogger(__name__)
 
-__all__ = ["QiskitEnergyEstimator"]
+__all__ = ["QiskitEnergyEstimator", "QiskitEnergyEstimatorSettings"]
+
+
+class QiskitEnergyEstimatorSettings(Settings):
+    """Settings configuration for a QiskitEnergyEstimator.
+
+    QiskitEnergyEstimator-specific settings:
+        seed (int, default="42"): Random seed for reproducibility.
+
+    """
+
+    def __init__(self):
+        """Initialize QiskitEnergyEstimatorSettings."""
+        super().__init__()
+        self._set_default("seed", "int", 42)
 
 
 class QiskitEnergyEstimator(EnergyEstimator):
     """Custom Estimator to estimate expectation values of quantum circuits with respect to a given observable."""
 
-    def __init__(self, backend: qiskit.providers.backend.BackendV2 | None = None, seed: int = 42):
+    def __init__(
+        self,
+        seed: int = 42,
+        backend_options: dict[str, Any] | None = None,
+        backend: qiskit.providers.backend.BackendV2 | None = None,
+    ):
         """Initialize the Estimator with a backend and optional transpilation settings.
-
-        Args:
-            backend: Backend simulator to run circuits. Default to use qiskit AerSimulator.
-            seed: Seed for the simulator to ensure reproducibility. Default is 42.
-                This argument takes priority over the seed specified in the Backend configuration.
-
-        """
-        super().__init__()
-        if backend is None:
-            self.backend = AerSimulator(seed_simulator=seed)
-        else:
-            self.backend = backend
-            # Reset the seed in the backend if applicable
-            if isinstance(self.backend, AerSimulator):
-                self.backend.set_options(seed_simulator=seed)
-
-    @classmethod
-    def from_backend_options(cls, seed: int = 42, backend_options: dict[str, Any] | None = None) -> EnergyEstimator:
-        """Create an EnergyEstimator from specified backend options for Aer simulator.
 
         Args:
             seed: Seed for the simulator to ensure reproducibility. Default is 42.
                 This argument takes priority over the seed specified in the Backend configuration/options.
-            backend_options: Backend-specific configuration dictionary. Frequently used options include
-                ``{"seed_simulator": int, "noise_model": NoiseModel, ...}``
+            backend_options: Backend-specific configuration dictionary for Qiskit AerSimulator.
+                Frequently used options include ``{"seed_simulator": int, "noise_model": NoiseModel, ...}``.
+                The backend option "seed_simulator" is overwritten by seed.
+                The backend option "noise_model" is overwritten when a noise model is provided as argument in the
+                ``run`` function.
+                This keyword argument is not compatible with qdk_chemistry.algorithms.create.
+            backend: Backend simulator to run circuits. Defaults to Qiskit AerSimulator.
+                ``backend`` and ``backend_options`` are mutually exclusive; provide only one.
+                This keyword argument is not compatible with qdk_chemistry.algorithms.create.
 
         References: `Qiskit Aer Simulator <https://github.com/Qiskit/qiskit-aer/blob/main/qiskit_aer/backends/aer_simulator.py>`_.
 
         """
-        if backend_options is None:
-            backend_options = {}
-        backend = AerSimulator(**backend_options)
-        return cls(backend=backend, seed=seed)
+        super().__init__()
+        self._settings = QiskitEnergyEstimatorSettings()
+        self._settings.set("seed", seed)
+
+        if backend is None:
+            if backend_options is None:
+                backend_options = {}
+            backend_options["seed_simulator"] = self._settings.seed
+            self.backend = AerSimulator(**backend_options)
+        else:
+            if backend_options is not None:
+                raise ValueError("backend and backend_options are mutually exclusive; provide only one.")
+            self.backend = backend
+            # Reset the seed in the backend if applicable
+            if isinstance(self.backend, AerSimulator):
+                self.backend.set_options(seed_simulator=self._settings.seed)
 
     def _run_measurement_circuits_and_get_bitstring_counts(
         self, measurement_circuits: list[QuantumCircuit], shots_list: list[int]
@@ -127,6 +146,7 @@ class QiskitEnergyEstimator(EnergyEstimator):
         circuit: Circuit,
         qubit_hamiltonians: list[QubitHamiltonian],
         total_shots: int,
+        noise_model: NoiseModel | None = None,
         classical_coeffs: list | None = None,
     ) -> tuple[EnergyExpectationResult, MeasurementData]:
         """Estimate the expectation value and variance of Hamiltonians.
@@ -135,6 +155,8 @@ class QiskitEnergyEstimator(EnergyEstimator):
             circuit: Circuit that provides an OpenQASM3 string of the quantum circuit to be evaluated.
             qubit_hamiltonians: A list of ``QubitHamiltonian`` to estimate.
             total_shots: Total number of shots to allocate across Hamiltonian terms.
+            noise_model: NoiseModel to be used in simulation, and the circuit will be transpiled into the basis gates
+                defined by the noise model.
             classical_coeffs: Optional list of coefficients for classical Pauli terms to calculate energy offset.
 
         Returns:
@@ -149,6 +171,12 @@ class QiskitEnergyEstimator(EnergyEstimator):
                 and the circuit will be transpiled into the basis gates defined by the noise model.
 
         """
+        if noise_model is not None:
+            if isinstance(self.backend, AerSimulator):
+                self.backend.set_options(noise_model=noise_model)
+            else:
+                raise NotImplementedError("A noise model can only be set for an AerSimulator.")
+
         num_observables = len(qubit_hamiltonians)
         if total_shots < num_observables:
             raise ValueError(
@@ -180,7 +208,7 @@ class QiskitEnergyEstimator(EnergyEstimator):
         # Load and optionally transpile circuits into basis gates defined by noise model
         measurement_circuits_qiskit = []
         for measurement_circuit in measurement_circuits:
-            circuit = qasm3.loads(measurement_circuit.get_circuit_qasm())
+            circuit = qasm3.loads(measurement_circuit.get_qasm())
             if basis_gates is not None:
                 circuit = transpile(circuit, basis_gates=basis_gates)
             measurement_circuits_qiskit.append(circuit)
