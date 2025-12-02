@@ -132,6 +132,15 @@ Examples:
 
 )");
 
+  cc_calculator.def("name", &CoupledClusterCalculator::name,
+                    R"(
+The algorithm's name.
+
+Returns:
+    str: The name of the algorithm
+
+)");
+
   cc_calculator.def("type_name", &CoupledClusterCalculator::type_name,
                     R"(
 The algorithm's type name.

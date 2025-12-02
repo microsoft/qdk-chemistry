@@ -45,6 +45,7 @@ __all__ = [
     "create",
     "register",
     "register_factory",
+    "show_default",
     "show_settings",
     "unregister",
     "unregister_factory",
@@ -72,7 +73,7 @@ def create(algorithm_type: str, algorithm_name: str | None = None, **kwargs) -> 
 
             (e.g., "scf_solver", "active_space_selector", "coupled_cluster_calculator").
 
-        algorithm_name (Optional[str]): The specific name of the algorithm implementation to create.
+        algorithm_name (str | None): The specific name of the algorithm implementation to create.
 
             If None or empty string, creates the default algorithm for that type.
 
@@ -238,7 +239,7 @@ def available(algorithm_type: str | None = None) -> dict[str, list[str]] | list[
     type, it returns only the list of available algorithms for that type.
 
     Args:
-        algorithm_type (Optional[str]): If provided, only list algorithms of this type.
+        algorithm_type (str | None): If provided, only list algorithms of this type.
 
             If None, list all algorithms across all types.
 
@@ -256,7 +257,7 @@ def available(algorithm_type: str | None = None) -> dict[str, list[str]] | list[
         >>> # List all available algorithms across all types
         >>> all_algorithms = registry.available()
         >>> print(all_algorithms)
-        {'scf_solver': ['pyscf', 'qdk'], 'active_space_selector': ['occupation', 'avas'], ...}
+        {'scf_solver': ['pyscf', 'qdk'], 'active_space_selector': ['pyscf_avas', 'qdk_occupation', ...], ...}
         >>> # List only SCF solvers
         >>> scf_solvers = registry.available("scf_solver")
         >>> print(scf_solvers)
@@ -264,7 +265,7 @@ def available(algorithm_type: str | None = None) -> dict[str, list[str]] | list[
         >>> # Check what active space selectors are available
         >>> selectors = registry.available("active_space_selector")
         >>> print(selectors)
-        ['occupation', 'avas', 'valence']
+        ['pyscf_avas', 'qdk_occupation', 'qdk_autocas_eos', 'qdk_autocas', 'qdk_valence']
 
     """
     if algorithm_type is None:
@@ -276,6 +277,47 @@ def available(algorithm_type: str | None = None) -> dict[str, list[str]] | list[
         if factory.algorithm_type_name() == algorithm_type:
             return factory.available()
     return []
+
+
+def show_default(algorithm_type: str | None = None) -> dict[str, str] | str:
+    """List the default algorithm by type.
+
+    This function returns information about the default algorithms configured
+    for each algorithm type. When called without arguments, it returns a dictionary
+    mapping all algorithm types to their default algorithm names. When called with
+    a specific algorithm type, it returns only the default algorithm name for that type.
+
+    Args:
+        algorithm_type (str | None): If provided, only return the default algorithm
+            for this type. If None, return default algorithms for all types.
+
+    Returns:
+        dict[str, str] | str: When algorithm_type is None, returns a dictionary where
+            keys are algorithm type names and values are the default algorithm names for
+            each type. When algorithm_type is specified, returns the default algorithm
+            name for that specific type (empty string if type not found).
+
+    Examples:
+        >>> from qdk_chemistry.algorithms import registry
+        >>> # List the default algorithms across all types
+        >>> default_algorithms = registry.show_default()
+        >>> print(default_algorithms)
+        {'scf_solver': 'qdk', 'active_space_selector': 'qdk_autocas_eos', ...}
+        >>> # Get the default SCF solver
+        >>> default_scf = registry.show_default("scf_solver")
+        >>> print(default_scf)
+        'qdk'
+
+    """
+    if algorithm_type is None:
+        result: dict[str, str] = {}
+        for factory in __factories:
+            result[factory.algorithm_type_name()] = factory.default_algorithm_name()
+        return result
+    for factory in __factories:
+        if factory.algorithm_type_name() == algorithm_type:
+            return factory.default_algorithm_name()
+    return ""
 
 
 def unregister(algorithm_type: str, algorithm_name: str) -> None:
@@ -350,6 +392,16 @@ def unregister_factory(algorithm_type: str) -> None:
 
 
 def _register_cpp_factories():
+    """Register all built-in C++ algorithm factories.
+
+    This internal initialization function registers all the C++-implemented
+    algorithm factories provided by the core library. This includes factories
+    for SCF solvers, active space selectors, coupled cluster calculators,
+    localizers, multi-configuration calculators, and other core algorithm types.
+
+    This function is automatically called during module import and should not
+    be called by users.
+    """
     from qdk_chemistry._core._algorithms import (  # noqa: PLC0415
         ActiveSpaceSelectorFactory,
         CoupledClusterCalculatorFactory,
@@ -374,6 +426,15 @@ def _register_cpp_factories():
 
 
 def _register_python_factories():
+    """Register all built-in Python algorithm factories.
+
+    This internal initialization function registers all the Python-implemented
+    algorithm factories. This includes factories for energy estimators, qubit
+    mappers, and state preparation algorithms that are implemented in Python.
+
+    This function is automatically called during module import and should not
+    be called by users.
+    """
     from qdk_chemistry.algorithms.energy_estimator import EnergyEstimatorFactory  # noqa: PLC0415
     from qdk_chemistry.algorithms.qubit_mapper import QubitMapperFactory  # noqa: PLC0415
     from qdk_chemistry.algorithms.state_preparation import StatePreparationFactory  # noqa: PLC0415
@@ -423,6 +484,15 @@ def _cleanup_algorithms():
 
 
 def _register_python_algorithms():
+    """Register all built-in Python algorithm instances.
+
+    This internal initialization function registers specific Python-implemented
+    algorithm instances as built-in algorithms. This includes the default QDK
+    energy estimator and state preparation algorithms.
+
+    This function is automatically called during module import and should not
+    be called by users.
+    """
     from qdk_chemistry.algorithms.energy_estimator import QDKEnergyEstimator  # noqa: PLC0415
     from qdk_chemistry.algorithms.state_preparation import SparseIsometryGF2XStatePreparation  # noqa: PLC0415
 

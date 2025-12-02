@@ -31,17 +31,17 @@ See below for language specific examples of creating and serializing :doc:`compr
 
 .. tab:: C++ API
 
-   .. literalinclude:: ../../examples/quickstart.cpp
+   .. literalinclude:: ../_static/examples/cpp/quickstart.cpp
       :language: cpp
-      :start-after: // start-cell-1
-      :end-before: // end-cell-1
+      :start-after: // start-cell-structure
+      :end-before: // end-cell-structure
 
 .. tab:: Python API
 
-   .. literalinclude:: ../../examples/quickstart.py
+   .. literalinclude:: ../_static/examples/python/quickstart.py
       :language: python
-      :start-after: # start-cell-1
-      :end-before: # end-cell-1
+      :start-after: # start-cell-structure
+      :end-before: # end-cell-structure
 
 Run a self-consistent field (SCF) calculation
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
@@ -58,17 +58,17 @@ See below for language-specific examples.
 
 .. tab:: C++ API
 
-   .. literalinclude:: ../../examples/quickstart.cpp
+   .. literalinclude:: ../_static/examples/cpp/quickstart.cpp
       :language: cpp
-      :start-after: // start-cell-2
-      :end-before: // end-cell-2
+      :start-after: // start-cell-scf
+      :end-before: // end-cell-scf
 
 .. tab:: Python API
 
-   .. literalinclude:: ../../examples/quickstart.py
+   .. literalinclude:: ../_static/examples/python/quickstart.py
       :language: python
-      :start-after: # start-cell-2
-      :end-before: # end-cell-2
+      :start-after: # start-cell-scf
+      :end-before: # end-cell-scf
 
 
 Select an active space
@@ -84,20 +84,17 @@ The following are language-specific examples of how to select a so-called "valen
 
 .. tab:: C++ API
 
-   .. literalinclude:: ../../examples/quickstart.cpp
+   .. literalinclude:: ../_static/examples/cpp/quickstart.cpp
       :language: cpp
-      :start-after: // start-cell-3
-      :end-before: // end-cell-3
+      :start-after: // start-cell-active-space
+      :end-before: // end-cell-active-space
 
 .. tab:: Python API
 
-   .. note::
-      This example shows the API pattern. For complete working examples, see :doc:`comprehensive/algorithms/active_space`.
-
-   .. literalinclude:: ../../examples/quickstart.py
+   .. literalinclude:: ../_static/examples/python/quickstart.py
       :language: python
-      :start-after: # start-cell-3
-      :end-before: # end-cell-3
+      :start-after: # start-cell-active-space
+      :end-before: # end-cell-active-space
 
 
 Calculate the Hamiltonian
@@ -109,20 +106,17 @@ The Hamiltonian constructor can generate the one- and two-electron integrals nee
 
 .. tab:: C++ API
 
-   .. literalinclude:: ../../examples/quickstart.cpp
+   .. literalinclude:: ../_static/examples/cpp/quickstart.cpp
       :language: cpp
-      :start-after: // start-cell-4
-      :end-before: // end-cell-4
+      :start-after: // start-cell-hamiltonian-constructor
+      :end-before: // end-cell-hamiltonian-constructor
 
 .. tab:: Python API
 
-   .. note::
-      This example shows the API pattern. For complete working examples, see :doc:`comprehensive/algorithms/hamiltonian_constructor`.
-
-   .. literalinclude:: ../../examples/quickstart.py
+   .. literalinclude:: ../_static/examples/python/quickstart.py
       :language: python
-      :start-after: # start-cell-4
-      :end-before: # end-cell-4
+      :start-after: # start-cell-hamiltonian-constructor
+      :end-before: # end-cell-hamiltonian-constructor
 
 Compute a multi-configuration wavefunction for the active space
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
@@ -135,20 +129,17 @@ Configuration Interaction (CI) and selected :term:`CI` approaches.
 
 .. tab:: C++ API
 
-   .. literalinclude:: ../../examples/quickstart.cpp
+   .. literalinclude:: ../_static/examples/cpp/quickstart.cpp
       :language: cpp
-      :start-after: // start-cell-5
-      :end-before: // end-cell-5
+      :start-after: // start-cell-mc-compute
+      :end-before: // end-cell-mc-compute
 
 .. tab:: Python API
 
-   .. note::
-      This example shows the API pattern. For complete working examples, see :doc:`comprehensive/algorithms/mc_calculator`.
-
-   .. literalinclude:: ../../examples/quickstart.py
+   .. literalinclude:: ../_static/examples/python/quickstart.py
       :language: python
-      :start-after: # start-cell-5
-      :end-before: # end-cell-5
+      :start-after: # start-cell-mc-compute
+      :end-before: # end-cell-mc-compute
 
 Select important configurations
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
@@ -159,18 +150,22 @@ This truncation is characterized by computing the overlap between the truncated 
 
 .. tab:: C++ API
 
-
-   .. literalinclude:: ../../examples/quickstart.cpp
+   .. literalinclude:: ../_static/examples/cpp/quickstart.cpp
       :language: cpp
-      :start-after: // start-cell-6-fn
-      :end-before: // end-cell-6-fn
+      :start-after: // start-cell-wfn-fn-select-configs
+      :end-before: // end-cell-wfn-fn-select-configs
+
+   .. literalinclude:: ../_static/examples/cpp/quickstart.cpp
+      :language: cpp
+      :start-after: // start-cell-wfn-select-configs
+      :end-before: // end-cell-wfn-select-configs
 
 .. tab:: Python API
 
-   .. literalinclude:: ../../examples/quickstart.py
+   .. literalinclude:: ../_static/examples/python/quickstart.py
       :language: python
-      :start-after: # start-cell-6
-      :end-before: # end-cell-6
+      :start-after: # start-cell-wfn-select-configs
+      :end-before: # end-cell-wfn-select-configs
 
 Preparing a qubit representation of the Hamiltonian
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
@@ -187,15 +182,14 @@ Second, by grouping the remaining Pauli operators into commuting sets that can b
 
    .. code-block:: cpp
 
-      // This step only available in Python API currently.
+      // This step is currently only available in the Python API.
 
 .. tab:: Python API
 
-
-   .. literalinclude:: ../../examples/quickstart.py
+   .. literalinclude:: ../_static/examples/python/quickstart.py
       :language: python
-      :start-after: # start-cell-7
-      :end-before: # end-cell-7
+      :start-after: # start-cell-qubit-hamiltonian
+      :end-before: # end-cell-qubit-hamiltonian
 
 Estimate the ground state energy using a quantum algorithm
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
@@ -211,17 +205,20 @@ The statistical nature of quantum measurements introduces variance in the energy
 
    .. code-block:: cpp
 
-      // This step only available in Python API currently.
+      // This step is currently only available in the Python API.
 
 .. tab:: Python API
 
-   .. literalinclude:: ../../examples/quickstart.py
+   .. literalinclude:: ../_static/examples/python/quickstart.py
       :language: python
-      :start-after: # start-cell-8
-      :end-before: # end-cell-8
+      :start-after: # start-cell-energy-estimation
+      :end-before: # end-cell-energy-estimation
 
 Additional examples
 -------------------
 
-Additional examples of workflows using QDK/Chemistry can be found in the ``examples`` directory of the source repository.
-See the :doc:`comprehensive/index` for links to more detailed documentation on specific components of QDK/Chemistry.
+For more information, see:
+
+- Above examples as complete `C++ <../_static/examples/cpp/quickstart.cpp>`_ and `Python <../_static/examples/python/quickstart.py>`_ scripts.
+- Additional examples of workflows using QDK/Chemistry in the `examples <https://github.com/microsoft/qdk-chemistry/tree/main/examples>`_ directory of the source repository.
+- :doc:`comprehensive/index` for links to more detailed documentation on specific components of QDK/Chemistry.
