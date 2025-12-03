@@ -77,6 +77,7 @@ target_sources(chemistry PRIVATE
   scf/scf_impl.cpp
   scf/ks_impl.cpp
   scf/scf_solver.cpp
+  scf/asahf.cpp
 )
 
 # Install Resources

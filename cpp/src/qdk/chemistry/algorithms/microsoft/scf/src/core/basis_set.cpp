@@ -121,6 +121,46 @@ std::shared_ptr<BasisSet> BasisSet::from_database_json(
   return std::shared_ptr<BasisSet>(new BasisSet(mol, path, mode, pure, sort));
 }
 
+BasisSet::BasisSet(std::shared_ptr<Molecule> mol, std::vector<Shell> shells,
+                   BasisMode mode, bool pure, bool sort)
+    : mol(mol), mode(mode), pure(pure), shells(shells) {
+#ifdef QDK_CHEMISTRY_ENABLE_MPI
+  if (mpi::get_world_size() > 1) {
+    MPI_Barrier(MPI_COMM_WORLD);
+  }
+#endif
+  if (mode == BasisMode::PSI4) {
+    norm_psi4_mode(shells);
+  }  // RAW branch doesn't normalize
+
+  if (sort) {
+    std::stable_sort(shells.begin(), shells.end(),
+                     [](const auto& x, const auto& y) {
+                       return x.angular_momentum != y.angular_momentum
+                                  ? x.angular_momentum < y.angular_momentum
+                                  : x.contraction < y.contraction;
+                     });
+  }
+
+  num_atomic_orbitals = std::accumulate(
+      shells.begin(), shells.end(), 0, [&pure](auto sum, const auto& sh) {
+        int sz = 0;
+        if (pure) {
+          sz = 2 * sh.angular_momentum + 1;
+        } else {
+          sz = (sh.angular_momentum + 1) * (sh.angular_momentum + 2) / 2;
+        }
+        return sum + sz;
+      });
+
+  // Calculate atom -> bf idx map
+  calc_atom2ao();
+
+  if (libint2::initialized()) {
+    shell_pairs_ = OneBodyIntegral::compute_shell_pairs(shells);
+  }
+}
+
 BasisSet::BasisSet(std::shared_ptr<Molecule> mol, const std::string& path,
                    BasisMode mode, bool pure, bool sort)
     : mol(mol), mode(mode), pure(pure) {

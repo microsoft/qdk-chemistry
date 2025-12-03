@@ -128,8 +128,7 @@ std::pair<double, std::shared_ptr<data::Wavefunction>> ScfSolver::_run_impl(
   // provided
   ms_scf_config->density_init_method =
       (use_input_initial_guess) ? qcs::DensityInitializationMethod::UserProvided
-      : (!use_explicit_basis_set) ? qcs::DensityInitializationMethod::Atom
-                                  : qcs::DensityInitializationMethod::SOAD;
+                                  : qcs::DensityInitializationMethod::Atom;
   ms_scf_config->eri.method =
       qcs::ERIMethod::Libint2Direct;  // TODO: Make this configurable
   ms_scf_config->eri.eri_threshold = ms_scf_config->converge_threshold * 1e-4;

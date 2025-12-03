@@ -6,6 +6,7 @@
 
 #include <filesystem>
 #include <qdk/chemistry/algorithms/scf.hpp>
+#include <qdk/chemistry/data/basis_set.hpp>
 #include <qdk/chemistry/data/wavefunction_containers/sd.hpp>
 
 #include "../src/qdk/chemistry/algorithms/microsoft/utils.hpp"
@@ -911,5 +912,61 @@ TEST_F(ScfTest, H2ScanDIISNumericalStability) {
     auto [energy, wavefunction] = scf_solver->run(structure, 0, 1, "sto-3g");
 
     EXPECT_NEAR(energy, expected_energies[i], testing::scf_energy_tolerance);
+  }
+}
+
+TEST_F(ScfTest, AtomInitGuessEnergyConvergence) {
+  auto scf_solver = ScfSolverFactory::create();
+  scf_solver->settings().set("method", "hf");
+  std::vector<std::string> basis_names = {"def2-tzvp"};
+  std::vector<std::string> singlet_elements = {"He", "Be", "C", "Fe", "Sr"};
+  std::vector<std::string> multiplet_elements = {"N", "Na", "Co", "Se"};
+
+  for (const auto& basis_name : basis_names) {
+    for (const auto& element : singlet_elements) {
+      // structure
+      std::vector<std::string> symbols = {element};
+      std::vector<Eigen::Vector3d> coordinates = {
+          Eigen::Vector3d(0.0, 0.0, 0.0)};
+      auto structure = std::make_shared<Structure>(coordinates, symbols);
+
+      // standard
+      auto basis = BasisSet::from_basis_name(basis_name, structure);
+      auto [energy, wavefunction] = scf_solver->run(structure, 0, 1, basis);
+
+      // custom
+      std::map<std::string, std::string> element_basis_map = {
+          {element, basis_name}};
+      auto basis_custom =
+          BasisSet::from_element_map(element_basis_map, structure);
+      auto [energy_cust, wavefunction_cust] =
+          scf_solver->run(structure, 0, 1, basis_custom);
+
+      EXPECT_NEAR(energy, energy_cust, testing::scf_energy_tolerance);
+    }
+  }
+
+  for (const auto& basis_name : basis_names) {
+    for (const auto& element : multiplet_elements) {
+      // structure
+      std::vector<std::string> symbols = {element};
+      std::vector<Eigen::Vector3d> coordinates = {
+          Eigen::Vector3d(0.0, 0.0, 0.0)};
+      auto structure = std::make_shared<Structure>(coordinates, symbols);
+
+      // standard
+      auto basis = BasisSet::from_basis_name(basis_name, structure);
+      auto [energy, wavefunction] = scf_solver->run(structure, 0, 2, basis);
+
+      // custom
+      std::map<std::string, std::string> element_basis_map = {
+          {element, basis_name}};
+      auto basis_custom =
+          BasisSet::from_element_map(element_basis_map, structure);
+      auto [energy_cust, wavefunction_cust] =
+          scf_solver->run(structure, 0, 2, basis_custom);
+
+      EXPECT_NEAR(energy, energy_cust, testing::scf_energy_tolerance);
+    }
   }
 }
