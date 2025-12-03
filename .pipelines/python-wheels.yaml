@@ -24,7 +24,7 @@ parameters:
     imageName: ubuntu-22.04
   # - name: linux_aarch64
   #   os: linux
-  #   arch: x86_64
+  #   arch: arm64
   #   march: armv8-a
   #   imageName: ubuntu-22.04
 
@@ -61,14 +61,14 @@ extends:
       jobs:
       - ${{ each target in parameters.matrix }}:
         - job: Build_${{ target.name }}
-          ${{ if eq(target.march, 'armv8-a') }}:
+          ${{ if eq(target.arch, 'aarch64') }}:
             pool:
-              name: $(CPU_POOL_X86)
+              name: $(CPU_POOL_ARM)
               demands:
               - ImageOverride -equals ${{ target.imageName }}
               os: ${{ target.os }}
-              # hostArchitecture: Arm64
-          ${{ if eq(target.march, 'x86-64-v3') }}:
+              hostArchitecture: Arm64
+          ${{ if eq(target.arch, 'x86_64') }}:
             pool:
               name: $(CPU_POOL_X86)
               demands:
@@ -98,7 +98,7 @@ extends:
               artifactName: linux-${{ target.march }}-wheels-python$(pythonVersion)
           steps:
           # Build - x86_64
-          - ${{ if eq(target.march, 'x86-64-v3') }}:
+          - ${{ if eq(target.arch, 'x86_64') }}:
             - template: .pipelines/templates/docker-pip-wheel.yml@self
               parameters:
                 march: $(buildMarch)
@@ -110,7 +110,7 @@ extends:
                 pythonVersion: $(pythonVersion)
 
           # Test - x86_64
-          - ${{ if eq(target.march, 'x86-64-v3') }}:
+          - ${{ if eq(target.arch, 'x86_64') }}:
             - template: .pipelines/templates/docker-test-wheel.yml@self
               parameters:
                 agentBuildDirectory: $(Agent.BuildDirectory)
@@ -119,7 +119,7 @@ extends:
                 pythonVersion: $(pythonVersion)
 
           # Build - ARM64
-          - ${{ if eq(target.march, 'armv8-a') }}:
+          - ${{ if eq(target.arch, 'aarch64') }}:
             - template: .pipelines/templates/docker-pip-wheel.yml@self
               parameters:
                 march: $(buildMarch)
@@ -131,43 +131,13 @@ extends:
                 pythonVersion: $(pythonVersion)
 
           # Test - ARM64
-          - ${{ if eq(target.march, 'armv8-a') }}:
+          - ${{ if eq(target.arch, 'aarch64') }}:
             - template: .pipelines/templates/docker-test-wheel.yml@self
               parameters:
                 agentBuildDirectory: $(Agent.BuildDirectory)
                 dockerImage: mcr.microsoft.com/mirror/docker/library/ubuntu:22.04
                 imageTag: linux/arm64/v8
                 pythonVersion: $(pythonVersion)
-
-          # # Deploy: only from main branch and not for PRs
-          # - task: TwineAuthenticate@1
-          #   displayName: Twine Authenticate for wheel upload
-          #   inputs:
-          #     $(DEPENDENCIES_ARTIFACT_FEED): $(DEPENDENCIES_ARTIFACT_PROJECT)/$(DEPENDENCIES_ARTIFACT_FEED)
-          #   condition: and(succeeded(), eq(variables['Build.SourceBranch'], 'refs/heads/main'), ne(variables['Build.Reason'], 'PullRequest'))
-
-          # - script: |
-          #     cd $(Agent.BuildDirectory)/qdk-chemistry/python
-          #     pip install --user twine
-          #     python3 -m twine upload -r $(DEPENDENCIES_ARTIFACT_FEED) repaired_wheelhouse/*.whl --config-file $(PYPIRC_PATH)
-          #   displayName: Upload wheel with twine
-          #   condition: and(succeeded(), eq(variables['Build.SourceBranch'], 'refs/heads/main'), ne(variables['Build.Reason'], 'PullRequest'))
-
-          # Optional Publish Build Artifacts for debugging before release
-          # [GMN] Delete this before release
-          # - task: TwineAuthenticate@1
-          #   displayName: Twine Authenticate for wheel upload (debug)
-          #   inputs:
-          #     $(DEPENDENCIES_ARTIFACT_FEED): $(DEPENDENCIES_ARTIFACT_PROJECT)/$(DEPENDENCIES_ARTIFACT_FEED)
-          #   condition: and(succeeded(), eq('${{ parameters.forceArtifactUpload }}', 'true'))
-
-          # - script: |
-          #     echo "WARNING: Forcing artifact upload. This is intended for debugging purposes only."
-          #     cd $(Agent.BuildDirectory)/qdk-chemistry/python
-          #     pip install --user twine
-          #     python3 -m twine upload -r $(DEPENDENCIES_ARTIFACT_FEED) repaired_wheelhouse/*.whl --config-file $(PYPIRC_PATH)
-          #   displayName: Upload wheel with twine (debug)
-          #   condition: and(succeeded(), eq('${{ parameters.forceArtifactUpload }}', 'true'))
 
     # - stage: Approval
     #   displayName: Approval

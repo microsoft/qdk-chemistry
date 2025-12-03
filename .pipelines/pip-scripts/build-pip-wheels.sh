@@ -57,7 +57,7 @@ git clone --depth 1 --branch v1.15.3 https://github.com/gabime/spdlog.git spdlog
 cd spdlog
 mkdir -p build
 cd build
-cmake .. -DCMAKE_BUILD_TYPE="$BUILD_TYPE" \
+cmake .. -DCMAKE_BUILD_TYPE=${BUILD_TYPE} \
         -DCMAKE_INSTALL_PREFIX=/usr/local \
         -DCMAKE_POSITION_INDEPENDENT_CODE=ON \
         -DCMAKE_CXX_FLAGS="-march=${MARCH} -fPIC -Os" \
@@ -100,7 +100,8 @@ python3 --version
 # Update pip and install build tools
 python3 -m pip install --upgrade pip
 python3 -m pip install auditwheel build
-python3 -m pip install "fonttools>=4.61.0"
+python3 -m pip install "fonttools>=4.61.0" # Resolves CVE-2025-66034
+
 # Install Python package
 cd python
 
