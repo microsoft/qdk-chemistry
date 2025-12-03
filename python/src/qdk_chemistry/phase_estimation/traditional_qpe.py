@@ -6,7 +6,7 @@ multiple ancilla qubits.
 
 References:
     Nielsen, M. A., & Chuang, I. L. (2010). "Quantum Computation and Quantum
-    Information" (10th Anniversary Edition), Ch. 5.2.
+    Information" (10th Anniversary Edition), Ch. 5.2. :cite:`Nielsen-Chuang2010-QPE`
 
 """
 
