@@ -69,6 +69,9 @@ macis::ASCISettings get_asci_settings_(const data::Settings& settings_) {
     throw std::runtime_error("min_grow_factor must be > 1.0, got " +
                              std::to_string(asci_settings.min_grow_factor));
   }
+  if (asci_settings.min_grow_factor > asci_settings.grow_factor) {
+    throw std::runtime_error("min_grow_factor must be <= grow_factor");
+  }
   if (asci_settings.growth_backoff_rate <= 0.0 ||
       asci_settings.growth_backoff_rate >= 1.0) {
     throw std::runtime_error("growth_backoff_rate must be in (0, 1), got " +
