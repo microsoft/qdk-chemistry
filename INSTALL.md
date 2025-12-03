@@ -121,7 +121,7 @@ cmake [...] -DCMAKE_PREFIX_PATH="/opt/openblas;/opt/hdf5"
 
 ## Dependencies
 
-**Disclaimer**: The list of dependencies listed in this file denotes the *direct* software dependencies of QDK/Chemistry. Each of these dependencies may come with dependencies of their own. The [Component Governance Manifest](TODO) keeps track of our current understanding of the complete dependency graph of QDK/Chemistry, but is subject to inaccuracies given changes in upstream dependencies. Please refer to the documentation of linked dependencies for more information of their respective dependency trees.
+**Disclaimer**: The list of dependencies listed in this file denotes the *direct* software dependencies of QDK/Chemistry. Each of these dependencies may come with dependencies of their own. The Component Governance Manifests for the [C++](cpp/manifest/qdk-chemistry/cgmanifest.json) and [Python](python/manifest/cgmanifest.json) libraries keeps track of our current understanding of the complete dependency graph of QDK/Chemistry, but is subject to inaccuracies given changes in upstream dependencies. Please refer to the documentation of linked dependencies for more information of their respective dependency trees.
 
 ```txt
 TODO (DBWY): Link the CGManifest when available
