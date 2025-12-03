@@ -22,11 +22,11 @@ parameters:
     arch: x86_64
     march: x86-64-v3
     imageName: ubuntu-22.04
-  - name: linux_aarch64
-    os: linux
-    arch: aarch64
-    march: armv8-a
-    imageName: qd-azurelinux3-pt-arm
+  # - name: linux_aarch64
+  #   os: linux
+  #   arch: aarch64
+  #   march: armv8-a
+  #   imageName: qd-azurelinux3-pt-arm
 
 variables:
 - group: QdkChemistry
@@ -79,7 +79,7 @@ extends:
             outputs:
             - output: pipelineArtifact
               displayName: Upload Linux Python $(pythonVersion) Wheels for ${{ target.march }}
-              targetPath: $(System.DefaultWorkingDirectory)/qdk-chemistry/python/repaired_wheelhouse
+              targetPath: $(System.DefaultWorkingDirectory)/python/repaired_wheelhouse
               artifactName: linux-${{ target.arch }}-wheels-python$(pythonVersion)
           steps:
           # Build - x86_64
@@ -124,19 +124,19 @@ extends:
                 imageTag: linux/arm64/v8
                 pythonVersion: $(pythonVersion)
 
-          # Deploy: only from main branch and not for PRs
-          - task: TwineAuthenticate@1
-            displayName: Twine Authenticate for wheel upload
-            inputs:
-              $(DEPENDENCIES_ARTIFACT_FEED): $(DEPENDENCIES_ARTIFACT_PROJECT)/$(DEPENDENCIES_ARTIFACT_FEED)
-            condition: and(succeeded(), eq(variables['Build.SourceBranch'], 'refs/heads/main'), ne(variables['Build.Reason'], 'PullRequest'))
+          # # Deploy: only from main branch and not for PRs
+          # - task: TwineAuthenticate@1
+          #   displayName: Twine Authenticate for wheel upload
+          #   inputs:
+          #     $(DEPENDENCIES_ARTIFACT_FEED): $(DEPENDENCIES_ARTIFACT_PROJECT)/$(DEPENDENCIES_ARTIFACT_FEED)
+          #   condition: and(succeeded(), eq(variables['Build.SourceBranch'], 'refs/heads/main'), ne(variables['Build.Reason'], 'PullRequest'))
 
-          - script: |
-              cd $(Agent.BuildDirectory)/qdk-chemistry/python
-              pip install --user twine
-              python3 -m twine upload -r $(DEPENDENCIES_ARTIFACT_FEED) repaired_wheelhouse/*.whl --config-file $(PYPIRC_PATH)
-            displayName: Upload wheel with twine
-            condition: and(succeeded(), eq(variables['Build.SourceBranch'], 'refs/heads/main'), ne(variables['Build.Reason'], 'PullRequest'))
+          # - script: |
+          #     cd $(Agent.BuildDirectory)/qdk-chemistry/python
+          #     pip install --user twine
+          #     python3 -m twine upload -r $(DEPENDENCIES_ARTIFACT_FEED) repaired_wheelhouse/*.whl --config-file $(PYPIRC_PATH)
+          #   displayName: Upload wheel with twine
+          #   condition: and(succeeded(), eq(variables['Build.SourceBranch'], 'refs/heads/main'), ne(variables['Build.Reason'], 'PullRequest'))
 
           # Optional Publish Build Artifacts for debugging before release
           # [GMN] Delete this before release
@@ -153,3 +153,69 @@ extends:
           #     python3 -m twine upload -r $(DEPENDENCIES_ARTIFACT_FEED) repaired_wheelhouse/*.whl --config-file $(PYPIRC_PATH)
           #   displayName: Upload wheel with twine (debug)
           #   condition: and(succeeded(), eq('${{ parameters.forceArtifactUpload }}', 'true'))
+
+    # - stage: Approval
+    #   displayName: Approval
+    #   dependsOn: Build
+    #   condition: and(succeeded(), eq(variables['Build.Reason'], 'Manual'))
+    #   jobs:
+    #       - job: "Approval"
+    #         pool: server
+    #         timeoutInMinutes: 1440 # job times out in 1 day
+    #         steps:
+    #           - task: ManualValidation@0
+    #             timeoutInMinutes: 1440 # task times out in 1 day
+    #             inputs:
+    #               notifyUsers: ""
+    #               instructions: "Please verify artifacts and approve the release"
+    #               onTimeout: "reject"
+
+    # - stage: release
+    #   displayName: Release
+    #   dependsOn: approval
+    #   condition: and(succeeded(), eq(variables['Build.Reason'], 'Manual'))
+    #   jobs:
+    #     - job: "Publish Python Packages"
+    #       pool:
+    #         name: "Azure-Pipelines-DevTools-EO"
+    #         image: "ubuntu-latest"
+    #         os: linux
+    #       templateContext:
+    #           type: releaseJob
+    #           isProduction: true
+    #           inputs: # Declare all build artifacts to be consumed in the release job
+    #           - input: pipelineArtifact
+    #             artifact: linux-x86_64-wheels-python3.11
+    #             targetPath: $(System.DefaultWorkingDirectory)/python/repaired_wheelhouse/linux-x86_64-wheels-python3.11
+    #           - input: pipelineArtifact
+    #             artifact: linux-x86_64-wheels-python3.12
+    #             targetPath: $(System.DefaultWorkingDirectory)/python/repaired_wheelhouse/linux-x86_64-wheels-python3.12
+    #           - input: pipelineArtifact
+    #             artifact: linux-x86_64-wheels-python3.13
+    #             targetPath: $(System.DefaultWorkingDirectory)/python/repaired_wheelhouse/linux-x86_64-wheels-python3.13
+    #           - input: pipelineArtifact
+    #             artifact: linux-aarch64-wheels-python3.11
+    #             targetPath: $(System.DefaultWorkingDirectory)/python/repaired_wheelhouse/linux-aarch64-wheels-python3.11
+    #           - input: pipelineArtifact
+    #             artifact: linux-aarch64-wheels-python3.12
+    #             targetPath: $(System.DefaultWorkingDirectory)/python/repaired_wheelhouse/linux-aarch64-wheels-python3.12
+    #           - input: pipelineArtifact
+    #             artifact: linux-aarch64-wheels-python3.13
+    #             targetPath: $(System.DefaultWorkingDirectory)/python/repaired_wheelhouse/linux-aarch64-wheels-python3.13
+    #       steps:
+    #         - task: EsrpRelease@9
+    #           condition: succeeded()
+    #           displayName: Publish Py Packages
+    #           inputs:
+    #             connectedservicename: "PME ESRP Azure Connection"
+    #             usemanagedidentity: true
+    #             keyvaultname:
+    #             signcertname: ESRPCert
+    #             clientid:
+    #             contenttype: PyPi
+    #             domaintenantid:
+    #             folderlocation: "$(System.DefaultWorkingDirectory)/qdk-chemistry/python/repaired_wheelhouse"
+    #             waitforreleasecompletion: true
+    #             owners: "nathanbaker@microsoft.com"
+    #             approvers: "nathanbaker@microsoft.com"
+    #             mainpublisher: ESRPRELPACMAN
