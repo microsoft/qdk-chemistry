@@ -31,7 +31,7 @@ import re
 import numpy as np
 from pyscf.mcscf import avas
 
-from qdk_chemistry.algorithms import ActiveSpaceSelector, register
+from qdk_chemistry.algorithms import ActiveSpaceSelector
 from qdk_chemistry.data import Configuration, Orbitals, Settings, SlaterDeterminantContainer, Wavefunction
 from qdk_chemistry.plugins.pyscf.utils import orbitals_to_scf
 
@@ -216,6 +216,3 @@ class PyscfAVAS(ActiveSpaceSelector):
     def name(self) -> str:
         """Return the name of the active space selector."""
         return "pyscf_avas"
-
-
-register(lambda: PyscfAVAS())

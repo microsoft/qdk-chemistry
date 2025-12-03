@@ -9,6 +9,7 @@ custom algorithms that can be registered and used within the QDK/Chemistry frame
 # Licensed under the MIT License. See LICENSE.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
 
+import contextlib
 import importlib
 from types import ModuleType
 from typing import TYPE_CHECKING, Any

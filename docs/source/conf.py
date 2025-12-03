@@ -159,6 +159,7 @@ nitpick_ignore_regex = [
     (r"cpp:identifier", r"macis.*"),
     (r"cpp:identifier", r"nlohmann.*"),
     (r"cpp:identifier", r"qcs.*"),
+    (r"cpp:identifier", r".*::value"),
     (r"py:class", r"qsharp._qsharp.*"),
     (r"py:class", r"h5py.*"),
     (r"py:class", r"numpy.*"),

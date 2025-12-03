@@ -35,7 +35,7 @@ This module requires both QDK/Chemistry and PySCF to be installed.
 import numpy as np
 from pyscf import cc
 
-from qdk_chemistry.algorithms import CoupledClusterCalculator, register
+from qdk_chemistry.algorithms import CoupledClusterCalculator
 from qdk_chemistry.data import CoupledClusterAmplitudes, Settings
 from qdk_chemistry.plugins.pyscf.utils import hamiltonian_to_scf
 
@@ -158,6 +158,3 @@ class PyscfCoupledClusterCalculator(CoupledClusterCalculator):
     def name(self) -> str:
         """Return the name of the Coupled Cluster calculator."""
         return "pyscf"
-
-
-register(lambda: PyscfCoupledClusterCalculator())

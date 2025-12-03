@@ -18,7 +18,6 @@ from qiskit_nature.second_q.mappers import (
     ParityMapper,
 )
 
-from qdk_chemistry.algorithms import register
 from qdk_chemistry.algorithms.qubit_mapper import QubitMapper
 from qdk_chemistry.data import Hamiltonian, QubitHamiltonian, Settings
 
@@ -99,6 +98,3 @@ class QiskitQubitMapper(QubitMapper):
     def name(self) -> str:
         """Return the algorithm name ``qiskit``."""
         return "qiskit"
-
-
-register(lambda: QiskitQubitMapper())

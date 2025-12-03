@@ -1138,6 +1138,7 @@ Args:
 
 Returns:
     tuple[int, int] | tuple[float, float] | list[int] | list[str]:
+
         The limit value - either a range tuple or a list of allowed values
 
 Raises:
@@ -1294,7 +1295,7 @@ Examples:
     >>> class MySettings(qdk_chemistry.data.Settings):
     ...     def __init__(self):
     ...         super().__init__()
-    ...         self._set_default("method", "string", "default",
+    ...         self._set_default("method", "string", "hf",
     ...                          "Electronic structure method",
     ...                          ["hf", "dft", "mp2"])
     ...         self._set_default("max_iter", "int", 1000,
@@ -1875,7 +1876,7 @@ Examples:
     ...     def __init__(self):
     ...         super().__init__()
     ...         # Basic usage
-    ...         self._set_default("method", "string", "default")
+    ...         self._set_default("method", "string", "hf")
     ...         self._set_default("max_iter", "int", 1000)
     ...         self._set_default("tolerance", "double", 1e-6)
     ...

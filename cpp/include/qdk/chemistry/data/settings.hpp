@@ -36,15 +36,29 @@ using SettingValue =
     std::variant<bool, int64_t, double, std::string, std::vector<int64_t>,
                  std::vector<double>, std::vector<std::string>>;
 
+/**
+ * @brief Constraint specifying minimum and maximum bounds for a setting value
+ * @tparam T The type of the bounded value (int64_t or double)
+ *
+ * This constraint type defines inclusive bounds [min, max] for numeric
+ * settings. By default, min and max are set to the type's limits.
+ */
 template <typename T>
 struct BoundConstraint {
-  T min = std::numeric_limits<T>::min();
-  T max = std::numeric_limits<T>::max();
+  T min = std::numeric_limits<T>::min();  ///< Minimum allowed value (inclusive)
+  T max = std::numeric_limits<T>::max();  ///< Maximum allowed value (inclusive)
 };
 
+/**
+ * @brief Constraint specifying a list of allowed values for a setting
+ * @tparam T The type of the allowed values (int64_t or std::string)
+ *
+ * This constraint type defines an explicit set of allowed values for a setting.
+ * The setting value must match one of the values in the allowed_values vector.
+ */
 template <typename T>
 struct ListConstraint {
-  std::vector<T> allowed_values;
+  std::vector<T> allowed_values;  ///< Vector of allowed values for the setting
 };
 
 /**
@@ -54,23 +68,65 @@ using Constraint =
     std::variant<BoundConstraint<int64_t>, ListConstraint<int64_t>,
                  BoundConstraint<double>, ListConstraint<std::string>>;
 
+/**
+ * @brief Type trait to detect if a type is a std::vector
+ * @tparam T The type to check
+ *
+ * Primary template that evaluates to std::false_type for non-vector types.
+ */
 template <typename T>
 struct is_vector : std::false_type {};
 
+/**
+ * @brief Specialization of is_vector for std::vector types
+ * @tparam T The element type of the vector
+ * @tparam A The allocator type of the vector
+ *
+ * Specialization that evaluates to std::true_type for std::vector types.
+ */
 template <typename T, typename A>
 struct is_vector<std::vector<T, A>> : std::true_type {};
 
+/**
+ * @brief Helper variable template for is_vector
+ * @tparam T The type to check
+ *
+ * Provides a convenient boolean constant indicating whether T is a std::vector.
+ */
 template <typename T>
 inline constexpr bool is_vector_v = is_vector<T>::value;
 
+/**
+ * @brief Type trait to detect non-bool integral types
+ * @tparam T The type to check
+ *
+ * Evaluates to std::true_type if T is an integral type other than bool.
+ * This is useful for distinguishing integer types from boolean in template
+ * contexts.
+ */
 template <typename T>
 struct is_non_bool_integral
     : std::conjunction<std::is_integral<T>,
                        std::negation<std::is_same<T, bool>>> {};
 
+/**
+ * @brief Helper variable template for is_non_bool_integral
+ * @tparam T The type to check
+ *
+ * Provides a convenient boolean constant indicating whether T is a non-bool
+ * integral type.
+ */
 template <typename T>
 inline constexpr bool is_non_bool_integral_v = is_non_bool_integral<T>::value;
 
+/**
+ * @brief Helper variable template to detect vectors of non-bool integral types
+ * @tparam T The type to check
+ *
+ * Evaluates to true if T is a std::vector whose element type is a non-bool
+ * integral type (e.g., std::vector<int>, std::vector<uint32_t>, but not
+ * std::vector<bool>).
+ */
 template <typename T>
 inline constexpr bool is_non_bool_integral_vector_v =
     is_vector_v<T> && is_non_bool_integral_v<typename T::value_type>;
@@ -702,6 +758,9 @@ class Settings : public DataClass,
    *
    * @param key The setting key
    * @param value The default value
+   * @param description Optional description of the setting for documentation
+   * @param limit Optional constraint on the allowed values
+   * @param documented Whether the setting should be included in documentation
    */
   void set_default(const std::string& key, const SettingValue& value,
                    std::optional<std::string> description = std::nullopt,
@@ -718,14 +777,18 @@ class Settings : public DataClass,
    *
    * @param key The setting key
    * @param value The default value
+   * @param description Optional description of the setting for documentation
+   * @param limit Optional constraint on the allowed values
+   * @param documented Whether the setting should be included in documentation
+   * @tparam T The type of the value
    */
   template <typename T>
-  void set_default(const std::string& key, const T& value,
-                   std::optional<std::string> description = std::nullopt,
-                   std::optional<std::variant<BoundConstraint<int64_t>,
-                                              ListConstraint<int64_t>>>
-                       limit = std::nullopt,
-                   bool documented = true) {
+  void set_default(
+      const std::string& key, const T& value,
+      std::optional<std::string> description = std::nullopt,
+      std::optional<std::variant<BoundConstraint<T>, ListConstraint<T>>> limit =
+          std::nullopt,
+      bool documented = true) {
     if (!has(key)) {
       // If the type is directly in the variant, use it as-is
       if constexpr (is_variant_member_v<T, SettingValue>) {
@@ -740,32 +803,21 @@ class Settings : public DataClass,
                 using LimitValType = std::decay_t<decltype(limit_val)>;
                 // Convert to the appropriate Constraint type
                 if constexpr (std::is_same_v<LimitValType,
-                                             std::pair<int64_t, int64_t>>) {
-                  limits_[key] = BoundConstraint<int64_t>{limit_val.first,
-                                                          limit_val.second};
+                                             BoundConstraint<int64_t>>) {
+                  limits_[key] = limit_val;
                 } else if constexpr (std::is_same_v<LimitValType,
-                                                    std::vector<int64_t>>) {
-                  ListConstraint<int64_t> constraint;
-                  constraint.allowed_values.assign(limit_val.begin(),
-                                                   limit_val.end());
-                  limits_[key] = std::move(constraint);
+                                                    ListConstraint<int64_t>>) {
+                  limits_[key] = limit_val;
+                } else if constexpr (std::is_same_v<LimitValType,
+                                                    BoundConstraint<double>>) {
+                  limits_[key] = limit_val;
                 } else if constexpr (std::is_same_v<
                                          LimitValType,
-                                         std::pair<double, double>>) {
-                  limits_[key] = BoundConstraint<double>{limit_val.first,
-                                                         limit_val.second};
-                } else if constexpr (std::is_same_v<LimitValType,
-                                                    std::vector<double>>) {
-                  // vector<double> is not in Constraint, but we don't use it
-                  // for limits anyway
+                                         ListConstraint<std::string>>) {
+                  limits_[key] = limit_val;
+                } else {
                   throw std::invalid_argument(
-                      "vector<double> limits are not supported");
-                } else if constexpr (std::is_same_v<LimitValType,
-                                                    std::vector<std::string>>) {
-                  ListConstraint<std::string> constraint;
-                  constraint.allowed_values.assign(limit_val.begin(),
-                                                   limit_val.end());
-                  limits_[key] = std::move(constraint);
+                      "Unsupported limit type for this value type");
                 }
               },
               *limit);
@@ -783,11 +835,22 @@ class Settings : public DataClass,
               [this, &key](const auto& limit_val) {
                 using LimitValType = std::decay_t<decltype(limit_val)>;
                 if constexpr (std::is_same_v<LimitValType,
-                                             BoundConstraint<int64_t>>) {
-                  limits_[key] = limit_val;
+                                             BoundConstraint<T>>) {
+                  // Convert T to int64_t for storage
+                  limits_[key] = BoundConstraint<int64_t>{
+                      static_cast<int64_t>(limit_val.min),
+                      static_cast<int64_t>(limit_val.max)};
                 } else if constexpr (std::is_same_v<LimitValType,
-                                                    ListConstraint<int64_t>>) {
-                  limits_[key] = limit_val;
+                                                    ListConstraint<T>>) {
+                  // Convert T values to int64_t for storage
+                  ListConstraint<int64_t> constraint;
+                  constraint.allowed_values.reserve(
+                      limit_val.allowed_values.size());
+                  for (const auto& val : limit_val.allowed_values) {
+                    constraint.allowed_values.push_back(
+                        static_cast<int64_t>(val));
+                  }
+                  limits_[key] = std::move(constraint);
                 } else {
                   // Unsupported limit type for this value type
                   throw std::invalid_argument(
@@ -837,6 +900,9 @@ class Settings : public DataClass,
    * @param key The key for which to set the default value.
    * @param value The default value to associate with the key, as a C-style
    * string.
+   * @param description Optional description of the setting for documentation
+   * @param limit Optional constraint on the allowed string values
+   * @param documented Whether the setting should be included in documentation
    */
   void set_default(const std::string& key, const char* value,
                    std::optional<const char*> description = std::nullopt,

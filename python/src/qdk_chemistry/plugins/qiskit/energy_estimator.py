@@ -30,7 +30,6 @@ if TYPE_CHECKING:
     import qiskit
     from qiskit.circuit import QuantumCircuit
 
-from qdk_chemistry.algorithms import register
 from qdk_chemistry.algorithms.energy_estimator import (
     EnergyEstimator,
 )
@@ -198,6 +197,3 @@ class QiskitEnergyEstimator(EnergyEstimator):
     def name(self) -> str:
         """Get the name of the estimator backend."""
         return "qiskit_aer_simulator"
-
-
-register(lambda: QiskitEnergyEstimator())
