@@ -9,7 +9,9 @@ custom algorithms that can be registered and used within the QDK/Chemistry frame
 # Licensed under the MIT License. See LICENSE.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
 
+import contextlib
 import importlib
+import warnings
 from types import ModuleType
 from typing import TYPE_CHECKING, Any
 
@@ -53,6 +55,8 @@ from qdk_chemistry.phase_estimation import (
     TraditionalPhaseEstimation,
     energy_from_phase,
 )
+from qdk_chemistry.utils.telemetry import TELEMETRY_ENABLED
+from qdk_chemistry.utils.telemetry_events import telemetry_tracker
 
 __all__ = [
     # Classes
@@ -136,3 +140,23 @@ def __getattr__(name: str) -> Any:
 def __dir__() -> list[str]:
     """Ensure dir() lists lazily resolved registry helpers."""
     return sorted(set(globals()) | _REGISTRY_EXPORTS)
+
+
+def apply_telemetry_to_classes():
+    with contextlib.suppress(NameError):
+        try:
+            for name in __all__:
+                instance = globals().get(name)
+                if hasattr(instance, "run"):
+                    instance.run = telemetry_tracker()(instance.run)
+
+        except (ImportError, AttributeError, RuntimeError, OSError) as e:
+            warnings.warn(
+                f"Failed to generate registry type stubs: {e}. Type hints may be incomplete.",
+                UserWarning,
+                stacklevel=2,
+            )
+
+
+if TELEMETRY_ENABLED:
+    apply_telemetry_to_classes()

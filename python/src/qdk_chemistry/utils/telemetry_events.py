@@ -7,6 +7,8 @@
 
 from __future__ import annotations
 
+import time
+from functools import wraps
 from typing import Any
 
 from .telemetry import log_telemetry
@@ -159,7 +161,7 @@ def on_algorithm_end(
             used (e.g., 'qdk', 'pyscf').
         error_type: The type of error encountered, if
             any. Defaults to None.
-        **properties: Additional contextual information about the
+        properties: Additional contextual information about the
             execution (e.g., 'num_basis_functions').
 
     """
@@ -181,20 +183,45 @@ def on_algorithm_end(
     )
 
 
-def on_test_call(name: str) -> None:
-    """Logs a telemetry event for a test call.
+def telemetry_tracker():
+    """Decorator to track telemetry for algorithm run methods."""
 
-    This function records a telemetry event with the name "qdk_chemistry.
-    test" and includes the provided test name as a property. The event is
-    logged as a counter type.
+    def decorator(run_method):
+        @wraps(run_method)
+        def wrapper(self, *args, **kwargs):
+            start_time = time.perf_counter()
+            try:
+                result = run_method(self, *args, **kwargs)
+                duration = time.perf_counter() - start_time
+                try:
+                    n_basis = extract_data(result)
+                    on_algorithm_end(
+                        algorithm_type=self.type_name(),
+                        algorithm_name=self.name(),
+                        duration_sec=duration,
+                        status="success",
+                        num_basis_functions=n_basis,
+                    )
+                except (AttributeError, TypeError, IndexError):
+                    on_algorithm_end(
+                        algorithm_type=self.type_name(),
+                        algorithm_name=self.name(),
+                        duration_sec=duration,
+                        status="success",
+                    )
+                return result
 
-    Args:
-        name: The name of the test to be logged in the telemetry event.
+            except Exception as e:
+                duration = time.perf_counter() - start_time
+                on_algorithm_end(
+                    algorithm_type=self.type_name(),
+                    algorithm_name=self.name(),
+                    duration_sec=duration,
+                    status="failed",
+                    error_type=type(e).__name__,
+                )
+                raise
 
-    """
-    log_telemetry(
-        "qdk_chemistry.test",
-        1,
-        properties={"test_name": name},
-        type="counter",
-    )
+        return wrapper
+
+    return decorator
