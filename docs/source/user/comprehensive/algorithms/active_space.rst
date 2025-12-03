@@ -182,7 +182,7 @@ QDK/Chemistry implementations
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 - **qdk_valence**: Manual valence-based selection
-- **qdk_occupation**: Occupation-based automatic selection  
+- **qdk_occupation**: Occupation-based automatic selection
 - **qdk_autocas**: Entropy-based automatic selection
 - **qdk_autocas_eos**: Enhanced entropy-based selection
 

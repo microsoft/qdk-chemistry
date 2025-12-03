@@ -53,4 +53,3 @@ print(f"Active orbitals summary:\n{active_orbitals.get_summary()}")
 
 # end-cell-run
 ################################################################################
-
