@@ -681,16 +681,16 @@ TEST_F(StructureTest, FilenameValidation) {
   // Test valid filenames work
   EXPECT_NO_THROW(s.to_json_file("valid.structure.json"));
   EXPECT_NO_THROW(s.to_xyz_file("valid.structure.xyz"));
+  EXPECT_NO_THROW(s.to_xyz_file("valid.xyz"));
   EXPECT_NO_THROW(s.to_file("valid.structure.json", "json"));
   EXPECT_NO_THROW(s.to_file("valid.structure.xyz", "xyz"));
+  EXPECT_NO_THROW(s.to_file("valid.xyz", "xyz"));
+  EXPECT_NO_THROW(Structure::from_xyz_file("valid.xyz"));
 
   // Test invalid filenames throw exceptions
   EXPECT_THROW(s.to_json_file("invalid.json"), std::invalid_argument);
-  EXPECT_NO_THROW(s.to_xyz_file("invalid.xyz"));
-
   EXPECT_THROW(Structure::from_json_file("invalid.json"),
                std::invalid_argument);
-  EXPECT_NO_THROW(Structure::from_xyz_file("invalid.xyz"));
 }
 
 TEST_F(StructureTest, FileIOErrorHandling) {
