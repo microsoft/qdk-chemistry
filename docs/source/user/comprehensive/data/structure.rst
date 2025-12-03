@@ -92,7 +92,7 @@ File formats
 As well as the JSON and HDF5 file formats supported for all data classes of QDK/Chemistry, there is the dedicated XYZ format for structures.
 
 XYZ format
-^^^^^^^^^^
+~~~~~~~~~~
 
 `XYZ representation <https://en.wikipedia.org/wiki/XYZ_file_format>`_ of the same :class:`~qdk_chemistry.data.Structure`:
 

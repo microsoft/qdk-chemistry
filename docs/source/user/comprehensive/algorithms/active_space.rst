@@ -8,7 +8,7 @@ Its primary purpose is to reduce the cost of quantum chemistry calculations by f
 Overview
 --------
 
-:term:`Active space` methods classify molecular orbitals into three categories:
+Active space methods classify molecular orbitals into three categories:
 
 1. **Inactive (core) orbitals**: Always doubly occupied and not explicitly correlated
 2. **Active orbitals**: Allow variable occupation and are explicitly correlated

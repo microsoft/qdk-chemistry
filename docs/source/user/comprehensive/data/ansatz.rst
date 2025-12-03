@@ -62,7 +62,7 @@ The :class:`~qdk_chemistry.data.Ansatz` class provides methods to access its com
    .. literalinclude:: ../../../_static/examples/python/ansatz.py
       :language: python
       :start-after: # start-cell-access
-      :end-before: # start-cell-access
+      :end-before: # end-cell-access
 
 
 Related classes
