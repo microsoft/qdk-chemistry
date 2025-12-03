@@ -558,7 +558,7 @@ def hamiltonian_to_scf(hamiltonian: Hamiltonian, alpha_occ: np.ndarray, beta_occ
 
     Raises:
         ValueError: If the Hamiltonian uses unsupported features like model Hamiltonian + unrestricted orbitals,
-        open-shell systems, or active spaces.
+        ``open-shell systems``, or ``active spaces``.
 
     Note:
         * This function is intended for (restricted) model hamiltonian usage, since the orbitals are not used directly.

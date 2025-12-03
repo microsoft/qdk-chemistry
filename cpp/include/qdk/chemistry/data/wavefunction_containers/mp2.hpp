@@ -95,7 +95,6 @@ class MP2Container : public WavefunctionContainer {
 
   /**
    * @brief Get T1 amplitudes
-   * @param
    * @return Pair of (alpha, beta) T1 amplitudes
    */
   std::pair<const VectorVariant&, const VectorVariant&> get_t1_amplitudes()

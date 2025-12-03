@@ -148,7 +148,7 @@ class Hamiltonian : public DataClass,
    * @param i First orbital index
    * @param j Second orbital index
    * @param channel Spin channel to query (aa, or bb), defaults to aa
-   * @return One-electron integral <ij>
+   * @return One-electron integral &lt;ij&gt;
    * @throws std::out_of_range if indices are invalid
    */
   double get_one_body_element(unsigned i, unsigned j,

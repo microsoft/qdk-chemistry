@@ -226,7 +226,7 @@ Get specific one-electron integral element <ij>.
 
 Args:
     i, j (int): Orbital indices for the one-electron integral
-    channel (SpinChannel): spin channel to check (aa or bb, default is aa)
+    channel (SpinChannel): spin channel to check (aa or bb, ``default is`` aa)
 
 Returns:
     float: Value of the one-electron integral <ij>

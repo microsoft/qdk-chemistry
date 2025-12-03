@@ -985,18 +985,18 @@ spin-separated amplitudes as well as reduced density matrices (RDMs).
            R"(
 Constructs a coupled cluster wavefunction container with amplitudes.
 
-Parameters:
+Args:
     orbitals (Orbitals): Shared pointer to orbital basis set
     wavefunction (Wavefunction): Shared pointer to wavefunction
     t1_amplitudes (numpy.ndarray, optional): T1 amplitudes (will be used for
-    both alpha and beta in restricted case)
+    ``both alpha and beta in restricted`` case)
     t2_amplitudes (numpy.ndarray, optional): T2 amplitudes (will be used for
-    alpha-beta coupling)
+    ``alpha-beta`` coupling)
 
 Examples:
     >>> t1 = np.array([...])
     >>> t2 = np.array([...])
-    >>> container = qdk.chemistry.CoupledClusterContainer(
+    >>> container = qdk_chemistry.CoupledClusterContainer(
     ...     orbitals, wfn, t1, t2)
         )",
            py::arg("orbitals"), py::arg("wavefunction"),
@@ -1012,7 +1012,7 @@ Examples:
            R"(
 Constructs a coupled cluster wavefunction container with spin-separated amplitudes.
 
-Parameters:
+Args:
     orbitals (Orbitals): Shared pointer to orbital basis set
     wavefunction (Wavefunction): Shared pointer to wavefunction
     t1_amplitudes_aa (numpy.ndarray, optional): Alpha T1 amplitudes
@@ -1025,7 +1025,7 @@ Examples:
     >>> t1_aa = np.array([...])
     >>> t1_bb = np.array([...])
     >>> t2_abab = np.array([...])
-    >>> container = qdk.chemistry.CoupledClusterContainer(
+    >>> container = qdk_chemistry.CoupledClusterContainer(
     ...     orbitals, wfn, t1_aa, t1_bb, t2_abab, None, None)
         )",
            py::arg("orbitals"), py::arg("wavefunction"),
@@ -1046,7 +1046,7 @@ Examples:
            R"(
 Constructs a coupled cluster wavefunction container with amplitudes and RDMs.
 
-Parameters:
+Args:
     orbitals (Orbitals): Shared pointer to orbital basis set
     wavefunction (Wavefunction): Shared pointer to wavefunction
     t1_amplitudes_aa (numpy.ndarray, optional): Alpha T1 amplitudes
@@ -1061,7 +1061,7 @@ Examples:
     >>> t1_aa = np.array([...])
     >>> t2_abab = np.array([...])
     >>> one_rdm = np.array([...])
-    >>> container = qdk.chemistry.CoupledClusterContainer(
+    >>> container = qdk_chemistry.CoupledClusterContainer(
     ...     orbitals, wfn, t1_aa, None, t2_abab, None, None, one_rdm, None)
         )",
            py::arg("orbitals"), py::arg("wavefunction"),
@@ -1156,13 +1156,13 @@ Examples:
            R"(
 Constructs an MP2 wavefunction container.
 
-Parameters:
+Args:
     hamiltonian (Hamiltonian): Shared pointer to the Hamiltonian
     wavefunction (Wavefunction): Shared pointer to the Wavefunction
     partitioning (str, optional): Choice of partitioning in perturbation theory (default: "mp")
 
 Examples:
-    >>> container = qdk.chemistry.MP2Container(
+    >>> container = qdk_chemistry.MP2Container(
     ...     hamiltonian, wfn, "mp")
         )",
            py::arg("hamiltonian"), py::arg("wavefunction"),

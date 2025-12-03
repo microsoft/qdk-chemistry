@@ -45,8 +45,8 @@ class DynamicalCorrelationCalculator
    * This method performs the calculation using the provided ansatz and returns
    * both the total energy and the resulting wavefunction.
    *
-   * @param ansatz The Ansatz (Wavefunction and Hamiltonian) describing the
-   *               system of interest
+   * @param args Arguments to pass to the underlying algorithm, typically an
+   * Ansatz (Wavefunction and Hamiltonian) describing the system of interest
    * @return A pair containing the total energy (first) and the resulting
    *         wavefunction (second)
    *

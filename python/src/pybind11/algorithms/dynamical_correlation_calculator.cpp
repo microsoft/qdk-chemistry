@@ -68,10 +68,10 @@ wavefunction that may contain correlation information.
 Examples:
   >>> import qdk
   >>> # Create ansatz from hamiltonian and wavefunction
-  >>> ansatz = qdk.chemistry.data.Ansatz(hamiltonian, wavefunction)
+  >>> ansatz = qdk_chemistry.data.Ansatz(hamiltonian, wavefunction)
   >>>
   >>> # Create calculator (e.g., MP2) using the registry
-  >>> calculator = qdk.chemistry.algorithms.create("dynamical_correlation_calculator", "qdk_mp2_calculator")
+  >>> calculator = qdk_chemistry.algorithms.create("dynamical_correlation_calculator", "qdk_mp2_calculator")
   >>>
   >>> # Run calculation
   >>> total_energy, result_wavefunction = calculator.run(ansatz)
@@ -91,14 +91,14 @@ Examples:
         )");
 
   ref_calc.def("__repr__", [](const DynamicalCorrelationCalculator &) {
-    return "<qdk.chemistry.algorithms.DynamicalCorrelationCalculator>";
+    return "<qdk_chemistry.algorithms.DynamicalCorrelationCalculator>";
   });
 
   ref_calc.def("run", &DynamicalCorrelationCalculator::run, py::arg("ansatz"),
                R"(
   Perform reference-derived calculation.
 
-  Parameters:
+  Args:
     ansatz (Ansatz): The Ansatz (Wavefunction and Hamiltonian) describing the quantum system
 
   Returns:
@@ -121,7 +121,7 @@ Returns:
 Access the calculator's configuration settings.
 
 Returns:
-  qdk.chemistry.data.Settings: Reference to the settings object for configuring the calculator
+  qdk_chemistry.data.Settings: Reference to the settings object for configuring the calculator
         )",
                py::return_value_policy::reference_internal);
 
@@ -146,7 +146,7 @@ Examples:
   >>> class MyDynamicalCorrelationCalculator(alg.DynamicalCorrelationCalculator):
   ...     def __init__(self):
   ...         super().__init__()
-  ...         from qdk.chemistry.data import ElectronicStructureSettings
+  ...         from qdk_chemistry.data import ElectronicStructureSettings
   ...         self._settings = ElectronicStructureSettings()
         )");
 
