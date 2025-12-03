@@ -126,10 +126,9 @@ TEST_F(ScfTest, Oxygen_atom_gdm) {
   auto scf_solver = ScfSolverFactory::create();
   // cc-pvdz
   scf_solver->settings().set("method", "pbe");
-  scf_solver->settings().set("basis_set", "cc-pvdz");
   scf_solver->settings().set("enable_gdm", true);
   // Default should be a singlet
-  auto [E_singlet, wfn_singlet] = scf_solver->run(oxygen, 0, 1);
+  auto [E_singlet, wfn_singlet] = scf_solver->run(oxygen, 0, 1, "cc-pvdz");
   EXPECT_NEAR(E_singlet, -74.873106298, testing::scf_energy_tolerance);
   // Check singlet orbitals
   EXPECT_TRUE(wfn_singlet->get_orbitals()->is_restricted());
@@ -140,11 +139,10 @@ TEST_F(ScfTest, Oxygen_atom_history_size_limit_gdm) {
   auto scf_solver = ScfSolverFactory::create();
   // cc-pvdz
   scf_solver->settings().set("method", "pbe");
-  scf_solver->settings().set("basis_set", "cc-pvdz");
   scf_solver->settings().set("enable_gdm", true);
   scf_solver->settings().set("gdm_bfgs_history_size_limit", 20);
   // Default should be a singlet
-  auto [E_singlet, wfn_singlet] = scf_solver->run(oxygen, 0, 1);
+  auto [E_singlet, wfn_singlet] = scf_solver->run(oxygen, 0, 1, "cc-pvdz");
   EXPECT_NEAR(E_singlet, -74.873106298, testing::scf_energy_tolerance);
   // Check singlet orbitals
   EXPECT_TRUE(wfn_singlet->get_orbitals()->is_restricted());
@@ -155,11 +153,10 @@ TEST_F(ScfTest, Oxygen_atom_one_diis_step_gdm) {
   auto scf_solver = ScfSolverFactory::create();
   // cc-pvdz
   scf_solver->settings().set("method", "pbe");
-  scf_solver->settings().set("basis_set", "cc-pvdz");
   scf_solver->settings().set("enable_gdm", true);
   scf_solver->settings().set("gdm_max_diis_iteration", 1);
 
-  auto [E_singlet, wfn_singlet] = scf_solver->run(oxygen, 0, 1);
+  auto [E_singlet, wfn_singlet] = scf_solver->run(oxygen, 0, 1, "cc-pvdz");
   EXPECT_NEAR(E_singlet, -74.873106298, testing::scf_energy_tolerance);
   // Check singlet orbitals
   EXPECT_TRUE(wfn_singlet->get_orbitals()->is_restricted());
@@ -171,7 +168,7 @@ TEST_F(ScfTest, Water_triplet_gdm) {
   // Default settings
   scf_solver->settings().set("method", "pbe");
   scf_solver->settings().set("enable_gdm", true);
-  auto [E_default, wfn_default] = scf_solver->run(water, 0, 3);
+  auto [E_default, wfn_default] = scf_solver->run(water, 0, 3, "def2-svp");
   auto orbitals_default = wfn_default->get_orbitals();
   EXPECT_NEAR(E_default, -76.0343083322644, testing::scf_energy_tolerance);
   EXPECT_FALSE(orbitals_default->is_restricted());
@@ -182,10 +179,9 @@ TEST_F(ScfTest, Oxygen_atom_charged_doublet_gdm) {
   auto scf_solver = ScfSolverFactory::create();
   // cc-pvdz
   scf_solver->settings().set("method", "pbe");
-  scf_solver->settings().set("basis_set", "cc-pvdz");
   scf_solver->settings().set("enable_gdm", true);
 
-  auto [E_doublet, wfn_doublet] = scf_solver->run(oxygen, 1, 2);
+  auto [E_doublet, wfn_doublet] = scf_solver->run(oxygen, 1, 2, "cc-pvdz");
   EXPECT_NEAR(E_doublet, -74.416994299, testing::scf_energy_tolerance);
   // Check singlet orbitals
   EXPECT_FALSE(wfn_doublet->get_orbitals()->is_restricted());
@@ -196,11 +192,10 @@ TEST_F(ScfTest, Oxygen_atom_invalid_energy_thresh_diis_switch_gdm) {
   auto scf_solver = ScfSolverFactory::create();
   // cc-pvdz
   scf_solver->settings().set("method", "pbe");
-  scf_solver->settings().set("basis_set", "cc-pvdz");
   scf_solver->settings().set("enable_gdm", true);
   scf_solver->settings().set("energy_thresh_diis_switch", -2e-4);
   // Default should be a singlet
-  EXPECT_THROW(scf_solver->run(oxygen, 0, 1),
+  EXPECT_THROW(scf_solver->run(oxygen, 0, 1, "cc-pvdz"),
                std::invalid_argument);  // open-shell dublet
 }
 
@@ -209,11 +204,10 @@ TEST_F(ScfTest, Oxygen_atom_invalid_bfgs_history_size_limit_gdm) {
   auto scf_solver = ScfSolverFactory::create();
   // cc-pvdz
   scf_solver->settings().set("method", "pbe");
-  scf_solver->settings().set("basis_set", "cc-pvdz");
   scf_solver->settings().set("enable_gdm", true);
   scf_solver->settings().set("gdm_bfgs_history_size_limit", 0);
   // Default should be a singlet
-  EXPECT_THROW(scf_solver->run(oxygen, 0, 1), std::invalid_argument);
+  EXPECT_THROW(scf_solver->run(oxygen, 0, 1, "cc-pvdz"), std::invalid_argument);
 }
 
 TEST_F(ScfTest, WaterDftB3lyp) {
@@ -1023,7 +1017,8 @@ TEST_F(ScfTest, AtomInitGuessEnergyConvergence) {
       auto [energy_cust, wavefunction_cust] =
           scf_solver->run(structure, 0, 1, basis_custom);
 
-      EXPECT_NEAR(energy, energy_cust, testing::scf_energy_tolerance);
+      EXPECT_NEAR(energy, energy_cust, testing::scf_energy_tolerance)
+          << "Failed for element: " << element << " with basis: " << basis_name;
     }
   }
 
@@ -1047,7 +1042,8 @@ TEST_F(ScfTest, AtomInitGuessEnergyConvergence) {
       auto [energy_cust, wavefunction_cust] =
           scf_solver->run(structure, 0, 2, basis_custom);
 
-      EXPECT_NEAR(energy, energy_cust, testing::scf_energy_tolerance);
+      EXPECT_NEAR(energy, energy_cust, testing::scf_energy_tolerance)
+          << "Failed for element: " << element << " with basis: " << basis_name;
     }
   }
 }

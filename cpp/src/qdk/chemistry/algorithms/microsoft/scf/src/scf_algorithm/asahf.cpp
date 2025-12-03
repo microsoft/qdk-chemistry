@@ -10,6 +10,7 @@
 #ifdef _OPENMP
 #include <omp.h>
 #endif
+#include "../scf/scf_impl.h"
 #include "util/macros.h"
 
 namespace qdk::chemistry::scf {
@@ -129,17 +130,16 @@ void get_atom_guess(const BasisSet& basis_set, const Molecule& mol,
   // make basic config
   SCFConfig cfg;
   cfg.mpi = qdk::chemistry::scf::mpi_default_input();
-  cfg.max_iteration = 100;
-  cfg.converge_threshold = 1e-6;
-  cfg.density_threshold = 1e-6;
+  cfg.scf_algorithm.max_iteration = 100;
+  cfg.scf_algorithm.og_threshold = 1e-6;
+  cfg.scf_algorithm.density_threshold = 1e-6;
+  cfg.scf_algorithm.method = SCFAlgorithmName::ASAHF;
   cfg.density_init_method = DensityInitializationMethod::Core;
   cfg.require_gradient = false;
   cfg.unrestricted = false;
   cfg.require_polarizability = false;
   cfg.exc.xc_name = "hf";
   cfg.eri.method = ERIMethod::Libint2Direct;
-  cfg.eri.eri_threshold = cfg.converge_threshold * 1e-4;
-  cfg.k_eri.eri_threshold = cfg.converge_threshold * 1e-4;
   cfg.grad_eri = cfg.eri;
   cfg.grad_eri.method = ERIMethod::Libint2Direct;
 
@@ -150,141 +150,31 @@ void get_atom_guess(const BasisSet& basis_set, const Molecule& mol,
         detail::make_atomic_molecule(static_cast<int>(atom_num));
     std::shared_ptr<BasisSet> atom_basis_set =
         detail::make_atom_basis_set(static_cast<int>(i), basis_set, atom_mol);
-    // run asahf solver
-    detail::AtomicSphericallyAveragedHartreeFock asahf_solver(
-        atom_mol, cfg, atom_basis_set, atom_basis_set);
-    const auto& asahf_ctx = asahf_solver.compute();
-    const auto& dm = asahf_solver.get_density_matrix();
+    // Create SCF solver with basis sets
+    SCFImpl scf_solver(atom_mol, cfg, atom_basis_set, atom_basis_set, false,
+                       true);
+    // Run SCF with ASAHF algorithm
+    const auto& asahf_ctx = scf_solver.run();
+    const auto& dm = scf_solver.get_density_matrix();
     // insert atomic density matrix into total density matrix
     tD.block(p, p, dm.rows(), dm.cols()) = dm;
     p += dm.rows();
   }
 }
 
-namespace detail {
-
 AtomicSphericallyAveragedHartreeFock::AtomicSphericallyAveragedHartreeFock(
-    std::shared_ptr<Molecule> mol, const SCFConfig& cfg,
-    std::shared_ptr<BasisSet> basis_set,
-    std::shared_ptr<BasisSet> raw_basis_set, bool delay_eri)
-    : SCFImpl(true, mol, cfg, basis_set, raw_basis_set, delay_eri), mol_(mol) {}
+    const SCFContext& ctx, size_t subspace_size)
+    : DIIS(ctx, subspace_size) {}
 
-const SCFContext& AtomicSphericallyAveragedHartreeFock::compute() {
-  const auto& cfg = *ctx_.cfg;
-  _iter();
-  return ctx_;
-}
-
-void AtomicSphericallyAveragedHartreeFock::_iter() {
-  auto cfg = ctx_.cfg;
-  VERIFY_INPUT(cfg->incremental_fock_start_step > 0,
-               "incremental_fock_start_step must be positive");
-  VERIFY_INPUT(cfg->fock_reset_steps > 0, "fock_reset_steps must be positive");
-  auto& res = ctx_.result;
-
-  build_one_electron_integrals_();
-
-  if (ctx_.cfg->mpi.world_rank == 0) {
-    init_density_matrix_();
-    res.nuclear_repulsion_energy = calc_nuclear_repulsion_energy_();
-  }
-
-  double energy_last = 0;
-  RowMajorMatrix F_diis =
-      RowMajorMatrix::Zero(num_atomic_orbitals_, num_atomic_orbitals_);
-  RowMajorMatrix P_diff =
-      RowMajorMatrix::Zero(num_atomic_orbitals_, num_atomic_orbitals_);
-  RowMajorMatrix P_last =
-      RowMajorMatrix::Zero(num_atomic_orbitals_, num_atomic_orbitals_);
-  RowMajorMatrix F_ls =
-      RowMajorMatrix::Zero(num_atomic_orbitals_, num_atomic_orbitals_);
-
-  for (auto step = 0; step < cfg->max_iteration; ++step) {
-    if (step < cfg->incremental_fock_start_step ||
-        step % cfg->fock_reset_steps == 0) {
-      P_diff = P_;
-      if (cfg->mpi.world_rank == 0) {
-        reset_fock_();
-      }
-    } else {
-      P_diff = P_ - P_last;
-    }
-    P_last = P_;
-
-    auto [alpha, beta, omega] = get_hyb_coeff_();
-    eri_->build_JK(P_diff.data(), J_.data(), K_.data(), alpha, beta, omega);
-
-    update_fock_();
-
-    double diis_error = std::numeric_limits<double>::max();
-
-    if (cfg->mpi.world_rank == 0) {
-      res.scf_total_energy = total_energy_();
-      auto delta_energy = res.scf_total_energy - energy_last;
-
-      RowMajorMatrix FP =
-          RowMajorMatrix::Zero(num_atomic_orbitals_, num_atomic_orbitals_);
-
-      RowMajorMatrix error =
-          RowMajorMatrix::Zero(num_atomic_orbitals_, num_atomic_orbitals_);
-      Eigen::Map<RowMajorMatrix> error_dm(error.data(), num_atomic_orbitals_,
-                                          num_atomic_orbitals_);
-      FP.noalias() =
-          Eigen::Map<const RowMajorMatrix>(F_.data(), num_atomic_orbitals_,
-                                           num_atomic_orbitals_) *
-          Eigen::Map<const RowMajorMatrix>(P_.data(), num_atomic_orbitals_,
-                                           num_atomic_orbitals_);
-      error_dm.noalias() = FP * S_;
-      for (size_t ibf = 0; ibf < num_atomic_orbitals_; ibf++) {
-        error_dm(ibf, ibf) = 0.0;
-        for (size_t jbf = 0; jbf < ibf; ++jbf) {
-          auto e_ij = error_dm(ibf, jbf);
-          auto e_ji = error_dm(jbf, ibf);
-          error_dm(ibf, jbf) = e_ij - e_ji;
-          error_dm(jbf, ibf) = e_ji - e_ij;
-        }
-      }
-      diis_error = error.lpNorm<Eigen::Infinity>();
-      diis_->extrapolate(F_, error, &F_diis);
-
-      // Update density matrix with spherically averaged Fock matrix
-      update_density_matrix_(F_diis, 0);
-
-      auto ddm_norm = (P_last - P_).norm();
-      auto ddm_rms = ddm_norm / num_atomic_orbitals_;
-      auto diis_rms = diis_error / num_atomic_orbitals_;
-
-      if (std::isnan(res.scf_total_energy) or std::isinf(res.scf_total_energy))
-        throw std::runtime_error("NaN or INF Encountered in SCF Energy");
-
-      res.converged =
-          step > 0 && std::fabs(delta_energy) < cfg->converge_threshold &&
-          (ddm_rms < cfg->density_threshold || diis_rms < cfg->og_threshold);
-      res.scf_iterations = step + 1;
-      if (!res.converged) {
-        if (cfg->enable_damping && diis_error > cfg->damping_threshold) {
-          auto factor = cfg->damping_factor;
-          P_ = P_last * factor + P_ * (1.0 - factor);
-        }
-        energy_last = res.scf_total_energy;
-      }
-    }
-    if (res.converged) {
-      break;
-    }
-  }
-  if (!res.converged) {
-    throw std::runtime_error(fmt::format(
-        "SCF failed to converge after {} steps", cfg->max_iteration));
-  }
-}
-
-void AtomicSphericallyAveragedHartreeFock::update_density_matrix_(
-    const RowMajorMatrix& fock, int idx) {
-  Eigen::Map<RowMajorMatrix> P_dm(P_.data(), num_atomic_orbitals_,
-                                  num_atomic_orbitals_);
-  Eigen::Map<RowMajorMatrix> C_dm(C_.data(), num_atomic_orbitals_,
-                                  num_molecular_orbitals_);
+void AtomicSphericallyAveragedHartreeFock::solve_fock_eigenproblem(
+    const RowMajorMatrix& F, const RowMajorMatrix& S, const RowMajorMatrix& X,
+    RowMajorMatrix& C, RowMajorMatrix& eigenvalues, RowMajorMatrix& P,
+    const int num_occupied_orbitals[2], int num_atomic_orbitals,
+    int num_molecular_orbitals, int idx_spin, bool unrestricted) {
+  Eigen::Map<RowMajorMatrix> P_dm(P.data(), num_atomic_orbitals,
+                                  num_atomic_orbitals);
+  Eigen::Map<RowMajorMatrix> C_dm(C.data(), num_atomic_orbitals,
+                                  num_molecular_orbitals);
 
   // get max l from shells
   size_t max_l = 0;
@@ -328,9 +218,9 @@ void AtomicSphericallyAveragedHartreeFock::update_density_matrix_(
         double overlap_sum = 0.0;
         for (size_t m1 = 0; m1 < degeneracy; ++m1) {
           fock_sum +=
-              fock(offset + i * degeneracy + m1, offset + j * degeneracy + m1);
+              F(offset + i * degeneracy + m1, offset + j * degeneracy + m1);
           overlap_sum +=
-              S_(offset + i * degeneracy + m1, offset + j * degeneracy + m1);
+              S(offset + i * degeneracy + m1, offset + j * degeneracy + m1);
         }
         double fock_avg = fock_sum / degeneracy;
         double overlap_avg = overlap_sum / degeneracy;
@@ -362,7 +252,7 @@ void AtomicSphericallyAveragedHartreeFock::update_density_matrix_(
     // update eigenvalues_
     for (size_t i = 0; i < eigenvalues_block.size(); ++i) {
       for (size_t m = 0; m < degeneracy; ++m) {
-        eigenvalues_(0, idx[i * degeneracy + m]) = eigenvalues_block[i];
+        eigenvalues(0, idx[i * degeneracy + m]) = eigenvalues_block[i];
       }
     }
 
@@ -408,7 +298,7 @@ void AtomicSphericallyAveragedHartreeFock::update_density_matrix_(
     size_t n_shells = idx.size() / degeneracy;
 
     auto [n_double_occ, frac_occ] =
-        get_num_frac_occ_orbs(l, mol_->total_nuclear_charge);
+        detail::get_num_frac_occ_orbs(l, ctx_.mol->total_nuclear_charge);
 
     std::vector<double> occ_l(n_shells, 0);
     for (size_t i = 0; i < n_double_occ; ++i) {
@@ -426,10 +316,10 @@ void AtomicSphericallyAveragedHartreeFock::update_density_matrix_(
 
   // Build density matrix
   P_dm.setZero();
-  for (size_t mu = 0; mu < num_atomic_orbitals_; ++mu) {
-    for (size_t nu = 0; nu < num_atomic_orbitals_; ++nu) {
+  for (size_t mu = 0; mu < num_atomic_orbitals; ++mu) {
+    for (size_t nu = 0; nu < num_atomic_orbitals; ++nu) {
       double density_value = 0.0;
-      for (size_t m = 0; m < num_molecular_orbitals_; ++m) {
+      for (size_t m = 0; m < num_molecular_orbitals; ++m) {
         density_value += C_dm(mu, m) * C_dm(nu, m) * occupation[m];
       }
       P_dm(mu, nu) = density_value;
@@ -474,7 +364,5 @@ void AtomicSphericallyAveragedHartreeFock::
   RowMajorMatrix X_ = U_cond * sigma_invsqrt;
   *ret = X_;
 }
-
-}  // namespace detail
 
 }  // namespace qdk::chemistry::scf

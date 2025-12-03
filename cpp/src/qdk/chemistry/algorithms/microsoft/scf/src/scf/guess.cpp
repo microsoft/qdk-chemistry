@@ -16,7 +16,7 @@
 #include <map>
 #include <vector>
 
-#include "scf/asahf.h"
+#include "scf_algorithm/asahf.h"
 #include "util/macros.h"
 
 namespace qdk::chemistry::scf {

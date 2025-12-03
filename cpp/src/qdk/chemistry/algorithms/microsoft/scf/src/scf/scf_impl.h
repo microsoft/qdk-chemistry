@@ -63,10 +63,12 @@ class SCFImpl {
    * @param raw_basis_set Raw (unnormalized) basis set for output
    * @param delay_eri If true, delay ERI initialization to derived constructor
    * (default: false)
+   * @param skip_verify If true, skip input verification checks (default: false)
    */
   SCFImpl(std::shared_ptr<Molecule> mol, const SCFConfig& cfg,
           std::shared_ptr<BasisSet> basis_set,
-          std::shared_ptr<BasisSet> raw_basis_set, bool delay_eri = false);
+          std::shared_ptr<BasisSet> raw_basis_set, bool delay_eri = false, bool skip_verify = false
+        );
 
   /**
    * @brief Virtual destructor
@@ -182,20 +184,6 @@ class SCFImpl {
 
  protected:
   /**
-   * @brief Construct SCF implementation with custom basis set
-   * @param skip_verification_flag If true, skip spin verification checks (required for ASAHF)
-   * @param mol Molecular structure
-   * @param cfg SCF configuration
-   * @param basis_set Basis set to use
-   * @param raw_basis_set Raw (unnormalized) basis set for output
-   * @param delay_eri If true, delay ERI initialization to derived constructor
-   * (default: false)
-   */
-  SCFImpl(bool skip_verification_flag, std::shared_ptr<Molecule> mol, const SCFConfig& cfg,
-          std::shared_ptr<BasisSet> basis_set,
-          std::shared_ptr<BasisSet> raw_basis_set,
-          bool delay_eri = false);
-  /**
    * @brief Build one-electron integrals (overlap, kinetic, nuclear attraction)
    */
   void build_one_electron_integrals_();
@@ -264,14 +252,6 @@ class SCFImpl {
    * @return Total SCF energy (Hartree)
    */
   virtual double total_energy_();
-
-  /**
-   * @brief Update density matrix from new MOs
-   *
-   * @param F Fock matrix to diagonalize
-   * @param idx Density matrix index (0 for alpha or restricted, 1 for beta)
-   */
-  virtual void update_density_matrix_(const RowMajorMatrix& F, int idx = 0);
 
   /**
    * @brief Get analytical energy gradients

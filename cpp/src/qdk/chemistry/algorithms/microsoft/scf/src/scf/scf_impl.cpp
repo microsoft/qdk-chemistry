@@ -10,7 +10,6 @@
 #include <qdk/chemistry/scf/util/gauxc_util.h>
 #include <qdk/chemistry/scf/util/int1e.h>
 
-#include "scf/asahf.h"
 #ifdef QDK_CHEMISTRY_ENABLE_MPI
 #include <mpi.h>
 #endif
@@ -48,192 +47,10 @@
 #endif
 
 namespace qdk::chemistry::scf {
-SCFImpl::SCFImpl(bool skip_verification_flag, std::shared_ptr<Molecule> mol_ptr,
-                 const SCFConfig& cfg, std::shared_ptr<BasisSet> basis_set,
-                 std::shared_ptr<BasisSet> raw_basis_set, bool delay_eri) {
-  auto& mol = *mol_ptr;
-  ctx_.mol = mol_ptr.get();
-  ctx_.cfg = &cfg;
-  if (basis_set == nullptr) {
-    ctx_.basis_set =
-        BasisSet::from_database_json(mol_ptr, cfg.basis, cfg.basis_mode,
-                                     !cfg.cartesian /*pure*/, true /*sort*/);
-  } else {
-    ctx_.basis_set = basis_set;
-  }
-  if (cfg.do_dfj) {
-    ctx_.aux_basis_set =
-        BasisSet::from_database_json(mol_ptr, cfg.aux_basis, cfg.basis_mode,
-                                     !cfg.cartesian /*pure*/, true /*sort*/);
-  }
-  if (cfg.output_basis_mode == BasisMode::RAW) {
-    // create an unnormalized raw basis for output only
-    if (raw_basis_set == nullptr) {
-      ctx_.basis_set_raw =
-          BasisSet::from_database_json(mol_ptr, cfg.basis, BasisMode::RAW,
-                                       !cfg.cartesian /*pure*/, true /*sort*/);
-    } else {
-      ctx_.basis_set_raw = raw_basis_set;
-    }
-  }
-  ctx_.result = {};
 
-  num_atomic_orbitals_ = ctx_.basis_set->num_atomic_orbitals;
-  num_molecular_orbitals_ = ctx_.basis_set->num_atomic_orbitals;
-  ctx_.num_molecular_orbitals = num_molecular_orbitals_;
-  num_density_matrices_ = cfg.unrestricted ? 2 : 1;
-#ifdef QDK_CHEMISTRY_ENABLE_QMMM
-  add_mm_charge_ = cfg.pointcharges != nullptr;
-#endif
-
-  auto n_ecp_electrons = ctx_.basis_set->n_ecp_electrons;
-  auto spin = mol.multiplicity - 1;
-  auto alpha = (mol.n_electrons - n_ecp_electrons + spin) / 2;
-  auto beta = mol.n_electrons - n_ecp_electrons - alpha;
-
-  if (cfg.mpi.world_rank == 0) {
-    std::string fock_string = "";
-    if (cfg.do_dfj) {
-      fock_string = "DFJ/";
-      if (cfg.k_eri.method == ERIMethod::SnK)
-        fock_string += "SnK";
-      else
-        fock_string += "TradK";
-    } else {
-      fock_string = "TradJ";
-      if (cfg.k_eri.method == ERIMethod::SnK)
-        fock_string += "/SnK";
-      else
-        fock_string += "K";
-    }
-
-    spdlog::info(
-        "mol: atoms={}, electrons={}, n_ecp_electrons={}, charge={}, "
-        "multiplicity={}, spin(2S)={}, alpha={}, beta={}",
-        mol.n_atoms, mol.n_electrons, n_ecp_electrons, mol.charge,
-        mol.multiplicity, spin, alpha, beta);
-    spdlog::info(
-        "restricted={}, basis={}, pure={}, num_atomic_orbitals={}, "
-        "energy_threshold={:.2e}, "
-        "density_threshold={:.2e}, "
-        "og_threshold={:.2e}",
-        !cfg.unrestricted, ctx_.basis_set->name, ctx_.basis_set->pure,
-        num_atomic_orbitals_, cfg.converge_threshold, cfg.density_threshold,
-        cfg.og_threshold);
-    spdlog::info("fock_alg={}", fock_string);
-    if (cfg.do_dfj) {
-      spdlog::info("aux_basis={}, naux={}", ctx_.aux_basis_set->name,
-                   ctx_.aux_basis_set->num_atomic_orbitals);
-    }
-    spdlog::info("eri_tolerance={:.2e}", cfg.eri.eri_threshold);
-
-#ifdef QDK_CHEMISTRY_ENABLE_DFTD3
-    spdlog::info("disp={}", to_string(cfg.disp));
-#endif
-
-#ifdef QDK_CHEMISTRY_ENABLE_PCM
-    spdlog::info("enable_pcm={}, use_ddx={}", cfg.enable_pcm, cfg.use_ddx);
-#endif
-
-#ifdef QDK_CHEMISTRY_ENABLE_QMMM
-    spdlog::info("qmmm={}", add_mm_charge_);
-#endif
-
-#ifdef _OPENMP
-    int nthreads = omp_get_max_threads();
-#else
-    int nthreads = 1;
-#endif
-    spdlog::info("world_size={}, omp_get_max_threads={}", cfg.mpi.world_size,
-                 nthreads);
-  }
-  if (cfg.verbose > 5) {
-    spdlog::info("eri_method={}, exc_method={}", to_string(cfg.eri.method),
-                 to_string(cfg.exc.method));
-  }
-  if( not skip_verification_flag) {
-    VERIFY_INPUT(alpha >= 0 && beta >= 0 && beta == alpha - spin,
-                 "Invalid spin number or charge");
-    VERIFY_INPUT(num_density_matrices_ == 2 || alpha == beta,
-                 "Restricted requires n_alpha == n_beta");
-  }
-
-  // MAX_N = 46340. Stop the calculation early if the basis set is too large
-  // A single MAX_NxMAX_N matrix will have ~2^31 double floating point numbers
-  // and will take about ~16GB memory
-  const int MAX_N =
-      static_cast<int>(std::floor(std::sqrt(std::numeric_limits<int>::max())));
-  if (num_atomic_orbitals_ > MAX_N) {
-    throw std::runtime_error(
-        fmt::format("Basis set too large: {}", num_atomic_orbitals_));
-  }
-
-  nelec_[0] = alpha;
-  nelec_[1] = beta;
-
-  int1e_ = std::make_unique<OneBodyIntegral>(ctx_.basis_set.get(), ctx_.mol,
-                                             cfg.mpi);
-  if (not delay_eri) {
-    if (cfg.do_dfj) {
-      TIMEIT(eri_ = ERIMultiplexer::create(*ctx_.basis_set, *ctx_.aux_basis_set,
-                                           cfg, 0.0),
-             "SCFImpl::SCFImpl->ERI::create");
-    } else {
-      TIMEIT(eri_ = ERIMultiplexer::create(*ctx_.basis_set, cfg, 0.0),
-             "SCFImpl::SCFImpl->ERI::create");
-    }
-  }
-
-  // Host allocations for purely AO quantities
-  P_ = RowMajorMatrix::Zero(num_density_matrices_ * num_atomic_orbitals_,
-                            num_atomic_orbitals_);
-  J_ = RowMajorMatrix::Zero(num_density_matrices_ * num_atomic_orbitals_,
-                            num_atomic_orbitals_);
-  K_ = RowMajorMatrix::Zero(num_density_matrices_ * num_atomic_orbitals_,
-                            num_atomic_orbitals_);
-  if (cfg.mpi.world_rank == 0) {
-    F_ = RowMajorMatrix::Zero(num_density_matrices_ * num_atomic_orbitals_,
-                              num_atomic_orbitals_);
-    diis_ = std::make_unique<DIIS>(cfg.diis_subspace_size);
-  }
-
-  // MO and mixed AO/MO quantities
-  // These may be resized after the orthonormality check
-  C_ = RowMajorMatrix::Zero(num_density_matrices_ * num_atomic_orbitals_,
-                            num_molecular_orbitals_);
-  eigenvalues_ =
-      RowMajorMatrix::Zero(num_density_matrices_, num_molecular_orbitals_);
-
-#ifdef QDK_CHEMISTRY_ENABLE_DFTD3
-  ctx_.result.scf_dispersion_correction_energy = 0.0;
-  disp_grad_ = RowMajorMatrix::Zero(mol.n_atoms, 3);
-#endif
-
-#ifdef QDK_CHEMISTRY_ENABLE_PCM
-  Vpcm_ = RowMajorMatrix::Zero(num_density_matrices_ * num_atomic_orbitals_,
-                               num_atomic_orbitals_);
-  ctx_.result.scf_pcm_energy = 0.0;
-  if (ctx_.cfg->enable_pcm) {
-    TIMEIT(pcm_ = pcm::PCM::create(*ctx_.basis_set, num_density_matrices_, cfg),
-           "PCM::initialize");
-  }
-#endif
-
-  if (cfg.require_polarizability) {
-    // Host allocations for CPSCF/TDDFT quantities
-    tP_ = RowMajorMatrix::Zero(num_density_matrices_ * num_atomic_orbitals_,
-                               num_atomic_orbitals_);
-    tJ_ = RowMajorMatrix::Zero(num_density_matrices_ * num_atomic_orbitals_,
-                               num_atomic_orbitals_);
-    tK_ = RowMajorMatrix::Zero(num_density_matrices_ * num_atomic_orbitals_,
-                               num_atomic_orbitals_);
-    tFock_ = RowMajorMatrix::Zero(num_density_matrices_ * num_atomic_orbitals_,
-                                  num_atomic_orbitals_);
-  }
-}
 SCFImpl::SCFImpl(std::shared_ptr<Molecule> mol_ptr, const SCFConfig& cfg,
                  std::shared_ptr<BasisSet> basis_set,
-                 std::shared_ptr<BasisSet> raw_basis_set, bool delay_eri) {
+                 std::shared_ptr<BasisSet> raw_basis_set, bool delay_eri, bool skip_verify) {
   auto& mol = *mol_ptr;
   ctx_.mol = mol_ptr.get();
   ctx_.cfg = &cfg;
@@ -333,10 +150,14 @@ SCFImpl::SCFImpl(std::shared_ptr<Molecule> mol_ptr, const SCFConfig& cfg,
     spdlog::info("eri_method={}, exc_method={}", to_string(cfg.eri.method),
                  to_string(cfg.exc.method));
   }
-  VERIFY_INPUT(alpha >= 0 && beta >= 0 && beta == alpha - spin,
-               "Invalid spin number or charge");
-  VERIFY_INPUT(num_density_matrices_ == 2 || alpha == beta,
-               "Restricted requires n_alpha == n_beta");
+
+  if (!skip_verify) {
+
+    VERIFY_INPUT(alpha >= 0 && beta >= 0 && beta == alpha - spin,
+                "Invalid spin number or charge");
+    VERIFY_INPUT(num_density_matrices_ == 2 || alpha == beta,
+                "Restricted requires n_alpha == n_beta");
+    }
 
   // MAX_N = 46340. Stop the calculation early if the basis set is too large
   // A single MAX_NxMAX_N matrix will have ~2^31 double floating point numbers

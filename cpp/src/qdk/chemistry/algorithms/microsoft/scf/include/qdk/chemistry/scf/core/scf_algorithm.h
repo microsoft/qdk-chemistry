@@ -93,7 +93,7 @@ class SCFAlgorithm {
    * beta)
    * @param[in] unrestricted Whether calculation is unrestricted
    */
-  void solve_fock_eigenproblem(const RowMajorMatrix& F, const RowMajorMatrix& S,
+  virtual void solve_fock_eigenproblem(const RowMajorMatrix& F, const RowMajorMatrix& S,
                                const RowMajorMatrix& X, RowMajorMatrix& C,
                                RowMajorMatrix& eigenvalues, RowMajorMatrix& P,
                                const int num_occupied_orbitals[2],
