@@ -93,6 +93,7 @@ __all__ = [
     "inspect_settings",
     "print_settings",
     "register",
+    "show_default",
     "unregister",
 ]
 
@@ -104,6 +105,7 @@ _REGISTRY_EXPORTS = frozenset(
         "inspect_settings",
         "print_settings",
         "register",
+        "show_default",
         "unregister",
     }
 )
@@ -118,6 +120,7 @@ if TYPE_CHECKING:  # pragma: no cover - typing-only imports
     inspect_settings = _registry_type.inspect_settings
     print_settings = _registry_type.print_settings
     register = _registry_type.register
+    show_default = _registry_type.show_default
     unregister = _registry_type.unregister
 
 

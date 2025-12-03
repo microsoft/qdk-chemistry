@@ -305,8 +305,8 @@ Create structure from coordinates, elements, masses, and nuclear charges.
 Args:
     coordinates (numpy.ndarray): Matrix of atomic coordinates (N x 3) in Angstrom
     elements (list[Element]): Vector of atomic elements using Element enum
-    masses (Optional[numpy.ndarray]): Vector of atomic masses in AMU (default: use standard masses)
-    nuclear_charges (Optional[numpy.ndarray]): Vector of nuclear charges (default: use standard charges)
+    masses (numpy.ndarray | None): Vector of atomic masses in AMU (default: use standard masses)
+    nuclear_charges (numpy.ndarray | None): Vector of nuclear charges (default: use standard charges)
 
 Examples:
 
@@ -709,7 +709,7 @@ Examples:
 Convert structure to XYZ format string (coordinates in Angstrom).
 
 Args:
-    comment (Optional[str]): Comment line for XYZ format
+    comment (str | None): Comment line for XYZ format
 
 Returns:
     str: XYZ format string
