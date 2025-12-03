@@ -8,6 +8,7 @@
  */
 
 #include <spdlog/sinks/null_sink.h>
+#include <spdlog/sinks/ostream_sink.h>
 #include <spdlog/spdlog.h>
 
 #include <iostream>
@@ -20,6 +21,7 @@
 #include <macis/sd_operations.hpp>
 #include <macis/types.hpp>
 #include <macis/util/fcidump.hpp>
+#include <sstream>
 
 #include "ut_common.hpp"
 
@@ -506,30 +508,52 @@ TEST_CASE("ASCI Exponential Backoff", "[asci][backoff]") {
         Catch::Matchers::WithinAbs(1.0, testing::numerical_zero_tolerance));
   }
 
-  SECTION("Small grow_factor with backoff") {
-    // Test that small grow_factor triggers backoff and continues
-    asci_settings.grow_factor = 1.1;  // Small growth
-    asci_settings.ntdets_max = 500;
-    asci_settings.ntdets_min = 5;
-    asci_settings.ncdets_max = 20;  // Limit to trigger backoff
+  SECTION("Verify backoff events via log capture") {
+    // Drop any existing loggers and suppress all output except our capture
+    spdlog::drop("asci_grow");
+    spdlog::drop("asci_search");
+    spdlog::drop("davidson");
+    spdlog::drop("ci_solver");
 
-    // Reset to HF
-    dets = {wfn_traits::canonical_hf_determinant(nalpha, nbeta)};
-    C = {1.0};
-    const auto E0_hf = ham_gen.matrix_element(dets[0], dets[0]);
-    E0 = E0_hf;
+    // Create null loggers for the noisy ones
+    spdlog::null_logger_mt("asci_search");
+    spdlog::null_logger_mt("davidson");
+    spdlog::null_logger_mt("ci_solver");
+
+    // Capture log output to verify backoff actually occurs
+    std::ostringstream log_stream;
+    auto ostream_sink =
+        std::make_shared<spdlog::sinks::ostream_sink_mt>(log_stream);
+    auto test_logger =
+        std::make_shared<spdlog::logger>("asci_grow", ostream_sink);
+    test_logger->set_level(spdlog::level::warn);  // Backoff logs at warn level
+    spdlog::register_logger(test_logger);
+
+    // Settings that force backoff - request huge growth in one step
+    // which will fail because ASCI search can't find that many determinants
+    asci_settings.grow_factor = 10000.0;  // Unrealistic factor
+    asci_settings.ntdets_max = 10000;     // Large target
+    asci_settings.ntdets_min = 5;
+    asci_settings.ncdets_max = 1;  // Very limited search space
 
     std::tie(E0, dets, C) = macis::asci_grow(
         asci_settings, mcscf_settings, E0, std::move(dets), std::move(C),
         ham_gen, norb MACIS_MPI_CODE(, MPI_COMM_WORLD));
 
-    // Should complete without throwing, even if growth is limited
-    REQUIRE(dets.size() > 1);  // Should grow beyond HF
+    // Check that backoff message appeared in logs
+    std::string log_output = log_stream.str();
+    bool backoff_logged =
+        log_output.find("reducing grow_factor") != std::string::npos;
+    REQUIRE(backoff_logged);
+
+    // Verify wavefunction is still valid
+    REQUIRE(dets.size() > 1);
     REQUIRE(C.size() == dets.size());
-    REQUIRE_THAT(std::inner_product(C.begin(), C.end(), C.begin(), 0.0),
-                 Catch::Matchers::WithinAbs(1.0, 1e-10));
-    // Energy should be reasonable (better than HF)
-    REQUIRE(E0 < E0_hf);
+    REQUIRE_THAT(
+        std::inner_product(C.begin(), C.end(), C.begin(), 0.0),
+        Catch::Matchers::WithinAbs(1.0, testing::numerical_zero_tolerance));
+
+    spdlog::drop("asci_grow");
   }
 
   SECTION("Minimum grow_factor behavior") {
@@ -551,8 +575,9 @@ TEST_CASE("ASCI Exponential Backoff", "[asci][backoff]") {
     // Should stop gracefully when can't grow anymore
     REQUIRE(dets.size() > 1);
     REQUIRE(C.size() == dets.size());
-    REQUIRE_THAT(std::inner_product(C.begin(), C.end(), C.begin(), 0.0),
-                 Catch::Matchers::WithinAbs(1.0, 1e-10));
+    REQUIRE_THAT(
+        std::inner_product(C.begin(), C.end(), C.begin(), 0.0),
+        Catch::Matchers::WithinAbs(1.0, testing::numerical_zero_tolerance));
   }
 
   SECTION("Normal growth without backoff") {
@@ -574,8 +599,9 @@ TEST_CASE("ASCI Exponential Backoff", "[asci][backoff]") {
     // Should reach target size
     REQUIRE(dets.size() == 1000);
     REQUIRE(C.size() == 1000);
-    REQUIRE_THAT(std::inner_product(C.begin(), C.end(), C.begin(), 0.0),
-                 Catch::Matchers::WithinAbs(1.0, 1e-10));
+    REQUIRE_THAT(
+        std::inner_product(C.begin(), C.end(), C.begin(), 0.0),
+        Catch::Matchers::WithinAbs(1.0, testing::numerical_zero_tolerance));
   }
 
   spdlog::drop_all();
