@@ -130,15 +130,7 @@ For more details on how QDK/Chemistry interfaces with external packages, see the
 Available settings
 ------------------
 
-The :class:`~qdk_chemistry.algorithms.OrbitalLocalizer` accepts a range of settings to control its behavior. These settings are divided into base settings
-(common to all localization methods) and specialized settings (specific to certain localization variants).
-
-Base settings
-~~~~~~~~~~~~~
-
-.. note::
-   TODO:  The base settings table is currently under construction.
-   Please see `online examples <https://github.com/microsoft/qdk-chemistry/blob/main/examples/factory_list.ipynb>`_ for the most up-to-date information.
+The :class:`~qdk_chemistry.algorithms.OrbitalLocalizer` settings vary by implementation. Different localization algorithms have their own specific configuration parameters.
 
 Specialized settings
 ~~~~~~~~~~~~~~~~~~~~
@@ -169,18 +161,16 @@ These settings apply only to specific variants of localization:
      - 1.0e-12
      - Threshold for small rotation detection
      - Pipek-Mezey, :term:`VVHV`
-   * - ``n_alpha_electrons``
-     - int
-     - Required
-     - Number of alpha electrons.
-       Orbital indices < n_alpha_electrons are treated as occupied, indices >= n_alpha_electrons are treated as virtual.
-     - :term:`MP2` Natural Orbitals, :term:`VVHV`
-   * - ``n_beta_electrons``
-     - int
-     - Required
-     - Number of beta electrons.
-       Orbital indices < n_beta_electrons are treated as occupied, indices >= n_beta_electrons are treated as virtual.
-     - :term:`MP2` Natural Orbitals, :term:`VVHV`
+   * - ``minimal_basis``
+     - string
+     - "sto-3g"
+     - Name of the minimal basis set used for valence virtual projection
+     - :term:`VVHV`
+   * - ``weighted_orthogonalization``
+     - bool
+     - true
+     - Whether to use weighted orthogonalization in hard virtual construction
+     - :term:`VVHV`
    * - ``method``
      - string
      - "pipek-mezey"
@@ -196,35 +186,6 @@ These settings apply only to specific variants of localization:
      - 1.0e-10
      - Threshold for classifying orbitals as occupied vs virtual
      - PySCF
-   * - ``minimal_basis``
-     - string
-     - "sto-3g"
-     - Name of the minimal basis set used for valence virtual projection
-     - :term:`VVHV`
-   * - ``weighted_orthogonalization``
-     - bool
-     - true
-     - Whether to use weighted orthogonalization in hard virtual construction
-     - :term:`VVHV`
-
-Implemented interface
----------------------
-
-QDK/Chemistry's :class:`~qdk_chemistry.algorithms.OrbitalLocalizer` provides a unified interface for localization methods.
-
-QDK/Chemistry implementations
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-- **QDK/Chemistry**: Native implementation of Pipek-Mezey, and :term:`MP2` natural orbital localization
-
-Third-party interfaces
-~~~~~~~~~~~~~~~~~~~~~~
-
-- **PySCF**: Interface to PySCF's orbital localization methods
-
-The factory pattern allows seamless selection between these implementations.
-
-For more details on how QDK/Chemistry interfaces with external packages, see the :doc:`Interfaces <../design/interfaces>` documentation.
 
 Further reading
 ---------------
