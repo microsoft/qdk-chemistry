@@ -36,7 +36,7 @@ def create_statevector_from_wavefunction(wavefunction: Wavefunction, normalize: 
             Default is True.
 
     Returns:
-        np.ndarray: Dense complex statevector of size 2^(2*num_active_orbitals).
+        numpy.ndarray: Dense complex statevector of size 2^(2*num_active_orbitals).
             The dtype is always complex128, even if the wavefunction has real
             coefficients.
 
