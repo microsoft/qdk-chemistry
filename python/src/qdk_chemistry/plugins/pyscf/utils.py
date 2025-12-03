@@ -617,8 +617,6 @@ def hamiltonian_to_scf(hamiltonian: Hamiltonian, alpha_occ: np.ndarray, beta_occ
 
     # Create a fake SCF object
     fake_scf = pyscf.scf.RHF(mol)
-    # TODO: Handle unrestricted / open-shell
-    fake_scf = pyscf.scf.RHF(mol)
     fake_scf.mol.nelectron = nalpha + nbeta
 
     # Store integrals in the SCF object
