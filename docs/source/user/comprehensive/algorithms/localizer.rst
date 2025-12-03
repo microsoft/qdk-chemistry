@@ -26,7 +26,7 @@ Creating a localizer
 
 As an algorithm class in QDK/Chemistry, the :class:`~qdk_chemistry.algorithms.OrbitalLocalizer` follows the :doc:`factory pattern design principle <../design/index>`.
 It is created using its corresponding factory, which provides a unified interface for different localization method implementations.
-For more information about this pattern, see the :doc:`Factory Pattern <../design/factory_pattern>` documentation.
+For more information about this pattern, see the :doc:`Factory Pattern <../algorithms/factory_pattern>` documentation.
 
 .. tab:: C++ API
 

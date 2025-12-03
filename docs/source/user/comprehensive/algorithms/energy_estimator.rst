@@ -25,7 +25,7 @@ The :class:`~qdk_chemistry.algorithms.EnergyEstimator` provides the following ca
 Creating an energy estimator
 ----------------------------
 
-The :class:`~qdk_chemistry.algorithms.EnergyEstimator` is created using the :doc:`factory pattern <../design/factory_pattern>`.
+The :class:`~qdk_chemistry.algorithms.EnergyEstimator` is created using the :doc:`factory pattern <../algorithms/factory_pattern>`.
 
 .. tab:: Python API
 

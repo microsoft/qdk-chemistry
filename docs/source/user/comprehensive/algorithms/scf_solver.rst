@@ -266,5 +266,5 @@ Further reading
 
 - The above examples can be downloaded as a complete `Python <../../../_static/examples/python/scf_solver.py>`_ script or `C++ <../../../_static/examples/cpp/scf_solver.cpp>`_ source file.
 - :doc:`Settings <../settings>`: Configuration settings for algorithms
-- :doc:`Factory Pattern <../design/factory_pattern>`: Understanding algorithm creation
+- :doc:`Factory Pattern <../algorithms/factory_pattern>`: Understanding algorithm creation
 - :doc:`../basis_functionals`: Exchange-correlation functionals for DFT calculations

@@ -49,7 +49,7 @@ Run a self-consistent field (SCF) calculation
 Once a :doc:`comprehensive/data/structure` is created, an :term:`SCF` calculation can be performed to produce an initial :class:`~qdk_chemistry.data.Wavefunction` as well as an :term:`SCF` energy.
 QDK/Chemistry performs :term:`SCF` calculations via instantiations of a :doc:`comprehensive/algorithms/scf_solver` algorithm.
 Instantiations of the :doc:`comprehensive/algorithms/scf_solver` algorithm (and all other ``Algorithm`` classes) are managed by a factory.
-See the :doc:`comprehensive/design/factory_pattern` documentation for more information on how it is used in the QDK/Chemistry.
+See the :doc:`comprehensive/algorithms/factory_pattern` documentation for more information on how it is used in the QDK/Chemistry.
 
 The inputs for an :term:`SCF` calculation are a :doc:`comprehensive/data/structure` object, the charge and multiplicity of the molecular system, and information about the single-particle basis to be used.
 Optionally, :doc:`comprehensive/settings` specific to the particular :doc:`comprehensive/algorithms/scf_solver` can be configured by accessing the ``settings()`` method.

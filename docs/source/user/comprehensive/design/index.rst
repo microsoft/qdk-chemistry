@@ -57,7 +57,7 @@ See the :doc:`Algorithms <../algorithms/index>` documentation for further detail
 Factory pattern
 ===============
 
-QDK/Chemistry leverages a :doc:`factory pattern <factory_pattern>` for algorithm creation:
+QDK/Chemistry leverages a :doc:`factory pattern <../algorithms/factory_pattern>` for algorithm creation:
 
 .. tab:: C++ API
 
@@ -79,7 +79,7 @@ This pattern allows:
 - Extension by new implementations without changing client code
 - Centralized management of dependencies and resources
 
-Read more on QDK/Chemistry's usage of this pattern in the :doc:`Factory Pattern <factory_pattern>` documentation.
+Read more on QDK/Chemistry's usage of this pattern in the :doc:`Factory Pattern <../algorithms/factory_pattern>` documentation.
 
 Runtime Algororithm Configuration via Settings
 ==============================================
@@ -141,7 +141,7 @@ Further reading
 ===============
 
 - The above examples can be downloaded as complete `C++ <../../../_static/examples/cpp/design_principles.cpp>`_ and `Python <../../../_static/examples/python/design_principles.py>`_ scripts.
-- :doc:`Factory Pattern <factory_pattern>`: Details on QDK/Chemistry's implementation of the factory pattern
+- :doc:`Factory Pattern <../algorithms/../algorithms/factory_pattern>`: Details on QDK/Chemistry's implementation of the factory pattern
 - :doc:`Settings <../settings>`: How to configure the execution behavior of algorithms through the Settings interface
 - :doc:`Interfaces <interfaces>`: QDK/Chemistry's interface system to external packages
 
@@ -149,5 +149,5 @@ Further reading
    :maxdepth: 1
    :hidden:
 
-   factory_pattern
+   ../algorithms/factory_pattern
    interfaces

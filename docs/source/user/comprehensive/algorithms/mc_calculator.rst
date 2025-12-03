@@ -24,7 +24,7 @@ The :class:`~qdk_chemistry.algorithms.MultiConfigurationCalculator` in QDK/Chemi
 Creating an MultiConfigurationCalculator
 ----------------------------------------
 
-The :class:`~qdk_chemistry.algorithms.MultiConfigurationCalculator` is created using the :doc:`factory pattern <../design/factory_pattern>`.
+The :class:`~qdk_chemistry.algorithms.MultiConfigurationCalculator` is created using the :doc:`factory pattern <../algorithms/factory_pattern>`.
 
 .. tab:: C++ API
 

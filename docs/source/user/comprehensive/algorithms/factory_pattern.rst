@@ -233,7 +233,7 @@ To create a new interface to an external program in Python:
 Connection to the interface system
 ----------------------------------
 
-The factory pattern serves as the foundation for QDK/Chemistry's :doc:`Interface System <interfaces>`.
+The factory pattern serves as the foundation for QDK/Chemistry's :doc:`Interface System <../design/interfaces>`.
 In QDK/Chemistry, factories enable the registration and instantiation of interface implementations that connect to external quantum chemistry programs.
 
 Internally, QDK/Chemistry's factories maintain a registry of creator functions mapped to implementation names.
@@ -245,11 +245,11 @@ This design enables several key capabilities:
 - Runtime selection of specific implementations
 - Decoupling of interface usage from implementation details
 
-For detailed information about implementing interfaces to external programs, including data conversion, error handling, resource management, and settings translation, see the :doc:`Interfaces <interfaces>` documentation.
+For detailed information about implementing interfaces to external programs, including data conversion, error handling, resource management, and settings translation, see the :doc:`Interfaces <../design/interfaces>` documentation.
 
 Further reading
 ---------------
 
 - Some of the above examples can be downloaded as complete `C++ <../../../_static/examples/cpp/factory_pattern.cpp>`_ and `Python <../../../_static/examples/python/factory_pattern.py>`_ scripts.
 - :doc:`Settings <../settings>`: Configuration of algorithm instances
-- :doc:`Interfaces <interfaces>`: QDK/Chemistry's interface system to external packages
+- :doc:`Interfaces <../design/interfaces>`: QDK/Chemistry's interface system to external packages

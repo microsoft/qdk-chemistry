@@ -10,7 +10,7 @@ Overview
 QDK/Chemistry is designed with an extensible plugin architecture that allows algorithms to be implemented either natively within QDK/Chemistry or as interfaces to established third-party quantum chemistry packages.
 This approach combines the benefits of a consistent API with the specialized capabilities of different software packages, following QDK/Chemistry's core :doc:`design principles <index>` of extensibility and interoperability.
 
-The interface system implements the :doc:`factory pattern <factory_pattern>`, which allows algorithms to be instantiated by name without the user needing to know the specific implementation details.
+The interface system implements the :doc:`factory pattern <../algorithms/factory_pattern>`, which allows algorithms to be instantiated by name without the user needing to know the specific implementation details.
 This abstraction enables seamless switching between different backends without changing your code, making it easier to benchmark and compare different approaches.
 
 Interface architecture
@@ -171,7 +171,7 @@ To create a new interface:
       register_scf_solver("custom", CustomScfSolver,
                          "Interface to Custom Chemistry Package")
 
-For developers interested in adding new interfaces, please refer to the :doc:`Factory pattern <factory_pattern>` documentation for more detailed guidance.
+For developers interested in adding new interfaces, please refer to the :doc:`Factory pattern <../algorithms/factory_pattern>` documentation for more detailed guidance.
 
 Interface-specific settings
 ---------------------------
@@ -271,6 +271,6 @@ Further reading
 
 - Some of the above examples can be downloaded as complete `C++ <../../../_static/examples/cpp/interfaces.cpp>`_ and `Python <../../../_static/examples/python/interfaces.py>`_ scripts.
 - :doc:`Design principles <index>`: Core architectural principles of QDK/Chemistry
-- :doc:`Factory pattern <factory_pattern>`: How to extend QDK/Chemistry with new algorithms and interfaces
+- :doc:`Factory pattern <../algorithms/factory_pattern>`: How to extend QDK/Chemistry with new algorithms and interfaces
 - :doc:`Settings <../settings>`: Configuring algorithm behavior consistently across implementations
 - :doc:`Serialization <../data/serialization>`: Data persistence and conversion in QDK/Chemistry

@@ -27,7 +27,7 @@ The :class:`~qdk_chemistry.algorithms.QubitMapper` in QDK/Chemistry provides:
 Creating a QubitMapper
 ----------------------
 
-The :class:`~qdk_chemistry.algorithms.QubitMapper` is created using the :doc:`factory pattern <../design/factory_pattern>`.
+The :class:`~qdk_chemistry.algorithms.QubitMapper` is created using the :doc:`factory pattern <../algorithms/factory_pattern>`.
 
 .. tab:: Python API
 
