@@ -97,8 +97,15 @@ struct ASCISettings {
 
   /// @brief If true, only consider single excitations (no doubles)
   bool just_singles = false;
-  /// @brief Factor by which to grow the variational space
-  size_t grow_factor = 8;
+  /// @brief Growth factor for determinant space expansion
+  double grow_factor = 8.0;
+  /// @brief Minimum allowed growth factor
+  double min_grow_factor = 1.01;
+  /// @brief Rate to reduce grow_factor on failure
+  double growth_backoff_rate = 0.5;
+  /// @brief Rate to restore grow_factor on success
+  double growth_recovery_rate = 1.1;
+
   /// @brief Maximum number of refinement iterations
   size_t max_refine_iter = 6;
   /// @brief Energy convergence tolerance for refinement

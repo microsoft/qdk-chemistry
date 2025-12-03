@@ -75,12 +75,31 @@ auto asci_grow(ASCISettings asci_settings, MCSCFSettings mcscf_settings,
   // Grow wfn until max size, or until we get stuck
   size_t prev_size = wfn.size();
   size_t iter = 1;
+  double current_grow_factor = asci_settings.grow_factor;
+  const double min_grow_factor = asci_settings.min_grow_factor;
+  const double growth_backoff_rate = asci_settings.growth_backoff_rate;
+  const double growth_recovery_rate = asci_settings.growth_recovery_rate;
+
   auto grow_st = hrt_t::now();
   while (wfn.size() < asci_settings.ntdets_max) {
-    size_t ndets_new =
-        std::min(std::max(asci_settings.ntdets_min,
-                          wfn.size() * asci_settings.grow_factor),
-                 asci_settings.ntdets_max);
+    // Use std::ceil to avoid truncation when grow_factor is close to 1.0
+    size_t ndets_new = std::min(
+        std::max(
+            asci_settings.ntdets_min,
+            static_cast<size_t>(std::ceil(wfn.size() * current_grow_factor))),
+        asci_settings.ntdets_max);
+
+    // Force +1 growth if ndets_new <= wfn.size() (can happen if grow_factor
+    // hits 1.0 or constraints clamp the value) to avoid stalling.
+    if (ndets_new <= wfn.size()) {
+      ndets_new = std::min(wfn.size() + 1, asci_settings.ntdets_max);
+      if (ndets_new <= wfn.size()) {
+        logger->info("Cannot grow further, reached target at {} determinants",
+                     wfn.size());
+        break;
+      }
+    }
+
     double E;
     auto ai_st = hrt_t::now();
     std::tie(E, wfn, X) = asci_iter<N, index_t>(
@@ -89,9 +108,33 @@ auto asci_grow(ASCISettings asci_settings, MCSCFSettings mcscf_settings,
     auto ai_en = hrt_t::now();
     dur_t ai_dur = ai_en - ai_st;
     logger->trace("  * ASCI_ITER_DUR = {:.2e} ms", ai_dur.count());
-    if (ndets_new > wfn.size())
-      throw std::runtime_error("Wavefunction didn't grow enough...");
 
+    // Check if we achieved the desired growth
+    if (wfn.size() < ndets_new) {
+      // Exponential backoff
+      current_grow_factor =
+          std::max(min_grow_factor, current_grow_factor * growth_backoff_rate);
+      logger->warn(
+          "Wavefunction grew to {} instead of {}, reducing grow_factor to "
+          "{:.3f}",
+          wfn.size(), ndets_new, current_grow_factor);
+
+      // Check if we're stuck (no growth at all)
+      if (wfn.size() <= prev_size) {
+        logger->warn("No growth achieved, stopping at {} determinants",
+                     wfn.size());
+        break;
+      }
+    } else {
+      // Recovery: gradually restore grow_factor on successful growth.
+      // Clamped to asci_settings.grow_factor to prevent overshoot even if
+      // growth_recovery_rate is set very high.
+      current_grow_factor =
+          std::min(asci_settings.grow_factor,
+                   current_grow_factor * growth_recovery_rate);
+    }
+
+    prev_size = wfn.size();
     logger->info(fmt_string, iter++, E, E - E0, wfn.size());
     if (asci_settings.grow_with_rot and
         wfn.size() >= asci_settings.rot_size_start) {
