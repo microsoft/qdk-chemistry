@@ -42,7 +42,7 @@ os.remove(tmpfile)
 ################################################################################
 
 ################################################################################
-# start-cell-hdf5 
+# start-cell-hdf5
 # Hamiltonian data class example
 # Create dummy data for Hamiltonian class
 one_body = np.identity(2)

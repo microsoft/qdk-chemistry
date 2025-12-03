@@ -8,7 +8,7 @@
 ################################################################################
 # start-cell-create
 import numpy as np
-from qdk_chemistry.algorithms import available, create
+from qdk_chemistry.algorithms import create
 from qdk_chemistry.data import Structure
 
 # Create a Pipek-Mezey localizer
@@ -30,17 +30,17 @@ print(f"Localizer settings: {localizer.settings().keys()}")
 ################################################################################
 # start-cell-localize
 # Create H2O molecule
-coords = np.array([[0.,0.,0.],[0.,0.757, 0.587], [0., -0.757, 0.587]])
+coords = np.array([[0.0, 0.0, 0.0], [0.0, 0.757, 0.587], [0.0, -0.757, 0.587]])
 symbols = ["O", "H", "H"]
 structure = Structure(coords, symbols=symbols)
 
-# Obtain orbitals from SCF 
+# Obtain orbitals from SCF
 scf_solver = create("scf_solver")
 scf_solver.settings().set("basis_set", "sto-3g")
 E_scf, wfn = scf_solver.run(structure, charge=0, spin_multiplicity=1)
 
-# Create indices for orbitals to localize 
-loc_indices = [0,1,2,3]
+# Create indices for orbitals to localize
+loc_indices = [0, 1, 2, 3]
 
 # Localize the specified orbitals
 localized_wfn = localizer.run(wfn, loc_indices, loc_indices)

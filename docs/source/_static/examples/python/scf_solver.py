@@ -8,7 +8,7 @@
 ################################################################################
 # start-cell-create
 import numpy as np
-from qdk_chemistry.algorithms import available, create
+from qdk_chemistry.algorithms import create
 from qdk_chemistry.data import Structure
 
 # Create the default ScfSolver instance
@@ -19,7 +19,9 @@ scf_solver = create("scf_solver")
 ################################################################################
 # start-cell-configure
 # Configure the SCF solver using the settings interface
-scf_solver.settings().set("method", "dft") # for a specific functional, specify instead of 'dft'
+scf_solver.settings().set(
+    "method", "dft"
+)  # for a specific functional, specify instead of 'dft'
 scf_solver.settings().set("basis_set", "def2-tzvpp")
 
 # end-cell-configure
@@ -28,11 +30,11 @@ scf_solver.settings().set("basis_set", "def2-tzvpp")
 ################################################################################
 # start-cell-run
 # Specify a structure
-coords = np.array([[0., 0., 0.], [0., 0., 1.4]])
+coords = np.array([[0.0, 0.0, 0.0], [0.0, 0.0, 1.4]])
 symbols = ["H", "H"]
 structure = Structure(coords, symbols=symbols)
 
-# Run scf 
+# Run scf
 E_scf, wfn = scf_solver.run(structure, charge=0, spin_multiplicity=1)
 scf_orbitals = wfn.get_orbitals()
 
