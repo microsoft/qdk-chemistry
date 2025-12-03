@@ -789,6 +789,8 @@ class Settings : public DataClass,
       std::optional<std::variant<BoundConstraint<T>, ListConstraint<T>>> limit =
           std::nullopt,
       bool documented = true) {
+    static_assert(is_supported_type<T>(),
+                  "Type not supported in SettingValue variant");
     if (!has(key)) {
       // If the type is directly in the variant, use it as-is
       if constexpr (is_variant_member_v<T, SettingValue>) {
