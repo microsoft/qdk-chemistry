@@ -9,7 +9,7 @@ Overview
 --------
 
 The :class:`~qdk_chemistry.data.Settings` class is a type-safe key-value store that provides a unified interface for configuring algorithms and data structures.
-Each algorithm type (such as :doc:`./algorithms/scf_solver`, :doc:`./algorithms/localizer`, etc.) extends the base :class:`~qdk_chemistry.data.Settings` class to create its own specialized settings with appropriate default values.
+Each algorithm type (such as :doc:`scf_solver`, :doc:`localizer`, etc.) extends the base :class:`~qdk_chemistry.data.Settings` class to create its own specialized settings with appropriate default values.
 The class follows a design philosophy where default settings are established during class initialization.
 This approach aligns with QDK/Chemistry's broader :doc:`design principles <index>` of type safety and flexibility.
 
@@ -19,7 +19,7 @@ The class supports:
   type-safe variant system
 - **Convenient accessor methods**: Get values with or without default fallbacks, check existence, and validate types
 - **Multiple serialization formats**: Save and load from JSON and HDF5 files for interoperability (see
-  :doc:`Serialization <./data/serialization>` for more details)
+  :doc:`Serialization <../data/serialization>` for more details)
 - **Default settings protection**: Default settings are defined during initialization through the protected
   ``set_default`` method, values can be alterd before algorithm execution but are locked afterwasrds to ensure consistency
 
@@ -34,14 +34,14 @@ Most algorithms validate their settings only at execution time, so you can adjus
 
 .. tab:: C++ API
 
-   .. literalinclude:: ../../_static/examples/cpp/settings.cpp
+   .. literalinclude:: ../../../_static/examples/cpp/settings.cpp
       :language: cpp
       :start-after: // start-cell-get-settings
       :end-before: // end-cell-get-settings
 
 .. tab:: Python API
 
-   .. literalinclude:: ../../_static/examples/python/settings.py
+   .. literalinclude:: ../../../_static/examples/python/settings.py
       :language: python
       :start-after: # start-cell-get-settings
       :end-before: # end-cell-get-settings
@@ -62,14 +62,14 @@ The ``set`` method is overloaded to handle various types including C-style strin
 
 .. tab:: C++ API
 
-   .. literalinclude:: ../../_static/examples/cpp/settings.cpp
+   .. literalinclude:: ../../../_static/examples/cpp/settings.cpp
       :language: cpp
       :start-after: // start-cell-set-settings
       :end-before: // end-cell-set-settings
 
 .. tab:: Python API
 
-   .. literalinclude:: ../../_static/examples/python/settings.py
+   .. literalinclude:: ../../../_static/examples/python/settings.py
       :language: python
       :start-after: # start-cell-set-settings
       :end-before: # end-cell-set-settings
@@ -83,14 +83,14 @@ For cases where you want to provide a fallback value if the key doesn't exist, u
 
 .. tab:: C++ API
 
-   .. literalinclude:: ../../_static/examples/cpp/settings.cpp
+   .. literalinclude:: ../../../_static/examples/cpp/settings.cpp
       :language: cpp
       :start-after: // start-cell-get-settings
       :end-before: // end-cell-get-settings
 
 .. tab:: Python API
 
-   .. literalinclude:: ../../_static/examples/python/settings.py
+   .. literalinclude:: ../../../_static/examples/python/settings.py
       :language: python
       :start-after: # start-cell-get-settings
       :end-before: # end-cell-get-settings
@@ -104,14 +104,14 @@ Additionally, the ``try_get`` method returns an ``std::optional`` that contains 
 
 .. tab:: C++ API
 
-   .. literalinclude:: ../../_static/examples/cpp/settings.cpp
+   .. literalinclude:: ../../../_static/examples/cpp/settings.cpp
       :language: cpp
       :start-after: // start-cell-misc-settings
       :end-before: // end-cell-misc-settings
 
 .. tab:: Python API
 
-   .. literalinclude:: ../../_static/examples/python/settings.py
+   .. literalinclude:: ../../../_static/examples/python/settings.py
       :language: python
       :start-after: # start-cell-misc-settings
       :end-before: # end-cell-misc-settings
@@ -125,14 +125,14 @@ present), manipulation (merging with other settings objects), and more.
 
 .. tab:: C++ API
 
-   .. literalinclude:: ../../_static/examples/cpp/settings.cpp
+   .. literalinclude:: ../../../_static/examples/cpp/settings.cpp
       :language: cpp
       :start-after: // start-cell-misc-settings
       :end-before: // end-cell-misc-settings
 
 .. tab:: Python API
 
-   .. literalinclude:: ../../_static/examples/python/settings.py
+   .. literalinclude:: ../../../_static/examples/python/settings.py
       :language: python
       :start-after: # start-cell-misc-settings
       :end-before: # end-cell-misc-settings
@@ -145,18 +145,18 @@ The :class:`~qdk_chemistry.data.Settings` class provides methods to serialize an
 This allows you to save algorithm configurations, share them with colleagues, or use them in future runs to ensure consistent results.
 
 JSON is a human-readable format ideal for manual editing and inspection, while HDF5 offers better performance and type preservation for large datasets.
-For more information on serialization throughout QDK/Chemistry, see the :doc:`Serialization <./data/serialization>` documentation.
+For more information on serialization throughout QDK/Chemistry, see the :doc:`Serialization <../data/serialization>` documentation.
 
 .. tab:: C++ API
 
-   .. literalinclude:: ../../_static/examples/cpp/settings.cpp
+   .. literalinclude:: ../../../_static/examples/cpp/settings.cpp
       :language: cpp
       :start-after: // start-cell-serialization
       :end-before: // end-cell-serialization
 
 .. tab:: Python API
 
-   .. literalinclude:: ../../_static/examples/python/settings.py
+   .. literalinclude:: ../../../_static/examples/python/settings.py
       :language: python
       :start-after: # start-cell-serialization
       :end-before: # end-cell-serialization
@@ -199,21 +199,21 @@ This design pattern ensures that algorithm settings are well-defined and discove
 The key aspect of this design is that default values are established during construction using the protected ``set_default`` method, which ensures baseline functionality.
 While new settings can be added at runtime through the public ``set`` method, defining defaults during construction helps with documentation and discoverability.
 
-This extensibility model is part of QDK/Chemistry's broader :doc:`Factory Pattern <./algorithms/factory_pattern>` design, which allows for flexible algorithm implementations while maintaining a consistent API.
-The pattern is used throughout QDK/Chemistry, such as in the :doc:`Interface System <./design/interfaces>` for integrating third-party packages.
+This extensibility model is part of QDK/Chemistry's broader :doc:`Factory Pattern <factory_pattern>` design, which allows for flexible algorithm implementations while maintaining a consistent API.
+The pattern is used throughout QDK/Chemistry, such as in the :doc:`Interface System <../design/interfaces>` for integrating third-party packages.
 
 Here's how to extend the :class:`~qdk_chemistry.data.Settings` class for a custom algorithm:
 
 .. tab:: C++ API
 
-   .. literalinclude:: ../../_static/examples/cpp/settings.cpp
+   .. literalinclude:: ../../../_static/examples/cpp/settings.cpp
       :language: cpp
       :start-after: // start-cell-extend-settings
       :end-before: // end-cell-extend-settings
 
 .. tab:: Python API
 
-   .. literalinclude:: ../../_static/examples/python/settings.py
+   .. literalinclude:: ../../../_static/examples/python/settings.py
       :language: python
       :start-after: # start-cell-extend-settings
       :end-before: # end-cell-extend-settings
@@ -257,14 +257,14 @@ These exceptions can be caught and handled to provide graceful error recovery:
 
 .. tab:: C++ API
 
-   .. literalinclude:: ../../_static/examples/cpp/settings.cpp
+   .. literalinclude:: ../../../_static/examples/cpp/settings.cpp
       :language: cpp
       :start-after: // start-cell-settings-errors
       :end-before: // end-cell-settings-errors
 
 .. tab:: Python API
 
-   .. literalinclude:: ../../_static/examples/python/settings.py
+   .. literalinclude:: ../../../_static/examples/python/settings.py
       :language: python
       :start-after: # start-cell-settings-errors
       :end-before: # end-cell-settings-errors
@@ -272,8 +272,8 @@ These exceptions can be caught and handled to provide graceful error recovery:
 Further reading
 ---------------
 
-- The above examples can be downloaded as complete `C++ <../../_static/examples/cpp/settings.cpp>`_ and `Python <../../_static/examples/python/settings.py>`_ scripts.
-- :doc:`Design Principles <index>`: Core architectural principles of QDK/Chemistry
-- :doc:`Factory Pattern <./algorithms/factory_pattern>`: Understanding the factory pattern and extending QDK/Chemistry
-- :doc:`Interfaces <./design/interfaces>`: QDK/Chemistry's interface system to external packages
-- :doc:`Serialization <./data/serialization>`: Data persistence in QDK/Chemistry
+- The above examples can be downloaded as complete `C++ <../../../_static/examples/cpp/settings.cpp>`_ and `Python <../../../_static/examples/python/settings.py>`_ scripts.
+- :doc:`Design Principles <../design/index>`: Core architectural principles of QDK/Chemistry
+- :doc:`Factory Pattern <factory_pattern>`: Understanding the factory pattern and extending QDK/Chemistry
+- :doc:`Interfaces <../design/interfaces>`: QDK/Chemistry's interface system to external packages
+- :doc:`Serialization <../data/serialization>`: Data persistence in QDK/Chemistry

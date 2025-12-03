@@ -23,7 +23,7 @@ The interface system is built on the following principles:
 2. **Runtime Selection**: Users can select implementations at runtime without changing their code
 3. **Transparent Delegation**: QDK/Chemistry handles all data format conversions between the QDK/Chemistry data model and external
    packages
-4. **Consistent Configuration**: All implementations are configured through the same :doc:`Settings <../settings>` interface
+4. **Consistent Configuration**: All implementations are configured through the same :doc:`Settings <../algorithms/settings>` interface
 
 .. graphviz:: /_static/diagrams/interface_architecture.dot
 
@@ -177,8 +177,8 @@ Interface-specific settings
 ---------------------------
 
 While QDK/Chemistry provides a unified API for all implementations, each backend may support additional options specific to that package.
-These package-specific settings are accessed through the same :doc:`Settings <../settings>` interface but are typically prefixed with the package name to avoid namespace collisions.
-This approach leverages the flexibility of QDK/Chemistry's :doc:`settings system <../settings>` to accommodate package-specific options while maintaining a consistent configuration experience.
+These package-specific settings are accessed through the same :doc:`Settings <../algorithms/settings>` interface but are typically prefixed with the package name to avoid namespace collisions.
+This approach leverages the flexibility of QDK/Chemistry's :doc:`settings system <../algorithms/settings>` to accommodate package-specific options while maintaining a consistent configuration experience.
 
 .. tab:: C++ API
 
@@ -272,5 +272,5 @@ Further reading
 - Some of the above examples can be downloaded as complete `C++ <../../../_static/examples/cpp/interfaces.cpp>`_ and `Python <../../../_static/examples/python/interfaces.py>`_ scripts.
 - :doc:`Design principles <index>`: Core architectural principles of QDK/Chemistry
 - :doc:`Factory pattern <../algorithms/factory_pattern>`: How to extend QDK/Chemistry with new algorithms and interfaces
-- :doc:`Settings <../settings>`: Configuring algorithm behavior consistently across implementations
+- :doc:`Settings <../algorithms/settings>`: Configuring algorithm behavior consistently across implementations
 - :doc:`Serialization <../data/serialization>`: Data persistence and conversion in QDK/Chemistry

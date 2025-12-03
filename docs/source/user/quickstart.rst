@@ -52,7 +52,7 @@ Instantiations of the :doc:`comprehensive/algorithms/scf_solver` algorithm (and 
 See the :doc:`comprehensive/algorithms/factory_pattern` documentation for more information on how it is used in the QDK/Chemistry.
 
 The inputs for an :term:`SCF` calculation are a :doc:`comprehensive/data/structure` object, the charge and multiplicity of the molecular system, and information about the single-particle basis to be used.
-Optionally, :doc:`comprehensive/settings` specific to the particular :doc:`comprehensive/algorithms/scf_solver` can be configured by accessing the ``settings()`` method.
+Optionally, :doc:`comprehensive/algorithms/settings` specific to the particular :doc:`comprehensive/algorithms/scf_solver` can be configured by accessing the ``settings()`` method.
 The basis for the :term:`SCF` calculation can be set via a string input (specifying one of the :ref:`available_basis_sets`), a custom :doc:`comprehensive/data/basis_set` or initial :doc:`comprehensive/data/orbitals` can also be provided.
 See below for language-specific examples.
 
@@ -78,7 +78,7 @@ While a full set of :term:`SCF` orbitals are useful for many applications, they 
 For this reason, both localization (orbital manipulation) and active space selection (orbital selection) algorithms are provided within QDK/Chemistry.
 
 QDK/Chemistry offers many methods for the selection of active spaces to reduce the problem size:  accurately modeling the quantum many-body problem while avoiding the prohibitive computational scaling of full configuration interaction.
-See the :doc:`comprehensive/algorithms/active_space` documentation for a list of supported methods, along with their associated :doc:`comprehensive/settings`, which accompany the standard QDK/Chemistry distribution.
+See the :doc:`comprehensive/algorithms/active_space` documentation for a list of supported methods, along with their associated :doc:`comprehensive/algorithms/settings`, which accompany the standard QDK/Chemistry distribution.
 
 The following are language-specific examples of how to select a so-called "valence" active space containing a subset of only those orbitals surrounding the Fermi level - in this
 case 6 electrons in 6 orbitals (6e, 6o).

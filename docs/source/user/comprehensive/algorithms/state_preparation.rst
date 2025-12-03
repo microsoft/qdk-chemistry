@@ -23,8 +23,8 @@ The :class:`~qdk_chemistry.algorithms.StatePreparation` in QDK/Chemistry provide
 Creating and configuring a StatePreparation object
 --------------------------------------------------
 
-The :class:`~qdk_chemistry.algorithms.StatePreparation` is created using the :doc:`factory pattern <../algorithms/factory_pattern>`.
-The resulting :class:`~qdk_chemistry.algorithms.StatePreparation` object can be configured using the :doc:`Settings <../settings>` object.
+The :class:`~qdk_chemistry.algorithms.StatePreparation` is created using the :doc:`factory pattern <factory_pattern>`.
+The resulting :class:`~qdk_chemistry.algorithms.StatePreparation` object can be configured using the :doc:`Settings <settings>` object.
 
 .. tab:: Python API
 
