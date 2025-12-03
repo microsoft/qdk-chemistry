@@ -5,8 +5,7 @@ algorithm, which measures phase bits sequentially from most-significant to least
 using a single ancilla qubit and adaptive feedback corrections.
 
 References:
-    Kitaev, A. (1995). "Quantum measurements and the Abelian Stabilizer Problem."
-    arXiv:quant-ph/9511026. :cite:`Kitaev1995`
+    Kitaev, A. (1995). arXiv:quant-ph/9511026. :cite:`Kitaev1995`
 
 """
 
