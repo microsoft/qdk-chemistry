@@ -15,36 +15,43 @@ resources:
     name: nlohmann/json
     ref: v3.12.0
     path: /ext/nlohmann-json
+    endpoint: github
   - repository: libint2
     type: github
     name: libint/libint
     ref: v2.9.0
     path: /ext/libint2
+    endpoint: github
   - repository: hdf5
     type: github
     name: HDFGroup/hdf5
     ref: hdf5-1_13_0
     path: /ext/hdf5
+    endpoint: github
   - repository: blis
     type: github
     name: flame/blis
     ref: v2.0.0
     path: /ext/blis
+    endpoint: github
   - repository: libflame
     type: github
     name: flame/libflame
     ref: v5.2.0
     path: /ext/libflame
+    endpoint: github
   - repository: spdlog
     type: github
     name: gabime/spdlog
     ref: v1.5.3
     path: /ext/spdlog
+    endpoint: github
   - repository: gauxc
     type: github
     name: wavefunction91/gauxc
     ref: v1.1
     path: /ext/gauxc
+    endpoint: github
   - repository: self
     path: qdk-chemistry
 
