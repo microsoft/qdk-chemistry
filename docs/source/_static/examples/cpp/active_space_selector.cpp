@@ -68,6 +68,3 @@ std::cout << "Active orbitals summary:\n"
 
 // end-cell-run
 // --------------------------------------------------------------------------------------------
-
-std::cout << "Active space selection example completed successfully!"
-          << std::endl;

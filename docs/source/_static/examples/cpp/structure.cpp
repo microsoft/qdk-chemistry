@@ -36,12 +36,12 @@ Structure structure_custom(coords, elements, custom_masses, custom_charges);
 Eigen::Vector3d coords = structure.get_atom_coordinates(0);  // First atom
 
 // Get element of a specific atom
-std::string element = structure.get_atom_element(0);  // First atom
+Element element = structure.get_atom_element(0);  // First atom
 
 // Get all coordinates (in angstrom) as a matrix
 Eigen::MatrixXd all_coords = structure.get_coordinates();
 
 // Get all elements as a vector
-std::vector<std::string> all_elements = structure.get_elements();
+std::vector<Element> all_elements = structure.get_elements();
 // end-cell-data
 // --------------------------------------------------------------------------------------------

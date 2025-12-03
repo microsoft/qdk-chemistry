@@ -10,6 +10,7 @@
 // start-cell-create
 #include <iostream>
 #include <qdk/chemistry.hpp>
+#include <string>
 using namespace qdk::chemistry::data;
 using namespace qdk::chemistry::algorithms;
 // Obtain orbitals from an SCF calculation

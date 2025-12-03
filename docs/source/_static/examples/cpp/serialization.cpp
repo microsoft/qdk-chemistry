@@ -24,7 +24,7 @@ auto structure_data = structure.to_json();
 // Deserialize from JSON object
 // "Structure" is the data type to de-serialize into (will throw, if it doesn't
 // match)
-auto structure_from_json = Structure::from_json(json_data);
+auto structure_from_json = Structure::from_json(structure_data);
 
 // Write to json file
 structure.to_json_file(
