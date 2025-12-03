@@ -20,6 +20,8 @@ workflows.
 
 .. graphviz:: /_static/diagrams/data_flow.dot
 
+|
+
 Data classes
 ------------
 
@@ -69,10 +71,10 @@ QDK/Chemistry implements the :doc:`factory pattern <factory_pattern>` for algori
 This pattern allows:
 
 - Runtime selection of the most appropriate implementation given user selected methods
-- Extension with new implementations without changing client code
+- Extension by new implementations without changing client code
 - Centralized management of dependencies and resources
 
-Read more in the :doc:`Factory Pattern <factory_pattern>` documentation.
+Read more on QDK/Chemistry's usage of this pattern in the :doc:`Factory Pattern <factory_pattern>` documentation.
 
 Settings pattern
 ================
@@ -100,7 +102,8 @@ This approach provides:
 - Default values with explicit overrides
 - Documentation of available options
 
-Read more in the :doc:`Settings <settings>` documentation.
+Read more on how one can configure, discover and extend instances of Settings objects in the
+:doc:`Settings <settings>` documentation.
 
 Data flow example
 =================
