@@ -9,6 +9,7 @@ Additional features may be available through plugins; see the
 :doc:`Plugins <plugins>` documentation for more information.
 
 .. _available_basis_sets:
+
 Available Basis Sets
 --------------------
 

@@ -121,7 +121,7 @@ many-body calculations and quantum algorithms.
       :end-before: # end-cell-hamiltonian-constructor
 
 Compute a multi-configurational wavefunction for the active space
-^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 With the active space Hamiltonian constructed, quantum many-body calculations
 can be performed to obtain accurate electronic energies and wavefunctions.
@@ -183,9 +183,11 @@ To execute quantum algorithms on actual quantum hardware, the Fermionic :doc:`Ha
 QDK/Chemistry supports multiple encoding schemes including the Jordan-Wigner and Bravyi-Kitaev transformations.
 The resulting qubit Hamiltonian is represented as a sum of Pauli strings (tensor products of Pauli :math:`X, Y, Z`, and identity operators), each with an associated coefficient.
 
-For efficient energy estimation, the qubit Hamiltonian can be optimized in two ways.
-First, by filtering out terms that have negligible expectation values given the sparse :class:`~qdk_chemistry.data.Wavefunction`, pre-computing their classical contributions.
-Second, by grouping the remaining Pauli operators into commuting sets that can be measured simultaneously, significantly reducing the number of measurement circuits required on the quantum device.
+For efficient energy estimation, the qubit Hamiltonian can be optimized in two ways:
+
+
+1. Filter out terms that have negligible expectation values given the sparse :class:`~qdk_chemistry.data.Wavefunction`, pre-computing their classical contributions.
+2. Group the remaining Pauli operators into commuting sets that can be measured simultaneously, significantly reducing the number of measurement circuits required on the quantum device.
 
 .. tab:: C++ API
 
@@ -200,10 +202,35 @@ Second, by grouping the remaining Pauli operators into commuting sets that can b
       :start-after: # start-cell-qubit-hamiltonian
       :end-before: # end-cell-qubit-hamiltonian
 
+Generate the State Preparation Circuit
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+.. TODO: Add more references to other meothds
+
+Given the classical representation of the sparse multi-configurational :class:`~qdk_chemistry.data.Wavefunction`, a quantum circuit can be generated to prepare this state on a quantum computer.
+This can be done in many ways, including via Isometry encoding :cite:`Christandl2016`, linear combinations of unitaries [...], and tensor product methods [...].
+However, when the wavefunction is very sparse, these methods can be inefficient. In QDK/Chemistry, we provide a specialized method for generating state preparation circuits for sparse wavefunctions
+based on the construction of sparse isometries over GF(2) with X gates [...], provided as a :doc:`comprehensive/algorithms/state_preparation` algorithm.
+See :doc:`comprehensive/algorithms/state_preparation` for more details on the other algorithms provided for state preparation.
+
+.. tab:: C++ API
+
+   .. code-block:: cpp
+
+      // This step is currently only available in the Python API.
+
+.. tab:: Python API
+
+   .. literalinclude:: ../_static/examples/python/quickstart.py
+      :language: python
+      :start-after: # start-state-prep-circuit
+      :end-before: # end-state-prep-circuit
+
+
 Estimate the ground state energy using a quantum algorithm
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-The final step combines the state preparation circuit with the measurement circuits derived from the grouped qubit :doc:`Hamiltonian <comprehensive/data/hamiltonian>` to estimate the ground state energy.
+The final step combines the state preparation circuit with the measurement circuits derived from the grouped qubit Hamiltonian to estimate the ground state energy.
 Each measurement circuit appends specific Pauli basis rotations to the state preparation circuit, followed by computational basis measurements.
 The measurement outcomes are repeated many times (shots) to build up statistics for each observable group.
 
