@@ -1,11 +1,11 @@
-Design principles of QDK/Chemistry
+Design Principles of QDK/Chemistry
 ##################################
 
 This document outlines the core architectural design principles of QDK/Chemistry, explaining the conceptual framework that guides the library's organization and implementation.
-For a complete overview of QDK/Chemistry's documentation, see the :doc:`comprehensive documentation index <../index>`.
+For a complete overview of QDK/Chemistry's documentation, see the :doc:`in-depth documentation index <../index>`.
 
 QDK/Chemistry is designed with a clear separation between **data containers** and **algorithms**.
-This fundamental design choice enables flexibility, extensibility, and maintainability of the codebase, while providing users with a consistent and intuitive API.
+This design choice enables flexibility, extensibility, and maintainability of the codebase, while providing users with a consistent and intuitive API.
 
 Separation of data and algorithms
 =================================
@@ -25,34 +25,39 @@ workflows.
 Data classes
 ------------
 
-Data classes in QDK/Chemistry are designed to be:
+Data classes in QDK/Chemistry represent quantities that represent intermediate data commonly encounters in quantum applications workflows. These classes are designed to be:
 
 - **Immutable**: Once created, the core data cannot be modified
-- **Self-contained**: Include all information necessary to represent the concept
+- **Self-contained**: Include all information necessary to represent the underlying quantum chemical quantity
 - :doc:`Serializable <../data/serialization>`: Can be easily saved to and loaded from files
 - **Language-agnostic**: Accessible through identical APIs in both C++ and Python
 
-See the :doc:`Data <../data/index>` documentation for further details on QDK/Chemistry's data structures.
+See the :doc:`Data <../data/index>` documentation for further details on the availability and usage of
+QDK/Chemistry's data classes.
 
 Algorithm classes
 -----------------
 
-Algorithm classes in QDK/Chemistry are designed to be:
+Algorithm classes represent mutations on data, such as the execution of quantum chemical methods and generation of circuit components commonly found in quantum applications workflows.
+These classes are designed to be:
 
 - **Stateless**: Their behavior depends only on their input data and configuration
 - **Configurable**: Through a standardized ``Settings`` interface
 - **Consistent**: Follow a uniform interface pattern
 - **Interoperable**: Provide unified interfaces to both native implementations and third-party packages
 
-See the :doc:`Algorithms <../algorithms/index>` documentation for further details on QDK/Chemistry's algorithm implementations.
 
 Each algorithm class can leverage both QDK-developed implementations and :doc:`interfaces <interfaces>` to established third-party electronic structure packages.
 This design allows users to benefit from specialized capabilities of external software while maintaining a consistent API.
 
+See the :doc:`Algorithms <../algorithms/index>` documentation for further details on the availablity and usage of
+ QDK/Chemistry's algorithm implementations.
+
+
 Factory pattern
 ===============
 
-QDK/Chemistry implements the :doc:`factory pattern <factory_pattern>` for algorithm creation:
+QDK/Chemistry leverages a :doc:`factory pattern <factory_pattern>` for algorithm creation:
 
 .. tab:: C++ API
 
@@ -70,16 +75,16 @@ QDK/Chemistry implements the :doc:`factory pattern <factory_pattern>` for algori
 
 This pattern allows:
 
-- Runtime selection of the most appropriate implementation given user selected methods
+- Runtime selection of the most appropriate implementation without changing calls to factory functions
 - Extension by new implementations without changing client code
 - Centralized management of dependencies and resources
 
 Read more on QDK/Chemistry's usage of this pattern in the :doc:`Factory Pattern <factory_pattern>` documentation.
 
-Settings pattern
-================
+Runtime Algororithm Configuration via Settings
+==============================================
 
-Algorithm configuration is managed through a consistent :doc:`Settings <../settings>` interface:
+Algorithm configuration is managed through instances of :doc:`Settings <../settings>` objects:
 
 .. tab:: C++ API
 
@@ -95,18 +100,11 @@ Algorithm configuration is managed through a consistent :doc:`Settings <../setti
       :start-after: # start-cell-scf-settings
       :end-before: # end-cell-scf-settings
 
-This approach provides:
-
-- Uniform configuration across all algorithms
-- Type safety and validation
-- Default values with explicit overrides
-- Documentation of available options
-
 Read more on how one can configure, discover and extend instances of Settings objects in the
 :doc:`Settings <../settings>` documentation.
 
-Data flow example
-=================
+A Complete Dataflow Example
+===========================
 
 A typical workflow in QDK/Chemistry demonstrates the data-algorithm separation:
 
