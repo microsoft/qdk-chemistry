@@ -39,6 +39,10 @@ extends:
           enabled: true
         sourceLanguages: python
         binaryLanguages: cpp
+      psccriptanalyzer:
+        enabled: false
+      armory:
+        enabled: false
       eslint:
         enabled: false
         justificationForDisabling: JavaScript is not used in this repository.
