@@ -22,11 +22,11 @@ parameters:
     arch: x86_64
     march: x86-64-v3
     imageName: ubuntu-22.04
-  # - name: linux_aarch64
-  #   os: linux
-  #   arch: aarch64
-  #   march: armv8-a
-  #   imageName: qd-azurelinux3-pt-arm
+  - name: linux_aarch64
+    os: linux
+    arch: aarch64
+    march: armv8-a
+    imageName: qd-azurelinux3-pt-arm
 
 variables:
 - group: QdkChemistry
@@ -38,6 +38,8 @@ extends:
         name: Azure-Pipelines-DevTools-EO
         image: windows-2022
         os: windows
+      eslint:
+        enabled: false
     stages:
     - stage: Build
       displayName: Build C++ Deps and Python Wheels
@@ -46,7 +48,7 @@ extends:
         - job: Build_${{ target.name }}
           ${{ if eq(target.arch, 'aarch64') }}:
             pool:
-              name: $(CPU_POOL_ARM)
+              name: $(CPU_POOL_X86)
               demands:
               - ImageOverride -equals ${{ target.imageName }}
               os: ${{ target.os }}
@@ -74,7 +76,7 @@ extends:
               Python3.13:
                 pythonVersion: '3.13'
                 buildMarch: ${{ target.march }}
-            maxParallel: 1
+            maxParallel: 4
           templateContext:
             outputs:
             - output: pipelineArtifact
@@ -205,7 +207,7 @@ extends:
     #       steps:
     #         - task: EsrpRelease@9
     #           condition: succeeded()
-    #           displayName: Publish Py Packages
+    #           displayName: Publish Python Packages
     #           inputs:
     #             connectedservicename: "PME ESRP Azure Connection"
     #             usemanagedidentity: true

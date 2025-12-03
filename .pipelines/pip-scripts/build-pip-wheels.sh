@@ -51,6 +51,22 @@ elif [[ ${MARCH} == 'x86-64-v3' ]]; then
 fi
 cmake --version
 
+# Install updated version of spdlog
+echo "=== Installing spdlog ==="
+git clone --depth 1 --branch v1.15.3 https://github.com/gabime/spdlog.git spdlog
+cd spdlog
+mkdir -p build
+cd build
+cmake .. -DCMAKE_BUILD_TYPE="$BUILD_TYPE" \
+        -DCMAKE_INSTALL_PREFIX=/usr/local \
+        -DCMAKE_POSITION_INDEPENDENT_CODE=ON \
+        -DCMAKE_CXX_FLAGS="-march=${MARCH} -fPIC -Os" \
+        -DBUILD_SHARED_LIBS=OFF
+make -j$(nproc)
+make install
+cd ../../
+rm -rf spdlog
+
 export CFLAGS="-fPIC -Os"
 echo "Downloading and installing BLIS..."
 bash .pipelines/install-scripts/install-blis.sh /usr/local ${MARCH} ${BLIS_VERSION} ${CFLAGS}
@@ -82,7 +98,7 @@ export PATH="$PYENV_ROOT/shims:$PATH"
 python3 --version
 
 # Update pip and install build tools
-python3 -m pip install --upgrade pip
+python3 -m pip install --upgrade pip fonttools
 python3 -m pip install auditwheel build
 
 # Install Python package
