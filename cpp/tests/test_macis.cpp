@@ -1312,6 +1312,7 @@ TEST_F(MacisAsciBackoffTest, NormalSettingsNoBackoff) {
   calculator->settings().set("ncdets_max",
                              static_cast<size_t>(100));  // Plenty of room
   calculator->settings().set("max_refine_iter", static_cast<size_t>(0));
+  calculator->settings().set("core_selection_strategy", std::string("fixed"));
 
   auto hamiltonian = hamiltonian_constructor_->run(orbitals_);
   auto [energy, wavefunction] = calculator->run(hamiltonian, 5, 5);
