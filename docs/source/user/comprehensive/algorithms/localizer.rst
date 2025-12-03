@@ -46,7 +46,7 @@ For more information about this pattern, see the :doc:`Factory Pattern <../desig
 Configuring the localizer
 -------------------------
 
-The :class:`~qdk_chemistry.algorithms.OrbitalLocalizer` can be configured using the :doc:`Settings <../design/settings>` object:
+The :class:`~qdk_chemistry.algorithms.OrbitalLocalizer` can be configured using the :doc:`Settings <../settings>` object:
 
 .. tab:: C++ API
 

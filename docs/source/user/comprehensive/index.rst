@@ -25,6 +25,7 @@ This documentation is organized into the following sections:
 
    design/index
    data/index
+   settings
    algorithms/index
    basis_functionals
    model_hamiltonians

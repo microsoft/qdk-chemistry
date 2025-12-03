@@ -251,5 +251,5 @@ Further reading
 ---------------
 
 - Some of the above examples can be downloaded as complete `C++ <../../../_static/examples/cpp/factory_pattern.cpp>`_ and `Python <../../../_static/examples/python/factory_pattern.py>`_ scripts.
-- :doc:`Settings <settings>`: Configuration of algorithm instances
+- :doc:`Settings <../settings>`: Configuration of algorithm instances
 - :doc:`Interfaces <interfaces>`: QDK/Chemistry's interface system to external packages

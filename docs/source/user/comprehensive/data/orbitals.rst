@@ -208,4 +208,4 @@ Further reading
 
 - The above examples can be downloaded as complete `C++ <../../../_static/examples/cpp/orbitals.cpp>`_ and `Python <../../../_static/examples/python/orbitals.py>`_ scripts.
 - :doc:`Serialization <../data/serialization>`: Data serialization and deserialization
-- :doc:`Settings <../design/settings>`: Configuration settings for algorithms
+- :doc:`Settings <../settings>`: Configuration settings for algorithms

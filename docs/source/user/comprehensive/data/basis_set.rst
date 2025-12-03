@@ -265,5 +265,5 @@ Further reading
 
 - The above examples can be downloaded as complete `C++ <../../../_static/examples/cpp/basis_set.cpp>`_ and `Python <../../../_static/examples/python/basis_set.py>`_ scripts.
 - :doc:`Serialization <../data/serialization>`: Data serialization and deserialization
-- :doc:`Settings <../design/settings>`: Configuration settings for algorithms
+- :doc:`Settings <../settings>`: Configuration settings for algorithms
 - :doc:`Supported basis sets <../basis_functionals>`: List of pre-defined basis sets available in QDK/Chemistry

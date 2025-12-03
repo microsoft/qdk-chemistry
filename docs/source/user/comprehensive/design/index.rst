@@ -79,7 +79,7 @@ Read more on QDK/Chemistry's usage of this pattern in the :doc:`Factory Pattern 
 Settings pattern
 ================
 
-Algorithm configuration is managed through a consistent :doc:`Settings <settings>` interface:
+Algorithm configuration is managed through a consistent :doc:`Settings <../settings>` interface:
 
 .. tab:: C++ API
 
@@ -103,7 +103,7 @@ This approach provides:
 - Documentation of available options
 
 Read more on how one can configure, discover and extend instances of Settings objects in the
-:doc:`Settings <settings>` documentation.
+:doc:`Settings <../settings>` documentation.
 
 Data flow example
 =================
@@ -144,7 +144,7 @@ Further reading
 
 - The above examples can be downloaded as complete `C++ <../../../_static/examples/cpp/design_principles.cpp>`_ and `Python <../../../_static/examples/python/design_principles.py>`_ scripts.
 - :doc:`Factory Pattern <factory_pattern>`: Details on QDK/Chemistry's implementation of the factory pattern
-- :doc:`Settings <settings>`: How to configure the execution behavior of algorithms through the Settings interface
+- :doc:`Settings <../settings>`: How to configure the execution behavior of algorithms through the Settings interface
 - :doc:`Interfaces <interfaces>`: QDK/Chemistry's interface system to external packages
 
 .. toctree::
@@ -153,4 +153,3 @@ Further reading
 
    factory_pattern
    interfaces
-   settings
