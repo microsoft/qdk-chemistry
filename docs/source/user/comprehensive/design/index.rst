@@ -59,7 +59,7 @@ QDK/Chemistry includes the following algorithm classes:
 
 .. - :doc:`DynamicalCorrelation <../algorithms/dynamical_correlation>`: Dynamical correlation methods
 
-Each algorithm class can leverage both Microsoft-developed implementations (developed within QDK/Chemistry) and :doc:`interfaces <interfaces>` to established third-party electronic structure packages.
+Each algorithm class can leverage both QDK-developed implementations (developed within QDK/Chemistry) and :doc:`interfaces <interfaces>` to established third-party electronic structure packages.
 This design allows users to benefit from specialized capabilities of external software while maintaining a consistent API.
 
 Factory pattern
@@ -83,7 +83,7 @@ QDK/Chemistry implements the :doc:`factory pattern <factory_pattern>` for algori
 
 This pattern allows:
 
-- Runtime selection of the most appropriate implementation
+- Runtime selection of the most appropriate implementation given user selected methods
 - Extension with new implementations without changing client code
 - Centralized management of dependencies and resources
 
@@ -139,7 +139,8 @@ A typical workflow in QDK/Chemistry demonstrates the data-algorithm separation:
 Interface architecture (plugins)
 ================================
 
-QDK/Chemistry is designed with a plugin architecture that allows for consistent :doc:`interfaces <interfaces>` to various external packages:
+QDK/Chemistry is designed with a plugin architecture that allows for consistent :doc:`interfaces <interfaces>` to various external packages
+as well as methods developed within QDK/Chemistry itself:
 
 .. graphviz:: /_static/diagrams/plugin_architecture.dot
 
@@ -148,14 +149,14 @@ This design provides several advantages:
 1. **Unified API**: Users interact with a consistent interface regardless of the underlying implementation
 2. **Implementation Flexibility**: Algorithms can be implemented natively or delegate to specialized external packages
 3. **Best-of-Breed Approach**: Leverage strengths of different packages while maintaining consistent data structures
-4. **Future-Proofing**: New implementations can be added without changing the user-facing API
+4. **Resilient**: New implementations can be added without changing the user-facing API
 
 Further reading
 ===============
 
 - The above examples can be downloaded as complete `C++ <../../../_static/examples/cpp/design_principles.cpp>`_ and `Python <../../../_static/examples/python/design_principles.py>`_ scripts.
 - :doc:`Factory Pattern <factory_pattern>`: Details on QDK/Chemistry's implementation of the factory pattern
-- :doc:`Settings <settings>`: How to configure algorithms through the Settings interface
+- :doc:`Settings <settings>`: How to configure the execution behavior of algorithms through the Settings interface
 - :doc:`Interfaces <interfaces>`: QDK/Chemistry's interface system to external packages
 
 .. toctree::
