@@ -98,9 +98,9 @@ export PATH="$PYENV_ROOT/shims:$PATH"
 python3 --version
 
 # Update pip and install build tools
-python3 -m pip install --upgrade pip fonttools
+python3 -m pip install --upgrade pip
 python3 -m pip install auditwheel build
-
+python3 -m pip install "fonttools>=4.61.0"
 # Install Python package
 cd python
 

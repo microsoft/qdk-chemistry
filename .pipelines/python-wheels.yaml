@@ -24,7 +24,7 @@ parameters:
     imageName: ubuntu-22.04
   - name: linux_aarch64
     os: linux
-    arch: aarch64
+    arch: x86_64
     march: armv8-a
     imageName: ubuntu-22.04
 
@@ -40,6 +40,7 @@ extends:
         os: windows
       eslint:
         enabled: false
+        exitOnFatalError: true
     stages:
     - stage: Build
       displayName: Build C++ Deps and Python Wheels
@@ -76,7 +77,7 @@ extends:
               Python3.13:
                 pythonVersion: '3.13'
                 buildMarch: ${{ target.march }}
-            maxParallel: 4
+            maxParallel: 6
           templateContext:
             outputs:
             - output: pipelineArtifact

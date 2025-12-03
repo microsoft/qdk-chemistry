@@ -169,7 +169,7 @@
         "type": "pip",
         "pip": {
           "name": "fonttools",
-          "version": "4.60.1"
+          "version": "4.61.0"
         }
       }
     },
