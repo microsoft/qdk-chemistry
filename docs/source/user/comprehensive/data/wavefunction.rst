@@ -81,7 +81,7 @@ Sparse multi-determinant wavefunctions for Selected Configuration Interaction me
       :start-after: # start-cell-create-sci
       :end-before: # end-cell-create-sci
 
-CAS wavefunction container 
+CAS wavefunction container
 ~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 A multi-determinant wavefunction from Complete Active Space methods (CASSCF/CASCI) with comprehensive reduced density matrix support for computing electronic properties.

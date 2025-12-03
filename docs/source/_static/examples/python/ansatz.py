@@ -14,7 +14,7 @@ from qdk_chemistry.algorithms import create
 # Create a simple H2 molecule structure
 structure = Structure(
     coordinates=np.array([[0.0, 0.0, 0.0], [0.0, 0.0, 1.4]]),  # Bohr
-    symbols=["H", "H"]
+    symbols=["H", "H"],
 )
 
 # SCF
