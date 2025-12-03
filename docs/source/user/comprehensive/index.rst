@@ -28,4 +28,4 @@ This documentation is organized into the following sections:
    algorithms/index
    basis_functionals
    model_hamiltonians
-   plugins
+   extending
