@@ -34,27 +34,28 @@ extends:
   template: v1/1ES.Official.PipelineTemplate.yml@1ESPipelineTemplates
   parameters:
     sdl:
+      eslint:
+        enabled: false
+        justificationForDisabling: JavaScript is not used in this repository.
+        exitOnFatalError: true
       sourceAnalysisPool:
         name: Azure-Pipelines-DevTools-EO
         image: windows-2022
         os: windows
-      eslint:
-        enabled: false
-        exitOnFatalError: true
     stages:
     - stage: Build
       displayName: Build C++ Deps and Python Wheels
       jobs:
       - ${{ each target in parameters.matrix }}:
         - job: Build_${{ target.name }}
-          ${{ if eq(target.arch, 'aarch64') }}:
+          ${{ if eq(target.march, 'armv8-a') }}:
             pool:
               name: $(CPU_POOL_X86)
               demands:
               - ImageOverride -equals ${{ target.imageName }}
               os: ${{ target.os }}
               hostArchitecture: Arm64
-          ${{ if eq(target.arch, 'x86_64') }}:
+          ${{ if eq(target.march, 'x86-64-v3') }}:
             pool:
               name: $(CPU_POOL_X86)
               demands:
@@ -64,8 +65,6 @@ extends:
           displayName: Build ${{ target.march }} wheels
           variables:
             LD_LIBRARY_PATH: $LD_LIBRARY_PATH:/usr/local/lib
-            targetOs: ${{ target.os }}
-            targetArch: ${{ target.arch }}
           strategy:
             matrix:
               Python3.11:
@@ -83,10 +82,10 @@ extends:
             - output: pipelineArtifact
               displayName: Upload Linux Python $(pythonVersion) Wheels for ${{ target.march }}
               targetPath: $(System.DefaultWorkingDirectory)/python/repaired_wheelhouse
-              artifactName: linux-${{ target.arch }}-wheels-python$(pythonVersion)
+              artifactName: linux-${{ target.march }}-wheels-python$(pythonVersion)
           steps:
           # Build - x86_64
-          - ${{ if eq(target.arch, 'x86_64') }}:
+          - ${{ if eq(target.march, 'x86-64-v3') }}:
             - template: .pipelines/templates/docker-pip-wheel.yml@self
               parameters:
                 march: $(buildMarch)
@@ -98,7 +97,7 @@ extends:
                 pythonVersion: $(pythonVersion)
 
           # Test - x86_64
-          - ${{ if eq(target.arch, 'x86_64') }}:
+          - ${{ if eq(target.march, 'x86-64-v3') }}:
             - template: .pipelines/templates/docker-test-wheel.yml@self
               parameters:
                 agentBuildDirectory: $(Agent.BuildDirectory)
@@ -107,7 +106,7 @@ extends:
                 pythonVersion: $(pythonVersion)
 
           # Build - ARM64
-          - ${{ if eq(target.arch, 'aarch64') }}:
+          - ${{ if eq(target.march, 'armv8-a') }}:
             - template: .pipelines/templates/docker-pip-wheel.yml@self
               parameters:
                 march: $(buildMarch)
@@ -119,7 +118,7 @@ extends:
                 pythonVersion: $(pythonVersion)
 
           # Test - ARM64
-          - ${{ if eq(target.arch, 'aarch64') }}:
+          - ${{ if eq(target.march, 'armv8-a') }}:
             - template: .pipelines/templates/docker-test-wheel.yml@self
               parameters:
                 agentBuildDirectory: $(Agent.BuildDirectory)
