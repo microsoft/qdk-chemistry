@@ -7,15 +7,15 @@
 
 import numpy as np
 from qdk_chemistry.data import (
-   Orbitals,
-   SlaterDeterminantContainer,
-   CasWavefunctionContainer,
-   SciWavefunctionContainer,
-   Configuration,
-   Wavefunction,
-   BasisSet,
-   Shell,
-   OrbitalType
+    Orbitals,
+    SlaterDeterminantContainer,
+    CasWavefunctionContainer,
+    SciWavefunctionContainer,
+    Configuration,
+    Wavefunction,
+    BasisSet,
+    Shell,
+    OrbitalType,
 )
 
 ################################################################################
@@ -46,7 +46,7 @@ while functions_created < 3:
             shell = Shell(atom_index, OrbitalType.S, exps, coefs)
             shells.append(shell)
             functions_created += 1
-basis_set = BasisSet('dummy', shells)
+basis_set = BasisSet("dummy", shells)
 
 # Create orbitals
 coefficients = np.eye(3)  # Identity matrix for 3 orbitals
@@ -64,8 +64,10 @@ sd_wavefunction = Wavefunction(sd_container)
 # start-cell-create-cas
 # Create a CAS wavefunction with multiple determinants
 # Same 3 orbitals, active space of 2 orbitals with 2 electrons
-cas_dets = [Configuration("20"),    # |2,0⟩ 
-            Configuration("ud")]    # |1,1⟩
+cas_dets = [
+    Configuration("20"),  # |2,0⟩
+    Configuration("ud"),
+]  # |1,1⟩
 cas_coeffs = np.array([0.9, 0.436])
 cas_container = CasWavefunctionContainer(cas_coeffs, cas_dets, orbitals)
 cas_wavefunction = Wavefunction(cas_container)
@@ -76,9 +78,11 @@ cas_wavefunction = Wavefunction(cas_container)
 # start-cell-create-sci
 # Create an SCI wavefunction with selected determinants
 # Same 3 orbitals, selected configurations for 2 electrons in 2 active orbitals
-sci_dets = [Configuration("20"),    # |2,0⟩
-            Configuration("ud"),    # |1,1⟩ 
-            Configuration("02")]    # |0,2⟩
+sci_dets = [
+    Configuration("20"),  # |2,0⟩
+    Configuration("ud"),  # |1,1⟩
+    Configuration("02"),
+]  # |0,2⟩
 sci_coeffs = np.array([0.85, 0.4, 0.3])
 sci_container = SciWavefunctionContainer(sci_coeffs, sci_dets, orbitals)
 sci_wavefunction = Wavefunction(sci_container)
@@ -111,7 +115,9 @@ if has_1rdm_spin_traced:
     rdm1_total = sd_wavefunction.get_active_one_rdm_spin_traced()
 
 if has_2rdm_spin_dep:
-    rdm2_aaaa, rdm2_aabb, rdm2_bbbb = sd_wavefunction.get_active_two_rdm_spin_dependent()
+    rdm2_aaaa, rdm2_aabb, rdm2_bbbb = (
+        sd_wavefunction.get_active_two_rdm_spin_dependent()
+    )
 
 if has_2rdm_spin_traced:
     rdm2_total = sd_wavefunction.get_active_two_rdm_spin_traced()
