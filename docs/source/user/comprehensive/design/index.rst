@@ -25,18 +25,12 @@ Data classes
 
 Data classes in QDK/Chemistry are designed to be:
 
-- Immutable: Once created, the core data cannot be modified
-- Self-contained: Include all information necessary to represent the concept
+- **Immutable**: Once created, the core data cannot be modified
+- **Self-contained**: Include all information necessary to represent the concept
 - :doc:`Serializable <../data/serialization>`: Can be easily saved to and loaded from files
-- Language-agnostic: Accessible through identical APIs in both C++ and Python
+- **Language-agnostic**: Accessible through identical APIs in both C++ and Python
 
-QDK/Chemistry includes the following data classes:
-
-- :doc:`Structure <../data/structure>`: Molecular geometry and composition
-- :doc:`BasisSet <../data/basis_set>`: Quantum chemistry basis set definitions
-- :doc:`Orbitals <../data/orbitals>`: Molecular orbital coefficients and energies
-- :doc:`Hamiltonian <../data/hamiltonian>`: Molecular Hamiltonian
-- :class:`~qdk_chemistry.data.Wavefunction`: Wavefunction representation
+See the :doc:`Data <../data/index>` documentation for further details on QDK/Chemistry's data structures.
 
 Algorithm classes
 -----------------
@@ -45,21 +39,12 @@ Algorithm classes in QDK/Chemistry are designed to be:
 
 - **Stateless**: Their behavior depends only on their input data and configuration
 - **Configurable**: Through a standardized ``Settings`` interface
-- **Factory-constructed**: Created through factory methods for flexibility and extensibility
 - **Consistent**: Follow a uniform interface pattern
 - **Interoperable**: Provide unified interfaces to both native implementations and third-party packages
 
-QDK/Chemistry includes the following algorithm classes:
+See the :doc:`Algorithms <../algorithms/index>` documentation for further details on QDK/Chemistry's algorithm implementations.
 
-- :doc:`ScfSolver <../algorithms/scf_solver>`: Self-consistent field calculations
-- :doc:`Localizer <../algorithms/localizer>`: Orbital localization methods
-- :doc:`ActiveSpaceSelector <../algorithms/active_space>`: Active space selection methods
-- :doc:`HamiltonianConstructor <../algorithms/hamiltonian_constructor>`: Hamiltonian construction
-- :doc:`MCCalculator <../algorithms/mc_calculator>`: Multi-configuration calculations
-
-.. - :doc:`DynamicalCorrelation <../algorithms/dynamical_correlation>`: Dynamical correlation methods
-
-Each algorithm class can leverage both QDK-developed implementations (developed within QDK/Chemistry) and :doc:`interfaces <interfaces>` to established third-party electronic structure packages.
+Each algorithm class can leverage both QDK-developed implementations and :doc:`interfaces <interfaces>` to established third-party electronic structure packages.
 This design allows users to benefit from specialized capabilities of external software while maintaining a consistent API.
 
 Factory pattern
