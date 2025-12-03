@@ -988,10 +988,8 @@ Constructs a coupled cluster wavefunction container with amplitudes.
 Args:
     orbitals (Orbitals): Shared pointer to orbital basis set
     wavefunction (Wavefunction): Shared pointer to wavefunction
-    t1_amplitudes (numpy.ndarray, optional): T1 amplitudes (will be used for
-    ``both alpha and beta in restricted`` case)
-    t2_amplitudes (numpy.ndarray, optional): T2 amplitudes (will be used for
-    ``alpha-beta`` coupling)
+    t1_amplitudes (numpy.ndarray, optional): T1 amplitudes (both alpha, beta spin)
+    t2_amplitudes (numpy.ndarray, optional): T2 amplitudes (both alpha, beta spin)
 
 Examples:
     >>> t1 = np.array([...])

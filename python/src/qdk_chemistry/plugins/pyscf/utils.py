@@ -557,8 +557,8 @@ def hamiltonian_to_scf(hamiltonian: Hamiltonian, alpha_occ: np.ndarray, beta_occ
         object that provides the necessary interfaces for post-HF methods without having performed an SCF calculation.
 
     Raises:
-        ValueError: If the Hamiltonian uses unsupported features like model Hamiltonian + unrestricted orbitals,
-        ``open-shell systems``, or ``active spaces``.
+        ValueError: If the Hamiltonian uses unsupported features like model Hamiltonian with unrestricted orbitals,
+            open-shell systems, or active spaces.
 
     Note:
         * This function is intended for (restricted) model hamiltonian usage, since the orbitals are not used directly.

@@ -158,7 +158,7 @@ Args:
     one_body_integrals_alpha (numpy.ndarray): Alpha one-electron integrals matrix [norb x norb]
     one_body_integrals_beta (numpy.ndarray): Beta one-electron integrals matrix [norb x norb]
     two_body_integrals_aaaa (numpy.ndarray): Alpha-alpha-alpha-alpha two-electron integrals vector
-    two_body_integrals_aabb (numpy.ndarray): Alpha-beta-alpha-beta two-electron integrals vector
+    two_body_integrals_aabb (numpy.ndarray): Alpha/beta/alpha/beta two-electron integrals vector
     two_body_integrals_bbbb (numpy.ndarray): Beta-beta-beta-beta two-electron integrals vector
     orbitals (Orbitals): Molecular orbital data
     core_energy (float): Core energy (nuclear repulsion + inactive orbitals)
@@ -226,7 +226,7 @@ Get specific one-electron integral element <ij>.
 
 Args:
     i, j (int): Orbital indices for the one-electron integral
-    channel (SpinChannel): spin channel to check (aa or bb, ``default is`` aa)
+    channel (SpinChannel): spin channel to check (aa or bb, default is aa)
 
 Returns:
     float: Value of the one-electron integral <ij>
@@ -270,8 +270,9 @@ Get specific two-electron integral element <ij|kl>.
 
 Args:
     i, j, k, l (int): Orbital indices for the two-electron integral
+
     channel (SpinChannel) : Which spin channel to check, aaaa, aabb, bbbb
-    (default is aaaa)
+        (default is aaaa)
 
 Returns:
     float: Value of the two-electron integral <ij|kl>
@@ -279,6 +280,7 @@ Returns:
 Examples:
     >>> integral = hamiltonian.get_two_body_element(0, 1, 2, 3)
     >>> print(f"<01|23> = {integral}")
+
 )",
                   py::arg("i"), py::arg("j"), py::arg("k"), py::arg("l"),
                   py::arg("channel") = SpinChannel::aaaa);
@@ -458,7 +460,7 @@ Save Hamiltonian to JSON file (with validation).
 Args:
     filename (str or pathlib.Path): Path to JSON file to create or overwrite.
 
-        Must have '.hamiltonian' before the file extension
+        Must have ``.hamiltonian`` before the file extension
         (e.g., ``water.hamiltonian.json``, ``molecule.hamiltonian.json``)
 
 Raises:
@@ -482,7 +484,7 @@ Load Hamiltonian from JSON file (static method with validation).
 Args:
     filename (str or pathlib.Path): Path to JSON file to read.
 
-        Must have '.hamiltonian' before the file extension
+        Must have ``.hamiltonian`` before the file extension
         (e.g., ``water.hamiltonian.json``, ``molecule.hamiltonian.json``)
 
 Returns:
@@ -509,7 +511,7 @@ Save Hamiltonian to HDF5 file (with validation).
 Args:
     filename (str or pathlib.Path): Path to HDF5 file to create/overwrite.
 
-        Must have '.hamiltonian' before the file extension
+        Must have ``.hamiltonian`` before the file extension
         (e.g., ``water.hamiltonian.h5``, ``molecule.hamiltonian.hdf5``)
 
 Raises:
@@ -532,13 +534,9 @@ Load Hamiltonian from HDF5 file (static method with validation).
 
 Args:
     filename (str or pathlib.Path): Path to HDF5 file to read.
-<<<<<<< HEAD
-    Must have '.hamiltonian' before the file extension (e.g., ``water.hamiltonian.h5``, ``molecule.hamiltonian.hdf5``)
-=======
 
-        Must have '.hamiltonian' before the file extension
+        Must have ``.hamiltonian`` before the file extension
         (e.g., ``water.hamiltonian.h5``, ``molecule.hamiltonian.hdf5``)
->>>>>>> 8f44c53378714142048cb832dbf2d9b38408899a
 
 Returns:
     Hamiltonian: New Hamiltonian loaded from file
@@ -565,7 +563,8 @@ Save Hamiltonian to FCIDUMP file.
 Args:
     filename (str or pathlib.Path): Path to FCIDUMP file to create/overwrite.
 
-        Typically uses '.fcidump' extension (e.g., ``water.fcidump``, ``molecule.fcidump``)
+        Typically uses ``.fcidump`` extension
+        (e.g., ``water.fcidump``, ``molecule.fcidump``)
 
     nalpha (int): Number of alpha electrons
     nbeta (int): Number of beta electrons
