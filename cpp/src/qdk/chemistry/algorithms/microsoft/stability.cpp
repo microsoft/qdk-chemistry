@@ -29,6 +29,12 @@ StabilityChecker::_run_impl(
   bool check_internal = _settings->get<bool>("internal");
   bool check_external = _settings->get<bool>("external");
 
+  // Validate settings
+  if (nroots <= 0) {
+    throw std::runtime_error("nroots must be positive, got " +
+                             std::to_string(nroots));
+  }
+
   // TODO: Implement the actual stability analysis
   // This is a stub implementation that needs to be filled in
 

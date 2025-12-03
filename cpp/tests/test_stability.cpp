@@ -4,6 +4,7 @@
 
 #include <gtest/gtest.h>
 
+#include <qdk/chemistry/algorithms/scf.hpp>
 #include <qdk/chemistry/algorithms/stability.hpp>
 #include <qdk/chemistry/data/stability_result.hpp>
 #include <qdk/chemistry/data/wavefunction.hpp>
@@ -164,7 +165,8 @@ TEST_F(StabilityCheckerTest, StabilityResult) {
 
 TEST_F(StabilityCheckerTest, Factory) {
   auto available_checkers = StabilityCheckerFactory::available();
-  EXPECT_EQ(available_checkers.size(), 0);
+  EXPECT_EQ(available_checkers.size(), 1);
+  EXPECT_EQ(available_checkers[0], "qdk");
   EXPECT_THROW(StabilityCheckerFactory::create("nonexistent_checker"),
                std::runtime_error);
 
