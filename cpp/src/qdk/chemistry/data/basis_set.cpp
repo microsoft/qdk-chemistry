@@ -400,6 +400,72 @@ BasisSet::BasisSet(const std::string& name, const std::vector<Shell>& shells,
   }
 }
 
+std::vector<Element> BasisSet::get_supported_elements_for_basis_set(
+    std::string basis_set_name) {
+  std::vector<Element> elements;
+
+  std::filesystem::path basis_dir =
+      qdk::chemistry::scf::QDKChemistryConfig::get_resources_dir();
+
+  if (!std::filesystem::exists(basis_dir) ||
+      !std::filesystem::is_directory(basis_dir)) {
+    throw std::runtime_error("Basis set resources directory does not exist: " +
+                             basis_dir.string());
+  }
+
+  // read elements from basis_summary.json
+  std::filesystem::path summary_file = basis_dir / "basis_summary.json";
+  if (!std::filesystem::exists(summary_file)) {
+    throw std::runtime_error("Basis set summary file does not exist: " +
+                             summary_file.string());
+  }
+
+  std::ifstream fin(summary_file);
+  auto data = nlohmann::json::parse(fin);
+  for (const auto& basis_entry : data) {
+    if (basis_entry["name"].get<std::string>() == basis_set_name) {
+      for (const auto& elem_str : basis_entry["supported_elements"]) {
+        int atomic_number = std::stoi(elem_str.get<std::string>());
+        elements.push_back(static_cast<Element>(atomic_number));
+      }
+      break;
+    }
+  }
+  if (elements.empty()) {
+    throw std::invalid_argument("No supported elements found for basis set: " +
+                                basis_set_name);
+  }
+
+  return elements;
+}
+
+std::vector<std::string> BasisSet::get_supported_basis_set_names() {
+  std::vector<std::string> basis_set_names;
+
+  std::filesystem::path basis_dir =
+      qdk::chemistry::scf::QDKChemistryConfig::get_resources_dir() /
+      "compressed";
+
+  if (!std::filesystem::exists(basis_dir) ||
+      !std::filesystem::is_directory(basis_dir)) {
+    throw std::runtime_error("Basis set resources directory does not exist: " +
+                             basis_dir.string());
+  }
+
+  for (const auto& entry : std::filesystem::directory_iterator(basis_dir)) {
+    if (entry.is_regular_file()) {
+      auto path = entry.path();
+      if (path.extension() == ".gz" && path.stem().extension() == ".tar") {
+        // extract basis set name from filename
+        std::string filename = path.stem().stem().string();
+        basis_set_names.push_back(filename);
+      }
+    }
+  }
+
+  return basis_set_names;
+}
+
 std::shared_ptr<BasisSet> BasisSet::from_basis_name(
     const std::string& name, const Structure& structure,
     AOType atomic_orbital_type) {

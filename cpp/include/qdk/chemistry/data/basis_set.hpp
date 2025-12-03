@@ -10,6 +10,7 @@
 #include <memory>
 #include <nlohmann/json.hpp>
 #include <qdk/chemistry/data/data_class.hpp>
+#include <qdk/chemistry/data/structure.hpp>
 #include <string>
 #include <unordered_map>
 #include <utility>
@@ -331,6 +332,20 @@ class BasisSet : public DataClass,
    * @brief Name for custom basis sets
    */
   inline const static std::string custom_name = "custom_basis_set";
+
+  /**
+   * @brief Get supported basis set names
+   * @return Vector of supported basis set names
+   */
+  static std::vector<std::string> get_supported_basis_set_names();
+
+  /**
+   * @brief Get supported elements for a given basis set
+   * @param basis_name Name of the basis set
+   * @return Vector of supported elements as enum
+   */
+  static std::vector<Element> get_supported_elements_for_basis_set(
+      std::string basis_name);
 
   /**
    * @brief Constructor with basis set name and structure

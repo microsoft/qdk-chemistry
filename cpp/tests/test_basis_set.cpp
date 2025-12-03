@@ -1565,3 +1565,30 @@ TEST_F(BasisSetTest, CustomMixedBasisSetCheck) {
   EXPECT_EQ(hf_det_element->get_orbitals()->get_num_molecular_orbitals(), 15);
   EXPECT_EQ(hf_det_atom->get_orbitals()->get_num_molecular_orbitals(), 24);
 }
+
+TEST_F(BasisSetTest, SupportedBasisSets) {
+  auto supported_basis_sets = BasisSet::get_supported_basis_set_names();
+  // Check that some known basis sets are in the supported list
+  EXPECT_NE(std::find(supported_basis_sets.begin(), supported_basis_sets.end(),
+                      "sto-3g"),
+            supported_basis_sets.end());
+  EXPECT_NE(std::find(supported_basis_sets.begin(), supported_basis_sets.end(),
+                      "cc-pvdz"),
+            supported_basis_sets.end());
+  EXPECT_NE(std::find(supported_basis_sets.begin(), supported_basis_sets.end(),
+                      "def2-tzvp"),
+            supported_basis_sets.end());
+}
+
+TEST_F(BasisSetTest, SupportedElementsForBasisSet) {
+  // Verify that supported elements for a given basis set are correct
+  std::string basis_name = "aug-ano-pv5z";
+  std::vector<Element> expected_elements = {Element::H,  Element::He,
+                                            Element::Li, Element::Be,
+                                            Element::Na, Element::Mg};
+
+  auto supported_elements =
+      BasisSet::get_supported_elements_for_basis_set(basis_name);
+
+  EXPECT_EQ(expected_elements, supported_elements);
+}
