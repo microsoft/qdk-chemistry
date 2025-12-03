@@ -34,6 +34,11 @@ extends:
   template: v1/1ES.Official.PipelineTemplate.yml@1ESPipelineTemplates
   parameters:
     sdl:
+      codeql:
+        compiled:
+          enabled: true
+        sourceLanguages: python
+        binaryLanguages: cpp
       eslint:
         enabled: false
         justificationForDisabling: JavaScript is not used in this repository.
@@ -54,7 +59,7 @@ extends:
               demands:
               - ImageOverride -equals ${{ target.imageName }}
               os: ${{ target.os }}
-              hostArchitecture: Arm64
+              # hostArchitecture: Arm64
           ${{ if eq(target.march, 'x86-64-v3') }}:
             pool:
               name: $(CPU_POOL_X86)
