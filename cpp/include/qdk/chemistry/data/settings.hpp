@@ -231,6 +231,12 @@ class Settings : public DataClass,
                                           !std::is_same_v<Integer, int64_t>,
                                       int> = 0>
   void set(const std::string& key, Integer value) {
+    // Check if key exists first
+    auto it = settings_.find(key);
+    if (it == settings_.end()) {
+      throw SettingNotFound(key);
+    }
+
     // Range check for non-int64_t integers
     if constexpr (std::is_signed_v<Integer>) {
       if constexpr (sizeof(Integer) > sizeof(int64_t)) {

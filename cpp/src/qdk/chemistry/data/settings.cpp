@@ -26,8 +26,7 @@ void Settings::set(const std::string& key, const SettingValue& value) {
 
   // Check if types match
   if (value.index() != settings_[key].index()) {
-    throw std::invalid_argument("Setting '" + key +
-                                "' does not match type of given argument.");
+    throw SettingTypeMismatch(key, "does not match type of given argument");
   }
 
   // If limits exist, validate against them
