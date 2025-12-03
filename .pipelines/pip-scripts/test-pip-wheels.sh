@@ -46,11 +46,11 @@ python3 -m venv /workspace/test_wheel_env
 
 # Upgrade pip and install pytest
 python3 -m pip install --upgrade pip
-python3 -m pip install pytest
 
 # Install the wheel in the clean environment
 cd /workspace/qdk-chemistry/python
-pip3 install repaired_wheelhouse/qdk_chemistry*.whl[plugins]
+pip3 install repaired_wheelhouse/qdk_chemistry*.whl
+python3 -m pip install pytest pyscf
 
 # Run pytest suite
 echo '=== Running pytest suite ==='
