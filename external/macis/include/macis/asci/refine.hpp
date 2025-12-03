@@ -83,21 +83,12 @@ auto asci_refine(ASCISettings asci_settings, MCSCFSettings mcscf_settings,
           "{}",
           ndets, wfn.size(), iter + 1);
 
-      // Warn if size dropped significantly (>10%). The 10% threshold is a
-      // heuristic: small drops are normal due to pruning, but large drops
-      // suggest the search space or ncdets_max may be too restrictive.
-      if (wfn.size() < ndets * 0.9) {
-        logger->warn(
-            "Wavefunction size dropped by more than 10% - this may indicate "
-            "ncdets_max is too restrictive or search space is limited");
-      }
-
       // Update target size for next iteration
       ndets = wfn.size();
 
       // If wavefunction became too small, stop refinement
       if (wfn.size() < asci_settings.ntdets_min) {
-        logger->warn(
+        logger->error(
             "Wavefunction shrunk below ntdets_min ({}), stopping refinement",
             asci_settings.ntdets_min);
         break;
