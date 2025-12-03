@@ -501,8 +501,9 @@ TEST_CASE("ASCI Exponential Backoff", "[asci][backoff]") {
     REQUIRE(dets.size() >= 50);  // Should grow with factor 2.5
     REQUIRE(dets.size() <= 100);
     REQUIRE(C.size() == dets.size());
-    REQUIRE_THAT(std::inner_product(C.begin(), C.end(), C.begin(), 0.0),
-                 Catch::Matchers::WithinAbs(1.0, 1e-10));
+    REQUIRE_THAT(
+        std::inner_product(C.begin(), C.end(), C.begin(), 0.0),
+        Catch::Matchers::WithinAbs(1.0, testing::numerical_zero_tolerance));
   }
 
   SECTION("Small grow_factor with backoff") {
