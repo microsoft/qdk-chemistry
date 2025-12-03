@@ -24,7 +24,7 @@ class ElectronicStructureSettings : public data::Settings {
  public:
   ElectronicStructureSettings() {
     set_default("method", "hf");
-    set_default("tolerance", 1e-8);
+    set_default("convergence_threshold", 1e-7);
     set_default("max_iterations", 50);
   }
 };
@@ -50,7 +50,8 @@ class ElectronicStructureSettings : public data::Settings {
  * scf_solver->settings().set("max_iterations", 100);
  *
  * // Perform SCF calculation
- * auto [energy, wavefunction] = scf_solver->run(molecular_structure, 0, 1);
+ * auto [energy, wavefunction] = scf_solver->run(molecular_structure, 0, 1,
+ * "cc-pvdz");
  *
  * std::cout << "SCF Total Energy: " << energy << " Hartree" << std::endl;
  * @endcode
@@ -101,8 +102,8 @@ class ScfSolver
    *
    * @throws std::runtime_error If SCF fails to converge
    * @throws std::invalid_argument If the input structure is invalid
-   * @throws SettingsAreLocked If attempting to modify settings after run() is
-   *         called
+   * @throws qdk::chemistry::data::SettingsAreLocked If attempting to modify
+   * settings after run() is called
    *
    * @note Settings are automatically locked when this method is called and
    *       cannot be modified during or after execution.

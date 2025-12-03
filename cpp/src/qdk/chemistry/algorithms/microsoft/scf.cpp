@@ -103,8 +103,15 @@ std::pair<double, std::shared_ptr<data::Wavefunction>> ScfSolver::_run_impl(
   // Extract SCF settings
   std::string method = _settings->get<std::string>("method");
   std::transform(method.begin(), method.end(), method.begin(), ::tolower);
-  double tolerance = _settings->get<double>("tolerance");
+
+  double convergence_threshold =
+      _settings->get<double>("convergence_threshold");
   int max_iterations = _settings->get<int>("max_iterations");
+
+  // Set different convergence threshold according to tolerance
+  double orbital_gradient_threshold = convergence_threshold;
+  // when convergence_threshold = 1e-7, density_threshold = 1e-5
+  double density_threshold = convergence_threshold * 1e2;
 
   // Create Molecule object
   auto ms_mol = qdk::chemistry::utils::microsoft::convert_to_molecule(
@@ -122,8 +129,9 @@ std::pair<double, std::shared_ptr<data::Wavefunction>> ScfSolver::_run_impl(
   ms_scf_config->basis = basis_set_name;
   ms_scf_config->basis_mode = qcs::BasisMode::PSI4;
   ms_scf_config->unrestricted = unrestricted;
-  ms_scf_config->converge_threshold = tolerance;
-  ms_scf_config->max_iteration = max_iterations;
+  ms_scf_config->scf_algorithm.density_threshold = density_threshold;
+  ms_scf_config->scf_algorithm.og_threshold = orbital_gradient_threshold;
+  ms_scf_config->scf_algorithm.max_iteration = max_iterations;
   // Set density initialization method based on whether initial guess is
   // provided
   ms_scf_config->density_init_method =
@@ -131,9 +139,41 @@ std::pair<double, std::shared_ptr<data::Wavefunction>> ScfSolver::_run_impl(
                                   : qcs::DensityInitializationMethod::Atom;
   ms_scf_config->eri.method =
       qcs::ERIMethod::Libint2Direct;  // TODO: Make this configurable
-  ms_scf_config->eri.eri_threshold = ms_scf_config->converge_threshold * 1e-4;
-  ms_scf_config->k_eri.eri_threshold = ms_scf_config->converge_threshold * 1e-4;
+
+  double eri_threshold = _settings->get<double>("eri_threshold");
+  if (eri_threshold > 0.0) {
+    ms_scf_config->eri.eri_threshold = eri_threshold;
+  } else {
+    // use the appropriate default according to convergence threshold
+    double eri_threshold_multiplier = 1.0e-5;
+    ms_scf_config->eri.eri_threshold =
+        convergence_threshold * eri_threshold_multiplier;
+  }
+  ms_scf_config->eri.use_atomics = _settings->get<bool>("eri_use_atomics");
+  ms_scf_config->k_eri = ms_scf_config->eri;
   ms_scf_config->grad_eri = ms_scf_config->eri;
+
+  ms_scf_config->fock_reset_steps = _settings->get<int>("fock_reset_steps");
+
+  // Convert enable_gdm boolean to algorithm method enum for backward
+  // compatibility
+  bool enable_gdm = _settings->get<bool>("enable_gdm");
+  if (enable_gdm) {
+    ms_scf_config->scf_algorithm.method = qcs::SCFAlgorithmName::DIIS_GDM;
+  } else {
+    ms_scf_config->scf_algorithm.method = qcs::SCFAlgorithmName::DIIS;
+  }
+
+  ms_scf_config->scf_algorithm.level_shift =
+      _settings->get<double>("level_shift");
+  ms_scf_config->scf_algorithm.max_iteration =
+      _settings->get<int>("max_scf_steps");
+  ms_scf_config->scf_algorithm.gdm_config.energy_thresh_diis_switch =
+      _settings->get<double>("energy_thresh_diis_switch");
+  ms_scf_config->scf_algorithm.gdm_config.gdm_max_diis_iteration =
+      _settings->get<int>("gdm_max_diis_iteration");
+  ms_scf_config->scf_algorithm.gdm_config.gdm_bfgs_history_size_limit =
+      _settings->get<int>("gdm_bfgs_history_size_limit");
   if (ms_scf_config->eri.method == qcs::ERIMethod::Incore) {
 #ifdef QDK_CHEMISTRY_ENABLE_HGP
     ms_scf_config->grad_eri.method = qcs::ERIMethod::HGP;

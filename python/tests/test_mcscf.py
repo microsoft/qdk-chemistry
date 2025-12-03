@@ -18,7 +18,9 @@ from .reference_tolerances import float_comparison_relative_tolerance, mcscf_ene
 try:
     import pyscf  # noqa: F401
 
-    import qdk_chemistry.plugins.pyscf  # noqa: F401
+    import qdk_chemistry.plugins.pyscf as pyscf_plugin
+
+    pyscf_plugin.load()
 
     PYSCF_AVAILABLE = True
 except ImportError:

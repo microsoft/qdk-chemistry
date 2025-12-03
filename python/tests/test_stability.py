@@ -12,14 +12,15 @@ import numpy as np
 import pytest
 
 from qdk_chemistry import algorithms
+from qdk_chemistry.constants import ANGSTROM_TO_BOHR
 from qdk_chemistry.data import StabilityResult, Structure
 
 from .reference_tolerances import float_comparison_absolute_tolerance, float_comparison_relative_tolerance
 
 try:
-    import qdk_chemistry.plugins.pyscf  # noqa: F401
-    from qdk_chemistry.constants import ANGSTROM_TO_BOHR
+    import qdk_chemistry.plugins.pyscf as pyscf_plugin
 
+    pyscf_plugin.load()
     PYSCF_AVAILABLE = True
 except ImportError:
     PYSCF_AVAILABLE = False

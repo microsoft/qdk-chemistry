@@ -47,6 +47,16 @@ def create_o2_structure():
     return Structure(symbols, coords)
 
 
+def create_oxygen_structure():
+    """Create an oxygen atom structure.
+
+    Single oxygen atom at origin - same as used in C++ tests.
+    """
+    symbols = ["O"]
+    coords = np.array([[0.00000000000, 0.00000000000, 0.00000000000]])
+    return Structure(symbols, coords)
+
+
 class TestScfSolver:
     """Test class for SCF solver functionality."""
 
@@ -214,3 +224,138 @@ class TestScfSolver:
                 rtol=float_comparison_relative_tolerance,
                 atol=scf_energy_tolerance,
             )
+
+    def test_scf_solver_oxygen_atom_gdm(self):
+        """Test SCF solver on oxygen atom with PBE/cc-pvdz."""
+        oxygen = create_oxygen_structure()
+        scf_solver = algorithms.create("scf_solver")
+
+        scf_solver.settings().set("method", "pbe")
+        scf_solver.settings().set("basis_set", "cc-pvdz")
+        scf_solver.settings().set("enable_gdm", True)
+
+        energy, wavefunction = scf_solver.run(oxygen, 0, 1)
+        orbitals = wavefunction.get_orbitals()
+
+        # Check that we get reasonable results
+        assert isinstance(energy, float)
+        assert orbitals is not None
+
+        # Compare with expected energy from C++ test
+        assert abs(energy - (-74.873106298)) < scf_energy_tolerance
+
+    def test_scf_solver_oxygen_atom_history_size_limit_gdm(self):
+        """Test SCF solver on oxygen atom with GDM and history size limit 20."""
+        oxygen = create_oxygen_structure()
+        scf_solver = algorithms.create("scf_solver")
+
+        scf_solver.settings().set("method", "pbe")
+        scf_solver.settings().set("basis_set", "cc-pvdz")
+        scf_solver.settings().set("enable_gdm", True)
+        scf_solver.settings().set("gdm_bfgs_history_size_limit", 20)
+
+        energy, wavefunction = scf_solver.run(oxygen, 0, 1)
+        orbitals = wavefunction.get_orbitals()
+
+        # Check that we get reasonable results
+        assert isinstance(energy, float)
+        assert orbitals is not None
+
+        # Compare with expected energy from C++ test
+        assert abs(energy - (-74.873106298)) < scf_energy_tolerance
+
+    def test_scf_solver_oxygen_atom_one_diis_step_gdm(self):
+        """Test SCF solver on oxygen atom with PBE/cc-pvdz, with only 1 diis step."""
+        oxygen = create_oxygen_structure()
+        scf_solver = algorithms.create("scf_solver")
+
+        # Set method and basis set to match C++ test
+        scf_solver.settings().set("method", "pbe")
+        scf_solver.settings().set("basis_set", "cc-pvdz")
+        scf_solver.settings().set("enable_gdm", True)
+        scf_solver.settings().set("gdm_max_diis_iteration", 1)
+
+        energy, wavefunction = scf_solver.run(oxygen, 0, 1)
+        orbitals = wavefunction.get_orbitals()
+
+        # Check that we get reasonable results
+        assert isinstance(energy, float)
+        assert orbitals is not None
+
+        # Compare with expected energy from C++ test
+        assert abs(energy - (-74.873106298)) < scf_energy_tolerance
+
+    def test_scf_solver_water_triplet_gdm(self):
+        """Test SCF solver on water molecule triplet with GDM enabled."""
+        water = create_water_structure()
+        scf_solver = algorithms.create("scf_solver")
+
+        # Set method and basis set to match C++ test
+        scf_solver.settings().set("method", "pbe")
+        scf_solver.settings().set("enable_gdm", True)
+
+        energy, wavefunction = scf_solver.run(water, 0, 3)  # triplet state
+        orbitals = wavefunction.get_orbitals()
+
+        # Check that we get reasonable results
+        assert isinstance(energy, float)
+        assert orbitals is not None
+
+        nuclear_repulsion = water.calculate_nuclear_repulsion_energy()
+        expected_total_energy = -84.036674819 + nuclear_repulsion
+        assert abs(energy - expected_total_energy) < scf_energy_tolerance
+
+        # Check that orbitals are unrestricted (not restricted)
+        assert not orbitals.is_restricted()
+
+    def test_scf_solver_oxygen_atom_charged_doublet_gdm(self):
+        """Test SCF solver on charged oxygen atom doublet with GDM enabled."""
+        oxygen = create_oxygen_structure()
+        scf_solver = algorithms.create("scf_solver")
+
+        # Set method and basis set to match C++ test
+        scf_solver.settings().set("method", "pbe")
+        scf_solver.settings().set("basis_set", "cc-pvdz")
+        scf_solver.settings().set("enable_gdm", True)
+
+        energy, wavefunction = scf_solver.run(oxygen, 1, 2)  # +1 charge, doublet state
+        orbitals = wavefunction.get_orbitals()
+
+        assert isinstance(energy, float)
+        assert orbitals is not None
+
+        # Compare with expected energy from C++ test
+        assert abs(energy - (-74.416994299)) < scf_energy_tolerance
+
+        # Check that orbitals are unrestricted (not restricted) for the doublet state
+        assert not orbitals.is_restricted()
+
+    def test_scf_solver_oxygen_atom_invalid_energy_thresh_diis_switch_gdm(self):
+        """Test SCF solver on oxygen atom with GDM - invalid energy_thresh_diis_switch."""
+        oxygen = create_oxygen_structure()
+        scf_solver = algorithms.create("scf_solver")
+
+        # Set method and basis set to match C++ test
+        scf_solver.settings().set("method", "pbe")
+        scf_solver.settings().set("basis_set", "cc-pvdz")
+        scf_solver.settings().set("enable_gdm", True)
+        scf_solver.settings().set("energy_thresh_diis_switch", -2e-4)
+
+        # Test that negative energy_thresh_diis_switch throws a ValueError (std::invalid_argument in C++)
+        with pytest.raises(ValueError, match="energy_thresh_diis_switch must be greater than"):
+            scf_solver.run(oxygen, 0, 1)  # singlet state
+
+    def test_scf_solver_oxygen_atom_invalid_bfgs_history_size_limit_gdm(self):
+        """Test SCF solver on oxygen atom with GDM - invalid BFGS history size limit."""
+        oxygen = create_oxygen_structure()
+        scf_solver = algorithms.create("scf_solver")
+
+        # Set method and basis set to match C++ test
+        scf_solver.settings().set("method", "pbe")
+        scf_solver.settings().set("basis_set", "cc-pvdz")
+        scf_solver.settings().set("enable_gdm", True)
+        scf_solver.settings().set("gdm_bfgs_history_size_limit", 0)
+
+        # Test that invalid history size limit throws a ValueError (std::invalid_argument in C++)
+        with pytest.raises(ValueError, match="GDM history size limit must be at least"):
+            scf_solver.run(oxygen, 0, 1)  # singlet state

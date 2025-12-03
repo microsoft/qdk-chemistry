@@ -297,12 +297,11 @@ SCFImpl::SCFImpl(std::shared_ptr<Molecule> mol_ptr, const SCFConfig& cfg,
         mol.multiplicity, spin, alpha, beta);
     spdlog::info(
         "restricted={}, basis={}, pure={}, num_atomic_orbitals={}, "
-        "energy_threshold={:.2e}, "
         "density_threshold={:.2e}, "
         "og_threshold={:.2e}",
         !cfg.unrestricted, ctx_.basis_set->name, ctx_.basis_set->pure,
-        num_atomic_orbitals_, cfg.converge_threshold, cfg.density_threshold,
-        cfg.og_threshold);
+        num_atomic_orbitals_, cfg.scf_algorithm.density_threshold,
+        cfg.scf_algorithm.og_threshold);
     spdlog::info("fock_alg={}", fock_string);
     if (cfg.do_dfj) {
       spdlog::info("aux_basis={}, naux={}", ctx_.aux_basis_set->name,
@@ -375,7 +374,7 @@ SCFImpl::SCFImpl(std::shared_ptr<Molecule> mol_ptr, const SCFConfig& cfg,
   if (cfg.mpi.world_rank == 0) {
     F_ = RowMajorMatrix::Zero(num_density_matrices_ * num_atomic_orbitals_,
                               num_atomic_orbitals_);
-    diis_ = std::make_unique<DIIS>(cfg.diis_subspace_size);
+    scf_algorithm_ = SCFAlgorithm::create(ctx_);
   }
 
   // MO and mixed AO/MO quantities
@@ -678,16 +677,11 @@ void SCFImpl::iterate_() {
   Timer::start_timing("SCF::iterate");
 
   double energy_last = 0;
-  RowMajorMatrix F_diis = RowMajorMatrix::Zero(
-      num_density_matrices_ * num_atomic_orbitals_, num_atomic_orbitals_);
-  RowMajorMatrix P_diff = RowMajorMatrix::Zero(
-      num_density_matrices_ * num_atomic_orbitals_, num_atomic_orbitals_);
+  RowMajorMatrix P_diff;
   RowMajorMatrix P_last = RowMajorMatrix::Zero(
       num_density_matrices_ * num_atomic_orbitals_, num_atomic_orbitals_);
-  RowMajorMatrix F_ls = RowMajorMatrix::Zero(
-      num_density_matrices_ * num_atomic_orbitals_, num_atomic_orbitals_);
 
-  for (auto step = 0; step < cfg->max_iteration; ++step) {
+  for (auto step = 0; step < cfg->scf_algorithm.max_iteration; ++step) {
 #ifdef ENABLE_NVTX3
     nvtx3::scoped_range r{nvtx3::rgb{0, 0, 255}, "SCF::iterate_step"};
 #endif
@@ -717,234 +711,48 @@ void SCFImpl::iterate_() {
 
     update_fock_();
 
-    double diis_error = std::numeric_limits<double>::max();
+    res.scf_total_energy = total_energy_();
 
     if (cfg->mpi.world_rank == 0) {
-      res.scf_total_energy = total_energy_();
-      auto delta_energy = res.scf_total_energy - energy_last;
-
-      {
-#ifdef ENABLE_NVTX3
-        nvtx3::scoped_range r{nvtx3::rgb{0, 0, 255}, "DIIS"};
-#endif
-        AutoTimer __timer("DIIS");
-#ifdef QDK_CHEMISTRY_ENABLE_GPU
-        auto F_d =
-            cuda::alloc<double>(num_atomic_orbitals_ * num_atomic_orbitals_);
-        auto P_d =
-            cuda::alloc<double>(num_atomic_orbitals_ * num_atomic_orbitals_);
-        auto FPS =
-            cuda::alloc<double>(num_atomic_orbitals_ * num_atomic_orbitals_);
-        auto tmp =
-            cuda::alloc<double>(num_atomic_orbitals_ * num_atomic_orbitals_);
-        auto SPF =
-            cuda::alloc<double>(num_atomic_orbitals_ * num_atomic_orbitals_);
-
-        auto S_d =
-            cuda::alloc<double>(num_atomic_orbitals_ * num_atomic_orbitals_);
-        CUDA_CHECK(cudaMemcpy(
-            S_d->data(), S_.data(),
-            sizeof(double) * num_atomic_orbitals_ * num_atomic_orbitals_,
-            cudaMemcpyHostToDevice));
-#else
-        RowMajorMatrix FP =
-            RowMajorMatrix::Zero(num_atomic_orbitals_, num_atomic_orbitals_);
-#endif
-
-        RowMajorMatrix error = RowMajorMatrix::Zero(
-            num_density_matrices_ * num_atomic_orbitals_, num_atomic_orbitals_);
-        for (auto i = 0; i < num_density_matrices_; ++i) {
-#ifdef QDK_CHEMISTRY_ENABLE_GPU
-          CUDA_CHECK(cudaMemcpy(
-              F_d->data(),
-              F_.data() + i * num_atomic_orbitals_ * num_atomic_orbitals_,
-              sizeof(double) * num_atomic_orbitals_ * num_atomic_orbitals_,
-              cudaMemcpyHostToDevice));
-          CUDA_CHECK(cudaMemcpy(
-              P_d->data(),
-              P_.data() + i * num_atomic_orbitals_ * num_atomic_orbitals_,
-              sizeof(double) * num_atomic_orbitals_ * num_atomic_orbitals_,
-              cudaMemcpyHostToDevice));
-          matrix_op::bmm(F_d->data(),
-                         {(int)num_atomic_orbitals_, (int)num_atomic_orbitals_},
-                         P_d->data(),
-                         {(int)num_atomic_orbitals_, (int)num_atomic_orbitals_},
-                         tmp->data());
-          matrix_op::bmm(tmp->data(),
-                         {(int)num_atomic_orbitals_, (int)num_atomic_orbitals_},
-                         S_d->data(),
-                         {(int)num_atomic_orbitals_, (int)num_atomic_orbitals_},
-                         FPS->data());
-
-          matrix_op::bmm(S_d->data(),
-                         {(int)num_atomic_orbitals_, (int)num_atomic_orbitals_},
-                         P_d->data(),
-                         {(int)num_atomic_orbitals_, (int)num_atomic_orbitals_},
-                         tmp->data());
-          matrix_op::bmm(tmp->data(),
-                         {(int)num_atomic_orbitals_, (int)num_atomic_orbitals_},
-                         F_d->data(),
-                         {(int)num_atomic_orbitals_, (int)num_atomic_orbitals_},
-                         SPF->data());
-
-          matrix_op::add_ex(
-              1.0, FPS->data(),
-              {(int)num_atomic_orbitals_, (int)num_atomic_orbitals_}, -1.0,
-              SPF->data(),
-              {(int)num_atomic_orbitals_, (int)num_atomic_orbitals_},
-              FPS->data());
-          CUDA_CHECK(cudaMemcpy(
-              error.data() + i * num_atomic_orbitals_ * num_atomic_orbitals_,
-              FPS->data(),
-              sizeof(double) * num_atomic_orbitals_ * num_atomic_orbitals_,
-              cudaMemcpyDeviceToHost));
-#else
-          Eigen::Map<RowMajorMatrix> error_dm(
-              error.data() + i * num_atomic_orbitals_ * num_atomic_orbitals_,
-              num_atomic_orbitals_, num_atomic_orbitals_);
-          FP.noalias() =
-              Eigen::Map<const RowMajorMatrix>(
-                  F_.data() + i * num_atomic_orbitals_ * num_atomic_orbitals_,
-                  num_atomic_orbitals_, num_atomic_orbitals_) *
-              Eigen::Map<const RowMajorMatrix>(
-                  P_.data() + i * num_atomic_orbitals_ * num_atomic_orbitals_,
-                  num_atomic_orbitals_, num_atomic_orbitals_);
-          error_dm.noalias() = FP * S_;
-          for (size_t ibf = 0; ibf < num_atomic_orbitals_; ibf++) {
-            error_dm(ibf, ibf) = 0.0;
-            for (size_t jbf = 0; jbf < ibf; ++jbf) {
-              auto e_ij = error_dm(ibf, jbf);
-              auto e_ji = error_dm(jbf, ibf);
-              error_dm(ibf, jbf) = e_ij - e_ji;
-              error_dm(jbf, ibf) = e_ji - e_ij;
-            }
-          }
-#endif  // QDK_CHEMISTRY_ENABLE_GPU
-        }
-        diis_error = error.lpNorm<Eigen::Infinity>();
-
-        if (cfg->level_shift > 0.0) {  // Level Shifting
-          double mu = cfg->level_shift;
-
-          RowMajorMatrix SPS =
-              RowMajorMatrix::Zero(num_density_matrices_ * num_atomic_orbitals_,
-                                   num_atomic_orbitals_);
-#ifdef QDK_CHEMISTRY_ENABLE_GPU
-          auto S_d =
-              cuda::alloc<double>(num_atomic_orbitals_ * num_atomic_orbitals_);
-          auto P_d =
-              cuda::alloc<double>(num_density_matrices_ * num_atomic_orbitals_ *
-                                  num_atomic_orbitals_);
-          auto SP_d =
-              cuda::alloc<double>(num_atomic_orbitals_ * num_atomic_orbitals_);
-          auto SPS_d =
-              cuda::alloc<double>(num_density_matrices_ * num_atomic_orbitals_ *
-                                  num_atomic_orbitals_);
-          CUDA_CHECK(cudaMemcpy(S_d->data(), S_.data(),
-                                sizeof(double) * S_.size(),
-                                cudaMemcpyHostToDevice));
-          CUDA_CHECK(cudaMemcpy(P_d->data(), P_.data(),
-                                sizeof(double) * P_.size(),
-                                cudaMemcpyHostToDevice));
-#else
-          RowMajorMatrix SP =
-              RowMajorMatrix::Zero(num_atomic_orbitals_, num_atomic_orbitals_);
-#endif
-          for (int spin = 0; spin < num_density_matrices_; spin++) {
-#ifdef QDK_CHEMISTRY_ENABLE_GPU
-            matrix_op::bmm(
-                S_d->data(),
-                {(int)num_atomic_orbitals_, (int)num_atomic_orbitals_},
-                P_d->data() +
-                    spin * num_atomic_orbitals_ * num_atomic_orbitals_,
-                {(int)num_atomic_orbitals_, (int)num_atomic_orbitals_},
-                SP_d->data());
-            matrix_op::bmm(
-                SP_d->data(),
-                {(int)num_atomic_orbitals_, (int)num_atomic_orbitals_},
-                S_d->data(),
-                {(int)num_atomic_orbitals_, (int)num_atomic_orbitals_},
-                SPS_d->data() +
-                    spin * num_atomic_orbitals_ * num_atomic_orbitals_);
-#else
-            SP.noalias() = S_ * Eigen::Map<const RowMajorMatrix>(
-                                    P_.data() + spin * num_atomic_orbitals_ *
-                                                    num_atomic_orbitals_,
-                                    num_atomic_orbitals_, num_atomic_orbitals_);
-            SPS.block(spin * num_atomic_orbitals_, 0, num_atomic_orbitals_,
-                      num_atomic_orbitals_)
-                .noalias() = SP * S_;
-#endif
-          }
-#ifdef QDK_CHEMISTRY_ENABLE_GPU
-          CUDA_CHECK(cudaMemcpy(SPS.data(), SPS_d->data(),
-                                sizeof(double) * SPS.size(),
-                                cudaMemcpyDeviceToHost));
-#endif
-
-          double* Fdata = F_.data();
-          double* F_lsdata = F_ls.data();
-          double* SPSdata = SPS.data();
-          double* Sdata = S_.data();
-
-          for (int i = 0; i < num_density_matrices_ * num_atomic_orbitals_ *
-                                  num_atomic_orbitals_;
-               i++) {
-            F_lsdata[i] =
-                Fdata[i] +
-                (Sdata[i % (num_atomic_orbitals_ * num_atomic_orbitals_)] -
-                 SPSdata[i]) *
-                    mu;
-          }
-        } else {
-          TIMEIT(diis_->extrapolate(F_, error, &F_diis), "DIIS::extrapolate");
-        }
-      }
-
-      for (auto i = 0; i < num_density_matrices_; ++i) {
-        if (cfg->level_shift > 0.0) {
-          TIMEIT(update_density_matrix_(F_ls, i),
-                 "solve_eigen");  // Use Fock matrix with level shifting
-        } else {
-          TIMEIT(update_density_matrix_(F_diis, i),
-                 "solve_eigen");  // Use DIIS extrapolated Fock matrix
-        }
-      }
-      auto ddm_norm = (P_last - P_).norm();
-      auto ddm_rms = ddm_norm / num_atomic_orbitals_;
-      auto diis_rms = diis_error / num_atomic_orbitals_;
-      spdlog::info(
-          "Step {:03}: E={:.15e}, DE={:+.15e}, |DP|={:.15e} OG={:.15e}", step,
-          res.scf_total_energy, delta_energy, ddm_rms, diis_rms);
-
       if (std::isnan(res.scf_total_energy) or std::isinf(res.scf_total_energy))
         throw std::runtime_error("NaN or INF Encountered in SCF Energy");
 
-      res.converged =
-          step > 0 && std::fabs(delta_energy) < cfg->converge_threshold &&
-          (ddm_rms < cfg->density_threshold || diis_rms < cfg->og_threshold);
+      // Check convergence
+      res.converged = scf_algorithm_->check_convergence(*this);
+      // Perform SCF Algorithm iteration only if not converged
+      scf_algorithm_->iterate(*this);
+
       res.scf_iterations = step + 1;
-      if (!res.converged) {
-        if (cfg->enable_damping && diis_error > cfg->damping_threshold) {
-          auto factor = cfg->damping_factor;
-          spdlog::trace("DIIS error: {:.15e}, Damping with factor {:.2f}",
-                        diis_error, factor);
-          P_ = P_last * factor + P_ * (1.0 - factor);
-        }
-        energy_last = res.scf_total_energy;
-      }
     }
 #ifdef QDK_CHEMISTRY_ENABLE_MPI
     TIMEIT(MPI_Bcast(&res.converged, 1, MPI_INT8_T, 0, MPI_COMM_WORLD),
            "MPI_Bcast(converged)");
 #endif
+
     if (res.converged) {
       break;
     }
   }
   if (!res.converged) {
-    throw std::runtime_error(fmt::format(
-        "SCF failed to converge after {} steps", cfg->max_iteration));
+    throw std::runtime_error(
+        fmt::format("SCF failed to converge after {} steps",
+                    cfg->scf_algorithm.max_iteration));
+  }
+  // update eigenvalues for GDM as GDM never updates eigenvalues_
+  if (ctx_.cfg->scf_algorithm.method == SCFAlgorithmName::GDM ||
+      ctx_.cfg->scf_algorithm.method == SCFAlgorithmName::DIIS_GDM) {
+    if (cfg->mpi.world_rank == 0) {
+      spdlog::info("Reset incremental Fock matrix");
+      reset_fock_();
+    }
+    auto [alpha, beta, omega] = get_hyb_coeff_();
+    eri_->build_JK(P_.data(), J_.data(), K_.data(), alpha, beta, omega);
+    update_fock_();
+    for (int i = 0; i < num_density_matrices_; ++i) {
+      scf_algorithm_->solve_fock_eigenproblem(
+          F_, S_, X_, C_, eigenvalues_, P_, nelec_, num_atomic_orbitals_,
+          num_molecular_orbitals_, i, ctx_.cfg->unrestricted);
+    }
   }
 }
 
@@ -1159,7 +967,12 @@ void SCFImpl::init_density_matrix_() {
                                    mol.atomic_nums.data(), mol.n_atoms);
     P_ *= 2.0;
   } else if (method == DensityInitializationMethod::Core) {
-    update_density_matrix_(H_);
+    // Use the SCF algorithm to update density matrix for each spin
+    for (int i = 0; i < num_density_matrices_; ++i) {
+      scf_algorithm_->solve_fock_eigenproblem(
+          H_, S_, X_, C_, eigenvalues_, P_, nelec_, num_atomic_orbitals_,
+          num_molecular_orbitals_, i, ctx_.cfg->unrestricted);
+    }
   } else if (method == DensityInitializationMethod::Atom) {
     atom_guess(*ctx_.basis_set, mol, P_.data());
   } else if (method == DensityInitializationMethod::File) {
@@ -1195,100 +1008,6 @@ void SCFImpl::init_density_matrix_() {
       spdlog::warn("Breaking symmetry not implemented for spin 0 molecule");
     }
   }
-}
-
-void SCFImpl::update_density_matrix_(const RowMajorMatrix& F_, int idx) {
-#ifdef ENABLE_NVTX3
-  nvtx3::scoped_range r{nvtx3::rgb{0, 0, 255}, "solve_eigen"};
-#endif
-#ifdef QDK_CHEMISTRY_ENABLE_GPU
-  // solve F_ C_ = e S_ C_ by (conditioned) transformation to F_' C_' = e C_',
-  // where F_' = X_.transpose() . F_ . X_; the original C_ is obtained as C_ =
-  // X_ . C_'
-  auto X_d =
-      cuda::alloc<double>(num_atomic_orbitals_ * num_molecular_orbitals_);
-  CUDA_CHECK(cudaMemcpy(X_d->data(), X_.data(), sizeof(double) * X_.size(),
-                        cudaMemcpyHostToDevice));
-  auto F_d = cuda::alloc<double>(num_atomic_orbitals_ * num_atomic_orbitals_);
-  CUDA_CHECK(
-      cudaMemcpy(F_d->data(),
-                 F_.data() + idx * num_atomic_orbitals_ * num_atomic_orbitals_,
-                 sizeof(double) * num_atomic_orbitals_ * num_atomic_orbitals_,
-                 cudaMemcpyHostToDevice));
-
-  auto tmp =
-      cuda::alloc<double>(num_molecular_orbitals_ * num_atomic_orbitals_);
-  matrix_op::bmm(
-      X_d->data(),
-      {1, (int)num_atomic_orbitals_, (int)num_molecular_orbitals_, true},
-      F_d->data(), {(int)num_atomic_orbitals_, (int)num_atomic_orbitals_},
-      tmp->data());
-
-  auto V =
-      cuda::alloc<double>(num_molecular_orbitals_ * num_molecular_orbitals_);
-  matrix_op::bmm(
-      tmp->data(), {(int)num_molecular_orbitals_, (int)num_atomic_orbitals_},
-      X_d->data(), {(int)num_atomic_orbitals_, (int)num_molecular_orbitals_},
-      V->data());
-
-  auto W = cuda::alloc<double>(num_molecular_orbitals_);
-  cusolver::ManagedcuSolverHandle handle;
-  cusolver::syevd(handle, CUSOLVER_EIG_MODE_VECTOR, CUBLAS_FILL_MODE_LOWER,
-                  num_molecular_orbitals_, V->data(), num_molecular_orbitals_,
-                  W->data());
-
-  auto C_d =
-      cuda::alloc<double>(num_atomic_orbitals_ * num_molecular_orbitals_);
-  matrix_op::bmm(
-      X_d->data(), {(int)num_atomic_orbitals_, (int)num_molecular_orbitals_},
-      V->data(),
-      {1, (int)num_molecular_orbitals_, (int)num_molecular_orbitals_, true},
-      C_d->data());
-
-  auto C_t = tmp;
-  matrix_op::transpose(
-      C_d->data(), {(int)num_atomic_orbitals_, (int)num_molecular_orbitals_},
-      C_t->data());
-
-  auto P_d = F_d;
-  auto alpha = ctx_.cfg->unrestricted ? 1.0 : 2.0;
-  matrix_op::bmm_ex(
-      alpha, C_t->data(), {1, nelec_[idx], (int)num_atomic_orbitals_, true},
-      C_t->data(), {nelec_[idx], (int)num_atomic_orbitals_}, 0.0, P_d->data());
-  CUDA_CHECK(cudaMemcpy(
-      P_.data() + idx * num_atomic_orbitals_ * num_atomic_orbitals_,
-      P_d->data(), sizeof(double) * num_atomic_orbitals_ * num_atomic_orbitals_,
-      cudaMemcpyDeviceToHost));
-  CUDA_CHECK(cudaMemcpy(
-      C_.data() + idx * num_atomic_orbitals_ * num_molecular_orbitals_,
-      C_d->data(),
-      sizeof(double) * num_atomic_orbitals_ * num_molecular_orbitals_,
-      cudaMemcpyDeviceToHost));
-  CUDA_CHECK(cudaMemcpy(eigenvalues_.data() + idx * num_molecular_orbitals_,
-                        W->data(), sizeof(double) * num_molecular_orbitals_,
-                        cudaMemcpyDeviceToHost));
-#else
-  Eigen::Map<const RowMajorMatrix> F_dm(
-      F_.data() + idx * num_atomic_orbitals_ * num_atomic_orbitals_,
-      num_atomic_orbitals_, num_atomic_orbitals_);
-  Eigen::Map<RowMajorMatrix> P_dm(
-      P_.data() + idx * num_atomic_orbitals_ * num_atomic_orbitals_,
-      num_atomic_orbitals_, num_atomic_orbitals_);
-  Eigen::Map<RowMajorMatrix> C_dm(
-      C_.data() + idx * num_atomic_orbitals_ * num_molecular_orbitals_,
-      num_atomic_orbitals_, num_molecular_orbitals_);
-  RowMajorMatrix tmp1 = X_.transpose() * F_dm;
-  RowMajorMatrix tmp2 = tmp1 * X_;
-  lapack::syev(lapack::Job::Vec, lapack::Uplo::Lower, num_molecular_orbitals_,
-               tmp2.data(), num_molecular_orbitals_,
-               eigenvalues_.data() + idx * num_molecular_orbitals_);
-  tmp2.transposeInPlace();  // Row major
-  C_dm.noalias() = X_ * tmp2;
-  auto alpha = ctx_.cfg->unrestricted ? 1.0 : 2.0;
-  P_dm.noalias() =
-      alpha * C_dm.block(0, 0, num_atomic_orbitals_, nelec_[idx]) *
-      C_dm.block(0, 0, num_atomic_orbitals_, nelec_[idx]).transpose();
-#endif  // QDK_CHEMISTRY_ENABLE_GPU
 }
 
 void SCFImpl::build_one_electron_integrals_() {
@@ -1426,4 +1145,5 @@ void SCFImpl::write_gradients_(const std::vector<double>& gradients,
     spdlog::info("Point Charge gradients:\n{}", oss.str());
   }
 }
+
 }  // namespace qdk::chemistry::scf

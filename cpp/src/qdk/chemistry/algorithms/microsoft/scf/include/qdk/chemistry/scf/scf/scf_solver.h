@@ -219,7 +219,7 @@ class SCF {
 
  private:
   /**
-   * @brief Private constructor (PIMPL pattern)
+   * @brief Private constructor
    *
    * @param impl Unique pointer to implementation object
    */

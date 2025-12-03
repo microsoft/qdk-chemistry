@@ -96,11 +96,11 @@ class ProjectedMultiConfigurationCalculator
    * @return A pair containing the calculated energy (first) and the resulting
    *         multi-configurational wavefunction (second)
    *
-   * @throw std::runtime_error if the calculation fails
-   * @throw std::invalid_argument if hamiltonian is invalid
-   * @throw std::invalid_argument if configurations is invalid
-   * @throw SettingsAreLocked if attempting to modify settings after run() is
-   * called
+   * @throws std::runtime_error if the calculation fails
+   * @throws std::invalid_argument if hamiltonian is invalid
+   * @throws std::invalid_argument if configurations is invalid
+   * @throws qdk::chemistry::data::SettingsAreLocked if attempting to modify
+   * settings after run() is called
    *
    * @note Settings are automatically locked when this method is called and
    * cannot be modified during or after execution.

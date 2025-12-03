@@ -24,6 +24,12 @@ from qdk_chemistry.definitions import DIAGONAL_Z_1Q_GATES
 
 _LOGGER = logging.getLogger(__name__)
 
+__all__ = [
+    "MergeZBasisRotations",
+    "RemoveZBasisOnZeroState",
+    "SubstituteCliffordRz",
+]
+
 
 class MergeZBasisRotations(TransformationPass):
     r"""Transformation pass to merge consecutive Z-basis rotations into a single Rz gate and remove identity gates.
