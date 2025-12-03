@@ -38,6 +38,17 @@ The :class:`~qdk_chemistry.data.Wavefunction` class provides access to:
 
 Mathematical representation
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~
+- **Container type**: Underlying implementation (CAS, SCI, Slater determinant, etc.)
+
+Container types
+---------------
+
+QDK/Chemistry supports different wavefunction container types for various quantum chemistry methods:
+
+#TODO PVG once unrestricted PR is merged, add mp2 and cc containers here as well.
+
+Slater determinant container
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 Wavefunctions are represented as linear combinations of determinants:
 
@@ -90,42 +101,46 @@ Most commonly, wavefunctions are obtained from :doc:`SCF calculations <../algori
 
    .. literalinclude:: ../../../../examples/wavefunction.py
       :language: python
-      :lines: 20-48
+      :start-after: # start-cell-create-cas
+      :end-before: # end-cell-create-cas
 
+SCI wavefunction container
+~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-Container types and specialization
-----------------------------------
+For Selected Configuration Interaction methods.
 
-The wavefunction class uses different container types for different quantum chemical methods:
+.. tab:: C++ API
 
-Slater Determinant Container
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+   .. literalinclude:: ../../../_static/examples/cpp/wavefunction_container.cpp
+      :language: cpp
+      :start-after: // start-cell-create-sci
+      :end-before: // end-cell-create-sci
 
-For single-determinant wavefunctions (Hartree-Fock, DFT):
+.. tab:: Python API
 
-- Contains a single electronic configuration
-- Supports real and complex coefficients
-- Provides basic RDM functionality
+   .. literalinclude:: ../../../_static/examples/python/wavefunction_container.py
+      :language: python
+      :start-after: # start-cell-create-sci
+      :end-before: # end-cell-create-sci
 
-CAS Container
-~~~~~~~~~~~~~
+Accessing wavefunction data
+---------------------------
 
-For complete active space wavefunctions:
+The :class:`~qdk_chemistry.data.Wavefunction` class provides methods to access coefficients, determinants, and derived properties:
 
-- Supports multiple determinants with expansion coefficients
-- Provides full RDM support (1- and 2-particle, spin-traced and spin-dependent)
-- Enables natural orbital analysis
+.. tab:: C++ API
 
-SCI Container
-~~~~~~~~~~~~~
+   .. literalinclude:: ../../../_static/examples/cpp/wavefunction_container.cpp
+      :language: cpp
+      :start-after: // start-cell-access-data
+      :end-before: // end-cell-access-data
 
-For selected configuration interaction:
+.. tab:: Python API
 
-- Sparse representation of multi-determinant wavefunctions
-- Optimized for large configuration spaces
-- Supports incremental determinant selection
-
-#TODO PVG once the unrestricted PR goes in, we need to add containers for CC and MP2.
+   .. literalinclude:: ../../../_static/examples/python/wavefunction_container.py
+      :language: python
+      :start-after: # start-cell-access-data
+      :end-before: # end-cell-access-data
 
 
 Related classes
