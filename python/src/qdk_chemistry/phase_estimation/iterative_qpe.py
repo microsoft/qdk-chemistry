@@ -6,7 +6,7 @@ using a single ancilla qubit and adaptive feedback corrections.
 
 References:
     Kitaev, A. (1995). "Quantum measurements and the Abelian Stabilizer Problem."
-    arXiv:quant-ph/9511026. https://arxiv.org/abs/quant-ph/9511026
+    arXiv:quant-ph/9511026. :cite:`Kitaev1995`
 
 """
 
@@ -59,7 +59,7 @@ class IterativePhaseEstimationIteration:
 
 
 class IterativePhaseEstimation(PhaseEstimation):
-    """Most-significant-bit-first iterative phase estimation (Kitaev style)."""
+    """Most-significant-bit-first iterative phase estimation (Kitaev style :cite:`Kitaev1995`)."""
 
     algorithm = PhaseEstimationAlgorithm.ITERATIVE
 

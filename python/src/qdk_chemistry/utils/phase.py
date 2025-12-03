@@ -101,7 +101,7 @@ def resolve_energy_aliases(
 
 
 def iterative_phase_feedback_update(current_phase: float, measured_bit: int) -> float:
-    """Update the feedback phase according to Kitaev's recursion.
+    """Update the feedback phase according to Kitaev's recursion :cite:`Kitaev1995`.
 
     Args:
         current_phase: Phase ``Φ(k+1)`` from the previous iteration.
