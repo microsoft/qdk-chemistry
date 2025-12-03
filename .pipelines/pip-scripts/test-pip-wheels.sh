@@ -50,7 +50,7 @@ python3 -m pip install pytest
 
 # Install the wheel in the clean environment
 cd /workspace/qdk-chemistry/python
-pip3 install repaired_wheelhouse/qdk_chemistry*.whl
+pip3 install repaired_wheelhouse/qdk_chemistry*.whl[plugins]
 
 # Run pytest suite
 echo '=== Running pytest suite ==='
