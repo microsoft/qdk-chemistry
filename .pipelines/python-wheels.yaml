@@ -22,11 +22,11 @@ parameters:
     arch: x86_64
     march: x86-64-v3
     imageName: ubuntu-22.04
-  - name: linux_aarch64
-    os: linux
-    arch: x86_64
-    march: armv8-a
-    imageName: ubuntu-22.04
+  # - name: linux_aarch64
+  #   os: linux
+  #   arch: x86_64
+  #   march: armv8-a
+  #   imageName: ubuntu-22.04
 
 variables:
 - group: QdkChemistry
@@ -41,8 +41,10 @@ extends:
         binaryLanguages: cpp
       psccriptanalyzer:
         enabled: false
+        justificationForDisabling: Powershell is not used in this repository.
       armory:
         enabled: false
+        justificationForDisabling: ARM templates are not used in this repository.
       eslint:
         enabled: false
         justificationForDisabling: JavaScript is not used in this repository.
@@ -85,7 +87,7 @@ extends:
               Python3.13:
                 pythonVersion: '3.13'
                 buildMarch: ${{ target.march }}
-            maxParallel: 6
+            maxParallel: 3
           templateContext:
             outputs:
             - output: pipelineArtifact
