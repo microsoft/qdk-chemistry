@@ -740,7 +740,8 @@ class Settings : public DataClass,
                 } else if constexpr (std::is_same_v<LimitValType,
                                                     std::vector<int64_t>>) {
                   ListConstraint<int64_t> constraint;
-                  constraint.allowed_values.assign(limit_val.begin(), limit_val.end());
+                  constraint.allowed_values.assign(limit_val.begin(),
+                                                   limit_val.end());
                   limits_[key] = std::move(constraint);
                 } else if constexpr (std::is_same_v<
                                          LimitValType,
@@ -756,7 +757,8 @@ class Settings : public DataClass,
                 } else if constexpr (std::is_same_v<LimitValType,
                                                     std::vector<std::string>>) {
                   ListConstraint<std::string> constraint;
-                  constraint.allowed_values.assign(limit_val.begin(), limit_val.end());
+                  constraint.allowed_values.assign(limit_val.begin(),
+                                                   limit_val.end());
                   limits_[key] = std::move(constraint);
                 }
               },
@@ -774,9 +776,11 @@ class Settings : public DataClass,
           std::visit(
               [this, &key](const auto& limit_val) {
                 using LimitValType = std::decay_t<decltype(limit_val)>;
-                if constexpr (std::is_same_v<LimitValType, BoundConstraint<int64_t>>) {
+                if constexpr (std::is_same_v<LimitValType,
+                                             BoundConstraint<int64_t>>) {
                   limits_[key] = limit_val;
-                } else if constexpr (std::is_same_v<LimitValType, ListConstraint<int64_t>>) {
+                } else if constexpr (std::is_same_v<LimitValType,
+                                                    ListConstraint<int64_t>>) {
                   limits_[key] = limit_val;
                 } else {
                   // Unsupported limit type for this value type

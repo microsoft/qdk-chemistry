@@ -911,7 +911,8 @@ TEST_F(SettingsTest, MetadataFunctions) {
                   BoundConstraint<int64_t>{0, 10});
       set_default("with_string_limits", std::string("option1"),
                   "String with limited options",
-                  ListConstraint<std::string>{{std::vector<std::string>{"option1", "option2", "option3"}}});
+                  ListConstraint<std::string>{{std::vector<std::string>{
+                      "option1", "option2", "option3"}}});
       set_default("undocumented", 100, std::nullopt, std::nullopt, false);
       set_default("no_metadata", 0);
     }
@@ -942,7 +943,8 @@ TEST_F(SettingsTest, MetadataFunctions) {
   EXPECT_EQ(limit_pair.max, 10);
 
   auto string_limits = meta_settings.get_limits("with_string_limits");
-  EXPECT_TRUE(std::holds_alternative<ListConstraint<std::string>>(string_limits));
+  EXPECT_TRUE(
+      std::holds_alternative<ListConstraint<std::string>>(string_limits));
   auto limit_vec = std::get<ListConstraint<std::string>>(string_limits);
   EXPECT_EQ(limit_vec.allowed_values.size(), 3);
   EXPECT_EQ(limit_vec.allowed_values[0], "option1");

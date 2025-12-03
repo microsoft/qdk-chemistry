@@ -35,8 +35,9 @@ void Settings::set(const std::string& key, const SettingValue& value) {
     if (std::holds_alternative<std::string>(value)) {
       if (std::holds_alternative<ListConstraint<std::string>>(limits_[key])) {
         auto options = std::get<ListConstraint<std::string>>(limits_[key]);
-        if (std::find(options.allowed_values.begin(), options.allowed_values.end(),
-                      std::get<std::string>(value)) == options.allowed_values.end()) {
+        if (std::find(
+                options.allowed_values.begin(), options.allowed_values.end(),
+                std::get<std::string>(value)) == options.allowed_values.end()) {
           std::string options_str = "[";
           for (size_t i = 0; i < options.allowed_values.size(); ++i) {
             if (i > 0) options_str += ", ";
@@ -51,12 +52,14 @@ void Settings::set(const std::string& key, const SettingValue& value) {
     } else if (std::holds_alternative<int64_t>(value)) {
       if (std::holds_alternative<ListConstraint<int64_t>>(limits_[key])) {
         auto options = std::get<ListConstraint<int64_t>>(limits_[key]);
-        if (std::find(options.allowed_values.begin(), options.allowed_values.end(),
-                      std::get<int64_t>(value)) == options.allowed_values.end()) {
+        if (std::find(options.allowed_values.begin(),
+                      options.allowed_values.end(), std::get<int64_t>(value)) ==
+            options.allowed_values.end()) {
           std::string options_str = "[";
           for (size_t i = 0; i < options.allowed_values.size(); ++i) {
             if (i > 0) options_str += ", ";
-            options_str += "\"" + std::to_string(options.allowed_values[i]) + "\"";
+            options_str +=
+                "\"" + std::to_string(options.allowed_values[i]) + "\"";
           }
           options_str += "]";
           throw std::invalid_argument(
@@ -91,8 +94,9 @@ void Settings::set(const std::string& key, const SettingValue& value) {
       if (std::holds_alternative<ListConstraint<std::string>>(limits_[key])) {
         auto options = std::get<ListConstraint<std::string>>(limits_[key]);
         for (auto& test_value : std::get<std::vector<std::string>>(value)) {
-          if (std::find(options.allowed_values.begin(), options.allowed_values.end(), test_value) ==
-              options.allowed_values.end()) {
+          if (std::find(options.allowed_values.begin(),
+                        options.allowed_values.end(),
+                        test_value) == options.allowed_values.end()) {
             std::string options_str = "[";
             for (size_t i = 0; i < options.allowed_values.size(); ++i) {
               if (i > 0) options_str += ", ";
@@ -109,12 +113,14 @@ void Settings::set(const std::string& key, const SettingValue& value) {
       if (std::holds_alternative<ListConstraint<int64_t>>(limits_[key])) {
         auto options = std::get<ListConstraint<int64_t>>(limits_[key]);
         for (auto& test_value : std::get<std::vector<int64_t>>(value)) {
-          if (std::find(options.allowed_values.begin(), options.allowed_values.end(), test_value) ==
-              options.allowed_values.end()) {
+          if (std::find(options.allowed_values.begin(),
+                        options.allowed_values.end(),
+                        test_value) == options.allowed_values.end()) {
             std::string options_str = "[";
             for (size_t i = 0; i < options.allowed_values.size(); ++i) {
               if (i > 0) options_str += ", ";
-              options_str += "\"" + std::to_string(options.allowed_values[i]) + "\"";
+              options_str +=
+                  "\"" + std::to_string(options.allowed_values[i]) + "\"";
             }
             options_str += "]";
             throw std::invalid_argument(
@@ -126,11 +132,9 @@ void Settings::set(const std::string& key, const SettingValue& value) {
                      limits_[key])) {
         auto options = std::get<BoundConstraint<int64_t>>(limits_[key]);
         for (auto& test_value : std::get<std::vector<int64_t>>(value)) {
-          if (options.min > test_value ||
-              test_value > options.max) {
-            std::string options_str =
-                "[" + std::to_string(options.min) + ", " +
-                std::to_string(options.max) + "]";
+          if (options.min > test_value || test_value > options.max) {
+            std::string options_str = "[" + std::to_string(options.min) + ", " +
+                                      std::to_string(options.max) + "]";
             throw std::invalid_argument(
                 "Value for setting '" + key +
                 "' is out of allowed range. Allowed range: " + options_str);
@@ -141,11 +145,9 @@ void Settings::set(const std::string& key, const SettingValue& value) {
       if (std::holds_alternative<BoundConstraint<double>>(limits_[key])) {
         auto options = std::get<BoundConstraint<double>>(limits_[key]);
         for (auto& test_value : std::get<std::vector<double>>(value)) {
-          if (options.min > test_value ||
-              test_value > options.max) {
-            std::string options_str =
-                "[" + std::to_string(options.min) + ", " +
-                std::to_string(options.max) + "]";
+          if (options.min > test_value || test_value > options.max) {
+            std::string options_str = "[" + std::to_string(options.min) + ", " +
+                                      std::to_string(options.max) + "]";
             throw std::invalid_argument(
                 "Value for setting '" + key +
                 "' is out of allowed range. Allowed range: " + options_str);
@@ -585,7 +587,8 @@ std::string Settings::as_table(size_t max_width, bool show_undocumented) const {
             std::string current_line = "[";
 
             for (size_t i = 0; i < variant_value.allowed_values.size(); ++i) {
-              std::string element = std::to_string(variant_value.allowed_values[i]);
+              std::string element =
+                  std::to_string(variant_value.allowed_values[i]);
               std::string separator =
                   (i < variant_value.allowed_values.size() - 1) ? ", " : "]";
 
@@ -607,7 +610,8 @@ std::string Settings::as_table(size_t max_width, bool show_undocumented) const {
             std::string current_line = "[";
 
             for (size_t i = 0; i < variant_value.allowed_values.size(); ++i) {
-              std::string element = "\"" + variant_value.allowed_values[i] + "\"";
+              std::string element =
+                  "\"" + variant_value.allowed_values[i] + "\"";
               std::string separator =
                   (i < variant_value.allowed_values.size() - 1) ? ", " : "]";
 

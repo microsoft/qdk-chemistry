@@ -18,12 +18,12 @@ inline bool hdf5_errors_should_be_suppressed() {
   }
 
   std::string normalized(env_value);
-  std::transform(normalized.begin(), normalized.end(), normalized.begin(),
-                 [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
+  std::transform(
+      normalized.begin(), normalized.end(), normalized.begin(),
+      [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
 
-  const bool verbose_requested =
-      (normalized == "1" || normalized == "true" || normalized == "yes" ||
-       normalized == "on");
+  const bool verbose_requested = (normalized == "1" || normalized == "true" ||
+                                  normalized == "yes" || normalized == "on");
 
   return !verbose_requested;
 }

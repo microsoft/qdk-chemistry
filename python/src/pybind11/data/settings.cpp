@@ -390,7 +390,8 @@ class PySettings : public Settings, public py::trampoline_self_life_support {
                    expected_type == "vector<string>") {
           ListConstraint<std::string> list_constraint;
           for (auto item : limit_list) {
-            list_constraint.allowed_values.push_back(py::cast<std::string>(item));
+            list_constraint.allowed_values.push_back(
+                py::cast<std::string>(item));
           }
           limit_val = list_constraint;
         }
