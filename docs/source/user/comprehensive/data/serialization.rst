@@ -35,65 +35,34 @@ JSON serialization
 
 .. tab:: C++ API
 
-   .. code-block:: cpp
-
-      #include <qdk/chemistry.hpp>
-      using namespace qdk::chemistry::data;
-
-      // Structure data class example
-      std::vector<Eigen::Vector3d> coords = {{0.0, 0.0, 0.0}, {0.0, 0.0, 1.4}};
-      std::vector<std::string> symbols = {"H", "H"};
-      std::vector <double> custom_masses {1.001, 0.999};
-      std::vector<double> custom_charges = {0.9, 1.1};
-      Structure structure(coords, elements, custom_masses, custom_charges);
-
-      // Serialize to JSON object
-      auto structure_data = structure.to_json();
-
-      // Deserialize from JSON object
-      // "Structure" is the data type to de-serialize into (will throw, if it doesn't match)
-      auto structure_from_json = Structure::from_json(json_data);
-
-      // Write to json file
-      structure.to_json_file("filename.structure.json"); // Extension depends on object type
-
-      // Read from json file
-      auto structure_from_json_file = Structure::from_json_file("filename.structure.json");
+   .. literalinclude:: ../../../_static/examples/cpp/serialization.cpp
+      :language: cpp
+      :start-after: // start-cell-json
+      :end-before: // end-cell-json
 
 .. tab:: Python API
 
-   .. literalinclude:: ../../../../examples/serialization.py
+   .. literalinclude:: ../../../_static/examples/python/serialization.py
       :language: python
-      :lines: 17-36
+      :start-after: # start-cell-json
+      :end-before: # end-cell-json
 
 HDF5 serialization
 ~~~~~~~~~~~~~~~~~~
 
 .. tab:: C++ API
 
-   .. code-block:: cpp
-
-    // Hamiltonian data class example
-    // Create dummy data for Hamiltonian class
-    Eigen::MatrixXd one_body = Eigen::MatrixXd::Identity(2, 2);
-    Eigen::VectorXd two_body = 2 * Eigen::VectorXd::Ones(16);
-    auto orbitals = std::make_shared<ModelOrbitals>(2, true); // 2 orbitals, restricted
-    double core_energy = 1.5;
-    Eigen::MatrixXd inactive_fock = Eigen::MatrixXd::Zero(0, 0);
-
-    Hamiltonian h_example(one_body, two_body, orbitals, core_energy, inactive_fock);
-
-    h_example.to_hdf5_file("h_example.hamiltonian.h5"); // Extension depends on object type
-
-    // Deserialize from HDF5 file
-    auto h_example_from_hdf5_file = Hamiltonian::from_hdf5_file("h_example.hamiltonian.h5");
-
+   .. literalinclude:: ../../../_static/examples/cpp/serialization.cpp
+      :language: cpp
+      :start-after: // start-cell-hdf5
+      :end-before: // end-cell-hdf5
 
 .. tab:: Python API
 
-   .. literalinclude:: ../../../../examples/serialization.py
+   .. literalinclude:: ../../../_static/examples/python/serialization.py
       :language: python
-      :lines: 44-57
+      :start-after: # start-cell-hdf5
+      :end-before: # end-cell-hdf5
 
 File extensions
 ---------------
@@ -134,6 +103,7 @@ The same patterns are observed for other data classes in QDK/Chemistry.
 Related topics
 --------------
 
+- The above examples can be downloaded as complete `C++ <../../../_static/examples/cpp/serialization.cpp>`_ and `Python <../../../_static/examples/python/serialization.py>`_ scripts.
 - :doc:`Structure <../data/structure>`: Molecular geometry and atomic information
 - :doc:`BasisSet <../data/basis_set>`: Basis set definitions
 - :doc:`Orbitals <../data/orbitals>`: Molecular orbital coefficients and properties

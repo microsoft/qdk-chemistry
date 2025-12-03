@@ -101,61 +101,70 @@ The below example illustrates the typical access to Orbitals (via an SCF):
 
 .. tab:: C++ API
 
-   .. code-block:: cpp
-
-      // Create H2 molecule
-      std::vector<Eigen::Vector3d> coords = {{0.0, 0.0, 0.0}, {0.0, 0.0, 1.4}};
-      std::vector<std::string> symbols = {"H", "H"};
-      Structure structure(coords, symbols);
-
-      // Obtain orbitals from an SCF calculation
-      auto scf_solver = ScfSolverFactory::create();
-      scf_solver->settings().set("basis_set", "sto-3g");
-      auto [E_scf, wfn] = scf_solver->run(structure, 0, 1);
-      std::shared_ptr<Orbitals> orbitals = wfn.get_orbitals();
-
-      // Access orbital coefficients
-      auto [coeffs, coeffs_beta] = orbitals->get_coefficients();
-
-      // Access orbital energies
-      auto [energies, energies_beta] = orbitals->get_energies();
-
-      // Access atomic orbital overlap matrix
-      const Eigen::MatrixXd& = orbitals->get_overlap_matrix();
-
+   .. literalinclude:: ../../../_static/examples/cpp/orbitals.cpp
+      :language: cpp
+      :start-after: // start-cell-create
+      :end-before: // end-cell-create
 
 .. tab:: Python API
 
-   .. literalinclude:: ../../../../examples/orbitals.py
+   .. literalinclude:: ../../../_static/examples/python/orbitals.py
       :language: python
-      :lines: 16-34
+      :start-after: # start-cell-create
+      :end-before: # end-cell-create
 
-Below demonstrates the simple construction of ModelOrbitals, which can then be passed to the :doc:`HamiltonianConstructor <../algorithms/hamiltonian_constructor>`
+Similar patterns are described below for ModelOrbitals.
 
 .. tab:: C++ API
 
-   .. code-block:: cpp
-
-   // Set basis set size
-   size_t basis_size = 6;
-
-   // Set active orbitals
-   std::vector<size_t> alpha_active = {1,2};
-   std::vector<size_t> beta_active = {2,3,4};
-   std::vector<size_t> alpha_inactive = {0,3,4,5};
-   std::vector<size_t> beta_inactive = {0,1,5};
-
-   ModelOrbitals model_orbitals(basis_size, std::make_tuple(alpha_active, beta_active, alpha_inactive, beta_inactive));
-
-   // We can then pass this object to a custom Hamiltonian constructor
-
+   .. literalinclude:: ../../../_static/examples/cpp/orbitals.cpp
+      :language: cpp
+      :start-after: // start-cell-model-orbitals-create
+      :end-before: // end-cell-model-orbitals-create
 
 .. tab:: Python API
 
-   .. literalinclude:: ../../../../examples/orbitals.py
+   .. literalinclude:: ../../../_static/examples/python/orbitals.py
       :language: python
-      :lines: 40-51
+      :start-after: # start-cell-model-orbitals-create
+      :end-before: # end-cell-model-orbitals-create
 
+Accessing Orbital Data
+----------------------
+
+The :class:`~qdk_chemistry.data.Orbitals` class provides methods to access orbital coefficients, energies, and other properties.
+Following the :doc:`immutable design principle <../design/index>` used throughout QDK/Chemistry, all getter methods return const references or copies of the data.
+For spin-dependent properties, methods return pairs of (alpha, beta) data.
+
+.. tab:: C++ API
+
+   .. literalinclude:: ../../../_static/examples/cpp/orbitals.cpp
+      :language: cpp
+      :start-after: // start-cell-access
+      :end-before: // end-cell-access
+
+.. tab:: Python API
+
+   .. literalinclude:: ../../../_static/examples/python/orbitals.py
+      :language: python
+      :start-after: # start-cell-access
+      :end-before: # end-cell-access
+
+
+Orbital transformations and applications
+----------------------------------------
+
+The :class:`~qdk_chemistry.data.Orbitals` class serves as a foundation for several important quantum chemical applications and transformations:
+
+- **Orbital Localization**: Transform delocalized :term:`SCF` orbitals into localized representations for better chemical interpretation and more efficient correlation methods.
+  See :doc:`Localizer <../algorithms/localizer>` for details.
+
+- **Active Space Selection**: Automatically identify important orbitals for multi-reference calculations based on
+  various criteria.
+  See :doc:`ActiveSpaceSelector <../algorithms/active_space>` for details.
+
+- **Hamiltonian Construction**: Build electronic Hamiltonians for post-HF methods using the orbital information.
+  See :doc:`HamiltonianConstructor <../algorithms/hamiltonian_constructor>` for details.
 
 Related classes
 ---------------
@@ -167,8 +176,9 @@ Related classes
 - :doc:`ScfSolver <../algorithms/scf_solver>`: Algorithm that produces orbitals
 - :doc:`Localizer <../algorithms/localizer>`: Algorithms for orbital transformations
 
-Related topics
---------------
+Further reading
+---------------
 
+- The above examples can be downloaded as complete `C++ <../../../_static/examples/cpp/orbitals.cpp>`_ and `Python <../../../_static/examples/python/orbitals.py>`_ scripts.
 - :doc:`Serialization <../data/serialization>`: Data serialization and deserialization
 - :doc:`Settings <../design/settings>`: Configuration settings for algorithms

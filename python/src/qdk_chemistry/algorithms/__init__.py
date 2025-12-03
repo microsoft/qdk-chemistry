@@ -89,6 +89,7 @@ __all__ = [
     "create",
     "energy_from_phase",
     "register",
+    "show_default",
     "show_settings",
     "unregister",
 ]
@@ -99,6 +100,7 @@ _REGISTRY_EXPORTS = frozenset(
         "available",
         "create",
         "register",
+        "show_default",
         "show_settings",
         "unregister",
     }
@@ -112,6 +114,7 @@ if TYPE_CHECKING:  # pragma: no cover - typing-only imports
     available = _registry_type.available
     create = _registry_type.create
     register = _registry_type.register
+    show_default = _registry_type.show_default
     show_settings = _registry_type.show_settings
     unregister = _registry_type.unregister
 

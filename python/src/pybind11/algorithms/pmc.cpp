@@ -146,6 +146,15 @@ Examples:
 
 )");
 
+  pmc_calculator.def("name", &ProjectedMultiConfigurationCalculator::name,
+                     R"(
+The algorithm's name.
+
+Returns:
+    str: The name of the algorithm
+
+)");
+
   pmc_calculator.def("type_name",
                      &ProjectedMultiConfigurationCalculator::type_name,
                      R"(

@@ -38,27 +38,18 @@ The most common use case is localizing occupied orbitals after an SCF calculatio
 
 .. tab:: C++ API
 
-   .. code-block:: cpp
-
-      // Create H2O molecule
-      std::vector<Eigen::Vector3d> coords = {{0.0, 0.0, 0.0}, {0.0, 0.757, 0.587}, {0.0, -0.757, 0.587}};
-      std::vector<std::string> symbols = {"O", "H", "H"};
-      Structure structure(coords, symbols);
-
-      // Obtain orbitals from SCF calculation
-      auto scf_solver = ScfSolverFactory::create();
-      scf_solver->settings().set("basis_set", "sto-3g");
-      auto [E_scf, wavefunction] = scf_solver->run(structure, 0, 1);
-      auto orbitals = wavefunction.get_orbitals();
-
-      // Create Pipek-Mezey localizer
-      auto localizer = LocalizerFactory::create("qdk_pipek_mezey");
+   .. literalinclude:: ../../../_static/examples/cpp/localizer.cpp
+      :language: cpp
+      :start-after: // start-cell-create
+      :end-before: // end-cell-create
 
 .. tab:: Python API
 
-   .. literalinclude:: ../../../../examples/localizer.py
+   .. literalinclude:: ../../../_static/examples/python/localizer.py
       :language: python
-      :lines: 16-32 TODO 
+      :start-after: # start-cell-create
+      :end-before: # end-cell-create
+
 
 Configuring the localizer
 -------------------------
@@ -67,16 +58,17 @@ The :class:`~qdk_chemistry.algorithms.OrbitalLocalizer` can be configured using 
 
 .. tab:: C++ API
 
-   .. code-block:: cpp
-
-      // Set the convergence threshold
-      localizer->settings().set("tolerance", 1.0e-6);
+   .. literalinclude:: ../../../_static/examples/cpp/localizer.cpp
+      :language: cpp
+      :start-after: // start-cell-configure
+      :end-before: // end-cell-configure
 
 .. tab:: Python API
 
-   .. literalinclude:: ../../../../examples/localizer.py
+   .. literalinclude:: ../../../_static/examples/python/localizer.py
       :language: python
-      :lines: TODO 
+      :start-after: # start-cell-configure
+      :end-before: # end-cell-configure
 
 Performing orbital localization
 -------------------------------
@@ -99,31 +91,23 @@ Once configured, the localization can be performed on a set of orbitals:
 
 .. tab:: C++ API
 
-   .. code-block:: cpp
-
-      // Obtain a valid Orbitals instance
-      Orbitals orbitals;
-      /* orbitals = ... */
-
-      // Configure electron counts in settings for methods that require them
-      localizer->settings().set("n_alpha_electrons", n_alpha);
-      localizer->settings().set("n_beta_electrons", n_beta);
-
-      // Create indices for orbitals to localize
-      std::vector<size_t> loc_indices_a = {0, 1, 2, 3}; // Alpha orbital indices
-      std::vector<size_t> loc_indices_b = {0, 1, 2, 3}; // Beta orbital indices
-
-      // Localize the specified orbitals
-      auto localized_orbitals = localizer->run(orbitals, loc_indices_a, loc_indices_b);
+   .. literalinclude:: ../../../_static/examples/cpp/localizer.cpp
+      :language: cpp
+      :start-after: // start-cell-localize
+      :end-before: // end-cell-localize
 
 .. tab:: Python API
 
-   .. literalinclude:: ../../../../examples/localizer.py
-      :language: python
-      :lines: TODO
+   .. note::
+      This example shows the API pattern. For complete working examples, see the test suite.
 
-Implemented interfaces
----------------------
+   .. literalinclude:: ../../../_static/examples/python/localizer.py
+      :language: python
+      :start-after: # start-cell-localize
+      :end-before: # end-cell-localize
+
+Available localization methods
+------------------------------
 
 QDK/Chemistry's :class:`~qdk_chemistry.algorithms.OrbitalLocalizer` provides a unified interface for localization methods.
 
@@ -222,11 +206,31 @@ These settings apply only to specific variants of localization:
      - true
      - Whether to use weighted orthogonalization in hard virtual construction
      - :term:`VVHV`
-     
-Related classes
+
+Implemented interface
+---------------------
+
+QDK/Chemistry's :class:`~qdk_chemistry.algorithms.OrbitalLocalizer` provides a unified interface for localization methods.
+
+QDK/Chemistry implementations
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+- **QDK/Chemistry**: Native implementation of Pipek-Mezey, and :term:`MP2` natural orbital localization
+
+Third-party interfaces
+~~~~~~~~~~~~~~~~~~~~~~
+
+- **PySCF**: Interface to PySCF's orbital localization methods
+
+The factory pattern allows seamless selection between these implementations.
+
+For more details on how QDK/Chemistry interfaces with external packages, see the :doc:`Interfaces <../design/interfaces>` documentation.
+
+Further reading
 ---------------
 
-- :doc:`Orbitals <../data/orbitals>`: Input and output orbitals for localization
+- The above examples can be downloaded as complete `Python <../../../_static/examples/python/localizer.py>`_ or `C++ <../../../_static/examples/cpp/localizer.cpp>`_ code.
+- :doc:`Orbitals <../data/orbitals>`: Input and output orbitals
 - :doc:`ScfSolver <scf_solver>`: Produces initial orbitals for localization
 - :doc:`ActiveSpaceSelector <active_space>`: Often used with localized orbitals for better active space selection
 - :doc:`HamiltonianConstructor <hamiltonian_constructor>`: Can build Hamiltonians using localized orbitals
