@@ -39,12 +39,14 @@ extends:
           enabled: true
         sourceLanguages: python
         binaryLanguages: cpp
-      psccriptanalyzer:
+      psscriptanalyzer:
         enabled: false
         justificationForDisabling: Powershell is not used in this repository.
+        break: false
       armory:
         enabled: false
         justificationForDisabling: ARM templates are not used in this repository.
+        break: false
       eslint:
         enabled: false
         justificationForDisabling: JavaScript is not used in this repository.
