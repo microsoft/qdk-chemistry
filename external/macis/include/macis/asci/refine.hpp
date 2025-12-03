@@ -116,7 +116,7 @@ auto asci_refine(ASCISettings asci_settings, MCSCFSettings mcscf_settings,
   if (converged)
     logger->info("ASCI Refine Converged!");
   else
-    throw std::runtime_error("ACCI Refine did not converge");
+    throw std::runtime_error("ASCI Refine did not converge");
 
   return std::make_tuple(E0, wfn, X);
 }
