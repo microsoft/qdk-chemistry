@@ -1,5 +1,5 @@
-Functionals and Basis Sets
-==========================
+Available Functionals and Basis Sets
+====================================
 
 In the following sections, we provide lists of the basis sets
 and density functional theory (DFT) functionals that are available in

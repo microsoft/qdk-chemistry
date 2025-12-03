@@ -1,5 +1,5 @@
-Design Principles of QDK/Chemistry
-##################################
+Design Motifs
+#############
 
 This document outlines the core architectural design principles of QDK/Chemistry, explaining the conceptual framework that guides the library's organization and implementation.
 For a complete overview of QDK/Chemistry's documentation, see the :doc:`in-depth documentation index <../index>`.

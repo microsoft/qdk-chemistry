@@ -1,9 +1,16 @@
-Available algorithms
-====================
+Algorithm Classes
+=================
 
 .. toctree::
    :maxdepth: 1
-   :caption: Contents
+   :caption: Creation and Configuration of Algorithm Classes
+
+   factory_pattern
+   settings
+
+.. toctree::
+   :maxdepth: 1
+   :caption: Available Algorithms
 
    active_space
    energy_estimator
