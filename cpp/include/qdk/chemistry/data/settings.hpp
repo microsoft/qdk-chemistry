@@ -8,6 +8,7 @@
 
 #include <any>
 #include <fstream>
+#include <limits>
 #include <map>
 #include <memory>
 #include <nlohmann/json.hpp>
@@ -35,12 +36,44 @@ using SettingValue =
     std::variant<bool, int64_t, double, std::string, std::vector<int64_t>,
                  std::vector<double>, std::vector<std::string>>;
 
+template <typename T>
+struct BoundConstraint {
+  T min = std::numeric_limits<T>::min();
+  T max = std::numeric_limits<T>::max();
+};
+
+template <typename T>
+struct ListConstraint {
+  std::vector<T> allowed_values;
+};
+
 /**
  * @brief Type for specifying limits on setting values
  */
-using LimitValue =
-    std::variant<std::pair<int64_t, int64_t>, std::vector<int64_t>,
-                 std::pair<double, double>, std::vector<std::string>>;
+using Constraint =
+    std::variant<BoundConstraint<int64_t>, ListConstraint<int64_t>,
+                 BoundConstraint<double>, ListConstraint<std::string>>;
+
+template <typename T>
+struct is_vector : std::false_type {};
+
+template <typename T, typename A>
+struct is_vector<std::vector<T, A>> : std::true_type {};
+
+template <typename T>
+inline constexpr bool is_vector_v = is_vector<T>::value;
+
+template <typename T>
+struct is_non_bool_integral
+    : std::conjunction<std::is_integral<T>,
+                       std::negation<std::is_same<T, bool>>> {};
+
+template <typename T>
+inline constexpr bool is_non_bool_integral_v = is_non_bool_integral<T>::value;
+
+template <typename T>
+inline constexpr bool is_non_bool_integral_vector_v =
+    is_vector_v<T> && is_non_bool_integral_v<typename T::value_type>;
 
 /**
  * @brief Exception thrown when modification of locked settings is requested
@@ -161,8 +194,12 @@ class Settings : public DataClass,
    * @brief Set a setting value (template version for convenience)
    * @param key The setting key
    * @param value The setting value
+   * @note This template is disabled for non-int64_t integers to avoid ambiguity
    */
-  template <typename T>
+  template <
+      typename T,
+      typename std::enable_if_t<
+          !is_non_bool_integral_v<T> || std::is_same_v<T, int64_t>, int> = 0>
   void set(const std::string& key, const T& value) {
     static_assert(is_supported_type<T>(),
                   "Type not supported in SettingValue variant");
@@ -173,28 +210,44 @@ class Settings : public DataClass,
 
     // If the type is directly in the variant, use it as-is
     if constexpr (is_variant_member_v<T, SettingValue>) {
-      settings_[key] = value;
+      SettingValue variant_value = value;
+      set(key, variant_value);
     }
-    // Handle integral types - store as int64_t (signed) or uint64_t (unsigned)
+    // Handle integral types - store as int64_t (signed)
     else if constexpr (is_non_bool_integral_v<T>) {
-      if constexpr (std::is_signed_v<T>) {
-        settings_[key] = static_cast<int64_t>(value);
-      } else {
-        settings_[key] = static_cast<uint64_t>(value);
-      }
+      settings_[key] = static_cast<int64_t>(value);
     }
     // Handle integer vector types
     else if constexpr (is_non_bool_integral_vector_v<T>) {
-      if constexpr (std::is_signed_v<typename T::value_type>) {
-        // Signed integer vectors -> vector<int64_t>
-        settings_[key] = _convert_to_int64_vector(value);
-      } else {
-        // Unsigned integer vectors -> vector<uint64_t>
-        settings_[key] = _convert_to_uint64_vector(value);
-      }
+      // Signed integer vectors -> vector<int64_t>
+      settings_[key] = _convert_to_int64_vector(value);
     } else {
       settings_[key] = value;
     }
+  }
+
+  template <typename Integer,
+            typename std::enable_if_t<is_non_bool_integral_v<Integer> &&
+                                          !std::is_same_v<Integer, int64_t>,
+                                      int> = 0>
+  void set(const std::string& key, Integer value) {
+    // Range check for non-int64_t integers
+    if constexpr (std::is_signed_v<Integer>) {
+      if constexpr (sizeof(Integer) > sizeof(int64_t)) {
+        if (value < static_cast<Integer>(std::numeric_limits<int64_t>::min()) ||
+            value > static_cast<Integer>(std::numeric_limits<int64_t>::max())) {
+          throw std::out_of_range("Value for setting '" + key +
+                                  "' cannot be represented as int64_t.");
+        }
+      }
+    } else {
+      // Unsigned type
+      if (value > static_cast<Integer>(std::numeric_limits<int64_t>::max())) {
+        throw std::out_of_range("Value for setting '" + key +
+                                "' cannot be represented as int64_t.");
+      }
+    }
+    settings_[key] = static_cast<int64_t>(value);
   }
 
   /**
@@ -242,14 +295,9 @@ class Settings : public DataClass,
     // Handle integral type conversions
     else if constexpr (is_non_bool_integral_v<T>) {
       try {
-        // Check which type is actually stored to avoid unnecessary conversion
-        // attempts
+        // Check which type is actually stored (only int64_t now)
         if (std::holds_alternative<int64_t>(it->second)) {
           if (auto result = _try_convert_from<T, int64_t>(it->second)) {
-            return *result;
-          }
-        } else if (std::holds_alternative<uint64_t>(it->second)) {
-          if (auto result = _try_convert_from<T, uint64_t>(it->second)) {
             return *result;
           }
         }
@@ -262,26 +310,12 @@ class Settings : public DataClass,
     else if constexpr (is_vector_v<T>) {
       using ElementType = typename T::value_type;
       if constexpr (is_non_bool_integral_v<ElementType>) {
-        // Try signed vector first (vector<int64_t>)
+        // Try signed vector (vector<int64_t>)
         if (std::holds_alternative<std::vector<int64_t>>(it->second)) {
           const auto& vec64 = std::get<std::vector<int64_t>>(it->second);
           T result;
           result.reserve(vec64.size());
           for (const auto& val : vec64) {
-            if (auto converted = _safe_convert<ElementType>(val)) {
-              result.push_back(*converted);
-            } else {
-              throw SettingTypeMismatch(key, "vector element out of range");
-            }
-          }
-          return result;
-        }
-        // Try unsigned vector (vector<uint64_t>)
-        else if (std::holds_alternative<std::vector<uint64_t>>(it->second)) {
-          const auto& vecu64 = std::get<std::vector<uint64_t>>(it->second);
-          T result;
-          result.reserve(vecu64.size());
-          for (const auto& val : vecu64) {
             if (auto converted = _safe_convert<ElementType>(val)) {
               result.push_back(*converted);
             } else {
@@ -329,8 +363,6 @@ class Settings : public DataClass,
           // Type is in variant but wrong signedness - try conversion
           if (auto result = _try_convert_from<T, int64_t>(it->second)) {
             return *result;
-          } else if (auto result = _try_convert_from<T, uint64_t>(it->second)) {
-            return *result;
           }
         }
         return default_value;
@@ -339,10 +371,8 @@ class Settings : public DataClass,
     // Handle integral type conversions
     else if constexpr (is_non_bool_integral_v<T>) {
       try {
-        // Try conversion from int64_t and uint64_t only (simplified)
+        // Try conversion from int64_t only
         if (auto result = _try_convert_from<T, int64_t>(it->second)) {
-          return *result;
-        } else if (auto result = _try_convert_from<T, uint64_t>(it->second)) {
           return *result;
         }
       } catch (...) {
@@ -392,12 +422,6 @@ class Settings : public DataClass,
    * @return Map of setting keys to their SettingValue variants
    */
   const std::map<std::string, SettingValue>& get_all_settings() const;
-
-  /**
-   * @brief Set settings from a map (useful for Python dictionary conversion)
-   * @param settings_map Map of settings to set
-   */
-  void set_from_map(const std::map<std::string, SettingValue>& settings_map);
 
   /**
    * @brief Convert settings to JSON
@@ -557,7 +581,7 @@ class Settings : public DataClass,
    * @return The limit value (can be range or enumeration)
    * @throws SettingNotFound if key doesn't exist or has no limits
    */
-  LimitValue get_limits(const std::string& key) const;
+  Constraint get_limits(const std::string& key) const;
 
   /**
    * @brief Check if a setting is documented
@@ -675,7 +699,7 @@ class Settings : public DataClass,
    */
   void set_default(const std::string& key, const SettingValue& value,
                    std::optional<std::string> description = std::nullopt,
-                   std::optional<LimitValue> limit = std::nullopt,
+                   std::optional<Constraint> limit = std::nullopt,
                    bool documented = true);
 
   /**
@@ -692,7 +716,8 @@ class Settings : public DataClass,
   template <typename T>
   void set_default(const std::string& key, const T& value,
                    std::optional<std::string> description = std::nullopt,
-                   std::optional<std::variant<std::pair<T, T>, std::vector<T>>>
+                   std::optional<std::variant<BoundConstraint<int64_t>,
+                                              ListConstraint<int64_t>>>
                        limit = std::nullopt,
                    bool documented = true) {
     if (!has(key)) {
@@ -703,30 +728,36 @@ class Settings : public DataClass,
           descriptions_[key] = *description;
         }
         if (limit.has_value()) {
-          // Convert template limit variant to LimitValue variant
+          // Convert template limit variant to Constraint variant
           std::visit(
               [this, &key](const auto& limit_val) {
                 using LimitValType = std::decay_t<decltype(limit_val)>;
-                // Convert to the appropriate LimitValue type
+                // Convert to the appropriate Constraint type
                 if constexpr (std::is_same_v<LimitValType,
                                              std::pair<int64_t, int64_t>>) {
-                  limits_[key] = limit_val;
+                  limits_[key] = BoundConstraint<int64_t>{limit_val.first,
+                                                          limit_val.second};
                 } else if constexpr (std::is_same_v<LimitValType,
                                                     std::vector<int64_t>>) {
-                  limits_[key] = limit_val;
+                  ListConstraint<int64_t> constraint;
+                  constraint.allowed_values.assign(limit_val.begin(), limit_val.end());
+                  limits_[key] = std::move(constraint);
                 } else if constexpr (std::is_same_v<
                                          LimitValType,
                                          std::pair<double, double>>) {
-                  limits_[key] = limit_val;
+                  limits_[key] = BoundConstraint<double>{limit_val.first,
+                                                         limit_val.second};
                 } else if constexpr (std::is_same_v<LimitValType,
                                                     std::vector<double>>) {
-                  // vector<double> is not in LimitValue, but we don't use it
+                  // vector<double> is not in Constraint, but we don't use it
                   // for limits anyway
                   throw std::invalid_argument(
                       "vector<double> limits are not supported");
                 } else if constexpr (std::is_same_v<LimitValType,
                                                     std::vector<std::string>>) {
-                  limits_[key] = limit_val;
+                  ListConstraint<std::string> constraint;
+                  constraint.allowed_values.assign(limit_val.begin(), limit_val.end());
+                  limits_[key] = std::move(constraint);
                 }
               },
               *limit);
@@ -743,16 +774,14 @@ class Settings : public DataClass,
           std::visit(
               [this, &key](const auto& limit_val) {
                 using LimitValType = std::decay_t<decltype(limit_val)>;
-                if constexpr (std::is_same_v<LimitValType, std::pair<T, T>>) {
-                  limits_[key] =
-                      std::make_pair(static_cast<int64_t>(limit_val.first),
-                                     static_cast<int64_t>(limit_val.second));
+                if constexpr (std::is_same_v<LimitValType, BoundConstraint<int64_t>>) {
+                  limits_[key] = limit_val;
+                } else if constexpr (std::is_same_v<LimitValType, ListConstraint<int64_t>>) {
+                  limits_[key] = limit_val;
                 } else {
-                  std::vector<int64_t> discrete_limits(limit_val.size());
-                  for (size_t idx = 0; idx < limit_val.size(); ++idx) {
-                    discrete_limits[idx] = static_cast<int64_t>(limit_val[idx]);
-                  }
-                  limits_[key] = std::move(discrete_limits);
+                  // Unsupported limit type for this value type
+                  throw std::invalid_argument(
+                      "Unsupported limit type for integral value");
                 }
               },
               *limit);
@@ -761,13 +790,8 @@ class Settings : public DataClass,
       }
       // Handle integer vector types
       else if constexpr (is_non_bool_integral_vector_v<T>) {
-        if constexpr (std::is_signed_v<typename T::value_type>) {
-          // Signed integer vectors -> vector<int64_t>
-          settings_[key] = _convert_to_int64_vector(value);
-        } else {
-          // Unsigned integer vectors -> vector<uint64_t>
-          settings_[key] = _convert_to_uint64_vector(value);
-        }
+        // All integer vectors -> vector<int64_t>
+        settings_[key] = _convert_to_int64_vector(value);
         if (description.has_value()) {
           descriptions_[key] = *description;
         }
@@ -882,8 +906,7 @@ class Settings : public DataClass,
   static std::optional<TargetT> _safe_convert(const SourceT& value) {
     // Fast path: no conversion needed for 64-bit to same 64-bit type
     if constexpr (std::is_same_v<TargetT, SourceT> &&
-                  (std::is_same_v<TargetT, int64_t> ||
-                   std::is_same_v<TargetT, uint64_t>)) {
+                  std::is_same_v<TargetT, int64_t>) {
       return value;
     }
 
@@ -918,25 +941,10 @@ class Settings : public DataClass,
     return int64_vec;
   }
 
-  /**
-   * @brief Convert a vector of unsigned integers to vector<uint64_t>
-   * @tparam T The source integer type
-   * @param value The vector to convert
-   * @return vector<uint64_t> with converted values
-   */
-  template <typename T>
-  static std::vector<uint64_t> _convert_to_uint64_vector(
-      const std::vector<T>& value) {
-    std::vector<uint64_t> uint64_vec(value.size());
-    std::transform(value.begin(), value.end(), uint64_vec.begin(),
-                   [](const T& v) { return static_cast<uint64_t>(v); });
-    return uint64_vec;
-  }
-
   /// Storage for all settings
   std::map<std::string, SettingValue> settings_;
   std::map<std::string, std::string> descriptions_;
-  std::map<std::string, LimitValue> limits_;
+  std::map<std::string, Constraint> limits_;
   std::map<std::string, bool> documented_;
 
   /// Flag to indicate if settings are locked
@@ -952,12 +960,10 @@ class Settings : public DataClass,
     if constexpr (is_variant_member_v<T, SettingValue>) {
       return true;
     } else if constexpr (is_non_bool_integral_v<T>) {
-      // Allow other integral types that can be safely converted to
-      // int64_t/uint64_t
+      // Allow other integral types that can be safely converted to int64_t
       return true;
     } else if constexpr (is_non_bool_integral_vector_v<T>) {
-      // Allow integer vector types that can be converted to vector<int64_t> or
-      // vector<uint64_t>
+      // Allow integer vector types that can be converted to vector<int64_t>
       return true;
     } else {
       return false;

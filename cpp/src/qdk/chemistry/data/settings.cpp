@@ -10,6 +10,7 @@
 #include <sstream>
 
 #include "filename_utils.hpp"
+#include "hdf5_error_handling.hpp"
 #include "json_serialization.hpp"
 
 namespace qdk::chemistry::data {
@@ -32,14 +33,14 @@ void Settings::set(const std::string& key, const SettingValue& value) {
   // If limits exist, validate against them
   if (limits_.find(key) != limits_.end()) {
     if (std::holds_alternative<std::string>(value)) {
-      if (std::holds_alternative<std::vector<std::string>>(limits_[key])) {
-        auto options = std::get<std::vector<std::string>>(limits_[key]);
-        if (std::find(options.begin(), options.end(),
-                      std::get<std::string>(value)) == options.end()) {
+      if (std::holds_alternative<ListConstraint<std::string>>(limits_[key])) {
+        auto options = std::get<ListConstraint<std::string>>(limits_[key]);
+        if (std::find(options.allowed_values.begin(), options.allowed_values.end(),
+                      std::get<std::string>(value)) == options.allowed_values.end()) {
           std::string options_str = "[";
-          for (size_t i = 0; i < options.size(); ++i) {
+          for (size_t i = 0; i < options.allowed_values.size(); ++i) {
             if (i > 0) options_str += ", ";
-            options_str += "\"" + options[i] + "\"";
+            options_str += "\"" + options.allowed_values[i] + "\"";
           }
           options_str += "]";
           throw std::invalid_argument(
@@ -48,56 +49,54 @@ void Settings::set(const std::string& key, const SettingValue& value) {
         }
       }
     } else if (std::holds_alternative<int64_t>(value)) {
-      if (std::holds_alternative<std::vector<int64_t>>(limits_[key])) {
-        auto options = std::get<std::vector<int64_t>>(limits_[key]);
-        if (std::find(options.begin(), options.end(),
-                      std::get<int64_t>(value)) == options.end()) {
+      if (std::holds_alternative<ListConstraint<int64_t>>(limits_[key])) {
+        auto options = std::get<ListConstraint<int64_t>>(limits_[key]);
+        if (std::find(options.allowed_values.begin(), options.allowed_values.end(),
+                      std::get<int64_t>(value)) == options.allowed_values.end()) {
           std::string options_str = "[";
-          for (size_t i = 0; i < options.size(); ++i) {
+          for (size_t i = 0; i < options.allowed_values.size(); ++i) {
             if (i > 0) options_str += ", ";
-            options_str += "\"" + std::to_string(options[i]) + "\"";
+            options_str += "\"" + std::to_string(options.allowed_values[i]) + "\"";
           }
           options_str += "]";
           throw std::invalid_argument(
               "Value for setting '" + key +
               "' is out of allowed options. Allowed options: " + options_str);
         }
-      } else if (std::holds_alternative<std::pair<int64_t, int64_t>>(
+      } else if (std::holds_alternative<BoundConstraint<int64_t>>(
                      limits_[key])) {
-        auto options = std::get<std::pair<int64_t, int64_t>>(limits_[key]);
-        if (std::get<0>(options) > std::get<int64_t>(value) ||
-            std::get<int64_t>(value) > std::get<1>(options)) {
-          std::string options_str = "[" + std::to_string(std::get<0>(options)) +
-                                    ", " +
-                                    std::to_string(std::get<1>(options)) + "]";
+        auto options = std::get<BoundConstraint<int64_t>>(limits_[key]);
+        if (options.min > std::get<int64_t>(value) ||
+            std::get<int64_t>(value) > options.max) {
+          std::string options_str = "[" + std::to_string(options.min) + ", " +
+                                    std::to_string(options.max) + "]";
           throw std::invalid_argument(
               "Value for setting '" + key +
               "' is out of allowed range. Allowed range: " + options_str);
         }
       }
     } else if (std::holds_alternative<double>(value)) {
-      if (std::holds_alternative<std::pair<double, double>>(limits_[key])) {
-        auto options = std::get<std::pair<double, double>>(limits_[key]);
-        if (std::get<0>(options) > std::get<double>(value) ||
-            std::get<double>(value) > std::get<1>(options)) {
-          std::string options_str = "[" + std::to_string(std::get<0>(options)) +
-                                    ", " +
-                                    std::to_string(std::get<1>(options)) + "]";
+      if (std::holds_alternative<BoundConstraint<double>>(limits_[key])) {
+        auto options = std::get<BoundConstraint<double>>(limits_[key]);
+        if (options.min > std::get<double>(value) ||
+            std::get<double>(value) > options.max) {
+          std::string options_str = "[" + std::to_string(options.min) + ", " +
+                                    std::to_string(options.max) + "]";
           throw std::invalid_argument(
               "Value for setting '" + key +
               "' is out of allowed range. Allowed range: " + options_str);
         }
       }
     } else if (std::holds_alternative<std::vector<std::string>>(value)) {
-      if (std::holds_alternative<std::vector<std::string>>(limits_[key])) {
-        auto options = std::get<std::vector<std::string>>(limits_[key]);
+      if (std::holds_alternative<ListConstraint<std::string>>(limits_[key])) {
+        auto options = std::get<ListConstraint<std::string>>(limits_[key]);
         for (auto& test_value : std::get<std::vector<std::string>>(value)) {
-          if (std::find(options.begin(), options.end(), test_value) ==
-              options.end()) {
+          if (std::find(options.allowed_values.begin(), options.allowed_values.end(), test_value) ==
+              options.allowed_values.end()) {
             std::string options_str = "[";
-            for (size_t i = 0; i < options.size(); ++i) {
+            for (size_t i = 0; i < options.allowed_values.size(); ++i) {
               if (i > 0) options_str += ", ";
-              options_str += "\"" + options[i] + "\"";
+              options_str += "\"" + options.allowed_values[i] + "\"";
             }
             options_str += "]";
             throw std::invalid_argument(
@@ -107,15 +106,15 @@ void Settings::set(const std::string& key, const SettingValue& value) {
         }
       }
     } else if (std::holds_alternative<std::vector<int64_t>>(value)) {
-      if (std::holds_alternative<std::vector<int64_t>>(limits_[key])) {
-        auto options = std::get<std::vector<int64_t>>(limits_[key]);
+      if (std::holds_alternative<ListConstraint<int64_t>>(limits_[key])) {
+        auto options = std::get<ListConstraint<int64_t>>(limits_[key]);
         for (auto& test_value : std::get<std::vector<int64_t>>(value)) {
-          if (std::find(options.begin(), options.end(), test_value) ==
-              options.end()) {
+          if (std::find(options.allowed_values.begin(), options.allowed_values.end(), test_value) ==
+              options.allowed_values.end()) {
             std::string options_str = "[";
-            for (size_t i = 0; i < options.size(); ++i) {
+            for (size_t i = 0; i < options.allowed_values.size(); ++i) {
               if (i > 0) options_str += ", ";
-              options_str += "\"" + std::to_string(options[i]) + "\"";
+              options_str += "\"" + std::to_string(options.allowed_values[i]) + "\"";
             }
             options_str += "]";
             throw std::invalid_argument(
@@ -123,15 +122,15 @@ void Settings::set(const std::string& key, const SettingValue& value) {
                 "' is out of allowed options. Allowed options: " + options_str);
           }
         }
-      } else if (std::holds_alternative<std::pair<int64_t, int64_t>>(
+      } else if (std::holds_alternative<BoundConstraint<int64_t>>(
                      limits_[key])) {
-        auto options = std::get<std::pair<int64_t, int64_t>>(limits_[key]);
+        auto options = std::get<BoundConstraint<int64_t>>(limits_[key]);
         for (auto& test_value : std::get<std::vector<int64_t>>(value)) {
-          if (std::get<0>(options) > test_value ||
-              test_value > std::get<1>(options)) {
+          if (options.min > test_value ||
+              test_value > options.max) {
             std::string options_str =
-                "[" + std::to_string(std::get<0>(options)) + ", " +
-                std::to_string(std::get<1>(options)) + "]";
+                "[" + std::to_string(options.min) + ", " +
+                std::to_string(options.max) + "]";
             throw std::invalid_argument(
                 "Value for setting '" + key +
                 "' is out of allowed range. Allowed range: " + options_str);
@@ -139,14 +138,14 @@ void Settings::set(const std::string& key, const SettingValue& value) {
         }
       }
     } else if (std::holds_alternative<std::vector<double>>(value)) {
-      if (std::holds_alternative<std::pair<double, double>>(limits_[key])) {
-        auto options = std::get<std::pair<double, double>>(limits_[key]);
+      if (std::holds_alternative<BoundConstraint<double>>(limits_[key])) {
+        auto options = std::get<BoundConstraint<double>>(limits_[key]);
         for (auto& test_value : std::get<std::vector<double>>(value)) {
-          if (std::get<0>(options) > test_value ||
-              test_value > std::get<1>(options)) {
+          if (options.min > test_value ||
+              test_value > options.max) {
             std::string options_str =
-                "[" + std::to_string(std::get<0>(options)) + ", " +
-                std::to_string(std::get<1>(options)) + "]";
+                "[" + std::to_string(options.min) + ", " +
+                std::to_string(options.max) + "]";
             throw std::invalid_argument(
                 "Value for setting '" + key +
                 "' is out of allowed range. Allowed range: " + options_str);
@@ -246,25 +245,6 @@ const std::map<std::string, SettingValue>& Settings::get_all_settings() const {
   return settings_;
 }
 
-void Settings::set_from_map(
-    const std::map<std::string, SettingValue>& settings_map) {
-  if (_locked) {
-    throw SettingsAreLocked();
-  }
-  // First, validate that all keys exist to ensure atomicity
-  for (const auto& [key, value] : settings_map) {
-    auto it = settings_.find(key);
-    if (it == settings_.end()) {
-      throw SettingNotFound(key);
-    }
-  }
-
-  // If all keys exist, perform the updates
-  for (const auto& [key, value] : settings_map) {
-    settings_[key] = value;
-  }
-}
-
 nlohmann::json Settings::to_json() const {
   nlohmann::json json_obj;
 
@@ -349,18 +329,20 @@ std::shared_ptr<Settings> Settings::from_json(const nlohmann::json& json_obj) {
       if (limit_json.is_array() && limit_json.size() == 2) {
         // Could be a pair of integers or doubles
         if (limit_json[0].is_number_integer()) {
-          settings->limits_[key] = std::make_pair(limit_json[0].get<int64_t>(),
-                                                  limit_json[1].get<int64_t>());
+          settings->limits_[key] = data::BoundConstraint<int64_t>{
+              limit_json[0].get<int64_t>(), limit_json[1].get<int64_t>()};
         } else if (limit_json[0].is_number_float()) {
-          settings->limits_[key] = std::make_pair(limit_json[0].get<double>(),
-                                                  limit_json[1].get<double>());
+          settings->limits_[key] = data::BoundConstraint<double>{
+              limit_json[0].get<double>(), limit_json[1].get<double>()};
         }
       } else if (limit_json.is_array()) {
         // Could be a vector of integers or strings
         if (!limit_json.empty() && limit_json[0].is_number_integer()) {
-          settings->limits_[key] = limit_json.get<std::vector<int64_t>>();
+          settings->limits_[key] = data::ListConstraint<int64_t>{
+              limit_json.get<std::vector<int64_t>>()};
         } else if (!limit_json.empty() && limit_json[0].is_string()) {
-          settings->limits_[key] = limit_json.get<std::vector<std::string>>();
+          settings->limits_[key] = data::ListConstraint<std::string>{
+              limit_json.get<std::vector<std::string>>()};
         }
       }
     }
@@ -433,7 +415,7 @@ bool Settings::has_limits(const std::string& key) const {
   return limits_.find(key) != limits_.end();
 }
 
-LimitValue Settings::get_limits(const std::string& key) const {
+Constraint Settings::get_limits(const std::string& key) const {
   auto it = limits_.find(key);
   if (it == limits_.end()) {
     throw SettingNotFound("No limits found for setting: " + key);
@@ -564,49 +546,48 @@ std::string Settings::as_table(size_t max_width, bool show_undocumented) const {
 
   // Helper to format limit value as multi-line if needed
   auto format_limits_multiline =
-      [limits_width](const LimitValue& limit) -> std::vector<std::string> {
+      [limits_width](const Constraint& limit) -> std::vector<std::string> {
     return std::visit(
         [limits_width](const auto& variant_value) -> std::vector<std::string> {
           using LimitType = std::decay_t<decltype(variant_value)>;
-          if constexpr (std::is_same_v<LimitType,
-                                       std::pair<int64_t, int64_t>>) {
+          if constexpr (std::is_same_v<LimitType, BoundConstraint<int64_t>>) {
             std::string single_line =
-                std::to_string(variant_value.first) +
-                " <= x <= " + std::to_string(variant_value.second);
+                std::to_string(variant_value.min) +
+                " <= x <= " + std::to_string(variant_value.max);
             if (single_line.length() <= limits_width) {
               return {single_line};
             } else {
-              return {std::to_string(variant_value.first) + " <= x",
-                      "x <= " + std::to_string(variant_value.second)};
+              return {std::to_string(variant_value.min) + " <= x",
+                      "x <= " + std::to_string(variant_value.max)};
             }
           } else if constexpr (std::is_same_v<LimitType,
-                                              std::pair<double, double>>) {
+                                              BoundConstraint<double>>) {
             std::ostringstream oss1, oss2, oss_combined;
             oss1 << std::scientific << std::setprecision(2);
             oss2 << std::scientific << std::setprecision(2);
             oss_combined << std::scientific << std::setprecision(2);
 
-            oss_combined << variant_value.first
-                         << " <= x <= " << variant_value.second;
+            oss_combined << variant_value.min
+                         << " <= x <= " << variant_value.max;
             std::string single_line = oss_combined.str();
 
             if (single_line.length() <= limits_width) {
               return {single_line};
             } else {
-              oss1 << variant_value.first << " <= x";
-              oss2 << "x <= " << variant_value.second;
+              oss1 << variant_value.min << " <= x";
+              oss2 << "x <= " << variant_value.max;
               return {oss1.str(), oss2.str()};
             }
           } else if constexpr (std::is_same_v<LimitType,
-                                              std::vector<int64_t>>) {
-            if (variant_value.empty()) return {"[]"};
+                                              ListConstraint<int64_t>>) {
+            if (variant_value.allowed_values.empty()) return {"[]"};
             std::vector<std::string> lines;
             std::string current_line = "[";
 
-            for (size_t i = 0; i < variant_value.size(); ++i) {
-              std::string element = std::to_string(variant_value[i]);
+            for (size_t i = 0; i < variant_value.allowed_values.size(); ++i) {
+              std::string element = std::to_string(variant_value.allowed_values[i]);
               std::string separator =
-                  (i < variant_value.size() - 1) ? ", " : "]";
+                  (i < variant_value.allowed_values.size() - 1) ? ", " : "]";
 
               // Check if adding this element would exceed width
               if (!current_line.empty() && current_line != "[" &&
@@ -620,15 +601,15 @@ std::string Settings::as_table(size_t max_width, bool show_undocumented) const {
             if (!current_line.empty()) lines.push_back(current_line);
             return lines;
           } else if constexpr (std::is_same_v<LimitType,
-                                              std::vector<std::string>>) {
-            if (variant_value.empty()) return {"[]"};
+                                              ListConstraint<std::string>>) {
+            if (variant_value.allowed_values.empty()) return {"[]"};
             std::vector<std::string> lines;
             std::string current_line = "[";
 
-            for (size_t i = 0; i < variant_value.size(); ++i) {
-              std::string element = "\"" + variant_value[i] + "\"";
+            for (size_t i = 0; i < variant_value.allowed_values.size(); ++i) {
+              std::string element = "\"" + variant_value.allowed_values[i] + "\"";
               std::string separator =
-                  (i < variant_value.size() - 1) ? ", " : "]";
+                  (i < variant_value.allowed_values.size() - 1) ? ", " : "]";
 
               // Check if adding this element would exceed width
               if (!current_line.empty() && current_line != "[" &&
@@ -744,7 +725,9 @@ void Settings::update(const std::map<std::string, SettingValue>& updates_map) {
   if (_locked) {
     throw SettingsAreLocked();
   }
-  set_from_map(updates_map);
+  for (const auto& [key, value] : updates_map) {
+    this->set(key, value);
+  }
 }
 
 void Settings::update(const std::map<std::string, std::string>& updates_map) {
@@ -789,7 +772,7 @@ void Settings::update(const Settings& other_settings) {
 
 void Settings::set_default(const std::string& key, const SettingValue& value,
                            std::optional<std::string> description,
-                           std::optional<LimitValue> limit, bool documented) {
+                           std::optional<Constraint> limit, bool documented) {
   if (!has(key)) {
     settings_[key] = value;  // Direct assignment for set_default - this is
                              // allowed to create new keys
@@ -802,34 +785,33 @@ void Settings::set_default(const std::string& key, const SettingValue& value,
     if ((std::holds_alternative<std::string>(value) ||
          std::holds_alternative<std::vector<std::string>>(value)) &&
         limit.has_value()) {
-      if (!(std::holds_alternative<std::vector<std::string>>(*limit))) {
+      if (!(std::holds_alternative<ListConstraint<std::string>>(*limit))) {
         throw std::invalid_argument(
             "Type of settings values and limits must match. Value type of "
             "std::string/str, or std::vector<std::string>/list[str]"
-            "must have type std::vector<std::string>/list[str] options.");
+            "must have type ListConstraint<std::string>/list[str] options.");
       }
     }
     if ((std::holds_alternative<double>(value) ||
          std::holds_alternative<std::vector<double>>(value)) &&
         limit.has_value()) {
-      if (!(std::holds_alternative<std::pair<double, double>>(*limit))) {
+      if (!(std::holds_alternative<BoundConstraint<double>>(*limit))) {
         throw std::invalid_argument(
             "Type of settings values and limits must match. Value type of "
             "double/float, std::vector<double>/list[float]"
-            "must have tuple[double, double] or std::pair<double, double> "
-            "limits.");
+            "must have BoundConstraint<double> limits.");
       }
     }
     if ((std::holds_alternative<int64_t>(value) ||
          std::holds_alternative<std::vector<int64_t>>(value)) &&
         limit.has_value()) {
-      if (!(std::holds_alternative<std::vector<int64_t>>(*limit) ||
-            std::holds_alternative<std::pair<int64_t, int64_t>>(*limit))) {
+      if (!(std::holds_alternative<ListConstraint<int64_t>>(*limit) ||
+            std::holds_alternative<BoundConstraint<int64_t>>(*limit))) {
         throw std::invalid_argument(
             "Type of settings values and limits must match. Value type of "
             "int64_t/int, std::vector<int64_t>/list[int]"
-            "must have std::vector<int64_t>/list[int] options or "
-            "tuple[int, int] or std::pair<int64_t, int64_t> limits.");
+            "must have ListConstraint<int64_t>/list[int] options or "
+            "BoundConstraint<int64_t> limits.");
       }
     }
     if (limit.has_value()) {
@@ -847,9 +829,10 @@ void Settings::set_default(const std::string& key, const char* value,
   if (description.has_value()) {
     desc_str = std::string(*description);
   }
-  std::optional<std::vector<std::string>> limit_strs;
+  std::optional<ListConstraint<std::string>> limit_strs;
   if (limit.has_value()) {
-    limit_strs = std::vector<std::string>(limit->begin(), limit->end());
+    limit_strs = ListConstraint<std::string>{
+        {std::vector<std::string>(limit->begin(), limit->end())}};
   }
   set_default(key, std::string(value), desc_str, limit_strs, documented);
 }
@@ -1288,8 +1271,10 @@ void Settings::_to_hdf5_file(const std::string& filename) const {
 
 std::shared_ptr<Settings> Settings::_from_hdf5_file(
     const std::string& filename) {
-  // Disable HDF5 automatic error printing to stderr
-  H5::Exception::dontPrint();
+  // Disable HDF5 automatic error printing to stderr unless verbose mode
+  if (hdf5_errors_should_be_suppressed()) {
+    H5::Exception::dontPrint();
+  }
 
   H5::H5File file;
   try {
@@ -1658,19 +1643,21 @@ std::shared_ptr<Settings> Settings::from_hdf5(H5::Group& group) {
             // Pair of integers
             int64_t pair_data[2];
             dataset.read(pair_data, H5::PredType::NATIVE_INT64);
-            settings->limits_[key] = std::make_pair(pair_data[0], pair_data[1]);
+            settings->limits_[key] =
+                data::BoundConstraint<int64_t>{pair_data[0], pair_data[1]};
           } else if (type_class == H5T_FLOAT && dims[0] == 2) {
             // Pair of doubles
             double pair_data[2];
             dataset.read(pair_data, H5::PredType::NATIVE_DOUBLE);
-            settings->limits_[key] = std::make_pair(pair_data[0], pair_data[1]);
+            settings->limits_[key] =
+                data::BoundConstraint<double>{pair_data[0], pair_data[1]};
           } else if (type_class == H5T_INTEGER) {
             // Vector of integers
             std::vector<int64_t> vec(dims[0]);
             if (dims[0] > 0) {
               dataset.read(vec.data(), H5::PredType::NATIVE_INT64);
             }
-            settings->limits_[key] = vec;
+            settings->limits_[key] = data::ListConstraint<int64_t>{{vec}};
           } else if (type_class == H5T_STRING) {
             // Vector of strings
             std::vector<std::string> vec;
@@ -1697,7 +1684,7 @@ std::shared_ptr<Settings> Settings::from_hdf5(H5::Group& group) {
                 }
               }
             }
-            settings->limits_[key] = vec;
+            settings->limits_[key] = data::ListConstraint<std::string>{{vec}};
           }
         }
       } else if (obj_name == "_documented") {

@@ -139,7 +139,7 @@ std::pair<double, std::shared_ptr<data::Wavefunction>> ScfSolver::_run_impl(
   ms_scf_config->scf_algorithm.level_shift =
       _settings->get<double>("level_shift");
   ms_scf_config->scf_algorithm.max_iteration =
-      _settings->get<int64_t>("max_scf_steps");
+      _settings->get<int64_t>("max_iterations");
   ms_scf_config->scf_algorithm.gdm_config.energy_thresh_diis_switch =
       _settings->get<double>("energy_thresh_diis_switch");
   ms_scf_config->scf_algorithm.gdm_config.gdm_max_diis_iteration =

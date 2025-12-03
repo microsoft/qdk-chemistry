@@ -357,37 +357,42 @@ class PySettings : public Settings, public py::trampoline_self_life_support {
       desc = py::cast<std::string>(description);
     }
 
-    std::optional<LimitValue> limit_val;
+    std::optional<Constraint> limit_val;
     if (!limit.is_none()) {
-      // Convert Python limit to LimitValue
+      // Convert Python limit to Constraint
       if (py::isinstance<py::tuple>(limit) && py::len(limit) == 2) {
-        // Range limit (tuple of 2 elements)
+        // Range limit (tuple of 2 elements) - convert to BoundConstraint
         py::tuple limit_tuple = py::cast<py::tuple>(limit);
         if (expected_type == "int" || expected_type == "vector<int>") {
-          limit_val = std::make_pair(py::cast<int64_t>(limit_tuple[0]),
-                                     py::cast<int64_t>(limit_tuple[1]));
+          BoundConstraint<int64_t> bound;
+          bound.min = py::cast<int64_t>(limit_tuple[0]);
+          bound.max = py::cast<int64_t>(limit_tuple[1]);
+          limit_val = bound;
         } else if (expected_type == "double" || expected_type == "float" ||
                    expected_type == "vector<double>" ||
                    expected_type == "vector<float>") {
-          limit_val = std::make_pair(py::cast<double>(limit_tuple[0]),
-                                     py::cast<double>(limit_tuple[1]));
+          BoundConstraint<double> bound;
+          bound.min = py::cast<double>(limit_tuple[0]);
+          bound.max = py::cast<double>(limit_tuple[1]);
+          limit_val = bound;
         }
       } else if (py::isinstance<py::list>(limit)) {
-        // Enumeration limit (list of allowed values)
+        // Enumeration limit (list of allowed values) - convert to
+        // ListConstraint
         py::list limit_list = py::cast<py::list>(limit);
         if (expected_type == "int" || expected_type == "vector<int>") {
-          std::vector<int64_t> int_options;
+          ListConstraint<int64_t> list_constraint;
           for (auto item : limit_list) {
-            int_options.push_back(py::cast<int64_t>(item));
+            list_constraint.allowed_values.push_back(py::cast<int64_t>(item));
           }
-          limit_val = int_options;
+          limit_val = list_constraint;
         } else if (expected_type == "string" ||
                    expected_type == "vector<string>") {
-          std::vector<std::string> str_options;
+          ListConstraint<std::string> list_constraint;
           for (auto item : limit_list) {
-            str_options.push_back(py::cast<std::string>(item));
+            list_constraint.allowed_values.push_back(py::cast<std::string>(item));
           }
-          limit_val = str_options;
+          limit_val = list_constraint;
         }
       }
     }
@@ -762,38 +767,6 @@ Examples:
 )",
                py::arg("key"));
 
-  settings.def("get_all_settings", &Settings::get_all_settings,
-               R"(
-Get all settings as a map for Python interoperability.
-
-Returns the internal settings map, primarily for advanced use cases and internal operations.
-
-Returns:
-    dict: Reference to internal settings map
-
-Notes:
-    This returns a reference to the internal data structure.
-    Use `to_dict()` for a safe copy of the settings.
-)",
-               py::return_value_policy::reference_internal);
-
-  settings.def("set_from_map", &Settings::set_from_map,
-               R"(
-Set settings from a map (useful for Python dictionary conversion).
-
-Loads settings from a C++ map structure.
-This is primarily used internally for converting from Python dictionaries.
-
-Args:
-    settings_map (dict): Map containing setting key-value pairs
-
-Examples:
-    >>> # This is typically used internally, prefer from_dict() for Python
-    >>> internal_map = get_some_map()
-    >>> settings.set_from_map(internal_map)
-)",
-               py::arg("settings_map"));
-
   // JSON serialization
   settings.def(
       "to_json",
@@ -1128,24 +1101,25 @@ Examples:
   settings.def(
       "get_limits",
       [](const Settings &self, const std::string &key) -> py::object {
-        LimitValue limits = self.get_limits(key);
+        Constraint limits = self.get_limits(key);
         return std::visit(
             [](const auto &variant_value) -> py::object {
               using LimitType = std::decay_t<decltype(variant_value)>;
               if constexpr (std::is_same_v<LimitType,
-                                           std::pair<int64_t, int64_t>>) {
+                                           BoundConstraint<int64_t>>) {
                 return py::cast(
-                    std::make_tuple(variant_value.first, variant_value.second));
+                    std::make_tuple(variant_value.min, variant_value.max));
               } else if constexpr (std::is_same_v<LimitType,
-                                                  std::pair<double, double>>) {
+                                                  BoundConstraint<double>>) {
                 return py::cast(
-                    std::make_tuple(variant_value.first, variant_value.second));
+                    std::make_tuple(variant_value.min, variant_value.max));
               } else if constexpr (std::is_same_v<LimitType,
-                                                  std::vector<int64_t>>) {
-                return py::cast(variant_value);
-              } else if constexpr (std::is_same_v<LimitType,
-                                                  std::vector<std::string>>) {
-                return py::cast(variant_value);
+                                                  ListConstraint<int64_t>>) {
+                return py::cast(variant_value.allowed_values);
+              } else if constexpr (std::is_same_v<
+                                       LimitType,
+                                       ListConstraint<std::string>>) {
+                return py::cast(variant_value.allowed_values);
               } else {
                 return py::none();
               }

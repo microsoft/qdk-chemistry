@@ -229,7 +229,7 @@ def inspect_settings(algorithm_type: str, algorithm_name: str) -> list[tuple[str
     for factory in __factories:
         if factory.algorithm_type_name() == algorithm_type:
             instance = factory.create(algorithm_name)
-            settings = instance.settings().get_all_settings()
+            settings = instance.settings().to_dict()
             result = []
             for name, default in settings.items():
                 python_type = instance.settings().get_expected_python_type(name)

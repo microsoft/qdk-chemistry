@@ -194,8 +194,7 @@ TEST_F(MacisAsciTest, ASCISettingsConfiguration) {
       settings.set("ncdets_max", int64_t(macis_params::ncdets_max)));
   EXPECT_NO_THROW(settings.set("h_el_tol", macis_params::h_el_tol));
   EXPECT_NO_THROW(settings.set("rv_prune_tol", macis_params::rv_prune_tol));
-  EXPECT_NO_THROW(
-      settings.set("grow_factor", int64_t(macis_params::grow_factor)));
+  EXPECT_NO_THROW(settings.set("grow_factor", macis_params::grow_factor));
   EXPECT_NO_THROW(
       settings.set("max_refine_iter", int64_t(macis_params::refine_off)));
 
@@ -210,7 +209,7 @@ TEST_F(MacisAsciTest, DispatchByNorbDifferentSizes) {
   ASSERT_NE(calculator, nullptr);
 
   auto& settings = calculator->settings();
-  settings.set("ntdets_max", int64_t(int64_t(macis_params::ntdets_max_small)));
+  settings.set("ntdets_max", int64_t(macis_params::ntdets_max_small));
   settings.set("max_refine_iter", int64_t(macis_params::refine_off));
 
   // Test small active space (< 32 orbitals) - should use wfn_t<64>
@@ -253,7 +252,7 @@ TEST_F(MacisAsciTest, RDMCalculationSimplified) {
   ASSERT_NE(calculator, nullptr);
 
   auto& settings = calculator->settings();
-  settings.set("ntdets_max", int64_t(int64_t(macis_params::ntdets_max_small)));
+  settings.set("ntdets_max", int64_t(macis_params::ntdets_max_small));
   settings.set("max_refine_iter", int64_t(macis_params::refine_off));
 
   auto hamiltonian = hamiltonian_constructor_->run(orbitals_);
@@ -271,7 +270,7 @@ TEST_F(MacisAsciTest, RDMCalculationSimplified) {
   // Test without RDM calculation
   calculator = MultiConfigurationCalculatorFactory::create("macis_asci");
   auto& settings2 = calculator->settings();
-  settings2.set("ntdets_max", int64_t(int64_t(macis_params::ntdets_max_small)));
+  settings2.set("ntdets_max", int64_t(macis_params::ntdets_max_small));
   settings2.set("max_refine_iter", int64_t(macis_params::refine_off));
   settings2.set("calculate_one_rdm", false);
   settings2.set("calculate_two_rdm", false);
@@ -286,7 +285,7 @@ TEST_F(MacisAsciTest, MultiConfigurationScfSettingsConversion) {
   ASSERT_NE(calculator, nullptr);
 
   auto& settings = calculator->settings();
-  settings.set("ntdets_max", int64_t(int64_t(macis_params::ntdets_max_small)));
+  settings.set("ntdets_max", int64_t(macis_params::ntdets_max_small));
   settings.set("max_refine_iter", int64_t(macis_params::refine_off));
 
   // Test QDK-style MultiConfigurationScf settings names
@@ -302,7 +301,7 @@ TEST_F(MacisAsciTest, MultiConfigurationScfSettingsConversion) {
   // Test MACIS-style settings names
   auto calculator2 = MultiConfigurationCalculatorFactory::create("macis_asci");
   auto& settings2 = calculator2->settings();
-  settings2.set("ntdets_max", int64_t(int64_t(macis_params::ntdets_max_small)));
+  settings2.set("ntdets_max", int64_t(macis_params::ntdets_max_small));
   settings2.set("max_refine_iter", int64_t(macis_params::refine_off));
   settings2.set("ci_residual_tolerance", testing::ci_energy_tolerance);
   settings2.set("davidson_iterations",
@@ -326,7 +325,7 @@ TEST_F(MacisAsciTest, DifferentActiveSpaceConfigurations) {
 
   auto& settings1 = calculator1->settings();
   // Use standard ASCI parameter name
-  settings1.set("ntdets_max", int64_t(int64_t(macis_params::ntdets_max_small)));
+  settings1.set("ntdets_max", int64_t(macis_params::ntdets_max_small));
   settings1.set("max_refine_iter", int64_t(macis_params::refine_off));
 
   auto ham_constructor = HamiltonianConstructorFactory::create();
@@ -354,7 +353,7 @@ TEST_F(MacisAsciTest, DifferentActiveSpaceConfigurations) {
   auto calculator2 = MultiConfigurationCalculatorFactory::create("macis_asci");
   auto& settings2 = calculator2->settings();
   // Use standard ASCI parameter name
-  settings2.set("ntdets_max", int64_t(int64_t(macis_params::ntdets_max_small)));
+  settings2.set("ntdets_max", int64_t(macis_params::ntdets_max_small));
   settings2.set("max_refine_iter", int64_t(macis_params::refine_off));
 
   // This exercises get_active_indices with different indices
@@ -391,7 +390,7 @@ TEST_F(MacisAsciTest, DifferentActiveElectronConfigurations) {
 
   auto calculator = MultiConfigurationCalculatorFactory::create("macis_asci");
   auto& settings = calculator->settings();
-  settings.set("ntdets_max", int64_t(int64_t(macis_params::ntdets_max_small)));
+  settings.set("ntdets_max", int64_t(macis_params::ntdets_max_small));
   settings.set("max_refine_iter", int64_t(macis_params::refine_off));
 
   auto hamiltonian_constructor = HamiltonianConstructorFactory::create();
@@ -437,7 +436,7 @@ TEST_F(MacisAsciTest, MixedAlphaBetaActiveSpaces) {
 
   auto calculator = MultiConfigurationCalculatorFactory::create("macis_asci");
   auto& settings = calculator->settings();
-  settings.set("ntdets_max", int64_t(int64_t(macis_params::ntdets_max_small)));
+  settings.set("ntdets_max", int64_t(macis_params::ntdets_max_small));
   settings.set("max_refine_iter", int64_t(macis_params::refine_off));
 
   auto hamiltonian_constructor = HamiltonianConstructorFactory::create();
@@ -464,7 +463,7 @@ TEST_F(MacisAsciTest, MultiConfigurationScfSettingsWithMACISNames) {
                int64_t(macis_params::davidson_iterations));
 
   // Use standard ASCI parameter name
-  settings.set("ntdets_max", int64_t(int64_t(macis_params::ntdets_max_small)));
+  settings.set("ntdets_max", int64_t(macis_params::ntdets_max_small));
   settings.set("max_refine_iter", int64_t(macis_params::refine_off));
 
   auto hamiltonian_constructor = HamiltonianConstructorFactory::create();
@@ -548,7 +547,7 @@ TEST_F(MacisAsciTest, ASCISettingsWithDefaults) {
 
   // Set only minimal settings - others should use MACIS defaults
   // Use standard ASCI parameter name
-  settings.set("ntdets_max", int64_t(int64_t(macis_params::ntdets_max_small)));
+  settings.set("ntdets_max", int64_t(macis_params::ntdets_max_small));
   settings.set("max_refine_iter", int64_t(macis_params::refine_off));
 
   auto hamiltonian_constructor = HamiltonianConstructorFactory::create();

@@ -908,10 +908,10 @@ TEST_F(SettingsTest, MetadataFunctions) {
     MetadataTestSettings() {
       set_default("with_desc", 42, "A setting with description");
       set_default("with_limits", 5, "A setting with limits",
-                  std::make_pair<int64_t, int64_t>(0, 10));
+                  BoundConstraint<int64_t>{0, 10});
       set_default("with_string_limits", std::string("option1"),
                   "String with limited options",
-                  std::vector<std::string>{"option1", "option2", "option3"});
+                  ListConstraint<std::string>{{std::vector<std::string>{"option1", "option2", "option3"}}});
       set_default("undocumented", 100, std::nullopt, std::nullopt, false);
       set_default("no_metadata", 0);
     }
@@ -935,17 +935,17 @@ TEST_F(SettingsTest, MetadataFunctions) {
 
   // Test get_limits
   auto int_limits = meta_settings.get_limits("with_limits");
-  auto val = std::holds_alternative<std::pair<int64_t, int64_t>>(int_limits);
+  auto val = std::holds_alternative<BoundConstraint<int64_t>>(int_limits);
   EXPECT_TRUE(val);
-  auto limit_pair = std::get<std::pair<int64_t, int64_t>>(int_limits);
-  EXPECT_EQ(limit_pair.first, 0);
-  EXPECT_EQ(limit_pair.second, 10);
+  auto limit_pair = std::get<BoundConstraint<int64_t>>(int_limits);
+  EXPECT_EQ(limit_pair.min, 0);
+  EXPECT_EQ(limit_pair.max, 10);
 
   auto string_limits = meta_settings.get_limits("with_string_limits");
-  EXPECT_TRUE(std::holds_alternative<std::vector<std::string>>(string_limits));
-  auto limit_vec = std::get<std::vector<std::string>>(string_limits);
-  EXPECT_EQ(limit_vec.size(), 3);
-  EXPECT_EQ(limit_vec[0], "option1");
+  EXPECT_TRUE(std::holds_alternative<ListConstraint<std::string>>(string_limits));
+  auto limit_vec = std::get<ListConstraint<std::string>>(string_limits);
+  EXPECT_EQ(limit_vec.allowed_values.size(), 3);
+  EXPECT_EQ(limit_vec.allowed_values[0], "option1");
 
   EXPECT_THROW(meta_settings.get_limits("no_metadata"), SettingNotFound);
 
