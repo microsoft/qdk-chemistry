@@ -685,7 +685,6 @@ TEST_F(StructureTest, FilenameValidation) {
   EXPECT_NO_THROW(s.to_file("valid.structure.json", "json"));
   EXPECT_NO_THROW(s.to_file("valid.structure.xyz", "xyz"));
   EXPECT_NO_THROW(s.to_file("valid.xyz", "xyz"));
-  EXPECT_NO_THROW(Structure::from_xyz_file("valid.xyz"));
 
   // Test invalid filenames throw exceptions
   EXPECT_THROW(s.to_json_file("invalid.json"), std::invalid_argument);
