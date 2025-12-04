@@ -207,9 +207,8 @@ class OrbitalRotationTest : public ::testing::Test {
     test_orbitals_restricted = water_wf->get_orbitals();
 
     // Get electron counts from wavefunction
-    auto [num_alpha, num_beta] = water_wf->get_total_num_electrons();
-    num_alpha_occupied_orbitals = num_alpha;
-    num_beta_occupied_orbitals = num_beta;
+    std::tie(num_alpha_occupied_orbitals, num_beta_occupied_orbitals) =
+        water_wf->get_total_num_electrons();
     num_molecular_orbitals =
         test_orbitals_restricted->get_num_molecular_orbitals();
     num_atomic_orbitals = test_orbitals_restricted->get_num_atomic_orbitals();
