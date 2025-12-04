@@ -86,19 +86,17 @@ class MacisAsciSettings : public MultiConfigurationSettings {
         "Increment for next value batch count",
         data::BoundConstraint<int64_t>{1, std::numeric_limits<int64_t>::max()});
     set_default<bool>("just_singles", macis_defaults.just_singles);
-    set_default<double>(
-        "grow_factor",
-        macis_defaults.grow_factor
-        "Factor by which to grow the variational space",
-        data::BoundConstraint<int64_t>{1, std::numeric_limits<int64_t>::max()});
+    set_default<double>("grow_factor", macis_defaults.grow_factor,
+                        "Factor by which to grow the variational space",
+                        data::BoundConstraint<double>{
+                            1.0e0, std::numeric_limits<double>::max()});
     set_default<double>("min_grow_factor", macis_defaults.min_grow_factor);
     set_default<double>("growth_backoff_rate",
                         macis_defaults.growth_backoff_rate);
     set_default<double>("growth_recovery_rate",
                         macis_defaults.growth_recovery_rate);
-    set_default<size_t>(
-        "max_refine_iter",
-        macis_defaults.max_refine_iter
+    set_default<int64_t>(
+        "max_refine_iter", macis_defaults.max_refine_iter,
         "Maximum number of refinement iterations",
         data::BoundConstraint<int64_t>{0, std::numeric_limits<int64_t>::max()});
     set_default<bool>("grow_with_rot", macis_defaults.grow_with_rot);

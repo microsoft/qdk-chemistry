@@ -99,6 +99,17 @@ template <typename T>
 concept NonBoolIntegral = std::integral<T> && !std::same_as<T, bool>;
 
 /**
+ * @brief Concept for types that are not non-bool integral types (except
+ * int64_t)
+ * @tparam T The type to check
+ *
+ * Matches any type that is either not integral, or is bool, or is int64_t.
+ * Useful for constraining templates to exclude integer types except int64_t.
+ */
+template <typename T>
+concept NonIntegralBool = !NonBoolIntegral<T> || std::same_as<T, int64_t>;
+
+/**
  * @brief Helper variable template for non-bool integral (for backward
  * compatibility)
  * @tparam T The type to check
@@ -282,8 +293,7 @@ class Settings : public DataClass,
    * @param value The setting value
    * @note This template is disabled for non-int64_t integers to avoid ambiguity
    */
-  template <typename T>
-    requires(!NonBoolIntegral<T> || std::same_as<T, int64_t>)
+  template <NonIntegralBool T>
   void set(const std::string& key, const T& value) {
     static_assert(SupportedSettingType<T>,
                   "Type not supported in SettingValue variant");

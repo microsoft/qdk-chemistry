@@ -163,6 +163,7 @@ nitpick_ignore_regex = [
     # C++20 concepts - Sphinx/Breathe doesn't fully support concept references yet
     (r"cpp:identifier", r"NonBoolIntegral<.*>"),
     (r"cpp:identifier", r"NonBoolIntegralVector<.*>"),
+    (r"cpp:identifier", r"NonIntegralBool"),
     (r"cpp:identifier", r"VariantMember<.*>"),
     (r"cpp:identifier", r"Vector<.*>"),
     (r"cpp:identifier", r"SupportedSettingType<.*>"),

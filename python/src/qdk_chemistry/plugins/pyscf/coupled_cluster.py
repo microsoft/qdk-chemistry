@@ -34,7 +34,8 @@ This module requires both QDK/Chemistry and PySCF to be installed.
 import numpy as np
 from pyscf import cc
 
-from qdk_chemistry.data import Settings, Wavefunction
+from qdk_chemistry.algorithms import DynamicalCorrelationCalculator
+from qdk_chemistry.data import CoupledClusterContainer, Settings, Wavefunction
 from qdk_chemistry.plugins.pyscf.utils import hamiltonian_to_scf
 
 __all__ = ["PyscfCoupledClusterCalculator", "PyscfCoupledClusterSettings"]
