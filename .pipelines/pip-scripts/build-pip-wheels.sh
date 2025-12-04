@@ -39,33 +39,29 @@ apt-get install -y \
 
 # Upgrade cmake as Ubuntu 22.04 only has up to v3.22 in apt
 if [[ ${MARCH} == 'armv8-a' ]]; then
-    wget -q https://github.com/Kitware/CMake/releases/download/v${CMAKE_VERSION}/cmake-${CMAKE_VERSION}-linux-aarch64.sh
-    chmod +x cmake-${CMAKE_VERSION}-linux-aarch64.sh
-    /bin/sh cmake-${CMAKE_VERSION}-linux-aarch64.sh --skip-license --prefix=/usr/local
-    rm cmake-${CMAKE_VERSION}-linux-aarch64.sh
+    export AARCH_64_CMAKE_CHECKSUM=6c1c4cdcf9cf9efac12bbd5a8a2baf65939b9d00
+    wget -q https://github.com/Kitware/CMake/releases/download/v${CMAKE_VERSION}/cmake-${CMAKE_VERSION}-linux-aarch64.tar.gz
+    echo "${AARCH_64_CMAKE_CHECKSUM}  cmake-${CMAKE_VERSION}-linux-aarch64.tar.gz" | shasum -c || exit 1
+    tar -xjf cmake-${CMAKE_VERSION}-linux-aarch64.tar.gz
+    cd cmake-${CMAKE_VERSION}-linux-aarch64
+    ./bootstrap --parallel=$(nproc) --prefix=/usr/local
+    make -j$(nproc)
+    make install
+    cd ..
+    rm -r cmake-${CMAKE_VERSION}-linux-aarch64 cmake-${CMAKE_VERSION}-linux-aarch64.tar.gz
 elif [[ ${MARCH} == 'x86-64-v3' ]]; then
-    wget -q https://github.com/Kitware/CMake/releases/download/v${CMAKE_VERSION}/cmake-${CMAKE_VERSION}-linux-x86_64.sh
-    chmod +x cmake-${CMAKE_VERSION}-linux-x86_64.sh
-    /bin/sh cmake-${CMAKE_VERSION}-linux-x86_64.sh --skip-license --prefix=/usr/local
-    rm cmake-${CMAKE_VERSION}-linux-x86_64.sh
+    export X86_64_CMAKE_CHECKSUM=685d0ba60b663312dbab24fb15c42249a17f5008
+    wget -q https://github.com/Kitware/CMake/releases/download/v${CMAKE_VERSION}/cmake-${CMAKE_VERSION}-linux-x86_64.tar.gz
+    echo "${X86_64_CMAKE_CHECKSUM}  cmake-${CMAKE_VERSION}-linux-x86_64.tar.gz" | shasum -c || exit 1
+    tar -xzf cmake-${CMAKE_VERSION}-linux-x86_64.tar.gz
+    cd cmake-${CMAKE_VERSION}-linux-x86_64
+    ./bootstrap --parallel=$(nproc) --prefix=/usr/local
+    make -j$(nproc)
+    make install
+    cd ..
+    rm -r cmake-${CMAKE_VERSION}-linux-x86_64 cmake-${CMAKE_VERSION}-linux-x86_64.tar.gz
 fi
 cmake --version
-
-# Install updated version of spdlog
-echo "=== Installing spdlog ==="
-git clone --depth 1 --branch v1.15.3 https://github.com/gabime/spdlog.git spdlog
-cd spdlog
-mkdir -p build
-cd build
-cmake .. -DCMAKE_BUILD_TYPE=${BUILD_TYPE} \
-        -DCMAKE_INSTALL_PREFIX=/usr/local \
-        -DCMAKE_POSITION_INDEPENDENT_CODE=ON \
-        -DCMAKE_CXX_FLAGS="-march=${MARCH} -fPIC -Os" \
-        -DBUILD_SHARED_LIBS=OFF
-make -j$(nproc)
-make install
-cd ../../
-rm -rf spdlog
 
 export CFLAGS="-fPIC -Os"
 echo "Downloading and installing BLIS..."
@@ -75,7 +71,9 @@ echo "Downloading and installing libflame..."
 bash .pipelines/install-scripts/install-libflame.sh /usr/local ${MARCH} ${LIBFLAME_VERSION} ${CFLAGS}
 
 echo "Downloading HDF5 $HDF5_VERSION..."
+export HDF5_CHECKSUM=f47d88abcbdacbc05419be9b69d96da8c585ebe0
 wget -q -nc --no-check-certificate https://support.hdfgroup.org/ftp/HDF5/releases/hdf5-1.13/hdf5-${HDF5_VERSION}/src/hdf5-${HDF5_VERSION}.tar.bz2
+echo "${HDF5_CHECKSUM}  hdf5-${HDF5_VERSION}.tar.bz2" | shasum -c || exit 1
 tar -xjf hdf5-${HDF5_VERSION}.tar.bz2
 rm hdf5-${HDF5_VERSION}.tar.bz2
 mv hdf5-${HDF5_VERSION} hdf5
@@ -85,13 +83,17 @@ echo "Installing HDF5..."
 bash .pipelines/install-scripts/install-hdf5.sh /usr/local ${BUILD_TYPE} ${PWD} ${CFLAGS}
 
 # Install pyenv to use non-system python3 versions
-export PYENV_ROOT="/workspace/.pyenv" && \
-wget -q https://github.com/pyenv/pyenv/archive/refs/heads/master.zip -O pyenv.zip && \
-unzip -q pyenv.zip && \
-mv pyenv-master "$PYENV_ROOT" && \
-rm pyenv.zip && \
-"$PYENV_ROOT/bin/pyenv" install ${PYTHON_VERSION} && \
-"$PYENV_ROOT/bin/pyenv" global ${PYTHON_VERSION} && \
+# pyenv is used in place of a venv to prevent any collisions with the system Python
+# when building with a non-system Python version.
+export PYENV_CHECKSUM=f39d38c42b70f89cec1ea0f1490edfcbf85481c5
+export PYENV_ROOT="/workspace/.pyenv"
+wget -q https://github.com/pyenv/pyenv/archive/refs/tags/v2.6.15.zip -O pyenv.zip
+echo "${PYENV_CHECKSUM}  pyenv.zip" | shasum -c || exit 1
+unzip -q pyenv.zip
+mv pyenv-master "$PYENV_ROOT"
+rm pyenv.zip
+"$PYENV_ROOT/bin/pyenv" install ${PYTHON_VERSION}
+"$PYENV_ROOT/bin/pyenv" global ${PYTHON_VERSION}
 export PATH="$PYENV_ROOT/versions/${PYTHON_VERSION}/bin:$PATH"
 export PATH="$PYENV_ROOT/shims:$PATH"
 
@@ -123,10 +125,7 @@ echo "Checking shared dependencies..."
 ldd build/cp*/_core.*.so
 
 # Repair wheel
-auditwheel repair dist/qdk_chemistry-*.whl -w repaired_wheelhouse/ \
-    --exclude libopen-rte.so.40 \
-    --exclude libopen-pal.so.40 \
-    --exclude libmpi.so.40
+auditwheel repair dist/qdk_chemistry-*.whl -w repaired_wheelhouse/
 
 # Fix RPATH
 WHEEL_FILE=$(ls repaired_wheelhouse/qdk_chemistry-*.whl)
@@ -147,3 +146,5 @@ done
 rm "$WHEEL_FILE"
 (cd "$TEMP_DIR" && python3 -m zipfile -c "$FULL_WHEEL_PATH" .)
 rm -rf "$TEMP_DIR"
+
+mkdir /workspace

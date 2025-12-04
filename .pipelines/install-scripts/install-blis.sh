@@ -14,7 +14,9 @@ elif [[ ${MARCH} == 'x86-64-v3' ]]; then
 fi
 # Download BLIS v2.0
 echo "Downloading BLIS ${BLIS_VERSION}..."
+export BLIS_CHECKSUM=1cccc40e6d4dff71911856e4f5782405fe76fc93
 wget -q https://github.com/flame/blis/archive/refs/tags/${BLIS_VERSION}.zip -O blis.zip
+echo "${BLIS_CHECKSUM}  blis.zip" | shasum -c || exit 1
 unzip -q blis.zip
 rm blis.zip
 mv blis-${BLIS_VERSION} blis
