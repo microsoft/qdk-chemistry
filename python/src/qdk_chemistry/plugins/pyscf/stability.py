@@ -188,7 +188,7 @@ class PyscfStabilitySettings(Settings):
         self._set_default("nroots", "int", 3)
         self._set_default("davidson_tolerance", "double", 1e-4)
         self._set_default("stability_tolerance", "double", -1e-4)
-        self._set_default("method", "str", "hf")
+        self._set_default("method", "string", "hf")
 
 
 class PyscfStabilityChecker(StabilityChecker):

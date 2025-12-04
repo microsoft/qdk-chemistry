@@ -735,8 +735,6 @@ class TestStabilityWorkflow:
 
             # If external instability, switch to unrestricted and disable external checks
             if do_external:
-                is_restricted_calculation = False
-
                 # Create new solver instances with updated settings
                 scf_solver_name = scf_solver.name()
                 stability_checker_name = stability_checker.name()
@@ -788,7 +786,7 @@ class TestStabilityWorkflow:
 
     @pytest.mark.parametrize("scf_backend", ["pyscf", "qdk"])
     def test_workflow_n2_rhf_both_instability(self, scf_backend):
-        """Test stability workflow on N2 at 1.6Å with internal instability."""
+        """Test stability workflow on N2 at 1.6Å with with both internal and external instabilities."""
         n2 = create_stretched_n2_structure(distance_angstrom=1.6)
 
         # Create and configure solvers
@@ -845,7 +843,7 @@ class TestStabilityWorkflow:
 
     @pytest.mark.parametrize("scf_backend", ["qdk"])
     def test_workflow_n2_uhf_instability(self, scf_backend):
-        """Test stability workflow on N2 at 1.4Å with external instability - should switch to UHF."""
+        """Test stability workflow on N2 at 1.4Å with internal instability of UHF."""
         n2 = create_stretched_n2_structure(distance_angstrom=1.4)
 
         # Create and configure solvers
@@ -860,7 +858,7 @@ class TestStabilityWorkflow:
         stability_checker.settings().set("davidson_tolerance", 1e-4)
         stability_checker.settings().set("nroots", 3)
 
-        # Run workflow - should detect external instability and switch to UHF
+        # Run workflow - should detect internal instability of UHF
         energy, wfn, is_stable, result = self._run_scf_with_stability_workflow(
             n2, 0, 1, scf_solver, stability_checker, max_stability_iterations=10
         )
