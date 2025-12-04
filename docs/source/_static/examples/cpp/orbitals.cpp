@@ -13,68 +13,73 @@
 #include <string>
 using namespace qdk::chemistry::data;
 using namespace qdk::chemistry::algorithms;
-// Obtain orbitals from an SCF calculation
-// Create H2 molecule
-std::vector<Eigen::Vector3d> coords = {{0.0, 0.0, 0.0}, {0.0, 0.0, 1.4}};
-std::vector<std::string> symbols = {"H", "H"};
-Structure structure(coords, symbols);
 
-// Obtain orbitals from an SCF calculation
-auto scf_solver = ScfSolverFactory::create();
-scf_solver->settings().set("basis_set", "sto-3g");
-auto [E_scf, wfn] = scf_solver->run(structure, 0, 1);
-std::shared_ptr<Orbitals> orbitals = wfn.get_orbitals();
+int main() {
+  // Obtain orbitals from an SCF calculation
+  // Create H2 molecule
+  std::vector<Eigen::Vector3d> coords = {{0.0, 0.0, 0.0}, {0.0, 0.0, 1.4}};
+  std::vector<std::string> symbols = {"H", "H"};
+  Structure structure(coords, symbols);
 
-// end-cell-create
-// --------------------------------------------------------------------------------------------
+  // Obtain orbitals from an SCF calculation
+  auto scf_solver = ScfSolverFactory::create();
+  scf_solver->settings().set("basis_set", "sto-3g");
+  auto [E_scf, wfn] = scf_solver->run(structure, 0, 1);
+  std::shared_ptr<Orbitals> orbitals = wfn.get_orbitals();
 
-// --------------------------------------------------------------------------------------------
-// start-cell-model-orbitals-create
-// Set basis set size
-size_t basis_size = 6;
+  // end-cell-create
+  // --------------------------------------------------------------------------------------------
 
-// Set active orbitals
-std::vector<size_t> alpha_active = {1, 2};
-std::vector<size_t> beta_active = {2, 3, 4};
-std::vector<size_t> alpha_inactive = {0, 3, 4, 5};
-std::vector<size_t> beta_inactive = {0, 1, 5};
+  // --------------------------------------------------------------------------------------------
+  // start-cell-model-orbitals-create
+  // Set basis set size
+  size_t basis_size = 6;
 
-ModelOrbitals model_orbitals(basis_size,
-                             std::make_tuple(alpha_active, beta_active,
-                                             alpha_inactive, beta_inactive));
+  // Set active orbitals
+  std::vector<size_t> alpha_active = {1, 2};
+  std::vector<size_t> beta_active = {2, 3, 4};
+  std::vector<size_t> alpha_inactive = {0, 3, 4, 5};
+  std::vector<size_t> beta_inactive = {0, 1, 5};
 
-// We can then pass this object to a custom Hamiltonian constructor
-// end-cell-model-orbitals-create
-// --------------------------------------------------------------------------------------------
+  ModelOrbitals model_orbitals(
+      basis_size, std::make_tuple(alpha_active, beta_active, alpha_inactive,
+                                  beta_inactive));
 
-// --------------------------------------------------------------------------------------------
-// start-cell-access
-// Access orbital coefficients (returns std::pair<const Eigen::MatrixXd&, const
-// Eigen::MatrixXd&>)
-auto [coeffs_alpha, coeffs_beta] = orbitals->get_coefficients();
+  // We can then pass this object to a custom Hamiltonian constructor
+  // end-cell-model-orbitals-create
+  // --------------------------------------------------------------------------------------------
 
-// Access orbital energies (returns std::pair<const Eigen::VectorXd&, const
-// Eigen::VectorXd&>)
-auto [energies_alpha, energies_beta] = orbitals->get_energies();
+  // --------------------------------------------------------------------------------------------
+  // start-cell-access
+  // Access orbital coefficients (returns std::pair<const Eigen::MatrixXd&,
+  // const Eigen::MatrixXd&>)
+  auto [coeffs_alpha, coeffs_beta] = orbitals->get_coefficients();
 
-// Get active space indices
-auto [active_indices_alpha, active_indices_beta] =
-    orbitals->get_active_space_indices();
+  // Access orbital energies (returns std::pair<const Eigen::VectorXd&, const
+  // Eigen::VectorXd&>)
+  auto [energies_alpha, energies_beta] = orbitals->get_energies();
 
-// Access atomic orbital overlap matrix (returns const Eigen::MatrixXd&)
-const auto& ao_overlap = orbitals->get_overlap_matrix();
+  // Get active space indices
+  auto [active_indices_alpha, active_indices_beta] =
+      orbitals->get_active_space_indices();
 
-// Access basis set information (returns const BasisSet&)
-const auto& basis_set = orbitals->get_basis_set();
+  // Access atomic orbital overlap matrix (returns const Eigen::MatrixXd&)
+  const auto& ao_overlap = orbitals->get_overlap_matrix();
 
-// Check calculation type
-bool is_restricted = orbitals->is_restricted();
+  // Access basis set information (returns const BasisSet&)
+  const auto& basis_set = orbitals->get_basis_set();
 
-// Get size information
-size_t num_molecular_orbitals = orbitals->get_num_molecular_orbitals();
-size_t num_atomic_orbitals = orbitals->get_num_atomic_orbitals();
+  // Check calculation type
+  bool is_restricted = orbitals->is_restricted();
 
-std::string summary = orbitals->get_summary();
-std::cout << summary << std::endl;
-// end-cell-access
-// --------------------------------------------------------------------------------------------
+  // Get size information
+  size_t num_molecular_orbitals = orbitals->get_num_molecular_orbitals();
+  size_t num_atomic_orbitals = orbitals->get_num_atomic_orbitals();
+
+  std::string summary = orbitals->get_summary();
+  std::cout << summary << std::endl;
+
+  // end-cell-access
+  // --------------------------------------------------------------------------------------------
+  return 0;
+}

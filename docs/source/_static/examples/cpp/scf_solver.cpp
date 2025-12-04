@@ -19,29 +19,32 @@ auto scf_solver = ScfSolverFactory::create();
 // end-cell-create
 // --------------------------------------------------------------------------------------------
 
-// --------------------------------------------------------------------------------------------
-// start-cell-configure
-// Standard settings that work with all solvers
-// Set the method
-scf_solver->settings().set("method",
-                           "b3lyp");  // b3lyp functional in dft
-// Set the basis set
-scf_solver->settings().set("basis_set", "def2-tzvpp");
+int main() {
+  // --------------------------------------------------------------------------------------------
+  // start-cell-configure
+  // Standard settings that work with all solvers
+  // Set the method
+  scf_solver->settings().set("method",
+                             "b3lyp");  // b3lyp functional in dft
+  // Set the basis set
+  scf_solver->settings().set("basis_set", "def2-tzvpp");
 
-// end-cell-configure
-// --------------------------------------------------------------------------------------------
+  // end-cell-configure
+  // --------------------------------------------------------------------------------------------
 
-// --------------------------------------------------------------------------------------------
-// start-cell-run
-// Specify a structure
-std::vector<Eigen::Vector3d> coords = {{0.0, 0.0, 0.0}, {0.0, 0.0, 1.4}};
-std::vector<std::string> symbols = {"H", "H"};
+  // --------------------------------------------------------------------------------------------
+  // start-cell-run
+  // Specify a structure
+  std::vector<Eigen::Vector3d> coords = {{0.0, 0.0, 0.0}, {0.0, 0.0, 1.4}};
+  std::vector<std::string> symbols = {"H", "H"};
 
-Structure structure(coords, symbols);
+  Structure structure(coords, symbols);
 
-// Run the SCF calculation
-auto [E_scf, wfn] = scf_solver->solve(structure, 0, 1);
-auto scf_orbitals = wfn->get_orbitals();
-std::cout << "SCF Energy: " << E_scf << " Hartree" << std::endl;
-// end-cell-run
-// --------------------------------------------------------------------------------------------
+  // Run the SCF calculation
+  auto [E_scf, wfn] = scf_solver->solve(structure, 0, 1);
+  auto scf_orbitals = wfn->get_orbitals();
+  std::cout << "SCF Energy: " << E_scf << " Hartree" << std::endl;
+  // end-cell-run
+  // --------------------------------------------------------------------------------------------
+  return 0;
+}

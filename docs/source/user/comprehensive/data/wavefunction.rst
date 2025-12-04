@@ -2,13 +2,13 @@ Wavefunction
 ============
 
 The :class:`~qdk_chemistry.data.Wavefunction` class in QDK/Chemistry represents quantum mechanical wavefunctions for molecular systems.
-This class provides access to wavefunction coefficients, determinants, reduced density matrices (RDMs), and other quantum chemical properties essential for post-Hartree-Fock calculations.
+This class provides access to wavefunction coefficients, determinants, reduced density matrices (RDMs), and other quantum chemical properties.
 
 Overview
 --------
 
 A wavefunction in quantum chemistry describes the quantum state of a molecular system.
-In QDK/Chemistry, the :class:`~qdk_chemistry.data.Wavefunction` class encapsulates various wavefunction types, from simple single-determinant Hartree-Fock wavefunctions to complex multi-reference wavefunctions used in advanced correlation methods.
+In QDK/Chemistry, the :class:`~qdk_chemistry.data.Wavefunction` class encapsulates various wavefunction types, from simple single-determinant Hartree-Fock wavefunctions to complex multi-reference wavefunctions.
 
 The class uses a container-based design where different wavefunction types (Slater determinants, configuration interaction, etc.) are implemented as specialized container classes, while the main :class:`~qdk_chemistry.data.Wavefunction` class provides a unified interface.
 
@@ -22,19 +22,6 @@ Wavefunctions are represented as linear combinations of determinants:
 
 where :math:`c_I` are expansion coefficients and :math:`|\Phi_I\rangle` are Slater determinants.
 
-Properties
-~~~~~~~~~~
-
-The :class:`~qdk_chemistry.data.Wavefunction` class provides access to:
-
-- **Coefficients**: Expansion coefficients for each determinant
-- **Determinants**: Electronic configurations
-- **Electron counts**: Total and active space electron numbers
-- **Orbital occupations**: Natural orbital occupations for all and active orbitals
-- **Reduced Density Matrices (RDMs)**: One- and two-particle density matrices
-- **Orbital entropies**: Single orbital entropies for correlation analysis
-- **Overlap calculations**: Inner products between wavefunctions
-- **Container type**: Underlying implementation (CAS, SCI, Slater determinant, etc.)
 
 Container types
 ---------------
@@ -100,6 +87,68 @@ A multi-determinant wavefunction from Complete Active Space methods (CASSCF/CASC
       :start-after: # start-cell-create-cas
       :end-before: # end-cell-create-cas
 
+Properties
+~~~~~~~~~~
+
+The :class:`~qdk_chemistry.data.Wavefunction` class provides access to various quantum chemical properties. Availability depends on the specific container type:
+
+.. list-table:: Property availability by container type
+   :header-rows: 1
+   :widths: 40 20 20 20
+
+   * - Property
+     - Slater determinant
+     - CAS
+     - SCI
+   * - **Coefficients**
+     - ✓
+     - ✓
+     - ✓
+   * - **Determinants**
+     - ✓
+     - ✓
+     - ✓
+   * - **Electron counts**
+     - ✓
+     - ✓
+     - ✓
+   * - **Orbital occupations**
+     - ✓
+     - ✓
+     - ✓
+   * - **1-RDMs (spin-dependent)**
+     - ✓
+     - ✓
+     - ✓
+   * - **1-RDMs (spin-traced)**
+     - ✓
+     - ✓
+     - ✓
+   * - **2-RDMs (spin-dependent)**
+     - ✓
+     - ✓*
+     - ✓*
+   * - **2-RDMs (spin-traced)**
+     - ✓
+     - ✓*
+     - ✓*
+   * - **Orbital entropies**
+     - ✓
+     - ✓*
+     - ✓*
+   * - **Overlap calculations**
+     - ✗
+     - ✓
+     - ✗
+   * - **Norm calculations**
+     - ✓
+     - ✓
+     - ✗
+
+Legend:
+- ✓ Available and implemented
+- ✗ Method throws runtime error (not implemented)
+- ✓* Available only if 2-RDMs were provided during construction
 
 Accessing wavefunction data
 ---------------------------

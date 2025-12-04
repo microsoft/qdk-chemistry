@@ -11,37 +11,41 @@
 #include <qdk/chemistry.hpp>
 using namespace qdk::chemistry::data;
 
-// Specify a structure using coordinates, and either symbols or elements
-std::vector<Eigen::Vector3d> coords = {{0.0, 0.0, 0.0},
-                                       {0.0, 0.0, 1.4}};  // Bohr
-std::vector<std::string> symbols = {"H", "H"};
+int main() {
+  // Specify a structure using coordinates, and either symbols or elements
+  std::vector<Eigen::Vector3d> coords = {{0.0, 0.0, 0.0},
+                                         {0.0, 0.0, 1.4}};  // Bohr
+  std::vector<std::string> symbols = {"H", "H"};
 
-Structure structure(coords, symbols);
+  Structure structure(coords, symbols);
 
-// element enum alternative
-std::vector<Element> elements = {Element::H, Element::H};
-Structure structure_alternative(coords, elements);
+  // element enum alternative
+  std::vector<Element> elements = {Element::H, Element::H};
+  Structure structure_alternative(coords, elements);
 
-// Can specify custom masses and/or charges
-std::vector<double> custom_masses{1.001, 0.999};
-std::vector<double> custom_charges = {0.9, 1.1};
-Structure structure_custom(coords, elements, custom_masses, custom_charges);
+  // Can specify custom masses and/or charges
+  std::vector<double> custom_masses{1.001, 0.999};
+  std::vector<double> custom_charges = {0.9, 1.1};
+  Structure structure_custom(coords, elements, custom_masses, custom_charges);
 
-// end-cell-create
-// --------------------------------------------------------------------------------------------
+  // end-cell-create
+  // --------------------------------------------------------------------------------------------
 
-// --------------------------------------------------------------------------------------------
-// start-cell-data
-// Get coordinates of a specific atom in Bohr
-Eigen::Vector3d atom_coords = structure.get_atom_coordinates(0);  // First atom
+  // --------------------------------------------------------------------------------------------
+  // start-cell-data
+  // Get coordinates of a specific atom in Bohr
+  Eigen::Vector3d atom_coords =
+      structure.get_atom_coordinates(0);  // First atom
 
-// Get element of a specific atom
-Element element = structure.get_atom_element(0);  // First atom
+  // Get element of a specific atom
+  Element element = structure.get_atom_element(0);  // First atom
 
-// Get all coordinates (in Bohr) as a matrix
-Eigen::MatrixXd all_coords = structure.get_coordinates();
+  // Get all coordinates (in Bohr) as a matrix
+  Eigen::MatrixXd all_coords = structure.get_coordinates();
 
-// Get all elements as a vector
-std::vector<Element> all_elements = structure.get_elements();
-// end-cell-data
-// --------------------------------------------------------------------------------------------
+  // Get all elements as a vector
+  std::vector<Element> all_elements = structure.get_elements();
+  // end-cell-data
+  // --------------------------------------------------------------------------------------------
+  return 0;
+}

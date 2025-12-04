@@ -9,117 +9,128 @@
 #include <qdk/chemistry.hpp>
 using namespace qdk::chemistry::data;
 
-// --------------------------------------------------------------------------------------------
-// start-cell-create-slater
-// Create basis set
-std::vector<Shell> shells;
-int atom_index = 0;
-int functions_created = 0;
-int num_atomic_orbitals = 3;
+// Helper function to create orbitals - will be used in the different
+// constructors for wavefunction containers
+std::shared_ptr<Orbitals> make_minimal_orbitals() {
+  // Create a minimal STO-1G basis
+  std::vector<Shell> shells;
 
-// Create shells to reach 3 AOs
-while (functions_created < num_atomic_orbitals) {
-  int remaining = num_atomic_orbitals - functions_created;
+  // Gaussian exponents and coefficients
+  Eigen::VectorXd exps(1);
+  exps << 1.0;
+  Eigen::VectorXd coefs(1);
+  coefs << 1.0;
 
-  if (remaining >= 3) {
-    // Add a P shell (3 functions: Px, Py, Pz)
-    Eigen::VectorXd exps(2);
-    exps << 1.0, 0.5;
-    Eigen::VectorXd coefs(2);
-    coefs << 0.6, 0.4;
-    Shell shell(atom_index, OrbitalType::P, exps, coefs);
-    shells.push_back(shell);
-    functions_created += 3;
-  } else {
-    // Add S shells for remaining functions (1 function each)
-    for (int i = 0; i < remaining; ++i) {
-      Eigen::VectorXd exps(1);
-      exps << 1.0;
-      Eigen::VectorXd coefs(1);
-      coefs << 1.0;
-      Shell shell(atom_index, OrbitalType::S, exps, coefs);
-      shells.push_back(shell);
-      functions_created += 1;
-    }
-  }
+  // Atom 0
+  Shell h1_s_shell(0, OrbitalType::S, exps, coefs);
+  shells.push_back(h1_s_shell);
+
+  // Atom 1
+  Shell h2_s_shell(1, OrbitalType::S, exps, coefs);
+  shells.push_back(h2_s_shell);
+
+  auto basis_set = std::make_shared<BasisSet>("STO-1G_H2", shells);
+
+  // Create bonding and antibonding MOs from AOs
+  Eigen::MatrixXd coefficients(2, 2);
+  coefficients << 0.7071, 0.7071, 0.7071, -0.7071;
+
+  Eigen::VectorXd energies(2);
+  energies << -1.0, 0.5;  // HOMO, LUMO
+
+  // Orbital constructor requires coefficients, energies, optionally AO overlap,
+  // and basis set
+  std::shared_ptr<Orbitals> orbitals = std::make_shared<Orbitals>(
+      coefficients, energies, std::nullopt, basis_set);
+
+  return orbitals;
 }
 
-auto basis_set = std::make_shared<BasisSet>("dummy", shells);
+int main() {
+  // --------------------------------------------------------------------------------------------
+  // start-cell-create-slater
+  // Use helper function to get orbitals
+  std::shared_ptr<Orbitals> orbitals = make_minimal_orbitals();
+  // Create a simple Slater determinant wavefunction for H2 ground state
+  // 2 electrons in bonding sigma orbital
+  Configuration det("20");
 
-// Create orbitals
-Eigen::MatrixXd coefficients = Eigen::MatrixXd::Identity(3, 3);
-Eigen::VectorXd energies(3);
-energies << -1.0, -0.5, 0.2;
-auto orbitals =
-    std::make_shared<Orbitals>(coefficients, energies, std::nullopt, basis_set);
+  // Constructor takes single determinant and orbitals as input
+  auto sd_container =
+      std::make_unique<SlaterDeterminantContainer>(det, orbitals);
+  Wavefunction sd_wavefunction(std::move(sd_container));
+  // end-cell-create-slater
+  // --------------------------------------------------------------------------------------------
 
-// Create a simple Slater determinant wavefunction
-Configuration det("20");
-auto sd_container = std::make_unique<SlaterDeterminantContainer>(det, orbitals);
-Wavefunction sd_wavefunction(std::move(sd_container));
-// end-cell-create-slater
-// --------------------------------------------------------------------------------------------
+  // --------------------------------------------------------------------------------------------
+  // start-cell-create-cas
+  // Create a CAS wavefunction for H2
+  // CAS(2,2) = 2 electrons in 2 MOs (bonding and antibonding)
+  // All possible configurations:
+  std::vector<Configuration> cas_dets = {
+      Configuration("20"),  // Both electrons in bonding (ground state)
+      Configuration("ud"),  // Alpha in bonding, beta in antibonding
+      Configuration("du"),  // Beta in bonding, alpha in antibonding
+      Configuration("02")   // Both electrons in antibonding
+  };
 
-// --------------------------------------------------------------------------------------------
-// start-cell-create-cas
-// Create a CAS wavefunction with multiple determinants
-std::vector<Configuration> cas_dets = {Configuration("20"),
-                                       Configuration("ud")};
-Eigen::VectorXd cas_coeffs(2);
-cas_coeffs << 0.9, 0.436;
-auto cas_container =
-    std::make_unique<CasWavefunctionContainer>(cas_coeffs, cas_dets, orbitals);
-Wavefunction cas_wavefunction(std::move(cas_container));
-// end-cell-create-cas
-// --------------------------------------------------------------------------------------------
+  // Coefficients
+  Eigen::VectorXd cas_coeffs(4);
+  cas_coeffs << 0.95, 0.15, 0.15, 0.05;  // Normalized later by the container
 
-// --------------------------------------------------------------------------------------------
-// start-cell-create-sci
-// Create an SCI wavefunction with selected determinants
-std::vector<Configuration> sci_dets = {Configuration("20"), Configuration("ud"),
-                                       Configuration("02")};
-Eigen::VectorXd sci_coeffs(3);
-sci_coeffs << 0.85, 0.4, 0.3;
-auto sci_container =
-    std::make_unique<SciWavefunctionContainer>(sci_coeffs, sci_dets, orbitals);
-Wavefunction sci_wavefunction(std::move(sci_container));
-// end-cell-create-sci
-// --------------------------------------------------------------------------------------------
+  // Create a CAS wavefunction : requires all coefficients and determinants, as
+  // well as orbitals, in constructor
+  auto cas_container = std::make_unique<CasWavefunctionContainer>(
+      cas_coeffs, cas_dets, orbitals);
+  Wavefunction cas_wavefunction(std::move(cas_container));
+  // end-cell-create-cas
+  // --------------------------------------------------------------------------------------------
 
-// --------------------------------------------------------------------------------------------
-// start-cell-access-data
-// Access basic wavefunction data
-auto coeffs = sd_wavefunction.get_coefficients();
-auto dets = sd_wavefunction.get_active_determinants();
+  // --------------------------------------------------------------------------------------------
+  // start-cell-create-sci
+  // Create an SCI wavefunction for H2
+  // SCI selects only the most important configurations/determinants from the
+  // full space
+  std::vector<Configuration> sci_dets = {
+      Configuration("20"),  // Ground state
+      Configuration("ud"),  // Mixed state
+      Configuration("du")   // Mixed state
+  };
 
-// Get orbital information
-auto orbitals_ref = sd_wavefunction.get_orbitals();
+  // Coefficients for selected determinants
+  Eigen::VectorXd sci_coeffs(3);
+  sci_coeffs << 0.96, 0.15, 0.15;
 
-// Get electron counts
-auto [n_alpha, n_beta] = sd_wavefunction.get_total_num_electrons();
+  // Create a SCI wavefunction: requires selected coefficients and determinants,
+  // as well as orbitals, in constructor
+  auto sci_container = std::make_unique<SciWavefunctionContainer>(
+      sci_coeffs, sci_dets, orbitals);
+  Wavefunction sci_wavefunction(std::move(sci_container));
+  // end-cell-create-sci
+  // --------------------------------------------------------------------------------------------
 
-// Check availability of RDMs
-bool has_1rdm_spin_dep = sd_wavefunction.has_one_rdm_spin_dependent();
-bool has_1rdm_spin_traced = sd_wavefunction.has_one_rdm_spin_traced();
-bool has_2rdm_spin_dep = sd_wavefunction.has_two_rdm_spin_dependent();
-bool has_2rdm_spin_traced = sd_wavefunction.has_two_rdm_spin_traced();
+  // --------------------------------------------------------------------------------------------
+  // start-cell-access-data
+  // Access coefficient(s) and determinant(s) - SD has only one
+  auto coeffs = sd_wavefunction.get_coefficients();
+  auto dets = sd_wavefunction.get_active_determinants();
 
-// Access if available
-if (has_1rdm_spin_dep) {
+  // Get orbital information
+  auto orbitals_ref = sd_wavefunction.get_orbitals();
+
+  // Get electron counts
+  auto [n_alpha, n_beta] = sd_wavefunction.get_total_num_electrons();
+
+  // Get RDMs
   auto [rdm1_aa, rdm1_bb] = sd_wavefunction.get_active_one_rdm_spin_dependent();
-}
-if (has_1rdm_spin_traced) {
   auto rdm1_total = sd_wavefunction.get_active_one_rdm_spin_traced();
-}
-if (has_2rdm_spin_dep) {
   auto [rdm2_aa, rdm2_aabb, rdm2_bbbb] =
       sd_wavefunction.get_active_two_rdm_spin_dependent();
-}
-if (has_2rdm_spin_traced) {
   auto rdm2_total = sd_wavefunction.get_active_two_rdm_spin_traced();
-}
 
-// Get single orbital entropies
-auto entropies = sd_wavefunction.get_single_orbital_entropies();
-// end-cell-access-data
-// --------------------------------------------------------------------------------------------
+  // Get single orbital entropies
+  auto entropies = sd_wavefunction.get_single_orbital_entropies();
+  // end-cell-access-data
+  // --------------------------------------------------------------------------------------------
+  return 0;
+}

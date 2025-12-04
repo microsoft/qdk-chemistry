@@ -18,43 +18,37 @@ from qdk_chemistry.data import (
     OrbitalType,
 )
 
+def make_minimal_orbitals():
+    """Helper function to create orbitals.
+     
+      These are used in the different constructors for wfn containers."""
+    
+    # Create STO-1G basis set for H2
+    shells = [
+        Shell(0, OrbitalType.S, exponents=[1.0], coefficients=[1.0]), 
+        Shell(1, OrbitalType.S, exponents=[1.0], coefficients=[1.0]),
+    ]
+    basis_set = BasisSet("STO-1G_H2", shells=shells)
+    
+    # Create bonding and antibonding MOs from AOs 
+    coefficients = np.array(([0.7071, 0.7071], [0.7071, -0.7071]))
+    energies = [-1.0, 0.5]
+
+    # Orbital constructor requires coefficients, energies, optionally AO overlap 
+    # matrix, and basis set 
+    orbitals = Orbitals(coefficients, energies, None, basis_set)
+    return orbitals
+
 ################################################################################
 # start-cell-create-slater
-# Create a simple Slater determinant wavefunction
+# Use helper function to get orbitals
+orbitals = make_minimal_orbitals()
 
-# Create basis set
-shells = []
-atom_index = 0
-functions_created = 0
+# Create a simple Slater determinant wavefunction for H2 ground state 
+# 2 electrons in bonding sigma orbital
+det = Configuration("20")
 
-# Create shells to reach 3 AOs
-while functions_created < 3:
-    remaining = 3 - functions_created
-
-    if remaining >= 3:
-        # Add a P shell (3 functions: Px, Py, Pz)
-        exps = np.array([1.0, 0.5])
-        coefs = np.array([0.6, 0.4])
-        shell = Shell(atom_index, OrbitalType.P, exps, coefs)
-        shells.append(shell)
-        functions_created += 3
-    elif remaining >= 1:
-        # Add S shells for remaining functions (1 function each)
-        for _ in range(remaining):
-            exps = np.array([1.0])
-            coefs = np.array([1.0])
-            shell = Shell(atom_index, OrbitalType.S, exps, coefs)
-            shells.append(shell)
-            functions_created += 1
-basis_set = BasisSet("dummy", shells)
-
-# Create orbitals
-coefficients = np.eye(3)  # Identity matrix for 3 orbitals
-energies = np.array([-1.0, -0.5, 0.2])  # Example orbital energies
-orbitals = Orbitals(coefficients, energies, None, basis_set)
-
-# Single determinant with 2 electrons in 3 orbitals (active space size 2)
-det = Configuration("20")  # First orbital doubly occupied, others empty
+# Constructor takes single determinant and orbitals as input
 sd_container = SlaterDeterminantContainer(det, orbitals)
 sd_wavefunction = Wavefunction(sd_container)
 # end-cell-create-slater
@@ -62,13 +56,21 @@ sd_wavefunction = Wavefunction(sd_container)
 
 ################################################################################
 # start-cell-create-cas
-# Create a CAS wavefunction with multiple determinants
-# Same 3 orbitals, active space of 2 orbitals with 2 electrons
+# Create a CAS wavefunction for H2
+# CAS(2,2) = 2 electrons in 2 MOs (bonding and antibonding)
+# All possible configurations:
 cas_dets = [
-    Configuration("20"),  # |2,0⟩
-    Configuration("ud"),
-]  # |1,1⟩
-cas_coeffs = np.array([0.9, 0.436])
+    Configuration("20"), # both electrons in bonding MO (ground state)
+    Configuration("ud"), # alpha in bonding, beta in antibonding
+    Configuration("du"), # beta in bonding, alpha in antibonding
+    Configuration("02"), # both electrons in antibonding
+]
+
+# Coefficients (normalized later by container)
+cas_coeffs = np.array([0.95, 0.15, 0.15, 0.05])
+
+# Create a CAS wavefunction: requires all coefficients and determinants, 
+# as well as orbitals, in constructor
 cas_container = CasWavefunctionContainer(cas_coeffs, cas_dets, orbitals)
 cas_wavefunction = Wavefunction(cas_container)
 # end-cell-create-cas
@@ -76,14 +78,19 @@ cas_wavefunction = Wavefunction(cas_container)
 
 ################################################################################
 # start-cell-create-sci
-# Create an SCI wavefunction with selected determinants
-# Same 3 orbitals, selected configurations for 2 electrons in 2 active orbitals
+# Create an SCI wavefunction for H2 
+# SCI selects only the most important configurations/determinants from the full space
 sci_dets = [
-    Configuration("20"),  # |2,0⟩
-    Configuration("ud"),  # |1,1⟩
-    Configuration("02"),
-]  # |0,2⟩
-sci_coeffs = np.array([0.85, 0.4, 0.3])
+    Configuration("20"),  # Ground state
+    Configuration("du"), # Mixed state, 
+    Configuration("ud"), # Second mixed state
+]
+
+# Coefficients for selected determinants
+sci_coeffs = np.array([0.96, 0.15, 0.15])
+
+# Create a SCI wavefunction: requires selected coefficients and determinants, as well 
+# as orbitals, in constructor
 sci_container = SciWavefunctionContainer(sci_coeffs, sci_dets, orbitals)
 sci_wavefunction = Wavefunction(sci_container)
 # end-cell-create-sci
@@ -91,7 +98,7 @@ sci_wavefunction = Wavefunction(sci_container)
 
 ################################################################################
 # start-cell-access-data
-# Access basic wavefunction data
+# Access coefficient(s) and determinant(s) - SD has only one
 coeffs = sd_wavefunction.get_coefficients()
 dets = sd_wavefunction.get_active_determinants()
 
@@ -101,26 +108,13 @@ orbitals_ref = sd_wavefunction.get_orbitals()
 # Get electron counts
 n_alpha, n_beta = sd_wavefunction.get_total_num_electrons()
 
-# Check availability of reduced density matrices
-has_1rdm_spin_dep = sd_wavefunction.has_one_rdm_spin_dependent()
-has_1rdm_spin_traced = sd_wavefunction.has_one_rdm_spin_traced()
-has_2rdm_spin_dep = sd_wavefunction.has_two_rdm_spin_dependent()
-has_2rdm_spin_traced = sd_wavefunction.has_two_rdm_spin_traced()
-
-# Access reduced density matrices if available
-if has_1rdm_spin_dep:
-    rdm1_aa, rdm1_bb = sd_wavefunction.get_active_one_rdm_spin_dependent()
-
-if has_1rdm_spin_traced:
-    rdm1_total = sd_wavefunction.get_active_one_rdm_spin_traced()
-
-if has_2rdm_spin_dep:
-    rdm2_aaaa, rdm2_aabb, rdm2_bbbb = (
+# Get RDMs
+rdm1_aa, rdm1_bb = sd_wavefunction.get_active_one_rdm_spin_dependent()
+rdm1_total = sd_wavefunction.get_active_one_rdm_spin_traced()
+rdm2_aaaa, rdm2_aabb, rdm2_bbbb = (
         sd_wavefunction.get_active_two_rdm_spin_dependent()
     )
-
-if has_2rdm_spin_traced:
-    rdm2_total = sd_wavefunction.get_active_two_rdm_spin_traced()
+rdm2_total = sd_wavefunction.get_active_two_rdm_spin_traced()
 
 # Get single orbital entropies
 entropies = sd_wavefunction.get_single_orbital_entropies()
