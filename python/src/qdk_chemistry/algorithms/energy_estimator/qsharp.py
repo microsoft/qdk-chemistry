@@ -23,8 +23,8 @@ class QDKEnergyEstimatorSettings(Settings):
     """Settings configuration for a QDKEnergyEstimator.
 
     QDKEnergyEstimator-specific settings:
-        seed (int, default="42"): Random seed for reproducibility.
-        qubit_loss (float, default="0.0"): Probability of qubit loss in simulation.
+        seed (int, default=42): Random seed for reproducibility.
+        qubit_loss (float, default=0.0): Probability of qubit loss in simulation.
 
     """
 

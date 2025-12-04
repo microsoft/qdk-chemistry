@@ -45,7 +45,7 @@ class QiskitEnergyEstimatorSettings(Settings):
     """Settings configuration for a QiskitEnergyEstimator.
 
     QiskitEnergyEstimator-specific settings:
-        seed (int, default="42"): Random seed for reproducibility.
+        seed (int, default=42): Random seed for reproducibility.
 
     """
 
