@@ -887,48 +887,42 @@ std::string Structure::_fix_symbol_capitalization(const std::string& symbol) {
     return symbol;
   }
 
-  std::string fixed = symbol;
+  std::string fixed_symbol = symbol;
 
   // Convert to lowercase first
-  std::transform(fixed.begin(), fixed.end(), fixed.begin(), ::tolower);
+  std::transform(fixed_symbol.begin(), fixed_symbol.end(), fixed_symbol.begin(),
+                 ::tolower);
 
   // Capitalize the first letter
-  fixed[0] = std::toupper(fixed[0]);
+  fixed_symbol[0] = std::toupper(fixed_symbol[0]);
 
-  return fixed;
+  // Handle special cases for deuterium (D) and tritium (T)
+  if (fixed_symbol == "D") {
+    return "H2";
+  }
+  if (fixed_symbol == "T") {
+    return "H3";
+  }
+
+  return fixed_symbol;
 }
 
 Element Structure::symbol_to_element(const std::string& symbol) {
-  std::string letters_only = _strip_numbers_from_symbol(symbol);
-  std::string fixed_symbol = _fix_symbol_capitalization(letters_only);
-
-  // Handle special cases for deuterium (D) and tritium (T)
-  if (fixed_symbol == "D" || fixed_symbol == "T") {
-    return Element::H;
-  }
-
-  unsigned charge = symbol_to_nuclear_charge(fixed_symbol);
+  std::string fixed_symbol = _fix_symbol_capitalization(symbol);
+  std::string fixed_element_symbol = _strip_numbers_from_symbol(fixed_symbol);
+  unsigned charge = symbol_to_nuclear_charge(fixed_element_symbol);
   return static_cast<Element>(charge);
 }
 
 Isotope Structure::symbol_to_isotope(const std::string& symbol) {
-  std::string letters_only = _strip_numbers_from_symbol(symbol);
-  std::string fixed_symbol = _fix_symbol_capitalization(letters_only);
-
-  // Handle special cases for deuterium (D) and tritium (T)
-  if (fixed_symbol == "D") {
-    return Isotope::D;
-  }
-  if (fixed_symbol == "T") {
-    return Isotope::T;
-  }
-
-  unsigned atomic_number = symbol_to_nuclear_charge(fixed_symbol);
-  std::string numbers_only = _extract_numbers_from_symbol(symbol);
-  if (numbers_only.empty()) {
+  std::string fixed_symbol = _fix_symbol_capitalization(symbol);
+  std::string fixed_element_symbol = _strip_numbers_from_symbol(fixed_symbol);
+  unsigned atomic_number = symbol_to_nuclear_charge(fixed_element_symbol);
+  std::string mass_number_string = _extract_numbers_from_symbol(fixed_symbol);
+  if (mass_number_string.empty()) {
     return static_cast<Isotope>(atomic_number);
   }
-  unsigned mass_number = std::stoul(numbers_only);
+  unsigned mass_number = std::stoul(mass_number_string);
   return static_cast<Isotope>(isotope(atomic_number, mass_number));
 }
 
@@ -937,14 +931,6 @@ std::string Structure::element_to_symbol(Element element) {
 }
 
 std::string Structure::isotope_to_symbol(Isotope isotope) {
-  // Handle special cases for deuterium (D) and tritium (T)
-  if (isotope == Isotope::D) {
-    return "D";
-  }
-  if (isotope == Isotope::T) {
-    return "T";
-  }
-
   unsigned atomic_number = static_cast<unsigned>(isotope) & 0x7F;
   unsigned mass_number = (static_cast<unsigned>(isotope) >> 7);
   std::string symbol = nuclear_charge_to_symbol(atomic_number);
@@ -953,8 +939,8 @@ std::string Structure::isotope_to_symbol(Isotope isotope) {
 }
 
 unsigned Structure::symbol_to_nuclear_charge(const std::string& symbol) {
-  std::string letters_only = _strip_numbers_from_symbol(symbol);
-  std::string fixed_symbol = _fix_symbol_capitalization(letters_only);
+  std::string fixed_symbol = _fix_symbol_capitalization(symbol);
+  std::string fixed_element_symbol = _strip_numbers_from_symbol(fixed_symbol);
 
   // Lazy initialization: build the reverse map only once when first needed
   if (SYMBOL_TO_CHARGE.empty()) {
@@ -963,13 +949,13 @@ unsigned Structure::symbol_to_nuclear_charge(const std::string& symbol) {
     }
   }
 
-  auto it = SYMBOL_TO_CHARGE.find(fixed_symbol);
+  auto it = SYMBOL_TO_CHARGE.find(fixed_element_symbol);
   if (it != SYMBOL_TO_CHARGE.end()) {
     return it->second;
   }
 
   throw std::invalid_argument("Unknown atomic symbol: " + symbol +
-                              " (normalized to: " + fixed_symbol + ")");
+                              " (normalized to: " + fixed_element_symbol + ")");
 }
 
 std::string Structure::nuclear_charge_to_symbol(unsigned nuclear_charge) {

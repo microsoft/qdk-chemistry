@@ -1158,6 +1158,8 @@ TEST_F(StructureBasicTest, SymbolToIsotope) {
   // Test with lowercase
   Isotope h1_lower = Structure::symbol_to_isotope("h1");
   EXPECT_EQ(h1_lower, Isotope::H1);
+  Isotope h2_lower = Structure::symbol_to_isotope("h2");
+  EXPECT_EQ(h2_lower, Isotope::H2);
 
   // Test special cases: deuterium (D) and tritium (T)
   Isotope deuterium = Structure::symbol_to_isotope("D");
@@ -1192,9 +1194,9 @@ TEST_F(StructureBasicTest, IsotopeToSymbol) {
   std::string t_symbol = Structure::isotope_to_symbol(Isotope::T);
 
   EXPECT_EQ(h2_symbol, "H2");
-  EXPECT_EQ(d_symbol, "D");
+  EXPECT_EQ(d_symbol, "H2");
   EXPECT_EQ(h3_symbol, "H3");
-  EXPECT_EQ(t_symbol, "T");
+  EXPECT_EQ(t_symbol, "H3");
 
   // Verify round-trip conversion
   Isotope h2_back = Structure::symbol_to_isotope(h2_symbol);
