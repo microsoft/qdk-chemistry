@@ -25,7 +25,12 @@ namespace qdk::chemistry::data {
 
 /**
  * @class CoupledClusterContainer
- * @brief Wavefunction container representing a coupled cluster wavefunction
+ * @brief Container representing a coupled cluster singles-doubles wavefunction
+ *
+ * CI coefficients are generated from the CC amplitudes on-demand (lazy
+ * evaluation) and are costly. Ci coefficients and determinants are cached after
+ * first computation and are calculated by truncating the expansion at the
+ * fourth order.
  */
 class CoupledClusterContainer : public WavefunctionContainer {
  public:
@@ -395,7 +400,45 @@ class CoupledClusterContainer : public WavefunctionContainer {
   /// Serialization version
   static constexpr const char* SERIALIZATION_VERSION = "0.1.0";
 
-  // Lazy-initialized determinant vector
+  // Lazy-initialized determinant vector and coefficients
   mutable std::unique_ptr<DeterminantVector> _determinant_vector_cache;
+  mutable std::unique_ptr<VectorVariant> _coefficients_cache;
+
+  /**
+   * @brief Generate CI determinants and coefficients from CC amplitudes
+   *
+   * Expands e^T = 1 + T + T²/2! + T³/3! + T⁴/4! + ...
+   * to generate CI-like determinants and coefficients up to 4th order
+   * (quadruple excitations).
+   *
+   * The expansion includes:
+   * - Order 0: Reference determinant (coefficient = 1)
+   * - Order 1: Singles from T1
+   * - Order 2: Doubles from T2 + T1²/2
+   * - Order 3: Triples from T1·T2 + T1³/6
+   * - Order 4: Quadruples from T2²/2 + T1²·T2/2 + T1⁴/24
+   */
+  void _generate_ci_expansion() const;
+
+  /**
+   * @brief Helper to create a Configuration from excitations
+   * @param ref Reference configuration
+   * @param alpha_excitations Vector of (from_orbital, to_orbital) for alpha
+   * @param beta_excitations Vector of (from_orbital, to_orbital) for beta
+   * @return New Configuration with excitations applied
+   */
+  static Configuration _apply_excitations(
+      const Configuration& ref,
+      const std::vector<std::pair<size_t, size_t>>& alpha_excitations,
+      const std::vector<std::pair<size_t, size_t>>& beta_excitations);
+
+  /**
+   * @brief Consolidate duplicate determinants by summing their coefficients
+   * @param determinants Vector of determinants (modified in place)
+   * @param coefficients Vector of coefficients (modified in place)
+   */
+  template <typename T>
+  static void _consolidate_determinants(DeterminantVector& determinants,
+                                        std::vector<T>& coefficients);
 };
 }  // namespace qdk::chemistry::data

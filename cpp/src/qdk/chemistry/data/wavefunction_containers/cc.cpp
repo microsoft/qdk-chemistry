@@ -4,8 +4,12 @@
  * license information.
  */
 
+#include <algorithm>
+#include <cmath>
+#include <map>
 #include <optional>
 #include <qdk/chemistry/data/wavefunction_containers/cc.hpp>
+#include <set>
 #include <stdexcept>
 #include <variant>
 
@@ -349,23 +353,44 @@ std::shared_ptr<Wavefunction> CoupledClusterContainer::get_wavefunction()
 
 const CoupledClusterContainer::VectorVariant&
 CoupledClusterContainer::get_coefficients() const {
-  throw std::runtime_error(
-      "get_coefficients() is not implemented for coupled cluster "
-      "wavefunctions. ");
+  if (!_coefficients_cache) {
+    _generate_ci_expansion();
+  }
+  return *_coefficients_cache;
 }
 
 CoupledClusterContainer::ScalarVariant CoupledClusterContainer::get_coefficient(
     const Configuration& det) const {
-  throw std::runtime_error(
-      "get_coefficient() is not implemented for coupled cluster "
-      "wavefunctions. ");
+  if (!_coefficients_cache || !_determinant_vector_cache) {
+    _generate_ci_expansion();
+  }
+
+  // Find the determinant in the cache
+  auto it = std::find(_determinant_vector_cache->begin(),
+                      _determinant_vector_cache->end(), det);
+  if (it == _determinant_vector_cache->end()) {
+    // Return zero if determinant not found
+    if (is_complex()) {
+      return std::complex<double>(0.0, 0.0);
+    } else {
+      return 0.0;
+    }
+  }
+
+  size_t idx = std::distance(_determinant_vector_cache->begin(), it);
+  if (is_complex()) {
+    return std::get<Eigen::VectorXcd>(*_coefficients_cache)(idx);
+  } else {
+    return std::get<Eigen::VectorXd>(*_coefficients_cache)(idx);
+  }
 }
 
 const CoupledClusterContainer::DeterminantVector&
 CoupledClusterContainer::get_active_determinants() const {
-  throw std::runtime_error(
-      "get_active_determinants() is not implemented for coupled cluster "
-      "wavefunctions. ");
+  if (!_determinant_vector_cache) {
+    _generate_ci_expansion();
+  }
+  return *_determinant_vector_cache;
 }
 
 std::pair<const CoupledClusterContainer::VectorVariant&,
@@ -399,8 +424,10 @@ bool CoupledClusterContainer::has_t2_amplitudes() const {
 }
 
 size_t CoupledClusterContainer::size() const {
-  throw std::runtime_error(
-      "size() is not meaningful for coupled cluster wavefunctions. ");
+  if (!_determinant_vector_cache) {
+    _generate_ci_expansion();
+  }
+  return _determinant_vector_cache->size();
 }
 
 CoupledClusterContainer::ScalarVariant CoupledClusterContainer::overlap(
@@ -427,8 +454,9 @@ bool CoupledClusterContainer::contains_reference(
 }
 
 void CoupledClusterContainer::clear_caches() const {
-  // Clear the cached determinant vector
+  // Clear the cached determinant vector and coefficients
   _determinant_vector_cache.reset();
+  _coefficients_cache.reset();
 
   // Clear all cached RDMs using base class helper
   _clear_rdms();
@@ -867,6 +895,508 @@ bool CoupledClusterContainer::is_complex() const {
     return true;
   }
   return false;
+}
+
+Configuration CoupledClusterContainer::_apply_excitations(
+    const Configuration& ref,
+    const std::vector<std::pair<size_t, size_t>>& alpha_excitations,
+    const std::vector<std::pair<size_t, size_t>>& beta_excitations) {
+  // Convert reference to string, apply excitations, convert back
+  std::string config_str = ref.to_string();
+
+  // Apply alpha excitations
+  for (const auto& [from_idx, to_idx] : alpha_excitations) {
+    if (from_idx >= config_str.size() || to_idx >= config_str.size()) {
+      throw std::out_of_range("Excitation index out of range");
+    }
+
+    char& from_char = config_str[from_idx];
+    char& to_char = config_str[to_idx];
+
+    // Remove alpha from source
+    if (from_char == '2') {
+      from_char = 'd';  // Doubly -> beta only
+    } else if (from_char == 'u') {
+      from_char = '0';  // Alpha -> unoccupied
+    } else {
+      throw std::runtime_error("Invalid alpha excitation: source has no alpha");
+    }
+
+    // Add alpha to target
+    if (to_char == '0') {
+      to_char = 'u';  // Unoccupied -> alpha
+    } else if (to_char == 'd') {
+      to_char = '2';  // Beta -> doubly
+    } else {
+      throw std::runtime_error(
+          "Invalid alpha excitation: target already has alpha");
+    }
+  }
+
+  // Apply beta excitations
+  for (const auto& [from_idx, to_idx] : beta_excitations) {
+    if (from_idx >= config_str.size() || to_idx >= config_str.size()) {
+      throw std::out_of_range("Excitation index out of range");
+    }
+
+    char& from_char = config_str[from_idx];
+    char& to_char = config_str[to_idx];
+
+    // Remove beta from source
+    if (from_char == '2') {
+      from_char = 'u';  // Doubly -> alpha only
+    } else if (from_char == 'd') {
+      from_char = '0';  // Beta -> unoccupied
+    } else {
+      throw std::runtime_error("Invalid beta excitation: source has no beta");
+    }
+
+    // Add beta to target
+    if (to_char == '0') {
+      to_char = 'd';  // Unoccupied -> beta
+    } else if (to_char == 'u') {
+      to_char = '2';  // Alpha -> doubly
+    } else {
+      throw std::runtime_error(
+          "Invalid beta excitation: target already has beta");
+    }
+  }
+
+  return Configuration(config_str);
+}
+
+template <typename T>
+void CoupledClusterContainer::_consolidate_determinants(
+    DeterminantVector& determinants, std::vector<T>& coefficients) {
+  if (determinants.empty()) return;
+
+  // Use a map to consolidate
+  std::map<std::string, std::pair<Configuration, T>> det_map;
+
+  for (size_t i = 0; i < determinants.size(); ++i) {
+    std::string key = determinants[i].to_string();
+    auto it = det_map.find(key);
+    if (it != det_map.end()) {
+      it->second.second += coefficients[i];
+    } else {
+      det_map[key] = {determinants[i], coefficients[i]};
+    }
+  }
+
+  // Rebuild vectors, filtering out near-zero coefficients
+  determinants.clear();
+  coefficients.clear();
+
+  constexpr double tol = 1e-14;
+  for (const auto& [key, value] : det_map) {
+    T coef = value.second;
+    double mag;
+    if constexpr (std::is_same_v<T, std::complex<double>>) {
+      mag = std::abs(coef);
+    } else {
+      mag = std::abs(coef);
+    }
+
+    if (mag > tol) {
+      determinants.push_back(value.first);
+      coefficients.push_back(coef);
+    }
+  }
+}
+
+// Explicit template instantiations
+template void CoupledClusterContainer::_consolidate_determinants<double>(
+    DeterminantVector& determinants, std::vector<double>& coefficients);
+template void CoupledClusterContainer::_consolidate_determinants<
+    std::complex<double>>(DeterminantVector& determinants,
+                          std::vector<std::complex<double>>& coefficients);
+
+void CoupledClusterContainer::_generate_ci_expansion() const {
+  if (!has_t1_amplitudes() && !has_t2_amplitudes()) {
+    throw std::runtime_error(
+        "Cannot generate CI expansion: no amplitudes available");
+  }
+
+  // Get reference determinant
+  const auto& references = _wavefunction->get_total_determinants();
+  if (references.empty()) {
+    throw std::runtime_error("No reference determinant available");
+  }
+  const Configuration& ref = references[0];
+
+  // Get electron counts
+  auto [n_alpha, n_beta] = ref.get_n_electrons();
+  size_t n_orbitals = _orbitals->get_num_molecular_orbitals();
+  size_t n_vir_alpha = n_orbitals - n_alpha;
+  size_t n_vir_beta = n_orbitals - n_beta;
+
+  // Determine if we're working with complex amplitudes
+  bool use_complex = is_complex();
+
+  // Get amplitude data as Eigen Maps for efficient access
+  // T1 alpha: shape (nocc_a, nvir_a), stored row-major as flat vector
+  // T1 beta: shape (nocc_b, nvir_b)
+  // T2 alpha-beta: shape (nocc_a, nocc_b, nvir_a, nvir_b)
+  // T2 alpha-alpha: shape (nocc_a, nocc_a, nvir_a, nvir_a)
+  // T2 beta-beta: shape (nocc_b, nocc_b, nvir_b, nvir_b)
+
+  DeterminantVector determinants;
+  std::vector<double> coefficients_real;
+  std::vector<std::complex<double>> coefficients_complex;
+
+  // Helper lambda for indexing
+  auto t1_idx = [](size_t i, size_t a, size_t nvir) { return i * nvir + a; };
+
+  auto t2_idx = [](size_t i, size_t j, size_t a, size_t b, size_t nocc2,
+                   size_t nvir1, size_t nvir2) {
+    return ((i * nocc2 + j) * nvir1 + a) * nvir2 + b;
+  };
+
+  // Helper to get T1 element
+  auto get_t1_aa = [&](size_t i, size_t a) -> auto {
+    size_t idx = t1_idx(i, a, n_vir_alpha);
+    if (use_complex) {
+      return std::get<Eigen::VectorXcd>(*_t1_amplitudes_aa)(idx);
+    } else {
+      return std::complex<double>(
+          std::get<Eigen::VectorXd>(*_t1_amplitudes_aa)(idx), 0.0);
+    }
+  };
+
+  auto get_t1_bb = [&](size_t i, size_t a) -> auto {
+    size_t idx = t1_idx(i, a, n_vir_beta);
+    if (use_complex) {
+      return std::get<Eigen::VectorXcd>(*_t1_amplitudes_bb)(idx);
+    } else {
+      return std::complex<double>(
+          std::get<Eigen::VectorXd>(*_t1_amplitudes_bb)(idx), 0.0);
+    }
+  };
+
+  auto get_t2_abab = [&](size_t i, size_t j, size_t a, size_t b) -> auto {
+    size_t idx = t2_idx(i, j, a, b, n_beta, n_vir_alpha, n_vir_beta);
+    if (use_complex) {
+      return std::get<Eigen::VectorXcd>(*_t2_amplitudes_abab)(idx);
+    } else {
+      return std::complex<double>(
+          std::get<Eigen::VectorXd>(*_t2_amplitudes_abab)(idx), 0.0);
+    }
+  };
+
+  auto get_t2_aaaa = [&](size_t i, size_t j, size_t a, size_t b) -> auto {
+    size_t idx = t2_idx(i, j, a, b, n_alpha, n_vir_alpha, n_vir_alpha);
+    if (use_complex) {
+      return std::get<Eigen::VectorXcd>(*_t2_amplitudes_aaaa)(idx);
+    } else {
+      return std::complex<double>(
+          std::get<Eigen::VectorXd>(*_t2_amplitudes_aaaa)(idx), 0.0);
+    }
+  };
+
+  auto get_t2_bbbb = [&](size_t i, size_t j, size_t a, size_t b) -> auto {
+    size_t idx = t2_idx(i, j, a, b, n_beta, n_vir_beta, n_vir_beta);
+    if (use_complex) {
+      return std::get<Eigen::VectorXcd>(*_t2_amplitudes_bbbb)(idx);
+    } else {
+      return std::complex<double>(
+          std::get<Eigen::VectorXd>(*_t2_amplitudes_bbbb)(idx), 0.0);
+    }
+  };
+
+  // Helper to add a determinant with coefficient
+  auto add_det = [&](const Configuration& det, std::complex<double> coef) {
+    determinants.push_back(det);
+    if (use_complex) {
+      coefficients_complex.push_back(coef);
+    } else {
+      coefficients_real.push_back(coef.real());
+    }
+  };
+
+  // ==========================================================================
+  // Order 0: Reference determinant (coefficient = 1)
+  // ==========================================================================
+  add_det(ref, std::complex<double>(1.0, 0.0));
+
+  // ==========================================================================
+  // Order 1: Singles (T1)
+  // ==========================================================================
+
+  if (has_t1_amplitudes()) {
+    // Alpha singles: i -> a
+    for (size_t i = 0; i < n_alpha; ++i) {
+      for (size_t a = 0; a < n_vir_alpha; ++a) {
+        auto coef = get_t1_aa(i, a);
+        Configuration det = _apply_excitations(ref, {{i, n_alpha + a}}, {});
+        add_det(det, coef);
+      }
+    }
+
+    // Beta singles: i -> a
+    for (size_t i = 0; i < n_beta; ++i) {
+      for (size_t a = 0; a < n_vir_beta; ++a) {
+        auto coef = get_t1_bb(i, a);
+        Configuration det = _apply_excitations(ref, {}, {{i, n_beta + a}});
+        add_det(det, coef);
+      }
+    }
+  }
+
+  // ==========================================================================
+  // Order 2: Doubles (T2 + T1²/2)
+  // ==========================================================================
+
+  if (has_t2_amplitudes()) {
+    // Alpha-alpha doubles: i,j -> a,b
+    // c_{ij}^{ab} = t_{ij}^{ab} + t_i^a * t_j^b - t_i^b * t_j^a
+    for (size_t i = 0; i < n_alpha; ++i) {
+      for (size_t j = i + 1; j < n_alpha; ++j) {
+        for (size_t a = 0; a < n_vir_alpha; ++a) {
+          for (size_t b = a + 1; b < n_vir_alpha; ++b) {
+            auto coef = get_t2_aaaa(i, j, a, b) +
+                        get_t1_aa(i, a) * get_t1_aa(j, b) -
+                        get_t1_aa(i, b) * get_t1_aa(j, a);
+            Configuration det = _apply_excitations(
+                ref, {{i, n_alpha + a}, {j, n_alpha + b}}, {});
+            add_det(det, coef);
+          }
+        }
+      }
+    }
+
+    // Beta-beta doubles: i,j -> a,b
+    for (size_t i = 0; i < n_beta; ++i) {
+      for (size_t j = i + 1; j < n_beta; ++j) {
+        for (size_t a = 0; a < n_vir_beta; ++a) {
+          for (size_t b = a + 1; b < n_vir_beta; ++b) {
+            auto coef = get_t2_bbbb(i, j, a, b) +
+                        get_t1_bb(i, a) * get_t1_bb(j, b) -
+                        get_t1_bb(i, b) * get_t1_bb(j, a);
+            Configuration det =
+                _apply_excitations(ref, {}, {{i, n_beta + a}, {j, n_beta + b}});
+            add_det(det, coef);
+          }
+        }
+      }
+    }
+
+    // Alpha-beta doubles: i_alpha, j_beta -> a_alpha, b_beta
+    // No exchange term for different spins!
+    for (size_t i = 0; i < n_alpha; ++i) {
+      for (size_t j = 0; j < n_beta; ++j) {
+        for (size_t a = 0; a < n_vir_alpha; ++a) {
+          for (size_t b = 0; b < n_vir_beta; ++b) {
+            auto coef =
+                get_t2_abab(i, j, a, b) + get_t1_aa(i, a) * get_t1_bb(j, b);
+            Configuration det =
+                _apply_excitations(ref, {{i, n_alpha + a}}, {{j, n_beta + b}});
+            add_det(det, coef);
+          }
+        }
+      }
+    }
+  }
+
+  // ==========================================================================
+  // Order 3: Triples (T1·T2 + T1³/6)
+  // ==========================================================================
+
+  if (has_t1_amplitudes() && has_t2_amplitudes()) {
+    // T1_α · T2_αα: 3 alpha excitations
+    for (size_t i = 0; i < n_alpha; ++i) {
+      for (size_t a = 0; a < n_vir_alpha; ++a) {
+        for (size_t j = 0; j < n_alpha; ++j) {
+          for (size_t k = j + 1; k < n_alpha; ++k) {
+            if (i == j || i == k) continue;
+            for (size_t b = 0; b < n_vir_alpha; ++b) {
+              for (size_t c = b + 1; c < n_vir_alpha; ++c) {
+                if (a == b || a == c) continue;
+                auto coef = get_t1_aa(i, a) * get_t2_aaaa(j, k, b, c);
+                Configuration det = _apply_excitations(
+                    ref, {{i, n_alpha + a}, {j, n_alpha + b}, {k, n_alpha + c}},
+                    {});
+                add_det(det, coef);
+              }
+            }
+          }
+        }
+      }
+    }
+
+    // T1_β · T2_ββ: 3 beta excitations
+    for (size_t i = 0; i < n_beta; ++i) {
+      for (size_t a = 0; a < n_vir_beta; ++a) {
+        for (size_t j = 0; j < n_beta; ++j) {
+          for (size_t k = j + 1; k < n_beta; ++k) {
+            if (i == j || i == k) continue;
+            for (size_t b = 0; b < n_vir_beta; ++b) {
+              for (size_t c = b + 1; c < n_vir_beta; ++c) {
+                if (a == b || a == c) continue;
+                auto coef = get_t1_bb(i, a) * get_t2_bbbb(j, k, b, c);
+                Configuration det = _apply_excitations(
+                    ref, {},
+                    {{i, n_beta + a}, {j, n_beta + b}, {k, n_beta + c}});
+                add_det(det, coef);
+              }
+            }
+          }
+        }
+      }
+    }
+
+    // T1_α · T2_αβ: 2 alpha + 1 beta
+    for (size_t i = 0; i < n_alpha; ++i) {
+      for (size_t a = 0; a < n_vir_alpha; ++a) {
+        for (size_t j = 0; j < n_alpha; ++j) {
+          if (i == j) continue;
+          for (size_t k = 0; k < n_beta; ++k) {
+            for (size_t b = 0; b < n_vir_alpha; ++b) {
+              if (a == b) continue;
+              for (size_t c = 0; c < n_vir_beta; ++c) {
+                auto coef = get_t1_aa(i, a) * get_t2_abab(j, k, b, c);
+                Configuration det = _apply_excitations(
+                    ref, {{i, n_alpha + a}, {j, n_alpha + b}},
+                    {{k, n_beta + c}});
+                add_det(det, coef);
+              }
+            }
+          }
+        }
+      }
+    }
+
+    // T1_β · T2_αβ: 1 alpha + 2 beta
+    for (size_t i = 0; i < n_beta; ++i) {
+      for (size_t a = 0; a < n_vir_beta; ++a) {
+        for (size_t j = 0; j < n_alpha; ++j) {
+          for (size_t k = 0; k < n_beta; ++k) {
+            if (i == k) continue;
+            for (size_t b = 0; b < n_vir_alpha; ++b) {
+              for (size_t c = 0; c < n_vir_beta; ++c) {
+                if (a == c) continue;
+                auto coef = get_t1_bb(i, a) * get_t2_abab(j, k, b, c);
+                Configuration det =
+                    _apply_excitations(ref, {{j, n_alpha + b}},
+                                       {{i, n_beta + a}, {k, n_beta + c}});
+                add_det(det, coef);
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+
+  // T1³/6 contributions are typically small; included for completeness
+  // but omitted here for brevity - can be added if needed
+
+  // ==========================================================================
+  // Order 4: Quadruples (T2²/2 + T1²·T2/2 + T1⁴/24)
+  // ==========================================================================
+
+  if (has_t2_amplitudes()) {
+    // T2_αα · T2_ββ: 2 alpha + 2 beta
+    for (size_t i = 0; i < n_alpha; ++i) {
+      for (size_t j = i + 1; j < n_alpha; ++j) {
+        for (size_t k = 0; k < n_beta; ++k) {
+          for (size_t l = k + 1; l < n_beta; ++l) {
+            for (size_t a = 0; a < n_vir_alpha; ++a) {
+              for (size_t b = a + 1; b < n_vir_alpha; ++b) {
+                for (size_t c = 0; c < n_vir_beta; ++c) {
+                  for (size_t d = c + 1; d < n_vir_beta; ++d) {
+                    auto coef =
+                        get_t2_aaaa(i, j, a, b) * get_t2_bbbb(k, l, c, d);
+                    Configuration det = _apply_excitations(
+                        ref, {{i, n_alpha + a}, {j, n_alpha + b}},
+                        {{k, n_beta + c}, {l, n_beta + d}});
+                    add_det(det, coef);
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+
+    // T2_αβ · T2_αβ / 2: 2 alpha + 2 beta (different indices)
+    for (size_t i = 0; i < n_alpha; ++i) {
+      for (size_t j = 0; j < n_beta; ++j) {
+        for (size_t k = i + 1; k < n_alpha; ++k) {
+          for (size_t l = 0; l < n_beta; ++l) {
+            if (j == l) continue;
+            for (size_t a = 0; a < n_vir_alpha; ++a) {
+              for (size_t b = 0; b < n_vir_beta; ++b) {
+                for (size_t c = 0; c < n_vir_alpha; ++c) {
+                  if (a == c) continue;
+                  for (size_t d = 0; d < n_vir_beta; ++d) {
+                    if (b == d) continue;
+                    auto coef =
+                        get_t2_abab(i, j, a, b) * get_t2_abab(k, l, c, d) / 2.0;
+                    Configuration det = _apply_excitations(
+                        ref, {{i, n_alpha + a}, {k, n_alpha + c}},
+                        {{j, n_beta + b}, {l, n_beta + d}});
+                    add_det(det, coef);
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+
+  // T1²·T2/2 and T1⁴/24 contributions are typically small;
+  // included for completeness but can be added if needed
+
+  // Consolidate duplicate determinants
+  if (use_complex) {
+    _consolidate_determinants(determinants, coefficients_complex);
+
+    // Normalize
+    double norm_sq = 0.0;
+    for (const auto& c : coefficients_complex) {
+      norm_sq += std::norm(c);
+    }
+    double norm = std::sqrt(norm_sq);
+    if (norm > 1e-14) {
+      for (auto& c : coefficients_complex) {
+        c /= norm;
+      }
+    }
+
+    // Store in cache
+    Eigen::VectorXcd coef_vec(coefficients_complex.size());
+    for (size_t i = 0; i < coefficients_complex.size(); ++i) {
+      coef_vec(i) = coefficients_complex[i];
+    }
+    _coefficients_cache = std::make_unique<VectorVariant>(std::move(coef_vec));
+  } else {
+    _consolidate_determinants(determinants, coefficients_real);
+
+    // Normalize
+    double norm_sq = 0.0;
+    for (const auto& c : coefficients_real) {
+      norm_sq += c * c;
+    }
+    double norm = std::sqrt(norm_sq);
+    if (norm > 1e-14) {
+      for (auto& c : coefficients_real) {
+        c /= norm;
+      }
+    }
+
+    // Store in cache
+    Eigen::VectorXd coef_vec(coefficients_real.size());
+    for (size_t i = 0; i < coefficients_real.size(); ++i) {
+      coef_vec(i) = coefficients_real[i];
+    }
+    _coefficients_cache = std::make_unique<VectorVariant>(std::move(coef_vec));
+  }
+
+  _determinant_vector_cache =
+      std::make_unique<DeterminantVector>(std::move(determinants));
 }
 
 }  // namespace qdk::chemistry::data

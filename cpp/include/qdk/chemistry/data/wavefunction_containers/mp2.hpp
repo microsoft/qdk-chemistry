@@ -79,17 +79,34 @@ class MP2Container : public WavefunctionContainer {
   std::shared_ptr<Wavefunction> get_wavefunction() const;
 
   /**
-   * @brief Not implemented for MP2 wavefunctions
+   * @brief Get CI coefficients from MP2 wavefunction
+   *
+   * MP2 is a perturbation theory method. The first-order wavefunction
+   * correction gives:
+   * - Reference (coefficient = 1)
+   * - Double excitations with T2 amplitudes as coefficients
+   *
+   * @return Reference to vector of CI coefficients
    */
   const VectorVariant& get_coefficients() const override;
 
   /**
-   * @brief Not implemented for MP2 wavefunctions
+   * @brief Get coefficient for a specific determinant
+   * @param det Configuration to look up
+   * @return Coefficient value
+   * @throws std::runtime_error if determinant is not found
    */
   ScalarVariant get_coefficient(const Configuration& det) const override;
 
   /**
-   * @brief Not implemented for MP2 wavefunctions
+   * @brief Get active determinants from MP2 wavefunction
+   *
+   * MP2 is a perturbation theory method. The first-order wavefunction
+   * correction gives:
+   * - Reference determinant
+   * - Doubly-excited determinants
+   *
+   * @return Reference to vector of determinant configurations
    */
   const DeterminantVector& get_active_determinants() const override;
 
@@ -121,9 +138,12 @@ class MP2Container : public WavefunctionContainer {
   bool has_t2_amplitudes() const;
 
   /**
-   * @brief Get number of determinants
-   * @throws std::runtime_error Always throws as this is not meaningful for MP2
-   * wavefunctions
+   * @brief Get number of determinants in the CI expansion
+   *
+   * Returns the number of determinants generated from the MP2 amplitude
+   * expansion (reference + doubles + quadruples).
+   *
+   * @return Number of determinants
    */
   size_t size() const override;
 
@@ -238,8 +258,10 @@ class MP2Container : public WavefunctionContainer {
   /** @brief Serialization version */
   static constexpr const char* SERIALIZATION_VERSION = "0.1.0";
 
-  /** @brief Cached determinant vector */
+  /** @brief Lazy-initialized determinant vector */
   mutable std::unique_ptr<DeterminantVector> _determinant_vector_cache;
+  /** @brief Lazy-initialized coefficients */
+  mutable std::unique_ptr<VectorVariant> _coefficients_cache;
 
   /**
    * @brief Compute T1 amplitudes from Hamiltonian
@@ -250,5 +272,39 @@ class MP2Container : public WavefunctionContainer {
    * @brief Compute T2 amplitudes from Hamiltonian
    */
   void _compute_t2_amplitudes() const;
+
+  /**
+   * @brief Generate CI determinants and coefficients from MP2 amplitudes
+   *
+   * MP2 is a perturbation theory method, not an exponential ansatz.
+   * The first-order wavefunction correction is:
+   *   |Ψ^(1)⟩ = Σ_{ijab} t_{ij}^{ab} |Φ_{ij}^{ab}⟩
+   *
+   * The CI expansion includes:
+   * - Reference determinant (coefficient = 1)
+   * - Doubly-excited determinants with T2 amplitudes as coefficients
+   */
+  void _generate_ci_expansion() const;
+
+  /**
+   * @brief Helper to create a Configuration from excitations
+   * @param ref Reference configuration
+   * @param alpha_excitations Vector of (from_orbital, to_orbital) for alpha
+   * @param beta_excitations Vector of (from_orbital, to_orbital) for beta
+   * @return New Configuration with excitations applied
+   */
+  static Configuration _apply_excitations(
+      const Configuration& ref,
+      const std::vector<std::pair<size_t, size_t>>& alpha_excitations,
+      const std::vector<std::pair<size_t, size_t>>& beta_excitations);
+
+  /**
+   * @brief Consolidate duplicate determinants by summing their coefficients
+   * @param determinants Vector of determinants (modified in place)
+   * @param coefficients Vector of coefficients (modified in place)
+   */
+  template <typename T>
+  static void _consolidate_determinants(DeterminantVector& determinants,
+                                        std::vector<T>& coefficients);
 };
 }  // namespace qdk::chemistry::data
