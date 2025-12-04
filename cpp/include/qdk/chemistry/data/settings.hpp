@@ -7,6 +7,7 @@
 #include <H5Cpp.h>
 
 #include <any>
+#include <concepts>
 #include <fstream>
 #include <limits>
 #include <map>
@@ -69,67 +70,95 @@ using Constraint =
                  BoundConstraint<double>, ListConstraint<std::string>>;
 
 /**
- * @brief Type trait to detect if a type is a std::vector
+ * @brief Concept to detect if a type is a std::vector
  * @tparam T The type to check
- *
- * Primary template that evaluates to std::false_type for non-vector types.
  */
 template <typename T>
-struct is_vector : std::false_type {};
+struct is_vector_impl : std::false_type {};
 
-/**
- * @brief Specialization of is_vector for std::vector types
- * @tparam T The element type of the vector
- * @tparam A The allocator type of the vector
- *
- * Specialization that evaluates to std::true_type for std::vector types.
- */
 template <typename T, typename A>
-struct is_vector<std::vector<T, A>> : std::true_type {};
+struct is_vector_impl<std::vector<T, A>> : std::true_type {};
+
+template <typename T>
+concept Vector = is_vector_impl<T>::value;
 
 /**
- * @brief Helper variable template for is_vector
+ * @brief Helper variable template for is_vector (for backward compatibility)
  * @tparam T The type to check
- *
- * Provides a convenient boolean constant indicating whether T is a std::vector.
  */
 template <typename T>
-inline constexpr bool is_vector_v = is_vector<T>::value;
+inline constexpr bool is_vector_v = Vector<T>;
 
 /**
- * @brief Type trait to detect non-bool integral types
+ * @brief Concept for non-bool integral types
  * @tparam T The type to check
  *
- * Evaluates to std::true_type if T is an integral type other than bool.
- * This is useful for distinguishing integer types from boolean in template
- * contexts.
+ * Matches integral types other than bool.
  */
 template <typename T>
-struct is_non_bool_integral
-    : std::conjunction<std::is_integral<T>,
-                       std::negation<std::is_same<T, bool>>> {};
+concept NonBoolIntegral = std::integral<T> && !std::same_as<T, bool>;
 
 /**
- * @brief Helper variable template for is_non_bool_integral
+ * @brief Helper variable template for non-bool integral (for backward
+ * compatibility)
  * @tparam T The type to check
- *
- * Provides a convenient boolean constant indicating whether T is a non-bool
- * integral type.
  */
 template <typename T>
-inline constexpr bool is_non_bool_integral_v = is_non_bool_integral<T>::value;
+inline constexpr bool is_non_bool_integral_v = NonBoolIntegral<T>;
 
 /**
- * @brief Helper variable template to detect vectors of non-bool integral types
+ * @brief Concept for vectors of non-bool integral types
  * @tparam T The type to check
  *
- * Evaluates to true if T is a std::vector whose element type is a non-bool
- * integral type (e.g., std::vector<int>, std::vector<uint32_t>, but not
- * std::vector<bool>).
+ * Matches std::vector whose element type is a non-bool integral type
+ * (e.g., std::vector<int>, std::vector<uint32_t>, but not std::vector<bool>).
  */
 template <typename T>
-inline constexpr bool is_non_bool_integral_vector_v =
-    is_vector_v<T> && is_non_bool_integral_v<typename T::value_type>;
+concept NonBoolIntegralVector =
+    Vector<T> && NonBoolIntegral<typename T::value_type>;
+
+/**
+ * @brief Helper variable template for non-bool integral vector (for backward
+ * compatibility)
+ * @tparam T The type to check
+ */
+template <typename T>
+inline constexpr bool is_non_bool_integral_vector_v = NonBoolIntegralVector<T>;
+
+/**
+ * @brief Concept to check if a type is a member of a std::variant
+ * @tparam T The type to check
+ * @tparam Variant The variant type to check against
+ */
+template <typename T, typename Variant>
+struct is_variant_member_impl;
+
+template <typename T, typename... Ts>
+struct is_variant_member_impl<T, std::variant<Ts...>>
+    : std::disjunction<std::is_same<T, Ts>...> {};
+
+template <typename T, typename Variant>
+concept VariantMember = is_variant_member_impl<T, Variant>::value;
+
+/**
+ * @brief Helper variable template for variant member check
+ * @tparam T The type to check
+ * @tparam Variant The variant type to check against
+ */
+template <typename T, typename Variant>
+inline constexpr bool is_variant_member_v = VariantMember<T, Variant>;
+
+/**
+ * @brief Concept for types supported by the SettingValue variant
+ * @tparam T The type to check
+ *
+ * A type is supported if it's directly in the variant, or is a non-bool
+ * integral type (convertible to int64_t), or is a vector of non-bool integral
+ * types (convertible to vector<int64_t>).
+ */
+template <typename T>
+concept SupportedSettingType = VariantMember<T, SettingValue> ||
+                               NonBoolIntegral<T> || NonBoolIntegralVector<T>;
 
 /**
  * @brief Exception thrown when modification of locked settings is requested
@@ -252,12 +281,10 @@ class Settings : public DataClass,
    * @param value The setting value
    * @note This template is disabled for non-int64_t integers to avoid ambiguity
    */
-  template <
-      typename T,
-      typename std::enable_if_t<
-          !is_non_bool_integral_v<T> || std::is_same_v<T, int64_t>, int> = 0>
+  template <typename T>
+    requires(!NonBoolIntegral<T> || std::same_as<T, int64_t>)
   void set(const std::string& key, const T& value) {
-    static_assert(is_supported_type<T>(),
+    static_assert(SupportedSettingType<T>,
                   "Type not supported in SettingValue variant");
     auto it = settings_.find(key);
     if (it == settings_.end()) {
@@ -265,16 +292,16 @@ class Settings : public DataClass,
     }
 
     // If the type is directly in the variant, use it as-is
-    if constexpr (is_variant_member_v<T, SettingValue>) {
+    if constexpr (VariantMember<T, SettingValue>) {
       SettingValue variant_value = value;
       set(key, variant_value);
     }
     // Handle integral types - store as int64_t (signed)
-    else if constexpr (is_non_bool_integral_v<T>) {
+    else if constexpr (NonBoolIntegral<T>) {
       settings_[key] = static_cast<int64_t>(value);
     }
     // Handle integer vector types
-    else if constexpr (is_non_bool_integral_vector_v<T>) {
+    else if constexpr (NonBoolIntegralVector<T>) {
       // Signed integer vectors -> vector<int64_t>
       settings_[key] = _convert_to_int64_vector(value);
     } else {
@@ -282,10 +309,8 @@ class Settings : public DataClass,
     }
   }
 
-  template <typename Integer,
-            typename std::enable_if_t<is_non_bool_integral_v<Integer> &&
-                                          !std::is_same_v<Integer, int64_t>,
-                                      int> = 0>
+  template <typename Integer>
+    requires NonBoolIntegral<Integer> && (!std::same_as<Integer, int64_t>)
   void set(const std::string& key, Integer value) {
     // Check if key exists first
     auto it = settings_.find(key);
@@ -347,7 +372,7 @@ class Settings : public DataClass,
     }
 
     // If the type is directly in the variant, return it
-    if constexpr (is_variant_member_v<T, SettingValue>) {
+    if constexpr (VariantMember<T, SettingValue>) {
       try {
         return std::get<T>(it->second);
       } catch (const std::bad_variant_access&) {
@@ -355,7 +380,7 @@ class Settings : public DataClass,
       }
     }
     // Handle integral type conversions
-    else if constexpr (is_non_bool_integral_v<T>) {
+    else if constexpr (NonBoolIntegral<T>) {
       try {
         // Check which type is actually stored (only int64_t now)
         if (std::holds_alternative<int64_t>(it->second)) {
@@ -369,9 +394,9 @@ class Settings : public DataClass,
       }
     }
     // Handle vector<int> and other integer vector conversions
-    else if constexpr (is_vector_v<T>) {
+    else if constexpr (Vector<T>) {
       using ElementType = typename T::value_type;
-      if constexpr (is_non_bool_integral_v<ElementType>) {
+      if constexpr (NonBoolIntegral<ElementType>) {
         // Try signed vector (vector<int64_t>)
         if (std::holds_alternative<std::vector<int64_t>>(it->second)) {
           const auto& vec64 = std::get<std::vector<int64_t>>(it->second);
@@ -416,12 +441,12 @@ class Settings : public DataClass,
     }
 
     // If the type is directly in the variant, try to get it
-    if constexpr (is_variant_member_v<T, SettingValue>) {
+    if constexpr (VariantMember<T, SettingValue>) {
       try {
         return std::get<T>(it->second);
       } catch (const std::bad_variant_access&) {
         // Fall through to try conversion if T is an integral type
-        if constexpr (is_non_bool_integral_v<T>) {
+        if constexpr (NonBoolIntegral<T>) {
           // Type is in variant but wrong signedness - try conversion
           if (auto result = _try_convert_from<T, int64_t>(it->second)) {
             return *result;
@@ -431,7 +456,7 @@ class Settings : public DataClass,
       }
     }
     // Handle integral type conversions
-    else if constexpr (is_non_bool_integral_v<T>) {
+    else if constexpr (NonBoolIntegral<T>) {
       try {
         // Try conversion from int64_t only
         if (auto result = _try_convert_from<T, int64_t>(it->second)) {
@@ -789,11 +814,11 @@ class Settings : public DataClass,
       std::optional<std::variant<BoundConstraint<T>, ListConstraint<T>>> limit =
           std::nullopt,
       bool documented = true) {
-    static_assert(is_supported_type<T>(),
+    static_assert(SupportedSettingType<T>,
                   "Type not supported in SettingValue variant");
     if (!has(key)) {
       // If the type is directly in the variant, use it as-is
-      if constexpr (is_variant_member_v<T, SettingValue>) {
+      if constexpr (VariantMember<T, SettingValue>) {
         settings_[key] = value;
         if (description.has_value()) {
           descriptions_[key] = *description;
@@ -804,16 +829,16 @@ class Settings : public DataClass,
               [this, &key](const auto& limit_val) {
                 using LimitValType = std::decay_t<decltype(limit_val)>;
                 // Convert to the appropriate Constraint type
-                if constexpr (std::is_same_v<LimitValType,
-                                             BoundConstraint<int64_t>>) {
+                if constexpr (std::same_as<LimitValType,
+                                           BoundConstraint<int64_t>>) {
                   limits_[key] = limit_val;
-                } else if constexpr (std::is_same_v<LimitValType,
-                                                    ListConstraint<int64_t>>) {
+                } else if constexpr (std::same_as<LimitValType,
+                                                  ListConstraint<int64_t>>) {
                   limits_[key] = limit_val;
-                } else if constexpr (std::is_same_v<LimitValType,
-                                                    BoundConstraint<double>>) {
+                } else if constexpr (std::same_as<LimitValType,
+                                                  BoundConstraint<double>>) {
                   limits_[key] = limit_val;
-                } else if constexpr (std::is_same_v<
+                } else if constexpr (std::same_as<
                                          LimitValType,
                                          ListConstraint<std::string>>) {
                   limits_[key] = limit_val;
@@ -827,7 +852,7 @@ class Settings : public DataClass,
         documented_[key] = documented;
       }
       // Handle integral types - store as int64_t (signed)
-      else if constexpr (is_non_bool_integral_v<T>) {
+      else if constexpr (NonBoolIntegral<T>) {
         settings_[key] = static_cast<int64_t>(value);
         if (description.has_value()) {
           descriptions_[key] = *description;
@@ -836,14 +861,13 @@ class Settings : public DataClass,
           std::visit(
               [this, &key](const auto& limit_val) {
                 using LimitValType = std::decay_t<decltype(limit_val)>;
-                if constexpr (std::is_same_v<LimitValType,
-                                             BoundConstraint<T>>) {
+                if constexpr (std::same_as<LimitValType, BoundConstraint<T>>) {
                   // Convert T to int64_t for storage
                   limits_[key] = BoundConstraint<int64_t>{
                       static_cast<int64_t>(limit_val.min),
                       static_cast<int64_t>(limit_val.max)};
-                } else if constexpr (std::is_same_v<LimitValType,
-                                                    ListConstraint<T>>) {
+                } else if constexpr (std::same_as<LimitValType,
+                                                  ListConstraint<T>>) {
                   // Convert T values to int64_t for storage
                   ListConstraint<int64_t> constraint;
                   constraint.allowed_values.reserve(
@@ -864,7 +888,7 @@ class Settings : public DataClass,
         documented_[key] = documented;
       }
       // Handle integer vector types
-      else if constexpr (is_non_bool_integral_vector_v<T>) {
+      else if constexpr (NonBoolIntegralVector<T>) {
         // All integer vectors -> vector<int64_t>
         settings_[key] = _convert_to_int64_vector(value);
         if (description.has_value()) {
@@ -916,50 +940,11 @@ class Settings : public DataClass,
   static constexpr const char* SERIALIZATION_VERSION = "0.1.0";
 
   /**
-   * @brief Helper to check if a type is in the SettingValue variant
-   */
-  template <typename T, typename Variant>
-  struct is_variant_member;
-
-  template <typename T, typename... Ts>
-  struct is_variant_member<T, std::variant<Ts...>>
-      : std::disjunction<std::is_same<T, Ts>...> {};
-
-  template <typename T, typename Variant>
-  inline static constexpr bool is_variant_member_v =
-      is_variant_member<T, Variant>::value;
-
-  /**
-   * @brief Helper to check if a type is a std::vector
-   */
-  template <typename T>
-  struct is_vector : std::false_type {};
-
-  template <typename T, typename A>
-  struct is_vector<std::vector<T, A>> : std::true_type {};
-
-  template <typename T>
-  inline static constexpr bool is_vector_v = is_vector<T>::value;
-
-  template <typename T>
-  struct is_non_bool_integral
-      : std::conjunction<std::is_integral<T>,
-                         std::negation<std::is_same<T, bool>>> {};
-
-  template <typename T>
-  inline static constexpr bool is_non_bool_integral_v =
-      is_non_bool_integral<T>::value;
-
-  template <typename T>
-  inline static constexpr bool is_non_bool_integral_vector_v =
-      is_vector_v<T> && is_non_bool_integral_v<typename T::value_type>;
-
-  /**
    * @brief Helper to try converting from a specific type if it's in the variant
    */
   template <typename TargetT, typename SourceT>
   static std::optional<TargetT> _try_convert_from(const SettingValue& value) {
-    if constexpr (is_variant_member_v<SourceT, SettingValue>) {
+    if constexpr (VariantMember<SourceT, SettingValue>) {
       if (std::holds_alternative<SourceT>(value)) {
         return _safe_convert<TargetT>(std::get<SourceT>(value));
       }
@@ -983,8 +968,8 @@ class Settings : public DataClass,
   template <typename TargetT, typename SourceT>
   static std::optional<TargetT> _safe_convert(const SourceT& value) {
     // Fast path: no conversion needed for 64-bit to same 64-bit type
-    if constexpr (std::is_same_v<TargetT, SourceT> &&
-                  std::is_same_v<TargetT, int64_t>) {
+    if constexpr (std::same_as<TargetT, SourceT> &&
+                  std::same_as<TargetT, int64_t>) {
       return value;
     }
 
@@ -1027,26 +1012,6 @@ class Settings : public DataClass,
 
   /// Flag to indicate if settings are locked
   mutable bool _locked = false;
-
-  /**
-   * @brief Check if a type is supported by SettingValue variant
-   */
-  template <typename T>
-  static constexpr bool is_supported_type() {
-    // Use is_variant_member to check against the actual variant types
-    // Also allow integral types and integer vectors that are convertible
-    if constexpr (is_variant_member_v<T, SettingValue>) {
-      return true;
-    } else if constexpr (is_non_bool_integral_v<T>) {
-      // Allow other integral types that can be safely converted to int64_t
-      return true;
-    } else if constexpr (is_non_bool_integral_vector_v<T>) {
-      // Allow integer vector types that can be converted to vector<int64_t>
-      return true;
-    } else {
-      return false;
-    }
-  }
 
   /**
    * @brief Convert a SettingValue to string representation

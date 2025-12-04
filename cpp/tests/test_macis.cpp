@@ -153,12 +153,12 @@ TEST_F(MacisAsciTest, BasicASCICalculation) {
   // Set minimal ASCI settings for fast execution
   auto& settings = calculator->settings();
   // Use larger number to avoid growth issues
-  settings.set("ntdets_max", int64_t(macis_params::ntdets_max_large));
-  settings.set("ntdets_min", int64_t(macis_params::ntdets_min));
+  settings.set("ntdets_max", macis_params::ntdets_max_large);
+  settings.set("ntdets_min", macis_params::ntdets_min);
   // Disable refinement for speed
-  settings.set("max_refine_iter", int64_t(macis_params::refine_off));
+  settings.set("max_refine_iter", macis_params::refine_off);
   // Smaller growth factor
-  settings.set("grow_factor", int64_t(macis_params::grow_factor));
+  settings.set("grow_factor", macis_params::grow_factor);
 
   auto hamiltonian = hamiltonian_constructor_->run(orbitals_);
 
@@ -170,9 +170,8 @@ TEST_F(MacisAsciTest, BasicASCICalculation) {
   // Verify basic properties of the result
   EXPECT_TRUE(std::isfinite(energy));
   EXPECT_GT(wavefunction.size(), 0);
-  EXPECT_LE(
-      wavefunction.size(),
-      int64_t(macis_params::ntdets_max_large));  // Should respect ntdets_max
+  EXPECT_LE(wavefunction.size(),
+            macis_params::ntdets_max_large);  // Should respect ntdets_max
 
   // Energy should be reasonable (above HF but below exact)
   EXPECT_LT(energy, 0.0);  // Should be negative for bound system
@@ -186,17 +185,13 @@ TEST_F(MacisAsciTest, ASCISettingsConfiguration) {
   auto& settings = calculator->settings();
 
   // Test setting various ASCI parameters
-  EXPECT_NO_THROW(
-      settings.set("ntdets_max", int64_t(macis_params::ntdets_max_small)));
-  EXPECT_NO_THROW(
-      settings.set("ntdets_min", int64_t(macis_params::ntdets_max_large)));
-  EXPECT_NO_THROW(
-      settings.set("ncdets_max", int64_t(macis_params::ncdets_max)));
+  EXPECT_NO_THROW(settings.set("ntdets_max", macis_params::ntdets_max_small));
+  EXPECT_NO_THROW(settings.set("ntdets_min", macis_params::ntdets_max_large));
+  EXPECT_NO_THROW(settings.set("ncdets_max", macis_params::ncdets_max));
   EXPECT_NO_THROW(settings.set("h_el_tol", macis_params::h_el_tol));
   EXPECT_NO_THROW(settings.set("rv_prune_tol", macis_params::rv_prune_tol));
   EXPECT_NO_THROW(settings.set("grow_factor", macis_params::grow_factor));
-  EXPECT_NO_THROW(
-      settings.set("max_refine_iter", int64_t(macis_params::refine_off)));
+  EXPECT_NO_THROW(settings.set("max_refine_iter", macis_params::refine_off));
 
   // Test that settings with these values can be used in a calculation
   auto hamiltonian = hamiltonian_constructor_->run(orbitals_);
@@ -209,8 +204,8 @@ TEST_F(MacisAsciTest, DispatchByNorbDifferentSizes) {
   ASSERT_NE(calculator, nullptr);
 
   auto& settings = calculator->settings();
-  settings.set("ntdets_max", int64_t(macis_params::ntdets_max_small));
-  settings.set("max_refine_iter", int64_t(macis_params::refine_off));
+  settings.set("ntdets_max", macis_params::ntdets_max_small);
+  settings.set("max_refine_iter", macis_params::refine_off);
 
   // Test small active space (< 32 orbitals) - should use wfn_t<64>
   auto water = testing::create_water_structure();
@@ -252,8 +247,8 @@ TEST_F(MacisAsciTest, RDMCalculationSimplified) {
   ASSERT_NE(calculator, nullptr);
 
   auto& settings = calculator->settings();
-  settings.set("ntdets_max", int64_t(macis_params::ntdets_max_small));
-  settings.set("max_refine_iter", int64_t(macis_params::refine_off));
+  settings.set("ntdets_max", macis_params::ntdets_max_small);
+  settings.set("max_refine_iter", macis_params::refine_off);
 
   auto hamiltonian = hamiltonian_constructor_->run(orbitals_);
 
@@ -270,8 +265,8 @@ TEST_F(MacisAsciTest, RDMCalculationSimplified) {
   // Test without RDM calculation
   calculator = MultiConfigurationCalculatorFactory::create("macis_asci");
   auto& settings2 = calculator->settings();
-  settings2.set("ntdets_max", int64_t(macis_params::ntdets_max_small));
-  settings2.set("max_refine_iter", int64_t(macis_params::refine_off));
+  settings2.set("ntdets_max", macis_params::ntdets_max_small);
+  settings2.set("max_refine_iter", macis_params::refine_off);
   settings2.set("calculate_one_rdm", false);
   settings2.set("calculate_two_rdm", false);
 
@@ -285,13 +280,12 @@ TEST_F(MacisAsciTest, MultiConfigurationScfSettingsConversion) {
   ASSERT_NE(calculator, nullptr);
 
   auto& settings = calculator->settings();
-  settings.set("ntdets_max", int64_t(macis_params::ntdets_max_small));
-  settings.set("max_refine_iter", int64_t(macis_params::refine_off));
+  settings.set("ntdets_max", macis_params::ntdets_max_small);
+  settings.set("max_refine_iter", macis_params::refine_off);
 
   // Test QDK-style MultiConfigurationScf settings names
   settings.set("ci_residual_tolerance", testing::ci_energy_tolerance);
-  settings.set("davidson_iterations",
-               int64_t(macis_params::davidson_iterations));
+  settings.set("davidson_iterations", macis_params::davidson_iterations);
   // Note: ci_matel_tol is not available in current settings schema
 
   auto hamiltonian = hamiltonian_constructor_->run(orbitals_);
@@ -301,11 +295,10 @@ TEST_F(MacisAsciTest, MultiConfigurationScfSettingsConversion) {
   // Test MACIS-style settings names
   auto calculator2 = MultiConfigurationCalculatorFactory::create("macis_asci");
   auto& settings2 = calculator2->settings();
-  settings2.set("ntdets_max", int64_t(macis_params::ntdets_max_small));
-  settings2.set("max_refine_iter", int64_t(macis_params::refine_off));
+  settings2.set("ntdets_max", macis_params::ntdets_max_small);
+  settings2.set("max_refine_iter", macis_params::refine_off);
   settings2.set("ci_residual_tolerance", testing::ci_energy_tolerance);
-  settings2.set("davidson_iterations",
-                int64_t(macis_params::davidson_iterations));
+  settings2.set("davidson_iterations", macis_params::davidson_iterations);
 
   auto result2 = calculator2->run(hamiltonian, 3, 3);
   EXPECT_TRUE(std::isfinite(result2.first));
@@ -325,8 +318,8 @@ TEST_F(MacisAsciTest, DifferentActiveSpaceConfigurations) {
 
   auto& settings1 = calculator1->settings();
   // Use standard ASCI parameter name
-  settings1.set("ntdets_max", int64_t(macis_params::ntdets_max_small));
-  settings1.set("max_refine_iter", int64_t(macis_params::refine_off));
+  settings1.set("ntdets_max", macis_params::ntdets_max_small);
+  settings1.set("max_refine_iter", macis_params::refine_off);
 
   auto ham_constructor = HamiltonianConstructorFactory::create();
   auto hamiltonian1 =
@@ -353,8 +346,8 @@ TEST_F(MacisAsciTest, DifferentActiveSpaceConfigurations) {
   auto calculator2 = MultiConfigurationCalculatorFactory::create("macis_asci");
   auto& settings2 = calculator2->settings();
   // Use standard ASCI parameter name
-  settings2.set("ntdets_max", int64_t(macis_params::ntdets_max_small));
-  settings2.set("max_refine_iter", int64_t(macis_params::refine_off));
+  settings2.set("ntdets_max", macis_params::ntdets_max_small);
+  settings2.set("max_refine_iter", macis_params::refine_off);
 
   // This exercises get_active_indices with different indices
   try {
@@ -390,8 +383,8 @@ TEST_F(MacisAsciTest, DifferentActiveElectronConfigurations) {
 
   auto calculator = MultiConfigurationCalculatorFactory::create("macis_asci");
   auto& settings = calculator->settings();
-  settings.set("ntdets_max", int64_t(macis_params::ntdets_max_small));
-  settings.set("max_refine_iter", int64_t(macis_params::refine_off));
+  settings.set("ntdets_max", macis_params::ntdets_max_small);
+  settings.set("max_refine_iter", macis_params::refine_off);
 
   auto hamiltonian_constructor = HamiltonianConstructorFactory::create();
   auto hamiltonian = hamiltonian_constructor->run(
@@ -436,8 +429,8 @@ TEST_F(MacisAsciTest, MixedAlphaBetaActiveSpaces) {
 
   auto calculator = MultiConfigurationCalculatorFactory::create("macis_asci");
   auto& settings = calculator->settings();
-  settings.set("ntdets_max", int64_t(macis_params::ntdets_max_small));
-  settings.set("max_refine_iter", int64_t(macis_params::refine_off));
+  settings.set("ntdets_max", macis_params::ntdets_max_small);
+  settings.set("max_refine_iter", macis_params::refine_off);
 
   auto hamiltonian_constructor = HamiltonianConstructorFactory::create();
   EXPECT_ANY_THROW(auto hamiltonian = hamiltonian_constructor->run(
@@ -459,12 +452,11 @@ TEST_F(MacisAsciTest, MultiConfigurationScfSettingsWithMACISNames) {
   // Set MACIS-style MultiConfigurationScf settings to test the other branch in
   // get_mcscf_settings_
   settings.set("ci_residual_tolerance", testing::ci_energy_tolerance);
-  settings.set("davidson_iterations",
-               int64_t(macis_params::davidson_iterations));
+  settings.set("davidson_iterations", macis_params::davidson_iterations);
 
   // Use standard ASCI parameter name
-  settings.set("ntdets_max", int64_t(macis_params::ntdets_max_small));
-  settings.set("max_refine_iter", int64_t(macis_params::refine_off));
+  settings.set("ntdets_max", macis_params::ntdets_max_small);
+  settings.set("max_refine_iter", macis_params::refine_off);
 
   auto hamiltonian_constructor = HamiltonianConstructorFactory::create();
   auto hamiltonian = hamiltonian_constructor->run(orbitals_);
@@ -486,45 +478,43 @@ TEST_F(MacisAsciTest, ASCISettingsConversion) {
   auto& settings = calculator->settings();
 
   // Set a range of ASCI settings to exercise get_asci_settings_
-  settings.set("ntdets_max", int64_t(macis_params::ntdets_max_large));
-  settings.set("ntdets_min", int64_t(macis_params::ntdets_min));
-  settings.set("ncdets_max", int64_t(macis_params::ncdets_max));
+  settings.set("ntdets_max", macis_params::ntdets_max_large);
+  settings.set("ntdets_min", macis_params::ntdets_min);
+  settings.set("ncdets_max", macis_params::ncdets_max);
   settings.set("h_el_tol", macis_params::h_el_tol);
   settings.set("rv_prune_tol", macis_params::rv_prune_tol);
-  settings.set("pair_size_max", int64_t(macis_params::pair_size_max));
+  settings.set("pair_size_max", macis_params::pair_size_max);
 
   // PT2 settings
   settings.set("pt2_tol", macis_params::pt2_tol);
-  settings.set("pt2_reserve_count", int64_t(macis_params::pt2_reserve_count));
+  settings.set("pt2_reserve_count", macis_params::pt2_reserve_count);
   settings.set("pt2_prune", true);
   settings.set("pt2_precompute_eps", true);
   settings.set("pt2_precompute_idx", true);
   settings.set("pt2_print_progress", false);  // Keep quiet
-  settings.set("pt2_bigcon_thresh", int64_t(macis_params::pt2_bigcon_thresh));
+  settings.set("pt2_bigcon_thresh", macis_params::pt2_bigcon_thresh);
 
   // Growth and refinement settings
-  settings.set("grow_factor", int64_t(macis_params::grow_factor));
+  settings.set("grow_factor", macis_params::grow_factor);
   // Disable refinement
-  settings.set("max_refine_iter", int64_t(macis_params::refine_off));
+  settings.set("max_refine_iter", macis_params::refine_off);
   settings.set("refine_energy_tol", macis_params::refine_energy_tol);
   settings.set("grow_with_rot", false);
-  settings.set("rot_size_start", int64_t(macis_params::rot_size_start));
+  settings.set("rot_size_start", macis_params::rot_size_start);
   settings.set("just_singles", false);
 
   // Constraint settings
-  settings.set("constraint_level",
-               int64_t(macis_params::constraint_level_default));
+  settings.set("constraint_level", macis_params::constraint_level_default);
   settings.set("pt2_max_constraint_level",
-               int64_t(macis_params::pt2_max_constraint_level));
+               macis_params::pt2_max_constraint_level);
   settings.set("pt2_min_constraint_level",
-               int64_t(macis_params::pt2_min_constraint_level));
+               macis_params::pt2_min_constraint_level);
   settings.set("pt2_constraint_refine_force",
                macis_params::pt2_constraint_refine_force);
 
   // Nxtval settings
-  settings.set("nxtval_bcount_thresh",
-               int64_t(macis_params::nxtval_bcount_thresh));
-  settings.set("nxtval_bcount_inc", int64_t(macis_params::nxtval_bcount_inc));
+  settings.set("nxtval_bcount_thresh", macis_params::nxtval_bcount_thresh);
+  settings.set("nxtval_bcount_inc", macis_params::nxtval_bcount_inc);
 
   auto hamiltonian_constructor = HamiltonianConstructorFactory::create();
   auto hamiltonian = hamiltonian_constructor->run(orbitals_);
@@ -547,8 +537,8 @@ TEST_F(MacisAsciTest, ASCISettingsWithDefaults) {
 
   // Set only minimal settings - others should use MACIS defaults
   // Use standard ASCI parameter name
-  settings.set("ntdets_max", int64_t(macis_params::ntdets_max_small));
-  settings.set("max_refine_iter", int64_t(macis_params::refine_off));
+  settings.set("ntdets_max", macis_params::ntdets_max_small);
+  settings.set("max_refine_iter", macis_params::refine_off);
 
   auto hamiltonian_constructor = HamiltonianConstructorFactory::create();
   auto hamiltonian = hamiltonian_constructor->run(orbitals_);
@@ -583,10 +573,8 @@ TEST_F(MacisAsciTest, NoActiveSpaceSetup) {
 
   // Test that we can configure the calculator with minimal settings
   auto& settings = calculator->settings();
-  EXPECT_NO_THROW(
-      settings.set("ntdets_max", int64_t(macis_params::ntdets_max_small)));
-  EXPECT_NO_THROW(
-      settings.set("max_refine_iter", int64_t(macis_params::refine_off)));
+  EXPECT_NO_THROW(settings.set("ntdets_max", macis_params::ntdets_max_small));
+  EXPECT_NO_THROW(settings.set("max_refine_iter", macis_params::refine_off));
 
   auto hamiltonian_constructor = HamiltonianConstructorFactory::create();
   EXPECT_NE(hamiltonian_constructor, nullptr);
@@ -643,8 +631,7 @@ TEST_F(MacisAsciTest, MacisCasBasicCalculation) {
   // Set basic MultiConfigurationScf settings for CASCI
   auto& settings = calculator->settings();
   settings.set("ci_residual_tolerance", testing::ci_energy_tolerance);
-  settings.set("davidson_iterations",
-               int64_t(macis_params::davidson_iterations));
+  settings.set("davidson_iterations", macis_params::davidson_iterations);
   // Note: ci_matel_tol is not available in current settings schema
 
   auto hamiltonian_constructor = HamiltonianConstructorFactory::create();
@@ -676,8 +663,7 @@ TEST_F(MacisAsciTest, MacisCasWithOneRDM) {
 
   auto& settings = calculator->settings();
   settings.set("ci_residual_tolerance", testing::ci_energy_tolerance);
-  settings.set("davidson_iterations",
-               int64_t(macis_params::davidson_iterations));
+  settings.set("davidson_iterations", macis_params::davidson_iterations);
   settings.set("calculate_one_rdm", true);  // Enable 1-RDM calculation
 
   auto hamiltonian_constructor = HamiltonianConstructorFactory::create();
@@ -711,8 +697,7 @@ TEST_F(MacisAsciTest, MacisCasWithTwoRDM) {
 
   auto& settings = calculator->settings();
   settings.set("ci_residual_tolerance", testing::ci_energy_tolerance);
-  settings.set("davidson_iterations",
-               int64_t(macis_params::davidson_iterations));
+  settings.set("davidson_iterations", macis_params::davidson_iterations);
   settings.set("calculate_two_rdm", true);  // Enable 2-RDM calculation
 
   auto hamiltonian_constructor = HamiltonianConstructorFactory::create();
@@ -745,8 +730,7 @@ TEST_F(MacisAsciTest, MacisCasWithBothRDMs) {
 
   auto& settings = calculator->settings();
   settings.set("ci_residual_tolerance", testing::ci_energy_tolerance);
-  settings.set("davidson_iterations",
-               int64_t(macis_params::davidson_iterations));
+  settings.set("davidson_iterations", macis_params::davidson_iterations);
   settings.set("calculate_one_rdm", true);
   settings.set("calculate_two_rdm", true);  // Enable both RDMs
 
@@ -784,8 +768,7 @@ TEST_F(MacisAsciTest, MacisCasDifferentActiveSizes) {
 
   auto& settings = calculator->settings();
   settings.set("ci_residual_tolerance", testing::ci_energy_tolerance);
-  settings.set("davidson_iterations",
-               int64_t(macis_params::davidson_iterations));
+  settings.set("davidson_iterations", macis_params::davidson_iterations);
 
   auto hamiltonian_constructor = HamiltonianConstructorFactory::create();
   auto hamiltonian = hamiltonian_constructor->run(orbitals_small);
@@ -829,8 +812,7 @@ TEST_F(MacisAsciTest, MacisCasFullActiveSpace) {
   auto& settings = calculator->settings();
   settings.set("ci_residual_tolerance",
                1e-6);  // Looser tolerance for larger calculation
-  settings.set("davidson_iterations",
-               int64_t(macis_params::davidson_iterations));
+  settings.set("davidson_iterations", macis_params::davidson_iterations);
 
   auto hamiltonian_constructor = HamiltonianConstructorFactory::create();
   auto hamiltonian = hamiltonian_constructor->run(orbitals_full);
@@ -861,8 +843,7 @@ TEST_F(MacisAsciTest, MacisCasSettingsHandling) {
   // Should map to ci_res_tol
   settings.set("ci_residual_tolerance", testing::ci_energy_tolerance);
   // Should map to ci_max_subspace
-  settings.set("davidson_iterations",
-               int64_t(macis_params::davidson_iterations));
+  settings.set("davidson_iterations", macis_params::davidson_iterations);
   // Note: ci_matel_tol is not available in current settings schema
 
   auto hamiltonian_constructor = HamiltonianConstructorFactory::create();
@@ -889,8 +870,7 @@ TEST_F(MacisAsciTest, MacisCasMACISStyleSettings) {
 
   // Test MACIS-style settings names directly
   settings.set("ci_residual_tolerance", testing::ci_energy_tolerance);
-  settings.set("davidson_iterations",
-               int64_t(macis_params::davidson_iterations));
+  settings.set("davidson_iterations", macis_params::davidson_iterations);
   // Note: ci_matel_tol is not available in current settings schema
 
   auto hamiltonian_constructor = HamiltonianConstructorFactory::create();
@@ -921,8 +901,7 @@ TEST_F(MacisAsciTest, MacisCasDeterminantHandling) {
 
   auto& settings = calculator->settings();
   settings.set("ci_residual_tolerance", testing::ci_energy_tolerance);
-  settings.set("davidson_iterations",
-               int64_t(macis_params::davidson_iterations));
+  settings.set("davidson_iterations", macis_params::davidson_iterations);
 
   auto hamiltonian_constructor = HamiltonianConstructorFactory::create();
   auto hamiltonian = hamiltonian_constructor->run(orbitals_small);
@@ -961,7 +940,7 @@ TEST_F(MacisAsciTest, MacisCasSelectiveRDMEvaluation) {
     ASSERT_NE(c, nullptr);
     auto& s = c->settings();
     s.set("ci_residual_tolerance", testing::ci_energy_tolerance);
-    s.set("davidson_iterations", int64_t(macis_params::davidson_iterations));
+    s.set("davidson_iterations", macis_params::davidson_iterations);
     s.set("calculate_one_rdm", calc_one_rdm);
     s.set("calculate_two_rdm", calc_two_rdm);
     auto [E, wfn] = c->run(hamiltonian, 2, 2);
@@ -1131,8 +1110,8 @@ TEST_F(MacisPmcTest, PMCSettingsConfiguration) {
   EXPECT_NO_THROW(settings.set("h_el_tol", macis_params::h_el_tol));
   EXPECT_NO_THROW(
       settings.set("ci_residual_tolerance", testing::ci_energy_tolerance));
-  EXPECT_NO_THROW(settings.set("davidson_iterations",
-                               int64_t(macis_params::davidson_iterations)));
+  EXPECT_NO_THROW(
+      settings.set("davidson_iterations", macis_params::davidson_iterations));
 
   // Test that settings with these values can be used in a calculation
   auto hamiltonian = hamiltonian_constructor_->run(orbitals_);

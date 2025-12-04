@@ -160,6 +160,12 @@ nitpick_ignore_regex = [
     (r"cpp:identifier", r"nlohmann.*"),
     (r"cpp:identifier", r"qcs.*"),
     (r"cpp:identifier", r".*::value"),
+    # C++20 concepts - Sphinx/Breathe doesn't fully support concept references yet
+    (r"cpp:identifier", r"NonBoolIntegral<.*>"),
+    (r"cpp:identifier", r"NonBoolIntegralVector<.*>"),
+    (r"cpp:identifier", r"VariantMember<.*>"),
+    (r"cpp:identifier", r"Vector<.*>"),
+    (r"cpp:identifier", r"SupportedSettingType<.*>"),
     (r"py:class", r"qsharp._qsharp.*"),
     (r"py:class", r"h5py.*"),
     (r"py:class", r"numpy.*"),
