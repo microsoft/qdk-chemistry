@@ -17,9 +17,11 @@ from pathlib import Path
 
 # Import some tools for convenience
 from qdk_chemistry._core import QDKChemistryConfig
+from qdk_chemistry.utils.telemetry import TELEMETRY_ENABLED
 from qdk_chemistry.utils import telemetry_events
 
-telemetry_events.on_qdk_chemistry_import()
+if TELEMETRY_ENABLED:
+    telemetry_events.on_qdk_chemistry_import()
 
 _DOCS_MODE = os.getenv("QDK_CHEMISTRY_DOCS", "0") == "1"
 

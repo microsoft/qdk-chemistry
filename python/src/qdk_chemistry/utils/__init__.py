@@ -8,5 +8,15 @@
 
 # Import C++ utilities from the compiled extension
 from qdk_chemistry._core.utils import compute_valence_space_parameters
+from qdk_chemistry.utils.telemetry import (
+    disable_telemetry,
+    enable_telemetry,
+    is_telemetry_enabled
+)
 
-__all__ = ["compute_valence_space_parameters"]
+__all__ = [
+    "compute_valence_space_parameters",
+    "disable_telemetry",
+    "enable_telemetry",
+    "is_telemetry_enabled"
+    ]
