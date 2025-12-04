@@ -42,8 +42,6 @@ from qdk_chemistry.utils.time_evolution import (
     extract_terms_from_hamiltonian,
 )
 
-_LOGGER = Logger.QDK_LOGGER(__name__)
-
 __all__: list[str] = []
 
 
@@ -73,7 +71,7 @@ class IterativePhaseEstimation(PhaseEstimation):
         """
         super().__init__(hamiltonian, evolution_time)
         self._terms: list[PauliEvolutionTerm] = extract_terms_from_hamiltonian(hamiltonian)
-        _LOGGER.debug(
+        Logger.debug(
             f"Initialized {self.__class__.__name__} with {len(self._terms)} evolution terms and "
             f"evolution time {evolution_time:.6f}."
         )
@@ -130,7 +128,7 @@ class IterativePhaseEstimation(PhaseEstimation):
         control = ancilla[0]
         system_qubits = list(system)
 
-        _LOGGER.debug(
+        Logger.debug(
             f"Creating IQPE iteration {iteration + 1}/{total_iterations} with phase correction {phase_correction:.6f}."
         )
 
@@ -150,7 +148,7 @@ class IterativePhaseEstimation(PhaseEstimation):
 
         circuit.h(control)
         circuit.measure(control, classical[0])
-        _LOGGER.debug(
+        Logger.debug(
             f"Completed IQPE iteration {iteration + 1}/{total_iterations} producing circuit with {circuit.num_qubits} "
             f"qubits and {circuit.num_clbits} classical bits."
         )
@@ -267,7 +265,7 @@ class IterativePhaseEstimation(PhaseEstimation):
             measurement_register = None if measurement_registers is None else measurement_registers[idx]
             iteration_name = None if iteration_names is None else iteration_names[idx]
 
-            _LOGGER.debug(f"Assembling IQPE iteration object {idx + 1}/{num_bits}.")
+            Logger.debug(f"Assembling IQPE iteration object {idx + 1}/{num_bits}.")
 
             iteration_circuit = self.create_iteration(
                 state_prep,

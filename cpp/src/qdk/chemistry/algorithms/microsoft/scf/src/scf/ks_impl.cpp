@@ -36,8 +36,8 @@ KSImpl::KSImpl(std::shared_ptr<Molecule> mol, const SCFConfig& cfg)
 #endif
   auto& bs = ctx_.basis_set;
   if (cfg.mpi.world_rank == 0) {
-    QDK_LOGGER()->info("xc={}, grid_level={}", cfg.exc.xc_name,
-                       gauxc_util::to_string(cfg.xc_input.grid_spec));
+    QDK_LOGGER().info("xc={}, grid_level={}", cfg.exc.xc_name,
+                      gauxc_util::to_string(cfg.xc_input.grid_spec));
   }
   XC_ = RowMajorMatrix::Zero(num_density_matrices_ * num_atomic_orbitals_,
                              num_atomic_orbitals_);
@@ -127,7 +127,7 @@ std::tuple<double, double, double> KSImpl::get_hyb_coeff_() const {
 const RowMajorMatrix KSImpl::get_vxc_grad_() const {
   QDK_LOG_TRACE_ENTERING();
   if (ctx_.cfg->mpi.world_rank == 0) {
-    QDK_LOGGER()->trace("Calculating EXC gradients");
+    QDK_LOGGER().trace("Calculating EXC gradients");
   }
   RowMajorMatrix grad = RowMajorMatrix::Zero(3, ctx_.mol->n_atoms);
   TIMEIT(exc_->get_gradients(P_.data(), grad.data()), "EXC::get_gradients");

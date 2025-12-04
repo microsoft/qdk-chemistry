@@ -98,36 +98,35 @@ SCFImpl::SCFImpl(std::shared_ptr<Molecule> mol_ptr, const SCFConfig& cfg,
         fock_string += "K";
     }
 
-    QDK_LOGGER()->info(
+    QDK_LOGGER().info(
         "mol: atoms={}, electrons={}, n_ecp_electrons={}, charge={}, "
         "multiplicity={}, spin(2S)={}, alpha={}, beta={}",
         mol.n_atoms, mol.n_electrons, n_ecp_electrons, mol.charge,
         mol.multiplicity, spin, alpha, beta);
-    QDK_LOGGER()->info(
+    QDK_LOGGER().info(
         "restricted={}, basis={}, pure={}, num_atomic_orbitals={}, "
         "density_threshold={:.2e}, "
         "og_threshold={:.2e}",
         !cfg.unrestricted, ctx_.basis_set->name, ctx_.basis_set->pure,
         num_atomic_orbitals_, cfg.scf_algorithm.density_threshold,
         cfg.scf_algorithm.og_threshold);
-    QDK_LOGGER()->info("fock_alg={}", fock_string);
+    QDK_LOGGER().info("fock_alg={}", fock_string);
     if (cfg.do_dfj) {
-      QDK_LOGGER()->info("aux_basis={}, naux={}", ctx_.aux_basis_set->name,
-                         ctx_.aux_basis_set->num_atomic_orbitals);
+      QDK_LOGGER().info("aux_basis={}, naux={}", ctx_.aux_basis_set->name,
+                        ctx_.aux_basis_set->num_atomic_orbitals);
     }
-    QDK_LOGGER()->info("eri_tolerance={:.2e}", cfg.eri.eri_threshold);
+    QDK_LOGGER().info("eri_tolerance={:.2e}", cfg.eri.eri_threshold);
 
 #ifdef QDK_CHEMISTRY_ENABLE_DFTD3
-    QDK_LOGGER()->info("disp={}", to_string(cfg.disp));
+    QDK_LOGGER().info("disp={}", to_string(cfg.disp));
 #endif
 
 #ifdef QDK_CHEMISTRY_ENABLE_PCM
-    QDK_LOGGER()->info("enable_pcm={}, use_ddx={}", cfg.enable_pcm,
-                       cfg.use_ddx);
+    QDK_LOGGER().info("enable_pcm={}, use_ddx={}", cfg.enable_pcm, cfg.use_ddx);
 #endif
 
 #ifdef QDK_CHEMISTRY_ENABLE_QMMM
-    QDK_LOGGER()->info("qmmm={}", add_mm_charge_);
+    QDK_LOGGER().info("qmmm={}", add_mm_charge_);
 #endif
 
 #ifdef _OPENMP
@@ -135,12 +134,12 @@ SCFImpl::SCFImpl(std::shared_ptr<Molecule> mol_ptr, const SCFConfig& cfg,
 #else
     int nthreads = 1;
 #endif
-    QDK_LOGGER()->info("world_size={}, omp_get_max_threads={}",
-                       cfg.mpi.world_size, nthreads);
+    QDK_LOGGER().info("world_size={}, omp_get_max_threads={}",
+                      cfg.mpi.world_size, nthreads);
   }
   if (cfg.verbose > 5) {
-    QDK_LOGGER()->info("eri_method={}, exc_method={}",
-                       to_string(cfg.eri.method), to_string(cfg.exc.method));
+    QDK_LOGGER().info("eri_method={}, exc_method={}", to_string(cfg.eri.method),
+                      to_string(cfg.exc.method));
   }
   VERIFY_INPUT(alpha >= 0 && beta >= 0 && beta == alpha - spin,
                "Invalid spin number or charge");
@@ -286,17 +285,17 @@ const SCFContext& SCFImpl::run() {
                          ctx_.mol->atomic_nums[A], res.mulliken_population[A]);
     }
     oss << fmt::format("{:-^65}", "");
-    QDK_LOGGER()->info("SCF converged: steps={}, E={:.12f}\n{}",
-                       res.scf_iterations, res.scf_total_energy, oss.str());
+    QDK_LOGGER().info("SCF converged: steps={}, E={:.12f}\n{}",
+                      res.scf_iterations, res.scf_total_energy, oss.str());
   }
 
   // Compute Gradient
   if (cfg.require_gradient) {
     if (cfg.mpi.world_rank == 0) {
-      QDK_LOGGER()->info("Calculating gradient");
+      QDK_LOGGER().info("Calculating gradient");
 #ifdef QDK_CHEMISTRY_ENABLE_QMMM
       if (add_mm_charge_) {
-        QDK_LOGGER()->info(
+        QDK_LOGGER().info(
             "Calculating molecules' and point charges' gradients with respect "
             "to each other");
       }
@@ -317,7 +316,7 @@ const SCFContext& SCFImpl::run() {
   // Compute polarizability
   if (cfg.require_polarizability) {
     if (cfg.mpi.world_rank == 0) {
-      QDK_LOGGER()->info("Calculating Static polarizability");
+      QDK_LOGGER().info("Calculating Static polarizability");
     }
     polarizability_();
   }
@@ -429,7 +428,7 @@ void SCFImpl::compute_orthogonalization_matrix_(const RowMajorMatrix& S_,
   }
 
   if (num_atomic_orbitals_ != num_molecular_orbitals_) {
-    QDK_LOGGER()->warn(
+    QDK_LOGGER().warn(
         "Orthogonalize: found linear dependency TOL={:.2e} "
         "num_atomic_orbitals_={} "
         "num_molecular_orbitals_={}",
@@ -476,8 +475,8 @@ void SCFImpl::iterate_() {
       dftd3_wrapper(*ctx_.mol, ctx_.cfg->exc.xc_name, ctx_.cfg->disp,
                     false /*atm*/, &res.scf_dispersion_correction_energy,
                     disp_grad_.data());
-      QDK_LOGGER()->debug("Dispersion energy: {}",
-                          res.scf_dispersion_correction_energy);
+      QDK_LOGGER().debug("Dispersion energy: {}",
+                         res.scf_dispersion_correction_energy);
     }
 #endif
   }
@@ -509,7 +508,7 @@ void SCFImpl::iterate_() {
         step % cfg->fock_reset_steps == 0) {
       P_diff = P_;
       if (cfg->mpi.world_rank == 0) {
-        QDK_LOGGER()->info("Reset incremental Fock matrix");
+        QDK_LOGGER().info("Reset incremental Fock matrix");
         reset_fock_();
       }
     } else {
@@ -741,7 +740,7 @@ const std::vector<double>& SCFImpl::get_gradients_() {
   auto [alpha, beta, omega] = get_hyb_coeff_();
   RowMajorMatrix dJ = RowMajorMatrix::Zero(3, n_atoms);
   RowMajorMatrix dK = RowMajorMatrix::Zero(3, n_atoms);
-  QDK_LOGGER()->trace("Calculating ERI gradients");
+  QDK_LOGGER().trace("Calculating ERI gradients");
   eri_->get_gradients(P_.data(), dJ.data(), dK.data(), alpha, beta, omega);
   dE += dJ + dK;
 
@@ -795,13 +794,13 @@ void SCFImpl::init_density_matrix_() {
     if (ifsDM.is_open()) {
       ifsDM.read((char*)P_.data(), P_.size() * sizeof(double));
       if (ctx_.cfg->mpi.world_rank == 0) {
-        QDK_LOGGER()->info("Guess read from file: {}",
-                           ctx_.cfg->density_init_file);
+        QDK_LOGGER().info("Guess read from file: {}",
+                          ctx_.cfg->density_init_file);
       }
     } else {
       if (ctx_.cfg->mpi.world_rank == 0) {
-        QDK_LOGGER()->error("Failed to open dm file: {}",
-                            ctx_.cfg->density_init_file);
+        QDK_LOGGER().error("Failed to open dm file: {}",
+                           ctx_.cfg->density_init_file);
         exit(EXIT_FAILURE);
       }
     }
@@ -821,7 +820,7 @@ void SCFImpl::init_density_matrix_() {
            sizeof(double) * num_atomic_orbitals_ * num_atomic_orbitals_);
     P_ *= 0.5;
     if (nelec_[0] == nelec_[1]) {  // spin(2S) = alpha - beta = 0
-      QDK_LOGGER()->warn(
+      QDK_LOGGER().warn(
           "Breaking symmetry not implemented for spin 0 molecule");
     }
   }
@@ -962,9 +961,9 @@ void SCFImpl::write_gradients_(const std::vector<double>& gradients,
   }
   oss << fmt::format("{:-^47}", "");
   if (mol != nullptr) {
-    QDK_LOGGER()->info("Molecule gradients:\n{}", oss.str());
+    QDK_LOGGER().info("Molecule gradients:\n{}", oss.str());
   } else {
-    QDK_LOGGER()->info("Point Charge gradients:\n{}", oss.str());
+    QDK_LOGGER().info("Point Charge gradients:\n{}", oss.str());
   }
 }
 

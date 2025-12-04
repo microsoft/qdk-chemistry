@@ -23,8 +23,6 @@ from qdk_chemistry.definitions import (
 )
 from qdk_chemistry.utils import Logger
 
-_LOGGER = Logger.QDK_LOGGER(__name__)
-
 __all__ = ["CircuitInfo", "analyze_qubit_status", "plot_circuit_diagram"]
 
 
@@ -204,7 +202,7 @@ def plot_circuit_diagram(
         remove_status.append("idle")
     if remove_classical_qubits:
         remove_status.append("classical")
-        _LOGGER.info(
+        Logger.info(
             "Removing classical qubits will also remove any control operations sourced from them "
             "and measurements involving them."
         )
@@ -228,7 +226,7 @@ def plot_circuit_diagram(
         kept_clbit_indices = list(range(len(circuit.clbits)))
 
     if not kept_clbit_indices and len(circuit.clbits) > 0:
-        _LOGGER.warn("All measurements are dropped, no classical bits remain.")
+        Logger.warn("All measurements are dropped, no classical bits remain.")
 
     new_qc = QuantumCircuit(len(kept_qubit_indices), len(kept_clbit_indices))
     qubit_map = {circuit.qubits[i]: new_qc.qubits[new_i] for new_i, i in enumerate(kept_qubit_indices)}
@@ -246,7 +244,7 @@ def plot_circuit_diagram(
             circuit_drawer(new_qc, output="mpl", filename=output_file, **draw_kwargs)
             return None
         except MemoryError:
-            _LOGGER.warn("MemoryError: Failed to save circuit diagram.")
+            Logger.warn("MemoryError: Failed to save circuit diagram.")
             return None
     else:
         return new_qc.draw("mpl", **draw_kwargs)

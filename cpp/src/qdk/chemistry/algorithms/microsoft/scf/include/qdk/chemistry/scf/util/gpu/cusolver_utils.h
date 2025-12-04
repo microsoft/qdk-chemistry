@@ -17,14 +17,14 @@
  *
  * Throws std::runtime_error if the cuSOLVER call fails.
  */
-#define CUSOLVER_CHECK(err)                                               \
-  do {                                                                    \
-    cusolverStatus_t err_ = (err);                                        \
-    if (err_ != CUSOLVER_STATUS_SUCCESS) {                                \
-      QDK_LOGGER()->critical("cuSOLVER error {} at {}:{}",                \
-                             static_cast<int>(err_), __FILE__, __LINE__); \
-      throw std::runtime_error("cuSOLVER error");                         \
-    }                                                                     \
+#define CUSOLVER_CHECK(err)                                              \
+  do {                                                                   \
+    cusolverStatus_t err_ = (err);                                       \
+    if (err_ != CUSOLVER_STATUS_SUCCESS) {                               \
+      QDK_LOGGER().critical("cuSOLVER error {} at {}:{}",                \
+                            static_cast<int>(err_), __FILE__, __LINE__); \
+      throw std::runtime_error("cuSOLVER error");                        \
+    }                                                                    \
   } while (0)
 
 namespace qdk::chemistry::scf::cusolver {

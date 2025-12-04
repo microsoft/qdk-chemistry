@@ -30,7 +30,7 @@ void init_memory_pool(int device) {
   QDK_LOG_TRACE_ENTERING();
   static bool initialized[MAX_NUM_DEVICE] = {false};
   if (!initialized[device]) {
-    QDK_LOGGER()->trace("Configure memory pool for device {}", device);
+    QDK_LOGGER().trace("Configure memory pool for device {}", device);
     cudaMemPool_t mempool;
     cudaDeviceGetDefaultMemPool(&mempool, device);
     uint64_t threshold = UINT64_MAX;
@@ -42,8 +42,8 @@ void init_memory_pool(int device) {
 
 void trim_memory_pool(size_t bytes, int device) {
   QDK_LOG_TRACE_ENTERING();
-  QDK_LOGGER()->trace("Trim memory pool to {} bytes for device {}", bytes,
-                      device);
+  QDK_LOGGER().trace("Trim memory pool to {} bytes for device {}", bytes,
+                     device);
   cudaMemPool_t mempool;
   cudaDeviceGetDefaultMemPool(&mempool, device);
   CUDA_CHECK(cudaMemPoolTrimTo(mempool, bytes));

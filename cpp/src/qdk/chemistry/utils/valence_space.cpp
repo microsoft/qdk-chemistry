@@ -76,7 +76,7 @@ std::pair<size_t, size_t> compute_valence_space_parameters(
   for (size_t i = 0; i < structure->get_num_atoms(); ++i) {
     const Element element = structure->get_atom_element(i);
     if (((unsigned)element > 86)) {
-      QDK_LOGGER()->warn(
+      QDK_LOGGER().warn(
           "valence active parameters are only implemented up through period-6 "
           "elements. "
           "Element atomic number: {}",

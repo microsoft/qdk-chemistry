@@ -115,7 +115,7 @@ class QiskitEnergyEstimator(EnergyEstimator):
         bitstring_counts: list[dict[str, int] | None] = []
         for i, meas_circuit in enumerate(measurement_circuits):
             shots = shots_list[i]
-            _LOGGER.debug(f"Running backend with circuit {i} and {shots} shots")
+            Logger.debug(f"Running backend with circuit {i} and {shots} shots")
             result = self.backend.run(meas_circuit, shots=shots).result().results[0].data.counts
             bitstring_counts.append(result)
         return bitstring_counts
@@ -185,7 +185,7 @@ class QiskitEnergyEstimator(EnergyEstimator):
 
         # Evenly distribute shots across all observables
         shots_list = [total_shots // num_observables] * num_observables
-        _LOGGER.debug(f"Shots allocated: {shots_list}")
+        Logger.debug(f"Shots allocated: {shots_list}")
 
         energy_offset = sum(classical_coeffs) if classical_coeffs else 0.0
 

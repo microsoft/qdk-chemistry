@@ -57,7 +57,7 @@ void DensityFittingBase::generate_metric() {
   const size_t naux = abs_.nbf();
   const size_t metric_sz = naux * naux;
 
-  if (!mpi_.world_rank) QDK_LOGGER()->trace("Generating DF Metric via Libint2");
+  if (!mpi_.world_rank) QDK_LOGGER().trace("Generating DF Metric via Libint2");
   h_metric_ = libint2_util::metric_df(basis_mode_, abs_);
 #ifdef QDK_CHEMISTRY_ENABLE_GPU
   cublasHandle_ = std::make_unique<cublas::ManagedcuBlasHandle>();
@@ -67,7 +67,7 @@ void DensityFittingBase::generate_metric() {
   if (gpu_) {
     // Allocate ERIs on the device and ship data
     if (!mpi_.world_rank)
-      QDK_LOGGER()->trace("Saving DF Metric in Device Memory");
+      QDK_LOGGER().trace("Saving DF Metric in Device Memory");
     CUDA_CHECK(cudaMallocAsync(&d_metric_, metric_sz * sizeof(double), 0));
     CUDA_CHECK(cudaStreamSynchronize(0));
     CUDA_CHECK(cudaMemcpy(d_metric_, h_metric_.get(),
@@ -84,8 +84,7 @@ void DensityFittingBase::generate_metric() {
 #endif
   } else {
 #endif
-    if (!mpi_.world_rank)
-      QDK_LOGGER()->trace("Saving DF Metric in Host Memory");
+    if (!mpi_.world_rank) QDK_LOGGER().trace("Saving DF Metric in Host Memory");
 #if QDK_CHEMISTRY_DF_INV_METHOD == QDK_CHEMISTRY_DF_CHOLESKY
     // Cholesky factorization
     lapack::potrf(lapack::Uplo::Lower, naux, h_metric_.get(), naux);

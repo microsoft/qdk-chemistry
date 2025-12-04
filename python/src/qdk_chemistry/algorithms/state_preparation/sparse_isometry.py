@@ -47,8 +47,6 @@ from qdk_chemistry.data import Circuit, Wavefunction
 from qdk_chemistry.utils.bitstring import bitstrings_to_binary_matrix, separate_alpha_beta_to_binary_string
 from qdk_chemistry.utils import Logger
 
-_LOGGER = Logger.QDK_LOGGER(__name__)
-
 __all__: list[str] = []
 
 
@@ -123,11 +121,11 @@ class SparseIsometryGF2XStatePreparation(StatePreparation):
 
         # Check for single determinant case after filtering
         if len(bitstrings) == 1:
-            _LOGGER.info("After filtering, only 1 determinant remains, using single reference state preparation")
+            Logger.info("After filtering, only 1 determinant remains, using single reference state preparation")
             return _prepare_single_reference_state(bitstrings[0])
 
         n_qubits = len(bitstrings[0])
-        _LOGGER.debug(f"Using {len(bitstrings)} determinants for state preparation")
+        Logger.debug(f"Using {len(bitstrings)} determinants for state preparation")
 
         # Step 1: Convert bitstrings to binary matrix
         bitstring_matrix = bitstrings_to_binary_matrix(bitstrings)
@@ -136,14 +134,14 @@ class SparseIsometryGF2XStatePreparation(StatePreparation):
         # (includes duplicate removal, all-ones removal, and GF2)
         gf2x_operation_results = gf2x_with_tracking(bitstring_matrix)
 
-        _LOGGER.debug(f"Original matrix shape: {bitstring_matrix.shape}")
-        _LOGGER.debug(f"Reduced matrix shape: {gf2x_operation_results.reduced_matrix.shape}")
-        _LOGGER.debug(f"Matrix rank: {gf2x_operation_results.rank}")
-        _LOGGER.debug(f"Total operations: {len(gf2x_operation_results.operations)}")
+        Logger.debug(f"Original matrix shape: {bitstring_matrix.shape}")
+        Logger.debug(f"Reduced matrix shape: {gf2x_operation_results.reduced_matrix.shape}")
+        Logger.debug(f"Matrix rank: {gf2x_operation_results.rank}")
+        Logger.debug(f"Total operations: {len(gf2x_operation_results.operations)}")
 
         # Log operations by type
-        _LOGGER.debug(f"CNOT operations: {[op for op in gf2x_operation_results.operations if op[0] == 'cnot']}")
-        _LOGGER.debug(f"X operations: {[op for op in gf2x_operation_results.operations if op[0] == 'x']}")
+        Logger.debug(f"CNOT operations: {[op for op in gf2x_operation_results.operations if op[0] == 'cnot']}")
+        Logger.debug(f"X operations: {[op for op in gf2x_operation_results.operations if op[0] == 'x']}")
 
         # Step 3: Create quantum circuit
         qc = QuantumCircuit(
@@ -173,7 +171,7 @@ class SparseIsometryGF2XStatePreparation(StatePreparation):
                 # Assign the coefficient to the correct statevector index
                 statevector_data[statevector_index] = coeffs[det_idx]
 
-                _LOGGER.debug(
+                Logger.debug(
                     f"Determinant {det_idx}: coeff={coeffs[det_idx]:.6f}, "
                     f"reduced_column={reduced_column.tolist()}, "
                     f"bitstring='{bitstring}', sv_index={statevector_index}"
@@ -184,18 +182,18 @@ class SparseIsometryGF2XStatePreparation(StatePreparation):
             if norm > 0:
                 statevector_data /= norm
 
-            _LOGGER.debug(f"Statevector created for reduced matrix with rank {gf2x_operation_results.rank}")
-            _LOGGER.debug(f"Statevector shape: {len(statevector_data)}")
-            _LOGGER.debug("Non-zero elements in statevector:")
+            Logger.debug(f"Statevector created for reduced matrix with rank {gf2x_operation_results.rank}")
+            Logger.debug(f"Statevector shape: {len(statevector_data)}")
+            Logger.debug("Non-zero elements in statevector:")
             for i, amp in enumerate(statevector_data):
                 bitstring_repr = format(i, f"0{gf2x_operation_results.rank}b")
-                _LOGGER.debug(f"  |{bitstring_repr}⟩: {amp:.6f}")
+                Logger.debug(f"  |{bitstring_repr}⟩: {amp:.6f}")
 
             # Create Statevector object for StatePreparation
             statevector = Statevector(statevector_data)
 
             # Step 5: Apply dense state preparation on reduced space
-            _LOGGER.debug(f"Target indices are {gf2x_operation_results.row_map}")
+            Logger.debug(f"Target indices are {gf2x_operation_results.row_map}")
             qc.append(QiskitStatePreparation(statevector, normalize=False), gf2x_operation_results.row_map)
         else:
             # If reduced matrix has zero rank, all determinants are identical
@@ -219,7 +217,7 @@ class SparseIsometryGF2XStatePreparation(StatePreparation):
                 qubit = operation[1]
                 qc.x(qubit)
 
-        _LOGGER.info(
+        Logger.info(
             f"Final circuit before transpilation: {qc.num_qubits} qubits, depth {qc.depth()}, {qc.size()} gates"
         )
 
@@ -232,7 +230,7 @@ class SparseIsometryGF2XStatePreparation(StatePreparation):
             pass_manager = PassManager([MergeZBasisRotations(), SubstituteCliffordRz(), RemoveZBasisOnZeroState()])
             qc = pass_manager.run(qc)
 
-            _LOGGER.info(
+            Logger.info(
                 f"Final circuit after transpilation: {qc.num_qubits} qubits, depth {qc.depth()}, {qc.size()} gates"
             )
 
@@ -345,7 +343,7 @@ def gf2x_with_tracking(matrix: np.ndarray) -> GF2XEliminationResult:
 
     # Log the original matrix rank
     original_rank = np.linalg.matrix_rank(matrix)
-    _LOGGER.info(f"Original matrix rank: {original_rank}")
+    Logger.info(f"Original matrix rank: {original_rank}")
 
     # Check for zero rank matrix (all zero rows)
     if original_rank == 0:
@@ -390,16 +388,16 @@ def gf2x_with_tracking(matrix: np.ndarray) -> GF2XEliminationResult:
 
         # Step 4: Check for diagonal matrix and apply further reduction if possible
         if rank > 1 and _is_diagonal_matrix(matrix_reduced):
-            _LOGGER.info(f"Detected diagonal matrix with rank {rank}, applying further reduction")
+            Logger.info(f"Detected diagonal matrix with rank {rank}, applying further reduction")
             gf2x_results = _reduce_diagonal_matrix(matrix_reduced, reduced_row_map, col_map, operations)
 
         # Log the final reduced matrix rank
-        _LOGGER.info(f"Final reduced matrix rank: {gf2x_results.rank}")
+        Logger.info(f"Final reduced matrix rank: {gf2x_results.rank}")
 
         return gf2x_results
 
     # If no rows left after preprocessing, return empty matrix
-    _LOGGER.info("Final reduced matrix rank: 0")
+    Logger.info("Final reduced matrix rank: 0")
     return GF2XEliminationResult(
         reduced_matrix=np.empty((0, n_cols), dtype=matrix.dtype),
         row_map=row_map,
@@ -460,7 +458,7 @@ def _remove_duplicate_rows_with_cnot(
                 operations_work.append(("cnot", (row_map_work[j], row_map_work[i])))
                 rows_to_eliminate.append(j)
 
-                _LOGGER.info(
+                Logger.info(
                     f"Found duplicate row {j} identical to row {i}, adding CNOT({row_map_work[i]}, {row_map_work[j]})"
                 )
 
@@ -477,7 +475,7 @@ def _remove_duplicate_rows_with_cnot(
 
     # Remove eliminated rows (which should now be all zeros)
     if rows_to_eliminate:
-        _LOGGER.info(f"Eliminating {len(rows_to_eliminate)} duplicate rows: {rows_to_eliminate}")
+        Logger.info(f"Eliminating {len(rows_to_eliminate)} duplicate rows: {rows_to_eliminate}")
 
         # Create mask for rows to keep
         rows_to_keep = [i for i in range(n_rows) if i not in rows_to_eliminate]
@@ -522,14 +520,14 @@ def _remove_all_ones_rows_with_x(
             operations_work.append(("x", row_map_work[i]))
             rows_to_eliminate.append(i)
 
-            _LOGGER.info(f"Found all-ones row {i}, adding X operation on row {row_map_work[i]}")
+            Logger.info(f"Found all-ones row {i}, adding X operation on row {row_map_work[i]}")
 
     # Apply X operations to eliminate all-ones rows
     for i in rows_to_eliminate:
         matrix_work[i] = np.zeros(n_cols, dtype=matrix_work.dtype)
     # Remove eliminated rows (which are now all zeros)
     if rows_to_eliminate:
-        _LOGGER.info(f"Eliminating {len(rows_to_eliminate)} all-ones rows: {rows_to_eliminate}")
+        Logger.info(f"Eliminating {len(rows_to_eliminate)} all-ones rows: {rows_to_eliminate}")
 
         # Create mask for rows to keep
         rows_to_keep = [i for i in range(n_rows) if i not in rows_to_eliminate]
@@ -740,12 +738,12 @@ def _reduce_diagonal_matrix(
 
     # Verify this is actually a diagonal matrix
     if not _is_diagonal_matrix(matrix_work):
-        _LOGGER.warn("Matrix is not diagonal, skipping diagonal reduction")
+        Logger.warn("Matrix is not diagonal, skipping diagonal reduction")
         return GF2XEliminationResult(
             reduced_matrix=matrix_work, row_map=row_map_work, col_map=col_map, operations=operations_work, rank=rank
         )
 
-    _LOGGER.info(f"Applying diagonal matrix reduction on {rank}x{rank} matrix")
+    Logger.info(f"Applying diagonal matrix reduction on {rank}x{rank} matrix")
 
     # Step 1: Apply sequential CNOT operations CNOT(i, i+1) for i = 0 to rank-2
     for i in range(rank - 1):
@@ -763,24 +761,24 @@ def _reduce_diagonal_matrix(
         # Apply CNOT: target row = target row XOR control row
         matrix_work[target_idx] = matrix_work[target_idx] ^ matrix_work[control_idx]
 
-        _LOGGER.info(f"Applied CNOT({row_map_work[control_idx]}, {row_map_work[target_idx]})")
+        Logger.info(f"Applied CNOT({row_map_work[control_idx]}, {row_map_work[target_idx]})")
 
     # After all CNOTs, the last row should be all 1s
     last_row = rank - 1
-    _LOGGER.info(f"Last row after CNOTs: {matrix_work[last_row]}")
+    Logger.info(f"Last row after CNOTs: {matrix_work[last_row]}")
 
     # Step 2: Apply X operation on the last row to make it all 0s
     operations_work.append(("x", row_map_work[last_row]))
     matrix_work[last_row] = np.zeros(matrix_work.shape[1], dtype=matrix_work.dtype)
 
-    _LOGGER.info(f"Applied X operation on row {row_map_work[last_row]}")
+    Logger.info(f"Applied X operation on row {row_map_work[last_row]}")
 
     # Step 3: Remove the last row (which is now all zeros)
     matrix_reduced = matrix_work[:-1, :]  # Remove last row
     reduced_row_map = row_map_work[:-1]  # Remove last row mapping
     new_rank = rank - 1
 
-    _LOGGER.info(f"Diagonal reduction complete: rank reduced from {rank} to {new_rank}")
+    Logger.info(f"Diagonal reduction complete: rank reduced from {rank} to {new_rank}")
 
     return GF2XEliminationResult(
         reduced_matrix=matrix_reduced,

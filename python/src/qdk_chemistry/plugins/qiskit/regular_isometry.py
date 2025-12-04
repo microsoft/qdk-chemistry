@@ -21,8 +21,6 @@ from qdk_chemistry.utils import Logger
 from qdk_chemistry.utils.bitstring import separate_alpha_beta_to_binary_string
 from qdk_chemistry.utils.statevector import _create_statevector_from_coeffs_and_dets_string
 
-_LOGGER = Logger.QDK_LOGGER(__name__)
-
 __all__ = ["RegularIsometryStatePreparation"]
 
 
@@ -69,7 +67,7 @@ class RegularIsometryStatePreparation(StatePreparation):
         if not bitstrings:
             raise ValueError("No valid bitstrings found. The determinants list might be empty.")
         n_qubits = len(bitstrings[0])
-        _LOGGER.debug(f"Using {len(bitstrings)} determinants for state preparation")
+        Logger.debug(f"Using {len(bitstrings)} determinants for state preparation")
 
         # Create a statevector from the filtered terms
         statevector_data = _create_statevector_from_coeffs_and_dets_string(coeffs, bitstrings, n_qubits)

@@ -11,7 +11,6 @@
 #include <qdk/chemistry/utils/logger.hpp>
 
 #include "../utils.hpp"
-#include "pipek_mezey.hpp"
 
 namespace qdk::chemistry::algorithms::microsoft {
 
@@ -299,12 +298,12 @@ Eigen::MatrixXd PipekMezeyLocalization::localize(
     }
   this->obj_fun_ = Xi.cwiseProduct(Xi).sum();
   if (this->converged_)
-    QDK_LOGGER()->info(
+    QDK_LOGGER().info(
         "Pipek-Mezey Converged in {:6} sweeps with ObjectiveFunction = "
         "{:.6e}",
         i_sweep, this->obj_fun_);
   else
-    QDK_LOGGER()->info(
+    QDK_LOGGER().info(
         "Pipek-Mezey Failed to Converge in {:6} sweeps - Last "
         "ObjectiveFunction = {:.6e}",
         i_sweep, this->obj_fun_);

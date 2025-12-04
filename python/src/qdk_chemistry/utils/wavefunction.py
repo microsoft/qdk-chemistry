@@ -11,8 +11,6 @@ from qdk_chemistry.algorithms import create
 from qdk_chemistry.data import Configuration, Hamiltonian, SciWavefunctionContainer, Wavefunction
 from qdk_chemistry.utils import Logger
 
-_LOGGER = Logger.QDK_LOGGER(__name__)
-
 __all__ = [
     "calculate_sparse_wavefunction",
     "get_active_determinants_info",
@@ -97,7 +95,7 @@ def calculate_sparse_wavefunction(
     """
     ranked = get_top_determinants(reference_wavefunction, max_determinants)
     if not ranked:
-        _LOGGER.warn("No determinants found; returning an empty wavefunction.")
+        Logger.warn("No determinants found; returning an empty wavefunction.")
         return Wavefunction(SciWavefunctionContainer(np.array([]), [], reference_wavefunction.get_orbitals()))
 
     projector = create("projected_multi_configuration_calculator", pmc_calculator)
@@ -125,13 +123,11 @@ def calculate_sparse_wavefunction(
     best_count = count
 
     if count == len(ranked_items) and not found:
-        _LOGGER.warn(
+        Logger.warn(
             f"Sparse CI tolerance not reached with {best_count} determinants; returning the full truncated set."
         )
 
-    _LOGGER.info(
-        f"Sparse CI finder ({best_count} dets) = {best_energy:.8f} Hartree (ΔE = {diff * 1000.0:.4f} mHartree)"
-    )
+    Logger.info(f"Sparse CI finder ({best_count} dets) = {best_energy:.8f} Hartree (ΔE = {diff * 1000.0:.4f} mHartree)")
     determinants = list(best_wavefunction.get_active_determinants())
     coeffs = [best_wavefunction.get_coefficient(det) for det in determinants]
     sci_container = SciWavefunctionContainer(

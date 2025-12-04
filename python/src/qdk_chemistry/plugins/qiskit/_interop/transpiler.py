@@ -21,8 +21,6 @@ from qdk_chemistry.data import Settings
 from qdk_chemistry.definitions import DIAGONAL_Z_1Q_GATES
 from qdk_chemistry.utils import Logger
 
-_LOGGER = Logger.QDK_LOGGER(__name__)
-
 __all__ = [
     "MergeZBasisRotations",
     "RemoveZBasisOnZeroState",
@@ -79,7 +77,7 @@ class MergeZBasisRotations(TransformationPass):
             The transformed ``DAGCircuit`` with merged Z-basis rotations.
 
         """
-        _LOGGER.debug("Running MergeZBasisRotations pass.")
+        Logger.debug("Running MergeZBasisRotations pass.")
         new_dag = DAGCircuit()
         for qreg in dag.qregs.values():
             new_dag.add_qreg(qreg)
@@ -243,7 +241,7 @@ class SubstituteCliffordRz(TransformationPass):
         if len(equivalent_gate_set) != len(set(equivalent_gate_set)):
             raise ValueError(f"Gates in equivalent_gate_set ({equivalent_gate_set}) are not unique.")
 
-        _LOGGER.debug("SubstituteCliffordRz pass: simplification logic needs careful review.")
+        Logger.debug("SubstituteCliffordRz pass: simplification logic needs careful review.")
 
         for node in dag.op_nodes():
             if node.op.name == "rz":
@@ -251,31 +249,31 @@ class SubstituteCliffordRz(TransformationPass):
 
                 # Skip parameterized rotations
                 if isinstance(angle, ParameterExpression):
-                    _LOGGER.debug("Skipping parameterized Rz.")
+                    Logger.debug("Skipping parameterized Rz.")
                     continue
 
                 factor = 2 * angle / np.pi
                 mod4_factor = np.mod(factor, 4)
-                _LOGGER.debug(f"Rz({angle:.4f}) = {factor:.4f} * π/2 (mod 4 = {mod4_factor:.2f})")
+                Logger.debug(f"Rz({angle:.4f}) = {factor:.4f} * π/2 (mod 4 = {mod4_factor:.2f})")
 
                 replacement_gate = None
                 if np.isclose(mod4_factor, 0, atol=tolerance) and "id" in equivalent_gate_set:
-                    _LOGGER.debug(f"Substituting Rz({angle:.4f}) with Id.")
+                    Logger.debug(f"Substituting Rz({angle:.4f}) with Id.")
                     replacement_gate = IGate()
                 elif np.isclose(mod4_factor, 1, atol=tolerance) and "s" in equivalent_gate_set:
-                    _LOGGER.debug(f"Substituting Rz({angle:.4f}) with S.")
+                    Logger.debug(f"Substituting Rz({angle:.4f}) with S.")
                     replacement_gate = SGate()
                 elif np.isclose(mod4_factor, 2, atol=tolerance) and "z" in equivalent_gate_set:
-                    _LOGGER.debug(f"Substituting Rz({angle:.4f}) with Z.")
+                    Logger.debug(f"Substituting Rz({angle:.4f}) with Z.")
                     replacement_gate = ZGate()
                 elif np.isclose(mod4_factor, 3, atol=tolerance) and "sdg" in equivalent_gate_set:
-                    _LOGGER.debug(f"Substituting Rz({angle:.4f}) with Sdg.")
+                    Logger.debug(f"Substituting Rz({angle:.4f}) with Sdg.")
                     replacement_gate = SdgGate()
 
                 if replacement_gate:
                     dag.substitute_node(node, replacement_gate, inplace=True)
                 else:
-                    _LOGGER.debug(f"Keeping original Rz({angle:.4f}).")
+                    Logger.debug(f"Keeping original Rz({angle:.4f}).")
 
         return dag
 
@@ -323,7 +321,7 @@ class RemoveZBasisOnZeroState(TransformationPass):
             The transformed ``DAGCircuit`` with Z-basis gates removed.
 
         """
-        _LOGGER.debug("Running RemoveZBasisOnZeroState pass.")
+        Logger.debug("Running RemoveZBasisOnZeroState pass.")
 
         # Track qubits still in |0⟩ (True means untouched)
         zero_state_qubits = dict.fromkeys(dag.qubits, True)
@@ -337,7 +335,7 @@ class RemoveZBasisOnZeroState(TransformationPass):
             if name in self._z_basis_gates:
                 remove_gate = all(zero_state_qubits.get(q, False) for q in qubits)
                 if remove_gate:
-                    _LOGGER.debug(f"Removing {name} on qubit {qubits} (still |0⟩)")
+                    Logger.debug(f"Removing {name} on qubit {qubits} (still |0⟩)")
                     dag.remove_op_node(node)
                     continue  # Skip to next node
 

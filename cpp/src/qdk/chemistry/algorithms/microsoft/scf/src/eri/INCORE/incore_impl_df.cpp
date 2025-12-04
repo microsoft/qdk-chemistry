@@ -56,17 +56,17 @@ void ERI_DF::generate_eri_() {
   const size_t num_atomic_orbitals2 = num_atomic_orbitals * num_atomic_orbitals;
   const size_t eri_sz = num_atomic_orbitals2 * (loc_i_en_ - loc_i_st_);
 
-  if (!mpi_.world_rank) QDK_LOGGER()->trace("Generating DF-ERIs via Libint2");
+  if (!mpi_.world_rank) QDK_LOGGER().trace("Generating DF-ERIs via Libint2");
   h_eri_ = libint2_util::eri_df(basis_mode_, obs_, abs_, loc_i_st_, loc_i_en_);
 
 #ifdef QDK_CHEMISTRY_ENABLE_GPU
   if (!gpu()) {
-    if (!mpi_.world_rank) QDK_LOGGER()->trace("Saving DF-ERIs on Host Memory");
+    if (!mpi_.world_rank) QDK_LOGGER().trace("Saving DF-ERIs on Host Memory");
   } else {
     // Allocate ERIs on the device and ship data
     if (!mpi_.world_rank) {
-      QDK_LOGGER()->trace("Saving DF-ERIs in Device Memory");
-      QDK_LOGGER()->trace("Using cuTensor for GPU DF-ERI Contraction");
+      QDK_LOGGER().trace("Saving DF-ERIs in Device Memory");
+      QDK_LOGGER().trace("Using cuTensor for GPU DF-ERI Contraction");
     }
     CUDA_CHECK(cudaMallocAsync(&d_eri_, eri_sz * sizeof(double), 0));
     CUDA_CHECK(cudaStreamSynchronize(0));

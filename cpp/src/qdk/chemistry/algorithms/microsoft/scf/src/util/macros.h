@@ -24,11 +24,11 @@
  * @brief Verify an expression and abort if false
  * @param expr Expression to verify
  */
-#define VERIFY(expr)                                                  \
-  if (!static_cast<bool>(expr)) {                                     \
-    QDK_LOGGER()->critical("{}:{}: Verifying '{}' failed.", __FILE__, \
-                           __LINE__, #expr);                          \
-    std::abort();                                                     \
+#define VERIFY(expr)                                                           \
+  if (!static_cast<bool>(expr)) {                                              \
+    QDK_LOGGER().critical("{}:{}: Verifying '{}' failed.", __FILE__, __LINE__, \
+                          #expr);                                              \
+    std::abort();                                                              \
   }
 
 /**

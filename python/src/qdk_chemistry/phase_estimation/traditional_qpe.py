@@ -32,8 +32,6 @@ from qdk_chemistry.utils.time_evolution import (
     extract_terms_from_hamiltonian,
 )
 
-_LOGGER = Logger.QDK_LOGGER(__name__)
-
 __all__: list[str] = []
 
 
@@ -57,7 +55,7 @@ class TraditionalPhaseEstimation(PhaseEstimation):
         super().__init__(hamiltonian, evolution_time)
         self._terms: list[PauliEvolutionTerm] = extract_terms_from_hamiltonian(hamiltonian)
         self._qft_do_swaps = qft_do_swaps
-        _LOGGER.debug(
+        Logger.debug(
             f"Initialized {self.__class__.__name__} with {len(self._terms)} evolution terms, "
             f"evolution time {evolution_time:.6f}, qft_do_swaps={qft_do_swaps}."
         )
@@ -88,7 +86,7 @@ class TraditionalPhaseEstimation(PhaseEstimation):
             if measurement_register is not None:
                 qc.add_register(measurement_register)
 
-        _LOGGER.debug(
+        Logger.debug(
             f"Creating traditional QPE circuit with {num_bits} ancilla qubits and measurement={include_measurement}."
         )
 
@@ -117,7 +115,7 @@ class TraditionalPhaseEstimation(PhaseEstimation):
             qc.barrier(label="iqft")
             qc.measure(ancilla, classical)
 
-        _LOGGER.debug(
+        Logger.debug(
             f"Completed traditional QPE circuit with {qc.num_qubits} qubits, include_measurement={include_measurement}."
         )
 

@@ -59,8 +59,8 @@ void SCFImpl::polarizability_() {
     Eigen::VectorXd X_vec = Eigen::VectorXd::Zero(nov);
 
     if (ctx_.cfg->mpi.world_rank == 0) {
-      QDK_LOGGER()->info("CPHF iteration for direction {}",
-                         xyz_1d);  // forming R^x = u_ai
+      QDK_LOGGER().info("CPHF iteration for direction {}",
+                        xyz_1d);  // forming R^x = u_ai
 
       // R_{ia} = \Sum_{uv} C_{ui} Dipole_{uv} C_{av}
       // (C is row-major, temp matrix is column-major, R_vec has
@@ -146,15 +146,15 @@ void SCFImpl::polarizability_() {
       3.0;
 
   if (ctx_.cfg->mpi.world_rank == 0) {
-    QDK_LOGGER()->info("Polarizability (a.u.): ");
+    QDK_LOGGER().info("Polarizability (a.u.): ");
     for (auto i = 0; i < 3; ++i) {
-      QDK_LOGGER()->info("{:.12f}, {:.12f}, {:.12f}",
-                         ctx_.result.scf_polarizability[i * 3],
-                         ctx_.result.scf_polarizability[i * 3 + 1],
-                         ctx_.result.scf_polarizability[i * 3 + 2]);
+      QDK_LOGGER().info("{:.12f}, {:.12f}, {:.12f}",
+                        ctx_.result.scf_polarizability[i * 3],
+                        ctx_.result.scf_polarizability[i * 3 + 1],
+                        ctx_.result.scf_polarizability[i * 3 + 2]);
     }
-    QDK_LOGGER()->info("Isotropic polarizability (a.u.): {:.12f}",
-                       ctx_.result.scf_isotropic_polarizability);
+    QDK_LOGGER().info("Isotropic polarizability (a.u.): {:.12f}",
+                      ctx_.result.scf_isotropic_polarizability);
   }
 }
 

@@ -30,7 +30,7 @@ void atom_guess(const BasisSet& obs, const Molecule& mol, double* D) {
   }
 
   if (!std::filesystem::exists(guess_chk)) {
-    QDK_LOGGER()->error(
+    QDK_LOGGER().error(
         "{} not found, use `scripts/generate_guess.py` to prepare basis",
         obs.name);
     exit(EXIT_FAILURE);

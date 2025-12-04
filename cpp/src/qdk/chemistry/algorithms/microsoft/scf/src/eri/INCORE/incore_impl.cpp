@@ -59,8 +59,8 @@ void ERI::generate_eri_() {
   const bool is_rsx = std::abs(omega_) > 1e-12;
 
   if (!mpi_.world_rank)
-    QDK_LOGGER()->debug("Generating ERIs via Libint2 {}",
-                        is_rsx ? "omega = " + std::to_string(omega_) : "");
+    QDK_LOGGER().debug("Generating ERIs via Libint2 {}",
+                       is_rsx ? "omega = " + std::to_string(omega_) : "");
 #if (QDK_CHEMISTRY_INCORE_ERI_STRATEGY & INCORE_ERI_GEN_DEBUG) > 0
   h_eri_ =
       libint2_util::debug_eri(basis_mode_, obs_, 0.0, loc_i_st_, loc_i_en_);
@@ -76,12 +76,12 @@ void ERI::generate_eri_() {
 
 #if (QDK_CHEMISTRY_INCORE_ERI_STRATEGY & INCORE_ERI_CON_HOST) > 0 || \
     (QDK_CHEMISTRY_INCORE_ERI_STRATEGY & INCORE_ERI_CON_HOST) > 0
-  if (!mpi_.world_rank) QDK_LOGGER()->debug("Saving ERIs on Host Memory");
+  if (!mpi_.world_rank) QDK_LOGGER().debug("Saving ERIs on Host Memory");
 #else
   // Allocate ERIs on the device and ship data
   if (!mpi_.world_rank) {
-    QDK_LOGGER()->debug("Saving ERIs in Device Memory");
-    QDK_LOGGER()->debug("Using cuTensor for GPU ERI Contraction");
+    QDK_LOGGER().debug("Saving ERIs in Device Memory");
+    QDK_LOGGER().debug("Using cuTensor for GPU ERI Contraction");
   }
   CUDA_CHECK(cudaMallocAsync(&d_eri_, eri_sz * sizeof(double), 0));
   CUDA_CHECK(cudaStreamSynchronize(0));

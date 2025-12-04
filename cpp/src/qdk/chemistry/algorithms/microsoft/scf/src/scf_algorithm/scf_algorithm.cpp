@@ -220,7 +220,7 @@ bool SCFAlgorithm::check_convergence(const SCFImpl& scf_impl) {
   bool converged = density_rms_ < cfg->scf_algorithm.density_threshold &&
                    og_error < cfg->scf_algorithm.og_threshold;
 
-  QDK_LOGGER()->info(
+  QDK_LOGGER().info(
       "Step {:03}: E={:.15e}, DE={:+.15e}, |DP|={:.15e}, |DG|={:.15e}, ",
       step_count_, energy, delta_energy_, density_rms_, og_error);
 

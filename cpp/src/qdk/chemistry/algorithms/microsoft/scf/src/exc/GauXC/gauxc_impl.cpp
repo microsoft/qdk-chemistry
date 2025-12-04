@@ -122,8 +122,6 @@ GAUXC::GAUXC(BasisSet& basis_set, const GAUXCInput& gauxc_input,
              bool unrestricted, const std::string& xc_name) {
   QDK_LOG_TRACE_ENTERING();
 
-  // QDK_LOGGER()->trace("TOP GauXC::GauXC");
-
   // Unpack the input options directly from GAUXCInput
   const auto& grid_spec = gauxc_input.grid_spec;
   const auto& rad_quad_spec = gauxc_input.rad_quad_spec;
@@ -138,15 +136,15 @@ GAUXC::GAUXC(BasisSet& basis_set, const GAUXCInput& gauxc_input,
   const auto& loadbalancer_ex_spec = gauxc_input.loadbalancer_ex;
   const auto& weights_ex_spec = gauxc_input.weights_ex;
 
-  QDK_LOGGER()->trace("GauXC Settings:");
-  QDK_LOGGER()->trace(
+  QDK_LOGGER().trace("GauXC Settings:");
+  QDK_LOGGER().trace(
       "  MolGrid={}, RadQuad={}, PruneSpec={}, BatchSz={}, BasisTol={}",
       gauxc_util::to_string(grid_spec), gauxc_util::to_string(rad_quad_spec),
       gauxc_util::to_string(prune_spec), batch_size, basis_tol);
-  QDK_LOGGER()->trace("  IntExSpace={}, LBExSpace={}, MolWeightsExSpace={}",
-                      gauxc_util::to_string(integrator_ex_spec),
-                      gauxc_util::to_string(loadbalancer_ex_spec),
-                      gauxc_util::to_string(weights_ex_spec));
+  QDK_LOGGER().trace("  IntExSpace={}, LBExSpace={}, MolWeightsExSpace={}",
+                     gauxc_util::to_string(integrator_ex_spec),
+                     gauxc_util::to_string(loadbalancer_ex_spec),
+                     gauxc_util::to_string(weights_ex_spec));
 
   // Create GauXC Runtime instance
 #ifdef QDK_CHEMISTRY_ENABLE_GPU
@@ -214,7 +212,7 @@ GAUXC::GAUXC(BasisSet& basis_set, const GAUXCInput& gauxc_input,
     size_t available_mem, total_mem;
     CUDA_CHECK(cudaMemGetInfo(&available_mem, &total_mem));
     device_buffer_sz_ = 0.5 * available_mem;
-    QDK_LOGGER()->trace("  DeviceBufferSz={}", device_buffer_sz_);
+    QDK_LOGGER().trace("  DeviceBufferSz={}", device_buffer_sz_);
   }
 #endif
 

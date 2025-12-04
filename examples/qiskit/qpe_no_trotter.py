@@ -47,7 +47,6 @@ if TYPE_CHECKING:
     from qiskit.quantum_info import SparsePauliOp
 
 Logger.set_global_level("info")
-LOGGER = Logger.QDK_LOGGER(__name__)
 
 ACTIVE_ELECTRONS = 2
 ACTIVE_ORBITALS = 2
@@ -213,9 +212,9 @@ casci_energy, casci_wavefunction = mc_calculator.run(
 
 core_energy = active_hamiltonian.get_core_energy()
 
-LOGGER.info("=== Generating QDK/Chemistry artifacts for H2 (0.76 Å, STO-3G) ===")
-LOGGER.info(f"  SCF total energy:   {scf_energy: .8f} Hartree")
-LOGGER.info(f"  CASCI total energy: {casci_energy: .8f} Hartree")
+Logger.info("=== Generating QDK/Chemistry artifacts for H2 (0.76 Å, STO-3G) ===")
+Logger.info(f"  SCF total energy:   {scf_energy: .8f} Hartree")
+Logger.info(f"  CASCI total energy: {casci_energy: .8f} Hartree")
 
 
 ########################################################################################
@@ -242,7 +241,7 @@ state_prep = transpile(
 )
 state_prep.name = "casci_sparse_isometry"
 
-LOGGER.info(
+Logger.info(
     "\nSparse-isometry state preparation circuit:\n"
     + str(state_prep.draw(output="text"))
 )
@@ -253,10 +252,10 @@ LOGGER.info(
 iqpe = IterativePhaseEstimation(qubit_hamiltonian, T_TIME)
 matrix_exp = MatrixExponential()
 
-LOGGER.info("\n=== Running iterative phase estimation (exact evolution) ===")
-LOGGER.info(f"  Hamiltonian terms: {len(qubit_pauli_op.paulis)}")
-LOGGER.info(f"  System qubits (spin orbitals): {num_spin_orbitals}")
-LOGGER.info(f"  Electron sector (alpha, beta): ({n_alpha}, {n_beta})")
+Logger.info("\n=== Running iterative phase estimation (exact evolution) ===")
+Logger.info(f"  Hamiltonian terms: {len(qubit_pauli_op.paulis)}")
+Logger.info(f"  System qubits (spin orbitals): {num_spin_orbitals}")
+Logger.info(f"  Electron sector (alpha, beta): ({n_alpha}, {n_beta})")
 
 bits, phase_fraction = run_iterative_exact_qpe(
     state_prep,
@@ -288,23 +287,23 @@ estimated_electronic_energy = (
 )
 estimated_total_energy = estimated_electronic_energy + core_energy
 
-LOGGER.info(f"Measured bits (MSB → LSB): {list(result.bits_msb_first or [])}")
-LOGGER.info(
+Logger.info(f"Measured bits (MSB → LSB): {list(result.bits_msb_first or [])}")
+Logger.info(
     f"Phase fraction φ (measured): {result.phase_fraction:.6f} (angle = {phase_angle_measured:.6f} rad)"
 )
 if not np.isclose(result.phase_fraction, result.canonical_phase_fraction):
-    LOGGER.info(
+    Logger.info(
         f"Canonical phase fraction φ: {result.canonical_phase_fraction:.6f} (angle = {phase_angle_canonical:.6f} rad)",
     )
-LOGGER.info(f"Raw energy_from_phase output: {raw_energy:+.8f} Hartree")
-LOGGER.info("Candidate energies (alias checks):")
+Logger.info(f"Raw energy_from_phase output: {raw_energy:+.8f} Hartree")
+Logger.info("Candidate energies (alias checks):")
 for energy in candidate_energies:
-    LOGGER.info(f"  E = {energy:+.8f} Hartree")
-LOGGER.info(f"Estimated electronic energy: {estimated_electronic_energy:.8f} Hartree")
-LOGGER.info(f"Estimated total energy: {estimated_total_energy:.8f} Hartree")
-LOGGER.info(f"Reference total energy (CASCI): {casci_energy:.8f} Hartree")
+    Logger.info(f"  E = {energy:+.8f} Hartree")
+Logger.info(f"Estimated electronic energy: {estimated_electronic_energy:.8f} Hartree")
+Logger.info(f"Estimated total energy: {estimated_total_energy:.8f} Hartree")
+Logger.info(f"Reference total energy (CASCI): {casci_energy:.8f} Hartree")
 iterative_energy_error = estimated_total_energy - casci_energy
-LOGGER.info(f"Energy difference (QPE - CASCI): {iterative_energy_error:+.8e} Hartree")
-LOGGER.info(
+Logger.info(f"Energy difference (QPE - CASCI): {iterative_energy_error:+.8e} Hartree")
+Logger.info(
     "Residual error is now dominated by the finite phase-register resolution because the time evolution is exact."
 )

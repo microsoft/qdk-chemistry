@@ -253,7 +253,7 @@ Eigen::MatrixXd VVHVLocalization::localize(
       hard_orbitals_loc;
 
   converged_ = true;
-  QDK_LOGGER()->info("VV-HV localization completed successfully");
+  QDK_LOGGER().info("VV-HV localization completed successfully");
 
   return localized_orbitals;
 }
@@ -303,7 +303,7 @@ void VVHVLocalization::initialize() {
         6 * num_atomic_orbitals_ori, num_atomic_orbitals_ori);
     ori_bs_1ee.quadrupole_integral(quadrupole_integrals_->data());
 
-    QDK_LOGGER()->debug(
+    QDK_LOGGER().debug(
         "VVHVLocalization: Pre-computed dipole and quadrupole integrals for "
         "orbital spread calculations");
   }
@@ -347,7 +347,7 @@ void VVHVLocalization::initialize() {
 Eigen::MatrixXd VVHVLocalization::calculate_valence_virtual(
     const Eigen::MatrixXd& occupied_orbitals) {
   QDK_LOG_TRACE_ENTERING();
-  QDK_LOGGER()->debug("VVHV::calculate_valence_virtual()");
+  QDK_LOGGER().debug("VVHV::calculate_valence_virtual()");
   const auto* ori_bs = this->basis_ori_fp_.get();  // Original/full basis set
   const auto num_atomic_orbitals_ori = ori_bs->num_atomic_orbitals;
   const auto num_atomic_orbitals_min =
@@ -369,10 +369,10 @@ Eigen::MatrixXd VVHVLocalization::calculate_valence_virtual(
       Eigen::MatrixXd::Zero(num_atomic_orbitals_ori, num_atomic_orbitals_min);
 
   // print number of occupied and valence virtual orbitals
-  QDK_LOGGER()->info(
+  QDK_LOGGER().info(
       "VVHV::now using minimal basis '{}' with {} atomic orbitals",
       minimal_basis_name_, num_atomic_orbitals_min);
-  QDK_LOGGER()->debug(
+  QDK_LOGGER().debug(
       "VVHV::number of occupied orbitals: {}, valence virtual orbitals: {}",
       num_occupied_orbitals, n_val_virt);
 
@@ -448,12 +448,12 @@ Eigen::MatrixXd VVHVLocalization::localize_valence_virtual(
   const auto num_atomic_orbitals_ori = ori_bs->num_atomic_orbitals;
   const auto n_val_virt = C_valence_unloc.cols();
 
-  QDK_LOGGER()->debug("VVHV::localize_valence_virtual()");
+  QDK_LOGGER().debug("VVHV::localize_valence_virtual()");
 
   // Localize valence virtual orbitals using the inner localizer
   Eigen::MatrixXd result = C_valence_unloc;
   if (n_val_virt > 0) {
-    QDK_LOGGER()->info(
+    QDK_LOGGER().info(
         "*** Localizing Valence Virtual Orbitals (VVHV Sub-scheme) ***");
     result = this->inner_localizer_->localize(C_valence_unloc);
   }
@@ -574,7 +574,7 @@ Eigen::MatrixXd VVHVLocalization::localize_hard_virtuals(
     const Eigen::MatrixXd& C_minimal_unloc) {
   QDK_LOG_TRACE_ENTERING();
 
-  QDK_LOGGER()->debug("VVHV::localize_hard_virtuals()");
+  QDK_LOGGER().debug("VVHV::localize_hard_virtuals()");
 
   const auto* ori_bs = this->basis_ori_fp_.get();  // Original/full basis set
   const auto* min_bs = this->minimal_basis_fp_.get();  // Minimal basis set
@@ -883,7 +883,7 @@ void VVHVLocalization::calculate_orbital_spreads(
     // Use pre-computed integrals
     dipole = dipole_integrals_.get();
     quadrupole = quadrupole_integrals_.get();
-    QDK_LOGGER()->debug(
+    QDK_LOGGER().debug(
         "VVHVLocalization: Using pre-computed dipole and quadrupole integrals "
         "for orbital spreads");
   } else {
@@ -902,7 +902,7 @@ void VVHVLocalization::calculate_orbital_spreads(
 
     dipole = local_dipole.get();
     quadrupole = local_quadrupole.get();
-    QDK_LOGGER()->debug(
+    QDK_LOGGER().debug(
         "VVHVLocalization: Computed dipole and quadrupole integrals locally "
         "for orbital spreads");
   }
@@ -1073,7 +1073,7 @@ void VVHVLocalization::check_eigenvalue_structure(
         << eigenvalues[i] << ";   ";
   oss << "\n";
   if (abs(eigenvalue_M_plus_1 / eigenvalue_M) < separation_ratio)
-    QDK_LOGGER()->warn(oss.str());
+    QDK_LOGGER().warn(oss.str());
 }
 
 }  // namespace qdk::chemistry::algorithms::microsoft

@@ -34,7 +34,6 @@ from qdk_chemistry.data import QpeResult, QubitHamiltonian
 from qdk_chemistry.utils import Logger
 
 Logger.set_global_level("info")
-LOGGER = Logger.QDK_LOGGER(__name__)
 
 TIME_STEP_1 = np.pi / 4
 PHASE_BITS_1 = 6
@@ -112,23 +111,23 @@ estimated_energy_1 = (
     result_1.resolved_energy if result_1.resolved_energy is not None else raw_energy_1
 )
 
-LOGGER.info("=== Iterative QPE: Non-commuting Hamiltonian Example ===")
-LOGGER.info("Hamiltonian: H = 0.519 * XI + ZZ")
-LOGGER.info(f"Time step t = pi / 4 ({TIME_STEP_1:.6f}) and {PHASE_BITS_1} phase bits\n")
-LOGGER.info(f"Measured bits (MSB → LSB): {list(result_1.bits_msb_first or [])}")
-LOGGER.info(f"Phase fraction φ (measured): {result_1.phase_fraction:.6f}")
-LOGGER.info(f"Phase angle     (measured) : {phase_angle_1:.6f} rad")
+Logger.info("=== Iterative QPE: Non-commuting Hamiltonian Example ===")
+Logger.info("Hamiltonian: H = 0.519 * XI + ZZ")
+Logger.info(f"Time step t = pi / 4 ({TIME_STEP_1:.6f}) and {PHASE_BITS_1} phase bits\n")
+Logger.info(f"Measured bits (MSB → LSB): {list(result_1.bits_msb_first or [])}")
+Logger.info(f"Phase fraction φ (measured): {result_1.phase_fraction:.6f}")
+Logger.info(f"Phase angle     (measured) : {phase_angle_1:.6f} rad")
 if not np.isclose(result_1.phase_fraction, result_1.canonical_phase_fraction):
-    LOGGER.info(
+    Logger.info(
         f"Canonical phase fraction φ: {result_1.canonical_phase_fraction:.6f} "
         f"(angle = {phase_angle_canonical_1:.6f} rad)",
     )
-LOGGER.info(f"Raw energy_from_phase output: {raw_energy_1:+.8f} Hartree")
-LOGGER.info("Candidate energies (alias checks):")
+Logger.info(f"Raw energy_from_phase output: {raw_energy_1:+.8f} Hartree")
+Logger.info("Candidate energies (alias checks):")
 for energy in candidate_energies_1:
-    LOGGER.info(f"  E = {energy:+.8f} Hartree")
-LOGGER.info(f"Reference energy: {REFERENCE_ENERGY_1:+.8f} Hartree")
-LOGGER.info(f"Estimated energy: {estimated_energy_1:+.8f} Hartree")
+    Logger.info(f"  E = {energy:+.8f} Hartree")
+Logger.info(f"Reference energy: {REFERENCE_ENERGY_1:+.8f} Hartree")
+Logger.info(f"Estimated energy: {estimated_energy_1:+.8f} Hartree")
 
 
 ########################################################################################
@@ -198,23 +197,22 @@ candidate_energies_2 = result_2.branching
 estimated_energy_2 = (
     result_2.resolved_energy if result_2.resolved_energy is not None else raw_energy_2
 )
-
-LOGGER.info("\n=== Iterative QPE: Second Non-commuting Hamiltonian Example ===")
-LOGGER.info(
+Logger.info("\n=== Iterative QPE: Second Non-commuting Hamiltonian Example ===")
+Logger.info(
     "Hamiltonian: H = -0.0289(X1 + X2) + 0.0541(Z1 + Z2) + 0.0150 X1X2 + 0.0590 Z1Z2"
 )
-LOGGER.info(f"Time step t = pi / 4 ({TIME_STEP_2:.6f}) and {PHASE_BITS_2} phase bits\n")
-LOGGER.info(f"Measured bits (MSB → LSB): {list(result_2.bits_msb_first or [])}")
-LOGGER.info(f"Phase fraction φ (measured): {result_2.phase_fraction:.6f}")
-LOGGER.info(f"Phase angle     (measured) : {phase_angle_2:.6f} rad")
+Logger.info(f"Time step t = pi / 4 ({TIME_STEP_2:.6f}) and {PHASE_BITS_2} phase bits\n")
+Logger.info(f"Measured bits (MSB → LSB): {list(result_2.bits_msb_first or [])}")
+Logger.info(f"Phase fraction φ (measured): {result_2.phase_fraction:.6f}")
+Logger.info(f"Phase angle     (measured) : {phase_angle_2:.6f} rad")
 if not np.isclose(result_2.phase_fraction, result_2.canonical_phase_fraction):
-    LOGGER.info(
+    Logger.info(
         f"Canonical phase fraction φ: {result_2.canonical_phase_fraction:.6f} "
         f"(angle = {phase_angle_canonical_2:.6f} rad)",
     )
-LOGGER.info(f"Raw energy_from_phase output: {raw_energy_2:+.8f} Hartree")
-LOGGER.info("Candidate energies (alias checks):")
+Logger.info(f"Raw energy_from_phase output: {raw_energy_2:+.8f} Hartree")
+Logger.info("Candidate energies (alias checks):")
 for energy in candidate_energies_2:
-    LOGGER.info(f"  E = {energy:+.8f} Hartree")
-LOGGER.info(f"Reference energy: {REFERENCE_ENERGY_2:+.8f} Hartree")
-LOGGER.info(f"Estimated energy: {estimated_energy_2:+.8f} Hartree")
+    Logger.info(f"  E = {energy:+.8f} Hartree")
+Logger.info(f"Reference energy: {REFERENCE_ENERGY_2:+.8f} Hartree")
+Logger.info(f"Estimated energy: {estimated_energy_2:+.8f} Hartree")

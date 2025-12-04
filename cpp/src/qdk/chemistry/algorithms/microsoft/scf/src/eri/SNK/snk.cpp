@@ -63,7 +63,7 @@ class ERI {
     xc_name_ = xc_name == "HF" ? "PBE0" : xc_name;  // does not matter
     num_atomic_orbitals_ = basis_set.num_atomic_orbitals;
 
-    // Get or create the GAUXC implementation from the registry
+    // Get or create the GauXC implementation from the registry
     util::GAUXCRegistry::get_or_create(const_cast<BasisSet&>(basis_set),
                                        gauxc_input_, unrestricted_, xc_name_);
   }
@@ -176,7 +176,7 @@ class ERI {
    *
    * @param unr Whether to use unrestricted formalism
    * @param basis_set Orbital basis set
-   * @param gauxc_input GAUXC configuration for numerical integration
+   * @param gauxc_input GauXC configuration for numerical integration
    * @param xc_name Functional name (used for grid configuration)
    * @return Unique pointer to new SNK ERI instance
    */

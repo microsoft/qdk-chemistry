@@ -466,7 +466,7 @@ std::vector<std::pair<int, int>> OneBodyIntegral::compute_shell_pairs(
       }
     }
   }
-  QDK_LOGGER()->trace("int1e::n_shell_pairs: {}", shell_pairs.size());
+  QDK_LOGGER().trace("int1e::n_shell_pairs: {}", shell_pairs.size());
   return shell_pairs;
 }
 

@@ -89,12 +89,12 @@ size_t load_from_database_json(std::filesystem::path bs_path, BasisSet& basis) {
     auto ecp = elem["ecp_potentials"];
     for (const auto& entry : ecp) {
       if (entry["ecp_type"].get<std::string>() != "scalar_ecp") {
-        QDK_LOGGER()->error("only scalar_ecp is supported");
+        QDK_LOGGER().error("only scalar_ecp is supported");
         exit(EXIT_FAILURE);
       }
       auto am = entry["angular_momentum"];
       if (am.size() != 1) {
-        QDK_LOGGER()->error("only one angular momentum is expected");
+        QDK_LOGGER().error("only one angular momentum is expected");
         exit(EXIT_FAILURE);
       }
 
@@ -154,10 +154,10 @@ BasisSet::BasisSet(std::shared_ptr<Molecule> mol, const std::string& path,
       auto cmd =
           fmt::format("tar xzf \"{}\" --directory \"{}\"",
                       compressed_path.generic_string(), odir.generic_string());
-      QDK_LOGGER()->trace("Execute command: {}", cmd);
+      QDK_LOGGER().trace("Execute command: {}", cmd);
       int return_code = std::system(cmd.c_str());
       if (return_code != 0) {
-        QDK_LOGGER()->error("command execution failed: {}", cmd);
+        QDK_LOGGER().error("command execution failed: {}", cmd);
         exit(EXIT_FAILURE);
       }
     }
@@ -200,7 +200,7 @@ BasisSet::BasisSet(std::shared_ptr<Molecule> mol, const std::string& path,
   calc_atom2ao();
 
   if (libint2::initialized()) {
-    QDK_LOGGER()->trace(
+    QDK_LOGGER().trace(
         "Loaded basis set from {}: n_shells={}, n_basis_funcs={}", path,
         shells.size(), num_atomic_orbitals);
     shell_pairs_ = OneBodyIntegral::compute_shell_pairs(shells);
@@ -372,7 +372,7 @@ std::shared_ptr<BasisSet> BasisSet::from_serialized_json(
     throw std::runtime_error(
         fmt::format("Basis File {} Does Not Exist", path.string()));
 
-  QDK_LOGGER()->trace("Loading basis set from file: {}", _path);
+  QDK_LOGGER().trace("Loading basis set from file: {}", _path);
 
   // Grab JSON from file
   auto json = nlohmann::ordered_json::parse(std::ifstream(path));
@@ -409,8 +409,8 @@ std::shared_ptr<BasisSet> BasisSet::from_serialized_json(
     bs->shells = std::move(shells);
   }
 
-  QDK_LOGGER()->trace("Loaded basis set: n_shells={}, n_atomic_orbitals",
-                      bs->shells.size(), bs->num_atomic_orbitals);
+  QDK_LOGGER().trace("Loaded basis set: n_shells={}, n_atomic_orbitals",
+                     bs->shells.size(), bs->num_atomic_orbitals);
 
   // Read ECP Shells
   nlohmann::ordered_json _ecp_shells = json["ecp_shells"];

@@ -79,8 +79,6 @@ from qdk_chemistry._core.constants import (
 )
 from qdk_chemistry.utils import Logger
 
-_LOGGER = Logger.QDK_LOGGER(__name__)
-
 
 def list_constants(show_values: bool = True, show_units: bool = True) -> None:
     """List all available constants with their documentation.
@@ -139,7 +137,7 @@ def list_constants(show_values: bool = True, show_units: bool = True) -> None:
                     line += f" {info.units}"
 
                 constants_info_string += line + "\n"
-    _LOGGER.info(constants_info_string)
+    Logger.info(constants_info_string)
 
 
 def find_constant(search_term: str) -> dict:
@@ -192,11 +190,11 @@ def show_constant_details(name: str) -> None:
         constant_details_string += f"Value: {info.value} {info.units}\n"
         constant_details_string += f"Description: {info.description}\n"
         constant_details_string += f"Source: {info.source}\n"
-        _LOGGER.info(constant_details_string)
+        Logger.info(constant_details_string)
     except KeyError:
         error_msg = f"Unknown constant: {name}\n"
         error_msg += "Use list_constants() to see all available constants.\n"
-        _LOGGER.error(error_msg)
+        Logger.error(error_msg)
 
 
 # Make the new functions available

@@ -14,8 +14,6 @@ from qdk_chemistry.algorithms.energy_estimator.energy_estimator import EnergyEst
 from qdk_chemistry.data import Circuit, EnergyExpectationResult, MeasurementData, QubitHamiltonian, Settings
 from qdk_chemistry.utils import Logger
 
-_LOGGER = Logger.QDK_LOGGER(__name__)
-
 __all__: list[str] = []
 
 
@@ -164,7 +162,7 @@ class QDKEnergyEstimator(EnergyEstimator):
 
         # Evenly distribute shots across all observables
         shots_list = [total_shots // num_observables] * num_observables
-        _LOGGER.debug(f"Shots allocated: {shots_list}")
+        Logger.debug(f"Shots allocated: {shots_list}")
 
         energy_offset = sum(classical_coeffs) if classical_coeffs else 0.0
 

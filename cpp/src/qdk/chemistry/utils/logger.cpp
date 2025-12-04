@@ -18,10 +18,28 @@ namespace qdk::chemistry::utils {
 static spdlog::level::level_enum g_global_level = spdlog::level::info;
 static std::mutex g_level_mutex;
 
-inline std::string path_to_colon_string(const std::string& file_path,
-                                        const std::string& start_segment) {
-  size_t pos = file_path.find(start_segment);
-  if (pos == std::string::npos) return "";  // start segment not found
+// Single global logger instance
+static std::shared_ptr<spdlog::logger> g_logger;
+static std::once_flag g_logger_init_flag;
+
+std::string path_to_colon_string(const std::string& file_path,
+                                 const std::string& start_segment) {
+  // Look for the segment as a directory (with / before and after)
+  // This prevents matching "qdk_chem" when looking for "qdk"
+  std::string segment_pattern = "/" + start_segment + "/";
+  size_t pos = file_path.find(segment_pattern);
+
+  if (pos == std::string::npos) {
+    // Also try at the start of the path (no leading /)
+    if (file_path.rfind(start_segment + "/", 0) == 0) {
+      pos = 0;
+    } else {
+      return "";  // start segment not found
+    }
+  } else {
+    // Skip the leading /
+    pos += 1;
+  }
 
   std::string relevant_path = file_path.substr(pos);
 
@@ -55,7 +73,7 @@ inline std::string path_to_colon_string(const std::string& file_path,
   return result.str();
 }
 
-inline std::string extract_method_name(std::string_view func_name) {
+std::string extract_method_name(std::string_view func_name) {
   std::string full_name = std::string(func_name);
   // Handle lambdas: strip everything starting with '::<lambda'
   size_t lambda_pos = full_name.find("::<lambda");
@@ -114,38 +132,44 @@ static spdlog::level::level_enum to_spdlog_level(LogLevel level) {
   return spdlog::level::info;  // fallback
 }
 
-std::shared_ptr<spdlog::logger> Logger::get(
-    const std::source_location& location) {
-  // Use the file path (or fallback) from source_location as logger name
-  std::string logger_name = path_to_colon_string(location.file_name());
-  if (logger_name.empty()) {
-    logger_name = "unknown_function";
+static void init_global_logger() {
+  try {
+    g_logger = spdlog::stdout_color_mt("qdk-chemistry");
+  } catch (const spdlog::spdlog_ex&) {
+    g_logger = spdlog::get("qdk-chemistry");
   }
 
-  // Try to get or create logger by function name
-  auto logger = spdlog::get(logger_name);
-  if (!logger) {
-    try {
-      logger = spdlog::stdout_color_mt(logger_name);
-    } catch (const spdlog::spdlog_ex&) {
-      // Handle race condition between threads
-      logger = spdlog::get(logger_name);
+  if (g_logger) {
+    std::lock_guard<std::mutex> lock(g_level_mutex);
+    g_logger->set_level(g_global_level);
+    // Pattern: [timestamp] [colored_level] message
+    // The file context and method are added by ContextLogger in the message
+    g_logger->set_pattern("[%Y-%m-%d %H:%M:%S.%f] [%^%l%$] %v");
+  }
+}
+
+std::shared_ptr<spdlog::logger> Logger::get() {
+  // Initialize the single global logger once
+  std::call_once(g_logger_init_flag, init_global_logger);
+
+  // Update level if it changed (thread-safe check)
+  if (g_logger) {
+    std::lock_guard<std::mutex> lock(g_level_mutex);
+    if (g_logger->level() != g_global_level) {
+      g_logger->set_level(g_global_level);
     }
   }
 
-  // Always apply QDK Chemistry default logging configuration
-  // Use our tracked global level instead of spdlog::get_level()
-  {
-    std::lock_guard<std::mutex> lock(g_level_mutex);
-    logger->set_level(g_global_level);
+  return g_logger;
+}
+
+std::string Logger::get_source_context(const std::source_location& location) {
+  std::string file_id = path_to_colon_string(location.file_name(), "qdk");
+
+  if (file_id.empty()) {
+    return "unknown";
   }
-
-  // Output format:
-  // [2025-11-04 17:54:10.939593] [source_location.method_name] [trace] Entering
-  // ...
-  logger->set_pattern("[%Y-%m-%d %H:%M:%S.%f] [%n] [%^%l%$] %v");
-
-  return logger;
+  return file_id;
 }
 
 void Logger::set_global_level(LogLevel level) {
@@ -155,6 +179,9 @@ void Logger::set_global_level(LogLevel level) {
   {
     std::lock_guard<std::mutex> lock(g_level_mutex);
     g_global_level = spdlog_level;
+    if (g_logger) {
+      g_logger->set_level(spdlog_level);
+    }
   }
 
   spdlog::set_level(spdlog_level);
@@ -164,6 +191,9 @@ void Logger::disable_all() {
   {
     std::lock_guard<std::mutex> lock(g_level_mutex);
     g_global_level = spdlog::level::off;
+    if (g_logger) {
+      g_logger->set_level(spdlog::level::off);
+    }
   }
 
   spdlog::set_level(spdlog::level::off);
@@ -175,8 +205,18 @@ spdlog::level::level_enum Logger::get_global_level() {
 }
 
 void log_trace_entering(const std::source_location& location) {
-  auto logger = Logger::get(location);
-  logger->trace("Entering {}", extract_method_name(location.function_name()));
+  auto logger = Logger::get();
+  std::string file_ctx = path_to_colon_string(location.file_name(), "qdk");
+  std::string method = extract_method_name(location.function_name());
+
+  if (file_ctx.empty()) {
+    file_ctx = "unknown";
+  }
+  if (method.empty()) {
+    method = "unknown";
+  }
+
+  logger->trace("[{}] Entering {}", file_ctx, method);
 }
 
 }  // namespace qdk::chemistry::utils
