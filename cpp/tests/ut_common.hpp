@@ -36,6 +36,9 @@ inline static constexpr double ci_energy_tolerance = 1e-8;
 /// @brief Tolerance for SCF energies
 inline static constexpr double scf_energy_tolerance = 1e-8;
 
+/// @brief Tolerance for MP2 energy match vs pyscf
+inline static constexpr double mp2_tolerance = 2e-8;
+
 /// @brief Tolerance for wavefunction operations
 inline static constexpr double wf_tolerance = 1e-10;
 
@@ -47,6 +50,9 @@ inline static constexpr double small_value_lower_bound_tolerance = 1e-16;
 
 ///@brief Tolerance upper bound for extremely small values
 inline static constexpr double small_value_upper_bound_tolerance = 1e-14;
+
+///@brief Tolerance for comparing integral values
+inline static constexpr double integral_tolerance = 1e-13;
 
 using namespace qdk::chemistry::data;
 

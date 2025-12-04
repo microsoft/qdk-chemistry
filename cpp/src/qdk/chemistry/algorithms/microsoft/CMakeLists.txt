@@ -13,6 +13,7 @@ target_sources(chemistry PRIVATE
     macis_base.cpp
     macis_cas.cpp
     macis_pmc.cpp
+    mp2.cpp
     scf.cpp
     utils.cpp
 )

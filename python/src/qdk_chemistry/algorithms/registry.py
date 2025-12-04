@@ -97,6 +97,10 @@ def create(algorithm_type: str, algorithm_name: str | None = None, **kwargs) -> 
         >>> pyscf_solver = registry.create("scf_solver", "pyscf")
         >>> # Create an SCF solver with custom settings
         >>> scf = registry.create("scf_solver", "pyscf", max_iterations=100, convergence_threshold=1e-8)
+        >>> # Create an MP2 calculator
+        >>> mp2_calc = registry.create("dynamical_correlation_calculator", "qdk_mp2_calculator")
+        >>> # Create the default reference-derived calculator (MP2)
+        >>> default_calc = registry.create("dynamical_correlation_calculator")
 
     """
     if algorithm_name is None:
@@ -165,7 +169,6 @@ def show_settings(algorithm_type: str, algorithm_name: str) -> list[tuple[str, s
         spin_multiplicity: int = 1
         tolerance: float = 1e-06
         max_iterations: int = 50
-        force_restricted: bool = False
 
     """
     for factory in __factories:
@@ -404,7 +407,7 @@ def _register_cpp_factories():
     """
     from qdk_chemistry._core._algorithms import (  # noqa: PLC0415
         ActiveSpaceSelectorFactory,
-        CoupledClusterCalculatorFactory,
+        DynamicalCorrelationCalculatorFactory,
         HamiltonianConstructorFactory,
         LocalizerFactory,
         MultiConfigurationCalculatorFactory,
@@ -415,12 +418,12 @@ def _register_cpp_factories():
     )
 
     register_factory(ActiveSpaceSelectorFactory)
-    register_factory(CoupledClusterCalculatorFactory)
     register_factory(HamiltonianConstructorFactory)
     register_factory(LocalizerFactory)
     register_factory(MultiConfigurationCalculatorFactory)
     register_factory(MultiConfigurationScfFactory)
     register_factory(ProjectedMultiConfigurationCalculatorFactory)
+    register_factory(DynamicalCorrelationCalculatorFactory)
     register_factory(ScfSolverFactory)
     register_factory(StabilityCheckerFactory)
 
