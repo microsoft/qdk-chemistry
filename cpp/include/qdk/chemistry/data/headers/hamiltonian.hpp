@@ -10,8 +10,6 @@
 #include <iostream>
 #include <memory>
 #include <nlohmann/json.hpp>
-#include <qdk/chemistry/data/hamiltonian_container.hpp>
-#include <qdk/chemistry/data/hamiltonian.hpp>
 #include <qdk/chemistry/data/orbitals.hpp>
 #include <stdexcept>
 #include <string>
@@ -19,11 +17,17 @@
 
 namespace qdk::chemistry::data {
 
-// enum class HamiltonianType { Hermitian, NonHermitian };
+/**
+ * @enum HamiltonianType
+ * @brief Types of Hamiltonians supported
+ */
+enum class HamiltonianType { Hermitian, NonHermitian };
 
-// enum class SpinChannel { aaaa, aabb, bbbb };
-
-class HamiltonianContainer;
+/**
+ * @enum SpinChannel
+ * @brief Spin channels for two-electron integrals
+ */
+enum class SpinChannel { aaaa, aabb, bbbb };
 
 /**
  * @class Hamiltonian
@@ -49,62 +53,52 @@ class HamiltonianContainer;
 class Hamiltonian : public DataClass,
                     public std::enable_shared_from_this<Hamiltonian> {
  public:
-  //   /**
-  //    * @brief Constructor for active space Hamiltonian with shared_ptr
-  //    orbitals
-  //    * and inactive Fock matrix
-  //    * @param one_body_integrals One-electron integrals in MO basis [norb x
-  //    norb]
-  //    * @param two_body_integrals Two-electron integrals in MO basis [norb x
-  //    norb x
-  //    * norb x norb]
-  //    * @param orbitals Shared pointer to molecular orbital data for the
-  //    system
-  //    * @param core_energy Core energy (nuclear repulsion + inactive orbital
-  //    * energy)
-  //    * @param inactive_fock_matrix Inactive Fock matrix for the selected
-  //    active
-  //    * space
-  //    * @param type Type of Hamiltonian (Hermitian by default)
-  //    * @throws std::invalid_argument if orbitals pointer is nullptr
-  //    */
-  //   Hamiltonian(const Eigen::MatrixXd& one_body_integrals,
-  //               const Eigen::VectorXd& two_body_integrals,
-  //               std::shared_ptr<Orbitals> orbitals, double core_energy,
-  //               const Eigen::MatrixXd& inactive_fock_matrix,
-  //               HamiltonianType type = HamiltonianType::Hermitian);
-
   /**
-   * @brief Constructor for unrestricted active space Hamiltonian with separate
-   * spin components
-   * @param one_body_integrals_alpha One-electron integrals for alpha spin in MO
-   * basis
-   * @param one_body_integrals_beta One-electron integrals for beta spin in MO
-   * basis
-   * @param two_body_integrals_aaaa Two-electron alpha-alpha-alpha-alpha
-   * integrals
-   * @param two_body_integrals_aabb Two-electron alpha-beta-alpha-beta integrals
-   * @param two_body_integrals_bbbb Two-electron beta-beta-beta-beta integrals
+   * @brief Constructor for active space Hamiltonian with shared_ptr orbitals
+   * and inactive Fock matrix
+   * @param one_body_integrals One-electron integrals in MO basis [norb x norb]
+   * @param two_body_integrals Two-electron integrals in MO basis [norb x norb x
+   * norb x norb]
    * @param orbitals Shared pointer to molecular orbital data for the system
    * @param core_energy Core energy (nuclear repulsion + inactive orbital
    * energy)
-   * @param inactive_fock_matrix_alpha Inactive Fock matrix for alpha spin in
-   * the selected active space
-   * @param inactive_fock_matrix_beta Inactive Fock matrix for beta spin in the
-   * selected active space
+   * @param inactive_fock_matrix Inactive Fock matrix for the selected active
+   * space
    * @param type Type of Hamiltonian (Hermitian by default)
    * @throws std::invalid_argument if orbitals pointer is nullptr
    */
   Hamiltonian(std::unique_ptr<HamiltonianContainer> container);
-  //   const Eigen::MatrixXd& one_body_integrals_alpha,
-  //               const Eigen::MatrixXd& one_body_integrals_beta,
-  //               const Eigen::VectorXd& two_body_integrals_aaaa,
-  //               const Eigen::VectorXd& two_body_integrals_aabb,
-  //               const Eigen::VectorXd& two_body_integrals_bbbb,
-  //               std::shared_ptr<Orbitals> orbitals, double core_energy,
-  //               const Eigen::MatrixXd& inactive_fock_matrix_alpha,
-  //               const Eigen::MatrixXd& inactive_fock_matrix_beta,
-  //               HamiltonianType type = HamiltonianType::Hermitian);
+
+  ///**
+  // * @brief Constructor for unrestricted active space Hamiltonian with separate
+  // * spin components
+  // * @param one_body_integrals_alpha One-electron integrals for alpha spin in MO
+  // * basis
+  // * @param one_body_integrals_beta One-electron integrals for beta spin in MO
+  // * basis
+  // * @param two_body_integrals_aaaa Two-electron alpha-alpha-alpha-alpha
+  // * integrals
+  // * @param two_body_integrals_aabb Two-electron alpha-beta-alpha-beta integrals
+  // * @param two_body_integrals_bbbb Two-electron beta-beta-beta-beta integrals
+  // * @param orbitals Shared pointer to molecular orbital data for the system
+  // * @param core_energy Core energy (nuclear repulsion + inactive orbital
+  // * energy)
+  // * @param inactive_fock_matrix_alpha Inactive Fock matrix for alpha spin in
+  // * the selected active space
+  // * @param inactive_fock_matrix_beta Inactive Fock matrix for beta spin in the
+  // * selected active space
+  // * @param type Type of Hamiltonian (Hermitian by default)
+  // * @throws std::invalid_argument if orbitals pointer is nullptr
+  // */
+  //Hamiltonian(const Eigen::MatrixXd& one_body_integrals_alpha,
+  //            const Eigen::MatrixXd& one_body_integrals_beta,
+  //            const Eigen::VectorXd& two_body_integrals_aaaa,
+  //            const Eigen::VectorXd& two_body_integrals_aabb,
+  //            const Eigen::VectorXd& two_body_integrals_bbbb,
+  //            std::shared_ptr<Orbitals> orbitals, double core_energy,
+  //            const Eigen::MatrixXd& inactive_fock_matrix_alpha,
+  //            const Eigen::MatrixXd& inactive_fock_matrix_beta,
+  //            HamiltonianType type = HamiltonianType::Hermitian);
 
   /**
    * @brief Copy constructor
@@ -411,40 +405,36 @@ class Hamiltonian : public DataClass,
  private:
   /// Container holding the wavefunction implementation
   std::unique_ptr<const HamiltonianContainer> _container;
+  ///// One-electron integrals in MO basis [norb x norb]
+  //const std::pair<std::shared_ptr<Eigen::MatrixXd>,
+  //                std::shared_ptr<Eigen::MatrixXd>>
+  //    _one_body_integrals;
 
-  //   /// Serialization version
-  //   static constexpr const char* SERIALIZATION_VERSION = "0.1.0";
-  //   /// One-electron integrals in MO basis [norb x norb]
-  //   const std::pair<std::shared_ptr<Eigen::MatrixXd>,
-  //                   std::shared_ptr<Eigen::MatrixXd>>
-  //       _one_body_integrals;
+  ///// Two-electron integrals in MO basis, stored as flattened arrays [norb^4]
+  ///// Access pattern: V[i*norb^3 + j*norb^2 + k*norb + l] = <ij|kl>
+  //const std::tuple<std::shared_ptr<Eigen::VectorXd>,
+  //                 std::shared_ptr<Eigen::VectorXd>,
+  //                 std::shared_ptr<Eigen::VectorXd>>
+  //    _two_body_integrals;
 
-  //   /// Two-electron integrals in MO basis, stored as flattened arrays
-  //   [norb^4]
-  //   /// Access pattern: V[i*norb^3 + j*norb^2 + k*norb + l] = <ij|kl>
-  //   const std::tuple<std::shared_ptr<Eigen::VectorXd>,
-  //                    std::shared_ptr<Eigen::VectorXd>,
-  //                    std::shared_ptr<Eigen::VectorXd>>
-  //       _two_body_integrals;
+  ///// @brief The inactive Fock matrix for the selected active space
+  //const std::pair<std::shared_ptr<Eigen::MatrixXd>,
+  //                std::shared_ptr<Eigen::MatrixXd>>
+  //    _inactive_fock_matrix;
 
-  //   /// @brief The inactive Fock matrix for the selected active space
-  //   const std::pair<std::shared_ptr<Eigen::MatrixXd>,
-  //                   std::shared_ptr<Eigen::MatrixXd>>
-  //       _inactive_fock_matrix;
+  ///// Molecular orbital data (coefficients, energies, occupations)
+  //const std::shared_ptr<Orbitals> _orbitals;
 
-  //   /// Molecular orbital data (coefficients, energies, occupations)
-  //   const std::shared_ptr<Orbitals> _orbitals;
+  ///// Core energy (nuclear repulsion + inactive orbital contributions)
+  //const double _core_energy;
 
-  //   /// Core energy (nuclear repulsion + inactive orbital contributions)
-  //   const double _core_energy;
+  ///// Type of Hamiltonian (Hermitian or NonHermitian)
+  //const HamiltonianType _type;
 
-  //   /// Type of Hamiltonian (Hermitian or NonHermitian)
-  //   const HamiltonianType _type;
-
-  //   /// Serialization version
+  /// Serialization version
   static constexpr const char* SERIALIZATION_VERSION = "0.1.0";
 
-  ///// Validation helpers
+  /// Validation helpers
   //void validate_integral_dimensions() const;
   //void validate_restrictedness_consistency() const;
   //void validate_active_space_dimensions() const;

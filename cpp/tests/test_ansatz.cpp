@@ -9,6 +9,7 @@
 #include <nlohmann/json.hpp>
 #include <qdk/chemistry/algorithms/active_space.hpp>
 #include <qdk/chemistry/algorithms/hamiltonian.hpp>
+#include <qdk/chemistry/data/hamiltonian_containers/canonical_4_center.hpp>
 #include <qdk/chemistry/algorithms/mc.hpp>
 #include <qdk/chemistry/algorithms/scf.hpp>
 #include <qdk/chemistry/data/ansatz.hpp>
@@ -54,8 +55,8 @@ class AnsatzSerializationTest : public ::testing::Test {
     double core_energy = 1.5;
     Eigen::MatrixXd inactive_fock = Eigen::MatrixXd::Zero(0, 0);
 
-    hamiltonian = std::make_shared<Hamiltonian>(one_body, two_body, orbitals,
-                                                core_energy, inactive_fock);
+    hamiltonian = std::make_shared<Hamiltonian>(std::make_unique<Canonical4CenterHamiltonian>(one_body, two_body, orbitals,
+                                                core_energy, inactive_fock));
 
     // Create test ansatz
     ansatz = std::make_shared<Ansatz>(hamiltonian, wavefunction);

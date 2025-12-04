@@ -4,6 +4,7 @@
 
 #include <fstream>
 #include <qdk/chemistry/data/ansatz.hpp>
+#include <qdk/chemistry/data/hamiltonian_containers/canonical_4_center.hpp>
 #include <qdk/chemistry/data/wavefunction_containers/sd.hpp>
 #include <sstream>
 #include <stdexcept>
@@ -377,11 +378,12 @@ std::shared_ptr<Ansatz> Ansatz::from_json(const nlohmann::json& j) {
         fock_matrix = Eigen::MatrixXd(0, 0);
       }
 
-      new_hamiltonian = std::make_shared<Hamiltonian>(
+      auto container = std::make_unique<Canonical4CenterHamiltonian>(
           original_hamiltonian->get_one_body_integrals(),
           original_hamiltonian->get_two_body_integrals(), wavefunction_orbitals,
           original_hamiltonian->get_core_energy(), fock_matrix,
           original_hamiltonian->get_type());
+      new_hamiltonian = std::make_shared<Hamiltonian>(std::move(container));
     } else {
       // Create unrestricted hamiltonian with wavefunction's orbitals
       Eigen::MatrixXd fock_matrix_alpha, fock_matrix_beta;
@@ -396,7 +398,7 @@ std::shared_ptr<Ansatz> Ansatz::from_json(const nlohmann::json& j) {
         fock_matrix_beta = Eigen::MatrixXd(0, 0);
       }
 
-      new_hamiltonian = std::make_shared<Hamiltonian>(
+      auto container = std::make_unique<Canonical4CenterHamiltonian>(
           original_hamiltonian->get_one_body_integrals_alpha(),
           original_hamiltonian->get_one_body_integrals_beta(),
           original_hamiltonian->get_two_body_integrals_aaaa(),
@@ -405,6 +407,7 @@ std::shared_ptr<Ansatz> Ansatz::from_json(const nlohmann::json& j) {
           wavefunction_orbitals, original_hamiltonian->get_core_energy(),
           fock_matrix_alpha, fock_matrix_beta,
           original_hamiltonian->get_type());
+      new_hamiltonian = std::make_shared<Hamiltonian>(std::move(container));
     }
 
     // 4. Make ansatz with the new hamiltonian and the wavefunction
@@ -551,11 +554,12 @@ std::shared_ptr<Ansatz> Ansatz::from_hdf5(H5::Group& group) {
         fock_matrix = Eigen::MatrixXd(0, 0);
       }
 
-      new_hamiltonian = std::make_shared<Hamiltonian>(
+      auto container = std::make_unique<Canonical4CenterHamiltonian>(
           original_hamiltonian->get_one_body_integrals(),
           original_hamiltonian->get_two_body_integrals(), wavefunction_orbitals,
           original_hamiltonian->get_core_energy(), fock_matrix,
           original_hamiltonian->get_type());
+      new_hamiltonian = std::make_shared<Hamiltonian>(std::move(container));
     } else {
       // Create unrestricted Hamiltonian with wavefunction's orbitals
       Eigen::MatrixXd fock_matrix_alpha, fock_matrix_beta;
@@ -570,7 +574,7 @@ std::shared_ptr<Ansatz> Ansatz::from_hdf5(H5::Group& group) {
         fock_matrix_beta = Eigen::MatrixXd(0, 0);
       }
 
-      new_hamiltonian = std::make_shared<Hamiltonian>(
+      auto container = std::make_unique<Canonical4CenterHamiltonian>(
           original_hamiltonian->get_one_body_integrals_alpha(),
           original_hamiltonian->get_one_body_integrals_beta(),
           original_hamiltonian->get_two_body_integrals_aaaa(),
@@ -579,6 +583,7 @@ std::shared_ptr<Ansatz> Ansatz::from_hdf5(H5::Group& group) {
           wavefunction_orbitals, original_hamiltonian->get_core_energy(),
           fock_matrix_alpha, fock_matrix_beta,
           original_hamiltonian->get_type());
+      new_hamiltonian = std::make_shared<Hamiltonian>(std::move(container));
     }
 
     // 4. Make ansatz with the new Hamiltonian and the wavefunction

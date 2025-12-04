@@ -16,6 +16,9 @@
 #include <qdk/chemistry/scf/eri/eri_multiplexer.h>
 #include <qdk/chemistry/scf/util/int1e.h>
 
+// QDK/Chemistry data::Hamiltonian headers
+#include <qdk/chemistry/data/hamiltonian_containers/canonical_4_center.hpp>
+
 #include "utils.hpp"
 
 namespace qdk::chemistry::algorithms::microsoft {
@@ -154,8 +157,9 @@ std::shared_ptr<data::Hamiltonian> HamiltonianConstructor::_run_impl(
     Eigen::MatrixXd dummy_fock =
         Eigen::MatrixXd::Zero(0, 0);  // No inactive orbitals
     return std::make_shared<data::Hamiltonian>(
-        H_active, moeri_active, orbitals,
-        structure->calculate_nuclear_repulsion_energy(), dummy_fock);
+        std::make_unique<data::Canonical4CenterHamiltonian>(
+            H_active, moeri_active, orbitals,
+            structure->calculate_nuclear_repulsion_energy(), dummy_fock));
   }
 
   auto inactive_indices =
@@ -170,8 +174,9 @@ std::shared_ptr<data::Hamiltonian> HamiltonianConstructor::_run_impl(
     Eigen::MatrixXd dummy_fock =
         Eigen::MatrixXd::Zero(0, 0);  // No inactive orbitals
     return std::make_shared<data::Hamiltonian>(
-        H_active, moeri_active, orbitals,
-        structure->calculate_nuclear_repulsion_energy(), dummy_fock);
+        std::make_unique<data::Canonical4CenterHamiltonian>(
+            H_active, moeri_active, orbitals,
+            structure->calculate_nuclear_repulsion_energy(), dummy_fock));
   }
 
   // Determine whether the inactive space is contiguous
@@ -225,9 +230,10 @@ std::shared_ptr<data::Hamiltonian> HamiltonianConstructor::_run_impl(
   }
 
   // Return the Hamiltonian instance
-  data::Hamiltonian H(
+  data::Hamiltonian H(std::make_unique<data::Canonical4CenterHamiltonian>(
       H_active, moeri_active, orbitals,
-      E_inactive + structure->calculate_nuclear_repulsion_energy(), F_inactive);
+      E_inactive + structure->calculate_nuclear_repulsion_energy(),
+      F_inactive));
   return std::make_shared<data::Hamiltonian>(std::move(H));
 }
 }  // namespace qdk::chemistry::algorithms::microsoft
