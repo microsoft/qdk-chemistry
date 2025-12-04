@@ -15,7 +15,7 @@ import qsharp._native
 import qsharp.openqasm
 from qiskit import QuantumCircuit, qasm3
 
-from qdk_chemistry.data import DataClass
+from qdk_chemistry.data.base import DataClass
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -32,6 +32,9 @@ class Circuit(DataClass):
 
     # Class attribute for filename validation
     _data_type_name = "circuit"
+
+    # Serialization version for this class
+    _serialization_version = "0.1.0"
 
     # Use keyword arguments to be future-proof
     def __init__(
@@ -171,7 +174,7 @@ class Circuit(DataClass):
         data: dict = {}
         if self.qasm is not None:
             data["qasm"] = self.qasm
-        return data
+        return self._add_json_version(data)
 
     def to_hdf5(self, group: h5py.Group) -> None:
         """Save the Circuit to an HDF5 group.
@@ -180,6 +183,7 @@ class Circuit(DataClass):
             group: HDF5 group or file to write the quantum circuit to
 
         """
+        self._add_hdf5_version(group)
         if self.qasm is not None:
             group.attrs["qasm"] = self.qasm
 
@@ -193,7 +197,11 @@ class Circuit(DataClass):
         Returns:
             Circuit: New instance of the Circuit
 
+        Raises:
+            RuntimeError: If version field is missing or incompatible
+
         """
+        cls._validate_json_version(cls._serialization_version, json_data)
         return cls(
             qasm=json_data.get("qasm"),
         )
@@ -208,7 +216,11 @@ class Circuit(DataClass):
         Returns:
             Circuit: New instance of the Circuit
 
+        Raises:
+            RuntimeError: If version attribute is missing or incompatible
+
         """
+        cls._validate_hdf5_version(cls._serialization_version, group)
         return cls(
             qasm=group.attrs.get("qasm"),
         )

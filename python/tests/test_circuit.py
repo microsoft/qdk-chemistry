@@ -280,7 +280,7 @@ class TestCircuitSerialization:
         h q[0];
         cx q[0], q[1];
         """
-        json_data = {"qasm": qasm}
+        json_data = {"qasm": qasm, "version": Circuit._serialization_version}
         circuit = Circuit.from_json(json_data)
 
         assert circuit.qasm == qasm
@@ -339,6 +339,7 @@ class TestCircuitSerialization:
         try:
             with h5py.File(tmp_path, "w") as f:
                 group = f.create_group("circuit")
+                group.attrs["version"] = Circuit._serialization_version
                 group.attrs["qasm"] = qasm
 
             with h5py.File(tmp_path, "r") as f:
@@ -410,7 +411,7 @@ class TestCircuitSerialization:
         """
         with tempfile.NamedTemporaryFile(mode="w", suffix=".circuit.json", delete=False) as tmp:
             tmp_path = Path(tmp.name)
-            json.dump({"qasm": qasm}, tmp)
+            json.dump({"qasm": qasm, "version": Circuit._serialization_version}, tmp)
 
         try:
             circuit = Circuit.from_json_file(tmp_path)
@@ -453,6 +454,7 @@ class TestCircuitSerialization:
 
         try:
             with h5py.File(tmp_path, "w") as f:
+                f.attrs["version"] = Circuit._serialization_version
                 f.attrs["qasm"] = qasm
 
             circuit = Circuit.from_hdf5_file(tmp_path)

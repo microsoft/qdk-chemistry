@@ -323,8 +323,10 @@ def test_measurement_data_to_json():
         with open(temp_path) as f:
             data = json.load(f)
         assert isinstance(data, dict)
-        # Should have one entry for the pauli group
-        assert len(data) == 1
+        # Should have one entry for the pauli group plus version field
+        assert len(data) == 2
+        assert "version" in data
+        assert "0" in data
     finally:
         Path(temp_path).unlink()
 

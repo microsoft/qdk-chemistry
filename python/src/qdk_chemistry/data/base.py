@@ -11,7 +11,12 @@ from typing import Any
 
 import h5py
 
-from qdk_chemistry._core.data import DataClass as _CoreDataClass
+from qdk_chemistry._core.data import (
+    DataClass as _CoreDataClass,
+)
+from qdk_chemistry._core.data import (
+    _validate_serialization_version,
+)
 
 __all__: list[str] = []
 
@@ -81,22 +86,27 @@ class DataClass(_CoreDataClass):
 
     Derived classes MUST implement:
 
-    1. get_summary() -> str
+    1. _data_type_name class attribute (e.g., "structure", "wavefunction")
+    2. _serialization_version class attribute (e.g., "0.1.0")
+    3. get_summary() -> str
         Return a human-readable summary string of the object
-    2. to_json() -> dict
+    4. to_json() -> dict
         Return a dictionary representation suitable for JSON serialization
-    3. to_hdf5(group: h5py.Group) -> None
+        Use _add_json_version() to include version information
+    5. to_hdf5(group: h5py.Group) -> None
         Write the object's data to an HDF5 group
-    4. from_json(json_data: dict[str, Any]) -> DataClass
+        Use _add_hdf5_version() to include version information
+    6. from_json(json_data: dict[str, Any]) -> DataClass
         Create an instance from a JSON dictionary
-    5. from_hdf5(group: h5py.Group) -> DataClass
+        Use _validate_json_version() to check version compatibility
+    7. from_hdf5(group: h5py.Group) -> DataClass
         Load an instance from an HDF5 group.
+        Use _validate_hdf5_version() to check version compatibility
 
     Derived classes should:
 
     - Set all attributes before calling super().__init__()
     - Call super().__init__() at the end of __init__ to enable immutability
-    - Set the _data_type_name class attribute (e.g., "structure", "wavefunction")
 
     Notes:
         These methods are pure virtual in the C++ base class and MUST be overridden.
@@ -105,10 +115,16 @@ class DataClass(_CoreDataClass):
         Filename validation enforces the convention that filenames must include
         the data type, e.g., "example.structure.json" or "data.wavefunction.h5"
 
+        The _serialization_version attribute must be set for each derived class
+        to track serialization format versions independently. Version validation
+        ensures major and minor versions match exactly during deserialization,
+        while allowing patch version differences for backward compatibility.
+
     """
 
-    # Class attribute to be overridden by derived classes
+    # Class attributes to be overridden by derived classes
     _data_type_name: str | None = None
+    _serialization_version: str | None = None
 
     def __init__(self) -> None:
         """Initialize the base class and mark instance as initialized.
@@ -179,6 +195,66 @@ class DataClass(_CoreDataClass):
         # The C++ trampoline will throw an error if not implemented
         raise NotImplementedError(f"{self.__class__.__name__} must implement get_summary()")
 
+    def _add_json_version(self, data: dict[str, Any]) -> dict[str, Any]:
+        """Add version field to JSON data.
+
+        Args:
+            data: Dictionary to add version to
+
+        Returns:
+            dict: The same dictionary with version added
+
+        """
+        if self._serialization_version is None:
+            raise NotImplementedError(f"{self.__class__.__name__} must implement _serialization_version")
+
+        data["version"] = self._serialization_version
+        return data
+
+    def _add_hdf5_version(self, group: h5py.Group) -> None:
+        """Add version attribute to HDF5 group if class defines a version.
+
+        Args:
+            group: HDF5 group or file to add version to
+
+        """
+        if self._serialization_version is None:
+            raise NotImplementedError(f"{self.__class__.__name__} must implement _serialization_version")
+
+        group.attrs["version"] = self._serialization_version
+
+    @classmethod
+    def _validate_json_version(cls, expected_version: str, json_data: dict[str, Any]) -> None:
+        """Validate serialization version in JSON data.
+
+        Args:
+            expected_version: The expected version string
+            json_data: Dictionary containing the serialized data
+
+        Raises:
+            RuntimeError: If version field is missing or incompatible
+
+        """
+        if "version" not in json_data:
+            raise RuntimeError(f"JSON for {cls.__name__} missing required 'version' field")
+        _validate_serialization_version(expected_version, json_data["version"])
+
+    @classmethod
+    def _validate_hdf5_version(cls, expected_version: str, group: h5py.Group) -> None:
+        """Validate serialization version in HDF5 group.
+
+        Args:
+            expected_version: The expected version string
+            group: HDF5 group containing the serialized data
+
+        Raises:
+            RuntimeError: If version attribute is missing or incompatible
+
+        """
+        if "version" not in group.attrs:
+            raise RuntimeError(f"HDF5 group for {cls.__name__} missing required 'version' attribute")
+        _validate_serialization_version(expected_version, group.attrs["version"])
+
     def to_dict(self) -> dict[str, Any]:
         """Convert the object to a dictionary.
 
@@ -188,7 +264,7 @@ class DataClass(_CoreDataClass):
         """
         return self.to_json()
 
-    def to_json(self) -> dict:
+    def to_json(self) -> dict[str, Any]:
         """Convert the object to a dictionary for JSON serialization.
 
         Returns:
