@@ -19,7 +19,7 @@ structure = Structure(
 
 # SCF
 scf_solver = create("scf_solver")
-scf_solver.settings().set(basis_set="sto-3g")
+scf_solver.settings().set("basis_set", "sto-3g")
 E_scf, wfn_scf = scf_solver.run(structure, charge=0, spin_multiplicity=1)
 
 # Create Hamiltonian from SCF orbitals

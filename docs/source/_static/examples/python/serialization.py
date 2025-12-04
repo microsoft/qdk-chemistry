@@ -54,7 +54,7 @@ h_example = Hamiltonian(one_body, two_body, orbitals, core_energy, inactive_fock
 h_example.to_hdf5_file("h2_example.hamiltonian.h5")
 
 # Deserialize from HDF5 file
-h_example_from_hdf5_file = Hamiltonian.from_hdf5_file("h_example.hamiltonian.h5")
+h_example_from_hdf5_file = Hamiltonian.from_hdf5_file("h2_example.hamiltonian.h5")
 os.remove("h2_example.hamiltonian.h5")
 # end-cell-hdf5
 ################################################################################
