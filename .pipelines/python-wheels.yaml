@@ -95,7 +95,7 @@ extends:
             - output: pipelineArtifact
               displayName: Upload Linux Python $(pythonVersion) Wheels for ${{ target.march }}
               targetPath: $(System.DefaultWorkingDirectory)/python/repaired_wheelhouse
-              artifactName: linux-${{ target.march }}-wheels-python$(pythonVersion)
+              artifactName: linux-${{ target.arch }}-wheels-python$(pythonVersion)
           steps:
           # Build - x86_64
           - ${{ if eq(target.arch, 'x86_64') }}:
@@ -155,38 +155,38 @@ extends:
     #               instructions: "Please verify artifacts and approve the release"
     #               onTimeout: "reject"
 
-    # - stage: Release
-    #   displayName: Release
-    #   dependsOn: Approval
-    #   condition: and(succeeded(), eq(variables['Build.Reason'], 'Manual'))
-    #   jobs:
-    #     - job: "Publish Python Packages"
-    #       pool:
-    #         name: "Azure-Pipelines-DevTools-EO"
-    #         image: "ubuntu-latest"
-    #         os: linux
-    #       templateContext:
-    #           type: releaseJob
-    #           isProduction: true
-    #           inputs: # Declare all build artifacts to be consumed in the release job
-    #           - input: pipelineArtifact
-    #             artifact: linux-x86_64-wheels-python3.11
-    #             targetPath: $(System.DefaultWorkingDirectory)/python/repaired_wheelhouse/linux-x86_64-wheels-python3.11
-    #           - input: pipelineArtifact
-    #             artifact: linux-x86_64-wheels-python3.12
-    #             targetPath: $(System.DefaultWorkingDirectory)/python/repaired_wheelhouse/linux-x86_64-wheels-python3.12
-    #           - input: pipelineArtifact
-    #             artifact: linux-x86_64-wheels-python3.13
-    #             targetPath: $(System.DefaultWorkingDirectory)/python/repaired_wheelhouse/linux-x86_64-wheels-python3.13
-    #           - input: pipelineArtifact
-    #             artifact: linux-aarch64-wheels-python3.11
-    #             targetPath: $(System.DefaultWorkingDirectory)/python/repaired_wheelhouse/linux-aarch64-wheels-python3.11
-    #           - input: pipelineArtifact
-    #             artifact: linux-aarch64-wheels-python3.12
-    #             targetPath: $(System.DefaultWorkingDirectory)/python/repaired_wheelhouse/linux-aarch64-wheels-python3.12
-    #           - input: pipelineArtifact
-    #             artifact: linux-aarch64-wheels-python3.13
-    #             targetPath: $(System.DefaultWorkingDirectory)/python/repaired_wheelhouse/linux-aarch64-wheels-python3.13
+    - stage: Release
+      displayName: Release
+      dependsOn: Approval
+      condition: and(succeeded(), eq(variables['Build.Reason'], 'Manual'))
+      jobs:
+        - job: "Publish Python Packages"
+          pool:
+            name: "Azure-Pipelines-DevTools-EO"
+            image: "ubuntu-latest"
+            os: linux
+          templateContext:
+              type: releaseJob
+              isProduction: true
+              inputs: # Declare all build artifacts to be consumed in the release job
+              - input: pipelineArtifact
+                artifact: linux-x86_64-wheels-python3.11
+                targetPath: $(System.DefaultWorkingDirectory)/python/repaired_wheelhouse/linux-x86_64-wheels-python3.11
+              - input: pipelineArtifact
+                artifact: linux-x86_64-wheels-python3.12
+                targetPath: $(System.DefaultWorkingDirectory)/python/repaired_wheelhouse/linux-x86_64-wheels-python3.12
+              - input: pipelineArtifact
+                artifact: linux-x86_64-wheels-python3.13
+                targetPath: $(System.DefaultWorkingDirectory)/python/repaired_wheelhouse/linux-x86_64-wheels-python3.13
+              - input: pipelineArtifact
+                artifact: linux-aarch64-wheels-python3.11
+                targetPath: $(System.DefaultWorkingDirectory)/python/repaired_wheelhouse/linux-aarch64-wheels-python3.11
+              - input: pipelineArtifact
+                artifact: linux-aarch64-wheels-python3.12
+                targetPath: $(System.DefaultWorkingDirectory)/python/repaired_wheelhouse/linux-aarch64-wheels-python3.12
+              - input: pipelineArtifact
+                artifact: linux-aarch64-wheels-python3.13
+                targetPath: $(System.DefaultWorkingDirectory)/python/repaired_wheelhouse/linux-aarch64-wheels-python3.13
     #       steps:
     #         - task: EsrpRelease@9
     #           condition: succeeded()
