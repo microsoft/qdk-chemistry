@@ -79,8 +79,7 @@ docs = [
   "sphinx_copybutton"
 ]
 plugins = [
-  "pyscf>=2.9.0",
-  "rdkit>=2023.0.0"
+  "pyscf>=2.9.0"
 ]
 
 # TODO (NAB): update these URLs with final ones, workitem: 41430
