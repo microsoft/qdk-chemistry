@@ -23,7 +23,7 @@ Units
 
 All internal coordinates in the :class:`~qdk_chemistry.data.Structure` class are in Bohr by default.
 This applies to all methods that return or accept coordinates.
-The only time Angstrom units can be found by default, are in the *xyz* file format, where Angstrom is default (see below).
+The only time Angstrom units can be found by default is in the *xyz* file format, where Angstrom is default (see below).
 
 Usage
 -----

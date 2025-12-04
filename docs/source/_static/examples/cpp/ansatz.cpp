@@ -26,18 +26,18 @@ int main() {
   scf_solver->settings().set("basis_set", "sto-3g");
   auto [E_scf, wfn_scf] = scf_solver->run(structure, 0, 1);
 
-  // Create hamiltonian from scf orbitals
+  // Create Hamiltonian from SCF Orbitals
   auto ham_constructor = HamiltonianConstructorFactory::create();
   auto hamiltonian = ham_constructor->run(wfn_scf->get_orbitals());
 
-  // Create ansatz object from hamiltonian and wavefunction
+  // Create Ansatz object from Hamiltonian and Wavefunction
   Ansatz ansatz(hamiltonian, wfn_scf);
   // end-cell-create
   // --------------------------------------------------------------------------------------------
 
   // --------------------------------------------------------------------------------------------
   // start-cell-access
-  // Access ansatz components
+  // Access Ansatz components
   auto hamiltonian_ref = ansatz.get_hamiltonian();
   auto wavefunction_ref = ansatz.get_wavefunction();
   auto orbitals_ref = ansatz.get_orbitals();

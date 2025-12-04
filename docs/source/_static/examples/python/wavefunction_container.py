@@ -83,9 +83,9 @@ cas_wavefunction = Wavefunction(cas_container)
 # Create an SCI wavefunction for H2
 # SCI selects only the most important configurations/determinants from the full space
 sci_dets = [
-    Configuration("20"),  # Ground state
-    Configuration("du"),  # Mixed state,
-    Configuration("ud"),  # Second mixed state
+    Configuration("20"),  # both electrons in bonding MO (ground state)
+    Configuration("du"),  # alpha in bonding, beta in antibonding
+    Configuration("ud"),  # beta in bonding, alpha in antibonding
 ]
 
 # Coefficients for selected determinants

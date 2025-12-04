@@ -19,7 +19,7 @@ int main() {
 
   Structure structure(coords, symbols);
 
-  // element enum alternative
+  // Element enum alternative
   std::vector<Element> elements = {Element::H, Element::H};
   Structure structure_alternative(coords, elements);
 
