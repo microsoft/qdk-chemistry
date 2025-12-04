@@ -20,8 +20,8 @@ scf_solver = create("scf_solver")
 # start-cell-configure
 # Configure the SCF solver using the settings interface
 scf_solver.settings().set(
-    "method", "dft"
-)  # for a specific functional, specify instead of 'dft'
+    "method", "b3lyp"
+)  # b3lyp functional in dft
 scf_solver.settings().set("basis_set", "def2-tzvpp")
 
 # end-cell-configure

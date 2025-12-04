@@ -23,9 +23,8 @@ auto scf_solver = ScfSolverFactory::create();
 // start-cell-configure
 // Standard settings that work with all solvers
 // Set the method
-scf_solver->settings().set(
-    "method",
-    "dft");  // For a specific functional, specify instead of "dft"
+scf_solver->settings().set("method",
+                           "b3lyp");  // b3lyp functional in dft
 // Set the basis set
 scf_solver->settings().set("basis_set", "def2-tzvpp");
 
