@@ -7,13 +7,11 @@
 
 ################################################################################
 # start-cell-hamiltonian-creation
-import tempfile
-from pathlib import Path
-
 import numpy as np
 from qdk_chemistry.algorithms import create
-from qdk_chemistry.data import Hamiltonian, Structure
+from qdk_chemistry.data import Structure, SpinChannel
 
+# Create a structure object
 coords = np.array(
     [
         [0.000000, 0.000000, 0.000000],
@@ -21,7 +19,10 @@ coords = np.array(
         [-0.44604614, 1.09629126, 0.000000],
     ]
 )
-structure = Structure(coords, ["O", "H", "H"])
+symbols = ["O", "H", "H"]
+structure = Structure(coords, symbols)
+
+# Run intiial SCF to get orbitals
 scf_solver = create("scf_solver")
 scf_solver.settings().set("basis_set", "sto-3g")
 E_scf, wfn = scf_solver.run(structure, charge=0, spin_multiplicity=1)
@@ -37,17 +38,22 @@ hamiltonian = hamiltonian_constructor.run(orbitals)
 
 ################################################################################
 # start-cell-properties
-# Example indices for two-electron integral access
+# Example indices for one- and two-electron integral access
 i_int, j_int, k_int, l_int = 0, 1, 2, 3
 
-# Access one-electron integrals
-h1 = hamiltonian.get_one_body_integrals()
+# Access one-electron integrals (both spin channels)
+h1_a, h1_b = hamiltonian.get_one_body_integrals()
 
-# Access two-electron integrals
-h2 = hamiltonian.get_two_body_integrals()
+# Access two-electron integrals (both spin channels)
+h2_aaaa, h2_aabb, h2_bbbb = hamiltonian.get_two_body_integrals()
 
-# Access a specific two-electron integral <ij|kl>
-element = hamiltonian.get_two_body_element(i_int, j_int, k_int, l_int)
+# Access a specific one-electron integral <ij> (for aa spin channel)
+one_body_element = hamiltonian.get_one_body_element(i_int, j_int, SpinChannel.aa)
+
+# Access a specific two-electron integral <ij|kl> (for aaaa spin channel)
+two_body_element = hamiltonian.get_two_body_element(
+    i_int, j_int, k_int, l_int, SpinChannel.aaaa
+)
 
 # Get core energy (nuclear repulsion + inactive orbital energy)
 core_energy = hamiltonian.get_core_energy()
@@ -55,29 +61,6 @@ core_energy = hamiltonian.get_core_energy()
 # Get orbital data
 orbitals = hamiltonian.get_orbitals()
 # end-cell-properties
-################################################################################
-
-################################################################################
-# start-cell-serialization
-temp_dir = Path(tempfile.gettempdir())
-# Serialize to JSON file
-hamiltonian.to_json_file(temp_dir / "molecule.hamiltonian.json")
-
-# Deserialize from JSON file
-hamiltonian_from_json_file = Hamiltonian.from_json_file(
-    temp_dir / "molecule.hamiltonian.json"
-)
-
-# Serialize to HDF5 file
-hamiltonian.to_hdf5_file("molecule.hamiltonian.h5")
-hamiltonian_from_hdf5_file = Hamiltonian.from_hdf5_file("molecule.hamiltonian.h5")
-
-# Generic file I/O based on type parameter
-hamiltonian.to_file(temp_dir / "molecule.hamiltonian.json", "json")
-hamiltonian_loaded = Hamiltonian.from_file(
-    temp_dir / "molecule.hamiltonian.json", "json"
-)
-# end-cell-serialization
 ################################################################################
 
 ################################################################################

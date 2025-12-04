@@ -4,6 +4,7 @@ target_sources(chemistry PRIVATE
     localization.cpp
     mc.cpp
     pmc.cpp
+    dynamical_correlation_calculator.cpp
     scf.cpp
 )
 
