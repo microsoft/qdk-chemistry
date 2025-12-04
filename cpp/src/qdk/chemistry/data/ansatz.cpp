@@ -93,54 +93,152 @@ double Ansatz::calculate_energy() const {
         "calculation");
   }
 
-  // get 2 rdm from wavefunction
-  const auto& rdm2 = std::get<Eigen::VectorXd>(
-      _wavefunction->get_active_two_rdm_spin_traced());
-  const auto& rdm1 = std::get<Eigen::MatrixXd>(
-      _wavefunction->get_active_one_rdm_spin_traced());
-
-  // get integrals from hamiltonian
-  const auto& h1 = _hamiltonian->get_one_body_integrals();
-  const auto& h2 = _hamiltonian->get_two_body_integrals();
-
-  // check that active space indices are consistent
-  auto active_space_indices =
-      _wavefunction->get_orbitals()->get_active_space_indices();
-  if (active_space_indices.first.size() != active_space_indices.second.size()) {
-    throw std::runtime_error(
-        "Active space indices are inconsistent between Hamiltonian and "
-        "wavefunction");
-  }
-  size_t norb = active_space_indices.first.size();
-
-  // Compute energy expectation value
   double energy = 0.0;
 
-  // One-body contribution
-  for (int p = 0; p < norb; ++p) {
-    for (int q = 0; q < norb; ++q) {
-      energy += h1(p, q) * rdm1(q, p);
-    }
-  }
+  if (_hamiltonian->is_restricted()) {
+    // get 2 rdm from wavefunction
+    const auto& rdm2 = std::get<Eigen::VectorXd>(
+        _wavefunction->get_active_two_rdm_spin_traced());
+    const auto& rdm1 = std::get<Eigen::MatrixXd>(
+        _wavefunction->get_active_one_rdm_spin_traced());
 
-  // Two-body contribution
-  const size_t norb2 = norb * norb;
-  const size_t norb3 = norb * norb2;
-  for (int p = 0; p < norb; ++p) {
-    for (int q = 0; q < norb; ++q) {
-      for (int r = 0; r < norb; ++r) {
-        for (int s = 0; s < norb; ++s) {
-          size_t index_co = p * norb3 + q * norb2 + r * norb + s;
-          size_t index_dm = r * norb3 + s * norb2 + p * norb + q;
-          energy += 0.5 * h2(index_co) * rdm2(index_dm);
+    // get integrals from hamiltonian
+    const auto& [h1_a, h1_b] = _hamiltonian->get_one_body_integrals();
+    // get_two_body_integrals returns (aaaa, aabb, bbbb) tuple
+    const auto& [h2_aaaa, h2_aabb, h2_bbbb] =
+        _hamiltonian->get_two_body_integrals();
+    // For restricted case, all components are the same; use a and aaaa
+    const auto& h1 = h1_a;
+    const auto& h2 = h2_aaaa;
+
+    // check that active space indices are consistent
+    auto active_space_indices =
+        _wavefunction->get_orbitals()->get_active_space_indices();
+    if (active_space_indices.first.size() !=
+        active_space_indices.second.size()) {
+      throw std::runtime_error(
+          "Active space indices are inconsistent between Hamiltonian and "
+          "wavefunction");
+    }
+    size_t norb = active_space_indices.first.size();
+
+    // One-body contribution
+    for (int p = 0; p < norb; ++p) {
+      for (int q = 0; q < norb; ++q) {
+        energy += h1(p, q) * rdm1(q, p);
+      }
+    }
+
+    // Two-body contribution
+    const size_t norb2 = norb * norb;
+    const size_t norb3 = norb * norb2;
+    for (int p = 0; p < norb; ++p) {
+      for (int q = 0; q < norb; ++q) {
+        for (int r = 0; r < norb; ++r) {
+          for (int s = 0; s < norb; ++s) {
+            size_t index_co = p * norb3 + q * norb2 + r * norb + s;
+            size_t index_dm = r * norb3 + s * norb2 + p * norb + q;
+            energy += 0.5 * h2(index_co) * rdm2(index_dm);
+          }
         }
       }
     }
+
+    // core energy contribution
+    energy += _hamiltonian->get_core_energy();
   }
 
-  // core energy contribution
-  energy += _hamiltonian->get_core_energy();
-  std::cout << "Core energy: " << _hamiltonian->get_core_energy() << std::endl;
+  // Unrestricted case
+  else {
+    // Use spin-dependent RDMs for unrestricted case
+    const auto& [rdm1_aa_var, rdm1_bb_var] =
+        _wavefunction->get_active_one_rdm_spin_dependent();
+    const auto& [rdm2_aabb_var, rdm2_aaaa_var, rdm2_bbbb_var] =
+        _wavefunction->get_active_two_rdm_spin_dependent();
+
+    // Extract RDM matrices/vectors from variants
+    const auto& rdm1_aa = std::get<Eigen::MatrixXd>(rdm1_aa_var);
+    const auto& rdm1_bb = std::get<Eigen::MatrixXd>(rdm1_bb_var);
+    const auto& rdm2_aabb = std::get<Eigen::VectorXd>(rdm2_aabb_var);
+    const auto& rdm2_aaaa = std::get<Eigen::VectorXd>(rdm2_aaaa_var);
+    const auto& rdm2_bbbb = std::get<Eigen::VectorXd>(rdm2_bbbb_var);
+
+    // get one body integrals from hamiltonian
+    const auto& [h1_alpha, h1_beta] = _hamiltonian->get_one_body_integrals();
+
+    // get_two_body_integrals returns (aaaa, aabb, bbbb) tuple
+    const auto& [h2_aaaa, h2_aabb, h2_bbbb] =
+        _hamiltonian->get_two_body_integrals();
+
+    // check that active space indices are consistent
+    auto active_space_indices =
+        _wavefunction->get_orbitals()->get_active_space_indices();
+    if (active_space_indices.first.size() !=
+        active_space_indices.second.size()) {
+      throw std::runtime_error(
+          "Active space indices are inconsistent between Hamiltonian and "
+          "wavefunction");
+    }
+    size_t norb = active_space_indices.first.size();
+
+    // One-body contribution (alpha + beta)
+    for (int p = 0; p < norb; ++p) {
+      for (int q = 0; q < norb; ++q) {
+        // Alpha contribution
+        energy += h1_alpha(p, q) * rdm1_aa(q, p);
+        // Beta contribution
+        energy += h1_beta(p, q) * rdm1_bb(q, p);
+      }
+    }
+
+    // Two-body contribution - loop through spin channels
+    const size_t norb2 = norb * norb;
+    const size_t norb3 = norb * norb2;
+
+    // Alpha-alpha contribution (h2_aaaa)
+    for (int p = 0; p < norb; ++p) {
+      for (int q = 0; q < norb; ++q) {
+        for (int r = 0; r < norb; ++r) {
+          for (int s = 0; s < norb; ++s) {
+            size_t index_co = p * norb3 + q * norb2 + r * norb + s;
+            size_t index_dm = r * norb3 + s * norb2 + p * norb + q;
+            energy += 0.5 * h2_aaaa(index_co) * rdm2_aaaa(index_dm);
+          }
+        }
+      }
+    }
+
+    // Alpha-beta contribution (h2_aabb)
+    // Note: h2_aabb is stored as (ββ|αα), so indices are swapped
+    for (int p = 0; p < norb; ++p) {
+      for (int q = 0; q < norb; ++q) {
+        for (int r = 0; r < norb; ++r) {
+          for (int s = 0; s < norb; ++s) {
+            // h2_aabb is (ββ|αα) so access as (r,s,p,q) not (p,q,r,s)
+            size_t index_co = r * norb3 + s * norb2 + p * norb + q;
+            size_t index_dm = r * norb3 + s * norb2 + p * norb + q;
+            energy += h2_aabb(index_co) * rdm2_aabb(index_dm);
+          }
+        }
+      }
+    }
+
+    // Beta-beta contribution (h2_bbbb)
+    for (int p = 0; p < norb; ++p) {
+      for (int q = 0; q < norb; ++q) {
+        for (int r = 0; r < norb; ++r) {
+          for (int s = 0; s < norb; ++s) {
+            size_t index_co = p * norb3 + q * norb2 + r * norb + s;
+            size_t index_dm = r * norb3 + s * norb2 + p * norb + q;
+            energy += 0.5 * h2_bbbb(index_co) * rdm2_bbbb(index_dm);
+          }
+        }
+      }
+    }
+
+    // core energy contribution
+    energy += _hamiltonian->get_core_energy();
+  }
 
   return energy;
 }
@@ -372,40 +470,40 @@ std::shared_ptr<Ansatz> Ansatz::from_json(const nlohmann::json& j) {
       // Create restricted hamiltonian with wavefunction's orbitals
       Eigen::MatrixXd fock_matrix;
       if (original_hamiltonian->has_inactive_fock_matrix()) {
-        fock_matrix = original_hamiltonian->get_inactive_fock_matrix_alpha();
+        auto [fock_matrix, fock_matrix_beta] =
+            original_hamiltonian->get_inactive_fock_matrix();
       } else {
         // Use empty matrix if fock matrix is not set
         fock_matrix = Eigen::MatrixXd(0, 0);
       }
 
+      const auto& [h2_aaaa, h2_aabb, h2_bbbb] =
+          original_hamiltonian->get_two_body_integrals();
+      const auto& [h_aa, h_bb] = original_hamiltonian->get_one_body_integrals();
       new_hamiltonian = std::make_shared<Hamiltonian>(
-          original_hamiltonian->get_one_body_integrals(),
-          original_hamiltonian->get_two_body_integrals(), wavefunction_orbitals,
+          h_aa, h2_aaaa, wavefunction_orbitals,
           original_hamiltonian->get_core_energy(), fock_matrix,
           original_hamiltonian->get_type());
     } else {
       // Create unrestricted hamiltonian with wavefunction's orbitals
       Eigen::MatrixXd fock_matrix_alpha, fock_matrix_beta;
       if (original_hamiltonian->has_inactive_fock_matrix()) {
-        fock_matrix_alpha =
-            original_hamiltonian->get_inactive_fock_matrix_alpha();
-        fock_matrix_beta =
-            original_hamiltonian->get_inactive_fock_matrix_beta();
+        auto [fock_matrix_alpha, fock_matrix_beta] =
+            original_hamiltonian->get_inactive_fock_matrix();
       } else {
         // Use empty matrices if fock matrix is not set
         fock_matrix_alpha = Eigen::MatrixXd(0, 0);
         fock_matrix_beta = Eigen::MatrixXd(0, 0);
       }
 
+      const auto& [h2_aaaa, h2_aabb, h2_bbbb] =
+          original_hamiltonian->get_two_body_integrals();
+      const auto& [h_aa, h_bb] = original_hamiltonian->get_one_body_integrals();
+
       new_hamiltonian = std::make_shared<Hamiltonian>(
-          original_hamiltonian->get_one_body_integrals_alpha(),
-          original_hamiltonian->get_one_body_integrals_beta(),
-          original_hamiltonian->get_two_body_integrals_aaaa(),
-          original_hamiltonian->get_two_body_integrals_aabb(),
-          original_hamiltonian->get_two_body_integrals_bbbb(),
-          wavefunction_orbitals, original_hamiltonian->get_core_energy(),
-          fock_matrix_alpha, fock_matrix_beta,
-          original_hamiltonian->get_type());
+          h_aa, h_bb, h2_aaaa, h2_aabb, h2_bbbb, wavefunction_orbitals,
+          original_hamiltonian->get_core_energy(), fock_matrix_alpha,
+          fock_matrix_beta, original_hamiltonian->get_type());
     }
 
     // 4. Make ansatz with the new hamiltonian and the wavefunction
@@ -424,7 +522,7 @@ void Ansatz::_to_json_file(const std::string& filename) const {
   }
 
   nlohmann::json j = to_json();
-  file << j.dump(2);  // Pretty print with 2-space indentation
+  file << j.dump(2);
   file.close();
 
   if (file.fail()) {
@@ -546,40 +644,40 @@ std::shared_ptr<Ansatz> Ansatz::from_hdf5(H5::Group& group) {
       // Create restricted Hamiltonian with wavefunction's orbitals
       Eigen::MatrixXd fock_matrix;
       if (original_hamiltonian->has_inactive_fock_matrix()) {
-        fock_matrix = original_hamiltonian->get_inactive_fock_matrix_alpha();
+        auto [fock_matrix, fock_matrix_beta] =
+            original_hamiltonian->get_inactive_fock_matrix();
       } else {
         // Use empty matrix if Fock matrix is not set
         fock_matrix = Eigen::MatrixXd(0, 0);
       }
 
+      const auto& [h2_aaaa, h2_aabb, h2_bbbb] =
+          original_hamiltonian->get_two_body_integrals();
+      const auto& [h_aa, h_bb] = original_hamiltonian->get_one_body_integrals();
       new_hamiltonian = std::make_shared<Hamiltonian>(
-          original_hamiltonian->get_one_body_integrals(),
-          original_hamiltonian->get_two_body_integrals(), wavefunction_orbitals,
+          h_aa, h2_aaaa, wavefunction_orbitals,
           original_hamiltonian->get_core_energy(), fock_matrix,
           original_hamiltonian->get_type());
     } else {
       // Create unrestricted Hamiltonian with wavefunction's orbitals
       Eigen::MatrixXd fock_matrix_alpha, fock_matrix_beta;
       if (original_hamiltonian->has_inactive_fock_matrix()) {
-        fock_matrix_alpha =
-            original_hamiltonian->get_inactive_fock_matrix_alpha();
-        fock_matrix_beta =
-            original_hamiltonian->get_inactive_fock_matrix_beta();
+        auto [fock_matrix_alpha, fock_matrix_beta] =
+            original_hamiltonian->get_inactive_fock_matrix();
       } else {
         // Use empty matrices if Fock matrix is not set
         fock_matrix_alpha = Eigen::MatrixXd(0, 0);
         fock_matrix_beta = Eigen::MatrixXd(0, 0);
       }
 
+      const auto& [h2_aaaa, h2_aabb, h2_bbbb] =
+          original_hamiltonian->get_two_body_integrals();
+      const auto& [h_aa, h_bb] = original_hamiltonian->get_one_body_integrals();
+
       new_hamiltonian = std::make_shared<Hamiltonian>(
-          original_hamiltonian->get_one_body_integrals_alpha(),
-          original_hamiltonian->get_one_body_integrals_beta(),
-          original_hamiltonian->get_two_body_integrals_aaaa(),
-          original_hamiltonian->get_two_body_integrals_aabb(),
-          original_hamiltonian->get_two_body_integrals_bbbb(),
-          wavefunction_orbitals, original_hamiltonian->get_core_energy(),
-          fock_matrix_alpha, fock_matrix_beta,
-          original_hamiltonian->get_type());
+          h_aa, h_bb, h2_aaaa, h2_aabb, h2_bbbb, wavefunction_orbitals,
+          original_hamiltonian->get_core_energy(), fock_matrix_alpha,
+          fock_matrix_beta, original_hamiltonian->get_type());
     }
 
     // 4. Make ansatz with the new Hamiltonian and the wavefunction

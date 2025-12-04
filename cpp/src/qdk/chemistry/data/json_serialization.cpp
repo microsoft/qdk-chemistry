@@ -6,9 +6,11 @@
 
 #include <H5Cpp.h>
 
+#include <Eigen/Dense>
 #include <stdexcept>
 #include <string>
 #include <tuple>
+#include <variant>
 
 namespace qdk::chemistry::data {
 
@@ -30,6 +32,54 @@ nlohmann::json vector_to_json(const Eigen::VectorXd& vector) {
     j.push_back(vector(i));
   }
   return j;
+}
+
+nlohmann::json vector_variant_to_json(const VectorVariant& vec_var,
+                                      bool is_complex) {
+  nlohmann::json j_vec;
+  if (is_complex) {
+    const auto& vec_c = std::get<Eigen::VectorXcd>(vec_var);
+    for (int i = 0; i < vec_c.size(); ++i) {
+      j_vec.push_back({vec_c(i).real(), vec_c(i).imag()});
+    }
+    return j_vec;
+  } else {
+    const auto& vec_r = std::get<Eigen::VectorXd>(vec_var);
+    for (int i = 0; i < vec_r.size(); ++i) {
+      j_vec.push_back(vec_r(i));
+    }
+  }
+  return j_vec;
+}
+
+VectorVariant json_to_vector_variant(const nlohmann::json& j_vec,
+                                     bool is_complex = false) {
+  VectorVariant vec_var;
+  if (is_complex) {
+    if (!j_vec.is_array() || j_vec.empty() || !j_vec[0].is_array()) {
+      throw std::runtime_error(
+          "Invalid complex format: expected array of [real, imag] pairs");
+    }
+    Eigen::VectorXcd vec(j_vec.size());
+    for (size_t i = 0; i < j_vec.size(); ++i) {
+      if (j_vec[i].size() != 2) {
+        throw std::runtime_error(
+            "Invalid complex format: expected array of [real, imag] pairs");
+      }
+      vec(i) = std::complex<double>(j_vec[i][0], j_vec[i][1]);
+    }
+    vec_var = vec;
+  } else {
+    if (!j_vec.is_array()) {
+      throw std::runtime_error("Invalid format: expected array of numbers");
+    }
+    Eigen::VectorXd vec(j_vec.size());
+    for (size_t i = 0; i < j_vec.size(); ++i) {
+      vec(i) = j_vec[i];
+    }
+    vec_var = vec;
+  }
+  return vec_var;
 }
 
 Eigen::MatrixXd json_to_matrix(const nlohmann::json& j) {

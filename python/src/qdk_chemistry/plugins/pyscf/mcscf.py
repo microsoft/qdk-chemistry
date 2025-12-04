@@ -60,7 +60,7 @@ from qdk_chemistry.data import (
     Settings,
     Wavefunction,
 )
-from qdk_chemistry.plugins.pyscf.utils import orbitals_to_scf
+from qdk_chemistry.plugins.pyscf.utils import SCFType, orbitals_to_scf
 
 __all__ = ["PyscfMcscfCalculator", "PyscfMcscfSettings"]
 
@@ -347,7 +347,7 @@ class PyscfMcscfCalculator(MultiConfigurationScf):
                 n_active_beta_electrons -= 1
 
         # get pyscf scf object
-        pyscf_scf = orbitals_to_scf(orbitals, occ_alpha=alpha_occ, occ_beta=beta_occ, force_restricted=True)
+        pyscf_scf = orbitals_to_scf(orbitals, occ_alpha=alpha_occ, occ_beta=beta_occ, scf_type=SCFType.RESTRICTED)
 
         # Create CASSCF object
         pyscf_mcscf = mcscf.CASSCF(pyscf_scf, n_active_orbitals, n_active_electrons)

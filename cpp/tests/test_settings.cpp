@@ -169,7 +169,9 @@ class TestSettings : public Settings {
 
   // Convenience getters (optional)
   int get_max_iterations() const { return get<int64_t>("max_iterations"); }
-  double get_tolerance() const { return get<double>("convergence_threshold"); }
+  double get_convergence_threshold() const {
+    return get<double>("convergence_threshold");
+  }
   std::string get_method() const { return get<std::string>("method"); }
   bool get_enable_logging() const { return get<bool>("enable_logging"); }
   std::vector<double> get_coefficients() const {

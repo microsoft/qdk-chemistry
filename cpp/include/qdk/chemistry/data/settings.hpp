@@ -217,13 +217,14 @@ class SettingTypeMismatch : public std::runtime_error {
  *
  *     // Convenience getters with validation (optional)
  *     int32_t get_max_iterations() const { return
- * get<int32_t>("max_iterations"); } double get_tolerance() const { return
- * get<double>("convergence_threshold"); } std::string get_method() const {
- * return get<std::string>("method"); }
+ * get<int32_t>("max_iterations"); } double get_convergence_threshold() const {
+ * return get<double>("convergence_threshold"); } std::string get_method() const
+ * { return get<std::string>("method"); }
  *
  *     // After construction, only existing settings can be modified
  *     void set_max_iterations(int32_t value) { set("max_iterations", value); }
- *     void set_tolerance(double value) { set("convergence_threshold", value); }
+ *     void set_convergence_threshold(double value) {
+ * set("convergence_threshold", value); }
  * };
  * ```
  */

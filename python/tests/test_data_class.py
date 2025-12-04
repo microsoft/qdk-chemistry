@@ -15,7 +15,6 @@ from qdk_chemistry._core.data import DataClass as DataClassCore
 from qdk_chemistry.data import (
     Ansatz,
     BasisSet,
-    CoupledClusterAmplitudes,
     DataClass,
     Hamiltonian,
     Orbitals,
@@ -65,7 +64,7 @@ class TestDataClass:
 
     @pytest.mark.parametrize(
         "data_class",
-        [Structure, Settings, BasisSet, Ansatz, Hamiltonian, Orbitals, Wavefunction, CoupledClusterAmplitudes],
+        [Structure, Settings, BasisSet, Ansatz, Hamiltonian, Orbitals, Wavefunction],
     )
     def test_data_classes_have_base_interface(self, data_class):
         """Test that data classes have the required base class methods."""

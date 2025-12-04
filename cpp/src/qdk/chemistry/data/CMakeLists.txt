@@ -3,7 +3,6 @@ target_sources(chemistry PRIVATE
     basis_set.cpp
     configuration.cpp
     configuration_set.cpp
-    coupled_cluster.cpp
     hdf5_serialization.cpp
     json_serialization.cpp
     hamiltonian.cpp
@@ -13,6 +12,8 @@ target_sources(chemistry PRIVATE
     structure.cpp
     wavefunction.cpp
     wavefunction_containers/cas.cpp
+    wavefunction_containers/cc.cpp
+    wavefunction_containers/mp2.cpp
     wavefunction_containers/sci.cpp
     wavefunction_containers/sd.cpp
 )
