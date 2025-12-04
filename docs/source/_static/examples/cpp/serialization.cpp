@@ -54,15 +54,15 @@ int main() {
   double core_energy = 1.5;
   Eigen::MatrixXd inactive_fock = Eigen::MatrixXd::Zero(0, 0);
 
-  Hamiltonian h_example(one_body, two_body, orbitals, core_energy,
-                        inactive_fock);
+  Hamiltonian h2_example(one_body, two_body, orbitals, core_energy,
+                         inactive_fock);
 
-  h_example.to_hdf5_file(
-      "h_example.hamiltonian.h5");  // Extension depends on object type
+  h2_example.to_hdf5_file(
+      "h2_example.hamiltonian.h5");  // Extension depends on object type
 
   // Deserialize from HDF5 file
-  auto h_example_from_hdf5_file =
-      Hamiltonian::from_hdf5_file("h_example.hamiltonian.h5");
+  auto h2_example_from_hdf5_file =
+      Hamiltonian::from_hdf5_file("h2_example.hamiltonian.h5");
 
   // end-cell-hdf5
   // --------------------------------------------------------------------------------------------

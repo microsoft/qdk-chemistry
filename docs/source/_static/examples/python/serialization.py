@@ -49,12 +49,12 @@ orbitals = ModelOrbitals(2, True)  # 2 orbitals, restricted
 core_energy = 1.5
 inactive_fock = np.zeros((0, 0))
 
-h_example = Hamiltonian(one_body, two_body, orbitals, core_energy, inactive_fock)
+h2_example = Hamiltonian(one_body, two_body, orbitals, core_energy, inactive_fock)
 
-h_example.to_hdf5_file("h2_example.hamiltonian.h5")
+h2_example.to_hdf5_file("h2_example.hamiltonian.h5")
 
 # Deserialize from HDF5 file
-h_example_from_hdf5_file = Hamiltonian.from_hdf5_file("h2_example.hamiltonian.h5")
+h2_example_from_hdf5_file = Hamiltonian.from_hdf5_file("h2_example.hamiltonian.h5")
 os.remove("h2_example.hamiltonian.h5")
 # end-cell-hdf5
 ################################################################################

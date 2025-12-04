@@ -94,7 +94,7 @@ As well as the JSON and HDF5 file formats supported for all data classes of QDK/
 XYZ format
 ~~~~~~~~~~
 
-`XYZ representation <https://en.wikipedia.org/wiki/XYZ_file_format>`_ of the same :class:`~qdk_chemistry.data.Structure`:
+`XYZ representation <https://en.wikipedia.org/wiki/XYZ_file_format>`_ of a :class:`~qdk_chemistry.data.Structure`:
 
 .. code-block:: text
 
