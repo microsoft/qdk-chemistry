@@ -22,7 +22,7 @@ auto localizer = LocalizerFactory::create("qdk_pipek_mezey");
 int main() {
   // --------------------------------------------------------------------------------------------
   // start-cell-configure
-  // Configure settins for localizer
+  // Configure settings for localizer
   localizer->settings().set("tolerance", 1.0e-6);
   localizer->settings().set("max_iterations", 100);
   std::cout << localizer->settings().keys() << std::endl;

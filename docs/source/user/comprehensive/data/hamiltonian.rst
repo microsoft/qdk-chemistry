@@ -212,6 +212,16 @@ The :class:`~qdk_chemistry.data.Hamiltonian` class provides methods to check the
       :start-after: # start-cell-validation
       :end-before: # end-cell-validation
 
+Related classes
+---------------
+
+- :doc:`Orbitals <orbitals>`: Molecular orbital information used to construct the Hamiltonian
+- :doc:`HamiltonianConstructor <../algorithms/hamiltonian_constructor>`: Algorithm for constructing Hamiltonians -
+  **primary tool** for generating Hamiltonian objects from molecular data
+- :doc:`../algorithms/mc_calculator`: Uses the Hamiltonian for correlation calculations
+- :class:`~qdk_chemistry.data.Wavefunction`: Represents the solution of the Hamiltonian eigenvalue problem
+- :doc:`Active space methods <../algorithms/active_space>`: Selection and use of active spaces with the Hamiltonian
+
 Further reading
 ---------------
 
@@ -219,8 +229,3 @@ Further reading
 - :doc:`Serialization <../data/serialization>`: Data serialization and deserialization in QDK/Chemistry
 - :doc:`Design principles <../design/index>`: Design principles for data classes in QDK/Chemistry
 - :doc:`Settings <../design/index>`: Configuration options for algorithms operating on Hamiltonians
-- :doc:`Orbitals <orbitals>`: Molecular orbital information used to construct the Hamiltonian
-- :doc:`HamiltonianConstructor <../algorithms/hamiltonian_constructor>`: Algorithm for constructing Hamiltonians
-- :doc:`../algorithms/mc_calculator`: Uses the Hamiltonian for correlation calculations
-- :class:`~qdk_chemistry.data.Wavefunction`: Represents the solution of the Hamiltonian eigenvalue problem
-- :doc:`Active space methods <../algorithms/active_space>`: Selection and use of active spaces with the Hamiltonian
