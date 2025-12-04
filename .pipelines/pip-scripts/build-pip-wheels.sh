@@ -78,7 +78,7 @@ export PYENV_ROOT="/workspace/.pyenv"
 wget -q https://github.com/pyenv/pyenv/archive/refs/tags/v2.6.15.zip -O pyenv.zip
 echo "${PYENV_CHECKSUM}  pyenv.zip" | shasum -c || exit 1
 unzip -q pyenv.zip
-mv pyenv-master "$PYENV_ROOT"
+mv pyenv-2.6.15 "$PYENV_ROOT"
 rm pyenv.zip
 "$PYENV_ROOT/bin/pyenv" install ${PYTHON_VERSION}
 "$PYENV_ROOT/bin/pyenv" global ${PYTHON_VERSION}
