@@ -26,7 +26,7 @@ parameters:
     os: linux
     arch: aarch64
     march: armv8-a
-    imageName: ubuntu-22.04
+    imageName: 1es-pt-azurelinux3-arm
 
 variables:
 - group: QdkChemistry
