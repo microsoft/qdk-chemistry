@@ -49,6 +49,7 @@ class StabilityCheckerSettings : public qdk::chemistry::data::Settings {
     set_default("nroots", 5);
     set_default("internal", true);
     set_default("external", false);
+    set_default("method", "hf");
   }
 };
 
