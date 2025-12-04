@@ -30,8 +30,8 @@ void matrix_exp(const double *m, double *exp_m, int size) {
     if (abssum_row > first_norm) first_norm = abssum_row;
   }
 
-  // matrix 1-norm threshold for order 13 Padé approximation, reference
-  // DOI. 10.1137/04061101X
+  // matrix 1-norm threshold for order 13 Padé approximation
+  // Reference: Nicholas J. Higham (2005) DOI:10.1137/04061101X
   static constexpr double theta13 = 5.371920351148152e0;
   int s = first_norm > theta13
               ? std::max(0, (int)(std::log2(first_norm / theta13)) + 1)
@@ -63,7 +63,8 @@ void matrix_exp(const double *m, double *exp_m, int size) {
 
 void pade_approximation(const double *x, double *exp_x, int size) {
   // b is equal to b[i] / b[0] for i = 0 to 13, b[i] are the coefficients for
-  // degree 13 Pade approximant, reference DOI. 10.1137/04061101X
+  // degree 13 Pade approximant.
+  // Reference: Nicholas J. Higham (2005) DOI:10.1137/04061101X
   static constexpr double b[14] = {1.,
                                    0.5,
                                    0.12,

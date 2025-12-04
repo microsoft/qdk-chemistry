@@ -25,9 +25,8 @@ class GDM;
  * rotations. This method is particularly effective for difficult SCF
  * convergence cases where traditional DIIS methods may fail.
  *
- * Reference: Van Voorhis, Troy, and Martin Head-Gordon. "A geometric approach
- * to direct minimization." Molecular Physics 100, no. 11 (2002): 1713-1721.
- * https://doi.org/10.1080/00268970110103642
+ * Reference: Troy Van Voorhis and Martin Head-Gordon (2002).
+ *   doi: 10.1080/00268970110103642 :cite:`VanVoorhis2002`
  *
  */
 class GDM : public SCFAlgorithm {
