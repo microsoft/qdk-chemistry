@@ -28,8 +28,6 @@ Container types
 
 QDK/Chemistry supports different wavefunction container types for various quantum chemistry methods:
 
-#TODO PVG once unrestricted PR is merged, add mp2 and cc containers here as well.
-
 Slater determinant container
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
