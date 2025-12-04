@@ -30,6 +30,7 @@ def create_structure_from_rdkit(molecule: Mol) -> Structure:
 
     return Structure(symbols, coords)
 
+
 def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
     """Parse CLI options in the same order as the workflow steps."""
     parser = argparse.ArgumentParser(description="simple water demo")
@@ -51,7 +52,6 @@ def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
     return parser.parse_args(argv)
 
 
-    
 def main(argv: Sequence[str] | None = None) -> None:
     """Example of constructing water from RDKit."""
 
@@ -61,17 +61,16 @@ def main(argv: Sequence[str] | None = None) -> None:
     ########################################################################################
     # 1. Load the target structure (use rdkit).
     ########################################################################################
-    
 
     water_rdkit = Chem.MolFromSmiles("O")
     water_rdkit = Chem.AddHs(water_rdkit)
     AllChem.EmbedMolecule(water_rdkit)
     AllChem.UFFOptimizeMolecule(water_rdkit)
     water = create_structure_from_rdkit(water_rdkit)
-    
+
     LOGGER.info(water.get_summary())
     LOGGER.info("XYZ Geometry in Angstrom")
-    LOGGER.info(water.to_xyz())    
+    LOGGER.info(water.to_xyz())
 
     ########################################################################################
     # 2. Run the SCF stage to obtain the reference wavefunction.
@@ -82,6 +81,7 @@ def main(argv: Sequence[str] | None = None) -> None:
     e_scf, scf_wavefunction = scf_solver.run(water, args.charge, args.spin)
     total_scf_energy = e_scf + nuclear_repulsion
     LOGGER.info("SCF Energy: %.8f Hartree", total_scf_energy)
+
 
 if __name__ == "__main__":
     main()
