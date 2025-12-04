@@ -143,20 +143,14 @@ def __dir__() -> list[str]:
 
 
 def apply_telemetry_to_classes():
+    """Apply telemetry tracking to the 'run' methods of all algorithm classes."""
     with contextlib.suppress(NameError):
-        try:
-            for name in __all__:
-                instance = globals().get(name)
-                if hasattr(instance, "run"):
-                    instance.run = telemetry_tracker()(instance.run)
-
-        except (ImportError, AttributeError, RuntimeError, OSError) as e:
-            warnings.warn(
-                f"Failed to generate registry type stubs: {e}. Type hints may be incomplete.",
-                UserWarning,
-                stacklevel=2,
-            )
-
+        for name in __all__:
+            instance = globals().get(name)
+            if hasattr(instance, "run"):
+                instance.run = telemetry_tracker()(instance.run)
 
 if TELEMETRY_ENABLED:
     apply_telemetry_to_classes()
+    # Delete the function to avoid namespace pollution
+    del apply_telemetry_to_classes
