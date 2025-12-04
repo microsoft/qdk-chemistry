@@ -242,11 +242,11 @@ class PyscfScfSolver(ScfSolver):
             initial_guess_is_unrestricted = initial_guess.is_unrestricted()
             if unrestricted and not initial_guess_is_unrestricted:
                 warnings.warn(
-                    "Unrestricted calculation requested but restricted initial guess provided. ",
+                    "Unrestricted calculation requested but restricted initial guess provided.",
                     stacklevel=2,
                 )
             if not unrestricted and initial_guess_is_unrestricted:
-                raise ValueError("Restricted calculation requested but unrestricted initial guess provided. ")
+                raise ValueError("Restricted calculation requested but unrestricted initial guess provided.")
 
             # Create occupation arrays based on electron configuration
             norb = initial_guess.get_num_molecular_orbitals()

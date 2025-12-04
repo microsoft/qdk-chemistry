@@ -786,7 +786,7 @@ class TestStabilityWorkflow:
 
     @pytest.mark.parametrize("scf_backend", ["pyscf", "qdk"])
     def test_workflow_n2_rhf_both_instability(self, scf_backend):
-        """Test stability workflow on N2 at 1.6Å with with both internal and external instabilities."""
+        """Test stability workflow on N2 at 1.6Å with both internal and external instabilities."""
         n2 = create_stretched_n2_structure(distance_angstrom=1.6)
 
         # Create and configure solvers

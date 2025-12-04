@@ -248,7 +248,7 @@ std::pair<double, std::shared_ptr<data::Wavefunction>> ScfSolver::_run_impl(
       if (initial_guess.value()->is_restricted())
         spdlog::warn(
             "Warning: Unrestricted calculation requested but restricted "
-            "initial guess provided. ");
+            "initial guess provided.");
 
       // For unrestricted case, stack alpha and beta coefficients and compute
       // density
@@ -285,7 +285,7 @@ std::pair<double, std::shared_ptr<data::Wavefunction>> ScfSolver::_run_impl(
       if (initial_guess.value()->is_unrestricted()) {
         throw std::invalid_argument(
             "Restricted calculation requested but unrestricted initial guess "
-            "provided. ");
+            "provided.");
       }
       // For restricted case, use alpha coefficients only
       Eigen::MatrixXd C_transformed = qdk_basis_map.transpose() * coeff_alpha;
