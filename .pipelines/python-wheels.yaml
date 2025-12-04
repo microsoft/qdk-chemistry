@@ -27,6 +27,9 @@ parameters:
     arch: aarch64
     march: armv8-a
     imageName: 1es-pt-azurelinux3-arm
+- name: forceArtifactUpload
+  type: boolean
+  default: false
 
 variables:
 - group: QdkChemistry
