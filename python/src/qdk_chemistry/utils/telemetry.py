@@ -107,32 +107,6 @@ pending_metrics: dict[str, list[PendingMetric]] = {}
 # This simplifies any thread-safety concerns, and avoids the need for locks, etc.
 telemetry_queue: Any = SimpleQueue()  # type 'Any' until we get off Python 3.8 builds
 
-def disable_telemetry() -> None:
-    """Disable telemetry collection at runtime."""
-    global TELEMETRY_ENABLED
-    logger.debug("Telemetry disabled by user request")
-    TELEMETRY_ENABLED = False
-
-
-def enable_telemetry() -> None:
-    """Enable telemetry collection at runtime."""
-    global TELEMETRY_ENABLED
-    
-    # Only enable if not explicitly disabled via environment variables
-    env_disabled = QDK_CHEMISTRY_PYTHON_TELEMETRY in ["0", "false", "disabled", "none"]
-    
-    if env_disabled:
-        logger.debug("Cannot enable telemetry: disabled via environment variable")
-    else:
-        logger.debug("Telemetry enabled by user request")
-        TELEMETRY_ENABLED = True
-
-
-def is_telemetry_enabled() -> bool:
-    """Check if telemetry is currently enabled."""
-    return TELEMETRY_ENABLED
-
-
 def log_telemetry(
     name: str,
     value: float,
