@@ -87,7 +87,7 @@ class PyscfScfSettings(ElectronicStructureSettings):
     """
 
     def __init__(self):
-        """Initialize the settings with default values from ElectronicStructureSettings plus plus PySCF-specific defaults."""
+        """Initialize the settings with default values from ElectronicStructureSettings plus PySCF-specific defaults."""
         super().__init__()  # This sets up all the base class defaults
 
 
