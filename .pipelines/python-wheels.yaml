@@ -22,11 +22,11 @@ parameters:
     arch: x86_64
     march: x86-64-v3
     imageName: ubuntu-22.04
-  # - name: linux_aarch64
-  #   os: linux
-  #   arch: arm64
-  #   march: armv8-a
-  #   imageName: ubuntu-22.04
+  - name: linux_aarch64
+    os: linux
+    arch: aarch64
+    march: armv8-a
+    imageName: ubuntu-22.04
 
 variables:
 - group: QdkChemistry
