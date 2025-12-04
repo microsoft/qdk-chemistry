@@ -8,6 +8,7 @@
 
 // --------------------------------------------------------------------------------------------
 // start-cell-json
+#include <filesystem>
 #include <qdk/chemistry.hpp>
 using namespace qdk::chemistry::data;
 
@@ -21,18 +22,21 @@ Structure structure(coords, symbols, custom_masses, custom_charges);
 // Serialize to JSON object
 auto structure_data = structure.to_json();
 
+const char* filename =
+    "h2_example.structure.json";  // Extension depends on object type
+
 // Deserialize from JSON object
 // "Structure" is the data type to de-serialize into (will throw, if it doesn't
 // match)
 auto structure_from_json = Structure::from_json(structure_data);
 
 // Write to json file
-structure.to_json_file(
-    "filename.structure.json");  // Extension depends on object type
+structure.to_json_file(filename);
 
 // Read from json file
-auto structure_from_json_file =
-    Structure::from_json_file("filename.structure.json");
+auto structure_from_json_file = Structure::from_json_file(filename);
+
+std::filesystem::remove(filename);
 
 // end-cell-json
 // --------------------------------------------------------------------------------------------

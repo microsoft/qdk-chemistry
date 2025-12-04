@@ -93,7 +93,7 @@ QDK/Chemistry enforces specific file extensions to ensure clarity about the cont
      - ``.hamiltonian.json``
      - ``.hamiltonian.h5``
      - ``hamiltonian.fcidump``
-   * - :doc:`Hamiltonian <../data/wavefunction>`
+   * - :doc:`Wavefunction <../data/wavefunction>`
      - ``.wavefunction.json``
      - ``.wavefunction.h5``
      - -

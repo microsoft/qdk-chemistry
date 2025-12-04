@@ -15,14 +15,14 @@ using namespace qdk::chemistry::data;
 using namespace qdk::chemistry::algorithms;
 
 // create H2 structure
-std::vector<Eigen::Vector3d> coords = {{0.0, 0.0, 0.0},
-                                       {0.0, 0.0, 1.4}};  // Bohr
+std::vector<Eigen::Vector3d> coords = {{0.0, 0.0, 0.0}, {0.0, 0.0, 1.4}};
 std::vector<std::string> symbols = {"H", "H"};
 
 Structure structure(coords, symbols);
 
 // SCF
 auto scf_solver = ScfSolverFactory::create();
+scf_solver->settings().set("basis_set", "sto-3g");
 auto [E_scf, wfn_scf] = scf_solver->run(structure, 0, 1);
 
 // Create hamiltonian from scf orbitals

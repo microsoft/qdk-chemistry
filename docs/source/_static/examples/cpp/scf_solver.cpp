@@ -39,10 +39,8 @@ std::vector<std::string> symbols = {"H", "H"};
 
 Structure structure(coords, symbols);
 
-const auto& [E_scf, wfn_scf] = scf_solver->run(structure, 0, 1);
-
 // Run the SCF calculation
-auto [E_scf, wfn] = scf_solver->solve(structure);
+auto [E_scf, wfn] = scf_solver->solve(structure, 0, 1);
 auto scf_orbitals = wfn->get_orbitals();
 std::cout << "SCF Energy: " << E_scf << " Hartree" << std::endl;
 // end-cell-run

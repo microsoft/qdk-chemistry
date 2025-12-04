@@ -32,13 +32,13 @@ Structure structure_custom(coords, elements, custom_masses, custom_charges);
 
 // --------------------------------------------------------------------------------------------
 // start-cell-data
-// Get coordinates of a specific atom in angstrom
-Eigen::Vector3d coords = structure.get_atom_coordinates(0);  // First atom
+// Get coordinates of a specific atom in Bohr
+Eigen::Vector3d atom_coords = structure.get_atom_coordinates(0);  // First atom
 
 // Get element of a specific atom
 Element element = structure.get_atom_element(0);  // First atom
 
-// Get all coordinates (in angstrom) as a matrix
+// Get all coordinates (in Bohr) as a matrix
 Eigen::MatrixXd all_coords = structure.get_coordinates();
 
 // Get all elements as a vector

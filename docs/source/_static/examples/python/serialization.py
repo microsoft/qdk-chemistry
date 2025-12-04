@@ -12,8 +12,6 @@ import os
 import numpy as np
 from qdk_chemistry.data import Structure, Hamiltonian, ModelOrbitals
 
-################################################################################
-# start-cell-json
 # Structure data class example
 coords = np.array([[0.0, 0.0, 0.0], [0.0, 0.0, 1.4]])
 symbols = ["H", "H"]
@@ -53,9 +51,10 @@ inactive_fock = np.zeros((0, 0))
 
 h_example = Hamiltonian(one_body, two_body, orbitals, core_energy, inactive_fock)
 
-h_example.to_hdf5_file("h_example.hamiltonian.h5")
+h_example.to_hdf5_file("h2_example.hamiltonian.h5")
 
 # Deserialize from HDF5 file
 h_example_from_hdf5_file = Hamiltonian.from_hdf5_file("h_example.hamiltonian.h5")
+os.remove("h2_example.hamiltonian.h5")
 # end-cell-hdf5
 ################################################################################

@@ -43,7 +43,7 @@ The following table summarizes the properties available for the different orbita
      - Orbitals
      - ModelOrbitals
    * - **Coefficients**
-     - Matrix of orbital coefficients [AO x MO] for alpha and beta spin channels
+     - Matrix of orbital coefficients [AO × MO] for alpha and beta spin channels
      - ✓
      - ✗
    * - **Energies**

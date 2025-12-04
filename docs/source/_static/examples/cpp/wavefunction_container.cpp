@@ -44,7 +44,7 @@ while (functions_created < num_atomic_orbitals) {
   }
 }
 
-auto basis_set = std::shared_ptr<BasisSet>("dummy", shells);
+auto basis_set = std::make_shared<BasisSet>("dummy", shells);
 
 // Create orbitals
 Eigen::MatrixXd coefficients = Eigen::MatrixXd::Identity(3, 3);
