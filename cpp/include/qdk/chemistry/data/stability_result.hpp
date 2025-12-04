@@ -66,7 +66,7 @@ namespace qdk::chemistry::data {
  * num_alpha_occupied_orbitals) + (num_alpha_occupied_orbitals -
  * num_beta_occupied_orbitals) * num_beta_occupied_orbitals
  * - This equals the virtual-occupied block plus the additional
- *          doubly-occupied to singly-occupied block
+ *   doubly-occupied to singly-occupied block
  *
  * **Indexing Convention:**
  * The virtual orbital index varies fastest. For the element corresponding to
