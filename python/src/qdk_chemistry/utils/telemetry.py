@@ -107,6 +107,7 @@ pending_metrics: dict[str, list[PendingMetric]] = {}
 # This simplifies any thread-safety concerns, and avoids the need for locks, etc.
 telemetry_queue: Any = SimpleQueue()  # type 'Any' until we get off Python 3.8 builds
 
+
 def log_telemetry(
     name: str,
     value: float,

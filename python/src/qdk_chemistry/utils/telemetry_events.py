@@ -184,7 +184,7 @@ def on_algorithm_end(
 
 
 def telemetry_tracker():
-    """Decorator to track telemetry for algorithm run methods."""
+    """Decorator to track telemetry for algorithm run execution."""
 
     def decorator(run_method):
         @wraps(run_method)

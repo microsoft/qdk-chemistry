@@ -147,8 +147,9 @@ def apply_telemetry_to_classes():
     with contextlib.suppress(NameError):
         for name in __all__:
             instance = globals().get(name)
-            if hasattr(instance, "run"):
+            if instance is not None and hasattr(instance, "run"):
                 instance.run = telemetry_tracker()(instance.run)
+
 
 if TELEMETRY_ENABLED:
     apply_telemetry_to_classes()
