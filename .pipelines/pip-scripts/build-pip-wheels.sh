@@ -38,29 +38,17 @@ apt-get install -y \
     libpugixml-dev
 
 # Upgrade cmake as Ubuntu 22.04 only has up to v3.22 in apt
-if [[ ${MARCH} == 'armv8-a' ]]; then
-    export AARCH_64_CMAKE_CHECKSUM=6c1c4cdcf9cf9efac12bbd5a8a2baf65939b9d00
-    wget -q https://github.com/Kitware/CMake/releases/download/v${CMAKE_VERSION}/cmake-${CMAKE_VERSION}-linux-aarch64.tar.gz
-    echo "${AARCH_64_CMAKE_CHECKSUM}  cmake-${CMAKE_VERSION}-linux-aarch64.tar.gz" | shasum -c || exit 1
-    tar -xzf cmake-${CMAKE_VERSION}-linux-aarch64.tar.gz
-    cd cmake-${CMAKE_VERSION}-linux-aarch64
-    ./bootstrap --parallel=$(nproc) --prefix=/usr/local
-    make -j$(nproc)
-    make install
-    cd ..
-    rm -r cmake-${CMAKE_VERSION}-linux-aarch64 cmake-${CMAKE_VERSION}-linux-aarch64.tar.gz
-elif [[ ${MARCH} == 'x86-64-v3' ]]; then
-    export X86_64_CMAKE_CHECKSUM=685d0ba60b663312dbab24fb15c42249a17f5008
-    wget -q https://github.com/Kitware/CMake/releases/download/v${CMAKE_VERSION}/cmake-${CMAKE_VERSION}-linux-x86_64.tar.gz
-    echo "${X86_64_CMAKE_CHECKSUM}  cmake-${CMAKE_VERSION}-linux-x86_64.tar.gz" | shasum -c || exit 1
-    tar -xzf cmake-${CMAKE_VERSION}-linux-x86_64.tar.gz
-    cd cmake-${CMAKE_VERSION}-linux-x86_64
-    ./bootstrap --parallel=$(nproc) --prefix=/usr/local
-    make -j$(nproc)
-    make install
-    cd ..
-    rm -r cmake-${CMAKE_VERSION}-linux-x86_64 cmake-${CMAKE_VERSION}-linux-x86_64.tar.gz
-fi
+export CMAKE_CHECKSUM=cf332727ac863cc0c86ac4f8cd3b711d05a5e417
+wget -q https://cmake.org/files/v3.28/cmake-3.28.3.tar.gz -O cmake-3.28.3.tar.gz
+echo "${CMAKE_CHECKSUM}  cmake-3.28.3.tar.gz" | shasum -c || exit 1
+tar -xzf cmake-3.28.3.tar.gz
+rm cmake-3.28.3.tar.gz
+cd cmake-3.28.3
+./bootstrap --parallel=$(nproc) --prefix=/usr/local
+make -j$(nproc)
+make install
+cd ..
+rm -r cmake-3.28.3
 cmake --version
 
 export CFLAGS="-fPIC -Os"
