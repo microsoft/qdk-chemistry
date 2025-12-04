@@ -76,11 +76,7 @@ class PyscfAVAS(ActiveSpaceSelector):
 
     The details of the AVAS method can be found in the following publication:
 
-        Sayfutyarova, E.R.; Sun, Q.; Chan, G.K.-L.; Knizia, G.;
-        "Automated construction of molecular active spaces from atomic valence orbitals"
-        J. Chem. Theory Comput. 2017, 13, 9, 4063-4078
-        doi: `10.1021/acs.jctc.7b00128 <https://doi.org/10.1021/acs.jctc.7b00128>`_
-        arXiv: `1701.07862 <https://arxiv.org/abs/1701.07862>`_
+        Sayfutyarova et al. (2017) doi:10.1021/acs.jctc.7b00128. :cite:`Sayfutyarova2017`
 
     Example:
         >>> avas = PyscfAVAS()
