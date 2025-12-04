@@ -20,7 +20,7 @@ scf_solver = create("scf_solver")
 # start-cell-configure
 # Configure the SCF solver using the settings interface
 # Note that the following line is optional, since hf is the default method
-scf_solver.settings().set("method", "hf") 
+scf_solver.settings().set("method", "hf")
 scf_solver.settings().set("basis_set", "def2-tzvpp")
 
 # end-cell-configure
