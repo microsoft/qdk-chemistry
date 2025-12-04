@@ -109,8 +109,17 @@ std::pair<double, std::shared_ptr<data::Wavefunction>> ScfSolver::_run_impl(
   ms_scf_config->density_init_method =
       use_input_initial_guess ? qcs::DensityInitializationMethod::UserProvided
                               : qcs::DensityInitializationMethod::Atom;
-  ms_scf_config->eri.method =
-      qcs::ERIMethod::Libint2Direct;  // TODO: Make this configurable
+
+  // Configure ERI method from settings
+  std::string eri_method = _settings->get<std::string>("eri_method");
+  if (eri_method == "direct") {
+    ms_scf_config->eri.method = qcs::ERIMethod::Libint2Direct;
+  } else if (eri_method == "incore") {
+    ms_scf_config->eri.method = qcs::ERIMethod::Incore;
+  } else {
+    throw std::invalid_argument("Unknown eri_method: " + eri_method +
+                                ". Valid options: direct, incore");
+  }
 
   double eri_threshold = _settings->get<double>("eri_threshold");
   if (eri_threshold > 0.0) {
