@@ -42,7 +42,7 @@ if [[ ${MARCH} == 'armv8-a' ]]; then
     export AARCH_64_CMAKE_CHECKSUM=6c1c4cdcf9cf9efac12bbd5a8a2baf65939b9d00
     wget -q https://github.com/Kitware/CMake/releases/download/v${CMAKE_VERSION}/cmake-${CMAKE_VERSION}-linux-aarch64.tar.gz
     echo "${AARCH_64_CMAKE_CHECKSUM}  cmake-${CMAKE_VERSION}-linux-aarch64.tar.gz" | shasum -c || exit 1
-    tar -xjf cmake-${CMAKE_VERSION}-linux-aarch64.tar.gz
+    tar -xzf cmake-${CMAKE_VERSION}-linux-aarch64.tar.gz
     cd cmake-${CMAKE_VERSION}-linux-aarch64
     ./bootstrap --parallel=$(nproc) --prefix=/usr/local
     make -j$(nproc)
