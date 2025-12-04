@@ -383,6 +383,7 @@ def orbitals_to_scf(
     occ_alpha: np.ndarray,
     occ_beta: np.ndarray,
     force_restricted: bool = False,
+    method: str = "hf",
 ):
     """Convert an Orbitals object to a PySCF SCF object.
 
@@ -399,6 +400,10 @@ def orbitals_to_scf(
         force_restricted: If True, forces the creation of a restricted SCF object (RHF or ROHF).
 
             Applies even if the input orbitals are unrestricted. Default is False.
+
+        method: The electronic structure method to use. Default is "hf" (Hartree-Fock).
+
+            Any other value is treated as a DFT exchange-correlation functional (e.g., "b3lyp", "pbe").
 
     Returns:
         A PySCF SCF object (RHF, ROHF, or UHF) populated with the molecular orbital data from the input ``Orbitals``
@@ -445,17 +450,32 @@ def orbitals_to_scf(
         # so total occupancy per MO is occ_a + occ_b
         total_occ = occ_alpha + occ_beta
         if np.any(occ_alpha != occ_beta):
-            mf = pyscf.scf.ROHF(mol)
+            # Restricted open-shell
+            if method.lower() == "hf":
+                mf = pyscf.scf.ROHF(mol)
+            else:
+                mf = pyscf.scf.ROKS(mol)
+                mf.xc = method
             mf.mo_coeff = coeff_a
             mf.mo_energy = energy_a
             mf.mo_occ = total_occ
         else:
-            mf = pyscf.scf.RHF(mol)
+            # Restricted closed-shell
+            if method.lower() == "hf":
+                mf = pyscf.scf.RHF(mol)
+            else:
+                mf = pyscf.scf.RKS(mol)
+                mf.xc = method
             mf.mo_coeff = coeff_a
             mf.mo_energy = energy_a
             mf.mo_occ = total_occ
     else:
-        mf = pyscf.scf.UHF(mol)
+        # Unrestricted
+        if method.lower() == "hf":
+            mf = pyscf.scf.UHF(mol)
+        else:
+            mf = pyscf.scf.UKS(mol)
+            mf.xc = method
         mf.mo_coeff = (coeff_a, coeff_b)
         mf.mo_energy = (energy_a, energy_b)
         mf.mo_occ = (occ_alpha, occ_beta)
@@ -468,6 +488,7 @@ def orbitals_to_scf_from_n_electrons_and_multiplicity(
     n_electrons: int,
     multiplicity: int = 1,
     force_restricted: bool = False,
+    method: str = "hf",
 ):
     """Convert an Orbitals object to a PySCF SCF object.
 
@@ -484,6 +505,10 @@ def orbitals_to_scf_from_n_electrons_and_multiplicity(
         force_restricted: If True, forces the creation of a restricted SCF object (RHF or ROHF).
 
             Applies even if the input orbitals are unrestricted. Default is False.
+
+        method: The electronic structure method to use. Default is "hf" for Hartree-Fock.
+
+            Any other value is treated as a DFT exchange-correlation functional (e.g., "b3lyp", "pbe").
 
     Returns:
         A PySCF SCF object (RHF, ROHF, or UHF) populated with the molecular orbital data from the input ``Orbitals``
@@ -504,7 +529,7 @@ def orbitals_to_scf_from_n_electrons_and_multiplicity(
     n_orbitals = orbitals.get_num_molecular_orbitals()
     alpha_occ, beta_occ = occupations_from_n_electrons_and_multiplicity(n_orbitals, n_electrons, multiplicity)
 
-    return orbitals_to_scf(orbitals, alpha_occ, beta_occ, force_restricted)
+    return orbitals_to_scf(orbitals, alpha_occ, beta_occ, force_restricted, method)
 
 
 def hamiltonian_to_scf(hamiltonian: Hamiltonian, alpha_occ: np.ndarray, beta_occ: np.ndarray) -> pyscf.scf.RHF:
