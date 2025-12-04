@@ -170,18 +170,14 @@ The :class:`~qdk_chemistry.data.Wavefunction` class provides methods to access c
       :end-before: # end-cell-access-data
 
 
-Related classes
+Further reading
 ---------------
 
+- :doc:`Serialization <../data/serialization>`: Data serialization and deserialization
+- :doc:`Settings <../design/settings>`: Configuration settings for algorithms
+- :doc:`Active space methods <../algorithms/active_space>`: Active space selection from wavefunctions
 - :doc:`Structure <structure>`: Molecular structure that defines the system
 - :doc:`Orbitals <orbitals>`: Orbital basis set for the wavefunction
 - :doc:`Hamiltonian <hamiltonian>`: Electronic Hamiltonian constructed from wavefunction
 - :doc:`ScfSolver <../algorithms/scf_solver>`: Algorithm that produces SCF wavefunctions
 - :doc:`MCCalculator <../algorithms/mc_calculator>`: Algorithm for multi-configuration wavefunctions
-
-Related topics
---------------
-
-- :doc:`Serialization <../data/serialization>`: Data serialization and deserialization
-- :doc:`Settings <../design/settings>`: Configuration settings for algorithms
-- :doc:`Active space methods <../algorithms/active_space>`: Active space selection from wavefunctions

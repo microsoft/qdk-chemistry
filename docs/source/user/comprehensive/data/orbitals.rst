@@ -166,19 +166,15 @@ The :class:`~qdk_chemistry.data.Orbitals` class serves as a foundation for sever
 - **Hamiltonian Construction**: Build electronic Hamiltonians for post-HF methods using the orbital information.
   See :doc:`HamiltonianConstructor <../algorithms/hamiltonian_constructor>` for details.
 
-Related classes
----------------
-
-- :doc:`Structure <structure>`: Molecular structure representation
-- :doc:`Hamiltonian <hamiltonian>`: Electronic Hamiltonian constructed from orbitals
-- :doc:`HamiltonianConstructor <../algorithms/hamiltonian_constructor>`: Algorithm that builds Hamiltonians from orbitals
-- :doc:`ActiveSpaceSelector <../algorithms/active_space>`: Algorithm for selecting active spaces from orbitals
-- :doc:`ScfSolver <../algorithms/scf_solver>`: Algorithm that produces orbitals
-- :doc:`Localizer <../algorithms/localizer>`: Algorithms for orbital transformations
-
 Further reading
 ---------------
 
 - The above examples can be downloaded as complete `C++ <../../../_static/examples/cpp/orbitals.cpp>`_ and `Python <../../../_static/examples/python/orbitals.py>`_ scripts.
 - :doc:`Serialization <../data/serialization>`: Data serialization and deserialization
 - :doc:`Settings <../design/settings>`: Configuration settings for algorithms
+- :doc:`Structure <structure>`: Molecular structure representation
+- :doc:`Hamiltonian <hamiltonian>`: Electronic Hamiltonian constructed from orbitals
+- :doc:`HamiltonianConstructor <../algorithms/hamiltonian_constructor>`: Algorithm that builds Hamiltonians from orbitals
+- :doc:`ActiveSpaceSelector <../algorithms/active_space>`: Algorithm for selecting active spaces from orbitals
+- :doc:`ScfSolver <../algorithms/scf_solver>`: Algorithm that produces orbitals
+- :doc:`Localizer <../algorithms/localizer>`: Algorithms for orbital transformations

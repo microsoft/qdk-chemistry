@@ -65,16 +65,12 @@ The :class:`~qdk_chemistry.data.Ansatz` class provides methods to access its com
       :end-before: # end-cell-access
 
 
-Related classes
+Further reading
 ---------------
 
+- :doc:`Serialization <../data/serialization>`: Data serialization and deserialization
+- :doc:`Settings <../design/settings>`: Configuration settings for algorithms
 - :doc:`Wavefunction <wavefunction>`: Quantum state component of the ansatz
 - :doc:`Hamiltonian <hamiltonian>`: Energy operator component of the ansatz
 - :doc:`Orbitals <orbitals>`: Molecular orbital basis set
 - :doc:`MCCalculator <../algorithms/mc_calculator>`: Algorithms that produce ansatz objects
-
-Related topics
---------------
-
-- :doc:`Serialization <../data/serialization>`: Data serialization and deserialization
-- :doc:`Settings <../design/settings>`: Configuration settings for algorithms

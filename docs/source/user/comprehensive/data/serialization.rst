@@ -100,8 +100,8 @@ QDK/Chemistry enforces specific file extensions to ensure clarity about the cont
 
 The same patterns are observed for other data classes in QDK/Chemistry.
 
-Related topics
---------------
+Further reading
+---------------
 
 - The above examples can be downloaded as complete `C++ <../../../_static/examples/cpp/serialization.cpp>`_ and `Python <../../../_static/examples/python/serialization.py>`_ scripts.
 - :doc:`Structure <../data/structure>`: Molecular geometry and atomic information
