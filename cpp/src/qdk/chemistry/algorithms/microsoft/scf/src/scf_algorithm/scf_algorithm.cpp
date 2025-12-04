@@ -49,7 +49,8 @@ std::shared_ptr<SCFAlgorithm> SCFAlgorithm::create(const SCFContext& ctx) {
 
   switch (cfg.scf_algorithm.method) {
     case SCFAlgorithmName::ASAHF:
-      return std::make_shared<AtomicSphericallyAveragedHartreeFock>(ctx, cfg.scf_algorithm.diis_subspace_size);
+      return std::make_shared<AtomicSphericallyAveragedHartreeFock>(
+          ctx, cfg.scf_algorithm.diis_subspace_size);
 
     case SCFAlgorithmName::DIIS:
       return std::make_shared<DIIS>(ctx, cfg.scf_algorithm.diis_subspace_size);

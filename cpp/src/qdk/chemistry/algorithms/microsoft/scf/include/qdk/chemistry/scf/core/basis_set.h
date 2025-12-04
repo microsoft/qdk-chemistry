@@ -177,8 +177,9 @@ class BasisSet {
    * @param pure Whether to use spherical harmonics
    * @param sort Whether to sort shells
    */
-  explicit BasisSet(std::shared_ptr<Molecule> mol, std::vector<Shell> inp_shells,
-                    BasisMode mode, bool pure, bool sort);
+  explicit BasisSet(std::shared_ptr<Molecule> mol,
+                    std::vector<Shell> inp_shells, BasisMode mode, bool pure,
+                    bool sort);
 
  private:
   /**

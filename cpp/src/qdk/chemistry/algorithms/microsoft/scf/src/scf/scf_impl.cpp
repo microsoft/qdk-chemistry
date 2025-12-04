@@ -50,7 +50,8 @@ namespace qdk::chemistry::scf {
 
 SCFImpl::SCFImpl(std::shared_ptr<Molecule> mol_ptr, const SCFConfig& cfg,
                  std::shared_ptr<BasisSet> basis_set,
-                 std::shared_ptr<BasisSet> raw_basis_set, bool delay_eri, bool skip_verify) {
+                 std::shared_ptr<BasisSet> raw_basis_set, bool delay_eri,
+                 bool skip_verify) {
   auto& mol = *mol_ptr;
   ctx_.mol = mol_ptr.get();
   ctx_.cfg = &cfg;
@@ -152,12 +153,11 @@ SCFImpl::SCFImpl(std::shared_ptr<Molecule> mol_ptr, const SCFConfig& cfg,
   }
 
   if (!skip_verify) {
-
     VERIFY_INPUT(alpha >= 0 && beta >= 0 && beta == alpha - spin,
-                "Invalid spin number or charge");
+                 "Invalid spin number or charge");
     VERIFY_INPUT(num_density_matrices_ == 2 || alpha == beta,
-                "Restricted requires n_alpha == n_beta");
-    }
+                 "Restricted requires n_alpha == n_beta");
+  }
 
   // MAX_N = 46340. Stop the calculation early if the basis set is too large
   // A single MAX_NxMAX_N matrix will have ~2^31 double floating point numbers
