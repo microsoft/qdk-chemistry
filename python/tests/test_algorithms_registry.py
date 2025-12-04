@@ -21,7 +21,7 @@ class TestRegistryShowDefault:
         # Should have entries for all known algorithm types
         expected_types = [
             "active_space_selector",
-            "coupled_cluster_calculator",
+            "dynamical_correlation_calculator",
             "hamiltonian_constructor",
             "orbital_localizer",
             "multi_configuration_calculator",
