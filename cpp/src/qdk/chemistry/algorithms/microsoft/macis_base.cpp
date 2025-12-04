@@ -46,7 +46,10 @@ macis::ASCISettings get_asci_settings_(const data::Settings& settings_) {
   SET_MACIS_SETTING(settings_, asci_settings, nxtval_bcount_thresh, size_t);
   SET_MACIS_SETTING(settings_, asci_settings, nxtval_bcount_inc, size_t);
   SET_MACIS_SETTING(settings_, asci_settings, just_singles, bool);
-  SET_MACIS_SETTING(settings_, asci_settings, grow_factor, size_t);
+  SET_MACIS_SETTING(settings_, asci_settings, grow_factor, double);
+  SET_MACIS_SETTING(settings_, asci_settings, min_grow_factor, double);
+  SET_MACIS_SETTING(settings_, asci_settings, growth_backoff_rate, double);
+  SET_MACIS_SETTING(settings_, asci_settings, growth_recovery_rate, double);
   SET_MACIS_SETTING(settings_, asci_settings, max_refine_iter, size_t);
   SET_MACIS_SETTING(settings_, asci_settings, refine_energy_tol, double);
   SET_MACIS_SETTING(settings_, asci_settings, grow_with_rot, bool);
@@ -56,6 +59,30 @@ macis::ASCISettings get_asci_settings_(const data::Settings& settings_) {
   SET_MACIS_SETTING(settings_, asci_settings, pt2_min_constraint_level, int);
   SET_MACIS_SETTING(settings_, asci_settings, pt2_constraint_refine_force,
                     int64_t);
+
+  // Validate grow_factor and related parameters
+  if (asci_settings.grow_factor <= 1.0) {
+    throw std::runtime_error("grow_factor must be > 1.0, got " +
+                             std::to_string(asci_settings.grow_factor));
+  }
+  if (asci_settings.min_grow_factor <= 1.0) {
+    throw std::runtime_error("min_grow_factor must be > 1.0, got " +
+                             std::to_string(asci_settings.min_grow_factor));
+  }
+  if (asci_settings.min_grow_factor > asci_settings.grow_factor) {
+    throw std::runtime_error("min_grow_factor must be <= grow_factor");
+  }
+  if (asci_settings.growth_backoff_rate <= 0.0 ||
+      asci_settings.growth_backoff_rate >= 1.0) {
+    throw std::runtime_error("growth_backoff_rate must be in (0, 1), got " +
+                             std::to_string(asci_settings.growth_backoff_rate));
+  }
+  if (asci_settings.growth_recovery_rate <= 1.0) {
+    throw std::runtime_error(
+        "growth_recovery_rate must be > 1.0, got " +
+        std::to_string(asci_settings.growth_recovery_rate));
+  }
+
   return asci_settings;
 }
 

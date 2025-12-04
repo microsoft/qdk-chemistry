@@ -219,8 +219,10 @@ RowMajorMatrix compute_schwarz_ints(const ::libint2::BasisSet& obs,
  * @note This class requires Libint2 library for integral evaluation
  */
 class ERI {
-  bool unrestricted_;        ///< Whether to use unrestricted formalism
-  ::libint2::BasisSet obs_;  ///< Libint2 orbital basis set representation
+  bool unrestricted_;              ///< Whether to use unrestricted formalism
+  bool use_thread_local_buffers_;  ///< Use thread-local buffers (true) or
+                                   ///< atomic ops (false)
+  ::libint2::BasisSet obs_;        ///< Libint2 orbital basis set representation
   std::vector<size_t>
       shell2bf_;  ///< Mapping from shell index to first atomic orbital
   shellpair_list_t splist_;   ///< Pre-computed shell pair list for screening
@@ -242,8 +244,9 @@ class ERI {
    * @note Construction involves significant overhead due to screening setup
    * @note Shell pair and Schwarz data is computed using OpenMP parallelization
    */
-  ERI(bool unr, qdk::chemistry::scf::BasisSet& basis_set)
+  ERI(bool unr, qdk::chemistry::scf::BasisSet& basis_set, bool use_atomics)
       : unrestricted_(unr),
+        use_thread_local_buffers_(!use_atomics),
         obs_(libint2_util::convert_to_libint_basisset(basis_set)) {
     shell2bf_ = obs_.shell2bf();
 
@@ -323,6 +326,25 @@ class ERI {
     if (J) std::memset(J, 0, mat_size * sizeof(double));
     if (K) std::memset(K, 0, mat_size * sizeof(double));
 
+    // Thread-local accumulation buffers for reproducibility
+    std::vector<std::vector<double>> J_local(0);
+    std::vector<std::vector<double>> K_local(0);
+
+    if (use_thread_local_buffers_) {
+      J_local.resize(nthreads);
+      K_local.resize(nthreads);
+      if (J) {
+        for (int t = 0; t < nthreads; ++t) {
+          J_local[t].resize(mat_size, 0.0);
+        }
+      }
+      if (K) {
+        for (int t = 0; t < nthreads; ++t) {
+          K_local[t].resize(mat_size, 0.0);
+        }
+      }
+    }
+
 #ifdef _OPENMP
 #pragma omp parallel
 #endif
@@ -334,6 +356,14 @@ class ERI {
 #endif
       auto& engine = engines_coulomb[thread_id];
       const auto& buf = engine.results();
+
+      // Get pointers to thread-local buffers
+      double* J_thread = nullptr;
+      double* K_thread = nullptr;
+      if (use_thread_local_buffers_) {
+        J_thread = J ? J_local[thread_id].data() : nullptr;
+        K_thread = K ? K_local[thread_id].data() : nullptr;
+      }
 
       for (size_t s1 = 0ul, s1234 = 0ul; s1 < nsh; ++s1) {
         const auto bf1_st = shell2bf_[s1];
@@ -404,7 +434,10 @@ class ERI {
               if (J)
                 for (size_t idm = 0; idm < num_density_matrices; ++idm) {
                   auto* J_cur =
-                      J + idm * num_atomic_orbitals * num_atomic_orbitals;
+                      use_thread_local_buffers_
+                          ? J_thread +
+                                idm * num_atomic_orbitals * num_atomic_orbitals
+                          : J + idm * num_atomic_orbitals * num_atomic_orbitals;
                   auto* P_cur =
                       P + idm * num_atomic_orbitals * num_atomic_orbitals;
                   for (size_t i = 0, ijkl = 0; i < n1; ++i) {
@@ -424,20 +457,29 @@ class ERI {
                           // J contractions
                           J_ij +=
                               P_cur[bf3 * num_atomic_orbitals + bf4] * value;
+                          if (use_thread_local_buffers_) {
+                            J_cur[bf3 * num_atomic_orbitals + bf4] +=
+                                P_ij * value;
+                          } else {
 #ifdef _OPENMP
 #pragma omp atomic update relaxed
 #endif
-                          J_cur[bf3 * num_atomic_orbitals + bf4] +=
-                              P_ij * value;
+                            J_cur[bf3 * num_atomic_orbitals + bf4] +=
+                                P_ij * value;
+                          }
 
                         }  // l
                       }  // k
 
-// Update J
+                      // Update J
+                      if (use_thread_local_buffers_) {
+                        J_cur[bf1 * num_atomic_orbitals + bf2] += J_ij;
+                      } else {
 #ifdef _OPENMP
 #pragma omp atomic update relaxed
 #endif
-                      J_cur[bf1 * num_atomic_orbitals + bf2] += J_ij;
+                        J_cur[bf1 * num_atomic_orbitals + bf2] += J_ij;
+                      }
                     }  // j
                   }  // i
                 }  // idm
@@ -446,7 +488,10 @@ class ERI {
               if (K)
                 for (size_t idm = 0; idm < num_density_matrices; ++idm) {
                   auto* K_cur =
-                      K + idm * num_atomic_orbitals * num_atomic_orbitals;
+                      use_thread_local_buffers_
+                          ? K_thread +
+                                idm * num_atomic_orbitals * num_atomic_orbitals
+                          : K + idm * num_atomic_orbitals * num_atomic_orbitals;
                   auto* P_cur =
                       P + idm * num_atomic_orbitals * num_atomic_orbitals;
                   for (size_t i = 0, ijkl = 0; i < n1; ++i) {
@@ -473,28 +518,40 @@ class ERI {
                           K_jk += 0.25 *
                                   P_cur[bf1 * num_atomic_orbitals + bf4] *
                                   value;
+                          if (use_thread_local_buffers_) {
+                            K_cur[bf1 * num_atomic_orbitals + bf4] +=
+                                P_jk * value;
+                            K_cur[bf2 * num_atomic_orbitals + bf4] +=
+                                P_ik * value;
+                          } else {
 #ifdef _OPENMP
 #pragma omp atomic update relaxed
 #endif
-                          K_cur[bf1 * num_atomic_orbitals + bf4] +=
-                              P_jk * value;
+                            K_cur[bf1 * num_atomic_orbitals + bf4] +=
+                                P_jk * value;
 #ifdef _OPENMP
 #pragma omp atomic update relaxed
 #endif
-                          K_cur[bf2 * num_atomic_orbitals + bf4] +=
-                              P_ik * value;
+                            K_cur[bf2 * num_atomic_orbitals + bf4] +=
+                                P_ik * value;
+                          }
 
                         }  // l
 
-// Update K
+                        // Update K
+                        if (use_thread_local_buffers_) {
+                          K_cur[bf1 * num_atomic_orbitals + bf3] += K_ik;
+                          K_cur[bf2 * num_atomic_orbitals + bf3] += K_jk;
+                        } else {
 #ifdef _OPENMP
 #pragma omp atomic update relaxed
 #endif
-                        K_cur[bf1 * num_atomic_orbitals + bf3] += K_ik;
+                          K_cur[bf1 * num_atomic_orbitals + bf3] += K_ik;
 #ifdef _OPENMP
 #pragma omp atomic update relaxed
 #endif
-                        K_cur[bf2 * num_atomic_orbitals + bf3] += K_jk;
+                          K_cur[bf2 * num_atomic_orbitals + bf3] += K_jk;
+                        }
                       }  // k
                     }  // j
                   }  // i
@@ -506,6 +563,24 @@ class ERI {
       }  // s1
 
     }  // End parallel region
+
+    // Deterministic reduction: combine thread-local buffers in order
+    if (use_thread_local_buffers_) {
+      if (J) {
+        for (int t = 0; t < nthreads; ++t) {
+          for (size_t i = 0; i < mat_size; ++i) {
+            J[i] += J_local[t][i];
+          }
+        }
+      }
+      if (K) {
+        for (int t = 0; t < nthreads; ++t) {
+          for (size_t i = 0; i < mat_size; ++i) {
+            K[i] += K_local[t][i];
+          }
+        }
+      }
+    }
 
     // Symmetrize J
     if (J)
@@ -617,6 +692,15 @@ class ERI {
     engines_coulomb[0].set_precision(engine_precision);
     for (int i = 1; i < nthreads; ++i) engines_coulomb[i] = engines_coulomb[0];
 
+    // Thread-local accumulation buffers for reproducibility
+    std::vector<std::vector<double>> out_local(0);
+    if (use_thread_local_buffers_) {
+      out_local.resize(nthreads);
+      for (int t = 0; t < nthreads; ++t) {
+        out_local[t].resize(out_size, 0.0);
+      }
+    }
+
 #ifdef _OPENMP
 #pragma omp parallel
 #endif
@@ -628,6 +712,12 @@ class ERI {
 #endif
       auto& engine = engines_coulomb[thread_id];
       const auto& buf = engine.results();
+
+      // Get pointer to thread-local buffer
+      double* out_thread = nullptr;
+      if (use_thread_local_buffers_) {
+        out_thread = out_local[thread_id].data();
+      }
 
       for (size_t s1 = 0ul, s1234 = 0ul; s1 < nsh; ++s1) {
         const auto bf1_st = shell2bf_[s1];
@@ -696,35 +786,63 @@ class ERI {
                       const auto value = buf_1234[ijkl] * s12_34_deg;
                       // p and l are fast indices separately
                       for (size_t p = 0; p < nt; ++p) {
-// (ij|kp) = \sum_l (ij|kl) * C(l,p)
+                        // (ij|kp) = \sum_l (ij|kl) * C(l,p)
+                        const size_t idx1 =
+                            (bf1 * num_atomic_orbitals + bf2) * inner_size +
+                            bf3 * nt + p;
+                        if (use_thread_local_buffers_) {
+                          out_thread[idx1] += C[bf4 * nt + p] * value * s12_deg;
+                        } else {
 #ifdef _OPENMP
 #pragma omp atomic update relaxed
 #endif
-                        out[(bf1 * num_atomic_orbitals + bf2) * inner_size +
-                            bf3 * nt + p] += C[bf4 * nt + p] * value * s12_deg;
+                          out[idx1] += C[bf4 * nt + p] * value * s12_deg;
+                        }
 
                         // (ij|lp) = \sum_k (ij|lk) * C(k,p) = \sum_l (ij|kl) *
                         // C(k,p)
                         if (s3 != s4) {
+                          const size_t idx2 =
+                              (bf1 * num_atomic_orbitals + bf2) * inner_size +
+                              bf4 * nt + p;
+                          if (use_thread_local_buffers_) {
+                            out_thread[idx2] +=
+                                C[bf3 * nt + p] * value * s12_deg;
+                          } else {
 #ifdef _OPENMP
 #pragma omp atomic update relaxed
 #endif
-                          out[(bf1 * num_atomic_orbitals + bf2) * inner_size +
-                              bf4 * nt + p] +=
-                              C[bf3 * nt + p] * value * s12_deg;
+                            out[idx2] += C[bf3 * nt + p] * value * s12_deg;
+                          }
                         }
 
-// (kl|ip) = \sum_j (kl|ij) * C(j,p)
+                        // (kl|ip) = \sum_j (kl|ij) * C(j,p)
+                        const size_t idx3 =
+                            (bf3 * num_atomic_orbitals + bf4) * inner_size +
+                            bf1 * nt + p;
+                        if (use_thread_local_buffers_) {
+                          out_thread[idx3] += C[bf2 * nt + p] * value * s34_deg;
+                        } else {
+#ifdef _OPENMP
 #pragma omp atomic update relaxed
-                        out[(bf3 * num_atomic_orbitals + bf4) * inner_size +
-                            bf1 * nt + p] += C[bf2 * nt + p] * value * s34_deg;
+#endif
+                          out[idx3] += C[bf2 * nt + p] * value * s34_deg;
+                        }
 
                         // (kl|jp) = \sum_i (kl|ji) * C(i,p)
                         if (s1 != s2) {
+                          const size_t idx4 =
+                              (bf3 * num_atomic_orbitals + bf4) * inner_size +
+                              bf2 * nt + p;
+                          if (use_thread_local_buffers_) {
+                            out_thread[idx4] +=
+                                C[bf1 * nt + p] * value * s34_deg;
+                          } else {
+#ifdef _OPENMP
 #pragma omp atomic update relaxed
-                          out[(bf3 * num_atomic_orbitals + bf4) * inner_size +
-                              bf2 * nt + p] +=
-                              C[bf1 * nt + p] * value * s34_deg;
+#endif
+                            out[idx4] += C[bf1 * nt + p] * value * s34_deg;
+                          }
                         }
                       }
                     }  // l (bf4)
@@ -736,6 +854,15 @@ class ERI {
           }  // s3
         }  // s2
       }  // s1
+    }
+
+    // Deterministic reduction: combine thread-local buffers in order
+    if (use_thread_local_buffers_) {
+      for (int t = 0; t < nthreads; ++t) {
+        for (size_t i = 0; i < out_size; ++i) {
+          out[i] += out_local[t][i];
+        }
+      }
     }
 
 // Symmetrize the first and second index: (ij|kp) = 0.5 * ( (ji|kp) + (ij|kp) ),
@@ -782,9 +909,10 @@ class ERI {
 }  // namespace libint2::direct
 
 LIBINT2_DIRECT::LIBINT2_DIRECT(bool unr, BasisSet& basis_set,
-                               ParallelConfig _mpi)
+                               ParallelConfig _mpi, bool use_atomics)
     : ERI(unr, 0.0, basis_set, _mpi),
-      eri_impl_(libint2::direct::ERI::make_libint2_direct_eri(unr, basis_set)) {
+      eri_impl_(libint2::direct::ERI::make_libint2_direct_eri(unr, basis_set,
+                                                              use_atomics)) {
   if (_mpi.world_size > 1) throw std::runtime_error("LIBINT2_DIRECT + MPI NYI");
 }
 

@@ -15,13 +15,21 @@ References:
 # Licensed under the MIT License. See LICENSE.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
 
+from __future__ import annotations
+
 import logging
-from collections.abc import Sequence
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from collections.abc import Sequence
+
+    from qdk_chemistry.data.qubit_hamiltonian import QubitHamiltonian
+
+
 from dataclasses import dataclass
 
 from qiskit import ClassicalRegister, QuantumCircuit, QuantumRegister
 
-from qdk_chemistry.data import QubitHamiltonian
 from qdk_chemistry.phase_estimation.base import PhaseEstimation, PhaseEstimationAlgorithm
 from qdk_chemistry.utils.phase import (
     accumulated_phase_from_bits,
@@ -35,6 +43,8 @@ from qdk_chemistry.utils.time_evolution import (
 )
 
 _LOGGER = logging.getLogger(__name__)
+
+__all__: list[str] = []
 
 
 @dataclass(frozen=True)
@@ -58,8 +68,7 @@ class IterativePhaseEstimation(PhaseEstimation):
 
         Args:
             hamiltonian: The target Hamiltonian whose eigenvalues will be estimated.
-            evolution_time: Time parameter ``t`` used in the time-evolution unitary
-                ``U = exp(-i H t)``.
+            evolution_time: Time parameter ``t`` used in the time-evolution unitary ``U = exp(-i H t)``.
 
         """
         super().__init__(hamiltonian, evolution_time)
@@ -86,14 +95,22 @@ class IterativePhaseEstimation(PhaseEstimation):
         Args:
             state_prep: Trial-state preparation circuit that prepares the initial
                 quantum state on the system qubits.
+
             iteration: Current iteration index (0-based), where 0 corresponds to the
+
                 most-significant bit.
+
             total_iterations: Total number of phase bits to measure across all iterations.
             phase_correction: Feedback phase angle to apply before controlled evolution.
+
                 Defaults to 0.0 for the first iteration.
+
             measurement_register: Optional classical register for storing the measurement
+
                 result. If None, a new register named ``c{iteration}`` is created.
+
             iteration_name: Optional custom name for the circuit. If None, no specific
+
                 name is assigned.
 
         Returns:
@@ -163,16 +180,20 @@ class IterativePhaseEstimation(PhaseEstimation):
 
         Args:
             state_prep: Trial-state preparation circuit that prepares the initial
+
                 quantum state on the system qubits.
-            iteration: Current iteration index (0-based), where 0 corresponds to the
-                most-significant bit.
+
+            iteration: Current iteration index (0-based), where 0 corresponds to the most-significant bit.
             total_iterations: Total number of phase bits to measure across all iterations.
             phase_correction: Feedback phase angle to apply before controlled evolution.
+
                 Defaults to 0.0 for the first iteration.
-            measurement_register: Optional classical register for storing the measurement
-                result. If None, a new register named ``c{iteration}`` is created.
-            iteration_name: Optional custom name for the circuit. If None, no specific
-                name is assigned.
+
+            measurement_register: Optional classical register for storing the measurement result.
+
+                If None, a new register named ``c{iteration}`` is created.
+
+            iteration_name: Optional custom name for the circuit. If None, no specific name is assigned.
 
         Returns:
             An IterativePhaseEstimationIteration object containing the circuit and
@@ -210,16 +231,19 @@ class IterativePhaseEstimation(PhaseEstimation):
         """Generate ``num_bits`` iteration circuits with optional phase feedback.
 
         Args:
-            state_prep: Trial-state preparation circuit that prepares the initial
-                quantum state on the system qubits.
-            num_bits: Total number of IQPE iterations to generate. Must be a positive
-                integer.
-            phase_corrections: Optional list of feedback phases Φ(k+1) to apply
-                before each iteration. Must have length equal to ``num_bits`` if provided.
+            state_prep: Trial-state preparation circuit that prepares the initial quantum state on the system qubits.
+            num_bits: Total number of IQPE iterations to generate. Must be a positive integer.
+            phase_corrections: Optional list of feedback phases Φ(k+1) to apply before each iteration.
+
+                Must have length equal to ``num_bits`` if provided.
                 Defaults to zeros if not specified.
-            measurement_registers: Optional collection of classical registers,
-                one per iteration. Must have length equal to ``num_bits`` if provided.
+
+            measurement_registers: Optional collection of classical registers, one per iteration.
+
+                Must have length equal to ``num_bits`` if provided.
+
             iteration_names: Optional custom names for the per-iteration circuits.
+
                 Must have length equal to ``num_bits`` if provided.
 
         Returns:
@@ -227,8 +251,9 @@ class IterativePhaseEstimation(PhaseEstimation):
             containing circuits and metadata.
 
         Raises:
-            ValueError: If ``num_bits`` is not positive, or if the length of
-                ``phase_corrections``, ``measurement_registers``, or ``iteration_names``
+            ValueError: If ``num_bits`` is not positive,
+
+                or if the length of ``phase_corrections``, ``measurement_registers``, or ``iteration_names``
                 does not match ``num_bits``.
 
         """
@@ -299,8 +324,7 @@ class IterativePhaseEstimation(PhaseEstimation):
         """Convenience helper that wraps :func:`~qdk_chemistry.utils.phase.accumulated_phase_from_bits`.
 
         Args:
-            bits_msb_first: Sequence of measured bits ordered from most-significant
-                to least-significant.
+            bits_msb_first: Sequence of measured bits ordered from most-significant to least-significant.
 
         Returns:
             The accumulated phase feedback computed from the bit sequence.
@@ -318,6 +342,7 @@ def _validate_iteration_inputs(iteration: int, total_iterations: int) -> None:
 
     Raises:
         ValueError: If ``total_iterations`` is not positive, or if ``iteration``
+
             is outside the valid range [0, total_iterations - 1].
 
     """
