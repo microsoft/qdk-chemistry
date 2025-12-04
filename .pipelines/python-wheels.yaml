@@ -155,9 +155,9 @@ extends:
     #               instructions: "Please verify artifacts and approve the release"
     #               onTimeout: "reject"
 
-    # - stage: release
+    # - stage: Release
     #   displayName: Release
-    #   dependsOn: approval
+    #   dependsOn: Approval
     #   condition: and(succeeded(), eq(variables['Build.Reason'], 'Manual'))
     #   jobs:
     #     - job: "Publish Python Packages"
@@ -199,7 +199,7 @@ extends:
     #             clientid:
     #             contenttype: PyPi
     #             domaintenantid:
-    #             folderlocation: "$(System.DefaultWorkingDirectory)/qdk-chemistry/python/repaired_wheelhouse"
+    #             folderlocation: "$(System.DefaultWorkingDirectory)/python/repaired_wheelhouse"
     #             waitforreleasecompletion: true
     #             owners: "nathanbaker@microsoft.com"
     #             approvers: "nathanbaker@microsoft.com"
