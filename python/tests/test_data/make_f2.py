@@ -16,7 +16,7 @@ if __name__ == "__main__":
     hf_energy, hf_wfn = hf.run(f2, 0, 1)
 
     print(
-        "HF energy and determinant:", hf_energy, hf_wfn.get_active_num_electrons(), hf_wfn.get_total_determinants()[0]
+        "HF energy and determinant:", hf_energy, hf_wfn.get_active_num_electrons(), hf_wfn.get_active_determinants()[0]
     )
 
     active_space_orbitals = Orbitals(
@@ -49,6 +49,6 @@ if __name__ == "__main__":
     print("PMC energy:", pmc_energy)
     print("PMC correction:", pmc_energy - active_space_h.get_core_energy())
     print("Leading configurations and coefficients:")
-    for det, coeff in zip(pmc_wfn.get_total_determinants(), pmc_wfn.get_coefficients(), strict=True):
+    for det, coeff in zip(pmc_wfn.get_active_determinants(), pmc_wfn.get_coefficients(), strict=True):
         if abs(coeff) > 0.001:
             print(det, coeff)

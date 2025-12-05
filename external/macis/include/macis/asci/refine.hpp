@@ -68,15 +68,32 @@ auto asci_refine(ASCISettings asci_settings, MCSCFSettings mcscf_settings,
   logger->info(fmt_string, 0, E0, 0.0);
 
   // Refinement Loop
-  const size_t ndets = wfn.size();
+  size_t ndets = wfn.size();
   bool converged = false;
   for (size_t iter = 0; iter < asci_settings.max_refine_iter; ++iter) {
     double E;
     std::tie(E, wfn, X) = asci_iter<N, index_t>(
         asci_settings, mcscf_settings, ndets, E0, std::move(wfn), std::move(X),
         ham_gen, norb MACIS_MPI_CODE(, comm));
-    if (wfn.size() != ndets)
-      throw std::runtime_error("Wavefunction size can't change in refinement");
+
+    // Check if wavefunction size changed
+    if (wfn.size() != ndets) {
+      logger->warn(
+          "Wavefunction size changed from {} to {} during refinement iteration "
+          "{}",
+          ndets, wfn.size(), iter + 1);
+
+      // Update target size for next iteration
+      ndets = wfn.size();
+
+      // If wavefunction became too small, stop refinement
+      if (wfn.size() < asci_settings.ntdets_min) {
+        logger->error(
+            "Wavefunction shrunk below ntdets_min ({}), stopping refinement",
+            asci_settings.ntdets_min);
+        break;
+      }
+    }
 
     const auto E_delta = E - E0;
     logger->info(fmt_string, iter + 1, E, E_delta);
@@ -90,7 +107,7 @@ auto asci_refine(ASCISettings asci_settings, MCSCFSettings mcscf_settings,
   if (converged)
     logger->info("ASCI Refine Converged!");
   else
-    throw std::runtime_error("ACCI Refine did not converge");
+    throw std::runtime_error("ASCI Refine did not converge");
 
   return std::make_tuple(E0, wfn, X);
 }

@@ -35,8 +35,7 @@ mc_calculator = create("multi_configuration_calculator", "macis_cas")
 # Configure the MC calculator
 mc_calculator.settings().set("num_roots", 1)  # Ground state only
 mc_calculator.settings().set("ci_residual_tolerance", 1.0e-6)
-# TODO: debug this setting
-# mc_calculator.settings().set("davidson_iterations", 200)
+mc_calculator.settings().set("davidson_iterations", 200)
 mc_calculator.settings().set("calculate_one_rdm", True)
 mc_calculator.settings().set("calculate_two_rdm", False)
 

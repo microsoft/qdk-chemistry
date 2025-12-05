@@ -259,7 +259,7 @@ def _generate_registry_stubs() -> None:
         for algorithm_type, algorithm_names in all_algorithms.items():
             for algorithm_name in algorithm_names:
                 try:
-                    settings = reg_module.show_settings(algorithm_type, algorithm_name)
+                    settings = reg_module.inspect_settings(algorithm_type, algorithm_name)
                     instance = reg_module.create(algorithm_type, algorithm_name)
                     class_type = type(instance)
                     class_name = class_type.__name__
@@ -280,7 +280,7 @@ def _generate_registry_stubs() -> None:
                     overload_lines.append(f"    algorithm_type: Literal['{algorithm_type}'],")
                     overload_lines.append(f"    algorithm_name: Literal['{algorithm_name}'] | None = None,")
 
-                    for setting_name, setting_type, default in settings:
+                    for setting_name, setting_type, default, _, _ in settings:
                         if setting_type == "str":
                             overload_lines.append(f'    {setting_name}: {setting_type} = "{default}",')
                         elif "int" in setting_type:

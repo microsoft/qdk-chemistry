@@ -345,10 +345,60 @@ class PySettings : public Settings, public py::trampoline_self_life_support {
   // Expose set_default for Python derived classes to use in __init__
   // Now requires the expected type to ensure type-safe defaults
   void _set_default(const std::string &key, const std::string &expected_type,
-                    const py::object &value) {
+                    const py::object &value,
+                    const py::object &description = py::none(),
+                    const py::object &limit = py::none(),
+                    bool documented = true) {
     SettingValue setting_value =
         python_to_setting_value_with_type(value, expected_type, key);
-    set_default(key, setting_value);
+
+    std::optional<std::string> desc;
+    if (!description.is_none()) {
+      desc = py::cast<std::string>(description);
+    }
+
+    std::optional<Constraint> limit_val;
+    if (!limit.is_none()) {
+      // Convert Python limit to Constraint
+      if (py::isinstance<py::tuple>(limit) && py::len(limit) == 2) {
+        // Range limit (tuple of 2 elements) - convert to BoundConstraint
+        py::tuple limit_tuple = py::cast<py::tuple>(limit);
+        if (expected_type == "int" || expected_type == "vector<int>") {
+          BoundConstraint<int64_t> bound;
+          bound.min = py::cast<int64_t>(limit_tuple[0]);
+          bound.max = py::cast<int64_t>(limit_tuple[1]);
+          limit_val = bound;
+        } else if (expected_type == "double" || expected_type == "float" ||
+                   expected_type == "vector<double>" ||
+                   expected_type == "vector<float>") {
+          BoundConstraint<double> bound;
+          bound.min = py::cast<double>(limit_tuple[0]);
+          bound.max = py::cast<double>(limit_tuple[1]);
+          limit_val = bound;
+        }
+      } else if (py::isinstance<py::list>(limit)) {
+        // Enumeration limit (list of allowed values) - convert to
+        // ListConstraint
+        py::list limit_list = py::cast<py::list>(limit);
+        if (expected_type == "int" || expected_type == "vector<int>") {
+          ListConstraint<int64_t> list_constraint;
+          for (auto item : limit_list) {
+            list_constraint.allowed_values.push_back(py::cast<int64_t>(item));
+          }
+          limit_val = list_constraint;
+        } else if (expected_type == "string" ||
+                   expected_type == "vector<string>") {
+          ListConstraint<std::string> list_constraint;
+          for (auto item : limit_list) {
+            list_constraint.allowed_values.push_back(
+                py::cast<std::string>(item));
+          }
+          limit_val = list_constraint;
+        }
+      }
+    }
+
+    set_default(key, setting_value, desc, limit_val, documented);
   }
 
   void _set_default_setting_value(const std::string &key,
@@ -718,38 +768,6 @@ Examples:
 )",
                py::arg("key"));
 
-  settings.def("get_all_settings", &Settings::get_all_settings,
-               R"(
-Get all settings as a map for Python interoperability.
-
-Returns the internal settings map, primarily for advanced use cases and internal operations.
-
-Returns:
-    dict: Reference to internal settings map
-
-Notes:
-    This returns a reference to the internal data structure.
-    Use `to_dict()` for a safe copy of the settings.
-)",
-               py::return_value_policy::reference_internal);
-
-  settings.def("set_from_map", &Settings::set_from_map,
-               R"(
-Set settings from a map (useful for Python dictionary conversion).
-
-Loads settings from a C++ map structure.
-This is primarily used internally for converting from Python dictionaries.
-
-Args:
-    settings_map (dict): Map containing setting key-value pairs
-
-Examples:
-    >>> # This is typically used internally, prefer from_dict() for Python
-    >>> internal_map = get_some_map()
-    >>> settings.set_from_map(internal_map)
-)",
-               py::arg("settings_map"));
-
   // JSON serialization
   settings.def(
       "to_json",
@@ -1030,6 +1048,161 @@ Examples:
 )",
                py::arg("key"));
 
+  settings.def("has_description", &Settings::has_description,
+               R"(
+Check if a setting has a description.
+
+Args:
+    key (str): The setting key name
+
+Returns:
+    bool: True if the setting has a description, False otherwise
+
+Examples:
+    >>> if settings.has_description("max_iterations"):
+    ...     desc = settings.get_description("max_iterations")
+)",
+               py::arg("key"));
+
+  settings.def("get_description", &Settings::get_description,
+               R"(
+Get the description of a setting.
+
+Args:
+    key (str): The setting key name
+
+Returns:
+    str: The description string
+
+Raises:
+    SettingNotFound: If the key doesn't exist or has no description
+
+Examples:
+    >>> desc = settings.get_description("max_iterations")
+    >>> print(desc)  # "Maximum number of iterations"
+)",
+               py::arg("key"));
+
+  settings.def("has_limits", &Settings::has_limits,
+               R"(
+Check if a setting has defined limits.
+
+Args:
+    key (str): The setting key name
+
+Returns:
+    bool: True if the setting has limits defined, False otherwise
+
+Examples:
+    >>> if settings.has_limits("max_iterations"):
+    ...     limits = settings.get_limits("max_iterations")
+)",
+               py::arg("key"));
+
+  settings.def(
+      "get_limits",
+      [](const Settings &self, const std::string &key) -> py::object {
+        Constraint limits = self.get_limits(key);
+        return std::visit(
+            [](const auto &variant_value) -> py::object {
+              using LimitType = std::decay_t<decltype(variant_value)>;
+              if constexpr (std::is_same_v<LimitType,
+                                           BoundConstraint<int64_t>>) {
+                return py::cast(
+                    std::make_tuple(variant_value.min, variant_value.max));
+              } else if constexpr (std::is_same_v<LimitType,
+                                                  BoundConstraint<double>>) {
+                return py::cast(
+                    std::make_tuple(variant_value.min, variant_value.max));
+              } else if constexpr (std::is_same_v<LimitType,
+                                                  ListConstraint<int64_t>>) {
+                return py::cast(variant_value.allowed_values);
+              } else if constexpr (std::is_same_v<
+                                       LimitType,
+                                       ListConstraint<std::string>>) {
+                return py::cast(variant_value.allowed_values);
+              } else {
+                return py::none();
+              }
+            },
+            limits);
+      },
+      R"(
+Get the limits of a setting.
+
+Returns the limit value which can be a range (tuple of min, max) or
+an enumeration (list of allowed values).
+
+Args:
+    key (str): The setting key name
+
+Returns:
+    tuple[int, int] | tuple[float, float] | list[int] | list[str]:
+
+        The limit value - either a range tuple or a list of allowed values
+
+Raises:
+    SettingNotFound: If the key doesn't exist or has no limits
+
+Examples:
+    >>> limits = settings.get_limits("max_iterations")
+    >>> print(limits)  # (1, 1000) for a range
+    >>>
+    >>> limits = settings.get_limits("method")
+    >>> print(limits)  # ['hf', 'dft', 'mp2'] for allowed values
+)",
+      py::arg("key"));
+
+  settings.def("is_documented", &Settings::is_documented,
+               R"(
+Check if a setting is documented.
+
+Args:
+    key (str): The setting key name
+
+Returns:
+    bool: True if the setting is marked as documented, False otherwise
+
+Raises:
+    SettingNotFound: If the key doesn't exist
+
+Examples:
+    >>> if settings.is_documented("max_iterations"):
+    ...     print("This setting is documented")
+)",
+               py::arg("key"));
+
+  settings.def("as_table", &Settings::as_table,
+               R"(
+Print settings as a formatted table.
+
+Prints all documented settings in a table format with columns:
+Key, Value, Limits, Description
+
+The table fits within the specified width with multi-line descriptions
+as needed. Non-integer numeric values are displayed in scientific notation.
+
+Args:
+    max_width (int): Maximum total width of the table (default: 120)
+    show_undocumented (bool): Whether to show undocumented settings (default: False)
+
+Returns:
+    str: Formatted table string
+
+Examples:
+    >>> print(settings.as_table())
+    ------------------------------------------------------------
+    Key                  | Value           | Limits              | Description
+    ------------------------------------------------------------
+    max_iterations       | 100             | [1, 1000]           | Maximum number of iterations
+    method               | "hf"            | ["hf", "dft"...]    | Electronic structure method
+    tolerance            | 1.00e-06        | [1.00e-08, 1.00...  | Convergence tolerance
+    ------------------------------------------------------------
+
+)",
+               py::arg("max_width") = 120,
+               py::arg("show_undocumented") = false);
+
   settings.def(
       "get_expected_python_type",
       [](const Settings &self, const std::string &key) -> std::string {
@@ -1089,9 +1262,12 @@ Examples:
   settings.def(
       "_set_default",
       [](Settings &self, const std::string &key,
-         const std::string &expected_type, const py::object &value) {
+         const std::string &expected_type, const py::object &value,
+         const py::object &description = py::none(),
+         const py::object &limit = py::none(), bool documented = true) {
         // Cast to PySettings to access the protected method
-        static_cast<PySettings &>(self)._set_default(key, expected_type, value);
+        static_cast<PySettings &>(self)._set_default(
+            key, expected_type, value, description, limit, documented);
       },
       R"(
 Set a default value (for use in derived class __init__ only).
@@ -1103,6 +1279,13 @@ Args:
     key (str): The setting key name
     expected_type (str): The expected type name (e.g., "int", "double", "string", "vector<int>")
     value (object): The default value to set
+    description (str, optional): Human-readable description of the setting
+    limit (tuple | list, optional): Limits for the setting value.
+
+        For numeric types: tuple of (min, max)
+        For string types: list of allowed values
+
+    documented (bool): Whether this setting should be included in documentation (default: True)
 
 Notes:
     This method is intended for internal use by derived classes only.
@@ -1112,11 +1295,20 @@ Examples:
     >>> class MySettings(qdk_chemistry.data.Settings):
     ...     def __init__(self):
     ...         super().__init__()
-    ...         self._set_default("method", "string", "default")
-    ...         self._set_default("max_iter", "int", 1000)
-    ...         self._set_default("convergence_threshold", "double", 1e-6)
+    ...         self._set_default("method", "string", "hf",
+    ...                          "Electronic structure method",
+    ...                          ["hf", "dft", "mp2"])
+    ...         self._set_default("max_iter", "int", 1000,
+    ...                          "Maximum iterations", (1, 10000))
+    ...         self._set_default("convergence_threshold", "double", 1e-6,
+    ...                          "Convergence threshold", (1e-12, 1e-3))
+    ...         self._set_default("debug_mode", "bool", False,
+    ...                          documented=False)
+
 )",
-      py::arg("key"), py::arg("expected_type"), py::arg("value"));
+      py::arg("key"), py::arg("expected_type"), py::arg("value"),
+      py::arg("description") = py::none(), py::arg("limit") = py::none(),
+      py::arg("documented") = true);
 
   // Python dictionary-like interface
   settings.def(
@@ -1651,9 +1843,12 @@ Examples:
   settings.def(
       "_set_default",
       [](Settings &self, const std::string &key,
-         const std::string &expected_type, const py::object &value) {
+         const std::string &expected_type, const py::object &value,
+         const py::object &description, const py::object &limit,
+         bool documented) {
         // Cast to PySettings to access the protected method
-        static_cast<PySettings &>(self)._set_default(key, expected_type, value);
+        static_cast<PySettings &>(self)._set_default(
+            key, expected_type, value, description, limit, documented);
       },
       R"(
 Set a default value (for use in derived class __init__ only).
@@ -1665,6 +1860,12 @@ Args:
     key (str): The setting key name
     expected_type (str): The expected type name (e.g., "int", "double", "string", "vector<int>")
     value (object): The default value to set
+    description (str, optional): Human-readable description of the setting
+    limit (tuple or list, optional): Allowed values or numeric range.
+        - For numeric types: tuple of (min, max) e.g., (0, 100) or (0.0, 1.0)
+        - For strings: list of allowed values e.g., ["option1", "option2", "option3"]
+        - For int vectors: list of allowed integer values
+    documented (bool, optional): Whether this setting should appear in as_table() output (default: True)
 
 Notes:
     This method is intended for internal use by derived classes only.
@@ -1674,11 +1875,27 @@ Examples:
     >>> class MySettings(qdk_chemistry.data.Settings):
     ...     def __init__(self):
     ...         super().__init__()
-    ...         self._set_default("method", "string", "default")
+    ...         # Basic usage
+    ...         self._set_default("method", "string", "hf")
     ...         self._set_default("max_iter", "int", 1000)
-    ...         self._set_default("convergence_threshold", "double", 1e-6)
+    ...         self._set_default("tolerance", "double", 1e-6)
+    ...
+    ...         # With description and numeric limits
+    ...         self._set_default("convergence_threshold", "double", 1e-8,
+    ...                          description="Convergence threshold",
+    ...                          limit=(1e-12, 1e-4))
+    ...
+    ...         # With string enumeration limits
+    ...         self._set_default("encoding", "string", "jordan-wigner",
+    ...                          description="Qubit encoding method",
+    ...                          limit=["jordan-wigner", "bravyi-kitaev", "parity"])
+    ...
+    ...         # Undocumented internal setting
+    ...         self._set_default("internal_flag", "bool", False, documented=False)
 )",
-      py::arg("key"), py::arg("expected_type"), py::arg("value"));
+      py::arg("key"), py::arg("expected_type"), py::arg("value"),
+      py::arg("description") = py::none(), py::arg("limit") = py::none(),
+      py::arg("documented") = true);
 
   // Python dictionary-like interface
   settings.def(

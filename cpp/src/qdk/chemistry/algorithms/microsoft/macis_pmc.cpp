@@ -41,9 +41,9 @@ struct pmc_helper {
     double H_thresh = macis_pmc_settings.get<double>("H_thresh");
     double davidson_res_tol =
         macis_pmc_settings.get<double>("davidson_res_tol");
-    size_t iterative_solver_dimension_cutoff =
-        macis_pmc_settings.get<size_t>("iterative_solver_dimension_cutoff");
-    size_t davidson_max_m = macis_pmc_settings.get<size_t>("davidson_max_m");
+    int64_t iterative_solver_dimension_cutoff =
+        macis_pmc_settings.get<int64_t>("iterative_solver_dimension_cutoff");
+    int64_t davidson_max_m = macis_pmc_settings.get<int64_t>("davidson_max_m");
 
     using wfn_type = macis::wfn_t<N>;
     using wfn_traits = macis::wavefunction_traits<wfn_type>;
@@ -54,8 +54,8 @@ struct pmc_helper {
         orbitals->get_active_space_indices().first;
     const size_t num_molecular_orbitals = active_indices.size();
 
-    const auto& T = hamiltonian.get_one_body_integrals();
-    const auto& V = hamiltonian.get_two_body_integrals();
+    const auto& [T_a, T_b] = hamiltonian.get_one_body_integrals();
+    const auto& [V_aaaa, V_aabb, V_bbbb] = hamiltonian.get_two_body_integrals();
 
     // Check that the orbitals are consistent with the Hamiltonian
     if (!configurations.empty()) {
@@ -81,10 +81,10 @@ struct pmc_helper {
 
     // Create Hamiltonian Generator
     generator_t ham_gen(macis::matrix_span<double>(
-                            const_cast<double*>(T.data()),
+                            const_cast<double*>(T_a.data()),
                             num_molecular_orbitals, num_molecular_orbitals),
                         macis::rank4_span<double>(
-                            const_cast<double*>(V.data()),
+                            const_cast<double*>(V_aaaa.data()),
                             num_molecular_orbitals, num_molecular_orbitals,
                             num_molecular_orbitals, num_molecular_orbitals));
 
