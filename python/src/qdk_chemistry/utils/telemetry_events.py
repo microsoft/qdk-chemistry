@@ -62,12 +62,11 @@ def get_basis_functions_bucket(basis_functions: str | int) -> str:
 
 
 def extract_data(result: Any) -> str:
-    """Extract molecular formula and number of basis functions from algorithm result.
+    """Extract number of basis functions from algorithm result.
 
     This function handles both single qdk_data objects and tuple results
     (e.g., (energy, qdk_data) pairs) returned by QDK chemistry algorithms.
-    It extracts the molecular formula and number of basis functions from the
-    qdk_data's orbital data for telemetry tracking.
+    It extracts the number of basis functions from the qdk_data's orbital data for telemetry tracking.
 
     Args:
         result: Algorithm result, either a qdk_data object or a tuple containing
