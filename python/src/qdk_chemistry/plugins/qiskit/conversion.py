@@ -11,10 +11,10 @@ representations, particularly for quantum circuit simulation and state preparati
 
 import numpy as np
 
-from qdk_chemistry.data import Configuration, Wavefunction
+from qdk_chemistry import data
 
 
-def create_statevector_from_wavefunction(wavefunction: Wavefunction, normalize: bool = True) -> np.ndarray:
+def create_statevector_from_wavefunction(wavefunction: data.Wavefunction, normalize: bool = True) -> np.ndarray:
     """Create a Qiskit-compatible statevector from a QDK Chemistry wavefunction.
 
     This function converts a QDK Chemistry wavefunction into a dense statevector
@@ -79,7 +79,7 @@ def create_statevector_from_wavefunction(wavefunction: Wavefunction, normalize: 
     return statevector
 
 
-def _configuration_to_statevector_index(configuration: Configuration, num_orbitals: int) -> int:
+def _configuration_to_statevector_index(configuration: data.Configuration, num_orbitals: int) -> int:
     """Convert a Configuration to its corresponding integer index in the statevector array.
 
     This function maps an electronic configuration (orbital occupation pattern) to
