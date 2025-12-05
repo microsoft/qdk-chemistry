@@ -57,7 +57,7 @@ def get_basis_functions_bucket(basis_functions: str | int) -> str:
     if basis_functions < 1500:
         # Intervals of 100 for 500-1499
         return str(((basis_functions - 1) // 100 + 1) * 100)
-    # 1000+ for anything >= 1000
+    # 1500+ for anything >= 1500
     return "1500+"
 
 
