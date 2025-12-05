@@ -29,7 +29,7 @@ mv libflame-${LIBFLAME_VERSION} libflame
 # Configure and build libflame
 cd libflame
 ln -s /usr/bin/python3 /usr/bin/python
-CFLAGS="${CFLAGS} ./configure \
+CFLAGS=${CFLAGS} ./configure \
     --build=$LIBFLAME_BUILD \
     --enable-static-build \
     --prefix=${INSTALL_PREFIX} \
