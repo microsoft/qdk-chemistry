@@ -146,9 +146,9 @@ def apply_telemetry_to_classes():
     """Apply telemetry tracking to the 'run' methods of all algorithm classes."""
     with contextlib.suppress(NameError):
         for name in __all__:
-            instance = globals().get(name)
-            if instance is not None and hasattr(instance, "run"):
-                instance.run = telemetry_tracker()(instance.run)
+            cls = globals().get(name)
+            if isinstance(cls, type) and hasattr(cls, "run"):
+                cls.run = telemetry_tracker()(cls.run)
 
 
 if TELEMETRY_ENABLED:
