@@ -135,4 +135,8 @@ rm "$WHEEL_FILE"
 (cd "$TEMP_DIR" && python3 -m zipfile -c "$FULL_WHEEL_PATH" .)
 rm -rf "$TEMP_DIR"
 
-mkdir /workspace
+# [GMN:TODO] Make sure that the artifacts end up in a separate directory
+# so that the ESRP upload will work correctly. The ESRP upload will not do
+# a recursive search for wheels like twine has done in the past.
+# mkdir /workspace/artifacts
+# cp repaired_wheelhouse/qdk_chemistry-*.whl /workspace/artifacts/

@@ -29,15 +29,12 @@ mv libflame-${LIBFLAME_VERSION} libflame
 # Configure and build libflame
 cd libflame
 ln -s /usr/bin/python3 /usr/bin/python
-CFLAGS="${CFLAGS} -march=${MARCH}" ./configure \
+CFLAGS="${CFLAGS} ./configure \
     --build=$LIBFLAME_BUILD \
     --enable-static-build \
     --prefix=${INSTALL_PREFIX} \
     --enable-lapack2flame \
     --enable-legacy-lapack \
-    --enable-default-m-blocksize=72 \
-    --enable-default-k-blocksize=256 \
-    --enable-default-n-blocksize=4080 \
     --enable-max-arg-list-hack \
     --target=$LIBFLAME_ARCH
 
