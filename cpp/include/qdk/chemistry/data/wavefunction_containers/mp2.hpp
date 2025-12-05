@@ -238,6 +238,90 @@ class MP2Container : public WavefunctionContainer {
    */
   bool is_complex() const override;
 
+  // === Lazy RDM evaluation overrides ===
+
+  /**
+   * @brief Check if spin-dependent one-particle RDMs are available
+   *
+   * Returns true if RDMs were explicitly set OR if amplitudes are available
+   * (enabling lazy computation from CI expansion).
+   *
+   * @return True if spin-dependent 1-RDMs can be obtained
+   */
+  bool has_one_rdm_spin_dependent() const override;
+
+  /**
+   * @brief Check if spin-traced one-particle RDM is available
+   *
+   * Returns true if RDM was explicitly set OR if amplitudes are available
+   * (enabling lazy computation from CI expansion).
+   *
+   * @return True if spin-traced 1-RDM can be obtained
+   */
+  bool has_one_rdm_spin_traced() const override;
+
+  /**
+   * @brief Check if spin-dependent two-particle RDMs are available
+   *
+   * Returns true if RDMs were explicitly set OR if amplitudes are available
+   * (enabling lazy computation from CI expansion).
+   *
+   * @return True if spin-dependent 2-RDMs can be obtained
+   */
+  bool has_two_rdm_spin_dependent() const override;
+
+  /**
+   * @brief Check if spin-traced two-particle RDM is available
+   *
+   * Returns true if RDM was explicitly set OR if amplitudes are available
+   * (enabling lazy computation from CI expansion).
+   *
+   * @return True if spin-traced 2-RDM can be obtained
+   */
+  bool has_two_rdm_spin_traced() const override;
+
+  /**
+   * @brief Get spin-dependent one-particle RDMs
+   *
+   * If RDMs were not explicitly set but amplitudes are available, computes
+   * RDMs lazily from the CI expansion generated from amplitudes.
+   *
+   * @return Tuple of (alpha-alpha, beta-beta) one-particle RDMs
+   */
+  std::tuple<const MatrixVariant&, const MatrixVariant&>
+  get_active_one_rdm_spin_dependent() const override;
+
+  /**
+   * @brief Get spin-traced one-particle RDM
+   *
+   * If RDMs were not explicitly set but amplitudes are available, computes
+   * RDMs lazily from the CI expansion generated from amplitudes.
+   *
+   * @return Spin-traced one-particle RDM
+   */
+  const MatrixVariant& get_active_one_rdm_spin_traced() const override;
+
+  /**
+   * @brief Get spin-dependent two-particle RDMs
+   *
+   * If RDMs were not explicitly set but amplitudes are available, computes
+   * RDMs lazily from the CI expansion generated from amplitudes.
+   *
+   * @return Tuple of (aabb, aaaa, bbbb) two-particle RDMs
+   */
+  std::tuple<const VectorVariant&, const VectorVariant&, const VectorVariant&>
+  get_active_two_rdm_spin_dependent() const override;
+
+  /**
+   * @brief Get spin-traced two-particle RDM
+   *
+   * If RDMs were not explicitly set but amplitudes are available, computes
+   * RDMs lazily from the CI expansion generated from amplitudes.
+   *
+   * @return Spin-traced two-particle RDM
+   */
+  const VectorVariant& get_active_two_rdm_spin_traced() const override;
+
  private:
   /** @brief Cached coefficients */
   VectorVariant _cached_coefficients;
@@ -285,6 +369,17 @@ class MP2Container : public WavefunctionContainer {
    * - Doubly-excited determinants with T2 amplitudes as coefficients
    */
   void _generate_ci_expansion() const;
+
+  /**
+   * @brief Generate RDMs from CI expansion using MACIS form_rdms
+   *
+   * Computes spin-dependent 1-RDMs and 2-RDMs from the CI determinants
+   * and coefficients generated from MP2 amplitudes. Uses MACIS's
+   * rdm_contributions functions for efficient RDM computation.
+   *
+   * This is called lazily when RDMs are requested but not explicitly set.
+   */
+  void _generate_rdms_from_ci_expansion() const;
 
   /**
    * @brief Helper to create a Configuration from excitations

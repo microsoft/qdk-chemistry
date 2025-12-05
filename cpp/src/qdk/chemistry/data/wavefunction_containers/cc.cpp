@@ -6,6 +6,8 @@
 
 #include <algorithm>
 #include <cmath>
+#include <macis/sd_operations.hpp>
+#include <macis/util/rdms.hpp>
 #include <map>
 #include <optional>
 #include <qdk/chemistry/data/wavefunction_containers/cc.hpp>
@@ -1397,6 +1399,264 @@ void CoupledClusterContainer::_generate_ci_expansion() const {
 
   _determinant_vector_cache =
       std::make_unique<DeterminantVector>(std::move(determinants));
+}
+
+// =============================================================================
+// Lazy RDM computation from CI expansion
+// =============================================================================
+
+namespace {
+// Helper: Dispatch RDM computation based on number of orbitals
+// Uses MACIS bitset sizes: 64, 128, 256
+template <size_t N>
+void compute_rdms_impl(const std::vector<Configuration>& determinants,
+                       const double* coeffs, size_t norb,
+                       std::vector<double>& one_rdm_aa,
+                       std::vector<double>& one_rdm_bb,
+                       std::vector<double>& two_rdm_aaaa,
+                       std::vector<double>& two_rdm_bbbb,
+                       std::vector<double>& two_rdm_aabb) {
+  using wfn_t = macis::wfn_t<N>;
+  using wfn_traits = macis::wavefunction_traits<wfn_t>;
+  using spin_det_t = macis::spin_wfn_t<wfn_t>;
+
+  const size_t ndets = determinants.size();
+
+  // Convert QDK Configurations to MACIS wfn_t format
+  std::vector<wfn_t> macis_dets;
+  macis_dets.reserve(ndets);
+  for (const auto& config : determinants) {
+    auto bitset = config.to_bitset<N>();
+    macis_dets.push_back(wfn_t(bitset));
+  }
+
+  // Create spans for RDM storage
+  macis::matrix_span<double> ordm_aa(one_rdm_aa.data(), norb, norb);
+  macis::matrix_span<double> ordm_bb(one_rdm_bb.data(), norb, norb);
+  macis::rank4_span<double> trdm_aaaa(two_rdm_aaaa.data(), norb, norb, norb,
+                                      norb);
+  macis::rank4_span<double> trdm_bbbb(two_rdm_bbbb.data(), norb, norb, norb,
+                                      norb);
+  macis::rank4_span<double> trdm_aabb(two_rdm_aabb.data(), norb, norb, norb,
+                                      norb);
+
+  std::vector<uint32_t> bra_occ_alpha, bra_occ_beta;
+
+  // Double loop over determinants to compute RDM contributions
+  for (size_t i = 0; i < ndets; ++i) {
+    const auto& bra = macis_dets[i];
+    if (wfn_traits::count(bra)) {
+      spin_det_t bra_alpha = wfn_traits::alpha_string(bra);
+      spin_det_t bra_beta = wfn_traits::beta_string(bra);
+
+      macis::bits_to_indices(bra_alpha, bra_occ_alpha);
+      macis::bits_to_indices(bra_beta, bra_occ_beta);
+
+      for (size_t j = 0; j < ndets; ++j) {
+        const auto& ket = macis_dets[j];
+        if (wfn_traits::count(ket)) {
+          spin_det_t ket_alpha = wfn_traits::alpha_string(ket);
+          spin_det_t ket_beta = wfn_traits::beta_string(ket);
+
+          wfn_t ex_total = bra ^ ket;
+          if (wfn_traits::count(ex_total) <= 4) {
+            spin_det_t ex_alpha = wfn_traits::alpha_string(ex_total);
+            spin_det_t ex_beta = wfn_traits::beta_string(ex_total);
+
+            const double val = coeffs[i] * coeffs[j];
+
+            if (std::abs(val) > 1e-16) {
+              macis::rdm_contributions_spin_dep<false>(
+                  bra_alpha, ket_alpha, ex_alpha, bra_beta, ket_beta, ex_beta,
+                  bra_occ_alpha, bra_occ_beta, val, ordm_aa, ordm_bb, trdm_aaaa,
+                  trdm_bbbb, trdm_aabb);
+            }
+          }
+        }
+      }
+    }
+  }
+}
+}  // namespace
+
+void CoupledClusterContainer::_generate_rdms_from_ci_expansion() const {
+  // Ensure CI expansion is available
+  if (!_determinant_vector_cache || !_coefficients_cache) {
+    _generate_ci_expansion();
+  }
+
+  // Only support real coefficients for now
+  if (is_complex()) {
+    throw std::runtime_error(
+        "Lazy RDM computation from complex CC amplitudes is not yet "
+        "supported. Please provide explicit RDMs at construction time "
+        "for complex-valued coupled cluster wavefunctions.");
+  }
+
+  const auto& determinants = *_determinant_vector_cache;
+  const auto& coeffs_variant = *_coefficients_cache;
+  const auto& coeffs = std::get<Eigen::VectorXd>(coeffs_variant);
+
+  size_t norb = _orbitals->get_num_molecular_orbitals();
+  size_t norb2 = norb * norb;
+  size_t norb4 = norb2 * norb2;
+
+  // Allocate RDM storage
+  std::vector<double> one_rdm_aa(norb2, 0.0);
+  std::vector<double> one_rdm_bb(norb2, 0.0);
+  std::vector<double> two_rdm_aaaa(norb4, 0.0);
+  std::vector<double> two_rdm_bbbb(norb4, 0.0);
+  std::vector<double> two_rdm_aabb(norb4, 0.0);
+
+  // Dispatch based on number of orbitals
+  if (norb <= 32) {
+    compute_rdms_impl<64>(determinants, coeffs.data(), norb, one_rdm_aa,
+                          one_rdm_bb, two_rdm_aaaa, two_rdm_bbbb, two_rdm_aabb);
+  } else if (norb <= 64) {
+    compute_rdms_impl<128>(determinants, coeffs.data(), norb, one_rdm_aa,
+                           one_rdm_bb, two_rdm_aaaa, two_rdm_bbbb,
+                           two_rdm_aabb);
+  } else if (norb <= 128) {
+    compute_rdms_impl<256>(determinants, coeffs.data(), norb, one_rdm_aa,
+                           one_rdm_bb, two_rdm_aaaa, two_rdm_bbbb,
+                           two_rdm_aabb);
+  } else {
+    throw std::runtime_error(
+        "Number of orbitals exceeds maximum supported (128) for RDM "
+        "computation");
+  }
+
+  // Store in base class RDM member variables
+  // Scale 2-RDMs by 2.0 to match convention (MACIS uses 0.5 prefactor)
+  Eigen::MatrixXd one_aa_mat =
+      Eigen::Map<Eigen::MatrixXd>(one_rdm_aa.data(), norb, norb);
+  Eigen::MatrixXd one_bb_mat =
+      Eigen::Map<Eigen::MatrixXd>(one_rdm_bb.data(), norb, norb);
+  Eigen::VectorXd two_aaaa_vec =
+      Eigen::Map<Eigen::VectorXd>(two_rdm_aaaa.data(), norb4) * 2.0;
+  Eigen::VectorXd two_bbbb_vec =
+      Eigen::Map<Eigen::VectorXd>(two_rdm_bbbb.data(), norb4) * 2.0;
+  Eigen::VectorXd two_aabb_vec =
+      Eigen::Map<Eigen::VectorXd>(two_rdm_aabb.data(), norb4) * 2.0;
+
+  _one_rdm_spin_dependent_aa =
+      std::make_shared<MatrixVariant>(std::move(one_aa_mat));
+  _one_rdm_spin_dependent_bb =
+      std::make_shared<MatrixVariant>(std::move(one_bb_mat));
+  _two_rdm_spin_dependent_aaaa =
+      std::make_shared<VectorVariant>(std::move(two_aaaa_vec));
+  _two_rdm_spin_dependent_bbbb =
+      std::make_shared<VectorVariant>(std::move(two_bbbb_vec));
+  _two_rdm_spin_dependent_aabb =
+      std::make_shared<VectorVariant>(std::move(two_aabb_vec));
+}
+
+bool CoupledClusterContainer::has_one_rdm_spin_dependent() const {
+  // RDMs available if explicitly set OR if we have amplitudes to compute them
+  if (_one_rdm_spin_dependent_aa != nullptr &&
+      _one_rdm_spin_dependent_bb != nullptr) {
+    return true;
+  }
+  // Can compute from amplitudes if available
+  return has_t1_amplitudes() || has_t2_amplitudes();
+}
+
+bool CoupledClusterContainer::has_one_rdm_spin_traced() const {
+  if (_one_rdm_spin_traced != nullptr) {
+    return true;
+  }
+  return has_one_rdm_spin_dependent();
+}
+
+bool CoupledClusterContainer::has_two_rdm_spin_dependent() const {
+  if (_two_rdm_spin_dependent_aabb != nullptr &&
+      _two_rdm_spin_dependent_aaaa != nullptr &&
+      _two_rdm_spin_dependent_bbbb != nullptr) {
+    return true;
+  }
+  // Can compute from amplitudes if available
+  return has_t1_amplitudes() || has_t2_amplitudes();
+}
+
+bool CoupledClusterContainer::has_two_rdm_spin_traced() const {
+  if (_two_rdm_spin_traced != nullptr) {
+    return true;
+  }
+  return has_two_rdm_spin_dependent();
+}
+
+std::tuple<const CoupledClusterContainer::MatrixVariant&,
+           const CoupledClusterContainer::MatrixVariant&>
+CoupledClusterContainer::get_active_one_rdm_spin_dependent() const {
+  // If not already computed, generate from CI expansion
+  if (_one_rdm_spin_dependent_aa == nullptr ||
+      _one_rdm_spin_dependent_bb == nullptr) {
+    if (has_t1_amplitudes() || has_t2_amplitudes()) {
+      _generate_rdms_from_ci_expansion();
+    } else {
+      throw std::runtime_error("Spin-dependent one-body RDM not available");
+    }
+  }
+  return std::make_tuple(std::cref(*_one_rdm_spin_dependent_aa),
+                         std::cref(*_one_rdm_spin_dependent_bb));
+}
+
+std::tuple<const CoupledClusterContainer::VectorVariant&,
+           const CoupledClusterContainer::VectorVariant&,
+           const CoupledClusterContainer::VectorVariant&>
+CoupledClusterContainer::get_active_two_rdm_spin_dependent() const {
+  // If not already computed, generate from CI expansion
+  if (_two_rdm_spin_dependent_aabb == nullptr ||
+      _two_rdm_spin_dependent_aaaa == nullptr ||
+      _two_rdm_spin_dependent_bbbb == nullptr) {
+    if (has_t1_amplitudes() || has_t2_amplitudes()) {
+      _generate_rdms_from_ci_expansion();
+    } else {
+      throw std::runtime_error("Spin-dependent two-body RDM not available");
+    }
+  }
+  return std::make_tuple(std::cref(*_two_rdm_spin_dependent_aabb),
+                         std::cref(*_two_rdm_spin_dependent_aaaa),
+                         std::cref(*_two_rdm_spin_dependent_bbbb));
+}
+
+const CoupledClusterContainer::MatrixVariant&
+CoupledClusterContainer::get_active_one_rdm_spin_traced() const {
+  // If spin-traced already available, return it
+  if (_one_rdm_spin_traced != nullptr) {
+    return *_one_rdm_spin_traced;
+  }
+
+  // Ensure spin-dependent RDMs are computed (this triggers lazy eval)
+  get_active_one_rdm_spin_dependent();
+
+  // Now compute spin-traced from spin-dependent
+  _one_rdm_spin_traced = detail::add_matrix_variants(
+      *_one_rdm_spin_dependent_aa, *_one_rdm_spin_dependent_bb);
+  return *_one_rdm_spin_traced;
+}
+
+const CoupledClusterContainer::VectorVariant&
+CoupledClusterContainer::get_active_two_rdm_spin_traced() const {
+  // If spin-traced already available, return it
+  if (_two_rdm_spin_traced != nullptr) {
+    return *_two_rdm_spin_traced;
+  }
+
+  // Ensure spin-dependent RDMs are computed (this triggers lazy eval)
+  get_active_two_rdm_spin_dependent();
+
+  // Compute spin-traced from spin-dependent components
+  // spin-traced = aaaa + bbbb + aabb + bbaa
+  auto two_rdm_ss_part = detail::add_vector_variants(
+      *_two_rdm_spin_dependent_aaaa, *_two_rdm_spin_dependent_bbbb);
+  auto two_rdm_spin_bbaa = detail::transpose_ijkl_klij_vector_variant(
+      *_two_rdm_spin_dependent_aabb, _orbitals->get_num_molecular_orbitals());
+  auto two_rdm_os_part = detail::add_vector_variants(
+      *_two_rdm_spin_dependent_aabb, *two_rdm_spin_bbaa);
+  _two_rdm_spin_traced =
+      detail::add_vector_variants(*two_rdm_os_part, *two_rdm_ss_part);
+  return *_two_rdm_spin_traced;
 }
 
 }  // namespace qdk::chemistry::data

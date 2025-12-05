@@ -266,6 +266,230 @@ TEST_F(CoupledClusterContainerTest, Hdf5SerializationSpatial) {
   std::remove(filename.c_str());
 }
 
+// Test CI coefficients generation from CC amplitudes
+TEST_F(CoupledClusterContainerTest, CICoefficientsGeneration) {
+  size_t nocc = 2;
+  size_t nvirt = 2;
+  size_t nmo = nocc + nvirt;
+
+  auto orbitals = testing::create_test_orbitals(nocc + nvirt, 4, true);
+  Configuration ref("2200");
+  auto wavefunction = create_test_wavefunction(ref, orbitals);
+
+  Eigen::VectorXd t1_amplitudes = Eigen::VectorXd::Random(nocc * nvirt);
+  Eigen::VectorXd t2_amplitudes =
+      Eigen::VectorXd::Random(nocc * nocc * nvirt * nvirt);
+
+  CoupledClusterContainer cc(orbitals, wavefunction, t1_amplitudes,
+                             t2_amplitudes);
+
+  // Test that CI coefficients can be retrieved (lazy evaluation)
+  const auto& coefficients = cc.get_coefficients();
+
+  // Verify coefficients are non-empty
+  std::visit(
+      [](const auto& vec) {
+        EXPECT_GT(vec.size(), 0) << "CI coefficients should not be empty";
+      },
+      coefficients);
+
+  // Test that determinants can be retrieved
+  const auto& determinants = cc.get_active_determinants();
+  EXPECT_GT(determinants.size(), 0)
+      << "Active determinants should not be empty";
+
+  // The number of coefficients should match the number of determinants
+  std::visit(
+      [&determinants](const auto& vec) {
+        EXPECT_EQ(static_cast<size_t>(vec.size()), determinants.size())
+            << "Number of coefficients should match number of determinants";
+      },
+      coefficients);
+
+  // The reference determinant should be in the expansion
+  bool found_reference = false;
+  for (const auto& det : determinants) {
+    if (det.to_string() == ref.to_string()) {
+      found_reference = true;
+      break;
+    }
+  }
+  EXPECT_TRUE(found_reference)
+      << "Reference determinant should be in the CI expansion";
+
+  // Test get_coefficient for reference determinant
+  auto ref_coeff = cc.get_coefficient(ref);
+  std::visit(
+      [](const auto& coeff) {
+        using T = std::decay_t<decltype(coeff)>;
+        if constexpr (std::is_same_v<T, double>) {
+          // Reference coefficient should be close to 1.0 for well-behaved CC
+          EXPECT_TRUE(std::abs(coeff) > 0.0)
+              << "Reference coefficient should be non-zero";
+        } else {
+          EXPECT_TRUE(std::abs(coeff) > 0.0)
+              << "Reference coefficient should be non-zero";
+        }
+      },
+      ref_coeff);
+
+  // Test size() returns the number of determinants
+  EXPECT_EQ(cc.size(), determinants.size())
+      << "size() should return the number of determinants";
+}
+
+// Test that CI coefficients and determinants are consistent
+TEST_F(CoupledClusterContainerTest, CIExpansionConsistency) {
+  size_t nocc = 2;
+  size_t nvirt = 2;
+
+  auto orbitals = testing::create_test_orbitals(nocc + nvirt, 4, true);
+  Configuration ref("2200");
+  auto wavefunction = create_test_wavefunction(ref, orbitals);
+
+  // Use small but non-zero amplitudes for testing
+  Eigen::VectorXd t1_amplitudes = Eigen::VectorXd::Ones(nocc * nvirt) * 0.1;
+  Eigen::VectorXd t2_amplitudes =
+      Eigen::VectorXd::Ones(nocc * nocc * nvirt * nvirt) * 0.05;
+
+  CoupledClusterContainer cc(orbitals, wavefunction, t1_amplitudes,
+                             t2_amplitudes);
+
+  const auto& coefficients = cc.get_coefficients();
+  const auto& determinants = cc.get_active_determinants();
+
+  // Verify each determinant can be looked up individually
+  for (size_t i = 0; i < determinants.size(); ++i) {
+    auto coeff = cc.get_coefficient(determinants[i]);
+    std::visit(
+        [i, &coefficients](const auto& individual_coeff) {
+          using T = std::decay_t<decltype(individual_coeff)>;
+          std::visit(
+              [i, &individual_coeff](const auto& all_coeffs) {
+                using U = std::decay_t<decltype(all_coeffs[0])>;
+                if constexpr (std::is_same_v<T, U>) {
+                  EXPECT_NEAR(std::abs(individual_coeff),
+                              std::abs(all_coeffs[i]), testing::wf_tolerance)
+                      << "Individual coefficient lookup should match vector";
+                }
+              },
+              coefficients);
+        },
+        coeff);
+  }
+}
+
+// Test lazy RDM computation from CC amplitudes
+// RDMs are now computed lazily from the CI expansion generated from amplitudes
+TEST_F(CoupledClusterContainerTest, LazyRDMComputationFromAmplitudes) {
+  size_t nocc = 2;
+  size_t nvirt = 2;
+
+  auto orbitals = testing::create_test_orbitals(nocc + nvirt, 4, true);
+  Configuration ref("2200");
+  auto wavefunction = create_test_wavefunction(ref, orbitals);
+
+  // Use small but non-zero amplitudes
+  Eigen::VectorXd t1_amplitudes = Eigen::VectorXd::Ones(nocc * nvirt) * 0.1;
+  Eigen::VectorXd t2_amplitudes =
+      Eigen::VectorXd::Ones(nocc * nocc * nvirt * nvirt) * 0.05;
+
+  // Create CC container with only amplitudes (no explicit RDMs)
+  CoupledClusterContainer cc(orbitals, wavefunction, t1_amplitudes,
+                             t2_amplitudes);
+
+  // CI coefficients should be available (lazy evaluation from amplitudes)
+  const auto& coefficients = cc.get_coefficients();
+  std::visit(
+      [](const auto& vec) {
+        EXPECT_GT(vec.size(), 0) << "CI coefficients should be available";
+      },
+      coefficients);
+
+  const auto& determinants = cc.get_active_determinants();
+  EXPECT_GT(determinants.size(), 0) << "Determinants should be available";
+
+  // RDMs should now be available via lazy computation from CI expansion
+  EXPECT_TRUE(cc.has_one_rdm_spin_traced())
+      << "Spin-traced 1-RDM should be available via lazy computation";
+  EXPECT_TRUE(cc.has_one_rdm_spin_dependent())
+      << "Spin-dependent 1-RDM should be available via lazy computation";
+  EXPECT_TRUE(cc.has_two_rdm_spin_traced())
+      << "Spin-traced 2-RDM should be available via lazy computation";
+  EXPECT_TRUE(cc.has_two_rdm_spin_dependent())
+      << "Spin-dependent 2-RDM should be available via lazy computation";
+
+  // Actually retrieve the RDMs to verify lazy computation works
+  const auto& one_rdm_traced = cc.get_active_one_rdm_spin_traced();
+  std::visit(
+      [&nocc, &nvirt](const auto& mat) {
+        EXPECT_EQ(mat.rows(), nocc + nvirt)
+            << "1-RDM should have correct dimensions";
+        EXPECT_EQ(mat.cols(), nocc + nvirt)
+            << "1-RDM should have correct dimensions";
+        // 1-RDM should not be all zeros (should have some occupation)
+        EXPECT_GT(mat.norm(), 0.0) << "1-RDM should not be zero";
+      },
+      one_rdm_traced);
+
+  // Get spin-dependent RDMs
+  auto [one_rdm_aa, one_rdm_bb] = cc.get_active_one_rdm_spin_dependent();
+  std::visit(
+      [&nocc, &nvirt](const auto& mat) {
+        EXPECT_EQ(mat.rows(), nocc + nvirt)
+            << "1-RDM aa should have correct dimensions";
+      },
+      one_rdm_aa);
+
+  // Get 2-RDMs
+  auto [two_rdm_aabb, two_rdm_aaaa, two_rdm_bbbb] =
+      cc.get_active_two_rdm_spin_dependent();
+  size_t nmo = nocc + nvirt;
+  std::visit(
+      [nmo](const auto& vec) {
+        EXPECT_EQ(vec.size(), nmo * nmo * nmo * nmo)
+            << "2-RDM should have correct size";
+      },
+      two_rdm_aabb);
+}
+
+// Test that RDMs are also available when explicitly provided to CC container
+TEST_F(CoupledClusterContainerTest, RDMsAvailableWhenExplicitlyProvided) {
+  size_t nocc = 2;
+  size_t nvirt = 2;
+  size_t nmo = nocc + nvirt;
+
+  auto orbitals = testing::create_test_orbitals(nocc + nvirt, 4, true);
+  Configuration ref("2200");
+  auto wavefunction = create_test_wavefunction(ref, orbitals);
+
+  Eigen::VectorXd t1_amplitudes = Eigen::VectorXd::Ones(nocc * nvirt) * 0.1;
+  Eigen::VectorXd t2_amplitudes =
+      Eigen::VectorXd::Ones(nocc * nocc * nvirt * nvirt) * 0.05;
+
+  // Create sample RDMs
+  Eigen::MatrixXd one_rdm = Eigen::MatrixXd::Identity(nmo, nmo);
+  Eigen::VectorXd two_rdm = Eigen::VectorXd::Zero(nmo * nmo * nmo * nmo);
+
+  // Create CC container with explicit RDMs
+  CoupledClusterContainer cc_with_rdm(orbitals, wavefunction, t1_amplitudes,
+                                      t2_amplitudes, one_rdm, two_rdm);
+
+  // Now RDMs should be available
+  EXPECT_TRUE(cc_with_rdm.has_one_rdm_spin_traced())
+      << "Spin-traced 1-RDM should be available when explicitly provided";
+  EXPECT_TRUE(cc_with_rdm.has_two_rdm_spin_traced())
+      << "Spin-traced 2-RDM should be available when explicitly provided";
+
+  // CI coefficients should also still be available
+  const auto& coefficients = cc_with_rdm.get_coefficients();
+  std::visit(
+      [](const auto& vec) {
+        EXPECT_GT(vec.size(), 0) << "CI coefficients should be available";
+      },
+      coefficients);
+}
+
 // Test HDF5 serialization/deserialization
 TEST_F(CoupledClusterContainerTest, Hdf5SerializationSpin) {
   size_t nocc = 2;

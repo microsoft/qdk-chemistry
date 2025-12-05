@@ -190,3 +190,291 @@ TEST_F(MP2Test, MP2Container) {
   EXPECT_TRUE(check_t2_nonzero(t2_bbbb))
       << "T2 beta-beta amplitudes should be non-zero for MP2";
 }
+
+// Test CI coefficients generation from MP2 amplitudes
+TEST_F(MP2Test, CICoefficientsGeneration) {
+  // O2 structure with 2.3 Bohr bond length
+  std::vector<Eigen::Vector3d> coordinates = {Eigen::Vector3d(0.0, 0.0, 0.0),
+                                              Eigen::Vector3d(2.3, 0.0, 0.0)};
+  std::vector<std::string> symbols = {"O", "O"};
+  Structure o2_structure(coordinates, symbols);
+
+  // Restricted HF calculation (singlet O2, multiplicity = 1)
+  auto scf_factory = ScfSolverFactory::create("qdk");
+  scf_factory->settings().set("basis_set", "cc-pvdz");
+  scf_factory->settings().set("method", "hf");
+  auto o2_structure_ptr = std::make_shared<Structure>(o2_structure);
+  auto [hf_energy, hf_wavefunction] = scf_factory->run(o2_structure_ptr, 0, 1);
+  auto hf_orbitals = hf_wavefunction->get_orbitals();
+
+  // Create Hamiltonian
+  auto ham_factory = HamiltonianConstructorFactory::create("qdk");
+  auto hf_hamiltonian = ham_factory->run(hf_orbitals);
+
+  // Create MP2Container
+  auto mp2_container =
+      std::make_unique<MP2Container>(hf_hamiltonian, hf_wavefunction);
+
+  // Test that CI coefficients can be retrieved (lazy evaluation)
+  const auto& coefficients = mp2_container->get_coefficients();
+
+  // Verify coefficients are non-empty
+  std::visit(
+      [](const auto& vec) {
+        EXPECT_GT(vec.size(), 0) << "CI coefficients should not be empty";
+      },
+      coefficients);
+
+  // Test that determinants can be retrieved
+  const auto& determinants = mp2_container->get_active_determinants();
+  EXPECT_GT(determinants.size(), 0)
+      << "Active determinants should not be empty";
+
+  // The number of coefficients should match the number of determinants
+  std::visit(
+      [&determinants](const auto& vec) {
+        EXPECT_EQ(static_cast<size_t>(vec.size()), determinants.size())
+            << "Number of coefficients should match number of determinants";
+      },
+      coefficients);
+
+  // Test size() returns the number of determinants
+  EXPECT_EQ(mp2_container->size(), determinants.size())
+      << "size() should return the number of determinants";
+}
+
+// Test CI expansion consistency for MP2
+TEST_F(MP2Test, CIExpansionConsistency) {
+  // O2 structure with 2.3 Bohr bond length
+  std::vector<Eigen::Vector3d> coordinates = {Eigen::Vector3d(0.0, 0.0, 0.0),
+                                              Eigen::Vector3d(2.3, 0.0, 0.0)};
+  std::vector<std::string> symbols = {"O", "O"};
+  Structure o2_structure(coordinates, symbols);
+
+  // Restricted HF calculation (singlet O2, multiplicity = 1)
+  auto scf_factory = ScfSolverFactory::create("qdk");
+  scf_factory->settings().set("basis_set", "cc-pvdz");
+  scf_factory->settings().set("method", "hf");
+  auto o2_structure_ptr = std::make_shared<Structure>(o2_structure);
+  auto [hf_energy, hf_wavefunction] = scf_factory->run(o2_structure_ptr, 0, 1);
+  auto hf_orbitals = hf_wavefunction->get_orbitals();
+
+  // Create Hamiltonian
+  auto ham_factory = HamiltonianConstructorFactory::create("qdk");
+  auto hf_hamiltonian = ham_factory->run(hf_orbitals);
+
+  // Create MP2Container
+  auto mp2_container =
+      std::make_unique<MP2Container>(hf_hamiltonian, hf_wavefunction);
+
+  const auto& coefficients = mp2_container->get_coefficients();
+  const auto& determinants = mp2_container->get_active_determinants();
+
+  // Verify each determinant can be looked up individually
+  for (size_t i = 0; i < std::min(determinants.size(), static_cast<size_t>(10));
+       ++i) {
+    auto coeff = mp2_container->get_coefficient(determinants[i]);
+    std::visit(
+        [i, &coefficients](const auto& individual_coeff) {
+          using T = std::decay_t<decltype(individual_coeff)>;
+          std::visit(
+              [i, &individual_coeff](const auto& all_coeffs) {
+                using U = std::decay_t<decltype(all_coeffs[0])>;
+                if constexpr (std::is_same_v<T, U>) {
+                  EXPECT_NEAR(std::abs(individual_coeff),
+                              std::abs(all_coeffs[i]), testing::wf_tolerance)
+                      << "Individual coefficient lookup should match vector at "
+                         "index "
+                      << i;
+                }
+              },
+              coefficients);
+        },
+        coeff);
+  }
+}
+
+// Test that reference determinant is in MP2 expansion with coefficient 1.0
+TEST_F(MP2Test, ReferenceInExpansion) {
+  // O2 structure with 2.3 Bohr bond length
+  std::vector<Eigen::Vector3d> coordinates = {Eigen::Vector3d(0.0, 0.0, 0.0),
+                                              Eigen::Vector3d(2.3, 0.0, 0.0)};
+  std::vector<std::string> symbols = {"O", "O"};
+  Structure o2_structure(coordinates, symbols);
+
+  // Restricted HF calculation (singlet O2, multiplicity = 1)
+  auto scf_factory = ScfSolverFactory::create("qdk");
+  scf_factory->settings().set("basis_set", "cc-pvdz");
+  scf_factory->settings().set("method", "hf");
+  auto o2_structure_ptr = std::make_shared<Structure>(o2_structure);
+  auto [hf_energy, hf_wavefunction] = scf_factory->run(o2_structure_ptr, 0, 1);
+  auto hf_orbitals = hf_wavefunction->get_orbitals();
+
+  // Create Hamiltonian
+  auto ham_factory = HamiltonianConstructorFactory::create("qdk");
+  auto hf_hamiltonian = ham_factory->run(hf_orbitals);
+
+  // Create MP2Container
+  auto mp2_container =
+      std::make_unique<MP2Container>(hf_hamiltonian, hf_wavefunction);
+
+  const auto& determinants = mp2_container->get_active_determinants();
+
+  // The reference determinant should be the first one in the expansion
+  const auto& ref_dets = hf_wavefunction->get_total_determinants();
+  ASSERT_FALSE(ref_dets.empty())
+      << "Reference wavefunction should have determinants";
+
+  // Check that the reference is in the MP2 expansion
+  bool found_reference = false;
+  for (const auto& det : determinants) {
+    for (const auto& ref : ref_dets) {
+      if (det.to_string() == ref.to_string()) {
+        found_reference = true;
+        // The reference should have coefficient 1.0 in MP2
+        auto ref_coeff = mp2_container->get_coefficient(det);
+        std::visit(
+            [](const auto& coeff) {
+              EXPECT_NEAR(std::abs(coeff), 1.0, testing::wf_tolerance)
+                  << "Reference determinant should have coefficient 1.0";
+            },
+            ref_coeff);
+        break;
+      }
+    }
+    if (found_reference) break;
+  }
+  EXPECT_TRUE(found_reference)
+      << "Reference determinant should be in the MP2 expansion";
+}
+
+// Test RDM availability for MP2 container
+// RDMs are lazily computed from CI coefficients in MP2Container using MACIS RDM
+// utilities. The CI coefficients are generated from amplitudes, and RDMs are
+// computed when requested.
+TEST_F(MP2Test, LazyRDMComputationFromAmplitudes) {
+  // O2 structure with 2.3 Bohr bond length
+  std::vector<Eigen::Vector3d> coordinates = {Eigen::Vector3d(0.0, 0.0, 0.0),
+                                              Eigen::Vector3d(2.3, 0.0, 0.0)};
+  std::vector<std::string> symbols = {"O", "O"};
+  Structure o2_structure(coordinates, symbols);
+
+  // Restricted HF calculation (singlet O2, multiplicity = 1)
+  auto scf_factory = ScfSolverFactory::create("qdk");
+  scf_factory->settings().set("basis_set", "cc-pvdz");
+  scf_factory->settings().set("method", "hf");
+  auto o2_structure_ptr = std::make_shared<Structure>(o2_structure);
+  auto [hf_energy, hf_wavefunction] = scf_factory->run(o2_structure_ptr, 0, 1);
+  auto hf_orbitals = hf_wavefunction->get_orbitals();
+
+  // Create Hamiltonian
+  auto ham_factory = HamiltonianConstructorFactory::create("qdk");
+  auto hf_hamiltonian = ham_factory->run(hf_orbitals);
+
+  // Create MP2Container
+  auto mp2_container =
+      std::make_unique<MP2Container>(hf_hamiltonian, hf_wavefunction);
+
+  // CI coefficients should be available (lazy evaluation from amplitudes)
+  const auto& coefficients = mp2_container->get_coefficients();
+  std::visit(
+      [](const auto& vec) {
+        EXPECT_GT(vec.size(), 0) << "CI coefficients should be available";
+      },
+      coefficients);
+
+  // RDMs SHOULD be available via lazy computation from CI coefficients
+  EXPECT_TRUE(mp2_container->has_one_rdm_spin_dependent())
+      << "MP2 container should have spin-dependent 1-RDM via lazy computation";
+  EXPECT_TRUE(mp2_container->has_one_rdm_spin_traced())
+      << "MP2 container should have spin-traced 1-RDM via lazy computation";
+  EXPECT_TRUE(mp2_container->has_two_rdm_spin_dependent())
+      << "MP2 container should have spin-dependent 2-RDM via lazy computation";
+  EXPECT_TRUE(mp2_container->has_two_rdm_spin_traced())
+      << "MP2 container should have spin-traced 2-RDM via lazy computation";
+
+  // Get RDMs and verify they have reasonable values
+  auto [one_rdm_aa, one_rdm_bb] =
+      mp2_container->get_active_one_rdm_spin_dependent();
+
+  // Verify 1-RDM has non-zero values (visit each variant separately)
+  std::visit(
+      [](const auto& mat) {
+        EXPECT_GT(mat.norm(), 0.0) << "1-RDM aa should not be zero";
+      },
+      one_rdm_aa);
+  std::visit(
+      [](const auto& mat) {
+        EXPECT_GT(mat.norm(), 0.0) << "1-RDM bb should not be zero";
+      },
+      one_rdm_bb);
+
+  // Verify 2-RDMs are available and have non-zero values
+  auto [two_rdm_aabb, two_rdm_aaaa, two_rdm_bbbb] =
+      mp2_container->get_active_two_rdm_spin_dependent();
+  std::visit(
+      [](const auto& rdm) {
+        bool has_nonzero = false;
+        for (size_t i = 0; i < rdm.size() && !has_nonzero; ++i) {
+          if (std::abs(rdm.data()[i]) > 1e-12) {
+            has_nonzero = true;
+          }
+        }
+        EXPECT_TRUE(has_nonzero) << "2-RDM aaaa should have non-zero values";
+      },
+      two_rdm_aaaa);
+}
+
+// Test that both amplitudes and CI coefficients are available on MP2Container
+TEST_F(MP2Test, AmplitudesAndCICoefficientsAvailable) {
+  // O2 structure with 2.3 Bohr bond length
+  std::vector<Eigen::Vector3d> coordinates = {Eigen::Vector3d(0.0, 0.0, 0.0),
+                                              Eigen::Vector3d(2.3, 0.0, 0.0)};
+  std::vector<std::string> symbols = {"O", "O"};
+  Structure o2_structure(coordinates, symbols);
+
+  // Restricted HF calculation
+  auto scf_factory = ScfSolverFactory::create("qdk");
+  scf_factory->settings().set("basis_set", "cc-pvdz");
+  scf_factory->settings().set("method", "hf");
+  auto o2_structure_ptr = std::make_shared<Structure>(o2_structure);
+  auto [hf_energy, hf_wavefunction] = scf_factory->run(o2_structure_ptr, 0, 1);
+  auto hf_orbitals = hf_wavefunction->get_orbitals();
+
+  auto ham_factory = HamiltonianConstructorFactory::create("qdk");
+  auto hf_hamiltonian = ham_factory->run(hf_orbitals);
+
+  auto mp2_container =
+      std::make_unique<MP2Container>(hf_hamiltonian, hf_wavefunction);
+
+  // Test that both T amplitudes and CI coefficients are available
+  // First, get CI coefficients (this triggers lazy evaluation)
+  const auto& coefficients = mp2_container->get_coefficients();
+  const auto& determinants = mp2_container->get_active_determinants();
+
+  // Then, get amplitudes
+  auto [t1_aa, t1_bb] = mp2_container->get_t1_amplitudes();
+  auto [t2_abab, t2_aaaa, t2_bbbb] = mp2_container->get_t2_amplitudes();
+
+  // Verify all are available
+  EXPECT_TRUE(mp2_container->has_t1_amplitudes())
+      << "T1 amplitudes should be available";
+  EXPECT_TRUE(mp2_container->has_t2_amplitudes())
+      << "T2 amplitudes should be available";
+
+  std::visit(
+      [](const auto& vec) {
+        EXPECT_GT(vec.size(), 0) << "CI coefficients should be non-empty";
+      },
+      coefficients);
+
+  EXPECT_GT(determinants.size(), 0) << "Determinants should be non-empty";
+
+  // Verify T1 is zero for MP2
+  std::visit(
+      [](const auto& vec) {
+        EXPECT_TRUE(vec.isZero(1e-10))
+            << "T1 amplitudes should be zero for MP2";
+      },
+      t1_aa);
+}
