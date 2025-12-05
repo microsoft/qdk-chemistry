@@ -55,19 +55,18 @@ def get_basis_functions_bucket(basis_functions: str | int) -> str:
         # Intervals of 50 for 50-500
         return str(((basis_functions - 1) // 50 + 1) * 50)
     if basis_functions < 1500:
-        # Intervals of 100 for 500-1000
+        # Intervals of 100 for 500-1499
         return str(((basis_functions - 1) // 100 + 1) * 100)
-    # 1000+ for anything >= 1000
+    # 1500+ for anything >= 1500
     return "1500+"
 
 
 def extract_data(result: Any) -> str:
-    """Extract molecular formula and number of basis functions from algorithm result.
+    """Extract number of basis functions from algorithm result.
 
     This function handles both single qdk_data objects and tuple results
     (e.g., (energy, qdk_data) pairs) returned by QDK chemistry algorithms.
-    It extracts the molecular formula and number of basis functions from the
-    qdk_data's orbital data for telemetry tracking.
+    It extracts the number of basis functions from the qdk_data's orbital data for telemetry tracking.
 
     Args:
         result: Algorithm result, either a qdk_data object or a tuple containing
@@ -172,8 +171,6 @@ def on_algorithm_end(
         "error_type": error_type,
         **properties,
     }
-    if error_type is not None:
-        telemetry_properties["error_type"] = error_type
 
     log_telemetry(
         "qdk_chemistry.algorithm.durationSec",
