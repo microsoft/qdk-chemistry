@@ -10,7 +10,7 @@ Overview
 A wavefunction in quantum chemistry describes the quantum state of a molecular system.
 In QDK/Chemistry, the :class:`~qdk_chemistry.data.Wavefunction` class encapsulates various wavefunction types, from simple single-determinant Hartree-Fock wavefunctions to complex multi-reference wavefunctions.
 
-The class uses a container-based design where different wavefunction types (Slater determinants, configuration interaction, etc.) are implemented as specialized container classes, while the main :class:`~qdk_chemistry.data.Wavefunction` class provides a unified interface.
+The class uses a container-based design where different wavefunction types (Slater determinants, configuration interaction, coupled cluster, etc.) are implemented as specialized container classes, while the main :class:`~qdk_chemistry.data.Wavefunction` class provides a unified interface.
 
 Mathematical representation
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -21,6 +21,14 @@ Wavefunctions are represented as linear combinations of determinants:
    |\Psi\rangle = \sum_I c_I |\Phi_I\rangle
 
 where :math:`c_I` are expansion coefficients and :math:`|\Phi_I\rangle` are Slater determinants.
+
+For post-Hartree-Fock methods like MP2 and coupled cluster, the wavefunction is expressed in terms of cluster operators:
+
+.. math::
+
+   |\Psi_{CC}\rangle = e^{\hat{T}} |\Phi_0\rangle
+
+where :math:`\hat{T} = \hat{T}_1 + \hat{T}_2 + ...` is the cluster operator and :math:`|\Phi_0\rangle` is the reference determinant.
 
 
 Container types
@@ -85,6 +93,44 @@ A multi-determinant wavefunction from Complete Active Space methods (CASSCF/CASC
       :start-after: # start-cell-create-cas
       :end-before: # end-cell-create-cas
 
+MP2 wavefunction container
+~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+A second-order Møller-Plesset perturbation theory wavefunction container that stores a reference wavefunction and Hamiltonian. T1 and T2 amplitudes are computed lazily on demand using canonical MP2 theory.
+
+.. tab:: C++ API
+
+   .. literalinclude:: ../../../_static/examples/cpp/wavefunction_container.cpp
+      :language: cpp
+      :start-after: // start-cell-create-mp2
+      :end-before: // end-cell-create-mp2
+
+.. tab:: Python API
+
+   .. literalinclude:: ../../../_static/examples/python/wavefunction_container.py
+      :language: python
+      :start-after: # start-cell-create-mp2
+      :end-before: # end-cell-create-mp2
+
+Coupled cluster wavefunction container
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+A coupled cluster wavefunction container that stores pre-computed T1 and T2 cluster amplitudes along with a reference wavefunction. Supports both restricted and unrestricted coupled cluster methods with optional reduced density matrix storage.
+
+.. tab:: C++ API
+
+   .. literalinclude:: ../../../_static/examples/cpp/wavefunction_container.cpp
+      :language: cpp
+      :start-after: // start-cell-create-cc
+      :end-before: // end-cell-create-cc
+
+.. tab:: Python API
+
+   .. literalinclude:: ../../../_static/examples/python/wavefunction_container.py
+      :language: python
+      :start-after: # start-cell-create-cc
+      :end-before: # end-cell-create-cc
+
 Properties
 ~~~~~~~~~~
 
@@ -92,21 +138,29 @@ The :class:`~qdk_chemistry.data.Wavefunction` class provides access to various q
 
 .. list-table:: Property availability by container type
    :header-rows: 1
-   :widths: 40 20 20 20
+   :widths: 30 15 15 15 15 15
 
    * - Property
      - Slater determinant
      - CAS
      - SCI
+     - MP2
+     - Coupled cluster
    * - **Coefficients**
      - ✓
      - ✓
      - ✓
+     - ✗
+     - ✗
    * - **Determinants**
      - ✓
      - ✓
      - ✓
+     - ✗
+     - ✗
    * - **Electron counts**
+     - ✓
+     - ✓
      - ✓
      - ✓
      - ✓
@@ -114,39 +168,64 @@ The :class:`~qdk_chemistry.data.Wavefunction` class provides access to various q
      - ✓
      - ✓
      - ✓
+     - ✗
+     - ✓†
    * - **1-RDMs (spin-dependent)**
      - ✓
      - ✓
      - ✓
+     - ✗
+     - ✓†
    * - **1-RDMs (spin-traced)**
      - ✓
      - ✓
      - ✓
+     - ✗
+     - ✓†
    * - **2-RDMs (spin-dependent)**
      - ✓
      - ✓*
      - ✓*
+     - ✗
+     - ✓†
    * - **2-RDMs (spin-traced)**
      - ✓
      - ✓*
      - ✓*
+     - ✗
+     - ✓†
    * - **Orbital entropies**
      - ✓
      - ✓*
      - ✓*
+     - ✗
+     - ✓†
+   * - **T1/T2 amplitudes**
+     - ✗
+     - ✗
+     - ✗
+     - ✓‡
+     - ✓
    * - **Overlap calculations**
      - ✗
      - ✓
      - ✗
+     - ✗
+     - ✗
    * - **Norm calculations**
      - ✓
      - ✓
+     - ✗
+     - ✗
      - ✗
 
 Legend:
 - ✓ Available and implemented
 - ✗ Not available (method not implemented)
 - ✓* Implemented and available only if 2-RDMs were provided during construction
+- ✓† Available if RDMs were provided during construction, otherwise computed from amplitudes
+- ✓‡ T2 amplitudes computed on demand for MP2
+TODO this sounds weird, need to check exactly 
 
 Accessing wavefunction data
 ---------------------------
@@ -167,6 +246,25 @@ The :class:`~qdk_chemistry.data.Wavefunction` class provides methods to access c
       :start-after: # start-cell-access-data
       :end-before: # end-cell-access-data
 
+Accessing cluster amplitudes
+----------------------------
+
+For MP2 and coupled cluster wavefunctions, you can access T1 and T2 cluster amplitudes:
+
+.. tab:: C++ API
+
+   .. literalinclude:: ../../../_static/examples/cpp/wavefunction_container.cpp
+      :language: cpp
+      :start-after: // start-cell-access-amplitudes
+      :end-before: // end-cell-access-amplitudes
+
+.. tab:: Python API
+
+   .. literalinclude:: ../../../_static/examples/python/wavefunction_container.py
+      :language: python
+      :start-after: # start-cell-access-amplitudes
+      :end-before: # end-cell-access-amplitudes
+
 
 Further reading
 ---------------
@@ -179,3 +277,4 @@ Further reading
 - :doc:`Hamiltonian <hamiltonian>`: Electronic Hamiltonian constructed from wavefunction
 - :doc:`ScfSolver <../algorithms/scf_solver>`: Algorithm that produces SCF wavefunctions
 - :doc:`MCCalculator <../algorithms/mc_calculator>`: Algorithm for multi-configuration wavefunctions
+- :doc:`DynamicalCorrelationCalculator <../algorithms/dynamical_correlation_calculator>`: Algorithm for MP2 and coupled cluster calculations
