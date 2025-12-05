@@ -1185,28 +1185,6 @@ class TestSettings:
         assert all(isinstance(x, float) for x in first_float_result)
         assert all(isinstance(x, str) for x in first_str_result)
 
-    def test_get_all_settings_method(self):
-        """Test get_all_settings method for internal map access."""
-        settings = _TestSettingsContainer()
-        settings["method"] = "hf"
-        settings["max_iterations"] = 100
-        settings["convergence_threshold"] = 1e-6
-        settings["use_symmetry"] = True
-        settings["active_orbitals"] = [1, 2, 3]
-
-        # Test get_all_settings method
-        all_settings = settings.get_all_settings()
-        assert isinstance(all_settings, dict)
-        # Should contain all predefined keys from _TestSettingsContainer
-        assert len(all_settings) > 5  # Has many more defaults
-
-        # This returns the internal map, so we need to check it contains the keys
-        assert "method" in all_settings
-        assert "max_iterations" in all_settings
-        assert "convergence_threshold" in all_settings
-        assert "use_symmetry" in all_settings
-        assert "active_orbitals" in all_settings
-
 
 class TestSettingsCustomClass:
     """Test creating custom settings classes."""
