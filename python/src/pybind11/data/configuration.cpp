@@ -47,7 +47,7 @@ Examples:
                     R"(
 Constructs a configuration from a string representation.
 
-Parameters:
+Args:
     str (str): String representation of the configuration
 
         Where '0' = unoccupied orbital, '1' = alpha-occupied orbital,
@@ -96,7 +96,7 @@ Examples:
                     R"(
 Check if two configurations are equal.
 
-Parameters:
+Args:
     other (Configuration): Another configuration to compare with
 
 Returns:
@@ -115,7 +115,7 @@ Examples:
                     R"(
 Check if two configurations are not equal.
 
-Parameters:
+Args:
     other (Configuration): Another configuration to compare with
 
 Returns:
@@ -154,7 +154,7 @@ Fills orbitals from lowest energy according to the Aufbau principle:
 - Singly occupied orbitals for unpaired electrons (alpha first if n_alpha > n_beta)
 - Unoccupied orbitals for remaining positions
 
-Parameters:
+Args:
     n_alpha (int): Number of alpha electrons
     n_beta (int): Number of beta electrons
     n_orbitals (int): Total number of orbitals
