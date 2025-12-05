@@ -266,20 +266,19 @@ nlohmann::json Settings::to_json() const {
       std::visit(
           [&limits_json, &key](const auto& variant_value) {
             using LimitType = std::decay_t<decltype(variant_value)>;
-            if constexpr (std::is_same_v<LimitType,
-                                         std::pair<int64_t, int64_t>>) {
-              limits_json[key] = nlohmann::json::array(
-                  {variant_value.first, variant_value.second});
+            if constexpr (std::is_same_v<LimitType, BoundConstraint<int64_t>>) {
+              limits_json[key] =
+                  nlohmann::json::array({variant_value.min, variant_value.max});
             } else if constexpr (std::is_same_v<LimitType,
-                                                std::pair<double, double>>) {
-              limits_json[key] = nlohmann::json::array(
-                  {variant_value.first, variant_value.second});
+                                                BoundConstraint<double>>) {
+              limits_json[key] =
+                  nlohmann::json::array({variant_value.min, variant_value.max});
             } else if constexpr (std::is_same_v<LimitType,
-                                                std::vector<int64_t>>) {
-              limits_json[key] = variant_value;
+                                                ListConstraint<int64_t>>) {
+              limits_json[key] = variant_value.allowed_values;
             } else if constexpr (std::is_same_v<LimitType,
-                                                std::vector<std::string>>) {
-              limits_json[key] = variant_value;
+                                                ListConstraint<std::string>>) {
+              limits_json[key] = variant_value.allowed_values;
             }
           },
           limit_value);
