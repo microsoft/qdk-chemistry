@@ -113,11 +113,7 @@ def extract_data(result: Any) -> str:
 
 
 def on_qdk_chemistry_import() -> None:
-    """Logs a telemetry event indicating that the QDK Chemistry module has been imported.
-
-    This function should be called when the QDK Chemistry package has been imported,
-    to track usage statistics for analytics and improvement purposes.
-    """
+    """Logs a telemetry event indicating that the QDK Chemistry module has been imported."""
     log_telemetry("qdk_chemistry.import", 1)
 
 
