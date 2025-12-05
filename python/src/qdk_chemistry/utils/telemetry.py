@@ -125,7 +125,7 @@ def log_telemetry(
 
     The type can be either 'counter' or 'histogram'. A 'counter' is a simple value
     that is summed over time, such as how many times an event occurs, while a
-    'histogram' is used to track 'quantative' values, such as the distribution of values
+    'histogram' is used to track 'quantiative' values, such as the distribution of values
     over time, e.g., the duration of an operation.
     """
     if not TELEMETRY_ENABLED:
