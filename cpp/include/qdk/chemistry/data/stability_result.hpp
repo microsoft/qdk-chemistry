@@ -29,7 +29,7 @@ namespace qdk::chemistry::data {
  * - Convenient access methods for stability analysis results
  *
  * @note Internal stability typically refers to stability against perturbations
- * within same method (e.g. RHF -> RHF), while external stability refers to
+ * within the same method (e.g. RHF -> RHF), while external stability refers to
  * stability against perturbations between different methods (e.g. RHF -> UHF).
  *
  * @section eigenvector_format Eigenvector Format

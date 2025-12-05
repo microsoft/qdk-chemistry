@@ -80,7 +80,7 @@ std::pair<double, std::shared_ptr<data::Wavefunction>> ScfSolver::_run_impl(
     unrestricted = true;
     if (!open_shell && !use_input_initial_guess) {
       spdlog::warn(
-          "Warning: Unrestricted reference requested for closed-shell system. "
+          "Unrestricted reference requested for closed-shell system. "
           "Automatic spin symmetry breaking is not supported. "
           "Consider providing a spin-broken initial guess if desired.");
     }
@@ -246,7 +246,7 @@ std::pair<double, std::shared_ptr<data::Wavefunction>> ScfSolver::_run_impl(
     if (unrestricted) {
       if (initial_guess.value()->is_restricted())
         spdlog::warn(
-            "Warning: Unrestricted calculation requested but restricted "
+            "Unrestricted calculation requested but restricted "
             "initial guess provided.");
 
       // For unrestricted case, stack alpha and beta coefficients and compute
