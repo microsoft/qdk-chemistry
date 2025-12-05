@@ -17,7 +17,6 @@ namespace qdk::chemistry::algorithms::microsoft {
  * analysis parameters with sensible default values.
  *
  * Default settings include:
- * - nroots: 5 - Number of eigenvalues/eigenvectors to compute
  * - internal: true - Use internal stability solver
  * - external: false - Check external stability (not yet implemented)
  *
@@ -29,7 +28,6 @@ namespace qdk::chemistry::algorithms::microsoft {
  * auto checker =
  * qdk::chemistry::algorithms::StabilityCheckerFactory::create();
  * auto& settings = checker->settings();
- * settings.set("nroots", 10);  // Override the default number of roots
  * ```
  *
  * @see qdk::chemistry::data::Settings
@@ -41,7 +39,6 @@ class StabilityCheckerSettings : public qdk::chemistry::data::Settings {
    * @brief Constructor that initializes default stability checker settings
    *
    * Creates a stability checker settings object with the following defaults:
-   * - nroots: Number of eigenvalues to compute
    * - internal: Check internal stability
    * - external: Check external stability
    */
@@ -72,7 +69,7 @@ class StabilityCheckerSettings : public qdk::chemistry::data::Settings {
  * qdk::chemistry::algorithms::StabilityCheckerFactory::create();
  *
  * // Configure settings if needed
- * checker->settings().set("nroots", 10);
+ * checker->settings().set("external", true);
  *
  * // Perform stability check
  * auto [is_stable, result] = checker->run(wavefunction);

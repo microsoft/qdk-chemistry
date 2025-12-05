@@ -110,10 +110,6 @@ class StabilityOperator {
   std::shared_ptr<qcs::EXC> exc_;
   const RowMajorMatrix& ground_density_;
 
-  // Mutable scratch matrices to avoid reallocation
-  RowMajorMatrix scratch1_;
-  RowMajorMatrix scratch2_;
-
   /**
    * @brief Apply the stability analysis matrix-vector operation
    *
@@ -165,13 +161,17 @@ class StabilityOperator {
     const double* Cb_vir_ptr =
         unrestricted ? Cb_occ_ptr + num_beta_ * num_atomic_orbitals : nullptr;
 
-    // Allocate internal scratch matrices
+    // Allocate scratch matrices
     const size_t num_density_matrices = unrestricted ? 2 : 1;
+    RowMajorMatrix scratch1 = RowMajorMatrix::Zero(
+        num_atomic_orbitals * num_density_matrices, num_atomic_orbitals);
+    RowMajorMatrix scratch2 = RowMajorMatrix::Zero(
+        num_atomic_orbitals * num_density_matrices, num_atomic_orbitals);
     RowMajorMatrix trial_density = RowMajorMatrix::Zero(
         num_atomic_orbitals * num_density_matrices, num_atomic_orbitals);
     RowMajorMatrix trial_fock = RowMajorMatrix::Zero(
         num_atomic_orbitals * num_density_matrices, num_atomic_orbitals);
-    double* temp = scratch1_.data();
+    double* temp = scratch1.data();
 
     // For each right-hand side, apply the operator
     for (size_t vec = 0; vec < num_vectors; ++vec) {
@@ -224,7 +224,7 @@ class StabilityOperator {
 
       // Compute trial Fock matrix
       compute_trial_fock(eri_, exc_, trial_density, ground_density_, trial_fock,
-                         scratch1_, scratch2_);
+                         scratch1, scratch2);
 
       // ABX_{ia} = \sum_{uv} C_{ui} F_{uv} C_{av}
       // Step 1: temp = trial_fock^T * Ca_occ, trial_fock is symmetric
@@ -267,17 +267,7 @@ class StabilityOperator {
         Cb_(Cb),
         eri_(eri),
         exc_(exc),
-        ground_density_(ground_density) {
-    // Pre-allocate scratch matrices
-    const size_t num_atomic_orbitals = Ca_.rows();
-    const bool unrestricted =
-        (ground_density_.rows() == 2 * num_atomic_orbitals);
-    const size_t num_density_matrices = unrestricted ? 2 : 1;
-    scratch1_ = RowMajorMatrix::Zero(num_atomic_orbitals * num_density_matrices,
-                                     num_atomic_orbitals);
-    scratch2_ = RowMajorMatrix::Zero(num_atomic_orbitals * num_density_matrices,
-                                     num_atomic_orbitals);
-  }
+        ground_density_(ground_density) {}
 
   void operator_action(size_t m, double alpha, const double* V, size_t LDV,
                        double beta, double* AV, size_t LDAV) const {
@@ -308,8 +298,6 @@ StabilityChecker::_run_impl(
   utils::microsoft::initialize_backend();
 
   // Extract settings
-  int nroots = _settings->get<int>("nroots");
-  // Set Davidson parameters
   const int64_t davidson_max_subspace =
       _settings->get_or_default<int64_t>("max_subspace", 30);
   const double stability_tol =
@@ -324,12 +312,6 @@ StabilityChecker::_run_impl(
         "External stability analysis is not implemented yet.");
   }
 
-  // Validate settings
-  if (nroots <= 0) {
-    throw std::runtime_error("nroots must be positive, got " +
-                             std::to_string(nroots));
-  }
-
   // Extract needed components, orbitals, basis set, coefficients, eigenvalues
   const auto orbitals = wavefunction->get_orbitals();
   const auto basis_set_qdk = orbitals->get_basis_set();
@@ -342,7 +324,7 @@ StabilityChecker::_run_impl(
   bool unrestricted = orbitals->is_unrestricted();
 
   // Set sizes
-  double num_density_matrices = unrestricted ? 2.0 : 1.0;
+  size_t num_density_matrices = unrestricted ? 2.0 : 1.0;
   const auto num_virtual_alpha_orbitals =
       num_molecular_orbitals - n_alpha_electrons;
   const auto num_virtual_beta_orbitals =
