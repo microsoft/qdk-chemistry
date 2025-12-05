@@ -27,7 +27,7 @@ from pyscf import lib, scf
 from pyscf.scf.stability import _gen_hop_rhf_external
 from pyscf.soscf import newton_ah
 
-from qdk_chemistry.algorithms import StabilityChecker, register
+from qdk_chemistry.algorithms import StabilityChecker
 from qdk_chemistry.data import Settings, StabilityResult, Wavefunction
 from qdk_chemistry.plugins.pyscf.utils import orbitals_to_scf
 
@@ -348,6 +348,3 @@ class PyscfStabilityChecker(StabilityChecker):
     def name(self) -> str:
         """Return the name for the stability checker."""
         return "pyscf"
-
-
-register(lambda: PyscfStabilityChecker())

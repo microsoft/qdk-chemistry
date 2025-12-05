@@ -184,6 +184,7 @@ TEST_F(ScfTest, Oxygen_atom_charged_doublet_gdm) {
   scf_solver->settings().set("method", "pbe");
   scf_solver->settings().set("basis_set", "cc-pvdz");
   scf_solver->settings().set("enable_gdm", true);
+  scf_solver->settings().set("max_iterations", 100);
 
   auto [E_doublet, wfn_doublet] = scf_solver->run(oxygen, 1, 2);
   EXPECT_NEAR(E_doublet, -74.416994299, testing::scf_energy_tolerance);

@@ -27,11 +27,9 @@ class BasicTestSettings : public Settings {
     set_default("bool_val", false);
     set_default("int_val", 0);
     set_default("int64_val", int64_t(0));
-    set_default("size_t_val", size_t(0));
-    set_default("float_val", 0.0f);
     set_default("double_val", 0.0);
     set_default("string_val", std::string(""));
-    set_default("int_vector", std::vector<int>{});
+    set_default("int_vector", std::vector<int64_t>{});
     set_default("double_vector", std::vector<double>{});
     set_default("string_vector", std::vector<std::string>{});
     set_default("test_key", 0);
@@ -45,8 +43,8 @@ class BasicTestSettings : public Settings {
     set_default("test_double", 0.0);
     set_default("custom_param", 0);
     set_default("string_key", std::string(""));
-    set_default("int_vec", std::vector<int>{});
-    set_default("test_vector", std::vector<int>{});
+    set_default("int_vec", std::vector<int64_t>{});
+    set_default("test_vector", std::vector<int64_t>{});
     set_default("string_vec", std::vector<std::string>{});
     // Add keys needed by TestSettings tests
     set_default("coefficients", std::vector<double>{});
@@ -54,9 +52,9 @@ class BasicTestSettings : public Settings {
 
     // Keys for JSONTypeConversionEdgeCases test
     set_default("large_int", int64_t(0));
-    set_default("empty_array", std::vector<int>{});
+    set_default("empty_array", std::vector<int64_t>{});
     set_default("unsupported", std::string(""));
-    set_default("unsupported_array", std::vector<int>{});
+    set_default("unsupported_array", std::vector<int64_t>{});
 
     // Keys for CStyleStringOverloads test
     set_default("cstring_val", std::string(""));
@@ -66,29 +64,25 @@ class BasicTestSettings : public Settings {
     set_default("bool_false", false);
 
     // Keys for HDF5ComprehensiveTypeCoverage test
-    set_default("empty_int_vector", std::vector<int>{});
+    set_default("empty_int_vector", std::vector<int64_t>{});
     set_default("empty_double_vector", std::vector<double>{});
     set_default("empty_string_vector", std::vector<std::string>{});
 
     // Keys for HDF5SpecializedNumericTypes test
     set_default("negative_int64", int64_t(0));
-    set_default("small_size_t", size_t(0));
-    set_default("large_size_t", size_t(0));
-    set_default("small_float", 0.0f);
-    set_default("large_float", 0.0f);
     set_default("small_double", 0.0);
     set_default("large_double", 0.0);
     set_default("precise_double", 0.0);
 
     // Keys for HDF5VectorEdgeCases test
-    set_default("large_int_vector", std::vector<int>{});
+    set_default("large_int_vector", std::vector<int64_t>{});
     set_default("large_double_vector", std::vector<double>{});
     set_default("large_string_vector", std::vector<std::string>{});
-    set_default("explicitly_empty_int", std::vector<int>{});
+    set_default("explicitly_empty_int", std::vector<int64_t>{});
     set_default("explicitly_empty_double", std::vector<double>{});
     set_default("explicitly_empty_string", std::vector<std::string>{});
-    set_default("single_element_vector", std::vector<int>{});
-    set_default("mixed_sign_vector", std::vector<int>{});
+    set_default("single_element_vector", std::vector<int64_t>{});
+    set_default("mixed_sign_vector", std::vector<int64_t>{});
 
     // Keys for HDF5StringVectorSpecialCases test
     set_default("special_string_vector", std::vector<std::string>{});
@@ -98,76 +92,63 @@ class BasicTestSettings : public Settings {
     set_default("long_strings_vector", std::vector<std::string>{});
 
     // Keys for ComprehensiveHasTypeTesting test
-    set_default("vector_int", std::vector<int>{});
+    set_default("vector_int", std::vector<int64_t>{});
     set_default("vector_double", std::vector<double>{});
     set_default("vector_string", std::vector<std::string>{});
     set_default("numeric_val", 0);
-    set_default("float_array", std::vector<double>{});
     set_default("double_array", std::vector<double>{});
-    set_default("int_array", std::vector<int>{});
+    set_default("int_array", std::vector<int64_t>{});
     set_default("string_array", std::vector<std::string>{});
 
     // Keys for ComprehensiveStringConversion test
     set_default("empty_string", std::string(""));
-    set_default("empty_int_vec", std::vector<int>{});
+    set_default("empty_int_vec", std::vector<int64_t>{});
     set_default("empty_str_vec", std::vector<std::string>{});
-    set_default("single_int_vec", std::vector<int>{});
+    set_default("single_int_vec", std::vector<int64_t>{});
     set_default("single_str_vec", std::vector<std::string>{});
-    set_default("multi_int_vec", std::vector<int>{});
+    set_default("multi_int_vec", std::vector<int64_t>{});
     set_default("multi_str_vec", std::vector<std::string>{});
 
     // Keys for CompleteVariantTypeCoverage test
     set_default("bool_type", false);
     set_default("int_type", 0);
     set_default("int64_type", int64_t(0));
-    set_default("size_t_type", size_t(0));
-    set_default("float_type", 0.0f);
     set_default("double_type", 0.0);
     set_default("string_type", std::string(""));
-    set_default("vector_int_type", std::vector<int>{});
+    set_default("vector_int_type", std::vector<int64_t>{});
     set_default("vector_double_type", std::vector<double>{});
     set_default("vector_string_type", std::vector<std::string>{});
     set_default("variant_bool", false);
     set_default("variant_int", 0);
     set_default("variant_int64", int64_t(0));
-    set_default("variant_size_t", size_t(0));
-    set_default("variant_float", 0.0f);
     set_default("variant_double", 0.0);
     set_default("variant_string", std::string(""));
-    set_default("variant_int_vec", std::vector<int>{});
+    set_default("variant_int_vec", std::vector<int64_t>{});
     set_default("variant_double_vec", std::vector<double>{});
     set_default("variant_string_vec", std::vector<std::string>{});
 
     // Keys for HDF5TypeDetectionEdgeCases test
     set_default("max_int64", int64_t(0));
-    set_default("max_size_t", size_t(0));
     set_default("min_int64", int64_t(0));
-    set_default("min_size_t", size_t(0));
     set_default("empty_string_vec", std::vector<std::string>{});
     set_default("empty_double_vec", std::vector<double>{});
     set_default("single_double_vec", std::vector<double>{});
     set_default("single_string_vec", std::vector<std::string>{});
-    set_default("small_int_vec", std::vector<int>{});
+    set_default("small_int_vec", std::vector<int64_t>{});
     set_default("edge_case_int", 0);
     set_default("edge_case_int64", int64_t(0));
-    set_default("edge_case_size_t", size_t(0));
-    set_default("edge_case_float", 0.0f);
     set_default("edge_case_double", 0.0);
 
     // Keys for HDF5CrossPlatformCompatibility test
     set_default("platform_int", 0);
     set_default("platform_int64", int64_t(0));
-    set_default("platform_size_t", size_t(0));
-    set_default("platform_float", 0.0f);
     set_default("platform_double", 0.0);
     set_default("cross_platform_bool", false);
     set_default("cross_platform_int", 0);
     set_default("cross_platform_int64", int64_t(0));
-    set_default("cross_platform_size_t", size_t(0));
-    set_default("cross_platform_float", 0.0f);
     set_default("cross_platform_double", 0.0);
     set_default("cross_platform_string", std::string(""));
-    set_default("cross_platform_int_vec", std::vector<int>{});
+    set_default("cross_platform_int_vec", std::vector<int64_t>{});
     set_default("cross_platform_double_vec", std::vector<double>{});
     set_default("cross_platform_string_vec", std::vector<std::string>{});
   }
@@ -187,7 +168,7 @@ class TestSettings : public Settings {
   }
 
   // Convenience getters (optional)
-  int get_max_iterations() const { return get<int>("max_iterations"); }
+  int get_max_iterations() const { return get<int64_t>("max_iterations"); }
   double get_convergence_threshold() const {
     return get<double>("convergence_threshold");
   }
@@ -258,7 +239,7 @@ TEST_F(SettingsTest, SetAndGetVariantTypes) {
 
   // Test template interface still works
   EXPECT_TRUE(settings.get<bool>("bool_val"));
-  EXPECT_EQ(settings.get<int>("int_val"), 42);
+  EXPECT_EQ(settings.get<int64_t>("int_val"), 42);
   EXPECT_EQ(settings.get<std::string>("string_val"), "hello");
 }
 
@@ -267,26 +248,22 @@ TEST_F(SettingsTest, SetAndGetBasicTypes) {
   settings.set("bool_val", true);
   settings.set("int_val", 42);
   settings.set("int64_val", int64_t(123456789));
-  settings.set("size_t_val", size_t(999));
-  settings.set("float_val", 3.14f);
   settings.set("double_val", 2.718281828);
   settings.set("string_val", std::string("hello"));
 
   EXPECT_TRUE(settings.get<bool>("bool_val"));
-  EXPECT_EQ(settings.get<int>("int_val"), 42);
+  EXPECT_EQ(settings.get<int64_t>("int_val"), 42);
   EXPECT_EQ(settings.get<int64_t>("int64_val"), int64_t(123456789));
-  EXPECT_EQ(settings.get<size_t>("size_t_val"), 999);
-  EXPECT_FLOAT_EQ(settings.get<float>("float_val"), 3.14f);
   EXPECT_DOUBLE_EQ(settings.get<double>("double_val"), 2.718281828);
   EXPECT_EQ(settings.get<std::string>("string_val"), "hello");
 
   EXPECT_EQ(settings.size(),
-            121);  // Should contain all 121 default keys
+            102);  // Should contain all 102 default keys
   EXPECT_FALSE(settings.empty());
 }
 
 TEST_F(SettingsTest, SetAndGetVectorTypes) {
-  std::vector<int> int_vec = {1, 2, 3, 4, 5};
+  std::vector<int64_t> int_vec = {1, 2, 3, 4, 5};
   std::vector<double> double_vec = {1.1, 2.2, 3.3};
   std::vector<std::string> string_vec = {"apple", "banana", "cherry"};
 
@@ -294,7 +271,7 @@ TEST_F(SettingsTest, SetAndGetVectorTypes) {
   settings.set("double_vector", double_vec);
   settings.set("string_vector", string_vec);
 
-  auto retrieved_int_vec = settings.get<std::vector<int>>("int_vector");
+  auto retrieved_int_vec = settings.get<std::vector<int64_t>>("int_vector");
   auto retrieved_double_vec =
       settings.get<std::vector<double>>("double_vector");
   auto retrieved_string_vec =
@@ -328,7 +305,7 @@ TEST_F(SettingsTest, GetOrDefaultVariant) {
 
   // Test with wrong type (should return default)
   settings.set("string_key", std::string("hello"));
-  EXPECT_EQ(settings.get_or_default<int>("string_key", 999), 999);
+  EXPECT_EQ(settings.get_or_default<int64_t>("string_key", 999), 999);
 }
 
 TEST_F(SettingsTest, Keys) {
@@ -337,7 +314,7 @@ TEST_F(SettingsTest, Keys) {
   settings.set("key3", 3);
 
   auto keys = settings.keys();
-  EXPECT_EQ(keys.size(), 121);
+  EXPECT_EQ(keys.size(), 102);
 
   // Check that the specific keys we set are present
   std::sort(keys.begin(), keys.end());
@@ -349,12 +326,12 @@ TEST_F(SettingsTest, Keys) {
 TEST_F(SettingsTest, NewInstance) {
   // Create a new instance to get fresh defaults
   BasicTestSettings fresh_settings;
-  EXPECT_EQ(fresh_settings.size(), 121);
+  EXPECT_EQ(fresh_settings.size(), 102);
   EXPECT_FALSE(fresh_settings.empty());  // Should have default values
 
   // Verify the defaults are correct
-  EXPECT_EQ(fresh_settings.get<int>("key1"), 0);  // Default value
-  EXPECT_EQ(fresh_settings.get<int>("key2"), 0);  // Default value
+  EXPECT_EQ(fresh_settings.get<int64_t>("key1"), 0);  // Default value
+  EXPECT_EQ(fresh_settings.get<int64_t>("key2"), 0);  // Default value
 }
 
 TEST_F(SettingsTest, GetAsString) {
@@ -362,7 +339,7 @@ TEST_F(SettingsTest, GetAsString) {
   settings.set("int_val", 42);
   settings.set("double_val", 3.14159);
   settings.set("string_val", std::string("hello"));
-  settings.set("int_vec", std::vector<int>{1, 2, 3});
+  settings.set("int_vec", std::vector<int64_t>{1, 2, 3});
   settings.set("string_vec", std::vector<std::string>{"a", "b"});
 
   EXPECT_EQ(settings.get_as_string("bool_val"), "true");
@@ -378,7 +355,7 @@ TEST_F(SettingsTest, GetAsString) {
 
 // Exception tests
 TEST_F(SettingsTest, SettingNotFoundExceptions) {
-  EXPECT_THROW(settings.get<int>("nonexistent"), SettingNotFound);
+  EXPECT_THROW(settings.get<int64_t>("nonexistent"), SettingNotFound);
   EXPECT_THROW(settings.get_as_string("nonexistent"), SettingNotFound);
 
   // Test variant version get method
@@ -412,7 +389,7 @@ TEST_F(SettingsTest, JSONSerialization) {
   settings.set("double_val", 3.14159);
   settings.set("string_val", std::string("hello"));
   settings.set("bool_val", true);
-  settings.set("int_vec", std::vector<int>{1, 2, 3});
+  settings.set("int_vec", std::vector<int64_t>{1, 2, 3});
 
   // Convert to JSON
   auto json_obj = settings.to_json();
@@ -433,13 +410,13 @@ TEST_F(SettingsTest, JSONSerialization) {
   }
 
   // Verify all values are preserved
-  EXPECT_EQ(new_settings.get<int>("int_val"), 42);
+  EXPECT_EQ(new_settings.get<int64_t>("int_val"), 42);
   EXPECT_NEAR(new_settings.get<double>("double_val"), 3.14159,
               testing::numerical_zero_tolerance);
   EXPECT_EQ(new_settings.get<std::string>("string_val"), "hello");
   EXPECT_EQ(new_settings.get<bool>("bool_val"), true);
-  EXPECT_EQ(new_settings.get<std::vector<int>>("int_vec"),
-            (std::vector<int>{1, 2, 3}));
+  EXPECT_EQ(new_settings.get<std::vector<int64_t>>("int_vec"),
+            (std::vector<int64_t>{1, 2, 3}));
 }
 
 TEST_F(SettingsTest, JSONValidationErrors) {
@@ -462,12 +439,13 @@ TEST_F(SettingsTest, JSONTypeConversionEdgeCases) {
   auto large_int_settings = Settings::from_json(large_int_json);
   EXPECT_EQ(large_int_settings->get<int64_t>("large_int"), int64_t(2147483648));
 
-  // Test empty JSON array default to vector<int>
+  // Test empty JSON array default to vector<int64_t>
   nlohmann::json empty_array_json = nlohmann::json::object();
   empty_array_json["version"] = "0.1.0";
   empty_array_json["empty_array"] = nlohmann::json::array();
   auto empty_array_settings = Settings::from_json(empty_array_json);
-  auto empty_vec = empty_array_settings->get<std::vector<int>>("empty_array");
+  auto empty_vec =
+      empty_array_settings->get<std::vector<int64_t>>("empty_array");
   EXPECT_TRUE(empty_vec.empty());
 
   // Test unsupported JSON type error
@@ -504,7 +482,7 @@ TEST_F(SettingsTest, GenericFileIO) {
   EXPECT_NO_THROW(loaded_settings = Settings::from_file(
                       "test_generic.settings.json", "json"));
 
-  EXPECT_EQ(loaded_settings->get<int>("test_val"), 123);
+  EXPECT_EQ(loaded_settings->get<int64_t>("test_val"), 123);
   EXPECT_EQ(loaded_settings->get<std::string>("test_string"), "test");
   EXPECT_EQ(loaded_settings->get<bool>("test_bool"), true);
   EXPECT_NEAR(loaded_settings->get<double>("test_double"), 3.14159,
@@ -518,7 +496,7 @@ TEST_F(SettingsTest, GenericFileIO) {
   EXPECT_NO_THROW(loaded_settings_hdf5 =
                       Settings::from_file("test_generic.settings.h5", "hdf5"));
 
-  EXPECT_EQ(loaded_settings_hdf5->get<int>("test_val"), 123);
+  EXPECT_EQ(loaded_settings_hdf5->get<int64_t>("test_val"), 123);
   EXPECT_EQ(loaded_settings_hdf5->get<std::string>("test_string"), "test");
   EXPECT_EQ(loaded_settings_hdf5->get<bool>("test_bool"), true);
   EXPECT_NEAR(loaded_settings_hdf5->get<double>("test_double"), 3.14159,
@@ -579,8 +557,8 @@ TEST_F(SettingsTest, ConsistencyBetweenMethods) {
                       Settings::from_json_file("test_specific.settings.json"));
 
   // Verify consistency
-  EXPECT_EQ(settings_from_generic->get<int>("test_val"),
-            settings_from_specific->get<int>("test_val"));
+  EXPECT_EQ(settings_from_generic->get<int64_t>("test_val"),
+            settings_from_specific->get<int64_t>("test_val"));
   EXPECT_EQ(settings_from_generic->get<std::string>("test_string"),
             settings_from_specific->get<std::string>("test_string"));
   EXPECT_EQ(settings_from_generic->get<bool>("test_bool"),
@@ -602,8 +580,8 @@ TEST_F(SettingsTest, ConsistencyBetweenMethods) {
                       Settings::from_hdf5_file("test_specific.settings.h5"));
 
   // Verify HDF5 consistency
-  EXPECT_EQ(settings_from_generic_hdf5->get<int>("test_val"),
-            settings_from_specific_hdf5->get<int>("test_val"));
+  EXPECT_EQ(settings_from_generic_hdf5->get<int64_t>("test_val"),
+            settings_from_specific_hdf5->get<int64_t>("test_val"));
   EXPECT_EQ(settings_from_generic_hdf5->get<std::string>("test_string"),
             settings_from_specific_hdf5->get<std::string>("test_string"));
   EXPECT_EQ(settings_from_generic_hdf5->get<bool>("test_bool"),
@@ -619,7 +597,7 @@ TEST_F(SettingsTest, RoundtripDataIntegrity) {
   settings.set("test_string", std::string("test"));
   settings.set("test_bool", true);
   settings.set("test_double", 3.14159);
-  settings.set("test_vector", std::vector<int>{1, 2, 3});
+  settings.set("test_vector", std::vector<int64_t>{1, 2, 3});
 
   // Multiple roundtrips for JSON
   auto current_settings =
@@ -630,13 +608,13 @@ TEST_F(SettingsTest, RoundtripDataIntegrity) {
     auto new_settings = Settings::from_file("roundtrip.json", "json");
 
     // Verify data integrity
-    EXPECT_EQ(new_settings->get<int>("test_val"), 123);
+    EXPECT_EQ(new_settings->get<int64_t>("test_val"), 123);
     EXPECT_EQ(new_settings->get<std::string>("test_string"), "test");
     EXPECT_EQ(new_settings->get<bool>("test_bool"), true);
     EXPECT_NEAR(new_settings->get<double>("test_double"), 3.14159,
                 testing::numerical_zero_tolerance);
-    EXPECT_EQ(new_settings->get<std::vector<int>>("test_vector"),
-              (std::vector<int>{1, 2, 3}));
+    EXPECT_EQ(new_settings->get<std::vector<int64_t>>("test_vector"),
+              (std::vector<int64_t>{1, 2, 3}));
 
     current_settings = new_settings;
   }
@@ -650,13 +628,13 @@ TEST_F(SettingsTest, RoundtripDataIntegrity) {
     auto new_settings = Settings::from_file("roundtrip.h5", "hdf5");
 
     // Verify data integrity
-    EXPECT_EQ(new_settings->get<int>("test_val"), 123);
+    EXPECT_EQ(new_settings->get<int64_t>("test_val"), 123);
     EXPECT_EQ(new_settings->get<std::string>("test_string"), "test");
     EXPECT_EQ(new_settings->get<bool>("test_bool"), true);
     EXPECT_NEAR(new_settings->get<double>("test_double"), 3.14159,
                 testing::numerical_zero_tolerance);
-    EXPECT_EQ(new_settings->get<std::vector<int>>("test_vector"),
-              (std::vector<int>{1, 2, 3}));
+    EXPECT_EQ(new_settings->get<std::vector<int64_t>>("test_vector"),
+              (std::vector<int64_t>{1, 2, 3}));
 
     current_settings = new_settings;
   }
@@ -666,18 +644,16 @@ TEST_F(SettingsTest, RoundtripDataIntegrity) {
 TEST_F(SettingsTest, HDF5ComprehensiveTypeCoverage) {
   // Test all scalar types for HDF5 serialization
   settings.set("int64_val", INT64_MAX);
-  settings.set("size_t_val", SIZE_MAX);
-  settings.set("float_val", 3.14159f);
   settings.set("double_val", 2.718281828459045);
 
   // Test vector types including empty vectors
-  settings.set("int_vector", std::vector<int>{1, 2, 3, 4, 5});
+  settings.set("int_vector", std::vector<int64_t>{1, 2, 3, 4, 5});
   settings.set("double_vector", std::vector<double>{1.1, 2.2, 3.3, 4.4});
   settings.set("string_vector",
                std::vector<std::string>{"hello", "world", "hdf5"});
 
   // Test empty vectors
-  settings.set("empty_int_vector", std::vector<int>{});
+  settings.set("empty_int_vector", std::vector<int64_t>{});
   settings.set("empty_double_vector", std::vector<double>{});
   settings.set("empty_string_vector", std::vector<std::string>{});
 
@@ -691,14 +667,12 @@ TEST_F(SettingsTest, HDF5ComprehensiveTypeCoverage) {
 
   // Verify scalar types
   EXPECT_EQ(loaded_settings->get<int64_t>("int64_val"), INT64_MAX);
-  EXPECT_EQ(loaded_settings->get<size_t>("size_t_val"), SIZE_MAX);
-  EXPECT_FLOAT_EQ(loaded_settings->get<float>("float_val"), 3.14159f);
   EXPECT_DOUBLE_EQ(loaded_settings->get<double>("double_val"),
                    2.718281828459045);
 
   // Verify vector types
-  EXPECT_EQ(loaded_settings->get<std::vector<int>>("int_vector"),
-            (std::vector<int>{1, 2, 3, 4, 5}));
+  EXPECT_EQ(loaded_settings->get<std::vector<int64_t>>("int_vector"),
+            (std::vector<int64_t>{1, 2, 3, 4, 5}));
   EXPECT_EQ(loaded_settings->get<std::vector<double>>("double_vector"),
             (std::vector<double>{1.1, 2.2, 3.3, 4.4}));
   EXPECT_EQ(loaded_settings->get<std::vector<std::string>>("string_vector"),
@@ -706,7 +680,7 @@ TEST_F(SettingsTest, HDF5ComprehensiveTypeCoverage) {
 
   // Verify empty vectors
   EXPECT_TRUE(
-      loaded_settings->get<std::vector<int>>("empty_int_vector").empty());
+      loaded_settings->get<std::vector<int64_t>>("empty_int_vector").empty());
   EXPECT_TRUE(
       loaded_settings->get<std::vector<double>>("empty_double_vector").empty());
   EXPECT_TRUE(
@@ -721,14 +695,6 @@ TEST_F(SettingsTest, HDF5SpecializedNumericTypes) {
   // HDF5ComprehensiveTypeCoverage)
   settings.set("negative_int64", INT64_MIN);
 
-  // Test size_t type serialization
-  settings.set("small_size_t", static_cast<size_t>(0));
-  settings.set("large_size_t", static_cast<size_t>(SIZE_MAX));
-
-  // Test float precision
-  settings.set("small_float", 1.175494351e-38f);
-  settings.set("large_float", 3.402823466e+38f);
-
   // Test double precision
   settings.set("small_double", 2.2250738585072014e-308);
   settings.set("large_double", 1.7976931348623157e+308);
@@ -742,12 +708,6 @@ TEST_F(SettingsTest, HDF5SpecializedNumericTypes) {
 
   // Verify all numeric types preserved correctly
   EXPECT_EQ(loaded_settings->get<int64_t>("negative_int64"), INT64_MIN);
-  EXPECT_EQ(loaded_settings->get<size_t>("small_size_t"),
-            static_cast<size_t>(0));
-  EXPECT_EQ(loaded_settings->get<size_t>("large_size_t"),
-            static_cast<size_t>(SIZE_MAX));
-  EXPECT_FLOAT_EQ(loaded_settings->get<float>("small_float"), 1.175494351e-38f);
-  EXPECT_FLOAT_EQ(loaded_settings->get<float>("large_float"), 3.402823466e+38f);
   EXPECT_DOUBLE_EQ(loaded_settings->get<double>("small_double"),
                    2.2250738585072014e-308);
   EXPECT_DOUBLE_EQ(loaded_settings->get<double>("large_double"),
@@ -758,7 +718,7 @@ TEST_F(SettingsTest, HDF5VectorEdgeCases) {
   // Test vector serialization edge cases
 
   // Test vectors with many elements
-  std::vector<int> large_int_vec;
+  std::vector<int64_t> large_int_vec;
   std::vector<double> large_double_vec;
   std::vector<std::string> large_string_vec;
 
@@ -773,7 +733,7 @@ TEST_F(SettingsTest, HDF5VectorEdgeCases) {
   settings.set("large_string_vector", large_string_vec);
 
   // Test empty vectors explicitly (covering empty vector paths)
-  settings.set("explicitly_empty_int", std::vector<int>());
+  settings.set("explicitly_empty_int", std::vector<int64_t>());
   settings.set("explicitly_empty_double", std::vector<double>());
   settings.set("explicitly_empty_string", std::vector<std::string>());
 
@@ -785,7 +745,7 @@ TEST_F(SettingsTest, HDF5VectorEdgeCases) {
                       "vector_edge_cases.settings.h5"));
 
   // Verify large vectors
-  EXPECT_EQ(loaded_settings->get<std::vector<int>>("large_int_vector"),
+  EXPECT_EQ(loaded_settings->get<std::vector<int64_t>>("large_int_vector"),
             large_int_vec);
   EXPECT_EQ(loaded_settings->get<std::vector<double>>("large_double_vector"),
             large_double_vec);
@@ -794,8 +754,8 @@ TEST_F(SettingsTest, HDF5VectorEdgeCases) {
       large_string_vec);
 
   // Verify explicitly empty vectors
-  EXPECT_TRUE(
-      loaded_settings->get<std::vector<int>>("explicitly_empty_int").empty());
+  EXPECT_TRUE(loaded_settings->get<std::vector<int64_t>>("explicitly_empty_int")
+                  .empty());
   EXPECT_TRUE(
       loaded_settings->get<std::vector<double>>("explicitly_empty_double")
           .empty());
@@ -871,13 +831,13 @@ TEST_F(SettingsTest, FromJsonIgnoresUnknownKeys) {
   }
 
   // Known keys should be loaded
-  EXPECT_EQ(test_settings.get<int>("max_iterations"), 500);
+  EXPECT_EQ(test_settings.get<int64_t>("max_iterations"), 500);
   EXPECT_NEAR(test_settings.get<double>("convergence_threshold"), 1e-8,
               testing::numerical_zero_tolerance);
 
   // Unknown keys should not exist in our test_settings (should throw
   // SettingNotFound)
-  EXPECT_THROW(test_settings.get<int>("unknown_key1"), SettingNotFound);
+  EXPECT_THROW(test_settings.get<int64_t>("unknown_key1"), SettingNotFound);
   EXPECT_THROW(test_settings.get<std::string>("unknown_key2"), SettingNotFound);
 }
 
@@ -903,7 +863,7 @@ TEST_F(SettingsTest, FromHdf5IgnoresUnknownKeys) {
     }
   }
 
-  EXPECT_EQ(new_test_settings.get<int>("max_iterations"), 500);
+  EXPECT_EQ(new_test_settings.get<int64_t>("max_iterations"), 500);
   EXPECT_NEAR(new_test_settings.get<double>("convergence_threshold"), 1e-6,
               testing::numerical_zero_tolerance);
 
@@ -916,9 +876,6 @@ TEST_F(SettingsTest, IntegerOverflowDetection) {
   // Store value larger than INT32_MAX as int64_t
   settings.set("int64_val", static_cast<int64_t>(INT32_MAX) + 1);
 
-  // Should throw when trying to retrieve as int32_t (overflow)
-  EXPECT_THROW(settings.get<int32_t>("int64_val"), SettingTypeMismatch);
-
   // Should succeed when retrieving as int64_t
   EXPECT_NO_THROW(settings.get<int64_t>("int64_val"));
   EXPECT_EQ(settings.get<int64_t>("int64_val"),
@@ -926,23 +883,6 @@ TEST_F(SettingsTest, IntegerOverflowDetection) {
 
   // Store value smaller than INT32_MIN as int64_t
   settings.set("int64_val", static_cast<int64_t>(INT32_MIN) - 1);
-
-  // Should throw when trying to retrieve as int32_t (underflow)
-  EXPECT_THROW(settings.get<int32_t>("int64_val"), SettingTypeMismatch);
-}
-
-// Test unsigned integer underflow detection
-TEST_F(SettingsTest, UnsignedIntegerUnderflowDetection) {
-  // Store negative value as int64_t
-  settings.set("int64_val", static_cast<int64_t>(-1));
-
-  // Should throw when trying to retrieve as uint32_t (negative value)
-  EXPECT_THROW(settings.get<uint32_t>("int64_val"), SettingTypeMismatch);
-  EXPECT_THROW(settings.get<uint64_t>("int64_val"), SettingTypeMismatch);
-
-  // Should succeed when retrieving as signed type
-  EXPECT_NO_THROW(settings.get<int64_t>("int64_val"));
-  EXPECT_EQ(settings.get<int64_t>("int64_val"), -1);
 }
 
 // Test vector element out-of-range errors
@@ -955,63 +895,67 @@ TEST_F(SettingsTest, VectorElementOutOfRangeErrors) {
 
   settings.set("int_vector", large_vec);
 
-  // Should throw when trying to convert to vector<int32_t>
-  EXPECT_THROW(
-      { auto result = settings.get<std::vector<int32_t>>("int_vector"); },
-      SettingTypeMismatch);
-
   // Should succeed with vector<int64_t>
   EXPECT_NO_THROW({
     auto result = settings.get<std::vector<int64_t>>("int_vector");
     EXPECT_EQ(result, large_vec);
   });
-
-  // Test with unsigned overflow
-  std::vector<uint64_t> large_uint_vec = {
-      UINT32_MAX,
-      static_cast<uint64_t>(UINT32_MAX) + 1,  // This will overflow
-      UINT32_MAX};
-
-  settings.set("int_vector", large_uint_vec);
-
-  // Should throw when trying to convert to vector<uint32_t>
-  EXPECT_THROW(
-      { auto result = settings.get<std::vector<uint32_t>>("int_vector"); },
-      SettingTypeMismatch);
 }
 
-// Test cross-signedness conversion edge cases
-TEST_F(SettingsTest, CrossSignednessConversionEdgeCases) {
-  // Store uint64_t value that's too large for int64_t
-  settings.set("size_t_val", static_cast<uint64_t>(INT64_MAX) + 1);
+// Test metadata functions (descriptions, limits, documented flag)
+TEST_F(SettingsTest, MetadataFunctions) {
+  // Create a test settings class with metadata
+  class MetadataTestSettings : public Settings {
+   public:
+    MetadataTestSettings() {
+      set_default("with_desc", 42, "A setting with description");
+      set_default("with_limits", 5, "A setting with limits",
+                  BoundConstraint<int64_t>{0, 10});
+      set_default("with_string_limits", std::string("option1"),
+                  "String with limited options",
+                  ListConstraint<std::string>{{std::vector<std::string>{
+                      "option1", "option2", "option3"}}});
+      set_default("undocumented", 100, std::nullopt, std::nullopt, false);
+      set_default("no_metadata", 0);
+    }
+  };
 
-  // Should throw when trying to retrieve as int64_t
-  EXPECT_THROW(settings.get<int64_t>("size_t_val"), SettingTypeMismatch);
+  MetadataTestSettings meta_settings;
 
-  // Should succeed when retrieving as uint64_t
-  EXPECT_NO_THROW(settings.get<uint64_t>("size_t_val"));
+  // Test has_description
+  EXPECT_TRUE(meta_settings.has_description("with_desc"));
+  EXPECT_FALSE(meta_settings.has_description("no_metadata"));
 
-  // Store negative int64_t
-  settings.set("int64_val", static_cast<int64_t>(-100));
+  // Test get_description
+  EXPECT_EQ(meta_settings.get_description("with_desc"),
+            "A setting with description");
+  EXPECT_THROW(meta_settings.get_description("no_metadata"), SettingNotFound);
 
-  // Should throw when trying to retrieve as any unsigned type
-  EXPECT_THROW(settings.get<uint64_t>("int64_val"), SettingTypeMismatch);
-  EXPECT_THROW(settings.get<uint32_t>("int64_val"), SettingTypeMismatch);
-  EXPECT_THROW(settings.get<size_t>("int64_val"), SettingTypeMismatch);
-}
+  // Test has_limits
+  EXPECT_TRUE(meta_settings.has_limits("with_limits"));
+  EXPECT_TRUE(meta_settings.has_limits("with_string_limits"));
+  EXPECT_FALSE(meta_settings.has_limits("no_metadata"));
 
-// Test that vector conversion provides clear error messages
-TEST_F(SettingsTest, VectorConversionErrorMessages) {
-  std::vector<int64_t> vec_with_overflow = {1, 2, INT64_MAX};
-  settings.set("int_vector", vec_with_overflow);
+  // Test get_limits
+  auto int_limits = meta_settings.get_limits("with_limits");
+  auto val = std::holds_alternative<BoundConstraint<int64_t>>(int_limits);
+  EXPECT_TRUE(val);
+  auto limit_pair = std::get<BoundConstraint<int64_t>>(int_limits);
+  EXPECT_EQ(limit_pair.min, 0);
+  EXPECT_EQ(limit_pair.max, 10);
 
-  try {
-    auto result = settings.get<std::vector<int32_t>>("int_vector");
-    FAIL() << "Expected SettingTypeMismatch exception";
-  } catch (const SettingTypeMismatch& e) {
-    std::string error_msg = e.what();
-    // Check that error message mentions "vector element out of range"
-    EXPECT_TRUE(error_msg.find("vector element out of range") !=
-                std::string::npos);
-  }
+  auto string_limits = meta_settings.get_limits("with_string_limits");
+  EXPECT_TRUE(
+      std::holds_alternative<ListConstraint<std::string>>(string_limits));
+  auto limit_vec = std::get<ListConstraint<std::string>>(string_limits);
+  EXPECT_EQ(limit_vec.allowed_values.size(), 3);
+  EXPECT_EQ(limit_vec.allowed_values[0], "option1");
+
+  EXPECT_THROW(meta_settings.get_limits("no_metadata"), SettingNotFound);
+
+  // Test is_documented
+  EXPECT_TRUE(meta_settings.is_documented("with_desc"));
+  EXPECT_TRUE(meta_settings.is_documented("no_metadata"));  // defaults to true
+  EXPECT_FALSE(meta_settings.is_documented("undocumented"));
+  EXPECT_THROW(meta_settings.is_documented("nonexistent"), SettingNotFound);
 }

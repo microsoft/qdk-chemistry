@@ -14,6 +14,7 @@
 #include <unordered_map>
 
 #include "filename_utils.hpp"
+#include "hdf5_error_handling.hpp"
 #include "hdf5_serialization.hpp"
 #include "json_serialization.hpp"
 
@@ -1152,6 +1153,11 @@ void Structure::_to_hdf5_file(const std::string& filename) const {
 
 std::shared_ptr<Structure> Structure::_from_hdf5_file(
     const std::string& filename) {
+  // Disable HDF5 automatic error printing to stderr unless verbose mode
+  if (hdf5_errors_should_be_suppressed()) {
+    H5::Exception::dontPrint();
+  }
+
   H5::H5File file;
   try {
     file.openFile(filename, H5F_ACC_RDONLY);

@@ -78,7 +78,7 @@ std::pair<double, std::shared_ptr<data::Wavefunction>> ScfSolver::_run_impl(
 
   double convergence_threshold =
       _settings->get<double>("convergence_threshold");
-  int max_iterations = _settings->get<int>("max_iterations");
+  int64_t max_iterations = _settings->get<int64_t>("max_iterations");
 
   // Set different convergence threshold according to tolerance
   double orbital_gradient_threshold = convergence_threshold;
@@ -125,7 +125,7 @@ std::pair<double, std::shared_ptr<data::Wavefunction>> ScfSolver::_run_impl(
   ms_scf_config->k_eri = ms_scf_config->eri;
   ms_scf_config->grad_eri = ms_scf_config->eri;
 
-  ms_scf_config->fock_reset_steps = _settings->get<int>("fock_reset_steps");
+  ms_scf_config->fock_reset_steps = _settings->get<int64_t>("fock_reset_steps");
 
   // Convert enable_gdm boolean to algorithm method enum for backward
   // compatibility
@@ -139,13 +139,13 @@ std::pair<double, std::shared_ptr<data::Wavefunction>> ScfSolver::_run_impl(
   ms_scf_config->scf_algorithm.level_shift =
       _settings->get<double>("level_shift");
   ms_scf_config->scf_algorithm.max_iteration =
-      _settings->get<int>("max_scf_steps");
+      _settings->get<int64_t>("max_iterations");
   ms_scf_config->scf_algorithm.gdm_config.energy_thresh_diis_switch =
       _settings->get<double>("energy_thresh_diis_switch");
   ms_scf_config->scf_algorithm.gdm_config.gdm_max_diis_iteration =
-      _settings->get<int>("gdm_max_diis_iteration");
+      _settings->get<int64_t>("gdm_max_diis_iteration");
   ms_scf_config->scf_algorithm.gdm_config.gdm_bfgs_history_size_limit =
-      _settings->get<int>("gdm_bfgs_history_size_limit");
+      _settings->get<int64_t>("gdm_bfgs_history_size_limit");
   if (ms_scf_config->eri.method == qcs::ERIMethod::Incore) {
 #ifdef QDK_CHEMISTRY_ENABLE_HGP
     ms_scf_config->grad_eri.method = qcs::ERIMethod::HGP;

@@ -29,7 +29,7 @@ Requires: PySCF (the code uses the ``pyscf.lo`` localization routines).
 
 from pyscf import lo
 
-from qdk_chemistry.algorithms import OrbitalLocalizer, register
+from qdk_chemistry.algorithms import OrbitalLocalizer
 from qdk_chemistry.data import Orbitals, SciWavefunctionContainer, Settings, SlaterDeterminantContainer, Wavefunction
 from qdk_chemistry.plugins.pyscf.utils import basis_to_pyscf_mol
 
@@ -213,6 +213,3 @@ class PyscfLocalizer(OrbitalLocalizer):
     def name(self) -> str:
         """Return the settings for the localizer."""
         return "pyscf_multi"
-
-
-register(lambda: PyscfLocalizer())

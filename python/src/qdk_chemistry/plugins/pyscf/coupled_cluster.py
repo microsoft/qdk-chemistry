@@ -34,7 +34,7 @@ This module requires both QDK/Chemistry and PySCF to be installed.
 import numpy as np
 from pyscf import cc
 
-from qdk_chemistry.algorithms import DynamicalCorrelationCalculator, register
+from qdk_chemistry.algorithms import DynamicalCorrelationCalculator
 from qdk_chemistry.data import CoupledClusterContainer, Settings, Wavefunction
 from qdk_chemistry.plugins.pyscf.utils import hamiltonian_to_scf
 
@@ -225,6 +225,3 @@ class PyscfCoupledClusterCalculator(DynamicalCorrelationCalculator):
         total_energy = initial_energy + pyscf_cc.e_corr
 
         return total_energy, updated_wavefunction
-
-
-register(lambda: PyscfCoupledClusterCalculator())
