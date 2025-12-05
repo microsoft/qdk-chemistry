@@ -762,20 +762,12 @@ std::shared_ptr<Structure> Structure::from_xyz(const std::string& xyz_string) {
 
 void Structure::to_xyz_file(const std::string& filename,
                             const std::string& comment) const {
-  // Validate filename has correct data type suffix
-  std::string validated_filename =
-      DataTypeFilename::validate_write_suffix(filename, "structure");
-
-  _to_xyz_file(validated_filename, comment);
+  _to_xyz_file(filename, comment);
 }
 
 std::shared_ptr<Structure> Structure::from_xyz_file(
     const std::string& filename) {
-  // Validate filename has correct data type suffix
-  std::string validated_filename =
-      DataTypeFilename::validate_read_suffix(filename, "structure");
-
-  return _from_xyz_file(validated_filename);
+  return _from_xyz_file(filename);
 }
 
 void Structure::_to_xyz_file(const std::string& filename,
