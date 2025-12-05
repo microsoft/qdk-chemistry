@@ -172,8 +172,6 @@ def on_algorithm_end(
         "error_type": error_type,
         **properties,
     }
-    if error_type is not None:
-        telemetry_properties["error_type"] = error_type
 
     log_telemetry(
         "qdk_chemistry.algorithm.durationSec",
