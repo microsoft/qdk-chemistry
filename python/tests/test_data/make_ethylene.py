@@ -18,7 +18,8 @@ if __name__ == "__main__":
     hf_energy, hf_wfn = hf.run(ethylene, 0, 1)
 
     Logger.info(
-        f"HF energy and determinant: {hf_energy}, {hf_wfn.get_active_num_electrons()}, {hf_wfn.get_active_determinants()[0]}"
+        f"HF energy and determinant: {hf_energy}, {hf_wfn.get_active_num_electrons()}, "
+        f"{hf_wfn.get_active_determinants()[0]}"
     )
 
     active_space_orbitals = Orbitals(

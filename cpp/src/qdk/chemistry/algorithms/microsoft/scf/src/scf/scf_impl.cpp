@@ -552,7 +552,7 @@ void SCFImpl::iterate_() {
   if (ctx_.cfg->scf_algorithm.method == SCFAlgorithmName::GDM ||
       ctx_.cfg->scf_algorithm.method == SCFAlgorithmName::DIIS_GDM) {
     if (cfg->mpi.world_rank == 0) {
-      spdlog::info("Reset incremental Fock matrix");
+      QDK_LOGGER().info("Reset incremental Fock matrix");
       reset_fock_();
     }
     auto [alpha, beta, omega] = get_hyb_coeff_();

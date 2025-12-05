@@ -39,6 +39,7 @@ nlohmann::json vector_to_json(const Eigen::VectorXd& vector) {
 
 nlohmann::json vector_variant_to_json(const VectorVariant& vec_var,
                                       bool is_complex) {
+  QDK_LOG_TRACE_ENTERING();
   nlohmann::json j_vec;
   if (is_complex) {
     const auto& vec_c = std::get<Eigen::VectorXcd>(vec_var);
@@ -57,6 +58,7 @@ nlohmann::json vector_variant_to_json(const VectorVariant& vec_var,
 
 VectorVariant json_to_vector_variant(const nlohmann::json& j_vec,
                                      bool is_complex = false) {
+  QDK_LOG_TRACE_ENTERING();
   VectorVariant vec_var;
   if (is_complex) {
     if (!j_vec.is_array() || j_vec.empty() || !j_vec[0].is_array()) {

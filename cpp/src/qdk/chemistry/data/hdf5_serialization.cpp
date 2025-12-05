@@ -58,6 +58,7 @@ Eigen::VectorXd load_vector_from_hdf5(H5::H5File& file,
 VectorVariant load_vector_variant_from_group(H5::Group& grp,
                                              const std::string& name,
                                              bool is_complex) {
+  QDK_LOG_TRACE_ENTERING();
   VectorVariant vec_var;
   if (grp.nameExists(name)) {
     if (is_complex) {
@@ -199,6 +200,7 @@ bool group_exists_in_group(H5::Group& group, const std::string& group_name) {
 void write_vector_to_hdf5(H5::Group& grp, const std::string& name,
                           const std::shared_ptr<VectorVariant>& vec,
                           bool is_complex) {
+  QDK_LOG_TRACE_ENTERING();
   if (vec) {
     if (is_complex) {
       const auto& data = std::get<Eigen::VectorXcd>(*vec);

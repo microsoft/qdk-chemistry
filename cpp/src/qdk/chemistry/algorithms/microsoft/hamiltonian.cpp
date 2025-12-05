@@ -82,6 +82,7 @@ bool validate_active_contiguous_indices(const std::vector<size_t>& indices,
 
 std::shared_ptr<data::Hamiltonian> HamiltonianConstructor::_run_impl(
     std::shared_ptr<data::Orbitals> orbitals) const {
+  QDK_LOG_TRACE_ENTERING();
   // Initialize the backend if not already done
   utils::microsoft::initialize_backend();
 

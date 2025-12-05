@@ -7,6 +7,7 @@
 #include <spdlog/cfg/env.h>
 #include <spdlog/sinks/stdout_color_sinks.h>
 
+#include <qdk/chemistry/config.hpp>  // Add this include
 #include <qdk/chemistry/utils/logger.hpp>
 
 namespace py = pybind11;
@@ -465,6 +466,10 @@ Examples:
   logger_module.def(
       "trace_entering",
       []() {
+#ifdef QDK_DISABLE_TRACE_LOG
+        // Compile-time disabled - do nothing, matching C++ behavior
+        return;
+#else
         auto [module_name, func_name] = get_python_context_with_function();
         // Warn if called at module level - <module> is not a real function
         if (func_name == "<module>") {
@@ -476,6 +481,7 @@ Examples:
         }
         qdk::chemistry::utils::Logger::get()->trace("[{}] Entering {}",
                                                     module_name, func_name);
+#endif
       },
       R"(
 Log function entry at trace level with automatic context.
@@ -501,6 +507,24 @@ Examples:
 
 See Also:
     :meth:`trace`: For custom trace messages
+
+)");
+
+  // Also expose the flag so Python code can check it
+  logger_module.def(
+      "is_trace_log_disabled",
+      []() -> bool {
+#ifdef QDK_DISABLE_TRACE_LOG
+        return true;
+#else
+        return false;
+#endif
+      },
+      R"(
+Check if trace logging is disabled at compile time.
+
+Returns:
+    bool: True if QDK_CHEMISTRY_DISABLE_TRACE_LOG was set during build
 
 )");
 
