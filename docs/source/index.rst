@@ -8,6 +8,9 @@ Welcome to QDK/Chemistry Documentation
 **QDK/Chemistry** (Quantum Applications Toolkit) provides a comprehensive set of tools and libraries for quantum chemistry calculations and simulations.
 It features a unified interface for vast community of quantum chemistry packages.
 
+.. note::
+   QDK/Chemistry collects optional anonymous usage telemetry. Disable by setting ``QDK_CHEMISTRY_PYTHON_TELEMETRY=none``.
+
 Key Features
 ============
 
