@@ -220,32 +220,6 @@ Examples:
       py::init<const Eigen::MatrixXd &, const std::vector<Element> &>(),
       py::arg("coordinates"), py::arg("elements"));
 
-  structure.def(py::init<const Eigen::MatrixXd &, const std::vector<Isotope> &,
-                         const Eigen::VectorXd &, const Eigen::VectorXd &>(),
-                R"(
-Create structure from coordinates, isotopes, masses, and nuclear charges.
-
-Args:
-    coordinates (numpy.ndarray): Matrix of atomic coordinates (N x 3) in Bohr
-    isotopes (list[Isotope]): Vector of isotopes using Isotope enum
-    masses (Optional[numpy.ndarray]): Vector of atomic masses in AMU (default: use standard masses)
-    nuclear_charges (Optional[numpy.ndarray]): Vector of nuclear charges (default: use standard charges)
-
-Examples:
-    >>> import numpy as np
-    >>> from qdk_chemistry.data import Structure, Isotope
-    >>> coords = np.array([[0.0, 0.0, 0.0], [0.0, 0.0, 0.74]])
-    >>> isotopes = [Isotope.H1, Isotope.H2]  # Protium and Deuterium
-    >>> h_hd = Structure(coords, isotopes)
-)",
-                py::arg("coordinates"), py::arg("isotopes"),
-                py::arg("masses") = Eigen::VectorXd(),
-                py::arg("nuclear_charges") = Eigen::VectorXd());
-
-  structure.def(
-      py::init<const Eigen::MatrixXd &, const std::vector<Isotope> &>(),
-      py::arg("coordinates"), py::arg("isotopes"));
-
   structure.def(
       py::init<const Eigen::MatrixXd &, const std::vector<std::string> &,
                const Eigen::VectorXd &, const Eigen::VectorXd &>(),
@@ -838,24 +812,6 @@ Examples:
 )",
                        py::arg("symbol"));
 
-  structure.def_static("symbol_to_isotope", &Structure::symbol_to_isotope,
-                       R"(
-Convert atomic symbol to isotope enum.
-
-Args:
-    symbol (str): Atomic symbol with optional mass number (e.g., "H1", "C13", "O")
-
-Returns:
-    Isotope: Isotope enum value
-
-Examples:
-    >>> isotope = Structure.symbol_to_isotope("C13")
-    >>> assert isotope == Isotope.C13
-    >>> isotope = Structure.symbol_to_isotope("C")
-    >>> assert isotope == Isotope.C
-)",
-                       py::arg("symbol"));
-
   structure.def_static("element_to_symbol", &Structure::element_to_symbol,
                        R"(
 Convert element enum to atomic symbol.
@@ -872,22 +828,6 @@ Examples:
 
 )",
                        py::arg("element"));
-
-  structure.def_static("isotope_to_symbol", &Structure::isotope_to_symbol,
-                       R"(
-Convert isotope enum to atomic symbol with mass number.
-
-Args:
-    isotope (Isotope): Isotope enum value
-
-Returns:
-    str: Atomic symbol with mass number
-
-Examples:
-    >>> symbol = Structure.isotope_to_symbol(Isotope.C13)
-    >>> assert symbol == "C13"
-)",
-                       py::arg("isotope"));
 
   structure.def_static("symbol_to_nuclear_charge",
                        &Structure::symbol_to_nuclear_charge,
@@ -982,21 +922,28 @@ Examples:
 
   structure.def_static(
       "get_default_atomic_mass",
-      py::overload_cast<Isotope>(&Structure::get_default_atomic_mass),
+      py::overload_cast<std::string>(&Structure::get_default_atomic_mass),
       R"(
-Get default atomic mass for an isotope.
+Get default atomic mass for an element symbol string.
 
 Args:
-    isotope (Isotope): Isotope enum value
+    symbol (str): Element symbol (e.g., "H", "H2", "C", "C12", "C13").
+        Using an element symbol string without a mass number returns the standard atomic weight.
+        "D" (deuterium) can be used as alias for "H2".
+        "T" (tritium) can be used as alias for "H3".
 
 Returns:
-    float: Default atomic mass in AMU
+    float: Atomic mass in AMU
 
 Examples:
-    >>> mass = Structure.get_default_atomic_mass(Isotope.C13)
+    >>> mass = Structure.get_default_atomic_mass("C")  # Standard carbon mass
+    >>> print(f"Carbon mass: {mass} AMU")
+    >>> mass = Structure.get_default_atomic_mass("C13")  # Carbon-13
     >>> print(f"Carbon-13 mass: {mass} AMU")
+    >>> mass = Structure.get_default_atomic_mass("D")  # Deuterium
+    >>> print(f"Deuterium mass: {mass} AMU")
 )",
-      py::arg("isotope"));
+      py::arg("symbol"));
 
   structure.def_static("get_default_nuclear_charge",
                        &Structure::get_default_nuclear_charge,

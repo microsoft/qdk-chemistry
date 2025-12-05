@@ -63,59 +63,6 @@ Structure::Structure(const Eigen::MatrixXd& coordinates,
 }
 
 Structure::Structure(const Eigen::MatrixXd& coordinates,
-                     const std::vector<Isotope>& isotopes,
-                     const Eigen::VectorXd& masses,
-                     const Eigen::VectorXd& nuclear_charges)
-    : _coordinates(coordinates),
-      _elements([&]() {
-        std::vector<Element> elements;
-        elements.reserve(isotopes.size());
-        for (const auto& isotope : isotopes) {
-          // Extract atomic number from isotope
-          unsigned Z = static_cast<unsigned>(isotope) & 0x7F;
-          elements.push_back(static_cast<Element>(Z));
-        }
-        return elements;
-      }()),
-      _masses([&]() {
-        if (masses.size() == 0) {
-          if (isotopes.empty()) {
-            return Eigen::VectorXd();  // Create completely empty vector
-          } else {
-            Eigen::VectorXd default_masses(isotopes.size());
-            for (size_t i = 0; i < isotopes.size(); ++i) {
-              default_masses[i] = get_default_atomic_mass(isotopes[i]);
-            }
-            return default_masses;
-          }
-        } else {
-          return masses;
-        }
-      }()),
-      _nuclear_charges([&]() {
-        if (nuclear_charges.size() == 0) {
-          if (isotopes.empty()) {
-            return Eigen::VectorXd();  // Create completely empty vector
-          } else {
-            Eigen::VectorXd default_charges(isotopes.size());
-            for (size_t i = 0; i < isotopes.size(); ++i) {
-              // Extract atomic number from isotope
-              unsigned Z = static_cast<unsigned>(isotopes[i]) & 0x7F;
-              default_charges[i] = static_cast<double>(Z);
-            }
-            return default_charges;
-          }
-        } else {
-          return nuclear_charges;
-        }
-      }()) {
-  if (!_is_valid()) {
-    throw std::invalid_argument(
-        "Invalid structure: inconsistent dimensions or invalid data");
-  }
-}
-
-Structure::Structure(const Eigen::MatrixXd& coordinates,
                      const std::vector<std::string>& symbols,
                      const Eigen::VectorXd& masses,
                      const Eigen::VectorXd& nuclear_charges)
@@ -135,8 +82,7 @@ Structure::Structure(const Eigen::MatrixXd& coordinates,
           } else {
             Eigen::VectorXd default_masses(symbols.size());
             for (size_t i = 0; i < symbols.size(); ++i) {
-              Isotope isotope = symbol_to_isotope(symbols[i]);
-              default_masses[i] = get_default_atomic_mass(isotope);
+              default_masses[i] = get_default_atomic_mass(symbols[i]);
             }
             return default_masses;
           }
@@ -227,77 +173,6 @@ Structure::Structure(const std::vector<Eigen::Vector3d>& coordinates,
 }
 
 Structure::Structure(const std::vector<Eigen::Vector3d>& coordinates,
-                     const std::vector<Isotope>& isotopes,
-                     const std::vector<double>& masses,
-                     const std::vector<double>& nuclear_charges)
-    : _coordinates([&]() {
-        if (coordinates.empty()) {
-          return Eigen::MatrixXd();  // Create completely empty matrix (0x0)
-        } else {
-          Eigen::MatrixXd coords(coordinates.size(), 3);
-          for (size_t i = 0; i < coordinates.size(); ++i) {
-            coords.row(i) = coordinates[i];
-          }
-          return coords;
-        }
-      }()),
-      _elements([&]() {
-        std::vector<Element> elements;
-        elements.reserve(isotopes.size());
-        for (const auto& isotope : isotopes) {
-          // Extract atomic number from isotope
-          unsigned Z = static_cast<unsigned>(isotope) & 0x7F;
-          elements.push_back(static_cast<Element>(Z));
-        }
-        return elements;
-      }()),
-      _masses([&]() {
-        if (masses.empty()) {
-          if (isotopes.empty()) {
-            return Eigen::VectorXd();  // Create completely empty vector
-          } else {
-            Eigen::VectorXd default_masses(isotopes.size());
-            for (size_t i = 0; i < isotopes.size(); ++i) {
-              default_masses[i] = get_default_atomic_mass(isotopes[i]);
-            }
-            return default_masses;
-          }
-        } else {
-          Eigen::VectorXd masses_vec(masses.size());
-          for (size_t i = 0; i < masses.size(); ++i) {
-            masses_vec[i] = masses[i];
-          }
-          return masses_vec;
-        }
-      }()),
-      _nuclear_charges([&]() {
-        if (nuclear_charges.empty()) {
-          if (isotopes.empty()) {
-            return Eigen::VectorXd();  // Create completely empty vector
-          } else {
-            Eigen::VectorXd default_charges(isotopes.size());
-            for (size_t i = 0; i < isotopes.size(); ++i) {
-              // Extract atomic number from isotope
-              unsigned Z = static_cast<unsigned>(isotopes[i]) & 0x7F;
-              default_charges[i] = static_cast<double>(Z);
-            }
-            return default_charges;
-          }
-        } else {
-          Eigen::VectorXd charges_vec(nuclear_charges.size());
-          for (size_t i = 0; i < nuclear_charges.size(); ++i) {
-            charges_vec[i] = nuclear_charges[i];
-          }
-          return charges_vec;
-        }
-      }()) {
-  if (!_is_valid()) {
-    throw std::invalid_argument(
-        "Invalid structure: inconsistent dimensions or invalid data");
-  }
-}
-
-Structure::Structure(const std::vector<Eigen::Vector3d>& coordinates,
                      const std::vector<std::string>& symbols,
                      const std::vector<double>& masses,
                      const std::vector<double>& nuclear_charges)
@@ -327,8 +202,7 @@ Structure::Structure(const std::vector<Eigen::Vector3d>& coordinates,
           } else {
             Eigen::VectorXd default_masses(symbols.size());
             for (size_t i = 0; i < symbols.size(); ++i) {
-              Isotope isotope = symbol_to_isotope(symbols[i]);
-              default_masses[i] = get_default_atomic_mass(isotope);
+              default_masses[i] = get_default_atomic_mass(symbols[i]);
             }
             return default_masses;
           }
@@ -856,6 +730,31 @@ double Structure::calculate_nuclear_repulsion_energy() const {
   return repulsion_energy;
 }
 
+std::string Structure::_fix_symbol(const std::string& symbol) {
+  if (symbol.empty()) {
+    return symbol;
+  }
+
+  std::string fixed_symbol = symbol;
+
+  // Convert to lowercase first
+  std::transform(fixed_symbol.begin(), fixed_symbol.end(), fixed_symbol.begin(),
+                 ::tolower);
+
+  // Capitalize the first letter
+  fixed_symbol[0] = std::toupper(fixed_symbol[0]);
+
+  // Handle special cases for deuterium (D) and tritium (T)
+  if (fixed_symbol == "D") {
+    return "H2";
+  }
+  if (fixed_symbol == "T") {
+    return "H3";
+  }
+
+  return fixed_symbol;
+}
+
 std::string Structure::_strip_numbers_from_symbol(const std::string& symbol) {
   std::string letters_only;
   letters_only.reserve(symbol.size());
@@ -882,64 +781,19 @@ std::string Structure::_extract_numbers_from_symbol(const std::string& symbol) {
   return numbers_only;
 }
 
-std::string Structure::_fix_symbol_capitalization(const std::string& symbol) {
-  if (symbol.empty()) {
-    return symbol;
-  }
-
-  std::string fixed_symbol = symbol;
-
-  // Convert to lowercase first
-  std::transform(fixed_symbol.begin(), fixed_symbol.end(), fixed_symbol.begin(),
-                 ::tolower);
-
-  // Capitalize the first letter
-  fixed_symbol[0] = std::toupper(fixed_symbol[0]);
-
-  // Handle special cases for deuterium (D) and tritium (T)
-  if (fixed_symbol == "D") {
-    return "H2";
-  }
-  if (fixed_symbol == "T") {
-    return "H3";
-  }
-
-  return fixed_symbol;
-}
-
 Element Structure::symbol_to_element(const std::string& symbol) {
-  std::string fixed_symbol = _fix_symbol_capitalization(symbol);
+  std::string fixed_symbol = _fix_symbol(symbol);
   std::string fixed_element_symbol = _strip_numbers_from_symbol(fixed_symbol);
   unsigned charge = symbol_to_nuclear_charge(fixed_element_symbol);
   return static_cast<Element>(charge);
-}
-
-Isotope Structure::symbol_to_isotope(const std::string& symbol) {
-  std::string fixed_symbol = _fix_symbol_capitalization(symbol);
-  std::string fixed_element_symbol = _strip_numbers_from_symbol(fixed_symbol);
-  unsigned atomic_number = symbol_to_nuclear_charge(fixed_element_symbol);
-  std::string mass_number_string = _extract_numbers_from_symbol(fixed_symbol);
-  if (mass_number_string.empty()) {
-    return static_cast<Isotope>(atomic_number);
-  }
-  unsigned mass_number = std::stoul(mass_number_string);
-  return static_cast<Isotope>(isotope(atomic_number, mass_number));
 }
 
 std::string Structure::element_to_symbol(Element element) {
   return nuclear_charge_to_symbol(static_cast<unsigned>(element));
 }
 
-std::string Structure::isotope_to_symbol(Isotope isotope) {
-  unsigned atomic_number = static_cast<unsigned>(isotope) & 0x7F;
-  unsigned mass_number = (static_cast<unsigned>(isotope) >> 7);
-  std::string symbol = nuclear_charge_to_symbol(atomic_number);
-  symbol += std::to_string(mass_number);
-  return symbol;
-}
-
 unsigned Structure::symbol_to_nuclear_charge(const std::string& symbol) {
-  std::string fixed_symbol = _fix_symbol_capitalization(symbol);
+  std::string fixed_symbol = _fix_symbol(symbol);
   std::string fixed_element_symbol = _strip_numbers_from_symbol(fixed_symbol);
 
   // Lazy initialization: build the reverse map only once when first needed
@@ -983,8 +837,16 @@ double Structure::get_default_atomic_mass(Element element) {
   return get_atomic_weight(element);
 }
 
-double Structure::get_default_atomic_mass(Isotope isotope) {
-  return get_atomic_weight(isotope);
+double Structure::get_default_atomic_mass(std::string symbol) {
+  std::string fixed_symbol = _fix_symbol(symbol);
+  std::string fixed_element_symbol = _strip_numbers_from_symbol(fixed_symbol);
+  unsigned atomic_number = symbol_to_nuclear_charge(fixed_element_symbol);
+  std::string mass_number_string = _extract_numbers_from_symbol(fixed_symbol);
+  if (mass_number_string.empty()) {
+    return get_atomic_weight(atomic_number, 0);
+  }
+  unsigned mass_number = std::stoul(mass_number_string);
+  return get_atomic_weight(atomic_number, mass_number);
 }
 
 unsigned Structure::get_default_nuclear_charge(Element element) {

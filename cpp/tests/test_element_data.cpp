@@ -24,54 +24,43 @@ TEST_F(ElementDataTest, ElementEnumValues) {
   EXPECT_EQ(static_cast<unsigned>(Element::Og), 118);
 }
 
-// Test Isotope enum values for atomic weights
-TEST_F(ElementDataTest, IsotopeEnumStandardValues) {
-  // Standard isotopes should match Element enum values
-  EXPECT_EQ(static_cast<unsigned>(Isotope::H), 1);
-  EXPECT_EQ(static_cast<unsigned>(Isotope::He), 2);
-  EXPECT_EQ(static_cast<unsigned>(Isotope::Og), 118);
-}
-
 // Test isotope() helper function
 TEST_F(ElementDataTest, IsotopeHelperFunction) {
   // Test encoding of specific isotopes
   // For H-1: Z=1, A=1
   unsigned h1_value = isotope(1, 1);
-  EXPECT_EQ(static_cast<unsigned>(Isotope::H1), h1_value);
+  EXPECT_EQ(h1_value, 129);  // (1 << 7) + 1 = 128 + 1 = 129
 
   // For H-2: Z=1, A=2
   unsigned h2_value = isotope(1, 2);
-  EXPECT_EQ(static_cast<unsigned>(Isotope::H2), h2_value);
+  EXPECT_EQ(h2_value, 257);  // (2 << 7) + 1 = 256 + 1 = 257
 
-  // For D: Z=1, A=2
-  unsigned d_value = isotope(1, 2);
-  EXPECT_EQ(static_cast<unsigned>(Isotope::D), d_value);
-
-  // For T: Z=1, A=3
-  unsigned t_value = isotope(1, 3);
-  EXPECT_EQ(static_cast<unsigned>(Isotope::T), t_value);
+  // For H-3: Z=1, A=3
+  unsigned h3_value = isotope(1, 3);
+  EXPECT_EQ(h3_value, 385);  // (3 << 7) + 1 = 384 + 1 = 385
 
   // For Og-295: Z=118, A=295
   unsigned og295_value = isotope(118, 295);
-  EXPECT_EQ(static_cast<unsigned>(Isotope::Og295), og295_value);
+  EXPECT_EQ(og295_value, 37878);  // (295 << 7) + 118 = 37760 + 118 = 37878
 }
 
 // Test that isotope values encode Z in lower 7 bits
 TEST_F(ElementDataTest, IsotopeEncodingZExtraction) {
-  // Extract Z from isotope enum values
-  unsigned z_h1 = static_cast<unsigned>(Isotope::H1) & 0x7F;
+  // Extract Z from isotope encoded values
+  unsigned h1_encoded = isotope(1, 1);
+  unsigned z_h1 = h1_encoded & 0x7F;
   EXPECT_EQ(z_h1, 1);
 
-  unsigned z_h2 = static_cast<unsigned>(Isotope::H2) & 0x7F;
+  unsigned h2_encoded = isotope(1, 2);
+  unsigned z_h2 = h2_encoded & 0x7F;
   EXPECT_EQ(z_h2, 1);
 
-  unsigned z_d = static_cast<unsigned>(Isotope::D) & 0x7F;
-  EXPECT_EQ(z_d, 1);
+  unsigned h3_encoded = isotope(1, 3);
+  unsigned z_h3 = h3_encoded & 0x7F;
+  EXPECT_EQ(z_h3, 1);
 
-  unsigned z_t = static_cast<unsigned>(Isotope::T) & 0x7F;
-  EXPECT_EQ(z_t, 1);
-
-  unsigned z_og295 = static_cast<unsigned>(Isotope::Og295) & 0x7F;
+  unsigned og295_encoded = isotope(118, 295);
+  unsigned z_og295 = og295_encoded & 0x7F;
   EXPECT_EQ(z_og295, 118);
 }
 
@@ -90,14 +79,24 @@ TEST_F(ElementDataTest, AllElementsHaveSymbols) {
   }
 }
 
-// Test CIAAW 2024 atomic weights for standard elements
-TEST_F(ElementDataTest, CIAAW2024StandardAtomicWeights) {
+// Test get_atomic_weight with Element enum
+TEST_F(ElementDataTest, GetAtomicWeightFromElement) {
   using namespace ciaaw_2024;
 
-  // Test some well-known standard atomic weights
-  EXPECT_DOUBLE_EQ(get_atomic_weight(Isotope::H), 1.0080);
-  EXPECT_DOUBLE_EQ(get_atomic_weight(Isotope::He), 4.0026);
-  EXPECT_DOUBLE_EQ(get_atomic_weight(Isotope::U), 238.03);
+  // Test that Element values return standard atomic weights
+  EXPECT_DOUBLE_EQ(get_atomic_weight(Element::H), 1.0080);
+  EXPECT_DOUBLE_EQ(get_atomic_weight(Element::He), 4.0026);
+  EXPECT_DOUBLE_EQ(get_atomic_weight(Element::Og), 294.0);
+}
+
+// Test standard atomic weights
+TEST_F(ElementDataTest, GetStandardAtomicWeights) {
+  using namespace ciaaw_2024;
+
+  // Test standard atomic weights (using Z, A=0)
+  EXPECT_DOUBLE_EQ(get_atomic_weight(1, 0), 1.0080);   // H
+  EXPECT_DOUBLE_EQ(get_atomic_weight(2, 0), 4.0026);   // He
+  EXPECT_DOUBLE_EQ(get_atomic_weight(118, 0), 294.0);  // Og
 }
 
 // Test CIAAW 2024 updated values (Gd, Lu, Zr as mentioned in documentation)
@@ -105,42 +104,31 @@ TEST_F(ElementDataTest, CIAAW2024UpdatedWeights) {
   using namespace ciaaw_2024;
 
   // Test updated values for Gd (64), Lu (71), Zr (40)
-  EXPECT_DOUBLE_EQ(get_atomic_weight(Isotope::Gd), 157.25);
-  EXPECT_DOUBLE_EQ(get_atomic_weight(Isotope::Lu), 174.97);
-  EXPECT_DOUBLE_EQ(get_atomic_weight(Isotope::Zr), 91.222);
+  EXPECT_DOUBLE_EQ(get_atomic_weight(64, 0), 157.25);  // Gd
+  EXPECT_DOUBLE_EQ(get_atomic_weight(71, 0), 174.97);  // Lu
+  EXPECT_DOUBLE_EQ(get_atomic_weight(40, 0), 91.222);  // Zr
 }
 
 // Test specific isotope masses
-TEST_F(ElementDataTest, SpecificIsotopeMasses) {
+TEST_F(ElementDataTest, GetSpecificIsotopeMasses) {
   using namespace ciaaw_2024;
 
-  // Test hydrogen isotopes
-  EXPECT_DOUBLE_EQ(get_atomic_weight(Isotope::H1), 1.007825032);
-  EXPECT_DOUBLE_EQ(get_atomic_weight(Isotope::H2), 2.014101778);
-  EXPECT_DOUBLE_EQ(get_atomic_weight(Isotope::D), 2.014101778);
-  EXPECT_DOUBLE_EQ(get_atomic_weight(Isotope::T), 3.016049281);
-  EXPECT_DOUBLE_EQ(get_atomic_weight(Isotope::Og295), 295.216178);
+  // Test specific isotope masses
+  EXPECT_DOUBLE_EQ(get_atomic_weight(1, 1), 1.007825032);     // H-1
+  EXPECT_DOUBLE_EQ(get_atomic_weight(1, 2), 2.014101778);     // H-2 (Deuterium)
+  EXPECT_DOUBLE_EQ(get_atomic_weight(1, 3), 3.016049281);     // H-3 (Tritium)
+  EXPECT_DOUBLE_EQ(get_atomic_weight(118, 295), 295.216178);  // Og-295
 }
 
-// Test get_atomic_weight with Element enum
-TEST_F(ElementDataTest, GetAtomicWeightFromElement) {
+// Test error handling for unknown element/isotope
+TEST_F(ElementDataTest, UnknownElementIsotopeThrows) {
   using namespace ciaaw_2024;
 
-  // Test that Element values can be converted to Isotope and return standard
-  // atomic weights
-  EXPECT_DOUBLE_EQ(get_atomic_weight(Element::H), 1.0080);
-  EXPECT_DOUBLE_EQ(get_atomic_weight(Element::He), 4.0026);
-  EXPECT_DOUBLE_EQ(get_atomic_weight(Element::Og), 294.0);
-}
+  // Test with invalid atomic number
+  EXPECT_THROW(get_atomic_weight(120, 0), std::invalid_argument);
 
-// Test error handling for unknown isotope
-TEST_F(ElementDataTest, UnknownIsotopeThrows) {
-  using namespace ciaaw_2024;
-
-  // Create an invalid isotope value
-  Isotope invalid_isotope = static_cast<Isotope>(120);
-
-  EXPECT_THROW(get_atomic_weight(invalid_isotope), std::invalid_argument);
+  // Test with valid Z but invalid A
+  EXPECT_THROW(get_atomic_weight(1, 999), std::invalid_argument);
 }
 
 // Test that all elements 1-118 have atomic weights

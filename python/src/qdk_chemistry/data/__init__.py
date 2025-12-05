@@ -17,7 +17,6 @@ Exposed classes are:
 - ``Element``: Represents a chemical element with its properties.
 - ``EnergyExpectationResult``: Result for Hamiltonian energy expectation value and variance.
 - ``Hamiltonian``: Quantum mechanical Hamiltonian operator representation.
-- ``Isotope``: Represents an isotope of a chemical element with its properties.
 - ``MeasurementData``: Measurement bitstring data and metadata for ``QubitHamiltonian`` objects.
 - ``ModelOrbitals``: Simple orbital representation for model systems without full basis set information.
 - ``Orbitals``: Molecular orbital information and properties.
@@ -60,7 +59,6 @@ from qdk_chemistry._core.data import (
     Element,
     Hamiltonian,
     HamiltonianType,
-    Isotope,
     ModelOrbitals,
     Orbitals,
     OrbitalType,
@@ -104,7 +102,6 @@ __all__ = [
     "EnergyExpectationResult",
     "Hamiltonian",
     "HamiltonianType",
-    "Isotope",
     "MeasurementData",
     "ModelOrbitals",
     "OrbitalType",

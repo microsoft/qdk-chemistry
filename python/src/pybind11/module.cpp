@@ -45,8 +45,7 @@ PYBIND11_MODULE(_core, m) {
 
   // Ordering is important!
   bind_base_class(data);
-  bind_element_data(
-      data);  // Element and Isotope enums must be bound before Structure
+  bind_element_data(data);  // Element enums must be bound before Structure
   bind_structure(data);
   bind_settings(data);
   bind_basis_set(data);

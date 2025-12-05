@@ -23,7 +23,7 @@ namespace qdk::chemistry::data {
  *
  * This class stores and manipulates molecular structure data including:
  * - Atomic coordinates in 3D space
- * - Atomic element identifiers using Element or Isotope enum
+ * - Atomic element identifiers using Element enum
  * - Atomic masses (in atomic mass units)
  * - Nuclear charges (atomic numbers) for each atom
  * - Serialization to/from JSON and XYZ formats
@@ -64,20 +64,6 @@ class Structure : public DataClass,
             const Eigen::VectorXd& nuclear_charges = {});
 
   /**
-   * @brief Constructor with coordinates, isotopes, masses, and nuclear charges
-   * @param coordinates Matrix of atomic coordinates (N x 3) in Bohr
-   * @param isotopes Vector of isotopes using Isotope enum
-   * @param masses Vector of atomic masses in AMU (default: use default masses)
-   * @param nuclear_charges Vector of nuclear charges (default: use default
-   * charges)
-   * @throws std::invalid_argument if dimensions don't match
-   */
-  Structure(const Eigen::MatrixXd& coordinates,
-            const std::vector<Isotope>& isotopes,
-            const Eigen::VectorXd& masses = {},
-            const Eigen::VectorXd& nuclear_charges = {});
-
-  /**
    * @brief Constructor from atomic symbols and coordinates
    * @param coordinates Matrix of atomic coordinates (N x 3) in Bohr
    * @param symbols Vector of atomic symbols (e.g., "H", "C", "O")
@@ -102,20 +88,6 @@ class Structure : public DataClass,
    */
   Structure(const std::vector<Eigen::Vector3d>& coordinates,
             const std::vector<Element>& elements,
-            const std::vector<double>& masses = {},
-            const std::vector<double>& nuclear_charges = {});
-
-  /**
-   * @brief Constructor from isotopes and coordinates as vector
-   * @param coordinates Vector of atomic coordinates (N x 3) in Bohr
-   * @param isotopes Vector of isotopes using Isotope enum
-   * @param masses Vector of atomic masses in AMU (default: use default masses)
-   * @param nuclear_charges Vector of nuclear charges (default: use default
-   * charges)
-   * @throws std::invalid_argument if dimensions don't match
-   */
-  Structure(const std::vector<Eigen::Vector3d>& coordinates,
-            const std::vector<Isotope>& isotopes,
             const std::vector<double>& masses = {},
             const std::vector<double>& nuclear_charges = {});
 
@@ -386,26 +358,11 @@ class Structure : public DataClass,
   static Element symbol_to_element(const std::string& symbol);
 
   /**
-   * @brief Convert isotope symbol to isotope enum
-   * @param symbol Isotope symbol (e.g., "H2", "C13", "O18")
-   * @return Isotope enum
-   * @throws std::invalid_argument if unknown symbol or invalid mass number
-   */
-  static Isotope symbol_to_isotope(const std::string& symbol);
-
-  /**
    * @brief Convert element enum to atomic symbol
    * @param element Atomic element enum
    * @return Atomic symbol (e.g., "H", "C", "O")
    */
   static std::string element_to_symbol(Element element);
-
-  /**
-   * @brief Convert isotope enum to atomic symbol with mass number
-   * @param isotope Atomic isotope enum
-   * @return Atomic symbol with mass number (e.g., "H1", "C13", "O16")
-   */
-  static std::string isotope_to_symbol(Isotope isotope);
 
   /**
    * @brief Convert atomic symbol to nuclear charge
@@ -446,11 +403,15 @@ class Structure : public DataClass,
   static double get_default_atomic_mass(Element element);
 
   /**
-   * @brief Get atomic mass for an isotope
-   * @param isotope Specific isotope enum
+   * @brief Get atomic mass for an element symbol string
+   * @param symbol Element symbol (e.g., "H", "H2", "C", "C12", "C13")
+   * Using an element symbol string without a mass number returns the standard
+   * atomic weight.
+   * "D" (deuterium) can be used as alias for "H2".
+   * "T" (tritium) can be used as alias for "H3".
    * @return Atomic mass in AMU
    */
-  static double get_default_atomic_mass(Isotope isotope);
+  static double get_default_atomic_mass(std::string symbol);
 
   /**
    * @brief Get nuclear charge for an element
@@ -491,7 +452,7 @@ class Structure : public DataClass,
    * @param symbol Input atomic symbol with potentially incorrect capitalization
    * @return Properly capitalized atomic symbol
    */
-  static std::string _fix_symbol_capitalization(const std::string& symbol);
+  static std::string _fix_symbol(const std::string& symbol);
 
   /**
    * @brief Private function to save structure to JSON file without validation

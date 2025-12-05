@@ -7,22 +7,20 @@
 
 import json
 import pickle
+import re
 import tempfile
 from pathlib import Path
 
 import numpy as np
 import pytest
 
+from qdk_chemistry.data import Element, Structure
+
 from .reference_tolerances import (
     float_comparison_absolute_tolerance,
     float_comparison_relative_tolerance,
     xyz_file_structure_tolerance,
 )
-
-try:
-    from qdk_chemistry.data import Structure
-except ImportError:
-    pytest.skip("qdk_chemistry.data.Structure not available", allow_module_level=True)
 
 
 class TestStructure:
@@ -413,6 +411,65 @@ class TestStructure:
             rtol=float_comparison_relative_tolerance,
             atol=float_comparison_absolute_tolerance,
         )
+
+    def test_get_default_atomic_mass_standard_weights(self):
+        """Test get_default_atomic_mass for standard atomic weights."""
+        h_mass = Structure.get_default_atomic_mass(Element.H)
+        c_mass = Structure.get_default_atomic_mass(Element.C)
+
+        assert np.isclose(
+            h_mass, 1.0080, rtol=float_comparison_relative_tolerance, atol=float_comparison_absolute_tolerance
+        )
+        assert np.isclose(
+            c_mass, 12.011, rtol=float_comparison_relative_tolerance, atol=float_comparison_absolute_tolerance
+        )
+
+    def test_get_default_atomic_mass_specific_isotopes(self):
+        """Test get_default_atomic_mass for specific isotope masses."""
+        h1_mass = Structure.get_default_atomic_mass("H1")
+        h2_mass = Structure.get_default_atomic_mass("H2")
+        d_mass = Structure.get_default_atomic_mass("D")
+        h3_mass = Structure.get_default_atomic_mass("H3")
+        t_mass = Structure.get_default_atomic_mass("T")
+        c12_mass = Structure.get_default_atomic_mass("C12")
+        c13_mass = Structure.get_default_atomic_mass("C13")
+        og295_mass = Structure.get_default_atomic_mass("Og295")
+
+        assert np.isclose(
+            h1_mass, 1.007825032, rtol=float_comparison_relative_tolerance, atol=float_comparison_absolute_tolerance
+        )
+        assert np.isclose(
+            h2_mass, 2.014101778, rtol=float_comparison_relative_tolerance, atol=float_comparison_absolute_tolerance
+        )
+        assert np.isclose(
+            d_mass, 2.014101778, rtol=float_comparison_relative_tolerance, atol=float_comparison_absolute_tolerance
+        )
+        assert np.isclose(
+            h3_mass, 3.016049281, rtol=float_comparison_relative_tolerance, atol=float_comparison_absolute_tolerance
+        )
+        assert np.isclose(
+            t_mass, 3.016049281, rtol=float_comparison_relative_tolerance, atol=float_comparison_absolute_tolerance
+        )
+        assert np.isclose(
+            c12_mass, 12.0, rtol=float_comparison_relative_tolerance, atol=float_comparison_absolute_tolerance
+        )
+        assert np.isclose(
+            c13_mass, 13.00335484, rtol=float_comparison_relative_tolerance, atol=float_comparison_absolute_tolerance
+        )
+        assert np.isclose(
+            og295_mass, 295.216178, rtol=float_comparison_relative_tolerance, atol=float_comparison_absolute_tolerance
+        )
+
+    def test_get_default_atomic_mass_invalid_inputs(self):
+        """Test get_default_atomic_mass with invalid inputs."""
+        with pytest.raises(AttributeError):
+            Structure.get_default_atomic_mass(Element.X)
+        with pytest.raises(AttributeError):
+            Structure.get_default_atomic_mass(Element.H1)
+        with pytest.raises(ValueError, match=re.escape("Unknown atomic symbol: X (normalized to: X)")):
+            Structure.get_default_atomic_mass("X")
+        with pytest.raises(ValueError, match=re.escape("Unknown element/isotope for mass lookup: Z = 1, A = 100")):
+            Structure.get_default_atomic_mass("H100")
 
 
 class TestStructureEdgeCases:

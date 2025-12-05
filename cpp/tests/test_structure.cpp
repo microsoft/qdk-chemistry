@@ -690,6 +690,12 @@ TEST_F(StructureBasicTest, UtilityFunctionsAndEdgeCases) {
   EXPECT_THROW(Structure::get_default_atomic_mass(invalid_element),
                std::invalid_argument);
 
+  // Test get_default_atomic_mass with string parameters
+  EXPECT_THROW(Structure::get_default_atomic_mass("Zz120"),
+               std::invalid_argument);  // Invalid atomic symbol
+  EXPECT_THROW(Structure::get_default_atomic_mass("H999"),
+               std::invalid_argument);  // Invalid mass number
+
   // Test get_default_nuclear_charge
   EXPECT_EQ(Structure::get_default_nuclear_charge(Element::H), 1);
   EXPECT_EQ(Structure::get_default_nuclear_charge(Element::C), 6);
@@ -1033,181 +1039,20 @@ TEST_F(StructureBasicTest, HDF5NumericalPrecision) {
 
     for (int j = 0; j < 3; ++j) {
       // Use very tight tolerance for precision test
-      EXPECT_NEAR(loaded_coords[j], orig_coords[j], 1e-14);
+      EXPECT_NEAR(loaded_coords[j], orig_coords[j],
+                  testing::numerical_zero_tolerance);
     }
 
     EXPECT_NEAR(loaded_precision->get_atom_mass(i),
-                precision_test.get_atom_mass(i), 1e-14);
+                precision_test.get_atom_mass(i),
+                testing::numerical_zero_tolerance);
     EXPECT_NEAR(loaded_precision->get_atom_nuclear_charge(i),
-                precision_test.get_atom_nuclear_charge(i), 1e-14);
+                precision_test.get_atom_nuclear_charge(i),
+                testing::numerical_zero_tolerance);
   }
 
   // Clean up
   std::filesystem::remove("test_precision.structure.h5");
-}
-
-// Test Structure construction with Isotope enum (Eigen::MatrixXd coordinates)
-TEST_F(StructureBasicTest, ConstructorWithIsotopesEigen) {
-  std::vector<Isotope> isotopes = {Isotope::H1, Isotope::D};
-  Eigen::MatrixXd coords(2, 3);
-  coords << 0.0, 0.0, 0.0, 0.0, 0.0, 1.4;
-
-  Structure s(coords, isotopes);
-
-  EXPECT_EQ(s.get_num_atoms(), 2);
-  EXPECT_EQ(s.get_atom_element(0), Element::H);
-  EXPECT_EQ(s.get_atom_element(1), Element::H);
-
-  // Test that isotope-specific masses are used
-  EXPECT_NEAR(s.get_atom_mass(0), 1.007825032,
-              testing::numerical_zero_tolerance);
-  EXPECT_NEAR(s.get_atom_mass(1), 2.014101778,
-              testing::numerical_zero_tolerance);
-
-  // Nuclear charges should be 1 for both (hydrogen)
-  EXPECT_NEAR(s.get_atom_nuclear_charge(0), 1.0,
-              testing::numerical_zero_tolerance);
-  EXPECT_NEAR(s.get_atom_nuclear_charge(1), 1.0,
-              testing::numerical_zero_tolerance);
-}
-
-// Test Structure construction with Isotope enum (vector coordinates)
-TEST_F(StructureBasicTest, ConstructorWithIsotopesVector) {
-  std::vector<Isotope> isotopes = {Isotope::C12, Isotope::C13, Isotope::C14};
-  std::vector<Eigen::Vector3d> coords = {
-      {0.0, 0.0, 0.0}, {2.0, 0.0, 0.0}, {4.0, 0.0, 0.0}};
-
-  Structure s(coords, isotopes);
-
-  EXPECT_EQ(s.get_num_atoms(), 3);
-  EXPECT_EQ(s.get_atom_element(0), Element::C);
-  EXPECT_EQ(s.get_atom_element(1), Element::C);
-  EXPECT_EQ(s.get_atom_element(2), Element::C);
-
-  // Test isotope-specific masses
-  EXPECT_NEAR(s.get_atom_mass(0), 12.0, testing::numerical_zero_tolerance);
-  EXPECT_NEAR(s.get_atom_mass(1), 13.00335484,
-              testing::numerical_zero_tolerance);
-  EXPECT_NEAR(s.get_atom_mass(2), 14.00324199,
-              testing::numerical_zero_tolerance);
-
-  // All carbon atoms should have nuclear charge 6
-  EXPECT_NEAR(s.get_atom_nuclear_charge(0), 6.0,
-              testing::numerical_zero_tolerance);
-  EXPECT_NEAR(s.get_atom_nuclear_charge(1), 6.0,
-              testing::numerical_zero_tolerance);
-  EXPECT_NEAR(s.get_atom_nuclear_charge(2), 6.0,
-              testing::numerical_zero_tolerance);
-}
-
-// Test Structure with isotopes and custom masses (custom masses override)
-TEST_F(StructureBasicTest, IsotopesWithCustomMasses) {
-  std::vector<Isotope> isotopes = {Isotope::C12, Isotope::C13};
-  Eigen::MatrixXd coords(2, 3);
-  coords << 0.0, 0.0, 0.0, 1.0, 0.0, 0.0;
-
-  // Custom masses override isotope masses
-  Eigen::VectorXd custom_masses(2);
-  custom_masses << 11.5, 13.5;
-
-  Structure s(coords, isotopes, custom_masses);
-
-  EXPECT_EQ(s.get_num_atoms(), 2);
-
-  // Custom masses should be used instead of isotope masses
-  EXPECT_NEAR(s.get_atom_mass(0), 11.5, testing::numerical_zero_tolerance);
-  EXPECT_NEAR(s.get_atom_mass(1), 13.5, testing::numerical_zero_tolerance);
-}
-
-// Test Structure with isotopes and custom nuclear charges
-TEST_F(StructureBasicTest, IsotopesWithCustomCharges) {
-  std::vector<Isotope> isotopes = {Isotope::O16, Isotope::O18};
-  std::vector<Eigen::Vector3d> coords = {{0.0, 0.0, 0.0}, {1.0, 0.0, 0.0}};
-
-  // Custom nuclear charges
-  std::vector<double> custom_charges = {8.5, 7.5};
-
-  Structure s(coords, isotopes, std::vector<double>(), custom_charges);
-
-  EXPECT_EQ(s.get_num_atoms(), 2);
-
-  // Custom charges should be used
-  EXPECT_NEAR(s.get_atom_nuclear_charge(0), 8.5,
-              testing::numerical_zero_tolerance);
-  EXPECT_NEAR(s.get_atom_nuclear_charge(1), 7.5,
-              testing::numerical_zero_tolerance);
-
-  // But isotope masses should still be used
-  EXPECT_NEAR(s.get_atom_mass(0), 15.99491462,
-              testing::numerical_zero_tolerance);
-  EXPECT_NEAR(s.get_atom_mass(1), 17.99915961,
-              testing::numerical_zero_tolerance);
-}
-
-// Test symbol_to_isotope function
-TEST_F(StructureBasicTest, SymbolToIsotope) {
-  // Test some isotopes
-  Isotope h1 = Structure::symbol_to_isotope("H1");
-  Isotope h2 = Structure::symbol_to_isotope("H2");
-  Isotope c12 = Structure::symbol_to_isotope("C12");
-
-  EXPECT_EQ(h1, Isotope::H1);
-  EXPECT_EQ(h2, Isotope::H2);
-  EXPECT_EQ(c12, Isotope::C12);
-
-  // Test with lowercase
-  Isotope h1_lower = Structure::symbol_to_isotope("h1");
-  EXPECT_EQ(h1_lower, Isotope::H1);
-  Isotope h2_lower = Structure::symbol_to_isotope("h2");
-  EXPECT_EQ(h2_lower, Isotope::H2);
-
-  // Test special cases: deuterium (D) and tritium (T)
-  Isotope deuterium = Structure::symbol_to_isotope("D");
-  Isotope tritium = Structure::symbol_to_isotope("T");
-  EXPECT_EQ(deuterium, Isotope::D);
-  EXPECT_EQ(deuterium, Isotope::H2);
-  EXPECT_EQ(tritium, Isotope::T);
-  EXPECT_EQ(tritium, Isotope::H3);
-
-  // Test with lowercase
-  Isotope deuterium_lower = Structure::symbol_to_isotope("d");
-  Isotope tritium_lower = Structure::symbol_to_isotope("t");
-  EXPECT_EQ(deuterium_lower, Isotope::D);
-  EXPECT_EQ(tritium_lower, Isotope::T);
-}
-
-// Test isotope_to_symbol function
-TEST_F(StructureBasicTest, IsotopeToSymbol) {
-  // Test regular isotopes
-  std::string h1_symbol = Structure::isotope_to_symbol(Isotope::H1);
-  std::string c12_symbol = Structure::isotope_to_symbol(Isotope::C12);
-  std::string c13_symbol = Structure::isotope_to_symbol(Isotope::C13);
-
-  EXPECT_EQ(h1_symbol, "H1");
-  EXPECT_EQ(c12_symbol, "C12");
-  EXPECT_EQ(c13_symbol, "C13");
-
-  // Test special cases: deuterium (D) and tritium (T)
-  std::string h2_symbol = Structure::isotope_to_symbol(Isotope::H2);
-  std::string d_symbol = Structure::isotope_to_symbol(Isotope::D);
-  std::string h3_symbol = Structure::isotope_to_symbol(Isotope::H3);
-  std::string t_symbol = Structure::isotope_to_symbol(Isotope::T);
-
-  EXPECT_EQ(h2_symbol, "H2");
-  EXPECT_EQ(d_symbol, "H2");
-  EXPECT_EQ(h3_symbol, "H3");
-  EXPECT_EQ(t_symbol, "H3");
-
-  // Verify round-trip conversion
-  Isotope h2_back = Structure::symbol_to_isotope(h2_symbol);
-  Isotope d_back = Structure::symbol_to_isotope(d_symbol);
-  Isotope h3_back = Structure::symbol_to_isotope(h3_symbol);
-  Isotope t_back = Structure::symbol_to_isotope(t_symbol);
-
-  EXPECT_EQ(h2_back, Isotope::H2);
-  EXPECT_EQ(d_back, Isotope::D);
-  EXPECT_EQ(h3_back, Isotope::H3);
-  EXPECT_EQ(t_back, Isotope::T);
 }
 
 // Test get_default_atomic_mass with Element
@@ -1220,20 +1065,33 @@ TEST_F(StructureBasicTest, GetDefaultAtomicMassElement) {
   EXPECT_NEAR(c_mass, 12.011, testing::numerical_zero_tolerance);
 }
 
-// Test get_default_atomic_mass with Isotope
-TEST_F(StructureBasicTest, GetDefaultAtomicMassIsotope) {
-  // Test specific isotopes
-  double h1_mass = Structure::get_default_atomic_mass(Isotope::H1);
-  double h2_mass = Structure::get_default_atomic_mass(Isotope::H2);
-  double d_mass = Structure::get_default_atomic_mass(Isotope::D);
-  double t_mass = Structure::get_default_atomic_mass(Isotope::T);
-  double c12_mass = Structure::get_default_atomic_mass(Isotope::C12);
+// Test get_default_atomic_mass with string parameters
+TEST_F(StructureBasicTest, GetDefaultAtomicMassString) {
+  // Test standard atomic weights
+  double h_mass = Structure::get_default_atomic_mass("H");
+  double c_mass = Structure::get_default_atomic_mass("C");
+
+  EXPECT_NEAR(h_mass, 1.0080, testing::numerical_zero_tolerance);
+  EXPECT_NEAR(c_mass, 12.011, testing::numerical_zero_tolerance);
+
+  // Test specific isotope masses
+  double h1_mass = Structure::get_default_atomic_mass("H1");
+  double h2_mass = Structure::get_default_atomic_mass("H2");
+  double h3_mass = Structure::get_default_atomic_mass("H3");
+  double c12_mass = Structure::get_default_atomic_mass("C12");
+  double c13_mass = Structure::get_default_atomic_mass("C13");
 
   EXPECT_NEAR(h1_mass, 1.007825032, testing::numerical_zero_tolerance);
   EXPECT_NEAR(h2_mass, 2.014101778, testing::numerical_zero_tolerance);
-  EXPECT_NEAR(d_mass, 2.014101778, testing::numerical_zero_tolerance);
-  EXPECT_NEAR(t_mass, 3.016049281, testing::numerical_zero_tolerance);
+  EXPECT_NEAR(h3_mass, 3.016049281, testing::numerical_zero_tolerance);
   EXPECT_NEAR(c12_mass, 12.0, testing::numerical_zero_tolerance);
+  EXPECT_NEAR(c13_mass, 13.00335484, testing::numerical_zero_tolerance);
+
+  // Test deuterium and tritium aliases
+  double d_mass = Structure::get_default_atomic_mass("D");
+  double t_mass = Structure::get_default_atomic_mass("T");
+  EXPECT_NEAR(d_mass, h2_mass, testing::numerical_zero_tolerance);
+  EXPECT_NEAR(t_mass, h3_mass, testing::numerical_zero_tolerance);
 }
 
 // Test Structure with isotope symbols in constructor
@@ -1257,7 +1115,7 @@ TEST_F(StructureBasicTest, ConstructorWithIsotopeSymbols) {
   EXPECT_NEAR(s.get_atom_mass(3), 15.99491462,
               testing::numerical_zero_tolerance);  // O-16
 
-  // Elements should be correct
+  // Check elements
   EXPECT_EQ(s.get_atom_element(0), Element::H);
   EXPECT_EQ(s.get_atom_element(1), Element::H);
   EXPECT_EQ(s.get_atom_element(2), Element::C);
@@ -1277,111 +1135,11 @@ TEST_F(StructureBasicTest, MixedSymbolNotation) {
 
   // H should use standard atomic weight
   EXPECT_NEAR(s.get_atom_mass(0), 1.0080, testing::numerical_zero_tolerance);
-  // H2 should use deuterium mass
+  // D should use deuterium mass
   EXPECT_NEAR(s.get_atom_mass(1), 2.014101778,
               testing::numerical_zero_tolerance);
   // C12 should use C-12 mass
   EXPECT_NEAR(s.get_atom_mass(2), 12.0, testing::numerical_zero_tolerance);
   // O should use standard atomic weight
   EXPECT_NEAR(s.get_atom_mass(3), 15.999, testing::numerical_zero_tolerance);
-}
-
-// Test empty structure with isotopes
-TEST_F(StructureBasicTest, EmptyStructureWithIsotopes) {
-  std::vector<Isotope> empty_isotopes;
-  Eigen::MatrixXd empty_coords(0, 3);
-
-  Structure s(empty_coords, empty_isotopes);
-
-  EXPECT_TRUE(s.is_empty());
-  EXPECT_EQ(s.get_num_atoms(), 0);
-  EXPECT_EQ(s.get_total_mass(), 0.0);
-}
-
-// Test isotope round-trip through JSON
-TEST_F(StructureBasicTest, IsotopeJSONRoundtrip) {
-  std::vector<Isotope> isotopes = {Isotope::H1, Isotope::D, Isotope::C12};
-  Eigen::MatrixXd coords(3, 3);
-  coords << 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 2.0, 0.0, 0.0;
-
-  Structure s1(coords, isotopes);
-
-  // Serialize to JSON
-  auto json_data = s1.to_json();
-
-  // Deserialize from JSON
-  auto s2 = Structure::from_json(json_data);
-
-  EXPECT_EQ(s2->get_num_atoms(), 3);
-
-  // Verify masses are preserved
-  EXPECT_NEAR(s2->get_atom_mass(0), s1.get_atom_mass(0),
-              testing::json_tolerance);
-  EXPECT_NEAR(s2->get_atom_mass(1), s1.get_atom_mass(1),
-              testing::json_tolerance);
-  EXPECT_NEAR(s2->get_atom_mass(2), s1.get_atom_mass(2),
-              testing::json_tolerance);
-}
-
-// Test isotope round-trip through HDF5
-TEST_F(StructureBasicTest, IsotopeHDF5Roundtrip) {
-  std::vector<Isotope> isotopes = {Isotope::O16, Isotope::O17, Isotope::O18};
-  std::vector<Eigen::Vector3d> coords = {
-      {0.0, 0.0, 0.0}, {1.0, 0.0, 0.0}, {2.0, 0.0, 0.0}};
-
-  Structure s1(coords, isotopes);
-
-  // Serialize to HDF5
-  s1.to_hdf5_file("test_isotopes.structure.h5");
-
-  // Deserialize from HDF5
-  auto s2 = Structure::from_hdf5_file("test_isotopes.structure.h5");
-
-  EXPECT_EQ(s2->get_num_atoms(), 3);
-
-  // Verify masses are preserved
-  EXPECT_NEAR(s2->get_atom_mass(0), s1.get_atom_mass(0),
-              testing::hdf5_tolerance);
-  EXPECT_NEAR(s2->get_atom_mass(1), s1.get_atom_mass(1),
-              testing::hdf5_tolerance);
-  EXPECT_NEAR(s2->get_atom_mass(2), s1.get_atom_mass(2),
-              testing::hdf5_tolerance);
-
-  // Clean up
-  std::filesystem::remove("test_isotopes.structure.h5");
-}
-
-// Test total mass calculation with isotopes
-TEST_F(StructureBasicTest, TotalMassWithIsotopes) {
-  std::vector<Isotope> isotopes = {Isotope::H1, Isotope::H1, Isotope::O16};
-  Eigen::MatrixXd coords(3, 3);
-  coords << 0.0, 0.0, 0.0, 1.4, 0.0, 0.0, 0.7, 1.0, 0.0;
-
-  Structure water(coords, isotopes);
-
-  double expected_mass = 1.007825032 + 1.007825032 + 15.99491462;
-  EXPECT_NEAR(water.get_total_mass(), expected_mass,
-              testing::numerical_zero_tolerance);
-}
-
-// Test nuclear repulsion energy with isotopes (should be same as with elements)
-TEST_F(StructureBasicTest, NuclearRepulsionWithIsotopes) {
-  std::vector<Isotope> isotopes = {Isotope::H1, Isotope::H2};
-  Eigen::MatrixXd coords(2, 3);
-  coords << 0.0, 0.0, 0.0, 0.0, 0.0, 1.4;
-
-  Structure h2(coords, isotopes);
-
-  // Nuclear repulsion depends on charges, not masses
-  // Both H-1 and H-2 have nuclear charge 1
-  double repulsion = h2.calculate_nuclear_repulsion_energy();
-  EXPECT_GT(repulsion, 0.0);  // Should be positive
-
-  // Compare with regular H structure
-  std::vector<Element> elements = {Element::H, Element::H};
-  Structure h2_regular(coords, elements);
-  double repulsion_regular = h2_regular.calculate_nuclear_repulsion_energy();
-
-  // Should be the same because nuclear charges are the same
-  EXPECT_NEAR(repulsion, repulsion_regular, testing::numerical_zero_tolerance);
 }
