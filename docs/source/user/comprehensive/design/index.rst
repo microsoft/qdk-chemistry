@@ -50,7 +50,7 @@ These classes are designed to be:
 - **Conforming**: Exposing a common interface for disparate implementations to enable a unified user experience.
 - **Extensible**: Allowing new implementations to be added without modifying existing code
 
-Programatically, Algorithms are specified as abstract interface which can be specialized downstream through concrete implementations. This
+Programatically, Algorithms are specified as abstract interfaces which can be specialized downstream through concrete implementations. This
 allows QDK/Chemistry to be expressed as a plugin architecture, for which algorithm implementations may be specified either natively within QDK/Chemistry or
 through established third-party quantum chemistry packages:
 
