@@ -45,8 +45,6 @@ Detailed instructions for installing QDK/Chemistry can be found in [INSTALL.md](
 
 There are many ways in which you can participate in this project, for example:
 
-There are many ways in which you can participate in this project, for example:
-
 - [Submit bugs and feature requests](https://github.com/microsoft/qdk-chemistry/issues), and help us verify as they are checked in
 - Review [source code changes](https://github.com/microsoft/qdk-chemistry/pulls)
 - Review the documentation and make pull requests for anything from typos to additional and new content
