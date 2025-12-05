@@ -35,7 +35,7 @@ def create_structure_from_rdkit(molecule: Mol) -> Structure:
 
 def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
     """Parse CLI options in the same order as the workflow steps."""
-    parser = argparse.ArgumentParser(description="simple water demo")
+    parser = argparse.ArgumentParser(description="Build QDK Chemistry structure from RDKit SMILES and run SCF")
 
     parser.add_argument(
         "--basis",
