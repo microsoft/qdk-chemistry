@@ -19,11 +19,11 @@ int main() {
 
   Structure structure(coords, symbols);
 
-  // Element enum alternative
+  // Equivalent to 'structure', but uses 'elements' instead of 'symbols'
   std::vector<Element> elements = {Element::H, Element::H};
   Structure structure_alternative(coords, elements);
 
-  // Can specify custom masses and/or charges
+  // Another variation on construction: can specify custom masses and/or charges
   std::vector<double> custom_masses{1.001, 0.999};
   std::vector<double> custom_charges = {0.9, 1.1};
   Structure structure_custom(coords, elements, custom_masses, custom_charges);

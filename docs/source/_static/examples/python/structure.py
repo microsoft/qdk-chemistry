@@ -15,11 +15,11 @@ coords = np.array([[0.0, 0.0, 0.0], [0.0, 0.0, 1.4]])  # Bohr
 symbols = ["H", "H"]
 
 structure = Structure(coords, symbols=symbols)
-# Element enum alternative
+# Equivalent to 'structure', but uses 'elements' instead of 'symbols'
 elements = [Element.H, Element.H]
 structure_alternative = Structure(coords, elements)
 
-# Can specify custom masses and/or charges
+# Another variation on construction: can specify custom masses and/or charges
 custom_masses = [1.001, 0.999]
 custom_charges = [0.9, 1.1]
 structure_custom = Structure(

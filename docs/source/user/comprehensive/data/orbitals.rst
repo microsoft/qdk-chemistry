@@ -25,9 +25,9 @@ data internally, but they reference the same underlying data for restricted case
 Model Orbitals
 ~~~~~~~~~~~~~~
 
-Model orbitals are a simpler subclass of Orbitals in QDK/Chemistry, for model systems without any basis set information.
+ModelOrbitals are a simpler class in QDK/Chemistry, for model systems without any basis set information.
 This class allows to fully specify model Hamiltonians and Wavefunctions.
-Several properties present for the Orbitals subclass are missing for Model Orbitals: coefficients, energies, etc. These are summarized in the properties table below.
+Several properties present for the Orbitals subclass are missing for ModelOrbitals: coefficients, energies, etc. These are summarized in the properties table below.
 
 Properties
 ~~~~~~~~~~

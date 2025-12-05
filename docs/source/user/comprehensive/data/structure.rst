@@ -1,7 +1,7 @@
 Structure
 =========
 
-The :class:`~qdk_chemistry.data.Structure` class in QDK/Chemistry represents a molecular structure, which always includes 3d coordinates and element information, and optionally includes related properties like atomic masses and nuclear charges.
+The :class:`~qdk_chemistry.data.Structure` class in QDK/Chemistry represents a molecular structure, which always includes 3D coordinates and element information, and optionally includes related properties like atomic masses and nuclear charges.
 As a core :doc:`data class <../design/index>`, it follows QDK/Chemistry's immutable data pattern.
 
 Overview

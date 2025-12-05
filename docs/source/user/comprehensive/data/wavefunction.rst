@@ -145,8 +145,8 @@ The :class:`~qdk_chemistry.data.Wavefunction` class provides access to various q
 
 Legend:
 - ✓ Available and implemented
-- ✗ Method throws runtime error (not implemented)
-- ✓* Available only if 2-RDMs were provided during construction
+- ✗ Not available (method not implemented)
+- ✓* Implemented and available only if 2-RDMs were provided during construction
 
 Accessing wavefunction data
 ---------------------------

@@ -114,7 +114,7 @@ QDK/Chemistry's :class:`~qdk_chemistry.algorithms.OrbitalLocalizer` provides a u
 QDK/Chemistry implementations
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-- **QDK/Chemistry**: Native implementation of Pipek-Mezey and :term:`MP2` natural orbital localization
+- **QDK/Chemistry**: Native implementation of Pipek-Mezey and MP2 natural orbital localization
 - **QDK/Chemistry**: VVHV orbital separation method
 
 Third-party interfaces
