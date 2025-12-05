@@ -429,6 +429,15 @@ TEST_F(CoupledClusterContainerTest, LazyRDMComputationFromAmplitudes) {
             << "1-RDM should have correct dimensions";
         // 1-RDM should not be all zeros (should have some occupation)
         EXPECT_GT(mat.norm(), 0.0) << "1-RDM should not be zero";
+        // Verify 1-RDM trace equals number of electrons
+        // Reference "2200" has 2 alpha + 2 beta = 4 electrons
+        auto rdm1_trace = mat.trace();
+        size_t n_electrons = 4;  // From reference "2200"
+        EXPECT_NEAR(std::real(rdm1_trace), static_cast<double>(n_electrons),
+                    1e-6)
+            << "1-RDM trace should equal number of electrons. "
+            << "Trace: " << std::real(rdm1_trace)
+            << ", N_electrons: " << n_electrons;
       },
       one_rdm_traced);
 
@@ -441,7 +450,7 @@ TEST_F(CoupledClusterContainerTest, LazyRDMComputationFromAmplitudes) {
       },
       one_rdm_aa);
 
-  // Get 2-RDMs
+  // Get 2-RDMs and verify size
   auto [two_rdm_aabb, two_rdm_aaaa, two_rdm_bbbb] =
       cc.get_active_two_rdm_spin_dependent();
   size_t nmo = nocc + nvirt;

@@ -7,6 +7,7 @@
 #include "../../algorithms/microsoft/mp2.hpp"
 
 #include <algorithm>
+#include <macis/hamiltonian_generator/double_loop.hpp>
 #include <macis/sd_operations.hpp>
 #include <macis/util/rdms.hpp>
 #include <map>
@@ -723,6 +724,19 @@ void MP2Container::_generate_ci_expansion() const {
     // Consolidate duplicates (shouldn't be any, but for safety)
     _consolidate_determinants(determinants, coefficients);
 
+    // Normalize the wavefunction: |Ψ⟩ = |Φ₀⟩ + Σ t_{ijab} |Φ_{ij}^{ab}⟩
+    // Norm² = 1 + Σ |t_{ijab}|², so we divide by sqrt(norm²)
+    double norm_sq = 0.0;
+    for (const auto& c : coefficients) {
+      norm_sq += std::norm(c);  // |c|² for complex
+    }
+    double norm = std::sqrt(norm_sq);
+    if (norm > 1e-14) {
+      for (auto& c : coefficients) {
+        c /= norm;
+      }
+    }
+
     // Store results
     _determinant_vector_cache =
         std::make_unique<DeterminantVector>(std::move(determinants));
@@ -824,6 +838,19 @@ void MP2Container::_generate_ci_expansion() const {
     // Consolidate duplicates (shouldn't be any, but for safety)
     _consolidate_determinants(determinants, coefficients);
 
+    // Normalize the wavefunction: |Ψ⟩ = |Φ₀⟩ + Σ t_{ijab} |Φ_{ij}^{ab}⟩
+    // Norm² = 1 + Σ |t_{ijab}|², so we divide by sqrt(norm²)
+    double norm_sq = 0.0;
+    for (const auto& c : coefficients) {
+      norm_sq += c * c;
+    }
+    double norm = std::sqrt(norm_sq);
+    if (norm > 1e-14) {
+      for (auto& c : coefficients) {
+        c /= norm;
+      }
+    }
+
     // Store results
     _determinant_vector_cache =
         std::make_unique<DeterminantVector>(std::move(determinants));
@@ -840,19 +867,16 @@ void MP2Container::_generate_ci_expansion() const {
 // =============================================================================
 
 namespace {
-// Helper: Dispatch RDM computation based on number of orbitals
-// Uses MACIS bitset sizes: 64, 128, 256
+// Helper: Dispatch RDM computation using MACIS HamiltonianGenerator
 template <size_t N>
-void mp2_compute_rdms_impl(const std::vector<Configuration>& determinants,
-                           const double* coeffs, size_t norb,
-                           std::vector<double>& one_rdm_aa,
-                           std::vector<double>& one_rdm_bb,
-                           std::vector<double>& two_rdm_aaaa,
-                           std::vector<double>& two_rdm_bbbb,
-                           std::vector<double>& two_rdm_aabb) {
+void mp2_compute_rdms_with_ham_gen(
+    const std::vector<Configuration>& determinants,
+    const std::vector<double>& coeffs, size_t norb, const Eigen::MatrixXd& T,
+    const Eigen::VectorXd& V, std::vector<double>& one_rdm_aa,
+    std::vector<double>& one_rdm_bb, std::vector<double>& two_rdm_aaaa,
+    std::vector<double>& two_rdm_bbbb, std::vector<double>& two_rdm_aabb) {
   using wfn_t = macis::wfn_t<N>;
-  using wfn_traits = macis::wavefunction_traits<wfn_t>;
-  using spin_det_t = macis::spin_wfn_t<wfn_t>;
+  using generator_t = macis::DoubleLoopHamiltonianGenerator<wfn_t>;
 
   const size_t ndets = determinants.size();
 
@@ -864,6 +888,12 @@ void mp2_compute_rdms_impl(const std::vector<Configuration>& determinants,
     macis_dets.push_back(wfn_t(bitset));
   }
 
+  // Create Hamiltonian generator with one-body and two-body integrals
+  generator_t ham_gen(
+      macis::matrix_span<double>(const_cast<double*>(T.data()), norb, norb),
+      macis::rank4_span<double>(const_cast<double*>(V.data()), norb, norb, norb,
+                                norb));
+
   // Create spans for RDM storage
   macis::matrix_span<double> ordm_aa(one_rdm_aa.data(), norb, norb);
   macis::matrix_span<double> ordm_bb(one_rdm_bb.data(), norb, norb);
@@ -874,42 +904,14 @@ void mp2_compute_rdms_impl(const std::vector<Configuration>& determinants,
   macis::rank4_span<double> trdm_aabb(two_rdm_aabb.data(), norb, norb, norb,
                                       norb);
 
-  std::vector<uint32_t> bra_occ_alpha, bra_occ_beta;
+  // Make a non-const copy of coefficients for MACIS API
+  std::vector<double> coeffs_copy = coeffs;
 
-  // Double loop over determinants to compute RDM contributions
-  for (size_t i = 0; i < ndets; ++i) {
-    const auto& bra = macis_dets[i];
-    if (wfn_traits::count(bra)) {
-      spin_det_t bra_alpha = wfn_traits::alpha_string(bra);
-      spin_det_t bra_beta = wfn_traits::beta_string(bra);
-
-      macis::bits_to_indices(bra_alpha, bra_occ_alpha);
-      macis::bits_to_indices(bra_beta, bra_occ_beta);
-
-      for (size_t j = 0; j < ndets; ++j) {
-        const auto& ket = macis_dets[j];
-        if (wfn_traits::count(ket)) {
-          spin_det_t ket_alpha = wfn_traits::alpha_string(ket);
-          spin_det_t ket_beta = wfn_traits::beta_string(ket);
-
-          wfn_t ex_total = bra ^ ket;
-          if (wfn_traits::count(ex_total) <= 4) {
-            spin_det_t ex_alpha = wfn_traits::alpha_string(ex_total);
-            spin_det_t ex_beta = wfn_traits::beta_string(ex_total);
-
-            const double val = coeffs[i] * coeffs[j];
-
-            if (std::abs(val) > 1e-16) {
-              macis::rdm_contributions_spin_dep<false>(
-                  bra_alpha, ket_alpha, ex_alpha, bra_beta, ket_beta, ex_beta,
-                  bra_occ_alpha, bra_occ_beta, val, ordm_aa, ordm_bb, trdm_aaaa,
-                  trdm_bbbb, trdm_aabb);
-            }
-          }
-        }
-      }
-    }
-  }
+  // Use ham_gen.form_rdms_spin_dep to compute RDMs - same as macis_base.hpp
+  ham_gen.form_rdms_spin_dep(macis_dets.begin(), macis_dets.end(),
+                             macis_dets.begin(), macis_dets.end(),
+                             coeffs_copy.data(), ordm_aa, ordm_bb, trdm_aaaa,
+                             trdm_bbbb, trdm_aabb);
 }
 }  // namespace
 
@@ -929,11 +931,19 @@ void MP2Container::_generate_rdms_from_ci_expansion() const {
 
   const auto& determinants = *_determinant_vector_cache;
   const auto& coeffs_variant = *_coefficients_cache;
-  const auto& coeffs = std::get<Eigen::VectorXd>(coeffs_variant);
+  const auto& coeffs_eigen = std::get<Eigen::VectorXd>(coeffs_variant);
+
+  // Convert to std::vector<double> for ham_gen
+  std::vector<double> coeffs(coeffs_eigen.data(),
+                             coeffs_eigen.data() + coeffs_eigen.size());
 
   size_t norb = get_orbitals()->get_num_molecular_orbitals();
   size_t norb2 = norb * norb;
   size_t norb4 = norb2 * norb2;
+
+  // Get integrals from Hamiltonian
+  const auto& [T_a, T_b] = _hamiltonian->get_one_body_integrals();
+  const auto& [V_aaaa, V_aabb, V_bbbb] = _hamiltonian->get_two_body_integrals();
 
   // Allocate RDM storage
   std::vector<double> one_rdm_aa(norb2, 0.0);
@@ -944,17 +954,17 @@ void MP2Container::_generate_rdms_from_ci_expansion() const {
 
   // Dispatch based on number of orbitals
   if (norb <= 32) {
-    mp2_compute_rdms_impl<64>(determinants, coeffs.data(), norb, one_rdm_aa,
-                              one_rdm_bb, two_rdm_aaaa, two_rdm_bbbb,
-                              two_rdm_aabb);
+    mp2_compute_rdms_with_ham_gen<64>(determinants, coeffs, norb, T_a, V_aaaa,
+                                      one_rdm_aa, one_rdm_bb, two_rdm_aaaa,
+                                      two_rdm_bbbb, two_rdm_aabb);
   } else if (norb <= 64) {
-    mp2_compute_rdms_impl<128>(determinants, coeffs.data(), norb, one_rdm_aa,
-                               one_rdm_bb, two_rdm_aaaa, two_rdm_bbbb,
-                               two_rdm_aabb);
+    mp2_compute_rdms_with_ham_gen<128>(determinants, coeffs, norb, T_a, V_aaaa,
+                                       one_rdm_aa, one_rdm_bb, two_rdm_aaaa,
+                                       two_rdm_bbbb, two_rdm_aabb);
   } else if (norb <= 128) {
-    mp2_compute_rdms_impl<256>(determinants, coeffs.data(), norb, one_rdm_aa,
-                               one_rdm_bb, two_rdm_aaaa, two_rdm_bbbb,
-                               two_rdm_aabb);
+    mp2_compute_rdms_with_ham_gen<256>(determinants, coeffs, norb, T_a, V_aaaa,
+                                       one_rdm_aa, one_rdm_bb, two_rdm_aaaa,
+                                       two_rdm_bbbb, two_rdm_aabb);
   } else {
     throw std::runtime_error(
         "Number of orbitals exceeds maximum supported (128) for RDM "
@@ -1049,47 +1059,41 @@ MP2Container::get_active_two_rdm_spin_dependent() const {
 
 const MP2Container::MatrixVariant&
 MP2Container::get_active_one_rdm_spin_traced() const {
-  // If spin-traced not available, try to compute from spin-dependent
-  if (_one_rdm_spin_traced == nullptr) {
-    if (has_t2_amplitudes()) {
-      // Generate RDMs from CI expansion if needed
-      _generate_rdms_from_ci_expansion();
-      // Compute spin-traced from spin-dependent
-      _one_rdm_spin_traced = detail::add_matrix_variants(
-          *_one_rdm_spin_dependent_aa, *_one_rdm_spin_dependent_bb);
-    } else {
-      throw std::runtime_error(
-          "Spin-traced one-body RDM not available and cannot be computed: "
-          "no T2 amplitudes available for lazy RDM generation");
-    }
+  // If spin-traced already available, return it
+  if (_one_rdm_spin_traced != nullptr) {
+    return *_one_rdm_spin_traced;
   }
+
+  // Ensure spin-dependent RDMs are computed (this triggers lazy eval)
+  get_active_one_rdm_spin_dependent();
+
+  // Now compute spin-traced from spin-dependent
+  _one_rdm_spin_traced = detail::add_matrix_variants(
+      *_one_rdm_spin_dependent_aa, *_one_rdm_spin_dependent_bb);
   return *_one_rdm_spin_traced;
 }
 
 const MP2Container::VectorVariant&
 MP2Container::get_active_two_rdm_spin_traced() const {
-  // If spin-traced not available, try to compute from spin-dependent
-  if (_two_rdm_spin_traced == nullptr) {
-    if (has_t2_amplitudes()) {
-      // Generate RDMs from CI expansion if needed
-      _generate_rdms_from_ci_expansion();
-      // Compute spin-traced from spin-dependent components
-      // spin-traced = aaaa + bbbb + aabb + bbaa
-      auto two_rdm_ss_part = detail::add_vector_variants(
-          *_two_rdm_spin_dependent_aaaa, *_two_rdm_spin_dependent_bbbb);
-      auto two_rdm_spin_bbaa = detail::transpose_ijkl_klij_vector_variant(
-          *_two_rdm_spin_dependent_aabb,
-          get_orbitals()->get_num_molecular_orbitals());
-      auto two_rdm_os_part = detail::add_vector_variants(
-          *_two_rdm_spin_dependent_aabb, *two_rdm_spin_bbaa);
-      _two_rdm_spin_traced =
-          detail::add_vector_variants(*two_rdm_os_part, *two_rdm_ss_part);
-    } else {
-      throw std::runtime_error(
-          "Spin-traced two-body RDM not available and cannot be computed: "
-          "no T2 amplitudes available for lazy RDM generation");
-    }
+  // If spin-traced already available, return it
+  if (_two_rdm_spin_traced != nullptr) {
+    return *_two_rdm_spin_traced;
   }
+
+  // Ensure spin-dependent RDMs are computed (this triggers lazy eval)
+  get_active_two_rdm_spin_dependent();
+
+  // Compute spin-traced from spin-dependent components
+  // spin-traced = aaaa + bbbb + aabb + bbaa
+  auto two_rdm_ss_part = detail::add_vector_variants(
+      *_two_rdm_spin_dependent_aaaa, *_two_rdm_spin_dependent_bbbb);
+  auto two_rdm_spin_bbaa = detail::transpose_ijkl_klij_vector_variant(
+      *_two_rdm_spin_dependent_aabb,
+      get_orbitals()->get_num_molecular_orbitals());
+  auto two_rdm_os_part = detail::add_vector_variants(
+      *_two_rdm_spin_dependent_aabb, *two_rdm_spin_bbaa);
+  _two_rdm_spin_traced =
+      detail::add_vector_variants(*two_rdm_os_part, *two_rdm_ss_part);
   return *_two_rdm_spin_traced;
 }
 

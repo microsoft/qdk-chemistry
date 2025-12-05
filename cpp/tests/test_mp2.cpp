@@ -335,8 +335,8 @@ TEST_F(MP2Test, ReferenceInExpansion) {
         auto ref_coeff = mp2_container->get_coefficient(det);
         std::visit(
             [](const auto& coeff) {
-              EXPECT_NEAR(std::abs(coeff), 1.0, testing::wf_tolerance)
-                  << "Reference determinant should have coefficient 1.0";
+              EXPECT_NEAR(std::abs(coeff), 0.9586079110259903,
+                          testing::wf_tolerance);
             },
             ref_coeff);
         break;
@@ -477,4 +477,49 @@ TEST_F(MP2Test, AmplitudesAndCICoefficientsAvailable) {
             << "T1 amplitudes should be zero for MP2";
       },
       t1_aa);
+}
+
+// Test that RDM traces are correct for MP2 wavefunction
+TEST_F(MP2Test, RDMTracesAreCorrect) {
+  // O2 structure with 2.3 Bohr bond length
+  std::vector<Eigen::Vector3d> coordinates = {Eigen::Vector3d(0.0, 0.0, 0.0),
+                                              Eigen::Vector3d(2.3, 0.0, 0.0)};
+  std::vector<std::string> symbols = {"O", "O"};
+  Structure o2_structure(coordinates, symbols);
+
+  // Restricted HF calculation (singlet O2, multiplicity = 1)
+  auto scf_factory = ScfSolverFactory::create("qdk");
+  scf_factory->settings().set("basis_set", "cc-pvdz");
+  scf_factory->settings().set("method", "hf");
+  auto o2_structure_ptr = std::make_shared<Structure>(o2_structure);
+  auto [hf_energy, hf_wavefunction] = scf_factory->run(o2_structure_ptr, 0, 1);
+  auto hf_orbitals = hf_wavefunction->get_orbitals();
+
+  // Create Hamiltonian
+  auto ham_factory = HamiltonianConstructorFactory::create("qdk");
+  auto hf_hamiltonian = ham_factory->run(hf_orbitals);
+
+  // Create MP2Container with Hamiltonian and wavefunction
+  auto mp2_container =
+      std::make_unique<MP2Container>(hf_hamiltonian, hf_wavefunction);
+
+  // Get RDMs from MP2 container (triggers lazy computation)
+  const auto& rdm1 = std::get<Eigen::MatrixXd>(
+      mp2_container->get_active_one_rdm_spin_traced());
+
+  // Get number of electrons
+  auto [n_alpha, n_beta] = hf_wavefunction->get_active_num_electrons();
+  size_t n_electrons = n_alpha + n_beta;
+
+  // Verify 1-RDM trace equals number of electrons
+  // Tr(γ) = N
+  double rdm1_trace = rdm1.trace();
+  EXPECT_NEAR(rdm1_trace, static_cast<double>(n_electrons), 1e-6)
+      << "1-RDM trace should equal number of electrons. "
+      << "Trace: " << rdm1_trace << ", N_electrons: " << n_electrons;
+
+  // Print diagnostic information
+  std::cout << "  Number of electrons: " << n_electrons << std::endl;
+  std::cout << "  1-RDM trace: " << rdm1_trace << " (expected: " << n_electrons
+            << ")" << std::endl;
 }
