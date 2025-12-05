@@ -723,6 +723,11 @@ class TestStabilityWorkflow:
             elif not stability_result.is_external_stable() and stability_result.has_external_result():
                 _, rotation_vector = stability_result.get_smallest_external_eigenvalue_and_vector()
                 do_external = True
+            else:
+                raise RuntimeError(
+                    "Stability analysis failed, but neither internal nor external instability was detected. "
+                    "This is an unexpected state; rotation_vector is undefined."
+                )
 
             # Get occupation numbers from wavefunction
             orbitals = wavefunction.get_orbitals()
@@ -770,7 +775,6 @@ class TestStabilityWorkflow:
 
         stability_checker = algorithms.create("stability_checker", "pyscf")
         stability_checker.settings().set("internal", True)
-        stability_checker.settings().set("external", True)
 
         # Run workflow with pyscf SCF (required for ROHF) and pyscf stability checker
         energy, _wfn, _is_stable, result = self._run_scf_with_stability_workflow(

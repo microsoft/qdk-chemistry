@@ -218,7 +218,7 @@ class PyscfScfSolver(ScfSolver):
             mf = scf.RKS(mol) if mol.spin == 0 else scf.UKS(mol)
             mf.xc = method
 
-        if scf_type == SCFType.RESTRICTED and mol.spin == 0 and initial_guess is None:
+        if scf_type == SCFType.UNRESTRICTED and mol.spin == 0 and initial_guess is None:
             warnings.warn(
                 "Unrestricted reference requested for closed-shell system. "
                 "Automatic spin symmetry breaking is not supported. "
