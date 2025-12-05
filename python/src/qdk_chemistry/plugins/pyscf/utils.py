@@ -33,6 +33,7 @@ Examples:
 # --------------------------------------------------------------------------------------------
 
 from collections import Counter
+from enum import StrEnum
 
 import numpy as np
 import pyscf
@@ -45,6 +46,21 @@ __all__ = [
     "pyscf_mol_to_qdk_basis",
     "structure_to_pyscf_atom_labels",
 ]
+
+
+class SCFType(StrEnum):
+    """Enum to specify the type of SCF calculation out of auto/restricted/unrestricted.
+
+    Attributes:
+        AUTO: Auto-detect based on restricted character of orbitals/hamiltonian
+        RESTRICTED: Force restricted calculation
+        UNRESTRICTED: Force unrestricted calculation
+
+    """
+
+    AUTO = "auto"
+    RESTRICTED = "restricted"
+    UNRESTRICTED = "unrestricted"
 
 
 def structure_to_pyscf_atom_labels(structure: Structure) -> tuple:
@@ -382,7 +398,7 @@ def orbitals_to_scf(
     orbitals: Orbitals,
     occ_alpha: np.ndarray,
     occ_beta: np.ndarray,
-    force_restricted: bool = False,
+    scf_type: SCFType | str = SCFType.AUTO,
     method: str = "hf",
 ):
     """Convert an Orbitals object to a PySCF SCF object.
@@ -397,9 +413,10 @@ def orbitals_to_scf(
 
         occ_alpha: Occupation numbers for alpha (spin-up) electrons.
         occ_beta: Occupation numbers for beta (spin-down) electrons.
-        force_restricted: If True, forces the creation of a restricted SCF object (RHF or ROHF).
-
-            Applies even if the input orbitals are unrestricted. Default is False.
+        scf_type: Type of SCF calculation to create. Can be:
+            * ``"auto"`` or ``SCFType.AUTO`` (default): Automatically detect based on ``orbitals.is_restricted()``
+            * ``"restricted"`` or ``SCFType.RESTRICTED``: Force restricted calculation (RHF or ROHF)
+            * ``"unrestricted"`` or ``SCFType.UNRESTRICTED``: Force unrestricted calculation (UHF)
 
         method: The electronic structure method to use. Default is "hf" (Hartree-Fock).
 
@@ -418,6 +435,9 @@ def orbitals_to_scf(
         the orbitals are restricted/unrestricted and closed-shell/open-shell.
 
     """
+    if isinstance(scf_type, str):
+        scf_type = SCFType(scf_type.lower())
+
     mol = basis_to_pyscf_mol(orbitals.get_basis_set())
     charge = mol.charge
 
@@ -445,7 +465,13 @@ def orbitals_to_scf(
         energy_a = np.zeros(num_molecular_orbitals)
         energy_b = np.zeros(num_molecular_orbitals)
 
-    if force_restricted or orbitals.is_restricted():
+    if scf_type == SCFType.UNRESTRICTED:
+        # Force UHF even for restricted orbitals
+        mf = pyscf.scf.UHF(mol)
+        mf.mo_coeff = (coeff_a, coeff_a)  # Use same coefficients for alpha and beta
+        mf.mo_energy = (energy_a, energy_a)  # Use same energies for alpha and beta
+        mf.mo_occ = (occ_alpha, occ_beta)
+    elif scf_type == SCFType.RESTRICTED or (scf_type == SCFType.AUTO and orbitals.is_restricted()):
         # For restricted Orbitals, internal occupations are per-spin (each 0 or 1 for closed shell),
         # so total occupancy per MO is occ_a + occ_b
         total_occ = occ_alpha + occ_beta
@@ -487,7 +513,7 @@ def orbitals_to_scf_from_n_electrons_and_multiplicity(
     orbitals: Orbitals,
     n_electrons: int,
     multiplicity: int = 1,
-    force_restricted: bool = False,
+    scf_type: SCFType | str = SCFType.AUTO,
     method: str = "hf",
 ):
     """Convert an Orbitals object to a PySCF SCF object.
@@ -502,9 +528,10 @@ def orbitals_to_scf_from_n_electrons_and_multiplicity(
 
         n_electrons: Total number of electrons in the system.
         multiplicity: Spin multiplicity (2S + 1), where S is the total spin. Default is 1 (singlet).
-        force_restricted: If True, forces the creation of a restricted SCF object (RHF or ROHF).
-
-            Applies even if the input orbitals are unrestricted. Default is False.
+        scf_type: Type of SCF calculation to create. Can be:
+            * ``"auto"`` or ``SCFType.AUTO`` (default): Automatically detect based on ``orbitals.is_restricted()``
+            * ``"restricted"`` or ``SCFType.RESTRICTED``: Force restricted calculation (RHF or ROHF)
+            * ``"unrestricted"`` or ``SCFType.UNRESTRICTED``: Force unrestricted calculation (UHF)
 
         method: The electronic structure method to use. Default is "hf" for Hartree-Fock.
 
@@ -529,7 +556,7 @@ def orbitals_to_scf_from_n_electrons_and_multiplicity(
     n_orbitals = orbitals.get_num_molecular_orbitals()
     alpha_occ, beta_occ = occupations_from_n_electrons_and_multiplicity(n_orbitals, n_electrons, multiplicity)
 
-    return orbitals_to_scf(orbitals, alpha_occ, beta_occ, force_restricted, method)
+    return orbitals_to_scf(orbitals, alpha_occ, beta_occ, scf_type, method)
 
 
 def hamiltonian_to_scf(hamiltonian: Hamiltonian, alpha_occ: np.ndarray, beta_occ: np.ndarray) -> pyscf.scf.RHF:
@@ -554,13 +581,13 @@ def hamiltonian_to_scf(hamiltonian: Hamiltonian, alpha_occ: np.ndarray, beta_occ
         object that provides the necessary interfaces for post-HF methods without having performed an SCF calculation.
 
     Raises:
-        ValueError: If the Hamiltonian uses unsupported features.
-
-            Examples are: unrestricted orbitals, open-shell systems, or active spaces.
+        ValueError: If the Hamiltonian uses unsupported features like model Hamiltonian with unrestricted orbitals,
+            open-shell systems, or active spaces.
 
     Note:
-        * Currently only supports restricted, closed-shell calculations without active spaces.
-        * Future versions may add support for unrestricted and open-shell calculations.
+        * This function is intended for (restricted) model hamiltonian usage, since the orbitals are not used directly.
+        * If a non-model Hamiltonian is passed, this function automatically re-routes to orbitals_to_scf.
+        * Active spaces are not supported.
         * The function creates a "fake" SCF object with the necessary interfaces for post-HF methods without actually
           performing an SCF calculation.
         * The returned SCF object contains dummy molecular orbitals and occupations suitable for post-HF method
@@ -585,13 +612,18 @@ def hamiltonian_to_scf(hamiltonian: Hamiltonian, alpha_occ: np.ndarray, beta_occ
         >>> cc_calc.kernel()
 
     """
-    # Convenience aliases
     orbitals = hamiltonian.get_orbitals()
+    try:
+        orbitals.get_coefficients()
+        # is not a model hamiltonian - reroute to orbitals_to_scf
+        return orbitals_to_scf(orbitals, occ_alpha=alpha_occ, occ_beta=beta_occ)
+    except RuntimeError:
+        if hamiltonian.is_unrestricted():
+            raise ValueError("You cannot pass an unrestricted model Hamiltonian here.") from None
+
     norb = orbitals.get_num_molecular_orbitals()
 
     # Consistency checks
-    if not orbitals.is_restricted():
-        raise ValueError("Unrestricted is not supported.")
     if np.any(alpha_occ != beta_occ):
         raise ValueError("Open-shell is not supported.")
     if (
@@ -608,14 +640,13 @@ def hamiltonian_to_scf(hamiltonian: Hamiltonian, alpha_occ: np.ndarray, beta_occ
     num_beta = int(np.sum(beta_occ))
 
     # Create a fake SCF object
-    # TODO: Handle unrestricted / open-shell
     fake_scf = pyscf.scf.RHF(mol)
     fake_scf.mol.nelectron = num_alpha + num_beta
 
     # Store integrals in the SCF object
-    eri = hamiltonian.get_two_body_integrals()
+    (eri, _, _) = hamiltonian.get_two_body_integrals()
     eri = np.reshape(eri, (norb, norb, norb, norb))
-    h1e = hamiltonian.get_one_body_integrals()
+    (h1e, _) = hamiltonian.get_one_body_integrals()
     # Use _eri directly as it's the established way to access this in PySCF
     # even though it's technically a private member
     fake_scf._eri = eri  # noqa: SLF001

@@ -25,9 +25,9 @@ enum class HamiltonianType { Hermitian, NonHermitian };
 
 /**
  * @enum SpinChannel
- * @brief Spin channels for two-electron integrals
+ * @brief Spin channels for one and two-electron integrals
  */
-enum class SpinChannel { aaaa, aabb, bbbb };
+enum class SpinChannel { aa, bb, aaaa, aabb, bbbb };
 
 /**
  * @class Hamiltonian
@@ -130,11 +130,12 @@ class Hamiltonian : public DataClass,
   virtual ~Hamiltonian() = default;
 
   /**
-   * @brief Get one-electron integrals in MO basis
-   * @return Reference to one-electron integrals matrix
+   * @brief Get tuple of alpha, beta one-electron integrals in MO basis
+   * @return Reference to alpha, beta one-electron integrals matrices
    * @throws std::runtime_error if integrals are not set
    */
-  const Eigen::MatrixXd& get_one_body_integrals() const;
+  std::tuple<const Eigen::MatrixXd&, const Eigen::MatrixXd&>
+  get_one_body_integrals() const;
 
   /**
    * @brief Check if one-body integrals are available
@@ -143,25 +144,25 @@ class Hamiltonian : public DataClass,
   bool has_one_body_integrals() const;
 
   /**
-   * @brief Get alpha one-electron integrals in MO basis
-   * @return Reference to alpha one-electron integrals matrix
-   * @throws std::runtime_error if integrals are not set
+   * @brief Get specific one-electron integral element
+   * @param i First orbital index
+   * @param j Second orbital index
+   * @param channel Spin channel to query (aa, or bb), defaults to aa
+   * @return One-electron integral &lt;ij&gt;
+   * @throws std::out_of_range if indices are invalid
    */
-  const Eigen::MatrixXd& get_one_body_integrals_alpha() const;
+  double get_one_body_element(unsigned i, unsigned j,
+                              SpinChannel channel = SpinChannel::aa) const;
 
   /**
-   * @brief Get beta one-electron integrals in MO basis
-   * @return Reference to beta one-electron integrals matrix
+   * @brief Get two-electron integrals in MO basis for all spin channels
+   * @return Tuple of references to (aaaa, aabb, bbbb) two-electron integrals
+   * vectors
    * @throws std::runtime_error if integrals are not set
    */
-  const Eigen::MatrixXd& get_one_body_integrals_beta() const;
-
-  /**
-   * @brief Get two-electron integrals in MO basis
-   * @return Reference to two-electron integrals vector
-   * @throws std::runtime_error if integrals are not set
-   */
-  const Eigen::VectorXd& get_two_body_integrals() const;
+  std::tuple<const Eigen::VectorXd&, const Eigen::VectorXd&,
+             const Eigen::VectorXd&>
+  get_two_body_integrals() const;
 
   /**
    * @brief Get specific two-electron integral element
@@ -184,28 +185,8 @@ class Hamiltonian : public DataClass,
   bool has_two_body_integrals() const;
 
   /**
-   * @brief Get alpha-alpha two-electron integrals in MO basis
-   * @return Reference to alpha-alpha two-electron integrals vector
-   * @throws std::runtime_error if integrals are not set
-   */
-  const Eigen::VectorXd& get_two_body_integrals_aaaa() const;
-
-  /**
-   * @brief Get alpha-beta two-electron integrals in MO basis
-   * @return Reference to alpha-beta two-electron integrals vector
-   * @throws std::runtime_error if integrals are not set
-   */
-  const Eigen::VectorXd& get_two_body_integrals_aabb() const;
-
-  /**
-   * @brief Get beta-beta two-electron integrals in MO basis
-   * @return Reference to beta-beta two-electron integrals vector
-   * @throws std::runtime_error if integrals are not set
-   */
-  const Eigen::VectorXd& get_two_body_integrals_bbbb() const;
-
-  /**
-   * @brief Get inactive Fock matrix for the selected active space
+   * @brief Get tuple of inactive Fock matrices (alpha, beta) for the selected
+   * active space
    * @return Reference to the inactive Fock matrix
    * @throws std::runtime_error if inactive Fock matrix is not set
    */
@@ -217,20 +198,6 @@ class Hamiltonian : public DataClass,
    * @return True if inactive Fock matrix is set
    */
   bool has_inactive_fock_matrix() const;
-
-  /**
-   * @brief Get alpha inactive Fock matrix for the selected active space
-   * @return Reference to the alpha inactive Fock matrix
-   * @throws std::runtime_error if inactive Fock matrix is not set
-   */
-  const Eigen::MatrixXd& get_inactive_fock_matrix_alpha() const;
-
-  /**
-   * @brief Get beta inactive Fock matrix for the selected active space
-   * @return Reference to the beta inactive Fock matrix
-   * @throws std::runtime_error if inactive Fock matrix is not set
-   */
-  const Eigen::MatrixXd& get_inactive_fock_matrix_beta() const;
 
   /**
    * @brief Get molecular orbital data

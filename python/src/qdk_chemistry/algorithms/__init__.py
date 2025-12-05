@@ -20,7 +20,7 @@ from qdk_chemistry.algorithms.active_space_selector import (
     QdkOccupationActiveSpaceSelector,
     QdkValenceActiveSpaceSelector,
 )
-from qdk_chemistry.algorithms.coupled_cluster_calculator import CoupledClusterCalculator
+from qdk_chemistry.algorithms.dynamical_correlation_calculator import DynamicalCorrelationCalculator
 from qdk_chemistry.algorithms.energy_estimator import EnergyEstimator
 from qdk_chemistry.algorithms.hamiltonian_constructor import (
     HamiltonianConstructor,
@@ -57,7 +57,7 @@ from qdk_chemistry.phase_estimation import (
 __all__ = [
     # Classes
     "ActiveSpaceSelector",
-    "CoupledClusterCalculator",
+    "DynamicalCorrelationCalculator",
     "EnergyEstimator",
     "HamiltonianConstructor",
     "IterativePhaseEstimation",
@@ -89,16 +89,17 @@ __all__ = [
     "create",
     "energy_from_phase",
     "register",
+    "show_default",
     "show_settings",
     "unregister",
 ]
-
 
 _REGISTRY_EXPORTS = frozenset(
     {
         "available",
         "create",
         "register",
+        "show_default",
         "show_settings",
         "unregister",
     }
@@ -112,6 +113,7 @@ if TYPE_CHECKING:  # pragma: no cover - typing-only imports
     available = _registry_type.available
     create = _registry_type.create
     register = _registry_type.register
+    show_default = _registry_type.show_default
     show_settings = _registry_type.show_settings
     unregister = _registry_type.unregister
 

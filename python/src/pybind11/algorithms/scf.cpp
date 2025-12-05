@@ -100,7 +100,7 @@ Args:
     structure (qdk_chemistry.data.Structure): The molecular structure to solve
     charge (int): The molecular charge
     spin_multiplicity (int): The spin multiplicity of the molecular system
-    initial_guess (Optional[qdk_chemistry.data.Orbitals]): Initial orbital guess for the SCF calculation. Defaults to ``None``.
+    initial_guess (qdk_chemistry.data.Orbitals | None): Initial orbital guess for the SCF calculation. Defaults to ``None``.
 
 Returns:
     tuple[float, qdk_chemistry.data.Wavefunction]: Converged total energy (nuclear + electronic) and the resulting wavefunction.

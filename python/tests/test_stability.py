@@ -453,11 +453,11 @@ def create_c2_plus_structure():
 class TestPyscfStabilityChecker:
     """Test class for PySCF stability checker functionality."""
 
-    def _create_scf_solver(self, backend="pyscf", basis_set="def2-svp", reference_type="auto"):
+    def _create_scf_solver(self, backend="pyscf", basis_set="def2-svp", scf_type="auto"):
         """Helper to create SCF solver with common settings for different backends."""
         scf_solver = algorithms.create("scf_solver", backend)
         scf_solver.settings().set("basis_set", basis_set)
-        scf_solver.settings().set("reference_type", reference_type)
+        scf_solver.settings().set("scf_type", scf_type)
         return scf_solver
 
     def _create_stability_checker(self, internal=True, external=True):
@@ -565,7 +565,7 @@ class TestPyscfStabilityChecker:
     def test_pyscf_stability_checker_rohf_o2(self):
         """Test PySCF stability checker on ROHF oxygen molecule."""
         o2 = create_o2_structure()
-        scf_solver = self._create_scf_solver(reference_type="restricted")
+        scf_solver = self._create_scf_solver(scf_type="restricted")
         _, wavefunction = scf_solver.run(o2, 0, 3)
 
         # Test internal-only analysis (external not supported for ROHF)
@@ -646,7 +646,7 @@ class TestPyscfStabilityChecker:
         structure = create_c2_plus_structure()
         ref_eigenvalue = -0.08256762551795531
 
-        scf_solver = self._create_scf_solver(reference_type="restricted")
+        scf_solver = self._create_scf_solver(scf_type="restricted")
         _, wavefunction = scf_solver.run(structure, 1, 2)
 
         # Test internal-only analysis (external not supported for ROHF)
@@ -748,7 +748,7 @@ class TestStabilityWorkflow:
                 new_stability_checker.settings().from_dict(stability_settings_map)
 
                 # Update specific settings for unrestricted calculation
-                new_scf_solver.settings().set("reference_type", "unrestricted")
+                new_scf_solver.settings().set("scf_type", "unrestricted")
                 new_stability_checker.settings().set("external", False)
 
                 scf_solver = new_scf_solver
@@ -766,7 +766,7 @@ class TestStabilityWorkflow:
         # Create and configure solvers
         scf_solver = algorithms.create("scf_solver", "pyscf")
         scf_solver.settings().set("basis_set", "def2-svp")
-        scf_solver.settings().set("reference_type", "restricted")
+        scf_solver.settings().set("scf_type", "restricted")
 
         stability_checker = algorithms.create("stability_checker", "pyscf")
         stability_checker.settings().set("internal", True)
@@ -792,7 +792,7 @@ class TestStabilityWorkflow:
         # Create and configure solvers
         scf_solver = algorithms.create("scf_solver", scf_backend)
         scf_solver.settings().set("basis_set", "def2-svp")
-        scf_solver.settings().set("reference_type", "auto")
+        scf_solver.settings().set("scf_type", "auto")
 
         stability_checker = algorithms.create("stability_checker", "pyscf")
         stability_checker.settings().set("internal", True)
@@ -817,7 +817,7 @@ class TestStabilityWorkflow:
         # Create and configure solvers
         scf_solver = algorithms.create("scf_solver", scf_backend)
         scf_solver.settings().set("basis_set", "def2-svp")
-        scf_solver.settings().set("reference_type", "auto")
+        scf_solver.settings().set("scf_type", "auto")
 
         stability_checker = algorithms.create("stability_checker", "pyscf")
         stability_checker.settings().set("internal", True)
@@ -849,7 +849,7 @@ class TestStabilityWorkflow:
         # Create and configure solvers
         scf_solver = algorithms.create("scf_solver", scf_backend)
         scf_solver.settings().set("basis_set", "def2-svp")
-        scf_solver.settings().set("reference_type", "unrestricted")
+        scf_solver.settings().set("scf_type", "unrestricted")
 
         stability_checker = algorithms.create("stability_checker", "pyscf")
         stability_checker.settings().set("internal", True)

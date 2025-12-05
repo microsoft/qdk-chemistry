@@ -4,12 +4,17 @@
 
 #pragma once
 #include <Eigen/Dense>
+#include <complex>
+#include <memory>
 #include <nlohmann/json.hpp>
 #include <stdexcept>
 #include <string>
+#include <variant>
 #include <vector>
 
 namespace qdk::chemistry::data {
+
+using VectorVariant = std::variant<Eigen::VectorXd, Eigen::VectorXcd>;
 
 /**
  * @file json_serialization.hpp
@@ -52,6 +57,15 @@ nlohmann::json matrix_to_json(const Eigen::MatrixXd& matrix);
 nlohmann::json vector_to_json(const Eigen::VectorXd& vector);
 
 /**
+ * @brief Convert Vector Variant to JSON array
+ * @param vec_var VectorVariant to convert
+ * @param is_complex whether or not it is complex
+ * @return JSON array representation
+ */
+nlohmann::json vector_variant_to_json(const VectorVariant& vec_var,
+                                      bool is_complex);
+
+/**
  * @brief Convert JSON array to Eigen matrix
  * @param j JSON array to convert
  * @return Eigen matrix
@@ -64,6 +78,14 @@ Eigen::MatrixXd json_to_matrix(const nlohmann::json& j);
  * @return Eigen vector
  */
 Eigen::VectorXd json_to_vector(const nlohmann::json& j);
+
+/**
+ * @brief Convert JSON array to VectorVariant
+ * @param j JSON array to convert
+ * @return VectorVariant
+ */
+VectorVariant json_to_vector_variant(const nlohmann::json& j_vec,
+                                     bool is_complex);
 
 /**
  * @brief Convert std::vector to JSON array

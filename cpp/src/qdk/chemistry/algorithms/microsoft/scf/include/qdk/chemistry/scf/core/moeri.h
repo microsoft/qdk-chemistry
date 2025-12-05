@@ -16,12 +16,12 @@ namespace qdk::chemistry::scf {
  *  @brief A class to handle the evaluation of MO integrals given an
  *  AO ERI implementation.
  *
- *  (pn|lk) = C(p,m) * (mn|lk) [first quarter - customization point]
- *  (pq|lk) = C(q,n) * (pn|lk) [second quarter]
- *  (pq|rk) = C(r,l) * (pq|lk) [third quarter]
- *  (pq|rs) = C(s,k) * (pq|rk) [fourth quarter - final result]
+ *  (pn|lk) = Ci(p,m) * (mn|lk) [first quarter - customization point]
+ *  (pq|lk) = Cj(q,n) * (pn|lk) [second quarter]
+ *  (pq|rk) = Ck(r,l) * (pq|lk) [third quarter]
+ *  (pq|rs) = Cl(s,k) * (pq|rk) [fourth quarter - final result]
  *
- *  Leverages the ERI::quater_trans to perform the first quarter transformation
+ *  Leverages the ERI::quarter_trans to perform the first quarter transformation
  *  and performs the remainder transformations via cuTensor.
  */
 class MOERI {
@@ -37,14 +37,36 @@ class MOERI {
   MOERI(std::shared_ptr<ERI> eri);
 
   /**
-   *  @brief Compute MO ERIs incore
+   *  @brief Compute MO ERIs incore with a single transformation matrix
    *
-   *  @param[in]  nao Number of atomic orbitals
-   *  @param[in]  nt Number of vectors in the MO space
-   *  @param[in]  C  Transformation coefficients (row major)
+   *  @param[in]  nao  Number of atomic orbitals
+   *  @param[in]  nt  Number of vectors in the MO space
+   *  @param[in]  C  First quarter transformation coefficients (row major)
    *  @param[out] out Output MO ERIs (row major)
    */
-  void compute(size_t nao, size_t nt, const double* C, double* out);
+  void compute(size_t nao, size_t nt, const double* C, double* out) {
+    compute(nao, nt, C, C, C, C, out);
+  }
+
+  /**
+   *  @brief Compute MO ERIs incore with four different transformation matrices.
+   *
+   *  Note that the resulting vector is sorted column major, meaning that access
+   *  to MO integrals (i,j,k,l) happens as i + j*n + k*n*n + l*n*n*n.
+   *
+   *  If desired, a row major result can be obtained by passing matrices in
+   *  reverse order (l,k,j,i).
+   *
+   *  @param[in]  nao  Number of atomic orbitals
+   *  @param[in]  nt  Number of vectors in the MO space
+   *  @param[in]  Ci  First quarter transformation coefficients (row major)
+   *  @param[in]  Cj  Second quarter transformation coefficients (row major)
+   *  @param[in]  Ck  Third quarter transformation coefficients (row major)
+   *  @param[in]  Cl  Fourth quarter transformation coefficients (row major)
+   *  @param[out] out Output MO ERIs (row major)
+   */
+  void compute(size_t nao, size_t nt, const double* Ci, const double* Cj,
+               const double* Ck, const double* Cl, double* out);
 
  private:
   std::shared_ptr<ERI> eri_;  ///< ERI instance

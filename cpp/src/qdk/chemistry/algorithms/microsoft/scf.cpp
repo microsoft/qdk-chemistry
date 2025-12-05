@@ -70,14 +70,13 @@ std::pair<double, std::shared_ptr<data::Wavefunction>> ScfSolver::_run_impl(
   const bool open_shell = (multiplicity != 1);
 
   // Determine reference type and unrestricted flag
-  std::string reference_type = _settings->get<std::string>("reference_type");
-  std::transform(reference_type.begin(), reference_type.end(),
-                 reference_type.begin(), ::tolower);
+  std::string scf_type = _settings->get<std::string>("scf_type");
+  std::transform(scf_type.begin(), scf_type.end(), scf_type.begin(), ::tolower);
 
   bool unrestricted;
-  if (reference_type == "auto") {
+  if (scf_type == "auto") {
     unrestricted = open_shell;
-  } else if (reference_type == "unrestricted") {
+  } else if (scf_type == "unrestricted") {
     unrestricted = true;
     if (!open_shell && !use_input_initial_guess) {
       spdlog::warn(
@@ -85,7 +84,7 @@ std::pair<double, std::shared_ptr<data::Wavefunction>> ScfSolver::_run_impl(
           "Automatic spin symmetry breaking is not supported. "
           "Consider providing a spin-broken initial guess if desired.");
     }
-  } else if (reference_type == "restricted") {
+  } else if (scf_type == "restricted") {
     if (open_shell) {
       throw std::invalid_argument(
           "Restricted Open-Shell calculation is not currently supported in the "
@@ -94,7 +93,7 @@ std::pair<double, std::shared_ptr<data::Wavefunction>> ScfSolver::_run_impl(
     unrestricted = false;
   } else {
     throw std::invalid_argument(
-        "reference_type must be one of: auto, restricted, unrestricted");
+        "scf_type must be one of: auto, restricted, unrestricted");
   }
 
   std::string basis_set = _settings->get<std::string>("basis_set");

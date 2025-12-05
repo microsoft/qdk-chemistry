@@ -109,10 +109,10 @@ the number of molecular orbitals.
 
 Args:
     coefficients (numpy.ndarray): The molecular orbital coefficients matrix (``num_atomic_orbitals`` × ``num_molecular_orbitals``)
-    energies (Optional[numpy.ndarray]): The orbital energies (``num_molecular_orbitals``), can be None
-    ao_overlap (Optional[numpy.ndarray]): The atomic orbital overlap matrix (``num_atomic_orbitals`` × ``num_atomic_orbitals``), can be ``None``
+    energies (numpy.ndarray | None): The orbital energies (``num_molecular_orbitals``), can be None
+    ao_overlap (numpy.ndarray | None): The atomic orbital overlap matrix (``num_atomic_orbitals`` × ``num_atomic_orbitals``), can be ``None``
     basis_set (BasisSet): The basis set
-    indices (Optional[tuple[list[int], list[int]]]): Tuple of (active_space_indices, inactive_space_indices), can be ``None``
+    indices (tuple[list[int], list[int]] | None): Tuple of (active_space_indices, inactive_space_indices), can be ``None``
 
 Examples:
     >>> import numpy as np
@@ -153,21 +153,21 @@ Args:
 
         (``num_atomic_orbitals`` × ``num_molecular_orbitals``)
 
-    energies_alpha (Optional[numpy.ndarray]): The alpha orbital energies
+    energies_alpha (numpy.ndarray | None): The alpha orbital energies
 
         (``num_molecular_orbitals``), can be None
 
-    energies_beta (Optional[numpy.ndarray]): The beta orbital energies
+    energies_beta (numpy.ndarray | None): The beta orbital energies
 
         (``num_molecular_orbitals``), can be None
 
-    ao_overlap (Optional[numpy.ndarray]): The atomic orbital overlap matrix
+    ao_overlap (numpy.ndarray | None): The atomic orbital overlap matrix
 
         (``num_atomic_orbitals`` × ``num_atomic_orbitals``), can be None
 
     basis_set (BasisSet): The basis set
 
-    indices (Optional[tuple[list[int], list[int], list[int], list[int]]]): Tuple of
+    indices (tuple[list[int], list[int], list[int], list[int]] | None): Tuple of
 
         (``active_alpha``, ``active_beta``, ``inactive_alpha``, ``inactive_beta``), can be ``None``
 

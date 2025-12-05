@@ -11,10 +11,13 @@ import pickle
 import numpy as np
 import pytest
 
-import qdk_chemistry.algorithms
+from qdk_chemistry import algorithms
 from qdk_chemistry.data import (
     CasWavefunctionContainer,
     Configuration,
+    CoupledClusterContainer,
+    Hamiltonian,
+    MP2Container,
     Orbitals,
     SlaterDeterminantContainer,
     Structure,
@@ -807,19 +810,19 @@ class TestWavefunctionRdmIntegraion:
         ntot = nelec_alpha + nelec_beta
 
         mol = Structure(["N", "N"], [[0.0, 0.0, 2.0], [0.0, 0.0, 0.0]])
-        scf_solver = qdk_chemistry.algorithms.create("scf_solver")
+        scf_solver = algorithms.create("scf_solver")
         scf_solver.settings().set("basis_set", "def2-svp")
         sd_wf = scf_solver.run(mol, 0, np.abs(nelec_alpha - nelec_beta) + 1)[1]
 
-        active_space_selector = qdk_chemistry.algorithms.create("active_space_selector", "qdk_valence")
+        active_space_selector = algorithms.create("active_space_selector", "qdk_valence")
         active_space_selector.settings().set("num_active_electrons", ntot)
         active_space_selector.settings().set("num_active_orbitals", norb)
         active_orbs_sd = active_space_selector.run(sd_wf)
 
-        hamil_ctor = qdk_chemistry.algorithms.create("hamiltonian_constructor")
+        hamil_ctor = algorithms.create("hamiltonian_constructor")
         hamiltonian = hamil_ctor.run(active_orbs_sd.get_orbitals())
 
-        macis_calc = qdk_chemistry.algorithms.create("multi_configuration_calculator", "macis_cas")
+        macis_calc = algorithms.create("multi_configuration_calculator", "macis_cas")
         macis_calc.settings().set("calculate_one_rdm", True)
         macis_calc.settings().set("calculate_two_rdm", True)
         wfn = macis_calc.run(hamiltonian, nelec_alpha, nelec_beta)[1]
@@ -887,20 +890,20 @@ class TestWavefunctionRdmIntegraion:
         ntot = nelec_alpha + nelec_beta
 
         mol = Structure(["O", "O"], [[0.0, 0.0, 2.0], [0.0, 0.0, 0.0]])
-        scf_solver = qdk_chemistry.algorithms.create("scf_solver", "pyscf")
+        scf_solver = algorithms.create("scf_solver", "pyscf")
         scf_solver.settings().set("basis_set", "def2-svp")
-        scf_solver.settings().set("reference_type", "restricted")
+        scf_solver.settings().set("scf_type", "restricted")
         sd_wf = scf_solver.run(mol, 0, np.abs(nelec_alpha - nelec_beta) + 1)[1]
 
-        active_space_selector = qdk_chemistry.algorithms.create("active_space_selector", "qdk_valence")
+        active_space_selector = algorithms.create("active_space_selector", "qdk_valence")
         active_space_selector.settings().set("num_active_electrons", ntot)
         active_space_selector.settings().set("num_active_orbitals", norb)
         active_orbs_sd = active_space_selector.run(sd_wf)
 
-        hamil_ctor = qdk_chemistry.algorithms.create("hamiltonian_constructor")
+        hamil_ctor = algorithms.create("hamiltonian_constructor")
         hamiltonian = hamil_ctor.run(active_orbs_sd.get_orbitals())
 
-        macis_calc = qdk_chemistry.algorithms.create("multi_configuration_calculator", "macis_cas")
+        macis_calc = algorithms.create("multi_configuration_calculator", "macis_cas")
         macis_calc.settings().set("calculate_one_rdm", True)
         macis_calc.settings().set("calculate_two_rdm", True)
         wfn = macis_calc.run(hamiltonian, nelec_alpha, nelec_beta)[1]
@@ -951,3 +954,158 @@ class TestWavefunctionRdmIntegraion:
             rtol=float_comparison_relative_tolerance,
             atol=scf_orbital_tolerance,
         )
+
+    @pytest.fixture
+    def basic_orbitals(self):
+        """Create basic orbitals for testing."""
+        coeffs = np.array([[1.0, 0.0, 0.0], [0.0, 1.0, 0.0], [0.0, 0.0, 1.0]])
+        energies = np.array([-1.0, -0.5, 0.5])  # Two occupied, one virtual
+        basis_set = create_test_basis_set(3, "test-mp2")
+        return Orbitals(coeffs, energies, None, basis_set)
+
+    @pytest.fixture
+    def basic_hamiltonian(self, basic_orbitals):
+        """Create a basic Hamiltonian for testing."""
+        # Create simple 1e and 2e integrals for 3 orbitals
+        h1e = np.array([[-1.0, 0.0, 0.0], [0.0, -0.5, 0.0], [0.0, 0.0, 0.5]])
+        h2e = np.zeros((3, 3, 3, 3))
+        # Add some simple repulsion integrals
+        h2e[0, 0, 0, 0] = 0.5
+        h2e[1, 1, 1, 1] = 0.3
+        h2e[0, 1, 0, 1] = 0.2
+        h2e[1, 0, 1, 0] = 0.2
+
+        core_energy = 0.0
+        inactive_fock = np.eye(0)  # Empty inactive Fock matrix
+        return Hamiltonian(h1e, h2e.flatten(), basic_orbitals, core_energy, inactive_fock)
+
+
+class TestMP2Container:
+    @pytest.fixture
+    def basic_orbitals(self):
+        """Create basic orbitals for testing."""
+        coeffs = np.array([[1.0, 0.0, 0.0], [0.0, 1.0, 0.0], [0.0, 0.0, 1.0]])
+        energies = np.array([-1.0, -0.5, 0.5])  # Two occupied, one virtual
+        basis_set = create_test_basis_set(3, "test-mp2")
+        return Orbitals(coeffs, energies, None, basis_set)
+
+    @pytest.fixture
+    def basic_hamiltonian(self, basic_orbitals):
+        """Create a basic Hamiltonian for testing."""
+        # Create simple 1e and 2e integrals for 3 orbitals
+        h1e = np.array([[-1.0, 0.0, 0.0], [0.0, -0.5, 0.0], [0.0, 0.0, 0.5]])
+        h2e = np.zeros((3, 3, 3, 3))
+        # Add some simple repulsion integrals
+        h2e[0, 0, 0, 0] = 0.5
+        h2e[1, 1, 1, 1] = 0.3
+        h2e[0, 1, 0, 1] = 0.2
+        h2e[1, 0, 1, 0] = 0.2
+
+        core_energy = 0.0
+        inactive_fock = np.eye(0)  # Empty inactive Fock matrix
+        return Hamiltonian(h1e, h2e.flatten(), basic_orbitals, core_energy, inactive_fock)
+
+    @pytest.fixture
+    def reference_wavefunction(self, basic_orbitals):
+        """Create a reference wavefunction for MP2/CC tests."""
+        ref = Configuration("220")  # Two electrons in first two orbitals
+        sd_container = SlaterDeterminantContainer(ref, basic_orbitals)
+        return Wavefunction(sd_container)
+
+    def test_mp2_container_construction(self, basic_hamiltonian, reference_wavefunction):
+        """Test MP2Container construction with lazy evaluation."""
+        mp2_container = MP2Container(basic_hamiltonian, reference_wavefunction)
+
+        assert mp2_container is not None
+
+        # Amplitudes should not be computed initially
+        assert not mp2_container.has_t1_amplitudes(), (
+            "T1 amplitudes should NOT be computed until requested (lazy evaluation)"
+        )
+        assert not mp2_container.has_t2_amplitudes(), (
+            "T2 amplitudes should NOT be computed until requested (lazy evaluation)"
+        )
+
+        # Trigger computations
+        t1_aa, t1_bb = mp2_container.get_t1_amplitudes()
+        t2_abab, t2_aaaa, t2_bbbb = mp2_container.get_t2_amplitudes()
+
+        # amplitudes should now be available
+        assert mp2_container.has_t1_amplitudes(), "T1 amplitudes should be cached after first access"
+        assert mp2_container.has_t2_amplitudes(), "T2 amplitudes should be cached after first access"
+
+        # Verify T1 amplitudes are zero for MP2
+        assert np.allclose(t1_aa, 0.0), "T1 alpha amplitudes should be zero for MP2"
+        assert np.allclose(t1_bb, 0.0), "T1 beta amplitudes should be zero for MP2"
+
+        # Verify T2 amplitudes exist (non-zero)
+        assert t2_abab is not None
+        assert t2_aaaa is not None
+        assert t2_bbbb is not None
+
+
+class TestCCContainer:
+    """Test the CoupledClusterContainer wavefunction container."""
+
+    @pytest.fixture
+    def basic_orbitals(self):
+        """Create basic orbitals for testing."""
+        coeffs = np.array([[1.0, 0.0, 0.0], [0.0, 1.0, 0.0], [0.0, 0.0, 1.0]])
+        energies = np.array([-1.0, -0.5, 0.5])  # Two occupied, one virtual
+        basis_set = create_test_basis_set(3, "test-cc")
+        return Orbitals(coeffs, energies, None, basis_set)
+
+    @pytest.fixture
+    def reference_wavefunction(self, basic_orbitals):
+        """Create a reference wavefunction for CC tests."""
+        ref = Configuration("220")  # Two electrons in first two orbitals
+        sd_container = SlaterDeterminantContainer(ref, basic_orbitals)
+        return Wavefunction(sd_container)
+
+    def test_cc_container_construction(self, basic_orbitals, reference_wavefunction):
+        """Test CoupledClusterContainer construction."""
+        # Create dummy amplitudes for 2 occupied, 1 virtual orbital
+        # T1: nocc * nvir = 2 * 1 = 2
+        t1 = np.array([0.01, 0.02])
+        # T2: nocc * nocc * nvir * nvir = 2 * 2 * 1 * 1 = 4
+        t2 = np.array([0.001, 0.002, 0.003, 0.004])
+
+        # Enable amplitude storage
+        cc_container = CoupledClusterContainer(basic_orbitals, reference_wavefunction, t1, t2)
+
+        assert cc_container is not None
+        assert cc_container.has_t1_amplitudes()
+        assert cc_container.has_t2_amplitudes()
+
+    def test_cc_container_in_wavefunction(self, basic_orbitals, reference_wavefunction):
+        """Test CoupledClusterContainer within a Wavefunction wrapper."""
+        # Create dummy amplitudes
+        # T1: nocc * nvir = 2 * 1 = 2
+        t1 = np.array([0.01, 0.02])
+        # T2: nocc * nocc * nvir * nvir = 2 * 2 * 1 * 1 = 4
+        t2 = np.array([0.001, 0.002, 0.003, 0.004])
+
+        cc_container = CoupledClusterContainer(basic_orbitals, reference_wavefunction, t1, t2)
+        wf = Wavefunction(cc_container)
+
+        # Test container type checking
+        assert wf.get_container_type() == "coupled_cluster"
+
+        # Test getting the container back
+        retrieved_container = wf.get_container()
+        assert retrieved_container is not None
+        assert retrieved_container.has_t1_amplitudes()
+        assert retrieved_container.has_t2_amplitudes()
+
+    def test_cc_container_electron_counts(self, basic_orbitals, reference_wavefunction):
+        """Test getting electron counts from CoupledClusterContainer."""
+        cc_container = CoupledClusterContainer(basic_orbitals, reference_wavefunction)
+        wf = Wavefunction(cc_container)
+
+        n_alpha, n_beta = wf.get_active_num_electrons()
+        assert n_alpha == 2
+        assert n_beta == 2
+
+        n_alpha_total, n_beta_total = wf.get_total_num_electrons()
+        assert n_alpha_total == 2
+        assert n_beta_total == 2
