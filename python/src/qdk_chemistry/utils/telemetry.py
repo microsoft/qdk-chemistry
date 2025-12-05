@@ -9,7 +9,7 @@ To use this API, simply call `log_telemetry` with the metric name, value, and an
 optional properties. The telemetry will be batched and sent at a regular intervals (60 sec),
 and when the process is about to exit.
 
-Disable qdk_chemistry Python telemetry by setting the environment variable `QDK_CHEMISTRY_PYTHON_TELEMETRY=none`.
+Disable qdk_chemistry Python telemetry by setting the environment variable `QDK_CHEMISTRY_PYTHON_TELEMETRY` to any of: `none`, `disabled`, `false`, or `0`.
 """
 
 # --------------------------------------------------------------------------------------------
