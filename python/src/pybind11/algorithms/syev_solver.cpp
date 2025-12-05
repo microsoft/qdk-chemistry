@@ -2,6 +2,7 @@
 // Licensed under the MIT License. See LICENSE.txt in the project root for
 // license information.
 
+#include <pybind11/eigen.h>
 #include <pybind11/numpy.h>
 #include <pybind11/pybind11.h>
 #include <pybind11/stl.h>
@@ -42,11 +43,7 @@ py::tuple dense_matrix_solver(const py::array_t<double>& matrix) {
     throw std::runtime_error("LAPACK syev failed to compute eigenvalues.");
   }
 
-  // Convert results to NumPy arrays
-  py::array_t<double> eigenvalues(w.size(), w.data());
-  py::array_t<double> eigenvectors({n, n}, a.data());
-
-  return py::make_tuple(eigenvalues, eigenvectors);
+  return py::make_tuple(w, a);
 }
 
 /**

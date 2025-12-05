@@ -50,8 +50,8 @@ class QubitHamiltonianSolverFactory(AlgorithmFactory):
         return "qubit_hamiltonian_solver"
 
     def default_algorithm_name(self) -> str:
-        """Return ``sparse_matrix_solver`` as the default algorithm name."""
-        return "sparse_matrix_solver"
+        """Return ``qdk_sparse_matrix_solver`` as the default algorithm name."""
+        return "qdk_sparse_matrix_solver"
 
 
 class SparseMatrixSolverSettings(Settings):
@@ -97,7 +97,7 @@ class SparseMatrixSolver(QubitHamiltonianSolver):
 
     def name(self) -> str:
         """Return the name of the qubit hamiltonian solver."""
-        return "sparse_matrix_solver"
+        return "qdk_sparse_matrix_solver"
 
 
 class DenseMatrixSolver(QubitHamiltonianSolver):
@@ -121,9 +121,9 @@ class DenseMatrixSolver(QubitHamiltonianSolver):
         dense_matrix_real = dense_matrix.real.copy()
         eigenvalues, eigenvectors = syev_solver(dense_matrix_real)
         ground_state_energy = eigenvalues[0]
-        ground_state_vector = eigenvectors[0]
+        ground_state_vector = eigenvectors[:, 0]
         return ground_state_energy, ground_state_vector
 
     def name(self) -> str:
         """Return the name of the qubit hamiltonian solver."""
-        return "dense_matrix_solver"
+        return "qdk_dense_matrix_solver"

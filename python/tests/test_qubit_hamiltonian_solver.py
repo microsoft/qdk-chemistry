@@ -17,7 +17,7 @@ from .reference_tolerances import float_comparison_absolute_tolerance, float_com
 def test_dense_matrix_solver_for_small_system():
     """Test dense matrix solver for small qubit systems."""
     qubit_hamiltonian = QubitHamiltonian(["ZZ", "XX"], [1.0, 0.5])
-    q_solver = create("qubit_hamiltonian_solver", "dense_matrix_solver")
+    q_solver = create("qubit_hamiltonian_solver", "qdk_dense_matrix_solver")
     assert isinstance(q_solver, DenseMatrixSolver)
 
     energy, state = q_solver.run(qubit_hamiltonian)
@@ -34,7 +34,7 @@ def test_sparse_matrix_solver():
     qubit_hamiltonian = QubitHamiltonian(
         ["ZZII", "YYII", "XXII", "IIZZ", "IIYY", "IIXX"], [1.0, 0.5, 0.5, 1.0, 0.5, 0.5]
     )
-    q_solver = create("qubit_hamiltonian_solver", "sparse_matrix_solver")
+    q_solver = create("qubit_hamiltonian_solver", "qdk_sparse_matrix_solver")
     assert isinstance(q_solver, SparseMatrixSolver)
     assert np.isclose(
         q_solver.settings().tol,

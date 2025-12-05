@@ -68,7 +68,7 @@ def test_syev_solver_heisenberg_model():
 
     # Verify eigenvectors by reconstructing the matrix
     for i in range(len(expected_eigenvectors)):
-        dot = float(np.dot(eigenvectors[i, :], expected_eigenvectors[i]))
+        dot = float(np.dot(eigenvectors[:, i], expected_eigenvectors[i]))
         assert np.isclose(
             abs(dot), 1.0, atol=float_comparison_absolute_tolerance, rtol=float_comparison_relative_tolerance
         )
