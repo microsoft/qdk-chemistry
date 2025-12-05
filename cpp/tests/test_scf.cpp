@@ -994,8 +994,10 @@ TEST_F(ScfTest, AtomInitGuessEnergyConvergence) {
   auto scf_solver = ScfSolverFactory::create();
   scf_solver->settings().set("method", "hf");
   std::vector<std::string> basis_names = {"def2-tzvp"};
-  std::vector<std::string> singlet_elements = {"He", "Be", "C", "Fe", "Sr"};
-  std::vector<std::string> multiplet_elements = {"N", "Na", "Co", "Se"};
+  std::vector<std::string> singlet_elements = {"He", "Be", "C",
+                                               "Fe", "Sr", "Pt"};
+  std::vector<std::string> multiplet_elements = {"N",  "Na", "Y",
+                                                 "In", "Au", "Rb"};
 
   for (const auto& basis_name : basis_names) {
     for (const auto& element : singlet_elements) {

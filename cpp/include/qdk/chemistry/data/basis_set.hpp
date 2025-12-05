@@ -328,10 +328,14 @@ class BasisSet : public DataClass,
    */
   BasisSet& operator=(BasisSet&& other) noexcept = default;
 
-  /*
-   * @brief Name for custom basis sets
-   */
+  /** @brief Name for custom basis sets */
   inline const static std::string custom_name = "custom_basis_set";
+
+  /** @brief Name for custom ecps */
+  inline const static std::string custom_ecp_name = "custom_ecp";
+
+  /** @brief Default name for default ecp */
+  inline const static std::string default_ecp_name = "default_ecp";
 
   /**
    * @brief Get supported basis set names
@@ -340,12 +344,26 @@ class BasisSet : public DataClass,
   static std::vector<std::string> get_supported_basis_set_names();
 
   /**
+   * @brief Get supported ECP basis set names
+   * @return Vector of supported ECP basis set names
+   */
+  static std::vector<std::string> get_supported_ecp_names();
+
+  /**
    * @brief Get supported elements for a given basis set
    * @param basis_name Name of the basis set
    * @return Vector of supported elements as enum
    */
   static std::vector<Element> get_supported_elements_for_basis_set(
       std::string basis_name);
+
+  /**
+   * @brief Get supported elements for a given ECP basis set
+   * @param ecp_name Name of the ECP basis set
+   * @return Vector of supported elements as enum
+   */
+  static std::vector<Element> get_supported_elements_for_ecp(
+      std::string ecp_name);
 
   /**
    * @brief Constructor with basis set name and structure
@@ -357,6 +375,7 @@ class BasisSet : public DataClass,
    */
   static std::shared_ptr<BasisSet> from_basis_name(
       const std::string& basis_name, const Structure& structure,
+      const std::string& ecp_name = default_ecp_name,
       AOType atomic_orbital_type = AOType::Spherical);
 
   /**
@@ -368,7 +387,8 @@ class BasisSet : public DataClass,
    * @return Shared pointer to the created BasisSet
    */
   static std::shared_ptr<BasisSet> from_basis_name(
-      const std::string& basis_name, std::shared_ptr<Structure> structure,
+      std::string basis_name, std::shared_ptr<Structure> structure,
+      std::string ecp_name = default_ecp_name,
       AOType atomic_orbital_type = AOType::Spherical);
 
   /**
@@ -382,6 +402,7 @@ class BasisSet : public DataClass,
   static std::shared_ptr<BasisSet> from_element_map(
       const std::map<std::string, std::string>& element_to_basis_map,
       const Structure& structure,
+      const std::map<std::string, std::string>& element_to_ecp_map = {},
       AOType atomic_orbital_type = AOType::Spherical);
 
   /**
@@ -395,6 +416,7 @@ class BasisSet : public DataClass,
   static std::shared_ptr<BasisSet> from_element_map(
       const std::map<std::string, std::string>& element_to_basis_map,
       std::shared_ptr<Structure> structure,
+      const std::map<std::string, std::string>& element_to_ecp_map = {},
       AOType atomic_orbital_type = AOType::Spherical);
 
   /**
@@ -409,6 +431,7 @@ class BasisSet : public DataClass,
   static std::shared_ptr<BasisSet> from_index_map(
       const std::map<size_t, std::string>& index_to_basis_map,
       const Structure& structure,
+      const std::map<size_t, std::string>& index_to_ecp_map = {},
       AOType atomic_orbital_type = AOType::Spherical);
 
   /**
@@ -423,6 +446,7 @@ class BasisSet : public DataClass,
   static std::shared_ptr<BasisSet> from_index_map(
       const std::map<size_t, std::string>& index_to_basis_map,
       std::shared_ptr<Structure> structure,
+      const std::map<size_t, std::string>& index_to_ecp_map = {},
       AOType atomic_orbital_type = AOType::Spherical);
 
   /**

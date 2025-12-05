@@ -63,9 +63,13 @@ SCFImpl::SCFImpl(std::shared_ptr<Molecule> mol_ptr, const SCFConfig& cfg,
     ctx_.basis_set = basis_set;
   }
   if (cfg.do_dfj) {
-    ctx_.aux_basis_set =
-        BasisSet::from_database_json(mol_ptr, cfg.aux_basis, cfg.basis_mode,
-                                     !cfg.cartesian /*pure*/, true /*sort*/);
+    if (basis_set == nullptr) {
+      ctx_.aux_basis_set =
+          BasisSet::from_database_json(mol_ptr, cfg.aux_basis, cfg.basis_mode,
+                                       !cfg.cartesian /*pure*/, true /*sort*/);
+    } else {
+      ctx_.aux_basis_set = basis_set;
+    }
   }
   if (cfg.output_basis_mode == BasisMode::RAW) {
     // create an unnormalized raw basis for output only

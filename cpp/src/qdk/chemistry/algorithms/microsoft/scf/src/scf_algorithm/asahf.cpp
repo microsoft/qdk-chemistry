@@ -113,19 +113,43 @@ std::shared_ptr<BasisSet> make_atom_basis_set(int index,
                                               const BasisSet& basis_set,
                                               std::shared_ptr<Molecule> mol) {
   std::vector<Shell> shells;
+  std::vector<Shell> ecp_shells;
+  int total_ecp_electrons = 0;
+  std::unordered_map<int, int> ecp_electrons;
 
   // Filter shells belonging to the specified atomic number
   for (const auto& shell : basis_set.shells) {
     if (shell.atom_index == index) {
       Shell tmp_shell = shell;
-      tmp_shell.atom_index = 0;  // reset atom index for single atom
+      tmp_shell.O = {0.0, 0.0, 0.0};  // reset center for single atom
+      tmp_shell.atom_index = 0;       // reset atom index for single atom
       shells.push_back(tmp_shell);
     }
   }
 
+  // Filter ECP shells belonging to the specified atomic number
+  for (const auto& shell : basis_set.ecp_shells) {
+    if (shell.atom_index == index) {
+      Shell tmp_shell = shell;
+      tmp_shell.atom_index = 0;       // reset atom index for single atom
+      tmp_shell.O = {0.0, 0.0, 0.0};  // reset center for single atom
+      ecp_shells.push_back(tmp_shell);
+    }
+  }
+
+  // get element from mol to get the ecp electrons from map
+  auto atomic_number = mol->atomic_nums[0];
+  if (basis_set.element_ecp_electrons.find(atomic_number) !=
+      basis_set.element_ecp_electrons.end()) {
+    ecp_electrons[atomic_number] =
+        basis_set.element_ecp_electrons.at(atomic_number);
+    total_ecp_electrons = ecp_electrons[atomic_number];
+  }
+
   // Create a new BasisSet for the atom
   return std::shared_ptr<BasisSet>(
-      new BasisSet(mol, shells, basis_set.mode, basis_set.pure, true));
+      new BasisSet(mol, shells, ecp_shells, ecp_electrons, total_ecp_electrons,
+                   basis_set.mode, basis_set.pure, true));
 }
 }  // namespace detail
 

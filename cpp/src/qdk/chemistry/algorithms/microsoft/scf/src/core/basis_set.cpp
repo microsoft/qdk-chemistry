@@ -122,6 +122,61 @@ std::shared_ptr<BasisSet> BasisSet::from_database_json(
 }
 
 BasisSet::BasisSet(std::shared_ptr<Molecule> mol, std::vector<Shell> shells,
+                   std::vector<Shell> ecp_shells,
+                   std::unordered_map<int, int> element_ecp_electrons,
+                   int n_ecp_electrons, BasisMode mode, bool pure, bool sort)
+    : mol(mol),
+      mode(mode),
+      pure(pure),
+      shells(shells),
+      ecp_shells(ecp_shells),
+      element_ecp_electrons(element_ecp_electrons),
+      n_ecp_electrons(n_ecp_electrons) {
+#ifdef QDK_CHEMISTRY_ENABLE_MPI
+  if (mpi::get_world_size() > 1) {
+    MPI_Barrier(MPI_COMM_WORLD);
+  }
+#endif
+  if (mode == BasisMode::PSI4) {
+    norm_psi4_mode(shells);
+  }  // RAW branch doesn't normalize
+
+  if (sort) {
+    std::stable_sort(shells.begin(), shells.end(),
+                     [](const auto& x, const auto& y) {
+                       return x.angular_momentum != y.angular_momentum
+                                  ? x.angular_momentum < y.angular_momentum
+                                  : x.contraction < y.contraction;
+                     });
+
+    std::stable_sort(ecp_shells.begin(), ecp_shells.end(),
+                     [](const auto& x, const auto& y) {
+                       return x.angular_momentum != y.angular_momentum
+                                  ? x.angular_momentum < y.angular_momentum
+                                  : x.contraction < y.contraction;
+                     });
+  }
+
+  num_atomic_orbitals = std::accumulate(
+      shells.begin(), shells.end(), 0, [&pure](auto sum, const auto& sh) {
+        int sz = 0;
+        if (pure) {
+          sz = 2 * sh.angular_momentum + 1;
+        } else {
+          sz = (sh.angular_momentum + 1) * (sh.angular_momentum + 2) / 2;
+        }
+        return sum + sz;
+      });
+
+  // Calculate atom -> bf idx map
+  calc_atom2ao();
+
+  if (libint2::initialized()) {
+    shell_pairs_ = OneBodyIntegral::compute_shell_pairs(shells);
+  }
+}
+
+BasisSet::BasisSet(std::shared_ptr<Molecule> mol, std::vector<Shell> shells,
                    BasisMode mode, bool pure, bool sort)
     : mol(mol), mode(mode), pure(pure), shells(shells) {
 #ifdef QDK_CHEMISTRY_ENABLE_MPI
@@ -348,6 +403,9 @@ Shell Shell::from_json(const nlohmann::ordered_json& rec,
   std::vector<int> rpow;
   if (rec.contains("r_exp")) {
     rpow = rec["r_exp"].template get<std::vector<int>>();
+    // check for alternative name
+  } else if (rec.contains("rpowers")) {
+    rpow = rec["rpowers"].template get<std::vector<int>>();
   }
   sh.contraction = exp.size();
   VERIFY(sh.contraction == coeff.size());
@@ -370,7 +428,8 @@ nlohmann::ordered_json Shell::to_json(const bool& is_ecp) const {
               {"exp", std::vector<double>(exponents, exponents + contraction)},
               {"coeff",
                std::vector<double>(coefficients, coefficients + contraction)},
-              {"r_exp", std::vector<int>(rpowers, rpowers + contraction)}};
+              {"r_exp", std::vector<int>(rpowers, rpowers + contraction)},
+              {"rpowers", std::vector<int>(rpowers, rpowers + contraction)}};
   } else {
     record = {{"atom", atom_index},
               {"am", angular_momentum},

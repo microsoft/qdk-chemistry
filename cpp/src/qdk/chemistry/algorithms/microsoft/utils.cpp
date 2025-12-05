@@ -248,17 +248,24 @@ qdk::chemistry::data::BasisSet convert_basis_set_to_qdk(
 }
 
 std::shared_ptr<qcs::BasisSet> convert_basis_set_from_qdk(
-    const qdk::chemistry::data::BasisSet& qdk_basis_set, bool raw) {
+    const qdk::chemistry::data::BasisSet& qdk_basis_set, bool keep_raw) {
   // Create internal Molecule from the structure
   auto structure = qdk_basis_set.get_structure();
   auto mol = convert_to_molecule(*structure, 0,
                                  1);  // Default charge=0, multiplicity=1
 
+  // remove number of ecp electrons from atomic charges
+  auto ecp_electrons = qdk_basis_set.get_ecp_electrons();
+  for (size_t i = 0; i < mol->n_atoms; ++i) {
+    int n_core_electrons = static_cast<int>(ecp_electrons[i]);
+    mol->atomic_charges[i] = mol->atomic_nums[i] - n_core_electrons;
+  }
+
   auto basis_json = convert_to_json(qdk_basis_set);
   auto internal_basis_set =
       qcs::BasisSet::from_serialized_json(mol, basis_json);
 
-  if (internal_basis_set->mode == qcs::BasisMode::RAW && raw) {
+  if (internal_basis_set->mode == qcs::BasisMode::RAW && !keep_raw) {
     _norm_psi4_mode(internal_basis_set->shells);
     internal_basis_set->mode = qcs::BasisMode::PSI4;
   }

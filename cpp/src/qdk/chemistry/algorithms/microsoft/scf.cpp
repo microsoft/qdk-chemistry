@@ -116,6 +116,15 @@ std::pair<double, std::shared_ptr<data::Wavefunction>> ScfSolver::_run_impl(
   // Create Molecule object
   auto ms_mol = qdk::chemistry::utils::microsoft::convert_to_molecule(
       *structure, charge, multiplicity);
+  // update atomic charges for ECPs
+  if (use_explicit_basis_set) {
+    // iterate through atoms and adjust charges
+    auto ecp_electrons = qdk_raw_basis_set->get_ecp_electrons();
+    for (size_t i = 0; i < ms_mol->n_atoms; ++i) {
+      int n_core_electrons = static_cast<int>(ecp_electrons[i]);
+      ms_mol->atomic_charges[i] = ms_mol->atomic_nums[i] - n_core_electrons;
+    }
+  }
 
   // Create SCFConfig
   auto ms_scf_config = std::make_unique<qcs::SCFConfig>();
@@ -202,7 +211,7 @@ std::pair<double, std::shared_ptr<data::Wavefunction>> ScfSolver::_run_impl(
                              utils::microsoft::convert_basis_set_from_qdk(
                                  *qdk_raw_basis_set),
                              utils::microsoft::convert_basis_set_from_qdk(
-                                 *qdk_raw_basis_set, false))
+                                 *qdk_raw_basis_set, true))
                        : qcs::SCF::make_hf_solver(ms_mol, *ms_scf_config)
              : (use_explicit_basis_set)
                  ? qcs::SCF::make_ks_solver(
@@ -210,10 +219,10 @@ std::pair<double, std::shared_ptr<data::Wavefunction>> ScfSolver::_run_impl(
                        utils::microsoft::convert_basis_set_from_qdk(
                            *qdk_raw_basis_set),
                        utils::microsoft::convert_basis_set_from_qdk(
-                           *qdk_raw_basis_set, false))
+                           *qdk_raw_basis_set, true))
                  : qcs::SCF::make_ks_solver(ms_mol, *ms_scf_config);
 
-  // Extract the basis set (rename to avoid conflict)
+  // Extract the basis set
   if (!use_explicit_basis_set) {
     qdk_raw_basis_set = std::make_shared<qdk::chemistry::data::BasisSet>(
         utils::microsoft::convert_basis_set_to_qdk(
