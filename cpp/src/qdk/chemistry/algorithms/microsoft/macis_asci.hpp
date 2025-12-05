@@ -63,7 +63,12 @@ class MacisAsciSettings : public MultiConfigurationSettings {
                         macis_defaults.nxtval_bcount_thresh);
     set_default<size_t>("nxtval_bcount_inc", macis_defaults.nxtval_bcount_inc);
     set_default<bool>("just_singles", macis_defaults.just_singles);
-    set_default<size_t>("grow_factor", macis_defaults.grow_factor);
+    set_default<double>("grow_factor", macis_defaults.grow_factor);
+    set_default<double>("min_grow_factor", macis_defaults.min_grow_factor);
+    set_default<double>("growth_backoff_rate",
+                        macis_defaults.growth_backoff_rate);
+    set_default<double>("growth_recovery_rate",
+                        macis_defaults.growth_recovery_rate);
     set_default<size_t>("max_refine_iter", macis_defaults.max_refine_iter);
     set_default<bool>("grow_with_rot", macis_defaults.grow_with_rot);
     set_default<size_t>("rot_size_start", macis_defaults.rot_size_start);
