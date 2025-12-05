@@ -24,6 +24,10 @@ namespace qdk::chemistry::algorithms::microsoft {
 
 namespace qcs = qdk::chemistry::scf;
 
+// Type aliases
+using RowMajorMatrix =
+    Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor>;
+
 namespace detail {
 /**
  * @brief Compute trial Fock matrix for stability analysis
@@ -41,7 +45,7 @@ namespace detail {
  * @param J_scratch Scratch matrix for J contributions (also used for XC)
  * @param K_scratch Scratch matrix for K contributions
  */
-void compute_trial_fock(const std::shared_ptr<qcs::ERIMultiplexer>& eri,
+void compute_trial_fock(const std::shared_ptr<qcs::ERI>& eri,
                         const std::shared_ptr<qcs::EXC>& exc,
                         const RowMajorMatrix& trial_density,
                         const RowMajorMatrix& ground_density,
@@ -106,7 +110,7 @@ class StabilityOperator {
   const Eigen::VectorXd& eigen_diff_;
   const Eigen::MatrixXd& Ca_;
   const Eigen::MatrixXd& Cb_;
-  std::shared_ptr<qcs::ERIMultiplexer> eri_;
+  std::shared_ptr<qcs::ERI> eri_;
   std::shared_ptr<qcs::EXC> exc_;
   const RowMajorMatrix& ground_density_;
 
@@ -116,15 +120,15 @@ class StabilityOperator {
    * This function computes Y += alpha * (A+B)*X,
    * See J. Chem. Phys. 66, 3045 (1977) for the definition of A and B.
    *
-   * @param X Input vectors (eigensize x num_vectors)
-   * @param Y Output vectors (eigensize x num_vectors), updated to Y +=
-   * alpha*(A+B)*X
+   * @param X_ptr Pointer to input vectors (eigensize x num_vectors in
+   * column-major)
+   * @param Y_ptr Pointer to output vectors (eigensize x num_vectors in
+   * column-major)
+   * @param num_vectors Number of vectors to process
    * @param alpha Scaling factor for the result
    */
-  void apply_stability_operator(const Eigen::MatrixXd& X, Eigen::MatrixXd& Y,
-                                double alpha) const {
-    AutoTimer __timer("stability:: apply_A_operator");
-
+  void apply_stability_operator(const double* X_ptr, double* Y_ptr,
+                                size_t num_vectors, double alpha) const {
     // Calculate sizes
     const size_t num_atomic_orbitals = Ca_.rows();
     const size_t num_molecular_orbitals = Ca_.cols();
@@ -137,18 +141,7 @@ class StabilityOperator {
     const size_t nova = num_alpha_ * num_alpha_virtual_orbitals;
     const size_t eigensize =
         unrestricted ? nova + num_beta_ * num_beta_virtual_orbitals : nova;
-    const size_t num_vectors = X.cols();
 
-    if (X.rows() != static_cast<int>(eigensize)) {
-      throw std::runtime_error(
-          "Matrix size mismatch in stability operator: X.rows() = " +
-          std::to_string(X.rows()) + ", expected " + std::to_string(eigensize));
-    }
-    if (Y.rows() != static_cast<int>(eigensize) ||
-        Y.cols() != static_cast<int>(num_vectors)) {
-      throw std::runtime_error(
-          "Matrix size mismatch in stability operator: Y dimensions incorrect");
-    }
     if (eigen_diff_.size() != static_cast<int>(eigensize)) {
       throw std::runtime_error(
           "Preconditioner size mismatch in stability operator");
@@ -175,8 +168,8 @@ class StabilityOperator {
 
     // For each right-hand side, apply the operator
     for (size_t vec = 0; vec < num_vectors; ++vec) {
-      const double* X_vec = X.col(vec).data();
-      double* Y_vec = Y.col(vec).data();
+      const double* X_vec = X_ptr + vec * eigensize;
+      double* Y_vec = Y_ptr + vec * eigensize;
 
       // calculate orbital energy difference term using preconditioner diagonal
       for (size_t idx = 0; idx < eigensize; ++idx) {
@@ -189,13 +182,13 @@ class StabilityOperator {
       // Step 1: temp = Ca_vir * X (temp is num_atomic_orbitals x num_alpha in
       // ColMajor)
       blas::gemm(blas::Layout::ColMajor, blas::Op::NoTrans, blas::Op::NoTrans,
-                 num_atomic_orbitals, num_alpha, num_alpha_virtual_orbitals,
+                 num_atomic_orbitals, num_alpha_, num_alpha_virtual_orbitals,
                  1.0, Ca_vir_ptr, num_atomic_orbitals, X_vec,
                  num_alpha_virtual_orbitals, 0.0, temp, num_atomic_orbitals);
       blas::gemm(blas::Layout::ColMajor, blas::Op::NoTrans, blas::Op::Trans,
-                 num_atomic_orbitals, num_atomic_orbitals, num_alpha, 1.0, temp,
-                 num_atomic_orbitals, Ca_occ_ptr, num_atomic_orbitals, 0.0,
-                 trial_density.data(), num_atomic_orbitals);
+                 num_atomic_orbitals, num_atomic_orbitals, num_alpha_, 1.0,
+                 temp, num_atomic_orbitals, Ca_occ_ptr, num_atomic_orbitals,
+                 0.0, trial_density.data(), num_atomic_orbitals);
       for (size_t i = 0; i < num_atomic_orbitals; ++i)
         for (size_t j = i; j < num_atomic_orbitals; ++j) {
           const auto symm_ij = trial_density(i, j) + trial_density(j, i);
@@ -204,12 +197,12 @@ class StabilityOperator {
         }
       if (unrestricted) {
         blas::gemm(blas::Layout::ColMajor, blas::Op::NoTrans, blas::Op::NoTrans,
-                   num_atomic_orbitals, num_beta, num_beta_virtual_orbitals,
+                   num_atomic_orbitals, num_beta_, num_beta_virtual_orbitals,
                    1.0, Cb_vir_ptr, num_atomic_orbitals, X_vec + nova,
                    num_beta_virtual_orbitals, 0.0, temp, num_atomic_orbitals);
         blas::gemm(
             blas::Layout::ColMajor, blas::Op::NoTrans, blas::Op::Trans,
-            num_atomic_orbitals, num_atomic_orbitals, num_beta, 1.0, temp,
+            num_atomic_orbitals, num_atomic_orbitals, num_beta_, 1.0, temp,
             num_atomic_orbitals, Cb_occ_ptr, num_atomic_orbitals, 0.0,
             trial_density.data() + num_atomic_orbitals * num_atomic_orbitals,
             num_atomic_orbitals);
@@ -229,23 +222,23 @@ class StabilityOperator {
       // ABX_{ia} = \sum_{uv} C_{ui} F_{uv} C_{av}
       // Step 1: temp = trial_fock^T * Ca_occ, trial_fock is symmetric
       blas::gemm(blas::Layout::ColMajor, blas::Op::Trans, blas::Op::NoTrans,
-                 num_atomic_orbitals, num_alpha, num_atomic_orbitals, 1.0,
+                 num_atomic_orbitals, num_alpha_, num_atomic_orbitals, 1.0,
                  trial_fock.data(), num_atomic_orbitals, Ca_occ_ptr,
                  num_atomic_orbitals, 0.0, temp, num_atomic_orbitals);
       // Step 2: Y_vec += alpha * Ca_vir^T * temp
       blas::gemm(blas::Layout::ColMajor, blas::Op::Trans, blas::Op::NoTrans,
-                 num_alpha_virtual_orbitals, num_alpha, num_atomic_orbitals,
+                 num_alpha_virtual_orbitals, num_alpha_, num_atomic_orbitals,
                  alpha, Ca_vir_ptr, num_atomic_orbitals, temp,
                  num_atomic_orbitals, 1.0, Y_vec, num_alpha_virtual_orbitals);
       if (unrestricted) {
         blas::gemm(
             blas::Layout::ColMajor, blas::Op::Trans, blas::Op::NoTrans,
-            num_atomic_orbitals, num_beta, num_atomic_orbitals, 1.0,
+            num_atomic_orbitals, num_beta_, num_atomic_orbitals, 1.0,
             trial_fock.data() + num_atomic_orbitals * num_atomic_orbitals,
             num_atomic_orbitals, Cb_occ_ptr, num_atomic_orbitals, 0.0, temp,
             num_atomic_orbitals);
         blas::gemm(blas::Layout::ColMajor, blas::Op::Trans, blas::Op::NoTrans,
-                   num_beta_virtual_orbitals, num_beta, num_atomic_orbitals,
+                   num_beta_virtual_orbitals, num_beta_, num_atomic_orbitals,
                    alpha, Cb_vir_ptr, num_atomic_orbitals, temp,
                    num_atomic_orbitals, 1.0, Y_vec + nova,
                    num_beta_virtual_orbitals);
@@ -257,7 +250,7 @@ class StabilityOperator {
   StabilityOperator(size_t num_alpha, size_t num_beta,
                     const Eigen::VectorXd& eigen_diff,
                     const Eigen::MatrixXd& Ca, const Eigen::MatrixXd& Cb,
-                    std::shared_ptr<qcs::ERIMultiplexer> eri,
+                    std::shared_ptr<qcs::ERI> eri,
                     std::shared_ptr<qcs::EXC> exc,
                     const RowMajorMatrix& ground_density)
       : num_alpha_(num_alpha),
@@ -273,19 +266,17 @@ class StabilityOperator {
                        double beta, double* AV, size_t LDAV) const {
     const size_t N = eigen_diff_.size();
 
-    // Wrap input and output pointers as Eigen matrices
-    Eigen::Map<const Eigen::MatrixXd> X(V, N, m);
-    Eigen::Map<Eigen::MatrixXd> Y(AV, N, m);
-
     // Scale Y by beta (Y = beta * Y)
     if (beta == 0.0) {
-      Y.setZero();
+      std::fill_n(AV, N * m, 0.0);
     } else if (beta != 1.0) {
-      Y *= beta;
+      for (size_t i = 0; i < N * m; ++i) {
+        AV[i] *= beta;
+      }
     }
 
     // Apply the stability operator: Y += alpha * (A+B) * X
-    apply_stability_operator(X, Y, alpha);
+    apply_stability_operator(V, AV, m, alpha);
   }
 };
 
@@ -296,6 +287,7 @@ StabilityChecker::_run_impl(
     std::shared_ptr<data::Wavefunction> wavefunction) const {
   // Initialize the backend if not already done
   utils::microsoft::initialize_backend();
+  spdlog::set_level(spdlog::level::info);
 
   // Extract settings
   const int64_t davidson_max_subspace =
@@ -323,8 +315,15 @@ StabilityChecker::_run_impl(
       wavefunction->get_total_num_electrons();
   bool unrestricted = orbitals->is_unrestricted();
 
+  // Throw error if the scf is ROHF/ROKS
+  if (!unrestricted && n_beta_electrons != n_beta_electrons) {
+    throw std::runtime_error(
+        "ROHF/ROKS is currently not supported in internal-backended stability "
+        "checker. Please use pySCF instead.");
+  }
+
   // Set sizes
-  size_t num_density_matrices = unrestricted ? 2.0 : 1.0;
+  size_t num_density_matrices = unrestricted ? 2 : 1;
   const auto num_virtual_alpha_orbitals =
       num_molecular_orbitals - n_alpha_electrons;
   const auto num_virtual_beta_orbitals =
@@ -357,7 +356,7 @@ StabilityChecker::_run_impl(
   }
 
   // Create ERI instance
-  std::shared_ptr<qcs::ERIMultiplexer> eri;
+  std::shared_ptr<qcs::ERI> eri;
   eri = qcs::ERIMultiplexer::create(*basis_set_internal, *scf_config, 0.0);
 
   // Build density matrix
