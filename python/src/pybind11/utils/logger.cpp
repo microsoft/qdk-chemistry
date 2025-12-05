@@ -188,7 +188,6 @@ Examples:
 
 See Also:
     :meth:`get_global_level`: Get the current log level
-    :meth:`disable_all`: Disable all logging
 
 )");
 
@@ -245,19 +244,19 @@ Examples:
       []() -> std::string {
         auto level = qdk::chemistry::utils::Logger::get_global_level();
         switch (level) {
-          case spdlog::level::trace:
+          case qdk::chemistry::utils::LogLevel::trace:
             return "trace";
-          case spdlog::level::debug:
+          case qdk::chemistry::utils::LogLevel::debug:
             return "debug";
-          case spdlog::level::info:
+          case qdk::chemistry::utils::LogLevel::info:
             return "info";
-          case spdlog::level::warn:
+          case qdk::chemistry::utils::LogLevel::warn:
             return "warn";
-          case spdlog::level::err:
+          case qdk::chemistry::utils::LogLevel::error:
             return "error";
-          case spdlog::level::critical:
+          case qdk::chemistry::utils::LogLevel::critical:
             return "critical";
-          case spdlog::level::off:
+          case qdk::chemistry::utils::LogLevel::off:
             return "off";
           default:
             return "unknown";
@@ -297,28 +296,7 @@ Examples:
     Then in Python::
 
         >>> from qdk_chemistry.utils import Logger
-        >>> Logger.load_env_levels()  # Applies SPDLOG_LEVEL=debug
-
-)");
-
-  logger_module.def("disable_all", &qdk::chemistry::utils::Logger::disable_all,
-                    R"(
-Disable all logging output.
-
-Convenience function that sets the global level to "off", completely
-suppressing all log messages from both Python and C++ code.
-
-Note:
-    This is useful for performance-critical sections or when running
-    in silent mode.
-
-Examples:
-    >>> from qdk_chemistry.utils import Logger
-    >>> Logger.disable_all()
-    >>> Logger.info("This won't appear")
-
-See Also:
-    :meth:`set_global_level`: For finer control over log levels
+        >>> Logger.load_env_levels()  // Applies SPDLOG_LEVEL=debug
 
 )");
 

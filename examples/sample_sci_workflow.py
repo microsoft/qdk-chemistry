@@ -27,8 +27,6 @@ from qdk_chemistry.utils.wavefunction import (
     get_active_determinants_info,
 )
 
-Logger.set_global_level("info")
-
 DEFAULT_ENERGY_TOLERANCE = 1.0e-3  # Hartree
 DEFAULT_MAX_DETERMINANTS = 2000
 
@@ -217,4 +215,5 @@ def main(argv: Sequence[str] | None = None) -> None:
 
 
 if __name__ == "__main__":
+    Logger.set_global_level("info")
     main()

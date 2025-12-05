@@ -3,7 +3,6 @@
 // license information.
 
 #include <gtest/gtest.h>
-#include <spdlog/spdlog.h>
 
 #include <qdk/chemistry/utils/logger.hpp>
 
@@ -75,16 +74,16 @@ TEST_F(LoggerTest, ContextLoggerLevelsWork) {
 TEST_F(LoggerTest, GlobalLevelControl) {
   // Set to info level
   Logger::set_global_level(LogLevel::info);
-  EXPECT_EQ(Logger::get_global_level(), spdlog::level::info);
+  EXPECT_EQ(Logger::get_global_level(), LogLevel::info);
 
   EXPECT_NO_THROW({
     QDK_LOGGER().info("This should appear");
     QDK_LOGGER().debug("This should be suppressed");
   });
 
-  // Disable all logging
-  Logger::disable_all();
-  EXPECT_EQ(Logger::get_global_level(), spdlog::level::off);
+  // Disable all logging via LogLevel::off
+  Logger::set_global_level(LogLevel::off);
+  EXPECT_EQ(Logger::get_global_level(), LogLevel::off);
 
   EXPECT_NO_THROW({ QDK_LOGGER().critical("This should be suppressed"); });
 }
@@ -130,46 +129,16 @@ TEST_F(LoggerTest, LogTraceEnteringMacro) {
   EXPECT_NO_THROW({ QDK_LOG_TRACE_ENTERING(); });
 }
 
-TEST_F(LoggerTest, LogTraceEnteringFormat) {
-  Logger::set_global_level(LogLevel::trace);
-
-  // log_trace_entering outputs: "[file_context] Entering method_name"
-  // Verify it doesn't throw and uses the correct format
-  EXPECT_NO_THROW({ QDK_LOG_TRACE_ENTERING(); });
-}
-
 TEST_F(LoggerTest, GetSourceContext) {
   auto context = Logger::get_source_context();
   // Context is non-empty (either a valid path or "unknown")
   EXPECT_FALSE(context.empty());
 }
 
-TEST_F(LoggerTest, GetSourceContextForQdkPath) {
-  // Test that path_to_colon_string works correctly for qdk paths
-  std::string qdk_path =
-      "/workspaces/qdk_chem/cpp/src/qdk/chemistry/utils/logger.cpp";
-  std::string result = path_to_colon_string(qdk_path, "qdk");
-  EXPECT_EQ(result, "qdk:chemistry:utils:logger");
-  EXPECT_NE(result.find("logger"), std::string::npos);
-}
-
 TEST_F(LoggerTest, GetSourceContextReturnsUnknownForNonQdkPath) {
-  // Test files are not under qdk/ directory
-  std::string test_path = "/workspaces/qdk_chem/cpp/tests/test_logger.cpp";
-  std::string result = path_to_colon_string(test_path, "qdk");
-  EXPECT_TRUE(result.empty());  // No qdk/ segment found
-
-  // Therefore get_source_context returns "unknown" for test files
+  // Test files are not under qdk/ directory, so context should be "unknown"
   auto context = Logger::get_source_context();
   EXPECT_EQ(context, "unknown");
-}
-
-TEST_F(LoggerTest, ExtractMethodName) {
-  // Test method name extraction
-  EXPECT_EQ(extract_method_name("void MyClass::myMethod(int)"), "myMethod");
-  EXPECT_EQ(extract_method_name("MyClass::MyClass()"), "MyClass constructor");
-  EXPECT_EQ(extract_method_name("globalFunction(std::string)"),
-            "globalFunction");
 }
 
 // Manual test that shows actual output

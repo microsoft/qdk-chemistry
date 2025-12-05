@@ -7,6 +7,7 @@
 #include <spdlog/spdlog.h>
 
 #include <memory>
+#include <qdk/chemistry/config.hpp>
 #include <source_location>
 #include <sstream>
 #include <string>
@@ -65,7 +66,7 @@ enum class LogLevel {
  *
  * // Control global logging
  * Logger::set_global_level(LogLevel::debug);  // Enable debug output
- * Logger::disable_all();                      // Disable all logging
+ * Logger::set_global_level(LogLevel::off);    // Disable all logging
  * ```
  *
  * Output Format
@@ -108,18 +109,6 @@ class Logger {
   static void set_global_level(LogLevel level);
 
   /**
-   * @brief Disable all logging output
-   *
-   * Convenience function to completely disable all logging by setting
-   * the global level to 'off'. This is equivalent to calling
-   * set_global_level(LogLevel::off).
-   *
-   * @note This is useful for performance-critical sections or when
-   *       running in silent mode
-   */
-  static void disable_all();
-
-  /**
    * @brief Get the current global log level
    *
    * Returns the current global logging level. This uses mutex protection
@@ -127,7 +116,7 @@ class Logger {
    *
    * @return The current global log level
    */
-  static spdlog::level::level_enum get_global_level();
+  static LogLevel get_global_level();
 
   /**
    * @brief Get a formatted source context string for the given location
@@ -142,50 +131,6 @@ class Logger {
   static std::string get_source_context(
       const std::source_location& location = std::source_location::current());
 };
-
-/**
- * @brief Convert a filesystem path to colon-separated string starting from a
- * given segment
- *
- * @param file_path Full path to the file
- * @param start_segment The segment from which to start (default "qdk")
- * @return Colon-separated string
- */
-std::string path_to_colon_string(const std::string& file_path,
-                                 const std::string& start_segment = "qdk");
-
-/**
- * @brief Extract a clean method/function name from a mangled function signature
- *
- * This function processes C++ function signatures (as provided by
- * std::source_location::function_name()) and extracts a human-readable
- * method or function name suitable for logging purposes.
- *
- * Processing Steps:
- * 1. Removes lambda expressions (everything after "::<lambda")
- * 2. Strips function parameter lists (everything after the last '(')
- * 3. Extracts the final component after the last "::" (method/function name)
- * 4. Detects constructors and appends " constructor" for clarity
- *
- * Examples:
- * - "MyClass::myMethod(int, bool)" → "myMethod"
- * - "namespace::MyClass::MyClass()" → "MyClass constructor"
- * - "globalFunction(std::string)" → "globalFunction"
- * - "MyClass::operator[](size_t)" → "operator[]"
- * - "lambda expressions" → strips lambda suffix
- *
- * @param func_name The raw function name from
- * std::source_location::function_name()
- * @return Clean, human-readable method/function name suitable for logging
- *
- * @note This function handles various C++ constructs including:
- *       - Namespaced functions and methods
- *       - Constructor detection and labeling
- *       - Lambda expression cleanup
- *       - Operator overloading
- *       - Template instantiations (basic handling)
- */
-std::string extract_method_name(std::string_view func_name);
 
 /**
  * @brief Logs a standardized trace message for entering a function
@@ -351,12 +296,21 @@ class ContextLogger {
  * Logs an "Entering" message with automatic source context.
  * Useful for tracing function call flow during debugging.
  *
+ * @note This macro is completely eliminated at compile time when
+ *       QDK_DISABLE_TRACE_LOG is defined (via CMake option
+ *       -DQDK_CHEMISTRY_DISABLE_TRACE_LOG=ON).
+ *       This avoids any runtime overhead in performance-critical builds.
+ *
  * Example:
  * ```cpp
  * void myFunction() {
- *   QDK_LOG_TRACE_ENTERING();  // Logs "[qdk:...:myFunction] Entering"
+ *   QDK_LOG_TRACE_ENTERING();  // Logs "[qdk:...:myFunction] Entering method"
  *   // ... function implementation
  * }
  * ```
  */
+#ifdef QDK_DISABLE_TRACE_LOG
+#define QDK_LOG_TRACE_ENTERING() ((void)0)
+#else
 #define QDK_LOG_TRACE_ENTERING() qdk::chemistry::utils::log_trace_entering()
+#endif

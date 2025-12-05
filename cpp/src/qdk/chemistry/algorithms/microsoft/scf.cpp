@@ -9,7 +9,6 @@
 #include <qdk/chemistry/scf/scf/scf_solver.h>
 #include <qdk/chemistry/scf/util/gauxc_registry.h>
 #include <qdk/chemistry/scf/util/libint2_util.h>
-#include <spdlog/spdlog.h>
 
 #include <qdk/chemistry/data/wavefunction_containers/sd.hpp>
 #include <qdk/chemistry/utils/logger.hpp>
@@ -24,6 +23,10 @@
 namespace qdk::chemistry::algorithms::microsoft {
 
 namespace qcs = qdk::chemistry::scf;
+
+// Bring logger types into scope
+using qdk::chemistry::utils::Logger;
+using qdk::chemistry::utils::LogLevel;
 
 // Helper function to calculate alpha and beta electron counts
 std::pair<int, int> calculate_electron_counts(int nuclear_charge, int charge,
@@ -198,10 +201,10 @@ std::pair<double, std::shared_ptr<data::Wavefunction>> ScfSolver::_run_impl(
 #endif
 
   // Save the current global level before disabling SCF logging
-  auto saved_global_level = spdlog::get_level();
+  auto saved_level = Logger::get_global_level();
 
   // Disable SCF logging
-  spdlog::set_level(spdlog::level::off);
+  Logger::set_global_level(LogLevel::off);
 
   auto scf = (method == "hf")
                  ? qcs::SCF::make_hf_solver(ms_mol, *ms_scf_config)
@@ -410,7 +413,7 @@ std::pair<double, std::shared_ptr<data::Wavefunction>> ScfSolver::_run_impl(
   double total_energy = context.result.scf_total_energy;
 
   // Restore the original global logging level
-  spdlog::set_level(saved_global_level);
+  Logger::set_global_level(saved_level);
 
   return std::make_pair(total_energy, std::make_shared<data::Wavefunction>(
                                           std::move(wavefunction)));

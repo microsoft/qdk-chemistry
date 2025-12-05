@@ -5,6 +5,7 @@
 #include <spdlog/sinks/stdout_color_sinks.h>
 
 #include <mutex>
+#include <qdk/chemistry/config.hpp>
 #include <qdk/chemistry/utils/logger.hpp>
 #include <source_location>
 #include <sstream>
@@ -15,15 +16,38 @@
 namespace qdk::chemistry::utils {
 
 // Track our own global level to avoid spdlog::get_level() issues
-static spdlog::level::level_enum g_global_level = spdlog::level::info;
+// Map compile-time level to spdlog level
+static constexpr spdlog::level::level_enum default_level_from_config() {
+  switch (QDK_CHEMISTRY_LOG_LEVEL) {
+    case 0:
+      return spdlog::level::trace;
+    case 1:
+      return spdlog::level::debug;
+    case 2:
+      return spdlog::level::info;
+    case 3:
+      return spdlog::level::warn;
+    case 4:
+      return spdlog::level::err;
+    case 5:
+      return spdlog::level::critical;
+    case 6:
+      return spdlog::level::off;
+    default:
+      return spdlog::level::info;
+  }
+}
+
+static spdlog::level::level_enum g_global_level = default_level_from_config();
 static std::mutex g_level_mutex;
 
 // Single global logger instance
 static std::shared_ptr<spdlog::logger> g_logger;
 static std::once_flag g_logger_init_flag;
 
-std::string path_to_colon_string(const std::string& file_path,
-                                 const std::string& start_segment) {
+// Internal helper - convert path to colon-separated context string
+static std::string path_to_colon_string(
+    const std::string& file_path, const std::string& start_segment = "qdk") {
   // Look for the segment as a directory (with / before and after)
   // This prevents matching "qdk_chem" when looking for "qdk"
   std::string segment_pattern = "/" + start_segment + "/";
@@ -73,7 +97,8 @@ std::string path_to_colon_string(const std::string& file_path,
   return result.str();
 }
 
-std::string extract_method_name(std::string_view func_name) {
+// Internal helper - extract clean method name from function signature
+static std::string extract_method_name(std::string_view func_name) {
   std::string full_name = std::string(func_name);
   // Handle lambdas: strip everything starting with '::<lambda'
   size_t lambda_pos = full_name.find("::<lambda");
@@ -132,6 +157,27 @@ static spdlog::level::level_enum to_spdlog_level(LogLevel level) {
   return spdlog::level::info;  // fallback
 }
 
+static LogLevel from_spdlog_level(spdlog::level::level_enum level) {
+  switch (level) {
+    case spdlog::level::trace:
+      return LogLevel::trace;
+    case spdlog::level::debug:
+      return LogLevel::debug;
+    case spdlog::level::info:
+      return LogLevel::info;
+    case spdlog::level::warn:
+      return LogLevel::warn;
+    case spdlog::level::err:
+      return LogLevel::error;
+    case spdlog::level::critical:
+      return LogLevel::critical;
+    case spdlog::level::off:
+      return LogLevel::off;
+    default:
+      return LogLevel::info;
+  }
+}
+
 static void init_global_logger() {
   try {
     g_logger = spdlog::stdout_color_mt("qdk-chemistry");
@@ -187,21 +233,9 @@ void Logger::set_global_level(LogLevel level) {
   spdlog::set_level(spdlog_level);
 }
 
-void Logger::disable_all() {
-  {
-    std::lock_guard<std::mutex> lock(g_level_mutex);
-    g_global_level = spdlog::level::off;
-    if (g_logger) {
-      g_logger->set_level(spdlog::level::off);
-    }
-  }
-
-  spdlog::set_level(spdlog::level::off);
-}
-
-spdlog::level::level_enum Logger::get_global_level() {
+LogLevel Logger::get_global_level() {
   std::lock_guard<std::mutex> lock(g_level_mutex);
-  return g_global_level;
+  return from_spdlog_level(g_global_level);
 }
 
 void log_trace_entering(const std::source_location& location) {
