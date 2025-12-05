@@ -296,7 +296,7 @@ class SparseIsometryGF2XStatePreparation(StatePreparation):
 
         return bitstring_matrix
 
-    def _prepare_single_reference_state(self, bitstring: str) -> QuantumCircuit:
+    def _prepare_single_reference_state(self, bitstring: str) -> str:
         r"""Prepare a single reference state on a quantum circuit based on a bitstring.
 
         Args:
@@ -305,7 +305,7 @@ class SparseIsometryGF2XStatePreparation(StatePreparation):
                 '1' means apply X gate, '0' means leave in |0⟩ state.
 
         Returns:
-                OpenQASM with the prepared single reference state
+                OpenQASM string with the prepared single reference state
 
         Example:
                 bitstring = "1010" creates a circuit with X gates on qubits 1 and 3:
