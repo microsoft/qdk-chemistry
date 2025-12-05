@@ -23,7 +23,9 @@ LOGGER = logging.getLogger(__file__)
 def create_structure_from_rdkit(molecule: Mol) -> Structure:
     """Create a Structure object from an RDKit molecule."""
     symbols = []
-    coords = molecule.GetConformer().GetPositions() * ANGSTROM_TO_BOHR
+    coords = (
+        molecule.GetConformer().GetPositions() * ANGSTROM_TO_BOHR
+    )  # qdk_chemistry uses Bohr units
 
     for atom in molecule.GetAtoms():
         symbols.append(f"{atom.GetSymbol()}")
@@ -59,13 +61,18 @@ def main(argv: Sequence[str] | None = None) -> None:
     args = parse_args(argv)
 
     ########################################################################################
-    # 1. Load the target structure (use rdkit).
+    # 1. Load the target structure (use RDKit).
     ########################################################################################
 
+    # Create water from SMILES string
     water_rdkit = Chem.MolFromSmiles("O")
+    # Add hydrogens to the molecule
     water_rdkit = Chem.AddHs(water_rdkit)
+    # Generate 3D coordinates
     AllChem.EmbedMolecule(water_rdkit)
+    # Optimize geometry using UFF force field provided by RDKit.
     AllChem.UFFOptimizeMolecule(water_rdkit)
+    # Convert to QDK Chemistry Structure
     water = create_structure_from_rdkit(water_rdkit)
 
     LOGGER.info(water.get_summary())
