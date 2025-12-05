@@ -9,6 +9,7 @@
 #include <qdk/chemistry/scf/eri/eri_multiplexer.h>
 #include <spdlog/spdlog.h>
 
+#include <macis/solvers/davidson.hpp>
 #include <qdk/chemistry/data/stability_result.hpp>
 #include <qdk/chemistry/data/wavefunction.hpp>
 
@@ -40,7 +41,7 @@ namespace detail {
  * @param J_scratch Scratch matrix for J contributions (also used for XC)
  * @param K_scratch Scratch matrix for K contributions
  */
-void compute_trial_fock(const qcs::ERIMultiplexer& eri,
+void compute_trial_fock(const std::shared_ptr<qcs::ERIMultiplexer>& eri,
                         const std::shared_ptr<qcs::EXC>& exc,
                         const RowMajorMatrix& trial_density,
                         const RowMajorMatrix& ground_density,
@@ -58,8 +59,8 @@ void compute_trial_fock(const qcs::ERIMultiplexer& eri,
   // Build J and K matrices
   J_scratch.setZero();
   K_scratch.setZero();
-  eri.build_JK(trial_density.data(), J_scratch.data(), K_scratch.data(), alpha,
-               beta, omega);
+  eri->build_JK(trial_density.data(), J_scratch.data(), K_scratch.data(), alpha,
+                beta, omega);
 
   // Compute Fock matrix: F = J - K for RHF, or appropriate combination for UHF
   if (unrestricted) {
@@ -92,156 +93,211 @@ void compute_trial_fock(const qcs::ERIMultiplexer& eri,
 }
 
 /**
- * @brief Apply the stability analysis matrix-vector operation
+ * @brief Operator wrapper for stability analysis Davidson solver
  *
- * This function computes Y = (A+B)*X,
- * See J. Chem. Phys. 66, 3045 (1977) for the definition of A and B.
- *
- * @param X Input vectors (eigensize x num_vectors)
- * @param Y Output vectors (eigensize x num_vectors), updated to (A+B)*X
- * @param num_alpha Number of occupied alpha orbitals
- * @param num_beta Number of occupied beta orbitals
- * @param eigen_diff Diagonal preconditioner (orbital energy differences)
- * @param Ca Alpha MO coefficients (num_atomic_orbitals x
- * num_molecular_orbitals)
- * @param Cb Beta MO coefficients (num_atomic_orbitals x num_molecular_orbitals,
- * only used if unrestricted)
- * @param eri ERI multiplexer for computing J and K matrices
- * @param exc Exchange-correlation object (nullptr for HF)
- * @param ground_density Ground state density matrix
+ * This class wraps the stability operator for use with the Davidson
+ * eigensolver. It provides the operator_action interface required by
+ * the Davidson algorithm.
  */
-void apply_stability_operator(const Eigen::MatrixXd& X, Eigen::MatrixXd& Y,
-                              size_t num_alpha, size_t num_beta,
-                              const Eigen::VectorXd& eigen_diff,
-                              const Eigen::MatrixXd& Ca,
-                              const Eigen::MatrixXd& Cb,
-                              const qcs::ERIMultiplexer& eri,
-                              const std::shared_ptr<qcs::EXC>& exc,
-                              const RowMajorMatrix& ground_density) {
-  AutoTimer __timer("stability:: apply_A_operator");
+class StabilityOperator {
+ private:
+  size_t num_alpha_;
+  size_t num_beta_;
+  const Eigen::VectorXd& eigen_diff_;
+  const Eigen::MatrixXd& Ca_;
+  const Eigen::MatrixXd& Cb_;
+  std::shared_ptr<qcs::ERIMultiplexer> eri_;
+  std::shared_ptr<qcs::EXC> exc_;
+  const RowMajorMatrix& ground_density_;
 
-  // Calculate sizes
-  const size_t num_atomic_orbitals = Ca.rows();
-  const size_t num_molecular_orbitals = Ca.cols();
-  const size_t num_alpha_virtual_orbitals = num_molecular_orbitals - num_alpha;
-  const size_t num_beta_virtual_orbitals = num_molecular_orbitals - num_beta;
-  const bool unrestricted = (ground_density.rows() == 2 * num_atomic_orbitals);
+  // Mutable scratch matrices to avoid reallocation
+  RowMajorMatrix scratch1_;
+  RowMajorMatrix scratch2_;
 
-  const size_t nova = num_alpha * num_alpha_virtual_orbitals;
-  const size_t eigensize =
-      unrestricted ? nova + num_beta * num_beta_virtual_orbitals : nova;
-  const size_t num_vectors = X.cols();
+  /**
+   * @brief Apply the stability analysis matrix-vector operation
+   *
+   * This function computes Y += alpha * (A+B)*X,
+   * See J. Chem. Phys. 66, 3045 (1977) for the definition of A and B.
+   *
+   * @param X Input vectors (eigensize x num_vectors)
+   * @param Y Output vectors (eigensize x num_vectors), updated to Y +=
+   * alpha*(A+B)*X
+   * @param alpha Scaling factor for the result
+   */
+  void apply_stability_operator(const Eigen::MatrixXd& X, Eigen::MatrixXd& Y,
+                                double alpha) const {
+    AutoTimer __timer("stability:: apply_A_operator");
 
-  if (X.rows() != static_cast<int>(eigensize)) {
-    throw std::runtime_error(
-        "Matrix size mismatch in stability operator: X.rows() = " +
-        std::to_string(X.rows()) + ", expected " + std::to_string(eigensize));
-  }
-  if (Y.rows() != static_cast<int>(eigensize) ||
-      Y.cols() != static_cast<int>(num_vectors)) {
-    throw std::runtime_error(
-        "Matrix size mismatch in stability operator: Y dimensions incorrect");
-  }
-  if (eigen_diff.size() != static_cast<int>(eigensize)) {
-    throw std::runtime_error(
-        "Preconditioner size mismatch in stability operator");
-  }
+    // Calculate sizes
+    const size_t num_atomic_orbitals = Ca_.rows();
+    const size_t num_molecular_orbitals = Ca_.cols();
+    const size_t num_alpha_virtual_orbitals =
+        num_molecular_orbitals - num_alpha_;
+    const size_t num_beta_virtual_orbitals = num_molecular_orbitals - num_beta_;
+    const bool unrestricted =
+        (ground_density_.rows() == 2 * num_atomic_orbitals);
 
-  // Get pointers to orbital blocks
-  const double* Ca_occ_ptr = Ca.data();
-  const double* Ca_vir_ptr = Ca_occ_ptr + num_alpha * num_atomic_orbitals;
-  const double* Cb_occ_ptr = unrestricted ? Cb.data() : nullptr;
-  const double* Cb_vir_ptr =
-      unrestricted ? Cb_occ_ptr + num_beta * num_atomic_orbitals : nullptr;
+    const size_t nova = num_alpha_ * num_alpha_virtual_orbitals;
+    const size_t eigensize =
+        unrestricted ? nova + num_beta_ * num_beta_virtual_orbitals : nova;
+    const size_t num_vectors = X.cols();
 
-  // Allocate internal scratch matrices
-  const size_t num_density_matrices = unrestricted ? 2 : 1;
-  RowMajorMatrix trial_density = RowMajorMatrix::Zero(
-      num_atomic_orbitals * num_density_matrices, num_atomic_orbitals);
-  RowMajorMatrix trial_fock = RowMajorMatrix::Zero(
-      num_atomic_orbitals * num_density_matrices, num_atomic_orbitals);
-  RowMajorMatrix scratch1 = RowMajorMatrix::Zero(
-      num_atomic_orbitals * num_density_matrices, num_atomic_orbitals);
-  RowMajorMatrix scratch2 = RowMajorMatrix::Zero(
-      num_atomic_orbitals * num_density_matrices, num_atomic_orbitals);
-  double* temp = scratch1.data();
-
-  // For each right-hand side, apply the operator
-  for (size_t vec = 0; vec < num_vectors; ++vec) {
-    const double* X_vec = X.col(vec).data();
-    double* Y_vec = Y.col(vec).data();
-
-    // calculate orbital energy difference term using preconditioner diagonal
-    for (size_t idx = 0; idx < eigensize; ++idx) {
-      Y_vec[idx] += eigen_diff(idx) * X_vec[idx];  // δij δab δστ (ϵaσ − ϵiτ )
+    if (X.rows() != static_cast<int>(eigensize)) {
+      throw std::runtime_error(
+          "Matrix size mismatch in stability operator: X.rows() = " +
+          std::to_string(X.rows()) + ", expected " + std::to_string(eigensize));
+    }
+    if (Y.rows() != static_cast<int>(eigensize) ||
+        Y.cols() != static_cast<int>(num_vectors)) {
+      throw std::runtime_error(
+          "Matrix size mismatch in stability operator: Y dimensions incorrect");
+    }
+    if (eigen_diff_.size() != static_cast<int>(eigensize)) {
+      throw std::runtime_error(
+          "Preconditioner size mismatch in stability operator");
     }
 
-    // tP_{uv} = \sum_{ia}  X_{ai} (C_{ui} C_{va} + C_{vi} C_{ua})
-    // R has num_alpha_virtual_orbitals as fast-index, tP is symmetric
-    // Step 1: temp = Ca_vir * X (temp is num_atomic_orbitals x num_alpha in
-    // ColMajor)
-    blas::gemm(blas::Layout::ColMajor, blas::Op::NoTrans, blas::Op::NoTrans,
-               num_atomic_orbitals, num_alpha, num_alpha_virtual_orbitals, 1.0,
-               Ca_vir_ptr, num_atomic_orbitals, X_vec,
-               num_alpha_virtual_orbitals, 0.0, temp, num_atomic_orbitals);
-    blas::gemm(blas::Layout::ColMajor, blas::Op::NoTrans, blas::Op::Trans,
-               num_atomic_orbitals, num_atomic_orbitals, num_alpha, 1.0, temp,
-               num_atomic_orbitals, Ca_occ_ptr, num_atomic_orbitals, 0.0,
-               trial_density.data(), num_atomic_orbitals);
-    for (size_t i = 0; i < num_atomic_orbitals; ++i)
-      for (size_t j = i; j < num_atomic_orbitals; ++j) {
-        const auto symm_ij = trial_density(i, j) + trial_density(j, i);
-        trial_density(i, j) = symm_ij;
-        trial_density(j, i) = symm_ij;
+    // Get pointers to orbital blocks
+    const double* Ca_occ_ptr = Ca_.data();
+    const double* Ca_vir_ptr = Ca_occ_ptr + num_alpha_ * num_atomic_orbitals;
+    const double* Cb_occ_ptr = unrestricted ? Cb_.data() : nullptr;
+    const double* Cb_vir_ptr =
+        unrestricted ? Cb_occ_ptr + num_beta_ * num_atomic_orbitals : nullptr;
+
+    // Allocate internal scratch matrices
+    const size_t num_density_matrices = unrestricted ? 2 : 1;
+    RowMajorMatrix trial_density = RowMajorMatrix::Zero(
+        num_atomic_orbitals * num_density_matrices, num_atomic_orbitals);
+    RowMajorMatrix trial_fock = RowMajorMatrix::Zero(
+        num_atomic_orbitals * num_density_matrices, num_atomic_orbitals);
+    double* temp = scratch1_.data();
+
+    // For each right-hand side, apply the operator
+    for (size_t vec = 0; vec < num_vectors; ++vec) {
+      const double* X_vec = X.col(vec).data();
+      double* Y_vec = Y.col(vec).data();
+
+      // calculate orbital energy difference term using preconditioner diagonal
+      for (size_t idx = 0; idx < eigensize; ++idx) {
+        Y_vec[idx] +=
+            alpha * eigen_diff_(idx) * X_vec[idx];  // δij δab δστ (ϵaσ − ϵiτ )
       }
-    if (unrestricted) {
+
+      // tP_{uv} = \sum_{ia}  X_{ai} (C_{ui} C_{va} + C_{vi} C_{ua})
+      // R has num_alpha_virtual_orbitals as fast-index, tP is symmetric
+      // Step 1: temp = Ca_vir * X (temp is num_atomic_orbitals x num_alpha in
+      // ColMajor)
       blas::gemm(blas::Layout::ColMajor, blas::Op::NoTrans, blas::Op::NoTrans,
-                 num_atomic_orbitals, num_beta, num_beta_virtual_orbitals, 1.0,
-                 Cb_vir_ptr, num_atomic_orbitals, X_vec + nova,
-                 num_beta_virtual_orbitals, 0.0, temp, num_atomic_orbitals);
-      blas::gemm(
-          blas::Layout::ColMajor, blas::Op::NoTrans, blas::Op::Trans,
-          num_atomic_orbitals, num_atomic_orbitals, num_beta, 1.0, temp,
-          num_atomic_orbitals, Cb_occ_ptr, num_atomic_orbitals, 0.0,
-          trial_density.data() + num_atomic_orbitals * num_atomic_orbitals,
-          num_atomic_orbitals);
+                 num_atomic_orbitals, num_alpha, num_alpha_virtual_orbitals,
+                 1.0, Ca_vir_ptr, num_atomic_orbitals, X_vec,
+                 num_alpha_virtual_orbitals, 0.0, temp, num_atomic_orbitals);
+      blas::gemm(blas::Layout::ColMajor, blas::Op::NoTrans, blas::Op::Trans,
+                 num_atomic_orbitals, num_atomic_orbitals, num_alpha, 1.0, temp,
+                 num_atomic_orbitals, Ca_occ_ptr, num_atomic_orbitals, 0.0,
+                 trial_density.data(), num_atomic_orbitals);
       for (size_t i = 0; i < num_atomic_orbitals; ++i)
         for (size_t j = i; j < num_atomic_orbitals; ++j) {
-          const auto symm_ij = trial_density(i + num_atomic_orbitals, j) +
-                               trial_density(j + num_atomic_orbitals, i);
-          trial_density(i + num_atomic_orbitals, j) = symm_ij;
-          trial_density(j + num_atomic_orbitals, i) = symm_ij;
+          const auto symm_ij = trial_density(i, j) + trial_density(j, i);
+          trial_density(i, j) = symm_ij;
+          trial_density(j, i) = symm_ij;
         }
-    }
+      if (unrestricted) {
+        blas::gemm(blas::Layout::ColMajor, blas::Op::NoTrans, blas::Op::NoTrans,
+                   num_atomic_orbitals, num_beta, num_beta_virtual_orbitals,
+                   1.0, Cb_vir_ptr, num_atomic_orbitals, X_vec + nova,
+                   num_beta_virtual_orbitals, 0.0, temp, num_atomic_orbitals);
+        blas::gemm(
+            blas::Layout::ColMajor, blas::Op::NoTrans, blas::Op::Trans,
+            num_atomic_orbitals, num_atomic_orbitals, num_beta, 1.0, temp,
+            num_atomic_orbitals, Cb_occ_ptr, num_atomic_orbitals, 0.0,
+            trial_density.data() + num_atomic_orbitals * num_atomic_orbitals,
+            num_atomic_orbitals);
+        for (size_t i = 0; i < num_atomic_orbitals; ++i)
+          for (size_t j = i; j < num_atomic_orbitals; ++j) {
+            const auto symm_ij = trial_density(i + num_atomic_orbitals, j) +
+                                 trial_density(j + num_atomic_orbitals, i);
+            trial_density(i + num_atomic_orbitals, j) = symm_ij;
+            trial_density(j + num_atomic_orbitals, i) = symm_ij;
+          }
+      }
 
-    // Compute trial Fock matrix
-    compute_trial_fock(eri, exc, trial_density, ground_density, trial_fock,
-                       scratch1, scratch2);
+      // Compute trial Fock matrix
+      compute_trial_fock(eri_, exc_, trial_density, ground_density_, trial_fock,
+                         scratch1_, scratch2_);
 
-    // ABX_{ia} = \sum_{uv} C_{ui} F_{uv} C_{av}
-    // Step 1: temp = trial_fock^T * Ca_occ, trial_fock is symmetric
-    blas::gemm(blas::Layout::ColMajor, blas::Op::Trans, blas::Op::NoTrans,
-               num_atomic_orbitals, num_alpha, num_atomic_orbitals, 1.0,
-               trial_fock.data(), num_atomic_orbitals, Ca_occ_ptr,
-               num_atomic_orbitals, 0.0, temp, num_atomic_orbitals);
-    // Step 2: Y_vec += Ca_vir^T * temp
-    blas::gemm(blas::Layout::ColMajor, blas::Op::Trans, blas::Op::NoTrans,
-               num_alpha_virtual_orbitals, num_alpha, num_atomic_orbitals, 1.0,
-               Ca_vir_ptr, num_atomic_orbitals, temp, num_atomic_orbitals, 1.0,
-               Y_vec, num_alpha_virtual_orbitals);
-    if (unrestricted) {
+      // ABX_{ia} = \sum_{uv} C_{ui} F_{uv} C_{av}
+      // Step 1: temp = trial_fock^T * Ca_occ, trial_fock is symmetric
       blas::gemm(blas::Layout::ColMajor, blas::Op::Trans, blas::Op::NoTrans,
-                 num_atomic_orbitals, num_beta, num_atomic_orbitals, 1.0,
-                 trial_fock.data() + num_atomic_orbitals * num_atomic_orbitals,
-                 num_atomic_orbitals, Cb_occ_ptr, num_atomic_orbitals, 0.0,
-                 temp, num_atomic_orbitals);
+                 num_atomic_orbitals, num_alpha, num_atomic_orbitals, 1.0,
+                 trial_fock.data(), num_atomic_orbitals, Ca_occ_ptr,
+                 num_atomic_orbitals, 0.0, temp, num_atomic_orbitals);
+      // Step 2: Y_vec += alpha * Ca_vir^T * temp
       blas::gemm(blas::Layout::ColMajor, blas::Op::Trans, blas::Op::NoTrans,
-                 num_beta_virtual_orbitals, num_beta, num_atomic_orbitals, 1.0,
-                 Cb_vir_ptr, num_atomic_orbitals, temp, num_atomic_orbitals,
-                 1.0, Y_vec + nova, num_beta_virtual_orbitals);
+                 num_alpha_virtual_orbitals, num_alpha, num_atomic_orbitals,
+                 alpha, Ca_vir_ptr, num_atomic_orbitals, temp,
+                 num_atomic_orbitals, 1.0, Y_vec, num_alpha_virtual_orbitals);
+      if (unrestricted) {
+        blas::gemm(
+            blas::Layout::ColMajor, blas::Op::Trans, blas::Op::NoTrans,
+            num_atomic_orbitals, num_beta, num_atomic_orbitals, 1.0,
+            trial_fock.data() + num_atomic_orbitals * num_atomic_orbitals,
+            num_atomic_orbitals, Cb_occ_ptr, num_atomic_orbitals, 0.0, temp,
+            num_atomic_orbitals);
+        blas::gemm(blas::Layout::ColMajor, blas::Op::Trans, blas::Op::NoTrans,
+                   num_beta_virtual_orbitals, num_beta, num_atomic_orbitals,
+                   alpha, Cb_vir_ptr, num_atomic_orbitals, temp,
+                   num_atomic_orbitals, 1.0, Y_vec + nova,
+                   num_beta_virtual_orbitals);
+      }
     }
   }
-}
+
+ public:
+  StabilityOperator(size_t num_alpha, size_t num_beta,
+                    const Eigen::VectorXd& eigen_diff,
+                    const Eigen::MatrixXd& Ca, const Eigen::MatrixXd& Cb,
+                    std::shared_ptr<qcs::ERIMultiplexer> eri,
+                    std::shared_ptr<qcs::EXC> exc,
+                    const RowMajorMatrix& ground_density)
+      : num_alpha_(num_alpha),
+        num_beta_(num_beta),
+        eigen_diff_(eigen_diff),
+        Ca_(Ca),
+        Cb_(Cb),
+        eri_(eri),
+        exc_(exc),
+        ground_density_(ground_density) {
+    // Pre-allocate scratch matrices
+    const size_t num_atomic_orbitals = Ca_.rows();
+    const bool unrestricted =
+        (ground_density_.rows() == 2 * num_atomic_orbitals);
+    const size_t num_density_matrices = unrestricted ? 2 : 1;
+    scratch1_ = RowMajorMatrix::Zero(num_atomic_orbitals * num_density_matrices,
+                                     num_atomic_orbitals);
+    scratch2_ = RowMajorMatrix::Zero(num_atomic_orbitals * num_density_matrices,
+                                     num_atomic_orbitals);
+  }
+
+  void operator_action(size_t m, double alpha, const double* V, size_t LDV,
+                       double beta, double* AV, size_t LDAV) const {
+    const size_t N = eigen_diff_.size();
+
+    // Wrap input and output pointers as Eigen matrices
+    Eigen::Map<const Eigen::MatrixXd> X(V, N, m);
+    Eigen::Map<Eigen::MatrixXd> Y(AV, N, m);
+
+    // Scale Y by beta (Y = beta * Y)
+    if (beta == 0.0) {
+      Y.setZero();
+    } else if (beta != 1.0) {
+      Y *= beta;
+    }
+
+    // Apply the stability operator: Y += alpha * (A+B) * X
+    apply_stability_operator(X, Y, alpha);
+  }
+};
 
 }  // namespace detail
 
@@ -253,8 +309,20 @@ StabilityChecker::_run_impl(
 
   // Extract settings
   int nroots = _settings->get<int>("nroots");
+  // Set Davidson parameters
+  const int64_t davidson_max_subspace =
+      _settings->get_or_default<int64_t>("max_subspace", 30);
+  const double stability_tol =
+      _settings->get_or_default<double>("stability_tolerance", -1.0e-4);
+  const double davidson_tol =
+      _settings->get_or_default<double>("davidson_tolerance", 1.0e-6);
   bool check_internal = _settings->get<bool>("internal");
   bool check_external = _settings->get<bool>("external");
+
+  if (check_external) {
+    throw std::runtime_error(
+        "External stability analysis is not implemented yet.");
+  }
 
   // Validate settings
   if (nroots <= 0) {
@@ -313,7 +381,7 @@ StabilityChecker::_run_impl(
   // Build density matrix
   RowMajorMatrix ground_density = RowMajorMatrix::Zero(
       num_atomic_orbitals * num_density_matrices, num_atomic_orbitals);
-  if (restricted) {
+  if (!unrestricted) {
     // Restricted case: build density matrix from occupied orbitals
     // P = 2 * C_occ * C_occ^T
     ground_density.noalias() =
@@ -360,18 +428,54 @@ StabilityChecker::_run_impl(
     }
   }
 
-  // Contruct Initial Eigenvector (set HOMO-LUMO elements to 1)
+  // Construct Initial Eigenvector using diagonal guess
   Eigen::VectorXd eigenvector = Eigen::VectorXd::Zero(eigensize);
-  eigenvector((n_alpha_electrons - 1) * num_virtual_alpha_orbitals) = 1.0;
+  // Set the element corresponding to the minimum energy difference to 1
+  Eigen::VectorXd::Index min_idx;
+  eigen_diff.minCoeff(&min_idx);
+  eigenvector(min_idx) = 1.0;
 
-  // Placeholder for stability result
-  bool is_stable = true;
-  auto stability_result = std::make_shared<data::StabilityResult>();
+  // Create the stability operator wrapper
+  detail::StabilityOperator stability_op(n_alpha_electrons, n_beta_electrons,
+                                         eigen_diff, Ca, Cb, eri, exc,
+                                         ground_density);
 
-  spdlog::warn(
-      "StabilityChecker::_run_impl is a stub and not yet fully implemented");
+  const int64_t max_subspace =
+      std::min(davidson_max_subspace, static_cast<int64_t>(eigensize));
 
-  return std::make_pair(is_stable, stability_result);
+  spdlog::info(
+      "Starting Davidson eigensolver (size: {}, subspace: {}, tol: {:.2e})",
+      eigensize, max_subspace, davidson_tol);
+
+  // Call Davidson eigensolver
+  auto [num_iterations, lowest_eigenvalue] =
+      macis::davidson(eigensize, max_subspace, stability_op, eigen_diff.data(),
+                      davidson_tol, eigenvector.data());
+
+  spdlog::info("Davidson converged in {} iterations, lowest eigenvalue: {:.8f}",
+               num_iterations, lowest_eigenvalue);
+
+  // Determine stability: stable if the lowest eigenvalue is greater than the
+  // stability tolerance
+  bool internal_stable = (lowest_eigenvalue > stability_tol);
+  bool external_stable = true;  // Not implementing external stability analysis
+
+  // Prepare eigenvalue and eigenvector for constructor
+  Eigen::VectorXd internal_eigenvalues(1);
+  internal_eigenvalues(0) = lowest_eigenvalue;
+  Eigen::MatrixXd internal_eigenvectors =
+      Eigen::Map<Eigen::MatrixXd>(eigenvector.data(), eigenvector.size(), 1);
+  Eigen::VectorXd external_eigenvalues = Eigen::VectorXd::Zero(0);
+  Eigen::MatrixXd external_eigenvectors = Eigen::MatrixXd::Zero(0, 0);
+
+  // Create the stability result object
+  auto stability_result = std::make_shared<data::StabilityResult>(
+      internal_stable, external_stable, internal_eigenvalues,
+      internal_eigenvectors, external_eigenvalues, external_eigenvectors);
+
+  bool stable = internal_stable && external_stable;
+
+  return std::make_pair(stable, stability_result);
 }
 
 }  // namespace qdk::chemistry::algorithms::microsoft
