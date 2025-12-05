@@ -8,8 +8,8 @@
 import numpy as np
 import pytest
 
-from qdk_chemistry import algorithms
-from qdk_chemistry.data import Ansatz, CoupledClusterAmplitudes, Settings, Structure
+from qdk_chemistry import algorithms, data
+from qdk_chemistry.data import Ansatz, Settings, Structure
 
 from .reference_tolerances import (
     float_comparison_absolute_tolerance,
@@ -34,7 +34,6 @@ except ImportError:
     PYSCF_AVAILABLE = False
 
 if PYSCF_AVAILABLE:
-    import qdk_chemistry.plugins.pyscf
     from qdk_chemistry.constants import ANGSTROM_TO_BOHR
     from qdk_chemistry.data import AOType, BasisSet, OrbitalType, Shell
     from qdk_chemistry.plugins.pyscf.mcscf import _mcsolver_to_fcisolver
@@ -169,7 +168,7 @@ class TestPyscfPlugin:
 
     def test_pyscf_cc_calculator(self):
         """Test creating PySCF Coupled Cluster module."""
-        cc = algorithms.create("coupled_cluster_calculator", "pyscf")
+        cc = algorithms.create("dynamical_correlation_calculator", "pyscf_coupled_cluster")
         assert cc is not None
 
     def test_pyscf_stability_checker_creation(self):
@@ -236,7 +235,7 @@ class TestPyscfPlugin:
 
     def test_pyscf_cc_settings(self):
         """Test PySCF Coupled Cluster settings interface."""
-        cc = algorithms.create("coupled_cluster_calculator", "pyscf")
+        cc = algorithms.create("dynamical_correlation_calculator", "pyscf_coupled_cluster")
         settings = cc.settings()
 
         # Test that settings object exists
@@ -371,7 +370,7 @@ class TestPyscfPlugin:
         lithium = create_li_structure()
         scf_solver = algorithms.create("scf_solver", "pyscf")
         scf_solver.settings().set("basis_set", "def2-svp")
-        scf_solver.settings().set("force_restricted", True)
+        scf_solver.settings().set("scf_type", "restricted")
 
         energy, wavefunction = scf_solver.run(lithium, 0, 2)
         orbitals = wavefunction.get_orbitals()
@@ -535,7 +534,7 @@ class TestPyscfPlugin:
         scf_solver = algorithms.create("scf_solver", "pyscf")
         scf_solver.settings().set("basis_set", "def2-svp")
         scf_solver.settings().set("method", "b3lyp")
-        scf_solver.settings().set("force_restricted", True)
+        scf_solver.settings().set("scf_type", "restricted")
 
         energy, wavefunction = scf_solver.run(lithium, 0, 2)
         orbitals = wavefunction.get_orbitals()
@@ -1088,7 +1087,6 @@ class TestPyscfPlugin:
 
         # Localize orbitals
         localizer = algorithms.create("orbital_localizer", "pyscf_multi")
-        localizer.settings().set("method", "edmiston-ruedenberg")
 
         # Test 1: Localize occupied first, then virtual orbitals on the localized occupied orbitals
         occ_indices_alpha = list(range(num_alpha))
@@ -1112,7 +1110,7 @@ class TestPyscfPlugin:
         assert final_objective_value_a > can_objective_value_a
         assert final_objective_value_b > can_objective_value_b
 
-        # Test 2: Randomly choose indices from occupied orbitals only for both spin channels
+        # Test 2: Randomly choose indices to localize for both spin channels
         localized_random = localizer.run(wavefunction, random_occ_indices_alpha, random_occ_indices_beta)
         mos_rand_a, mos_rand_b = localized_random.get_orbitals().get_coefficients()
 
@@ -1155,7 +1153,7 @@ class TestPyscfPlugin:
         o2 = create_o2_structure()
         scf_solver = algorithms.create("scf_solver", "pyscf")
         scf_solver.settings().set("basis_set", "def2-svp")
-        scf_solver.settings().set("force_restricted", True)
+        scf_solver.settings().set("scf_type", "restricted")
 
         _, wavefunction = scf_solver.run(o2, 0, 3)
         orbitals = wavefunction.get_orbitals()
@@ -1221,7 +1219,7 @@ class TestPyscfPlugin:
         o2 = create_o2_structure()
         scf_solver = algorithms.create("scf_solver", "pyscf")
         scf_solver.settings().set("basis_set", "def2-svp")
-        scf_solver.settings().set("force_restricted", True)
+        scf_solver.settings().set("scf_type", "restricted")
 
         _, wavefunction = scf_solver.run(o2, 0, 3)
         orbitals = wavefunction.get_orbitals()
@@ -1293,7 +1291,7 @@ class TestPyscfPlugin:
         o2 = create_o2_structure()
         scf_solver = algorithms.create("scf_solver", "pyscf")
         scf_solver.settings().set("basis_set", "def2-svp")
-        scf_solver.settings().set("force_restricted", True)
+        scf_solver.settings().set("scf_type", "restricted")
 
         _, wavefunction = scf_solver.run(o2, 0, 3)
         orbitals = wavefunction.get_orbitals()
@@ -1385,7 +1383,7 @@ class TestPyscfPlugin:
         o2 = create_o2_structure()
         scf_solver = algorithms.create("scf_solver", "pyscf")
         scf_solver.settings().set("basis_set", "def2-svp")
-        scf_solver.settings().set("force_restricted", True)
+        scf_solver.settings().set("scf_type", "restricted")
 
         _, wavefunction = scf_solver.run(o2, 0, 3)
 
@@ -1409,12 +1407,80 @@ class TestPyscfPlugin:
         hamiltonian = ham_calculator.run(wavefunction.get_orbitals())
 
         # Compute CC energy
-        cc_calculator = algorithms.create("coupled_cluster_calculator", "pyscf")
-        _, cc_amplitudes = cc_calculator.run(Ansatz(hamiltonian, wavefunction))
-        assert cc_amplitudes is not None
-        assert isinstance(cc_amplitudes, CoupledClusterAmplitudes)
-        assert cc_amplitudes.has_t1_amplitudes()
-        assert cc_amplitudes.has_t2_amplitudes()
+        cc_calculator = algorithms.create("dynamical_correlation_calculator", "pyscf_coupled_cluster")
+        cc_calculator.settings().set("store_amplitudes", True)
+        ansatz_object = Ansatz(hamiltonian, wavefunction)
+        cc_energy, updated_wavefunction = cc_calculator.run(ansatz_object)
+        reference_energy = -76.14613724756676
+        assert np.isclose(cc_energy, reference_energy), f"{cc_energy=} should match total energy {reference_energy=}"
+
+        # Get amplitudes from the wavefunction container
+        cc_container = updated_wavefunction.get_container()
+        assert cc_container.has_t1_amplitudes()
+        assert cc_container.has_t2_amplitudes()
+        t1_amplitudes = cc_container.get_t1_amplitudes()
+        t2_amplitudes = cc_container.get_t2_amplitudes()
+        assert t1_amplitudes is not None
+        assert t2_amplitudes is not None
+
+    def test_pyscf_uccsd_o2_triplet_def2svp(self):
+        """Test PySCF UCCSD on O2 triplet with def2-svp basis."""
+        o2 = create_o2_structure()
+        scf_solver = algorithms.create("scf_solver", "pyscf")
+        scf_solver.settings().set("basis_set", "def2-svp")
+        _, wavefunction = scf_solver.run(o2, 0, 3)
+
+        # Verify we have unrestricted orbitals
+        orbitals = wavefunction.get_orbitals()
+        assert orbitals.is_unrestricted(), "O2 triplet should have unrestricted orbitals"
+        assert wavefunction.get_container_type() == "sd"
+        assert wavefunction.size() == 1, "single determinant"
+
+        # Create Hamiltonian
+        ham_calculator = algorithms.create("hamiltonian_constructor", "qdk")
+        hamiltonian = ham_calculator.run(orbitals)
+
+        # Compute UCCSD energy
+        cc_calculator = algorithms.create("dynamical_correlation_calculator", "pyscf_coupled_cluster")
+        cc_calculator.settings().set("store_amplitudes", True)
+        ansatz_object = Ansatz(hamiltonian, wavefunction)
+        cc_energy, updated_wavefunction = cc_calculator.run(ansatz_object)
+        reference_energy = -149.8417973596817
+        assert np.isclose(cc_energy, reference_energy), (
+            f"cc energy {cc_energy} should match reference {reference_energy}"
+        )
+
+        # Get amplitudes from the wavefunction container
+        cc_container = updated_wavefunction.get_container()
+        assert cc_container.has_t1_amplitudes(), "should have T1 amplitudes"
+        assert cc_container.has_t2_amplitudes(), "should have T2 amplitudes"
+
+        # For unrestricted, we should get separate alpha and beta amplitudes
+        t1_alpha, t1_beta = cc_container.get_t1_amplitudes()
+        t2_abab, t2_aaaa, t2_bbbb = cc_container.get_t2_amplitudes()
+
+        # Verify all amplitudes are present
+        assert t1_alpha is not None, "T1 alpha amplitudes should not be None"
+        assert t1_beta is not None, "T1 beta amplitudes should not be None"
+        assert t2_abab is not None, "T2 alpha-beta amplitudes should not be None"
+        assert t2_aaaa is not None, "T2 alpha-alpha amplitudes should not be None"
+        assert t2_bbbb is not None, "T2 beta-beta amplitudes should not be None"
+
+        # Verify the amplitudes have the expected shapes (stored as column vectors)
+        # T1: (nocc * nvirt, 1) for each spin
+        # T2: (nocc * nocc * nvirt * nvirt, 1) for each component
+
+        occ_a, occ_b = wavefunction.get_total_orbital_occupations()
+        nocc_alpha = int(np.sum(occ_a))
+        nocc_beta = int(np.sum(occ_b))
+        nvirt_alpha = orbitals.get_num_molecular_orbitals() - nocc_alpha
+        nvirt_beta = orbitals.get_num_molecular_orbitals() - nocc_beta
+
+        t1_alpha_array = np.array(t1_alpha) if not isinstance(t1_alpha, np.ndarray) else t1_alpha
+        t1_beta_array = np.array(t1_beta) if not isinstance(t1_beta, np.ndarray) else t1_beta
+
+        assert t1_alpha_array.shape[0] == nocc_alpha * nvirt_alpha, "T1 alpha shape mismatch"
+        assert t1_beta_array.shape[0] == nocc_beta * nvirt_beta, "T1 beta shape mismatch"
 
     def test_pyscf_mcscf_singlet(self):
         """Test PySCF MCSCF for n2 with cc-pvdz basis and CAS(6,6)."""
@@ -1459,7 +1525,7 @@ class TestPyscfPlugin:
         # Perform SCF calculation with qdk-chemistry
         scf_solver = algorithms.create("scf_solver", "pyscf")
         scf_solver.settings().set("basis_set", "cc-pvdz")
-        scf_solver.settings().set("force_restricted", True)
+        scf_solver.settings().set("scf_type", "restricted")
         _, wavefunction = scf_solver.run(o2, 0, 3)
 
         # Construct qdk-chemistry Hamiltonian for active space
@@ -1503,7 +1569,7 @@ class TestPyscfPlugin:
 
         # Get pyscf object from hf orbitals
         occ_a, occ_b = wavefunction.get_total_orbital_occupations()
-        pyscf_scf = orbitals_to_scf(wavefunction.get_orbitals(), occ_alpha=occ_a, occ_beta=occ_b, force_restricted=True)
+        pyscf_scf = orbitals_to_scf(wavefunction.get_orbitals(), occ_alpha=occ_a, occ_beta=occ_b, scf_type="restricted")
 
         # Create MACIS calculator
         macis_calc = algorithms.create("multi_configuration_calculator", "macis_cas")
@@ -1533,7 +1599,7 @@ class TestPyscfPlugin:
 
         # Get pyscf object from hf orbitals
         occ_a, occ_b = wavefunction.get_total_orbital_occupations()
-        pyscf_scf = orbitals_to_scf(wavefunction.get_orbitals(), occ_alpha=occ_a, occ_beta=occ_b, force_restricted=True)
+        pyscf_scf = orbitals_to_scf(wavefunction.get_orbitals(), occ_alpha=occ_a, occ_beta=occ_b, scf_type="restricted")
 
         # Create MACIS calculator
         macis_calc = algorithms.create("multi_configuration_calculator", "macis_cas")
@@ -1565,7 +1631,7 @@ class TestPyscfPlugin:
 
         # Get pyscf object from hf orbitals
         occ_a, occ_b = wavefunction.get_total_orbital_occupations()
-        pyscf_scf = orbitals_to_scf(wavefunction.get_orbitals(), occ_alpha=occ_a, occ_beta=occ_b, force_restricted=True)
+        pyscf_scf = orbitals_to_scf(wavefunction.get_orbitals(), occ_alpha=occ_a, occ_beta=occ_b, scf_type="restricted")
 
         # Create MACIS calculator
         macis_calc = algorithms.create("multi_configuration_calculator", "macis_cas")
@@ -1591,12 +1657,12 @@ class TestPyscfPlugin:
         # Perform SCF calculation with qdk-chemistry
         scf_solver = algorithms.create("scf_solver", "pyscf")
         scf_solver.settings().set("basis_set", "cc-pvdz")
-        scf_solver.settings().set("force_restricted", True)
+        scf_solver.settings().set("scf_type", "restricted")
         _, wavefunction = scf_solver.run(o2, 0, 3)
 
         # Get pyscf object from hf orbitals
         occ_a, occ_b = wavefunction.get_total_orbital_occupations()
-        pyscf_scf = orbitals_to_scf(wavefunction.get_orbitals(), occ_alpha=occ_a, occ_beta=occ_b, force_restricted=True)
+        pyscf_scf = orbitals_to_scf(wavefunction.get_orbitals(), occ_alpha=occ_a, occ_beta=occ_b, scf_type="restricted")
 
         # Create MACIS calculator
         macis_calc = algorithms.create("multi_configuration_calculator", "macis_cas")
@@ -1668,6 +1734,100 @@ class TestPyscfPlugin:
             atol=float_comparison_absolute_tolerance,
         )
 
+    def test_hamiltonian_to_scf_rerouting_and_error_handling(self):
+        """Test hamiltonian_to_scf rerouting and error handling.
+
+        This test validates three scenarios:
+        1. Rerouting: Non-model Hamiltonians should reroute to orbitals_to_scf
+        2. Error throwing: Invalid configurations should raise ValueError
+        3. Non-rerouting: Valid model Hamiltonians should create fake SCF objects
+        """
+        # 1: Rerouting for non-model Hamiltonian
+        water = create_water_structure()
+        scf_solver = algorithms.create("scf_solver", "pyscf")
+        scf_solver.settings().set("basis_set", "sto-3g")
+        _, wavefunction = scf_solver.run(water, 0, 1)
+        orbitals = wavefunction.get_orbitals()
+
+        # Create a Hamiltonian from these orbitals (non-model)
+        hamiltonian_calculator = algorithms.create("hamiltonian_constructor")
+        hamiltonian = hamiltonian_calculator.run(orbitals)
+
+        # Verify the orbitals have coefficients (non-model)
+        coeff_a, coeff_b = orbitals.get_coefficients()
+        assert coeff_a is not None
+        assert coeff_b is not None
+
+        # Create occupation arrays for a singlet state
+        norb = orbitals.get_num_molecular_orbitals()
+        occupation_alpha = np.concatenate((np.ones(5), np.zeros(norb - 5)))
+        occupation_beta = np.concatenate((np.ones(5), np.zeros(norb - 5)))
+
+        # Call hamiltonian_to_scf - should re-route to orbitals_to_scf
+        scf_from_hamiltonian = hamiltonian_to_scf(hamiltonian, occupation_alpha, occupation_beta)
+
+        # MO coefficients should NOT be identity matrix
+        assert not np.allclose(scf_from_hamiltonian.mo_coeff, np.eye(norb)), (
+            "MO coefficients should not be identity matrix for non-model Hamiltonian (rerouted case)"
+        )
+
+        # 2. Unrestricted model Hamiltonian should throw
+        model_orbitals_unrestricted = data.ModelOrbitals(4, False)  # unrestricted
+        one_body_alpha = np.eye(4)
+        one_body_beta = np.eye(4) * 1.1
+        two_body_aaaa = np.zeros(4**4)
+        two_body_aabb = np.zeros(4**4)
+        two_body_bbbb = np.zeros(4**4)
+        h_unrestricted_model = data.Hamiltonian(
+            one_body_alpha,
+            one_body_beta,
+            two_body_aaaa,
+            two_body_aabb,
+            two_body_bbbb,
+            model_orbitals_unrestricted,
+            0.0,
+            np.eye(4),
+            np.eye(4),
+        )
+
+        occupation_alpha_test = np.array([1.0, 1.0, 0.0, 0.0])
+        occupation_beta_test = np.array([1.0, 1.0, 0.0, 0.0])
+
+        with pytest.raises(ValueError, match="You cannot pass an unrestricted model Hamiltonian here"):
+            hamiltonian_to_scf(h_unrestricted_model, occupation_alpha_test, occupation_beta_test)
+
+        # 3. Non-rerouting for valid model Hamiltonian
+
+        # Create a model Hamiltonian (restricted, closed-shell, full active space)
+        model_orbitals_proper = data.ModelOrbitals(4, True)  # All orbitals are active by default
+        one_body_model = np.eye(4) * 0.5
+        two_body_model = np.zeros(4**4)
+        h_model = data.Hamiltonian(one_body_model, two_body_model, model_orbitals_proper, 0.5, np.eye(4))
+
+        # Closed-shell occupations
+        occupation_alpha_closed = np.array([1.0, 1.0, 0.0, 0.0])
+        occupation_beta_closed = np.array([1.0, 1.0, 0.0, 0.0])
+
+        # Call hamiltonian_to_scf - should create fake SCF
+        scf_from_model = hamiltonian_to_scf(h_model, occupation_alpha_closed, occupation_beta_closed)
+
+        # For model Hamiltonian - MO coefficients should be identity matrix (fake SCF)
+        assert np.allclose(scf_from_model.mo_coeff, np.eye(4)), (
+            "MO coefficients should be identity matrix for model Hamiltonian (fake SCF object)"
+        )
+
+        # Verify core energy matches
+        assert np.isclose(scf_from_model.energy_nuc(), 0.5), "Core energy should match the model Hamiltonian"
+
+        # Verify occupations are set correctly (total = alpha + beta for restricted)
+        expected_total_occ = occupation_alpha_closed + occupation_beta_closed
+        assert np.allclose(scf_from_model.mo_occ, expected_total_occ), (
+            "Occupations should be correctly set in fake SCF object"
+        )
+
+        # Verify electron count
+        assert scf_from_model.mol.nelectron == 4, "Total electron count should be 4"
+
 
 class TestQDKChemistryPySCFBasisConversion:
     """Test suite for QDK/Chemistry-PySCF basis set conversion."""
@@ -1702,7 +1862,7 @@ class TestQDKChemistryPySCFBasisConversion:
 
     def create_simple_basis_set(self, structure, basis_name="STO-3G"):
         """Create a simple basis set for testing."""
-        scf_solver = qdk_chemistry.algorithms.create("scf_solver")
+        scf_solver = algorithms.create("scf_solver")
         scf_solver.settings().set("basis_set", basis_name.lower())
         _, wavefunction = scf_solver.run(structure, 0, 1)
         return wavefunction.get_orbitals().get_basis_set()
@@ -1895,7 +2055,7 @@ class TestQDKChemistryPySCFBasisConversion:
     def test_molecular_orbital_consistency(self):
         """Test that molecular orbitals remain consistent after basis conversion."""
         # Get QDK/Chemistry solution
-        scf_solver = qdk_chemistry.algorithms.create("scf_solver", "pyscf")
+        scf_solver = algorithms.create("scf_solver", "pyscf")
         scf_solver.settings().set("basis_set", "sto-3g")
         qdk_energy, qdk_wavefunction = scf_solver.run(self.he_structure, 0, 1)
         qdk_orbitals = qdk_wavefunction.get_orbitals()

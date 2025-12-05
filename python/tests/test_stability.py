@@ -586,7 +586,7 @@ class TestPyscfStabilityChecker:
         o2 = create_o2_structure()
         scf_solver = algorithms.create("scf_solver", "pyscf")
         scf_solver.settings().set("basis_set", "def2-svp")
-        scf_solver.settings().set("force_restricted", True)
+        scf_solver.settings().set("scf_type", "restricted")
         _, wavefunction = scf_solver.run(o2, 0, 3)
 
         # Perform stability analysis (only internal, since external not supported for ROHF)
@@ -795,7 +795,7 @@ class TestPyscfStabilityChecker:
         c2_plus = create_c2_plus_structure()
         scf_solver = algorithms.create("scf_solver", "pyscf")
         scf_solver.settings().set("basis_set", "def2-svp")
-        scf_solver.settings().set("force_restricted", True)  # Force ROHF
+        scf_solver.settings().set("scf_type", "restricted")  # Force ROHF
         _, wavefunction = scf_solver.run(c2_plus, 1, 2)  # charge=1, multiplicity=2
 
         # Perform stability analysis (only internal for ROHF)

@@ -13,7 +13,7 @@ Available algorithms
    mcscf
    pmc
    qubit_mapper
-   reference_derived
+   dynamical_correlation
    scf_solver
    stability_checker
    state_preparation
