@@ -207,8 +207,9 @@ def _pending_to_payload() -> list[dict[str, Any]]:
                     },
                 },
             }
-            # Histogram values differ only in that they have min/max values also
+            
             if unique_props["type"] == "histogram":
+                # Histogram values differ only in that they have min/max values also
                 entry["data"]["baseData"]["metrics"][0]["min"] = unique_props["min"]
                 entry["data"]["baseData"]["metrics"][0]["max"] = unique_props["max"]
 
