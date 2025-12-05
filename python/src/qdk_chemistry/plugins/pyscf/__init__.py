@@ -4,10 +4,17 @@
 # Licensed under the MIT License. See LICENSE.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
 
+_loaded = False
+
 
 # Import necessary modules
 def load():
     """Load the Pyscf plugin into QDK/Chemistry."""
+    global _loaded  # noqa: PLW0603
+    if _loaded:
+        return
+    _loaded = True
+
     from qdk_chemistry.algorithms import register  # noqa: PLC0415
     from qdk_chemistry.plugins.pyscf.active_space_avas import PyscfAVAS  # noqa: PLC0415
     from qdk_chemistry.plugins.pyscf.coupled_cluster import PyscfCoupledClusterCalculator  # noqa: PLC0415
