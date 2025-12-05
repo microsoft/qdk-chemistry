@@ -37,12 +37,12 @@ def test_sparse_matrix_solver():
     q_solver = create("qubit_hamiltonian_solver", "qdk_sparse_matrix_solver")
     assert isinstance(q_solver, SparseMatrixSolver)
     assert np.isclose(
-        q_solver.settings().tol,
+        q_solver.settings().get("tol"),
         1e-8,
         atol=float_comparison_absolute_tolerance,
         rtol=float_comparison_relative_tolerance,
     )
-    assert q_solver.settings().max_m == 20
+    assert q_solver.settings().get("max_m") == 20
 
     energy, state = q_solver.run(qubit_hamiltonian)
     assert np.isclose(energy, -4, atol=float_comparison_absolute_tolerance, rtol=float_comparison_relative_tolerance)

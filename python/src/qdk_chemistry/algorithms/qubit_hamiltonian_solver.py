@@ -1,6 +1,6 @@
 """QDK/Chemistry qubit hamiltonian solver abstractions and utilities.
 
-This module provides the bases classes `QubitHamiltonianSolver` and `QubitHamiltonianSolverFactory`
+This module provides the base classes `QubitHamiltonianSolver` and `QubitHamiltonianSolverFactory`
 for solving qubit Hamiltonians for ground state energies using various algorithms.
 """
 
@@ -92,7 +92,9 @@ class SparseMatrixSolver(QubitHamiltonianSolver):
         """
         sparse_matrix = qubit_hamiltonian.pauli_ops.to_matrix(sparse=True)
         sparse_matrix_real = sparse_matrix.real.copy()
-        eigenvalue, eigenvector = davidson_solver(sparse_matrix_real, tol=1e-8, max_m=20)
+        eigenvalue, eigenvector = davidson_solver(
+            sparse_matrix_real, tol=self._settings.get("tol"), max_m=self._settings.get("max_m")
+        )
         return eigenvalue, eigenvector
 
     def name(self) -> str:
