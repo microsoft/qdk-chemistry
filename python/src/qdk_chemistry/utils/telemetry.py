@@ -2,7 +2,7 @@
 
 Module sends telemetry directly to Azure Monitor using a similar mechanism and
 format to the Azure Monitor OpenTelemetry Python SDK. It only supports custom metrics of
-type "counter" and "histogram" for now. It's goal is to be minimal in size and dependencies,
+type "counter" and "histogram" for now. Its goal is to be minimal in size and dependencies,
 and easy to read to understand exactly what data is being sent.
 
 To use this API, simply call `log_telemetry` with the metric name, value, and any other
