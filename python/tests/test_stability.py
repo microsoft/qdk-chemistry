@@ -841,7 +841,7 @@ class TestStabilityWorkflow:
         # Check energy matches reference value - should converge to same UHF energy as manual rotation
         assert abs(energy - (-108.815746915896)) < 1e-6, f"Energy {energy} should match reference -108.815746915896"
 
-    @pytest.mark.parametrize("scf_backend", ["qdk"])
+    @pytest.mark.parametrize("scf_backend", ["pyscf", "qdk"])
     def test_workflow_n2_uhf_instability(self, scf_backend):
         """Test stability workflow on N2 at 1.4Å with internal instability of UHF."""
         n2 = create_stretched_n2_structure(distance_angstrom=1.4)

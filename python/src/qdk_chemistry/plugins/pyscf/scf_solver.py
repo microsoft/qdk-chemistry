@@ -175,27 +175,6 @@ class PyscfScfSolver(ScfSolver):
         # The PySCF convention is 2S not 2S+1
         multiplicity = spin_multiplicity
         spin = (multiplicity - 1) if multiplicity > 0 else None
-        open_shell = multiplicity != 1
-
-        # Determine reference type and unrestricted flag
-        scf_type = self._settings["scf_type"].lower()
-
-        if scf_type == "auto":
-            unrestricted = open_shell
-        elif scf_type == "unrestricted":
-            unrestricted = True
-            if not open_shell and initial_guess is None:
-                warnings.warn(
-                    "Unrestricted reference requested for closed-shell system. "
-                    "Automatic spin symmetry breaking is not supported. "
-                    "Consider providing a spin-broken initial guess if desired.",
-                    stacklevel=2,
-                )
-        elif scf_type == "restricted":
-            unrestricted = False
-            # Note: For open-shell with restricted, we'll use ROHF/ROKS which PySCF supports
-        else:
-            raise ValueError("scf_type must be one of: auto, restricted, unrestricted")
 
         # Check effective core potentials (ECPs)
         ecp, ecp_atoms = bse_predefined_ecp(basis_name, atoms)
@@ -212,30 +191,40 @@ class PyscfScfSolver(ScfSolver):
         )
         mol.build()
 
-        # Select the appropriate SCF method based on the method setting and reference type
+        # Determine SCF type from settings
+        scf_type = self._settings["scf_type"]
+        if isinstance(scf_type, str):
+            scf_type = SCFType(scf_type.lower())
+
+        # Select the appropriate SCF method based on the method setting
         if method == "hf":
             # Hartree-Fock methods
-            if unrestricted:
+            if scf_type == SCFType.RESTRICTED:
+                mf = scf.ROHF(mol) if mol.spin != 0 else scf.RHF(mol)
+            elif scf_type == SCFType.UNRESTRICTED:
                 mf = scf.UHF(mol)
-            elif not open_shell:
+            elif mol.spin == 0:
                 mf = scf.RHF(mol)
             else:
-                # Restricted open-shell Hartree-Fock
-                mf = scf.ROHF(mol)
+                mf = scf.UHF(mol)
         # DFT methods (Kohn-Sham)
-        elif unrestricted:
+        elif scf_type == SCFType.RESTRICTED:
+            mf = scf.ROKS(mol) if mol.spin != 0 else scf.RKS(mol)
+            mf.xc = method
+        elif scf_type == SCFType.UNRESTRICTED:
             mf = scf.UKS(mol)
-            mf.xc = method  # Set the exchange-correlation functional
-        elif not open_shell:
-            mf = scf.RKS(mol)
-            mf.xc = method  # Set the exchange-correlation functional
-        else:
-            # Restricted open-shell Kohn-Sham
-            mf = scf.ROKS(mol)
             mf.xc = method
         else:  # SCFType.AUTO
             mf = scf.RKS(mol) if mol.spin == 0 else scf.UKS(mol)
             mf.xc = method
+
+        if scf_type == SCFType.RESTRICTED and mol.spin == 0 and initial_guess is None:
+            warnings.warn(
+                "Unrestricted reference requested for closed-shell system. "
+                "Automatic spin symmetry breaking is not supported. "
+                "Consider providing a spin-broken initial guess if desired.",
+                stacklevel=2,
+            )
 
         # Configure convergence settings
 
@@ -248,6 +237,7 @@ class PyscfScfSolver(ScfSolver):
         if initial_guess is not None and hasattr(initial_guess, "get_coefficients"):
             # Validate initial guess compatibility with reference type
             initial_guess_is_unrestricted = initial_guess.is_unrestricted()
+            unrestricted = scf_type == SCFType.UNRESTRICTED or (scf_type == SCFType.AUTO and mol.spin != 0)
             if unrestricted and not initial_guess_is_unrestricted:
                 warnings.warn(
                     "Unrestricted calculation requested but restricted initial guess provided.",
@@ -279,15 +269,8 @@ class PyscfScfSolver(ScfSolver):
         basis_set = pyscf_mol_to_qdk_basis(mf.mol, structure, basis_name)
         _ovlp = mf.get_ovlp()
 
-        if not unrestricted and mol.spin == 0:
-            orbitals = Orbitals(
-                mf.mo_coeff,
-                mf.mo_energy,
-                ao_overlap=_ovlp,
-                basis_set=basis_set,
-            )
-        elif not unrestricted:
-            # Restricted open-shell (ROHF/ROKS) - create unrestricted-style orbitals with same coefficients
+        if scf_type == SCFType.RESTRICTED and mol.spin != 0:
+            # ROHF/ROKS case - create unrestricted-style orbitals but with same coefficients
             orbitals = Orbitals(
                 mf.mo_coeff,  # Same coefficients for alpha and beta
                 mf.mo_coeff,
@@ -296,7 +279,8 @@ class PyscfScfSolver(ScfSolver):
                 ao_overlap=_ovlp,
                 basis_set=basis_set,
             )
-        elif unrestricted:
+        elif scf_type == SCFType.UNRESTRICTED or (scf_type == SCFType.AUTO and mol.spin != 0):
+            # UHF/UKS case - alpha and beta orbitals are different
             energy_a, energy_b = mf.mo_energy
             coeff_a, coeff_b = mf.mo_coeff
 

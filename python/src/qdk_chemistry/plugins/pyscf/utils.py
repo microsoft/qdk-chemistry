@@ -419,7 +419,6 @@ def orbitals_to_scf(
             * ``"unrestricted"`` or ``SCFType.UNRESTRICTED``: Force unrestricted calculation (UHF)
 
         method: The electronic structure method to use. Default is "hf" (Hartree-Fock).
-
             Any other value is treated as a DFT exchange-correlation functional (e.g., "b3lyp", "pbe").
 
     Returns:
@@ -465,13 +464,7 @@ def orbitals_to_scf(
         energy_a = np.zeros(num_molecular_orbitals)
         energy_b = np.zeros(num_molecular_orbitals)
 
-    if scf_type == SCFType.UNRESTRICTED:
-        # Force UHF even for restricted orbitals
-        mf = pyscf.scf.UHF(mol)
-        mf.mo_coeff = (coeff_a, coeff_a)  # Use same coefficients for alpha and beta
-        mf.mo_energy = (energy_a, energy_a)  # Use same energies for alpha and beta
-        mf.mo_occ = (occ_alpha, occ_beta)
-    elif scf_type == SCFType.RESTRICTED or (scf_type == SCFType.AUTO and orbitals.is_restricted()):
+    if scf_type == SCFType.RESTRICTED or (scf_type == SCFType.AUTO and orbitals.is_restricted()):
         # For restricted Orbitals, internal occupations are per-spin (each 0 or 1 for closed shell),
         # so total occupancy per MO is occ_a + occ_b
         total_occ = occ_alpha + occ_beta
@@ -533,8 +526,7 @@ def orbitals_to_scf_from_n_electrons_and_multiplicity(
             * ``"restricted"`` or ``SCFType.RESTRICTED``: Force restricted calculation (RHF or ROHF)
             * ``"unrestricted"`` or ``SCFType.UNRESTRICTED``: Force unrestricted calculation (UHF)
 
-        method: The electronic structure method to use. Default is "hf" for Hartree-Fock.
-
+        method: The electronic structure method to use. Default is "hf" (Hartree-Fock).
             Any other value is treated as a DFT exchange-correlation functional (e.g., "b3lyp", "pbe").
 
     Returns:
