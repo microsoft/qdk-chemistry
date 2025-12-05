@@ -601,7 +601,6 @@ nlohmann::json Hamiltonian::to_json() const {
   // Store version first
   j["version"] = SERIALIZATION_VERSION;
 
-  // Add container type identifier
   j["container_type"] = _container->get_container_type();
 
   j["type"] =
@@ -733,8 +732,8 @@ std::shared_ptr<Hamiltonian> Hamiltonian::from_json(const nlohmann::json& j) {
     if (!j.contains("container")) {
       throw std::runtime_error("JSON missing required 'container' field");
     }
-    auto container = HamiltonianContainer::from_json(j["container"]);
 
+    auto container = HamiltonianContainer::from_json(j["container"]);
     return std::make_shared<Hamiltonian>(std::move(container));
 
   } catch (const std::exception& e) {
@@ -989,11 +988,6 @@ void Hamiltonian::to_hdf5(H5::Group& group) const {
     version_attr.write(string_type, version_str);
     version_attr.close();
 
-    // Write container type identifier
-    std::string container_type = _container->get_container_type();
-    H5::Attribute type_attr = group.createAttribute(
-        "container_type", string_type, H5::DataSpace(H5S_SCALAR));
-    type_attr.write(string_type, container_type);
 
     // Delegate to container serialization (orbitals are included within the
     // container)

@@ -93,6 +93,11 @@ Canonical4CenterHamiltonian::Canonical4CenterHamiltonian(
 
 std::unique_ptr<HamiltonianContainer> Canonical4CenterHamiltonian::clone()
     const {
+  if (is_restricted()) {
+    return std::make_unique<Canonical4CenterHamiltonian>(
+        *_one_body_integrals.first, *std::get<0>(_two_body_integrals),
+        _orbitals, _core_energy, *_inactive_fock_matrix.first, _type);
+  }
   return std::make_unique<Canonical4CenterHamiltonian>(
       *_one_body_integrals.first, *_one_body_integrals.second,
       *std::get<0>(_two_body_integrals), *std::get<1>(_two_body_integrals),
@@ -360,6 +365,9 @@ nlohmann::json Canonical4CenterHamiltonian::to_json() const {
 
   // Store version first
   j["version"] = SERIALIZATION_VERSION;
+
+  // Store container type
+  j["container_type"] = get_container_type();
 
   // Store metadata
   j["core_energy"] = _core_energy;
@@ -690,6 +698,12 @@ void Canonical4CenterHamiltonian::to_hdf5(H5::Group& group) const {
         group.createAttribute("version", string_type, scalar_space);
     std::string version_str = SERIALIZATION_VERSION;
     version_attr.write(string_type, version_str);
+
+    // Add container type attribute
+    H5::Attribute container_type_attr =
+        group.createAttribute("container_type", string_type, scalar_space);
+    std::string container_type_str = get_container_type();
+    container_type_attr.write(string_type, container_type_str);
 
     // Save metadata
     H5::Group metadata_group = group.createGroup("metadata");

@@ -263,10 +263,10 @@ TEST_F(HamiltonianTest, JSONSerialization) {
   // Test JSON conversion
   nlohmann::json j = h.to_json();
 
-  EXPECT_EQ(j["core_energy"], 1.5);
-  EXPECT_TRUE(j["has_one_body_integrals"]);
-  EXPECT_TRUE(j["has_two_body_integrals"]);
-  EXPECT_TRUE(j["has_orbitals"]);
+  EXPECT_EQ(j["container"]["core_energy"], 1.5);
+  EXPECT_TRUE(j["container"]["has_one_body_integrals"]);
+  EXPECT_TRUE(j["container"]["has_two_body_integrals"]);
+  EXPECT_TRUE(j["container"]["has_orbitals"]);
 
   // Test round-trip conversion
   auto h2 = Hamiltonian::from_json(j);
