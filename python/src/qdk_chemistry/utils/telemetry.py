@@ -286,7 +286,7 @@ def _telemetry_thread_start():
             _ = _post_telemetry()
 
         # If we get here, it's after a post attempt. Pending will still have items if the attempt
-        # failed, so updated the time for the next attempt in that case.
+        # failed, so update the time for the next attempt in that case.
         next_post_sec = None if not pending_metrics else time.monotonic() + BATCH_INTERVAL_SEC
 
 
