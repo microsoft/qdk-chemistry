@@ -44,8 +44,7 @@ void compute_trial_fock(const qcs::ERIMultiplexer& eri,
                         const std::shared_ptr<qcs::EXC>& exc,
                         const RowMajorMatrix& trial_density,
                         const RowMajorMatrix& ground_density,
-                        RowMajorMatrix& trial_fock, 
-                        RowMajorMatrix& J_scratch,  
+                        RowMajorMatrix& trial_fock, RowMajorMatrix& J_scratch,
                         RowMajorMatrix& K_scratch) {
   const size_t num_atomic_orbitals = ground_density.cols();
   const bool unrestricted = (ground_density.rows() == 2 * num_atomic_orbitals);
@@ -59,7 +58,8 @@ void compute_trial_fock(const qcs::ERIMultiplexer& eri,
   // Build J and K matrices
   J_scratch.setZero();
   K_scratch.setZero();
-  eri.build_JK(trial_density.data(), J_scratch.data(), K_scratch.data(), alpha, beta, omega);
+  eri.build_JK(trial_density.data(), J_scratch.data(), K_scratch.data(), alpha,
+               beta, omega);
 
   // Compute Fock matrix: F = J - K for RHF, or appropriate combination for UHF
   if (unrestricted) {
@@ -67,15 +67,15 @@ void compute_trial_fock(const qcs::ERIMultiplexer& eri,
     trial_fock.block(0, 0, num_atomic_orbitals, num_atomic_orbitals) =
         J_scratch.block(0, 0, num_atomic_orbitals, num_atomic_orbitals) +
         J_scratch.block(num_atomic_orbitals, 0, num_atomic_orbitals,
-                num_atomic_orbitals) -
+                        num_atomic_orbitals) -
         K_scratch.block(0, 0, num_atomic_orbitals, num_atomic_orbitals);
     trial_fock.block(num_atomic_orbitals, 0, num_atomic_orbitals,
                      num_atomic_orbitals) =
         J_scratch.block(num_atomic_orbitals, 0, num_atomic_orbitals,
-                num_atomic_orbitals) +
+                        num_atomic_orbitals) +
         J_scratch.block(0, 0, num_atomic_orbitals, num_atomic_orbitals) -
         K_scratch.block(num_atomic_orbitals, 0, num_atomic_orbitals,
-                num_atomic_orbitals);
+                        num_atomic_orbitals);
   } else {
     // For RHF: F = 2*J - K
     trial_fock = 2.0 * J_scratch - K_scratch;
@@ -91,105 +91,158 @@ void compute_trial_fock(const qcs::ERIMultiplexer& eri,
   }
 }
 
-    auto A_op = [&](int32_t N, int32_t NRHS, const double alpha,
-                    const double* X, int32_t LDX, double beta, double* Y,
-                    int32_t LDY) {
-      AutoTimer __timer("polarizability:: A_op");
+/**
+ * @brief Apply the stability analysis matrix-vector operation
+ *
+ * This function computes Y = (A+B)*X,
+ * See J. Chem. Phys. 66, 3045 (1977) for the definition of A and B.
+ *
+ * @param X Input vectors (eigensize x num_vectors)
+ * @param Y Output vectors (eigensize x num_vectors), updated to (A+B)*X
+ * @param num_alpha Number of occupied alpha orbitals
+ * @param num_beta Number of occupied beta orbitals
+ * @param eigen_diff Diagonal preconditioner (orbital energy differences)
+ * @param Ca Alpha MO coefficients (num_atomic_orbitals x
+ * num_molecular_orbitals)
+ * @param Cb Beta MO coefficients (num_atomic_orbitals x num_molecular_orbitals,
+ * only used if unrestricted)
+ * @param eri ERI multiplexer for computing J and K matrices
+ * @param exc Exchange-correlation object (nullptr for HF)
+ * @param ground_density Ground state density matrix
+ */
+void apply_stability_operator(const Eigen::MatrixXd& X, Eigen::MatrixXd& Y,
+                              size_t num_alpha, size_t num_beta,
+                              const Eigen::VectorXd& eigen_diff,
+                              const Eigen::MatrixXd& Ca,
+                              const Eigen::MatrixXd& Cb,
+                              const qcs::ERIMultiplexer& eri,
+                              const std::shared_ptr<qcs::EXC>& exc,
+                              const RowMajorMatrix& ground_density) {
+  AutoTimer __timer("stability:: apply_A_operator");
 
-      if (N != nov) {
-        throw std::runtime_error("Matrix size mismatch in CPSCF GMRES solver.");
+  // Calculate sizes
+  const size_t num_atomic_orbitals = Ca.rows();
+  const size_t num_molecular_orbitals = Ca.cols();
+  const size_t num_alpha_virtual_orbitals = num_molecular_orbitals - num_alpha;
+  const size_t num_beta_virtual_orbitals = num_molecular_orbitals - num_beta;
+  const bool unrestricted = (ground_density.rows() == 2 * num_atomic_orbitals);
+
+  const size_t nova = num_alpha * num_alpha_virtual_orbitals;
+  const size_t eigensize =
+      unrestricted ? nova + num_beta * num_beta_virtual_orbitals : nova;
+  const size_t num_vectors = X.cols();
+
+  if (X.rows() != static_cast<int>(eigensize)) {
+    throw std::runtime_error(
+        "Matrix size mismatch in stability operator: X.rows() = " +
+        std::to_string(X.rows()) + ", expected " + std::to_string(eigensize));
+  }
+  if (Y.rows() != static_cast<int>(eigensize) ||
+      Y.cols() != static_cast<int>(num_vectors)) {
+    throw std::runtime_error(
+        "Matrix size mismatch in stability operator: Y dimensions incorrect");
+  }
+  if (eigen_diff.size() != static_cast<int>(eigensize)) {
+    throw std::runtime_error(
+        "Preconditioner size mismatch in stability operator");
+  }
+
+  // Get pointers to orbital blocks
+  const double* Ca_occ_ptr = Ca.data();
+  const double* Ca_vir_ptr = Ca_occ_ptr + num_alpha * num_atomic_orbitals;
+  const double* Cb_occ_ptr = unrestricted ? Cb.data() : nullptr;
+  const double* Cb_vir_ptr =
+      unrestricted ? Cb_occ_ptr + num_beta * num_atomic_orbitals : nullptr;
+
+  // Allocate internal scratch matrices
+  const size_t num_density_matrices = unrestricted ? 2 : 1;
+  RowMajorMatrix trial_density = RowMajorMatrix::Zero(
+      num_atomic_orbitals * num_density_matrices, num_atomic_orbitals);
+  RowMajorMatrix trial_fock = RowMajorMatrix::Zero(
+      num_atomic_orbitals * num_density_matrices, num_atomic_orbitals);
+  RowMajorMatrix scratch1 = RowMajorMatrix::Zero(
+      num_atomic_orbitals * num_density_matrices, num_atomic_orbitals);
+  RowMajorMatrix scratch2 = RowMajorMatrix::Zero(
+      num_atomic_orbitals * num_density_matrices, num_atomic_orbitals);
+  double* temp = scratch1.data();
+
+  // For each right-hand side, apply the operator
+  for (size_t vec = 0; vec < num_vectors; ++vec) {
+    const double* X_vec = X.col(vec).data();
+    double* Y_vec = Y.col(vec).data();
+
+    // calculate orbital energy difference term using preconditioner diagonal
+    for (size_t idx = 0; idx < eigensize; ++idx) {
+      Y_vec[idx] += eigen_diff(idx) * X_vec[idx];  // δij δab δστ (ϵaσ − ϵiτ )
+    }
+
+    // tP_{uv} = \sum_{ia}  X_{ai} (C_{ui} C_{va} + C_{vi} C_{ua})
+    // R has num_alpha_virtual_orbitals as fast-index, tP is symmetric
+    // Step 1: temp = Ca_vir * X (temp is num_atomic_orbitals x num_alpha in
+    // ColMajor)
+    blas::gemm(blas::Layout::ColMajor, blas::Op::NoTrans, blas::Op::NoTrans,
+               num_atomic_orbitals, num_alpha, num_alpha_virtual_orbitals, 1.0,
+               Ca_vir_ptr, num_atomic_orbitals, X_vec,
+               num_alpha_virtual_orbitals, 0.0, temp, num_atomic_orbitals);
+    blas::gemm(blas::Layout::ColMajor, blas::Op::NoTrans, blas::Op::Trans,
+               num_atomic_orbitals, num_atomic_orbitals, num_alpha, 1.0, temp,
+               num_atomic_orbitals, Ca_occ_ptr, num_atomic_orbitals, 0.0,
+               trial_density.data(), num_atomic_orbitals);
+    for (size_t i = 0; i < num_atomic_orbitals; ++i)
+      for (size_t j = i; j < num_atomic_orbitals; ++j) {
+        const auto symm_ij = trial_density(i, j) + trial_density(j, i);
+        trial_density(i, j) = symm_ij;
+        trial_density(j, i) = symm_ij;
       }
-
-      // Set Y to zero initially if we're not adding to it
-      if (beta == 0.0)
-        std::fill(Y, Y + N * NRHS, 0.0);
-      else
-        for (int32_t i = 0; i < N * NRHS; ++i) Y[i] *= beta;
-
-      // For each right-hand side, apply the operator
-      for (int32_t rhs = 0; rhs < NRHS; ++rhs) {
-        const double* X_rhs = X + rhs * LDX;
-        double* Y_rhs = Y + rhs * LDY;
-
-        // calculate orbital energy difference term
-        for (size_t i = 0; i < num_alpha; ++i)
-          for (size_t a = 0; a < num_alpha_virtual_orbitals; ++a) {
-            Y_rhs[i * num_alpha_virtual_orbitals + a] +=
-                alpha * (eigenvalues_(0, a + num_alpha) - eigenvalues_(0, i)) *
-                X_rhs[i * num_alpha_virtual_orbitals +
-                      a];  // δij δab δστ (ϵaσ − ϵiτ )
-          }
-        if (ctx_.cfg->unrestricted) {
-          for (size_t i = 0; i < num_beta; ++i)
-            for (size_t a = 0; a < num_beta_virtual_orbitals; ++a)
-              Y_rhs[nova + i * num_beta_virtual_orbitals + a] +=
-                  alpha * (eigenvalues_(1, a + num_beta) - eigenvalues_(1, i)) *
-                  X_rhs[nova + i * num_beta_virtual_orbitals +
-                        a];  // δij δab δστ (ϵaσ − ϵiτ )
+    if (unrestricted) {
+      blas::gemm(blas::Layout::ColMajor, blas::Op::NoTrans, blas::Op::NoTrans,
+                 num_atomic_orbitals, num_beta, num_beta_virtual_orbitals, 1.0,
+                 Cb_vir_ptr, num_atomic_orbitals, X_vec + nova,
+                 num_beta_virtual_orbitals, 0.0, temp, num_atomic_orbitals);
+      blas::gemm(
+          blas::Layout::ColMajor, blas::Op::NoTrans, blas::Op::Trans,
+          num_atomic_orbitals, num_atomic_orbitals, num_beta, 1.0, temp,
+          num_atomic_orbitals, Cb_occ_ptr, num_atomic_orbitals, 0.0,
+          trial_density.data() + num_atomic_orbitals * num_atomic_orbitals,
+          num_atomic_orbitals);
+      for (size_t i = 0; i < num_atomic_orbitals; ++i)
+        for (size_t j = i; j < num_atomic_orbitals; ++j) {
+          const auto symm_ij = trial_density(i + num_atomic_orbitals, j) +
+                               trial_density(j + num_atomic_orbitals, i);
+          trial_density(i + num_atomic_orbitals, j) = symm_ij;
+          trial_density(j + num_atomic_orbitals, i) = symm_ij;
         }
+    }
 
-        // tP_{uv} = \sum_{ia}  R_{ia} (C_{ui} C_{av} + C_{vi} C_{au})
-        // R has num_alpha_virtual_orbitals as fast-index, tP is symmetric
-        blas::gemm(blas::Layout::ColMajor, blas::Op::Trans, blas::Op::NoTrans,
-                   num_alpha, num_atomic_orbitals_, num_alpha_virtual_orbitals,
-                   1.0, X_rhs, num_alpha_virtual_orbitals, Ca_vir_ptr,
-                   num_molecular_orbitals_, 0.0, temp.data(), num_alpha);
-        blas::gemm(blas::Layout::ColMajor, blas::Op::Trans, blas::Op::NoTrans,
-                   num_atomic_orbitals_, num_atomic_orbitals_, num_alpha, 1.0,
-                   temp.data(), num_alpha, Ca_occ_ptr, num_molecular_orbitals_,
-                   0.0, tP_.data(), num_atomic_orbitals_);
-        for (size_t i = 0; i < num_atomic_orbitals_; ++i)
-          for (size_t j = i; j < num_atomic_orbitals_; ++j) {
-            const auto symm_ij = tP_(i, j) + tP_(j, i);
-            tP_(i, j) = symm_ij;
-            tP_(j, i) = symm_ij;
-          }
-        if (ctx_.cfg->unrestricted) {
-          blas::gemm(blas::Layout::ColMajor, blas::Op::Trans, blas::Op::NoTrans,
-                     num_beta, num_atomic_orbitals_, num_beta_virtual_orbitals,
-                     1.0, X_rhs + nova, num_beta_virtual_orbitals, Cb_vir_ptr,
-                     num_molecular_orbitals_, 0.0, temp.data(), num_beta);
-          blas::gemm(blas::Layout::ColMajor, blas::Op::Trans, blas::Op::NoTrans,
-                     num_atomic_orbitals_, num_atomic_orbitals_, num_beta, 1.0,
-                     temp.data(), num_beta, Cb_occ_ptr, num_molecular_orbitals_,
-                     0.0,
-                     tP_.data() + num_atomic_orbitals_ * num_atomic_orbitals_,
-                     num_atomic_orbitals_);
-          for (size_t i = 0; i < num_atomic_orbitals_; ++i)
-            for (size_t j = i; j < num_atomic_orbitals_; ++j) {
-              const auto symm_ij = tP_(i + num_atomic_orbitals_, j) +
-                                   tP_(j + num_atomic_orbitals_, i);
-              tP_(i + num_atomic_orbitals_, j) = symm_ij;
-              tP_(j + num_atomic_orbitals_, i) = symm_ij;
-            }
-        }
+    // Compute trial Fock matrix
+    compute_trial_fock(eri, exc, trial_density, ground_density, trial_fock,
+                       scratch1, scratch2);
 
-        // Single process mode - just compute directly
-        update_trial_fock_();
+    // ABX_{ia} = \sum_{uv} C_{ui} F_{uv} C_{av}
+    // Step 1: temp = trial_fock^T * Ca_occ, trial_fock is symmetric
+    blas::gemm(blas::Layout::ColMajor, blas::Op::Trans, blas::Op::NoTrans,
+               num_atomic_orbitals, num_alpha, num_atomic_orbitals, 1.0,
+               trial_fock.data(), num_atomic_orbitals, Ca_occ_ptr,
+               num_atomic_orbitals, 0.0, temp, num_atomic_orbitals);
+    // Step 2: Y_vec += Ca_vir^T * temp
+    blas::gemm(blas::Layout::ColMajor, blas::Op::Trans, blas::Op::NoTrans,
+               num_alpha_virtual_orbitals, num_alpha, num_atomic_orbitals, 1.0,
+               Ca_vir_ptr, num_atomic_orbitals, temp, num_atomic_orbitals, 1.0,
+               Y_vec, num_alpha_virtual_orbitals);
+    if (unrestricted) {
+      blas::gemm(blas::Layout::ColMajor, blas::Op::Trans, blas::Op::NoTrans,
+                 num_atomic_orbitals, num_beta, num_atomic_orbitals, 1.0,
+                 trial_fock.data() + num_atomic_orbitals * num_atomic_orbitals,
+                 num_atomic_orbitals, Cb_occ_ptr, num_atomic_orbitals, 0.0,
+                 temp, num_atomic_orbitals);
+      blas::gemm(blas::Layout::ColMajor, blas::Op::Trans, blas::Op::NoTrans,
+                 num_beta_virtual_orbitals, num_beta, num_atomic_orbitals, 1.0,
+                 Cb_vir_ptr, num_atomic_orbitals, temp, num_atomic_orbitals,
+                 1.0, Y_vec + nova, num_beta_virtual_orbitals);
+    }
+  }
+}
 
-        // ABX_{ia} = \sum_{uv} C_{ui} F_{uv} C_{av}
-        blas::gemm(blas::Layout::ColMajor, blas::Op::NoTrans, blas::Op::NoTrans,
-                   num_alpha, num_atomic_orbitals_, num_atomic_orbitals_, 1.0,
-                   Ca_occ_ptr, num_molecular_orbitals_, tFock_.data(),
-                   num_atomic_orbitals_, 0.0, temp.data(), num_alpha);
-        blas::gemm(blas::Layout::ColMajor, blas::Op::NoTrans, blas::Op::Trans,
-                   num_alpha_virtual_orbitals, num_alpha, num_atomic_orbitals_,
-                   alpha, Ca_vir_ptr, num_molecular_orbitals_, temp.data(),
-                   num_alpha, 1.0, Y_rhs, num_alpha_virtual_orbitals);
-        if (ctx_.cfg->unrestricted) {
-          blas::gemm(
-              blas::Layout::ColMajor, blas::Op::NoTrans, blas::Op::NoTrans,
-              num_beta, num_atomic_orbitals_, num_atomic_orbitals_, 1.0,
-              Cb_occ_ptr, num_molecular_orbitals_,
-              tFock_.data() + num_atomic_orbitals_ * num_atomic_orbitals_,
-              num_atomic_orbitals_, 0.0, temp.data(), num_beta);
-          blas::gemm(blas::Layout::ColMajor, blas::Op::NoTrans, blas::Op::Trans,
-                     num_beta_virtual_orbitals, num_beta, num_atomic_orbitals_,
-                     alpha, Cb_vir_ptr, num_molecular_orbitals_, temp.data(),
-                     num_beta, 1.0, Y_rhs + nova, num_beta_virtual_orbitals);
-        }
-      }
-    };
 }  // namespace detail
 
 std::pair<bool, std::shared_ptr<data::StabilityResult>>
@@ -286,13 +339,13 @@ StabilityChecker::_run_impl(
   }
 
   // Prepare Diagonal elements for preconditioning
-  Eigen::VectorXd precondition_diag = Eigen::VectorXd::Zero(eigensize);
+  Eigen::VectorXd eigen_diff = Eigen::VectorXd::Zero(eigensize);
   {
     size_t index = 0;
     // Alpha block
     for (size_t i = 0; i < n_alpha_electrons; ++i) {
       for (size_t a = n_alpha_electrons; a < num_molecular_orbitals; ++a) {
-        precondition_diag(index) = energies_alpha(a) - energies_alpha(i);
+        eigen_diff(index) = energies_alpha(a) - energies_alpha(i);
         ++index;
       }
     }
@@ -300,7 +353,7 @@ StabilityChecker::_run_impl(
     if (unrestricted) {
       for (size_t i = 0; i < n_beta_electrons; ++i) {
         for (size_t a = n_beta_electrons; a < num_molecular_orbitals; ++a) {
-          precondition_diag(index) = energies_beta(a) - energies_beta(i);
+          eigen_diff(index) = energies_beta(a) - energies_beta(i);
           ++index;
         }
       }
