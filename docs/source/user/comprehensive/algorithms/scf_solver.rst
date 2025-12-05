@@ -35,10 +35,10 @@ The final result provides:
 
 :term:`SCF` methods provide an excellent starting point, but they miss important electronic correlation effects:
 
-- **Static correlation**: Essential for systems with near-degenerate states or bond-breaking processes.
+- **Static correlation**: Essential for systems with near-degenerate states ogir bond-breaking processes.
   See :doc:`MCCalculator <mc_calculator>` documentation.
 - **Dynamic correlation**: Required for all molecular systems to account for instantaneous electron-electron interactions.
-  See :doc:`ReferenceDerivedCalculator <reference_derived>` documentation.
+  See :doc:`DynamicalCorrelationCalculator <dynamical_correlation>` documentation.
 
 The orbitals from :term:`SCF` calculations typically serve as input for post-:term:`SCF` methods that capture these correlation effects.
 :term:`SCF` methods thus serve as the foundation for more advanced electronic structure calculations and provide essential insights into molecular properties, reactivity, and spectroscopic characteristics.
