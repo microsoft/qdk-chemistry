@@ -18,16 +18,6 @@
 
 namespace qdk::chemistry::data {
 
-// Canonical4CenterHamiltonian::Canonical4CenterHamiltonian(
-//     const Canonical4CenterHamiltonian& other)
-//     : HamiltonianContainer(other),
-//       _two_body_integrals(other._two_body_integrals) {
-//   if (!is_valid()) {
-//     throw std::invalid_argument(
-//         "Tried to generate invalid Canonical4CenterHamiltonian object.");
-//   }
-// }
-
 Canonical4CenterHamiltonian::Canonical4CenterHamiltonian(
     const Eigen::MatrixXd& one_body_integrals,
     const Eigen::VectorXd& two_body_integrals,
@@ -104,18 +94,6 @@ std::unique_ptr<HamiltonianContainer> Canonical4CenterHamiltonian::clone()
       *std::get<2>(_two_body_integrals), _orbitals, _core_energy,
       *_inactive_fock_matrix.first, *_inactive_fock_matrix.second, _type);
 }
-
-// HamiltonianContainer::HamiltonianContainer(const HamiltonianContainer& other)
-//     : _one_body_integrals(other._one_body_integrals),
-//       _inactive_fock_matrix(other._inactive_fock_matrix),
-//       _orbitals(other._orbitals),
-//       _core_energy(other._core_energy),
-//       _type(other._type) {
-//   // if (!_is_valid()) {
-//   //   throw std::invalid_argument(
-//   //       "Tried to generate invalid HamiltonianContainer object.");
-//   // }
-// }
 
 std::string Canonical4CenterHamiltonian::get_container_type() const {
   return "canonical_4_center";
@@ -204,9 +182,6 @@ bool Canonical4CenterHamiltonian::is_restricted() const {
           (!_inactive_fock_matrix.first && !_inactive_fock_matrix.second));
 }
 
-// bool Canonical4CenterHamiltonian::is_unrestricted() const { return
-// !is_restricted(); }
-
 bool Canonical4CenterHamiltonian::is_valid() const {
   // Check if essential data is present
   if (!has_one_body_integrals() || !has_two_body_integrals()) {
@@ -224,38 +199,16 @@ bool Canonical4CenterHamiltonian::is_valid() const {
 }
 
 void Canonical4CenterHamiltonian::validate_integral_dimensions() const {
+  // Check alpha one-body integrals
   HamiltonianContainer::validate_integral_dimensions();
 
-  if (/*!has_one_body_integrals() || */ !has_two_body_integrals()) {
+  if (!has_two_body_integrals()) {
     return;
   }
 
-  // Check alpha one-body integrals
+  // Check two-body integrals dimensions
   size_t norb_alpha = _one_body_integrals.first->rows();
   size_t norb_alpha_cols = _one_body_integrals.first->cols();
-
-  // if (norb_alpha != norb_alpha_cols) {
-  //   throw std::invalid_argument(
-  //       "Alpha one-body integrals matrix must be square");
-  // }
-
-  // // Check beta one-body integrals (if different from alpha)
-  // if (_one_body_integrals.second != _one_body_integrals.first) {
-  //   size_t norb_beta = _one_body_integrals.second->rows();
-  //   size_t norb_beta_cols = _one_body_integrals.second->cols();
-
-  //   if (norb_beta != norb_beta_cols) {
-  //     throw std::invalid_argument(
-  //         "Beta one-body integrals matrix must be square");
-  //   }
-
-  //   if (norb_beta != norb_alpha) {
-  //     throw std::invalid_argument(
-  //         "Alpha and beta one-body integrals must have same dimensions");
-  //   }
-  // }
-
-  // Check two-body integrals dimensions
   unsigned expected_size = norb_alpha * norb_alpha * norb_alpha * norb_alpha;
 
   // Check alpha-alpha integrals
@@ -286,55 +239,6 @@ void Canonical4CenterHamiltonian::validate_integral_dimensions() const {
   }
 }
 
-// void Hamiltonian::validate_restrictedness_consistency() const {
-//   if (!_orbitals) return;
-
-//   bool orbitals_restricted = _orbitals->is_restricted();
-//   bool hamiltonian_restricted = is_restricted();
-
-//   if (orbitals_restricted != hamiltonian_restricted) {
-//     throw std::invalid_argument(
-//         "Hamiltonian restrictedness (" +
-//         std::string(hamiltonian_restricted ? "restricted" : "unrestricted") +
-//         ") must match orbitals restrictedness (" +
-//         std::string(orbitals_restricted ? "restricted" : "unrestricted") +
-//         ")");
-//   }
-// }
-
-// void Hamiltonian::validate_active_space_dimensions() const {
-//   if (!_orbitals || !_orbitals->has_active_space()) return;
-
-//   auto active_indices = _orbitals->get_active_space_indices();
-//   size_t n_active_alpha = active_indices.first.size();
-//   size_t n_active_beta = active_indices.second.size();
-
-//   // Check one-body integrals dimensions match active space
-//   if (has_one_body_integrals()) {
-//     if (_one_body_integrals.first->rows() != n_active_alpha) {
-//       throw std::invalid_argument(
-//           "Alpha one-body integrals dimension (" +
-//           std::to_string(_one_body_integrals.first->rows()) +
-//           ") does not match number of alpha active orbitals (" +
-//           std::to_string(n_active_alpha) + ")");
-//     }
-
-//     if (_one_body_integrals.second != _one_body_integrals.first &&
-//         _one_body_integrals.second->rows() != n_active_beta) {
-//       throw std::invalid_argument(
-//           "Beta one-body integrals dimension does not match number of beta "
-//           "active orbitals");
-//     }
-//   }
-
-//   // For restricted case, alpha and beta active spaces should be the same
-//   if (is_restricted() && n_active_alpha != n_active_beta) {
-//     throw std::invalid_argument(
-//         "For restricted Hamiltonian, alpha and beta active spaces must have "
-//         "same size");
-//   }
-// }
-
 std::tuple<std::shared_ptr<Eigen::VectorXd>, std::shared_ptr<Eigen::VectorXd>,
            std::shared_ptr<Eigen::VectorXd>>
 Canonical4CenterHamiltonian::make_restricted_two_body_integrals(
@@ -344,15 +248,6 @@ Canonical4CenterHamiltonian::make_restricted_two_body_integrals(
       shared_integrals, shared_integrals,
       shared_integrals);  // aaaa, aabb, bbbb all point to same data
 }
-
-// std::pair<std::shared_ptr<Eigen::MatrixXd>, std::shared_ptr<Eigen::MatrixXd>>
-// Canonical4CenterHamiltonian::make_restricted_inactive_fock_matrix(
-//     const Eigen::MatrixXd& matrix) {
-//   auto shared_matrix = std::make_shared<Eigen::MatrixXd>(matrix);
-//   return std::make_pair(
-//       shared_matrix, shared_matrix);  // Both alpha and beta point to same
-//       data
-// }
 
 void Canonical4CenterHamiltonian::to_fcidump_file(const std::string& filename,
                                                   size_t nalpha,

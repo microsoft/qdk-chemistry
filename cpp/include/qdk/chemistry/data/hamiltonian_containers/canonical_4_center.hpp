@@ -18,10 +18,6 @@
 
 namespace qdk::chemistry::data {
 
-// enum class HamiltonianType { Hermitian, NonHermitian };
-
-// enum class SpinChannel { aaaa, aabb, bbbb };
-
 /**
  * @class Canonical4CenterHamiltonian
  * @brief Represents an molecular Hamiltonian in the molecular orbital
@@ -237,25 +233,15 @@ class Canonical4CenterHamiltonian : public HamiltonianContainer {
                    std::shared_ptr<Eigen::VectorXd>>
       _two_body_integrals;
 
-  //   /// Validation helpers
+  /// Validation helpers
   void validate_integral_dimensions() const;
-  //   void validate_restrictedness_consistency() const;
-  //   void validate_active_space_dimensions() const;
-  size_t get_two_body_index(size_t i, size_t j, size_t k, size_t l) const;
 
-  /// Helper functions for constructor initialization
-  //   static std::pair<std::shared_ptr<Eigen::MatrixXd>,
-  //                    std::shared_ptr<Eigen::MatrixXd>>
-  //   make_restricted_one_body_integrals(const Eigen::MatrixXd& integrals);
+  size_t get_two_body_index(size_t i, size_t j, size_t k, size_t l) const;
 
   static std::tuple<std::shared_ptr<Eigen::VectorXd>,
                     std::shared_ptr<Eigen::VectorXd>,
                     std::shared_ptr<Eigen::VectorXd>>
   make_restricted_two_body_integrals(const Eigen::VectorXd& integrals);
-
-  //   static std::pair<std::shared_ptr<Eigen::MatrixXd>,
-  //                    std::shared_ptr<Eigen::MatrixXd>>
-  //   make_restricted_inactive_fock_matrix(const Eigen::MatrixXd& matrix);
 
   /**
    * @brief Save FCIDUMP file without filename validation (internal use)

@@ -69,10 +69,6 @@ class HamiltonianContainer {
    * basis
    * @param one_body_integrals_beta One-electron integrals for beta spin in MO
    * basis
-   * @param two_body_integrals_aaaa Two-electron alpha-alpha-alpha-alpha
-   * integrals
-   * @param two_body_integrals_aabb Two-electron alpha-beta-alpha-beta integrals
-   * @param two_body_integrals_bbbb Two-electron beta-beta-beta-beta integrals
    * @param orbitals Shared pointer to molecular orbital data for the system
    * @param core_energy Core energy (nuclear repulsion + inactive orbital
    * energy)
@@ -85,9 +81,6 @@ class HamiltonianContainer {
    */
   HamiltonianContainer(const Eigen::MatrixXd& one_body_integrals_alpha,
                        const Eigen::MatrixXd& one_body_integrals_beta,
-                       // const Eigen::VectorXd& two_body_integrals_aaaa,
-                       // const Eigen::VectorXd& two_body_integrals_aabb,
-                       // const Eigen::VectorXd& two_body_integrals_bbbb,
                        std::shared_ptr<Orbitals> orbitals, double core_energy,
                        const Eigen::MatrixXd& inactive_fock_matrix_alpha,
                        const Eigen::MatrixXd& inactive_fock_matrix_beta,
@@ -104,7 +97,7 @@ class HamiltonianContainer {
    */
   virtual std::unique_ptr<HamiltonianContainer> clone() const = 0;
 
-    /**
+  /**
    * @brief Get the type of the underlying container
    * @return String identifying the container type (e.g., "canonical_4_center",
    * "desnity_fitted", "DoubleFactorizedTHC")
@@ -297,7 +290,7 @@ class HamiltonianContainer {
    */
   virtual void to_fcidump_file(const std::string& filename, size_t nalpha,
                                size_t nbeta) const = 0;
-                               
+
   /**
    * @brief Check if the Hamiltonian data is complete and consistent
    * @return True if all required data is set and dimensions are consistent
@@ -309,14 +302,6 @@ class HamiltonianContainer {
   const std::pair<std::shared_ptr<Eigen::MatrixXd>,
                   std::shared_ptr<Eigen::MatrixXd>>
       _one_body_integrals;
-
-  //   /// Two-electron integrals in MO basis, stored as flattened arrays
-  //   [norb^4]
-  //   /// Access pattern: V[i*norb^3 + j*norb^2 + k*norb + l] = <ij|kl>
-  //   mutable std::tuple<std::shared_ptr<Eigen::VectorXd>,
-  //                      std::shared_ptr<Eigen::VectorXd>,
-  //                      std::shared_ptr<Eigen::VectorXd>>
-  //       _two_body_integrals;
 
   /// @brief The inactive Fock matrix for the selected active space
   const std::pair<std::shared_ptr<Eigen::MatrixXd>,
@@ -336,22 +321,15 @@ class HamiltonianContainer {
   virtual void validate_integral_dimensions() const;
   void validate_restrictedness_consistency() const;
   void validate_active_space_dimensions() const;
-  // size_t get_two_body_index(size_t i, size_t j, size_t k, size_t l) const;
 
   /// Helper functions for constructor initialization
   static std::pair<std::shared_ptr<Eigen::MatrixXd>,
                    std::shared_ptr<Eigen::MatrixXd>>
   make_restricted_one_body_integrals(const Eigen::MatrixXd& integrals);
 
-  //   static std::tuple<std::shared_ptr<Eigen::VectorXd>,
-  //                     std::shared_ptr<Eigen::VectorXd>,
-  //                     std::shared_ptr<Eigen::VectorXd>>
-  //   make_restricted_two_body_integrals(const Eigen::VectorXd& integrals);
-
   static std::pair<std::shared_ptr<Eigen::MatrixXd>,
                    std::shared_ptr<Eigen::MatrixXd>>
   make_restricted_inactive_fock_matrix(const Eigen::MatrixXd& matrix);
-
 };
 
 }  // namespace qdk::chemistry::data
