@@ -37,7 +37,7 @@ import numpy as np
 from pyscf import gto, scf
 from pyscf.gto.mole import bse_predefined_ecp
 
-from qdk_chemistry.algorithms import ScfSolver, register
+from qdk_chemistry.algorithms import ScfSolver
 from qdk_chemistry.data import (
     Configuration,
     ElectronicStructureSettings,
@@ -299,6 +299,3 @@ class PyscfScfSolver(ScfSolver):
     def name(self) -> str:
         """Return the name of the SCF solver."""
         return "pyscf"
-
-
-register(lambda: PyscfScfSolver())

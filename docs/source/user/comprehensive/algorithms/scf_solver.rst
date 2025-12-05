@@ -35,9 +35,10 @@ The final result provides:
 
 :term:`SCF` methods provide an excellent starting point, but they miss important electronic correlation effects:
 
-- **Static correlation**: Essential for systems with near-degenerate states or bond-breaking processes.
+- **Static correlation**: Essential for systems with near-degenerate states ogir bond-breaking processes.
   See :doc:`MCCalculator <mc_calculator>` documentation.
 - **Dynamic correlation**: Required for all molecular systems to account for instantaneous electron-electron interactions.
+  See :doc:`DynamicalCorrelationCalculator <dynamical_correlation>` documentation.
 
 The orbitals from :term:`SCF` calculations typically serve as input for post-:term:`SCF` methods that capture these correlation effects.
 :term:`SCF` methods thus serve as the foundation for more advanced electronic structure calculations and provide essential insights into molecular properties, reactivity, and spectroscopic characteristics.
@@ -72,29 +73,10 @@ The :class:`~qdk_chemistry.algorithms.ScfSolver` in QDK/Chemistry provides the f
     6-31G, etc.), Dunning (cc-pVDZ, cc-pVTZ, etc.), and Karlsruhe (def2-SVP, def2-TZVP, etc.) families
   - Support for custom basis sets and effective core potentials (ECPs)
 
-Creating an :term:`SCF` solver
-------------------------------
+Running an :term:`SCF` calculation
+----------------------------------
 
-As an algorithm class in QDK/Chemistry, the :class:`~qdk_chemistry.algorithms.ScfSolver` follows the :doc:`factory pattern design principle <../design/index>` and is created using its corresponding factory.
-
-Available Solvers
-~~~~~~~~~~~~~~~~~
-
-QDK/Chemistry currently provides the following registered solvers:
-
-.. list-table::
-   :header-rows: 1
-   :widths: 20 20 60
-
-   * - Solver
-     - Developer
-     - Description
-   * - **default**
-     - Microsoft
-     - Default solver implemented directly in QDK/Chemistry, optimized for performance and versatility
-   * - **pyscf**
-     - Third-party
-     - Integration with the PySCF quantum chemistry package
+Below is an example of how to run SCF using the default (Microsoft) QDK/Chemistry solver, with mostly default settings (except the basis set):
 
 .. tab:: C++ API
 

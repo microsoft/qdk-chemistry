@@ -46,8 +46,7 @@ ham_constructor = create("hamiltonian_constructor")
 hamiltonian = ham_constructor.run(active_orbitals)
 
 mc = create("multi_configuration_calculator")
-# TODO: uncomment the line below when the bug is fixed
-# mc.settings().set("davidson_iterations", 300)
+mc.settings().set("davidson_iterations", 300)
 E_cas, wfn_cas = mc.run(
     hamiltonian, n_active_alpha_electrons=1, n_active_beta_electrons=1
 )
