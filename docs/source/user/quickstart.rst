@@ -13,9 +13,9 @@ End-to-end example
 ------------------
 
 This document is intended to provide a brief introduction to the QDK/Chemistry library by walking through a minimal end-to-end example for ground state energy estimation with state preparation and measurement.
-The emphasis of this example is optimization:  reducing the resources required for the quantum computer.
-The example starts with a molecular structure and ends with a simulated calculation using quantum algorithms.
-The focus of this example is on high-level concepts and common coding patterns.
+The emphasis of this example is optimization:  reducing the resources required for the quantum computer to run a chemistry application.
+The example starts with a molecular structure and ends with an energy estimation computed by simulating a quantum circuit.
+The focus of this example is on high-level concepts and common coding patterns that can be extended to other applications.
 
 You can also view a related code sample in a Jupyter notebook format, along with several other examples, in the `examples folder <https://github.com/microsoft/qdk-chemistry/blob/main/examples/>`_ of the GitHub repository.
 
@@ -25,7 +25,7 @@ Create a Structure object
 The :doc:`comprehensive/data/structure` class represents a molecular structure, i.e. the coordinates of its atoms.
 :doc:`comprehensive/data/structure` objects can be constructed manually, or via deserialization from a file.
 QDK/Chemistry supports multiple serialization formats for :doc:`comprehensive/data/structure` objects, including the standard `XYZ file format <https://en.wikipedia.org/wiki/XYZ_file_format>`_, as well as QDK/Chemistry-specific JSON and HDF5 serialization schemes.
-Internally to QDK/Chemistry, coordinates are always stored in Bohr/atomic units; however, when reading or writing to files, the units follow the file format convention (XYZ) or can be specified (JSON, HDF5).
+Internally to QDK/Chemistry, coordinates are always stored in Bohr/atomic units; however, when reading or writing to files, the units follow the file format convention (Angstrom for XYZ) or can be specified (JSON, HDF5).
 See below for language specific examples of creating and serializing :doc:`comprehensive/data/structure` objects.
 
 
@@ -47,14 +47,16 @@ Run a self-consistent field (SCF) calculation
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 Once a :doc:`comprehensive/data/structure` is created, an :term:`SCF` calculation can be performed to produce an initial :class:`~qdk_chemistry.data.Wavefunction` as well as an :term:`SCF` energy.
-QDK/Chemistry performs :term:`SCF` calculations via instantiations of a :doc:`comprehensive/algorithms/scf_solver` algorithm.
+QDK/Chemistry performs :term:`SCF` calculations via instantiations of a :doc:`comprehensive/algorithms/scf_solver` algorithm, and is the first instance
+of the separation :doc:` Data classes <./comprehensive/data/index>` and :doc:`Algorithm classes <./comprehensive/algorithms/index>` design principles most will encounter
+in QDK/Chemistry. See the :doc:`design principles <./comprehensive/design/index>` documentation for more information on this pattern and how data flow is generally
+treated in QDK/Chemistry.
 Instantiations of the :doc:`comprehensive/algorithms/scf_solver` algorithm (and all other ``Algorithm`` classes) are managed by a factory.
-See the :doc:`comprehensive/algorithms/factory_pattern` documentation for more information on how it is used in the QDK/Chemistry.
+See the :doc:`comprehensive/algorithms/factory_pattern` documentation for more information on how it is used in the code base.
 
 The inputs for an :term:`SCF` calculation are a :doc:`comprehensive/data/structure` object, the charge and multiplicity of the molecular system, and information about the single-particle basis to be used.
 Optionally, :doc:`comprehensive/algorithms/settings` specific to the particular :doc:`comprehensive/algorithms/scf_solver` can be configured by accessing the ``settings()`` method.
 The basis for the :term:`SCF` calculation can be set via a string input (specifying one of the :ref:`available_basis_sets`), a custom :doc:`comprehensive/data/basis_set` or initial :doc:`comprehensive/data/orbitals` can also be provided.
-See below for language-specific examples.
 
 .. tab:: C++ API
 
@@ -74,14 +76,14 @@ See below for language-specific examples.
 Select an active space
 ^^^^^^^^^^^^^^^^^^^^^^
 
-While a full set of :term:`SCF` orbitals are useful for many applications, they are often not the optimal set for further post-:term:`SCF` calculations.
-For this reason, both localization (orbital manipulation) and active space selection (orbital selection) algorithms are provided within QDK/Chemistry.
+While a full set of :term:`SCF` orbitals are useful for many applications, they are often not the optimal set for further post-:term:`SCF` calculations, including algorithms intended for a quantum computer.
+For this reason, both orbital localization and active space selection algorithms are provided within QDK/Chemistry.
 
 QDK/Chemistry offers many methods for the selection of active spaces to reduce the problem size:  accurately modeling the quantum many-body problem while avoiding the prohibitive computational scaling of full configuration interaction.
 See the :doc:`comprehensive/algorithms/active_space` documentation for a list of supported methods, along with their associated :doc:`comprehensive/algorithms/settings`, which accompany the standard QDK/Chemistry distribution.
 
 The following are language-specific examples of how to select a so-called "valence" active space containing a subset of only those orbitals surrounding the Fermi level - in this
-case 6 electrons in 6 orbitals (6e, 6o).
+case 6 electrons to be distributed in 6 orbitals (6e, 6o).
 
 .. tab:: C++ API
 

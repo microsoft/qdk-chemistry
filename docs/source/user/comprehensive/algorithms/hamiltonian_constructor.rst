@@ -1,5 +1,5 @@
-Classical Hamiltonian Construction
-==================================
+Hamiltonian Construction
+========================
 
 The ``HamiltonianConstructor`` algorithm in QDK/Chemistry is responsible for constructing the electronic Hamiltonian, which is essential for quantum chemistry calculations.
 It generates the one- and two-electron integrals that define the energy operator for the electronic structure.
