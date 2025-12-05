@@ -230,11 +230,11 @@ To create a new interface to an external program in Python:
    from qdk_chemistry.algorithms import create_scf_solver
    solver = create_scf_solver("external-program")
 
-Connection to the interface system
-----------------------------------
+Connection to the plugin system
+-------------------------------
 
-The factory pattern serves as the foundation for QDK/Chemistry's :doc:`Interface System <../design/interfaces>`.
-In QDK/Chemistry, factories enable the registration and instantiation of interface implementations that connect to external quantum chemistry programs.
+The factory pattern serves as the foundation for QDK/Chemistry's :ref:`plugin system <plugin-system>`.
+In QDK/Chemistry, factories enable the registration and instantiation of plugin implementations that connect to external quantum chemistry programs.
 
 Internally, QDK/Chemistry's factories maintain a registry of creator functions mapped to implementation names.
 When a client requests an implementation by name, the factory looks up the appropriate creator function and instantiates the object with the necessary setup.
@@ -243,13 +243,13 @@ This design enables several key capabilities:
 
 - Seamless integration with external quantum chemistry packages
 - Runtime selection of specific implementations
-- Decoupling of interface usage from implementation details
+- Decoupling of plugin usage from implementation details
 
-For detailed information about implementing interfaces to external programs, including data conversion, error handling, resource management, and settings translation, see the :doc:`Interfaces <../design/interfaces>` documentation.
+For detailed information about implementing plugins for external programs, including data conversion, error handling, resource management, and settings translation, see the :ref:`plugin system <plugin-system>` documentation.
 
 Further reading
 ---------------
 
 - Some of the above examples can be downloaded as complete `C++ <../../../_static/examples/cpp/factory_pattern.cpp>`_ and `Python <../../../_static/examples/python/factory_pattern.py>`_ scripts.
 - :doc:`Settings <settings>`: Configuration of algorithm instances
-- :doc:`Interfaces <../design/interfaces>`: QDK/Chemistry's interface system to external packages
+- :ref:`Plugin system <plugin-system>`: QDK/Chemistry's plugin system for extending functionality

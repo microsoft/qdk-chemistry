@@ -124,7 +124,7 @@ Third-party interfaces
 
 The factory pattern allows seamless selection between these implementations.
 
-For more details on how QDK/Chemistry interfaces with external packages, see the :doc:`Interfaces <../design/interfaces>` documentation.
+For more details on how QDK/Chemistry interfaces with external packages, see the :ref:`plugin system <plugin-system>` documentation.
 
 
 Available settings

@@ -200,7 +200,7 @@ The key aspect of this design is that default values are established during cons
 While new settings can be added at runtime through the public ``set`` method, defining defaults during construction helps with documentation and discoverability.
 
 This extensibility model is part of QDK/Chemistry's broader :doc:`Factory Pattern <factory_pattern>` design, which allows for flexible algorithm implementations while maintaining a consistent API.
-The pattern is used throughout QDK/Chemistry, such as in the :doc:`Interface System <../design/interfaces>` for integrating third-party packages.
+The pattern is used throughout QDK/Chemistry, such as in the :ref:`plugin system <plugin-system>` for integrating third-party packages.
 
 Here's how to extend the :class:`~qdk_chemistry.data.Settings` class for a custom algorithm:
 
@@ -275,5 +275,5 @@ Further reading
 - The above examples can be downloaded as complete `C++ <../../../_static/examples/cpp/settings.cpp>`_ and `Python <../../../_static/examples/python/settings.py>`_ scripts.
 - :doc:`Design Principles <../design/index>`: Core architectural principles of QDK/Chemistry
 - :doc:`Factory Pattern <factory_pattern>`: Understanding the factory pattern and extending QDK/Chemistry
-- :doc:`Interfaces <../design/interfaces>`: QDK/Chemistry's interface system to external packages
+- :ref:`Plugin system <plugin-system>`: QDK/Chemistry's plugin system for extending functionality
 - :doc:`Serialization <../data/serialization>`: Data persistence in QDK/Chemistry

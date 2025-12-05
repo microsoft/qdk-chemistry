@@ -145,4 +145,4 @@ Further reading
 - The above examples can be downloaded as complete `C++ <../../../_static/examples/cpp/design_principles.cpp>`_ and `Python <../../../_static/examples/python/design_principles.py>`_ scripts.
 - :doc:`Factory Pattern <../algorithms/factory_pattern>`: Details on QDK/Chemistry's implementation of the factory pattern
 - :doc:`Settings <../algorithms/settings>`: How to configure the execution behavior of algorithms through the Settings interface
-- :doc:`Interfaces <interfaces>`: QDK/Chemistry's interface system to external packages
+- :ref:`Plugin system <plugin-system>`: QDK/Chemistry's plugin system for extending functionality

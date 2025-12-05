@@ -80,7 +80,7 @@ Third-party interfaces
 The factory pattern allows seamless selection between these implementations, with the most appropriate option chosen
 based on the calculation requirements and available packages.
 
-For more details on how QDK/Chemistry interfaces with external packages, see the :doc:`Interfaces <../design/interfaces>` documentation.
+For more details on how QDK/Chemistry interfaces with external packages, see the :ref:`plugin system <plugin-system>` documentation.
 
 Further reading
 ---------------
