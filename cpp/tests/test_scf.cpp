@@ -457,12 +457,11 @@ TEST_F(ScfTest, EriMethodSetting) {
   // Both methods should give the same energy
   EXPECT_NEAR(energy_direct, energy_incore, testing::scf_energy_tolerance);
 
-  // Test invalid eri_method - should throw during solve
+  // Test invalid eri_method - should throw when setting invalid value
   EXPECT_THROW(
       {
         auto scf_solver = ScfSolverFactory::create();
         scf_solver->settings().set("eri_method", "not_a_method");
-        scf_solver->run(water, 0, 1);
       },
       std::invalid_argument);
 }

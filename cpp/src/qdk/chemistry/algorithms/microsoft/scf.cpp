@@ -114,11 +114,8 @@ std::pair<double, std::shared_ptr<data::Wavefunction>> ScfSolver::_run_impl(
   std::string eri_method = _settings->get<std::string>("eri_method");
   if (eri_method == "direct") {
     ms_scf_config->eri.method = qcs::ERIMethod::Libint2Direct;
-  } else if (eri_method == "incore") {
+  } else {  // Must be "incore" due to ListConstraint validation
     ms_scf_config->eri.method = qcs::ERIMethod::Incore;
-  } else {
-    throw std::invalid_argument("Unknown eri_method: " + eri_method +
-                                ". Valid options: direct, incore");
   }
 
   double eri_threshold = _settings->get<double>("eri_threshold");
