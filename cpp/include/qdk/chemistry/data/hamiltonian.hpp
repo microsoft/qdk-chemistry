@@ -23,48 +23,23 @@ class HamiltonianContainer;
 
 /**
  * @class Hamiltonian
- * @brief Represents an molecular Hamiltonian in the molecular orbital
- * basis
+ * @brief Interfaces a molecular Hamiltonian in the molecular orbital
+ * basis by wrapping an implementation from @ref HamiltonianContainer.
  *
- * This class stores molecular Hamiltonian data for quantum chemistry
- * calculations, specifically designed for active space methods. It contains:
+ * This class provides an interface to molecular Hamiltonian data for quantum
+ * chemistry calculations, specifically designed for active space methods. It
+ * interfaces with a HamiltonianContainer that stores:
  * - One-electron integrals (kinetic + nuclear attraction) in MO representation
  * - Two-electron integrals (electron-electron repulsion) in MO representation
  * - Molecular orbital information for the active space
  * - Core energy contributions from inactive orbitals and nuclear repulsion
- *
- * This class implies that all inactive orbitals are fully occupied for the
- * purpose of computing the core energy and inactive Fock matrix.
- *
- * The Hamiltonian is immutable after construction, meaning all data must be
- * provided during construction and cannot be modified afterwards. The
- * Hamiltonian supports both restricted and unrestricted calculations and
- * integrates with the broader quantum chemistry framework for active space
- * methods.
  */
 class Hamiltonian : public DataClass,
                     public std::enable_shared_from_this<Hamiltonian> {
  public:
   /**
-   * @brief Constructor for unrestricted active space Hamiltonian with separate
-   * spin components
-   * @param one_body_integrals_alpha One-electron integrals for alpha spin in MO
-   * basis
-   * @param one_body_integrals_beta One-electron integrals for beta spin in MO
-   * basis
-   * @param two_body_integrals_aaaa Two-electron alpha-alpha-alpha-alpha
-   * integrals
-   * @param two_body_integrals_aabb Two-electron alpha-beta-alpha-beta integrals
-   * @param two_body_integrals_bbbb Two-electron beta-beta-beta-beta integrals
-   * @param orbitals Shared pointer to molecular orbital data for the system
-   * @param core_energy Core energy (nuclear repulsion + inactive orbital
-   * energy)
-   * @param inactive_fock_matrix_alpha Inactive Fock matrix for alpha spin in
-   * the selected active space
-   * @param inactive_fock_matrix_beta Inactive Fock matrix for beta spin in the
-   * selected active space
-   * @param type Type of Hamiltonian (Hermitian by default)
-   * @throws std::invalid_argument if orbitals pointer is nullptr
+   * @brief Constructor for Hamiltonian with a HamiltonianContainer
+   * @param container Unique pointer to HamiltonianContainer holding the data
    */
   Hamiltonian(std::unique_ptr<HamiltonianContainer> container);
 

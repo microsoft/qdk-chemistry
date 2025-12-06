@@ -42,8 +42,7 @@ namespace qdk::chemistry::data {
 class Canonical4CenterHamiltonian : public HamiltonianContainer {
  public:
   /**
-   * @brief Constructor for active space Hamiltonian with shared_ptr orbitals
-   * and inactive Fock matrix
+   * @brief Constructor for active space Hamiltonian with four center integrals
    * @param one_body_integrals One-electron integrals in MO basis [norb x norb]
    * @param two_body_integrals Two-electron integrals in MO basis [norb x norb x
    * norb x norb]
@@ -63,8 +62,8 @@ class Canonical4CenterHamiltonian : public HamiltonianContainer {
       HamiltonianType type = HamiltonianType::Hermitian);
 
   /**
-   * @brief Constructor for unrestricted active space Hamiltonian with separate
-   * spin components
+   * @brief Constructor for active space Hamiltonian with four center integrals
+   * using separate spin components
    * @param one_body_integrals_alpha One-electron integrals for alpha spin in MO
    * basis
    * @param one_body_integrals_beta One-electron integrals for beta spin in MO

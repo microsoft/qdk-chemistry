@@ -23,15 +23,17 @@ enum class SpinChannel { aaaa, aabb, bbbb };
 
 /**
  * @class HamiltonianContainer
- * @brief Represents an molecular Hamiltonian in the molecular orbital
- * basis
+ * @brief Represents a molecular Hamiltonian implemetnation in the molecular
+ * orbital basis
  *
  * This class stores molecular Hamiltonian data for quantum chemistry
  * calculations, specifically designed for active space methods. It contains:
  * - One-electron integrals (kinetic + nuclear attraction) in MO representation
- * - Two-electron integrals (electron-electron repulsion) in MO representation
  * - Molecular orbital information for the active space
  * - Core energy contributions from inactive orbitals and nuclear repulsion
+ *
+ * Note that this class does not store two-electron integrals; derived classes
+ * are expected to implement storage and access for these integrals.
  *
  * This class implies that all inactive orbitals are fully occupied for the
  * purpose of computing the core energy and inactive Fock matrix.
@@ -57,7 +59,6 @@ class HamiltonianContainer {
    * @throws std::invalid_argument if orbitals pointer is nullptr
    */
   HamiltonianContainer(const Eigen::MatrixXd& one_body_integrals,
-                       // const Eigen::VectorXd& two_body_integrals,
                        std::shared_ptr<Orbitals> orbitals, double core_energy,
                        const Eigen::MatrixXd& inactive_fock_matrix,
                        HamiltonianType type = HamiltonianType::Hermitian);
@@ -100,7 +101,7 @@ class HamiltonianContainer {
   /**
    * @brief Get the type of the underlying container
    * @return String identifying the container type (e.g., "canonical_4_center",
-   * "desnity_fitted", "DoubleFactorizedTHC")
+   * "density_fitted", "double_factorized_THC")
    */
   virtual std::string get_container_type() const = 0;
 
