@@ -178,17 +178,20 @@ class StabilityOperator {
       }
 
       // tP_{uv} = \sum_{ia}  X_{ai} (C_{ui} C_{va} + C_{vi} C_{ua})
-      // R has num_alpha_virtual_orbitals as fast-index, tP is symmetric
-      // Step 1: temp = Ca_vir * X (temp is num_atomic_orbitals x num_alpha in
-      // ColMajor)
+      // X has num_alpha_virtual_orbitals as fast-index: X[a + i*nvir]
+      // Step 1: temp = Ca_vir * X (temp is num_atomic_orbitals x num_alpha)
+      // X is (nvir x nocc) in column-major, we want: temp = Ca_vir * X
+      trial_density.setZero();
       blas::gemm(blas::Layout::ColMajor, blas::Op::NoTrans, blas::Op::NoTrans,
                  num_atomic_orbitals, num_alpha_, num_alpha_virtual_orbitals,
                  1.0, Ca_vir_ptr, num_atomic_orbitals, X_vec,
                  num_alpha_virtual_orbitals, 0.0, temp, num_atomic_orbitals);
+      // Step 2: trial_density = temp * Ca_occ^T (symmetrize later)
       blas::gemm(blas::Layout::ColMajor, blas::Op::NoTrans, blas::Op::Trans,
                  num_atomic_orbitals, num_atomic_orbitals, num_alpha_, 1.0,
                  temp, num_atomic_orbitals, Ca_occ_ptr, num_atomic_orbitals,
                  0.0, trial_density.data(), num_atomic_orbitals);
+      // Symmetrize: P = P + P^T
       for (size_t i = 0; i < num_atomic_orbitals; ++i)
         for (size_t j = i; j < num_atomic_orbitals; ++j) {
           const auto symm_ij = trial_density(i, j) + trial_density(j, i);
@@ -316,7 +319,7 @@ StabilityChecker::_run_impl(
   bool unrestricted = orbitals->is_unrestricted();
 
   // Throw error if the scf is ROHF/ROKS
-  if (!unrestricted && n_beta_electrons != n_beta_electrons) {
+  if (!unrestricted && n_alpha_electrons != n_beta_electrons) {
     throw std::runtime_error(
         "ROHF/ROKS is currently not supported in internal-backended stability "
         "checker. Please use pySCF instead.");
@@ -328,7 +331,8 @@ StabilityChecker::_run_impl(
       num_molecular_orbitals - n_alpha_electrons;
   const auto num_virtual_beta_orbitals =
       num_molecular_orbitals - n_beta_electrons;
-  auto eigensize = num_virtual_alpha_orbitals * n_alpha_electrons;
+  auto nova = num_virtual_alpha_orbitals * n_alpha_electrons;
+  auto eigensize = nova;
   if (unrestricted) eigensize += num_virtual_beta_orbitals * n_beta_electrons;
 
   // Get method from wavefunction metadata or settings
@@ -409,12 +413,15 @@ StabilityChecker::_run_impl(
     }
   }
 
-  // Construct Initial Eigenvector using diagonal guess
-  Eigen::VectorXd eigenvector = Eigen::VectorXd::Zero(eigensize);
+  // Construct Initial Eigenvector, the nonzero elements is intended to avoid
+  // division by zero in Gram-Schmidt of Davidson's algorithm
+  Eigen::VectorXd eigenvector = Eigen::VectorXd::Constant(eigensize, 1e-2);
   // Set the element corresponding to the minimum energy difference to 1
-  Eigen::VectorXd::Index min_idx;
-  eigen_diff.minCoeff(&min_idx);
-  eigenvector(min_idx) = 1.0;
+  eigenvector((n_alpha_electrons - 1) * num_virtual_alpha_orbitals) = 1.0;
+  if (unrestricted)
+    eigenvector((n_beta_electrons - 1) * num_virtual_beta_orbitals + nova) =
+        1.0;
+  eigenvector.normalize();
 
   // Create the stability operator wrapper
   detail::StabilityOperator stability_op(n_alpha_electrons, n_beta_electrons,
