@@ -152,7 +152,7 @@ void HamiltonianContainer::validate_integral_dimensions() const {
   // assume the container has one-body integrals only, expect derived classes to
   // work on the two-body integrals
 
-  if (!has_one_body_integrals()  {
+  if (!has_one_body_integrals())  {
     return;
   }
 
