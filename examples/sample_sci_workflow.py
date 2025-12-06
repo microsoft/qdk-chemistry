@@ -166,6 +166,10 @@ def main(argv: Sequence[str] | None = None) -> None:
     )
     casci_calculator.settings().set("calculate_one_rdm", True)
     casci_calculator.settings().set("calculate_two_rdm", True)
+    # Use fixed core selection for ASCI when starting from HF, since
+    # percentage-based selection doesn't work well with single-determinant start
+    if args.initial_active_space_solver == "macis_asci":
+        casci_calculator.settings().set("core_selection_strategy", "fixed")
     e_cas, wfn_cas = casci_calculator.run(
         active_hamiltonian, *active_orbital_wavefunction.get_active_num_electrons()
     )

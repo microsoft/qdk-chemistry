@@ -504,7 +504,7 @@ TEST_CASE("ASCI Exponential Backoff", "[asci][backoff]") {
     // Should reach target size or close to it
     // Note: The algorithm may return slightly more than ntdets_max when
     // multiple determinants have the same predicted weight at the cutoff.
-    REQUIRE(dets.size() >= 50);  // Should grow with factor 2.5
+    REQUIRE(dets.size() >= 50);   // Should grow with factor 2.5
     REQUIRE(dets.size() <= 101);  // Allow small overage for equivalent dets
     REQUIRE(C.size() == dets.size());
     REQUIRE_THAT(
