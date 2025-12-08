@@ -436,6 +436,36 @@ TEST_F(ScfTest, Settings_EdgeCases) {
       qdk::chemistry::data::SettingTypeMismatch);
 }
 
+TEST_F(ScfTest, EriMethodSetting) {
+  auto water = testing::create_water_structure();
+
+  // Test default eri_method (direct)
+  auto scf_solver_direct = ScfSolverFactory::create();
+  scf_solver_direct->settings().set("basis_set", "sto-3g");
+  EXPECT_EQ(scf_solver_direct->settings().get<std::string>("eri_method"),
+            "direct");
+  auto [energy_direct, wfn_direct] = scf_solver_direct->run(water, 0, 1);
+
+  // Test eri_method = incore
+  auto scf_solver_incore = ScfSolverFactory::create();
+  scf_solver_incore->settings().set("basis_set", "sto-3g");
+  scf_solver_incore->settings().set("eri_method", "incore");
+  EXPECT_EQ(scf_solver_incore->settings().get<std::string>("eri_method"),
+            "incore");
+  auto [energy_incore, wfn_incore] = scf_solver_incore->run(water, 0, 1);
+
+  // Both methods should give the same energy
+  EXPECT_NEAR(energy_direct, energy_incore, testing::scf_energy_tolerance);
+
+  // Test invalid eri_method - should throw when setting invalid value
+  EXPECT_THROW(
+      {
+        auto scf_solver = ScfSolverFactory::create();
+        scf_solver->settings().set("eri_method", "not_a_method");
+      },
+      std::invalid_argument);
+}
+
 TEST_F(ScfTest, InitialGuessRestart) {
   // ===== Water as restricted test =====
   auto water = testing::create_water_structure();
