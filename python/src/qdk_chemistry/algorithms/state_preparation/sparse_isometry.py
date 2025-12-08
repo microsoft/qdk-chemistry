@@ -44,7 +44,6 @@ from qiskit.quantum_info import Statevector
 from qiskit.transpiler import PassManager
 
 from qdk_chemistry.algorithms.state_preparation.state_preparation import StatePreparation, StatePreparationSettings
-from qdk_chemistry.data import Wavefunction
 from qdk_chemistry.data import Circuit, Wavefunction
 
 _LOGGER = logging.getLogger(__name__)
