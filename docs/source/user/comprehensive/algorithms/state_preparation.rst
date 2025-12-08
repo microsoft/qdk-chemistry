@@ -16,6 +16,9 @@ The :class:`~qdk_chemistry.algorithms.StatePreparation` module provides two comp
 Using the StatePreparation
 --------------------------
 
+.. note::
+   This algorithm is currently available only in the Python API.
+
 This section demonstrates how to create, configure, and run a state preparation.
 The ``run`` method returns an OpenQASM circuit string that, when executed, loads the input wavefunction onto a qubit register.
 

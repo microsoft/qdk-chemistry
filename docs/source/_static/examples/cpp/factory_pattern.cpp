@@ -14,7 +14,7 @@ using namespace qdk::chemistry::algorithms;
 using namespace qdk::chemistry::data;
 
 // Create a simple molecule
-auto structure = Structure::from_xyz("H 0.0 0.0 0.0\nH 0.0 0.0 1.4");
+auto structure = Structure::from_xyz("2\n\nH 0.0 0.0 0.0\nH 0.0 0.0 1.4");
 
 // Create an SCF solver using the default implementation
 auto scf_solver = ScfSolverFactory::create();

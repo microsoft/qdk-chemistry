@@ -21,6 +21,9 @@ The mapper supports multiple encoding strategies:
 Using the QubitMapper
 ---------------------
 
+.. note::
+   This algorithm is currently available only in the Python API.
+
 This section demonstrates how to create, configure, and run a qubit mapping.
 The ``run`` method returns a :class:`~qdk_chemistry.data.QubitHamiltonian` object containing the Pauli-string representation.
 

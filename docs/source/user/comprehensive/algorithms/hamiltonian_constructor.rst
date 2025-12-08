@@ -73,9 +73,6 @@ See `Available implementations`_ below for implementation-specific options.
 
 .. tab:: Python API
 
-   .. note::
-      This example shows a complete working workflow including structure creation, SCF calculation, and Hamiltonian construction.
-
    .. literalinclude:: ../../../_static/examples/python/hamiltonian_constructor.py
       :language: python
       :start-after: # start-cell-construct

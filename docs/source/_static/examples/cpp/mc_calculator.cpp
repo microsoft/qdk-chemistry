@@ -8,8 +8,17 @@
 
 // --------------------------------------------------------------------------------------------
 // start-cell-create
+#include <iostream>
 #include <qdk/chemistry.hpp>
 using namespace qdk::chemistry::algorithms;
+using namespace qdk::chemistry::data;
+
+// List available multi-configuration calculator implementations
+auto available_mc = MultiConfigurationCalculatorFactory::available();
+std::cout << "Available MC calculators:" << std::endl;
+for (const auto& name : available_mc) {
+  std::cout << "  - " << name << std::endl;
+}
 
 // Create the default MultiConfigurationCalculator instance (MACIS
 // implementation)
@@ -35,15 +44,29 @@ mc_calculator->settings().set("calculate_one_rdm", true);
 
 // --------------------------------------------------------------------------------------------
 // start-cell-run
-// Obtain a valid Hamiltonian
-Hamiltonian hamiltonian;
-/* hamiltonian = ... */
+// Create a structure (H2 molecule)
+std::vector<Eigen::Vector3d> coords = {{0.0, 0.0, 0.0}, {0.0, 0.0, 1.4}};
+std::vector<std::string> symbols = {"H", "H"};
+Structure structure(coords, symbols);
+
+// Run SCF to get orbitals
+auto scf_solver = ScfSolverFactory::create();
+scf_solver->settings().set("basis_set", "sto-3g");
+auto [E_scf, wfn] = scf_solver->run(structure, 0, 1);
+
+// Build Hamiltonian from orbitals
+auto ham_constructor = HamiltonianConstructorFactory::create();
+auto hamiltonian = ham_constructor->run(wfn->get_orbitals());
 
 // Run the CI calculation
-auto [E_ci, wavefunction] = mc_calculator->calculate(hamiltonian);
+// For H2, we have 2 electrons (1 alpha, 1 beta)
+int n_alpha = 1;
+int n_beta = 1;
+auto [E_ci, ci_wavefunction] = mc_calculator->run(hamiltonian, n_alpha, n_beta);
 
-// For multiple states, access the energies and wavefunctions
-auto energies = mc_calculator->get_energies();
-auto wavefunctions = mc_calculator->get_wavefunctions();
+std::cout << "SCF Energy: " << E_scf << " Hartree" << std::endl;
+std::cout << "CI Energy:  " << E_ci << " Hartree" << std::endl;
+std::cout << "Correlation energy: " << E_ci - E_scf << " Hartree" << std::endl;
+std::cout << ci_wavefunction->get_summary() << std::endl;
 // end-cell-run
 // --------------------------------------------------------------------------------------------

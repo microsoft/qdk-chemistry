@@ -2,7 +2,7 @@ Factory Pattern
 ===============
 
 QDK/Chemistry extensively uses the Factory pattern, a creational design pattern that provides an interface for creating objects without specifying their concrete classes.
-This document explains how and why QDK/Chemistry uses this pattern for algorithm instantiation.
+This document explains how and why QDK/Chemistry uses this pattern for :doc:`algorithm <index>` instantiation.
 
 Overview of the factory pattern
 -------------------------------
@@ -33,7 +33,7 @@ Factory classes in QDK/Chemistry
 QDK/Chemistry provides factory infrastructure for each algorithm type.
 In Python, algorithm instantiation is managed through a centralized registry module rather than individual factory classes.
 
-.. list-table:: QDK/Chemistry Algorithm Types
+.. list-table:: QDK/Chemistry Algorithm Factories
    :header-rows: 1
    :widths: auto
 
@@ -69,13 +69,13 @@ In Python, algorithm instantiation is managed through a centralized registry mod
      - ``StabilityCheckerFactory``
    * - :doc:`EnergyEstimator <../algorithms/energy_estimator>`
      - ``"energy_estimator"``
-     - —
+     - Python only
    * - :doc:`StatePreparation <../algorithms/state_preparation>`
      - ``"state_prep"``
-     - —
+     - Python only
    * - :doc:`QubitMapper <../algorithms/qubit_mapper>`
      - ``"qubit_mapper"``
-     - —
+     - Python only
 
 
 Using factories
@@ -132,6 +132,26 @@ Listing algorithm types and implementations
       for (const auto& name : localizer_methods) {
           std::cout << "  - " << name << std::endl;
       }
+
+      // List available Hamiltonian constructor implementations
+      auto ham_methods = HamiltonianConstructorFactory::available();
+      std::cout << "Available Hamiltonian constructors:" << std::endl;
+      for (const auto& name : ham_methods) {
+          std::cout << "  - " << name << std::endl;
+      }
+
+      // List available multi-configuration calculator implementations
+      auto mc_methods = MultiConfigurationCalculatorFactory::available();
+      std::cout << "Available MC calculators:" << std::endl;
+      for (const auto& name : mc_methods) {
+          std::cout << "  - " << name << std::endl;
+      }
+
+      // Show default implementation for each factory type
+      std::cout << "Default SCF solver: " << ScfSolverFactory::default_name() << std::endl;
+      std::cout << "Default localizer: " << LocalizerFactory::default_name() << std::endl;
+      std::cout << "Default Hamiltonian constructor: " << HamiltonianConstructorFactory::default_name() << std::endl;
+      std::cout << "Default MC calculator: " << MultiConfigurationCalculatorFactory::default_name() << std::endl;
 
 .. tab:: Python API
 
@@ -216,7 +236,7 @@ This design enables several key capabilities:
 - Runtime selection of specific implementations
 - Decoupling of plugin usage from implementation details
 
-For detailed information about implementing custom plugins, including data conversion, error handling, and settings translation, see the :doc:`plugin documentation <../plugins>`.
+For detailed information about implementing custom plugins see the :doc:`plugin documentation <../plugins>`.
 
 Further reading
 ---------------
