@@ -8,7 +8,6 @@ Algorithm Classes
 
    factory_pattern
    settings
-   ../plugins
 
 .. toctree::
    :maxdepth: 1
