@@ -8,7 +8,7 @@
 ################################################################################
 # start-cell-scf-localizer
 import numpy as np
-from qdk_chemistry.algorithms import create, available
+from qdk_chemistry.algorithms import available, create
 from qdk_chemistry.data import Structure
 
 # Create a simple molecule for testing
