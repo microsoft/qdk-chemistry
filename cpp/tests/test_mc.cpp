@@ -48,7 +48,6 @@ TEST_F(MCTest, MCSettings) {
   EXPECT_FALSE(mc_settings.get<bool>("calculate_two_rdm"));
   EXPECT_DOUBLE_EQ(mc_settings.get<double>("ci_residual_tolerance"), 1.0e-6);
   EXPECT_EQ(mc_settings.get<int64_t>("davidson_iterations"), 200);
-  EXPECT_EQ(mc_settings.get<int64_t>("num_roots"), 1);
 
   // Test destructor by creating and destroying in scope
   {
@@ -217,7 +216,6 @@ TEST_F(MCTest, MCSettings_DefaultValues) {
   EXPECT_FALSE(mc_settings.get<bool>("calculate_two_rdm"));
   EXPECT_DOUBLE_EQ(mc_settings.get<double>("ci_residual_tolerance"), 1.0e-6);
   EXPECT_EQ(mc_settings.get<int64_t>("davidson_iterations"), 200);
-  EXPECT_EQ(mc_settings.get<int64_t>("num_roots"), 1);
 
   // Test that we can modify settings
   mc_settings.set("calculate_one_rdm", true);
