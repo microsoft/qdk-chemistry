@@ -15,7 +15,7 @@ coords = np.array([[0.0, 0.0, 0.0], [0.0, 0.0, 1.4]])
 structure = Structure(coords, ["H", "H"])
 
 # Create an SCF solver using the factory
-scf_solver = create("scf_solver", "qdk")
+scf_solver = create("scf_solver", "pyscf")
 
 # Configure it using the standard settings interface
 scf_solver.settings().set("basis_set", "cc-pvdz")
