@@ -331,7 +331,8 @@ StabilityChecker::_run_impl(
 
   if (check_external and unrestricted) {
     throw std::runtime_error(
-        "External stability analysis is only implemented for RHF/RKS for now.");
+        "External stability analysis (RHF -> UHF) is not supported for UHF "
+        "wavefunctions.");
   }
 
   // Set sizes

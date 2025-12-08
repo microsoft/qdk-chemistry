@@ -2,6 +2,8 @@
 // Licensed under the MIT License. See LICENSE.txt in the project root for
 // license information.
 
+#include "qdk/chemistry/algorithms/microsoft/stability.hpp"
+
 #include <pybind11/pybind11.h>
 #include <pybind11/stl.h>
 
@@ -154,4 +156,47 @@ Returns:
   stability_checker.def("__repr__", [](const StabilityChecker &) {
     return "<qdk_chemistry.algorithms.StabilityChecker>";
   });
+
+  // Bind concrete microsoft::StabilityChecker implementation
+  py::class_<microsoft::StabilityChecker, StabilityChecker, py::smart_holder>(
+      m, "QdkStabilityChecker", R"(
+QDK implementation of the stability checker.
+
+This class provides a concrete implementation of the stability checker using the internal backend.
+It inherits from the base :class:`StabilityChecker` class and implements the
+``run`` method to perform stability analysis on wavefunctions.
+
+Typical usage:
+
+.. code-block:: python
+
+    import qdk_chemistry.algorithms as alg
+    import qdk_chemistry.data as data
+
+    # Assume you have a wavefunction from an SCF calculation
+    scf_solver = alg.QdkScfSolver()
+    energy, wavefunction = scf_solver.run(structure, 0, 1)
+
+    # Create a stability checker instance
+    stability_checker = alg.QdkStabilityChecker()
+
+    # Configure settings if needed
+    stability_checker.settings().set("internal", True)
+    stability_checker.settings().set("external", True)
+
+    # Perform stability analysis
+    is_stable, result = stability_checker.run(wavefunction)
+
+See Also:
+    :class:`StabilityChecker`
+    :class:`qdk_chemistry.data.StabilityResult`
+    :class:`qdk_chemistry.data.Wavefunction`
+
+)")
+      .def(py::init<>(), R"(
+Default constructor.
+
+Initializes a stability checker with default settings.
+
+)");
 }
