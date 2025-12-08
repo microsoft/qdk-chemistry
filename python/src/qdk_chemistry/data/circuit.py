@@ -136,7 +136,7 @@ class Circuit(DataClass):
             kept_clbit_indices = list(range(len(qc.clbits)))
 
         if not kept_clbit_indices and len(qc.clbits) > 0:
-            Logger.warning("All measurements are dropped, no classical bits remain.")
+            Logger.warn("All measurements are dropped, no classical bits remain.")
 
         new_qc = QuantumCircuit(len(kept_qubit_indices), len(kept_clbit_indices))
         qubit_map = {qc.qubits[i]: new_qc.qubits[new_i] for new_i, i in enumerate(kept_qubit_indices)}
