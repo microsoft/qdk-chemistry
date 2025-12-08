@@ -35,7 +35,7 @@ Alternatively, you can click the green button in the bottom-left corner of VS Co
 
 **Windows**: We do not currently provide native Windows support for building qdk-chemistry. If building the package on Windows, you will need to use the Windows Subsystem for Linux (WSL). Microsoft's [official installation instructions for WSL](https://learn.microsoft.com/en-us/windows/wsl/install) can guide you through the process of setting up WSL if you do not have it installed.
 
-**macOS**: To build qdk-chemistry on macOS, you will need the latest version of XCode installed. If you do not already have it installed, it can be downloaded from the [App Store](https://apps.apple.com/us/app/xcode/id497799835?mt=12).
+**macOS**: To build qdk-chemistry on macOS, you will need the latest version of Xcode installed. If you do not already have it installed, it can be downloaded from the [App Store](https://apps.apple.com/us/app/xcode/id497799835?mt=12).
 
 ### Building the Python Package
 
