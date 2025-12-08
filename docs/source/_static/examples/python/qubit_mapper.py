@@ -23,8 +23,8 @@ qubit_mapper.settings().set("encoding", "jordan-wigner")
 
 ################################################################################
 # start-cell-run
-from pathlib import Path
-from qdk_chemistry.data import Structure
+from pathlib import Path  # noqa: E402
+from qdk_chemistry.data import Structure  # noqa: E402
 
 # Read a molecular structure from XYZ file
 structure = Structure.from_xyz_file(Path(".") / "../data/water.structure.xyz")

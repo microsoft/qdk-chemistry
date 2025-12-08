@@ -25,8 +25,8 @@ state_prep.settings().set("transpile_optimization_level", 3)
 
 ################################################################################
 # start-cell-run
-import numpy as np
-from qdk_chemistry.data import (
+import numpy as np  # noqa: E402
+from qdk_chemistry.data import (  # noqa: E402
     BasisSet,
     CasWavefunctionContainer,
     Configuration,

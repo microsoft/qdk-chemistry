@@ -23,8 +23,8 @@ mp2_calculator = create("dynamical_correlation_calculator")
 
 ################################################################################
 # start-cell-run
-from qdk_chemistry.data import Structure, Ansatz
-import numpy as np
+from qdk_chemistry.data import Structure, Ansatz  # noqa: E402
+import numpy as np  # noqa: E402
 
 # Create a simple structure
 coords = np.array([[0.0, 0.0, 0.0], [1.4, 0.0, 0.0]])
