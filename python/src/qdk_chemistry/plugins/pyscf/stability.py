@@ -204,6 +204,14 @@ class PyscfStabilityChecker(StabilityChecker):
     It supports multiple wavefunction types and can perform internal stability analysis of
     RHF, ROHF, UHF and external stability analysis (RHF -> UHF instability).
 
+    Internal stability eigenvalues are rescaled to follow the convention used in the
+    original stability analysis formulation (J. Chem. Phys. 66, 3045–3050 (1977)) and
+    to be consistent with the QDK implementation:
+
+    - RHF internal eigenvalues are scaled by 1/4
+    - UHF internal eigenvalues are scaled by 1/2
+    - RHF external eigenvalues are left unscaled
+
     Key behavior:
     - Automatically detects wavefunction type (RHF, ROHF, UHF) and applies appropriate analysis
     - Internal stability analysis is performed within the same wavefunction type
@@ -287,12 +295,19 @@ class PyscfStabilityChecker(StabilityChecker):
         external_eigenvalues_list = []
         external_eigenvectors_list = []
 
+        # Scale factors for internal eigenvalues so that reported values follow the
+        # convention of J. Chem. Phys. 66, 3045–3050 (1977) and match the QDK backend.
+        internal_scale_factor = 1.0
+
         if isinstance(mf, scf.rohf.ROHF):
             # ROHF stability analysis
             if do_internal:
                 e, v = _rohf_internal(mf, with_symmetry=with_symmetry, nroots=nroots, tol=alg_tol)
                 internal_eigenvalues_list.extend(e if isinstance(e, list | tuple | np.ndarray) else [e])
                 internal_eigenvectors_list.extend(v if isinstance(v, list | tuple | np.ndarray) else [v])
+                # TODO: Update internal_scale_factor if needed for future implementation.
+                # ROHF internal stability is not implemented in QDK backend so the factor is not known.
+                internal_scale_factor = 1.0
             # Raise error if external stability is requested for ROHF
             if do_external:
                 raise ValueError(
@@ -304,6 +319,9 @@ class PyscfStabilityChecker(StabilityChecker):
             # UHF stability analysis
             if do_internal:
                 e, v = _uhf_internal(mf, with_symmetry=with_symmetry, nroots=nroots, tol=alg_tol)
+                # Scale UHF internal eigenvalues by 1/2 to match the convention
+                # used in the original stability analysis paper and the QDK backend.
+                internal_scale_factor = 0.5
                 internal_eigenvalues_list.extend(e if isinstance(e, list | tuple | np.ndarray) else [e])
                 internal_eigenvectors_list.extend(v if isinstance(v, list | tuple | np.ndarray) else [v])
             # Raise error if external stability is requested for UHF
@@ -317,6 +335,9 @@ class PyscfStabilityChecker(StabilityChecker):
             # RHF stability analysis (default)
             if do_internal:
                 e, v = _rhf_internal(mf, with_symmetry=with_symmetry, nroots=nroots, tol=alg_tol)
+                # Scale RHF internal eigenvalues by 1/4 to match the convention
+                # used in the original stability analysis paper and the QDK backend.
+                internal_scale_factor = 0.25
                 internal_eigenvalues_list.extend(e if isinstance(e, list | tuple | np.ndarray) else [e])
                 internal_eigenvectors_list.extend(v if isinstance(v, list | tuple | np.ndarray) else [v])
             if do_external:
@@ -328,9 +349,12 @@ class PyscfStabilityChecker(StabilityChecker):
         internal_stable = True
         external_stable = True
 
-        # Convert to numpy arrays if we have results
+        # Convert to numpy arrays if we have results. Internal eigenvalues are
+        # scaled (RHF by 1/4, UHF by 1/2) to follow the convention of
+        # J. Chem. Phys. 66, 3045–3050 (1977) and to match the QDK backend.
+        # External eigenvalues are left unscaled.
         if len(internal_eigenvalues_list) > 0:
-            internal_eigenvalues = np.array(internal_eigenvalues_list)
+            internal_eigenvalues = np.array(internal_eigenvalues_list) * internal_scale_factor
             internal_eigenvectors = np.array(internal_eigenvectors_list).T  # Transpose for proper shape
             # Check internal stability: all eigenvalues should be > stability_tol
             internal_stable = np.all(internal_eigenvalues > stability_tol)

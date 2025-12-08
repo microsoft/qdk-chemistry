@@ -490,33 +490,12 @@ class TestPyscfStabilityChecker:
         else:
             assert len(external_eigenvalues) == 0
 
-    def _check_reference_eigenvalue(
-        self, result, stability_checker, ref_value, is_internal=True, backend="pyscf", wavefunction=None
-    ):
-        """Helper to check eigenvalue against reference with dynamic tolerance.
-
-        For qdk backend:
-        - RHF internal: reference values are scaled by 1/4
-        - RHF external: reference values are NOT scaled (use full PySCF value)
-        - UHF internal: reference values are scaled by 1/2
-        """
+    def _check_reference_eigenvalue(self, result, stability_checker, ref_value, is_internal=True):
+        """Helper to check eigenvalue against reference within solver tolerance."""
         smallest = (
             result.get_smallest_internal_eigenvalue() if is_internal else result.get_smallest_external_eigenvalue()
         )
-
-        # Apply scaling for qdk backend based on wavefunction type
         expected_value = ref_value
-        if backend == "qdk":
-            # For internal stability: RHF uses 1/4 scaling, UHF uses 1/2 scaling
-            # For external stability: No scaling (RHF only, as UHF doesn't support external)
-            if is_internal:
-                # Check if restricted or unrestricted
-                is_restricted = wavefunction.get_orbitals().is_restricted() if wavefunction else True
-                if is_restricted:
-                    expected_value = ref_value / 4.0  # RHF scaling
-                else:
-                    expected_value = ref_value / 2.0  # UHF scaling
-            # else: external stability uses full PySCF value (no scaling)
 
         alg_tol = stability_checker.settings().get("davidson_tolerance")
         assert abs(smallest - expected_value) < alg_tol
@@ -552,12 +531,8 @@ class TestPyscfStabilityChecker:
         assert result.is_external_stable() is True
 
         # Check reference values
-        self._check_reference_eigenvalue(
-            result, stability_checker, 1.1915284105596065, is_internal=True, backend=backend, wavefunction=wavefunction
-        )
-        self._check_reference_eigenvalue(
-            result, stability_checker, 0.1798655099964312, is_internal=False, backend=backend, wavefunction=wavefunction
-        )
+        self._check_reference_eigenvalue(result, stability_checker, 0.2978821026399016, is_internal=True)
+        self._check_reference_eigenvalue(result, stability_checker, 0.1798655099964312, is_internal=False)
 
         # Test internal-only analysis
         stability_checker_internal = self._create_stability_checker(backend=backend, internal=True, external=False)
@@ -586,9 +561,7 @@ class TestPyscfStabilityChecker:
 
         self._assert_basic_stability_result(result, True, has_internal=True, has_external=False)
         assert result.is_internal_stable() is True
-        self._check_reference_eigenvalue(
-            result, stability_checker, 0.04196462242858642, is_internal=True, backend=backend, wavefunction=wavefunction
-        )
+        self._check_reference_eigenvalue(result, stability_checker, 0.02098231121429321, is_internal=True)
 
         # Test that external analysis raises error for UHF
         stability_checker_external = self._create_stability_checker(backend=backend, internal=False, external=True)
@@ -612,8 +585,6 @@ class TestPyscfStabilityChecker:
             stability_checker,
             -0.00965024239084978,
             is_internal=True,
-            backend="pyscf",
-            wavefunction=wavefunction,
         )
 
         # Test that external analysis raises error for ROHF
@@ -625,8 +596,8 @@ class TestPyscfStabilityChecker:
     @pytest.mark.parametrize(
         ("distance", "expected_internal_stable", "expected_external_stable", "ref_internal", "ref_external"),
         [
-            (1.2, True, False, 0.6683982584414123, -0.04997491473779583),  # External instability
-            (1.6, False, False, -0.26163382707539584, -0.28245222121208535),  # Internal instability
+            (1.2, True, False, 0.16709956461035308, -0.04997491473779583),  # External instability
+            (1.6, False, False, -0.06540845676884896, -0.28245222121208535),  # Internal instability
         ],
     )
     def test_pyscf_stability_checker_n2_rhf_instabilities(
@@ -652,18 +623,14 @@ class TestPyscfStabilityChecker:
         assert is_stable is (expected_internal_stable and expected_external_stable)
 
         # Check reference eigenvalues
-        self._check_reference_eigenvalue(
-            result, stability_checker, ref_internal, is_internal=True, backend=backend, wavefunction=wavefunction
-        )
-        self._check_reference_eigenvalue(
-            result, stability_checker, ref_external, is_internal=False, backend=backend, wavefunction=wavefunction
-        )
+        self._check_reference_eigenvalue(result, stability_checker, ref_internal, is_internal=True)
+        self._check_reference_eigenvalue(result, stability_checker, ref_external, is_internal=False)
 
     @pytest.mark.parametrize("backend", ["pyscf", "qdk"])
     def test_pyscf_stability_checker_bn_plus_uhf(self, backend):
         """Test stability checker on BN+ cation (UHF) with different backends."""
         structure = create_bn_plus_structure()
-        ref_eigenvalue = -0.15872092489909065
+        ref_eigenvalue = -0.07936046244954532
         # QDK finds 1 negative eigenvalue, PySCF finds 2 (different convergence/tolerance)
         expected_negative_count = 1 if backend == "qdk" else 2
 
@@ -676,9 +643,7 @@ class TestPyscfStabilityChecker:
 
         self._assert_basic_stability_result(result, False, has_internal=True, has_external=False)
         assert result.is_internal_stable() is False  # Should be internally unstable
-        self._check_reference_eigenvalue(
-            result, stability_checker, ref_eigenvalue, is_internal=True, backend=backend, wavefunction=wavefunction
-        )
+        self._check_reference_eigenvalue(result, stability_checker, ref_eigenvalue, is_internal=True)
 
         # Check number of negative eigenvalues
         internal_eigenvalues = result.get_internal_eigenvalues()
@@ -702,9 +667,7 @@ class TestPyscfStabilityChecker:
 
         self._assert_basic_stability_result(result, False, has_internal=True, has_external=False)
         assert result.is_internal_stable() is False  # Should be internally unstable
-        self._check_reference_eigenvalue(
-            result, stability_checker, ref_eigenvalue, is_internal=True, backend="pyscf", wavefunction=wavefunction
-        )
+        self._check_reference_eigenvalue(result, stability_checker, ref_eigenvalue, is_internal=True)
 
         # Check number of negative eigenvalues
         internal_eigenvalues = result.get_internal_eigenvalues()

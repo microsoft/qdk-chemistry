@@ -530,7 +530,6 @@ TEST_F(StabilityCheckerTest, QDK_RHF_Water_Stable) {
   EXPECT_TRUE(is_stable);
 
   // Check the smallest internal eigenvalue against reference
-  // Reference value is 1/4 of pyscf value: 1.1915284105596065 / 4
   double smallest_internal_eigenvalue =
       result->get_smallest_internal_eigenvalue();
   double davidson_tol =
@@ -538,7 +537,6 @@ TEST_F(StabilityCheckerTest, QDK_RHF_Water_Stable) {
   EXPECT_NEAR(smallest_internal_eigenvalue, 0.29788210264, davidson_tol);
 
   // Check the smallest external eigenvalue against reference
-  // Reference value is pyscf value: 0.1798655099964312
   double smallest_external_eigenvalue =
       result->get_smallest_external_eigenvalue();
   EXPECT_NEAR(smallest_external_eigenvalue, 0.1798655099964312, davidson_tol);
@@ -577,7 +575,6 @@ TEST_F(StabilityCheckerTest, QDK_UHF_O2_Stable) {
   EXPECT_TRUE(is_stable);
 
   // Check the smallest internal eigenvalue against reference
-  // Reference value is half of pyscf for UHF
   double smallest_eigenvalue = result->get_smallest_internal_eigenvalue();
   double davidson_tol =
       stability_checker->settings().get<double>("davidson_tolerance");
@@ -615,17 +612,13 @@ TEST_F(StabilityCheckerTest, QDK_RHF_N2_Stretched_External_Instability) {
   EXPECT_FALSE(is_stable);  // Overall unstable due to external instability
 
   // Check the smallest internal eigenvalue against reference
-  // Reference value from Python test: 0.6683982584414123
-  // Our value should be 1/4 of that
   double smallest_internal_eigenvalue =
       result->get_smallest_internal_eigenvalue();
   double davidson_tol =
       stability_checker->settings().get<double>("davidson_tolerance");
-  EXPECT_NEAR(smallest_internal_eigenvalue, 0.6683982584414123 / 4.0,
-              davidson_tol);
+  EXPECT_NEAR(smallest_internal_eigenvalue, 0.16709956461035308, davidson_tol);
 
   // Check the smallest external eigenvalue against reference
-  // Reference value from Python test: -0.04997491473779583
   double smallest_external_eigenvalue =
       result->get_smallest_external_eigenvalue();
   EXPECT_NEAR(smallest_external_eigenvalue, -0.04997491473779583, davidson_tol);
@@ -662,14 +655,11 @@ TEST_F(StabilityCheckerTest, QDK_RHF_N2_Stretched_Internal_Instability) {
   EXPECT_FALSE(is_stable);
 
   // Check the smallest internal eigenvalue against reference
-  // Reference value from Python test: -0.26163382707539584
-  // Our value should be 1/4 of that
   double smallest_internal_eigenvalue =
       result->get_smallest_internal_eigenvalue();
   double davidson_tol =
       stability_checker->settings().get<double>("davidson_tolerance");
-  EXPECT_NEAR(smallest_internal_eigenvalue, -0.26163382707539584 / 4.0,
-              davidson_tol);
+  EXPECT_NEAR(smallest_internal_eigenvalue, -0.06540845676884896, davidson_tol);
 
   // Check the smallest external eigenvalue against reference
   // Reference value from Python test: -0.28245222121208535
@@ -712,10 +702,8 @@ TEST_F(StabilityCheckerTest, QDK_UHF_BN_Plus_Internal_Instability) {
   EXPECT_FALSE(is_stable);
 
   // Check the smallest internal eigenvalue against reference
-  // Reference value from Python test: -0.15872092489909065
-  // Our value should be half of that for UHF
   double smallest_eigenvalue = result->get_smallest_internal_eigenvalue();
   double davidson_tol =
       stability_checker->settings().get<double>("davidson_tolerance");
-  EXPECT_NEAR(smallest_eigenvalue, -0.15872092489909065 / 2.0, davidson_tol);
+  EXPECT_NEAR(smallest_eigenvalue, -0.07936046244954532, davidson_tol);
 }
