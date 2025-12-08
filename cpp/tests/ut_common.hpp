@@ -255,10 +255,24 @@ inline std::shared_ptr<Structure> create_o2_structure() {
 
 /**
  * @brief Create a stretched N2 structure
+ */
+inline std::shared_ptr<Structure> create_stretched_n2_structure() {
+  std::vector<Eigen::Vector3d> coords = {
+      {0.000000000, 0.000000000, 0.000000000},
+      {0.000000000, 0.000000000, 3.7794519772}};
+
+  std::vector<Element> elements = {qdk::chemistry::data::Element::N,
+                                   qdk::chemistry::data::Element::N};
+
+  return std::make_shared<Structure>(coords, elements);
+}
+
+/**
+ * @brief Create a stretched N2 structure
  * @param distance_angstrom Distance between nitrogen atoms in Angstrom
  */
 inline std::shared_ptr<Structure> create_stretched_n2_structure(
-    double distance_angstrom = 2.0) {
+    double distance_angstrom) {
   std::vector<Eigen::Vector3d> coords = {
       {0.000000000, 0.000000000, 0.000000000},
       {distance_angstrom, 0.000000000, 0.000000000}};
