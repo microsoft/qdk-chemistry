@@ -10,6 +10,7 @@ Exposed classes are:
 - :class:`BasisSet`: Gaussian basis set definitions for quantum calculations.
 - :class:`AOType`: Enumeration of basis set types (STO-3G, 6-31G, etc.).
 - :class:`CasWavefunctionContainer`: Complete Active Space (CAS) wavefunction with CI coefficients and determinants.
+- :class:`Circuit`: Quantum circuit information.
 - :class:`Configuration`: Electronic configuration state information.
 - :class:`CoupledClusterContainer`: Container for coupled cluster wavefunction amplitudes and determinants.
 - :class:`DataClass`: Base data class.
@@ -81,6 +82,7 @@ from qdk_chemistry._core.data import (
     get_current_ciaaw_version,
 )
 from qdk_chemistry.data.base import DataClass
+from qdk_chemistry.data.circuit import Circuit
 from qdk_chemistry.data.estimator_data import EnergyExpectationResult, MeasurementData
 from qdk_chemistry.data.qpe_result import QpeResult
 from qdk_chemistry.data.qubit_hamiltonian import QubitHamiltonian
@@ -96,6 +98,7 @@ __all__ = [
     "Ansatz",
     "BasisSet",
     "CasWavefunctionContainer",
+    "Circuit",
     "Configuration",
     "CoupledClusterContainer",
     "DataClass",

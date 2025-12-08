@@ -18,6 +18,7 @@ void bind_stability_result(py::module& m);
 void bind_settings(py::module& m);
 void bind_structure(py::module& m);
 void bind_basis_set(py::module& m);
+void bind_serialization(py::module& m);
 void bind_mc(py::module& m);
 void bind_mcscf(py::module& m);
 void bind_hamiltonian_constructor(py::module& m);
@@ -55,6 +56,7 @@ PYBIND11_MODULE(_core, m) {
   bind_wavefunction(data);
   bind_ansatz(data);
   bind_stability_result(data);
+  bind_serialization(data);
 
   bind_localizer(algorithms);
   bind_mc(algorithms);
