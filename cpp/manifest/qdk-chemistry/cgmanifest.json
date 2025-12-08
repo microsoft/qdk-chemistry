@@ -150,17 +150,6 @@
       "component": {
         "type": "git",
         "git": {
-          "repositoryUrl": "https://github.com/USCiLab/cereal.git",
-          "commitHash": "02eace19a99ce3cd564ca4e379753d69af08c2c8",
-          "tag": "v1.3.0"
-        }
-      },
-      "developmentDependency": false
-    },
-    {
-      "component": {
-        "type": "git",
-        "git": {
           "repositoryUrl": "https://github.com/wavefunction91/ExchCXX.git",
           "commitHash": "f932a1bd3a0ff9d5b1de4cfe7fe86bfb1f20cb74 "
         }
