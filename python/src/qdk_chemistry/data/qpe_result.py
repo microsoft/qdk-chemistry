@@ -1,4 +1,4 @@
-"""QDK/Chemistry data class for quantum phase estimation results."""
+"""QDK/Chemistry Quantum Phase Estimation Results module."""
 
 # --------------------------------------------------------------------------------------------
 # Copyright (c) Microsoft Corporation. All rights reserved.
@@ -44,6 +44,9 @@ class QpeResult(DataClass):
 
     # Class attribute for filename validation
     _data_type_name = "qpe_result"
+
+    # Serialization version for this class
+    _serialization_version = "0.1.0"
 
     def __init__(
         self,
@@ -223,7 +226,7 @@ class QpeResult(DataClass):
         if self.metadata is not None:
             data["metadata"] = self.metadata
 
-        return data
+        return self._add_json_version(data)
 
     def to_hdf5(self, group: h5py.Group) -> None:
         """Save the QPE result to an HDF5 group.
@@ -233,6 +236,7 @@ class QpeResult(DataClass):
             Python users should call to_hdf5_file() directly.
 
         """
+        self._add_hdf5_version(group)
         group.attrs["method"] = self.method
         group.attrs["evolution_time"] = self.evolution_time
         group.attrs["phase_fraction"] = self.phase_fraction
@@ -263,7 +267,12 @@ class QpeResult(DataClass):
         Returns:
             QpeResult: New instance reconstructed from the JSON data
 
+        Raises:
+            RuntimeError: If version field is missing or incompatible
+
         """
+        cls._validate_json_version(cls._serialization_version, json_data)
+
         return cls(
             method=json_data["method"],
             evolution_time=json_data["evolution_time"],
@@ -289,7 +298,12 @@ class QpeResult(DataClass):
         Returns:
             QpeResult: New instance reconstructed from the HDF5 data
 
+        Raises:
+            RuntimeError: If version attribute is missing or incompatible
+
         """
+        cls._validate_hdf5_version(cls._serialization_version, group)
+
         branching = tuple(group["branching"][:])
 
         bits_msb_first = None

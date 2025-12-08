@@ -37,7 +37,7 @@ Preparing a quantum state
 --------------------------
 
 Once configured, the :class:`~qdk_chemistry.algorithms.StatePreparation` can be used to generate
-a quantum circuit in OpenQASM format from a :class:`~qdk_chemistry.data.Wavefunction`.
+a quantum circuit from a :class:`~qdk_chemistry.data.Wavefunction`.
 
 .. tab:: Python API
 
