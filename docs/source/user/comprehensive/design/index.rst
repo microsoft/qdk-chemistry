@@ -69,7 +69,7 @@ QDK/Chemistry's algorithm implementations can be found in the :doc:`Algorithms <
 Factory Pattern
 ===============
 
-QDK/Chemistry leverages a :doc:`factory pattern <../algorithms/factory_pattern>` for algorithm creation:
+QDK/Chemistry's :doc:`plugin architecture <../plugins>` leverages a :doc:`factory pattern <../algorithms/factory_pattern>` for algorithm creation:
 
 .. tab:: C++ API
 

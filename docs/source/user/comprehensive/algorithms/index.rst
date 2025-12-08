@@ -1,6 +1,33 @@
 Algorithm Classes
 =================
 
+.. toctree::
+   :maxdepth: 1
+   :hidden:
+   :caption: Creation, Configuration and Extension of Algorithm Classes
+
+   factory_pattern
+   settings
+   ../plugins
+
+.. toctree::
+   :maxdepth: 1
+   :hidden:
+   :caption: Available Algorithms
+
+   active_space
+   energy_estimator
+   hamiltonian_constructor
+   localizer
+   mc_calculator
+   mcscf
+   pmc
+   qubit_mapper
+   dynamical_correlation
+   scf_solver
+   stability_checker
+   state_preparation
+
 QDK/Chemistry provides a comprehensive set of algorithm classes whixh express core methological primitives for quantum and classical chemistry calculations.
 All algorithms follow a :doc:`factory pattern <factory_pattern>` design, allowing you to create instances by name and configured
 through a unified :doc:`settings <settings>` interface.
@@ -78,28 +105,4 @@ Use ``available()`` to list registered implementations:
       # Inspect available settings
       solver.print_settings()
 
-For details on creating, loading, and using custom algorithmimplementations, see the :doc:`plugin system <../plugins>` documentation.
-
-.. toctree::
-   :maxdepth: 1
-   :caption: Creation and Configuration of Algorithm Classes
-
-   factory_pattern
-   settings
-
-.. toctree::
-   :maxdepth: 1
-   :caption: Available Algorithms
-
-   active_space
-   energy_estimator
-   hamiltonian_constructor
-   localizer
-   mc_calculator
-   mcscf
-   pmc
-   qubit_mapper
-   dynamical_correlation
-   scf_solver
-   stability_checker
-   state_preparation
+For details on creating, loading, and using custom algorithm implementations, see the :doc:`plugin system <../plugins>` and :doc:`factory pattern <factory_pattern>` documentation.
