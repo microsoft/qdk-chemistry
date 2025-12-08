@@ -67,7 +67,34 @@ std::pair<double, std::shared_ptr<data::Wavefunction>> ScfSolver::_run_impl(
     // Workitem: 41322
   }
 
-  const bool unrestricted = (multiplicity != 1);
+  const bool open_shell = (multiplicity != 1);
+
+  // Determine reference type and unrestricted flag
+  std::string scf_type = _settings->get<std::string>("scf_type");
+  std::transform(scf_type.begin(), scf_type.end(), scf_type.begin(), ::tolower);
+
+  bool unrestricted;
+  if (scf_type == "auto") {
+    unrestricted = open_shell;
+  } else if (scf_type == "unrestricted") {
+    unrestricted = true;
+    if (!open_shell && !use_input_initial_guess) {
+      spdlog::warn(
+          "Unrestricted reference requested for closed-shell system. "
+          "Automatic spin symmetry breaking is not supported. "
+          "Consider providing a spin-broken initial guess if desired.");
+    }
+  } else if (scf_type == "restricted") {
+    if (open_shell) {
+      throw std::invalid_argument(
+          "Restricted Open-Shell calculation is not currently supported in the "
+          "QDK/Chemistry SCFSolver");
+    }
+    unrestricted = false;
+  } else {
+    throw std::invalid_argument(
+        "scf_type must be one of: auto, restricted, unrestricted");
+  }
 
   std::string basis_set = _settings->get<std::string>("basis_set");
   std::transform(basis_set.begin(), basis_set.end(), basis_set.begin(),
@@ -223,6 +250,11 @@ std::pair<double, std::shared_ptr<data::Wavefunction>> ScfSolver::_run_impl(
     qcs::RowMajorMatrix density_matrix;
 
     if (unrestricted) {
+      if (initial_guess.value()->is_restricted())
+        spdlog::warn(
+            "Unrestricted calculation requested but restricted "
+            "initial guess provided.");
+
       // For unrestricted case, stack alpha and beta coefficients and compute
       // density
       const size_t num_molecular_orbitals = coeff_alpha.cols();
@@ -255,6 +287,11 @@ std::pair<double, std::shared_ptr<data::Wavefunction>> ScfSolver::_run_impl(
           C_beta_transformed.block(0, 0, num_atomic_orbitals, n_beta)
               .transpose();
     } else {
+      if (initial_guess.value()->is_unrestricted()) {
+        throw std::invalid_argument(
+            "Restricted calculation requested but unrestricted initial guess "
+            "provided.");
+      }
       // For restricted case, use alpha coefficients only
       Eigen::MatrixXd C_transformed = qdk_basis_map.transpose() * coeff_alpha;
 
