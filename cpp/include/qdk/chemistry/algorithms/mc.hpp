@@ -44,10 +44,6 @@ class MultiConfigurationSettings : public data::Settings {
                          "Maximum number of Davidson iterations",
                          qdk::chemistry::data::BoundConstraint<int64_t>{
                              1, std::numeric_limits<int64_t>::max()});
-    // number of states
-    set_default<int64_t>("num_roots", 1, "Number of roots",
-                         qdk::chemistry::data::BoundConstraint<int64_t>{
-                             1, std::numeric_limits<int64_t>::max()});
   }
 
   /**
