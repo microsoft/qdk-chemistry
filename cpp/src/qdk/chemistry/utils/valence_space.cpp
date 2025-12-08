@@ -2,9 +2,8 @@
 // Licensed under the MIT License. See LICENSE.txt in the project root for
 // license information.
 
-#include <spdlog/spdlog.h>
-
 #include <algorithm>
+#include <qdk/chemistry/utils/logger.hpp>
 #include <qdk/chemistry/utils/valence_space.hpp>
 
 namespace qdk::chemistry::utils {
@@ -31,6 +30,7 @@ static const std::vector<size_t> VALENCE_ORBITALS_BY_PERIOD = {
 
 // Helper function to calculate valence electrons for an element
 size_t calculate_valence_electrons(Element element) {
+  QDK_LOG_TRACE_ENTERING();
   size_t atomic_number = static_cast<size_t>(element);
   if ((atomic_number == 1) || (atomic_number == 2)) {  // H and He
     return atomic_number;
@@ -51,6 +51,7 @@ size_t calculate_valence_electrons(Element element) {
 
 // Helper function to calculate valence orbitals for an element
 size_t calculate_valence_orbitals(Element element) {
+  QDK_LOG_TRACE_ENTERING();
   size_t atomic_number = static_cast<size_t>(element);
 
   // Determine the period
@@ -64,6 +65,7 @@ size_t calculate_valence_orbitals(Element element) {
 
 std::pair<size_t, size_t> compute_valence_space_parameters(
     std::shared_ptr<Wavefunction> wavefunction, int charge) {
+  QDK_LOG_TRACE_ENTERING();
   // Extract structure from wavefunction
   std::shared_ptr<Structure> structure =
       wavefunction->get_orbitals()->get_basis_set()->get_structure();
@@ -74,7 +76,7 @@ std::pair<size_t, size_t> compute_valence_space_parameters(
   for (size_t i = 0; i < structure->get_num_atoms(); ++i) {
     const Element element = structure->get_atom_element(i);
     if (((unsigned)element > 86)) {
-      spdlog::warn(
+      QDK_LOGGER().warn(
           "valence active parameters are only implemented up through period-6 "
           "elements. "
           "Element atomic number: {}",

@@ -11,6 +11,7 @@
 #include <macis/util/mpi.hpp>
 #include <qdk/chemistry/data/structure.hpp>
 #include <qdk/chemistry/data/wavefunction_containers/cas.hpp>
+#include <qdk/chemistry/utils/logger.hpp>
 
 namespace qdk::chemistry::algorithms::microsoft {
 
@@ -33,6 +34,8 @@ struct cas_helper {
   static return_type impl(const data::Hamiltonian& hamiltonian,
                           const data::Settings& settings_, unsigned int nalpha,
                           unsigned int nbeta) {
+    QDK_LOG_TRACE_ENTERING();
+
     using wfn_type = macis::wfn_t<N>;
     using generator_t = macis::SortedDoubleLoopHamiltonianGenerator<wfn_type>;
 
@@ -91,6 +94,8 @@ std::pair<double, std::shared_ptr<data::Wavefunction>> MacisCas::_run_impl(
     std::shared_ptr<data::Hamiltonian> hamiltonian,
     unsigned int n_active_alpha_electrons,
     unsigned int n_active_beta_electrons) const {
+  QDK_LOG_TRACE_ENTERING();
+
   const auto& orbitals = hamiltonian->get_orbitals();
   const auto& [active_indices, active_indices_beta] =
       orbitals->get_active_space_indices();

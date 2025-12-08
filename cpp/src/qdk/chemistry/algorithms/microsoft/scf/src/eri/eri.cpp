@@ -12,7 +12,6 @@
 #ifdef ENABLE_NVTX3
 #include <nvtx3/nvtx3.hpp>
 #endif
-#include <spdlog/spdlog.h>
 
 // These are external headers provided in the addons package
 #ifdef QDK_CHEMISTRY_ENABLE_HGP
@@ -25,6 +24,8 @@
 #include "eri/LIBINTX/libintx.h"
 #endif
 
+#include <qdk/chemistry/utils/logger.hpp>
+
 #include "eri/INCORE/incore.h"
 #include "eri/LIBINT2_DIRECT/libint2_direct.h"
 #include "eri/SNK/snk.h"
@@ -34,6 +35,8 @@
 namespace qdk::chemistry::scf {
 std::shared_ptr<ERI> ERI::create(BasisSet& basis_set, const SCFConfig& cfg,
                                  double omega) {
+  QDK_LOG_TRACE_ENTERING();
+
 #ifdef ENABLE_NVTX3
   nvtx3::scoped_range r{nvtx3::rgb{127, 0, 255}, "ERI::create"};
 #endif
@@ -66,6 +69,8 @@ std::shared_ptr<ERI> ERI::create(BasisSet& basis_set, const SCFConfig& cfg,
 
 std::shared_ptr<ERI> ERI::create(BasisSet& basis_set, BasisSet& aux_basis_set,
                                  const SCFConfig& cfg, double omega) {
+  QDK_LOG_TRACE_ENTERING();
+
 #ifdef ENABLE_NVTX3
   nvtx3::scoped_range r{nvtx3::rgb{127, 0, 255}, "ERI::create"};
 #endif
@@ -88,6 +93,8 @@ std::shared_ptr<ERI> ERI::create(BasisSet& basis_set, BasisSet& aux_basis_set,
 
 void ERI::build_JK(const double* P, double* J, double* K, double alpha,
                    double beta, double omega) {
+  QDK_LOG_TRACE_ENTERING();
+
 #ifdef ENABLE_NVTX3
   nvtx3::scoped_range r{nvtx3::rgb{127, 0, 255}, "ERI::build_JK"};
 #endif
@@ -112,6 +119,8 @@ void ERI::build_JK(const double* P, double* J, double* K, double alpha,
 }
 
 void ERI::quarter_trans(size_t nt, const double* C, double* out) {
+  QDK_LOG_TRACE_ENTERING();
+
   quarter_trans_impl(nt, C, out);
 }
 }  // namespace qdk::chemistry::scf

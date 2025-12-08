@@ -19,7 +19,6 @@ Key Features:
 
 from __future__ import annotations
 
-import logging
 from typing import TYPE_CHECKING, Any
 
 from qiskit import qasm3, transpile
@@ -34,8 +33,7 @@ from qdk_chemistry.algorithms.energy_estimator import (
     EnergyEstimator,
 )
 from qdk_chemistry.data import Circuit, EnergyExpectationResult, MeasurementData, QubitHamiltonian, Settings
-
-_LOGGER = logging.getLogger(__name__)
+from qdk_chemistry.utils import Logger
 
 __all__ = ["QiskitEnergyEstimator", "QiskitEnergyEstimatorSettings"]
 
@@ -50,6 +48,7 @@ class QiskitEnergyEstimatorSettings(Settings):
 
     def __init__(self):
         """Initialize QiskitEnergyEstimatorSettings."""
+        Logger.trace_entering()
         super().__init__()
         self._set_default("seed", "int", 42)
 
@@ -81,6 +80,7 @@ class QiskitEnergyEstimator(EnergyEstimator):
         References: `Qiskit Aer Simulator <https://github.com/Qiskit/qiskit-aer/blob/main/qiskit_aer/backends/aer_simulator.py>`_.
 
         """
+        Logger.trace_entering()
         super().__init__()
         self._settings = QiskitEnergyEstimatorSettings()
         self._settings.set("seed", seed)
@@ -112,10 +112,11 @@ class QiskitEnergyEstimator(EnergyEstimator):
             A list of dictionaries containing the bitstring counts for each measurement circuit.
 
         """
+        Logger.trace_entering()
         bitstring_counts: list[dict[str, int] | None] = []
         for i, meas_circuit in enumerate(measurement_circuits):
             shots = shots_list[i]
-            _LOGGER.debug(f"Running backend with circuit {i} and {shots} shots")
+            Logger.debug(f"Running backend with circuit {i} and {shots} shots")
             result = self.backend.run(meas_circuit, shots=shots).result().results[0].data.counts
             bitstring_counts.append(result)
         return bitstring_counts
@@ -137,6 +138,7 @@ class QiskitEnergyEstimator(EnergyEstimator):
             ``MeasurementData`` containing the measurement counts and observable data.
 
         """
+        Logger.trace_entering()
         counts = self._run_measurement_circuits_and_get_bitstring_counts(measurement_circuits, shots_list)
         return MeasurementData(bitstring_counts=counts, hamiltonians=qubit_hamiltonians, shots_list=shots_list)
 
@@ -170,6 +172,7 @@ class QiskitEnergyEstimator(EnergyEstimator):
                 and the circuit will be transpiled into the basis gates defined by the noise model.
 
         """
+        Logger.trace_entering()
         if noise_model is not None:
             if isinstance(self.backend, AerSimulator):
                 self.backend.set_options(noise_model=noise_model)
@@ -185,7 +188,7 @@ class QiskitEnergyEstimator(EnergyEstimator):
 
         # Evenly distribute shots across all observables
         shots_list = [total_shots // num_observables] * num_observables
-        _LOGGER.debug(f"Shots allocated: {shots_list}")
+        Logger.debug(f"Shots allocated: {shots_list}")
 
         energy_offset = sum(classical_coeffs) if classical_coeffs else 0.0
 
@@ -224,4 +227,5 @@ class QiskitEnergyEstimator(EnergyEstimator):
 
     def name(self) -> str:
         """Get the name of the estimator backend."""
+        Logger.trace_entering()
         return "qiskit_aer_simulator"

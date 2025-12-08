@@ -11,14 +11,13 @@
 #include <iostream>
 #include <lapack.hh>
 #include <limits>
+#include <qdk/chemistry/utils/logger.hpp>
 #include <vector>
 
 #include "../scf/scf_impl.h"
 #include "qdk/chemistry/scf/core/scf.h"
 #include "qdk/chemistry/scf/core/types.h"
-#include "spdlog/spdlog.h"
 #include "util/matrix_exp.h"
-
 #ifdef QDK_CHEMISTRY_ENABLE_GPU
 #include "util/gpu/cuda_helper.h"
 #include "util/gpu/matrix_operations.h"
@@ -60,6 +59,7 @@ class GDM {
    * @param[in] delta_energy_diis Energy change from DIIS algorithm
    */
   void set_delta_energy_diis(const double delta_energy_diis) {
+    QDK_LOG_TRACE_ENTERING();
     delta_energy_ = delta_energy_diis;
   }
 
@@ -168,6 +168,7 @@ GDM::GDM(const SCFContext& ctx, int history_size_limit)
       last_accepted_energy_(std::numeric_limits<double>::infinity()),
       kappa_scale_factor_(0.0),
       gdm_step_count_(0) {
+  QDK_LOG_TRACE_ENTERING();
   // Calculate values from SCFContext
   const auto& cfg = *ctx.cfg;
   const auto& mol = *ctx.mol;
@@ -193,8 +194,8 @@ GDM::GDM(const SCFContext& ctx, int history_size_limit)
         std::to_string(history_size_limit));
   }
 
-  spdlog::debug("GDM initialized with history_size_limit = {}",
-                history_size_limit_);
+  QDK_LOGGER().debug("GDM initialized with history_size_limit = {}",
+                     history_size_limit_);
   num_density_matrices_ = unrestricted ? 2 : 1;
 
   // Initialize vectors with proper size
@@ -223,6 +224,7 @@ GDM::GDM(const SCFContext& ctx, int history_size_limit)
 void GDM::transform_history_(RowMajorMatrix& history, const int history_size,
                              const int num_occupied_orbitals,
                              const int num_molecular_orbitals) {
+  QDK_LOG_TRACE_ENTERING();
   const int num_virtual_orbitals =
       num_molecular_orbitals - num_occupied_orbitals;
   RowMajorMatrix temp =
@@ -250,6 +252,7 @@ void GDM::transform_history_(RowMajorMatrix& history, const int history_size,
 
 void GDM::apply_orbital_rotation_(RowMajorMatrix& C, const int spin_index,
                                   const Eigen::VectorXd& kappa_vector) {
+  QDK_LOG_TRACE_ENTERING();
   const int num_molecular_orbitals = C.cols();
   int num_occupied_orbitals = num_electrons_[spin_index];
   const int num_virtual_orbitals =
@@ -289,6 +292,7 @@ void GDM::gdm_iteration_step_(const RowMajorMatrix& F, RowMajorMatrix& C,
                               RowMajorMatrix& P, const int spin_index,
                               const double scf_total_energy,
                               const double occupation_factor) {
+  QDK_LOG_TRACE_ENTERING();
   // Numerical tolerance for avoiding division by zero
   static constexpr double denominator_min_limit = 1.0e-14;
   // Compute gradient vector
@@ -316,7 +320,7 @@ void GDM::gdm_iteration_step_(const RowMajorMatrix& F, RowMajorMatrix& C,
 
     // Check if history is full and remove oldest vector if needed
     if (history_size_[spin_index] == history_size_limit_ - 1) {
-      spdlog::info(
+      QDK_LOGGER().info(
           "GDM history size reached limit {}, removing oldest history vectors",
           history_size_limit_);
       // Remove oldest history vectors by shifting all vectors forward
@@ -340,7 +344,7 @@ void GDM::gdm_iteration_step_(const RowMajorMatrix& F, RowMajorMatrix& C,
       gdm_step_count_ != 0) {
     // energy increases too much, shorten kappa in the next step and
     // retain last_accepted_energy_
-    spdlog::info(
+    QDK_LOGGER().info(
         "Energy increased too much (increase: {:.6e}, record_good_energy: "
         "{:.6e}, "
         "tolerance: {:.6e}), will restore orbitals and shorten kappa in "
@@ -366,7 +370,7 @@ void GDM::gdm_iteration_step_(const RowMajorMatrix& F, RowMajorMatrix& C,
     kappa_[spin_index] *= kappa_scale_factor_;
     history_kappa_[spin_index].row(history_size_[spin_index]) =
         kappa_[spin_index];  // update the history_kappa_
-    spdlog::info(
+    QDK_LOGGER().info(
         "Restored orbitals to previous step and scaled kappa by factor of {}",
         kappa_scale_factor_);
   } else {
@@ -488,10 +492,10 @@ void GDM::gdm_iteration_step_(const RowMajorMatrix& F, RowMajorMatrix& C,
       Eigen::VectorXd scaled_kappa_vector;
       if (history_size_[spin_index] == 0) {
         // No history available, return gradient (identity matrix)
-        spdlog::info("No history available, using identity matrix");
+        QDK_LOGGER().info("No history available, using identity matrix");
         scaled_kappa_vector = -scaled_gradient_vector;
       } else {
-        spdlog::debug(
+        QDK_LOGGER().debug(
             "Applying BFGS two-loop recursion with {} historical records",
             history_size_[spin_index]);
 
@@ -543,8 +547,8 @@ void GDM::gdm_iteration_step_(const RowMajorMatrix& F, RowMajorMatrix& C,
       double kappa_norm = kappa_[spin_index].norm();
       double kappa_norm_limit = 10.0;
       if (kappa_norm > kappa_norm_limit) {
-        spdlog::warn("Kappa norm is too large ({}), scaling down to {}",
-                     kappa_norm, kappa_norm_limit);
+        QDK_LOGGER().warn("Kappa norm is too large ({}), scaling down to {}",
+                          kappa_norm, kappa_norm_limit);
         kappa_[spin_index] = kappa_[spin_index] / kappa_norm * kappa_norm_limit;
       }
 
@@ -571,6 +575,7 @@ void GDM::gdm_iteration_step_(const RowMajorMatrix& F, RowMajorMatrix& C,
 
 void GDM::iterate(const RowMajorMatrix& F, RowMajorMatrix& P, RowMajorMatrix& C,
                   const double energy) {
+  QDK_LOG_TRACE_ENTERING();
   const auto* cfg = ctx_.cfg;
   const int num_molecular_orbitals =
       static_cast<int>(ctx_.num_molecular_orbitals);
@@ -591,11 +596,14 @@ void GDM::iterate(const RowMajorMatrix& F, RowMajorMatrix& P, RowMajorMatrix& C,
 GDM::GDM(const SCFContext& ctx, const GDMConfig& gdm_config)
     : SCFAlgorithm(ctx),
       gdm_impl_(std::make_unique<impl::GDM>(
-          ctx, gdm_config.gdm_bfgs_history_size_limit)) {}
+          ctx, gdm_config.gdm_bfgs_history_size_limit)) {
+  QDK_LOG_TRACE_ENTERING();
+}
 
 GDM::~GDM() noexcept = default;
 
 void GDM::iterate(SCFImpl& scf_impl) {
+  QDK_LOG_TRACE_ENTERING();
   // Extract needed parameters from SCFImpl
   auto& P = scf_impl.density_matrix();
   const auto& F = scf_impl.get_fock_matrix();
@@ -607,6 +615,7 @@ void GDM::iterate(SCFImpl& scf_impl) {
 }
 
 void GDM::set_delta_energy_diis(const double delta_energy_diis) {
+  QDK_LOG_TRACE_ENTERING();
   gdm_impl_->set_delta_energy_diis(delta_energy_diis);
 }
 

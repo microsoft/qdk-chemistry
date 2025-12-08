@@ -10,6 +10,7 @@
 #endif
 #include <Eigen/Core>
 #include <blas.hh>
+#include <qdk/chemistry/utils/logger.hpp>
 
 namespace qdk::chemistry::scf {
 MOERI::MOERI(std::shared_ptr<ERI> eri)
@@ -19,11 +20,14 @@ MOERI::MOERI(std::shared_ptr<ERI> eri)
       handle_(std::make_shared<cutensor::TensorHandle>())
 #endif
 {
+  QDK_LOG_TRACE_ENTERING();
 }
+
 MOERI::~MOERI() noexcept = default;
 
 void MOERI::compute(size_t nb, size_t nt, const double* Ci, const double* Cj,
                     const double* Ck, const double* Cl, double* out) {
+  QDK_LOG_TRACE_ENTERING();
   if (nt > nb)
     throw std::runtime_error(
         "MOERI does not support num_molecular_orbitals > num_atomic_orbitals");
