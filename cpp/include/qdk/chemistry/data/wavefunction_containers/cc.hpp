@@ -28,7 +28,7 @@ namespace qdk::chemistry::data {
  * @brief Container representing a coupled cluster singles-doubles wavefunction
  *
  * CI coefficients are generated from the CC amplitudes on-demand (lazy
- * evaluation) and are costly. Ci coefficients and determinants are cached after
+ * evaluation) and are costly. CI coefficients and determinants are cached after
  * first computation and are calculated by truncating the expansion at the
  * fourth order.
  */
