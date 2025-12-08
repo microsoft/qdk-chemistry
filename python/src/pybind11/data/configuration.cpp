@@ -88,7 +88,7 @@ Parameters:
         Number of spatial orbitals to use from the configuration
 
 Returns:
-    [str, str]
+    tuple[str, str]
 
         Tuple of binary strings (alpha, beta) where '1' indicates occupied
         and '0' indicates unoccupied for each spin channel

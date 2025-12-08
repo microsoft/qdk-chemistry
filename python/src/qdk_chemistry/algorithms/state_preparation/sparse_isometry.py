@@ -46,7 +46,6 @@ from qiskit.transpiler import PassManager
 from qdk_chemistry.algorithms.state_preparation.state_preparation import StatePreparation, StatePreparationSettings
 from qdk_chemistry.data import Wavefunction
 from qdk_chemistry.data import Circuit, Wavefunction
-from qdk_chemistry.utils.bitstring import bitstrings_to_binary_matrix, separate_alpha_beta_to_binary_string
 
 _LOGGER = logging.getLogger(__name__)
 
