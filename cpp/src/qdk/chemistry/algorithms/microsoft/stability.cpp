@@ -113,6 +113,7 @@ class StabilityOperator {
   std::shared_ptr<qcs::ERI> eri_;
   std::shared_ptr<qcs::EXC> exc_;
   const RowMajorMatrix& ground_density_;
+  bool rhf_external_ = false;
 
   /**
    * @brief Apply the stability analysis matrix-vector operation
@@ -255,7 +256,7 @@ class StabilityOperator {
                     const Eigen::MatrixXd& Ca, const Eigen::MatrixXd& Cb,
                     std::shared_ptr<qcs::ERI> eri,
                     std::shared_ptr<qcs::EXC> exc,
-                    const RowMajorMatrix& ground_density)
+                    const RowMajorMatrix& ground_density, bool rhf_external)
       : num_alpha_(num_alpha),
         num_beta_(num_beta),
         eigen_diff_(eigen_diff),
@@ -263,7 +264,8 @@ class StabilityOperator {
         Cb_(Cb),
         eri_(eri),
         exc_(exc),
-        ground_density_(ground_density) {}
+        ground_density_(ground_density),
+        rhf_external_(rhf_external) {}
 
   void operator_action(size_t m, double alpha, const double* V, size_t LDV,
                        double beta, double* AV, size_t LDAV) const {
@@ -278,8 +280,37 @@ class StabilityOperator {
       }
     }
 
-    // Apply the stability operator: Y += alpha * (A+B) * X
-    apply_stability_operator(V, AV, m, alpha);
+    if (rhf_external_) {
+      // Allocate temporary arrays with twice the size
+      std::vector<double> V_copy(2 * N * m);
+      std::vector<double> AV_copy(2 * N * m, 0.0);
+
+      // For each vector, fill with V and -V
+      for (size_t vec = 0; vec < m; ++vec) {
+        // V_copy(vec*2*N : vec*2*N+N) = V(vec*N : vec*N+N)
+        for (size_t i = 0; i < N; ++i) {
+          V_copy[vec * 2 * N + i] = V[vec * N + i];
+        }
+        // V_copy(vec*2*N+N : vec*2*N+2*N) = -V(vec*N : vec*N+N)
+        for (size_t i = 0; i < N; ++i) {
+          V_copy[vec * 2 * N + N + i] = -V[vec * N + i];
+        }
+      }
+
+      // Apply the stability operator on the extended vectors
+      apply_stability_operator(V_copy.data(), AV_copy.data(), m, alpha);
+
+      // Sum first and second half of each vector in AV_copy into AV
+      for (size_t vec = 0; vec < m; ++vec) {
+        for (size_t i = 0; i < N; ++i) {
+          AV[vec * N + i] +=
+              0.5 * (AV_copy[vec * 2 * N + i] + AV_copy[vec * 2 * N + N + i]);
+        }
+      }
+    } else {
+      // Apply the stability operator: Y += alpha * (A+B) * X
+      apply_stability_operator(V, AV, m, alpha);
+    }
   }
 };
 
@@ -302,11 +333,6 @@ StabilityChecker::_run_impl(
   bool check_internal = _settings->get<bool>("internal");
   bool check_external = _settings->get<bool>("external");
 
-  if (check_external) {
-    throw std::runtime_error(
-        "External stability analysis is not implemented yet.");
-  }
-
   // Extract needed components, orbitals, basis set, coefficients, eigenvalues
   const auto orbitals = wavefunction->get_orbitals();
   const auto basis_set_qdk = orbitals->get_basis_set();
@@ -323,6 +349,11 @@ StabilityChecker::_run_impl(
     throw std::runtime_error(
         "ROHF/ROKS is currently not supported in internal-backended stability "
         "checker. Please use pySCF instead.");
+  }
+
+  if (check_external and unrestricted) {
+    throw std::runtime_error(
+        "External stability analysis is only implemented for RHF/RKS for now.");
   }
 
   // Set sizes
@@ -423,11 +454,6 @@ StabilityChecker::_run_impl(
         1.0;
   eigenvector.normalize();
 
-  // Create the stability operator wrapper
-  detail::StabilityOperator stability_op(n_alpha_electrons, n_beta_electrons,
-                                         eigen_diff, Ca, Cb, eri, exc,
-                                         ground_density);
-
   const int64_t max_subspace =
       std::min(davidson_max_subspace, static_cast<int64_t>(eigensize));
 
@@ -435,26 +461,59 @@ StabilityChecker::_run_impl(
       "Starting Davidson eigensolver (size: {}, subspace: {}, tol: {:.2e})",
       eigensize, max_subspace, davidson_tol);
 
-  // Call Davidson eigensolver
-  auto [num_iterations, lowest_eigenvalue] =
-      macis::davidson(eigensize, max_subspace, stability_op, eigen_diff.data(),
-                      davidson_tol, eigenvector.data());
-
-  spdlog::info("Davidson converged in {} iterations, lowest eigenvalue: {:.8f}",
-               num_iterations, lowest_eigenvalue);
-
-  // Determine stability: stable if the lowest eigenvalue is greater than the
-  // stability tolerance
-  bool internal_stable = (lowest_eigenvalue > stability_tol);
-  bool external_stable = true;  // Not implementing external stability analysis
-
-  // Prepare eigenvalue and eigenvector for constructor
-  Eigen::VectorXd internal_eigenvalues(1);
-  internal_eigenvalues(0) = lowest_eigenvalue;
-  Eigen::MatrixXd internal_eigenvectors =
-      Eigen::Map<Eigen::MatrixXd>(eigenvector.data(), eigenvector.size(), 1);
+  bool internal_stable = true;
+  bool external_stable = true;
+  Eigen::VectorXd internal_eigenvalues = Eigen::VectorXd::Zero(0);
+  Eigen::MatrixXd internal_eigenvectors = Eigen::MatrixXd::Zero(0, 0);
   Eigen::VectorXd external_eigenvalues = Eigen::VectorXd::Zero(0);
   Eigen::MatrixXd external_eigenvectors = Eigen::MatrixXd::Zero(0, 0);
+
+  if (check_internal) {
+    internal_eigenvectors.resize(eigenvector.size(), 1);
+    internal_eigenvectors = eigenvector;
+
+    // Create the stability operator wrapper and run Davidson eigensolver
+    detail::StabilityOperator stability_op(n_alpha_electrons, n_beta_electrons,
+                                           eigen_diff, Ca, Cb, eri, exc,
+                                           ground_density, false);
+    auto [num_iterations, lowest_eigenvalue] = macis::davidson(
+        eigensize, max_subspace, stability_op, eigen_diff.data(), davidson_tol,
+        internal_eigenvectors.data());
+
+    // Determine stability: stable if the lowest eigenvalue is greater than the
+    // stability tolerance
+    internal_stable = (lowest_eigenvalue > stability_tol);
+
+    spdlog::info(
+        "Davidson converged in {} iterations for internal stability, lowest "
+        "eigenvalue: {:.8f}",
+        num_iterations, lowest_eigenvalue);
+    internal_eigenvalues.resize(1);
+    internal_eigenvalues(0) = lowest_eigenvalue;
+  }
+
+  if (check_external) {
+    external_eigenvectors.resize(eigenvector.size(), 1);
+    external_eigenvectors = eigenvector;
+
+    // Create the stability operator wrapper and run Davidson eigensolver
+    detail::StabilityOperator stability_op(n_alpha_electrons, n_beta_electrons,
+                                           eigen_diff, Ca, Cb, eri, exc,
+                                           ground_density, true);
+    auto [num_iterations, lowest_eigenvalue] = macis::davidson(
+        eigensize, max_subspace, stability_op, eigen_diff.data(), davidson_tol,
+        external_eigenvectors.data());
+
+    // Determine stability: stable if the lowest eigenvalue is greater than the
+    // stability tolerance
+    external_stable = (lowest_eigenvalue > stability_tol);
+    spdlog::info(
+        "Davidson converged in {} iterations for external stability, lowest "
+        "eigenvalue: {:.8f}",
+        num_iterations, lowest_eigenvalue);
+    external_eigenvalues.resize(1);
+    external_eigenvalues(0) = lowest_eigenvalue;
+  }
 
   // Create the stability result object
   auto stability_result = std::make_shared<data::StabilityResult>(

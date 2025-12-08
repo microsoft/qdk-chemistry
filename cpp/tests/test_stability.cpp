@@ -4,6 +4,7 @@
 
 #include <gtest/gtest.h>
 
+#include <cstdio>
 #include <qdk/chemistry/algorithms/scf.hpp>
 #include <qdk/chemistry/algorithms/stability.hpp>
 #include <qdk/chemistry/data/stability_result.hpp>
@@ -354,6 +355,9 @@ TEST_F(StabilityCheckerTest, StabilityResult_JSON_IO) {
               from_file->get_internal_eigenvalues());
   EXPECT_TRUE(original.get_external_eigenvalues() ==
               from_file->get_external_eigenvalues());
+
+  // Cleanup temporary file
+  std::remove("test.stability_result.json");
 }
 
 TEST_F(StabilityCheckerTest, StabilityResult_HDF5_IO) {
@@ -389,6 +393,9 @@ TEST_F(StabilityCheckerTest, StabilityResult_HDF5_IO) {
               from_hdf5->get_internal_eigenvectors());
   EXPECT_TRUE(original.get_external_eigenvectors() ==
               from_hdf5->get_external_eigenvectors());
+
+  // Cleanup temporary file
+  std::remove("test.stability_result.h5");
 }
 
 TEST_F(StabilityCheckerTest, StabilityResult_Generic_File_IO) {
@@ -422,6 +429,10 @@ TEST_F(StabilityCheckerTest, StabilityResult_Generic_File_IO) {
                std::invalid_argument);
   EXPECT_THROW(StabilityResult::from_file("test.stability_result.xyz", "xyz"),
                std::invalid_argument);
+
+  // Cleanup temporary files
+  std::remove("test.stability_result.json");
+  std::remove("test.stability_result.h5");
 }
 
 TEST_F(StabilityCheckerTest, StabilityResult_File_Validation) {
@@ -463,6 +474,9 @@ TEST_F(StabilityCheckerTest, StabilityResult_Empty_Data_IO) {
       StabilityResult::from_json_file("empty.stability_result.json");
   EXPECT_TRUE(empty_from_file->is_stable());
   EXPECT_TRUE(empty_from_file->empty());
+
+  // Cleanup temporary file
+  std::remove("empty.stability_result.json");
 }
 
 TEST_F(StabilityCheckerTest, StabilityResult_Validation) {
