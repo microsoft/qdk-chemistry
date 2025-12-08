@@ -635,7 +635,7 @@ std::shared_ptr<BasisSet> BasisSet::from_index_map(
     auto it = index_to_basis_map.find(atom_index);
     if (it == index_to_basis_map.end()) {
       throw std::invalid_argument("No basis set specified for atom index: " +
-                                  std::string(atom_index));
+                                  std::to_string(atom_index));
     }
     std::string tmp_basis_set_name = it->second;
     // convert basis_set_name to lowercase
