@@ -22,7 +22,7 @@ Wavefunctions are represented as linear combinations of determinants:
 
 where :math:`c_I` are expansion coefficients and :math:`|\Phi_I\rangle` are Slater determinants.
 
-For post-Hartree-Fock methods like MP2 and coupled cluster, the wavefunction is expressed in terms of cluster operators:
+For post-Hartree-Fock methods like coupled cluster, the wavefunction is expressed in terms of cluster operators:
 
 .. math::
 
@@ -77,7 +77,7 @@ Sparse multi-determinant wavefunctions for Selected Configuration Interaction me
 CAS wavefunction container
 ~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-A multi-determinant wavefunction from Complete Active Space methods (CASSCF/CASCI) with comprehensive reduced density matrix support for computing electronic properties.
+A multi-determinant wavefunction from Complete Active Space methods (CASSCF/CASCI).
 
 .. tab:: C++ API
 
@@ -96,7 +96,8 @@ A multi-determinant wavefunction from Complete Active Space methods (CASSCF/CASC
 MP2 wavefunction container
 ~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-A second-order Møller-Plesset perturbation theory wavefunction container that stores a reference wavefunction and Hamiltonian. T1 and T2 amplitudes are computed lazily on demand using canonical MP2 theory.
+A wavefunction container for second-order Møller-Plesset perturbation theory (MP2), which stores a reference wavefunction and Hamiltonian.
+From these, T1 and T2 amplitudes can be computed on demand.
 
 .. tab:: C++ API
 
@@ -115,7 +116,8 @@ A second-order Møller-Plesset perturbation theory wavefunction container that s
 Coupled cluster wavefunction container
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-A coupled cluster wavefunction container that stores pre-computed T1 and T2 cluster amplitudes along with a reference wavefunction. Supports both restricted and unrestricted coupled cluster methods with optional reduced density matrix storage.
+A coupled cluster wavefunction container that stores T1 and T2 cluster amplitudes along with a reference wavefunction.
+Reduced density matrices (RDMs) can be stored if provided. 
 
 .. tab:: C++ API
 
@@ -169,42 +171,42 @@ The :class:`~qdk_chemistry.data.Wavefunction` class provides access to various q
      - ✓
      - ✓
      - ✗
-     - ✓†
+     - ✓
    * - **1-RDMs (spin-dependent)**
      - ✓
      - ✓
      - ✓
      - ✗
-     - ✓†
+     - ✓
    * - **1-RDMs (spin-traced)**
      - ✓
      - ✓
      - ✓
      - ✗
-     - ✓†
+     - ✓
    * - **2-RDMs (spin-dependent)**
      - ✓
      - ✓*
      - ✓*
      - ✗
-     - ✓†
+     - ✓
    * - **2-RDMs (spin-traced)**
      - ✓
      - ✓*
      - ✓*
      - ✗
-     - ✓†
+     - ✓
    * - **Orbital entropies**
      - ✓
      - ✓*
      - ✓*
      - ✗
-     - ✓†
+     - ✓
    * - **T1/T2 amplitudes**
      - ✗
      - ✗
      - ✗
-     - ✓‡
+     - ✓
      - ✓
    * - **Overlap calculations**
      - ✗
@@ -223,9 +225,6 @@ Legend:
 - ✓ Available and implemented
 - ✗ Not available (method not implemented)
 - ✓* Implemented and available only if 2-RDMs were provided during construction
-- ✓† Available if RDMs were provided during construction, otherwise computed from amplitudes
-- ✓‡ T2 amplitudes computed on demand for MP2
-TODO this sounds weird, need to check exactly 
 
 Accessing wavefunction data
 ---------------------------
@@ -249,7 +248,7 @@ The :class:`~qdk_chemistry.data.Wavefunction` class provides methods to access c
 Accessing cluster amplitudes
 ----------------------------
 
-For MP2 and coupled cluster wavefunctions, you can access T1 and T2 cluster amplitudes:
+For MP2 and coupled cluster wavefunctions, one can access T1 and T2 cluster amplitudes:
 
 .. tab:: C++ API
 
