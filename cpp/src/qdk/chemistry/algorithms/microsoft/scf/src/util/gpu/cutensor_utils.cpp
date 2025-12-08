@@ -6,6 +6,8 @@
 #ifdef QDK_CHEMISTRY_ENABLE_GPU
 #include <qdk/chemistry/scf/util/gpu/cutensor_utils.h>
 
+#include <qdk/chemistry/utils/logger.hpp>
+
 namespace qdk::chemistry::scf::cutensor {
 
 /**
@@ -24,6 +26,7 @@ namespace qdk::chemistry::scf::cutensor {
  * @note The input dims array must have at least nrank elements
  */
 auto make_row_major_strides(int64_t nrank, int64_t dims[]) {
+  QDK_LOG_TRACE_ENTERING();
   std::vector<int64_t> stride(nrank);
   stride.back() = 1;
   for (int i = 1; i < nrank; ++i)
@@ -33,6 +36,7 @@ auto make_row_major_strides(int64_t nrank, int64_t dims[]) {
 
 TensorDesc::TensorDesc(cutensorHandle_t handle, int64_t nrank, int64_t dims[],
                        cutensorDataType_t dtype, unsigned align) {
+  QDK_LOG_TRACE_ENTERING();
   // Row Major Data
   auto stride = make_row_major_strides(nrank, dims);
   CUTENSOR_CHECK(cutensorCreateTensorDescriptor(handle, &desc_, nrank, dims,
@@ -42,6 +46,7 @@ TensorDesc::TensorDesc(cutensorHandle_t handle, int64_t nrank, int64_t dims[],
 TensorDesc::TensorDesc(cutensorHandle_t handle, int64_t nrank, int64_t dims[],
                        int64_t strides[], cutensorDataType_t dtype,
                        unsigned align) {
+  QDK_LOG_TRACE_ENTERING();
   CUTENSOR_CHECK(cutensorCreateTensorDescriptor(handle, &desc_, nrank, dims,
                                                 strides, dtype, align));
 }
@@ -50,13 +55,17 @@ TensorDesc::~TensorDesc() noexcept {
   CUTENSOR_CHECK_ABORT(cutensorDestroyTensorDescriptor(desc_));
 }
 
-TensorHandle::TensorHandle() { CUTENSOR_CHECK(cutensorCreate(&handle_)); }
+TensorHandle::TensorHandle() {
+  QDK_LOG_TRACE_ENTERING();
+  CUTENSOR_CHECK(cutensorCreate(&handle_));
+}
 
 TensorHandle::~TensorHandle() noexcept {
   CUTENSOR_CHECK_ABORT(cutensorDestroy(handle_));
 }
 
 void ContractionData::create_contraction_() {
+  QDK_LOG_TRACE_ENTERING();
   CUTENSOR_CHECK(cutensorCreateContraction(
       *handle_, &descCont_, descA_->desc(), indA_.data(), CUTENSOR_OP_IDENTITY,
       descB_->desc(), indB_.data(), CUTENSOR_OP_IDENTITY, descC_->desc(),
@@ -65,11 +74,13 @@ void ContractionData::create_contraction_() {
 }
 
 void ContractionData::create_planpref_() {
+  QDK_LOG_TRACE_ENTERING();
   CUTENSOR_CHECK(cutensorCreatePlanPreference(*handle_, &planPref_, algo_,
                                               CUTENSOR_JIT_MODE_NONE));
 }
 
 uint64_t ContractionData::get_workspace_estimate_() {
+  QDK_LOG_TRACE_ENTERING();
   uint64_t workspaceEst;
   const cutensorWorksizePreference_t workspacePref = CUTENSOR_WORKSPACE_DEFAULT;
   CUTENSOR_CHECK(cutensorEstimateWorkspaceSize(*handle_, descCont_, planPref_,
@@ -78,11 +89,13 @@ uint64_t ContractionData::get_workspace_estimate_() {
 }
 
 void ContractionData::create_plan_(uint64_t workspace_est) {
+  QDK_LOG_TRACE_ENTERING();
   CUTENSOR_CHECK(cutensorCreatePlan(*handle_, &plan_, descCont_, planPref_,
                                     workspace_est));
 }
 
 void ContractionData::allocate_workspace_() {
+  QDK_LOG_TRACE_ENTERING();
   CUTENSOR_CHECK(cutensorPlanGetAttribute(
       *handle_, plan_, CUTENSOR_PLAN_REQUIRED_WORKSPACE, &workspace_sz_,
       sizeof(workspace_sz_)));
@@ -106,6 +119,7 @@ ContractionData::ContractionData(tensor_hndl_ptr handle, tensor_desc_ptr descA,
       indB_(indB),
       indC_(indC),
       algo_(algo) {
+  QDK_LOG_TRACE_ENTERING();
   create_contraction_();
   create_planpref_();
   create_plan_(get_workspace_estimate_());
@@ -121,6 +135,7 @@ ContractionData::~ContractionData() noexcept {
 
 void ContractionData::contract(double alpha, const double* A, const double* B,
                                double beta, double* C, cudaStream_t stream) {
+  QDK_LOG_TRACE_ENTERING();
   CUTENSOR_CHECK(cutensorContract(*handle_, plan_, &alpha, A, B, &beta, C, C,
                                   workspace_, workspace_sz_, stream));
 }

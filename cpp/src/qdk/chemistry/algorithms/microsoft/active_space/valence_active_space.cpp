@@ -7,11 +7,14 @@
 #include <algorithm>
 #include <iostream>
 #include <numeric>
+#include <qdk/chemistry/utils/logger.hpp>
 
 namespace qdk::chemistry::algorithms::microsoft {
 
 std::shared_ptr<data::Wavefunction> ValenceActiveSpaceSelector::_run_impl(
     std::shared_ptr<data::Wavefunction> wavefunction) const {
+  QDK_LOG_TRACE_ENTERING();
+
   // If orbitals already have an active space, we'll downselect from it
   // If not, we'll work with all orbitals
 

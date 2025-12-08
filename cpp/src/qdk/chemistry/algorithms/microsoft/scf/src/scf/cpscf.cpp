@@ -4,10 +4,10 @@
 
 #include <qdk/chemistry/scf/core/moeri.h>
 #include <qdk/chemistry/scf/exc/gauxc_impl.h>
-#include <spdlog/spdlog.h>
 
 #include <blas.hh>
 #include <lapack.hh>
+#include <qdk/chemistry/utils/logger.hpp>
 
 #include "scf/ks_impl.h"
 #include "scf/scf_impl.h"
@@ -16,6 +16,7 @@
 
 namespace qdk::chemistry::scf {
 void SCFImpl::polarizability_() {
+  QDK_LOG_TRACE_ENTERING();
   std::array<double, 9> polarizability;
 
 #ifdef QDK_CHEMISTRY_ENABLE_MPI
@@ -58,8 +59,8 @@ void SCFImpl::polarizability_() {
     Eigen::VectorXd X_vec = Eigen::VectorXd::Zero(nov);
 
     if (ctx_.cfg->mpi.world_rank == 0) {
-      spdlog::info("CPHF iteration for direction {}",
-                   xyz_1d);  // forming R^x = u_ai
+      QDK_LOGGER().info("CPHF iteration for direction {}",
+                        xyz_1d);  // forming R^x = u_ai
 
       // R_{ia} = \Sum_{uv} C_{ui} Dipole_{uv} C_{av}
       // (C is row-major, temp matrix is column-major, R_vec has
@@ -145,19 +146,20 @@ void SCFImpl::polarizability_() {
       3.0;
 
   if (ctx_.cfg->mpi.world_rank == 0) {
-    spdlog::info("Polarizability (a.u.): ");
+    QDK_LOGGER().info("Polarizability (a.u.): ");
     for (auto i = 0; i < 3; ++i) {
-      spdlog::info("{:.12f}, {:.12f}, {:.12f}",
-                   ctx_.result.scf_polarizability[i * 3],
-                   ctx_.result.scf_polarizability[i * 3 + 1],
-                   ctx_.result.scf_polarizability[i * 3 + 2]);
+      QDK_LOGGER().info("{:.12f}, {:.12f}, {:.12f}",
+                        ctx_.result.scf_polarizability[i * 3],
+                        ctx_.result.scf_polarizability[i * 3 + 1],
+                        ctx_.result.scf_polarizability[i * 3 + 2]);
     }
-    spdlog::info("Isotropic polarizability (a.u.): {:.12f}",
-                 ctx_.result.scf_isotropic_polarizability);
+    QDK_LOGGER().info("Isotropic polarizability (a.u.): {:.12f}",
+                      ctx_.result.scf_isotropic_polarizability);
   }
 }
 
 void SCFImpl::cpscf_(const double* R_input, double* X_sol) {
+  QDK_LOG_TRACE_ENTERING();
   AutoTimer __timer("polarizability:: cpscf");
   const size_t num_alpha = nelec_[0];
   const size_t num_alpha_virtual_orbitals = num_molecular_orbitals_ - num_alpha;
@@ -393,6 +395,7 @@ void SCFImpl::cpscf_(const double* R_input, double* X_sol) {
 }
 
 void SCFImpl::update_trial_fock_() {
+  QDK_LOG_TRACE_ENTERING();
   AutoTimer __timer("polarizability::  SCFImpl::update_trial_fock");
   auto [alpha, beta, omega] = get_hyb_coeff_();
   eri_->build_JK(tP_.data(), tJ_.data(), tK_.data(), alpha, beta, omega);
@@ -415,6 +418,7 @@ void SCFImpl::update_trial_fock_() {
 }
 
 void KSImpl::update_trial_fock_() {
+  QDK_LOG_TRACE_ENTERING();
   AutoTimer __timer("polarizability::  KSImpl::update_trial_fock_");
   SCFImpl::update_trial_fock_();
   // tP is row-major but does not affect since tPa and tPb is symmetric here
