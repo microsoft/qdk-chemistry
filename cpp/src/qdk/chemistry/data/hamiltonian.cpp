@@ -87,10 +87,35 @@ bool HamiltonianContainer::has_one_body_integrals() const {
          _one_body_integrals.first->cols() > 0;
 }
 
+double HamiltonianContainer::get_one_body_element(unsigned i, unsigned j,
+                                         SpinChannel channel) const {
+  if (!has_one_body_integrals()) {
+    throw std::runtime_error("One-body integrals are not set");
+  }
+
+  size_t norb = _orbitals->get_active_space_indices().first.size();
+  if (i >= norb || j >= norb) {
+    throw std::out_of_range("Orbital index out of range");
+  }
+
+  // Select the appropriate integral based on spin channel
+  switch (channel) {
+    case SpinChannel::aa:
+      return (*_one_body_integrals.first)(i, j);
+    case SpinChannel::bb:
+      return (*_one_body_integrals.second)(i, j);
+    default:
+      throw std::invalid_argument(
+          "Invalid spin channel for one-body integrals");
+  }
+}
 
 bool HamiltonianContainer::has_inactive_fock_matrix() const {
-  return _inactive_fock_matrix.first != nullptr &&
-         _inactive_fock_matrix.first->size() > 0;
+  bool has_alpha = _inactive_fock_matrix.first != nullptr &&
+                   _inactive_fock_matrix.first->size() > 0;
+  bool has_beta = _inactive_fock_matrix.second != nullptr &&
+                  _inactive_fock_matrix.second->size() > 0;
+  return has_alpha && has_beta;
 }
 
 std::pair<const Eigen::MatrixXd&, const Eigen::MatrixXd&>

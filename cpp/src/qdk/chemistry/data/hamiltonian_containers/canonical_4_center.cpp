@@ -253,6 +253,8 @@ nlohmann::json Canonical4CenterHamiltonian::to_json() const {
   // Store one-body integrals
   if (has_one_body_integrals()) {
     j["has_one_body_integrals"] = true;
+
+    // Store alpha one-body integrals
     std::vector<std::vector<double>> one_body_alpha_vec;
     for (int i = 0; i < _one_body_integrals.first->rows(); ++i) {
       std::vector<double> row;
@@ -263,7 +265,7 @@ nlohmann::json Canonical4CenterHamiltonian::to_json() const {
     }
     j["one_body_integrals_alpha"] = one_body_alpha_vec;
 
-    // For unrestricted case, store beta integrals separately
+    // Store beta one-body integrals (only if unrestricted)
     if (is_unrestricted()) {
       std::vector<std::vector<double>> one_body_beta_vec;
       for (int i = 0; i < _one_body_integrals.second->rows(); ++i) {
@@ -283,26 +285,32 @@ nlohmann::json Canonical4CenterHamiltonian::to_json() const {
   // Store two-body integrals
   if (has_two_body_integrals()) {
     j["has_two_body_integrals"] = true;
+
+    // Store as object {"aaaa": [...], "aabb": [...], "bbbb": [...]}
+    nlohmann::json two_body_obj;
+
+    // Store aaaa
     std::vector<double> two_body_aaaa_vec;
     for (int i = 0; i < std::get<0>(_two_body_integrals)->size(); ++i) {
       two_body_aaaa_vec.push_back((*std::get<0>(_two_body_integrals))(i));
     }
-    j["two_body_integrals_aaaa"] = two_body_aaaa_vec;
+    two_body_obj["aaaa"] = two_body_aaaa_vec;
 
-    // For unrestricted case, store aabb and bbbb integrals separately
-    if (is_unrestricted()) {
-      std::vector<double> two_body_aabb_vec;
-      for (int i = 0; i < std::get<1>(_two_body_integrals)->size(); ++i) {
-        two_body_aabb_vec.push_back((*std::get<1>(_two_body_integrals))(i));
-      }
-      j["two_body_integrals_aabb"] = two_body_aabb_vec;
-
-      std::vector<double> two_body_bbbb_vec;
-      for (int i = 0; i < std::get<2>(_two_body_integrals)->size(); ++i) {
-        two_body_bbbb_vec.push_back((*std::get<2>(_two_body_integrals))(i));
-      }
-      j["two_body_integrals_bbbb"] = two_body_bbbb_vec;
+    // Store aabb
+    std::vector<double> two_body_aabb_vec;
+    for (int i = 0; i < std::get<1>(_two_body_integrals)->size(); ++i) {
+      two_body_aabb_vec.push_back((*std::get<1>(_two_body_integrals))(i));
     }
+    two_body_obj["aabb"] = two_body_aabb_vec;
+
+    // Store bbbb
+    std::vector<double> two_body_bbbb_vec;
+    for (int i = 0; i < std::get<2>(_two_body_integrals)->size(); ++i) {
+      two_body_bbbb_vec.push_back((*std::get<2>(_two_body_integrals))(i));
+    }
+    two_body_obj["bbbb"] = two_body_bbbb_vec;
+
+    j["two_body_integrals"] = two_body_obj;
   } else {
     j["has_two_body_integrals"] = false;
   }
@@ -310,6 +318,7 @@ nlohmann::json Canonical4CenterHamiltonian::to_json() const {
   // Store inactive Fock matrix
   if (has_inactive_fock_matrix()) {
     j["has_inactive_fock_matrix"] = true;
+    // Store alpha inactive Fock matrix
     std::vector<std::vector<double>> inactive_fock_alpha_vec;
     for (int i = 0; i < _inactive_fock_matrix.first->rows(); ++i) {
       std::vector<double> row;
@@ -321,7 +330,7 @@ nlohmann::json Canonical4CenterHamiltonian::to_json() const {
     }
     j["inactive_fock_matrix_alpha"] = inactive_fock_alpha_vec;
 
-    // For unrestricted case, store beta Fock matrix separately
+    // Store beta inactive Fock matrix (only if unrestricted)
     if (is_unrestricted()) {
       std::vector<std::vector<double>> inactive_fock_beta_vec;
       for (int i = 0; i < _inactive_fock_matrix.second->rows(); ++i) {
@@ -361,7 +370,7 @@ Canonical4CenterHamiltonian::from_json(const nlohmann::json& j) {
     // Load metadata
     double core_energy = j.value("core_energy", 0.0);
 
-    // Load Hamiltonian type (default to Hermitian for backward compatibility)
+    // Load Hamiltonian type
     HamiltonianType type = HamiltonianType::Hermitian;
     if (j.contains("type")) {
       std::string type_str = j["type"].get<std::string>();
@@ -370,9 +379,91 @@ Canonical4CenterHamiltonian::from_json(const nlohmann::json& j) {
       }
     }
 
-    // Load restrictedness information (default to true for backward
-    // compatibility)
+    // Determine if the saved Hamiltonian was restricted or unrestricted
     bool is_restricted_data = j.value("is_restricted", true);
+
+    // Helper function to load matrix from JSON
+    auto load_matrix =
+        [](const nlohmann::json& matrix_json) -> Eigen::MatrixXd {
+      auto matrix_vec = matrix_json.get<std::vector<std::vector<double>>>();
+      int rows = matrix_vec.size();
+      int cols = rows > 0 ? matrix_vec[0].size() : 0;
+      Eigen::MatrixXd matrix(rows, cols);
+      for (int i = 0; i < rows; ++i) {
+        for (int j_idx = 0; j_idx < cols; ++j_idx) {
+          matrix(i, j_idx) = matrix_vec[i][j_idx];
+        }
+      }
+      return matrix;
+    };
+
+    // Helper function to load vector from JSON
+    auto load_vector =
+        [](const nlohmann::json& vector_json) -> Eigen::VectorXd {
+      auto vector_vec = vector_json.get<std::vector<double>>();
+      Eigen::VectorXd vector(vector_vec.size());
+      for (size_t i = 0; i < vector_vec.size(); ++i) {
+        vector(i) = vector_vec[i];
+      }
+      return vector;
+    };
+
+    // Load one-body integrals
+    Eigen::MatrixXd one_body_alpha, one_body_beta;
+    if (j.value("has_one_body_integrals", false)) {
+      if (j.contains("one_body_integrals_alpha")) {
+        one_body_alpha = load_matrix(j["one_body_integrals_alpha"]);
+      }
+
+      if (is_restricted_data) {
+        one_body_beta = one_body_alpha;
+      } else if (j.contains("one_body_integrals_beta")) {
+        one_body_beta = load_matrix(j["one_body_integrals_beta"]);
+      } else {
+        throw std::runtime_error("Should have beta integrals, if unrestricted");
+      }
+    }
+
+    // Load two-body integrals
+    Eigen::VectorXd two_body_aaaa, two_body_aabb, two_body_bbbb;
+    bool has_two_body = j.value("has_two_body_integrals", false);
+    if (has_two_body) {
+      if (!j.contains("two_body_integrals")) {
+        throw std::runtime_error("Two-body integrals data not found in JSON");
+      }
+
+      auto two_body_obj = j["two_body_integrals"];
+      if (!two_body_obj.is_object()) {
+        throw std::runtime_error(
+            "two_body_integrals must be an object with aaaa, aabb, bbbb keys");
+      }
+
+      if (!two_body_obj.contains("aaaa") || !two_body_obj.contains("aabb") ||
+          !two_body_obj.contains("bbbb")) {
+        throw std::runtime_error(
+            "two_body_integrals must contain aaaa, aabb, and bbbb keys");
+      }
+
+      two_body_aaaa = load_vector(two_body_obj["aaaa"]);
+      two_body_aabb = load_vector(two_body_obj["aabb"]);
+      two_body_bbbb = load_vector(two_body_obj["bbbb"]);
+    }
+
+    // Load inactive Fock matrix
+
+    Eigen::MatrixXd inactive_fock_alpha, inactive_fock_beta;
+    bool has_inactive_fock = j.value("has_inactive_fock_matrix", false);
+    if (has_inactive_fock) {
+      if (j.contains("inactive_fock_matrix_alpha")) {
+        inactive_fock_alpha = load_matrix(j["inactive_fock_matrix_alpha"]);
+      }
+
+      if (is_restricted_data) {
+        inactive_fock_beta = inactive_fock_alpha;
+      } else if (j.contains("inactive_fock_matrix_beta")) {
+        inactive_fock_beta = load_matrix(j["inactive_fock_matrix_beta"]);
+      }
+    }
 
     // Load orbital data
     if (!j.value("has_orbitals", false)) {
@@ -380,146 +471,10 @@ Canonical4CenterHamiltonian::from_json(const nlohmann::json& j) {
     }
     auto orbitals = Orbitals::from_json(j["orbitals"]);
 
-    // Load integral data based on restrictedness
-    Eigen::MatrixXd one_body_alpha, one_body_beta;
-    Eigen::VectorXd two_body_aaaa, two_body_aabb, two_body_bbbb;
-    Eigen::MatrixXd inactive_fock_alpha, inactive_fock_beta;
-
-    // Load one-body integrals
-    if (j.value("has_one_body_integrals", false)) {
-      // Try new format first (with alpha/beta labels)
-      if (j.contains("one_body_integrals_alpha")) {
-        auto one_body_alpha_vec = j["one_body_integrals_alpha"]
-                                      .get<std::vector<std::vector<double>>>();
-        int rows = one_body_alpha_vec.size();
-        int cols = rows > 0 ? one_body_alpha_vec[0].size() : 0;
-        one_body_alpha.resize(rows, cols);
-        for (int i = 0; i < rows; ++i) {
-          for (int j_idx = 0; j_idx < cols; ++j_idx) {
-            one_body_alpha(i, j_idx) = one_body_alpha_vec[i][j_idx];
-          }
-        }
-
-        // For unrestricted, load beta separately
-        if (!is_restricted_data && j.contains("one_body_integrals_beta")) {
-          auto one_body_beta_vec = j["one_body_integrals_beta"]
-                                       .get<std::vector<std::vector<double>>>();
-          int rows_beta = one_body_beta_vec.size();
-          int cols_beta = rows_beta > 0 ? one_body_beta_vec[0].size() : 0;
-          one_body_beta.resize(rows_beta, cols_beta);
-          for (int i = 0; i < rows_beta; ++i) {
-            for (int j_idx = 0; j_idx < cols_beta; ++j_idx) {
-              one_body_beta(i, j_idx) = one_body_beta_vec[i][j_idx];
-            }
-          }
-        }
-      } else if (j.contains("one_body_integrals")) {
-        // Backward compatibility: old format without alpha/beta labels
-        // This is always restricted format
-        auto one_body_vec =
-            j["one_body_integrals"].get<std::vector<std::vector<double>>>();
-        int rows = one_body_vec.size();
-        int cols = rows > 0 ? one_body_vec[0].size() : 0;
-        one_body_alpha.resize(rows, cols);
-        for (int i = 0; i < rows; ++i) {
-          for (int j_idx = 0; j_idx < cols; ++j_idx) {
-            one_body_alpha(i, j_idx) = one_body_vec[i][j_idx];
-          }
-        }
-      }
-    }
-
-    // Load two-body integrals
-    if (j.value("has_two_body_integrals", false)) {
-      // Try new format first (with aaaa/aabb/bbbb labels)
-      if (j.contains("two_body_integrals_aaaa")) {
-        auto two_body_aaaa_vec =
-            j["two_body_integrals_aaaa"].get<std::vector<double>>();
-        two_body_aaaa.resize(two_body_aaaa_vec.size());
-        for (size_t i = 0; i < two_body_aaaa_vec.size(); ++i) {
-          two_body_aaaa(i) = two_body_aaaa_vec[i];
-        }
-
-        // For unrestricted, load aabb and bbbb separately
-        if (!is_restricted_data) {
-          if (j.contains("two_body_integrals_aabb")) {
-            auto two_body_aabb_vec =
-                j["two_body_integrals_aabb"].get<std::vector<double>>();
-            two_body_aabb.resize(two_body_aabb_vec.size());
-            for (size_t i = 0; i < two_body_aabb_vec.size(); ++i) {
-              two_body_aabb(i) = two_body_aabb_vec[i];
-            }
-          }
-          if (j.contains("two_body_integrals_bbbb")) {
-            auto two_body_bbbb_vec =
-                j["two_body_integrals_bbbb"].get<std::vector<double>>();
-            two_body_bbbb.resize(two_body_bbbb_vec.size());
-            for (size_t i = 0; i < two_body_bbbb_vec.size(); ++i) {
-              two_body_bbbb(i) = two_body_bbbb_vec[i];
-            }
-          }
-        }
-      } else if (j.contains("two_body_integrals")) {
-        // Backward compatibility: old format without spin labels
-        // This is always restricted format
-        auto two_body_vec = j["two_body_integrals"].get<std::vector<double>>();
-        two_body_aaaa.resize(two_body_vec.size());
-        for (size_t i = 0; i < two_body_vec.size(); ++i) {
-          two_body_aaaa(i) = two_body_vec[i];
-        }
-      }
-    }
-
-    // Load inactive Fock matrix
-    if (j.value("has_inactive_fock_matrix", false)) {
-      // Try new format first (with alpha/beta labels)
-      if (j.contains("inactive_fock_matrix_alpha")) {
-        auto inactive_fock_alpha_vec =
-            j["inactive_fock_matrix_alpha"]
-                .get<std::vector<std::vector<double>>>();
-        int rows = inactive_fock_alpha_vec.size();
-        int cols = rows > 0 ? inactive_fock_alpha_vec[0].size() : 0;
-        inactive_fock_alpha.resize(rows, cols);
-        for (int i = 0; i < rows; ++i) {
-          for (int j_idx = 0; j_idx < cols; ++j_idx) {
-            inactive_fock_alpha(i, j_idx) = inactive_fock_alpha_vec[i][j_idx];
-          }
-        }
-
-        // For unrestricted, load beta separately
-        if (!is_restricted_data && j.contains("inactive_fock_matrix_beta")) {
-          auto inactive_fock_beta_vec =
-              j["inactive_fock_matrix_beta"]
-                  .get<std::vector<std::vector<double>>>();
-          int rows_beta = inactive_fock_beta_vec.size();
-          int cols_beta = rows_beta > 0 ? inactive_fock_beta_vec[0].size() : 0;
-          inactive_fock_beta.resize(rows_beta, cols_beta);
-          for (int i = 0; i < rows_beta; ++i) {
-            for (int j_idx = 0; j_idx < cols_beta; ++j_idx) {
-              inactive_fock_beta(i, j_idx) = inactive_fock_beta_vec[i][j_idx];
-            }
-          }
-        }
-      } else if (j.contains("inactive_fock_matrix")) {
-        // Backward compatibility: old format without alpha/beta labels
-        // This is always restricted format
-        auto inactive_fock_vec =
-            j["inactive_fock_matrix"].get<std::vector<std::vector<double>>>();
-        int rows = inactive_fock_vec.size();
-        int cols = rows > 0 ? inactive_fock_vec[0].size() : 0;
-        inactive_fock_alpha.resize(rows, cols);
-        for (int i = 0; i < rows; ++i) {
-          for (int j_idx = 0; j_idx < cols; ++j_idx) {
-            inactive_fock_alpha(i, j_idx) = inactive_fock_vec[i][j_idx];
-          }
-        }
-      }
-    }
-
     // Validate consistency: if orbitals have inactive indices,
     // then inactive fock matrix must be present
     if (orbitals->has_inactive_space()) {
-      if (inactive_fock_alpha.size() == 0) {
+      if (!has_inactive_fock) {
         auto inactive_indices = orbitals->get_inactive_space_indices();
         size_t total_inactive =
             inactive_indices.first.size() + inactive_indices.second.size();
@@ -540,7 +495,7 @@ Canonical4CenterHamiltonian::from_json(const nlohmann::json& j) {
       }
     }
 
-    // Create Hamiltonian with loaded data using appropriate constructor
+    // Create and return appropriate Hamiltonian using the correct constructor
     if (is_restricted_data) {
       // Use restricted constructor - it will create shared pointers internally
       // so alpha and beta point to the same data
@@ -768,6 +723,12 @@ Canonical4CenterHamiltonian::from_hdf5(H5::Group& group) {
 void Canonical4CenterHamiltonian::_to_fcidump_file(const std::string& filename,
                                                    size_t nalpha,
                                                    size_t nbeta) const {
+  // Check if this is an unrestricted Hamiltonian and throw error
+  if (is_unrestricted()) {
+    throw std::runtime_error(
+        "FCIDUMP format is not supported for unrestricted Hamiltonians.");
+  }
+
   std::ofstream file(filename);
   if (!file.is_open()) {
     throw std::runtime_error("Cannot open file for writing: " + filename);
@@ -776,9 +737,19 @@ void Canonical4CenterHamiltonian::_to_fcidump_file(const std::string& filename,
   size_t num_molecular_orbitals;
   if (has_orbitals()) {
     if (_orbitals->has_active_space()) {
+      auto active_indices = _orbitals->get_active_space_indices();
+      size_t n_active_alpha = active_indices.first.size();
+      size_t n_active_beta = active_indices.second.size();
+
+      // For restricted case, alpha and beta should be the same
+      if (n_active_alpha != n_active_beta) {
+        throw std::invalid_argument(
+            "For restricted Hamiltonian, alpha and beta active spaces must "
+            "have "
+            "same size");
+      }
       num_molecular_orbitals =
-          _orbitals->get_active_space_indices()
-              .first.size();  // TODO: Assumes the same indices for alpha/beta
+          n_active_alpha;  // Can use either alpha or beta since they're equal
     } else {
       num_molecular_orbitals = _orbitals->get_num_molecular_orbitals();
     }
