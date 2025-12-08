@@ -27,35 +27,26 @@ The :class:`~qdk_chemistry.algorithms.QubitMapper` in QDK/Chemistry provides:
 Creating a QubitMapper
 ----------------------
 
-The :class:`~qdk_chemistry.algorithms.QubitMapper` is created using the :doc:`factory pattern <../advanced/factory_pattern>`.
+The :class:`~qdk_chemistry.algorithms.QubitMapper` is created using the :doc:`factory pattern <../design/factory_pattern>`.
 
 .. tab:: Python API
 
-   .. literalinclude:: ../../../../examples/qubit_mapper.py
+   .. literalinclude:: ../../../_static/examples/python/qubit_mapper.py
       :language: python
-      :lines: 3-10
+      :start-after: # start-cell-create
+      :end-before: # end-cell-create
 
 Mapping a Hamiltonian
 ----------------------
 
-This mapper is used to create a :doc:`QubitHamiltonian <../data/qubit_hamiltonian>` object from a :doc:`Hamiltonian <../data/hamiltonian>`.
+This mapper is used to create a :class:`~qdk_chemistry.data.QubitHamiltonian` object from a :class:`~qdk_chemistry.data.Hamiltonian`.
 
 .. tab:: Python API
 
-   .. code-block:: python
-
-      # --------------------------------------------------------------------------------------------
-      # Copyright (c) Microsoft Corporation. All rights reserved.
-      # Licensed under the MIT License. See LICENSE.txt in the project root for license information.
-      # --------------------------------------------------------------------------------------------
-
-      from qdk_chemistry.data import Hamiltonian
-
-      # Obtain a valid Hamiltonian instance
-      hamiltonian = Hamiltonian.from_json_file("molecule.hamiltonian.json")
-
-      # Map the Hamiltonian to a QubitHamiltonian
-      qubit_hamiltonian = mapper.run(hamiltonian)
+   .. literalinclude:: ../../../_static/examples/python/qubit_mapper.py
+      :language: python
+      :start-after: # start-cell-example
+      :end-before: # end-cell-example
 
 Available settings
 ------------------
@@ -91,7 +82,8 @@ based on the calculation requirements and available packages.
 
 For more details on how QDK/Chemistry interfaces with external packages, see the :doc:`Interfaces <../design/interfaces>` documentation.
 
-Related classes
+Further reading
 ---------------
 
+- The above examples can be downloaded as a complete `Python <../../../_static/examples/python/qubit_mapper.py>`_ script.
 - :doc:`Hamiltonian <../data/hamiltonian>`: Input Hamiltonian for mapping

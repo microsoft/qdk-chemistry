@@ -12,14 +12,15 @@ import numpy as np
 import pytest
 
 from qdk_chemistry import algorithms
+from qdk_chemistry.constants import ANGSTROM_TO_BOHR
 from qdk_chemistry.data import StabilityResult, Structure
 
 from .reference_tolerances import float_comparison_absolute_tolerance, float_comparison_relative_tolerance
 
 try:
-    import qdk_chemistry.plugins.pyscf  # noqa: F401
-    from qdk_chemistry.constants import ANGSTROM_TO_BOHR
+    import qdk_chemistry.plugins.pyscf as pyscf_plugin
 
+    pyscf_plugin.load()
     PYSCF_AVAILABLE = True
 except ImportError:
     PYSCF_AVAILABLE = False
@@ -585,7 +586,7 @@ class TestPyscfStabilityChecker:
         o2 = create_o2_structure()
         scf_solver = algorithms.create("scf_solver", "pyscf")
         scf_solver.settings().set("basis_set", "def2-svp")
-        scf_solver.settings().set("force_restricted", True)
+        scf_solver.settings().set("scf_type", "restricted")
         _, wavefunction = scf_solver.run(o2, 0, 3)
 
         # Perform stability analysis (only internal, since external not supported for ROHF)
@@ -794,7 +795,7 @@ class TestPyscfStabilityChecker:
         c2_plus = create_c2_plus_structure()
         scf_solver = algorithms.create("scf_solver", "pyscf")
         scf_solver.settings().set("basis_set", "def2-svp")
-        scf_solver.settings().set("force_restricted", True)  # Force ROHF
+        scf_solver.settings().set("scf_type", "restricted")  # Force ROHF
         _, wavefunction = scf_solver.run(c2_plus, 1, 2)  # charge=1, multiplicity=2
 
         # Perform stability analysis (only internal for ROHF)

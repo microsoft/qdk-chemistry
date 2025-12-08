@@ -63,7 +63,7 @@ Examples:
           R"(
 Set the resources directory path.
 
-Parameters:
+Args:
     path (str): The new resources directory path.
 
 Examples:

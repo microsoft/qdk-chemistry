@@ -19,7 +19,7 @@ namespace qdk::chemistry::data {
 
 enum class HamiltonianType { Hermitian, NonHermitian };
 
-enum class SpinChannel { aaaa, aabb, bbbb };
+enum class SpinChannel { aa, bb, aaaa, aabb, bbbb };
 
 /**
  * @class HamiltonianContainer
@@ -106,38 +106,28 @@ class HamiltonianContainer {
   virtual std::string get_container_type() const = 0;
 
   /**
-   * @brief Get one-electron integrals in MO basis
-   * @return Reference to one-electron integrals matrix
-   * @throws std::runtime_error if integrals are not set
-   */
-  const Eigen::MatrixXd& get_one_body_integrals() const;
-
-  /**
    * @brief Check if one-body integrals are available
    * @return True if one-body integrals are set
    */
   bool has_one_body_integrals() const;
 
   /**
-   * @brief Get alpha one-electron integrals in MO basis
-   * @return Reference to alpha one-electron integrals matrix
+   * @brief Get tuple of alpha, beta one-electron integrals in MO basis
+   * @return Reference to alpha, beta one-electron integrals matrices
    * @throws std::runtime_error if integrals are not set
    */
-  const Eigen::MatrixXd& get_one_body_integrals_alpha() const;
+  std::tuple<const Eigen::MatrixXd&, const Eigen::MatrixXd&>
+  get_one_body_integrals() const;
 
   /**
-   * @brief Get beta one-electron integrals in MO basis
-   * @return Reference to beta one-electron integrals matrix
+   * @brief Get two-electron integrals in MO basis for all spin channels
+   * @return Tuple of references to (aaaa, aabb, bbbb) two-electron integrals
+   * vectors
    * @throws std::runtime_error if integrals are not set
    */
-  const Eigen::MatrixXd& get_one_body_integrals_beta() const;
-
-  /**
-   * @brief Get two-electron integrals in MO basis
-   * @return Reference to two-electron integrals vector
-   * @throws std::runtime_error if integrals are not set
-   */
-  virtual const Eigen::VectorXd& get_two_body_integrals() const = 0;
+  virtual std::tuple<const Eigen::VectorXd&, const Eigen::VectorXd&,
+             const Eigen::VectorXd&>
+  get_two_body_integrals() const = 0;
 
   /**
    * @brief Get specific two-electron integral element
@@ -161,27 +151,6 @@ class HamiltonianContainer {
   virtual bool has_two_body_integrals() const = 0;
 
   /**
-   * @brief Get alpha-alpha two-electron integrals in MO basis
-   * @return Reference to alpha-alpha two-electron integrals vector
-   * @throws std::runtime_error if integrals are not set
-   */
-  virtual const Eigen::VectorXd& get_two_body_integrals_aaaa() const = 0;
-
-  /**
-   * @brief Get alpha-beta two-electron integrals in MO basis
-   * @return Reference to alpha-beta two-electron integrals vector
-   * @throws std::runtime_error if integrals are not set
-   */
-  virtual const Eigen::VectorXd& get_two_body_integrals_aabb() const = 0;
-
-  /**
-   * @brief Get beta-beta two-electron integrals in MO basis
-   * @return Reference to beta-beta two-electron integrals vector
-   * @throws std::runtime_error if integrals are not set
-   */
-  virtual const Eigen::VectorXd& get_two_body_integrals_bbbb() const = 0;
-
-  /**
    * @brief Get inactive Fock matrix for the selected active space
    * @return Reference to the inactive Fock matrix
    * @throws std::runtime_error if inactive Fock matrix is not set
@@ -194,20 +163,6 @@ class HamiltonianContainer {
    * @return True if inactive Fock matrix is set
    */
   bool has_inactive_fock_matrix() const;
-
-  /**
-   * @brief Get alpha inactive Fock matrix for the selected active space
-   * @return Reference to the alpha inactive Fock matrix
-   * @throws std::runtime_error if inactive Fock matrix is not set
-   */
-  const Eigen::MatrixXd& get_inactive_fock_matrix_alpha() const;
-
-  /**
-   * @brief Get beta inactive Fock matrix for the selected active space
-   * @return Reference to the beta inactive Fock matrix
-   * @throws std::runtime_error if inactive Fock matrix is not set
-   */
-  const Eigen::MatrixXd& get_inactive_fock_matrix_beta() const;
 
   /**
    * @brief Get molecular orbital data

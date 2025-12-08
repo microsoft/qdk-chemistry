@@ -11,43 +11,44 @@ Instead, model Hamiltonians are defined directly in terms of their parameters.
 Creating model Hamiltonians
 ----------------------------
 
-To define a model Hamiltonian in QDK/Chemistry, users can utilize the ``ModelOrbitals`` class, which is a simplified version of the :doc:`Orbitals <data/orbitals>` class that doesn't require basis set information or molecular orbital coefficients.
+To define a model Hamiltonian in QDK/Chemistry, users can utilize the :class:`~qdk_chemistry.data.ModelOrbitals` class, which is a simplified version of the :doc:`Orbitals <data/orbitals>` class that doesn't require basis set information or molecular orbital coefficients.
 This is particularly useful for studying model systems like Hubbard models, Heisenberg models, or other phenomenological Hamiltonians.
 
 Example: Hubbard model Hamiltonian
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-The following example demonstrates how to create a simple Hubbard model Hamiltonian using ``ModelOrbitals`` and the ``Hamiltonian`` class:
+The following example demonstrates how to create a simple Hubbard model Hamiltonian using :class:`~qdk_chemistry.data.ModelOrbitals` and the :class:`~qdk_chemistry.data.Hamiltonian` class:
 
 .. tab:: Python API
 
-   .. literalinclude:: ../../../examples/model_hamiltonian.py
+   .. literalinclude:: ../../_static/examples/python/model_hamiltonians.py
       :language: python
-      :start-after: # start-cell-1
-      :end-before: # end-cell-1
+      :start-after: # start-cell-create-hubbard
+      :end-before: # end-cell-create-hubbard
 
 
 Using model Hamiltonians with algorithms
 -----------------------------------------
 
-Model Hamiltonians created with ``ModelOrbitals`` can be used with any QDK/Chemistry algorithm that accepts :doc:`Hamiltonian <data/hamiltonian>` objects, including:
+Model Hamiltonians created with :class:`~qdk_chemistry.data.ModelOrbitals` can be used with any QDK/Chemistry algorithm that accepts :doc:`Hamiltonian <data/hamiltonian>` objects, including:
 
 * :doc:`Multi-configuration calculators <algorithms/mc_calculator>` (:term:`FCI`, :term:`ASCI`, etc.)
-* :class:`~qdk_chemistry.algorithms.CoupledClusterCalculator` (:term:`CCSD`, :term:`CCSD(T)`, etc.)
+* :class:`~qdk_chemistry.algorithms.DynamicalCorrelationCalculator` (:term:`CCSD`, :term:`CCSD(T)`, etc.)
 * Quantum algorithm interfaces (:term:`VQE`, :term:`QPE`, etc.)
 
 Example with multi-configuration calculator:
 
 .. tab:: Python API
 
-   .. literalinclude:: ../../../examples/model_hamiltonian.py
+   .. literalinclude:: ../../_static/examples/python/model_hamiltonians.py
       :language: python
-      :start-after: # start-cell-2
-      :end-before: # end-cell-2
+      :start-after: # start-cell-solve-hubbard
+      :end-before: # end-cell-solve-hubbard
 
-See also
---------
+Further reading
+---------------
 
+* The above examples can be downloaded as a complete `Python <../../_static/examples/python/model_hamiltonians.py>`_ script.
 * :doc:`data/orbitals` - Full Orbitals class documentation
 * :doc:`data/hamiltonian` - Hamiltonian class documentation
 * :doc:`algorithms/mc_calculator` - Multi-configuration calculator usage

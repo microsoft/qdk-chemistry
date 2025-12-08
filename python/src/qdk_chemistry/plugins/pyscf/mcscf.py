@@ -50,7 +50,6 @@ from pyscf import ao2mo, gto, mcscf
 from qdk_chemistry.algorithms import (
     MultiConfigurationCalculator,
     MultiConfigurationScf,
-    register,
 )
 from qdk_chemistry.data import (
     CasWavefunctionContainer,
@@ -61,7 +60,9 @@ from qdk_chemistry.data import (
     Settings,
     Wavefunction,
 )
-from qdk_chemistry.plugins.pyscf.utils import orbitals_to_scf
+from qdk_chemistry.plugins.pyscf.utils import SCFType, orbitals_to_scf
+
+__all__ = ["PyscfMcscfCalculator", "PyscfMcscfSettings"]
 
 
 class _QdkMcSolverWrapper:
@@ -106,7 +107,7 @@ class _QdkMcSolverWrapper:
             nelec: Number of electrons in active space. Can be total electrons or (alpha, beta) tuple.
             ci0: Initial CI guess vector.
             ecore: Core energy contribution.
-            **kwargs: Additional keyword arguments.
+            kwargs: Additional keyword arguments.
 
         Returns:
             A tuple containing the total energy and CI coefficients.
@@ -168,7 +169,7 @@ class _QdkMcSolverWrapper:
             norb: Number of orbitals.
             nelec: Number of electrons.
             link_index: Link indices (PySCF internal parameter).
-            **kwargs: Additional keyword arguments.
+            kwargs: Additional keyword arguments.
 
         Returns:
             1-particle reduced density matrix.
@@ -193,7 +194,7 @@ class _QdkMcSolverWrapper:
             nelec: Number of electrons (can be total count or (alpha, beta) tuple).
             link_index: Link indices (PySCF internal parameter).
             reorder: Whether to reorder the density matrices.
-            **kwargs: Additional keyword arguments.
+            kwargs: Additional keyword arguments.
 
         Returns:
             A tuple containing (rdm1, rdm2) where rdm1 is the 1-particle
@@ -216,7 +217,7 @@ class _QdkMcSolverWrapper:
         return one_rdm, two_rdm
 
 
-def mcsolver_to_fcisolver(mol: Any, mc_calculator: MultiConfigurationCalculator) -> _QdkMcSolverWrapper:
+def _mcsolver_to_fcisolver(mol: Any, mc_calculator: MultiConfigurationCalculator) -> _QdkMcSolverWrapper:
     """Convert a QDK MultiConfigurationCalculator to a PySCF-compatible FCI solver.
 
     This function creates a wrapper that adapts a QDK MultiConfigurationCalculator
@@ -235,7 +236,7 @@ def mcsolver_to_fcisolver(mol: Any, mc_calculator: MultiConfigurationCalculator)
         >>> from pyscf import gto
         >>> mol = gto.M(atom='H 0 0 0; H 0 0 1.5', basis='sto-3g')
         >>> mc_calc = algorithms.create("multi_configuration_calculator", "macis_cas")
-        >>> fci_solver = mcsolver_to_fcisolver(mol, mc_calc)
+        >>> fci_solver = _mcsolver_to_fcisolver(mol, mc_calc)
         >>> # Now fci_solver can be used with PySCF CASSCF
         >>> from pyscf import mcscf
         >>> casscf = mcscf.CASSCF(mf, 2, 2)
@@ -346,13 +347,13 @@ class PyscfMcscfCalculator(MultiConfigurationScf):
                 n_active_beta_electrons -= 1
 
         # get pyscf scf object
-        pyscf_scf = orbitals_to_scf(orbitals, occ_alpha=alpha_occ, occ_beta=beta_occ, force_restricted=True)
+        pyscf_scf = orbitals_to_scf(orbitals, occ_alpha=alpha_occ, occ_beta=beta_occ, scf_type=SCFType.RESTRICTED)
 
         # Create CASSCF object
         pyscf_mcscf = mcscf.CASSCF(pyscf_scf, n_active_orbitals, n_active_electrons)
         mc_calculator.settings().set("calculate_one_rdm", True)
         mc_calculator.settings().set("calculate_two_rdm", True)
-        pyscf_mcscf.fcisolver = mcsolver_to_fcisolver(
+        pyscf_mcscf.fcisolver = _mcsolver_to_fcisolver(
             pyscf_scf.mol,
             mc_calculator,
         )
@@ -477,27 +478,3 @@ class PyscfMcscfCalculator(MultiConfigurationScf):
     def name(self) -> str:
         """Return the name of the MCSCF solver."""
         return "pyscf"
-
-
-def _create_pyscf_multi_configuration_scf():
-    """Factory function to create a PySCF MCSCF calculator instance.
-
-    Returns:
-        PyscfMcscfCalculator: A new instance of the PySCF MCSCF calculator.
-
-    """
-    return PyscfMcscfCalculator()
-
-
-def _register_pyscf_multi_configuration_scf():
-    """Register the PySCF MCSCF calculator with the QDK framework.
-
-    This function registers the PySCF MCSCF calculator factory with the QDK
-    MCSCF calculator registry, making it available for use through
-    the QDK plugin system.
-    """
-    register(_create_pyscf_multi_configuration_scf)
-
-
-# Initialize the calculator on module import
-_ = _register_pyscf_multi_configuration_scf()

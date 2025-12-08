@@ -18,7 +18,9 @@ from .reference_tolerances import float_comparison_relative_tolerance, mcscf_ene
 try:
     import pyscf  # noqa: F401
 
-    import qdk_chemistry.plugins.pyscf  # noqa: F401
+    import qdk_chemistry.plugins.pyscf as pyscf_plugin
+
+    pyscf_plugin.load()
 
     PYSCF_AVAILABLE = True
 except ImportError:
@@ -83,7 +85,7 @@ class TestMCSCF:
         # Perform SCF calculation with PySCF
         scf_solver = alg.create("scf_solver", "pyscf")
         scf_solver.settings().set("basis_set", "cc-pvdz")
-        scf_solver.settings().set("force_restricted", True)
+        scf_solver.settings().set("scf_type", "restricted")
         _, wavefunction = scf_solver.run(o2, 0, 3)
 
         # Construct QDK Hamiltonian for active space

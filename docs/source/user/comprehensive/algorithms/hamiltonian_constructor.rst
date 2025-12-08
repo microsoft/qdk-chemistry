@@ -27,55 +27,45 @@ The ``HamiltonianConstructor`` in QDK/Chemistry provides:
 
 Creating a HamiltonianConstructor
 ---------------------------------
-
 The ``HamiltonianConstructor`` is created using the factory pattern.
 This constructor is used to create a :doc:`Hamiltonian <../data/hamiltonian>` object from a set of :doc:`Orbitals <../data/orbitals>`.
 The orbitals provide the necessary information about the molecular system including the basis set, orbital coefficients, and electron occupations.
 
 .. tab:: C++ API
 
-   .. code-block:: cpp
-
-      #include <qdk/chemistry.hpp>
-      using namespace qdk::chemistry::algorithms;
-
-      // Create the default HamiltonianConstructor instance
-      auto hamiltonian_constructor = HamiltonianConstructorFactory::create();
+   .. literalinclude:: ../../../_static/examples/cpp/hamiltonian_constructor.cpp
+      :language: cpp
+      :start-after: // start-cell-create
+      :end-before: // end-cell-create
 
 .. tab:: Python API
 
-   .. literalinclude:: ../../../../examples/hamiltonian_constructor.py
+   .. literalinclude:: ../../../_static/examples/python/hamiltonian_constructor.py
       :language: python
-      :lines: 3-
+      :start-after: # start-cell-create
+      :end-before: # end-cell-create
 
 Configuring the Hamiltonian construction
 ----------------------------------------
 
-The ``HamiltonianConstructor`` can be configured using the ``Settings`` object with the following parameters.
+The ``HamiltonianConstructor`` can be configured using the ``Settings`` object to control how integrals are computed.
 
 .. note::
    All orbital indices in QDK/Chemistry are 0-based, following the convention used in most programming languages.
 
-.. note::
-   **Note on active orbitals:** When specifying active orbitals, the indices must be unique (no duplicates).
-
-.. note::
-   **Note on orbital spaces:** If no active orbitals are specified, the entire orbital space is used.
-   If no inactive orbitals are specified and active orbitals are provided, orbitals from index 0 up to the first active orbital are considered inactive.
-
 .. tab:: C++ API
 
-   .. code-block:: cpp
-
-      // Specify active orbitals for active space Hamiltonian
-      std::vector<int> active_orbitals = {4, 5, 6, 7}; // Example indices (0-based)
-      hamiltonian_constructor->settings().set("active_orbitals", active_orbitals);
+   .. literalinclude:: ../../../_static/examples/cpp/hamiltonian_constructor.cpp
+      :language: cpp
+      :start-after: // start-cell-configure
+      :end-before: // end-cell-configure
 
 .. tab:: Python API
 
-   .. literalinclude:: ../../../../examples/settings.py
+   .. literalinclude:: ../../../_static/examples/python/hamiltonian_constructor.py
       :language: python
-      :lines: 4-12
+      :start-after: # start-cell-configure
+      :end-before: # end-cell-configure
 
 Constructing the Hamiltonian
 ----------------------------
@@ -84,37 +74,26 @@ Once configured, the Hamiltonian can be constructed from a set of orbitals:
 
 .. tab:: C++ API
 
-   .. code-block:: cpp
-
-      // Obtain a valid Orbitals instance
-      Orbitals orbitals;
-      /* orbitals = ... */
-
-      // Construct the Hamiltonian
-      auto hamiltonian = hamiltonian_constructor->run(orbitals);
-
-      // Access the resulting integrals
-      auto h1 = hamiltonian.get_one_body_integrals();
-      auto h2 = hamiltonian.get_two_body_integrals();
+   .. literalinclude:: ../../../_static/examples/cpp/hamiltonian_constructor.cpp
+      :language: cpp
+      :start-after: // start-cell-construct
+      :end-before: // end-cell-construct
 
 .. tab:: Python API
 
    .. note::
-      This example shows the API pattern.
-      For complete working examples, see the test suite.
+      This example shows a complete working workflow including structure creation, SCF calculation, and Hamiltonian construction.
 
-   .. literalinclude:: ../../../../examples/factory_pattern.py
+   .. literalinclude:: ../../../_static/examples/python/hamiltonian_constructor.py
       :language: python
-      :lines: 1-9
+      :start-after: # start-cell-construct
+      :end-before: # end-cell-construct
 
 Available settings
 ------------------
 
 The ``HamiltonianConstructor`` accepts a range of settings to control its behavior.
 These settings are divided into base settings (common to all Hamiltonian construction) and specialized settings (specific to certain construction variants).
-
-Available settings
-~~~~~~~~~~~~~~~~~~
 
 These settings are available in the default ``HamiltonianConstructor``:
 
@@ -125,16 +104,17 @@ These settings are available in the default ``HamiltonianConstructor``:
    * - Setting
      - Type
      - Description
-   * - ``active_orbitals``
-     - vector<int>
-     - Indices of active orbitals (0-based, empty for full space)
-   * - ``inactive_orbitals``
-     - vector<int>
-     - Indices of inactive orbitals (0-based, empty for automatic detection)
+   * - ``eri_method``
+     - string
+     - Method for computing electron repulsion integrals ("direct" or "incore")
+   * - ``force_unrestricted``
+     - bool
+     - Force unrestricted calculation even for closed-shell systems (default: false)
 
-Related classes
+Further reading
 ---------------
 
+- The above examples can be downloaded as complete `Python <../../../_static/examples/python/hamiltonian_constructor.py>`_ or `C++ <../../../_static/examples/cpp/hamiltonian_constructor.cpp>`_ scripts.
 - :doc:`Orbitals <../data/orbitals>`: Input orbitals for Hamiltonian construction
 - :doc:`Hamiltonian <../data/hamiltonian>`: Output Hamiltonian representation
 - :doc:`ActiveSpaceSelector <active_space>`: Provides active orbital indices

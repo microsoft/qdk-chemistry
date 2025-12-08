@@ -99,13 +99,15 @@ std::string Canonical4CenterHamiltonian::get_container_type() const {
   return "canonical_4_center";
 }
 
-const Eigen::VectorXd& Canonical4CenterHamiltonian::get_two_body_integrals()
-    const {
+std::tuple<const Eigen::VectorXd&, const Eigen::VectorXd&,
+           const Eigen::VectorXd&>
+Canonical4CenterHamiltonian::get_two_body_integrals() const {
   if (!has_two_body_integrals()) {
     throw std::runtime_error("Two-body integrals are not set");
   }
-  return *std::get<0>(_two_body_integrals);  // Return alpha-alpha integrals for
-                                             // backward compatibility
+  return std::make_tuple(std::cref(*std::get<0>(_two_body_integrals)),
+                         std::cref(*std::get<1>(_two_body_integrals)),
+                         std::cref(*std::get<2>(_two_body_integrals)));
 }
 
 double Canonical4CenterHamiltonian::get_two_body_element(
@@ -144,30 +146,6 @@ size_t Canonical4CenterHamiltonian::get_two_body_index(size_t i, size_t j,
 bool Canonical4CenterHamiltonian::has_two_body_integrals() const {
   return std::get<0>(_two_body_integrals) != nullptr &&
          std::get<0>(_two_body_integrals)->size() > 0;
-}
-
-const Eigen::VectorXd&
-Canonical4CenterHamiltonian::get_two_body_integrals_aaaa() const {
-  if (!has_two_body_integrals()) {
-    throw std::runtime_error("Two-body integrals are not set");
-  }
-  return *std::get<0>(_two_body_integrals);
-}
-
-const Eigen::VectorXd&
-Canonical4CenterHamiltonian::get_two_body_integrals_aabb() const {
-  if (!has_two_body_integrals()) {
-    throw std::runtime_error("Two-body integrals are not set");
-  }
-  return *std::get<1>(_two_body_integrals);
-}
-
-const Eigen::VectorXd&
-Canonical4CenterHamiltonian::get_two_body_integrals_bbbb() const {
-  if (!has_two_body_integrals()) {
-    throw std::runtime_error("Two-body integrals are not set");
-  }
-  return *std::get<2>(_two_body_integrals);
 }
 
 bool Canonical4CenterHamiltonian::is_restricted() const {

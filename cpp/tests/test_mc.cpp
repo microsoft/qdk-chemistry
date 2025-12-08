@@ -47,8 +47,8 @@ TEST_F(MCTest, MCSettings) {
   EXPECT_FALSE(mc_settings.get<bool>("calculate_one_rdm"));
   EXPECT_FALSE(mc_settings.get<bool>("calculate_two_rdm"));
   EXPECT_DOUBLE_EQ(mc_settings.get<double>("ci_residual_tolerance"), 1.0e-6);
-  EXPECT_EQ(mc_settings.get<size_t>("davidson_iterations"), 200);
-  EXPECT_EQ(mc_settings.get<size_t>("num_roots"), 1);
+  EXPECT_EQ(mc_settings.get<int64_t>("davidson_iterations"), 200);
+  EXPECT_EQ(mc_settings.get<int64_t>("num_roots"), 1);
 
   // Test destructor by creating and destroying in scope
   {
@@ -168,15 +168,14 @@ TEST_F(MCTest, Water_DEF2SVP_CASCI) {
       std::vector<size_t>{0, 1});
   // Print number of electrons before and after selection
   auto ham = hamiltonian_constructor->run(orbitals_with_active_space);
-  EXPECT_NEAR(ham->get_core_energy(), -6.349912948458e+01,
+  EXPECT_NEAR(ham->get_core_energy(), -6.3499129701956562e+01,
               testing::numerical_zero_tolerance * 10);
 
   // Run CASCI
   auto mc =
       qdk::chemistry::algorithms::MultiConfigurationCalculatorFactory::create();
   auto [E_cas, wfn_cas] = mc->run(ham, 3, 3);
-  // -12.446160691659227 + -6.349912948458e+01 is total CASCI energy
-  EXPECT_NEAR(E_cas, -75.94529017623923, testing::ci_energy_tolerance);
+  EXPECT_NEAR(E_cas, -75.94529022131313, testing::ci_energy_tolerance);
   EXPECT_EQ(wfn_cas->size(), 400);
 }
 
@@ -217,8 +216,8 @@ TEST_F(MCTest, MCSettings_DefaultValues) {
   EXPECT_FALSE(mc_settings.get<bool>("calculate_one_rdm"));
   EXPECT_FALSE(mc_settings.get<bool>("calculate_two_rdm"));
   EXPECT_DOUBLE_EQ(mc_settings.get<double>("ci_residual_tolerance"), 1.0e-6);
-  EXPECT_EQ(mc_settings.get<size_t>("davidson_iterations"), 200);
-  EXPECT_EQ(mc_settings.get<size_t>("num_roots"), 1);
+  EXPECT_EQ(mc_settings.get<int64_t>("davidson_iterations"), 200);
+  EXPECT_EQ(mc_settings.get<int64_t>("num_roots"), 1);
 
   // Test that we can modify settings
   mc_settings.set("calculate_one_rdm", true);

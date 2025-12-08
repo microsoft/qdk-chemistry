@@ -25,9 +25,9 @@ namespace qdk::chemistry::algorithms {
  *
  * @tparam Derived The derived algorithm class such as ScfSolver
  * @tparam ReturnType The return type of the algorithm's run() and _run_impl()
- * methods
+ *         methods
  * @tparam Args Parameter pack containing the types of input arguments required
- * by the algorithm
+ *         by the algorithm
  *
  * Usage:
  * @code
@@ -120,10 +120,11 @@ class Algorithm {
  * instances based on string keys. It allows for easy extension and registration
  * of different algorithm implementations.
  *
- * @tparam AlgorithmType The base algorithm type that the factory creates all
- *                       registered algorithms will have to inherit from this
- *                       class and have matching signature for their run()
- *                       methods.
+ * Template parameters:
+ * @tparam BaseAlgorithmType The base algorithm type that every registered
+ *         implementation inherits from and whose run() signature is enforced.
+ * @tparam Derived The factory type that implements algorithm-specific
+ *         registration helpers (default names, etc.).
  *
  * Usage:
  * @code

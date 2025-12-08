@@ -15,6 +15,7 @@
 #include <stdexcept>
 
 #include "filename_utils.hpp"
+#include "hdf5_error_handling.hpp"
 #include "hdf5_serialization.hpp"
 #include "json_serialization.hpp"
 
@@ -70,12 +71,14 @@ HamiltonianContainer::HamiltonianContainer(
   }
 }
 
-const Eigen::MatrixXd& HamiltonianContainer::get_one_body_integrals() const {
+
+std::tuple<const Eigen::MatrixXd&, const Eigen::MatrixXd&>
+HamiltonianContainer::get_one_body_integrals() const {
   if (!has_one_body_integrals()) {
     throw std::runtime_error("One-body integrals are not set");
   }
-  return *_one_body_integrals
-              .first;  // Return alpha integrals for backward compatibility
+  return std::make_tuple(std::cref(*std::get<0>(_one_body_integrals)),
+                         std::cref(*std::get<1>(_one_body_integrals)));
 }
 
 bool HamiltonianContainer::has_one_body_integrals() const {
@@ -84,21 +87,6 @@ bool HamiltonianContainer::has_one_body_integrals() const {
          _one_body_integrals.first->cols() > 0;
 }
 
-const Eigen::MatrixXd& HamiltonianContainer::get_one_body_integrals_alpha()
-    const {
-  if (!has_one_body_integrals()) {
-    throw std::runtime_error("One-body integrals are not set");
-  }
-  return *_one_body_integrals.first;
-}
-
-const Eigen::MatrixXd& HamiltonianContainer::get_one_body_integrals_beta()
-    const {
-  if (!has_one_body_integrals()) {
-    throw std::runtime_error("One-body integrals are not set");
-  }
-  return *_one_body_integrals.second;
-}
 
 bool HamiltonianContainer::has_inactive_fock_matrix() const {
   return _inactive_fock_matrix.first != nullptr &&
@@ -111,22 +99,6 @@ HamiltonianContainer::get_inactive_fock_matrix() const {
     throw std::runtime_error("Inactive Fock matrix is not set");
   }
   return {*_inactive_fock_matrix.first, *_inactive_fock_matrix.second};
-}
-
-const Eigen::MatrixXd& HamiltonianContainer::get_inactive_fock_matrix_alpha()
-    const {
-  if (!has_inactive_fock_matrix()) {
-    throw std::runtime_error("Inactive Fock matrix is not set");
-  }
-  return *_inactive_fock_matrix.first;
-}
-
-const Eigen::MatrixXd& HamiltonianContainer::get_inactive_fock_matrix_beta()
-    const {
-  if (!has_inactive_fock_matrix()) {
-    throw std::runtime_error("Inactive Fock matrix is not set");
-  }
-  return *_inactive_fock_matrix.second;
 }
 
 const std::shared_ptr<Orbitals> HamiltonianContainer::get_orbitals() const {
@@ -254,31 +226,75 @@ std::string Hamiltonian::get_summary() const {
   summary += "  Type: ";
   summary += (is_hermitian() ? "Hermitian" : "NonHermitian");
   summary += "\n";
+  summary += "  Restrictedness: ";
+  summary += (is_restricted() ? "Restricted" : "Unrestricted");
+  summary += "\n";
   summary += "  Active Orbitals: " + std::to_string(norb) + "\n";
   summary +=
       "  Total Orbitals: " + std::to_string(num_molecular_orbitals) + "\n";
 
   const double threshold = 1e-6;  // Threshold for determining negligible
                                   // integrals in summary statistics
-  const size_t non_negligible_one_body_ints = std::count_if(
-      get_one_body_integrals().data(),
-      get_one_body_integrals().data() + get_one_body_integrals().size(),
-      [threshold](double val) { return std::abs(val) > threshold; });
-  const size_t non_negligible_two_body_ints = std::count_if(
-      get_two_body_integrals().data(),
-      get_two_body_integrals().data() + get_two_body_integrals().size(),
-      [threshold](double val) { return std::abs(val) > threshold; });
 
   summary += "  Core Energy: " + std::to_string(get_core_energy()) + "\n";
   summary += "  Integral Statistics:\n";
-  summary += "    One-body Integrals: " +
-             std::to_string(get_one_body_integrals().size()) +
-             " (larger than " + std::to_string(threshold) + ": " +
-             std::to_string(non_negligible_one_body_ints) + ")\n";
-  summary += "    Two-body Integrals: " +
-             std::to_string(get_two_body_integrals().size()) +
-             " (larger than " + std::to_string(threshold) + ": " +
-             std::to_string(non_negligible_two_body_ints) + ")\n";
+
+  // One-body integrals - alpha
+  auto [one_body_alpha, one_body_beta] = get_one_body_integrals();
+  const size_t non_negligible_one_body_alpha = std::count_if(
+      one_body_alpha.data(), one_body_alpha.data() + one_body_alpha.size(),
+      [threshold](double val) { return std::abs(val) > threshold; });
+
+  summary += "    One-body Integrals (alpha): " +
+             std::to_string(one_body_alpha.size()) + " (larger than " +
+             std::to_string(threshold) + ": " +
+             std::to_string(non_negligible_one_body_alpha) + ")\n";
+
+  // One-body integrals - beta (if unrestricted)
+  if (is_unrestricted()) {
+    const size_t non_negligible_one_body_beta = std::count_if(
+        one_body_beta.data(), one_body_beta.data() + one_body_beta.size(),
+        [threshold](double val) { return std::abs(val) > threshold; });
+
+    summary += "    One-body Integrals (beta): " +
+               std::to_string(one_body_beta.size()) + " (larger than " +
+               std::to_string(threshold) + ": " +
+               std::to_string(non_negligible_one_body_beta) + ")\n";
+  }
+
+  // Two-body integrals - aaaa
+  const auto& two_body_aaaa = std::get<0>(get_two_body_integrals());
+  const size_t non_negligible_two_body_aaaa = std::count_if(
+      two_body_aaaa.data(), two_body_aaaa.data() + two_body_aaaa.size(),
+      [threshold](double val) { return std::abs(val) > threshold; });
+
+  summary +=
+      "    Two-body Integrals (aaaa): " + std::to_string(two_body_aaaa.size()) +
+      " (larger than " + std::to_string(threshold) + ": " +
+      std::to_string(non_negligible_two_body_aaaa) + ")\n";
+
+  // Two-body integrals - aabb and bbbb (if unrestricted)
+  if (is_unrestricted()) {
+    const auto& two_body_aabb = std::get<1>(get_two_body_integrals());
+    const size_t non_negligible_two_body_aabb = std::count_if(
+        two_body_aabb.data(), two_body_aabb.data() + two_body_aabb.size(),
+        [threshold](double val) { return std::abs(val) > threshold; });
+
+    summary += "    Two-body Integrals (aabb): " +
+               std::to_string(two_body_aabb.size()) + " (larger than " +
+               std::to_string(threshold) + ": " +
+               std::to_string(non_negligible_two_body_aabb) + ")\n";
+
+    const auto& two_body_bbbb = std::get<2>(get_two_body_integrals());
+    const size_t non_negligible_two_body_bbbb = std::count_if(
+        two_body_bbbb.data(), two_body_bbbb.data() + two_body_bbbb.size(),
+        [threshold](double val) { return std::abs(val) > threshold; });
+
+    summary += "    Two-body Integrals (bbbb): " +
+               std::to_string(two_body_bbbb.size()) + " (larger than " +
+               std::to_string(threshold) + ": " +
+               std::to_string(non_negligible_two_body_bbbb) + ")\n";
+  }
 
   return summary;
 }
@@ -531,6 +547,11 @@ std::shared_ptr<Hamiltonian> Hamiltonian::from_hdf5(H5::Group& group) {
 
 std::shared_ptr<Hamiltonian> Hamiltonian::_from_hdf5_file(
     const std::string& filename) {
+  // Disable HDF5 automatic error printing to stderr unless verbose mode
+  if (hdf5_errors_should_be_suppressed()) {
+    H5::Exception::dontPrint();
+  }
+
   H5::H5File file;
   try {
     // Open HDF5 file
@@ -567,7 +588,8 @@ Hamiltonian& Hamiltonian::operator=(const Hamiltonian& other) {
   return *this;
 }
 
-const Eigen::MatrixXd& Hamiltonian::get_one_body_integrals() const {
+std::tuple<const Eigen::MatrixXd&, const Eigen::MatrixXd&>
+Hamiltonian::get_one_body_integrals() const {
   return _container->get_one_body_integrals();
 }
 
@@ -575,15 +597,9 @@ bool Hamiltonian::has_one_body_integrals() const {
   return _container->has_one_body_integrals();
 }
 
-const Eigen::MatrixXd& Hamiltonian::get_one_body_integrals_alpha() const {
-  return _container->get_one_body_integrals_alpha();
-}
-
-const Eigen::MatrixXd& Hamiltonian::get_one_body_integrals_beta() const {
-  return _container->get_one_body_integrals_beta();
-}
-
-const Eigen::VectorXd& Hamiltonian::get_two_body_integrals() const {
+std::tuple<const Eigen::VectorXd&, const Eigen::VectorXd&,
+           const Eigen::VectorXd&>
+Hamiltonian::get_two_body_integrals() const {
   return _container->get_two_body_integrals();
 }
 
@@ -597,18 +613,6 @@ bool Hamiltonian::has_two_body_integrals() const {
   return _container->has_two_body_integrals();
 }
 
-const Eigen::VectorXd& Hamiltonian::get_two_body_integrals_aaaa() const {
-  return _container->get_two_body_integrals_aaaa();
-}
-
-const Eigen::VectorXd& Hamiltonian::get_two_body_integrals_aabb() const {
-  return _container->get_two_body_integrals_aabb();
-}
-
-const Eigen::VectorXd& Hamiltonian::get_two_body_integrals_bbbb() const {
-  return _container->get_two_body_integrals_bbbb();
-}
-
 std::pair<const Eigen::MatrixXd&, const Eigen::MatrixXd&>
 Hamiltonian::get_inactive_fock_matrix() const {
   return _container->get_inactive_fock_matrix();
@@ -616,13 +620,6 @@ Hamiltonian::get_inactive_fock_matrix() const {
 
 bool Hamiltonian::has_inactive_fock_matrix() const {
   return _container->has_inactive_fock_matrix();
-}
-const Eigen::MatrixXd& Hamiltonian::get_inactive_fock_matrix_alpha() const {
-  return _container->get_inactive_fock_matrix_alpha();
-}
-
-const Eigen::MatrixXd& Hamiltonian::get_inactive_fock_matrix_beta() const {
-  return _container->get_inactive_fock_matrix_beta();
 }
 
 const std::shared_ptr<Orbitals> Hamiltonian::get_orbitals() const {

@@ -1,5 +1,5 @@
-Self-consistent field solver
-============================
+Self-consistent field solving
+=============================
 
 The :class:`~qdk_chemistry.algorithms.ScfSolver` algorithm in QDK/Chemistry performs Self-Consistent Field (SCF) calculations to optimize molecular orbitals for a given molecular structure.
 Following QDK/Chemistry's :doc:`algorithm design principles <../design/index>`, it takes a :doc:`Structure <../data/structure>` instance as input and produces an :doc:`Orbitals <../data/orbitals>` instance as output.
@@ -35,9 +35,10 @@ The final result provides:
 
 :term:`SCF` methods provide an excellent starting point, but they miss important electronic correlation effects:
 
-- **Static correlation**: Essential for systems with near-degenerate states or bond-breaking processes.
+- **Static correlation**: Essential for systems with near-degenerate states ogir bond-breaking processes.
   See :doc:`MCCalculator <mc_calculator>` documentation.
 - **Dynamic correlation**: Required for all molecular systems to account for instantaneous electron-electron interactions.
+  See :doc:`DynamicalCorrelationCalculator <dynamical_correlation>` documentation.
 
 The orbitals from :term:`SCF` calculations typically serve as input for post-:term:`SCF` methods that capture these correlation effects.
 :term:`SCF` methods thus serve as the foundation for more advanced electronic structure calculations and provide essential insights into molecular properties, reactivity, and spectroscopic characteristics.
@@ -68,51 +69,28 @@ The :class:`~qdk_chemistry.algorithms.ScfSolver` in QDK/Chemistry provides the f
 
 - **Basis set support**:
 
-  - Extensive library of standard quantum chemistry basis sets including Pople (STO-nG, 3-21G,
+  - Extensive library of standard quantum chemistry :doc:`basis sets <../basis_functionals>` including Pople (STO-nG, 3-21G,
     6-31G, etc.), Dunning (cc-pVDZ, cc-pVTZ, etc.), and Karlsruhe (def2-SVP, def2-TZVP, etc.) families
   - Support for custom basis sets and effective core potentials (ECPs)
 
-Creating an :term:`SCF` solver
-------------------------------
+Running an :term:`SCF` calculation
+----------------------------------
 
-As an algorithm class in QDK/Chemistry, the :class:`~qdk_chemistry.algorithms.ScfSolver` follows the :doc:`factory pattern design principle <../design/index>` and is created using its corresponding factory.
-
-Available Solvers
-~~~~~~~~~~~~~~~~~
-
-QDK/Chemistry currently provides the following registered solvers:
-
-.. list-table::
-   :header-rows: 1
-   :widths: 20 20 60
-
-   * - Solver
-     - Developer
-     - Description
-   * - **default**
-     - Microsoft
-     - Default solver implemented directly in QDK/Chemistry, optimized for performance and versatility
-   * - **pyscf**
-     - Third-party
-     - Integration with the PySCF quantum chemistry package
+Below is an example of how to run SCF using the default (Microsoft) QDK/Chemistry solver, with mostly default settings (except the basis set):
 
 .. tab:: C++ API
 
-   .. code-block:: cpp
-
-      #include <qdk/chemistry.hpp>
-      using namespace qdk::chemistry::algorithms;
-
-      // Create the default ScfSolver instance
-      auto scf_solver = ScfSolverFactory::create();
-
-      // Or specify a particular solver implementation
-      auto pyscf_solver = ScfSolverFactory::create("pyscf");
+   .. literalinclude:: ../../../_static/examples/cpp/scf_solver.cpp
+      :language: cpp
+      :start-after: // start-cell-create
+      :end-before: // end-cell-create
 
 .. tab:: Python API
 
-   .. literalinclude:: ../../../../examples/factory_pattern.py
+   .. literalinclude:: ../../../_static/examples/python/scf_solver.py
       :language: python
+      :start-after: # start-cell-create
+      :end-before: # end-cell-create
 
 Configuring the :term:`SCF` calculation
 ---------------------------------------
@@ -129,22 +107,17 @@ See the `Available Settings`_ section below for a complete list of configuration
 
 .. tab:: C++ API
 
-   .. code-block:: cpp
-
-      // Standard settings that work with all solvers
-      // Set the method
-      scf_solver.settings().set("method", "dft")
-      // Set the basis set
-      scf_solver->settings().set("basis_set", "def2-tzvpp");
-
-      // For DFT calculations, set the exchange-correlation functional
-      scf_solver->settings().set("functional", "B3LYP");
+   .. literalinclude:: ../../../_static/examples/cpp/scf_solver.cpp
+      :language: cpp
+      :start-after: // start-cell-configure
+      :end-before: // end-cell-configure
 
 .. tab:: Python API
 
-   .. literalinclude:: ../../../../examples/settings.py
+   .. literalinclude:: ../../../_static/examples/python/scf_solver.py
       :language: python
-      :lines: 4-12
+      :start-after: # start-cell-configure
+      :end-before: # end-cell-configure
 
 Running an :term:`SCF` calculation
 ----------------------------------
@@ -157,22 +130,17 @@ The ``solve`` method returns two values:
 
 .. tab:: C++ API
 
-   .. code-block:: cpp
-
-      // Create a structure (or load from a file)
-      Structure structure;
-      // configuring structure ...
-
-      // Run the SCF calculation
-      // Return types are: std::tuple<double, Orbitals>
-      auto [E_scf, scf_orbitals] = scf_solver->solve(structure);
-      std::cout << "SCF Energy: " << E_scf << " Hartree" << std::endl;
+   .. literalinclude:: ../../../_static/examples/cpp/scf_solver.cpp
+      :language: cpp
+      :start-after: // start-cell-run
+      :end-before: // end-cell-run
 
 .. tab:: Python API
 
-   .. literalinclude:: ../../../../examples/scf_solver.py
+   .. literalinclude:: ../../../_static/examples/python/scf_solver.py
       :language: python
-      :lines: 1-17
+      :start-after: # start-cell-run
+      :end-before: # end-cell-run
 
 Available settings
 ------------------
@@ -275,9 +243,10 @@ Related classes
 - :doc:`Structure <../data/structure>`: Input molecular structure
 - :doc:`Orbitals <../data/orbitals>`: Output optimized molecular orbitals
 
-Related topics
---------------
+Further reading
+---------------
 
+- The above examples can be downloaded as a complete `Python <../../../_static/examples/python/scf_solver.py>`_ script or `C++ <../../../_static/examples/cpp/scf_solver.cpp>`_ source file.
 - :doc:`Settings <../design/settings>`: Configuration settings for algorithms
 - :doc:`Factory Pattern <../design/factory_pattern>`: Understanding algorithm creation
 - :doc:`../basis_functionals`: Exchange-correlation functionals for DFT calculations
