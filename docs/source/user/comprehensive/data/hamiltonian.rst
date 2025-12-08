@@ -30,6 +30,19 @@ Properties
 - **Selected orbital indices**: Indices defining the active space orbitals
 - **Number of electrons**: Count of electrons in the active space
 
+Restricted vs. unrestricted Hamiltonians
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+The ``Hamiltonian`` class supports both restricted and unrestricted representations:
+
+- **Restricted**: Uses the same spatial orbitals for alpha and beta electrons. Suitable for closed-shell systems where alpha and beta electrons occupy the same spatial orbitals with opposite spins.
+- **Unrestricted**: Allows different spatial orbitals for alpha and beta electrons.
+
+For unrestricted Hamiltonians, the one-electron and two-electron integrals are stored separately for each spin channel:
+
+- One-electron integrals: :math:`h_{\alpha\alpha}` and :math:`h_{\beta\beta}`
+- Two-electron integrals: :math:`h_{\alpha\alpha\alpha\alpha}`, :math:`h_{\alpha\beta\alpha\beta}`, and :math:`h_{\beta\beta\beta\beta}`
+
 Usage
 -----
 
@@ -44,32 +57,17 @@ Hamiltonian object should be considered constant and not modified:
 
 .. tab:: C++ API
 
-   .. code-block:: cpp
-
-      // Create a Hamiltonian constructor
-      // Returns std::shared_ptr<HamiltonianConstructor>
-      auto hamiltonian_constructor = HamiltonianConstructorFactory::create();
-
-      // Set active orbitals if needed
-      std::vector<size_t> active_orbitals = {4, 5, 6, 7}; // Example indices
-      hamiltonian_constructor->settings().set("active_orbitals", active_orbitals);
-
-      // Construct the Hamiltonian from orbitals
-      // Returns Hamiltonian
-      auto hamiltonian = hamiltonian_constructor->run(orbitals);
-
-      // Alternatively, create a Hamiltonian directly
-      Hamiltonian direct_hamiltonian(one_body_integrals, two_body_integrals, orbitals,
-                                   selected_orbital_indices, num_electrons, core_energy);
+   .. literalinclude:: ../../../_static/examples/cpp/hamiltonian.cpp
+      :language: cpp
+      :start-after: // start-cell-hamiltonian-creation
+      :end-before: // end-cell-hamiltonian-creation
 
 .. tab:: Python API
 
-   .. note::
-      This example shows the API pattern. For complete working examples, see the test suite.
-
-   .. literalinclude:: ../../../../examples/hamiltonian.py
+   .. literalinclude:: ../../../_static/examples/python/hamiltonian.py
       :language: python
-      :lines: 3-16
+      :start-after: # start-cell-hamiltonian-creation
+      :end-before: # end-cell-hamiltonian-creation
 
 Accessing Hamiltonian data
 --------------------------
@@ -77,7 +75,7 @@ Accessing Hamiltonian data
 The :class:`~qdk_chemistry.data.Hamiltonian` class provides methods to access the one- and two-electron integrals and other properties. In line
 with its immutable design principle, these methods return const references or copies of the internal data:
 
-Two-Electron Integral Storage and Notation
+Two-electron integral storage and notation
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 Two-electron integrals in quantum chemistry can be represented using different notations and storage formats.
@@ -109,159 +107,23 @@ When accessing specific elements with ``get_two_body_element(i, j, k, l)``, the 
 
 .. tab:: C++ API
 
-   .. code-block:: cpp
-
-      // Access one-electron integrals, returns const Eigen::MatrixXd&
-      auto h1 = hamiltonian.get_one_body_integrals();
-
-      // Access two-electron integrals, returns const Eigen::VectorXd&
-      auto h2 = hamiltonian.get_two_body_integrals();
-
-      // Access a specific two-electron integral <ij|kl>
-      double element = hamiltonian.get_two_body_element(i, j, k, l);
-
-      // Get core energy (nuclear repulsion + inactive orbital energy), returns double
-      auto core_energy = hamiltonian.get_core_energy();
-
-      // Get inactive Fock matrix (if available), returns const Eigen::MatrixXd&
-      if (hamiltonian.has_inactive_fock_matrix()) {
-          auto inactive_fock = hamiltonian.get_inactive_fock_matrix();
-      }
-
-      // Get orbital data, returns const Orbitals&
-      const auto& orbitals = hamiltonian.get_orbitals();
-
-      // Get active space information, returns const std::vector<size_t>&
-      auto active_indices = hamiltonian.get_selected_orbital_indices();
-      // Returns size_t
-      auto num_electrons = hamiltonian.get_num_electrons();
-      // Returns size_t
-      auto num_orbitals = hamiltonian.get_num_orbitals();
+   .. literalinclude:: ../../../_static/examples/cpp/hamiltonian.cpp
+      :language: cpp
+      :start-after: // start-cell-properties
+      :end-before: // end-cell-properties
 
 .. tab:: Python API
 
-   .. note::
-      This example shows the API pattern. For complete working examples, see the test suite.
-
-   .. literalinclude:: ../../../../examples/hamiltonian.py
+   .. literalinclude:: ../../../_static/examples/python/hamiltonian.py
       :language: python
-      :lines: 18-32
-
-.. TODO: this was old example data that should be removed.
-.. # Get orbital data
-.. orbitals = hamiltonian.get_orbitals()
-
-.. # Get active space information
-.. active_indices = hamiltonian.get_selected_orbital_indices()
-.. num_electrons = hamiltonian.get_num_electrons()
-.. num_orbitals = hamiltonian.get_num_orbitals()
+      :start-after: # start-cell-properties
+      :end-before: # end-cell-properties
 
 Serialization
 -------------
 
 The :class:`~qdk_chemistry.data.Hamiltonian` class supports serialization to and from JSON and HDF5 formats.
 For detailed information about serialization in QDK/Chemistry, see the :doc:`Serialization <../data/serialization>` documentation.
-
-.. note::
-   All Hamiltonian-related files should follow a consistent naming convention, such as
-   ``molecule.hamiltonian.json`` and ``molecule.hamiltonian.h5`` for JSON and HDF5 files respectively.
-
-File formats
-~~~~~~~~~~~~
-
-QDK/Chemistry supports multiple serialization formats for Hamiltonian data:
-
-JSON format
-^^^^^^^^^^^
-
-JSON representation of a :class:`~qdk_chemistry.data.Hamiltonian` object has the following structure (showing simplified content):
-
-.. code-block:: json
-
-  {
-    "core_energy":0.0,
-    "has_one_body_integrals":true,
-    "has_orbitals":true,
-    "has_two_body_integrals":true,
-    "num_electrons":2,
-    "num_orbitals":2,
-    "one_body_integrals":[[-0.7789220366556091,-1.1102230246251565e-16],
-      [-1.6653345369377348e-16,-0.6702666733672852]],
-    "orbitals":{"..."},
-    "selected_orbital_indices":[0,1],
-    "two_body_integrals":["..."],
-  }
-
-.. note::
-   The ``orbitals`` field contains a nested ``Orbitals`` object with its own serialization structure.
-   For detailed information about the serialization format of the ``Orbitals`` data contained within the Hamiltonian, please refer to the :ref:`Orbitals Serialization <orbitals-serialization>` section.
-
-HDF5 format
-^^^^^^^^^^^
-
-HDF5 representation of a :class:`~qdk_chemistry.data.Hamiltonian` object has the following structure (showing groups and datasets):
-
-.. code-block:: text
-
-  /
-  ├── selected_orbital_indices  # Dataset: uint32, 1D array active space orbital indices
-  ├── one_body_integrals        # Dataset: float64, 1D array of one-electron integrals
-  ├── two_body_integrals        # Dataset: float64, 2D array of one-electron integrals
-  ├── metadata/                     # Group
-  │   ├── core_energy           # Attribute: float64, core energy
-  │   ├── has_orbitals          # Attribute: uint8, 0 if false, 1 if true
-  │   ├── num_electrons         # Attribute: uint32, number of electrons (in the active space)
-  │   └── num_orbitals          # Attribute: uint32, number of orbitals (in the active space)
-  └── orbitals/                     # Group
-      └── json_data             # Dataset: representation of the JSON orbital data
-
-.. note::
-   The ``orbitals/`` group follows the same structure and organization as an independent ``Orbitals`` HDF5 file.
-   For complete details on the structure and content of this group, see the :ref:`Orbitals Serialization <orbitals-serialization>` section in the Orbitals documentation.
-
-.. tab:: C++ API
-
-   .. code-block:: cpp
-
-      // Serialize to JSON file
-      hamiltonian.to_json_file("molecule.hamiltonian.json");
-
-      // Deserialize from JSON file
-      auto hamiltonian_from_json_file = Hamiltonian::from_json_file("molecule.hamiltonian.json");
-
-      // Serialize to HDF5 file
-      hamiltonian.to_hdf5_file("molecule.hamiltonian.h5");
-
-      // Deserialize from HDF5 file
-      auto hamiltonian_from_hdf5_file = Hamiltonian::from_hdf5_file("molecule.hamiltonian.h5");
-
-      // Generic file I/O based on type parameter
-      hamiltonian.to_file("molecule.hamiltonian.json", "json");
-      auto hamiltonian_from_file = Hamiltonian::from_file("molecule.hamiltonian.h5", "hdf5");
-
-      // Convert to JSON object
-      // Returns nlohmann::json
-      nlohmann::json j = hamiltonian.to_json();
-
-      // Load from JSON object
-      auto hamiltonian_from_json = Hamiltonian::from_json(j);
-
-.. tab:: Python API
-
-   .. note::
-      This example shows the API pattern.
-      For complete working examples, see the test suite.
-
-   .. literalinclude:: ../../../../examples/hamiltonian.py
-      :language: python
-      :lines: 34-49
-
-.. TODO: this was old example data that should be removed.
-.. # Convert to/from JSON in Python
-.. import json
-.. j = hamiltonian.to_json()
-.. j_str = json.dumps(j)
-.. hamiltonian_from_json = Hamiltonian.from_json(json.loads(j_str))
 
 Active space Hamiltonian
 ------------------------
@@ -277,27 +139,20 @@ The :class:`~qdk_chemistry.data.Hamiltonian` class provides methods to check the
 
 .. tab:: C++ API
 
-   .. code-block:: cpp
-
-      // Check if the Hamiltonian data is complete and consistent
-      // Returns bool
-      bool valid = hamiltonian.is_valid();
-
-      // Check if specific components are available
-      // All return bool
-      bool has_one_body = hamiltonian.has_one_body_integrals();
-      bool has_two_body = hamiltonian.has_two_body_integrals();
-      bool has_orbitals = hamiltonian.has_orbitals();
-      bool has_inactive_fock = hamiltonian.has_inactive_fock_matrix();
+   .. literalinclude:: ../../../_static/examples/cpp/hamiltonian.cpp
+      :language: cpp
+      :start-after: // start-cell-validation
+      :end-before: // end-cell-validation
 
 .. tab:: Python API
 
    .. note::
       This example shows the API pattern. For complete working examples, see the test suite.
 
-   .. literalinclude:: ../../../../examples/hamiltonian.py
+   .. literalinclude:: ../../../_static/examples/python/hamiltonian.py
       :language: python
-      :lines: 51-58
+      :start-after: # start-cell-validation
+      :end-before: # end-cell-validation
 
 Related classes
 ---------------
@@ -309,9 +164,10 @@ Related classes
 - :class:`~qdk_chemistry.data.Wavefunction`: Represents the solution of the Hamiltonian eigenvalue problem
 - :doc:`Active space methods <../algorithms/active_space>`: Selection and use of active spaces with the Hamiltonian
 
-Related topics
---------------
+Further reading
+---------------
 
+- The above examples can be downloaded as complete `C++ <../../../_static/examples/cpp/hamiltonian.cpp>`_ and `Python <../../../_static/examples/python/hamiltonian.py>`_ scripts.
 - :doc:`Serialization <../data/serialization>`: Data serialization and deserialization in QDK/Chemistry
 - :doc:`Design principles <../design/index>`: Design principles for data classes in QDK/Chemistry
 - :doc:`Settings <../design/index>`: Configuration options for algorithms operating on Hamiltonians

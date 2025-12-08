@@ -246,7 +246,8 @@ class TestAnsatzSerialization:
             assert orig_ham.get_core_energy() == restored_ham.get_core_energy()
 
             if orig_ham.has_one_body_integrals():
-                assert np.array_equal(orig_ham.get_one_body_integrals(), restored_ham.get_one_body_integrals())
+                assert np.array_equal(orig_ham.get_one_body_integrals()[0], restored_ham.get_one_body_integrals()[0])
+                assert np.array_equal(orig_ham.get_one_body_integrals()[1], restored_ham.get_one_body_integrals()[1])
 
         # Verify wavefunction data
         if test_ansatz.has_wavefunction():
@@ -310,14 +311,16 @@ class TestAnsatzSerialization:
     def test_restricted_open_shell_energy(self):
         """Test the energy evaluation for a restricted open-shell system."""
         try:
-            import qdk_chemistry.plugins.pyscf  # noqa: F401 PLC0415
+            import qdk_chemistry.plugins.pyscf as pyscf_plugin  # noqa: PLC0415
+
+            pyscf_plugin.load()
         except ImportError:
             pytest.skip("pyscf not available, skipping O2 triplet Ansatz test")
 
         mol = Structure([[0.0, 0.0, 0.0], [0.0, 0.0, 4.0]], ["O", "O"])
         # get scf energy and wfn
         scf = algorithms.create("scf_solver", "pyscf")
-        scf.settings().set("force_restricted", True)
+        scf.settings().set("scf_type", "restricted")
         scf.settings().set("basis_set", "cc-pvdz")
         e_scf, hf_wfn = scf.run(mol, 0, 3)
         # get hamiltonian

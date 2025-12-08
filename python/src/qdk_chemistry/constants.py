@@ -12,20 +12,18 @@ The constants include fundamental physical constants, particle masses,
 and energy conversion factors commonly used in computational chemistry
 and quantum mechanics.
 
-Data Source
------------
-CODATA recommended values of the fundamental physical constants
-Currently using: CODATA 2018 (default)
-Also available: CODATA 2014 (via C++ preprocessor directives)
-https://physics.nist.gov/cuu/Constants/
+Data Source:
+    CODATA recommended values of the fundamental physical constants
+    Currently using: CODATA 2018 (default)
+    Also available: CODATA 2014 (via C++ preprocessor directives)
+    https://physics.nist.gov/cuu/Constants/
 
-Constants Documentation
------------------------
-Each constant includes detailed documentation about its physical meaning,
-units, mathematical symbol, and provenance. The documentation automatically
-reflects the CODATA version currently in use. You can access this information
-using the ``get_constant_info()`` function or by examining the ``__doc__`` attribute
-of individual constants.
+Constants Documentation:
+    Each constant includes detailed documentation about its physical meaning,
+    units, mathematical symbol, and provenance. The documentation automatically
+    reflects the CODATA version currently in use. You can access this information
+    using the ``get_constant_info()`` function or by examining the ``__doc__`` attribute
+    of individual constants.
 
 Examples:
     >>> from qdk_chemistry.constants import ANGSTROM_TO_BOHR, HARTREE_TO_EV
@@ -75,6 +73,7 @@ from qdk_chemistry._core.constants import (
     PROTON_MASS,
     REDUCED_PLANCK_CONSTANT,
     SPEED_OF_LIGHT,
+    ConstantInfo,
     get_constant_info,
     get_constants_info,
 )
@@ -217,6 +216,7 @@ __all__ = [
     "PROTON_MASS",
     "REDUCED_PLANCK_CONSTANT",
     "SPEED_OF_LIGHT",
+    "ConstantInfo",
     "find_constant",
     "get_constant_info",
     "get_constants_info",

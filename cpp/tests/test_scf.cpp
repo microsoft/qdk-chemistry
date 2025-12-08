@@ -72,8 +72,7 @@ TEST_F(ScfTest, Water) {
   // Default settings
   auto [E_default, wfn_default] = scf_solver->run(water, 0, 1);
   auto orbitals_default = wfn_default->get_orbitals();
-  EXPECT_NEAR(E_default - water->calculate_nuclear_repulsion_energy(),
-              -83.9252697201, testing::scf_energy_tolerance);
+  EXPECT_NEAR(E_default, -75.9229032345009, testing::scf_energy_tolerance);
   EXPECT_TRUE(orbitals_default->is_restricted());
 
   // Change basis set to def2-tzvp
@@ -81,8 +80,7 @@ TEST_F(ScfTest, Water) {
   scf_solver->settings().set("basis_set", "def2-tzvp");
   std::cout << scf_solver->settings().to_json().dump(2) << std::endl;
   auto [E_def2tzvp, wfn_def2tzvp] = scf_solver->run(water, 0, 1);
-  EXPECT_NEAR(E_def2tzvp - water->calculate_nuclear_repulsion_energy(),
-              -84.0229441374, testing::scf_energy_tolerance);
+  EXPECT_NEAR(E_def2tzvp, -76.0205776517675, testing::scf_energy_tolerance);
 }
 
 TEST_F(ScfTest, Lithium) {
@@ -91,13 +89,12 @@ TEST_F(ScfTest, Lithium) {
 
   // Default settings
   auto [E_default, wfn_default] = scf_solver->run(li, 0, 2);
-  EXPECT_NEAR(E_default, -7.4250663561e+00, testing::scf_energy_tolerance);
+  EXPECT_NEAR(E_default, -7.4250663561, testing::scf_energy_tolerance);
   EXPECT_FALSE(wfn_default->get_orbitals()->is_restricted());
 
   // Li +1 should be a singlet
   auto [E_li_plus_1, wfn_li_plus_1] = scf_solver->run(li, 1, 1);
-  EXPECT_NEAR(E_li_plus_1, -7.232895386855468e+00,
-              testing::scf_energy_tolerance);
+  EXPECT_NEAR(E_li_plus_1, -7.2328981138900552, testing::scf_energy_tolerance);
   EXPECT_TRUE(wfn_li_plus_1->get_orbitals()->is_restricted());
 }
 
@@ -114,16 +111,110 @@ TEST_F(ScfTest, Oxygen) {
   // Run as a triplet
   auto [E_triplet, wfn_triplet] = scf_solver->run(o2, 0, 3);
 
-  EXPECT_NEAR(E_singlet - o2->calculate_nuclear_repulsion_energy(),
-              -1.7558700613e+02, testing::scf_energy_tolerance);
-  EXPECT_NEAR(E_triplet - o2->calculate_nuclear_repulsion_energy(),
-              -1.7566984837e+02, testing::scf_energy_tolerance);
+  EXPECT_NEAR(E_singlet, -147.551127403083, testing::scf_energy_tolerance);
+  EXPECT_NEAR(E_triplet, -147.633969643351, testing::scf_energy_tolerance);
 
   // Check singlet orbitals
   EXPECT_TRUE(wfn_singlet->get_orbitals()->is_restricted());
 
   // Check triplet orbitals
   EXPECT_FALSE(wfn_triplet->get_orbitals()->is_restricted());
+}
+
+TEST_F(ScfTest, Oxygen_atom_gdm) {
+  auto oxygen = testing::create_oxygen_structure();
+  auto scf_solver = ScfSolverFactory::create();
+  // cc-pvdz
+  scf_solver->settings().set("method", "pbe");
+  scf_solver->settings().set("basis_set", "cc-pvdz");
+  scf_solver->settings().set("enable_gdm", true);
+  // Default should be a singlet
+  auto [E_singlet, wfn_singlet] = scf_solver->run(oxygen, 0, 1);
+  EXPECT_NEAR(E_singlet, -74.873106298, testing::scf_energy_tolerance);
+  // Check singlet orbitals
+  EXPECT_TRUE(wfn_singlet->get_orbitals()->is_restricted());
+}
+
+TEST_F(ScfTest, Oxygen_atom_history_size_limit_gdm) {
+  auto oxygen = testing::create_oxygen_structure();
+  auto scf_solver = ScfSolverFactory::create();
+  // cc-pvdz
+  scf_solver->settings().set("method", "pbe");
+  scf_solver->settings().set("basis_set", "cc-pvdz");
+  scf_solver->settings().set("enable_gdm", true);
+  scf_solver->settings().set("gdm_bfgs_history_size_limit", 20);
+  // Default should be a singlet
+  auto [E_singlet, wfn_singlet] = scf_solver->run(oxygen, 0, 1);
+  EXPECT_NEAR(E_singlet, -74.873106298, testing::scf_energy_tolerance);
+  // Check singlet orbitals
+  EXPECT_TRUE(wfn_singlet->get_orbitals()->is_restricted());
+}
+
+TEST_F(ScfTest, Oxygen_atom_one_diis_step_gdm) {
+  auto oxygen = testing::create_oxygen_structure();
+  auto scf_solver = ScfSolverFactory::create();
+  // cc-pvdz
+  scf_solver->settings().set("method", "pbe");
+  scf_solver->settings().set("basis_set", "cc-pvdz");
+  scf_solver->settings().set("enable_gdm", true);
+  scf_solver->settings().set("gdm_max_diis_iteration", 1);
+
+  auto [E_singlet, wfn_singlet] = scf_solver->run(oxygen, 0, 1);
+  EXPECT_NEAR(E_singlet, -74.873106298, testing::scf_energy_tolerance);
+  // Check singlet orbitals
+  EXPECT_TRUE(wfn_singlet->get_orbitals()->is_restricted());
+}
+
+TEST_F(ScfTest, Water_triplet_gdm) {
+  auto water = testing::create_water_structure();
+  auto scf_solver = ScfSolverFactory::create();
+  // Default settings
+  scf_solver->settings().set("method", "pbe");
+  scf_solver->settings().set("enable_gdm", true);
+  auto [E_default, wfn_default] = scf_solver->run(water, 0, 3);
+  auto orbitals_default = wfn_default->get_orbitals();
+  EXPECT_NEAR(E_default, -76.0343083322644, testing::scf_energy_tolerance);
+  EXPECT_FALSE(orbitals_default->is_restricted());
+}
+
+TEST_F(ScfTest, Oxygen_atom_charged_doublet_gdm) {
+  auto oxygen = testing::create_oxygen_structure();
+  auto scf_solver = ScfSolverFactory::create();
+  // cc-pvdz
+  scf_solver->settings().set("method", "pbe");
+  scf_solver->settings().set("basis_set", "cc-pvdz");
+  scf_solver->settings().set("enable_gdm", true);
+  scf_solver->settings().set("max_iterations", 100);
+
+  auto [E_doublet, wfn_doublet] = scf_solver->run(oxygen, 1, 2);
+  EXPECT_NEAR(E_doublet, -74.416994299, testing::scf_energy_tolerance);
+  // Check singlet orbitals
+  EXPECT_FALSE(wfn_doublet->get_orbitals()->is_restricted());
+}
+
+TEST_F(ScfTest, Oxygen_atom_invalid_energy_thresh_diis_switch_gdm) {
+  auto oxygen = testing::create_oxygen_structure();
+  auto scf_solver = ScfSolverFactory::create();
+  // cc-pvdz
+  scf_solver->settings().set("method", "pbe");
+  scf_solver->settings().set("basis_set", "cc-pvdz");
+  scf_solver->settings().set("enable_gdm", true);
+  scf_solver->settings().set("energy_thresh_diis_switch", -2e-4);
+  // Default should be a singlet
+  EXPECT_THROW(scf_solver->run(oxygen, 0, 1),
+               std::invalid_argument);  // open-shell dublet
+}
+
+TEST_F(ScfTest, Oxygen_atom_invalid_bfgs_history_size_limit_gdm) {
+  auto oxygen = testing::create_oxygen_structure();
+  auto scf_solver = ScfSolverFactory::create();
+  // cc-pvdz
+  scf_solver->settings().set("method", "pbe");
+  scf_solver->settings().set("basis_set", "cc-pvdz");
+  scf_solver->settings().set("enable_gdm", true);
+  scf_solver->settings().set("gdm_bfgs_history_size_limit", 0);
+  // Default should be a singlet
+  EXPECT_THROW(scf_solver->run(oxygen, 0, 1), std::invalid_argument);
 }
 
 TEST_F(ScfTest, WaterDftB3lyp) {
@@ -136,8 +227,7 @@ TEST_F(ScfTest, WaterDftB3lyp) {
 
   auto [E_b3lyp, wfn_b3lyp] = scf_solver->run(water, 0, 1);
 
-  EXPECT_NEAR(E_b3lyp - water->calculate_nuclear_repulsion_energy(),
-              -84.335786559482, testing::scf_energy_tolerance);
+  EXPECT_NEAR(E_b3lyp, -76.3334200741567, testing::scf_energy_tolerance);
   EXPECT_TRUE(wfn_b3lyp->get_orbitals()->is_restricted());
 }
 
@@ -155,9 +245,8 @@ TEST_F(ScfTest, WaterDftPbe) {
   EXPECT_TRUE(wfn_pbe->get_orbitals()->is_restricted());
 
   // Energy should be reasonable (negative and close to other DFT results)
-  EXPECT_LT(E_pbe - water->calculate_nuclear_repulsion_energy(),
-            -80.0);  // Should be reasonable for water
-  EXPECT_GT(E_pbe - water->calculate_nuclear_repulsion_energy(), -90.0);
+  EXPECT_LT(E_pbe, -75.0);  // Should be reasonable for water
+  EXPECT_GT(E_pbe, -77.0);
 }
 
 TEST_F(ScfTest, LithiumDftB3lypUks) {
@@ -239,12 +328,8 @@ TEST_F(ScfTest, OxygenTripletDftB3lypUks) {
       orbitals_b3lyp->is_restricted());  // Should be UKS (unrestricted)
 
   // Energy should be reasonable for O2
-  EXPECT_LT(
-      energy_b3lyp - oxygen_molecule->calculate_nuclear_repulsion_energy(),
-      -175.0);
-  EXPECT_GT(
-      energy_b3lyp - oxygen_molecule->calculate_nuclear_repulsion_energy(),
-      -185.0);
+  EXPECT_LT(energy_b3lyp, -149.0);
+  EXPECT_GT(energy_b3lyp, -151.0);
 
   // Check that basis set is populated
   EXPECT_TRUE(orbitals_b3lyp->has_basis_set());
@@ -287,10 +372,8 @@ TEST_F(ScfTest, OxygenTripletDftPbeUks) {
   EXPECT_NEAR(total_beta_electrons, 7.0, testing::numerical_zero_tolerance);
 
   // Energy should be reasonable for O2
-  EXPECT_LT(energy_pbe - oxygen_molecule->calculate_nuclear_repulsion_energy(),
-            -170.0);  // Should be reasonable for O2
-  EXPECT_GT(energy_pbe - oxygen_molecule->calculate_nuclear_repulsion_energy(),
-            -190.0);
+  EXPECT_LT(energy_pbe, -149.0);  // Should be reasonable for O2
+  EXPECT_GT(energy_pbe, -151.0);
 }
 
 TEST_F(ScfTest, DftMethodCaseInsensitive) {
@@ -353,6 +436,36 @@ TEST_F(ScfTest, Settings_EdgeCases) {
       qdk::chemistry::data::SettingTypeMismatch);
 }
 
+TEST_F(ScfTest, EriMethodSetting) {
+  auto water = testing::create_water_structure();
+
+  // Test default eri_method (direct)
+  auto scf_solver_direct = ScfSolverFactory::create();
+  scf_solver_direct->settings().set("basis_set", "sto-3g");
+  EXPECT_EQ(scf_solver_direct->settings().get<std::string>("eri_method"),
+            "direct");
+  auto [energy_direct, wfn_direct] = scf_solver_direct->run(water, 0, 1);
+
+  // Test eri_method = incore
+  auto scf_solver_incore = ScfSolverFactory::create();
+  scf_solver_incore->settings().set("basis_set", "sto-3g");
+  scf_solver_incore->settings().set("eri_method", "incore");
+  EXPECT_EQ(scf_solver_incore->settings().get<std::string>("eri_method"),
+            "incore");
+  auto [energy_incore, wfn_incore] = scf_solver_incore->run(water, 0, 1);
+
+  // Both methods should give the same energy
+  EXPECT_NEAR(energy_direct, energy_incore, testing::scf_energy_tolerance);
+
+  // Test invalid eri_method - should throw when setting invalid value
+  EXPECT_THROW(
+      {
+        auto scf_solver = ScfSolverFactory::create();
+        scf_solver->settings().set("eri_method", "not_a_method");
+      },
+      std::invalid_argument);
+}
+
 TEST_F(ScfTest, InitialGuessRestart) {
   // ===== Water as restricted test =====
   auto water = testing::create_water_structure();
@@ -365,8 +478,7 @@ TEST_F(ScfTest, InitialGuessRestart) {
   auto orbitals_first = wfn_first->get_orbitals();
 
   // Verify we get the expected energy for HF/def2-tzvp
-  EXPECT_NEAR(energy_first - water->calculate_nuclear_repulsion_energy(),
-              -84.0229441374, testing::scf_energy_tolerance);
+  EXPECT_NEAR(energy_first, -76.0205776517675, testing::scf_energy_tolerance);
 
   // Now restart with the converged orbitals as initial guess
   // Create a new solver instance since settings are locked after run
@@ -395,8 +507,8 @@ TEST_F(ScfTest, OxygenTripletInitialGuessRestart) {
   auto orbitals_o2_first = wfn_o2_first->get_orbitals();
 
   // Verify we get the expected energy for HF/STO-3G triplet
-  EXPECT_NEAR(energy_o2_first - o2->calculate_nuclear_repulsion_energy(),
-              -1.7566984837e+02, testing::scf_energy_tolerance);
+  EXPECT_NEAR(energy_o2_first, -147.633969643351,
+              testing::scf_energy_tolerance);
 
   // Now restart with the converged orbitals as initial guess
   // Create a new solver instance since settings are locked after run

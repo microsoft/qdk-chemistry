@@ -15,7 +15,20 @@ if(CCACHE_EXECUTABLE AND NOT CMAKE_CXX_COMPILER_LAUNCHER)
 endif()
 
 set(CMAKE_POSITION_INDEPENDENT_CODE ON CACHE BOOL "Enable PIC for all targets" FORCE)
+set(CMAKE_MACOSX_RPATH ON CACHE BOOL "Enable RPATH on macOS" FORCE)
 
+# Custom CMake Find* modules for linear algebra dependencies
+include( FetchContent )
+FetchContent_Declare( linalg-cmake-modules
+  GIT_REPOSITORY https://github.com/wavefunction91/linalg-cmake-modules.git
+  GIT_TAG        main
+)
+FetchContent_GetProperties( linalg-cmake-modules )
+if( NOT linalg-cmake-modules_POPULATED )
+  FetchContent_Populate( linalg-cmake-modules )
+endif()
+
+# list( APPEND CMAKE_MODULE_PATH ${linalg-cmake-modules_SOURCE_DIR} )
 # First try to find an installed qdk library
 find_package(qdk QUIET COMPONENTS chemistry)
 
@@ -63,11 +76,9 @@ pybind11_add_module(_core
     src/pybind11/data/settings.cpp
     src/pybind11/data/structure.cpp
     src/pybind11/data/basis_set.cpp
-    src/pybind11/data/coupled_cluster.cpp
     src/pybind11/data/configuration.cpp
     src/pybind11/data/ansatz.cpp
     src/pybind11/data/stability_result.cpp
-    src/pybind11/algorithms/cc.cpp
     src/pybind11/algorithms/localizer.cpp
     src/pybind11/algorithms/stability.cpp
     src/pybind11/algorithms/mc.cpp
@@ -76,6 +87,7 @@ pybind11_add_module(_core
     src/pybind11/algorithms/hamiltonian.cpp
     src/pybind11/algorithms/scf.cpp
     src/pybind11/algorithms/active_space.cpp
+    src/pybind11/algorithms/dynamical_correlation_calculator.cpp
     src/pybind11/utils/valence_space.cpp
     src/pybind11/constants.cpp
     src/pybind11/qdk_scf_config.cpp
@@ -84,6 +96,9 @@ pybind11_add_module(_core
 
 # Link against the qdk::chemistry library
 target_link_libraries(_core PRIVATE qdk::chemistry)
+
+# Add cpp/src to include path for accessing private implementation headers
+target_include_directories(_core PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/../cpp/src")
 
 # C++20
 target_compile_features(_core PUBLIC cxx_std_20)

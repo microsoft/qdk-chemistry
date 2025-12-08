@@ -25,8 +25,10 @@ class ElectronicStructureSettings : public data::Settings {
   ElectronicStructureSettings() {
     set_default("method", "hf");
     set_default("basis_set", "def2-svp");
-    set_default("tolerance", 1e-8);
-    set_default("max_iterations", 50);
+    set_default("convergence_threshold", 1e-7);
+    set_default("max_iterations", 50, "Maximum number of SCF iterations",
+                qdk::chemistry::data::BoundConstraint<int64_t>{
+                    1, std::numeric_limits<int64_t>::max()});
   }
 };
 
@@ -100,8 +102,8 @@ class ScfSolver
    *
    * @throws std::runtime_error If SCF fails to converge
    * @throws std::invalid_argument If the input structure is invalid
-   * @throws SettingsAreLocked If attempting to modify settings after run() is
-   *         called
+   * @throws qdk::chemistry::data::SettingsAreLocked If attempting to modify
+   * settings after run() is called
    *
    * @note Settings are automatically locked when this method is called and
    *       cannot be modified during or after execution.

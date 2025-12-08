@@ -40,9 +40,14 @@ class MultiConfigurationSettings : public data::Settings {
     // energy convergence threshold
     set_default<double>("ci_residual_tolerance", 1.0e-6);
     // maximum number of iterations any Davidson
-    set_default<size_t>("davidson_iterations", 200);
+    set_default<int64_t>("davidson_iterations", 200,
+                         "Maximum number of Davidson iterations",
+                         qdk::chemistry::data::BoundConstraint<int64_t>{
+                             1, std::numeric_limits<int64_t>::max()});
     // number of states
-    set_default<size_t>("num_roots", 1);
+    set_default<int64_t>("num_roots", 1, "Number of roots",
+                         qdk::chemistry::data::BoundConstraint<int64_t>{
+                             1, std::numeric_limits<int64_t>::max()});
   }
 
   /**
@@ -106,10 +111,10 @@ class MultiConfigurationCalculator
    * @return A pair containing the calculated energy (first) and the resulting
    *         multi-configurational wavefunction (second)
    *
-   * @throw std::runtime_error if the calculation fails
-   * @throw std::invalid_argument if hamiltonian is invalid
-   * @throw SettingsAreLocked if attempting to modify settings after run() is
-   * called
+   * @throws std::runtime_error if the calculation fails
+   * @throws std::invalid_argument if hamiltonian is invalid
+   * @throws qdk::chemistry::data::SettingsAreLocked if attempting to modify
+   * settings after run() is called
    *
    * @note Settings are automatically locked when this method is called and
    * cannot be modified during or after execution.

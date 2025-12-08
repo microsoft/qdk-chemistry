@@ -111,11 +111,14 @@ class Canonical4CenterHamiltonian : public HamiltonianContainer {
   virtual std::string get_container_type() const override;
 
   /**
-   * @brief Get two-electron integrals in MO basis
-   * @return Reference to two-electron integrals vector
+   * @brief Get two-electron integrals in MO basis for all spin channels
+   * @return Tuple of references to (aaaa, aabb, bbbb) two-electron integrals
+   * vectors
    * @throws std::runtime_error if integrals are not set
    */
-  virtual const Eigen::VectorXd& get_two_body_integrals() const override;
+  virtual std::tuple<const Eigen::VectorXd&, const Eigen::VectorXd&,
+             const Eigen::VectorXd&>
+  get_two_body_integrals() const override;
 
   /**
    * @brief Get specific two-electron integral element
@@ -137,33 +140,6 @@ class Canonical4CenterHamiltonian : public HamiltonianContainer {
    * @return True if two-body integrals are set
    */
   virtual bool has_two_body_integrals() const override;
-
-  /**
-   * @brief Get alpha-alpha two-electron integrals in MO basis
-   * @return Reference to alpha-alpha two-electron integrals vector
-   * @throws std::runtime_error if integrals are not set
-   */
-  virtual const Eigen::VectorXd& get_two_body_integrals_aaaa() const override;
-
-  /**
-   * @brief Get alpha-beta two-electron integrals in MO basis
-   * @return Reference to alpha-beta two-electron integrals vector
-   * @throws std::runtime_error if integrals are not set
-   */
-  virtual const Eigen::VectorXd& get_two_body_integrals_aabb() const override;
-
-  /**
-   * @brief Get beta-beta two-electron integrals in MO basis
-   * @return Reference to beta-beta two-electron integrals vector
-   * @throws std::runtime_error if integrals are not set
-   */
-  virtual const Eigen::VectorXd& get_two_body_integrals_bbbb() const override;
-
-  /**
-   * @brief Get inactive Fock matrix for the selected active space
-   * @return Reference to the inactive Fock matrix
-   * @throws std::runtime_error if inactive Fock matrix is not set
-   */
 
   /**
    * @brief Check if the Hamiltonian is restricted

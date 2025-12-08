@@ -71,18 +71,16 @@ py::object setting_value_to_python(const SettingValue &value) {
 
         if constexpr (std::is_same_v<ValueType, bool>) {
           return py::bool_(variant_value);
-        } else if constexpr (std::is_same_v<ValueType, int> ||
-                             std::is_same_v<ValueType, long> ||
-                             std::is_same_v<ValueType, size_t>) {
+        } else if constexpr (std::is_integral_v<ValueType>) {
           return py::int_(variant_value);
         } else if constexpr (std::is_same_v<ValueType, float> ||
                              std::is_same_v<ValueType, double>) {
           return py::float_(variant_value);
         } else if constexpr (std::is_same_v<ValueType, std::string>) {
           return py::str(variant_value);
-        } else if constexpr (std::is_same_v<ValueType, std::vector<bool>>) {
+        } else if constexpr (std::is_same_v<ValueType, std::vector<int64_t>>) {
           return py::cast(variant_value);
-        } else if constexpr (std::is_same_v<ValueType, std::vector<int>>) {
+        } else if constexpr (std::is_same_v<ValueType, std::vector<uint64_t>>) {
           return py::cast(variant_value);
         } else if constexpr (std::is_same_v<ValueType, std::vector<double>>) {
           return py::cast(variant_value);
@@ -110,36 +108,13 @@ SettingValue python_to_setting_value_with_type(const py::object &obj,
             key, "bool (got " + std::string(py::str(py::type::of(obj))) + ")");
       }
       return obj.cast<bool>();
-    } else if (expected_type == "int") {
+    } else if (expected_type == "int" || expected_type == "int64_t" ||
+               expected_type == "uint64_t") {
       if (!py::isinstance<py::int_>(obj) || py::isinstance<py::bool_>(obj)) {
         throw SettingTypeMismatch(
             key, "int (got " + std::string(py::str(py::type::of(obj))) + ")");
       }
-      long long value = obj.cast<long long>();
-      if (value < INT_MIN || value > INT_MAX) {
-        throw SettingTypeMismatch(
-            key, "int (value " + std::to_string(value) + " out of range)");
-      }
-      return static_cast<int>(value);
-    } else if (expected_type == "int64_t" || expected_type == "long") {
-      if (!py::isinstance<py::int_>(obj) || py::isinstance<py::bool_>(obj)) {
-        throw SettingTypeMismatch(
-            key, expected_type + " (got " +
-                     std::string(py::str(py::type::of(obj))) + ")");
-      }
       return obj.cast<int64_t>();
-    } else if (expected_type == "size_t") {
-      if (!py::isinstance<py::int_>(obj) || py::isinstance<py::bool_>(obj)) {
-        throw SettingTypeMismatch(
-            key,
-            "size_t (got " + std::string(py::str(py::type::of(obj))) + ")");
-      }
-      long long value = obj.cast<long long>();
-      if (value < 0) {
-        throw SettingTypeMismatch(key, "size_t (cannot be negative, got " +
-                                           std::to_string(value) + ")");
-      }
-      return static_cast<size_t>(value);
     } else if (expected_type == "float") {
       if (!py::isinstance<py::float_>(obj) && !py::isinstance<py::int_>(obj)) {
         throw SettingTypeMismatch(
@@ -160,8 +135,10 @@ SettingValue python_to_setting_value_with_type(const py::object &obj,
             "string (got " + std::string(py::str(py::type::of(obj))) + ")");
       }
       return obj.cast<std::string>();
-    } else if (expected_type == "vector<int>") {
-      std::vector<int> result;
+    } else if (expected_type == "vector<int>" ||
+               expected_type == "vector<int64_t>" ||
+               expected_type == "vector<uint64_t>") {
+      std::vector<int64_t> result;
       if (py::isinstance<py::list>(obj) || py::isinstance<py::tuple>(obj)) {
         py::sequence seq = obj.cast<py::sequence>();
         result.reserve(seq.size());
@@ -179,13 +156,8 @@ SettingValue python_to_setting_value_with_type(const py::object &obj,
                          ", expected int)");
           }
           try {
-            long long value = elem.cast<long long>();
-            if (value < INT_MIN || value > INT_MAX) {
-              throw SettingTypeMismatch(
-                  key, "vector<int> (element " + std::to_string(i) + " value " +
-                           std::to_string(value) + " out of range for int)");
-            }
-            result.push_back(static_cast<int>(value));
+            int64_t value = elem.cast<int64_t>();
+            result.push_back(value);
           } catch (const py::cast_error &e) {
             throw SettingTypeMismatch(
                 key, "vector<int> (element " + std::to_string(i) +
@@ -210,14 +182,8 @@ SettingValue python_to_setting_value_with_type(const py::object &obj,
                          ", expected int)");
           }
           try {
-            long long value = elem.cast<long long>();
-            if (value < INT_MIN || value > INT_MAX) {
-              throw SettingTypeMismatch(key, "vector<int> (array element " +
-                                                 std::to_string(i) + " value " +
-                                                 std::to_string(value) +
-                                                 " out of range for int)");
-            }
-            result.push_back(static_cast<int>(value));
+            int64_t value = elem.cast<int64_t>();
+            result.push_back(value);
           } catch (const py::cast_error &e) {
             throw SettingTypeMismatch(
                 key, "vector<int> (array element " + std::to_string(i) +
@@ -307,125 +273,6 @@ SettingValue python_to_setting_value_with_type(const py::object &obj,
                                       std::string(py::str(py::type::of(obj))) +
                                       ", expected list or tuple)");
       }
-    } else if (expected_type == "vector<bool>") {
-      std::vector<bool> result;
-      if (py::isinstance<py::list>(obj) || py::isinstance<py::tuple>(obj)) {
-        py::sequence seq = obj.cast<py::sequence>();
-        result.reserve(seq.size());
-        for (size_t i = 0; i < seq.size(); ++i) {
-          py::object elem = seq[i];
-          if (!py::isinstance<py::bool_>(elem)) {
-            throw SettingTypeMismatch(
-                key, "vector<bool> (element " + std::to_string(i) + " is " +
-                         std::string(py::str(py::type::of(elem))) +
-                         ", expected bool)");
-          }
-          try {
-            result.push_back(elem.cast<bool>());
-          } catch (const py::cast_error &e) {
-            throw SettingTypeMismatch(
-                key, "vector<bool> (element " + std::to_string(i) +
-                         " cast failed: " + std::string(e.what()) + ")");
-          }
-        }
-        return result;
-      } else if (py::isinstance<py::array>(obj)) {
-        py::array arr = obj.cast<py::array>();
-        result.reserve(arr.size());
-        for (size_t i = 0; i < arr.size(); ++i) {
-          py::object elem = arr[py::int_(i)];
-          if (!py::isinstance<py::bool_>(elem)) {
-            throw SettingTypeMismatch(
-                key, "vector<bool> (array element " + std::to_string(i) +
-                         " is " + std::string(py::str(py::type::of(elem))) +
-                         ", expected bool)");
-          }
-          try {
-            result.push_back(elem.cast<bool>());
-          } catch (const py::cast_error &e) {
-            throw SettingTypeMismatch(
-                key, "vector<bool> (array element " + std::to_string(i) +
-                         " cast failed: " + std::string(e.what()) + ")");
-          }
-        }
-        return result;
-      } else {
-        throw SettingTypeMismatch(
-            key, "vector<bool> (got " +
-                     std::string(py::str(py::type::of(obj))) +
-                     ", expected list, tuple, or numpy array)");
-      }
-    } else if (expected_type == "vector<int64_t>" ||
-               expected_type == "vector<long>" ||
-               expected_type == "vector<size_t>") {
-      // Map vector<int64_t>, vector<long>, and vector<size_t> to vector<int>
-      // Note: This may lose precision for values outside int range
-      std::vector<int> result;
-      if (py::isinstance<py::list>(obj) || py::isinstance<py::tuple>(obj)) {
-        py::sequence seq = obj.cast<py::sequence>();
-        result.reserve(seq.size());
-        for (size_t i = 0; i < seq.size(); ++i) {
-          py::object elem = seq[i];
-          if (py::isinstance<py::bool_>(elem)) {
-            throw SettingTypeMismatch(key, expected_type + " (element " +
-                                               std::to_string(i) +
-                                               " is bool, expected int)");
-          }
-          if (!is_integer_like(elem)) {
-            throw SettingTypeMismatch(
-                key, expected_type + " (element " + std::to_string(i) + " is " +
-                         std::string(py::str(py::type::of(elem))) +
-                         ", expected int)");
-          }
-          try {
-            long long value = elem.cast<long long>();
-            if (value < INT_MIN || value > INT_MAX) {
-              throw SettingTypeMismatch(
-                  key, expected_type + " (element " + std::to_string(i) +
-                           " value " + std::to_string(value) +
-                           " out of range for int storage)");
-            }
-            result.push_back(static_cast<int>(value));
-          } catch (const py::cast_error &e) {
-            throw SettingTypeMismatch(
-                key, expected_type + " (element " + std::to_string(i) +
-                         " cast failed: " + std::string(e.what()) + ")");
-          }
-        }
-        return result;
-      } else if (py::isinstance<py::array>(obj)) {
-        py::array arr = obj.cast<py::array>();
-        result.reserve(arr.size());
-        for (size_t i = 0; i < arr.size(); ++i) {
-          py::object elem = arr[py::int_(i)];
-          if (!is_integer_like(elem)) {
-            throw SettingTypeMismatch(
-                key, expected_type + " (array element " + std::to_string(i) +
-                         " is " + std::string(py::str(py::type::of(elem))) +
-                         ", expected int)");
-          }
-          try {
-            long long value = elem.cast<long long>();
-            if (value < INT_MIN || value > INT_MAX) {
-              throw SettingTypeMismatch(
-                  key, expected_type + " (array element " + std::to_string(i) +
-                           " value " + std::to_string(value) +
-                           " out of range for int storage)");
-            }
-            result.push_back(static_cast<int>(value));
-          } catch (const py::cast_error &e) {
-            throw SettingTypeMismatch(
-                key, expected_type + " (array element " + std::to_string(i) +
-                         " cast failed: " + std::string(e.what()) + ")");
-          }
-        }
-        return result;
-      } else {
-        throw SettingTypeMismatch(
-            key, expected_type + " (got " +
-                     std::string(py::str(py::type::of(obj))) +
-                     ", expected list, tuple, or numpy array)");
-      }
     } else if (expected_type == "vector<float>") {
       // Map vector<float> to vector<double>
       std::vector<double> result;
@@ -477,12 +324,12 @@ SettingValue python_to_setting_value_with_type(const py::object &obj,
                      ", expected list, tuple, or numpy array)");
       }
     } else {
-      throw std::runtime_error(
-          "Unknown expected type '" + expected_type + "' for setting '" + key +
-          "'. Supported types are: bool, int, int64_t, long, size_t, float, "
-          "double, string, vector<bool>, vector<int>, vector<int64_t>, "
-          "vector<long>, vector<size_t>, vector<float>, vector<double>, "
-          "vector<string>");
+      throw std::runtime_error("Unknown expected type '" + expected_type +
+                               "' for setting '" + key +
+                               "'. Supported types are: bool, int, float, "
+                               "double, string, vector<int>, "
+                               "vector<float>, vector<double>, "
+                               "vector<string>");
     }
   } catch (const py::cast_error &e) {
     throw SettingTypeMismatch(
@@ -498,10 +345,60 @@ class PySettings : public Settings, public py::trampoline_self_life_support {
   // Expose set_default for Python derived classes to use in __init__
   // Now requires the expected type to ensure type-safe defaults
   void _set_default(const std::string &key, const std::string &expected_type,
-                    const py::object &value) {
+                    const py::object &value,
+                    const py::object &description = py::none(),
+                    const py::object &limit = py::none(),
+                    bool documented = true) {
     SettingValue setting_value =
         python_to_setting_value_with_type(value, expected_type, key);
-    set_default(key, setting_value);
+
+    std::optional<std::string> desc;
+    if (!description.is_none()) {
+      desc = py::cast<std::string>(description);
+    }
+
+    std::optional<Constraint> limit_val;
+    if (!limit.is_none()) {
+      // Convert Python limit to Constraint
+      if (py::isinstance<py::tuple>(limit) && py::len(limit) == 2) {
+        // Range limit (tuple of 2 elements) - convert to BoundConstraint
+        py::tuple limit_tuple = py::cast<py::tuple>(limit);
+        if (expected_type == "int" || expected_type == "vector<int>") {
+          BoundConstraint<int64_t> bound;
+          bound.min = py::cast<int64_t>(limit_tuple[0]);
+          bound.max = py::cast<int64_t>(limit_tuple[1]);
+          limit_val = bound;
+        } else if (expected_type == "double" || expected_type == "float" ||
+                   expected_type == "vector<double>" ||
+                   expected_type == "vector<float>") {
+          BoundConstraint<double> bound;
+          bound.min = py::cast<double>(limit_tuple[0]);
+          bound.max = py::cast<double>(limit_tuple[1]);
+          limit_val = bound;
+        }
+      } else if (py::isinstance<py::list>(limit)) {
+        // Enumeration limit (list of allowed values) - convert to
+        // ListConstraint
+        py::list limit_list = py::cast<py::list>(limit);
+        if (expected_type == "int" || expected_type == "vector<int>") {
+          ListConstraint<int64_t> list_constraint;
+          for (auto item : limit_list) {
+            list_constraint.allowed_values.push_back(py::cast<int64_t>(item));
+          }
+          limit_val = list_constraint;
+        } else if (expected_type == "string" ||
+                   expected_type == "vector<string>") {
+          ListConstraint<std::string> list_constraint;
+          for (auto item : limit_list) {
+            list_constraint.allowed_values.push_back(
+                py::cast<std::string>(item));
+          }
+          limit_val = list_constraint;
+        }
+      }
+    }
+
+    set_default(key, setting_value, desc, limit_val, documented);
   }
 
   void _set_default_setting_value(const std::string &key,
@@ -550,16 +447,16 @@ void bind_settings(pybind11::module &data) {
 
   // Bind SettingValue variant
   py::class_<SettingValue> setting_value(data, "SettingValue", R"(
-    Type-safe variant for storing different setting value types.
+Type-safe variant for storing different setting value types.
 
-    This variant can hold common types used in settings configurations:
-    bool, int, long, size_t, float, double, string, vector<int>, vector<double>, vector<string>
-    )");
+This variant can hold common types used in settings configurations:
+bool, int, long, size_t, float, double, string, vector<int>, vector<double>, vector<string>
+)");
 
   // Bind exception classes
   py::register_exception<SettingNotFound>(data, "SettingNotFound");
   py::register_exception<SettingTypeMismatch>(data, "SettingTypeMismatch");
-  py::register_exception<SettingAreLocked>(data, "SettingAreLocked");
+  py::register_exception<SettingsAreLocked>(data, "SettingsAreLocked");
 
   // Utility functions for conversion
   data.def("setting_value_to_python", &setting_value_to_python,
@@ -599,34 +496,33 @@ The settings map can only be populated during construction using _set_default.
 Examples:
 
     To create a custom settings class in Python:
-
-        >>> class MySettings(qdk_chemistry.data.Settings):
-        ...     def __init__(self):
-        ...         super().__init__()
-        ...         self._set_default("method", "string", "default")
-        ...         self._set_default("max_iterations", "int", 100)
-        ...         self._set_default("tolerance", "double", 1e-6)
-        ...
-        >>> settings = MySettings()
-        >>> settings["method"] = "hf"
-        >>> settings.method = "hf"     # Alternative access
-        >>> settings["max_iterations"] = 200
-        >>> settings["tolerance"] = 1e-8
-        >>> value = settings["method"]
-        >>> print("tolerance" in settings)
-        >>> print(len(settings))
-        >>>
-        >>> # Iterator functionality
-        >>> for key in settings:
-        ...     print(key, settings[key])
-        >>> for key in settings.keys():
-        ...     print(key)
-        >>> for value in settings.values():
-        ...     print(value)
-        >>> for key, value in settings.items():
-        ...     print(f"{key}: {value}")
-        >>>
-        >>> print(settings.to_dict())  # Convert to dict
+    >>> class MySettings(qdk_chemistry.data.Settings):
+    ...     def __init__(self):
+    ...         super().__init__()
+    ...         self._set_default("method", "string", "default")
+    ...         self._set_default("max_iterations", "int", 100)
+    ...         self._set_default("convergence_threshold", "double", 1e-6)
+    ...
+    >>> settings = MySettings()
+    >>> settings["method"] = "hf"
+    >>> settings.method = "hf"     # Alternative access
+    >>> settings["max_iterations"] = 200
+    >>> settings["convergence_threshold"] = 1e-8
+    >>> value = settings["method"]
+    >>> print("convergence_threshold" in settings)
+    >>> print(len(settings))
+    >>>
+    >>> # Iterator functionality
+    >>> for key in settings:
+    ...     print(key, settings[key])
+    >>> for key in settings.keys():
+    ...     print(key)
+    >>> for value in settings.values():
+    ...     print(value)
+    >>> for key, value in settings.items():
+    ...     print(f"{key}: {value}")
+    >>>
+    >>> print(settings.to_dict())  # Convert to dict
 
     Alternative: If you have an existing Settings object
 
@@ -678,7 +574,7 @@ Raises:
 Examples:
     >>> settings.set("method", "hf")
     >>> settings.set("max_iterations", 100)
-    >>> settings.set("tolerance", 1e-6)
+    >>> settings.set("convergence_threshold", 1e-6)
     >>> settings.set("parameters", [1.0, 2.0, 3.0])
 )",
       py::arg("key"), py::arg("value"));
@@ -723,7 +619,7 @@ Raises:
 Examples:
     >>> method = settings.get("method")
     >>> max_iter = settings.get("max_iterations")
-    >>> tolerance = settings.get("tolerance")
+    >>> convergence_threshold = settings.get("convergence_threshold")
 )",
       py::arg("key"));
 
@@ -867,42 +763,10 @@ Raises:
     SettingNotFound: If the key is not found
 
 Examples:
-    >>> str_val = settings.get_as_string("tolerance")  # "1e-06"
+    >>> str_val = settings.get_as_string("convergence_threshold")  # "1e-06"
     >>> str_val = settings.get_as_string("max_iterations")  # "100"
 )",
                py::arg("key"));
-
-  settings.def("get_all_settings", &Settings::get_all_settings,
-               R"(
-Get all settings as a map for Python interoperability.
-
-Returns the internal settings map, primarily for advanced use cases and internal operations.
-
-Returns:
-    dict: Reference to internal settings map
-
-Notes:
-    This returns a reference to the internal data structure.
-    Use `to_dict()` for a safe copy of the settings.
-)",
-               py::return_value_policy::reference_internal);
-
-  settings.def("set_from_map", &Settings::set_from_map,
-               R"(
-Set settings from a map (useful for Python dictionary conversion).
-
-Loads settings from a C++ map structure.
-This is primarily used internally for converting from Python dictionaries.
-
-Args:
-    settings_map (dict): Map containing setting key-value pairs
-
-Examples:
-    >>> # This is typically used internally, prefer from_dict() for Python
-    >>> internal_map = get_some_map()
-    >>> settings.set_from_map(internal_map)
-)",
-               py::arg("settings_map"));
 
   // JSON serialization
   settings.def(
@@ -925,7 +789,7 @@ Examples:
     {
         "method": "hf",
         "max_iterations": 100,
-        "tolerance": 1e-06
+        "convergence_threshold": 1e-06
     }
 )");
 
@@ -1082,8 +946,8 @@ Examples:
     >>> settings["method"] = "hf"
     >>> settings["max_iterations"] = 100
     >>> settings.lock()
-    >>> # Any further modifications will raise SettingAreLocked exception
-    >>> settings["method"] = "dft"  # Raises SettingAreLocked
+    >>> # Any further modifications will raise SettingsAreLocked exception
+    >>> settings["method"] = "dft"  # Raises SettingsAreLocked
 )");
 
   settings.def(
@@ -1180,9 +1044,164 @@ Raises:
 
 Examples:
     >>> type_name = settings.get_type_name("max_iterations")  # "int"
-    >>> type_name = settings.get_type_name("tolerance")       # "double"
+    >>> type_name = settings.get_type_name("convergence_threshold")  # "double"
 )",
                py::arg("key"));
+
+  settings.def("has_description", &Settings::has_description,
+               R"(
+Check if a setting has a description.
+
+Args:
+    key (str): The setting key name
+
+Returns:
+    bool: True if the setting has a description, False otherwise
+
+Examples:
+    >>> if settings.has_description("max_iterations"):
+    ...     desc = settings.get_description("max_iterations")
+)",
+               py::arg("key"));
+
+  settings.def("get_description", &Settings::get_description,
+               R"(
+Get the description of a setting.
+
+Args:
+    key (str): The setting key name
+
+Returns:
+    str: The description string
+
+Raises:
+    SettingNotFound: If the key doesn't exist or has no description
+
+Examples:
+    >>> desc = settings.get_description("max_iterations")
+    >>> print(desc)  # "Maximum number of iterations"
+)",
+               py::arg("key"));
+
+  settings.def("has_limits", &Settings::has_limits,
+               R"(
+Check if a setting has defined limits.
+
+Args:
+    key (str): The setting key name
+
+Returns:
+    bool: True if the setting has limits defined, False otherwise
+
+Examples:
+    >>> if settings.has_limits("max_iterations"):
+    ...     limits = settings.get_limits("max_iterations")
+)",
+               py::arg("key"));
+
+  settings.def(
+      "get_limits",
+      [](const Settings &self, const std::string &key) -> py::object {
+        Constraint limits = self.get_limits(key);
+        return std::visit(
+            [](const auto &variant_value) -> py::object {
+              using LimitType = std::decay_t<decltype(variant_value)>;
+              if constexpr (std::is_same_v<LimitType,
+                                           BoundConstraint<int64_t>>) {
+                return py::cast(
+                    std::make_tuple(variant_value.min, variant_value.max));
+              } else if constexpr (std::is_same_v<LimitType,
+                                                  BoundConstraint<double>>) {
+                return py::cast(
+                    std::make_tuple(variant_value.min, variant_value.max));
+              } else if constexpr (std::is_same_v<LimitType,
+                                                  ListConstraint<int64_t>>) {
+                return py::cast(variant_value.allowed_values);
+              } else if constexpr (std::is_same_v<
+                                       LimitType,
+                                       ListConstraint<std::string>>) {
+                return py::cast(variant_value.allowed_values);
+              } else {
+                return py::none();
+              }
+            },
+            limits);
+      },
+      R"(
+Get the limits of a setting.
+
+Returns the limit value which can be a range (tuple of min, max) or
+an enumeration (list of allowed values).
+
+Args:
+    key (str): The setting key name
+
+Returns:
+    tuple[int, int] | tuple[float, float] | list[int] | list[str]:
+
+        The limit value - either a range tuple or a list of allowed values
+
+Raises:
+    SettingNotFound: If the key doesn't exist or has no limits
+
+Examples:
+    >>> limits = settings.get_limits("max_iterations")
+    >>> print(limits)  # (1, 1000) for a range
+    >>>
+    >>> limits = settings.get_limits("method")
+    >>> print(limits)  # ['hf', 'dft', 'mp2'] for allowed values
+)",
+      py::arg("key"));
+
+  settings.def("is_documented", &Settings::is_documented,
+               R"(
+Check if a setting is documented.
+
+Args:
+    key (str): The setting key name
+
+Returns:
+    bool: True if the setting is marked as documented, False otherwise
+
+Raises:
+    SettingNotFound: If the key doesn't exist
+
+Examples:
+    >>> if settings.is_documented("max_iterations"):
+    ...     print("This setting is documented")
+)",
+               py::arg("key"));
+
+  settings.def("as_table", &Settings::as_table,
+               R"(
+Print settings as a formatted table.
+
+Prints all documented settings in a table format with columns:
+Key, Value, Limits, Description
+
+The table fits within the specified width with multi-line descriptions
+as needed. Non-integer numeric values are displayed in scientific notation.
+
+Args:
+    max_width (int): Maximum total width of the table (default: 120)
+    show_undocumented (bool): Whether to show undocumented settings (default: False)
+
+Returns:
+    str: Formatted table string
+
+Examples:
+    >>> print(settings.as_table())
+    ------------------------------------------------------------
+    Key                  | Value           | Limits              | Description
+    ------------------------------------------------------------
+    max_iterations       | 100             | [1, 1000]           | Maximum number of iterations
+    method               | "hf"            | ["hf", "dft"...]    | Electronic structure method
+    tolerance            | 1.00e-06        | [1.00e-08, 1.00...  | Convergence tolerance
+    ------------------------------------------------------------
+
+)",
+               py::arg("max_width") = 120,
+               py::arg("show_undocumented") = false);
 
   settings.def(
       "get_expected_python_type",
@@ -1195,19 +1214,13 @@ Examples:
         // Map C++ type names to Python type descriptions
         if (type_name == "bool") {
           return "bool";
-        } else if (type_name == "int" || type_name == "int64_t" ||
-                   type_name == "long" || type_name == "size_t") {
+        } else if (type_name == "int") {
           return "int";
         } else if (type_name == "float" || type_name == "double") {
           return "float";
         } else if (type_name == "string") {
           return "str";
-        } else if (type_name == "vector<bool>") {
-          return "list[bool]";
-        } else if (type_name == "vector<int>" ||
-                   type_name == "vector<int64_t>" ||
-                   type_name == "vector<long>" ||
-                   type_name == "vector<size_t>") {
+        } else if (type_name == "vector<int>") {
           return "list[int]";
         } else if (type_name == "vector<float>" ||
                    type_name == "vector<double>") {
@@ -1236,7 +1249,7 @@ Raises:
 Examples:
     >>> expected = settings.get_expected_python_type("max_iterations")
     >>> print(expected)  # "int"
-    >>> expected = settings.get_expected_python_type("tolerance")
+    >>> expected = settings.get_expected_python_type("convergence_threshold")
     >>> print(expected)  # "float"
     >>> expected = settings.get_expected_python_type("basis_set")
     >>> print(expected)  # "str"
@@ -1249,9 +1262,12 @@ Examples:
   settings.def(
       "_set_default",
       [](Settings &self, const std::string &key,
-         const std::string &expected_type, const py::object &value) {
+         const std::string &expected_type, const py::object &value,
+         const py::object &description = py::none(),
+         const py::object &limit = py::none(), bool documented = true) {
         // Cast to PySettings to access the protected method
-        static_cast<PySettings &>(self)._set_default(key, expected_type, value);
+        static_cast<PySettings &>(self)._set_default(
+            key, expected_type, value, description, limit, documented);
       },
       R"(
 Set a default value (for use in derived class __init__ only).
@@ -1263,6 +1279,13 @@ Args:
     key (str): The setting key name
     expected_type (str): The expected type name (e.g., "int", "double", "string", "vector<int>")
     value (object): The default value to set
+    description (str, optional): Human-readable description of the setting
+    limit (tuple | list, optional): Limits for the setting value.
+
+        For numeric types: tuple of (min, max)
+        For string types: list of allowed values
+
+    documented (bool): Whether this setting should be included in documentation (default: True)
 
 Notes:
     This method is intended for internal use by derived classes only.
@@ -1272,11 +1295,20 @@ Examples:
     >>> class MySettings(qdk_chemistry.data.Settings):
     ...     def __init__(self):
     ...         super().__init__()
-    ...         self._set_default("method", "string", "default")
-    ...         self._set_default("max_iter", "int", 1000)
-    ...         self._set_default("tolerance", "double", 1e-6)
+    ...         self._set_default("method", "string", "hf",
+    ...                          "Electronic structure method",
+    ...                          ["hf", "dft", "mp2"])
+    ...         self._set_default("max_iter", "int", 1000,
+    ...                          "Maximum iterations", (1, 10000))
+    ...         self._set_default("convergence_threshold", "double", 1e-6,
+    ...                          "Convergence threshold", (1e-12, 1e-3))
+    ...         self._set_default("debug_mode", "bool", False,
+    ...                          documented=False)
+
 )",
-      py::arg("key"), py::arg("expected_type"), py::arg("value"));
+      py::arg("key"), py::arg("expected_type"), py::arg("value"),
+      py::arg("description") = py::none(), py::arg("limit") = py::none(),
+      py::arg("documented") = true);
 
   // Python dictionary-like interface
   settings.def(
@@ -1300,7 +1332,7 @@ Raises:
 
 Examples:
     >>> method = settings["method"]
-    >>> tolerance = settings["tolerance"]
+    >>> convergence_threshold = settings["convergence_threshold"]
 )",
       py::arg("key"));
 
@@ -1803,7 +1835,7 @@ Raises:
 
 Examples:
     >>> type_name = settings.get_type_name("max_iterations")  # "int"
-    >>> type_name = settings.get_type_name("tolerance")       # "double"
+    >>> type_name = settings.get_type_name("convergence_threshold")  # "double"
 )",
                py::arg("key"));
 
@@ -1811,9 +1843,12 @@ Examples:
   settings.def(
       "_set_default",
       [](Settings &self, const std::string &key,
-         const std::string &expected_type, const py::object &value) {
+         const std::string &expected_type, const py::object &value,
+         const py::object &description, const py::object &limit,
+         bool documented) {
         // Cast to PySettings to access the protected method
-        static_cast<PySettings &>(self)._set_default(key, expected_type, value);
+        static_cast<PySettings &>(self)._set_default(
+            key, expected_type, value, description, limit, documented);
       },
       R"(
 Set a default value (for use in derived class __init__ only).
@@ -1825,6 +1860,12 @@ Args:
     key (str): The setting key name
     expected_type (str): The expected type name (e.g., "int", "double", "string", "vector<int>")
     value (object): The default value to set
+    description (str, optional): Human-readable description of the setting
+    limit (tuple or list, optional): Allowed values or numeric range.
+        - For numeric types: tuple of (min, max) e.g., (0, 100) or (0.0, 1.0)
+        - For strings: list of allowed values e.g., ["option1", "option2", "option3"]
+        - For int vectors: list of allowed integer values
+    documented (bool, optional): Whether this setting should appear in as_table() output (default: True)
 
 Notes:
     This method is intended for internal use by derived classes only.
@@ -1834,11 +1875,27 @@ Examples:
     >>> class MySettings(qdk_chemistry.data.Settings):
     ...     def __init__(self):
     ...         super().__init__()
-    ...         self._set_default("method", "string", "default")
+    ...         # Basic usage
+    ...         self._set_default("method", "string", "hf")
     ...         self._set_default("max_iter", "int", 1000)
     ...         self._set_default("tolerance", "double", 1e-6)
+    ...
+    ...         # With description and numeric limits
+    ...         self._set_default("convergence_threshold", "double", 1e-8,
+    ...                          description="Convergence threshold",
+    ...                          limit=(1e-12, 1e-4))
+    ...
+    ...         # With string enumeration limits
+    ...         self._set_default("encoding", "string", "jordan-wigner",
+    ...                          description="Qubit encoding method",
+    ...                          limit=["jordan-wigner", "bravyi-kitaev", "parity"])
+    ...
+    ...         # Undocumented internal setting
+    ...         self._set_default("internal_flag", "bool", False, documented=False)
 )",
-      py::arg("key"), py::arg("expected_type"), py::arg("value"));
+      py::arg("key"), py::arg("expected_type"), py::arg("value"),
+      py::arg("description") = py::none(), py::arg("limit") = py::none(),
+      py::arg("documented") = true);
 
   // Python dictionary-like interface
   settings.def(
@@ -1862,7 +1919,7 @@ Raises:
 
 Examples:
     >>> method = settings["method"]
-    >>> tolerance = settings["tolerance"]
+    >>> convergence_threshold = settings["convergence_threshold"]
 )",
       py::arg("key"));
 
@@ -2373,12 +2430,12 @@ This class extends the base Settings class with default values commonly used in 
 
 The default settings include:
 
-    * method: "hf" - The electronic structure method (Hartree-Fock)
-    * charge: 0 - Molecular charge
-    * spin_multiplicity: 1 - Spin multiplicity (2S+1)
-    * basis_set: "def2-svp" - Default basis set
-    * tolerance: 1e-6 - Convergence tolerance
-    * max_iterations: 50 - Maximum number of iterations
+- method: "hf" - The electronic structure method (Hartree-Fock)
+- charge: 0 - Molecular charge
+- spin_multiplicity: 1 - Spin multiplicity (2S+1)
+- basis_set: "def2-svp" - Default basis set
+- tolerance: 1e-6 - Convergence tolerance
+- max_iterations: 50 - Maximum number of iterations
 
 These defaults can be overridden by setting new values after instantiation.
 
@@ -2392,9 +2449,9 @@ Examples:
     >>> settings.max_iterations = 100  # Increase max iterations
 )")
       .def(py::init<>(), R"(
-    Create ElectronicStructureSettings with default values.
+Create ElectronicStructureSettings with default values.
 
-    Initializes settings with sensible defaults for electronic structure
-    calculations. All defaults can be modified after construction.
+Initializes settings with sensible defaults for electronic structure
+calculations. All defaults can be modified after construction.
 )");
 }

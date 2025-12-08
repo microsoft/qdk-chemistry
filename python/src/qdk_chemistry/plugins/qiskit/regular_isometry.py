@@ -12,7 +12,6 @@ from qiskit.compiler import transpile
 from qiskit.quantum_info import Statevector
 from qiskit.transpiler import PassManager
 
-from qdk_chemistry.algorithms import register
 from qdk_chemistry.algorithms.state_preparation import StatePreparation, StatePreparationSettings
 from qdk_chemistry.data import Wavefunction
 from qdk_chemistry.plugins.qiskit._interop.transpiler import (
@@ -24,6 +23,8 @@ from qdk_chemistry.utils.bitstring import separate_alpha_beta_to_binary_string
 from qdk_chemistry.utils.statevector import _create_statevector_from_coeffs_and_dets_string
 
 _LOGGER = logging.getLogger(__name__)
+
+__all__ = ["RegularIsometryStatePreparation"]
 
 
 class RegularIsometryStatePreparation(StatePreparation):
@@ -101,6 +102,3 @@ class RegularIsometryStatePreparation(StatePreparation):
     def name(self) -> str:
         """Return the name of the state preparation method."""
         return "regular_isometry"
-
-
-register(lambda: RegularIsometryStatePreparation())

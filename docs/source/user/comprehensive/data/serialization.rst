@@ -1,7 +1,7 @@
 Serialization
 =============
 
-QDK/Chemistry provides serialization capabilities for all its data classes, allowing you to save and load computational results in various formats.
+QDK/Chemistry provides serialization capabilities for all its data classes, allowing to save and load computational results in various formats.
 This document explains the serialization mechanisms and formats supported by QDK/Chemistry.
 
 Overview
@@ -14,10 +14,6 @@ In QDK/Chemistry, this is crucial for:
 - Sharing data between different programs or languages
 - Preserving computational results for future analysis
 - Implementing checkpoint and restart capabilities
-
-.. note::
-   For detailed information about the structure and organization of serialized data for each class, refer to the corresponding class documentation.
-   Each data class page includes examples of the JSON and HDF5 schema used for serialization.
 
 Supported formats
 -----------------
@@ -39,44 +35,34 @@ JSON serialization
 
 .. tab:: C++ API
 
-   .. code-block:: cpp
-
-      // Serialize to JSON object
-      auto json_data = object.to_json();
-
-      // Deserialize from JSON object
-      auto object_from_json = ObjectType::from_json(json_data);
-
-      // Serialize to JSON file
-      object.to_json_file("filename.ext.json"); // Extension depends on object type
-
-      // Deserialize from JSON file
-      auto object_from_json_file = ObjectType::from_json_file("filename.ext.json");
+   .. literalinclude:: ../../../_static/examples/cpp/serialization.cpp
+      :language: cpp
+      :start-after: // start-cell-json
+      :end-before: // end-cell-json
 
 .. tab:: Python API
 
-   .. literalinclude:: ../../../../examples/serialization.py
+   .. literalinclude:: ../../../_static/examples/python/serialization.py
       :language: python
-      :lines: 14-20,26-32
+      :start-after: # start-cell-json
+      :end-before: # end-cell-json
 
 HDF5 serialization
 ~~~~~~~~~~~~~~~~~~
 
 .. tab:: C++ API
 
-   .. code-block:: cpp
-
-      // Serialize to HDF5 file
-      object.to_hdf5_file("filename.ext.h5"); // Extension depends on object type
-
-      // Deserialize from HDF5 file
-      auto object_from_hdf5_file = ObjectType::from_hdf5_file("filename.ext.h5");
+   .. literalinclude:: ../../../_static/examples/cpp/serialization.cpp
+      :language: cpp
+      :start-after: // start-cell-hdf5
+      :end-before: // end-cell-hdf5
 
 .. tab:: Python API
 
-   .. literalinclude:: ../../../../examples/serialization.py
+   .. literalinclude:: ../../../_static/examples/python/serialization.py
       :language: python
-      :lines: 35-41
+      :start-after: # start-cell-hdf5
+      :end-before: # end-cell-hdf5
 
 File extensions
 ---------------
@@ -107,16 +93,19 @@ QDK/Chemistry enforces specific file extensions to ensure clarity about the cont
      - ``.hamiltonian.json``
      - ``.hamiltonian.h5``
      - ``hamiltonian.fcidump``
-   * - :class:`~qdk_chemistry.data.Wavefunction`
+   * - :doc:`Wavefunction <../data/wavefunction>`
      - ``.wavefunction.json``
      - ``.wavefunction.h5``
      - -
 
-Related topics
---------------
+The same patterns are observed for other data classes in QDK/Chemistry.
 
+Further reading
+---------------
+
+- The above examples can be downloaded as complete `C++ <../../../_static/examples/cpp/serialization.cpp>`_ and `Python <../../../_static/examples/python/serialization.py>`_ scripts.
 - :doc:`Structure <../data/structure>`: Molecular geometry and atomic information
-- :doc:`BasisSet <../data/basis_set>`: Quantum chemistry basis set definitions
+- :doc:`BasisSet <../data/basis_set>`: Basis set definitions
 - :doc:`Orbitals <../data/orbitals>`: Molecular orbital coefficients and properties
 - :doc:`Hamiltonian <../data/hamiltonian>`: Electronic Hamiltonian operator
-- :class:`~qdk_chemistry.data.Wavefunction`: Quantum mechanical wavefunction data
+- :doc:`Wavefunction <../data/wavefunction>`: Wavefunction data

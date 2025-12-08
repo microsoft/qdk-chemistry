@@ -47,10 +47,20 @@ class ScfSettings
    *
    */
   ScfSettings() : qdk::chemistry::algorithms::ElectronicStructureSettings() {
-    // TODO enable these
-    // set_default("diis_enabled", true);
-    // set_default("diis_start", 2);
-    // set_default("level_shift", 0.0);
+    set_default("level_shift", -1.0);
+    set_default("enable_gdm", false);
+    set_default("energy_thresh_diis_switch", 1e-3);
+    set_default("gdm_max_diis_iteration", 50);
+    set_default("gdm_bfgs_history_size_limit", 50);
+    set_default("fock_reset_steps", 1073741824);
+    set_default("eri_use_atomics", false);
+    set_default("eri_threshold", -1.0);
+    set_default(
+        "eri_method", std::string("direct"),
+        "ERI evaluation method: 'direct' computes integrals on-the-fly, "
+        "'incore' stores all integrals in memory",
+        data::ListConstraint<std::string>{
+            {std::vector<std::string>{"direct", "incore"}}});
   }
 };
 
