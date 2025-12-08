@@ -62,8 +62,7 @@ print("Active Space Hamiltonian:\n", hamiltonian.get_summary())
 
 mc = create("multi_configuration_calculator")
 print(f"Available multi-configuration calculator settings: {mc.settings().items()}")
-# TODO: uncomment the line below when the bug is fixed
-# mc.settings().set("davidson_iterations", 300)
+mc.settings().set("davidson_iterations", 300)
 E_cas, wfn_cas = mc.run(
     hamiltonian, n_active_alpha_electrons=1, n_active_beta_electrons=1
 )

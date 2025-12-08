@@ -8,37 +8,52 @@
 
 // --------------------------------------------------------------------------------------------
 // start-cell-create
+#include <iostream>
 #include <qdk/chemistry.hpp>
+#include <string>
 using namespace qdk::chemistry::algorithms;
+using namespace qdk::chemistry::data;
 
-// Create an MP2 natural orbital localizer
-auto mp2_localizer = LocalizerFactory::create("mp2_natural_orbitals");
+// Create a Pipek-Mezey localizer using the factory
+auto localizer = LocalizerFactory::create("qdk_pipek_mezey");
 // end-cell-create
 // --------------------------------------------------------------------------------------------
 
-// --------------------------------------------------------------------------------------------
-// start-cell-configure
-// Set the convergence threshold
-localizer->settings().set("tolerance", 1.0e-6);
-// end-cell-configure
-// --------------------------------------------------------------------------------------------
+int main() {
+  // --------------------------------------------------------------------------------------------
+  // start-cell-configure
+  // Configure settings for localizer
+  localizer->settings().set("tolerance", 1.0e-6);
+  localizer->settings().set("max_iterations", 100);
+  std::cout << localizer->settings().keys() << std::endl;
 
-// --------------------------------------------------------------------------------------------
-// start-cell-localize
-// Obtain a valid Orbitals instance
-Orbitals orbitals;
-/* orbitals = ... */
+  // end-cell-configure
+  // --------------------------------------------------------------------------------------------
 
-// Configure electron counts in settings for methods that require them
-localizer->settings().set("n_alpha_electrons", n_alpha);
-localizer->settings().set("n_beta_electrons", n_beta);
+  // --------------------------------------------------------------------------------------------
+  // start-cell-localize
+  // Create H2O molecule
+  std::vector<Eigen::Vector3d> coords = {
+      {0.0, 0.0, 0.0}, {0.0, 0.757, 0.587}, {0.0, -0.757, 0.587}};
+  std::vector<std::string> symbols = {"O", "H", "H"};
+  Structure structure(coords, symbols);
 
-// Create indices for orbitals to localize
-std::vector<size_t> loc_indices_a = {0, 1, 2, 3};  // Alpha orbital indices
-std::vector<size_t> loc_indices_b = {0, 1, 2, 3};  // Beta orbital indices
+  // Obtain orbitals from SCF calculation
+  auto scf_solver = ScfSolverFactory::create();
+  scf_solver->settings().set("basis_set", "sto-3g");
+  auto [E_scf, wavefunction] = scf_solver->run(structure, 0, 1);
 
-// Localize the specified orbitals
-auto localized_orbitals =
-    localizer->run(orbitals, loc_indices_a, loc_indices_b);
-// end-cell-localize
-// --------------------------------------------------------------------------------------------
+  // Specify which orbitals to localize
+  // For restricted calculations, alpha and beta orbitals are identical
+  std::vector<size_t> loc_indices = {0, 1, 2, 3};
+
+  // Localize the specified orbitals
+  auto localized_wfn = localizer->run(wavefunction, loc_indices, loc_indices);
+  auto localized_orbitals = localized_wfn->get_orbitals();
+
+  // Print summary
+  std::cout << localizer->get_summary() << std::endl;
+  // end-cell-localize
+  // --------------------------------------------------------------------------------------------
+  return 0;
+}
