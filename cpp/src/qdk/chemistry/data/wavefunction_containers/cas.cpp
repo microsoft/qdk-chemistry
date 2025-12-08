@@ -653,6 +653,15 @@ std::unique_ptr<CasWavefunctionContainer> CasWavefunctionContainer::from_hdf5(
       type = (type_str == "self_dual") ? WavefunctionType::SelfDual
                                        : WavefunctionType::NotSelfDual;
     }
+
+    // Load restrictedness flag
+    bool is_restricted = false;
+    if (group.attrExists("is_restricted")) {
+      H5::Attribute restrictedness_attr = group.openAttribute("is_restricted");
+      hbool_t is_restricted_flag;
+      restrictedness_attr.read(H5::PredType::NATIVE_HBOOL, &is_restricted_flag);
+      is_restricted = (is_restricted_flag != 0);
+    }
     // Load complexity flag
     bool is_complex = false;
     if (group.attrExists("is_complex")) {
@@ -715,6 +724,8 @@ std::unique_ptr<CasWavefunctionContainer> CasWavefunctionContainer::from_hdf5(
     auto config_set = ConfigurationSet::from_hdf5(config_set_group);
     const auto& determinants = config_set.get_configurations();
     auto orbitals = config_set.get_orbitals();
+
+    // TODO load rdms if they are available, and pass to container
 
     return std::make_unique<CasWavefunctionContainer>(
         coefficients, determinants, orbitals, type);
