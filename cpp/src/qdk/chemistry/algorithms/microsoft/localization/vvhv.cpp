@@ -4,6 +4,7 @@
 
 #include "vvhv.hpp"
 
+#include <qdk/chemistry/scf/core/basis_set.h>
 #include <qdk/chemistry/scf/core/types.h>
 #include <qdk/chemistry/scf/util/int1e.h>
 #include <qdk/chemistry/scf/util/libint2_util.h>
@@ -27,193 +28,234 @@ namespace qdk::chemistry::algorithms::microsoft {
 
 namespace qcs = qdk::chemistry::scf;
 
-std::shared_ptr<data::Wavefunction> VVHVLocalizer::_run_impl(
-    std::shared_ptr<data::Wavefunction> wavefunction,
-    const std::vector<size_t>& loc_indices_a,
-    const std::vector<size_t>& loc_indices_b) const {
-  QDK_LOG_TRACE_ENTERING();
-  auto orbitals = wavefunction->get_orbitals();
-  // Get electron counts from settings
-  auto [n_alpha_electrons, n_beta_electrons] =
-      wavefunction->get_total_num_electrons();
+/**
+ * @brief VV-HV localization scheme implementation.
+ *
+ * This class implements the VV-HV localization algorithm for molecular
+ * orbitals. It partitions the virtual space into valence virtuals and hard
+ * virtuals based on projection onto a minimal basis, then uses a pluggable
+ * localization scheme (e.g., Pipek-Mezey) to localize the occupied space and
+ * valence virtuals space and project Atomic orbitals into the hard virtual
+ * space.
+ *
+ * This class holds a pointer to an IterativeOrbitalLocalizationScheme for the
+ * actual localization work. This allows flexibility to use different
+ * localization methods (Pipek-Mezey, Foster-Boys, etc.) for occupied orbitals
+ * and valence virtuals in the future.
+ */
+class VVHVLocalization : public IterativeOrbitalLocalizationScheme {
+ public:
+  /**
+   * @brief Constructor for VVHVLocalization.
+   *
+   * @param settings Localization settings
+   * @param basis_set The basis set used for the orbitals
+   * @param ao_overlap Atomic orbital overlap matrix
+   * @param minimal_basis_name Name of the minimal basis set (e.g., "STO-3G")
+   * @param inner_localizer Reusable inner localization scheme (e.g.,
+   * Pipek-Mezey)
+   */
+  VVHVLocalization(
+      const IterativeOrbitalLocalizationSettings& settings,
+      std::shared_ptr<data::BasisSet> basis_set,
+      const Eigen::MatrixXd& ao_overlap, const std::string& minimal_basis_name,
+      std::shared_ptr<IterativeOrbitalLocalizationScheme> inner_localizer)
+      : IterativeOrbitalLocalizationScheme(settings),
+        basis_set_(basis_set),
+        overlap_ori_(ao_overlap),
+        minimal_basis_name_(minimal_basis_name),
+        basis_ori_fp_(utils::microsoft::convert_basis_set_from_qdk(*basis_set)),
+        inner_localizer_(inner_localizer) {
+    QDK_LOG_TRACE_ENTERING();
 
-  // Check if electron counts have been set
-  if (n_alpha_electrons < 0 || n_beta_electrons < 0) {
-    throw std::invalid_argument(
-        "n_alpha_electrons and n_beta_electrons must be set in localizer "
-        "settings before calling _run_impl()");
+    // Initialize all data structures and pre-compute integrals
+    initialize();
   }
 
-  // Get number of molecular orbitals first
-  const size_t num_molecular_orbitals = orbitals->get_num_molecular_orbitals();
+  ~VVHVLocalization() = default;
 
-  // Validate that indices are sorted
-  if (!std::is_sorted(loc_indices_a.begin(), loc_indices_a.end())) {
-    throw std::invalid_argument("loc_indices_a must be sorted");
-  }
-  if (!std::is_sorted(loc_indices_b.begin(), loc_indices_b.end())) {
-    throw std::invalid_argument("loc_indices_b must be sorted");
-  }
+  /**
+   * @brief Localize the virtual orbitals using the VV-HV algorithm.
+   *
+   * This method performs the localization of virtual molecular orbitals
+   * according to the VV-HV scheme. It constructs the valence virtual space by
+   * projecting the occupied space out of the minimal basis, then localizes
+   * valence virtuals and constructs hard virtual orbitals.
+   *
+   * @param occupied_orbitals Matrix of occupied orbital coefficients
+   * (num_atomic_orbitals x num_occupied_orbitals)
+   * @return Localized virtual orbital coefficient matrix (num_atomic_orbitals x
+   * num_virtual_orbitals)
+   */
+  Eigen::MatrixXd localize(const Eigen::MatrixXd& occupied_orbitals);
 
-  // Check that indices only cover virtual orbitals
-  auto check_virtual_indices = [num_molecular_orbitals](
-                                   const std::vector<size_t>& indices,
-                                   size_t n_electrons) {
-    const size_t num_virtual_orbitals = num_molecular_orbitals - n_electrons;
-    if (indices.size() != num_virtual_orbitals) {
-      return false;
-    }
-    std::vector<bool> covered(num_virtual_orbitals, false);
-    for (size_t idx : indices) {
-      if (idx < n_electrons || idx >= num_molecular_orbitals) {
-        return false;  // Index is not in virtual range
-      }
-      covered[idx - n_electrons] = true;
-    }
-    for (bool c : covered) {
-      if (!c) return false;
-    }
-    return true;
-  };
+ private:
+  // Input parameters
+  std::shared_ptr<data::BasisSet> basis_set_;
+  std::string minimal_basis_name_;
 
-  if (!check_virtual_indices(loc_indices_a, n_alpha_electrons)) {
-    throw std::invalid_argument(
-        "VVHVLocalizer requires all alpha virtual orbital indices to be "
-        "covered. loc_indices_a must contain all alpha virtual orbital indices "
-        "from n_alpha_electrons to num_molecular_orbitals-1.");
-  }
+  // Inner Localization scheme
+  // Currently uses Pipek-Mezey, but can be replaced with other schemes in the
+  // future.
+  std::shared_ptr<IterativeOrbitalLocalizationScheme> inner_localizer_;
 
-  if (!orbitals->is_restricted() &&
-      !check_virtual_indices(loc_indices_b, n_beta_electrons)) {
-    throw std::invalid_argument(
-        "VVHVLocalizer requires all beta virtual orbital indices to be "
-        "covered. loc_indices_b must contain all beta virtual orbital indices "
-        "from n_beta_electrons to num_molecular_orbitals-1.");
-  }
+  // Pre-computed integral data (computed during initialization)
+  const Eigen::MatrixXd& overlap_ori_;  // Overlap in original basis
+  Eigen::MatrixXd
+      overlap_mix_;  // Cross overlap between original and minimal basis
 
-  if (orbitals->is_restricted() && !(loc_indices_a == loc_indices_b)) {
-    throw std::invalid_argument(
-        "For restricted orbitals, loc_indices_a and loc_indices_b must be "
-        "identical");
-  }
-  const auto& basis_set = orbitals->get_basis_set();
-  const size_t num_atomic_orbitals = basis_set->get_num_atomic_orbitals();
-  if (num_atomic_orbitals != num_molecular_orbitals) {
-    throw std::runtime_error(
-        "Current VVHVLocalizer can not handle basis set linear dependence");
-  }
+  // Pre-computed dipole and quadrupole integrals (if weighted_orthogonalization
+  // is true)
+  std::unique_ptr<qcs::RowMajorMatrix>
+      dipole_integrals_;  // 3*num_atomic_orbitals x num_atomic_orbitals matrix
+  std::unique_ptr<qcs::RowMajorMatrix>
+      quadrupole_integrals_;  // 6*num_atomic_orbitals x num_atomic_orbitals
+                              // matrix
 
-  // Initialize the backend if not already done
-  utils::microsoft::initialize_backend();
+  // Basis set data
+  std::shared_ptr<qcs::BasisSet>
+      basis_ori_fp_;  // Original basis set in LightAIMD format
+  std::shared_ptr<qcs::BasisSet>
+      minimal_basis_fp_;  // Minimal basis set in LightAIMD format
 
-  // Get minimal basis name from settings or use default
-  std::string minimal_basis_name =
-      _settings->get_or_default<std::string>("minimal_basis", "sto-3g");
+  /**
+   * @brief Perform symmetric orthonormalization of orbital coefficients.
+   *
+   * Computes the overlap matrix S = C^T * overlap_inp * C, diagonalizes it,
+   * validates the eigenvalue structure, and transforms the orbitals to be
+   * orthonormal with respect to overlap_inp.
+   *
+   * @param num_atomic_orbitals Number of atomic orbitals (rows in C and
+   * overlap_inp)
+   * @param num_orbitals Number of orbitals (columns in C)
+   * @param overlap_inp Overlap matrix (num_atomic_orbitals x
+   * num_atomic_orbitals) in the representation which input orbitals C are given
+   * @param C Input orbital coefficient matrix (num_atomic_orbitals x
+   * num_orbitals)
+   * @param C_out Output orthonormalized orbital coefficient matrix
+   * (num_atomic_orbitals x num_orbitals_out, num_orbitals_out = num_orbitals -
+   * expected_near_zero)
+   * @param ortho_threshold Threshold for orthonormalization (eigenvalue cutoff)
+   * @param expected_near_zero Expected number of near-zero eigenvalues to skip
+   * (skip check if 0)
+   * @param error_label Label for error messages
+   * @param separation_ratio Required ratio of eigenvalue[M+1]/eigenvalue[M] for
+   * sufficient separation
+   */
+  void orthonormalization(int num_atomic_orbitals, int num_orbitals,
+                          const double* overlap_inp, double* C, double* C_out,
+                          double ortho_threshold = 1e-6,
+                          unsigned int expected_near_zero = 0,
+                          const std::string& error_label = "",
+                          double separation_ratio = 5.0);
 
-  auto [coeffs_alpha, coeffs_beta] = orbitals->get_coefficients();
-  auto ao_overlap = orbitals->get_overlap_matrix();
+  /**
+   * @brief Check the eigenvalue structure when projecting out some space.
+   *
+   * Validates that the number of near-zero eigenvalues matches expectations and
+   * that there is sufficient separation between near-zero and non-near-zero
+   * eigenvalues.
+   *
+   * @param eigenvalues Array of eigenvalues to check (length total_eigenvalues)
+   * @param expected_near_zero Expected number of near-zero eigenvalues
+   * @param total_eigenvalues Total number of eigenvalues in the array
+   * @param error_label Label for error messages
+   * @param separation_ratio Required ratio of eigenvalue[M+1]/eigenvalue[M] for
+   * sufficient separation
+   */
+  void check_eigenvalue_structure(const double* eigenvalues,
+                                  int expected_near_zero, int total_eigenvalues,
+                                  const std::string& error_label,
+                                  double separation_ratio = 5.0) const;
 
-  // TODO (DBWY): Adding configurable inner localizer
-  // Work Item: 41816
-  // Create reusable Pipek-Mezey localizer for inner localization
-  const size_t num_atoms = basis_set->get_structure()->get_num_atoms();
-  std::vector<int> bf_to_atom(num_atomic_orbitals);
-  for (size_t i = 0; i < num_atomic_orbitals; ++i) {
-    bf_to_atom[i] = basis_set->get_atom_index_for_atomic_orbital(i);
-  }
-  auto inner_localizer = std::make_shared<PipekMezeyLocalization>(
-      *static_cast<const IterativeOrbitalLocalizationSettings*>(
-          _settings.get()),
-      ao_overlap, num_atoms, bf_to_atom);
+  /**
+   * @brief Calculate orbital spreads for given orbitals using dipole and
+   * quadrupole integrals.
+   *
+   * Uses the dipole and quadrupole class members to compute orbital spreads.
+   *
+   * @param orbitals Matrix of orbital coefficients (num_atomic_orbitals x
+   * num_orbitals)
+   * @param spreads Output vector of orbital spreads
+   * :math:`\left( \langle r^2 \rangle -\lvert\langle r \rangle\rvert^2 \right)`
+   */
+  void calculate_orbital_spreads(const Eigen::MatrixXd& orbitals,
+                                 Eigen::VectorXd& spreads) const;
 
-  if (orbitals->is_restricted()) {
-    // Restricted case: RHF or ROHF - only handle virtual orbitals
-    const size_t num_occupied_orbitals =
-        std::max(n_alpha_electrons, n_beta_electrons);
-    const size_t num_virtual_orbitals =
-        num_molecular_orbitals - num_occupied_orbitals;
-    VVHVLocalization localizer(
-        *static_cast<const IterativeOrbitalLocalizationSettings*>(
-            _settings.get()),
-        basis_set, ao_overlap, minimal_basis_name, inner_localizer);
+  /**
+   * @brief Build (optionally sub-localize) hard virtual orbitals for a single
+   * atom+angular momentum block.
+   *
+   * @param overlap_ori_al Overlap matrix block (original basis) for the atom+l
+   * block (size num_atomic_orbitals_al_ori x num_atomic_orbitals_al_ori)
+   * @param overlap_mix_al Mixed overlap block between original and minimal
+   * basis (size num_atomic_orbitals_al_ori x num_atomic_orbitals_al_min)
+   * @param bf_al_ori Index list (global AO indices) for this atom+l in the
+   * original basis
+   * @param bf_al_min Index list for this atom+l in the minimal basis
+   * @param C_hv_al (Output) Matrix (num_atomic_orbitals_ori x nhv_al) to
+   * receive hard virtual coefficients (global AO representation)
+   * @param num_atomic_orbitals_ori Total number of original atomic orbitals
+   * (global row dimension for C_hv_al)
+   * @param atom_index Atom index (for logging / diagnostics)
+   * @param l Angular momentum quantum number (for logging / diagnostics)
+   */
+  void proto_hv(const Eigen::MatrixXd& overlap_ori_al,
+                const Eigen::MatrixXd& overlap_mix_al,
+                const std::vector<int>& bf_al_ori,
+                const std::vector<int>& bf_al_min, Eigen::MatrixXd& C_hv_al,
+                int num_atomic_orbitals_ori, int atom_index, int l);
 
-    // Extract occupied orbitals and pass to localize, get back localized
-    // virtual orbitals only
-    Eigen::MatrixXd occupied_orbitals =
-        coeffs_alpha.block(0, 0, num_atomic_orbitals, num_occupied_orbitals);
-    Eigen::MatrixXd C_virt_loc = localizer.localize(occupied_orbitals);
+  /**
+   * @brief Initialize data structures and compute overlap matrices and
+   * integrals.
+   *
+   * This method computes overlap matrices, basis set transformations, and
+   * optionally dipole/quadrupole integrals for orbital spread calculations.
+   * Should be called once during construction.
+   */
+  void initialize();
 
-    // Reconstruct full coefficient matrix with original occupied orbitals
-    Eigen::MatrixXd C_lmo = coeffs_alpha;
-    C_lmo.block(0, num_occupied_orbitals, num_atomic_orbitals,
-                num_virtual_orbitals) = C_virt_loc;
+  /**
+   * @brief Calculate the valence virtual space from occupied orbitals.
+   *
+   * This method constructs the unlocalized valence virtual space by projecting
+   * occupied space out of the minimal basis and orthonormalizing.
+   *
+   * @param occupied_orbitals Input occupied orbital coefficients matrix
+   * @return Unlocalized valence virtual orbitals
+   */
+  Eigen::MatrixXd calculate_valence_virtual(
+      const Eigen::MatrixXd& occupied_orbitals);
 
-    auto new_orbitals = std::make_shared<data::Orbitals>(
-        C_lmo,
-        std::nullopt,   // no energies for localized orbitals
-        ao_overlap,     // Atomic Orbital overlap
-        basis_set,      // basis set
-        std::nullopt);  // no active space indices
-    return detail::new_wavefunction(wavefunction, new_orbitals);
-  } else {
-    // Unrestricted case: UHF - only handle virtual orbitals
-    const size_t num_alpha_virtual_orbitalslpha =
-        num_molecular_orbitals - n_alpha_electrons;
-    const size_t num_beta_virtual_orbitals =
-        num_molecular_orbitals - n_beta_electrons;
+  /**
+   * @brief Localize valence virtual orbitals using the inner localizer.
+   *
+   * This method localizes valence virtual orbitals using the inner_localizer_
+   * (currently Pipek-Mezey by default).
+   *
+   * @param C_valence_unloc Unlocalized valence virtual orbitals
+   * @return Localized valence virtual orbitals
+   */
+  Eigen::MatrixXd localize_valence_virtual(
+      const Eigen::MatrixXd& C_valence_unloc);
 
-    // Create a single VVHVLocalization instance and reuse for both channels
-    VVHVLocalization localizer(
-        *static_cast<const IterativeOrbitalLocalizationSettings*>(
-            _settings.get()),
-        basis_set, ao_overlap, minimal_basis_name, inner_localizer);
-
-    // Alpha channel
-    Eigen::MatrixXd occupied_alpha =
-        coeffs_alpha.block(0, 0, num_atomic_orbitals, n_alpha_electrons);
-    Eigen::MatrixXd C_virt_alpha_loc = localizer.localize(occupied_alpha);
-
-    // Beta channel - reuse the same localizer instance
-    Eigen::MatrixXd occupied_beta =
-        coeffs_beta.block(0, 0, num_atomic_orbitals, n_beta_electrons);
-    Eigen::MatrixXd C_virt_beta_loc = localizer.localize(occupied_beta);
-
-    // Reconstruct full coefficient matrices with original occupied orbitals
-    Eigen::MatrixXd C_alpha = coeffs_alpha;
-    Eigen::MatrixXd C_beta = coeffs_beta;
-    C_alpha.block(0, n_alpha_electrons, num_atomic_orbitals,
-                  num_alpha_virtual_orbitalslpha) = C_virt_alpha_loc;
-    C_beta.block(0, n_beta_electrons, num_atomic_orbitals,
-                 num_beta_virtual_orbitals) = C_virt_beta_loc;
-
-    auto new_orbitals = std::make_shared<data::Orbitals>(
-        C_alpha, C_beta, std::nullopt,
-        std::nullopt,   // no energies for localized orbitals
-        ao_overlap,     // Atomic Orbital overlap
-        basis_set,      // basis set
-        std::nullopt);  // no active space indices
-    return detail::new_wavefunction(wavefunction, new_orbitals);
-  }
-}
+  /**
+   * @brief Localize hard virtual orbitals for given valence virtual orbitals.
+   *
+   * Hard virtuals are constructed atom-by-atom and
+   * angular-momentum-by-angular-momentum, then optionally localized within each
+   * block.
+   *
+   * @param C_minimal_unloc Combined minimal space orbitals (valence virtual +
+   * occupied)
+   * @return Hard virtual orbitals only
+   */
+  Eigen::MatrixXd localize_hard_virtuals(
+      const Eigen::MatrixXd& C_minimal_unloc);
+};
 
 // VVHVLocalization implementation
-VVHVLocalization::VVHVLocalization(
-    const IterativeOrbitalLocalizationSettings& settings,
-    std::shared_ptr<data::BasisSet> basis_set,
-    const Eigen::MatrixXd& ao_overlap, const std::string& minimal_basis_name,
-    std::shared_ptr<IterativeOrbitalLocalizationScheme> inner_localizer)
-    : IterativeOrbitalLocalizationScheme(settings),
-      basis_set_(basis_set),
-      overlap_ori_(ao_overlap),
-      minimal_basis_name_(minimal_basis_name),
-      basis_ori_fp_(utils::microsoft::convert_basis_set_from_qdk(*basis_set)),
-      inner_localizer_(inner_localizer) {
-  QDK_LOG_TRACE_ENTERING();
-
-  // Initialize all data structures and pre-compute integrals
-  initialize();
-}
-
 Eigen::MatrixXd VVHVLocalization::localize(
     const Eigen::MatrixXd& occupied_orbitals) {
   QDK_LOG_TRACE_ENTERING();
@@ -1074,6 +1116,175 @@ void VVHVLocalization::check_eigenvalue_structure(
   oss << "\n";
   if (abs(eigenvalue_M_plus_1 / eigenvalue_M) < separation_ratio)
     QDK_LOGGER().warn(oss.str());
+}
+
+std::shared_ptr<data::Wavefunction> VVHVLocalizer::_run_impl(
+    std::shared_ptr<data::Wavefunction> wavefunction,
+    const std::vector<size_t>& loc_indices_a,
+    const std::vector<size_t>& loc_indices_b) const {
+  QDK_LOG_TRACE_ENTERING();
+  auto orbitals = wavefunction->get_orbitals();
+  // Get electron counts from settings
+  auto [n_alpha_electrons, n_beta_electrons] =
+      wavefunction->get_total_num_electrons();
+
+  // Check if electron counts have been set
+  if (n_alpha_electrons < 0 || n_beta_electrons < 0) {
+    throw std::invalid_argument(
+        "n_alpha_electrons and n_beta_electrons must be set in localizer "
+        "settings before calling _run_impl()");
+  }
+
+  // Get number of molecular orbitals first
+  const size_t num_molecular_orbitals = orbitals->get_num_molecular_orbitals();
+
+  // Validate that indices are sorted
+  if (!std::is_sorted(loc_indices_a.begin(), loc_indices_a.end())) {
+    throw std::invalid_argument("loc_indices_a must be sorted");
+  }
+  if (!std::is_sorted(loc_indices_b.begin(), loc_indices_b.end())) {
+    throw std::invalid_argument("loc_indices_b must be sorted");
+  }
+
+  // Check that indices only cover virtual orbitals
+  auto check_virtual_indices = [num_molecular_orbitals](
+                                   const std::vector<size_t>& indices,
+                                   size_t n_electrons) {
+    const size_t num_virtual_orbitals = num_molecular_orbitals - n_electrons;
+    if (indices.size() != num_virtual_orbitals) {
+      return false;
+    }
+    std::vector<bool> covered(num_virtual_orbitals, false);
+    for (size_t idx : indices) {
+      if (idx < n_electrons || idx >= num_molecular_orbitals) {
+        return false;  // Index is not in virtual range
+      }
+      covered[idx - n_electrons] = true;
+    }
+    for (bool c : covered) {
+      if (!c) return false;
+    }
+    return true;
+  };
+
+  if (!check_virtual_indices(loc_indices_a, n_alpha_electrons)) {
+    throw std::invalid_argument(
+        "VVHVLocalizer requires all alpha virtual orbital indices to be "
+        "covered. loc_indices_a must contain all alpha virtual orbital indices "
+        "from n_alpha_electrons to num_molecular_orbitals-1.");
+  }
+
+  if (!orbitals->is_restricted() &&
+      !check_virtual_indices(loc_indices_b, n_beta_electrons)) {
+    throw std::invalid_argument(
+        "VVHVLocalizer requires all beta virtual orbital indices to be "
+        "covered. loc_indices_b must contain all beta virtual orbital indices "
+        "from n_beta_electrons to num_molecular_orbitals-1.");
+  }
+
+  if (orbitals->is_restricted() && !(loc_indices_a == loc_indices_b)) {
+    throw std::invalid_argument(
+        "For restricted orbitals, loc_indices_a and loc_indices_b must be "
+        "identical");
+  }
+  const auto& basis_set = orbitals->get_basis_set();
+  const size_t num_atomic_orbitals = basis_set->get_num_atomic_orbitals();
+  if (num_atomic_orbitals != num_molecular_orbitals) {
+    throw std::runtime_error(
+        "Current VVHVLocalizer can not handle basis set linear dependence");
+  }
+
+  // Initialize the backend if not already done
+  utils::microsoft::initialize_backend();
+
+  // Get minimal basis name from settings or use default
+  std::string minimal_basis_name =
+      _settings->get_or_default<std::string>("minimal_basis", "sto-3g");
+
+  auto [coeffs_alpha, coeffs_beta] = orbitals->get_coefficients();
+  auto ao_overlap = orbitals->get_overlap_matrix();
+
+  // TODO (DBWY): Adding configurable inner localizer
+  // Work Item: 41816
+  // Create reusable Pipek-Mezey localizer for inner localization
+  const size_t num_atoms = basis_set->get_structure()->get_num_atoms();
+  std::vector<int> bf_to_atom(num_atomic_orbitals);
+  for (size_t i = 0; i < num_atomic_orbitals; ++i) {
+    bf_to_atom[i] = basis_set->get_atom_index_for_atomic_orbital(i);
+  }
+  auto inner_localizer = std::make_shared<PipekMezeyLocalization>(
+      *static_cast<const IterativeOrbitalLocalizationSettings*>(
+          _settings.get()),
+      ao_overlap, num_atoms, bf_to_atom);
+
+  if (orbitals->is_restricted()) {
+    // Restricted case: RHF or ROHF - only handle virtual orbitals
+    const size_t num_occupied_orbitals =
+        std::max(n_alpha_electrons, n_beta_electrons);
+    const size_t num_virtual_orbitals =
+        num_molecular_orbitals - num_occupied_orbitals;
+    VVHVLocalization localizer(
+        *static_cast<const IterativeOrbitalLocalizationSettings*>(
+            _settings.get()),
+        basis_set, ao_overlap, minimal_basis_name, inner_localizer);
+
+    // Extract occupied orbitals and pass to localize, get back localized
+    // virtual orbitals only
+    Eigen::MatrixXd occupied_orbitals =
+        coeffs_alpha.block(0, 0, num_atomic_orbitals, num_occupied_orbitals);
+    Eigen::MatrixXd C_virt_loc = localizer.localize(occupied_orbitals);
+
+    // Reconstruct full coefficient matrix with original occupied orbitals
+    Eigen::MatrixXd C_lmo = coeffs_alpha;
+    C_lmo.block(0, num_occupied_orbitals, num_atomic_orbitals,
+                num_virtual_orbitals) = C_virt_loc;
+
+    auto new_orbitals = std::make_shared<data::Orbitals>(
+        C_lmo,
+        std::nullopt,   // no energies for localized orbitals
+        ao_overlap,     // Atomic Orbital overlap
+        basis_set,      // basis set
+        std::nullopt);  // no active space indices
+    return detail::new_wavefunction(wavefunction, new_orbitals);
+  } else {
+    // Unrestricted case: UHF - only handle virtual orbitals
+    const size_t num_alpha_virtual_orbitals =
+        num_molecular_orbitals - n_alpha_electrons;
+    const size_t num_beta_virtual_orbitals =
+        num_molecular_orbitals - n_beta_electrons;
+
+    // Create a single VVHVLocalization instance and reuse for both channels
+    VVHVLocalization localizer(
+        *static_cast<const IterativeOrbitalLocalizationSettings*>(
+            _settings.get()),
+        basis_set, ao_overlap, minimal_basis_name, inner_localizer);
+
+    // Alpha channel
+    Eigen::MatrixXd occupied_alpha =
+        coeffs_alpha.block(0, 0, num_atomic_orbitals, n_alpha_electrons);
+    Eigen::MatrixXd C_virt_alpha_loc = localizer.localize(occupied_alpha);
+
+    // Beta channel - reuse the same localizer instance
+    Eigen::MatrixXd occupied_beta =
+        coeffs_beta.block(0, 0, num_atomic_orbitals, n_beta_electrons);
+    Eigen::MatrixXd C_virt_beta_loc = localizer.localize(occupied_beta);
+
+    // Reconstruct full coefficient matrices with original occupied orbitals
+    Eigen::MatrixXd C_alpha = coeffs_alpha;
+    Eigen::MatrixXd C_beta = coeffs_beta;
+    C_alpha.block(0, n_alpha_electrons, num_atomic_orbitals,
+                  num_alpha_virtual_orbitals) = C_virt_alpha_loc;
+    C_beta.block(0, n_beta_electrons, num_atomic_orbitals,
+                 num_beta_virtual_orbitals) = C_virt_beta_loc;
+
+    auto new_orbitals = std::make_shared<data::Orbitals>(
+        C_alpha, C_beta, std::nullopt,
+        std::nullopt,   // no energies for localized orbitals
+        ao_overlap,     // Atomic Orbital overlap
+        basis_set,      // basis set
+        std::nullopt);  // no active space indices
+    return detail::new_wavefunction(wavefunction, new_orbitals);
+  }
 }
 
 }  // namespace qdk::chemistry::algorithms::microsoft
