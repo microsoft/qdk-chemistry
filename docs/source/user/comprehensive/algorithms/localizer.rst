@@ -31,10 +31,10 @@ QDK/Chemistry provides several orbital transformation methods through the :class
 Usage
 -----
 
-Before performing localization, you need an :doc:`Orbitals <../data/orbitals>` instance as input.
-This is typically obtained from an :doc:`ScfSolver <scf_solver>` calculation, as localization is usually applied to converged :term:`SCF` orbitals.
+This section demonstrates how to create, configure, and run orbital localization.
+The ``run`` method takes an :doc:`Orbitals <../data/orbitals>` instance (typically from an :doc:`ScfSolver <scf_solver>` calculation) and returns a new :doc:`Orbitals <../data/orbitals>` object with transformed orbitals.
 
-The most common use case is localizing occupied orbitals after an SCF calculation:
+**Creating a localizer:**
 
 .. tab:: C++ API
 
@@ -50,11 +50,10 @@ The most common use case is localizing occupied orbitals after an SCF calculatio
       :start-after: # start-cell-create
       :end-before: # end-cell-create
 
+**Configuring settings:**
 
-Configuring the localizer
--------------------------
-
-The :class:`~qdk_chemistry.algorithms.OrbitalLocalizer` can be configured using the :doc:`Settings <settings>` object:
+Settings can be modified using the ``settings()`` object.
+See `Available implementations`_ below for implementation-specific options.
 
 .. tab:: C++ API
 
@@ -70,12 +69,7 @@ The :class:`~qdk_chemistry.algorithms.OrbitalLocalizer` can be configured using 
       :start-after: # start-cell-configure
       :end-before: # end-cell-configure
 
-Performing orbital localization
--------------------------------
-
-Before performing localization, you need an :doc:`Orbitals <../data/orbitals>` instance as input.
-This is typically obtained from an :doc:`ScfSolver <scf_solver>` calculation, as localization is usually applied to converged :term:`SCF` orbitals.
-Following QDK/Chemistry's :doc:`algorithm design principles <../design/index>`, the :class:`~qdk_chemistry.algorithms.OrbitalLocalizer` algorithm takes an :doc:`Orbitals <../data/orbitals>` object as input and produces a new :doc:`Orbitals <../data/orbitals>` object as output, preserving the original orbitals while creating a transformed representation.
+**Running localization:**
 
 The ``run`` method requires three parameters:
 
@@ -85,9 +79,6 @@ The ``run`` method requires three parameters:
 
 .. note::
    For restricted calculations, ``loc_indices_a`` and ``loc_indices_b`` must be identical.
-   If empty vectors/lists are provided, no orbitals of that spin type will be localized.
-
-Once configured, the localization can be performed on a set of orbitals:
 
 .. tab:: C++ API
 
@@ -98,94 +89,162 @@ Once configured, the localization can be performed on a set of orbitals:
 
 .. tab:: Python API
 
-   .. note::
-      This example shows the API pattern. For complete working examples, see the test suite.
-
    .. literalinclude:: ../../../_static/examples/python/localizer.py
       :language: python
       :start-after: # start-cell-localize
       :end-before: # end-cell-localize
 
-Available localization methods
-------------------------------
+Available implementations
+-------------------------
 
-QDK/Chemistry's :class:`~qdk_chemistry.algorithms.OrbitalLocalizer` provides a unified interface for localization methods.
+QDK/Chemistry's :class:`~qdk_chemistry.algorithms.OrbitalLocalizer` provides a unified interface to orbital localization methods.
+You can discover available implementations programmatically:
 
-QDK/Chemistry implementations
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+.. tab:: C++ API
 
-- **QDK/Chemistry**: Native implementation of Pipek-Mezey and MP2 natural orbital localization
-- **QDK/Chemistry**: VVHV orbital separation method
+   .. code-block:: cpp
 
-Third-party interfaces
-~~~~~~~~~~~~~~~~~~~~~~
+      auto names = LocalizerFactory::available();
+      for (const auto& name : names) {
+          std::cout << name << std::endl;
+      }
 
-- **PySCF**: Interface to PySCF's orbital localization methods (Pipek-Mezey, Boys, etc.)
+.. tab:: Python API
 
-The factory pattern allows seamless selection between these implementations.
+   .. code-block:: python
 
-For more details on how QDK/Chemistry interfaces with external packages, see the :ref:`plugin system <plugin-system>` documentation.
+      from qdk_chemistry.algorithms import registry
+      print(registry.available("orbital_localizer"))
+      # ['pyscf_multi', 'qdk_vvhv', 'qdk_mp2_natural_orbitals', 'qdk_pipek_mezey']
 
+QDK Pipek-Mezey
+~~~~~~~~~~~~~~~
 
-Available settings
-------------------
+**Factory name:** ``"qdk_pipek_mezey"`` (default)
 
-The :class:`~qdk_chemistry.algorithms.OrbitalLocalizer` settings vary by implementation. Different localization algorithms have their own specific configuration parameters.
+Maximizes the sum of squared Mulliken charges on each atom for each orbital, creating orbitals that are maximally localized on specific atoms or bonds.
 
-Specialized settings
-~~~~~~~~~~~~~~~~~~~~
-
-These settings apply only to specific variants of localization:
+**Settings:**
 
 .. list-table::
    :header-rows: 1
-   :widths: 20 15 15 30 20
+   :widths: 25 15 15 45
 
    * - Setting
      - Type
      - Default
      - Description
-     - Applicable To
    * - ``tolerance``
      - float
-     - 1.0e-6
+     - ``1e-6``
      - Convergence criterion for localization iterations
-     - Pipek-Mezey, Valence Virtual Hard Virtual (VVHV)
    * - ``max_iterations``
      - int
-     - 10000
+     - ``10000``
      - Maximum number of localization iterations
-     - Pipek-Mezey, :term:`VVHV`
    * - ``small_rotation_tolerance``
      - float
-     - 1.0e-12
+     - ``1e-12``
      - Threshold for small rotation detection
-     - Pipek-Mezey, :term:`VVHV`
+
+QDK MP2 Natural Orbitals
+~~~~~~~~~~~~~~~~~~~~~~~~
+
+**Factory name:** ``"qdk_mp2_natural_orbitals"``
+
+Transforms canonical orbitals into natural orbitals based on MP2 density matrices, providing orbitals that diagonalize the correlation effects.
+
+**Settings:** This implementation has no configurable settings.
+
+QDK VVHV
+~~~~~~~~
+
+**Factory name:** ``"qdk_vvhv"``
+
+Valence Virtual Hard Virtual (VVHV) orbital separation—separates orbitals into valence, virtual, and hard virtual categories for more efficient treatment in correlation methods.
+
+**Settings:**
+
+.. list-table::
+   :header-rows: 1
+   :widths: 25 15 15 45
+
+   * - Setting
+     - Type
+     - Default
+     - Description
+   * - ``tolerance``
+     - float
+     - ``1e-6``
+     - Convergence criterion for localization iterations
+   * - ``max_iterations``
+     - int
+     - ``10000``
+     - Maximum number of localization iterations
+   * - ``small_rotation_tolerance``
+     - float
+     - ``1e-12``
+     - Threshold for small rotation detection
    * - ``minimal_basis``
      - string
-     - "sto-3g"
-     - Name of the minimal basis set used for valence virtual projection
-     - :term:`VVHV`
+     - ``"sto-3g"``
+     - Minimal basis set for valence virtual projection
    * - ``weighted_orthogonalization``
      - bool
-     - true
-     - Whether to use weighted orthogonalization in hard virtual construction
-     - :term:`VVHV`
+     - ``True``
+     - Use weighted orthogonalization in hard virtual construction
+
+PySCF Multi
+~~~~~~~~~~~
+
+**Factory name:** ``"pyscf_multi"``
+
+The PySCF plugin provides access to `PySCF's <https://pyscf.org/>`_ orbital localization routines, supporting multiple localization algorithms.
+
+**Capabilities:**
+
+- Pipek-Mezey (PM) localization
+- Foster-Boys (FB) localization
+- Edmiston-Ruedenberg (ER) localization
+- Cholesky-based localization
+
+**Settings:**
+
+.. list-table::
+   :header-rows: 1
+   :widths: 25 15 15 45
+
+   * - Setting
+     - Type
+     - Default
+     - Description
    * - ``method``
      - string
-     - "pipek-mezey"
-     - Localization algorithm to use ("pipek-mezey", "foster-boys", "edmiston-ruedenberg", "cholesky")
-     - PySCF
+     - ``"pipek-mezey"``
+     - Localization algorithm: ``"pipek-mezey"``, ``"foster-boys"``, ``"edmiston-ruedenberg"``, or ``"cholesky"``
    * - ``population_method``
      - string
-     - "mulliken"
+     - ``"mulliken"``
      - Population analysis method for Pipek-Mezey localization
-     - PySCF
    * - ``occupation_threshold``
      - float
-     - 1.0e-10
+     - ``1e-10``
      - Threshold for classifying orbitals as occupied vs virtual
-     - PySCF
+
+**Example:**
+
+.. code-block:: python
+
+   from qdk_chemistry.algorithms import create
+
+   localizer = create("orbital_localizer", "pyscf_multi")
+   localizer.settings().set("method", "foster-boys")
+
+   # Localize occupied orbitals
+   occ_indices = list(range(n_occupied))
+   localized_orbs = localizer.run(orbitals, occ_indices, occ_indices)
+
+For more details on how to extend QDK/Chemistry with additional implementations, see the :doc:`plugin system <../plugins>` documentation.
 
 Further reading
 ---------------

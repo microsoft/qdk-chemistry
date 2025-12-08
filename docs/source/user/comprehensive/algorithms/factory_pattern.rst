@@ -19,7 +19,7 @@ This approach has several advantages:
 Factory pattern in QDK/Chemistry
 --------------------------------
 
-In QDK/Chemistry, algorithm classes like :doc:`ScfSolver <../algorithms/scf_solver>`, :doc:`Localizer <../algorithms/localizer>`, and :doc:`MCCalculator <../algorithms/mc_calculator>` are instantiated through factory classes rather than direct constructors.
+In QDK/Chemistry, :doc:`algorithm <index>` classes are instantiated through factory classes rather than direct constructors.
 This design allows QDK/Chemistry to:
 
 - Support multiple implementations of the same algorithm interface
@@ -30,41 +30,60 @@ This design allows QDK/Chemistry to:
 Factory classes in QDK/Chemistry
 --------------------------------
 
-QDK/Chemistry provides factory classes for each algorithm type:
+QDK/Chemistry provides factory infrastructure for each algorithm type.
+In Python, algorithm instantiation is managed through a centralized registry module rather than individual factory classes.
 
-.. list-table:: QDK/Chemistry Algorithm Factories
+.. list-table:: QDK/Chemistry Algorithm Types
    :header-rows: 1
    :widths: auto
 
    * - Algorithm
-     - Factory Class
-     - Creation Function (Python)
+     - Algorithm Type (Python)
+     - Factory Class (C++)
    * - :doc:`ScfSolver <../algorithms/scf_solver>`
+     - ``"scf_solver"``
      - ``ScfSolverFactory``
-     - ``create_scf_solver()``
    * - :doc:`Localizer <../algorithms/localizer>`
+     - ``"orbital_localizer"``
      - ``LocalizerFactory``
-     - ``create_localizer()``
    * - :doc:`ActiveSpaceSelector <../algorithms/active_space>`
+     - ``"active_space_selector"``
      - ``ActiveSpaceSelectorFactory``
-     - ``create_active_space_selector()``
    * - :doc:`HamiltonianConstructor <../algorithms/hamiltonian_constructor>`
+     - ``"hamiltonian_constructor"``
      - ``HamiltonianConstructorFactory``
-     - ``create_hamiltonian_constructor()``
    * - :doc:`MCCalculator <../algorithms/mc_calculator>`
-     - ``MCCalculatorFactory``
-     - ``create_mc_calculator()``
-
-..   * - :doc:`DynamicalCorrelation <../algorithms/dynamical_correlation>`
-..     - ``DynamicalCorrelationFactory``
-..     - ``create_dynamical_correlation()``
+     - ``"multi_configuration_calculator"``
+     - ``MultiConfigurationCalculatorFactory``
+   * - :doc:`MultiConfigurationScf <../algorithms/mcscf>`
+     - ``"multi_configuration_scf"``
+     - ``MultiConfigurationScfFactory``
+   * - :doc:`ProjectedMultiConfigurationCalculator <../algorithms/pmc>`
+     - ``"projected_multi_configuration_calculator"``
+     - ``ProjectedMultiConfigurationCalculatorFactory``
+   * - :doc:`DynamicalCorrelationCalculator <../algorithms/dynamical_correlation>`
+     - ``"dynamical_correlation_calculator"``
+     - ``DynamicalCorrelationCalculatorFactory``
+   * - :doc:`StabilityChecker <../algorithms/stability_checker>`
+     - ``"stability_checker"``
+     - ``StabilityCheckerFactory``
+   * - :doc:`EnergyEstimator <../algorithms/energy_estimator>`
+     - ``"energy_estimator"``
+     - —
+   * - :doc:`StatePreparation <../algorithms/state_preparation>`
+     - ``"state_prep"``
+     - —
+   * - :doc:`QubitMapper <../algorithms/qubit_mapper>`
+     - ``"qubit_mapper"``
+     - —
 
 
 Using factories
 ---------------
 
-QDK/Chemistry provides factory methods to create algorithm instances in both C++ and Python.
-These factory methods allow users to create default implementations or specific implementations by name.
+To create an algorithm instance, call the appropriate factory method with an optional implementation name.
+If no name is provided, the default implementation is used.
+See :ref:`discovering-implementations` below for how to list available implementations programmatically.
 
 .. tab:: C++ API
 
@@ -80,161 +99,113 @@ These factory methods allow users to create default implementations or specific 
       :start-after: # start-cell-scf-localizer
       :end-before: # end-cell-scf-localizer
 
-Extending QDK/Chemistry
------------------------
+.. _discovering-implementations:
 
-QDK/Chemistry is designed with extensibility in mind, allowing developers to add new algorithms, data formats, and functionality.
-The factory pattern is the primary mechanism for extending QDK/Chemistry with custom implementations, especially for interfacing with external quantum chemistry programs.
+Discovering implementations
+---------------------------
 
-Interface implementation patterns
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+QDK/Chemistry provides programmatic discovery of available algorithm types and their implementations.
+This is useful for exploring what's available at runtime, building dynamic UIs, or debugging plugin loading.
 
-QDK/Chemistry can be extended in several ways:
-
-1. **External Program Interfaces**: Create implementations that connect QDK/Chemistry to external quantum chemistry packages
-2. **Custom Algorithm Implementations**: Develop your own implementations of QDK/Chemistry's algorithm interfaces
-3. **Data Format Bridges**: Create bridges between QDK/Chemistry's data structures and external formats
-
-Implementing program interfaces in C++
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-To create a new interface to an external program in C++:
-
-1. **Inherit from the algorithm base class**:
+Listing algorithm types and implementations
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 .. tab:: C++ API
 
    .. code-block:: cpp
 
-      #include <external_program/api.h>  // Your external program's API
+      #include <iostream>
+      #include <qdk/chemistry.hpp>
 
-      #include <qdk/chemistry/algorithms/scf_solver.hpp>
+      using namespace qdk::chemistry::algorithms;
 
-      namespace my_namespace {
-
-      class ExternalProgramScfSolver : public qdk::chemistry::algorithms::ScfSolver {
-      public:
-      ExternalProgramScfSolver() = default;
-      ~ExternalProgramScfSolver() override = default;
-
-      // Implement the interface method that connects to your external program
-      std::tuple<double, qdk::chemistry::data::Orbitals> solve(
-            const qdk::chemistry::data::Structure& structure) override {
-         // Convert QDK/Chemistry structure to external program format
-         auto ext_molecule = convert_to_external_format(structure);
-
-         // Run calculation using external program's API
-         auto ext_results =
-            external_program::run_scf(ext_molecule, settings().get_all());
-
-         // Convert results back to QDK/Chemistry format
-         double energy = ext_results.energy;
-         qdk::chemistry::data::Orbitals orbitals =
-            convert_from_external_format(ext_results.orbitals);
-
-         return {energy, orbitals};
+      // List available SCF solver implementations
+      auto scf_methods = ScfSolverFactory::available();
+      std::cout << "Available SCF solvers:" << std::endl;
+      for (const auto& name : scf_methods) {
+          std::cout << "  - " << name << std::endl;
       }
 
-      private:
-      // Helper functions for format conversion
-      external_program::Molecule convert_to_external_format(
-            const qdk::chemistry::data::Structure& structure);
-      qdk::chemistry::data::Orbitals convert_from_external_format(
-            const external_program::Orbitals& ext_orbitals);
-      };
-
-      }  // namespace my_namespace
-
-1. **Register with the factory**:
-
-.. code-block:: cpp
-
-   #include <qdk/chemistry/algorithms/scf_solver_factory.hpp>
-
-   // Register the implementation
-   bool registered = qdk::chemistry::algorithms::ScfSolverFactory::register_implementation(
-       "external-program",  // Name for this implementation
-       []() { return std::make_unique<my_namespace::ExternalProgramScfSolver>(); }
-   );
-
-3. **Use your implementation**:
-
-.. code-block:: cpp
-
-   auto solver = qdk::chemistry::algorithms::ScfSolverFactory::create("external-program");
-
-Implementing program interfaces in Python
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-To create a new interface to an external program in Python:
-
-1. **Inherit from the algorithm base class**:
+      // List available localizer implementations
+      auto localizer_methods = LocalizerFactory::available();
+      std::cout << "Available localizers:" << std::endl;
+      for (const auto& name : localizer_methods) {
+          std::cout << "  - " << name << std::endl;
+      }
 
 .. tab:: Python API
 
    .. code-block:: python
 
-      from qdk_chemistry.algorithms import ScfSolver
-      from qdk_chemistry.data import Structure, Orbitals
-      import external_program  # Your external program's Python package
+      from qdk_chemistry.algorithms import registry
 
-      class ExternalProgramScfSolver(ScfSolver):
-          def __init__(self):
-              super().__init__()
+      # List all algorithm types and their implementations
+      all_algorithms = registry.available()
+      print(all_algorithms)
+      # Output: {'scf_solver': ['qdk', 'pyscf'], 'orbital_localizer': ['qdk_pipek_mezey', 'pyscf'], ...}
 
-          def solve(self, structure):
-              # Convert QDK/Chemistry structure to external program format
-              ext_molecule = self._convert_to_external_format(structure)
+      # List implementations for a specific algorithm type
+      scf_methods = registry.available("scf_solver")
+      print("Available SCF solvers:", scf_methods)
+      # Output: ['qdk', 'pyscf']
 
-              # Set up calculation with external program
-              ext_calc = external_program.SCF(ext_molecule)
+      localizer_methods = registry.available("orbital_localizer")
+      print("Available localizers:", localizer_methods)
+      # Output: ['qdk_pipek_mezey', 'pyscf', ...]
 
-              # Apply settings
-              for key, value in self.settings().get_all().items():
-                  if key.startswith("external_program."):
-                      option_name = key.split(".", 1)[1]
-                      ext_calc.set_option(option_name, value)
+      # Show default implementations for each algorithm type
+      defaults = registry.show_default()
+      print("Defaults:", defaults)
+      # Output: {'scf_solver': 'qdk', 'orbital_localizer': 'qdk_pipek_mezey', ...}
 
-              # Run calculation
-              ext_results = ext_calc.run()
+Inspecting settings
+~~~~~~~~~~~~~~~~~~~
 
-              # Convert results back to QDK/Chemistry format
-              energy = ext_results.energy
-              orbitals = self._convert_from_external_format(ext_results.orbitals)
+Each algorithm implementation has configurable settings.
+You can discover available settings programmatically as shown below.
+For comprehensive documentation on working with settings, see :doc:`settings`.
 
-              return energy, orbitals
+.. tab:: C++ API
 
-          def _convert_to_external_format(self, structure):
-              # Implementation of conversion from QDK/Chemistry to external format
-              # ...
-              return ext_molecule
+   .. code-block:: cpp
 
-          def _convert_from_external_format(self, ext_orbitals):
-              # Implementation of conversion from external format to QDK/Chemistry
-              # ...
-              return orbitals
+      #include <iostream>
+      #include <qdk/chemistry.hpp>
 
-2. **Register with the factory**:
+      using namespace qdk::chemistry::algorithms;
 
-.. code-block:: python
+      // Create an SCF solver and inspect its settings
+      auto scf = ScfSolverFactory::create("qdk");
 
-   from qdk_chemistry.algorithms import register_scf_solver
+      // Print settings as a formatted table
+      std::cout << scf->settings().as_table() << std::endl;
 
-   # Register the implementation
-   register_scf_solver("external-program", ExternalProgramScfSolver)
+      // Or iterate over individual settings
+      for (const auto& key : scf->settings().keys()) {
+          std::cout << key << ": " << scf->settings().get_as_string(key) << std::endl;
+      }
 
-3. **Use your implementation**:
+.. tab:: Python API
 
-.. code-block:: python
+   .. code-block:: python
 
-   from qdk_chemistry.algorithms import create_scf_solver
-   solver = create_scf_solver("external-program")
+      from qdk_chemistry.algorithms import registry
+
+      # Create an SCF solver and inspect its settings
+      scf = registry.create("scf_solver", "qdk")
+
+      # Print settings as a formatted table
+      registry.print_settings("scf_solver", "qdk")
+
+      # Or iterate over individual settings
+      for key in scf.settings().keys():
+          print(f"{key}: {scf.settings().get(key)}")
 
 Connection to the plugin system
 -------------------------------
 
-The factory pattern serves as the foundation for QDK/Chemistry's :ref:`plugin system <plugin-system>`.
-In QDK/Chemistry, factories enable the registration and instantiation of plugin implementations that connect to external quantum chemistry programs.
+The factory pattern serves as the foundation for QDK/Chemistry's :doc:`plugin system <../plugins>`.
+Factories enable the registration and instantiation of plugin implementations that connect to external quantum chemistry programs.
 
 Internally, QDK/Chemistry's factories maintain a registry of creator functions mapped to implementation names.
 When a client requests an implementation by name, the factory looks up the appropriate creator function and instantiates the object with the necessary setup.
@@ -245,11 +216,11 @@ This design enables several key capabilities:
 - Runtime selection of specific implementations
 - Decoupling of plugin usage from implementation details
 
-For detailed information about implementing plugins for external programs, including data conversion, error handling, resource management, and settings translation, see the :ref:`plugin system <plugin-system>` documentation.
+For detailed information about implementing custom plugins, including data conversion, error handling, and settings translation, see the :doc:`plugin documentation <../plugins>`.
 
 Further reading
 ---------------
 
-- Some of the above examples can be downloaded as complete `C++ <../../../_static/examples/cpp/factory_pattern.cpp>`_ and `Python <../../../_static/examples/python/factory_pattern.py>`_ scripts.
+- Factory usage examples: `C++ <../../../_static/examples/cpp/factory_pattern.cpp>`_ | `Python <../../../_static/examples/python/factory_pattern.py>`_
 - :doc:`Settings <settings>`: Configuration of algorithm instances
-- :ref:`Plugin system <plugin-system>`: QDK/Chemistry's plugin system for extending functionality
+- :doc:`Plugins <../plugins>`: Extending QDK/Chemistry with custom implementations

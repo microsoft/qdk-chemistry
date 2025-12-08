@@ -8,22 +8,20 @@
 ################################################################################
 # start-cell-scf-localizer
 import numpy as np
-from qdk_chemistry.algorithms import create, available
+from qdk_chemistry.algorithms import create
 from qdk_chemistry.data import Structure
 
-# Create a simple molecule for testing
+# Create a simple molecule
 coords = np.array([[0.0, 0.0, 0.0], [0.0, 0.0, 1.4]])
 structure = Structure(coords, ["H", "H"])
 
-# Create default implementation
-print(f"Available SCF solver methods: {available('scf_solver')}")
-scf_solver = create("scf_solver", "qdk")
+# Create an SCF solver using the default implementation
+scf_solver = create("scf_solver")
 
-# Create specific implementation by name
-print(f"Available orbital localizer methods: {available('orbital_localizer')}")
+# Create an orbital localizer using a specific implementation
 localizer = create("orbital_localizer", "qdk_pipek_mezey")
 
-# Configure and use the instance
+# Configure the SCF solver and run
 scf_solver.settings().set("basis_set", "cc-pvdz")
 E_scf, wfn = scf_solver.run(structure, charge=0, spin_multiplicity=1)
 # end-cell-scf-localizer

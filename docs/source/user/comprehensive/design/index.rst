@@ -51,7 +51,7 @@ These classes are designed to be:
 - **Extensible**: Allowing new implementations to be added without modifying existing code
 
 Programatically, Algorithms are specified as abstract interfaces which can be specialized downstream through concrete implementations. This
-allows QDK/Chemistry to be expressed as a plugin architecture, for which algorithm implementations may be specified either natively within QDK/Chemistry or
+allows QDK/Chemistry to be expressed as a :doc:`plugin architecture <../plugins>`, for which algorithm implementations may be specified either natively within QDK/Chemistry or
 through established third-party quantum chemistry packages:
 
 .. graphviz:: /_static/diagrams/plugin_architecture.dot
@@ -59,7 +59,7 @@ through established third-party quantum chemistry packages:
 |
 
 This design allows users to benefit from specialized capabilities of "best-in-breed" software while maintaining a consistent user experience.
-See the :doc:`Extending QDK/Chemistry <../extending>` documentation for further details on how to contribute new algorithm implementations.
+See the :doc:`Plugin System <../plugins>` documentation for further details on how to contribute new algorithm implementations.
 
 Further details on the availablity and usage of
 QDK/Chemistry's algorithm implementations can be found in the :doc:`Algorithms <../algorithms/index>` documentation.

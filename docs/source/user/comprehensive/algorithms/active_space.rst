@@ -30,33 +30,19 @@ At its core, active space selection:
 
 The selected active space then serves as input for post-:term:`SCF` methods like :doc:`multi-configuration calculations <mc_calculator>` that explicitly treat electron correlation within the active space.
 
-Capabilities
-------------
+The ``run`` method returns a :doc:`Wavefunction <../data/wavefunction>` object with:
 
-The :class:`~qdk_chemistry.algorithms.ActiveSpaceSelector` in QDK/Chemistry provides several selection strategies:
+- **Active orbital indices**: Which orbitals are in the active space
+- **Core orbital indices**: Orbitals treated as doubly occupied
+- **Updated orbital metadata**: Information about the selection process
 
-- **Valence-based selection**: Selects orbitals near the HOMO-LUMO gap based on user-specified numbers of electrons and orbitals
+Using the ActiveSpaceSelector
+-----------------------------
 
-  - ``qdk_valence``: Manual specification of active electrons and orbitals
+This section demonstrates how to create, configure, and run active space selection.
+The ``run`` method takes a :doc:`Wavefunction <../data/wavefunction>` from a prior :term:`SCF` calculation and returns a new :doc:`Wavefunction <../data/wavefunction>` with active space information.
 
-- **Occupation-based selection**: Identifies orbitals with fractional occupation numbers
-
-  - ``qdk_occupation``: Selects orbitals with occupations deviating from 0 or 2
-
-- **Entropy-based selection**: Uses orbital entropies to identify strongly correlated orbitals
-
-  - ``qdk_autocas``: Automated selection based on single orbital entropies
-  - ``qdk_autocas_eos``: Enhanced entropy-based selection with plateau detection
-
-- **Orbital type support**:
-
-  - Restricted orbitals (closed-shell and open-shell systems)
-  - Support for both canonical and localized orbitals
-
-Creating an active space selector
----------------------------------
-
-Below is an example of how to create and run an active space selector using the default (Microsoft) QDK/Chemistry implementation:
+**Creating an active space selector:**
 
 .. tab:: C++ API
 
@@ -72,11 +58,10 @@ Below is an example of how to create and run an active space selector using the 
       :start-after: # start-cell-create
       :end-before: # end-cell-create
 
-Configuring the active space selection
---------------------------------------
+**Configuring settings:**
 
-The :class:`~qdk_chemistry.algorithms.ActiveSpaceSelector` can be configured using the ``Settings`` object.
-Different selectors have different configuration options depending on their selection strategy.
+Settings can be modified using the ``settings()`` object.
+See `Available implementations`_ below for implementation-specific options.
 
 .. tab:: C++ API
 
@@ -92,11 +77,7 @@ Different selectors have different configuration options depending on their sele
       :start-after: # start-cell-configure
       :end-before: # end-cell-configure
 
-Running active space selection
-------------------------------
-
-Once configured, the active space selection can be executed on a wavefunction from a prior :term:`SCF` calculation.
-The ``run`` method returns a :doc:`Wavefunction <../data/wavefunction>` object with active space information populated.
+**Running the selection:**
 
 .. tab:: C++ API
 
@@ -112,13 +93,38 @@ The ``run`` method returns a :doc:`Wavefunction <../data/wavefunction>` object w
       :start-after: # start-cell-run
       :end-before: # end-cell-run
 
-Available settings
-------------------
+Available implementations
+-------------------------
 
-The :class:`~qdk_chemistry.algorithms.ActiveSpaceSelector` accepts different settings depending on the selection method.
+QDK/Chemistry's :class:`~qdk_chemistry.algorithms.ActiveSpaceSelector` provides implementations for various selection strategies.
+You can discover available implementations programmatically:
 
-Valence selector settings (``qdk_valence``)
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+.. tab:: C++ API
+
+   .. code-block:: cpp
+
+      auto names = ActiveSpaceSelectorFactory::available();
+      for (const auto& name : names) {
+          std::cout << name << std::endl;
+      }
+
+.. tab:: Python API
+
+   .. code-block:: python
+
+      from qdk_chemistry.algorithms import registry
+      print(registry.available("active_space_selector"))
+      # ['pyscf_avas', 'qdk_occupation', 'qdk_autocas_eos', 'qdk_autocas', 'qdk_valence']
+
+QDK Valence
+~~~~~~~~~~~
+
+**Factory name:** ``"qdk_valence"`` (default)
+
+Manual valence-based selection where users specify the number of active electrons and orbitals.
+Selects orbitals near the HOMO-LUMO gap.
+
+**Settings:**
 
 .. list-table::
    :header-rows: 1
@@ -130,15 +136,21 @@ Valence selector settings (``qdk_valence``)
      - Description
    * - ``num_active_electrons``
      - int
-     - -1
-     - Number of electrons to include in the active space (required)
+     - ``-1``
+     - Number of electrons in the active space (required)
    * - ``num_active_orbitals``
      - int
-     - -1
-     - Number of orbitals to include in the active space (required)
+     - ``-1``
+     - Number of orbitals in the active space (required)
 
-Occupation selector settings (``qdk_occupation``)
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+QDK Occupation
+~~~~~~~~~~~~~~
+
+**Factory name:** ``"qdk_occupation"``
+
+Automatic selection based on orbital occupation numbers, identifying orbitals with fractional occupation.
+
+**Settings:**
 
 .. list-table::
    :header-rows: 1
@@ -150,11 +162,18 @@ Occupation selector settings (``qdk_occupation``)
      - Description
    * - ``occupation_threshold``
      - float
-     - 0.1
-     - Threshold for selecting orbitals with fractional occupation
+     - ``0.1``
+     - Orbitals with occupations deviating from 0 or 2 by more than this threshold are selected
 
-Entropy selector settings (``qdk_autocas``, ``qdk_autocas_eos``)
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+QDK Autocas
+~~~~~~~~~~~
+
+**Factory name:** ``"qdk_autocas"``
+
+Entropy-based automatic selection using single orbital entropies to identify strongly correlated orbitals.
+Uses histogram-based plateau detection.
+
+**Settings:**
 
 .. list-table::
    :header-rows: 1
@@ -164,29 +183,98 @@ Entropy selector settings (``qdk_autocas``, ``qdk_autocas_eos``)
      - Type
      - Default
      - Description
-   * - ``min_plateau_size``
-     - int
-     - 2
-     - Minimum size of entropy plateau for autocas selection
    * - ``entropy_threshold``
      - float
-     - 0.1
-     - Entropy threshold for eos-based selection
+     - ``0.14``
+     - Entropy threshold for selection
+   * - ``min_plateau_size``
+     - int
+     - ``10``
+     - Minimum size of entropy plateau for selection
+   * - ``num_bins``
+     - int
+     - ``100``
+     - Number of histogram bins for plateau detection
+   * - ``normalize_entropies``
+     - bool
+     - ``True``
+     - Whether to normalize entropy values
 
-Implemented interfaces
-----------------------
+QDK Autocas EOS
+~~~~~~~~~~~~~~~
 
-QDK/Chemistry's :class:`~qdk_chemistry.algorithms.ActiveSpaceSelector` provides implementations for various selection strategies:
+**Factory name:** ``"qdk_autocas_eos"``
 
-QDK/Chemistry implementations
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Enhanced entropy-based selection using entanglement of orbitals with entropy differences.
 
-- **qdk_valence**: Manual valence-based selection
-- **qdk_occupation**: Occupation-based automatic selection
-- **qdk_autocas**: Entropy-based automatic selection
-- **qdk_autocas_eos**: Enhanced entropy-based selection
+**Settings:**
 
-The factory pattern allows seamless selection between these implementations based on the system requirements and desired level of automation.
+.. list-table::
+   :header-rows: 1
+   :widths: 25 15 15 45
+
+   * - Setting
+     - Type
+     - Default
+     - Description
+   * - ``entropy_threshold``
+     - float
+     - ``0.14``
+     - Entropy threshold for selection
+   * - ``diff_threshold``
+     - float
+     - ``0.1``
+     - Difference threshold for EOS-based selection
+   * - ``normalize_entropies``
+     - bool
+     - ``True``
+     - Whether to normalize entropy values
+
+PySCF AVAS
+~~~~~~~~~~
+
+**Factory name:** ``"pyscf_avas"``
+
+The PySCF plugin provides access to the Automated Valence Active Space (AVAS) method from `PySCF <https://pyscf.org/>`_.
+AVAS selects active orbitals by projecting molecular orbitals onto a target atomic orbital basis.
+See the `original AVAS publication <https://doi.org/10.1021/acs.jctc.7b00128>`_ for details.
+
+**Settings:**
+
+.. list-table::
+   :header-rows: 1
+   :widths: 25 15 15 45
+
+   * - Setting
+     - Type
+     - Default
+     - Description
+   * - ``ao_labels``
+     - list[str]
+     - ``[]``
+     - Atomic orbital labels to include (e.g., ``["Fe 3d", "Fe 4d"]``); required
+   * - ``canonicalize``
+     - bool
+     - ``False``
+     - Whether to canonicalize active orbitals after selection
+   * - ``openshell_option``
+     - int
+     - ``2``
+     - Handling of singly-occupied orbitals: ``2`` = project as alpha, ``3`` = keep in active space
+
+**Example:**
+
+.. code-block:: python
+
+   from qdk_chemistry.algorithms import create
+
+   avas = create("active_space_selector", "pyscf_avas")
+   avas.settings().set("ao_labels", ["Fe 3d", "Fe 4d"])
+   avas.settings().set("canonicalize", True)
+
+   active_wavefunction = avas.run(scf_wavefunction)
+
+For more details on how to extend QDK/Chemistry with additional implementations, see the :doc:`plugin system <../plugins>` documentation.
 
 Related classes
 ---------------

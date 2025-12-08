@@ -2,6 +2,7 @@ Multi-configuration calculations
 ================================
 
 The :class:`~qdk_chemistry.algorithms.MultiConfigurationCalculator` algorithm in QDK/Chemistry performs Multi-Configurational (MC) calculations to solve the electronic structure problem beyond the mean-field approximation.
+Following QDK/Chemistry's :doc:`algorithm design principles <../design/index>`, it takes a :doc:`Hamiltonian <../data/hamiltonian>` instance as input and produces a :class:`~qdk_chemistry.data.Wavefunction` instance as output.
 It provides access to various Configuration Interaction (CI) methods to account for static electron correlation effects, which are critical for accurately describing systems with near-degenerate electronic states.
 
 Overview
@@ -12,19 +13,22 @@ These methods can accurately describe systems with strong static correlation eff
 Static correlation arises when multiple electronic configurations contribute significantly to the wavefunction, such as in bond-breaking processes, transition states, excited states, and open-shell systems.
 The :class:`~qdk_chemistry.algorithms.MultiConfigurationCalculator` algorithm implements various :term:`CI` approaches, from full CI (FCI) to selected :term:`CI` methods that focus on the most important configurations.
 
-Capabilities
-------------
+The ``run`` method returns:
 
-The :class:`~qdk_chemistry.algorithms.MultiConfigurationCalculator` in QDK/Chemistry provides:
+- **Energy**: Correlated electronic energies for one or more states
+- **Wavefunction**: A :class:`~qdk_chemistry.data.Wavefunction` object containing CI expansion coefficients
+- **RDMs** (optional): One- and two-electron reduced density matrices when ``calculate_one_rdm`` or ``calculate_two_rdm`` are enabled
 
-- **Full Configuration Interaction (FCI)**: Exact solution within a given orbital space, also known as Complete Active
-  Space (**CAS**) when performed within a selected active space of orbitals
-- **Selected Configuration Interaction (SCI)**: Adaptive selection of important configurations
+:term:`MC` calculations capture static correlation but typically require additional methods for dynamic correlation.
+For quantitative accuracy, consider :doc:`DynamicalCorrelationCalculator <dynamical_correlation>` or :doc:`MultiConfigurationScf <mcscf>` methods.
 
-Creating an MultiConfigurationCalculator
-----------------------------------------
+Using the MultiConfigurationCalculator
+--------------------------------------
 
-The :class:`~qdk_chemistry.algorithms.MultiConfigurationCalculator` is created using the :doc:`factory pattern <../algorithms/factory_pattern>`.
+This section demonstrates how to create, configure, and run a multi-configuration calculation.
+The ``run`` method takes a :doc:`Hamiltonian <../data/hamiltonian>` object as input and returns energy values and a :class:`~qdk_chemistry.data.Wavefunction` object.
+
+**Creating an MC calculator:**
 
 .. tab:: C++ API
 
@@ -40,14 +44,10 @@ The :class:`~qdk_chemistry.algorithms.MultiConfigurationCalculator` is created u
       :start-after: # start-cell-create
       :end-before: # end-cell-create
 
-Configuring the :term:`MC` calculation
---------------------------------------
+**Configuring settings:**
 
-The :class:`~qdk_chemistry.algorithms.MultiConfigurationCalculator` can be configured using the ``Settings`` object:
-
-.. note::
-   The examples below show commonly used settings.
-   For a complete list of available settings with descriptions, see the `Available Settings`_ section.
+Settings can be modified using the ``settings()`` object.
+See `Available implementations`_ below for implementation-specific options.
 
 .. tab:: C++ API
 
@@ -63,10 +63,7 @@ The :class:`~qdk_chemistry.algorithms.MultiConfigurationCalculator` can be confi
       :start-after: # start-cell-configure
       :end-before: # end-cell-configure
 
-Running a :term:`CI` calculation
----------------------------------
-
-Once configured, the :term:`CI` calculation can be executed using a :doc:`Hamiltonian <../data/hamiltonian>` object as input, which returns energy values and a :class:`qdk_chemistry.data.Wavefunction` object as output:
+**Running the calculation:**
 
 .. tab:: C++ API
 
@@ -77,41 +74,47 @@ Once configured, the :term:`CI` calculation can be executed using a :doc:`Hamilt
 
 .. tab:: Python API
 
-   .. note::
-      This example shows the API pattern. For complete working examples, see the test suite.
-
    .. literalinclude:: ../../../_static/examples/python/mc_calculator.py
       :language: python
       :start-after: # start-cell-run
       :end-before: # end-cell-run
 
-Available :term:`MC` calculators
----------------------------------
+Available implementations
+-------------------------
 
-.. list-table::
-   :header-rows: 1
-   :widths: 20 40 40
+QDK/Chemistry's :class:`~qdk_chemistry.algorithms.MultiConfigurationCalculator` provides a unified interface for multi-configurational calculations.
+You can discover available implementations programmatically:
 
-   * - Method
-     - Description
-     - Typical Use Cases
-   * - ``macis_cas``
-     - Full Configuration Interaction
-     - Small active spaces, benchmark calculations
-   * - ``macis_asci``
-     - Selected Configuration Interaction
-     - Larger active spaces, efficient correlation treatment
+.. tab:: C++ API
 
-Available settings
-------------------
+   .. code-block:: cpp
 
-The :class:`~qdk_chemistry.algorithms.MultiConfigurationCalculator` accepts a range of settings to control its behavior.
-These settings are divided into base settings (common to all :term:`MC` calculations) and specialized settings (specific to certain :term:`MC` variants).
+      auto names = MultiConfigurationCalculatorFactory::available();
+      for (const auto& name : names) {
+          std::cout << name << std::endl;
+      }
 
-Base settings
-~~~~~~~~~~~~~
+.. tab:: Python API
 
-These settings apply to all :term:`MC` calculation methods:
+   .. code-block:: python
+
+      from qdk_chemistry.algorithms import registry
+      print(registry.available("multi_configuration_calculator"))
+      # ['macis_asci', 'macis_cas']
+
+MACIS CAS
+~~~~~~~~~
+
+**Factory name:** ``"macis_cas"`` (default)
+
+The MACIS (Many-body Adaptive Configuration Interaction Solver) CAS implementation provides exact Full Configuration Interaction within the active space.
+
+**Capabilities:**
+
+- Complete Active Space CI (CAS-CI)
+- One- and two-electron reduced density matrices
+
+**Settings:**
 
 .. list-table::
    :header-rows: 1
@@ -121,48 +124,97 @@ These settings apply to all :term:`MC` calculation methods:
      - Type
      - Default
      - Description
-   * - ``num_roots``
-     - int
-     - 3
-     - Number of states to solve for (ground state + excited states)
-   * - ``ci_residual_threshold``
+   * - ``ci_residual_tolerance``
      - float
-     - 1.0e-6
-     - Convergence threshold for :term:`CI` iterations
+     - ``1e-6``
+     - Convergence threshold for CI iterations
    * - ``davidson_iterations``
      - int
-     - 200
+     - ``200``
      - Maximum number of Davidson iterations
    * - ``calculate_one_rdm``
      - bool
-     - true
-     - Whether to calculate one-electron reduced density matrix
+     - ``False``
+     - Calculate one-electron reduced density matrix
+   * - ``calculate_two_rdm``
+     - bool
+     - ``False``
+     - Calculate two-electron reduced density matrix
 
-.. Specialized settings
-.. ~~~~~~~~~~~~~~~~~~~~
+MACIS ASCI
+~~~~~~~~~~
 
-.. TODO:  The specialized :term:`MC` calculator settings documentation is currently under construction.
+**Factory name:** ``"macis_asci"``
 
-.. These settings apply only to specific variants of :term:`MC` calculations.
+The MACIS ASCI (Adaptive Sampling Configuration Interaction) provides selected CI for larger active spaces where FCI is computationally prohibitive.
 
-Implemented interface
----------------------
+**Capabilities:**
 
-QDK/Chemistry's :class:`~qdk_chemistry.algorithms.MultiConfigurationCalculator` provides a unified interface for :term:`MC` calculations.
+- Adaptive Sampling Configuration Interaction (ASCI)
+- One- and two-electron reduced density matrices
 
-- **MACIS**: QDK/Chemistry's native Many-body Adaptive Configuration Interaction Solver library
-- **PySCF**: Interface to PySCF's :term:`FCI` and :term:`CAS`-:term:`CI` implementations
+**Common Settings:**
 
-The factory pattern allows seamless selection between these implementations, with the most appropriate option chosen
-based on the calculation requirements and available packages.
+.. list-table::
+   :header-rows: 1
+   :widths: 25 15 15 45
 
-For more details on how QDK/Chemistry interfaces with external packages, see the :ref:`plugin system <plugin-system>` documentation.
+   * - Setting
+     - Type
+     - Default
+     - Description
+   * - ``ci_residual_tolerance``
+     - float
+     - ``1e-6``
+     - Convergence threshold for CI iterations
+   * - ``davidson_iterations``
+     - int
+     - ``200``
+     - Maximum number of Davidson iterations
+   * - ``calculate_one_rdm``
+     - bool
+     - ``False``
+     - Calculate one-electron reduced density matrix
+   * - ``calculate_two_rdm``
+     - bool
+     - ``False``
+     - Calculate two-electron reduced density matrix
+   * - ``ntdets_max``
+     - int
+     - ``100000``
+     - Maximum number of trial determinants
+   * - ``ntdets_min``
+     - int
+     - ``100``
+     - Minimum number of trial determinants
+   * - ``ncdets_max``
+     - int
+     - ``100``
+     - Maximum number of connected determinants
+   * - ``grow_factor``
+     - float
+     - ``8.0``
+     - Factor for growing determinant space
+   * - ``max_refine_iter``
+     - int
+     - ``6``
+     - Maximum refinement iterations
+   * - ``refine_energy_tol``
+     - float
+     - ``1e-6``
+     - Energy tolerance for refinement convergence
 
-:term:`MACIS` implementation
------------------------------
+**Example:**
 
-The default :class:`~qdk_chemistry.algorithms.MultiConfigurationCalculator` implementation in QDK/Chemistry is based on the :term:`MACIS` library, which provides efficient algorithms for :term:`SCI` calculations.
-The :term:`MACIS` implementation automatically determines electron numbers from the orbital occupations in the Hamiltonian.
+.. code-block:: python
+
+   from qdk_chemistry.algorithms import create
+
+   mc = create("multi_configuration_calculator", "macis_asci")
+   mc.settings().set("ntdets_max", 50000)
+   mc.settings().set("calculate_one_rdm", True)
+
+For more details on how to extend QDK/Chemistry with additional implementations, see the :doc:`plugin system <../plugins>` documentation.
 
 Further reading
 ---------------

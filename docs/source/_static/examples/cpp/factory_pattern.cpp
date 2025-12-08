@@ -11,15 +11,19 @@
 #include <qdk/chemistry.hpp>
 
 using namespace qdk::chemistry::algorithms;
+using namespace qdk::chemistry::data;
 
-// Create default implementation
+// Create a simple molecule
+auto structure = Structure::from_xyz("H 0.0 0.0 0.0\nH 0.0 0.0 1.4");
+
+// Create an SCF solver using the default implementation
 auto scf_solver = ScfSolverFactory::create();
 
-// Create specific implementation by name
-auto localizer = LocalizerFactory::create("pipek-mezey");
+// Create an orbital localizer using a specific implementation
+auto localizer = LocalizerFactory::create("qdk_pipek_mezey");
 
-// Configure and use the instance
-scf_solver->settings().set("basis_set", "def2-tzvp");
-auto [E_scf, orbitals] = scf_solver->solve(structure);
+// Configure the SCF solver and run
+scf_solver->settings().set("basis_set", "cc-pvdz");
+auto [E_scf, wfn] = scf_solver->run(structure, 0, 1);
 // end-cell-scf-localizer
 // -----------------------------------------------------------------------------

@@ -7,37 +7,49 @@
 // --------------------------------------------------------------------------------------------
 
 // -----------------------------------------------------------------------------
-// start-cell-mp2-example
+// start-cell-create
 #include <qdk/chemistry.hpp>
 
 using namespace qdk::chemistry::algorithms;
 using namespace qdk::chemistry::data;
 
+// Create a DynamicalCorrelationCalculator instance
+auto mp2_calculator =
+    DynamicalCorrelationCalculatorFactory::create("qdk_mp2_calculator");
+// end-cell-create
+// -----------------------------------------------------------------------------
+
+// -----------------------------------------------------------------------------
+// start-cell-configure
+// Configure settings (for implementations that support them)
+// mp2_calculator->settings().set("conv_tol", 1e-8);
+// end-cell-configure
+// -----------------------------------------------------------------------------
+
+// -----------------------------------------------------------------------------
+// start-cell-run
 // Create a simple structure
 std::vector<Eigen::Vector3d> coords = {{0.0, 0.0, 0.0}, {1.4, 0.0, 0.0}};
 std::vector<std::string> symbols = {"H", "H"};
 Structure structure(coords, symbols);
 
-// Run initial SCF
+// Run initial SCF to get reference wavefunction
 auto scf_solver = ScfSolverFactory::create();
 auto [E_HF, wfn_HF] = scf_solver->run(structure, 0, 1);
 
-// Create a Hamiltonian constructor
+// Create Hamiltonian from orbitals
 auto hamiltonian_constructor = HamiltonianConstructorFactory::create();
-
-// Construct the Hamiltonian from orbitals
 auto hamiltonian = hamiltonian_constructor->run(wfn_HF->get_orbitals());
 
-// Create ansatz for MP2 calculation
+// Create ansatz combining wavefunction and Hamiltonian
 auto ansatz = std::make_shared<Ansatz>(*hamiltonian, *wfn_HF);
 
-// Run MP2
-auto mp2_calculator =
-    DynamicalCorrelationCalculatorFactory::create("qdk_mp2_calculator");
-
-// Get energies
+// Run the correlation calculation
 auto [mp2_total_energy, final_wavefunction] = mp2_calculator->run(ansatz);
 
-// If desired, we can extract only the correlation energy
+// Extract correlation energy
 double mp2_corr_energy = mp2_total_energy - E_HF;
-// end-cell-mp2-example
+std::cout << "MP2 Correlation Energy: " << mp2_corr_energy << " Hartree\n";
+std::cout << "MP2 Total Energy: " << mp2_total_energy << " Hartree\n";
+// end-cell-run
+// -----------------------------------------------------------------------------
