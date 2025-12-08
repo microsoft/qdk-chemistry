@@ -49,9 +49,9 @@ container = CasWavefunctionContainer(coeffs, dets, orbitals)
 wavefunction = Wavefunction(container)
 
 # Construct the circuit
-regular_qasm = regular_prep.run(wavefunction)
-sparse_qasm = sparse_prep.run(wavefunction)
-print(f"Regular isometry QASM:\n{regular_qasm}")
-print(f"Sparse isometry QASM:\n{sparse_qasm}")
+regular_circuit = regular_prep.run(wavefunction)
+sparse_circuit = sparse_prep.run(wavefunction)
+print(f"Regular isometry QASM:\n{regular_circuit.get_qasm()}")
+print(f"Sparse isometry QASM:\n{sparse_circuit.get_qasm()}")
 # end-cell-run
 ################################################################################

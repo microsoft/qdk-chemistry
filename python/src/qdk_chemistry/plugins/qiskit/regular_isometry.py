@@ -13,7 +13,7 @@ from qiskit.quantum_info import Statevector
 from qiskit.transpiler import PassManager
 
 from qdk_chemistry.algorithms.state_preparation import StatePreparation, StatePreparationSettings
-from qdk_chemistry.data import Wavefunction
+from qdk_chemistry.data import Circuit, Wavefunction
 from qdk_chemistry.plugins.qiskit._interop.transpiler import (
     MergeZBasisRotations,
     RemoveZBasisOnZeroState,
@@ -38,14 +38,14 @@ class RegularIsometryStatePreparation(StatePreparation):
         super().__init__()
         self._settings = StatePreparationSettings()
 
-    def _run_impl(self, wavefunction: Wavefunction) -> str:
+    def _run_impl(self, wavefunction: Wavefunction) -> Circuit:
         """Create a quantum circuit that prepares the state using regular isometry.
 
         Args:
             wavefunction: Wavefunction to prepare state from
 
         Returns:
-            A QASM string representation of the quantum circuit.
+            A Circuit object containing a QASM string representation of the quantum circuit.
 
         """
         # Active Space Consistency Check
@@ -87,7 +87,7 @@ class RegularIsometryStatePreparation(StatePreparation):
             )
             circuit = pass_manager.run(circuit)
 
-        return qasm3.dumps(circuit)
+        return Circuit(qasm=qasm3.dumps(circuit))
 
     def name(self) -> str:
         """Return the name of the state preparation method."""

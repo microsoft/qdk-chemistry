@@ -45,6 +45,8 @@ from qiskit.transpiler import PassManager
 
 from qdk_chemistry.algorithms.state_preparation.state_preparation import StatePreparation, StatePreparationSettings
 from qdk_chemistry.data import Wavefunction
+from qdk_chemistry.data import Circuit, Wavefunction
+from qdk_chemistry.utils.bitstring import bitstrings_to_binary_matrix, separate_alpha_beta_to_binary_string
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -85,14 +87,14 @@ class SparseIsometryGF2XStatePreparation(StatePreparation):
         super().__init__()
         self._settings = StatePreparationSettings()
 
-    def _run_impl(self, wavefunction: Wavefunction) -> str:
+    def _run_impl(self, wavefunction: Wavefunction) -> Circuit:
         """Prepare a quantum circuit that encodes the given wavefunction using sparse isometry over GF(2^x).
 
         Args:
             wavefunction: The target wavefunction to prepare.
 
         Returns:
-            OpenQASM3 string of the quantum circuit that prepares the wavefunction.
+            A Circuit object containing an OpenQASM3 string of the quantum circuit that prepares the wavefunction.
 
         """
         # Imported here to avoid circular import issues
@@ -235,7 +237,7 @@ class SparseIsometryGF2XStatePreparation(StatePreparation):
                 f"Final circuit after transpilation: {qc.num_qubits} qubits, depth {qc.depth()}, {qc.size()} gates"
             )
 
-        return qasm3.dumps(qc)
+        return Circuit(qasm=qasm3.dumps(qc))
 
     def _bitstrings_to_binary_matrix(self, bitstrings: list[str]) -> np.ndarray:
         """Convert a list of bitstrings to a binary matrix.
@@ -296,7 +298,7 @@ class SparseIsometryGF2XStatePreparation(StatePreparation):
 
         return bitstring_matrix
 
-    def _prepare_single_reference_state(self, bitstring: str) -> str:
+    def _prepare_single_reference_state(self, bitstring: str) -> Circuit:
         r"""Prepare a single reference state on a quantum circuit based on a bitstring.
 
         Args:
@@ -305,7 +307,7 @@ class SparseIsometryGF2XStatePreparation(StatePreparation):
                 '1' means apply X gate, '0' means leave in |0⟩ state.
 
         Returns:
-                OpenQASM string with the prepared single reference state
+                A Circuit object containing an OpenQASM3 string with the prepared single reference state
 
         Example:
                 bitstring = "1010" creates a circuit with X gates on qubits 1 and 3:
@@ -336,7 +338,7 @@ class SparseIsometryGF2XStatePreparation(StatePreparation):
             if bit == "1":
                 circuit.x(i)
 
-        return qasm3.dumps(circuit)
+        return Circuit(qasm=qasm3.dumps(circuit))
 
     def name(self) -> str:
         """Return the name of the state preparation method."""

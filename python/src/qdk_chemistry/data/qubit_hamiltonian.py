@@ -1,4 +1,4 @@
-"""QDK/Chemistry Qubit Hamiltonian Module.
+"""QDK/Chemistry Qubit Hamiltonian module.
 
 This module provides the QubitHamiltonian dataclass for electronic structure problems. It bridges fermionic Hamiltonians
 and quantum circuit construction or measurement workflows.
@@ -34,6 +34,9 @@ class QubitHamiltonian(DataClass):
 
     # Class attribute for filename validation
     _data_type_name = "qubit_hamiltonian"
+
+    # Serialization version for this class
+    _serialization_version = "0.1.0"
 
     def __init__(self, pauli_strings: list[str], coefficients: np.ndarray):
         """Initialize a QubitHamiltonian.
@@ -119,10 +122,11 @@ class QubitHamiltonian(DataClass):
 
     def to_json(self) -> dict[str, Any]:
         """Convert the Hamiltonian to a dictionary for JSON serialization."""
-        return {
+        data = {
             "pauli_strings": self.pauli_strings,
             "coefficients": self.coefficients.tolist(),
         }
+        return self._add_json_version(data)
 
     def to_hdf5(self, group: h5py.Group) -> None:
         """Save the Hamiltonian to an HDF5 group.
@@ -132,6 +136,7 @@ class QubitHamiltonian(DataClass):
             Python users should call to_hdf5_file() directly.
 
         """
+        self._add_hdf5_version(group)
         group.create_dataset("pauli_strings", data=np.array(self.pauli_strings, dtype="S"))
         group.create_dataset("coefficients", data=self.coefficients)
 
@@ -145,7 +150,11 @@ class QubitHamiltonian(DataClass):
         Returns:
             QubitHamiltonian: New instance reconstructed from JSON data
 
+        Raises:
+            RuntimeError: If version field is missing or incompatible
+
         """
+        cls._validate_json_version(cls._serialization_version, json_data)
         return cls(
             pauli_strings=json_data["pauli_strings"],
             coefficients=np.array(json_data["coefficients"]),
@@ -161,7 +170,11 @@ class QubitHamiltonian(DataClass):
         Returns:
             QubitHamiltonian: New instance reconstructed from HDF5 data
 
+        Raises:
+            RuntimeError: If version attribute is missing or incompatible
+
         """
+        cls._validate_hdf5_version(cls._serialization_version, group)
         pauli_strings = [s.decode() for s in group["pauli_strings"][:]]
         coefficients = np.array(group["coefficients"])
         return cls(pauli_strings=pauli_strings, coefficients=coefficients)
