@@ -22,8 +22,7 @@ from qdk_chemistry.algorithms.energy_estimator.energy_estimator import (
     _parity,
     _paulis_to_indices,
 )
-from qdk_chemistry.data import QubitHamiltonian
-from qdk_chemistry.data.estimator_data import MeasurementData
+from qdk_chemistry.data import Circuit, MeasurementData, QubitHamiltonian
 
 from .reference_tolerances import float_comparison_absolute_tolerance, float_comparison_relative_tolerance
 
@@ -136,12 +135,13 @@ def test_measurement_circuit_mixed_basis():
 def test_create_measurement_circuits_basic():
     """Test measurement circuit generation for a simple observable."""
     # Prepare input circuit
-    circuit_qasm = """
+    qasm = """
         include "stdgates.inc";
         qubit[2] q;
         x q[0];
         cx q[0], q[1];
         """
+    circuit = Circuit(qasm=qasm)
 
     # Define observable
     observable = [
@@ -151,34 +151,36 @@ def test_create_measurement_circuits_basic():
     ]
 
     # Call function
-    circuits = EnergyEstimator._create_measurement_circuits(circuit_qasm, observable)
+    circuits = EnergyEstimator._create_measurement_circuits(circuit, observable)
 
     # There should be one measurement circuit per observable
     assert isinstance(circuits, list)
     assert len(circuits) == 3
-    assert all(isinstance(circ, str) for circ in circuits)
-    assert "measure" in circuits[0]  # Z basis
-    assert circuits[0].count("measure") == 2
-    assert "h q" not in circuits[0]  # No basis change for Z
-    assert "h q" in circuits[1]  # X basis change
-    assert circuits[1].count("h q") == 2  # One H gate added for X basis for each qubit
-    assert circuits[0].count("measure") == 2
-    assert "sdg q" in circuits[2]  # Y basis change
-    assert circuits[2].count("sdg q") == 2  # One Sdg gate added for Y basis for each qubit
-    assert "h q" in circuits[2]  # Y basis change
-    assert circuits[2].count("h q") == 2  # One H gate added for Y basis for each qubit
-    assert circuits[0].count("measure") == 2
+    assert all(isinstance(circ, Circuit) for circ in circuits)
+    assert all(isinstance(circ.get_qasm(), str) for circ in circuits)
+    assert "measure" in circuits[0].qasm  # Z basis
+    assert circuits[0].qasm.count("measure") == 2
+    assert "h q" not in circuits[0].qasm  # No basis change for Z
+    assert "h q" in circuits[1].qasm  # X basis change
+    assert circuits[1].qasm.count("h q") == 2  # One H gate added for X basis for each qubit
+    assert circuits[0].qasm.count("measure") == 2
+    assert "sdg q" in circuits[2].qasm  # Y basis change
+    assert circuits[2].qasm.count("sdg q") == 2  # One Sdg gate added for Y basis for each qubit
+    assert "h q" in circuits[2].qasm  # Y basis change
+    assert circuits[2].qasm.count("h q") == 2  # One H gate added for Y basis for each qubit
+    assert circuits[0].qasm.count("measure") == 2
 
 
 def test_create_measurement_circuits_qubit_mismatch():
     """Test measurement circuit generation raises ValueError on qubit number mismatch."""
     # Prepare input circuit with 2 qubits
-    circuit_qasm = """
+    qasm = """
         include "stdgates.inc";
         qubit[2] q;
         x q[0];
         cx q[0], q[1];
         """
+    circuit = Circuit(qasm=qasm)
 
     # Define observable with 3 qubits
     observable = [
@@ -193,7 +195,7 @@ def test_create_measurement_circuits_qubit_mismatch():
             r"the number of qubits in the Hamiltonian \(3\)\."
         ),
     ):
-        EnergyEstimator._create_measurement_circuits(circuit_qasm, observable)
+        EnergyEstimator._create_measurement_circuits(circuit, observable)
 
 
 @pytest.mark.parametrize(
@@ -321,21 +323,21 @@ def test_measurement_data_to_json():
         with open(temp_path) as f:
             data = json.load(f)
         assert isinstance(data, dict)
-        # Should have one entry for the pauli group
-        assert len(data) == 1
+        # Should have one entry for the pauli group plus version field
+        assert len(data) == 2
+        assert "version" in data
+        assert "0" in data
     finally:
         Path(temp_path).unlink()
 
 
 def test_create_energy_estimator_qiskit():
     """Test factory function for creating Qiskit energy estimator."""
-    estimator = create(
-        "energy_estimator",
-        "qiskit_aer_simulator",
-    )
+    estimator = create("energy_estimator", "qiskit_aer_simulator")
     assert isinstance(estimator, EnergyEstimator)
     assert isinstance(estimator, QiskitEnergyEstimator)
     assert isinstance(estimator.backend, AerSimulator)
+    assert estimator.settings().get("seed") == 42
     assert estimator.backend.options.seed_simulator == 42
 
 
@@ -344,5 +346,5 @@ def test_create_energy_estimator_qdk():
     estimator = create("energy_estimator", "qdk_base_simulator")
     assert isinstance(estimator, EnergyEstimator)
     assert isinstance(estimator, QDKEnergyEstimator)
-    assert estimator.seed == 42
-    assert estimator.noise_model is None
+    assert estimator.settings().get("seed") == 42
+    assert estimator.settings().get("qubit_loss") == 0.0
