@@ -2,8 +2,6 @@
 // Licensed under the MIT License. See LICENSE.txt in the project root for
 // license information.
 
-#include <spdlog/spdlog.h>
-
 #include <blas.hh>
 #include <qdk/chemistry/algorithms/scf.hpp>
 #include <qdk/chemistry/algorithms/stability.hpp>

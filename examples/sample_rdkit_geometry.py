@@ -17,8 +17,7 @@ from rdkit.Chem import AllChem, Mol
 
 from qdk_chemistry.constants import ANGSTROM_TO_BOHR
 
-LOGGER = logging.getLogger(__file__)
-
+from qdk_chemistry.utils import Logger
 
 def create_structure_from_rdkit(molecule: Mol) -> Structure:
     """Create a Structure object from an RDKit molecule."""
@@ -59,7 +58,7 @@ def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
 def main(argv: Sequence[str] | None = None) -> None:
     """Example of constructing water from RDKit."""
 
-    logging.basicConfig(level=logging.INFO)
+    Logger.set_global_level("info")
     args = parse_args(argv)
 
     ########################################################################################
@@ -77,9 +76,9 @@ def main(argv: Sequence[str] | None = None) -> None:
     # Convert to QDK Chemistry Structure
     water = create_structure_from_rdkit(water_rdkit)
 
-    LOGGER.info(water.get_summary())
-    LOGGER.info("XYZ Geometry in Angstrom")
-    LOGGER.info(water.to_xyz())
+    Logger.info(water.get_summary())
+    Logger.info("XYZ Geometry in Angstrom")
+    Logger.info(water.to_xyz())
 
     ########################################################################################
     # 2. Run the SCF stage to obtain the reference wavefunction.
@@ -89,7 +88,7 @@ def main(argv: Sequence[str] | None = None) -> None:
     scf_solver.settings().set("basis_set", args.basis)
     e_scf, scf_wavefunction = scf_solver.run(water, args.charge, args.spin)
     total_scf_energy = e_scf + nuclear_repulsion
-    LOGGER.info("SCF Energy: %.8f Hartree", total_scf_energy)
+    Logger.info(f"SCF Energy: {total_scf_energy:.8f} Hartree")
 
 
 if __name__ == "__main__":

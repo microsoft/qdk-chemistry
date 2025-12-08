@@ -35,10 +35,7 @@ from qdk_chemistry.algorithms.energy_estimator import (
 from qdk_chemistry.data import Circuit, EnergyExpectationResult, MeasurementData, QubitHamiltonian, Settings
 from qdk_chemistry.utils import Logger
 
-_LOGGER = Logger.QDK_LOGGER(__name__)
-
 __all__ = ["QiskitEnergyEstimator", "QiskitEnergyEstimatorSettings"]
-
 
 class QiskitEnergyEstimatorSettings(Settings):
     """Settings configuration for a QiskitEnergyEstimator.
