@@ -19,12 +19,16 @@ from qdk_chemistry.utils import rotate_orbitals
 from .reference_tolerances import float_comparison_absolute_tolerance, float_comparison_relative_tolerance
 
 try:
-    import qdk_chemistry.plugins.pyscf as pyscf_plugin
+    import pyscf  # noqa: F401
 
-    pyscf_plugin.load()
     PYSCF_AVAILABLE = True
 except ImportError:
     PYSCF_AVAILABLE = False
+
+if PYSCF_AVAILABLE:
+    import qdk_chemistry.plugins.pyscf as pyscf_plugin
+
+    pyscf_plugin.load()
 
 pytestmark = pytest.mark.skipif(not PYSCF_AVAILABLE, reason="PySCF not available")
 

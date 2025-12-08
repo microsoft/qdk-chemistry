@@ -29,6 +29,13 @@ from .reference_tolerances import (
 )
 from .test_helpers import create_test_basis_set
 
+try:
+    import pyscf  # noqa: F401
+
+    PYSCF_AVAILABLE = True
+except ImportError:
+    PYSCF_AVAILABLE = False
+
 
 class TestAnsatzSerialization:
     """Test ansatz serialization and deserialization."""
@@ -308,6 +315,7 @@ class TestAnsatzSerialization:
         # energy from ansatz should reproduce scf energy
         assert np.isclose(e_rhf, e_scf, rtol=float_comparison_relative_tolerance, atol=scf_energy_tolerance)
 
+    @pytest.mark.skipif(not PYSCF_AVAILABLE, reason="pyscf not available")
     def test_restricted_open_shell_energy(self):
         """Test the energy evaluation for a restricted open-shell system."""
         try:
