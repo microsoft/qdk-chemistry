@@ -193,7 +193,7 @@ Eigen::MatrixXd PipekMezeyLocalization::localize(
              num_atomic_orbitals, 0.0, overlap_times_coeffs.data(),
              num_atomic_orbitals);
 
-  const auto max_sweeps = this->settings_.get<size_t>("max_iterations");
+  const auto max_sweeps = this->settings_.get<int64_t>("max_iterations");
   const auto tol = this->settings_.get<double>("tolerance");
   const auto AB_tol = this->settings_.get<double>("small_rotation_tolerance");
   size_t i_sweep;

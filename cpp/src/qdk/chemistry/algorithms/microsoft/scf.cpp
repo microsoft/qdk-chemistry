@@ -67,7 +67,34 @@ std::pair<double, std::shared_ptr<data::Wavefunction>> ScfSolver::_run_impl(
     // Workitem: 41322
   }
 
-  const bool unrestricted = (multiplicity != 1);
+  const bool open_shell = (multiplicity != 1);
+
+  // Determine reference type and unrestricted flag
+  std::string scf_type = _settings->get<std::string>("scf_type");
+  std::transform(scf_type.begin(), scf_type.end(), scf_type.begin(), ::tolower);
+
+  bool unrestricted;
+  if (scf_type == "auto") {
+    unrestricted = open_shell;
+  } else if (scf_type == "unrestricted") {
+    unrestricted = true;
+    if (!open_shell && !use_input_initial_guess) {
+      spdlog::warn(
+          "Unrestricted reference requested for closed-shell system. "
+          "Automatic spin symmetry breaking is not supported. "
+          "Consider providing a spin-broken initial guess if desired.");
+    }
+  } else if (scf_type == "restricted") {
+    if (open_shell) {
+      throw std::invalid_argument(
+          "Restricted Open-Shell calculation is not currently supported in the "
+          "QDK/Chemistry SCFSolver");
+    }
+    unrestricted = false;
+  } else {
+    throw std::invalid_argument(
+        "scf_type must be one of: auto, restricted, unrestricted");
+  }
 
   std::string basis_set = _settings->get<std::string>("basis_set");
   std::transform(basis_set.begin(), basis_set.end(), basis_set.begin(),
@@ -78,7 +105,7 @@ std::pair<double, std::shared_ptr<data::Wavefunction>> ScfSolver::_run_impl(
 
   double convergence_threshold =
       _settings->get<double>("convergence_threshold");
-  int max_iterations = _settings->get<int>("max_iterations");
+  int64_t max_iterations = _settings->get<int64_t>("max_iterations");
 
   // Set different convergence threshold according to tolerance
   double orbital_gradient_threshold = convergence_threshold;
@@ -109,8 +136,14 @@ std::pair<double, std::shared_ptr<data::Wavefunction>> ScfSolver::_run_impl(
   ms_scf_config->density_init_method =
       use_input_initial_guess ? qcs::DensityInitializationMethod::UserProvided
                               : qcs::DensityInitializationMethod::Atom;
-  ms_scf_config->eri.method =
-      qcs::ERIMethod::Libint2Direct;  // TODO: Make this configurable
+
+  // Configure ERI method from settings
+  std::string eri_method = _settings->get<std::string>("eri_method");
+  if (eri_method == "direct") {
+    ms_scf_config->eri.method = qcs::ERIMethod::Libint2Direct;
+  } else {  // Must be "incore" due to ListConstraint validation
+    ms_scf_config->eri.method = qcs::ERIMethod::Incore;
+  }
 
   double eri_threshold = _settings->get<double>("eri_threshold");
   if (eri_threshold > 0.0) {
@@ -125,7 +158,7 @@ std::pair<double, std::shared_ptr<data::Wavefunction>> ScfSolver::_run_impl(
   ms_scf_config->k_eri = ms_scf_config->eri;
   ms_scf_config->grad_eri = ms_scf_config->eri;
 
-  ms_scf_config->fock_reset_steps = _settings->get<int>("fock_reset_steps");
+  ms_scf_config->fock_reset_steps = _settings->get<int64_t>("fock_reset_steps");
 
   // Convert enable_gdm boolean to algorithm method enum for backward
   // compatibility
@@ -139,13 +172,13 @@ std::pair<double, std::shared_ptr<data::Wavefunction>> ScfSolver::_run_impl(
   ms_scf_config->scf_algorithm.level_shift =
       _settings->get<double>("level_shift");
   ms_scf_config->scf_algorithm.max_iteration =
-      _settings->get<int>("max_scf_steps");
+      _settings->get<int64_t>("max_iterations");
   ms_scf_config->scf_algorithm.gdm_config.energy_thresh_diis_switch =
       _settings->get<double>("energy_thresh_diis_switch");
   ms_scf_config->scf_algorithm.gdm_config.gdm_max_diis_iteration =
-      _settings->get<int>("gdm_max_diis_iteration");
+      _settings->get<int64_t>("gdm_max_diis_iteration");
   ms_scf_config->scf_algorithm.gdm_config.gdm_bfgs_history_size_limit =
-      _settings->get<int>("gdm_bfgs_history_size_limit");
+      _settings->get<int64_t>("gdm_bfgs_history_size_limit");
   if (ms_scf_config->eri.method == qcs::ERIMethod::Incore) {
 #ifdef QDK_CHEMISTRY_ENABLE_HGP
     ms_scf_config->grad_eri.method = qcs::ERIMethod::HGP;
@@ -217,6 +250,11 @@ std::pair<double, std::shared_ptr<data::Wavefunction>> ScfSolver::_run_impl(
     qcs::RowMajorMatrix density_matrix;
 
     if (unrestricted) {
+      if (initial_guess.value()->is_restricted())
+        spdlog::warn(
+            "Unrestricted calculation requested but restricted "
+            "initial guess provided.");
+
       // For unrestricted case, stack alpha and beta coefficients and compute
       // density
       const size_t num_molecular_orbitals = coeff_alpha.cols();
@@ -249,6 +287,11 @@ std::pair<double, std::shared_ptr<data::Wavefunction>> ScfSolver::_run_impl(
           C_beta_transformed.block(0, 0, num_atomic_orbitals, n_beta)
               .transpose();
     } else {
+      if (initial_guess.value()->is_unrestricted()) {
+        throw std::invalid_argument(
+            "Restricted calculation requested but unrestricted initial guess "
+            "provided.");
+      }
       // For restricted case, use alpha coefficients only
       Eigen::MatrixXd C_transformed = qdk_basis_map.transpose() * coeff_alpha;
 
