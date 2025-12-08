@@ -508,7 +508,7 @@ std::shared_ptr<BasisSet> BasisSet::from_basis_name(
     }
 
     // check for specific ecp name
-    if (ecp_name != ecp_name) {
+    if (ecp_name != basis_name) {
       all_ecp_electrons.push_back(0);
       continue;
     }
@@ -635,7 +635,7 @@ std::shared_ptr<BasisSet> BasisSet::from_index_map(
     auto it = index_to_basis_map.find(atom_index);
     if (it == index_to_basis_map.end()) {
       throw std::invalid_argument("No basis set specified for atom index: " +
-                                  atom_index);
+                                  std::string(atom_index));
     }
     std::string tmp_basis_set_name = it->second;
     // convert basis_set_name to lowercase

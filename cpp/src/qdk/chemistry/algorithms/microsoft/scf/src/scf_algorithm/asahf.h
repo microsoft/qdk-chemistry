@@ -11,7 +11,7 @@
 
 namespace qdk::chemistry::scf {
 /**
- * @breif Generate atomic density matrix guess using ASAHF for each atom
+ * @brief Generate atomic density matrix guess using ASAHF for each atom
  * @param basis_set Basis set for the molecule
  * @param mol Molecular structure
  * @param tD Output density matrix
