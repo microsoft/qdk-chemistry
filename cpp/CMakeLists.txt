@@ -48,7 +48,7 @@ FetchContent_Declare( linalg-cmake-modules
 FetchContent_MakeAvailable( linalg-cmake-modules )
 
 list( APPEND CMAKE_MODULE_PATH ${linalg-cmake-modules_SOURCE_DIR} )
-set(ILP64_FOUND OFF) # Prevent FindBLAS/FindLAPACK from defaulting to ILP64
+set(ILP64_FOUND FALSE FORCE) # Prevent FindBLAS/FindLAPACK from defaulting to ILP64
 
 # Microarchitecture handling
 include(cmake/qdk-uarch.cmake)
