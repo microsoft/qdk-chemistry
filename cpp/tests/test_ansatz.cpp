@@ -208,7 +208,7 @@ TEST_F(AnsatzEnergyCalculationTest, O2TripletCAS_8e6o) {
 
   // get wavefunction
   auto scf = ScfSolverFactory::create();
-  const auto& [E_scf, wfn_scf] = scf->run(structure, 0, 3);
+  const auto& [E_scf, wfn_scf] = scf->run(structure, 0, 3, "def2-svp");
 
   // get full hamiltonian
   auto hamil_ctor = HamiltonianConstructorFactory::create();

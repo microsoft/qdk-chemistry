@@ -428,18 +428,16 @@ TEST_F(ScfTest, EriMethodSetting) {
 
   // Test default eri_method (direct)
   auto scf_solver_direct = ScfSolverFactory::create();
-  scf_solver_direct->settings().set("basis_set", "sto-3g");
   EXPECT_EQ(scf_solver_direct->settings().get<std::string>("eri_method"),
             "direct");
-  auto [energy_direct, wfn_direct] = scf_solver_direct->run(water, 0, 1);
+  auto [energy_direct, wfn_direct] = scf_solver_direct->run(water, 0, 1, "sto-3g");
 
   // Test eri_method = incore
   auto scf_solver_incore = ScfSolverFactory::create();
-  scf_solver_incore->settings().set("basis_set", "sto-3g");
   scf_solver_incore->settings().set("eri_method", "incore");
   EXPECT_EQ(scf_solver_incore->settings().get<std::string>("eri_method"),
             "incore");
-  auto [energy_incore, wfn_incore] = scf_solver_incore->run(water, 0, 1);
+  auto [energy_incore, wfn_incore] = scf_solver_incore->run(water, 0, 1, "sto-3g");
 
   // Both methods should give the same energy
   EXPECT_NEAR(energy_direct, energy_incore, testing::scf_energy_tolerance);

@@ -200,9 +200,8 @@ class OrbitalRotationTest : public ::testing::Test {
     // Use a real molecular system - Water
     auto water = testing::create_water_structure();
     auto scf_solver = ScfSolverFactory::create();
-    scf_solver->settings().set("basis_set", "STO-3G");
 
-    auto [water_e, water_wf] = scf_solver->run(water, 0, 1);
+    auto [water_e, water_wf] = scf_solver->run(water, 0, 1, "STO-3G");
 
     test_orbitals_restricted = water_wf->get_orbitals();
 

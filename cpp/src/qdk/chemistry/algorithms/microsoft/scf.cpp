@@ -305,7 +305,7 @@ std::pair<double, std::shared_ptr<data::Wavefunction>> ScfSolver::_run_impl(
     qcs::RowMajorMatrix density_matrix;
 
     if (unrestricted) {
-      if (initial_guess.value()->is_restricted())
+      if (initial_guess->is_restricted())
         spdlog::warn(
             "Unrestricted calculation requested but restricted "
             "initial guess provided.");
@@ -342,7 +342,7 @@ std::pair<double, std::shared_ptr<data::Wavefunction>> ScfSolver::_run_impl(
           C_beta_transformed.block(0, 0, num_atomic_orbitals, n_beta)
               .transpose();
     } else {
-      if (initial_guess.value()->is_unrestricted()) {
+      if (initial_guess->is_unrestricted()) {
         throw std::invalid_argument(
             "Restricted calculation requested but unrestricted initial guess "
             "provided.");
