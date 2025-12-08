@@ -8,8 +8,14 @@ This algorithm forms the final stage of a quantum chemistry workflow, where a pr
 Overview
 --------
 
+<<<<<<< HEAD
 The :class:`~qdk_chemistry.algorithms.EnergyEstimator` evaluates the expectation value of a :class:`~qdk_chemistry.data.QubitHamiltonian` with respect to a quantum circuit that loads a wavefunction onto qubits.
 It automatically generates measurement circuits for each Pauli term, executes them on a backend simulator with user-specified shots, and statistically aggregates bitstring outcomes.
+=======
+The :class:`~qdk_chemistry.algorithms.EnergyEstimator` evaluates the expectation value of a :class:`~qdk_chemistry.data.QubitHamiltonian` with respect to a given quantum circuit that loads a wavefunction onto qubits.
+It takes a Circuit object with target qubit Hamiltonians and automatically generates the corresponding measurement circuits.
+These circuits are executed on a selected backend simulator with the user-specified number of shots, and the resulting bitstring statistics are used to calculate per-term expectation values and the total energy.
+>>>>>>> main
 
 The algorithm supports:
 

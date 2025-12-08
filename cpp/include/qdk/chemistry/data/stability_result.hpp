@@ -29,8 +29,49 @@ namespace qdk::chemistry::data {
  * - Convenient access methods for stability analysis results
  *
  * @note Internal stability typically refers to stability against perturbations
- * within same method (e.g. RHF -> RHF), while external stability refers to
+ * within the same method (e.g. RHF -> RHF), while external stability refers to
  * stability against perturbations between different methods (e.g. RHF -> UHF).
+ *
+ * @section eigenvector_format Eigenvector Format
+ *
+ * The eigenvectors encode orbital rotation parameters between occupied
+ * and virtual orbitals. The required size depends on the orbital type:
+ *
+ * **RHF (Restricted Hartree-Fock):**
+ * - Size: num_occupied_orbitals * num_virtual_orbitals
+ * - Where: num_virtual_orbitals = num_molecular_orbitals -
+ *                                 num_occupied_orbitals
+ * - Elements represent rotations between occupied and virtual spatial orbitals
+ * - Both spins rotate together (spin symmetry preserved)
+ *
+ * **UHF (Unrestricted Hartree-Fock):**
+ * - Size: num_alpha_occupied_orbitals * num_alpha_virtual_orbitals +
+ *         num_beta_occupied_orbitals * num_beta_virtual_orbitals
+ * - Where: num_alpha_virtual_orbitals = num_molecular_orbitals -
+ *                                       num_alpha_occupied_orbitals
+ *          num_beta_virtual_orbitals = num_molecular_orbitals -
+ *                                      num_beta_occupied_orbitals
+ * - First num_alpha_occupied_orbitals * num_alpha_virtual_orbitals elements:
+ *   alpha rotations
+ * - Last num_beta_occupied_orbitals * num_beta_virtual_orbitals elements:
+ *   beta rotations
+ * - Alpha and beta orbitals rotate independently
+ *
+ * **ROHF (Restricted Open-shell Hartree-Fock):**
+ * - The rotation mask is the union of two rectangular blocks:
+ *   1. Alpha block: num_alpha_occupied_orbitals * num_alpha_virtual_orbitals
+ *   2. Beta block: num_beta_occupied_orbitals * num_beta_virtual_orbitals
+ * - Size calculation for union (assuming num_alpha_occupied >=
+ * num_beta_occupied): num_alpha_occupied_orbitals * (num_molecular_orbitals -
+ * num_alpha_occupied_orbitals) + (num_alpha_occupied_orbitals -
+ * num_beta_occupied_orbitals) * num_beta_occupied_orbitals
+ * - This equals the virtual-occupied block plus the additional
+ *   doubly-occupied to singly-occupied block
+ *
+ * **Indexing Convention:**
+ * The virtual orbital index varies fastest. For the element corresponding to
+ * occupied orbital i and virtual orbital a, the index is computed as:
+ * index = i * num_virtual + a.
  */
 class StabilityResult : public DataClass,
                         public std::enable_shared_from_this<StabilityResult> {

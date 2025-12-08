@@ -10,16 +10,17 @@
 from qdk_chemistry.algorithms import create
 
 # Create a StatePreparation instance
-state_prep = create("state_prep", "sparse_isometry_gf2x")
+sparse_prep = create("state_prep", "sparse_isometry_gf2x")
+regular_prep = create("state_prep", "regular_isometry")
 # end-cell-create
 ################################################################################
 
 ################################################################################
 # start-cell-configure
 # Configure transpilation settings
-state_prep.settings().set("transpile", True)
-state_prep.settings().set("basis_gates", ["rz", "cz", "sdg", "h"])
-state_prep.settings().set("transpile_optimization_level", 3)
+sparse_prep.settings().set("transpile", True)
+sparse_prep.settings().set("basis_gates", ["rz", "cz", "sdg", "h"])
+sparse_prep.settings().set("transpile_optimization_level", 3)
 # end-cell-configure
 ################################################################################
 
@@ -55,8 +56,10 @@ coeffs = np.array([0.9, 0.1])
 container = CasWavefunctionContainer(coeffs, dets, orbitals)
 wavefunction = Wavefunction(container)
 
-# Construct the quantum circuit
-qasm_circuit = state_prep.run(wavefunction)
-print(f"OpenQASM circuit:\n{qasm_circuit}")
+# Construct the circuit
+regular_circuit = regular_prep.run(wavefunction)
+sparse_circuit = sparse_prep.run(wavefunction)
+print(f"Regular isometry QASM:\n{regular_circuit.get_qasm()}")
+print(f"Sparse isometry QASM:\n{sparse_circuit.get_qasm()}")
 # end-cell-run
 ################################################################################

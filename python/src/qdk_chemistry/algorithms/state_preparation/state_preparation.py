@@ -6,7 +6,7 @@
 # --------------------------------------------------------------------------------------------
 
 from qdk_chemistry.algorithms.base import Algorithm, AlgorithmFactory
-from qdk_chemistry.data import Settings, Wavefunction
+from qdk_chemistry.data import Circuit, Settings, Wavefunction
 
 __all__: list[str] = []
 
@@ -35,14 +35,14 @@ class StatePreparation(Algorithm):
         """Return the algorithm type name as state_prep."""
         return "state_prep"
 
-    def run(self, wavefunction: Wavefunction) -> str:
+    def run(self, wavefunction: Wavefunction) -> Circuit:
         """Prepare a quantum circuit that encodes the given wavefunction.
 
         Args:
             wavefunction: The target wavefunction to prepare.
 
         Returns:
-            OpenQASM3 string of the quantum circuit that prepares the wavefunction.
+            A Circuit object containing an OpenQASM3 string of the quantum circuit that prepares the wavefunction.
 
         """
         return super().run(wavefunction)

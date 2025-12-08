@@ -124,7 +124,7 @@ The MACIS (Many-body Adaptive Configuration Interaction Solver) CAS implementati
      - Type
      - Default
      - Description
-   * - ``ci_residual_tolerance``
+   * - ``ci_residual_threshold``
      - float
      - ``1e-6``
      - Convergence threshold for CI iterations

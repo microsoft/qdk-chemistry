@@ -41,6 +41,8 @@ See `Available implementations`_ below for implementation-specific options.
       :end-before: # end-cell-configure
 
 **Running the calculation:**
+Once configured, the :class:`~qdk_chemistry.algorithms.StatePreparation` can be used to generate
+a quantum circuit from a :class:`~qdk_chemistry.data.Wavefunction`.
 
 .. tab:: Python API
 

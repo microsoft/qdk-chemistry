@@ -134,7 +134,7 @@ class SubstituteCliffordRzSettings(Settings):
 
     SubstituteCliffordRz-specific settings:
         equivalent_gate_set (vector<string>, default=["id", "s", "sdg", "z"]): Equivalent gate set to use.
-        tolerance (float, default=float(np.finfo(np.float64).eps)): Float comparison tolerance to use.
+        tolerance (double, default=float(np.finfo(np.float64).eps)): Float comparison tolerance to use.
 
     """
 
@@ -142,7 +142,7 @@ class SubstituteCliffordRzSettings(Settings):
         """Initialize SubstituteCliffordRzSettings."""
         super().__init__()
         self._set_default("equivalent_gate_set", "vector<string>", ["id", "s", "sdg", "z"])
-        self._set_default("tolerance", "float", float(np.finfo(np.float64).eps))
+        self._set_default("tolerance", "double", float(np.finfo(np.float64).eps))
 
     def set(self, key: str, value):
         """Override set to ensure 'id' is always in equivalent_gate_set and duplicates are removed.
