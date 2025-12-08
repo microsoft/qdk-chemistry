@@ -155,7 +155,7 @@ Examples:
 Get number of atomic orbitals this shell contributes.
 
 Args:
-    atomic_orbital_type (Optional[AOType]): Whether to use spherical (2l+1) or Cartesian functions.
+    atomic_orbital_type (AOType | None): Whether to use spherical (2l+1) or Cartesian functions.
         Default is Spherical
 
 Returns:
@@ -215,7 +215,7 @@ Creates a basis set associated with a molecular structure.
 Args:
     name (str): Name of the basis set
     structure (Structure): Molecular structure to associate with this basis set
-    atomic_orbital_type (Optional[AOType]): Whether to use spherical or Cartesian atomic orbitals. Default is Spherical
+    atomic_orbital_type (AOType | None): Whether to use spherical or Cartesian atomic orbitals. Default is Spherical
 
 Examples:
     >>> from qdk_chemistry.data import Structure
@@ -234,7 +234,7 @@ Creates a basis set with predefined shells.
 Args:
     name (str): Name of the basis set
     shells (list[Shell]): Vector of shell objects defining the atomic orbitals
-    atomic_orbital_type (Optional[AOType]): Whether to use spherical or Cartesian atomic orbitals.
+    atomic_orbital_type (AOType | None): Whether to use spherical or Cartesian atomic orbitals.
         Default is Spherical.
 
 Examples:
@@ -255,7 +255,7 @@ Args:
     name (str): Name of the basis set
     shells (list[Shell]): Vector of shell objects defining the atomic orbitals
     structure (Structure): Molecular structure to associate with this basis set
-    atomic_orbital_type (Optional[AOType]): Whether to use spherical or Cartesian atomic orbitals.
+    atomic_orbital_type (AOType | None): Whether to use spherical or Cartesian atomic orbitals.
         Default is Spherical
 
 Examples:
@@ -279,7 +279,7 @@ Args:
     shells (list[Shell]): Vector of shell objects defining the atomic orbitals
     ecp_shells (list[Shell]): Vector of ECP shell objects
     structure (Structure): Molecular structure to associate with this basis set
-    atomic_orbital_type (Optional[AOType]): Whether to use spherical or Cartesian atomic orbitals.
+    atomic_orbital_type (AOType | None): Whether to use spherical or Cartesian atomic orbitals.
         Default is Spherical
 
 Examples:
@@ -308,7 +308,7 @@ Args:
     ecp_shells (list[Shell]): Vector of ECP shell objects
     ecp_electrons (list[int]): Number of ECP electrons for each atom
     structure (Structure): Molecular structure to associate with this basis set
-    atomic_orbital_type (Optional[AOType]): Whether to use spherical or Cartesian atomic orbitals.
+    atomic_orbital_type (AOType | None): Whether to use spherical or Cartesian atomic orbitals.
         Default is Spherical
 
 Examples:

@@ -2,8 +2,7 @@
 
 This module provides integration between QDK/Chemistry and PySCF for performing
 Coupled Cluster (CC) calculations. It implements a CCSD (Coupled Cluster Singles and Doubles)
-calculator that can be used within the QDK/Chemistry framework for accurate electronic structure
-calculations.
+calculator that can be used within the QDK/Chemistry framework.
 
 The module contains:
 
@@ -12,16 +11,16 @@ The module contains:
 * Registration utilities to integrate the calculator with QDK/Chemistry's plugin system
 
 The calculator handles automatic conversion between QDK/Chemistry Hamiltonian objects and PySCF
-format, performs the CC calculation, and returns results (energy and
-excitation amplitudes) in QDK/Chemistry-compatible format.
+format, performs the CC calculation, and returns results (energy and wavefunction)
+in QDK/Chemistry-compatible format.
 
 Upon import, this module automatically registers the PySCF CC calculator with QDK/Chemistry's
-CC calculator registry under the name "pyscf".
+CC calculator registry under the name "pyscf_coupled_cluster".
 
 Examples:
     >>> from qdk_chemistry.plugins.pyscf.coupled_cluster import PyscfCoupledClusterCalculator
     >>> cc_calculator = PyscfCoupledClusterCalculator()
-    >>> energy, amplitudes = cc_calculator.calculate(hamiltonian)
+    >>> energy, wavefunction = cc_calculator.run(ansatz)
 
 This module requires both QDK/Chemistry and PySCF to be installed.
 
@@ -35,8 +34,8 @@ This module requires both QDK/Chemistry and PySCF to be installed.
 import numpy as np
 from pyscf import cc
 
-from qdk_chemistry.algorithms import CoupledClusterCalculator, register
-from qdk_chemistry.data import CoupledClusterAmplitudes, Settings
+from qdk_chemistry.algorithms import DynamicalCorrelationCalculator
+from qdk_chemistry.data import CoupledClusterContainer, Settings, Wavefunction
 from qdk_chemistry.plugins.pyscf.utils import hamiltonian_to_scf
 
 __all__ = ["PyscfCoupledClusterCalculator", "PyscfCoupledClusterSettings"]
@@ -81,9 +80,10 @@ class PyscfCoupledClusterSettings(Settings):
         self._set_default("direct", "bool", False)
         self._set_default("async_io", "bool", True)
         self._set_default("incore_complete", "bool", True)
+        self._set_default("store_amplitudes", "bool", False)
 
 
-class PyscfCoupledClusterCalculator(CoupledClusterCalculator):
+class PyscfCoupledClusterCalculator(DynamicalCorrelationCalculator):
     """PySCF-based Coupled Cluster calculator for quantum chemistry calculations.
 
     This class provides an interface between QDK/Chemistry and PySCF for performing
@@ -100,28 +100,36 @@ class PyscfCoupledClusterCalculator(CoupledClusterCalculator):
         super().__init__()
         self._settings = PyscfCoupledClusterSettings()
 
+    def name(self):
+        """Return the name of this coupled cluster implementation."""
+        return "pyscf_coupled_cluster"
+
     def _run_impl(self, ansatz):
         """Perform a Coupled Cluster calculation using PySCF.
 
-        This method takes a QDK/Chemistry Hamiltonian object, converts it to the PySCF format,
-        performs a CCSD calculation, and returns the results as a pair of energy and
-        QDK/Chemistry CoupledClusterAmplitudes object.
+        This method takes a QDK/Chemistry Ansatz object, converts it to the PySCF format,
+        performs a CCSD calculation, and returns the results as a pair of total energy and
+        wavefunction containing the CC amplitudes.
 
         Args:
             ansatz: The QDK/Chemistry :class:`Ansatz` object representing the system to calculate.
+            store_amplitudes: Whether to store amplitudes or not in the CC container (default is False).
 
         Returns:
-            A tuple containing the total energy and a QDK/Chemistry CoupledClusterAmplitudes
-            object containing the excitation amplitudes.
+            A tuple containing the total energy and wavefunction, containing CC amplitudes.
 
         Raises:
             RuntimeError: If the CCSD calculation does not converge.
 
         """
         hamiltonian = ansatz.get_hamiltonian()
+
         alpha_occ, beta_occ = ansatz.get_wavefunction().get_total_orbital_occupations()
         pyscf_scf = hamiltonian_to_scf(hamiltonian, alpha_occ, beta_occ)
         pyscf_cc = cc.CCSD(pyscf_scf)
+
+        store_amplitudes = self._settings.get("store_amplitudes")
+
         # Handle Settings
         if self._settings.get_or_default("verbose", -1) != -1:
             pyscf_cc.verbose = int(self._settings.get("verbose"))
@@ -141,23 +149,79 @@ class PyscfCoupledClusterCalculator(CoupledClusterCalculator):
         pyscf_cc.kernel()
         if not pyscf_cc.converged:
             raise RuntimeError("CCSD calculation did not converge")
-        t1 = pyscf_cc.t1
-        t2 = pyscf_cc.t2
-        t1 = np.reshape(t1, (t1.size, 1))
-        t2 = np.reshape(t2, (t2.size, 1))
 
-        # Create amplitudes object without correlation energy
-        nalpha, nbeta = ansatz.get_wavefunction().get_total_num_electrons()
-        qdk_cc_amplitudes = CoupledClusterAmplitudes(hamiltonian.get_orbitals(), t1, t2, nalpha, nbeta)
+        original_wavefunction = ansatz.get_wavefunction()
+        orbitals = original_wavefunction.get_orbitals()
+        initial_energy = ansatz.calculate_energy()
+
+        # Check if this is an unrestricted calculation
+        # PySCF returns tuples for UHF/UKS, single arrays for RHF/ROHF
+        is_unrestricted = isinstance(pyscf_cc.t1, tuple)
+
+        if is_unrestricted:
+            # Unrestricted case: t1 = (t1_aa, t1_bb), t2 = (t2_aaaa, t2_aabb, t2_bbbb)
+            t1_aa, t1_bb = pyscf_cc.t1
+            t2_aaaa, t2_aabb, t2_bbbb = pyscf_cc.t2
+
+            if store_amplitudes:
+                # Reshape amplitudes for storage
+                t1_aa = np.reshape(t1_aa, (t1_aa.size, 1))
+                t1_bb = np.reshape(t1_bb, (t1_bb.size, 1))
+                t2_aaaa = np.reshape(t2_aaaa, (t2_aaaa.size, 1))
+                t2_aabb = np.reshape(t2_aabb, (t2_aabb.size, 1))
+                t2_bbbb = np.reshape(t2_bbbb, (t2_bbbb.size, 1))
+
+                # Create CoupledClusterContainer with spin-separated amplitudes
+                cc_container = CoupledClusterContainer(
+                    orbitals,
+                    original_wavefunction,
+                    t1_aa,  # Alpha T1 amplitudes
+                    t1_bb,  # Beta T1 amplitudes
+                    t2_aabb,  # Alpha-beta T2 amplitudes
+                    t2_aaaa,  # Alpha-alpha T2 amplitudes
+                    t2_bbbb,  # Beta-beta T2 amplitudes
+                )
+            else:
+                # Create CoupledClusterContainer without storing amplitudes
+                cc_container = CoupledClusterContainer(
+                    orbitals,
+                    original_wavefunction,
+                    None,  # No T1 alpha amplitudes
+                    None,  # No T1 beta amplitudes
+                    None,  # No T2 alpha-beta amplitudes
+                    None,  # No T2 alpha-alpha amplitudes
+                    None,  # No T2 beta-beta amplitudes
+                )
+        else:
+            # Restricted case: t1 and t2 are single arrays
+            t1 = pyscf_cc.t1
+            t2 = pyscf_cc.t2
+
+            if store_amplitudes:
+                # Reshape amplitudes for storage
+                t1 = np.reshape(t1, (t1.size, 1))
+                t2 = np.reshape(t2, (t2.size, 1))
+
+                # Create CoupledClusterContainer with spatial amplitudes
+                cc_container = CoupledClusterContainer(
+                    orbitals,
+                    original_wavefunction,
+                    t1,  # T1 amplitudes (used for both alpha and beta in restricted case)
+                    t2,  # T2 amplitudes (alpha-beta coupling)
+                )
+            else:
+                # Create CoupledClusterContainer without storing amplitudes
+                cc_container = CoupledClusterContainer(
+                    orbitals,
+                    original_wavefunction,
+                    None,  # No T1 amplitudes
+                    None,  # No T2 amplitudes
+                )
+
+        # Create a new wavefunction with the CC container
+        updated_wavefunction = Wavefunction(cc_container)
 
         # Total energy = SCF energy + correlation energy
-        total_energy = pyscf_scf.e_tot + pyscf_cc.e_corr
+        total_energy = initial_energy + pyscf_cc.e_corr
 
-        return total_energy, qdk_cc_amplitudes
-
-    def name(self) -> str:
-        """Return the name of the Coupled Cluster calculator."""
-        return "pyscf"
-
-
-register(lambda: PyscfCoupledClusterCalculator())
+        return total_energy, updated_wavefunction

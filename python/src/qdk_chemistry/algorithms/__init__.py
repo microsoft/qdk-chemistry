@@ -22,7 +22,7 @@ from qdk_chemistry.algorithms.active_space_selector import (
     QdkOccupationActiveSpaceSelector,
     QdkValenceActiveSpaceSelector,
 )
-from qdk_chemistry.algorithms.coupled_cluster_calculator import CoupledClusterCalculator
+from qdk_chemistry.algorithms.dynamical_correlation_calculator import DynamicalCorrelationCalculator
 from qdk_chemistry.algorithms.energy_estimator import EnergyEstimator
 from qdk_chemistry.algorithms.hamiltonian_constructor import (
     HamiltonianConstructor,
@@ -38,6 +38,7 @@ from qdk_chemistry.algorithms.orbital_localizer import (
     OrbitalLocalizer,
     QdkMP2NaturalOrbitalLocalizer,
     QdkPipekMezeyLocalizer,
+    QdkVVHVLocalizer,
 )
 from qdk_chemistry.algorithms.projected_multi_configuration_calculator import (
     ProjectedMultiConfigurationCalculator,
@@ -61,7 +62,7 @@ from qdk_chemistry.utils.telemetry_events import telemetry_tracker
 __all__ = [
     # Classes
     "ActiveSpaceSelector",
-    "CoupledClusterCalculator",
+    "DynamicalCorrelationCalculator",
     "EnergyEstimator",
     "HamiltonianConstructor",
     "IterativePhaseEstimation",
@@ -82,6 +83,7 @@ __all__ = [
     "QdkOccupationActiveSpaceSelector",
     "QdkPipekMezeyLocalizer",
     "QdkScfSolver",
+    "QdkVVHVLocalizer",
     "QdkValenceActiveSpaceSelector",
     "QubitMapper",
     "ScfSolver",
@@ -92,18 +94,21 @@ __all__ = [
     "available",
     "create",
     "energy_from_phase",
+    "inspect_settings",
+    "print_settings",
     "register",
-    "show_settings",
+    "show_default",
     "unregister",
 ]
-
 
 _REGISTRY_EXPORTS = frozenset(
     {
         "available",
         "create",
+        "inspect_settings",
+        "print_settings",
         "register",
-        "show_settings",
+        "show_default",
         "unregister",
     }
 )
@@ -115,8 +120,10 @@ if TYPE_CHECKING:  # pragma: no cover - typing-only imports
 
     available = _registry_type.available
     create = _registry_type.create
+    inspect_settings = _registry_type.inspect_settings
+    print_settings = _registry_type.print_settings
     register = _registry_type.register
-    show_settings = _registry_type.show_settings
+    show_default = _registry_type.show_default
     unregister = _registry_type.unregister
 
 

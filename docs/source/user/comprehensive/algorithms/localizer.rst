@@ -3,6 +3,8 @@ Orbital localization
 
 The :class:`~qdk_chemistry.algorithms.OrbitalLocalizer` algorithm in QDK/Chemistry performs various orbital transformations to create localized or otherwise transformed molecular orbitals.
 Following QDK/Chemistry's :doc:`algorithm design principles <../design/index>`, it takes an :doc:`Orbitals <../data/orbitals>` instance as input and produces a new :doc:`Orbitals <../data/orbitals>` instance as output.
+For more information about this pattern, see the :doc:`Factory Pattern <../design/factory_pattern>` documentation.
+
 These transformations preserve the overall electronic state but provide orbitals with different properties that are useful for chemical analysis or subsequent calculations.
 
 Overview
@@ -17,16 +19,22 @@ Localization methods
 
 QDK/Chemistry provides several orbital transformation methods through the :class:`~qdk_chemistry.algorithms.OrbitalLocalizer` interface:
 
-- **Pipek-Mezey Localization**
-- **Natural Orbitals**
-- **Second-order Møller-Plesset (MP2) Natural Orbitals**
+**Pipek-Mezey Localization**
+   Maximizes the sum of squared Mulliken charges on each atom for each orbital, creating orbitals that are maximally localized on specific atoms or bonds.
 
-Creating a localizer
---------------------
+**MP2 Natural Orbitals**
+   Transforms canonical orbitals into natural orbitals based on MP2 density matrices, providing orbitals that diagonalize the correlation effects.
 
-As an algorithm class in QDK/Chemistry, the :class:`~qdk_chemistry.algorithms.OrbitalLocalizer` follows the :doc:`factory pattern design principle <../design/index>`.
-It is created using its corresponding factory, which provides a unified interface for different localization method implementations.
-For more information about this pattern, see the :doc:`Factory Pattern <../design/factory_pattern>` documentation.
+**Valence Virtual Hard Virtual (VVHV) Orbitals**
+   Separates orbitals into valence, virtual, and hard virtual categories for more efficient treatment in correlation methods.
+
+Usage
+-----
+
+Before performing localization, you need an :doc:`Orbitals <../data/orbitals>` instance as input.
+This is typically obtained from an :doc:`ScfSolver <scf_solver>` calculation, as localization is usually applied to converged :term:`SCF` orbitals.
+
+The most common use case is localizing occupied orbitals after an SCF calculation:
 
 .. tab:: C++ API
 
@@ -101,27 +109,28 @@ Once configured, the localization can be performed on a set of orbitals:
 Available localization methods
 ------------------------------
 
-qdk_mp2_natural_orbitals
-   :term:`MP2` Natural Orbitals
+QDK/Chemistry's :class:`~qdk_chemistry.algorithms.OrbitalLocalizer` provides a unified interface for localization methods.
 
-qdk_pipek_mezey
-   Pipek-Mezey Localized Orbitals
+QDK/Chemistry implementations
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-qdk_vvhv
-   Valence Virtual Hard Virtual (:term:`VVHV`) Orbitals
+- **QDK/Chemistry**: Native implementation of Pipek-Mezey and MP2 natural orbital localization
+- **QDK/Chemistry**: VVHV orbital separation method
+
+Third-party interfaces
+~~~~~~~~~~~~~~~~~~~~~~
+
+- **PySCF**: Interface to PySCF's orbital localization methods (Pipek-Mezey, Boys, etc.)
+
+The factory pattern allows seamless selection between these implementations.
+
+For more details on how QDK/Chemistry interfaces with external packages, see the :doc:`Interfaces <../design/interfaces>` documentation.
+
 
 Available settings
 ------------------
 
-The :class:`~qdk_chemistry.algorithms.OrbitalLocalizer` accepts a range of settings to control its behavior. These settings are divided into base settings
-(common to all localization methods) and specialized settings (specific to certain localization variants).
-
-Base settings
-~~~~~~~~~~~~~
-
-.. note::
-   TODO:  The base settings table is currently under construction.
-   Please see `online examples <https://github.com/microsoft/qdk-chemistry/blob/main/examples/factory_list.ipynb>`_ for the most up-to-date information.
+The :class:`~qdk_chemistry.algorithms.OrbitalLocalizer` settings vary by implementation. Different localization algorithms have their own specific configuration parameters.
 
 Specialized settings
 ~~~~~~~~~~~~~~~~~~~~
@@ -152,18 +161,16 @@ These settings apply only to specific variants of localization:
      - 1.0e-12
      - Threshold for small rotation detection
      - Pipek-Mezey, :term:`VVHV`
-   * - ``n_alpha_electrons``
-     - int
-     - Required
-     - Number of alpha electrons.
-       Orbital indices < n_alpha_electrons are treated as occupied, indices >= n_alpha_electrons are treated as virtual.
-     - :term:`MP2` Natural Orbitals, :term:`VVHV`
-   * - ``n_beta_electrons``
-     - int
-     - Required
-     - Number of beta electrons.
-       Orbital indices < n_beta_electrons are treated as occupied, indices >= n_beta_electrons are treated as virtual.
-     - :term:`MP2` Natural Orbitals, :term:`VVHV`
+   * - ``minimal_basis``
+     - string
+     - "sto-3g"
+     - Name of the minimal basis set used for valence virtual projection
+     - :term:`VVHV`
+   * - ``weighted_orthogonalization``
+     - bool
+     - true
+     - Whether to use weighted orthogonalization in hard virtual construction
+     - :term:`VVHV`
    * - ``method``
      - string
      - "pipek-mezey"
@@ -179,35 +186,6 @@ These settings apply only to specific variants of localization:
      - 1.0e-10
      - Threshold for classifying orbitals as occupied vs virtual
      - PySCF
-   * - ``minimal_basis``
-     - string
-     - "sto-3g"
-     - Name of the minimal basis set used for valence virtual projection
-     - :term:`VVHV`
-   * - ``weighted_orthogonalization``
-     - bool
-     - true
-     - Whether to use weighted orthogonalization in hard virtual construction
-     - :term:`VVHV`
-
-Implemented interface
----------------------
-
-QDK/Chemistry's :class:`~qdk_chemistry.algorithms.OrbitalLocalizer` provides a unified interface for localization methods.
-
-QDK/Chemistry implementations
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-- **QDK/Chemistry**: Native implementation of Pipek-Mezey, and :term:`MP2` natural orbital localization
-
-Third-party interfaces
-~~~~~~~~~~~~~~~~~~~~~~
-
-- **PySCF**: Interface to PySCF's orbital localization methods
-
-The factory pattern allows seamless selection between these implementations.
-
-For more details on how QDK/Chemistry interfaces with external packages, see the :doc:`Interfaces <../design/interfaces>` documentation.
 
 Further reading
 ---------------
@@ -215,5 +193,13 @@ Further reading
 - The above examples can be downloaded as complete `Python <../../../_static/examples/python/localizer.py>`_ or `C++ <../../../_static/examples/cpp/localizer.cpp>`_ code.
 - :doc:`Orbitals <../data/orbitals>`: Input and output orbitals
 - :doc:`ScfSolver <scf_solver>`: Produces initial orbitals for localization
-- :doc:`ActiveSpaceSelector <active_space>`: Often used with localized orbitals
+- :doc:`ActiveSpaceSelector <active_space>`: Often used with localized orbitals for better active space selection
 - :doc:`HamiltonianConstructor <hamiltonian_constructor>`: Can build Hamiltonians using localized orbitals
+- :doc:`Wavefunction <../data/wavefunction>`: Container for orbitals and electronic state information
+
+Related topics
+--------------
+
+- :doc:`Serialization <../data/serialization>`: Data serialization and deserialization
+- :doc:`Settings <../design/settings>`: Configuration settings for algorithms
+- :doc:`Factory pattern <../design/factory_pattern>`: Creating algorithm instances

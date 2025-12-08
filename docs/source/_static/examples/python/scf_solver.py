@@ -8,16 +8,8 @@
 ################################################################################
 # start-cell-create
 import numpy as np
-from qdk_chemistry.algorithms import available, create
+from qdk_chemistry.algorithms import create
 from qdk_chemistry.data import Structure
-
-# Create a Structure (coordinates in Bohr/atomic units)
-coords = np.array([[0.0, 0.0, 0.0], [0.0, 0.0, 1.4]])
-structure = Structure(coords, ["H", "H"])
-
-# List available SCF solver implementations
-available_solvers = available("scf_solver")
-print(f"Available SCF solvers: {available_solvers}")
 
 # Create the default ScfSolver instance
 scf_solver = create("scf_solver")
@@ -27,21 +19,25 @@ scf_solver = create("scf_solver")
 ################################################################################
 # start-cell-configure
 # Configure the SCF solver using the settings interface
-scf_solver.settings().set("basis_set", "sto-3g")
+# Note that the following line is optional, since hf is the default method
 scf_solver.settings().set("method", "hf")
-scf_solver.settings().set("max_iterations", 100)
-scf_solver.settings().set("convergence_threshold", 1.0e-8)
+# Set the basis set
+scf_solver.settings().set("basis_set", "def2-tzvpp")
+
 # end-cell-configure
 ################################################################################
 
 ################################################################################
 # start-cell-run
-# Run the SCF calculation
+# Specify a structure
+coords = np.array([[0.0, 0.0, 0.0], [0.0, 0.0, 1.4]])
+symbols = ["H", "H"]
+structure = Structure(coords, symbols=symbols)
+
+# Run scf
 E_scf, wfn = scf_solver.run(structure, charge=0, spin_multiplicity=1)
 scf_orbitals = wfn.get_orbitals()
 
 print(f"SCF Energy: {E_scf:.10f} Hartree")
-print(f"Number of molecular orbitals: {scf_orbitals.get_num_molecular_orbitals()}")
-print(f"Is restricted: {scf_orbitals.is_restricted()}")
 # end-cell-run
 ################################################################################

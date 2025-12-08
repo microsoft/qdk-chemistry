@@ -6,12 +6,14 @@
 #include <gtest/gtest.h>
 
 #include <optional>
-#include <qdk/chemistry/algorithms/coupled_cluster.hpp>
-#include <qdk/chemistry/data/coupled_cluster.hpp>
+#include <qdk/chemistry/algorithms/dynamical_correlation_calculator.hpp>
+#include <qdk/chemistry/data/ansatz.hpp>
 #include <qdk/chemistry/data/hamiltonian.hpp>
 #include <qdk/chemistry/data/orbitals.hpp>
 #include <qdk/chemistry/data/settings.hpp>
 #include <qdk/chemistry/data/structure.hpp>
+#include <qdk/chemistry/data/wavefunction.hpp>
+#include <qdk/chemistry/data/wavefunction_containers/cc.hpp>
 #include <qdk/chemistry/data/wavefunction_containers/sd.hpp>
 
 #include "ut_common.hpp"
@@ -19,64 +21,66 @@
 using namespace qdk::chemistry::algorithms;
 using namespace qdk::chemistry::data;
 
-// Mock implementation of the CoupledClusterCalculator
-class MockCoupledClusterCalculator : public CoupledClusterCalculator {
+// Mock implementation of a DynamicalCorrelationCalculator that produces CC
+// results
+class MockCoupledClusterCalculator : public DynamicalCorrelationCalculator {
  public:
   MockCoupledClusterCalculator() {}
-  ~MockCoupledClusterCalculator() noexcept override = default;
+  ~MockCoupledClusterCalculator() override = default;
   std::string name() const override { return "mock_cc"; }
+  std::string type_name() const override {
+    return "dynamical_correlation_calculator";
+  }
 
  protected:
-  std::pair<double, std::shared_ptr<CoupledClusterAmplitudes>> _run_impl(
-      std::shared_ptr<Ansatz> /*ansatz*/) const override {
-    // Create a minimal valid CoupledClusterAmplitudes object
-    double total_energy = -10.0;  // Dummy value
+  std::pair<double, std::shared_ptr<Wavefunction>> _run_impl(
+      std::shared_ptr<Ansatz> ansatz) const override {
+    // Create a wavefunction with CC container
+    auto original_wfn = ansatz->get_wavefunction();
+    auto orbs = original_wfn->get_orbitals();
 
-    // Populate with canonical data (occupations must be 0, 1, or 2 for
-    // restricted)
-    Eigen::MatrixXd coeffs(2, 2);
-    coeffs << 1.0, 0.0, 0.0, 1.0;
-    Eigen::VectorXd eps(2);
-    eps << -1.0, -0.5;
-
-    auto basis = testing::create_random_basis_set(2);
-    auto orbs = std::make_shared<Orbitals>(coeffs, eps, std::nullopt, basis,
-                                           std::nullopt);
-
-    // Create dummy amplitudes
-    CoupledClusterAmplitudes::amplitude_type t1(1);
+    // Create dummy T1 and T2 amplitudes
+    Eigen::VectorXd t1(1);
     t1(0) = 0.01;
 
-    CoupledClusterAmplitudes::amplitude_type t2(1);
+    Eigen::VectorXd t2(1);
     t2(0) = 0.005;
 
-    CoupledClusterAmplitudes cc(orbs, t1, t2, 1, 1);
-    return {total_energy,
-            std::make_shared<CoupledClusterAmplitudes>(std::move(cc))};
+    std::optional<CoupledClusterContainer::VectorVariant> t1_opt = t1;
+    std::optional<CoupledClusterContainer::VectorVariant> t2_opt = t2;
+
+    auto cc_container = std::make_unique<CoupledClusterContainer>(
+        orbs, original_wfn, t1_opt, t2_opt);
+
+    // Create wavefunction with CC container
+    auto result_wfn = std::make_shared<Wavefunction>(std::move(cc_container));
+
+    double total_energy = -10.0;  // Dummy value
+    return {total_energy, result_wfn};
   }
 };
 
 TEST(CoupledClusterCalculatorTest, Factory) {
-  // Register a mock implementation
+  // Register a mock implementation with DynamicalCorrelationCalculatorFactory
   const std::string key = "mock_cc";
 
-  CoupledClusterCalculatorFactory::register_instance(
+  DynamicalCorrelationCalculatorFactory::register_instance(
       []() { return std::make_unique<MockCoupledClusterCalculator>(); });
 
   // Check if the mock implementation is available
-  auto available = CoupledClusterCalculatorFactory::available();
+  auto available = DynamicalCorrelationCalculatorFactory::available();
   ASSERT_TRUE(std::find(available.begin(), available.end(), key) !=
               available.end());
 
   // Create a calculator using the factory
-  auto calculator = CoupledClusterCalculatorFactory::create(key);
+  auto calculator = DynamicalCorrelationCalculatorFactory::create(key);
   ASSERT_NE(calculator, nullptr);
 
   // Unregister the implementation
-  EXPECT_TRUE(CoupledClusterCalculatorFactory::unregister_instance(key));
+  EXPECT_TRUE(DynamicalCorrelationCalculatorFactory::unregister_instance(key));
 
   // Verify it was removed
-  available = CoupledClusterCalculatorFactory::available();
+  available = DynamicalCorrelationCalculatorFactory::available();
   EXPECT_TRUE(std::find(available.begin(), available.end(), key) ==
               available.end());
 }
@@ -103,10 +107,15 @@ TEST(CoupledClusterCalculatorTest, Calculate) {
       Configuration("20"), dummy_orbitals));
   auto ansatz_ptr =
       std::make_shared<Ansatz>(std::move(hamiltonian), std::move(wfn));
-  auto [energy, cc_result] = calculator.run(ansatz_ptr);
+  auto [energy, result_wavefunction] = calculator.run(ansatz_ptr);
 
   // Verify the results
   EXPECT_DOUBLE_EQ(energy, -10.0);
-  EXPECT_TRUE(cc_result->has_t1_amplitudes());
-  EXPECT_TRUE(cc_result->has_t2_amplitudes());
+  EXPECT_NE(result_wavefunction, nullptr);
+
+  // Test that we can get the amplitudes from the wavefunction container
+  auto& cc_container =
+      result_wavefunction->get_container<CoupledClusterContainer>();
+  EXPECT_TRUE(cc_container.has_t1_amplitudes());
+  EXPECT_TRUE(cc_container.has_t2_amplitudes());
 }

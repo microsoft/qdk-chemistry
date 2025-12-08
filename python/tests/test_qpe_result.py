@@ -137,6 +137,7 @@ def test_qpe_result_immutability():
 def test_qpe_result_from_json():
     """Test QPE result creation from JSON dictionary."""
     json_data = {
+        "version": QpeResult._serialization_version,
         "method": "IQPE",
         "evolution_time": 1.5,
         "phase_fraction": 0.25,
@@ -167,6 +168,7 @@ def test_qpe_result_from_json():
 def test_qpe_result_from_json_minimal():
     """Test QPE result creation from minimal JSON dictionary."""
     json_data = {
+        "version": QpeResult._serialization_version,
         "method": "QPE",
         "evolution_time": 2.0,
         "phase_fraction": 0.5,
