@@ -50,9 +50,13 @@ void compute_trial_fock(const std::shared_ptr<qcs::ERI>& eri,
                         const RowMajorMatrix& trial_density,
                         const RowMajorMatrix& ground_density,
                         RowMajorMatrix& trial_fock, RowMajorMatrix& J_scratch,
-                        RowMajorMatrix& K_scratch) {
+                        RowMajorMatrix& K_scratch, bool rhf_external) {
   const size_t num_atomic_orbitals = ground_density.cols();
   const bool unrestricted = (ground_density.rows() == 2 * num_atomic_orbitals);
+  if (rhf_external and unrestricted)
+    throw std::runtime_error(
+        "RHF external stability requested but unrestricted density matrix "
+        "provided");
 
   // Get hybrid coefficients (0,0,0 for HF)
   double alpha = 1.0, beta = 0.0, omega = 0.0;
@@ -82,13 +86,17 @@ void compute_trial_fock(const std::shared_ptr<qcs::ERI>& eri,
         K_scratch.block(num_atomic_orbitals, 0, num_atomic_orbitals,
                         num_atomic_orbitals);
   } else {
-    // For RHF: F = 2*J - K
-    trial_fock = 2.0 * J_scratch - K_scratch;
+    if (rhf_external)
+      // For RHF external: F = - K
+      trial_fock = -K_scratch;
+    else
+      // For RHF internal: F = 2*J - K
+      trial_fock = 2.0 * J_scratch - K_scratch;
   }
 
   // Add XC contribution if DFT (similar to KSImpl::update_trial_fock_)
   // Only call exc->eval_fxc_contraction when exc is not null
-  if (exc) {
+  if (exc and !rhf_external) {
     J_scratch.setZero();
     exc->eval_fxc_contraction(ground_density.data(), trial_density.data(),
                               J_scratch.data());
@@ -221,7 +229,7 @@ class StabilityOperator {
 
       // Compute trial Fock matrix
       compute_trial_fock(eri_, exc_, trial_density, ground_density_, trial_fock,
-                         scratch1, scratch2);
+                         scratch1, scratch2, rhf_external_);
 
       // ABX_{ia} = \sum_{uv} C_{ui} F_{uv} C_{av}
       // Step 1: temp = trial_fock^T * Ca_occ, trial_fock is symmetric
@@ -280,37 +288,7 @@ class StabilityOperator {
       }
     }
 
-    if (rhf_external_) {
-      // Allocate temporary arrays with twice the size
-      std::vector<double> V_copy(2 * N * m);
-      std::vector<double> AV_copy(2 * N * m, 0.0);
-
-      // For each vector, fill with V and -V
-      for (size_t vec = 0; vec < m; ++vec) {
-        // V_copy(vec*2*N : vec*2*N+N) = V(vec*N : vec*N+N)
-        for (size_t i = 0; i < N; ++i) {
-          V_copy[vec * 2 * N + i] = V[vec * N + i];
-        }
-        // V_copy(vec*2*N+N : vec*2*N+2*N) = -V(vec*N : vec*N+N)
-        for (size_t i = 0; i < N; ++i) {
-          V_copy[vec * 2 * N + N + i] = -V[vec * N + i];
-        }
-      }
-
-      // Apply the stability operator on the extended vectors
-      apply_stability_operator(V_copy.data(), AV_copy.data(), m, alpha);
-
-      // Sum first and second half of each vector in AV_copy into AV
-      for (size_t vec = 0; vec < m; ++vec) {
-        for (size_t i = 0; i < N; ++i) {
-          AV[vec * N + i] +=
-              0.5 * (AV_copy[vec * 2 * N + i] + AV_copy[vec * 2 * N + N + i]);
-        }
-      }
-    } else {
-      // Apply the stability operator: Y += alpha * (A+B) * X
-      apply_stability_operator(V, AV, m, alpha);
-    }
+    apply_stability_operator(V, AV, m, alpha);
   }
 };
 
@@ -321,7 +299,7 @@ StabilityChecker::_run_impl(
     std::shared_ptr<data::Wavefunction> wavefunction) const {
   // Initialize the backend if not already done
   utils::microsoft::initialize_backend();
-  spdlog::set_level(spdlog::level::info);
+  // spdlog::set_level(spdlog::level::info);
 
   // Extract settings
   const int64_t davidson_max_subspace =

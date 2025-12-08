@@ -501,7 +501,7 @@ TEST_F(StabilityCheckerTest, StabilityResult_Validation) {
 
 // Tests for QDK (first-party) stability checker implementation
 TEST_F(StabilityCheckerTest, QDK_RHF_Water_Stable) {
-  // Test internal stability analysis on stable RHF water molecule
+  // Test internal and external stability analysis on stable RHF water molecule
   auto water = testing::create_water_structure();
 
   // Run SCF calculation
@@ -509,10 +509,10 @@ TEST_F(StabilityCheckerTest, QDK_RHF_Water_Stable) {
   scf_solver->settings().set("basis_set", "def2-svp");
   auto [energy, wavefunction] = scf_solver->run(water, 0, 1);
 
-  // Create stability checker for internal-only analysis
+  // Create stability checker for full analysis (internal + external)
   auto stability_checker = StabilityCheckerFactory::create("qdk");
   stability_checker->settings().set("internal", true);
-  stability_checker->settings().set("external", false);
+  stability_checker->settings().set("external", true);
 
   // Run stability analysis
   auto [is_stable, result] = stability_checker->run(wavefunction);
@@ -520,20 +520,28 @@ TEST_F(StabilityCheckerTest, QDK_RHF_Water_Stable) {
   // Verify result properties
   EXPECT_TRUE(result != nullptr);
   EXPECT_TRUE(result->has_internal_result());
-  EXPECT_FALSE(result->has_external_result());
+  EXPECT_TRUE(result->has_external_result());
   EXPECT_GT(result->internal_size(), 0);
-  EXPECT_EQ(result->external_size(), 0);
+  EXPECT_GT(result->external_size(), 0);
 
-  // Water RHF should be internally stable
+  // Water RHF should be both internally and externally stable
   EXPECT_TRUE(result->is_internal_stable());
+  EXPECT_TRUE(result->is_external_stable());
   EXPECT_TRUE(is_stable);
 
   // Check the smallest internal eigenvalue against reference
-  // Reference value is 1/4 of pyscf value
-  double smallest_eigenvalue = result->get_smallest_internal_eigenvalue();
+  // Reference value is 1/4 of pyscf value: 1.1915284105596065 / 4
+  double smallest_internal_eigenvalue =
+      result->get_smallest_internal_eigenvalue();
   double davidson_tol =
       stability_checker->settings().get<double>("davidson_tolerance");
-  EXPECT_NEAR(smallest_eigenvalue, 0.29788218, davidson_tol);
+  EXPECT_NEAR(smallest_internal_eigenvalue, 0.29788210264, davidson_tol);
+
+  // Check the smallest external eigenvalue against reference
+  // Reference value is pyscf value: 0.1798655099964312
+  double smallest_external_eigenvalue =
+      result->get_smallest_external_eigenvalue();
+  EXPECT_NEAR(smallest_external_eigenvalue, 0.1798655099964312, davidson_tol);
 }
 
 TEST_F(StabilityCheckerTest, QDK_UHF_O2_Stable) {
@@ -576,6 +584,53 @@ TEST_F(StabilityCheckerTest, QDK_UHF_O2_Stable) {
   EXPECT_NEAR(smallest_eigenvalue, 0.02098146, davidson_tol);
 }
 
+TEST_F(StabilityCheckerTest, QDK_RHF_N2_Stretched_External_Instability) {
+  // Test external stability analysis on stretched N2 molecule (RHF)
+  // At 1.2 Angstrom, N2 RHF should be internally stable but externally unstable
+  auto n2 = testing::create_stretched_n2_structure(1.2);
+
+  // Run RHF SCF calculation
+  auto scf_solver = ScfSolverFactory::create();
+  scf_solver->settings().set("basis_set", "def2-svp");
+  auto [energy, wavefunction] = scf_solver->run(n2, 0, 1);
+
+  // Create stability checker for full analysis (internal + external)
+  auto stability_checker = StabilityCheckerFactory::create("qdk");
+  stability_checker->settings().set("internal", true);
+  stability_checker->settings().set("external", true);
+
+  // Run stability analysis
+  auto [is_stable, result] = stability_checker->run(wavefunction);
+
+  // Verify result properties
+  EXPECT_TRUE(result != nullptr);
+  EXPECT_TRUE(result->has_internal_result());
+  EXPECT_TRUE(result->has_external_result());
+  EXPECT_GT(result->internal_size(), 0);
+  EXPECT_GT(result->external_size(), 0);
+
+  // N2 RHF at 1.2 Angstrom should be internally stable but externally unstable
+  EXPECT_TRUE(result->is_internal_stable());
+  EXPECT_FALSE(result->is_external_stable());
+  EXPECT_FALSE(is_stable);  // Overall unstable due to external instability
+
+  // Check the smallest internal eigenvalue against reference
+  // Reference value from Python test: 0.6683982584414123
+  // Our value should be 1/4 of that
+  double smallest_internal_eigenvalue =
+      result->get_smallest_internal_eigenvalue();
+  double davidson_tol =
+      stability_checker->settings().get<double>("davidson_tolerance");
+  EXPECT_NEAR(smallest_internal_eigenvalue, 0.6683982584414123 / 4.0,
+              davidson_tol);
+
+  // Check the smallest external eigenvalue against reference
+  // Reference value from Python test: -0.04997491473779583
+  double smallest_external_eigenvalue =
+      result->get_smallest_external_eigenvalue();
+  EXPECT_NEAR(smallest_external_eigenvalue, -0.04997491473779583, davidson_tol);
+}
+
 TEST_F(StabilityCheckerTest, QDK_RHF_N2_Stretched_Internal_Instability) {
   // Test internal stability analysis on stretched N2 molecule (RHF)
   // At 1.6 Angstrom, N2 RHF should be internally unstable
@@ -586,10 +641,10 @@ TEST_F(StabilityCheckerTest, QDK_RHF_N2_Stretched_Internal_Instability) {
   scf_solver->settings().set("basis_set", "def2-svp");
   auto [energy, wavefunction] = scf_solver->run(n2, 0, 1);
 
-  // Create stability checker for internal-only analysis
+  // Create stability checker for full analysis (internal + external)
   auto stability_checker = StabilityCheckerFactory::create("qdk");
   stability_checker->settings().set("internal", true);
-  stability_checker->settings().set("external", false);
+  stability_checker->settings().set("external", true);
 
   // Run stability analysis
   auto [is_stable, result] = stability_checker->run(wavefunction);
@@ -597,21 +652,30 @@ TEST_F(StabilityCheckerTest, QDK_RHF_N2_Stretched_Internal_Instability) {
   // Verify result properties
   EXPECT_TRUE(result != nullptr);
   EXPECT_TRUE(result->has_internal_result());
-  EXPECT_FALSE(result->has_external_result());
+  EXPECT_TRUE(result->has_external_result());
   EXPECT_GT(result->internal_size(), 0);
-  EXPECT_EQ(result->external_size(), 0);
+  EXPECT_GT(result->external_size(), 0);
 
-  // N2 RHF at 1.6 Angstrom should be internally unstable
+  // N2 RHF at 1.6 Angstrom should be both internally and externally unstable
   EXPECT_FALSE(result->is_internal_stable());
+  EXPECT_FALSE(result->is_external_stable());
   EXPECT_FALSE(is_stable);
 
   // Check the smallest internal eigenvalue against reference
   // Reference value from Python test: -0.26163382707539584
   // Our value should be 1/4 of that
-  double smallest_eigenvalue = result->get_smallest_internal_eigenvalue();
+  double smallest_internal_eigenvalue =
+      result->get_smallest_internal_eigenvalue();
   double davidson_tol =
       stability_checker->settings().get<double>("davidson_tolerance");
-  EXPECT_NEAR(smallest_eigenvalue, -0.26163382707539584 / 4.0, davidson_tol);
+  EXPECT_NEAR(smallest_internal_eigenvalue, -0.26163382707539584 / 4.0,
+              davidson_tol);
+
+  // Check the smallest external eigenvalue against reference
+  // Reference value from Python test: -0.28245222121208535
+  double smallest_external_eigenvalue =
+      result->get_smallest_external_eigenvalue();
+  EXPECT_NEAR(smallest_external_eigenvalue, -0.28245222121208535, davidson_tol);
 }
 
 TEST_F(StabilityCheckerTest, QDK_UHF_BN_Plus_Internal_Instability) {
