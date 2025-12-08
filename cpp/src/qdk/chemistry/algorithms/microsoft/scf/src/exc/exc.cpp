@@ -13,7 +13,8 @@
 #include "nvtx3/nvtx3.hpp"
 #endif
 #include <qdk/chemistry/scf/core/scf.h>
-#include <spdlog/spdlog.h>
+
+#include <qdk/chemistry/utils/logger.hpp>
 
 #include "util/macros.h"
 
@@ -24,10 +25,14 @@ EXC::EXC(std::shared_ptr<BasisSet> basis_set, const SCFConfig& cfg)
       mpi_(cfg.mpi),
       x_alpha_(0.0),
       x_beta_(0.0),
-      x_omega_(0.0) {}
+      x_omega_(0.0) {
+  QDK_LOG_TRACE_ENTERING();
+}
 
 std::shared_ptr<EXC> EXC::create(std::shared_ptr<BasisSet> basis_set,
                                  const SCFConfig& cfg) {
+  QDK_LOG_TRACE_ENTERING();
+
 #ifdef ENABLE_NVTX3
   nvtx3::scoped_range r{nvtx3::rgb{255, 0, 255}, "EXC::create"};
 #endif

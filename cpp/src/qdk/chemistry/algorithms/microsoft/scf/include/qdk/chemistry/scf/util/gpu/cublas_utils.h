@@ -8,8 +8,8 @@
 #include <cublas_v2.h>
 #include <cuda_runtime.h>
 #include <qdk/chemistry/scf/util/gpu/cuda_helper.h>
-#include <spdlog/spdlog.h>
 
+#include <qdk/chemistry/utils/logger.hpp>
 #include <stdexcept>
 
 /**
@@ -28,14 +28,14 @@
  * @param err cuBLAS API call expression that returns cublasStatus_t
  * @throws std::runtime_error if cuBLAS call fails
  */
-#define CUBLAS_CHECK(err)                                                  \
-  do {                                                                     \
-    cublasStatus_t err_ = (err);                                           \
-    if (err_ != CUBLAS_STATUS_SUCCESS) {                                   \
-      spdlog::critical("cuBLAS error {} at {}:{}", static_cast<int>(err_), \
-                       __FILE__, __LINE__);                                \
-      throw std::runtime_error("cuBLAS error");                            \
-    }                                                                      \
+#define CUBLAS_CHECK(err)                                                \
+  do {                                                                   \
+    cublasStatus_t err_ = (err);                                         \
+    if (err_ != CUBLAS_STATUS_SUCCESS) {                                 \
+      QDK_LOGGER().critical("cuBLAS error {} at {}:{}",                  \
+                            static_cast<int>(err_), __FILE__, __LINE__); \
+      throw std::runtime_error("cuBLAS error");                          \
+    }                                                                    \
   } while (0)
 
 namespace qdk::chemistry::scf::cublas {

@@ -15,6 +15,7 @@ from qdk_chemistry.plugins.qiskit._interop.circuit import (
     analyze_qubit_status,
     plot_circuit_diagram,
 )
+from qdk_chemistry.utils import Logger
 
 
 @pytest.fixture
@@ -252,27 +253,26 @@ def test_clbit_register_handling():
     assert "3" in texts  # 3 clibits registered
 
 
-def test_plot_circuit_diagram_logging_and_warning(caplog):
+def test_plot_circuit_diagram_logging_and_warning(capfd):
     # Circuit with one qubit and one classical bit
     qc = QuantumCircuit(2, 1)
     qc.h(1)
     qc.measure(0, 0)
 
-    # Capture logs
-    with caplog.at_level("WARNING"):
-        plot_circuit_diagram(qc, remove_classical_qubits=True)
+    # Capture log from the warning level call
+    Logger.set_global_level("warn")
+    plot_circuit_diagram(qc, remove_classical_qubits=True)
+    captured = capfd.readouterr()
 
     # Verify the warning was logged
-    assert any("All measurements are dropped" in message for message in caplog.messages), (
-        f"Expected warning not found in logs: {caplog.messages}"
-    )
+    assert "All measurements are dropped" in captured.out, f"Expected warning not found in logs: {captured.out}"
 
-    with caplog.at_level("INFO"):
-        plot_circuit_diagram(qc, remove_classical_qubits=True)
-    assert any(
-        "Removing classical qubits will also remove any control operations sourced from them" in message
-        for message in caplog.messages
-    ), f"Expected info not found in logs: {caplog.messages}"
+    Logger.set_global_level("info")
+    plot_circuit_diagram(qc, remove_classical_qubits=True)
+    captured = capfd.readouterr()
+    assert "Removing classical qubits will also remove any control operations sourced from them" in captured.out, (
+        f"Expected info not found in logs: {captured.out}"
+    )
 
 
 def test_circuit_no_qubits():
@@ -282,13 +282,16 @@ def test_circuit_no_qubits():
         plot_circuit_diagram(circuit, remove_idle_qubits=True)
 
 
-def test_circuit_memory_error():
+def test_circuit_memory_error(capfd):
     """Test MemoryError handling."""
     circuit = QuantumCircuit(1)
     circuit.h(0)
     with (
         patch("qdk_chemistry.plugins.qiskit._interop.circuit.circuit_drawer", side_effect=MemoryError()),
-        patch("qdk_chemistry.plugins.qiskit._interop.circuit._LOGGER") as mock_logger,
     ):
+        Logger.set_global_level("warn")
         plot_circuit_diagram(circuit, output_file="test.png")
-        mock_logger.warning.assert_called_once()
+        captured = capfd.readouterr()
+        assert "MemoryError: Failed to save circuit diagram." in captured.out, (
+            f"Expected warning not found in logs: {captured.out}"
+        )

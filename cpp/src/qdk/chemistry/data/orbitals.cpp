@@ -8,6 +8,7 @@
 #include <optional>
 #include <qdk/chemistry/data/orbitals.hpp>
 #include <qdk/chemistry/data/structure.hpp>
+#include <qdk/chemistry/utils/logger.hpp>
 #include <set>
 #include <stdexcept>
 
@@ -30,6 +31,7 @@ Orbitals::Orbitals(
     const std::optional<std::tuple<std::vector<size_t>, std::vector<size_t>>>&
         indices)
     : _basis_set(basis_set) {
+  QDK_LOG_TRACE_ENTERING();
   // Validate input data
   if (!_basis_set) {
     throw std::runtime_error("Basis set cannot be null");
@@ -122,6 +124,7 @@ Orbitals::Orbitals(
                                    std::vector<size_t>, std::vector<size_t>>>&
         indices)
     : _basis_set(basis_set) {
+  QDK_LOG_TRACE_ENTERING();
   // Validate input data
   if (!_basis_set) {
     throw std::runtime_error("Basis set cannot be null");
@@ -227,6 +230,7 @@ Orbitals::Orbitals(
 Orbitals::~Orbitals() = default;
 
 Orbitals::Orbitals(const Orbitals& other) {
+  QDK_LOG_TRACE_ENTERING();
   // Copy coefficients
   if (other._coefficients.first) {
     _coefficients.first =
@@ -295,6 +299,7 @@ Orbitals::Orbitals(const Orbitals& other) {
 }
 
 Orbitals& Orbitals::operator=(const Orbitals& other) {
+  QDK_LOG_TRACE_ENTERING();
   if (this != &other) {  // Self-assignment check
     // Copy coefficients
     if (other._coefficients.first) {
@@ -365,6 +370,7 @@ Orbitals& Orbitals::operator=(const Orbitals& other) {
 
 std::pair<const Eigen::MatrixXd&, const Eigen::MatrixXd&>
 Orbitals::get_coefficients() const {
+  QDK_LOG_TRACE_ENTERING();
   if (!_coefficients.first || !_coefficients.second) {
     throw std::runtime_error("Orbital coefficients not set");
   }
@@ -377,6 +383,7 @@ Orbitals::get_coefficients() const {
 
 std::pair<const Eigen::VectorXd&, const Eigen::VectorXd&>
 Orbitals::get_energies() const {
+  QDK_LOG_TRACE_ENTERING();
   if (!_energies.first || !_energies.second) {
     throw std::runtime_error("Orbital energies not set");
   }
@@ -384,6 +391,7 @@ Orbitals::get_energies() const {
 }
 
 bool Orbitals::has_energies() const {
+  QDK_LOG_TRACE_ENTERING();
   if (_energies.first == nullptr || _energies.second == nullptr) {
     return false;
   }
@@ -394,6 +402,7 @@ std::pair<Eigen::MatrixXd, Eigen::MatrixXd>
 Orbitals::calculate_ao_density_matrix(
     const Eigen::VectorXd& occupations_alpha,
     const Eigen::VectorXd& occupations_beta) const {
+  QDK_LOG_TRACE_ENTERING();
   // Validate inputs
   if (!_coefficients.first || !_coefficients.second) {
     throw std::runtime_error("Orbital coefficients not set");
@@ -421,6 +430,7 @@ Orbitals::calculate_ao_density_matrix(
 
 Eigen::MatrixXd Orbitals::calculate_ao_density_matrix(
     const Eigen::VectorXd& occupations) const {
+  QDK_LOG_TRACE_ENTERING();
   // Validate inputs
   if (!_coefficients.first) {
     throw std::runtime_error("Orbital coefficients not set");
@@ -444,6 +454,7 @@ Eigen::MatrixXd Orbitals::calculate_ao_density_matrix(
 std::pair<Eigen::MatrixXd, Eigen::MatrixXd>
 Orbitals::calculate_ao_density_matrix_from_rdm(
     const Eigen::MatrixXd& rdm_alpha, const Eigen::MatrixXd& rdm_beta) const {
+  QDK_LOG_TRACE_ENTERING();
   // Validate inputs
   if (!_coefficients.first || !_coefficients.second) {
     throw std::runtime_error("Orbital coefficients not set");
@@ -470,6 +481,7 @@ Orbitals::calculate_ao_density_matrix_from_rdm(
 
 Eigen::MatrixXd Orbitals::calculate_ao_density_matrix_from_rdm(
     const Eigen::MatrixXd& rdm) const {
+  QDK_LOG_TRACE_ENTERING();
   // Validate inputs
   if (!_coefficients.first) {
     throw std::runtime_error("Orbital coefficients not set");
@@ -492,16 +504,19 @@ Eigen::MatrixXd Orbitals::calculate_ao_density_matrix_from_rdm(
 
 std::pair<const std::vector<size_t>&, const std::vector<size_t>&>
 Orbitals::get_active_space_indices() const {
+  QDK_LOG_TRACE_ENTERING();
   return _active_space_indices;
 }
 
 std::pair<const std::vector<size_t>&, const std::vector<size_t>&>
 Orbitals::get_inactive_space_indices() const {
+  QDK_LOG_TRACE_ENTERING();
   return _inactive_space_indices;
 }
 
 std::pair<std::vector<size_t>, std::vector<size_t>>
 Orbitals::get_virtual_space_indices() const {
+  QDK_LOG_TRACE_ENTERING();
   const size_t num_molecular_orbitals = get_num_molecular_orbitals();
 
   // Create sets for efficient lookup
@@ -534,22 +549,28 @@ Orbitals::get_virtual_space_indices() const {
 // === AO overlap matrix ===
 
 const Eigen::MatrixXd& Orbitals::get_overlap_matrix() const {
+  QDK_LOG_TRACE_ENTERING();
   if (!_ao_overlap) {
     throw std::runtime_error("AO overlap matrix not set");
   }
   return *_ao_overlap;
 }
 
-bool Orbitals::has_overlap_matrix() const { return _ao_overlap != nullptr; }
+bool Orbitals::has_overlap_matrix() const {
+  QDK_LOG_TRACE_ENTERING();
+  return _ao_overlap != nullptr;
+}
 
 std::tuple<Eigen::MatrixXd, Eigen::MatrixXd, Eigen::MatrixXd>
 Orbitals::get_mo_overlap() const {
+  QDK_LOG_TRACE_ENTERING();
   return std::make_tuple(get_mo_overlap_alpha_alpha(),
                          get_mo_overlap_alpha_beta(),
                          get_mo_overlap_beta_beta());
 }
 
 Eigen::MatrixXd Orbitals::get_mo_overlap_alpha_alpha() const {
+  QDK_LOG_TRACE_ENTERING();
   // Validate inputs
   if (!_ao_overlap) {
     throw std::runtime_error("AO overlap matrix not set");
@@ -568,6 +589,7 @@ Eigen::MatrixXd Orbitals::get_mo_overlap_alpha_alpha() const {
 }
 
 Eigen::MatrixXd Orbitals::get_mo_overlap_alpha_beta() const {
+  QDK_LOG_TRACE_ENTERING();
   // Validate inputs
   if (!_ao_overlap) {
     throw std::runtime_error("AO overlap matrix not set");
@@ -587,6 +609,7 @@ Eigen::MatrixXd Orbitals::get_mo_overlap_alpha_beta() const {
 }
 
 Eigen::MatrixXd Orbitals::get_mo_overlap_beta_beta() const {
+  QDK_LOG_TRACE_ENTERING();
   // Validate inputs
   if (!_ao_overlap) {
     throw std::runtime_error("AO overlap matrix not set");
@@ -604,11 +627,18 @@ Eigen::MatrixXd Orbitals::get_mo_overlap_beta_beta() const {
   return S_MO_beta_beta;
 }
 
-std::shared_ptr<BasisSet> Orbitals::get_basis_set() const { return _basis_set; }
+std::shared_ptr<BasisSet> Orbitals::get_basis_set() const {
+  QDK_LOG_TRACE_ENTERING();
+  return _basis_set;
+}
 
-bool Orbitals::has_basis_set() const { return _basis_set != nullptr; }
+bool Orbitals::has_basis_set() const {
+  QDK_LOG_TRACE_ENTERING();
+  return _basis_set != nullptr;
+}
 
 size_t Orbitals::get_num_molecular_orbitals() const {
+  QDK_LOG_TRACE_ENTERING();
   if (_coefficients.first) {
     return _coefficients.first->cols();
   }
@@ -616,6 +646,7 @@ size_t Orbitals::get_num_molecular_orbitals() const {
 }
 
 size_t Orbitals::get_num_atomic_orbitals() const {
+  QDK_LOG_TRACE_ENTERING();
   if (_coefficients.first) {
     return _coefficients.first->rows();
   }
@@ -623,6 +654,7 @@ size_t Orbitals::get_num_atomic_orbitals() const {
 }
 
 std::vector<size_t> Orbitals::get_all_mo_indices() const {
+  QDK_LOG_TRACE_ENTERING();
   const size_t num_molecular_orbitals = get_num_molecular_orbitals();
   std::vector<size_t> indices(num_molecular_orbitals);
   std::iota(indices.begin(), indices.end(), 0);
@@ -630,6 +662,7 @@ std::vector<size_t> Orbitals::get_all_mo_indices() const {
 }
 
 bool Orbitals::is_restricted() const {
+  QDK_LOG_TRACE_ENTERING();
   if (!_coefficients.first || !_coefficients.second) {
     throw std::runtime_error(
         "Cannot determine if orbitals are restricted: orbital coefficients "
@@ -655,16 +688,19 @@ bool Orbitals::is_restricted() const {
 }
 
 bool Orbitals::has_active_space() const {
+  QDK_LOG_TRACE_ENTERING();
   return !_active_space_indices.first.empty() ||
          !_active_space_indices.second.empty();
 }
 
 bool Orbitals::has_inactive_space() const {
+  QDK_LOG_TRACE_ENTERING();
   return !_inactive_space_indices.first.empty() ||
          !_inactive_space_indices.second.empty();
 }
 
 bool Orbitals::_is_valid() const {
+  QDK_LOG_TRACE_ENTERING();
   // Check if coefficients are set
   if (!_coefficients.first || !_coefficients.second) {
     return false;
@@ -798,6 +834,7 @@ bool Orbitals::_is_valid() const {
 }
 
 std::string Orbitals::get_summary() const {
+  QDK_LOG_TRACE_ENTERING();
   std::string summary = "Orbitals Summary:\n";
   summary += "  AOs: " + std::to_string(get_num_atomic_orbitals()) + "\n";
   summary += "  MOs: " + std::to_string(get_num_molecular_orbitals()) + "\n";
@@ -839,6 +876,7 @@ std::string Orbitals::get_summary() const {
 
 void Orbitals::to_file(const std::string& filename,
                        const std::string& type) const {
+  QDK_LOG_TRACE_ENTERING();
   if (type == "json") {
     _to_json_file(filename);
   } else if (type == "hdf5") {
@@ -851,6 +889,7 @@ void Orbitals::to_file(const std::string& filename,
 
 std::shared_ptr<Orbitals> Orbitals::from_file(const std::string& filename,
                                               const std::string& type) {
+  QDK_LOG_TRACE_ENTERING();
   if (type == "json") {
     return _from_json_file(filename);
   } else if (type == "hdf5") {
@@ -862,6 +901,7 @@ std::shared_ptr<Orbitals> Orbitals::from_file(const std::string& filename,
 }
 
 void Orbitals::to_hdf5_file(const std::string& filename) const {
+  QDK_LOG_TRACE_ENTERING();
   // Validate filename has correct data type suffix
   std::string validated_filename =
       DataTypeFilename::validate_write_suffix(filename, "orbitals");
@@ -871,6 +911,7 @@ void Orbitals::to_hdf5_file(const std::string& filename) const {
 
 std::shared_ptr<Orbitals> Orbitals::from_hdf5_file(
     const std::string& filename) {
+  QDK_LOG_TRACE_ENTERING();
   // Validate filename has correct data type suffix
   std::string validated_filename =
       DataTypeFilename::validate_read_suffix(filename, "orbitals");
@@ -879,6 +920,7 @@ std::shared_ptr<Orbitals> Orbitals::from_hdf5_file(
 }
 
 void Orbitals::to_json_file(const std::string& filename) const {
+  QDK_LOG_TRACE_ENTERING();
   // Validate filename has correct data type suffix
   std::string validated_filename =
       DataTypeFilename::validate_write_suffix(filename, "orbitals");
@@ -888,6 +930,7 @@ void Orbitals::to_json_file(const std::string& filename) const {
 
 std::shared_ptr<Orbitals> Orbitals::from_json_file(
     const std::string& filename) {
+  QDK_LOG_TRACE_ENTERING();
   // Validate filename has correct data type suffix
   std::string validated_filename =
       DataTypeFilename::validate_read_suffix(filename, "orbitals");
@@ -896,6 +939,7 @@ std::shared_ptr<Orbitals> Orbitals::from_json_file(
 }
 
 void Orbitals::_to_json_file(const std::string& filename) const {
+  QDK_LOG_TRACE_ENTERING();
   std::ofstream file(filename);
   if (!file.is_open()) {
     throw std::runtime_error("Cannot open file for writing: " + filename);
@@ -911,6 +955,7 @@ void Orbitals::_to_json_file(const std::string& filename) const {
 
 std::shared_ptr<Orbitals> Orbitals::_from_json_file(
     const std::string& filename) {
+  QDK_LOG_TRACE_ENTERING();
   std::ifstream file(filename);
   if (!file.is_open()) {
     throw std::runtime_error(
@@ -929,6 +974,7 @@ std::shared_ptr<Orbitals> Orbitals::_from_json_file(
 }
 
 void Orbitals::_to_hdf5_file(const std::string& filename) const {
+  QDK_LOG_TRACE_ENTERING();
   if (!_is_valid()) {
     throw std::runtime_error("Cannot save invalid orbital data to HDF5");
   }
@@ -946,6 +992,7 @@ void Orbitals::_to_hdf5_file(const std::string& filename) const {
 }
 
 void Orbitals::to_hdf5(H5::Group& group) const {
+  QDK_LOG_TRACE_ENTERING();
   try {
     // Save version first
     H5::DataSpace scalar_space(H5S_SCALAR);
@@ -1029,6 +1076,7 @@ void Orbitals::to_hdf5(H5::Group& group) const {
 
 std::shared_ptr<Orbitals> Orbitals::_from_hdf5_file(
     const std::string& filename) {
+  QDK_LOG_TRACE_ENTERING();
   // Disable HDF5 automatic error printing to stderr unless verbose mode
   if (hdf5_errors_should_be_suppressed()) {
     H5::Exception::dontPrint();
@@ -1056,6 +1104,7 @@ std::shared_ptr<Orbitals> Orbitals::_from_hdf5_file(
 }
 
 std::shared_ptr<Orbitals> Orbitals::from_hdf5(H5::Group& group) {
+  QDK_LOG_TRACE_ENTERING();
   try {
     // Validate version first
     if (!group.attrExists("version")) {
@@ -1179,6 +1228,7 @@ std::shared_ptr<Orbitals> Orbitals::from_hdf5(H5::Group& group) {
 }
 
 nlohmann::json Orbitals::to_json() const {
+  QDK_LOG_TRACE_ENTERING();
   if (!_is_valid()) {
     throw std::runtime_error("Cannot serialize invalid orbital data to JSON");
   }
@@ -1235,6 +1285,7 @@ nlohmann::json Orbitals::to_json() const {
 }
 
 std::shared_ptr<Orbitals> Orbitals::from_json(const nlohmann::json& j) {
+  QDK_LOG_TRACE_ENTERING();
   try {
     // Validate version first
     if (!j.contains("version")) {
@@ -1333,6 +1384,7 @@ std::shared_ptr<Orbitals> Orbitals::from_json(const nlohmann::json& j) {
 }
 
 void Orbitals::_save_metadata_to_hdf5(H5::H5File& file) const {
+  QDK_LOG_TRACE_ENTERING();
   // Extract metadata
   unsigned num_atomic_orbitals = get_num_atomic_orbitals();
   unsigned num_molecular_orbitals = get_num_molecular_orbitals();
@@ -1349,6 +1401,7 @@ void Orbitals::_save_metadata_to_hdf5(H5::H5File& file) const {
 void Orbitals::_save_orbital_metadata_to_hdf5(
     H5::H5File& file, size_t num_atomic_orbitals, size_t num_molecular_orbitals,
     bool is_restricted, bool has_overlap_matrix, bool has_basis_set) {
+  QDK_LOG_TRACE_ENTERING();
   // Create metadata group
   H5::Group metadata_group = file.createGroup("metadata");
 
@@ -1377,27 +1430,35 @@ void Orbitals::_save_orbital_metadata_to_hdf5(
   basis_dataset.write(&has_basis_set, H5::PredType::NATIVE_HBOOL);
 }
 
-bool Orbitals::is_unrestricted() const { return !is_restricted(); }
+bool Orbitals::is_unrestricted() const {
+  QDK_LOG_TRACE_ENTERING();
+  return !is_restricted();
+}
 
 void Orbitals::_post_construction_validate() {
+  QDK_LOG_TRACE_ENTERING();
   if (!_is_valid()) {
     throw std::invalid_argument("Tried to generate invalid Orbitals object.");
   }
 }
 
 const Eigen::MatrixXd& Orbitals::get_coefficients_alpha() const {
+  QDK_LOG_TRACE_ENTERING();
   return get_coefficients().first;
 }
 
 const Eigen::MatrixXd& Orbitals::get_coefficients_beta() const {
+  QDK_LOG_TRACE_ENTERING();
   return get_coefficients().second;
 }
 
 const Eigen::VectorXd& Orbitals::get_energies_alpha() const {
+  QDK_LOG_TRACE_ENTERING();
   return get_energies().first;
 }
 
 const Eigen::VectorXd& Orbitals::get_energies_beta() const {
+  QDK_LOG_TRACE_ENTERING();
   return get_energies().second;
 }
 
@@ -1405,6 +1466,7 @@ const Eigen::VectorXd& Orbitals::get_energies_beta() const {
 
 ModelOrbitals::ModelOrbitals(size_t basis_size, bool restricted)
     : Orbitals(), _num_orbitals(basis_size), _is_restricted(restricted) {
+  QDK_LOG_TRACE_ENTERING();
   // Set active space indices to all orbitals by default
   std::vector<size_t> all_indices(basis_size);
   std::iota(all_indices.begin(), all_indices.end(), 0);
@@ -1423,6 +1485,7 @@ ModelOrbitals::ModelOrbitals(
     size_t basis_size,
     const std::tuple<std::vector<size_t>, std::vector<size_t>>& indices)
     : Orbitals(), _num_orbitals(basis_size), _is_restricted(true) {
+  QDK_LOG_TRACE_ENTERING();
   const auto& [active_space_indices, inactive_space_indices] = indices;
   // Validate that all indices are within bounds
   for (size_t idx : active_space_indices) {
@@ -1473,6 +1536,7 @@ ModelOrbitals::ModelOrbitals(
     const std::tuple<std::vector<size_t>, std::vector<size_t>,
                      std::vector<size_t>, std::vector<size_t>>& indices)
     : Orbitals(), _num_orbitals(basis_size), _is_restricted(false) {
+  QDK_LOG_TRACE_ENTERING();
   const auto& [active_space_indices_alpha, active_space_indices_beta,
                inactive_space_indices_alpha, inactive_space_indices_beta] =
       indices;
@@ -1570,6 +1634,7 @@ ModelOrbitals::ModelOrbitals(const ModelOrbitals& other)
     : Orbitals(),  // Call base class default constructor
       _num_orbitals(other._num_orbitals),
       _is_restricted(other._is_restricted) {
+  QDK_LOG_TRACE_ENTERING();
   // Copy the active/inactive space indices from the base class
   _active_space_indices = other._active_space_indices;
   _inactive_space_indices = other._inactive_space_indices;
@@ -1580,6 +1645,7 @@ ModelOrbitals::ModelOrbitals(const ModelOrbitals& other)
 
 // Assignment operator for ModelOrbitals
 ModelOrbitals& ModelOrbitals::operator=(const ModelOrbitals& other) {
+  QDK_LOG_TRACE_ENTERING();
   if (this != &other) {
     _num_orbitals = other._num_orbitals;
     _is_restricted = other._is_restricted;
@@ -1592,44 +1658,52 @@ ModelOrbitals& ModelOrbitals::operator=(const ModelOrbitals& other) {
 // Override methods to throw errors for model systems
 std::pair<const Eigen::MatrixXd&, const Eigen::MatrixXd&>
 ModelOrbitals::get_coefficients() const {
+  QDK_LOG_TRACE_ENTERING();
   throw std::runtime_error(
       "ModelOrbitals: get_coefficients() not available for model systems");
 }
 
 std::pair<const Eigen::VectorXd&, const Eigen::VectorXd&>
 ModelOrbitals::get_energies() const {
+  QDK_LOG_TRACE_ENTERING();
   throw std::runtime_error(
       "ModelOrbitals: get_energies() not available for model systems");
 }
 
 const Eigen::MatrixXd& ModelOrbitals::get_overlap_matrix() const {
+  QDK_LOG_TRACE_ENTERING();
   throw std::runtime_error(
       "ModelOrbitals: get_overlap_matrix() not available for model systems");
 }
 
 std::shared_ptr<BasisSet> ModelOrbitals::get_basis_set() const {
+  QDK_LOG_TRACE_ENTERING();
   throw std::runtime_error(
       "ModelOrbitals: get_basis_set() not available for model systems");
 }
 
 const Eigen::MatrixXd& ModelOrbitals::get_coefficients_alpha() const {
+  QDK_LOG_TRACE_ENTERING();
   throw std::runtime_error(
       "ModelOrbitals: get_coefficients_alpha() not available for model "
       "systems");
 }
 
 const Eigen::MatrixXd& ModelOrbitals::get_coefficients_beta() const {
+  QDK_LOG_TRACE_ENTERING();
   throw std::runtime_error(
       "ModelOrbitals: get_coefficients_beta() not available for model "
       "systems");
 }
 
 const Eigen::VectorXd& ModelOrbitals::get_energies_alpha() const {
+  QDK_LOG_TRACE_ENTERING();
   throw std::runtime_error(
       "ModelOrbitals: get_energies_alpha() not available for model systems");
 }
 
 const Eigen::VectorXd& ModelOrbitals::get_energies_beta() const {
+  QDK_LOG_TRACE_ENTERING();
   throw std::runtime_error(
       "ModelOrbitals: get_energies_beta() not available for model systems");
 }
@@ -1638,6 +1712,7 @@ std::pair<Eigen::MatrixXd, Eigen::MatrixXd>
 ModelOrbitals::calculate_ao_density_matrix(
     const Eigen::VectorXd& occupations_alpha,
     const Eigen::VectorXd& occupations_beta) const {
+  QDK_LOG_TRACE_ENTERING();
   throw std::runtime_error(
       "ModelOrbitals: calculate_ao_density_matrix() not available for model "
       "systems");
@@ -1645,6 +1720,7 @@ ModelOrbitals::calculate_ao_density_matrix(
 
 Eigen::MatrixXd ModelOrbitals::calculate_ao_density_matrix(
     const Eigen::VectorXd& occupations) const {
+  QDK_LOG_TRACE_ENTERING();
   throw std::runtime_error(
       "ModelOrbitals: calculate_ao_density_matrix() not available for model "
       "systems");
@@ -1653,6 +1729,7 @@ Eigen::MatrixXd ModelOrbitals::calculate_ao_density_matrix(
 std::pair<Eigen::MatrixXd, Eigen::MatrixXd>
 ModelOrbitals::calculate_ao_density_matrix_from_rdm(
     const Eigen::MatrixXd& rdm_alpha, const Eigen::MatrixXd& rdm_beta) const {
+  QDK_LOG_TRACE_ENTERING();
   throw std::runtime_error(
       "ModelOrbitals: calculate_ao_density_matrix_from_rdm() not available "
       "for "
@@ -1661,6 +1738,7 @@ ModelOrbitals::calculate_ao_density_matrix_from_rdm(
 
 Eigen::MatrixXd ModelOrbitals::calculate_ao_density_matrix_from_rdm(
     const Eigen::MatrixXd& rdm) const {
+  QDK_LOG_TRACE_ENTERING();
   throw std::runtime_error(
       "ModelOrbitals: calculate_ao_density_matrix_from_rdm() not available "
       "for "
@@ -1670,6 +1748,7 @@ Eigen::MatrixXd ModelOrbitals::calculate_ao_density_matrix_from_rdm(
 // MO overlap methods return identity matrices for model systems
 std::tuple<Eigen::MatrixXd, Eigen::MatrixXd, Eigen::MatrixXd>
 ModelOrbitals::get_mo_overlap() const {
+  QDK_LOG_TRACE_ENTERING();
   const size_t num_molecular_orbitals = get_num_molecular_orbitals();
   Eigen::MatrixXd identity =
       Eigen::MatrixXd::Identity(num_molecular_orbitals, num_molecular_orbitals);
@@ -1677,40 +1756,52 @@ ModelOrbitals::get_mo_overlap() const {
 }
 
 Eigen::MatrixXd ModelOrbitals::get_mo_overlap_alpha_alpha() const {
+  QDK_LOG_TRACE_ENTERING();
   const size_t num_molecular_orbitals = get_num_molecular_orbitals();
   return Eigen::MatrixXd::Identity(num_molecular_orbitals,
                                    num_molecular_orbitals);
 }
 
 Eigen::MatrixXd ModelOrbitals::get_mo_overlap_alpha_beta() const {
+  QDK_LOG_TRACE_ENTERING();
   const size_t num_molecular_orbitals = get_num_molecular_orbitals();
   return Eigen::MatrixXd::Identity(num_molecular_orbitals,
                                    num_molecular_orbitals);
 }
 
 Eigen::MatrixXd ModelOrbitals::get_mo_overlap_beta_beta() const {
+  QDK_LOG_TRACE_ENTERING();
   const size_t num_molecular_orbitals = get_num_molecular_orbitals();
   return Eigen::MatrixXd::Identity(num_molecular_orbitals,
                                    num_molecular_orbitals);
 }
 
 std::vector<size_t> ModelOrbitals::get_all_mo_indices() const {
+  QDK_LOG_TRACE_ENTERING();
   std::vector<size_t> indices(_num_orbitals);
   std::iota(indices.begin(), indices.end(), 0);
   return indices;
 }
 
-bool ModelOrbitals::is_restricted() const { return _is_restricted; }
+bool ModelOrbitals::is_restricted() const {
+  QDK_LOG_TRACE_ENTERING();
+  return _is_restricted;
+}
 
-bool ModelOrbitals::is_unrestricted() const { return !_is_restricted; }
+bool ModelOrbitals::is_unrestricted() const {
+  QDK_LOG_TRACE_ENTERING();
+  return !_is_restricted;
+}
 
 bool ModelOrbitals::_is_valid() const {
+  QDK_LOG_TRACE_ENTERING();
   // ModelOrbitals are always valid - they represent model systems
   // without requiring actual coefficient data
   return true;
 }
 
 void ModelOrbitals::_post_construction_validate() {
+  QDK_LOG_TRACE_ENTERING();
   // For ModelOrbitals, we call our own _is_valid method which always returns
   // true
   if (!_is_valid()) {
@@ -1720,6 +1811,7 @@ void ModelOrbitals::_post_construction_validate() {
 }
 
 nlohmann::json ModelOrbitals::to_json() const {
+  QDK_LOG_TRACE_ENTERING();
   nlohmann::json j;
 
   // Store version first
@@ -1745,6 +1837,7 @@ nlohmann::json ModelOrbitals::to_json() const {
 
 std::shared_ptr<ModelOrbitals> ModelOrbitals::from_json(
     const nlohmann::json& j) {
+  QDK_LOG_TRACE_ENTERING();
   try {
     // Validate version first (only if version field exists, for backward
     // compatibility)
@@ -1812,6 +1905,7 @@ std::shared_ptr<ModelOrbitals> ModelOrbitals::from_json(
 }
 
 void ModelOrbitals::to_hdf5(H5::Group& group) const {
+  QDK_LOG_TRACE_ENTERING();
   try {
     // Add version attribute
     H5::DataSpace scalar_space(H5S_SCALAR);
@@ -1861,6 +1955,7 @@ void ModelOrbitals::to_hdf5(H5::Group& group) const {
 }
 
 std::shared_ptr<ModelOrbitals> ModelOrbitals::from_hdf5(H5::Group& group) {
+  QDK_LOG_TRACE_ENTERING();
   try {
     // Check version first
     H5::StrType string_type(H5::PredType::C_S1, H5T_VARIABLE);
@@ -1942,6 +2037,5 @@ std::shared_ptr<ModelOrbitals> ModelOrbitals::from_hdf5(H5::Group& group) {
     throw std::runtime_error("HDF5 error: " + std::string(e.getCDetailMsg()));
   }
 }
-
 }  // namespace data
 }  // namespace qdk::chemistry

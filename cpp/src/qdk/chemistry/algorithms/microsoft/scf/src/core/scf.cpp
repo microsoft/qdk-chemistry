@@ -9,10 +9,13 @@
 #ifdef QDK_CHEMISTRY_ENABLE_MPI
 #include <mpi.h>
 #endif
+#include <qdk/chemistry/utils/logger.hpp>
 
 namespace qdk::chemistry::scf {
 
 ParallelConfig mpi_default_input() {
+  QDK_LOG_TRACE_ENTERING();
+
   int world_size = 1;
   int world_rank = 0;
   int local_size = 1;

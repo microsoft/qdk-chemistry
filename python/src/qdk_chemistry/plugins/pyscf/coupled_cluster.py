@@ -37,6 +37,7 @@ from pyscf import cc
 from qdk_chemistry.algorithms import DynamicalCorrelationCalculator
 from qdk_chemistry.data import CoupledClusterContainer, Settings, Wavefunction
 from qdk_chemistry.plugins.pyscf.utils import hamiltonian_to_scf
+from qdk_chemistry.utils import Logger
 
 __all__ = ["PyscfCoupledClusterCalculator", "PyscfCoupledClusterSettings"]
 
@@ -71,6 +72,7 @@ class PyscfCoupledClusterSettings(Settings):
 
     def __init__(self):
         """Initialize the settings with default values."""
+        Logger.trace_entering()
         super().__init__()
         self._set_default("conv_tol", "double", 1e-7)
         self._set_default("conv_tol_normt", "double", 1e-5)
@@ -97,11 +99,13 @@ class PyscfCoupledClusterCalculator(DynamicalCorrelationCalculator):
 
     def __init__(self):
         """Initialize the calculator with default settings."""
+        Logger.trace_entering()
         super().__init__()
         self._settings = PyscfCoupledClusterSettings()
 
     def name(self):
         """Return the name of this coupled cluster implementation."""
+        Logger.trace_entering()
         return "pyscf_coupled_cluster"
 
     def _run_impl(self, ansatz):
@@ -122,6 +126,7 @@ class PyscfCoupledClusterCalculator(DynamicalCorrelationCalculator):
             RuntimeError: If the CCSD calculation does not converge.
 
         """
+        Logger.trace_entering()
         hamiltonian = ansatz.get_hamiltonian()
 
         alpha_occ, beta_occ = ansatz.get_wavefunction().get_total_orbital_occupations()
