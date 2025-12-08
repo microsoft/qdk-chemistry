@@ -481,11 +481,12 @@ std::shared_ptr<Ansatz> Ansatz::from_json(const nlohmann::json& j) {
       const auto& [h2_aaaa, h2_aabb, h2_bbbb] =
           original_hamiltonian->get_two_body_integrals();
       const auto& [h_aa, h_bb] = original_hamiltonian->get_one_body_integrals();
-      new_hamiltonian = std::make_shared<Hamiltonian>(std::make_unique<Canonical4CenterHamiltonian>(
-          h_aa, h2_aaaa, wavefunction_orbitals,
+      new_hamiltonian = std::make_shared<Hamiltonian>(
+          std::make_unique<Canonical4CenterHamiltonian>(
+              h_aa, h2_aaaa, wavefunction_orbitals,
 
-          original_hamiltonian->get_core_energy(), fock_matrix,
-          original_hamiltonian->get_type()));
+              original_hamiltonian->get_core_energy(), fock_matrix,
+              original_hamiltonian->get_type()));
     } else {
       // Create unrestricted hamiltonian with wavefunction's orbitals
       Eigen::MatrixXd fock_matrix_alpha, fock_matrix_beta;
@@ -502,11 +503,11 @@ std::shared_ptr<Ansatz> Ansatz::from_json(const nlohmann::json& j) {
           original_hamiltonian->get_two_body_integrals();
       const auto& [h_aa, h_bb] = original_hamiltonian->get_one_body_integrals();
 
-      new_hamiltonian = std::make_shared<Hamiltonian>(std::make_unique<Canonical4CenterHamiltonian>(
-          h_aa, h_bb, h2_aaaa, h2_aabb, h2_bbbb, wavefunction_orbitals,
-          original_hamiltonian->get_core_energy(), fock_matrix_alpha,
-          fock_matrix_beta, original_hamiltonian->get_type()));
-
+      new_hamiltonian = std::make_shared<Hamiltonian>(
+          std::make_unique<Canonical4CenterHamiltonian>(
+              h_aa, h_bb, h2_aaaa, h2_aabb, h2_bbbb, wavefunction_orbitals,
+              original_hamiltonian->get_core_energy(), fock_matrix_alpha,
+              fock_matrix_beta, original_hamiltonian->get_type()));
     }
 
     // 4. Make ansatz with the new hamiltonian and the wavefunction
@@ -678,11 +679,11 @@ std::shared_ptr<Ansatz> Ansatz::from_hdf5(H5::Group& group) {
           original_hamiltonian->get_two_body_integrals();
       const auto& [h_aa, h_bb] = original_hamiltonian->get_one_body_integrals();
 
-      new_hamiltonian = std::make_shared<Hamiltonian>(std::make_unique<Canonical4CenterHamiltonian>(
-          h_aa, h_bb, h2_aaaa, h2_aabb, h2_bbbb, wavefunction_orbitals,
-          original_hamiltonian->get_core_energy(), fock_matrix_alpha,
-          fock_matrix_beta, original_hamiltonian->get_type()));
-
+      new_hamiltonian = std::make_shared<Hamiltonian>(
+          std::make_unique<Canonical4CenterHamiltonian>(
+              h_aa, h_bb, h2_aaaa, h2_aabb, h2_bbbb, wavefunction_orbitals,
+              original_hamiltonian->get_core_energy(), fock_matrix_alpha,
+              fock_matrix_beta, original_hamiltonian->get_type()));
     }
 
     // 4. Make ansatz with the new Hamiltonian and the wavefunction

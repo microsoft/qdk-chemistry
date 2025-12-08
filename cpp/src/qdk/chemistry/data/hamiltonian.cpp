@@ -71,7 +71,6 @@ HamiltonianContainer::HamiltonianContainer(
   }
 }
 
-
 std::tuple<const Eigen::MatrixXd&, const Eigen::MatrixXd&>
 HamiltonianContainer::get_one_body_integrals() const {
   if (!has_one_body_integrals()) {
@@ -88,7 +87,7 @@ bool HamiltonianContainer::has_one_body_integrals() const {
 }
 
 double HamiltonianContainer::get_one_body_element(unsigned i, unsigned j,
-                                         SpinChannel channel) const {
+                                                  SpinChannel channel) const {
   if (!has_one_body_integrals()) {
     throw std::runtime_error("One-body integrals are not set");
   }
@@ -149,7 +148,7 @@ void HamiltonianContainer::validate_integral_dimensions() const {
   // assume the container has one-body integrals only, expect derived classes to
   // work on the two-body integrals
 
-  if (!has_one_body_integrals())  {
+  if (!has_one_body_integrals()) {
     return;
   }
 
