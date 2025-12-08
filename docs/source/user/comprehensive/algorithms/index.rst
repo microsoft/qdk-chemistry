@@ -68,6 +68,18 @@ The following table summarizes the available algorithm classes in QDK/Chemistry 
    * - :doc:`StatePreparation <state_preparation>`
      - Quantum state preparation
      - Wavefunction → Circuit
+   * - :doc:`EnergyEstimator <energy_estimator>`
+     - Quantum energy expectation values
+     - Circuit + QubitHamiltonian → Energy
+   * - :doc:`DynamicalCorrelationCalculator <dynamical_correlation>`
+     - Post-HF correlation calculations (MP2, CC)
+     - Ansatz → Energy
+   * - :doc:`ProjectedMultiConfigurationCalculator <pmc>`
+     - Projected multi-configuration calculations
+     - Hamiltonian → Wavefunction
+   * - :doc:`StabilityChecker <stability_checker>`
+     - SCF stability analysis
+     - Orbitals → Stability
 
 Discovering implementations
 ---------------------------
