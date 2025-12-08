@@ -9,7 +9,7 @@ Welcome to QDK/Chemistry Documentation
 It features a unified interface for vast community of quantum chemistry packages.
 
 .. note::
-   QDK/Chemistry collects anonymous usage telemetry by default (for production builds). You can disable telemetry by setting the environment variable ``QDK_CHEMISTRY_PYTHON_TELEMETRY=none``.
+   QDK/Chemistry collects anonymous usage telemetry by default (for production builds). You can disable telemetry by setting the environment variable ``QDK_CHEMISTRY_PYTHON_TELEMETRY=False`` to one of the following: ``none``, ``disabled``, ``false``, or ``0``.
 
 Key Features
 ============

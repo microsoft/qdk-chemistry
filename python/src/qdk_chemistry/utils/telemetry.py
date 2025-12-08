@@ -10,7 +10,7 @@ optional properties. The telemetry will be batched and sent at a regular interva
 and when the process is about to exit.
 
 Disable qdk_chemistry Python telemetry by setting the environment variable
-`QDK_CHEMISTRY_PYTHON_TELEMETRY` to any of: `none`, `disabled`, `false`, or `0`.
+`QDK_CHEMISTRY_PYTHON_TELEMETRY` to one of the following: `none`, `disabled`, `false`, or `0`.
 """
 
 # --------------------------------------------------------------------------------------------
