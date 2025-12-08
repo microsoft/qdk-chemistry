@@ -105,9 +105,9 @@ def _assert_warning_constraints(lines: list[str], expected_warning: str | None, 
     """Validate warning presence/absence expectations for a workflow run."""
     if expected_warning is not None:
         warning_line = _find_line(lambda line: expected_warning in line, lines)
-        assert "WARNING:" in warning_line, "Expected warning line missing logging prefix."
+        assert "[warning]" in warning_line, "Expected warning line missing logging prefix."
     if expect_no_warnings:
-        assert all("WARNING:" not in line for line in lines), (
+        assert all("[warning]" not in line for line in lines), (
             "Unexpected warning emitted by workflow.\nOutput:\n" + "\n".join(lines)
         )
 

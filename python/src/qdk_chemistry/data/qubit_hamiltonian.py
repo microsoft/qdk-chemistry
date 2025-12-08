@@ -19,6 +19,7 @@ from qiskit.quantum_info import SparsePauliOp
 
 from qdk_chemistry.data import Wavefunction
 from qdk_chemistry.data.base import DataClass
+from qdk_chemistry.utils import Logger
 from qdk_chemistry.utils.statevector import create_statevector_from_wavefunction
 
 __all__ = ["filter_and_group_pauli_ops_from_wavefunction"]
@@ -51,6 +52,7 @@ class QubitHamiltonian(DataClass):
                 or if the Pauli strings or coefficients are invalid.
 
         """
+        Logger.trace_entering()
         if len(pauli_strings) != len(coefficients):
             raise ValueError("Mismatch between number of Pauli strings and coefficients.")
 
@@ -95,6 +97,7 @@ class QubitHamiltonian(DataClass):
             A list of ``QubitHamiltonian`` representing the grouped Hamiltonian.
 
         """
+        Logger.trace_entering()
         sparse_pauli_ops = self.pauli_ops.group_commuting(qubit_wise=qubit_wise)
         return [
             QubitHamiltonian(pauli_strings=group.paulis.to_labels(), coefficients=group.coeffs)
@@ -214,6 +217,7 @@ def _filter_and_group_pauli_ops_from_statevector(
             * A list of classical coefficients for terms that were reduced to classical contributions.
 
     """
+    Logger.trace_entering()
     psi = np.asarray(statevector, dtype=complex)
     norm = np.linalg.norm(psi)
     if norm < np.finfo(np.float64).eps:
@@ -315,6 +319,7 @@ def filter_and_group_pauli_ops_from_wavefunction(
             * A list of classical coefficients for terms that were reduced to classical contributions.
 
     """
+    Logger.trace_entering()
     psi = create_statevector_from_wavefunction(wavefunction)
     return _filter_and_group_pauli_ops_from_statevector(
         hamiltonian, psi, abelian_grouping, trimming, trimming_tolerance

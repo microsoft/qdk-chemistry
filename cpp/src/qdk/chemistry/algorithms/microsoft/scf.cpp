@@ -9,9 +9,9 @@
 #include <qdk/chemistry/scf/scf/scf_solver.h>
 #include <qdk/chemistry/scf/util/gauxc_registry.h>
 #include <qdk/chemistry/scf/util/libint2_util.h>
-#include <spdlog/spdlog.h>
 
 #include <qdk/chemistry/data/wavefunction_containers/sd.hpp>
+#include <qdk/chemistry/utils/logger.hpp>
 
 #ifdef _OPENMP
 #include <omp.h>
@@ -24,9 +24,14 @@ namespace qdk::chemistry::algorithms::microsoft {
 
 namespace qcs = qdk::chemistry::scf;
 
+// Bring logger types into scope
+using qdk::chemistry::utils::Logger;
+using qdk::chemistry::utils::LogLevel;
+
 // Helper function to calculate alpha and beta electron counts
 std::pair<int, int> calculate_electron_counts(int nuclear_charge, int charge,
                                               int multiplicity) {
+  QDK_LOG_TRACE_ENTERING();
   int total_electrons = nuclear_charge - charge;
   int n_alpha = (total_electrons + multiplicity - 1) / 2;
   int n_beta = total_electrons - n_alpha;
@@ -36,6 +41,7 @@ std::pair<int, int> calculate_electron_counts(int nuclear_charge, int charge,
 std::pair<double, std::shared_ptr<data::Wavefunction>> ScfSolver::_run_impl(
     std::shared_ptr<data::Structure> structure, int charge, int multiplicity,
     std::optional<std::shared_ptr<data::Orbitals>> initial_guess) const {
+  QDK_LOG_TRACE_ENTERING();
   // Initialize the backend if not already done
   utils::microsoft::initialize_backend();
 
@@ -79,7 +85,7 @@ std::pair<double, std::shared_ptr<data::Wavefunction>> ScfSolver::_run_impl(
   } else if (scf_type == "unrestricted") {
     unrestricted = true;
     if (!open_shell && !use_input_initial_guess) {
-      spdlog::warn(
+      QDK_LOGGER().warn(
           "Unrestricted reference requested for closed-shell system. "
           "Automatic spin symmetry breaking is not supported. "
           "Consider providing a spin-broken initial guess if desired.");
@@ -194,11 +200,11 @@ std::pair<double, std::shared_ptr<data::Wavefunction>> ScfSolver::_run_impl(
   // omp_set_num_threads(1);
 #endif
 
-  // Turnoff SCF logger
-  // std::vector<spdlog::sink_ptr> sinks = {};
-  // spdlog::set_default_logger(std::make_shared<spdlog::logger>(
-  //    "QDK-Chemistry-SCF", sinks.begin(), sinks.end()));
-  spdlog::set_level(spdlog::level::off);
+  // Save the current global level before disabling SCF logging
+  auto saved_level = Logger::get_global_level();
+
+  // Disable SCF logging
+  Logger::set_global_level(LogLevel::off);
 
   auto scf = (method == "hf")
                  ? qcs::SCF::make_hf_solver(ms_mol, *ms_scf_config)
@@ -251,7 +257,7 @@ std::pair<double, std::shared_ptr<data::Wavefunction>> ScfSolver::_run_impl(
 
     if (unrestricted) {
       if (initial_guess.value()->is_restricted())
-        spdlog::warn(
+        QDK_LOGGER().warn(
             "Unrestricted calculation requested but restricted "
             "initial guess provided.");
 
@@ -405,6 +411,9 @@ std::pair<double, std::shared_ptr<data::Wavefunction>> ScfSolver::_run_impl(
 
   // Return total energy
   double total_energy = context.result.scf_total_energy;
+
+  // Restore the original global logging level
+  Logger::set_global_level(saved_level);
 
   return std::make_pair(total_energy, std::make_shared<data::Wavefunction>(
                                           std::move(wavefunction)));

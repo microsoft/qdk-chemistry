@@ -10,8 +10,6 @@ rotations, substituting Clifford Rz gates, and removing Z-basis operations on qu
 state. It also includes functions to create custom pass managers based on preset configurations and custom passes.
 """
 
-import logging
-
 import numpy as np
 from qiskit.circuit import ParameterExpression
 from qiskit.circuit.library import IGate, SdgGate, SGate, ZGate
@@ -21,8 +19,7 @@ from qiskit.transpiler.passes.optimization import Optimize1qGatesDecomposition
 
 from qdk_chemistry.data import Settings
 from qdk_chemistry.definitions import DIAGONAL_Z_1Q_GATES
-
-_LOGGER = logging.getLogger(__name__)
+from qdk_chemistry.utils import Logger
 
 __all__ = [
     "MergeZBasisRotations",
@@ -67,6 +64,7 @@ class MergeZBasisRotations(TransformationPass):
 
     def __init__(self):
         """Use Optimize1qGatesDecomposition to handle gate optimization to merge Z basis rotations."""
+        Logger.trace_entering()
         super().__init__()
         self._optimize1q_decomposition = Optimize1qGatesDecomposition(basis=["rz", "rx"])
 
@@ -80,7 +78,8 @@ class MergeZBasisRotations(TransformationPass):
             The transformed ``DAGCircuit`` with merged Z-basis rotations.
 
         """
-        _LOGGER.debug("Running MergeZBasisRotations pass.")
+        Logger.trace_entering()
+        Logger.debug("Running MergeZBasisRotations pass.")
         new_dag = DAGCircuit()
         for qreg in dag.qregs.values():
             new_dag.add_qreg(qreg)
@@ -140,6 +139,7 @@ class SubstituteCliffordRzSettings(Settings):
 
     def __init__(self):
         """Initialize SubstituteCliffordRzSettings."""
+        Logger.trace_entering()
         super().__init__()
         self._set_default("equivalent_gate_set", "vector<string>", ["id", "s", "sdg", "z"])
         self._set_default("tolerance", "double", float(np.finfo(np.float64).eps))
@@ -155,6 +155,7 @@ class SubstituteCliffordRzSettings(Settings):
         # Ensure 'id' is present in equivalent_gate_set and remove duplicates
         if key == "equivalent_gate_set" and isinstance(value, list):
             value = list({*value, "id"})
+        Logger.trace_entering()
         super().set(key, value)
 
     def update(self, settings_dict: dict):
@@ -170,6 +171,7 @@ class SubstituteCliffordRzSettings(Settings):
                 **settings_dict,
                 "equivalent_gate_set": list({*settings_dict["equivalent_gate_set"], "id"}),
             }
+        Logger.trace_entering()
         super().update(settings_dict)
 
 
@@ -218,6 +220,7 @@ class SubstituteCliffordRz(TransformationPass):
             tolerance (float): Angle comparison tolerance. Default is np.finfo(np.float64).eps.
 
         """
+        Logger.trace_entering()
         super().__init__()
         self._settings = SubstituteCliffordRzSettings()
         if equivalent_gate_set is not None:
@@ -236,6 +239,7 @@ class SubstituteCliffordRz(TransformationPass):
             The transformed ``DAGCircuit`` with Rz substitutions.
 
         """
+        Logger.trace_entering()
         equivalent_gate_set = self._settings.get("equivalent_gate_set")
         tolerance = self._settings.get("tolerance")
 
@@ -244,7 +248,7 @@ class SubstituteCliffordRz(TransformationPass):
         if len(equivalent_gate_set) != len(set(equivalent_gate_set)):
             raise ValueError(f"Gates in equivalent_gate_set ({equivalent_gate_set}) are not unique.")
 
-        _LOGGER.debug("SubstituteCliffordRz pass: simplification logic needs careful review.")
+        Logger.debug("SubstituteCliffordRz pass: simplification logic needs careful review.")
 
         for node in dag.op_nodes():
             if node.op.name == "rz":
@@ -252,31 +256,31 @@ class SubstituteCliffordRz(TransformationPass):
 
                 # Skip parameterized rotations
                 if isinstance(angle, ParameterExpression):
-                    _LOGGER.debug("Skipping parameterized Rz.")
+                    Logger.debug("Skipping parameterized Rz.")
                     continue
 
                 factor = 2 * angle / np.pi
                 mod4_factor = np.mod(factor, 4)
-                _LOGGER.debug(f"Rz({angle:.4f}) = {factor:.4f} * π/2 (mod 4 = {mod4_factor:.2f})")
+                Logger.debug(f"Rz({angle:.4f}) = {factor:.4f} * π/2 (mod 4 = {mod4_factor:.2f})")
 
                 replacement_gate = None
                 if np.isclose(mod4_factor, 0, atol=tolerance) and "id" in equivalent_gate_set:
-                    _LOGGER.debug(f"Substituting Rz({angle:.4f}) with Id.")
+                    Logger.debug(f"Substituting Rz({angle:.4f}) with Id.")
                     replacement_gate = IGate()
                 elif np.isclose(mod4_factor, 1, atol=tolerance) and "s" in equivalent_gate_set:
-                    _LOGGER.debug(f"Substituting Rz({angle:.4f}) with S.")
+                    Logger.debug(f"Substituting Rz({angle:.4f}) with S.")
                     replacement_gate = SGate()
                 elif np.isclose(mod4_factor, 2, atol=tolerance) and "z" in equivalent_gate_set:
-                    _LOGGER.debug(f"Substituting Rz({angle:.4f}) with Z.")
+                    Logger.debug(f"Substituting Rz({angle:.4f}) with Z.")
                     replacement_gate = ZGate()
                 elif np.isclose(mod4_factor, 3, atol=tolerance) and "sdg" in equivalent_gate_set:
-                    _LOGGER.debug(f"Substituting Rz({angle:.4f}) with Sdg.")
+                    Logger.debug(f"Substituting Rz({angle:.4f}) with Sdg.")
                     replacement_gate = SdgGate()
 
                 if replacement_gate:
                     dag.substitute_node(node, replacement_gate, inplace=True)
                 else:
-                    _LOGGER.debug(f"Keeping original Rz({angle:.4f}).")
+                    Logger.debug(f"Keeping original Rz({angle:.4f}).")
 
         return dag
 
@@ -287,6 +291,7 @@ class SubstituteCliffordRz(TransformationPass):
             The settings object associated with SubstituteCliffordRz.
 
         """
+        Logger.trace_entering()
         return self._settings
 
 
@@ -311,6 +316,7 @@ class RemoveZBasisOnZeroState(TransformationPass):
 
     def __init__(self):
         """Initialize the ``RemoveZBasisOnZeroState`` transformation pass."""
+        Logger.trace_entering()
         super().__init__()
         self._z_basis_gates = {"rz", "z", "s", "sdg"}
 
@@ -324,7 +330,8 @@ class RemoveZBasisOnZeroState(TransformationPass):
             The transformed ``DAGCircuit`` with Z-basis gates removed.
 
         """
-        _LOGGER.debug("Running RemoveZBasisOnZeroState pass.")
+        Logger.trace_entering()
+        Logger.debug("Running RemoveZBasisOnZeroState pass.")
 
         # Track qubits still in |0⟩ (True means untouched)
         zero_state_qubits = dict.fromkeys(dag.qubits, True)
@@ -338,7 +345,7 @@ class RemoveZBasisOnZeroState(TransformationPass):
             if name in self._z_basis_gates:
                 remove_gate = all(zero_state_qubits.get(q, False) for q in qubits)
                 if remove_gate:
-                    _LOGGER.debug(f"Removing {name} on qubit {qubits} (still |0⟩)")
+                    Logger.debug(f"Removing {name} on qubit {qubits} (still |0⟩)")
                     dag.remove_op_node(node)
                     continue  # Skip to next node
 
@@ -362,4 +369,5 @@ class RemoveZBasisOnZeroState(TransformationPass):
             The gate classification logic depends on the ``DIAGONAL_Z_1Q_GATES`` defined in ``definitions.py``.
 
         """
+        Logger.trace_entering()
         return gate_name in DIAGONAL_Z_1Q_GATES

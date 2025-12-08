@@ -4,6 +4,8 @@
 
 #include <qdk/chemistry/scf/util/libint2_util.h>
 
+#include <qdk/chemistry/utils/logger.hpp>
+
 #ifdef _OPENMP
 #include <omp.h>
 #endif
@@ -11,6 +13,7 @@
 namespace qdk::chemistry::scf::libint2_util {
 
 libint2::Shell convert_to_libint_shell(const Shell& o, bool pure) {
+  QDK_LOG_TRACE_ENTERING();
   libint2::Shell sh;
   sh.O = o.O;
   sh.contr.resize(1);
@@ -25,6 +28,7 @@ libint2::Shell convert_to_libint_shell(const Shell& o, bool pure) {
 }
 
 libint2::BasisSet convert_to_libint_basisset(const BasisSet& o) {
+  QDK_LOG_TRACE_ENTERING();
   std::vector<libint2::Shell> shells;
   for (auto& sh : o.shells) {
     shells.push_back(convert_to_libint_shell(sh, o.pure));
@@ -35,6 +39,7 @@ libint2::BasisSet convert_to_libint_basisset(const BasisSet& o) {
 std::unique_ptr<double[]> debug_eri(BasisMode basis_mode,
                                     const libint2::BasisSet& obs, double omega,
                                     size_t i_lo, size_t i_hi) {
+  QDK_LOG_TRACE_ENTERING();
   const size_t num_atomic_orbitals = obs.nbf();
   const size_t num_atomic_orbitals2 = num_atomic_orbitals * num_atomic_orbitals;
   const size_t num_atomic_orbitals3 =
@@ -123,6 +128,7 @@ std::unique_ptr<double[]> debug_eri(BasisMode basis_mode,
 std::unique_ptr<double[]> opt_eri(BasisMode basis_mode,
                                   const libint2::BasisSet& obs, double omega,
                                   size_t i_lo, size_t i_hi) {
+  QDK_LOG_TRACE_ENTERING();
   const size_t num_atomic_orbitals = obs.nbf();
   const size_t num_atomic_orbitals2 = num_atomic_orbitals * num_atomic_orbitals;
   const size_t num_atomic_orbitals3 =
@@ -305,6 +311,7 @@ std::unique_ptr<double[]> eri_df(BasisMode basis_mode,
                                  const libint2::BasisSet& obs,
                                  const libint2::BasisSet& abs, size_t i_lo,
                                  size_t i_hi) {
+  QDK_LOG_TRACE_ENTERING();
   const size_t num_atomic_orbitals = obs.nbf();
   const size_t naux = abs.nbf();
   const size_t num_atomic_orbitals2 = num_atomic_orbitals * num_atomic_orbitals;
@@ -404,6 +411,7 @@ std::unique_ptr<double[]> eri_df(BasisMode basis_mode,
 
 std::unique_ptr<double[]> metric_df(BasisMode basis_mode,
                                     const libint2::BasisSet& abs) {
+  QDK_LOG_TRACE_ENTERING();
   const size_t naux = abs.nbf();
   const size_t met_sz = naux * naux;
 
@@ -472,6 +480,7 @@ void eri_df_grad(double* dJ, const double* P, const double* X,
                  const std::vector<int>& obs_sh2atom,
                  const std::vector<int>& abs_sh2atom, size_t n_atoms,
                  ParallelConfig mpi) {
+  QDK_LOG_TRACE_ENTERING();
   const size_t num_atomic_orbitals = obs.nbf();
   const size_t naux = abs.nbf();
   const size_t num_atomic_orbitals2 = num_atomic_orbitals * num_atomic_orbitals;
@@ -554,6 +563,7 @@ void metric_df_grad(double* dJ, const double* X, BasisMode basis_mode,
                     const libint2::BasisSet& abs,
                     const std::vector<int>& abs_sh2atom, size_t n_atoms,
                     ParallelConfig mpi) {
+  QDK_LOG_TRACE_ENTERING();
   const size_t naux = abs.nbf();
   const size_t nshells = abs.size();
   auto shell2bf = abs.shell2bf();

@@ -30,6 +30,7 @@ void bind_qdk_chemistry_config(py::module& m);
 void bind_valence_space(py::module& m);
 void bind_orbital_rotation(py::module& m);
 void bind_dynamical_correlation_calculator(py::module& m);
+void bind_logger(py::module& m);
 
 PYBIND11_MODULE(_core, m) {
   m.doc() = "QDK/Chemistry C++ core bindings";
@@ -44,6 +45,7 @@ PYBIND11_MODULE(_core, m) {
   utils.doc() = R"(Utilities submodule)";
 
   // Ordering is important!
+
   bind_base_class(data);
   bind_structure(data);
   bind_settings(data);
@@ -69,6 +71,7 @@ PYBIND11_MODULE(_core, m) {
   // Bind utilities
   bind_valence_space(utils);
   bind_orbital_rotation(utils);
+  bind_logger(utils);
 
   // Bind constants and config at the top level
   bind_constants(m);
