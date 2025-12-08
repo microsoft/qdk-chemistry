@@ -31,9 +31,10 @@ import re
 import numpy as np
 from pyscf.mcscf import avas
 
-from qdk_chemistry.algorithms import ActiveSpaceSelector, register
+from qdk_chemistry.algorithms import ActiveSpaceSelector
 from qdk_chemistry.data import Configuration, Orbitals, Settings, SlaterDeterminantContainer, Wavefunction
 from qdk_chemistry.plugins.pyscf.utils import orbitals_to_scf
+from qdk_chemistry.utils import Logger
 
 __all__ = ["PyscfAVAS", "PyscfAVASSettings"]
 
@@ -63,6 +64,7 @@ class PyscfAVASSettings(Settings):
 
     def __init__(self):
         """Initialize the settings with default values."""
+        Logger.trace_entering()
         super().__init__()
         self._set_default("ao_labels", "vector<string>", [])
         self._set_default("canonicalize", "bool", False)
@@ -90,6 +92,7 @@ class PyscfAVAS(ActiveSpaceSelector):
 
     def __init__(self):
         """Initialize the PySCF AVAS with default settings."""
+        Logger.trace_entering()
         super().__init__()
         self._settings = PyscfAVASSettings()
 
@@ -106,6 +109,7 @@ class PyscfAVAS(ActiveSpaceSelector):
             input. The input orbitals are not modified.
 
         """
+        Logger.trace_entering()
         # Convert QDK/Chemistry -> PySCF SCF object
         orbitals = wavefunction.get_orbitals()
         alpha_occs, beta_occs = wavefunction.get_total_orbital_occupations()
@@ -211,7 +215,5 @@ class PyscfAVAS(ActiveSpaceSelector):
 
     def name(self) -> str:
         """Return the name of the active space selector."""
+        Logger.trace_entering()
         return "pyscf_avas"
-
-
-register(lambda: PyscfAVAS())

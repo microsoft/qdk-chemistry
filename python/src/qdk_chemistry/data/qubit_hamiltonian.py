@@ -1,4 +1,4 @@
-"""QDK/Chemistry Qubit Hamiltonian Module.
+"""QDK/Chemistry Qubit Hamiltonian module.
 
 This module provides the QubitHamiltonian dataclass for electronic structure problems. It bridges fermionic Hamiltonians
 and quantum circuit construction or measurement workflows.
@@ -19,6 +19,7 @@ from qiskit.quantum_info import SparsePauliOp
 
 from qdk_chemistry.data import Wavefunction
 from qdk_chemistry.data.base import DataClass
+from qdk_chemistry.utils import Logger
 from qdk_chemistry.utils.statevector import create_statevector_from_wavefunction
 
 __all__ = ["filter_and_group_pauli_ops_from_wavefunction"]
@@ -36,6 +37,9 @@ class QubitHamiltonian(DataClass):
     # Class attribute for filename validation
     _data_type_name = "qubit_hamiltonian"
 
+    # Serialization version for this class
+    _serialization_version = "0.1.0"
+
     def __init__(self, pauli_strings: list[str], coefficients: np.ndarray):
         """Initialize a QubitHamiltonian.
 
@@ -48,6 +52,7 @@ class QubitHamiltonian(DataClass):
                 or if the Pauli strings or coefficients are invalid.
 
         """
+        Logger.trace_entering()
         if len(pauli_strings) != len(coefficients):
             raise ValueError("Mismatch between number of Pauli strings and coefficients.")
 
@@ -92,6 +97,7 @@ class QubitHamiltonian(DataClass):
             A list of ``QubitHamiltonian`` representing the grouped Hamiltonian.
 
         """
+        Logger.trace_entering()
         sparse_pauli_ops = self.pauli_ops.group_commuting(qubit_wise=qubit_wise)
         return [
             QubitHamiltonian(pauli_strings=group.paulis.to_labels(), coefficients=group.coeffs)
@@ -120,10 +126,11 @@ class QubitHamiltonian(DataClass):
 
     def to_json(self) -> dict[str, Any]:
         """Convert the Hamiltonian to a dictionary for JSON serialization."""
-        return {
+        data = {
             "pauli_strings": self.pauli_strings,
             "coefficients": self.coefficients.tolist(),
         }
+        return self._add_json_version(data)
 
     def to_hdf5(self, group: h5py.Group) -> None:
         """Save the Hamiltonian to an HDF5 group.
@@ -133,6 +140,7 @@ class QubitHamiltonian(DataClass):
             Python users should call to_hdf5_file() directly.
 
         """
+        self._add_hdf5_version(group)
         group.create_dataset("pauli_strings", data=np.array(self.pauli_strings, dtype="S"))
         group.create_dataset("coefficients", data=self.coefficients)
 
@@ -146,7 +154,11 @@ class QubitHamiltonian(DataClass):
         Returns:
             QubitHamiltonian: New instance reconstructed from JSON data
 
+        Raises:
+            RuntimeError: If version field is missing or incompatible
+
         """
+        cls._validate_json_version(cls._serialization_version, json_data)
         return cls(
             pauli_strings=json_data["pauli_strings"],
             coefficients=np.array(json_data["coefficients"]),
@@ -162,7 +174,11 @@ class QubitHamiltonian(DataClass):
         Returns:
             QubitHamiltonian: New instance reconstructed from HDF5 data
 
+        Raises:
+            RuntimeError: If version attribute is missing or incompatible
+
         """
+        cls._validate_hdf5_version(cls._serialization_version, group)
         pauli_strings = [s.decode() for s in group["pauli_strings"][:]]
         coefficients = np.array(group["coefficients"])
         return cls(pauli_strings=pauli_strings, coefficients=coefficients)
@@ -201,6 +217,7 @@ def _filter_and_group_pauli_ops_from_statevector(
             * A list of classical coefficients for terms that were reduced to classical contributions.
 
     """
+    Logger.trace_entering()
     psi = np.asarray(statevector, dtype=complex)
     norm = np.linalg.norm(psi)
     if norm < np.finfo(np.float64).eps:
@@ -302,6 +319,7 @@ def filter_and_group_pauli_ops_from_wavefunction(
             * A list of classical coefficients for terms that were reduced to classical contributions.
 
     """
+    Logger.trace_entering()
     psi = create_statevector_from_wavefunction(wavefunction)
     return _filter_and_group_pauli_ops_from_statevector(
         hamiltonian, psi, abelian_grouping, trimming, trimming_tolerance

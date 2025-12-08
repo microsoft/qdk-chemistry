@@ -5,7 +5,6 @@
 #include "scf/guess.h"
 
 #include <qdk/chemistry/scf/core/types.h>
-#include <spdlog/spdlog.h>
 
 #include <Eigen/Dense>
 #include <algorithm>
@@ -14,12 +13,14 @@
 #include <fstream>
 #include <iostream>
 #include <map>
+#include <qdk/chemistry/utils/logger.hpp>
 #include <vector>
 
 #include "util/macros.h"
 
 namespace qdk::chemistry::scf {
 void atom_guess(const BasisSet& obs, const Molecule& mol, double* D) {
+  QDK_LOG_TRACE_ENTERING();
   std::filesystem::path guess_chk(std::filesystem::temp_directory_path() /
                                   "qdk" / "chemistry");
   if (obs.pure) {
@@ -29,7 +30,7 @@ void atom_guess(const BasisSet& obs, const Molecule& mol, double* D) {
   }
 
   if (!std::filesystem::exists(guess_chk)) {
-    spdlog::error(
+    QDK_LOGGER().error(
         "{} not found, use `scripts/generate_guess.py` to prepare basis",
         obs.name);
     exit(EXIT_FAILURE);

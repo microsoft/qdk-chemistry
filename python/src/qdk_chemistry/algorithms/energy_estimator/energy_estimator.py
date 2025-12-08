@@ -7,12 +7,15 @@
 
 from __future__ import annotations
 
+from typing import Any
+
 import numpy as np
 from qiskit import ClassicalRegister, QuantumCircuit, QuantumRegister, qasm3
 from qiskit.quantum_info import Pauli, PauliList
 
 from qdk_chemistry.algorithms.base import Algorithm, AlgorithmFactory
-from qdk_chemistry.data import EnergyExpectationResult, QubitHamiltonian
+from qdk_chemistry.data import Circuit, EnergyExpectationResult, QubitHamiltonian
+from qdk_chemistry.utils import Logger
 
 __all__: list[str] = []
 
@@ -55,6 +58,7 @@ def _compute_expval_and_variance_from_bitstrings(
         A tuple containing expectation values and variances.
 
     """
+    Logger.trace_entering()
     # Determine measurement basis and Pauli contains only measured terms (drop I terms)
     basis = _determine_measurement_basis(paulis)
     measured_indices = np.where(basis.z | basis.x)[0]
@@ -140,17 +144,19 @@ class EnergyEstimator(Algorithm):
 
     def run(
         self,
-        circuit_qasm: str,
+        circuit: Circuit,
         qubit_hamiltonians: list[QubitHamiltonian],
         total_shots: int,
+        noise_model: Any | None = None,
         classical_coeffs: list | None = None,
     ) -> EnergyExpectationResult:
         """Estimate the expectation value and variance of Hamiltonians.
 
         Args:
-            circuit_qasm: OpenQASM3 string of the quantum circuit to be evaluated.
+            circuit: Circuit that provides an OpenQASM3 string of the quantum circuit to be evaluated.
             qubit_hamiltonians: List of ``QubitHamiltonian`` to estimate.
             total_shots: Total number of shots to allocate across the observable terms.
+            noise_model: Optional noise model to simulate noise in the quantum circuit.
             classical_coeffs: Optional list of coefficients for classical Pauli terms to calculate energy offset.
 
         Returns:
@@ -164,22 +170,23 @@ class EnergyEstimator(Algorithm):
         """
         # This function definition is not required it is present to add type hints and docstrings
         #  for the derived classes specialized run() method.
-        return super().run(circuit_qasm, qubit_hamiltonians, total_shots, classical_coeffs)
+        return super().run(circuit, qubit_hamiltonians, total_shots, noise_model, classical_coeffs)
 
     @staticmethod
-    def _create_measurement_circuits(circuit_qasm: str, grouped_hamiltonians: list[QubitHamiltonian]) -> list[str]:
+    def _create_measurement_circuits(circuit: Circuit, grouped_hamiltonians: list[QubitHamiltonian]) -> list[Circuit]:
         """Create measurement circuits for each QubitHamiltonian.
 
         Args:
-            circuit_qasm: OpenQASM3 string of the base circuit.
+            circuit: Circuit that provides an OpenQASM3 string of the base circuit.
             grouped_hamiltonians: List of ``QubitHamiltonian`` grouped in qubit-wise commuting sets.
 
         Returns:
-            List of measurement circuits in OpenQASM3 format.
+            List of Circuits that provide the measurement circuits in OpenQASM3 format.
 
         """
+        Logger.trace_entering()
         meas_circuits = []
-        base_circuit = qasm3.loads(circuit_qasm)
+        base_circuit = qasm3.loads(circuit.get_qasm())
 
         if base_circuit.num_qubits != grouped_hamiltonians[0].num_qubits:
             raise ValueError(
@@ -191,7 +198,7 @@ class EnergyEstimator(Algorithm):
             basis = _determine_measurement_basis(hamiltonian.pauli_ops.paulis)
             meas_ops = _build_measurement_circuit(basis)
             full_circ = base_circuit.compose(meas_ops, inplace=False)
-            meas_circuits.append(qasm3.dumps(full_circ))
+            meas_circuits.append(Circuit(qasm=qasm3.dumps(full_circ)))
 
         return meas_circuits
 
@@ -212,6 +219,7 @@ class EnergyEstimator(Algorithm):
             ``EnergyExpectationResult`` containing the energy expectation value and variance.
 
         """
+        Logger.trace_entering()
         if len(bitstring_counts_list) != len(hamiltonians):
             raise ValueError(f"Expected {len(hamiltonians)} bitstring result sets, got {len(bitstring_counts_list)}.")
 

@@ -8,41 +8,43 @@
 
 // --------------------------------------------------------------------------------------------
 // start-cell-create
+#include <iostream>
 #include <qdk/chemistry.hpp>
+#include <string>
 using namespace qdk::chemistry::algorithms;
+using namespace qdk::chemistry::data;
 
-// Create the default ScfSolver instance
+// Create default ScfSolver instance
 auto scf_solver = ScfSolverFactory::create();
-
-// Or specify a particular solver implementation
-auto pyscf_solver = ScfSolverFactory::create("pyscf");
 // end-cell-create
 // --------------------------------------------------------------------------------------------
 
-// --------------------------------------------------------------------------------------------
-// start-cell-configure
-// Standard settings that work with all solvers
-// Set the method
-scf_solver.settings()
-    .set("method", "dft")
-    // Set the basis set
-    scf_solver->settings()
-    .set("basis_set", "def2-tzvpp");
+int main() {
+  // --------------------------------------------------------------------------------------------
+  // start-cell-configure
+  // Standard settings that work with all solvers
+  // Set the method
+  // Note the following line is optional, since hf is the default method
+  scf_solver->settings().set("method", "hf");
+  // Set the basis set
+  scf_solver->settings().set("basis_set", "def2-tzvpp");
 
-// For DFT calculations, set the exchange-correlation functional
-scf_solver->settings().set("functional", "B3LYP");
-// end-cell-configure
-// --------------------------------------------------------------------------------------------
+  // end-cell-configure
+  // --------------------------------------------------------------------------------------------
 
-// --------------------------------------------------------------------------------------------
-// start-cell-run
-// Create a structure (or load from a file)
-Structure structure;
-// configuring structure ...
+  // --------------------------------------------------------------------------------------------
+  // start-cell-run
+  // Specify a structure
+  std::vector<Eigen::Vector3d> coords = {{0.0, 0.0, 0.0}, {0.0, 0.0, 1.4}};
+  std::vector<std::string> symbols = {"H", "H"};
 
-// Run the SCF calculation
-// Return types are: std::tuple<double, Orbitals>
-auto [E_scf, scf_orbitals] = scf_solver->solve(structure);
-std::cout << "SCF Energy: " << E_scf << " Hartree" << std::endl;
-// end-cell-run
-// --------------------------------------------------------------------------------------------
+  Structure structure(coords, symbols);
+
+  // Run the SCF calculation
+  auto [E_scf, wfn] = scf_solver->run(structure, 0, 1);
+  auto scf_orbitals = wfn->get_orbitals();
+  std::cout << "SCF Energy: " << E_scf << " Hartree" << std::endl;
+  // end-cell-run
+  // --------------------------------------------------------------------------------------------
+  return 0;
+}

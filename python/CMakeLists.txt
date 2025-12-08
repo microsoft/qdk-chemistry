@@ -76,11 +76,10 @@ pybind11_add_module(_core
     src/pybind11/data/settings.cpp
     src/pybind11/data/structure.cpp
     src/pybind11/data/basis_set.cpp
-    src/pybind11/data/coupled_cluster.cpp
     src/pybind11/data/configuration.cpp
     src/pybind11/data/ansatz.cpp
     src/pybind11/data/stability_result.cpp
-    src/pybind11/algorithms/cc.cpp
+    src/pybind11/data/serialization.cpp
     src/pybind11/algorithms/localizer.cpp
     src/pybind11/algorithms/stability.cpp
     src/pybind11/algorithms/mc.cpp
@@ -89,7 +88,10 @@ pybind11_add_module(_core
     src/pybind11/algorithms/hamiltonian.cpp
     src/pybind11/algorithms/scf.cpp
     src/pybind11/algorithms/active_space.cpp
+    src/pybind11/algorithms/dynamical_correlation_calculator.cpp
+    src/pybind11/utils/logger.cpp
     src/pybind11/utils/valence_space.cpp
+    src/pybind11/utils/orbital_rotation.cpp
     src/pybind11/constants.cpp
     src/pybind11/qdk_scf_config.cpp
     src/pybind11/module.cpp

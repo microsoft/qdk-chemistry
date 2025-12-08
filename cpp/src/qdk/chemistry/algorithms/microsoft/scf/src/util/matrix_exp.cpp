@@ -4,8 +4,6 @@
 
 #include "matrix_exp.h"
 
-#include <spdlog/spdlog.h>
-
 #include <Eigen/Dense>
 #include <algorithm>
 #include <blas.hh>
@@ -13,11 +11,13 @@
 #include <iostream>
 #include <lapack.hh>
 #include <memory>
+#include <qdk/chemistry/utils/logger.hpp>
 #include <stdexcept>
 
 namespace qdk::chemistry::scf {
 
 void matrix_exp(const double *m, double *exp_m, int size) {
+  QDK_LOG_TRACE_ENTERING();
   // confirm the scaling factor 2^s
   double first_norm = 0.0;  // maximum column sum
   for (int row = 0; row < size; row++) {
@@ -36,8 +36,9 @@ void matrix_exp(const double *m, double *exp_m, int size) {
   int s = first_norm > theta13
               ? std::max(0, (int)(std::log2(first_norm / theta13)) + 1)
               : 0;
-  spdlog::debug("computing exp(m), first norm of m {}, scaling factor s {}",
-                first_norm, s);
+  QDK_LOGGER().debug(
+      "computing exp(m), first norm of m {}, scaling factor s {}", first_norm,
+      s);
   // scale the matrix by 2^s
   double scale = 1.0 / std::pow(2.0, s);
   auto scaled_m = std::make_unique<double[]>(size * size);
@@ -62,6 +63,7 @@ void matrix_exp(const double *m, double *exp_m, int size) {
 }
 
 void pade_approximation(const double *x, double *exp_x, int size) {
+  QDK_LOG_TRACE_ENTERING();
   // b is equal to b[i] / b[0] for i = 0 to 13, b[i] are the coefficients for
   // degree 13 Pade approximant.
   // Reference: Nicholas J. Higham (2005) DOI:10.1137/04061101X

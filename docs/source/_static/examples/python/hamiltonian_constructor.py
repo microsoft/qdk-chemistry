@@ -4,21 +4,12 @@
 # Copyright (c) Microsoft Corporation. All rights reserved.
 # Licensed under the MIT License. See LICENSE.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
+from qdk_chemistry.algorithms import available, create
+import numpy as np
+from qdk_chemistry.data import Structure
 
 ################################################################################
 # start-cell-create
-import numpy as np
-from qdk_chemistry.algorithms import available, create
-from qdk_chemistry.data import Structure
-
-# First run an SCF calculation to get orbitals
-coords = np.array([[0.0, 0.0, 0.0], [0.0, 0.0, 1.4]])
-structure = Structure(coords, ["H", "H"])
-scf_solver = create("scf_solver")
-scf_solver.settings().set("basis_set", "sto-3g")
-E_scf, wfn = scf_solver.run(structure, charge=0, spin_multiplicity=1)
-orbitals = wfn.get_orbitals()
-
 # List available Hamiltonian constructor implementations
 available_constructors = available("hamiltonian_constructor")
 print(f"Available Hamiltonian constructors: {available_constructors}")
@@ -40,16 +31,27 @@ hamiltonian_constructor.settings().set("eri_method", "direct")
 
 ################################################################################
 # start-cell-construct
+# Create a structure
+coords = np.array([[0.0, 0.0, 0.0], [0.0, 0.0, 1.4]])
+symbols = ["H", "H"]
+structure = Structure(coords, symbols)
+
+# Run an SCF to get orbitals
+scf_solver = create("scf_solver")
+scf_solver.settings().set("basis_set", "sto-3g")
+E_scf, wfn = scf_solver.run(structure, charge=0, spin_multiplicity=1)
+orbitals = wfn.get_orbitals()
+
 # Construct the Hamiltonian from orbitals
 hamiltonian = hamiltonian_constructor.run(orbitals)
 
 # Access the resulting integrals
-h1 = hamiltonian.get_one_body_integrals()
-h2 = hamiltonian.get_two_body_integrals()
+h1_a, h1_b = hamiltonian.get_one_body_integrals()
+h2_aaaa, h2_aabb, h2_bbbb = hamiltonian.get_two_body_integrals()
 core_energy = hamiltonian.get_core_energy()
 
-print(f"One-body integrals shape: {h1.shape}")
-print(f"Two-body integrals shape: {h2.shape}")
+print(f"One-body integrals shape: {h1_a.shape}")
+print(f"Two-body integrals shape: {h2_aaaa.shape}")
 print(f"Core energy: {core_energy:.10f} Hartree")
 print(hamiltonian.get_summary())
 # end-cell-construct

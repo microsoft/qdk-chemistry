@@ -84,10 +84,14 @@ Values:
 Enumeration for different spin channels in unrestricted calculations.
 
 Values:
-    aaaa: Alpha-alpha-alpha-alpha spin channel
-    aabb: Alpha-beta-alpha-beta spin channel
-    bbbb: Beta-beta-beta-beta spin channel
+    aa: Alpha-alpha spin channel (for one-body integrals)
+    bb: Beta-beta spin channel (for one-body integrals)
+    aaaa: Alpha-alpha-alpha-alpha spin channel (for two-body integrals)
+    aabb: Alpha-beta-alpha-beta spin channel (for two-body integrals)
+    bbbb: Beta-beta-beta-beta spin channel (for two-body integrals)
 )")
+      .value("aa", SpinChannel::aa)
+      .value("bb", SpinChannel::bb)
       .value("aaaa", SpinChannel::aaaa)
       .value("aabb", SpinChannel::aabb)
       .value("bbbb", SpinChannel::bbbb);
@@ -154,7 +158,7 @@ Args:
     one_body_integrals_alpha (numpy.ndarray): Alpha one-electron integrals matrix [norb x norb]
     one_body_integrals_beta (numpy.ndarray): Beta one-electron integrals matrix [norb x norb]
     two_body_integrals_aaaa (numpy.ndarray): Alpha-alpha-alpha-alpha two-electron integrals vector
-    two_body_integrals_aabb (numpy.ndarray): Alpha-beta-alpha-beta two-electron integrals vector
+    two_body_integrals_aabb (numpy.ndarray): Alpha/beta/alpha/beta two-electron integrals vector
     two_body_integrals_bbbb (numpy.ndarray): Beta-beta-beta-beta two-electron integrals vector
     orbitals (Orbitals): Molecular orbital data
     core_energy (float): Core energy (nuclear repulsion + inactive orbitals)
@@ -184,20 +188,23 @@ Examples:
   bind_getter_as_property(hamiltonian, "get_one_body_integrals",
                           &Hamiltonian::get_one_body_integrals,
                           R"(
-Get one-electron integrals in molecular orbital basis.
+Get tuple of one-electron integrals (alpha, beta) in molecular orbital basis.
 
 Returns:
-    numpy.ndarray: One-electron integral matrix [norb x norb] containing kinetic energy and nuclear attraction integrals
+    [numpy.ndarray, numpy.ndarray]: One-electron integral matrix [norb x norb]
+    of alpha and beta respectively, containing kinetic energy and nuclear
+    attraction integrals.
 
 Raises:
     RuntimeError: If one-body integrals have not been set
 
 Examples:
-    >>> h1 = hamiltonian.get_one_body_integrals()
-    >>> print(f"One-body matrix shape: {h1.shape}")
-    >>> print(f"Diagonal element h[0,0] = {h1[0,0]}")
-)",
+    >>> h1_alpha, h1_beta = hamiltonian.get_one_body_integrals()
+    >>> print(f"One-body matrix shape: {h1_alpha.shape}")
+    >>> print(f"Diagonal element h1_alpha[0,0] = {h1_alpha[0,0]}")
+    )",
                           py::return_value_policy::reference_internal);
+
   hamiltonian.def("has_one_body_integrals",
                   &Hamiltonian::has_one_body_integrals,
                   R"(
@@ -213,6 +220,24 @@ Examples:
     ...     print("One-body integrals not available")
 )");
 
+  hamiltonian.def("get_one_body_element", &Hamiltonian::get_one_body_element,
+                  R"(
+Get specific one-electron integral element <ij>.
+
+Args:
+    i, j (int): Orbital indices for the one-electron integral
+    channel (SpinChannel): spin channel to check (aa or bb, default is aa)
+
+Returns:
+    float: Value of the one-electron integral <ij>
+
+Examples:
+    >>> integral = hamiltonian.get_one_body_element(0, 1)
+    >>> print(f"<01> = {integral}")
+)",
+                  py::arg("i"), py::arg("j"),
+                  py::arg("channel") = SpinChannel::aa);
+
   // Two-body integral access
   bind_getter_as_property(hamiltonian, "get_two_body_integrals",
                           &Hamiltonian::get_two_body_integrals,
@@ -220,21 +245,25 @@ Examples:
 Get two-electron integrals in molecular orbital basis.
 
 Returns:
-    numpy.ndarray: Two-electron integral vector [norb^4] containing electron-electron repulsion integrals stored in chemist notation
+    tuple[numpy.ndarray, numpy.ndarray, numpy.ndarray]: Tuple of two-electron
+    integral vectors [norb^4] containing electron-electron repulsion integrals
+    aaaa, aabb and bbbb
 
 Raises:
     RuntimeError: If two-body integrals have not been set
 
 Notes:
-    The integrals are stored as a flattened vector in chemist notation <ij|kl> where the indices are ordered as i + j*norb + k*norb^2 + l*norb^3
+    Each of the integrals are stored as a flattened vector in chemist notation
+    <ij|kl> where the indices are ordered as i + j*norb + k*norb^2 + l*norb^3
 
 Examples:
-    >>> h2 = hamiltonian.get_two_body_integrals()
+    >>> (h2, _, _) = hamiltonian.get_two_body_integrals()
     >>> print(f"Two-body vector length: {len(h2)}")
     >>> norb = hamiltonian.get_num_orbitals()
     >>> print(f"Expected length: {norb**4}")
-)",
+        )",
                           py::return_value_policy::reference_internal);
+
   hamiltonian.def("get_two_body_element", &Hamiltonian::get_two_body_element,
                   R"(
 Get specific two-electron integral element <ij|kl>.
@@ -242,12 +271,16 @@ Get specific two-electron integral element <ij|kl>.
 Args:
     i, j, k, l (int): Orbital indices for the two-electron integral
 
+    channel (SpinChannel) : Which spin channel to check, aaaa, aabb, bbbb
+        (default is aaaa)
+
 Returns:
     float: Value of the two-electron integral <ij|kl>
 
 Examples:
     >>> integral = hamiltonian.get_two_body_element(0, 1, 2, 3)
     >>> print(f"<01|23> = {integral}")
+
 )",
                   py::arg("i"), py::arg("j"), py::arg("k"), py::arg("l"),
                   py::arg("channel") = SpinChannel::aaaa);
@@ -262,10 +295,10 @@ Returns:
 
 Examples:
     >>> if hamiltonian.has_two_body_integrals():
-    ...     integrals = hamiltonian.get_two_body_integrals()
+    ...     integrals_tuple = hamiltonian.get_two_body_integrals()
     ... else:
     ...     print("Two-body integrals not available")
-)");
+    )");
 
   // Orbital information
   bind_getter_as_property(hamiltonian, "get_orbitals",
@@ -312,8 +345,61 @@ Examples:
     >>> print(f"Core energy: {e_core} hartree")
 )");
 
-  bind_getter_as_property(hamiltonian, "get_summary", &Hamiltonian::get_summary,
+  hamiltonian.def("has_inactive_fock_matrix",
+                  &Hamiltonian::has_inactive_fock_matrix,
+                  R"(
+Check if inactive fock matrix is available.
+
+Returns:
+    bool: True if fock matrix is available.
+
+Examples:
+    >>> if hamiltonian.has_inactive_fock_matrix():
+    ...    alpha_fock, beta_fock = get_inactive_fock_matrix()
+    ... else:
+    ...     print("Inactive fock matrix is not available")
+)");
+
+  bind_getter_as_property(hamiltonian, "get_inactive_fock_matrix",
+                          &Hamiltonian::get_inactive_fock_matrix,
                           R"(
+Get tuple of alpha, beta inactive fock matrices
+
+Returns:
+    [np.ndarray, np.ndarray] alpha, beta fock matrices
+
+Examples:
+    >>> alpha_inactive_fock, beta_inactive_fock = hamiltonian.get_inactive_fock_matrix()
+)");
+
+  hamiltonian.def("is_restricted", &Hamiltonian::is_restricted,
+                  R"(
+Check if Hamiltonian is restricted by checking if alpha
+and beta components are the same.
+
+Returns:
+    bool: Whether or not the hamiltonian is restricted
+
+Examples:
+    >>> restricted = hamiltonian.is_restricted()
+    >>> print(f"Hamiltonian is restricted: {restricted}")
+)");
+
+  hamiltonian.def("is_unrestricted", &Hamiltonian::is_unrestricted,
+                  R"(
+Check if Hamiltonian is unrestricted by checking if alpha
+and beta components are different.
+
+Returns:
+    bool: Whether or not the hamiltonian is unrestricted
+
+Examples:
+    >>> unrestricted = hamiltonian.is_unrestricted()
+    >>> print(f"Hamiltonian is unrestricted: {unrestricted}")
+)");
+
+  hamiltonian.def("get_summary", &Hamiltonian::get_summary,
+                  R"(
 Get a human-readable summary of the Hamiltonian data.
 
 Returns:
@@ -374,7 +460,7 @@ Save Hamiltonian to JSON file (with validation).
 Args:
     filename (str or pathlib.Path): Path to JSON file to create or overwrite.
 
-        Must have '.hamiltonian' before the file extension
+        Must have ``.hamiltonian`` before the file extension
         (e.g., ``water.hamiltonian.json``, ``molecule.hamiltonian.json``)
 
 Raises:
@@ -398,7 +484,7 @@ Load Hamiltonian from JSON file (static method with validation).
 Args:
     filename (str or pathlib.Path): Path to JSON file to read.
 
-        Must have '.hamiltonian' before the file extension
+        Must have ``.hamiltonian`` before the file extension
         (e.g., ``water.hamiltonian.json``, ``molecule.hamiltonian.json``)
 
 Returns:
@@ -425,7 +511,7 @@ Save Hamiltonian to HDF5 file (with validation).
 Args:
     filename (str or pathlib.Path): Path to HDF5 file to create/overwrite.
 
-        Must have '.hamiltonian' before the file extension
+        Must have ``.hamiltonian`` before the file extension
         (e.g., ``water.hamiltonian.h5``, ``molecule.hamiltonian.hdf5``)
 
 Raises:
@@ -449,7 +535,7 @@ Load Hamiltonian from HDF5 file (static method with validation).
 Args:
     filename (str or pathlib.Path): Path to HDF5 file to read.
 
-        Must have '.hamiltonian' before the file extension
+        Must have ``.hamiltonian`` before the file extension
         (e.g., ``water.hamiltonian.h5``, ``molecule.hamiltonian.hdf5``)
 
 Returns:
@@ -477,7 +563,8 @@ Save Hamiltonian to FCIDUMP file.
 Args:
     filename (str or pathlib.Path): Path to FCIDUMP file to create/overwrite.
 
-        Typically uses '.fcidump' extension (e.g., ``water.fcidump``, ``molecule.fcidump``)
+        Typically uses ``.fcidump`` extension
+        (e.g., ``water.fcidump``, ``molecule.fcidump``)
 
     nalpha (int): Number of alpha electrons
     nbeta (int): Number of beta electrons

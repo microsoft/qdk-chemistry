@@ -50,7 +50,6 @@ from pyscf import ao2mo, gto, mcscf
 from qdk_chemistry.algorithms import (
     MultiConfigurationCalculator,
     MultiConfigurationScf,
-    register,
 )
 from qdk_chemistry.data import (
     CasWavefunctionContainer,
@@ -61,7 +60,8 @@ from qdk_chemistry.data import (
     Settings,
     Wavefunction,
 )
-from qdk_chemistry.plugins.pyscf.utils import orbitals_to_scf
+from qdk_chemistry.plugins.pyscf.utils import SCFType, orbitals_to_scf
+from qdk_chemistry.utils import Logger
 
 __all__ = ["PyscfMcscfCalculator", "PyscfMcscfSettings"]
 
@@ -83,6 +83,7 @@ class _QdkMcSolverWrapper:
             mc_calculator: The QDK multi-configurational calculator to wrap.
 
         """
+        Logger.trace_entering()
         self.mol = mol
         self.mc_calculator = mc_calculator
         self.wavefunction = None
@@ -117,6 +118,7 @@ class _QdkMcSolverWrapper:
             RuntimeError: If the wavefunction is not returned from the MC calculator.
 
         """
+        Logger.trace_entering()
         # Handle nelec format (can be int or tuple)
         if isinstance(nelec, tuple | list):
             n_alpha, n_beta = nelec
@@ -176,6 +178,7 @@ class _QdkMcSolverWrapper:
             1-particle reduced density matrix.
 
         """
+        Logger.trace_entering()
         return self.make_rdm12(fcivec, norb, nelec, **kwargs)[0]
 
     def make_rdm12(
@@ -205,6 +208,7 @@ class _QdkMcSolverWrapper:
             ValueError: If wavefunction is not available (kernel() must be run first).
 
         """
+        Logger.trace_entering()
         if self.wavefunction is None:
             raise ValueError("Wavefunction not available. Run kernel() first.")
 
@@ -249,6 +253,7 @@ def _mcsolver_to_fcisolver(mol: Any, mc_calculator: MultiConfigurationCalculator
         and calling conventions between the two libraries.
 
     """
+    Logger.trace_entering()
     return _QdkMcSolverWrapper(mol, mc_calculator)
 
 
@@ -264,6 +269,7 @@ class PyscfMcscfSettings(Settings):
 
     def __init__(self):
         """Initialize the settings with default values from ElectronicStructureSettings plus MCSCF-specific defaults."""
+        Logger.trace_entering()
         super().__init__()
         self._set_default("max_cycle_macro", "int", 50)
         self._set_default("verbose", "int", 0)
@@ -284,6 +290,7 @@ class PyscfMcscfCalculator(MultiConfigurationScf):
 
     def __init__(self):
         """Initialize the calculator with default settings."""
+        Logger.trace_entering()
         super().__init__()
         self._settings = PyscfMcscfSettings()
 
@@ -317,6 +324,7 @@ class PyscfMcscfCalculator(MultiConfigurationScf):
             RuntimeError: If the MCSCF calculation does not converge.
 
         """
+        Logger.trace_entering()
         # check that alpha and beta active space indices are the same
         if orbitals.get_active_space_indices()[0] != orbitals.get_active_space_indices()[1]:
             raise ValueError("MCSCF implementation only supports identical active spaces for alpha and beta electrons.")
@@ -348,7 +356,7 @@ class PyscfMcscfCalculator(MultiConfigurationScf):
                 n_active_beta_electrons -= 1
 
         # get pyscf scf object
-        pyscf_scf = orbitals_to_scf(orbitals, occ_alpha=alpha_occ, occ_beta=beta_occ, force_restricted=True)
+        pyscf_scf = orbitals_to_scf(orbitals, occ_alpha=alpha_occ, occ_beta=beta_occ, scf_type=SCFType.RESTRICTED)
 
         # Create CASSCF object
         pyscf_mcscf = mcscf.CASSCF(pyscf_scf, n_active_orbitals, n_active_electrons)
@@ -392,6 +400,7 @@ class PyscfMcscfCalculator(MultiConfigurationScf):
             RuntimeError: If the wavefunction type is not supported.
 
         """
+        Logger.trace_entering()
         # Extract basis set and overlap from PySCF object
         _ovlp = pyscf_mcscf._scf.get_ovlp()  # noqa: SLF001
 
@@ -478,28 +487,5 @@ class PyscfMcscfCalculator(MultiConfigurationScf):
 
     def name(self) -> str:
         """Return the name of the MCSCF solver."""
+        Logger.trace_entering()
         return "pyscf"
-
-
-def _create_pyscf_multi_configuration_scf():
-    """Factory function to create a PySCF MCSCF calculator instance.
-
-    Returns:
-        PyscfMcscfCalculator: A new instance of the PySCF MCSCF calculator.
-
-    """
-    return PyscfMcscfCalculator()
-
-
-def _register_pyscf_multi_configuration_scf():
-    """Register the PySCF MCSCF calculator with the QDK framework.
-
-    This function registers the PySCF MCSCF calculator factory with the QDK
-    MCSCF calculator registry, making it available for use through
-    the QDK plugin system.
-    """
-    register(_create_pyscf_multi_configuration_scf)
-
-
-# Initialize the calculator on module import
-_ = _register_pyscf_multi_configuration_scf()

@@ -11,6 +11,8 @@ from collections.abc import Iterable, Sequence
 
 import numpy as np
 
+from qdk_chemistry.utils import Logger
+
 __all__ = [
     "accumulated_phase_from_bits",
     "energy_alias_candidates",
@@ -32,6 +34,7 @@ def energy_from_phase(phase_fraction: float, *, evolution_time: float) -> float:
         Energy estimate corresponding to ``phase_fraction``.
 
     """
+    Logger.trace_entering()
     angle = (phase_fraction % 1.0) * (2 * np.pi)
     if angle > np.pi:
         angle -= 2 * np.pi
@@ -60,6 +63,7 @@ def energy_alias_candidates(
         Sorted list of alias energy values covering positive and negative branches.
 
     """
+    Logger.trace_entering()
     period = 2 * np.pi / evolution_time
     # Materialize the range in case a generator is provided and guarantee the zero shift.
     shifts = tuple(shift_range)
@@ -96,6 +100,7 @@ def resolve_energy_aliases(
         Alias energy closest to ``reference_energy``.
 
     """
+    Logger.trace_entering()
     candidates = energy_alias_candidates(raw_energy, evolution_time=evolution_time, shift_range=shift_range)
     return min(candidates, key=lambda energy: abs(energy - reference_energy))
 
@@ -114,6 +119,7 @@ def iterative_phase_feedback_update(current_phase: float, measured_bit: int) -> 
         ValueError: If ``measured_bit`` is not 0 or 1.
 
     """
+    Logger.trace_entering()
     if measured_bit not in (0, 1):
         raise ValueError(f"measured_bit must be 0 or 1, received {measured_bit}.")
     return current_phase / 2.0 + np.pi * measured_bit / 2.0
@@ -129,6 +135,7 @@ def phase_fraction_from_feedback(phase_feedback: float) -> float:
         Phase fraction corresponding to ``phase_feedback``.
 
     """
+    Logger.trace_entering()
     return float(phase_feedback / np.pi)
 
 
@@ -142,6 +149,7 @@ def accumulated_phase_from_bits(bits_msb_first: Sequence[int]) -> float:
         Accumulated phase angle ``Φ(1)``.
 
     """
+    Logger.trace_entering()
     phase = 0.0
     for bit in reversed(bits_msb_first):
         phase = iterative_phase_feedback_update(phase, bit)

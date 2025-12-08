@@ -9,6 +9,7 @@
 #include <iostream>
 #include <memory>
 #include <qdk/chemistry/data/wavefunction_containers/sci.hpp>
+#include <qdk/chemistry/utils/logger.hpp>
 #include <stdexcept>
 #include <tuple>
 #include <variant>
@@ -32,7 +33,9 @@ SciWavefunctionContainer::SciWavefunctionContainer(
                                std::nullopt,  // two_rdm_aabb
                                std::nullopt,  // two_rdm_aaaa
                                std::nullopt,  // two_rdm_bbbb
-                               type) {}
+                               type) {
+  QDK_LOG_TRACE_ENTERING();
+}
 
 SciWavefunctionContainer::SciWavefunctionContainer(
     const VectorVariant& coeffs, const DeterminantVector& dets,
@@ -47,7 +50,9 @@ SciWavefunctionContainer::SciWavefunctionContainer(
                                std::nullopt,  // two_rdm_aabb
                                std::nullopt,  // two_rdm_aaaa
                                std::nullopt,  // two_rdm_bbbb
-                               type) {}
+                               type) {
+  QDK_LOG_TRACE_ENTERING();
+}
 
 SciWavefunctionContainer::SciWavefunctionContainer(
     const VectorVariant& coeffs, const DeterminantVector& dets,
@@ -63,9 +68,13 @@ SciWavefunctionContainer::SciWavefunctionContainer(
                             two_rdm_spin_traced, two_rdm_aabb, two_rdm_aaaa,
                             two_rdm_bbbb, type),
       _coefficients(coeffs),
-      _configuration_set(dets, orbitals) {}
+      _configuration_set(dets, orbitals) {
+  QDK_LOG_TRACE_ENTERING();
+}
 
 std::unique_ptr<WavefunctionContainer> SciWavefunctionContainer::clone() const {
+  QDK_LOG_TRACE_ENTERING();
+
   return std::make_unique<SciWavefunctionContainer>(
       _coefficients, _configuration_set.get_configurations(),
       this->get_orbitals(),
@@ -93,6 +102,7 @@ std::unique_ptr<WavefunctionContainer> SciWavefunctionContainer::clone() const {
 
 ScalarVariant SciWavefunctionContainer::get_coefficient(
     const Configuration& det) const {
+  QDK_LOG_TRACE_ENTERING();
   const auto& determinants = get_active_determinants();
   if (determinants.empty()) {
     throw std::runtime_error("No determinants available");
@@ -110,19 +120,25 @@ ScalarVariant SciWavefunctionContainer::get_coefficient(
 
 const SciWavefunctionContainer::VectorVariant&
 SciWavefunctionContainer::get_coefficients() const {
+  QDK_LOG_TRACE_ENTERING();
+
   return _coefficients;
 }
 
 std::shared_ptr<Orbitals> SciWavefunctionContainer::get_orbitals() const {
+  QDK_LOG_TRACE_ENTERING();
+
   return _configuration_set.get_orbitals();
 }
 
 const SciWavefunctionContainer::DeterminantVector&
 SciWavefunctionContainer::get_active_determinants() const {
+  QDK_LOG_TRACE_ENTERING();
   return _configuration_set.get_configurations();
 }
 
 size_t SciWavefunctionContainer::size() const {
+  QDK_LOG_TRACE_ENTERING();
   if (detail::is_vector_variant_complex(_coefficients)) {
     return std::get<Eigen::VectorXcd>(_coefficients).size();
   }
@@ -131,21 +147,29 @@ size_t SciWavefunctionContainer::size() const {
 
 SciWavefunctionContainer::ScalarVariant SciWavefunctionContainer::overlap(
     const WavefunctionContainer& other) const {
+  QDK_LOG_TRACE_ENTERING();
+
   throw std::runtime_error(
       "overlap not implemented in SciWavefunctionContainer");
 }
 
 double SciWavefunctionContainer::norm() const {
+  QDK_LOG_TRACE_ENTERING();
+
   throw std::runtime_error("norm not implemented in SciWavefunctionContainer");
 }
 
 void SciWavefunctionContainer::clear_caches() const {
+  QDK_LOG_TRACE_ENTERING();
+
   // Clear all cached RDMs
   _clear_rdms();
 }
 
 std::pair<size_t, size_t> SciWavefunctionContainer::get_total_num_electrons()
     const {
+  QDK_LOG_TRACE_ENTERING();
+
   // Get active space electrons using the dedicated method
   auto [n_alpha_active, n_beta_active] = get_active_num_electrons();
 
@@ -161,6 +185,7 @@ std::pair<size_t, size_t> SciWavefunctionContainer::get_total_num_electrons()
 
 std::pair<size_t, size_t> SciWavefunctionContainer::get_active_num_electrons()
     const {
+  QDK_LOG_TRACE_ENTERING();
   const auto& determinants = get_active_determinants();
   if (determinants.empty()) {
     throw std::runtime_error("No determinants available");
@@ -171,6 +196,7 @@ std::pair<size_t, size_t> SciWavefunctionContainer::get_active_num_electrons()
 
 std::pair<Eigen::VectorXd, Eigen::VectorXd>
 SciWavefunctionContainer::get_total_orbital_occupations() const {
+  QDK_LOG_TRACE_ENTERING();
   const auto& determinants = get_active_determinants();
   if (determinants.empty()) {
     throw std::runtime_error("No determinants available");
@@ -237,6 +263,7 @@ SciWavefunctionContainer::get_total_orbital_occupations() const {
 
 std::pair<Eigen::VectorXd, Eigen::VectorXd>
 SciWavefunctionContainer::get_active_orbital_occupations() const {
+  QDK_LOG_TRACE_ENTERING();
   const auto& determinants = get_active_determinants();
   if (determinants.empty()) {
     throw std::runtime_error("No determinants available");
@@ -318,14 +345,19 @@ SciWavefunctionContainer::get_active_orbital_occupations() const {
 }
 
 std::string SciWavefunctionContainer::get_container_type() const {
+  QDK_LOG_TRACE_ENTERING();
+
   return "sci";
 }
 
 bool SciWavefunctionContainer::is_complex() const {
+  QDK_LOG_TRACE_ENTERING();
   return detail::is_vector_variant_complex(_coefficients);
 }
 
 nlohmann::json SciWavefunctionContainer::to_json() const {
+  QDK_LOG_TRACE_ENTERING();
+
   nlohmann::json j;
 
   // Store version first
@@ -365,6 +397,8 @@ nlohmann::json SciWavefunctionContainer::to_json() const {
 
 std::unique_ptr<SciWavefunctionContainer> SciWavefunctionContainer::from_json(
     const nlohmann::json& j) {
+  QDK_LOG_TRACE_ENTERING();
+
   try {
     // Validate version first
     if (!j.contains("version")) {
@@ -439,6 +473,8 @@ std::unique_ptr<SciWavefunctionContainer> SciWavefunctionContainer::from_json(
 }
 
 void SciWavefunctionContainer::to_hdf5(H5::Group& group) const {
+  QDK_LOG_TRACE_ENTERING();
+
   try {
     H5::StrType string_type(H5::PredType::C_S1, H5T_VARIABLE);
 
@@ -507,6 +543,8 @@ void SciWavefunctionContainer::to_hdf5(H5::Group& group) const {
 
 std::unique_ptr<SciWavefunctionContainer> SciWavefunctionContainer::from_hdf5(
     H5::Group& group) {
+  QDK_LOG_TRACE_ENTERING();
+
   try {
     // Check version first
     H5::StrType string_type(H5::PredType::C_S1, H5T_VARIABLE);
