@@ -524,7 +524,12 @@ void CasWavefunctionContainer::to_hdf5(H5::Group& group) const {
         "wavefunction_type", string_type, H5::DataSpace(H5S_SCALAR));
     wf_type_attr.write(string_type, wf_type);
 
-    // Store complexity flag
+    // Store restrictedness flag
+    bool is_restricted = get_orbitals()->is_restricted();
+    H5::Attribute restricted_attr = group.createAttribute(
+        "is_restricted", H5::PredType::NATIVE_HBOOL, H5::DataSpace(H5S_SCALAR));
+
+    // Store complexity flag for coefficients
     bool is_complex = detail::is_vector_variant_complex(_coefficients);
     H5::Attribute complex_attr = group.createAttribute(
         "is_complex", H5::PredType::NATIVE_HBOOL, H5::DataSpace(H5S_SCALAR));
@@ -561,6 +566,86 @@ void CasWavefunctionContainer::to_hdf5(H5::Group& group) const {
     // Store configuration set (delegates to ConfigurationSet serialization)
     H5::Group config_set_group = group.createGroup("configuration_set");
     _configuration_set.to_hdf5(config_set_group);
+
+    H5::Group rdm_group = group.createGroup("rdms");
+
+    // If rdms are available, store
+    // Make lambda function to avoid repeating storage code
+    auto save_one_rdm_to_hdf5 = [](bool is_one_rdm_complex,
+                                   MatrixVariant _one_rdm_spin_dependent_aa,
+                                   H5::Group rdm_group,
+                                   std::string storage_name) {
+      // complex
+      if (is_one_rdm_complex) {
+        const auto& rdm_complex =
+            std::get<Eigen::MatrixXcd>(_one_rdm_spin_dependent_aa);
+        hsize_t one_rdm_dims[2] = {rdm_complex.rows(), rdm_complex.cols()};
+        H5::DataSpace one_rdm_space(2, one_rdm_dims);
+
+        H5::CompType complex_type(sizeof(std::complex<double>));
+        complex_type.insertMember("real", 0, H5::PredType::NATIVE_DOUBLE);
+        complex_type.insertMember("imag", sizeof(double),
+                                  H5::PredType::NATIVE_DOUBLE);
+        H5::DataSet complex_dataset_onerdm =
+            rdm_group.createDataSet(storage_name, complex_type, one_rdm_space);
+        // Write directly from Eigen's memory layout without copying
+        complex_dataset_onerdm.write(rdm_complex.data(), complex_type);
+      }
+      // real
+      else {
+        const auto& rdm_real =
+            std::get<Eigen::MatrixXd>(_one_rdm_spin_dependent_aa);
+        hsize_t one_rdm_dims[2] = {rdm_real.rows(), rdm_real.cols()};
+        H5::DataSpace one_rdm_space(2, one_rdm_dims);
+        H5::DataSet dataset_onerdm = rdm_group.createDataSet(
+            storage_name, H5::PredType::NATIVE_DOUBLE, one_rdm_space);
+        // Write directly from Eigen's memory without copying
+        dataset_onerdm.write(rdm_real.data(), H5::PredType::NATIVE_DOUBLE);
+      }
+      return 0;
+    };
+
+    if (has_one_rdm_spin_dependent()) {
+      // restricted only
+      if (get_orbitals()->is_restricted()) {
+        std::string storage_name = "one_rdm_aa";
+
+        if (_one_rdm_spin_dependent_aa != nullptr) {
+          // check if real or complex
+          bool is_one_rdm_complex =
+              detail::is_matrix_variant_complex(*_one_rdm_spin_dependent_aa);
+          save_one_rdm_to_hdf5(is_one_rdm_complex, *_one_rdm_spin_dependent_aa,
+                               rdm_group, storage_name);
+
+          // if we dont have aa, save bb
+        } else if (_one_rdm_spin_dependent_bb != nullptr) {
+          // check if real or complex
+          bool is_one_rdm_complex =
+              detail::is_matrix_variant_complex(*_one_rdm_spin_dependent_bb);
+          save_one_rdm_to_hdf5(is_one_rdm_complex, *_one_rdm_spin_dependent_bb,
+                               rdm_group, storage_name);
+        }
+      } else {
+        // unrestricted - want to store both
+        std::string storage_name_aa = "one_rdm_aa";
+        bool is_aa_rdm_complex =
+            detail::is_matrix_variant_complex(*_one_rdm_spin_dependent_aa);
+        save_one_rdm_to_hdf5(is_aa_rdm_complex, *_one_rdm_spin_dependent_aa,
+                             rdm_group, storage_name_aa);
+        std::string storage_name_bb = "one_rdm_bb";
+        bool is_bb_rdm_complex =
+            detail::is_matrix_variant_complex(*_one_rdm_spin_dependent_bb);
+        save_one_rdm_to_hdf5(is_bb_rdm_complex, *_one_rdm_spin_dependent_bb,
+                             rdm_group, storage_name_bb);
+      }
+    }
+
+    // if (has_two_rdm_spin_dependent()) {
+    //  restricted only
+    // if (get_orbitals()->is_restricted()) {
+    //  we need aabb and aaaa
+    //}
+    //}
 
   } catch (const H5::Exception& e) {
     throw std::runtime_error("HDF5 error: " + std::string(e.getCDetailMsg()));
