@@ -344,26 +344,12 @@ class BasisSet : public DataClass,
   static std::vector<std::string> get_supported_basis_set_names();
 
   /**
-   * @brief Get supported ECP basis set names
-   * @return Vector of supported ECP basis set names
-   */
-  static std::vector<std::string> get_supported_ecp_names();
-
-  /**
    * @brief Get supported elements for a given basis set
    * @param basis_name Name of the basis set
    * @return Vector of supported elements as enum
    */
   static std::vector<Element> get_supported_elements_for_basis_set(
       std::string basis_name);
-
-  /**
-   * @brief Get supported elements for a given ECP basis set
-   * @param ecp_name Name of the ECP basis set
-   * @return Vector of supported elements as enum
-   */
-  static std::vector<Element> get_supported_elements_for_ecp(
-      std::string ecp_name);
 
   /**
    * @brief Constructor with basis set name and structure

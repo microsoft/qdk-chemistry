@@ -439,46 +439,6 @@ std::vector<Element> BasisSet::get_supported_elements_for_basis_set(
   return elements;
 }
 
-std::vector<Element> BasisSet::get_supported_elements_for_ecp(
-    std::string ecp_name) {
-  std::vector<Element> elements;
-  throw std::runtime_error("Not yet implemented");
-  return elements;
-}
-
-std::vector<std::string> BasisSet::get_supported_ecp_names() {
-  std::vector<std::string> ecp_names;
-
-  std::filesystem::path basis_dir =
-      qdk::chemistry::scf::QDKChemistryConfig::get_resources_dir();
-
-  if (!std::filesystem::exists(basis_dir) ||
-      !std::filesystem::is_directory(basis_dir)) {
-    throw std::runtime_error("Basis set resources directory does not exist: " +
-                             basis_dir.string());
-  }
-
-  // read ecp names from basis_summary.json
-  std::filesystem::path summary_file = basis_dir / "basis_summary.json";
-  if (!std::filesystem::exists(summary_file)) {
-    throw std::runtime_error("Basis set summary file does not exist: " +
-                             summary_file.string());
-  }
-
-  std::ifstream fin(summary_file);
-  auto data = nlohmann::json::parse(fin);
-  for (const auto& basis_entry : data) {
-    if (basis_entry.contains("ecp_name")) {
-      std::string ecp_name = basis_entry["ecp_name"].get<std::string>();
-      if (!ecp_name.empty()) {
-        ecp_names.push_back(ecp_name);
-      }
-    }
-  }
-
-  return ecp_names;
-}
-
 std::vector<std::string> BasisSet::get_supported_basis_set_names() {
   std::vector<std::string> basis_set_names;
 

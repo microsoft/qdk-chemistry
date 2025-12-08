@@ -1627,3 +1627,94 @@ TEST_F(BasisSetTest, SupportedElementsForBasisSet) {
 
   EXPECT_EQ(expected_elements, supported_elements);
 }
+
+// Edge case tests for from_basis_name
+TEST_F(BasisSetTest, FromBasisNameNullptrStructure) {
+  std::shared_ptr<Structure> null_structure = nullptr;
+  EXPECT_THROW(BasisSet::from_basis_name("sto-3g", null_structure),
+               std::invalid_argument);
+}
+
+TEST_F(BasisSetTest, FromBasisNameInvalidBasisSet) {
+  auto structure = testing::create_water_structure();
+  EXPECT_THROW(BasisSet::from_basis_name("invalid-basis-set-name", structure),
+               std::invalid_argument);
+}
+
+TEST_F(BasisSetTest, FromBasisNameEmptyBasisSet) {
+  auto structure = testing::create_water_structure();
+  EXPECT_THROW(BasisSet::from_basis_name("", structure), std::invalid_argument);
+}
+
+// Edge case tests for from_element_map
+TEST_F(BasisSetTest, FromElementMapNullptrStructure) {
+  std::map<std::string, std::string> element_map;
+  element_map["H"] = "sto-3g";
+  element_map["O"] = "sto-3g";
+  std::shared_ptr<Structure> null_structure = nullptr;
+  EXPECT_THROW(BasisSet::from_element_map(element_map, null_structure),
+               std::invalid_argument);
+}
+
+TEST_F(BasisSetTest, FromElementMapMissingElement) {
+  auto structure = testing::create_water_structure();
+  std::map<std::string, std::string> element_map;
+  // Only specify H, missing O
+  element_map["H"] = "sto-3g";
+  EXPECT_THROW(BasisSet::from_element_map(element_map, structure),
+               std::invalid_argument);
+}
+
+TEST_F(BasisSetTest, FromElementMapEmpty) {
+  auto structure = testing::create_water_structure();
+  std::map<std::string, std::string> empty_map;
+  EXPECT_THROW(BasisSet::from_element_map(empty_map, structure),
+               std::invalid_argument);
+}
+
+TEST_F(BasisSetTest, FromElementMapInvalidBasisSet) {
+  auto structure = testing::create_water_structure();
+  std::map<std::string, std::string> element_map;
+  element_map["H"] = "invalid-basis-set";
+  element_map["O"] = "sto-3g";
+  EXPECT_THROW(BasisSet::from_element_map(element_map, structure),
+               std::invalid_argument);
+}
+
+// Edge case tests for from_index_map
+TEST_F(BasisSetTest, FromIndexMapNullptrStructure) {
+  std::map<size_t, std::string> index_map;
+  index_map[0] = "sto-3g";
+  index_map[1] = "sto-3g";
+  index_map[2] = "sto-3g";
+  std::shared_ptr<Structure> null_structure = nullptr;
+  EXPECT_THROW(BasisSet::from_index_map(index_map, null_structure),
+               std::invalid_argument);
+}
+
+TEST_F(BasisSetTest, FromIndexMapMissingAtomIndex) {
+  auto structure = testing::create_water_structure();  // 3 atoms
+  std::map<size_t, std::string> index_map;
+  // Only specify atoms 0 and 1, missing atom 2
+  index_map[0] = "sto-3g";
+  index_map[1] = "sto-3g";
+  EXPECT_THROW(BasisSet::from_index_map(index_map, structure),
+               std::invalid_argument);
+}
+
+TEST_F(BasisSetTest, FromIndexMapEmpty) {
+  auto structure = testing::create_water_structure();
+  std::map<size_t, std::string> empty_map;
+  EXPECT_THROW(BasisSet::from_index_map(empty_map, structure),
+               std::invalid_argument);
+}
+
+TEST_F(BasisSetTest, FromIndexMapInvalidBasisSet) {
+  auto structure = testing::create_water_structure();
+  std::map<size_t, std::string> index_map;
+  index_map[0] = "invalid-basis-set";
+  index_map[1] = "sto-3g";
+  index_map[2] = "sto-3g";
+  EXPECT_THROW(BasisSet::from_index_map(index_map, structure),
+               std::invalid_argument);
+}

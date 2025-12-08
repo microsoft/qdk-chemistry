@@ -155,6 +155,11 @@ std::shared_ptr<BasisSet> make_atom_basis_set(int index,
 
 void get_atom_guess(const BasisSet& basis_set, const Molecule& mol,
                     RowMajorMatrix& tD) {
+  // check if basis set is canonical
+  if (!basis_set.pure) {
+    throw std::runtime_error("ASAHF initial guess requires a spherical basis.");
+  }
+
   // make basic config
   SCFConfig cfg;
   cfg.mpi = qdk::chemistry::scf::mpi_default_input();
