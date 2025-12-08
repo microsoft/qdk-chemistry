@@ -12,6 +12,7 @@
 #include <tuple>
 #include <variant>
 
+#include "../hdf5_serialization.hpp"
 #include "../json_serialization.hpp"
 
 namespace qdk::chemistry::data {
@@ -570,41 +571,6 @@ void CasWavefunctionContainer::to_hdf5(H5::Group& group) const {
     H5::Group rdm_group = group.createGroup("rdms");
 
     // If rdms are available, store
-    // Make lambda function to avoid repeating storage code
-    auto save_one_rdm_to_hdf5 = [](bool is_one_rdm_complex,
-                                   MatrixVariant _one_rdm_spin_dependent_aa,
-                                   H5::Group rdm_group,
-                                   std::string storage_name) {
-      // complex
-      if (is_one_rdm_complex) {
-        const auto& rdm_complex =
-            std::get<Eigen::MatrixXcd>(_one_rdm_spin_dependent_aa);
-        hsize_t one_rdm_dims[2] = {rdm_complex.rows(), rdm_complex.cols()};
-        H5::DataSpace one_rdm_space(2, one_rdm_dims);
-
-        H5::CompType complex_type(sizeof(std::complex<double>));
-        complex_type.insertMember("real", 0, H5::PredType::NATIVE_DOUBLE);
-        complex_type.insertMember("imag", sizeof(double),
-                                  H5::PredType::NATIVE_DOUBLE);
-        H5::DataSet complex_dataset_onerdm =
-            rdm_group.createDataSet(storage_name, complex_type, one_rdm_space);
-        // Write directly from Eigen's memory layout without copying
-        complex_dataset_onerdm.write(rdm_complex.data(), complex_type);
-      }
-      // real
-      else {
-        const auto& rdm_real =
-            std::get<Eigen::MatrixXd>(_one_rdm_spin_dependent_aa);
-        hsize_t one_rdm_dims[2] = {rdm_real.rows(), rdm_real.cols()};
-        H5::DataSpace one_rdm_space(2, one_rdm_dims);
-        H5::DataSet dataset_onerdm = rdm_group.createDataSet(
-            storage_name, H5::PredType::NATIVE_DOUBLE, one_rdm_space);
-        // Write directly from Eigen's memory without copying
-        dataset_onerdm.write(rdm_real.data(), H5::PredType::NATIVE_DOUBLE);
-      }
-      return 0;
-    };
-
     if (has_one_rdm_spin_dependent()) {
       // restricted only
       if (get_orbitals()->is_restricted()) {
@@ -640,12 +606,27 @@ void CasWavefunctionContainer::to_hdf5(H5::Group& group) const {
       }
     }
 
-    // if (has_two_rdm_spin_dependent()) {
-    //  restricted only
-    // if (get_orbitals()->is_restricted()) {
-    //  we need aabb and aaaa
-    //}
-    //}
+    if (has_two_rdm_spin_dependent()) {
+      std::string storage_name_aabb = "two_rdm_aabb";
+      std::string storage_name_aaaa = "two_rdm_aaaa";
+      // we need aabb and aaaa for both restricted and unrestricted
+      bool is_aabb_rdm_complex =
+          detail::is_vector_variant_complex(*_two_rdm_spin_dependent_aabb);
+      save_two_rdm_to_hdf5(is_aabb_rdm_complex, *_two_rdm_spin_dependent_aabb,
+                           rdm_group, storage_name_aabb);
+      bool is_aaaa_rdm_complex =
+          detail::is_vector_variant_complex(*_two_rdm_spin_dependent_aaaa);
+      save_two_rdm_to_hdf5(is_aaaa_rdm_complex, *_two_rdm_spin_dependent_aaaa,
+                           rdm_group, storage_name_aaaa);
+      if (get_orbitals()->is_unrestricted()) {
+        // also save bbbb
+        std::string storage_name_bbbb = "two_rdm_bbbb";
+        bool is_bbbb_rdm_complex =
+            detail::is_vector_variant_complex(*_two_rdm_spin_dependent_bbbb);
+        save_two_rdm_to_hdf5(is_bbbb_rdm_complex, *_two_rdm_spin_dependent_bbbb,
+                             rdm_group, storage_name_bbbb);
+      }
+    }
 
   } catch (const H5::Exception& e) {
     throw std::runtime_error("HDF5 error: " + std::string(e.getCDetailMsg()));

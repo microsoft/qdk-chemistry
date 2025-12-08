@@ -13,7 +13,7 @@
 #include <vector>
 
 namespace qdk::chemistry::data {
-
+using MatrixVariant = std::variant<Eigen::MatrixXd, Eigen::MatrixXcd>;
 using VectorVariant = std::variant<Eigen::VectorXd, Eigen::VectorXcd>;
 
 /**
@@ -263,6 +263,29 @@ bool dataset_exists_in_group(H5::Group& group, const std::string& dataset_name);
  */
 bool group_exists_in_group(H5::Group& group, const std::string& group_name);
 
+/**
+ * @brief Save one rdm to hdf5
+ * @param is_one_rdm_complex Whether or not rdm is complex (affects how it is
+ * stored)
+ * @param one_rdm_spin_dependent_chl The one rdm to store
+ * @param rdm_group Which rdm group to save to
+ * @param storage_name How to save in the dedicated rdm group
+ */
+void save_one_rdm_to_hdf5(bool is_one_rdm_complex,
+                          MatrixVariant one_rdm_spin_dependent_chl,
+                          H5::Group rdm_group, std::string storage_name);
+
+/**
+ * @brief Save two rdm to hdf5
+ * @param is_two_rdm_complex Whether or not rdm is complex (affects how it is
+ * stored)
+ * @param two_rdm_spin_dependent_chl The two rdm to store
+ * @param rdm_group Which rdm group to save to
+ * @param storage_name How to save in the dedicated rdm group
+ */
+void save_two_rdm_to_hdf5(bool is_two_rdm_complex,
+                          VectorVariant two_rdm_spin_dependent_chl,
+                          H5::Group rdm_group, std::string storage_name);
 // Template implementations
 
 // Save STL vector to HDF5 file
