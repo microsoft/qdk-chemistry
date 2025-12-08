@@ -9,7 +9,7 @@
 
 namespace py = pybind11;
 
-void bind_utils(py::module& m) {
+void bind_valence_space(py::module& m) {
   m.def("compute_valence_space_parameters",
         &qdk::chemistry::utils::compute_valence_space_parameters,
         R"(

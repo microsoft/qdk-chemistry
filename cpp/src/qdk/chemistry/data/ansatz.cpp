@@ -5,10 +5,12 @@
 #include <fstream>
 #include <qdk/chemistry/data/ansatz.hpp>
 #include <qdk/chemistry/data/wavefunction_containers/sd.hpp>
+#include <qdk/chemistry/utils/logger.hpp>
 #include <sstream>
 #include <stdexcept>
 
 #include "filename_utils.hpp"
+#include "hdf5_error_handling.hpp"
 #include "json_serialization.hpp"
 
 namespace qdk::chemistry::data {
@@ -16,6 +18,8 @@ namespace qdk::chemistry::data {
 Ansatz::Ansatz(const Hamiltonian& hamiltonian, const Wavefunction& wavefunction)
     : _hamiltonian(std::make_shared<Hamiltonian>(hamiltonian)),
       _wavefunction(std::make_shared<Wavefunction>(wavefunction)) {
+  QDK_LOG_TRACE_ENTERING();
+
   if (!_is_valid()) {
     throw std::invalid_argument("Tried to generate invalid Ansatz object.");
   }
@@ -24,6 +28,8 @@ Ansatz::Ansatz(const Hamiltonian& hamiltonian, const Wavefunction& wavefunction)
 Ansatz::Ansatz(std::shared_ptr<Hamiltonian> hamiltonian,
                std::shared_ptr<Wavefunction> wavefunction)
     : _hamiltonian(hamiltonian), _wavefunction(wavefunction) {
+  QDK_LOG_TRACE_ENTERING();
+
   if (!_hamiltonian) {
     throw std::invalid_argument("Hamiltonian pointer cannot be nullptr");
   }
@@ -37,12 +43,16 @@ Ansatz::Ansatz(std::shared_ptr<Hamiltonian> hamiltonian,
 
 Ansatz::Ansatz(const Ansatz& other)
     : _hamiltonian(other._hamiltonian), _wavefunction(other._wavefunction) {
+  QDK_LOG_TRACE_ENTERING();
+
   if (!_is_valid()) {
     throw std::invalid_argument("Tried to generate invalid Ansatz object.");
   }
 }
 
 Ansatz& Ansatz::operator=(const Ansatz& other) {
+  QDK_LOG_TRACE_ENTERING();
+
   if (this != &other) {
     _hamiltonian = other._hamiltonian;
     _wavefunction = other._wavefunction;
@@ -51,24 +61,38 @@ Ansatz& Ansatz::operator=(const Ansatz& other) {
 }
 
 std::shared_ptr<Hamiltonian> Ansatz::get_hamiltonian() const {
+  QDK_LOG_TRACE_ENTERING();
+
   if (!_hamiltonian) {
     throw std::runtime_error("Hamiltonian is not set");
   }
   return _hamiltonian;
 }
 
-bool Ansatz::has_hamiltonian() const { return _hamiltonian != nullptr; }
+bool Ansatz::has_hamiltonian() const {
+  QDK_LOG_TRACE_ENTERING();
+
+  return _hamiltonian != nullptr;
+}
 
 std::shared_ptr<Wavefunction> Ansatz::get_wavefunction() const {
+  QDK_LOG_TRACE_ENTERING();
+
   if (!_wavefunction) {
     throw std::runtime_error("Wavefunction is not set");
   }
   return _wavefunction;
 }
 
-bool Ansatz::has_wavefunction() const { return _wavefunction != nullptr; }
+bool Ansatz::has_wavefunction() const {
+  QDK_LOG_TRACE_ENTERING();
+
+  return _wavefunction != nullptr;
+}
 
 std::shared_ptr<Orbitals> Ansatz::get_orbitals() const {
+  QDK_LOG_TRACE_ENTERING();
+
   if (!has_hamiltonian()) {
     throw std::runtime_error("Hamiltonian is not available");
   }
@@ -76,11 +100,15 @@ std::shared_ptr<Orbitals> Ansatz::get_orbitals() const {
 }
 
 bool Ansatz::has_orbitals() const {
+  QDK_LOG_TRACE_ENTERING();
+
   return has_hamiltonian() && _hamiltonian->has_orbitals() &&
          has_wavefunction();
 }
 
 double Ansatz::calculate_energy() const {
+  QDK_LOG_TRACE_ENTERING();
+
   if (!_is_valid()) {
     throw std::runtime_error("Cannot calculate energy for invalid Ansatz");
   }
@@ -92,59 +120,159 @@ double Ansatz::calculate_energy() const {
         "calculation");
   }
 
-  // get 2 rdm from wavefunction
-  const auto& rdm2 = std::get<Eigen::VectorXd>(
-      _wavefunction->get_active_two_rdm_spin_traced());
-  const auto& rdm1 = std::get<Eigen::MatrixXd>(
-      _wavefunction->get_active_one_rdm_spin_traced());
-
-  // get integrals from hamiltonian
-  const auto& h1 = _hamiltonian->get_one_body_integrals();
-  const auto& h2 = _hamiltonian->get_two_body_integrals();
-
-  // check that active space indices are consistent
-  auto active_space_indices =
-      _wavefunction->get_orbitals()->get_active_space_indices();
-  if (active_space_indices.first.size() != active_space_indices.second.size()) {
-    throw std::runtime_error(
-        "Active space indices are inconsistent between Hamiltonian and "
-        "wavefunction");
-  }
-  size_t norb = active_space_indices.first.size();
-
-  // Compute energy expectation value
   double energy = 0.0;
 
-  // One-body contribution
-  for (int p = 0; p < norb; ++p) {
-    for (int q = 0; q < norb; ++q) {
-      energy += h1(p, q) * rdm1(q, p);
-    }
-  }
+  if (_hamiltonian->is_restricted()) {
+    // get 2 rdm from wavefunction
+    const auto& rdm2 = std::get<Eigen::VectorXd>(
+        _wavefunction->get_active_two_rdm_spin_traced());
+    const auto& rdm1 = std::get<Eigen::MatrixXd>(
+        _wavefunction->get_active_one_rdm_spin_traced());
 
-  // Two-body contribution
-  const size_t norb2 = norb * norb;
-  const size_t norb3 = norb * norb2;
-  for (int p = 0; p < norb; ++p) {
-    for (int q = 0; q < norb; ++q) {
-      for (int r = 0; r < norb; ++r) {
-        for (int s = 0; s < norb; ++s) {
-          size_t index_co = p * norb3 + q * norb2 + r * norb + s;
-          size_t index_dm = r * norb3 + s * norb2 + p * norb + q;
-          energy += 0.5 * h2(index_co) * rdm2(index_dm);
+    // get integrals from hamiltonian
+    const auto& [h1_a, h1_b] = _hamiltonian->get_one_body_integrals();
+    // get_two_body_integrals returns (aaaa, aabb, bbbb) tuple
+    const auto& [h2_aaaa, h2_aabb, h2_bbbb] =
+        _hamiltonian->get_two_body_integrals();
+    // For restricted case, all components are the same; use a and aaaa
+    const auto& h1 = h1_a;
+    const auto& h2 = h2_aaaa;
+
+    // check that active space indices are consistent
+    auto active_space_indices =
+        _wavefunction->get_orbitals()->get_active_space_indices();
+    if (active_space_indices.first.size() !=
+        active_space_indices.second.size()) {
+      throw std::runtime_error(
+          "Active space indices are inconsistent between Hamiltonian and "
+          "wavefunction");
+    }
+    size_t norb = active_space_indices.first.size();
+
+    // One-body contribution
+    for (int p = 0; p < norb; ++p) {
+      for (int q = 0; q < norb; ++q) {
+        energy += h1(p, q) * rdm1(q, p);
+      }
+    }
+
+    // Two-body contribution
+    const size_t norb2 = norb * norb;
+    const size_t norb3 = norb * norb2;
+    for (int p = 0; p < norb; ++p) {
+      for (int q = 0; q < norb; ++q) {
+        for (int r = 0; r < norb; ++r) {
+          for (int s = 0; s < norb; ++s) {
+            size_t index_co = p * norb3 + q * norb2 + r * norb + s;
+            size_t index_dm = r * norb3 + s * norb2 + p * norb + q;
+            energy += 0.5 * h2(index_co) * rdm2(index_dm);
+          }
         }
       }
     }
+
+    // core energy contribution
+    energy += _hamiltonian->get_core_energy();
   }
 
-  // core energy contribution
-  energy += _hamiltonian->get_core_energy();
-  std::cout << "Core energy: " << _hamiltonian->get_core_energy() << std::endl;
+  // Unrestricted case
+  else {
+    // Use spin-dependent RDMs for unrestricted case
+    const auto& [rdm1_aa_var, rdm1_bb_var] =
+        _wavefunction->get_active_one_rdm_spin_dependent();
+    const auto& [rdm2_aabb_var, rdm2_aaaa_var, rdm2_bbbb_var] =
+        _wavefunction->get_active_two_rdm_spin_dependent();
+
+    // Extract RDM matrices/vectors from variants
+    const auto& rdm1_aa = std::get<Eigen::MatrixXd>(rdm1_aa_var);
+    const auto& rdm1_bb = std::get<Eigen::MatrixXd>(rdm1_bb_var);
+    const auto& rdm2_aabb = std::get<Eigen::VectorXd>(rdm2_aabb_var);
+    const auto& rdm2_aaaa = std::get<Eigen::VectorXd>(rdm2_aaaa_var);
+    const auto& rdm2_bbbb = std::get<Eigen::VectorXd>(rdm2_bbbb_var);
+
+    // get one body integrals from hamiltonian
+    const auto& [h1_alpha, h1_beta] = _hamiltonian->get_one_body_integrals();
+
+    // get_two_body_integrals returns (aaaa, aabb, bbbb) tuple
+    const auto& [h2_aaaa, h2_aabb, h2_bbbb] =
+        _hamiltonian->get_two_body_integrals();
+
+    // check that active space indices are consistent
+    auto active_space_indices =
+        _wavefunction->get_orbitals()->get_active_space_indices();
+    if (active_space_indices.first.size() !=
+        active_space_indices.second.size()) {
+      throw std::runtime_error(
+          "Active space indices are inconsistent between Hamiltonian and "
+          "wavefunction");
+    }
+    size_t norb = active_space_indices.first.size();
+
+    // One-body contribution (alpha + beta)
+    for (int p = 0; p < norb; ++p) {
+      for (int q = 0; q < norb; ++q) {
+        // Alpha contribution
+        energy += h1_alpha(p, q) * rdm1_aa(q, p);
+        // Beta contribution
+        energy += h1_beta(p, q) * rdm1_bb(q, p);
+      }
+    }
+
+    // Two-body contribution - loop through spin channels
+    const size_t norb2 = norb * norb;
+    const size_t norb3 = norb * norb2;
+
+    // Alpha-alpha contribution (h2_aaaa)
+    for (int p = 0; p < norb; ++p) {
+      for (int q = 0; q < norb; ++q) {
+        for (int r = 0; r < norb; ++r) {
+          for (int s = 0; s < norb; ++s) {
+            size_t index_co = p * norb3 + q * norb2 + r * norb + s;
+            size_t index_dm = r * norb3 + s * norb2 + p * norb + q;
+            energy += 0.5 * h2_aaaa(index_co) * rdm2_aaaa(index_dm);
+          }
+        }
+      }
+    }
+
+    // Alpha-beta contribution (h2_aabb)
+    // Note: h2_aabb is stored as (ββ|αα), so indices are swapped
+    for (int p = 0; p < norb; ++p) {
+      for (int q = 0; q < norb; ++q) {
+        for (int r = 0; r < norb; ++r) {
+          for (int s = 0; s < norb; ++s) {
+            // h2_aabb is (ββ|αα) so access as (r,s,p,q) not (p,q,r,s)
+            size_t index_co = r * norb3 + s * norb2 + p * norb + q;
+            size_t index_dm = r * norb3 + s * norb2 + p * norb + q;
+            energy += h2_aabb(index_co) * rdm2_aabb(index_dm);
+          }
+        }
+      }
+    }
+
+    // Beta-beta contribution (h2_bbbb)
+    for (int p = 0; p < norb; ++p) {
+      for (int q = 0; q < norb; ++q) {
+        for (int r = 0; r < norb; ++r) {
+          for (int s = 0; s < norb; ++s) {
+            size_t index_co = p * norb3 + q * norb2 + r * norb + s;
+            size_t index_dm = r * norb3 + s * norb2 + p * norb + q;
+            energy += 0.5 * h2_bbbb(index_co) * rdm2_bbbb(index_dm);
+          }
+        }
+      }
+    }
+
+    // core energy contribution
+    energy += _hamiltonian->get_core_energy();
+  }
 
   return energy;
 }
 
 bool Ansatz::_is_valid() const {
+  QDK_LOG_TRACE_ENTERING();
+
   try {
     if (!has_hamiltonian() || !has_wavefunction()) {
       return false;
@@ -159,6 +287,8 @@ bool Ansatz::_is_valid() const {
 }
 
 void Ansatz::validate_orbital_consistency() const {
+  QDK_LOG_TRACE_ENTERING();
+
   if (!has_hamiltonian() || !has_wavefunction()) {
     throw std::runtime_error(
         "Cannot validate orbital consistency: missing Hamiltonian or "
@@ -194,9 +324,15 @@ void Ansatz::validate_orbital_consistency() const {
   }
 }
 
-void Ansatz::_validate_construction() const { validate_orbital_consistency(); }
+void Ansatz::_validate_construction() const {
+  QDK_LOG_TRACE_ENTERING();
+
+  validate_orbital_consistency();
+}
 
 std::string Ansatz::get_summary() const {
+  QDK_LOG_TRACE_ENTERING();
+
   std::ostringstream oss;
   oss << "=== Ansatz Summary ===\n";
 
@@ -240,6 +376,8 @@ std::string Ansatz::get_summary() const {
 
 void Ansatz::to_file(const std::string& filename,
                      const std::string& type) const {
+  QDK_LOG_TRACE_ENTERING();
+
   if (type == "json") {
     to_json_file(filename);
   } else if (type == "hdf5") {
@@ -252,6 +390,8 @@ void Ansatz::to_file(const std::string& filename,
 
 std::shared_ptr<Ansatz> Ansatz::from_file(const std::string& filename,
                                           const std::string& type) {
+  QDK_LOG_TRACE_ENTERING();
+
   if (type == "json") {
     return from_json_file(filename);
   } else if (type == "hdf5") {
@@ -263,6 +403,8 @@ std::shared_ptr<Ansatz> Ansatz::from_file(const std::string& filename,
 }
 
 void Ansatz::to_hdf5_file(const std::string& filename) const {
+  QDK_LOG_TRACE_ENTERING();
+
   // Validate filename
   if (filename.empty()) {
     throw std::runtime_error("Filename cannot be empty");
@@ -271,6 +413,8 @@ void Ansatz::to_hdf5_file(const std::string& filename) const {
 }
 
 std::shared_ptr<Ansatz> Ansatz::from_hdf5_file(const std::string& filename) {
+  QDK_LOG_TRACE_ENTERING();
+
   // Validate filename
   if (filename.empty()) {
     throw std::runtime_error("Filename cannot be empty");
@@ -279,6 +423,8 @@ std::shared_ptr<Ansatz> Ansatz::from_hdf5_file(const std::string& filename) {
 }
 
 void Ansatz::to_json_file(const std::string& filename) const {
+  QDK_LOG_TRACE_ENTERING();
+
   // Validate filename
   if (filename.empty()) {
     throw std::runtime_error("Filename cannot be empty");
@@ -287,6 +433,8 @@ void Ansatz::to_json_file(const std::string& filename) const {
 }
 
 std::shared_ptr<Ansatz> Ansatz::from_json_file(const std::string& filename) {
+  QDK_LOG_TRACE_ENTERING();
+
   // Validate filename
   if (filename.empty()) {
     throw std::runtime_error("Filename cannot be empty");
@@ -295,6 +443,8 @@ std::shared_ptr<Ansatz> Ansatz::from_json_file(const std::string& filename) {
 }
 
 nlohmann::json Ansatz::to_json() const {
+  QDK_LOG_TRACE_ENTERING();
+
   nlohmann::json j;
 
   // Store version first
@@ -321,6 +471,8 @@ nlohmann::json Ansatz::to_json() const {
 }
 
 std::shared_ptr<Ansatz> Ansatz::from_json(const nlohmann::json& j) {
+  QDK_LOG_TRACE_ENTERING();
+
   try {
     // Validate version first
     if (!j.contains("version")) {
@@ -371,40 +523,40 @@ std::shared_ptr<Ansatz> Ansatz::from_json(const nlohmann::json& j) {
       // Create restricted hamiltonian with wavefunction's orbitals
       Eigen::MatrixXd fock_matrix;
       if (original_hamiltonian->has_inactive_fock_matrix()) {
-        fock_matrix = original_hamiltonian->get_inactive_fock_matrix_alpha();
+        auto [fock_matrix, fock_matrix_beta] =
+            original_hamiltonian->get_inactive_fock_matrix();
       } else {
         // Use empty matrix if fock matrix is not set
         fock_matrix = Eigen::MatrixXd(0, 0);
       }
 
+      const auto& [h2_aaaa, h2_aabb, h2_bbbb] =
+          original_hamiltonian->get_two_body_integrals();
+      const auto& [h_aa, h_bb] = original_hamiltonian->get_one_body_integrals();
       new_hamiltonian = std::make_shared<Hamiltonian>(
-          original_hamiltonian->get_one_body_integrals(),
-          original_hamiltonian->get_two_body_integrals(), wavefunction_orbitals,
+          h_aa, h2_aaaa, wavefunction_orbitals,
           original_hamiltonian->get_core_energy(), fock_matrix,
           original_hamiltonian->get_type());
     } else {
       // Create unrestricted hamiltonian with wavefunction's orbitals
       Eigen::MatrixXd fock_matrix_alpha, fock_matrix_beta;
       if (original_hamiltonian->has_inactive_fock_matrix()) {
-        fock_matrix_alpha =
-            original_hamiltonian->get_inactive_fock_matrix_alpha();
-        fock_matrix_beta =
-            original_hamiltonian->get_inactive_fock_matrix_beta();
+        auto [fock_matrix_alpha, fock_matrix_beta] =
+            original_hamiltonian->get_inactive_fock_matrix();
       } else {
         // Use empty matrices if fock matrix is not set
         fock_matrix_alpha = Eigen::MatrixXd(0, 0);
         fock_matrix_beta = Eigen::MatrixXd(0, 0);
       }
 
+      const auto& [h2_aaaa, h2_aabb, h2_bbbb] =
+          original_hamiltonian->get_two_body_integrals();
+      const auto& [h_aa, h_bb] = original_hamiltonian->get_one_body_integrals();
+
       new_hamiltonian = std::make_shared<Hamiltonian>(
-          original_hamiltonian->get_one_body_integrals_alpha(),
-          original_hamiltonian->get_one_body_integrals_beta(),
-          original_hamiltonian->get_two_body_integrals_aaaa(),
-          original_hamiltonian->get_two_body_integrals_aabb(),
-          original_hamiltonian->get_two_body_integrals_bbbb(),
-          wavefunction_orbitals, original_hamiltonian->get_core_energy(),
-          fock_matrix_alpha, fock_matrix_beta,
-          original_hamiltonian->get_type());
+          h_aa, h_bb, h2_aaaa, h2_aabb, h2_bbbb, wavefunction_orbitals,
+          original_hamiltonian->get_core_energy(), fock_matrix_alpha,
+          fock_matrix_beta, original_hamiltonian->get_type());
     }
 
     // 4. Make ansatz with the new hamiltonian and the wavefunction
@@ -417,13 +569,15 @@ std::shared_ptr<Ansatz> Ansatz::from_json(const nlohmann::json& j) {
 }
 
 void Ansatz::_to_json_file(const std::string& filename) const {
+  QDK_LOG_TRACE_ENTERING();
+
   std::ofstream file(filename);
   if (!file.is_open()) {
     throw std::runtime_error("Failed to open file for writing: " + filename);
   }
 
   nlohmann::json j = to_json();
-  file << j.dump(2);  // Pretty print with 2-space indentation
+  file << j.dump(2);
   file.close();
 
   if (file.fail()) {
@@ -432,6 +586,8 @@ void Ansatz::_to_json_file(const std::string& filename) const {
 }
 
 std::shared_ptr<Ansatz> Ansatz::_from_json_file(const std::string& filename) {
+  QDK_LOG_TRACE_ENTERING();
+
   std::ifstream file(filename);
   if (!file.is_open()) {
     throw std::runtime_error(
@@ -451,6 +607,8 @@ std::shared_ptr<Ansatz> Ansatz::_from_json_file(const std::string& filename) {
 }
 
 void Ansatz::to_hdf5(H5::Group& group) const {
+  QDK_LOG_TRACE_ENTERING();
+
   try {
     // Write metadata
     H5::StrType string_type(H5::PredType::C_S1, H5T_VARIABLE);
@@ -483,6 +641,8 @@ void Ansatz::to_hdf5(H5::Group& group) const {
 }
 
 std::shared_ptr<Ansatz> Ansatz::from_hdf5(H5::Group& group) {
+  QDK_LOG_TRACE_ENTERING();
+
   try {
     // Validate version first
     if (!group.attrExists("version")) {
@@ -545,40 +705,40 @@ std::shared_ptr<Ansatz> Ansatz::from_hdf5(H5::Group& group) {
       // Create restricted Hamiltonian with wavefunction's orbitals
       Eigen::MatrixXd fock_matrix;
       if (original_hamiltonian->has_inactive_fock_matrix()) {
-        fock_matrix = original_hamiltonian->get_inactive_fock_matrix_alpha();
+        auto [fock_matrix, fock_matrix_beta] =
+            original_hamiltonian->get_inactive_fock_matrix();
       } else {
         // Use empty matrix if Fock matrix is not set
         fock_matrix = Eigen::MatrixXd(0, 0);
       }
 
+      const auto& [h2_aaaa, h2_aabb, h2_bbbb] =
+          original_hamiltonian->get_two_body_integrals();
+      const auto& [h_aa, h_bb] = original_hamiltonian->get_one_body_integrals();
       new_hamiltonian = std::make_shared<Hamiltonian>(
-          original_hamiltonian->get_one_body_integrals(),
-          original_hamiltonian->get_two_body_integrals(), wavefunction_orbitals,
+          h_aa, h2_aaaa, wavefunction_orbitals,
           original_hamiltonian->get_core_energy(), fock_matrix,
           original_hamiltonian->get_type());
     } else {
       // Create unrestricted Hamiltonian with wavefunction's orbitals
       Eigen::MatrixXd fock_matrix_alpha, fock_matrix_beta;
       if (original_hamiltonian->has_inactive_fock_matrix()) {
-        fock_matrix_alpha =
-            original_hamiltonian->get_inactive_fock_matrix_alpha();
-        fock_matrix_beta =
-            original_hamiltonian->get_inactive_fock_matrix_beta();
+        auto [fock_matrix_alpha, fock_matrix_beta] =
+            original_hamiltonian->get_inactive_fock_matrix();
       } else {
         // Use empty matrices if Fock matrix is not set
         fock_matrix_alpha = Eigen::MatrixXd(0, 0);
         fock_matrix_beta = Eigen::MatrixXd(0, 0);
       }
 
+      const auto& [h2_aaaa, h2_aabb, h2_bbbb] =
+          original_hamiltonian->get_two_body_integrals();
+      const auto& [h_aa, h_bb] = original_hamiltonian->get_one_body_integrals();
+
       new_hamiltonian = std::make_shared<Hamiltonian>(
-          original_hamiltonian->get_one_body_integrals_alpha(),
-          original_hamiltonian->get_one_body_integrals_beta(),
-          original_hamiltonian->get_two_body_integrals_aaaa(),
-          original_hamiltonian->get_two_body_integrals_aabb(),
-          original_hamiltonian->get_two_body_integrals_bbbb(),
-          wavefunction_orbitals, original_hamiltonian->get_core_energy(),
-          fock_matrix_alpha, fock_matrix_beta,
-          original_hamiltonian->get_type());
+          h_aa, h_bb, h2_aaaa, h2_aabb, h2_bbbb, wavefunction_orbitals,
+          original_hamiltonian->get_core_energy(), fock_matrix_alpha,
+          fock_matrix_beta, original_hamiltonian->get_type());
     }
 
     // 4. Make ansatz with the new Hamiltonian and the wavefunction
@@ -590,6 +750,8 @@ std::shared_ptr<Ansatz> Ansatz::from_hdf5(H5::Group& group) {
 }
 
 void Ansatz::_to_hdf5_file(const std::string& filename) const {
+  QDK_LOG_TRACE_ENTERING();
+
   try {
     H5::H5File file(filename, H5F_ACC_TRUNC);
     H5::Group ansatz_group = file.createGroup("/ansatz");
@@ -600,6 +762,12 @@ void Ansatz::_to_hdf5_file(const std::string& filename) const {
 }
 
 std::shared_ptr<Ansatz> Ansatz::_from_hdf5_file(const std::string& filename) {
+  QDK_LOG_TRACE_ENTERING();
+  // Disable HDF5 automatic error printing to stderr unless verbose mode
+  if (hdf5_errors_should_be_suppressed()) {
+    H5::Exception::dontPrint();
+  }
+
   H5::H5File file;
   try {
     file.openFile(filename, H5F_ACC_RDONLY);

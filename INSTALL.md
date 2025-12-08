@@ -29,6 +29,14 @@ Alternatively, you can click the green button in the bottom-left corner of VS Co
 
 ## Building from Source
 
+### Operating System Specific Notes
+
+**Linux**: We would recommend a Debian distribution due to the broad number of scientific computing packages available through apt. You may need to build certain dependencies from source (e.g. Eigen3, nlohmann-json) if using a distribution with more limited package availability.
+
+**Windows**: We do not currently provide native Windows support for building qdk-chemistry. If building the package on Windows, you will need to use the Windows Subsystem for Linux (WSL). Microsoft's [official installation instructions for WSL](https://learn.microsoft.com/en-us/windows/wsl/install) can guide you through the process of setting up WSL if you do not have it installed.
+
+**macOS**: To build qdk-chemistry on macOS, you will need the latest version of Xcode installed. If you do not already have it installed, it can be downloaded from the [App Store](https://apps.apple.com/us/app/xcode/id497799835?mt=12).
+
 ### Building the Python Package
 
 The easiest way to build and install the QDK/Chemistry python package from source is via `pip`.
@@ -121,7 +129,7 @@ cmake [...] -DCMAKE_PREFIX_PATH="/opt/openblas;/opt/hdf5"
 
 ## Dependencies
 
-**Disclaimer**: The list of dependencies listed in this file denotes the *direct* software dependencies of QDK/Chemistry. Each of these dependencies may come with dependencies of their own. The Component Governance Manifests for the [C++](cpp/manifest/qdk-chemistry/cgmanifest.json) and [Python](python/manifest/cgmanifest.json) libraries keep track of our current understanding of the complete dependency graph of QDK/Chemistry, but is subject to inaccuracies given changes in upstream dependencies. Please refer to the documentation of linked dependencies for more information of their respective dependency trees.
+**Disclaimer**: The list of dependencies listed in this file denotes the *direct* software dependencies of QDK/Chemistry. Each of these dependencies may come with dependencies of their own. The Component Governance Manifests for the [C++](cpp/manifest/qdk-chemistry/cgmanifest.json) and [Python](python/manifest/cgmanifest.json) libraries keep track of our current understanding of the complete dependency graph of QDK/Chemistry, but are subject to inaccuracies given changes in upstream dependencies. Please refer to the documentation of linked dependencies for more information of their respective dependency trees.
 
 ```txt
 TODO (DBWY): Flesh out DNF Installation instructions

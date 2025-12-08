@@ -31,7 +31,8 @@ def test_measurement_data_serialization():
 
     # Serialize to dictionary
     measurement_data_dict = measurement_data.to_dict()
-    assert len(measurement_data_dict) == 3
+    assert len(measurement_data_dict) == 4  # 3 measurements + version field
+    assert "version" in measurement_data_dict
     assert measurement_data_dict["0"]["hamiltonian"]["paulis"] == ["ZZ"]
     assert measurement_data_dict["0"]["shots"] == 10000
     assert measurement_data_dict["1"]["hamiltonian"]["paulis"] == ["IX"]

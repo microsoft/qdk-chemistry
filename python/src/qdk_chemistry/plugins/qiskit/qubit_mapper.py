@@ -18,9 +18,9 @@ from qiskit_nature.second_q.mappers import (
     ParityMapper,
 )
 
-from qdk_chemistry.algorithms import register
 from qdk_chemistry.algorithms.qubit_mapper import QubitMapper
 from qdk_chemistry.data import Hamiltonian, QubitHamiltonian, Settings
+from qdk_chemistry.utils import Logger
 
 __all__ = ["QiskitQubitMapper", "QiskitQubitMapperSettings"]
 
@@ -31,12 +31,21 @@ class QiskitQubitMapperSettings(Settings):
     QiskitQubitMapper-specific settings:
         encoding (string, default="jordan-wigner"): Qubit mapping strategy to use.
 
+            Valid options: "jordan-wigner", "bravyi-kitaev", "parity"
+
     """
 
     def __init__(self):
         """Initialize QiskitQubitMapperSettings."""
+        Logger.trace_entering()
         super().__init__()
-        self._set_default("encoding", "string", "jordan-wigner")
+        self._set_default(
+            "encoding",
+            "string",
+            "jordan-wigner",
+            "Qubit mapping strategy to use",
+            ["jordan-wigner", "bravyi-kitaev", "parity"],
+        )
 
 
 class QiskitQubitMapper(QubitMapper):
@@ -56,6 +65,7 @@ class QiskitQubitMapper(QubitMapper):
                 Default: "jordan-wigner".
 
         """
+        Logger.trace_entering()
         super().__init__()
         self._settings = QiskitQubitMapperSettings()
         self._settings.set("encoding", encoding)
@@ -70,6 +80,7 @@ class QiskitQubitMapper(QubitMapper):
             QubitHamiltonian: An instance of the QubitHamiltonian.
 
         """
+        Logger.trace_entering()
         encoding = self._settings.get("encoding")
         if encoding not in self.QubitMappers:
             raise ValueError(
@@ -77,8 +88,8 @@ class QiskitQubitMapper(QubitMapper):
                 f"Please use one of the following options: {self.QubitMappers.keys()}"
             )
 
-        h1_a = hamiltonian.get_one_body_integrals()
-        h2_aa = hamiltonian.get_two_body_integrals()
+        (h1_a, _) = hamiltonian.get_one_body_integrals()
+        (h2_aa, _, _) = hamiltonian.get_two_body_integrals()
         num_orbs = len(hamiltonian.get_orbitals().get_active_space_indices()[0])
         electronic_hamiltonian = ElectronicEnergy.from_raw_integrals(
             h1_a=h1_a, h2_aa=h2_aa.reshape(num_orbs, num_orbs, num_orbs, num_orbs)
@@ -90,7 +101,5 @@ class QiskitQubitMapper(QubitMapper):
 
     def name(self) -> str:
         """Return the algorithm name ``qiskit``."""
+        Logger.trace_entering()
         return "qiskit"
-
-
-register(lambda: QiskitQubitMapper())

@@ -10,6 +10,7 @@ import warnings
 from qiskit_aer.noise import NoiseModel, depolarizing_error
 
 from qdk_chemistry.noise_models import QuantumErrorProfile, SupportedErrorTypes
+from qdk_chemistry.utils import Logger
 
 __all__ = ["get_noise_model_from_profile"]
 
@@ -27,6 +28,7 @@ def get_noise_model_from_profile(
         Configured noise model based on profile
 
     """
+    Logger.trace_entering()
     noise_model = NoiseModel(basis_gates=quantum_error_profile.basis_gates)
 
     for gate, error_dict in quantum_error_profile.errors.items():

@@ -6,13 +6,17 @@
 
 #include <H5Cpp.h>
 
+#include <Eigen/Dense>
+#include <qdk/chemistry/utils/logger.hpp>
 #include <stdexcept>
 #include <string>
 #include <tuple>
+#include <variant>
 
 namespace qdk::chemistry::data {
 
 nlohmann::json matrix_to_json(const Eigen::MatrixXd& matrix) {
+  QDK_LOG_TRACE_ENTERING();
   nlohmann::json j = nlohmann::json::array();
   for (int row = 0; row < matrix.rows(); ++row) {
     nlohmann::json row_array = nlohmann::json::array();
@@ -25,6 +29,7 @@ nlohmann::json matrix_to_json(const Eigen::MatrixXd& matrix) {
 }
 
 nlohmann::json vector_to_json(const Eigen::VectorXd& vector) {
+  QDK_LOG_TRACE_ENTERING();
   nlohmann::json j = nlohmann::json::array();
   for (int i = 0; i < vector.size(); ++i) {
     j.push_back(vector(i));
@@ -32,7 +37,58 @@ nlohmann::json vector_to_json(const Eigen::VectorXd& vector) {
   return j;
 }
 
+nlohmann::json vector_variant_to_json(const VectorVariant& vec_var,
+                                      bool is_complex) {
+  QDK_LOG_TRACE_ENTERING();
+  nlohmann::json j_vec;
+  if (is_complex) {
+    const auto& vec_c = std::get<Eigen::VectorXcd>(vec_var);
+    for (int i = 0; i < vec_c.size(); ++i) {
+      j_vec.push_back({vec_c(i).real(), vec_c(i).imag()});
+    }
+    return j_vec;
+  } else {
+    const auto& vec_r = std::get<Eigen::VectorXd>(vec_var);
+    for (int i = 0; i < vec_r.size(); ++i) {
+      j_vec.push_back(vec_r(i));
+    }
+  }
+  return j_vec;
+}
+
+VectorVariant json_to_vector_variant(const nlohmann::json& j_vec,
+                                     bool is_complex = false) {
+  QDK_LOG_TRACE_ENTERING();
+  VectorVariant vec_var;
+  if (is_complex) {
+    if (!j_vec.is_array() || j_vec.empty() || !j_vec[0].is_array()) {
+      throw std::runtime_error(
+          "Invalid complex format: expected array of [real, imag] pairs");
+    }
+    Eigen::VectorXcd vec(j_vec.size());
+    for (size_t i = 0; i < j_vec.size(); ++i) {
+      if (j_vec[i].size() != 2) {
+        throw std::runtime_error(
+            "Invalid complex format: expected array of [real, imag] pairs");
+      }
+      vec(i) = std::complex<double>(j_vec[i][0], j_vec[i][1]);
+    }
+    vec_var = vec;
+  } else {
+    if (!j_vec.is_array()) {
+      throw std::runtime_error("Invalid format: expected array of numbers");
+    }
+    Eigen::VectorXd vec(j_vec.size());
+    for (size_t i = 0; i < j_vec.size(); ++i) {
+      vec(i) = j_vec[i];
+    }
+    vec_var = vec;
+  }
+  return vec_var;
+}
+
 Eigen::MatrixXd json_to_matrix(const nlohmann::json& j) {
+  QDK_LOG_TRACE_ENTERING();
   if (!j.is_array() || j.empty()) {
     throw std::invalid_argument(
         "JSON must be a non-empty array for matrix conversion");
@@ -55,6 +111,7 @@ Eigen::MatrixXd json_to_matrix(const nlohmann::json& j) {
 }
 
 Eigen::VectorXd json_to_vector(const nlohmann::json& j) {
+  QDK_LOG_TRACE_ENTERING();
   if (!j.is_array()) {
     throw std::invalid_argument("JSON must be an array for vector conversion");
   }
@@ -69,6 +126,7 @@ Eigen::VectorXd json_to_vector(const nlohmann::json& j) {
 
 std::tuple<int, int, int> parse_version_string(
     const std::string& version_string) {
+  QDK_LOG_TRACE_ENTERING();
   // Expected format: "major.minor.patch"
   std::size_t first_dot = version_string.find('.');
   std::size_t second_dot = version_string.find('.', first_dot + 1);
@@ -95,6 +153,7 @@ std::tuple<int, int, int> parse_version_string(
 
 void validate_serialization_version(const std::string& expected_version,
                                     const std::string& found_version) {
+  QDK_LOG_TRACE_ENTERING();
   if (expected_version == found_version) {
     return;  // Exact match is always valid
   }

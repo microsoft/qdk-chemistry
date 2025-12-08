@@ -27,8 +27,6 @@ CFLAGS=${CFLAGS} ./configure \
     --disable-shared \
     --enable-static \
     --prefix=${INSTALL_PREFIX} \
-    --blas-int-size=32 \
-    --int-size=32 \
     $BLIS_ARCH
 
 make -j$(nproc)

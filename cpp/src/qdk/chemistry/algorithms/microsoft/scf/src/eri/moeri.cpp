@@ -10,6 +10,7 @@
 #endif
 #include <Eigen/Core>
 #include <blas.hh>
+#include <qdk/chemistry/utils/logger.hpp>
 
 namespace qdk::chemistry::scf {
 MOERI::MOERI(std::shared_ptr<ERI> eri)
@@ -19,10 +20,14 @@ MOERI::MOERI(std::shared_ptr<ERI> eri)
       handle_(std::make_shared<cutensor::TensorHandle>())
 #endif
 {
+  QDK_LOG_TRACE_ENTERING();
 }
+
 MOERI::~MOERI() noexcept = default;
 
-void MOERI::compute(size_t nb, size_t nt, const double* C, double* out) {
+void MOERI::compute(size_t nb, size_t nt, const double* Ci, const double* Cj,
+                    const double* Ck, const double* Cl, double* out) {
+  QDK_LOG_TRACE_ENTERING();
   if (nt > nb)
     throw std::runtime_error(
         "MOERI does not support num_molecular_orbitals > num_atomic_orbitals");
@@ -35,12 +40,22 @@ void MOERI::compute(size_t nb, size_t nt, const double* C, double* out) {
 #ifdef QDK_CHEMISTRY_ENABLE_GPU
 
   // Compute first quarter transformation via some "good" technique
-  eri_->quarter_trans(nt, C, tmp1.data());
-
+  eri_->quarter_trans(nt, Ci, tmp1.data());
   auto tmp1_d = cuda::alloc<double>(nt * nb * nb * nb);
   auto tmp2_d = cuda::alloc<double>(nt * nt * nb * nb);
-  auto C_d = cuda::alloc<double>(nb * nt);
-  CUDA_CHECK(cudaMemcpy(C_d->data(), C, nb * nt * sizeof(double),
+  auto Ci_d = cuda::alloc<double>(nb * nt);
+  auto Cj_d = cuda::alloc<double>(nb * nt);
+  auto Ck_d = cuda::alloc<double>(nb * nt);
+  auto Cl_d = cuda::alloc<double>(nb * nt);
+
+  // Copy all transformation matrices to device
+  CUDA_CHECK(cudaMemcpy(Ci_d->data(), Ci, nb * nt * sizeof(double),
+                        cudaMemcpyHostToDevice));
+  CUDA_CHECK(cudaMemcpy(Cj_d->data(), Cj, nb * nt * sizeof(double),
+                        cudaMemcpyHostToDevice));
+  CUDA_CHECK(cudaMemcpy(Ck_d->data(), Ck, nb * nt * sizeof(double),
+                        cudaMemcpyHostToDevice));
+  CUDA_CHECK(cudaMemcpy(Cl_d->data(), Cl, nb * nt * sizeof(double),
                         cudaMemcpyHostToDevice));
 
   CUDA_CHECK(cudaMemcpy(tmp1_d->data(), tmp1.data(),
@@ -83,47 +98,56 @@ void MOERI::compute(size_t nb, size_t nt, const double* C, double* out) {
   auto q4cont = std::make_shared<cutensor::ContractionData>(
       handle_, q3desc, q3_ind, matdesc, mat_ind, q4desc, q4_ind);
 
-  q2cont->contract(1.0, tmp1_d->data(), C_d->data(), 0.0, tmp2_d->data());
-  q3cont->contract(1.0, tmp2_d->data(), C_d->data(), 0.0, tmp1_d->data());
-  q4cont->contract(1.0, tmp1_d->data(), C_d->data(), 0.0, tmp2_d->data());
+  // Use different C matrices for each quarter transformation
+  q2cont->contract(1.0, tmp1_d->data(), Cj_d->data(), 0.0, tmp2_d->data());
+  q3cont->contract(1.0, tmp2_d->data(), Ck_d->data(), 0.0, tmp1_d->data());
+  q4cont->contract(1.0, tmp1_d->data(), Cl_d->data(), 0.0, tmp2_d->data());
 
   CUDA_CHECK(cudaMemcpy(out, tmp2_d->data(), nt * nt * nt * nt * sizeof(double),
                         cudaMemcpyDeviceToHost));
 #else  // QDK_CHEMISTRY_ENABLE_GPU
 
-  Eigen::Map<const RowMajorMatrix> C_rm(C, nb, nt);
+  // Eigen::Map<const RowMajorMatrix> C_rm(C, nb, nt);
+  //  Create Eigen maps for all four coefficient matrices
+  Eigen::Map<const RowMajorMatrix> Ci_rm(Ci, nb, nt);
+  Eigen::Map<const RowMajorMatrix> Cj_rm(Cj, nb, nt);
+  Eigen::Map<const RowMajorMatrix> Ck_rm(Ck, nb, nt);
+  Eigen::Map<const RowMajorMatrix> Cl_rm(Cl, nb, nt);
+
   // Compute first quarter transformation via some "good" technique
-  eri_->quarter_trans(nt, C_rm.data(), tmp1.data());
+  eri_->quarter_trans(nt, Ci_rm.data(), tmp1.data());
 
   // All the following conversion use col major C
-  Eigen::MatrixXd C_cm = C_rm;
+  Eigen::MatrixXd Cj_cm = Cj_rm;
+  Eigen::MatrixXd Ck_cm = Ck_rm;
+  Eigen::MatrixXd Cl_cm = Cl_rm;
 
   // 2nd Quarter
-  // TMP2(p,q,k,l) = C(j,q) * TMP1(p,j,k,l)
-  // TMP2_kl(p,q)  = TMP1_kl(p,j) * C(j,q)
+  // TMP2(p,q,k,l) = Cj(j,q) * TMP1(p,j,k,l)
+  // TMP2_kl(p,q)  = TMP1_kl(p,j) * Cj(j,q)
   for (size_t kl = 0; kl < nb2; ++kl) {
     auto TMP1_kl = tmp1.data() + kl * nb * nt;
     auto TMP2_kl = tmp2.data() + kl * nt2;
     blas::gemm(blas::Layout::ColMajor, blas::Op::NoTrans, blas::Op::NoTrans, nt,
-               nt, nb, 1.0, TMP1_kl, nt, C_cm.data(), nb, 0.0, TMP2_kl, nt);
+               nt, nb, 1.0, TMP1_kl, nt, Cj_cm.data(), nb, 0.0, TMP2_kl, nt);
   }
 
   // 3rd Quarter
-  // TMP1(p,q,r,l) = C(k,r) * TMP2(p,q,k,l)
-  // TMP1_l(pq,r)  = TMP2_l(pq,k) * C(k,r)
+  // TMP1(p,q,r,l) = Ck(k,r) * TMP2(p,q,k,l)
+  // TMP1_l(pq,r)  = TMP2_l(pq,k) * Ck(k,r)
   for (size_t l = 0; l < nb; ++l) {
     auto TMP2_l = tmp2.data() + l * nt2 * nb;
     auto TMP1_l = tmp1.data() + l * nt3;
     blas::gemm(blas::Layout::ColMajor, blas::Op::NoTrans, blas::Op::NoTrans,
-               nt2, nt, nb, 1.0, TMP2_l, nt2, C_cm.data(), nb, 0.0, TMP1_l,
+               nt2, nt, nb, 1.0, TMP2_l, nt2, Ck_cm.data(), nb, 0.0, TMP1_l,
                nt2);
   }
 
   // 4th Quarter
-  // Y(p,q,r,s) = C(l,s) * TMP1(p,q,r,l)
-  // Y(pqr,s) = V(pqr,l) * C(l,s)
+  // Y(p,q,r,s) = Cl(l,s) * TMP1(p,q,r,l)
+  // Y(pqr,s) = V(pqr,l) * Cl(l,s)
   blas::gemm(blas::Layout::ColMajor, blas::Op::NoTrans, blas::Op::NoTrans, nt3,
-             nt, nb, 1.0, tmp1.data(), nt3, C_cm.data(), nb, 0.0, out, nt3);
+             nt, nb, 1.0, tmp1.data(), nt3, Cl_cm.data(), nb, 0.0, out, nt3);
 
 #endif  // QDK_CHEMISTRY_ENABLE_GPU
 }

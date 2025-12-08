@@ -174,8 +174,6 @@ enum class Element : unsigned {
  * - Serialization: JSON read/write uses Bohr for coordinates.
  * - XYZ I/O: XYZ files are read/written in Angstrom (according to their
  *   standard) and converted at the API boundary.
- * - Constructors/add_atom: constructors and add_atom expect coordinates in
- *   Bohr.
  */
 class Structure : public DataClass,
                   public std::enable_shared_from_this<Structure> {

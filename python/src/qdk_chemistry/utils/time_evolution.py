@@ -12,6 +12,8 @@ from typing import TYPE_CHECKING
 
 import numpy as np
 
+from qdk_chemistry.utils import Logger
+
 if TYPE_CHECKING:
     from collections.abc import Iterable, Sequence
 
@@ -71,6 +73,7 @@ def pauli_evolution_terms(pauli_op: SparsePauliOp, *, atol: float = 1e-12) -> li
         ValueError: If a coefficient has an imaginary part whose magnitude exceeds ``atol``.
 
     """
+    Logger.trace_entering()
     terms: list[PauliEvolutionTerm] = []
     for pauli, coeff in zip(pauli_op.paulis, pauli_op.coeffs, strict=True):
         if abs(coeff) < atol:
@@ -106,6 +109,7 @@ def controlled_pauli_rotation(
         The quantum circuit with the controlled rotation appended.
 
     """
+    Logger.trace_entering()
     if not term.pauli_map:
         # Identity contribution results in a controlled phase on the ancilla.
         circuit.p(-angle, control_qubit)
@@ -166,6 +170,7 @@ def append_controlled_time_evolution(
         ValueError: If ``power`` is less than 1.
 
     """
+    Logger.trace_entering()
     if power < 1:
         raise ValueError("power must be at least 1 for controlled time evolution.")
 
@@ -193,4 +198,5 @@ def extract_terms_from_hamiltonian(hamiltonian: QubitHamiltonian) -> list[PauliE
         List of :class:`PauliEvolutionTerm` entries representing the Hamiltonian.
 
     """
+    Logger.trace_entering()
     return pauli_evolution_terms(hamiltonian.pauli_ops)
