@@ -7,10 +7,7 @@
 
 ################################################################################
 # start-cell-get-settings
-import os
-import tempfile
-import qdk_chemistry
-from qdk_chemistry.algorithms import available, create
+from qdk_chemistry.algorithms import create
 from qdk_chemistry.data import Settings
 
 # Create an algorithm
@@ -22,19 +19,15 @@ settings = scf_solver.settings()
 # Get a parameter
 max_iter = settings.get("max_iterations")
 print(f"Max iterations: {max_iter}")
-
 # end-cell-get-settings
 ################################################################################
 
 ################################################################################
 # start-cell-set-settings
-# Create an algorithm
-scf_solver = create("scf_solver")
-
 # Get the settings object
 settings = scf_solver.settings()
 
-# Set a integer value
+# Set an integer value
 settings.set("max_iterations", 100)
 
 # Set a string value
@@ -46,46 +39,30 @@ settings.set("convergence_threshold", 1.0e-8)
 ################################################################################
 
 ################################################################################
-# start-cell-get-settings
-# View all settings
-# List available implementations for each algorithm type
-for algorithm_name in available():
-    print(f"{algorithm_name} has methods:")
-    for method_name in available(algorithm_name):
-        print(f"  {method_name} has settings:")
-        method_ = create(algorithm_name, method_name)
-        settings_ = method_.settings()
-        for key, value in settings_.items():
-            print(f"    {key}: {value}")
-# end-cell-get-settings
+# start-cell-factory-settings
+from qdk_chemistry.algorithms import create  # noqa E402
+
+# Pass settings directly to create() as keyword arguments
+scf_solver = create(
+    "scf_solver",
+    max_iterations=100,
+    basis_set="def2-tzvp",
+    convergence_threshold=1.0e-8,
+)
+
+# This is equivalent to:
+# scf_solver = create("scf_solver")
+# scf_solver.settings().set("max_iterations", 100)
+# scf_solver.settings().set("basis_set", "def2-tzvp")
+# scf_solver.settings().set("convergence_threshold", 1.0e-8)
+# end-cell-factory-settings
 ################################################################################
 
 ################################################################################
 # start-cell-misc-settings
 # Check if a setting exists
 if settings.has("basis_set"):
-    # Use the setting
     print(f"Basis set is configured: {settings.get('basis_set')}")
-
-# Check if a setting exists (Python duck typing, no type check needed)
-if settings.has("convergence_threshold"):
-    # Use the setting
-    print(f"Convergence threshold: {settings.get('convergence_threshold')}")
-
-# List the available settings
-print("Available settings:", settings)
-
-# Try to get a value (Python uses get_or_default or try/except)
-try:
-    value = settings.get("convergence_threshold")
-    # Use the value
-    print(f"Got convergence threshold: {value}")
-except KeyError:
-    print("convergence_threshold not found")
-
-# Check if settings exist
-if settings.has("max_iterations"):
-    print("max_iterations setting exists")
 
 # Get with default fallback
 custom_param = settings.get_or_default("my_custom_param", 42)
@@ -99,9 +76,6 @@ count = settings.size()
 
 # Check if settings are empty
 is_empty = settings.empty()
-
-# Clear all settings
-settings = scf_solver.settings()  # Re-initialize to clear
 
 # Validate that required settings exist
 settings.validate_required(["basis_set", "convergence_threshold"])
@@ -119,38 +93,40 @@ type_name = settings.get_type_name("convergence_threshold")
 
 ################################################################################
 # start-cell-serialization
-# Serialization
+import os  # noqa E402
+import tempfile  # noqa E402
+
 tmpdir = tempfile.mkdtemp()
 os.chdir(tmpdir)
+
 # Save settings to JSON file
 settings.to_json_file("configuration.settings.json")
 
 # Load settings from JSON file
-settings_from_json_file = settings.from_json_file("configuration.settings.json")
+settings_from_json_file = Settings.from_json_file("configuration.settings.json")
 
-# Generic file I/O with JSON format
+# Generic file I/O with specified format
 settings.to_file("configuration.settings.json", "json")
-settings_from_file = settings.from_file("configuration.settings.json", "json")
+settings_from_file = Settings.from_file("configuration.settings.json", "json")
 
-# Convert to JSON object
+# Convert to JSON string
 json_data = settings.to_json()
 
-# Load from JSON object
-settings_from_json = settings.from_json(json_data)
+# Load from JSON string
+settings_from_json = Settings.from_json(json_data)
 # end-cell-serialization
 ################################################################################
 
 
 ################################################################################
 # start-cell-extend-settings
-## Extending Settings class
 class MySettings(Settings):
     def __init__(self):
         super().__init__()
-        # Set default values during initialization
-        self.set_default("max_iterations", 100)
-        self.set_default("convergence_threshold", 1e-6)
-        self.set_default("method", "default")
+        # Set default values during construction
+        self._set_default("max_iterations", "int", 100)
+        self._set_default("convergence_threshold", "double", 1e-6)
+        self._set_default("method", "string", "default")
 
 
 # end-cell-extend-settings
@@ -158,12 +134,14 @@ class MySettings(Settings):
 
 ################################################################################
 # start-cell-settings-errors
+import qdk_chemistry  # noqa E402
+
 # Error handling example
 try:
     value = settings.get("non_existent_setting")
 except qdk_chemistry.data.SettingNotFound as e:
     print(e)  # "Setting not found: non_existent_setting"
-    # Don't exit; use a fallback and continue execution
-    value = settings.get_or_default("non_existent_setting", None)
+    # Use a fallback and continue execution
+    value = settings.get_or_default("non_existent_setting", 0.0)
 # end-cell-settings-errors
 ################################################################################
