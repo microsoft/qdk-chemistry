@@ -31,6 +31,7 @@ def get_top_determinants(
         A dictionary containing (Configuration, CI coefficient) pairs consisting of the top determinants.
 
     """
+    Logger.trace_entering()
     coefficients = list(wavefunction.get_coefficients())
     determinants = wavefunction.get_active_determinants()
     pairs = sorted(zip(coefficients, determinants, strict=True), key=lambda pair: -abs(pair[0]))
@@ -50,6 +51,7 @@ def get_active_determinants_info(wavefunction: Wavefunction, max_determinants: i
         A formatted string listing CI coefficients and their corresponding configurations.
 
     """
+    Logger.trace_entering()
     info_str = ""
     info_str += f"Stored wavefunction with {wavefunction.size()} determinants\n"
     info_str += "Determinants:\n"
@@ -93,6 +95,7 @@ def calculate_sparse_wavefunction(
         Energy value and a Wavefunction object representing the sparse-CI wavefunction.
 
     """
+    Logger.trace_entering()
     ranked = get_top_determinants(reference_wavefunction, max_determinants)
     if not ranked:
         Logger.warn("No determinants found; returning an empty wavefunction.")

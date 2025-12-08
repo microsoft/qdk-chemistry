@@ -69,6 +69,7 @@ class IterativePhaseEstimation(PhaseEstimation):
             evolution_time: Time parameter ``t`` used in the time-evolution unitary ``U = exp(-i H t)``.
 
         """
+        Logger.trace_entering()
         super().__init__(hamiltonian, evolution_time)
         self._terms: list[PauliEvolutionTerm] = extract_terms_from_hamiltonian(hamiltonian)
         Logger.debug(
@@ -114,6 +115,7 @@ class IterativePhaseEstimation(PhaseEstimation):
             system qubits, and classical measurement register.
 
         """
+        Logger.trace_entering()
         _validate_iteration_inputs(iteration, total_iterations)
         self._validate_state_prep_qubits(state_prep)
 
@@ -190,6 +192,7 @@ class IterativePhaseEstimation(PhaseEstimation):
             and phase correction.
 
         """
+        Logger.trace_entering()
         circuit = self.create_iteration_circuit(
             state_prep,
             iteration=iteration,
@@ -246,6 +249,7 @@ class IterativePhaseEstimation(PhaseEstimation):
                 does not match ``num_bits``.
 
         """
+        Logger.trace_entering()
         if num_bits <= 0:
             raise ValueError("num_bits must be a positive integer.")
 

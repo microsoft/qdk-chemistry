@@ -52,6 +52,7 @@ class TraditionalPhaseEstimation(PhaseEstimation):
                 ordered from most-significant to least-significant bit.
 
         """
+        Logger.trace_entering()
         super().__init__(hamiltonian, evolution_time)
         self._terms: list[PauliEvolutionTerm] = extract_terms_from_hamiltonian(hamiltonian)
         self._qft_do_swaps = qft_do_swaps
@@ -69,6 +70,7 @@ class TraditionalPhaseEstimation(PhaseEstimation):
         include_measurement: bool = True,
     ) -> QuantumCircuit:
         """Build the traditional QPE circuit."""
+        Logger.trace_entering()
         if num_bits <= 0:
             raise ValueError("num_bits must be a positive integer.")
 

@@ -36,6 +36,7 @@ import numpy as np
 
 if TYPE_CHECKING:
     from qdk_chemistry.data import Configuration
+from qdk_chemistry.utils import Logger
 
 __all__ = [
     "binary_string_to_configuration",
@@ -65,6 +66,7 @@ def separate_alpha_beta_to_binary_string(input_string: str) -> tuple[str, str]:
         A tuple containing the alpha and beta bitstrings.
 
     """
+    Logger.trace_entering()
     n = len(input_string)
     alpha_string = ""
     beta_string = ""
@@ -96,6 +98,7 @@ def binary_string_to_configuration(bitstring: str) -> Configuration:
         Configuration object corresponding to the binary string.
 
     """
+    Logger.trace_entering()
     from qdk_chemistry.data import Configuration  # noqa: PLC0415
 
     if len(bitstring) % 2 != 0:
@@ -132,6 +135,7 @@ def binary_to_decimal(binary: str | list, reverse=False) -> int:
         ValueError: If the input is neither a string nor a list.
 
     """
+    Logger.trace_entering()
     if reverse:
         binary = binary[::-1]
     if isinstance(binary, str):
@@ -175,6 +179,7 @@ def bitstrings_to_binary_matrix(bitstrings: list[str]) -> np.ndarray:
          [1 0]] # q[2]
 
     """
+    Logger.trace_entering()
     if not bitstrings:
         raise ValueError("Bitstrings list cannot be empty")
 

@@ -28,6 +28,7 @@ class QDKEnergyEstimatorSettings(Settings):
 
     def __init__(self):
         """Initialize QDKEnergyEstimatorSettings."""
+        Logger.trace_entering()
         super().__init__()
         self._set_default("seed", "int", 42)
         self._set_default("qubit_loss", "double", 0.0)
@@ -52,6 +53,7 @@ class QDKEnergyEstimator(EnergyEstimator):
             qubit_loss: Probability of qubit loss in simulation.
 
         """
+        Logger.trace_entering()
         super().__init__()
         self._settings = QDKEnergyEstimatorSettings()
         self._settings.set("seed", seed)
@@ -153,6 +155,7 @@ class QDKEnergyEstimator(EnergyEstimator):
             * Only one circuit is supported per run.
 
         """
+        Logger.trace_entering()
         num_observables = len(qubit_hamiltonians)
         if total_shots < num_observables:
             raise ValueError(

@@ -45,6 +45,7 @@ def analyze_qubit_status(circuit: QuantumCircuit) -> dict[int, str]:
         A summary of qubit roles indexed by qubit index.
 
     """
+    Logger.trace_entering()
     dag = circuit_to_dag(circuit)
 
     # Setup data structures to track qubit status and two-qubit gates for propagation.
@@ -132,6 +133,7 @@ class CircuitInfo:
 
     def __post_init__(self):
         """Post-initialization to compute circuit properties."""
+        Logger.trace_entering()
         self.num_qubits = self.circuit.num_qubits
         self.depth = self.circuit.depth()
         self.gate_counts = Counter(self.circuit.count_ops())
@@ -139,10 +141,12 @@ class CircuitInfo:
 
     def count_gate_category(self, gate_list: frozenset[str]) -> int:
         """Return the number of gates in the circuit that belong to a list."""
+        Logger.trace_entering()
         return sum(self.gate_counts.get(g, 0) for g in gate_list)
 
     def count_gate(self, gate_name: str) -> int:
         """Return the number of times a specific gate appears."""
+        Logger.trace_entering()
         return self.gate_counts.get(gate_name.lower(), 0)
 
     @property
@@ -161,6 +165,7 @@ class CircuitInfo:
         return self.count_gate_category(NON_CLIFFORD_GATES)
 
     def summary(self) -> dict:
+        Logger.trace_entering()
         """Return a summary of the circuit information."""
         return {
             "num_qubits": self.num_qubits,
@@ -173,6 +178,7 @@ class CircuitInfo:
 
     def __str__(self) -> str:
         """Nicely formatted summary for printing."""
+        Logger.trace_entering()
         s = self.summary()
         return (
             f"Circuit info summary:\n"
@@ -196,6 +202,7 @@ def plot_circuit_diagram(
 
     Ensures measurement targets and classical registers remain consistent.
     """
+    Logger.trace_entering()
     status = analyze_qubit_status(circuit)
     remove_status = []
     if remove_idle_qubits:

@@ -92,6 +92,7 @@ def list_constants(show_values: bool = True, show_units: bool = True) -> None:
         >>> list_constants(show_values=False)  # Just names and descriptions
 
     """
+    Logger.trace_entering()
     constants_info = get_constants_info()
 
     constants_info_string = "\nQDK/Chemistry Physical Constants (CODATA 2018)\n"
@@ -155,6 +156,7 @@ def find_constant(search_term: str) -> dict:
         >>> find_constant("energy")
 
     """
+    Logger.trace_entering()
     constants_info = get_constants_info()
     matches = {}
 
@@ -182,6 +184,7 @@ def show_constant_details(name: str) -> None:
         >>> show_constant_details('fine_structure_constant')
 
     """
+    Logger.trace_entering()
     try:
         info = get_constant_info(name)
         constant_details_string = f"\nConstant: {info.name}\n"

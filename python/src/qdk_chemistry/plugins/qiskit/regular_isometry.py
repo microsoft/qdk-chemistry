@@ -33,6 +33,7 @@ class RegularIsometryStatePreparation(StatePreparation):
 
     def __init__(self):
         """Initialize the RegularIsometryStatePreparation."""
+        Logger.trace_entering()
         super().__init__()
         self._settings = StatePreparationSettings()
 
@@ -46,6 +47,7 @@ class RegularIsometryStatePreparation(StatePreparation):
             A Circuit object containing a QASM string representation of the quantum circuit.
 
         """
+        Logger.trace_entering()
         # Active Space Consistency Check
         alpha_indices, beta_indices = wavefunction.get_orbitals().get_active_space_indices()
         if alpha_indices != beta_indices:
@@ -98,4 +100,5 @@ class RegularIsometryStatePreparation(StatePreparation):
 
     def name(self) -> str:
         """Return the name of the state preparation method."""
+        Logger.trace_entering()
         return "regular_isometry"

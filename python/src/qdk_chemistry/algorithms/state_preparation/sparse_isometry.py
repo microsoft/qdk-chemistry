@@ -81,6 +81,7 @@ class SparseIsometryGF2XStatePreparation(StatePreparation):
 
     def __init__(self):
         """Initialize the SparseIsometryGF2XStatePreparation."""
+        Logger.trace_entering()
         super().__init__()
         self._settings = StatePreparationSettings()
 
@@ -94,6 +95,7 @@ class SparseIsometryGF2XStatePreparation(StatePreparation):
             A Circuit object containing an OpenQASM3 string of the quantum circuit that prepares the wavefunction.
 
         """
+        Logger.trace_entering()
         # Imported here to avoid circular import issues
         from qdk_chemistry.plugins.qiskit._interop.transpiler import (  # noqa: PLC0415
             MergeZBasisRotations,
@@ -238,6 +240,7 @@ class SparseIsometryGF2XStatePreparation(StatePreparation):
 
     def name(self) -> str:
         """Return the name of the state preparation method."""
+        Logger.trace_entering()
         return "sparse_isometry_gf2x"
 
 
@@ -265,6 +268,7 @@ def _prepare_single_reference_state(bitstring: str) -> Circuit:
           (qubit 3, corresponds to leftmost bit '1')
 
     """
+    Logger.trace_entering()
     # Input validation
     if not bitstring:
         raise ValueError("Bitstring cannot be empty")
@@ -330,6 +334,7 @@ def gf2x_with_tracking(matrix: np.ndarray) -> GF2XEliminationResult:
         A dataclass containing GF2+X elimination results.
 
     """
+    Logger.trace_entering()
     n_rows, n_cols = matrix.shape
     row_map = list(range(n_rows))
     col_map = list(range(n_cols))

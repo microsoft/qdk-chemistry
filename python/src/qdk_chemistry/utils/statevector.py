@@ -15,6 +15,7 @@ if TYPE_CHECKING:
 import numpy as np
 
 from qdk_chemistry.utils.bitstring import binary_to_decimal, separate_alpha_beta_to_binary_string
+from qdk_chemistry.utils import Logger
 
 __all__ = ["create_statevector_from_wavefunction"]
 
@@ -37,6 +38,7 @@ def _create_statevector_from_coeffs_and_dets_string(
         A complex numpy array to represent the statevector.
 
     """
+    Logger.trace_entering()
     if len(coeffs) != len(dets_string):
         raise ValueError("Number of coefficients must match number of bitstrings.")
     statevector = np.zeros(2**num_qubits, dtype=complex)
@@ -70,6 +72,7 @@ def create_statevector_from_wavefunction(
         A complex numpy array to represent the statevector.
 
     """
+    Logger.trace_entering()
     orbitals = wavefunction.get_orbitals()
     active_orbital_indices, _ = orbitals.get_active_space_indices()
     num_orbs = len(active_orbital_indices)
