@@ -1,7 +1,7 @@
 Serialization
 =============
 
-QDK/Chemistry provides serialization capabilities for all its data classes, allowing you to save and load computational results in various formats.
+QDK/Chemistry provides serialization capabilities for all its data classes, allowing to save and load computational results in various formats.
 This document explains the serialization mechanisms and formats supported by QDK/Chemistry.
 
 Overview
@@ -14,10 +14,6 @@ In QDK/Chemistry, this is crucial for:
 - Sharing data between different programs or languages
 - Preserving computational results for future analysis
 - Implementing checkpoint and restart capabilities
-
-.. note::
-   For detailed information about the structure and organization of serialized data for each class, refer to the corresponding class documentation.
-   Each data class page includes examples of the JSON and HDF5 schema used for serialization.
 
 Supported formats
 -----------------
@@ -97,17 +93,19 @@ QDK/Chemistry enforces specific file extensions to ensure clarity about the cont
      - ``.hamiltonian.json``
      - ``.hamiltonian.h5``
      - ``hamiltonian.fcidump``
-   * - :class:`~qdk_chemistry.data.Wavefunction`
+   * - :doc:`Wavefunction <../data/wavefunction>`
      - ``.wavefunction.json``
      - ``.wavefunction.h5``
      - -
+
+The same patterns are observed for other data classes in QDK/Chemistry.
 
 Further reading
 ---------------
 
 - The above examples can be downloaded as complete `C++ <../../../_static/examples/cpp/serialization.cpp>`_ and `Python <../../../_static/examples/python/serialization.py>`_ scripts.
 - :doc:`Structure <../data/structure>`: Molecular geometry and atomic information
-- :doc:`BasisSet <../data/basis_set>`: Quantum chemistry basis set definitions
+- :doc:`BasisSet <../data/basis_set>`: Basis set definitions
 - :doc:`Orbitals <../data/orbitals>`: Molecular orbital coefficients and properties
 - :doc:`Hamiltonian <../data/hamiltonian>`: Electronic Hamiltonian operator
-- :class:`~qdk_chemistry.data.Wavefunction`: Quantum mechanical wavefunction data
+- :doc:`Wavefunction <../data/wavefunction>`: Wavefunction data

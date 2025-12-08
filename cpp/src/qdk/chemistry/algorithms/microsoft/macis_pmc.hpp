@@ -45,11 +45,17 @@ class MacisPmcSettings : public ProjectedMultiConfigurationSettings {
     macis::ASCISettings macis_defaults;
 
     // Tolerance parameters
-    set_default<size_t>("iterative_solver_dimension_cutoff", 100);
+    set_default<int64_t>(
+        "iterative_solver_dimension_cutoff", 100,
+        "Matrix size cutoff for using iterative eigensolver",
+        data::BoundConstraint<int64_t>{1, std::numeric_limits<int64_t>::max()});
     set_default<double>("H_thresh", 1e-16);
     set_default<double>("h_el_tol", macis_defaults.h_el_tol);
     set_default<double>("davidson_res_tol", 1e-8);
-    set_default<size_t>("davidson_max_m", 200);
+    set_default<int64_t>(
+        "davidson_max_m", 200,
+        "Maximum allowed subspace size for Davidson solver",
+        data::BoundConstraint<int64_t>{1, std::numeric_limits<int64_t>::max()});
   }
 
   /**

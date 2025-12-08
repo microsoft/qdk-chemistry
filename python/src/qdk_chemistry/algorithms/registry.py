@@ -43,10 +43,11 @@ if TYPE_CHECKING:
 __all__ = [
     "available",
     "create",
+    "inspect_settings",
+    "print_settings",
     "register",
     "register_factory",
     "show_default",
-    "show_settings",
     "unregister",
     "unregister_factory",
 ]
@@ -81,7 +82,7 @@ def create(algorithm_type: str, algorithm_name: str | None = None, **kwargs) -> 
 
             These configure the algorithm's settings. These are forwarded directly to the algorithm's settings
             via `settings().update()`. Available settings depend on the specific algorithm
-            type and implementation and can be looked up with show_settings().
+            type and implementation and can be looked up with inspect_settings() or print_settings().
 
     Returns:
         Algorithm: The created algorithm instance.
@@ -133,12 +134,65 @@ def create(algorithm_type: str, algorithm_name: str | None = None, **kwargs) -> 
     )
 
 
-def show_settings(algorithm_type: str, algorithm_name: str) -> list[tuple[str, str, Any]]:
-    """Show the settings schema for a specific algorithm.
+def print_settings(algorithm_type: str, algorithm_name: str, characters: int = 120) -> None:
+    """Print the settings table for a specific algorithm.
+
+    This function retrieves and prints the settings schema for a given algorithm type and name
+    as a formatted table. The table displays configurable parameters including their names,
+    current values, allowed values/ranges, and descriptions.
+
+    Args:
+        algorithm_type (str): The type of algorithm.
+
+            (e.g., "scf_solver", "active_space_selector", "coupled_cluster_calculator").
+
+        algorithm_name (str): The specific name of the algorithm implementation.
+
+        characters (int): Maximum width of the table in characters (default: 120).
+
+    Raises:
+        KeyError: If the specified algorithm type is not registered in the system.
+
+    Examples:
+        >>> from qdk_chemistry.algorithms import registry
+        >>> # Print settings table for the PySCF SCF solver
+        >>> registry.print_settings("scf_solver", "pyscf")
+        ------------------------------------------------------------------------------------------------------------------------
+        Key                  | Value           | Allowed              | Description
+        ------------------------------------------------------------------------------------------------------------------------
+        charge               | 0               | -                    | Total molecular charge
+        convergence_thresh...| 1.00e-06        | 1.00e-12 <= x        | Energy convergence threshold
+                             |                 | x <= 1.00e-02        |
+        force_restricted     | false           | -                    | Force restricted calculation
+        max_iterations       | 50              | 1 <= x <= 1000       | Maximum SCF iterations
+        method               | "hf"            | ["hf", "dft"]        | SCF method to use
+        spin_multiplicity    | 1               | 1 <= x <= 10         | Spin multiplicity (2S+1)
+        ------------------------------------------------------------------------------------------------------------------------
+        >>> # Print with custom width
+        >>> registry.print_settings("scf_solver", "pyscf", characters=100)
+
+    """
+    for factory in __factories:
+        if factory.algorithm_type_name() == algorithm_type:
+            instance = factory.create(algorithm_name)
+            print(instance.settings().as_table(characters))
+            return
+    available_types = [factory.algorithm_type_name() for factory in __factories]
+    raise KeyError(
+        f"Algorithm type '{algorithm_type}' is not registered. "
+        f"Available algorithm types: {', '.join(available_types)}. "
+        "Available algorithm types are influenced by loaded plugins and registered custom algorithms. "
+        "Please ensure the relevant plugins are loaded or custom algorithms are registered ahead of calling create()."
+    )
+
+
+def inspect_settings(algorithm_type: str, algorithm_name: str) -> list[tuple[str, str, Any, str | None, Any | None]]:
+    """Inspect the settings schema for a specific algorithm.
 
     This function retrieves the settings schema for a given algorithm type and name.
     The settings schema provides information about configurable parameters for the
-    algorithm, including their names, expected Python types, and default values.
+    algorithm, including their names, expected Python types, default values, descriptions,
+    and allowed values/ranges.
 
     Args:
         algorithm_type (str): The type of algorithm.
@@ -148,11 +202,14 @@ def show_settings(algorithm_type: str, algorithm_name: str) -> list[tuple[str, s
         algorithm_name (str): The specific name of the algorithm implementation.
 
     Returns:
-        list[tuple[str, str, Any]]: A list of tuples where each tuple contains:
+        list[tuple[str, str, Any, str | None, Any | None]]: A list of tuples where each tuple contains:
             - Setting name (str): The name/key of the setting
             - Expected Python type (str): The Python type expected for this setting
               (e.g., int, float, str, bool, list[int], list[float])
             - Default value (Any): The default value for this setting
+            - Description (str | None): Human-readable description of the setting, or None if not available
+            - Limits (Any | None): Allowed values or range, or None if not constrained.
+              For numeric types: tuple of (min, max). For strings/lists: list of allowed values.
 
     Raises:
         KeyError: If the specified algorithm type is not registered in the system.
@@ -160,25 +217,33 @@ def show_settings(algorithm_type: str, algorithm_name: str) -> list[tuple[str, s
     Examples:
         >>> from qdk_chemistry.algorithms import registry
         >>> # Show settings for the PySCF SCF solver
-        >>> settings_info = registry.show_settings("scf_solver", "pyscf")
-        >>> for name, python_type, default in settings_info:
-        ...     print(f"{name}: {python_type} = {default}")
-        method: str = hf
-        basis_set: str = def2-svp
-        charge: int = 0
-        spin_multiplicity: int = 1
-        tolerance: float = 1e-06
-        max_iterations: int = 50
+        >>> settings_info = registry.inspect_settings("scf_solver", "pyscf")
+        >>> for name, python_type, default, description, limits in settings_info:
+        ...     limit_str = f" (allowed: {limits})" if limits else ""
+        ...     desc_str = f"  # {description}" if description else ""
+        ...     print(f"{name}: {python_type} = {default}{limit_str}{desc_str}")
+        method: str = hf (allowed: ['hf', 'dft'])  # SCF method to use
+        basis_set: str = def2-svp  # Basis set for the calculation
+        charge: int = 0  # Total molecular charge
+        spin_multiplicity: int = 1 (allowed: (1, 10))  # Spin multiplicity (2S+1)
+        tolerance: float = 1e-06 (allowed: (1e-12, 0.01))  # Convergence threshold
+        max_iterations: int = 50 (allowed: (1, 1000))  # Maximum SCF iterations
+        force_restricted: bool = False  # Force restricted calculation
 
     """
     for factory in __factories:
         if factory.algorithm_type_name() == algorithm_type:
             instance = factory.create(algorithm_name)
-            settings = instance.settings().get_all_settings()
-            return [
-                (name, instance.settings().get_expected_python_type(name), default)
-                for name, default in settings.items()
-            ]
+            settings = instance.settings().to_dict()
+            result = []
+            for name, default in settings.items():
+                python_type = instance.settings().get_expected_python_type(name)
+                description = (
+                    instance.settings().get_description(name) if instance.settings().has_description(name) else None
+                )
+                limits = instance.settings().get_limits(name) if instance.settings().has_limits(name) else None
+                result.append((name, python_type, default, description, limits))
+            return result
     available_types = [factory.algorithm_type_name() for factory in __factories]
     raise KeyError(
         f"Algorithm type '{algorithm_type}' is not registered. Available algorithm types: {', '.join(available_types)}"

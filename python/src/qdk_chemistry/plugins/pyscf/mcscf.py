@@ -50,7 +50,6 @@ from pyscf import ao2mo, gto, mcscf
 from qdk_chemistry.algorithms import (
     MultiConfigurationCalculator,
     MultiConfigurationScf,
-    register,
 )
 from qdk_chemistry.data import (
     CasWavefunctionContainer,
@@ -479,27 +478,3 @@ class PyscfMcscfCalculator(MultiConfigurationScf):
     def name(self) -> str:
         """Return the name of the MCSCF solver."""
         return "pyscf"
-
-
-def _create_pyscf_multi_configuration_scf():
-    """Factory function to create a PySCF MCSCF calculator instance.
-
-    Returns:
-        PyscfMcscfCalculator: A new instance of the PySCF MCSCF calculator.
-
-    """
-    return PyscfMcscfCalculator()
-
-
-def _register_pyscf_multi_configuration_scf():
-    """Register the PySCF MCSCF calculator with the QDK framework.
-
-    This function registers the PySCF MCSCF calculator factory with the QDK
-    MCSCF calculator registry, making it available for use through
-    the QDK plugin system.
-    """
-    register(_create_pyscf_multi_configuration_scf)
-
-
-# Initialize the calculator on module import
-_ = _register_pyscf_multi_configuration_scf()

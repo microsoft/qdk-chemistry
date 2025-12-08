@@ -39,9 +39,18 @@ class MacisAsciSettings : public MultiConfigurationSettings {
     // Can we provide a pointer to that file here? Workitem: 41318
 
     // ASCI determinant control parameters
-    set_default<size_t>("ntdets_max", macis_defaults.ntdets_max);
-    set_default<size_t>("ntdets_min", macis_defaults.ntdets_min);
-    set_default<size_t>("ncdets_max", macis_defaults.ncdets_max);
+    set_default<int64_t>(
+        "ntdets_max", macis_defaults.ntdets_max,
+        "Maximum number of trial determinants in the variational space",
+        data::BoundConstraint<int64_t>{1, std::numeric_limits<int64_t>::max()});
+    set_default<int64_t>(
+        "ntdets_min", macis_defaults.ntdets_min,
+        "Minimum number of trial determinants required",
+        data::BoundConstraint<int64_t>{1, std::numeric_limits<int64_t>::max()});
+    set_default<int64_t>(
+        "ncdets_max", macis_defaults.ncdets_max,
+        "Maximum number of core determinants",
+        data::BoundConstraint<int64_t>{1, std::numeric_limits<int64_t>::max()});
 
     // Tolerance parameters
     set_default<double>("h_el_tol", macis_defaults.h_el_tol);
@@ -50,35 +59,58 @@ class MacisAsciSettings : public MultiConfigurationSettings {
     set_default<double>("refine_energy_tol", macis_defaults.refine_energy_tol);
 
     // PT2 correction parameters
-    set_default<size_t>("pt2_reserve_count", macis_defaults.pt2_reserve_count);
+    set_default<int64_t>(
+        "pt2_reserve_count", macis_defaults.pt2_reserve_count,
+        "Reserve count for PT2 calculations",
+        data::BoundConstraint<int64_t>{0, std::numeric_limits<int64_t>::max()});
     set_default<bool>("pt2_prune", macis_defaults.pt2_prune);
     set_default<bool>("pt2_precompute_eps", macis_defaults.pt2_precompute_eps);
     set_default<bool>("pt2_precompute_idx", macis_defaults.pt2_precompute_idx);
     set_default<bool>("pt2_print_progress", macis_defaults.pt2_print_progress);
-    set_default<size_t>("pt2_bigcon_thresh", macis_defaults.pt2_bigcon_thresh);
+    set_default<int64_t>(
+        "pt2_bigcon_thresh", macis_defaults.pt2_bigcon_thresh,
+        "Threshold for using bigcon PT2 algorithm",
+        data::BoundConstraint<int64_t>{0, std::numeric_limits<int64_t>::max()});
 
     // Algorithm control parameters
-    set_default<size_t>("pair_size_max", macis_defaults.pair_size_max);
-    set_default<size_t>("nxtval_bcount_thresh",
-                        macis_defaults.nxtval_bcount_thresh);
-    set_default<size_t>("nxtval_bcount_inc", macis_defaults.nxtval_bcount_inc);
+    set_default<int64_t>(
+        "pair_size_max", macis_defaults.pair_size_max,
+        "Maximum number of ASCI contribution pairs to store in memory",
+        data::BoundConstraint<int64_t>{1, std::numeric_limits<int64_t>::max()});
+    set_default<int64_t>(
+        "nxtval_bcount_thresh", macis_defaults.nxtval_bcount_thresh,
+        "Threshold for next value batch count",
+        data::BoundConstraint<int64_t>{1, std::numeric_limits<int64_t>::max()});
+    set_default<int64_t>(
+        "nxtval_bcount_inc", macis_defaults.nxtval_bcount_inc,
+        "Increment for next value batch count",
+        data::BoundConstraint<int64_t>{1, std::numeric_limits<int64_t>::max()});
     set_default<bool>("just_singles", macis_defaults.just_singles);
-    set_default<double>("grow_factor", macis_defaults.grow_factor);
+    set_default<double>("grow_factor", macis_defaults.grow_factor,
+                        "Factor by which to grow the variational space",
+                        data::BoundConstraint<double>{
+                            1.0e0, std::numeric_limits<double>::max()});
     set_default<double>("min_grow_factor", macis_defaults.min_grow_factor);
     set_default<double>("growth_backoff_rate",
                         macis_defaults.growth_backoff_rate);
     set_default<double>("growth_recovery_rate",
                         macis_defaults.growth_recovery_rate);
-    set_default<size_t>("max_refine_iter", macis_defaults.max_refine_iter);
+    set_default<int64_t>(
+        "max_refine_iter", macis_defaults.max_refine_iter,
+        "Maximum number of refinement iterations",
+        data::BoundConstraint<int64_t>{0, std::numeric_limits<int64_t>::max()});
     set_default<bool>("grow_with_rot", macis_defaults.grow_with_rot);
-    set_default<size_t>("rot_size_start", macis_defaults.rot_size_start);
+    set_default<int64_t>(
+        "rot_size_start", macis_defaults.rot_size_start,
+        "Starting size for rotations",
+        data::BoundConstraint<int64_t>{1, std::numeric_limits<int64_t>::max()});
 
     // Constraint parameters
-    set_default<int>("constraint_level", macis_defaults.constraint_level);
-    set_default<int>("pt2_max_constraint_level",
-                     macis_defaults.pt2_max_constraint_level);
-    set_default<int>("pt2_min_constraint_level",
-                     macis_defaults.pt2_min_constraint_level);
+    set_default<int64_t>("constraint_level", macis_defaults.constraint_level);
+    set_default<int64_t>("pt2_max_constraint_level",
+                         macis_defaults.pt2_max_constraint_level);
+    set_default<int64_t>("pt2_min_constraint_level",
+                         macis_defaults.pt2_min_constraint_level);
     set_default<int64_t>("pt2_constraint_refine_force",
                          macis_defaults.pt2_constraint_refine_force);
   }
