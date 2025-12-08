@@ -46,32 +46,32 @@ def make_minimal_orbitals():
 
 def make_minimal_hamiltonian(orbitals):
     """Helper function to create a minimal Hamiltonian.
-    
+
     This is needed for MP2 container examples."""
-    
+
     # Create minimal one- and two-electron integrals for H2
     h_core = np.array([[-1.5, -0.8], [-0.8, 0.5]])  # Core Hamiltonian
-    
+
     # Two-electron integrals in MO basis, stored as flattened vector
     # Indexing: index = i*norb³ + j*norb² + k*norb + l for (ij|kl)
     # For H2: norb=2, so we need 2⁴=16 elements
     eri = np.zeros(16)
-    
+
     # Set some representative values for H2 two-electron integrals
     # Format: (ij|kl) in physicist notation
-    eri[0] = 1.0    # (00|00) - index 0*8 + 0*4 + 0*2 + 0 = 0
-    eri[5] = 0.6    # (01|01) - index 0*8 + 1*4 + 0*2 + 1 = 5
-    eri[10] = 0.6   # (10|10) - index 1*8 + 0*4 + 1*2 + 0 = 10
-    eri[15] = 0.8   # (11|11) - index 1*8 + 1*4 + 1*2 + 1 = 15
-    eri[3] = 0.4    # (00|11) - index 0*8 + 0*4 + 1*2 + 1 = 3
-    eri[12] = 0.4   # (11|00) - index 1*8 + 1*4 + 0*2 + 0 = 12
-    
+    eri[0] = 1.0  # (00|00) - index 0*8 + 0*4 + 0*2 + 0 = 0
+    eri[5] = 0.6  # (01|01) - index 0*8 + 1*4 + 0*2 + 1 = 5
+    eri[10] = 0.6  # (10|10) - index 1*8 + 0*4 + 1*2 + 0 = 10
+    eri[15] = 0.8  # (11|11) - index 1*8 + 1*4 + 1*2 + 1 = 15
+    eri[3] = 0.4  # (00|11) - index 0*8 + 0*4 + 1*2 + 1 = 3
+    eri[12] = 0.4  # (11|00) - index 1*8 + 1*4 + 0*2 + 0 = 12
+
     # Core energy (nuclear repulsion + core electron contributions)
     core_energy = 0.0
-    
+
     # Inactive Fock matrix (empty for minimal example)
     inactive_fock = np.zeros((2, 2))
-    
+
     # Create Hamiltonian
     hamiltonian = Hamiltonian(h_core, eri, orbitals, core_energy, inactive_fock)
     return hamiltonian
@@ -160,21 +160,22 @@ mp2_wavefunction = Wavefunction(mp2_container)
 
 # Use the Slater determinant as reference
 orbitals = make_minimal_orbitals()
-ref_det = Configuration("20") 
+ref_det = Configuration("20")
 sd_container = SlaterDeterminantContainer(ref_det, orbitals)
 ref_wavefunction = Wavefunction(sd_container)
 
 # Create example T1 and T2 amplitudes
 # T1: occupied-virtual excitations (1 occ × 1 virt = 1 element for H2)
-t1_amplitudes = np.array([0.05])  
+t1_amplitudes = np.array([0.05])
 
-# T2: occupied-occupied to virtual-virtual excitations 
+# T2: occupied-occupied to virtual-virtual excitations
 # (1 occ pair × 1 virt pair = 1 element for H2)
 t2_amplitudes = np.array([0.15])
 
 # Create CC container: requires reference wavefunction, orbitals, and amplitudes
-cc_container = CoupledClusterContainer(orbitals, ref_wavefunction, 
-                                     t1_amplitudes, t2_amplitudes)
+cc_container = CoupledClusterContainer(
+    orbitals, ref_wavefunction, t1_amplitudes, t2_amplitudes
+)
 cc_wavefunction = Wavefunction(cc_container)
 # end-cell-create-cc
 ################################################################################
@@ -207,10 +208,12 @@ entropies = sd_wavefunction.get_single_orbital_entropies()
 # Access T1 and T2 amplitudes from MP2 and CC containers
 
 # For MP2 - amplitudes computed on demand
-t2_abab_mp2, t2_aaaa_mp2, t2_bbbb_mp2 = mp2_wavefunction.get_container().get_t2_amplitudes()
+t2_abab_mp2, t2_aaaa_mp2, t2_bbbb_mp2 = (
+    mp2_wavefunction.get_container().get_t2_amplitudes()
+)
 
-# For CC - amplitudes stored during construction     
-t1_aa, t1_bb = cc_wavefunction.get_container().get_t1_amplitudes() 
+# For CC - amplitudes stored during construction
+t1_aa, t1_bb = cc_wavefunction.get_container().get_t1_amplitudes()
 t2_abab_cc, t2_aaaa_cc, t2_bbbb_cc = cc_wavefunction.get_container().get_t2_amplitudes()
 # end-cell-access-amplitudes
 ################################################################################
