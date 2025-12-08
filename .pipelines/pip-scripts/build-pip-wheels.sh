@@ -38,17 +38,30 @@ apt-get install -y \
     libpugixml-dev
 
 # Upgrade cmake as Ubuntu 22.04 only has up to v3.22 in apt
-export CMAKE_CHECKSUM=cf332727ac863cc0c86ac4f8cd3b711d05a5e417
-wget -q https://cmake.org/files/v3.28/cmake-3.28.3.tar.gz -O cmake-3.28.3.tar.gz
-echo "${CMAKE_CHECKSUM}  cmake-3.28.3.tar.gz" | shasum -c || exit 1
-tar -xzf cmake-3.28.3.tar.gz
-rm cmake-3.28.3.tar.gz
-cd cmake-3.28.3
-./bootstrap --parallel=$(nproc) --prefix=/usr/local
-make -j$(nproc)
-make install
-cd ..
-rm -r cmake-3.28.3
+# export CMAKE_CHECKSUM=cf332727ac863cc0c86ac4f8cd3b711d05a5e417
+# wget -q https://cmake.org/files/v3.28/cmake-3.28.3.tar.gz -O cmake-3.28.3.tar.gz
+# echo "${CMAKE_CHECKSUM}  cmake-3.28.3.tar.gz" | shasum -c || exit 1
+# tar -xzf cmake-3.28.3.tar.gz
+# rm cmake-3.28.3.tar.gz
+# cd cmake-3.28.3
+# ./bootstrap --parallel=$(nproc) --prefix=/usr/local
+# make -j$(nproc)
+# make install
+# cd ..
+# rm -r cmake-3.28.3
+# cmake --version
+
+if [[ ${MARCH} == 'armv8-a' ]]; then
+    wget -q https://github.com/Kitware/CMake/releases/download/v${CMAKE_VERSION}/cmake-${CMAKE_VERSION}-linux-aarch64.sh
+    chmod +x cmake-${CMAKE_VERSION}-linux-aarch64.sh
+    /bin/sh cmake-${CMAKE_VERSION}-linux-aarch64.sh --skip-license --prefix=/usr/local
+    rm cmake-${CMAKE_VERSION}-linux-aarch64.sh
+elif [[ ${MARCH} == 'x86-64-v3' ]]; then
+    wget -q https://github.com/Kitware/CMake/releases/download/v${CMAKE_VERSION}/cmake-${CMAKE_VERSION}-linux-x86_64.sh
+    chmod +x cmake-${CMAKE_VERSION}-linux-x86_64.sh
+    /bin/sh cmake-${CMAKE_VERSION}-linux-x86_64.sh --skip-license --prefix=/usr/local
+    rm cmake-${CMAKE_VERSION}-linux-x86_64.sh
+fi
 cmake --version
 
 export CFLAGS="-fPIC -Os"
