@@ -36,10 +36,10 @@ The ``run`` method returns a :doc:`Wavefunction <../data/wavefunction>` object w
 - **Core orbital indices**: Orbitals treated as doubly occupied
 - **Updated orbital metadata**: Information about the selection process
 
-Using the ActiveSpaceSelector
------------------------------
+Running an active space selection
+----------------------------------
 
-This section demonstrates how to create, configure, and run active space selection.
+This section demonstrates how to create, configure, and run an active space selection.
 The ``run`` method takes a :doc:`Wavefunction <../data/wavefunction>` from a prior :term:`SCF` calculation and returns a new :doc:`Wavefunction <../data/wavefunction>` with active space information.
 
 **Creating an active space selector:**
@@ -281,11 +281,11 @@ Related classes
 
 - :doc:`Wavefunction <../data/wavefunction>`: Input wavefunction from SCF calculation
 - :doc:`Orbitals <../data/orbitals>`: Contains orbital information and active space indices
-- :doc:`MCCalculator <mc_calculator>`: Uses active space for multireference calculations
 
 Further reading
 ---------------
 
 - The above examples can be downloaded as a complete `Python <../../../_static/examples/python/active_space_selector.py>`_ script or `C++ <../../../_static/examples/cpp/active_space_selector.cpp>`_ source file.
+- :doc:`MCCalculator <mc_calculator>`: Uses active space for multireference calculations
 - :doc:`Settings <settings>`: Configuration settings for algorithms
 - :doc:`Factory Pattern <factory_pattern>`: Understanding algorithm creation

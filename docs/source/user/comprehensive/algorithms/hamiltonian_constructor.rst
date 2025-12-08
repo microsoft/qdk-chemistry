@@ -126,11 +126,17 @@ The native QDK/Chemistry implementation for Hamiltonian construction. Transforms
      - string
      - Type of SCF reference ("rhf", "rohf", or "uhf")
 
+Related classes
+---------------
+
+- :doc:`Orbitals <../data/orbitals>`: Input orbitals for Hamiltonian construction
+- :doc:`Hamiltonian <../data/hamiltonian>`: Output Hamiltonian representation
+
 Further reading
 ---------------
 
 - The above examples can be downloaded as complete `Python <../../../_static/examples/python/hamiltonian_constructor.py>`_ or `C++ <../../../_static/examples/cpp/hamiltonian_constructor.cpp>`_ scripts.
-- :doc:`Orbitals <../data/orbitals>`: Input orbitals for Hamiltonian construction
-- :doc:`Hamiltonian <../data/hamiltonian>`: Output Hamiltonian representation
 - :doc:`ActiveSpaceSelector <active_space>`: Provides active orbital indices
 - :doc:`MCCalculator <mc_calculator>`: Uses the Hamiltonian for correlation calculations
+- :doc:`Settings <settings>`: Configuration settings for algorithms
+- :doc:`Factory Pattern <factory_pattern>`: Understanding algorithm creation

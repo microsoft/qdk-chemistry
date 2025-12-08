@@ -28,8 +28,8 @@ QDK/Chemistry provides several orbital transformation methods through the :class
 **Valence Virtual Hard Virtual (VVHV) Orbitals**
    Separates orbitals into valence, virtual, and hard virtual categories for more efficient treatment in correlation methods.
 
-Usage
------
+Running orbital localization
+----------------------------
 
 This section demonstrates how to create, configure, and run orbital localization.
 The ``run`` method takes an :doc:`Orbitals <../data/orbitals>` instance (typically from an :doc:`ScfSolver <scf_solver>` calculation) and returns a new :doc:`Orbitals <../data/orbitals>` object with transformed orbitals.
@@ -246,19 +246,19 @@ The PySCF plugin provides access to `PySCF's <https://pyscf.org/>`_ orbital loca
 
 For more details on how to extend QDK/Chemistry with additional implementations, see the :doc:`plugin system <../plugins>` documentation.
 
+Related classes
+---------------
+
+- :doc:`Orbitals <../data/orbitals>`: Input and output orbitals
+- :doc:`Wavefunction <../data/wavefunction>`: Container for orbitals and electronic state information
+
 Further reading
 ---------------
 
 - The above examples can be downloaded as complete `Python <../../../_static/examples/python/localizer.py>`_ or `C++ <../../../_static/examples/cpp/localizer.cpp>`_ code.
-- :doc:`Orbitals <../data/orbitals>`: Input and output orbitals
 - :doc:`ScfSolver <scf_solver>`: Produces initial orbitals for localization
 - :doc:`ActiveSpaceSelector <active_space>`: Often used with localized orbitals for better active space selection
 - :doc:`HamiltonianConstructor <hamiltonian_constructor>`: Can build Hamiltonians using localized orbitals
-- :doc:`Wavefunction <../data/wavefunction>`: Container for orbitals and electronic state information
-
-Related topics
---------------
-
 - :doc:`Serialization <../data/serialization>`: Data serialization and deserialization
 - :doc:`Settings <settings>`: Configuration settings for algorithms
 - :doc:`Factory pattern <factory_pattern>`: Creating algorithm instances

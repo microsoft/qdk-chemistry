@@ -160,15 +160,21 @@ Coupled cluster implementations via PySCF integration, providing high-accuracy c
      - Store CC amplitudes
 
 
-Related topics
---------------
+Related classes
+---------------
+
+- :doc:`Ansatz <../data/ansatz>`: Input combining reference wavefunction and Hamiltonian
+- :doc:`Hamiltonian <../data/hamiltonian>`: Hamiltonian data structure, including unrestricted Hamiltonians
+- :doc:`Orbitals <../data/orbitals>`: Orbital data structure, including unrestricted orbitals
+- :doc:`Wavefunction <../data/wavefunction>`: Wavefunction container for correlation methods
+
+Further reading
+---------------
 
 - :doc:`SCF Solver <scf_solver>`: Generate reference wavefunctions
 - :doc:`Hamiltonian Constructor <hamiltonian_constructor>`: Build Hamiltonians from orbitals
-- :doc:`../data/hamiltonian`: Hamiltonian data structure, including unrestricted Hamiltonians
-- :doc:`../data/orbitals`: Orbital data structure, including unrestricted orbitals
-- :doc:`../data/ansatz`: Ansatz combining reference wavefunction and Hamiltonian
-- :doc:`../data/wavefunction`: Wavefunction container for correlation methods
+- :doc:`Settings <settings>`: Configuration settings for algorithms
+- :doc:`Factory Pattern <factory_pattern>`: Understanding algorithm creation
 
 .. note::
    For additional examples and validation tests, refer to the test suite in ``python/tests/test_mp2.py``

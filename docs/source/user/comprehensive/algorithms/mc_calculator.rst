@@ -216,11 +216,17 @@ The MACIS ASCI (Adaptive Sampling Configuration Interaction) provides selected C
 
 For more details on how to extend QDK/Chemistry with additional implementations, see the :doc:`plugin system <../plugins>` documentation.
 
+Related classes
+---------------
+
+- :doc:`Hamiltonian <../data/hamiltonian>`: Input Hamiltonian for CI calculation
+- :class:`~qdk_chemistry.data.Wavefunction`: Output CI wavefunction
+
 Further reading
 ---------------
 
 - The above examples can be downloaded as complete `Python <../../../_static/examples/python/mc_calculator.py>`_ or `C++ <../../../_static/examples/cpp/mc_calculator.cpp>`_ code.
-- :doc:`Hamiltonian <../data/hamiltonian>`: Input Hamiltonian for CI calculation
-- :class:`qdk_chemistry.data.Wavefunction`: Output CI wavefunction
 - :doc:`HamiltonianConstructor <hamiltonian_constructor>`: Produces the Hamiltonian for CI
 - :doc:`ActiveSpaceSelector <active_space>`: Helps identify important orbitals for the active space
+- :doc:`Settings <settings>`: Configuration settings for algorithms
+- :doc:`Factory Pattern <factory_pattern>`: Understanding algorithm creation

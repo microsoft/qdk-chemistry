@@ -89,10 +89,17 @@ Qubit mapping implementation integrated through the Qiskit plugin. Supports mult
 
 For more details on how QDK/Chemistry interfaces with external packages, see the :ref:`plugin system <plugin-system>` documentation.
 
+Related classes
+---------------
+
+- :doc:`Hamiltonian <../data/hamiltonian>`: Input Hamiltonian for mapping
+- :class:`~qdk_chemistry.data.QubitHamiltonian`: Output qubit operator representation
+
 Further reading
 ---------------
 
 - The above examples can be downloaded as a complete `Python <../../../_static/examples/python/qubit_mapper.py>`_ script.
-- :doc:`Hamiltonian <../data/hamiltonian>`: Input Hamiltonian for mapping
 - :doc:`StatePreparation <state_preparation>`: Prepare quantum circuits from wavefunctions
 - :doc:`EnergyEstimator <energy_estimator>`: Estimate energies using the qubit Hamiltonian
+- :doc:`Settings <settings>`: Configuration settings for algorithms
+- :doc:`Factory Pattern <factory_pattern>`: Understanding algorithm creation

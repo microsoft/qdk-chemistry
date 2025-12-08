@@ -116,9 +116,16 @@ State preparation using regular isometry synthesis via Qiskit. Implements the is
 
 For more details on how QDK/Chemistry interfaces with external packages, see the :ref:`plugin system <plugin-system>` documentation.
 
+Related classes
+---------------
+
+- :class:`~qdk_chemistry.data.Wavefunction`: Input wavefunction for circuit construction
+
 Further reading
 ---------------
 
 - The above examples can be downloaded as a complete `Python <../../../_static/examples/python/state_preparation.py>`_ script.
 - :doc:`EnergyEstimator <energy_estimator>`: Estimate the energy of prepared states
 - :doc:`QubitMapper <qubit_mapper>`: Map Hamiltonians to qubit operators
+- :doc:`Settings <settings>`: Configuration settings for algorithms
+- :doc:`Factory Pattern <factory_pattern>`: Understanding algorithm creation

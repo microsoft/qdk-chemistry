@@ -144,6 +144,12 @@ Energy estimation using Qiskit's Aer simulator backend. Provides access to Qiski
 
 For more details on how QDK/Chemistry interfaces with external packages, see the :ref:`plugin system <plugin-system>` documentation.
 
+Related classes
+---------------
+
+- :class:`~qdk_chemistry.data.QubitHamiltonian`: Input qubit Hamiltonian from QubitMapper
+- :doc:`Wavefunction <../data/wavefunction>`: Source wavefunction for state preparation
+
 Further reading
 ---------------
 
@@ -151,3 +157,5 @@ Further reading
 - :doc:`StatePreparation <state_preparation>`: Load wavefunctions onto qubits as quantum circuits
 - :doc:`QubitMapper <qubit_mapper>`: Map fermionic Hamiltonians to qubit operators
 - See the ``examples/state_prep_energy.ipynb`` notebook for an end-to-end workflow demonstration
+- :doc:`Settings <settings>`: Configuration settings for algorithms
+- :doc:`Factory Pattern <factory_pattern>`: Understanding algorithm creation
