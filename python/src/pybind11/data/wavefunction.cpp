@@ -495,6 +495,9 @@ Examples:
                    R"(
 Calculate single orbital entropies for active orbitals only.
 
+This function uses the method of Boguslawski & Tecmer (2015), doi:10.1002/qua.24832,
+:cite:`Boguslawski2015`.
+
 Returns:
     numpy.ndarray: Vector of orbital entropies for active orbitals (always real)
 
