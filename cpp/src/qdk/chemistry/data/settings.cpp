@@ -420,10 +420,12 @@ std::string Settings::get_type_name(const std::string& key) const {
 }
 
 bool Settings::has_description(const std::string& key) const {
+  QDK_LOG_TRACE_ENTERING();
   return descriptions_.find(key) != descriptions_.end();
 }
 
 std::string Settings::get_description(const std::string& key) const {
+  QDK_LOG_TRACE_ENTERING();
   auto it = descriptions_.find(key);
   if (it == descriptions_.end()) {
     throw SettingNotFound("No description found for setting: " + key);
@@ -432,10 +434,12 @@ std::string Settings::get_description(const std::string& key) const {
 }
 
 bool Settings::has_limits(const std::string& key) const {
+  QDK_LOG_TRACE_ENTERING();
   return limits_.find(key) != limits_.end();
 }
 
 Constraint Settings::get_limits(const std::string& key) const {
+  QDK_LOG_TRACE_ENTERING();
   auto it = limits_.find(key);
   if (it == limits_.end()) {
     throw SettingNotFound("No limits found for setting: " + key);
@@ -444,6 +448,7 @@ Constraint Settings::get_limits(const std::string& key) const {
 }
 
 bool Settings::is_documented(const std::string& key) const {
+  QDK_LOG_TRACE_ENTERING();
   if (!has(key)) {
     throw SettingNotFound(key);
   }
@@ -456,6 +461,7 @@ bool Settings::is_documented(const std::string& key) const {
 }
 
 std::string Settings::as_table(size_t max_width, bool show_undocumented) const {
+  QDK_LOG_TRACE_ENTERING();
   // Helper to wrap text to fit within a column width
   auto wrap_text = [](const std::string& text,
                       size_t width) -> std::vector<std::string> {

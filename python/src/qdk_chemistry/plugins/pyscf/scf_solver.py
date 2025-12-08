@@ -48,13 +48,13 @@ from qdk_chemistry.data import (
     Structure,
     Wavefunction,
 )
-from qdk_chemistry.utils import Logger
 from qdk_chemistry.plugins.pyscf.utils import (
     SCFType,
     orbitals_to_scf,
     pyscf_mol_to_qdk_basis,
     structure_to_pyscf_atom_labels,
 )
+from qdk_chemistry.utils import Logger
 
 __all__ = ["PyscfScfSettings", "PyscfScfSolver"]
 

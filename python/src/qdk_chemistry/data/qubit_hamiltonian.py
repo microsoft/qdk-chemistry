@@ -19,8 +19,8 @@ from qiskit.quantum_info import SparsePauliOp
 
 from qdk_chemistry.data import Wavefunction
 from qdk_chemistry.data.base import DataClass
-from qdk_chemistry.utils.statevector import create_statevector_from_wavefunction
 from qdk_chemistry.utils import Logger
+from qdk_chemistry.utils.statevector import create_statevector_from_wavefunction
 
 __all__ = ["filter_and_group_pauli_ops_from_wavefunction"]
 

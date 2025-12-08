@@ -7,10 +7,6 @@
 # TODO (DBWY): This file is not used as broad import of all utilities is not desirable. Should be removed
 
 # Import C++ utilities from the compiled extension
-from qdk_chemistry._core.utils import (
-    compute_valence_space_parameters,
-    Logger,
-    rotate_orbitals
-)
+from qdk_chemistry._core.utils import Logger, compute_valence_space_parameters, rotate_orbitals
 
-__all__ = ["compute_valence_space_parameters", "Logger", "rotate_orbitals"]
+__all__ = ["Logger", "compute_valence_space_parameters", "rotate_orbitals"]

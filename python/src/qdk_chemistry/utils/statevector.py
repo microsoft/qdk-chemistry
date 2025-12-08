@@ -14,8 +14,8 @@ if TYPE_CHECKING:
 
 import numpy as np
 
-from qdk_chemistry.utils.bitstring import binary_to_decimal, separate_alpha_beta_to_binary_string
 from qdk_chemistry.utils import Logger
+from qdk_chemistry.utils.bitstring import binary_to_decimal, separate_alpha_beta_to_binary_string
 
 __all__ = ["create_statevector_from_wavefunction"]
 

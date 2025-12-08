@@ -37,6 +37,7 @@ from qdk_chemistry.utils import Logger
 
 __all__ = ["QiskitEnergyEstimator", "QiskitEnergyEstimatorSettings"]
 
+
 class QiskitEnergyEstimatorSettings(Settings):
     """Settings configuration for a QiskitEnergyEstimator.
 

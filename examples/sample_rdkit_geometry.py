@@ -18,6 +18,7 @@ from qdk_chemistry.constants import ANGSTROM_TO_BOHR
 
 from qdk_chemistry.utils import Logger
 
+
 def create_structure_from_rdkit(molecule: Mol) -> Structure:
     """Create a Structure object from an RDKit molecule."""
     symbols = []

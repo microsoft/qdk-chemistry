@@ -5,6 +5,7 @@
 #include <blas.hh>
 #include <qdk/chemistry/algorithms/scf.hpp>
 #include <qdk/chemistry/algorithms/stability.hpp>
+#include <qdk/chemistry/utils/logger.hpp>
 #include <qdk/chemistry/utils/orbital_rotation.hpp>
 #include <stdexcept>
 
@@ -22,6 +23,7 @@ namespace detail {
 BoolMatrix create_rotation_mask(size_t num_molecular_orbitals,
                                 size_t num_alpha_occupied,
                                 size_t num_beta_occupied) {
+  QDK_LOG_TRACE_ENTERING();
   BoolMatrix mask =
       BoolMatrix::Zero(num_molecular_orbitals, num_molecular_orbitals);
 
@@ -49,6 +51,7 @@ BoolMatrix create_rotation_mask(size_t num_molecular_orbitals,
 // Following PySCF's unpack_uniq_var logic
 Eigen::MatrixXd unpack_rotation_vector(const Eigen::VectorXd& rotation_vector,
                                        const BoolMatrix& mask) {
+  QDK_LOG_TRACE_ENTERING();
   const size_t num_molecular_orbitals = mask.rows();
 
   // Count expected size from mask (true entries)
@@ -96,6 +99,7 @@ Eigen::MatrixXd unpack_rotation_vector(const Eigen::VectorXd& rotation_vector,
 Eigen::MatrixXd apply_orbital_rotation(const Eigen::MatrixXd& mo_coeff,
                                        const Eigen::VectorXd& rotation_vector,
                                        const BoolMatrix& mask) {
+  QDK_LOG_TRACE_ENTERING();
   // Unpack rotation vector using mask
   Eigen::MatrixXd dr = detail::unpack_rotation_vector(rotation_vector, mask);
 
@@ -119,6 +123,7 @@ std::shared_ptr<Orbitals> rotate_orbitals(
     std::shared_ptr<const Orbitals> orbitals,
     const Eigen::VectorXd& rotation_vector, size_t num_alpha_occupied_orbitals,
     size_t num_beta_occupied_orbitals, bool restricted_external) {
+  QDK_LOG_TRACE_ENTERING();
   const size_t num_molecular_orbitals = orbitals->get_num_molecular_orbitals();
 
   if (orbitals->is_restricted()) {

@@ -10,6 +10,7 @@
 from collections.abc import Iterable, Sequence
 
 import numpy as np
+
 from qdk_chemistry.utils import Logger
 
 __all__ = [

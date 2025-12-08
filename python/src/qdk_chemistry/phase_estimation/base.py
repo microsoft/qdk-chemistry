@@ -16,6 +16,7 @@ from __future__ import annotations
 from abc import ABC
 from enum import StrEnum
 from typing import TYPE_CHECKING, TypeVar, cast
+
 from qdk_chemistry.utils import Logger
 
 if TYPE_CHECKING:

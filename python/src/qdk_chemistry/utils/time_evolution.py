@@ -11,6 +11,7 @@ from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
 import numpy as np
+
 from qdk_chemistry.utils import Logger
 
 if TYPE_CHECKING:
