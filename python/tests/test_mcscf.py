@@ -83,7 +83,7 @@ class TestMCSCF:
 
         # Perform SCF calculation with PySCF
         scf_solver = alg.create("scf_solver", "pyscf")
-        scf_solver.settings().set("force_restricted", True)
+        scf_solver.settings().set("scf_type", "restricted")
         _, wavefunction = scf_solver.run(o2, 0, 3, "cc-pvdz")
 
         # Construct QDK Hamiltonian for active space

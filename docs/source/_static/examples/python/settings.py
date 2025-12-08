@@ -9,9 +9,8 @@
 # start-cell-get-settings
 import os
 import tempfile
-
 import qdk_chemistry
-from qdk_chemistry.algorithms import create, available
+from qdk_chemistry.algorithms import available, create
 from qdk_chemistry.data import Settings
 
 # Create an algorithm

@@ -8,6 +8,7 @@
  */
 
 #include <spdlog/sinks/null_sink.h>
+#include <spdlog/sinks/ostream_sink.h>
 #include <spdlog/spdlog.h>
 
 #include <iostream>
@@ -20,6 +21,7 @@
 #include <macis/sd_operations.hpp>
 #include <macis/types.hpp>
 #include <macis/util/fcidump.hpp>
+#include <sstream>
 
 #include "ut_common.hpp"
 
@@ -450,5 +452,157 @@ TEST_CASE("ASCI") {
 #endif
 
   MACIS_MPI_CODE(MPI_Barrier(MPI_COMM_WORLD);)
+  spdlog::drop_all();
+}
+
+TEST_CASE("ASCI Exponential Backoff", "[asci][backoff]") {
+  using macis::NumElectron;
+  using macis::NumInactive;
+  using macis::NumVirtual;
+
+  // Read Water FCIDUMP
+  const size_t norb = macis::read_fcidump_norb(water_ccpvdz_fcidump);
+  const size_t norb2 = norb * norb;
+  const size_t norb4 = norb2 * norb2;
+
+  std::vector<double> T(norb2), V(norb4);
+  auto E_core = macis::read_fcidump_core(water_ccpvdz_fcidump);
+  macis::read_fcidump_1body(water_ccpvdz_fcidump, T.data(), norb);
+  macis::read_fcidump_2body(water_ccpvdz_fcidump, V.data(), norb);
+
+  // Hamiltonian Generator
+  using wfn_type = macis::wfn_t<64>;
+  using wfn_traits = macis::wavefunction_traits<wfn_type>;
+  using generator_t = macis::DoubleLoopHamiltonianGenerator<wfn_type>;
+  generator_t ham_gen(
+      macis::matrix_span<double>(T.data(), norb, norb),
+      macis::rank4_span<double>(V.data(), norb, norb, norb, norb));
+
+  uint32_t nalpha(5), nbeta(5);
+
+  macis::ASCISettings asci_settings;
+  macis::MCSCFSettings mcscf_settings;
+
+  // HF guess
+  std::vector<wfn_type> dets = {
+      wfn_traits::canonical_hf_determinant(nalpha, nbeta)};
+  std::vector<double> C = {1.0};
+  double E0 = ham_gen.matrix_element(dets[0], dets[0]);
+
+  SECTION("Fractional grow_factor") {
+    // Test that fractional grow_factor works
+    asci_settings.grow_factor = 2.5;
+    asci_settings.ntdets_max = 100;
+    asci_settings.ntdets_min = 10;
+
+    std::tie(E0, dets, C) = macis::asci_grow(
+        asci_settings, mcscf_settings, E0, std::move(dets), std::move(C),
+        ham_gen, norb MACIS_MPI_CODE(, MPI_COMM_WORLD));
+
+    // Should reach target size or close to it
+    REQUIRE(dets.size() >= 50);  // Should grow with factor 2.5
+    REQUIRE(dets.size() <= 100);
+    REQUIRE(C.size() == dets.size());
+    REQUIRE_THAT(
+        std::inner_product(C.begin(), C.end(), C.begin(), 0.0),
+        Catch::Matchers::WithinAbs(1.0, testing::numerical_zero_tolerance));
+  }
+
+  SECTION("Verify backoff events via log capture") {
+    // Drop any existing loggers and suppress all output except our capture
+    spdlog::drop("asci_grow");
+    spdlog::drop("asci_search");
+    spdlog::drop("davidson");
+    spdlog::drop("ci_solver");
+
+    // Create null loggers for the noisy ones
+    spdlog::null_logger_mt("asci_search");
+    spdlog::null_logger_mt("davidson");
+    spdlog::null_logger_mt("ci_solver");
+
+    // Capture log output to verify backoff actually occurs
+    std::ostringstream log_stream;
+    auto ostream_sink =
+        std::make_shared<spdlog::sinks::ostream_sink_mt>(log_stream);
+    auto test_logger =
+        std::make_shared<spdlog::logger>("asci_grow", ostream_sink);
+    test_logger->set_level(spdlog::level::warn);  // Backoff logs at warn level
+    spdlog::register_logger(test_logger);
+
+    // Settings that force backoff - request huge growth in one step
+    // which will fail because ASCI search can't find that many determinants
+    asci_settings.grow_factor = 10000.0;  // Unrealistic factor
+    asci_settings.ntdets_max = 10000;     // Large target
+    asci_settings.ntdets_min = 5;
+    asci_settings.ncdets_max = 1;  // Very limited search space
+
+    std::tie(E0, dets, C) = macis::asci_grow(
+        asci_settings, mcscf_settings, E0, std::move(dets), std::move(C),
+        ham_gen, norb MACIS_MPI_CODE(, MPI_COMM_WORLD));
+
+    // Check that backoff message appeared in logs
+    std::string log_output = log_stream.str();
+    bool backoff_logged =
+        log_output.find("reducing grow_factor") != std::string::npos;
+    REQUIRE(backoff_logged);
+
+    // Verify wavefunction is still valid
+    REQUIRE(dets.size() > 1);
+    REQUIRE(C.size() == dets.size());
+    REQUIRE_THAT(
+        std::inner_product(C.begin(), C.end(), C.begin(), 0.0),
+        Catch::Matchers::WithinAbs(1.0, testing::numerical_zero_tolerance));
+
+    spdlog::drop("asci_grow");
+  }
+
+  SECTION("Minimum grow_factor behavior") {
+    // Test that grow_factor doesn't go below minimum (1.01)
+    asci_settings.grow_factor = 10.0;  // Start high
+    asci_settings.ntdets_max = 1000;
+    asci_settings.ntdets_min = 5;
+    asci_settings.ncdets_max = 5;  // Very limited to force many backoffs
+
+    // Reset to HF
+    dets = {wfn_traits::canonical_hf_determinant(nalpha, nbeta)};
+    C = {1.0};
+    E0 = ham_gen.matrix_element(dets[0], dets[0]);
+
+    std::tie(E0, dets, C) = macis::asci_grow(
+        asci_settings, mcscf_settings, E0, std::move(dets), std::move(C),
+        ham_gen, norb MACIS_MPI_CODE(, MPI_COMM_WORLD));
+
+    // Should stop gracefully when can't grow anymore
+    REQUIRE(dets.size() > 1);
+    REQUIRE(C.size() == dets.size());
+    REQUIRE_THAT(
+        std::inner_product(C.begin(), C.end(), C.begin(), 0.0),
+        Catch::Matchers::WithinAbs(1.0, testing::numerical_zero_tolerance));
+  }
+
+  SECTION("Normal growth without backoff") {
+    // Test that normal settings don't trigger backoff
+    asci_settings.grow_factor = 8.0;  // Default
+    asci_settings.ntdets_max = 1000;
+    asci_settings.ntdets_min = 100;
+    asci_settings.ncdets_max = 1000;  // Plenty of room
+
+    // Reset to HF
+    dets = {wfn_traits::canonical_hf_determinant(nalpha, nbeta)};
+    C = {1.0};
+    E0 = ham_gen.matrix_element(dets[0], dets[0]);
+
+    std::tie(E0, dets, C) = macis::asci_grow(
+        asci_settings, mcscf_settings, E0, std::move(dets), std::move(C),
+        ham_gen, norb MACIS_MPI_CODE(, MPI_COMM_WORLD));
+
+    // Should reach target size
+    REQUIRE(dets.size() == 1000);
+    REQUIRE(C.size() == 1000);
+    REQUIRE_THAT(
+        std::inner_product(C.begin(), C.end(), C.begin(), 0.0),
+        Catch::Matchers::WithinAbs(1.0, testing::numerical_zero_tolerance));
+  }
+
   spdlog::drop_all();
 }

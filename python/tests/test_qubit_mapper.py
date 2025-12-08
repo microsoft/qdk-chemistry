@@ -22,9 +22,9 @@ from .test_helpers import create_test_hamiltonian
 def test_qiskit_qubit_mappers(encoding) -> None:
     """Basic test for mapping a Hamiltonian to a Qubit Hamiltonian using Qiskit."""
     assert "qiskit" in available("qubit_mapper")
-    qubit_mapper = create("qubit_mapper", "qiskit", encoding="test")
+    qubit_mapper = create("qubit_mapper", "qiskit", encoding="jordan-wigner")
     assert isinstance(qubit_mapper, QubitMapper)
-    assert qubit_mapper.settings().get("encoding") == "test"
+    assert qubit_mapper.settings().get("encoding") == "jordan-wigner"
     qubit_mapper.settings().set("encoding", encoding)
     assert qubit_mapper.settings().get("encoding") == encoding
 

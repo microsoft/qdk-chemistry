@@ -41,9 +41,16 @@ class AutocasActiveSpaceSettings : public data::Settings {
    * settings
    */
   AutocasActiveSpaceSettings() {
-    set_default<size_t>("num_bins", 100);
-    set_default<size_t>("min_plateau_size", 10);
-    set_default<double>("entropy_threshold", 0.14);
+    set_default<int64_t>(
+        "num_bins", 100, "Number of bins for entropy discretization",
+        data::BoundConstraint<int64_t>{2, std::numeric_limits<int64_t>::max()});
+    set_default<int64_t>(
+        "min_plateau_size", 10,
+        "Minimum size of entropy plateau to be considered",
+        data::BoundConstraint<int64_t>{1, std::numeric_limits<int64_t>::max()});
+    set_default<double>(
+        "entropy_threshold", 0.14,
+        "Minimum absolute entropy value the plateau has to be above");
     set_default<bool>("normalize_entropies", true);
   }
 };
