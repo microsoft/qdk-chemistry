@@ -783,46 +783,10 @@ class TestStabilityWorkflow:
             orbitals = wavefunction.get_orbitals()
             num_alpha_electrons, num_beta_electrons = wavefunction.get_total_num_electrons()
 
-            # QDK returns eigenvectors in column-major order (nvir x nocc),
-            # but rotate_orbitals expects row-major order (nocc x nvir)
-            if backend == "qdk":
-                num_molecular_orbitals = orbitals.get_num_molecular_orbitals()
-                if orbitals.is_restricted():
-                    # RHF/ROHF: use alpha electrons
-                    num_occupied = num_alpha_electrons
-                    num_virtual = num_molecular_orbitals - num_occupied
-                    rotation_mat = rotation_vector.reshape(num_occupied, num_virtual)
-                    rotation_vector = rotation_mat.T.flatten()
-                else:
-                    # UHF: rotation_vector contains both alpha and beta
-                    # For simplicity, we'll handle the full vector conversion
-                    num_alpha_virtual = num_molecular_orbitals - num_alpha_electrons
-                    num_beta_virtual = num_molecular_orbitals - num_beta_electrons
-                    alpha_size = num_alpha_electrons * num_alpha_virtual
-
-                    # Split, reshape, transpose, and recombine
-                    alpha_vec = rotation_vector[:alpha_size]
-                    beta_vec = rotation_vector[alpha_size:]
-
-                    # Reshape from column-major (nvir, nocc) to row-major (nocc, nvir)
-                    alpha_mat = alpha_vec.reshape(num_alpha_electrons, num_alpha_virtual)
-                    alpha_rowmajor = alpha_mat.T.flatten()
-
-                    beta_mat = beta_vec.reshape(num_beta_electrons, num_beta_virtual)
-                    beta_rowmajor = beta_mat.T.flatten()
-
-                    rotation_vector = np.concatenate([alpha_rowmajor, beta_rowmajor])
-
-            Ca, Cb = orbitals.get_coefficients()
-            print("before rotation")
-            print(Ca)
             # Rotate the orbitals
             rotated_orbitals = rotate_orbitals(
                 orbitals, rotation_vector, num_alpha_electrons, num_beta_electrons, do_external
             )
-            Ca, Cb = rotated_orbitals.get_coefficients()
-            print("after rotation")
-            print(Ca)
 
             # If external instability, switch to unrestricted and disable external checks
             if do_external:

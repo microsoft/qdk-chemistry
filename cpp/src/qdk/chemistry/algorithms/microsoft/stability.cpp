@@ -292,6 +292,26 @@ class StabilityOperator {
   }
 };
 
+/**
+ * @brief Transpose eigenvector from column-major to row-major format in-place
+ *
+ * Converts eigenvector storage from (nvir x nocc) column-major to (nocc x nvir)
+ * row-major.
+ *
+ * @param eigenvector_ptr Pointer to the eigenvector data to transpose in-place
+ * @param num_virtual Number of virtual orbitals
+ * @param num_occupied Number of occupied orbitals
+ */
+void transpose_eigenvector_to_rowmajor(double* eigenvector_ptr,
+                                       size_t num_virtual,
+                                       size_t num_occupied) {
+  Eigen::Map<const Eigen::MatrixXd> col_major(eigenvector_ptr, num_virtual,
+                                              num_occupied);
+  Eigen::MatrixXd row_major = col_major.transpose();
+  Eigen::Map<Eigen::MatrixXd>(eigenvector_ptr, num_occupied, num_virtual) =
+      row_major;
+}
+
 }  // namespace detail
 
 std::pair<bool, std::shared_ptr<data::StabilityResult>>
@@ -330,7 +350,7 @@ StabilityChecker::_run_impl(
   }
 
   if (check_external and unrestricted) {
-    throw std::runtime_error(
+    throw std::invalid_argument(
         "External stability analysis (RHF -> UHF) is not supported for UHF "
         "wavefunctions.");
   }
@@ -469,6 +489,17 @@ StabilityChecker::_run_impl(
         num_iterations, lowest_eigenvalue);
     internal_eigenvalues.resize(1);
     internal_eigenvalues(0) = lowest_eigenvalue;
+
+    // Transpose eigenvectors from column-major (nvir x nocc) to row-major
+    // to be compatible with the PySCF format
+    detail::transpose_eigenvector_to_rowmajor(internal_eigenvectors.data(),
+                                              num_virtual_alpha_orbitals,
+                                              n_alpha_electrons);
+    if (unrestricted) {
+      detail::transpose_eigenvector_to_rowmajor(
+          internal_eigenvectors.data() + nova, num_virtual_beta_orbitals,
+          n_beta_electrons);
+    }
   }
 
   if (check_external) {
@@ -492,6 +523,17 @@ StabilityChecker::_run_impl(
         num_iterations, lowest_eigenvalue);
     external_eigenvalues.resize(1);
     external_eigenvalues(0) = lowest_eigenvalue;
+
+    // Transpose eigenvectors from column-major (nvir x nocc)
+    // to be compatible with the PySCF format
+    detail::transpose_eigenvector_to_rowmajor(external_eigenvectors.data(),
+                                              num_virtual_alpha_orbitals,
+                                              n_alpha_electrons);
+    if (unrestricted) {
+      detail::transpose_eigenvector_to_rowmajor(
+          external_eigenvectors.data() + nova, num_virtual_beta_orbitals,
+          n_beta_electrons);
+    }
   }
 
   // Create the stability result object
