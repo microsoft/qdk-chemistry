@@ -270,8 +270,10 @@ TEST_F(StructureBasicTest, EigenVectorProperties) {
   // Test that masses are Eigen::VectorXd
   const Eigen::VectorXd& masses = s.get_masses();
   EXPECT_EQ(masses.size(), 2);
-  EXPECT_GT(masses(0), 0.0);  // Should have positive mass
-  EXPECT_GT(masses(1), 0.0);  // Should have positive mass
+  EXPECT_NEAR(masses(0), 1.0080,
+              testing::numerical_zero_tolerance);  // Should have positive mass
+  EXPECT_NEAR(masses(1), 12.011,
+              testing::numerical_zero_tolerance);  // Should have positive mass
 
   // Test constructor with custom charges
   std::vector<double> custom_charges = {1.5, 6.5};  // Fractional charges
@@ -421,8 +423,10 @@ TEST_F(StructureBasicTest, StructureProperties) {
 
   const Eigen::VectorXd& masses = s.get_masses();
   EXPECT_EQ(masses.size(), 2);
-  EXPECT_GT(masses[0], 0.0);  // Should have positive mass
-  EXPECT_GT(masses[1], 0.0);  // Should have positive mass
+  EXPECT_NEAR(masses[0], 1.0080,
+              testing::numerical_zero_tolerance);  // Should have positive mass
+  EXPECT_NEAR(masses[1], 12.011,
+              testing::numerical_zero_tolerance);  // Should have positive mass
 
   const Eigen::VectorXd& charges = s.get_nuclear_charges();
   EXPECT_EQ(charges.size(), 2);
@@ -547,8 +551,12 @@ TEST_F(StructureBasicTest, JSONDeserializationEdgeCases) {
       {"elements", {1, 6}}};
   auto s3 = Structure::from_json(json_no_masses);
   EXPECT_EQ(s3->get_num_atoms(), 2);
-  EXPECT_GT(s3->get_atom_mass(0), 0.0);  // Should have standard H mass
-  EXPECT_GT(s3->get_atom_mass(1), 0.0);  // Should have standard C mass
+  EXPECT_NEAR(
+      s3->get_atom_mass(0), 1.0080,
+      testing::numerical_zero_tolerance);  // Should have standard H mass
+  EXPECT_NEAR(
+      s3->get_atom_mass(1), 12.011,
+      testing::numerical_zero_tolerance);  // Should have standard C mass
 
   // Test standard nuclear charges when not provided
   nlohmann::json json_no_nuclear_charges = {
