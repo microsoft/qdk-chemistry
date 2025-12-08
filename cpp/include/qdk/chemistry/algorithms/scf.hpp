@@ -29,6 +29,7 @@ class ElectronicStructureSettings : public data::Settings {
     set_default("max_iterations", 50, "Maximum number of SCF iterations",
                 qdk::chemistry::data::BoundConstraint<int64_t>{
                     1, std::numeric_limits<int64_t>::max()});
+    set_default("scf_type", "auto");
   }
 };
 
