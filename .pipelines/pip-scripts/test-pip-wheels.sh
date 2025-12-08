@@ -5,9 +5,9 @@ PYTHON_VERSION=${1:-3.11}
 export DEBIAN_FRONTEND=noninteractive
 
 # Try to prevent stochastic segfault from libc-bin
-rm /var/lib/dpkg/info/libc-bin.*
-apt-get clean
-apt-get update
+rm /var/lib/dpkg/info/libc-bin.* && \
+apt-get clean && \
+apt-get update && \
 apt install libc-bin
 
 # Update and install dependencies needed for testing
