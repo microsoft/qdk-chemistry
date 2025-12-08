@@ -69,7 +69,7 @@ class Structure : public DataClass,
    * @param symbols Vector of atomic symbols (e.g., "H", "C", "O")
    * @param masses Vector of atomic masses in AMU (default: use default masses)
    * @param nuclear_charges Vector of nuclear charges (default: use default
-   *    * charges)
+   * charges)
    * @throws std::invalid_argument if dimensions don't match or unknown symbols
    */
   Structure(const Eigen::MatrixXd& coordinates,
@@ -447,12 +447,20 @@ class Structure : public DataClass,
   static std::string _extract_numbers_from_symbol(const std::string& symbol);
 
   /**
-   * @brief Fix capitalization of atomic symbol (e.g., "he" -> "He", "CA" ->
-   * "Ca")
+   * @brief Normalize atomic symbol by fixing capitalization and handling
+   * special cases
    * @param symbol Input atomic symbol with potentially incorrect capitalization
-   * @return Properly capitalized atomic symbol
+   * (e.g., "he3", "CA", "D", "t")
+   * @return Properly capitalized atomic symbol (e.g., "He3", "Ca") or converted
+   * form for special cases ("D" -> "H2", "t" -> "H3")
+   *
+   * This function:
+   * - Converts the symbol to have the first letter uppercase and remaining
+   * letters lowercase
+   * - Handles special aliases: "D" (deuterium) is converted to "H2" and "T"
+   * (tritium) is converted to "H3"
    */
-  static std::string _fix_symbol(const std::string& symbol);
+  static std::string _normalize_symbol(const std::string& symbol);
 
   /**
    * @brief Private function to save structure to JSON file without validation

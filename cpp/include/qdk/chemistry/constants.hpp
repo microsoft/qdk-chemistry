@@ -185,7 +185,9 @@ constexpr const char* get_current_codata_version() {
 #elif QDK_CHEMISTRY_CODATA_VERSION == QDK_CHEMISTRY_CODATA_2014
   return "CODATA 2014";
 #else
-  static_assert(false,
+  static_assert(QDK_CHEMISTRY_CODATA_VERSION == QDK_CHEMISTRY_CODATA_2022 ||
+                    QDK_CHEMISTRY_CODATA_VERSION == QDK_CHEMISTRY_CODATA_2018 ||
+                    QDK_CHEMISTRY_CODATA_VERSION == QDK_CHEMISTRY_CODATA_2014,
                 "Unsupported QDK_CHEMISTRY_CODATA_VERSION. Supported versions: "
                 "QDK_CHEMISTRY_CODATA_2022, QDK_CHEMISTRY_CODATA_2018, "
                 "QDK_CHEMISTRY_CODATA_2014");
@@ -206,7 +208,9 @@ using namespace codata_2018;
 #elif QDK_CHEMISTRY_CODATA_VERSION == QDK_CHEMISTRY_CODATA_2014
 using namespace codata_2014;
 #else
-static_assert(false,
+static_assert(QDK_CHEMISTRY_CODATA_VERSION == QDK_CHEMISTRY_CODATA_2022 ||
+                  QDK_CHEMISTRY_CODATA_VERSION == QDK_CHEMISTRY_CODATA_2018 ||
+                  QDK_CHEMISTRY_CODATA_VERSION == QDK_CHEMISTRY_CODATA_2014,
               "Unsupported QDK_CHEMISTRY_CODATA_VERSION. Supported versions: "
               "QDK_CHEMISTRY_CODATA_2022, QDK_CHEMISTRY_CODATA_2018, "
               "QDK_CHEMISTRY_CODATA_2014");

@@ -12,7 +12,7 @@ The constants include fundamental physical constants, particle masses,
 and energy conversion factors commonly used in computational chemistry
 and quantum mechanics.
 
-Data Source
+Data Source:
     CODATA recommended values of the fundamental physical constants
     Currently using: CODATA 2022 (default)
     Also available: CODATA 2018, CODATA 2014 (via C++ preprocessor directives)

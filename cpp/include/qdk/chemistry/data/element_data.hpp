@@ -288,7 +288,7 @@ constexpr const char* get_current_ciaaw_version() {
 #if QDK_CHEMISTRY_CIAAW_VERSION == QDK_CHEMISTRY_CIAAW_2024
   return "CIAAW 2024";
 #else
-  static_assert(false,
+  static_assert(QDK_CHEMISTRY_CIAAW_VERSION == QDK_CHEMISTRY_CIAAW_2024,
                 "Unsupported QDK_CHEMISTRY_CIAAW_VERSION. Supported versions: "
                 "QDK_CHEMISTRY_CIAAW_2024");
 #endif
@@ -300,7 +300,7 @@ constexpr const char* get_current_ciaaw_version() {
 #if QDK_CHEMISTRY_CIAAW_VERSION == QDK_CHEMISTRY_CIAAW_2024
 using namespace ciaaw_2024;
 #else
-static_assert(false,
+static_assert(QDK_CHEMISTRY_CIAAW_VERSION == QDK_CHEMISTRY_CIAAW_2024,
               "Unsupported QDK_CHEMISTRY_CIAAW_VERSION. Supported versions: "
               "QDK_CHEMISTRY_CIAAW_2024");
 #endif
