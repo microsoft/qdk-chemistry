@@ -7,6 +7,7 @@
 
 import pickle
 import tempfile
+import warnings
 
 import numpy as np
 import pytest
@@ -863,9 +864,12 @@ class TestStabilityWorkflow:
         stability_checker.settings().set("nroots", 3)
 
         # Run workflow - should detect internal instability of UHF
-        energy, wfn, is_stable, result = self._run_scf_with_stability_workflow(
-            n2, 0, 1, scf_solver, stability_checker, max_stability_iterations=10
-        )
+        # Suppress expected warning about unrestricted reference for closed-shell system
+        with warnings.catch_warnings():
+            warnings.filterwarnings("ignore", message="Unrestricted reference requested for closed-shell system")
+            energy, _wfn, _is_stable, result = self._run_scf_with_stability_workflow(
+                n2, 0, 1, scf_solver, stability_checker, max_stability_iterations=10
+            )
         assert result.is_internal_stable() is True, "Final wavefunction should be internally stable"
 
         # Check energy matches reference value - should converge to same UHF energy as manual rotation

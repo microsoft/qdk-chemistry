@@ -1289,3 +1289,369 @@ class TestSettingsCustomClass:
         # Should fail with missing key
         with pytest.raises(SettingNotFoundError):
             settings.validate_required(["param1", "param2", "missing_param"])
+
+
+class TestSettingsTypeMismatchErrors:
+    """Test comprehensive type mismatch error handling."""
+
+    def test_bool_type_mismatch_errors(self):
+        """Test that booleans cannot be used where other types are expected."""
+        settings = _TestSettingsContainer()
+
+        # Bool cannot be used as int (explicit check in code)
+        with pytest.raises(SettingTypeMismatch, match="int"):
+            settings.set("int_val", True)
+
+        with pytest.raises(SettingTypeMismatch, match="int"):
+            settings["int_val"] = False
+
+    def test_int_type_mismatch_errors(self):
+        """Test integer type mismatch scenarios."""
+        settings = _TestSettingsContainer()
+
+        # String cannot be used as int
+        with pytest.raises(SettingTypeMismatch, match="int"):
+            settings["int_val"] = "not an integer"
+
+        # Float cannot be used as int (without conversion)
+        with pytest.raises(SettingTypeMismatch, match="int"):
+            settings["int_val"] = 3.14
+
+        # List cannot be used as int
+        with pytest.raises(SettingTypeMismatch, match="int"):
+            settings["int_val"] = [1, 2, 3]
+
+    def test_float_type_mismatch_errors(self):
+        """Test float type mismatch scenarios."""
+        settings = _TestSettingsContainer()
+
+        # String cannot be used as float
+        with pytest.raises(SettingTypeMismatch, match=r"float|double"):
+            settings["float_val"] = "not a float"
+
+        # List cannot be used as float
+        with pytest.raises(SettingTypeMismatch, match=r"float|double"):
+            settings["float_val"] = [1.0, 2.0]
+
+    def test_string_type_mismatch_errors(self):
+        """Test string type mismatch scenarios."""
+        settings = _TestSettingsContainer()
+
+        # Int cannot be used as string
+        with pytest.raises(SettingTypeMismatch, match="string"):
+            settings["string_val"] = 42
+
+        # Float cannot be used as string
+        with pytest.raises(SettingTypeMismatch, match="string"):
+            settings["string_val"] = 3.14
+
+        # Bool cannot be used as string
+        with pytest.raises(SettingTypeMismatch, match="string"):
+            settings["string_val"] = True
+
+        # List cannot be used as string
+        with pytest.raises(SettingTypeMismatch, match="string"):
+            settings["string_val"] = ["a", "b"]
+
+    def test_vector_int_type_mismatch_errors(self):
+        """Test vector<int> type mismatch scenarios."""
+        settings = _TestSettingsContainer()
+
+        # String cannot be used as vector<int>
+        with pytest.raises(SettingTypeMismatch, match="vector<int>"):
+            settings["int_vector"] = "not a list"
+
+        # Single int cannot be used as vector<int>
+        with pytest.raises(SettingTypeMismatch, match="vector<int>"):
+            settings["int_vector"] = 42
+
+        # Bool list cannot be used as vector<int>
+        with pytest.raises(SettingTypeMismatch, match="bool"):
+            settings["int_vector"] = [True, False, True]
+
+        # Mixed bool and int cannot be used
+        with pytest.raises(SettingTypeMismatch, match="bool"):
+            settings["int_vector"] = [1, True, 3]
+
+        # Float list cannot be used as vector<int>
+        with pytest.raises(SettingTypeMismatch):
+            settings["int_vector"] = [1.5, 2.5, 3.5]
+
+        # String list cannot be used as vector<int>
+        with pytest.raises(SettingTypeMismatch):
+            settings["int_vector"] = ["1", "2", "3"]
+
+    def test_vector_double_type_mismatch_errors(self):
+        """Test vector<double> type mismatch scenarios."""
+        settings = _TestSettingsContainer()
+
+        # String cannot be used as vector<double>
+        with pytest.raises(SettingTypeMismatch, match="vector<double>"):
+            settings["double_vector"] = "not a list"
+
+        # Single float cannot be used as vector<double>
+        with pytest.raises(SettingTypeMismatch, match="vector<double>"):
+            settings["double_vector"] = 3.14
+
+        # String list cannot be used as vector<double>
+        with pytest.raises(SettingTypeMismatch):
+            settings["double_vector"] = ["1.0", "2.0"]
+
+        # Bool list cannot be used as vector<double>
+        with pytest.raises(SettingTypeMismatch):
+            settings["double_vector"] = [True, False]
+
+    def test_vector_string_type_mismatch_errors(self):
+        """Test vector<string> type mismatch scenarios."""
+        settings = _TestSettingsContainer()
+
+        # String cannot be used as vector<string>
+        with pytest.raises(SettingTypeMismatch, match="vector<string>"):
+            settings["string_vector"] = "not a list"
+
+        # Int list cannot be used as vector<string>
+        with pytest.raises(SettingTypeMismatch):
+            settings["string_vector"] = [1, 2, 3]
+
+        # Float list cannot be used as vector<string>
+        with pytest.raises(SettingTypeMismatch):
+            settings["string_vector"] = [1.0, 2.0]
+
+        # Bool list cannot be used as vector<string>
+        with pytest.raises(SettingTypeMismatch):
+            settings["string_vector"] = [True, False]
+
+        # Mixed type list cannot be used as vector<string>
+        with pytest.raises(SettingTypeMismatch):
+            settings["string_vector"] = ["a", 1, "b"]
+
+
+class TestSettingsNumpyAdvancedTypeHandling:
+    """Test advanced numpy type detection and handling."""
+
+    def test_numpy_bool_rejected_as_int(self):
+        """Test that numpy bool is rejected for int settings."""
+        settings = _TestSettingsContainer()
+
+        # Numpy bool should be rejected for int (same as Python bool)
+        with pytest.raises(SettingTypeMismatch, match="int"):
+            settings["int_val"] = np.bool_(True)
+
+        with pytest.raises(SettingTypeMismatch, match="int"):
+            settings["int_val"] = np.bool_(False)
+
+    def test_numpy_array_to_vector_int(self):
+        """Test numpy array conversion to vector<int>."""
+        settings = _TestSettingsContainer()
+
+        # Test 1D numpy int array
+        arr = np.array([1, 2, 3, 4, 5], dtype=np.int32)
+        settings["int_vector"] = arr
+        assert settings["int_vector"] == [1, 2, 3, 4, 5]
+
+        # Test with int64
+        arr64 = np.array([10, 20, 30], dtype=np.int64)
+        settings["int_vector"] = arr64
+        assert settings["int_vector"] == [10, 20, 30]
+
+        # Test with uint
+        arr_uint = np.array([5, 10, 15], dtype=np.uint32)
+        settings["int_vector"] = arr_uint
+        assert settings["int_vector"] == [5, 10, 15]
+
+    def test_numpy_array_to_vector_double(self):
+        """Test numpy array conversion to vector<double>."""
+        settings = _TestSettingsContainer()
+
+        # Test 1D numpy float array
+        arr = np.array([1.1, 2.2, 3.3, 4.4], dtype=np.float64)
+        settings["double_vector"] = arr
+        result = settings["double_vector"]
+        assert len(result) == 4
+        assert np.allclose(result, [1.1, 2.2, 3.3, 4.4])
+
+        # Test with float32
+        arr32 = np.array([1.5, 2.5, 3.5], dtype=np.float32)
+        settings["double_vector"] = arr32
+        result = settings["double_vector"]
+        assert len(result) == 3
+
+        # Test with integer array (should be promoted to double)
+        arr_int = np.array([1, 2, 3], dtype=np.int32)
+        settings["double_vector"] = arr_int
+        assert settings["double_vector"] == [1.0, 2.0, 3.0]
+
+    def test_numpy_array_bool_elements_rejected_for_vector_int(self):
+        """Test that numpy arrays with bool elements are rejected for vector<int>."""
+        settings = _TestSettingsContainer()
+
+        # Array of bools should be rejected
+        arr_bool = np.array([True, False, True], dtype=np.bool_)
+        with pytest.raises(SettingTypeMismatch, match="bool"):
+            settings["int_vector"] = arr_bool
+
+    def test_numpy_array_invalid_dtypes_for_vectors(self):
+        """Test that numpy arrays with invalid dtypes are rejected."""
+        settings = _TestSettingsContainer()
+
+        # String array for int vector should fail
+        arr_str = np.array(["1", "2", "3"], dtype=object)
+        with pytest.raises(SettingTypeMismatch):
+            settings["int_vector"] = arr_str
+
+
+class TestSettingsLockUnlock:
+    """Test lock functionality."""
+
+    def test_lock_prevents_modifications(self):
+        """Test that lock prevents setting modifications."""
+        settings = _TestSettingsContainer()
+        settings["int_val"] = 42
+        settings["string_val"] = "test"
+
+        # Lock the settings
+        settings.lock()
+
+        # Attempts to modify should raise exception
+        with pytest.raises(Exception, match="locked"):
+            settings["int_val"] = 100
+
+        with pytest.raises(Exception, match="locked"):
+            settings.set("string_val", "new_value")
+
+
+class TestSettingsLimitsAndDescriptions:
+    """Test limits and description functionality."""
+
+    def test_set_and_get_description(self):
+        """Test setting and getting descriptions."""
+
+        class DescribedSettings(Settings):
+            def __init__(self):
+                super().__init__()
+                self._set_default("param1", "int", 42, "This is parameter 1")
+                self._set_default("param2", "string", "default", "This is parameter 2")
+                self._set_default("param3", "int", 0)  # No description
+
+        settings = DescribedSettings()
+
+        # Test has_description
+        assert settings.has_description("param1")
+        assert settings.has_description("param2")
+        assert not settings.has_description("param3")
+
+        # Test get_description
+        assert settings.get_description("param1") == "This is parameter 1"
+        assert settings.get_description("param2") == "This is parameter 2"
+
+
+class TestSettingsVectorEdgeCases:
+    """Test edge cases for vector conversions."""
+
+    def test_empty_vectors(self):
+        """Test empty vector assignments."""
+        settings = _TestSettingsContainer()
+
+        # Empty list for vector<int>
+        settings["int_vector"] = []
+        assert settings["int_vector"] == []
+
+        # Empty list for vector<double>
+        settings["double_vector"] = []
+        assert settings["double_vector"] == []
+
+        # Empty list for vector<string>
+        settings["string_vector"] = []
+        assert settings["string_vector"] == []
+
+        # Empty tuple should also work
+        settings["int_vector"] = ()
+        assert settings["int_vector"] == []
+
+    def test_single_element_vectors(self):
+        """Test single element vector assignments."""
+        settings = _TestSettingsContainer()
+
+        # Single int
+        settings["int_vector"] = [42]
+        assert settings["int_vector"] == [42]
+
+        # Single float
+        settings["double_vector"] = [3.14]
+        assert settings["double_vector"] == [3.14]
+
+        # Single string
+        settings["string_vector"] = ["test"]
+        assert settings["string_vector"] == ["test"]
+
+    def test_large_vectors(self):
+        """Test large vector assignments."""
+        settings = _TestSettingsContainer()
+
+        # Large int vector
+        large_int_list = list(range(1000))
+        settings["int_vector"] = large_int_list
+        assert settings["int_vector"] == large_int_list
+
+        # Large float vector
+        large_float_list = [float(i) * 0.1 for i in range(1000)]
+        settings["double_vector"] = large_float_list
+        result = settings["double_vector"]
+        assert len(result) == 1000
+        assert np.allclose(result, large_float_list)
+
+    def test_tuple_to_vector_conversion(self):
+        """Test tuple to vector conversion."""
+        settings = _TestSettingsContainer()
+
+        # Tuple of ints
+        settings["int_vector"] = (1, 2, 3, 4)
+        assert settings["int_vector"] == [1, 2, 3, 4]
+
+        # Tuple of floats
+        settings["double_vector"] = (1.1, 2.2, 3.3)
+        assert settings["double_vector"] == [1.1, 2.2, 3.3]
+
+        # Tuple of strings
+        settings["string_vector"] = ("a", "b", "c")
+        assert settings["string_vector"] == ["a", "b", "c"]
+
+    def test_mixed_numeric_types_in_vector_double(self):
+        """Test mixed int and float in vector<double>."""
+        settings = _TestSettingsContainer()
+
+        # Mix of int and float should work for vector<double>
+        settings["double_vector"] = [1, 2.5, 3, 4.5]
+        result = settings["double_vector"]
+        assert result == [1.0, 2.5, 3.0, 4.5]
+
+    def test_numpy_array_empty(self):
+        """Test empty numpy array conversion."""
+        settings = _TestSettingsContainer()
+
+        # Empty numpy int array
+        arr = np.array([], dtype=np.int32)
+        settings["int_vector"] = arr
+        assert settings["int_vector"] == []
+
+        # Empty numpy float array
+        arr_float = np.array([], dtype=np.float64)
+        settings["double_vector"] = arr_float
+        assert settings["double_vector"] == []
+
+
+class TestSettingsIntFloatConversion:
+    """Test int to float automatic conversion."""
+
+    def test_int_accepted_for_float_settings(self):
+        """Test that integers are accepted for float/double settings."""
+        settings = _TestSettingsContainer()
+
+        # Int should be promotable to float
+        settings["float_val"] = 42
+        assert settings["float_val"] == 42.0
+        assert isinstance(settings["float_val"], float)
+
+        settings["double_val"] = 100
+        assert settings["double_val"] == 100.0
+        assert isinstance(settings["double_val"], float)

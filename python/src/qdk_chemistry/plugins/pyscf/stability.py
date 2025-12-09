@@ -274,10 +274,10 @@ class PyscfStabilityChecker(StabilityChecker):
         mf = orbitals_to_scf(orbitals, occ_alpha, occ_beta, method=method)
 
         # Determine wavefunction type and perform appropriate stability analysis
-        internal_eigenvalues_list = []
-        internal_eigenvectors_list = []
-        external_eigenvalues_list = []
-        external_eigenvectors_list = []
+        internal_eigenvalues_list: list = []
+        internal_eigenvectors_list: list = []
+        external_eigenvalues_list: list = []
+        external_eigenvectors_list: list = []
 
         if isinstance(mf, scf.rohf.ROHF):
             # ROHF stability analysis

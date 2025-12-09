@@ -5,6 +5,7 @@
 # Licensed under the MIT License. See LICENSE.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
 
+import json
 import tempfile
 from pathlib import Path
 
@@ -268,3 +269,226 @@ class TestDataClassCompliance:
 
         assert summary1 == summary2
         assert isinstance(summary1, str)
+
+
+class TestDataClassDeserialization:
+    """Test deserialization methods on DataClass base class."""
+
+    def test_derived_class_from_json_file_works(self):
+        """Test that derived classes can successfully use from_json_file."""
+        coords = np.array([[0.0, 0.0, 0.0], [0.0, 0.0, 0.74]])
+        nuclear_charges = [1, 1]
+        s = Structure(coords, nuclear_charges)
+
+        with tempfile.TemporaryDirectory() as temp_dir:
+            temp_path = Path(temp_dir)
+            json_file = temp_path / "test.structure.json"
+
+            # Save structure
+            s.to_json_file(str(json_file))
+
+            # Load structure back
+            loaded = Structure.from_json_file(str(json_file))
+            assert loaded.get_num_atoms() == s.get_num_atoms()
+
+    def test_derived_class_from_hdf5_file_works(self):
+        """Test that derived classes can successfully use from_hdf5_file."""
+        coords = np.array([[0.0, 0.0, 0.0], [0.0, 0.0, 0.74]])
+        nuclear_charges = [1, 1]
+        s = Structure(coords, nuclear_charges)
+
+        with tempfile.TemporaryDirectory() as temp_dir:
+            temp_path = Path(temp_dir)
+            h5_file = temp_path / "test.structure.h5"
+
+            # Save structure
+            s.to_hdf5_file(str(h5_file))
+
+            # Load structure back
+            loaded = Structure.from_hdf5_file(str(h5_file))
+            assert loaded.get_num_atoms() == s.get_num_atoms()
+
+
+class TestDataClassErrorHandling:
+    """Test error handling and edge cases for DataClass methods."""
+
+    def test_to_hdf5_file_invalid_directory(self):
+        """Test that to_file raises error for unsupported format."""
+        coords = np.array([[0.0, 0.0, 0.0]])
+        nuclear_charges = [1]
+        s = Structure(coords, nuclear_charges)
+
+        with tempfile.TemporaryDirectory() as temp_dir:
+            temp_path = Path(temp_dir)
+            test_file = temp_path / "test.txt"
+
+            with pytest.raises((ValueError, RuntimeError)):
+                s.to_file(str(test_file), "unsupported_format")
+
+    def test_to_file_with_empty_format_string(self):
+        """Test that to_file handles empty format string."""
+        coords = np.array([[0.0, 0.0, 0.0]])
+        nuclear_charges = [1]
+        s = Structure(coords, nuclear_charges)
+
+        with tempfile.TemporaryDirectory() as temp_dir:
+            temp_path = Path(temp_dir)
+            test_file = temp_path / "test.dat"
+
+            with pytest.raises((ValueError, RuntimeError)):
+                s.to_file(str(test_file), "")
+
+    def test_from_hdf5_file_nonexistent_file(self):
+        """Test that pathlib.Path objects with special characters work."""
+        coords = np.array([[0.0, 0.0, 0.0]])
+        nuclear_charges = [1]
+        s = Structure(coords, nuclear_charges)
+
+        with tempfile.TemporaryDirectory() as temp_dir:
+            temp_path = Path(temp_dir)
+            # Use a filename with spaces and underscores
+            json_file = temp_path / "test file_name.structure.json"
+
+            s.to_json_file(json_file)
+            assert json_file.exists()
+
+            loaded = Structure.from_json_file(json_file)
+            assert loaded.get_num_atoms() == 1
+
+
+class TestDataClassRoundTrip:
+    """Test round-trip serialization/deserialization for DataClass."""
+
+    def test_json_round_trip(self):
+        """Test that data survives JSON round-trip."""
+        coords = np.array([[0.0, 0.0, 0.0], [1.0, 0.0, 0.0], [0.0, 1.0, 0.0]])
+        nuclear_charges = [6, 1, 1]
+        original = Structure(coords, nuclear_charges)
+
+        with tempfile.TemporaryDirectory() as temp_dir:
+            temp_path = Path(temp_dir)
+            json_file = temp_path / "roundtrip.structure.json"
+
+            # Save and load
+            original.to_json_file(json_file)
+            loaded = Structure.from_json_file(json_file)
+
+            # Verify data is preserved
+            assert loaded.get_num_atoms() == original.get_num_atoms()
+            assert loaded.get_total_nuclear_charge() == original.get_total_nuclear_charge()
+
+    def test_hdf5_round_trip(self):
+        """Test that data survives HDF5 round-trip."""
+        coords = np.array([[0.0, 0.0, 0.0], [1.0, 0.0, 0.0], [0.0, 1.0, 0.0]])
+        nuclear_charges = [6, 1, 1]
+        original = Structure(coords, nuclear_charges)
+
+        with tempfile.TemporaryDirectory() as temp_dir:
+            temp_path = Path(temp_dir)
+            h5_file = temp_path / "roundtrip.structure.h5"
+
+            # Save and load
+            original.to_hdf5_file(h5_file)
+            loaded = Structure.from_hdf5_file(h5_file)
+
+            # Verify data is preserved
+            assert loaded.get_num_atoms() == original.get_num_atoms()
+            assert loaded.get_total_nuclear_charge() == original.get_total_nuclear_charge()
+
+    def test_generic_file_json_round_trip(self):
+        """Test that data survives generic file I/O round-trip with JSON format."""
+        coords = np.array([[0.0, 0.0, 0.0], [1.0, 0.0, 0.0]])
+        nuclear_charges = [8, 1]
+        original = Structure(coords, nuclear_charges)
+
+        with tempfile.TemporaryDirectory() as temp_dir:
+            temp_path = Path(temp_dir)
+            file_path = temp_path / "generic.structure.json"
+
+            # Save and load using generic interface
+            original.to_file(file_path, "json")
+            loaded = Structure.from_file(file_path, "json")
+
+            # Verify data is preserved
+            assert loaded.get_num_atoms() == original.get_num_atoms()
+            assert loaded.get_total_nuclear_charge() == original.get_total_nuclear_charge()
+
+    def test_generic_file_hdf5_round_trip(self):
+        """Test that data survives generic file I/O round-trip with HDF5 format."""
+        coords = np.array([[0.0, 0.0, 0.0], [1.0, 0.0, 0.0]])
+        nuclear_charges = [8, 1]
+        original = Structure(coords, nuclear_charges)
+
+        with tempfile.TemporaryDirectory() as temp_dir:
+            temp_path = Path(temp_dir)
+            file_path = temp_path / "generic.structure.h5"
+
+            # Save and load using generic interface
+            original.to_file(file_path, "hdf5")
+            loaded = Structure.from_file(file_path, "hdf5")
+
+            # Verify data is preserved
+            assert loaded.get_num_atoms() == original.get_num_atoms()
+            assert loaded.get_total_nuclear_charge() == original.get_total_nuclear_charge()
+
+
+class TestDataClassMultipleObjects:
+    """Test DataClass with multiple objects and complex scenarios."""
+
+    def test_json_string_method(self):
+        """Test that to_json returns valid JSON string."""
+        coords = np.array([[0.0, 0.0, 0.0], [1.0, 0.0, 0.0]])
+        nuclear_charges = [1, 1]
+        s = Structure(coords, nuclear_charges)
+
+        json_str = s.to_json()
+
+        # Should be valid JSON
+        parsed = json.loads(json_str)
+        assert isinstance(parsed, dict)
+        assert len(parsed) > 0
+
+    def test_get_summary_not_empty(self):
+        """Test that get_summary returns non-empty informative string."""
+        coords = np.array([[0.0, 0.0, 0.0], [1.0, 0.0, 0.0]])
+        nuclear_charges = [6, 1]
+        s = Structure(coords, nuclear_charges)
+
+        summary = s.get_summary()
+
+        assert isinstance(summary, str)
+        assert len(summary) > 10  # Should be more than just a few characters
+        # Summary should contain some useful information
+        assert "Structure" in summary or "atom" in summary.lower()
+
+    def test_concurrent_file_operations(self):
+        """Test that multiple file operations can be performed safely."""
+        coords = np.array([[0.0, 0.0, 0.0]])
+        nuclear_charges = [1]
+        s = Structure(coords, nuclear_charges)
+
+        with tempfile.TemporaryDirectory() as temp_dir:
+            temp_path = Path(temp_dir)
+
+            # Perform multiple file operations
+            json_file1 = temp_path / "test1.structure.json"
+            json_file2 = temp_path / "test2.structure.json"
+            h5_file = temp_path / "test.structure.h5"
+
+            s.to_json_file(json_file1)
+            s.to_json_file(json_file2)
+            s.to_hdf5_file(h5_file)
+
+            # All files should exist
+            assert json_file1.exists()
+            assert json_file2.exists()
+            assert h5_file.exists()
+
+            # All should be loadable
+            loaded1 = Structure.from_json_file(json_file1)
+            loaded2 = Structure.from_json_file(json_file2)
+            loaded3 = Structure.from_hdf5_file(h5_file)
+
+            assert loaded1.get_num_atoms() == 1
+            assert loaded2.get_num_atoms() == 1
+            assert loaded3.get_num_atoms() == 1

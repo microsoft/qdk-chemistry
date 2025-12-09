@@ -11,7 +11,7 @@ from dataclasses import dataclass
 
 import numpy as np
 import pytest
-from qiskit import QuantumCircuit, transpile
+from qiskit import ClassicalRegister, QuantumCircuit, transpile
 from qiskit.quantum_info import SparsePauliOp
 from qiskit_aer import AerSimulator
 
@@ -20,6 +20,9 @@ from qdk_chemistry.algorithms import (
     TraditionalPhaseEstimation,
 )
 from qdk_chemistry.data import QpeResult, QubitHamiltonian
+from qdk_chemistry.phase_estimation.base import PhaseEstimationAlgorithm
+from qdk_chemistry.phase_estimation.iterative_qpe import IterativePhaseEstimationIteration
+from qdk_chemistry.utils.phase import accumulated_phase_from_bits
 
 from .reference_tolerances import (
     float_comparison_relative_tolerance,
@@ -438,3 +441,338 @@ def test_iterative_phase_estimation_second_non_commuting_example() -> None:
     assert np.isclose(
         result.resolved_energy, -0.08984375, rtol=float_comparison_relative_tolerance, atol=qpe_energy_tolerance
     )
+
+
+# Tests for create_iterations method
+def test_create_iterations_generates_correct_number_of_circuits(
+    two_qubit_phase_problem: PhaseEstimationProblem,
+) -> None:
+    """Test that create_iterations generates the correct number of iteration circuits."""
+    iqpe = IterativePhaseEstimation(two_qubit_phase_problem.hamiltonian, two_qubit_phase_problem.evolution_time)
+
+    iterations = iqpe.create_iterations(two_qubit_phase_problem.state_prep, num_bits=5)
+
+    assert len(iterations) == 5
+    for idx, iteration in enumerate(iterations):
+        assert iteration.iteration == idx
+        assert iteration.total_iterations == 5
+
+
+def test_create_iterations_with_phase_corrections() -> None:
+    """Test create_iterations with custom phase corrections."""
+    sparse_pauli_op = SparsePauliOp.from_list([("ZZ", 1.0)])
+    hamiltonian = QubitHamiltonian(
+        pauli_strings=sparse_pauli_op.paulis.to_labels(), coefficients=sparse_pauli_op.coeffs
+    )
+    state_prep = QuantumCircuit(2)
+    state_prep.h([0, 1])
+
+    iqpe = IterativePhaseEstimation(hamiltonian, np.pi)
+
+    phase_corrections = [0.0, np.pi / 4, np.pi / 2, np.pi]
+    iterations = iqpe.create_iterations(state_prep, num_bits=4, phase_corrections=phase_corrections)
+
+    assert len(iterations) == 4
+    for idx, iteration in enumerate(iterations):
+        assert iteration.phase_correction == phase_corrections[idx]
+
+
+def test_create_iterations_with_custom_measurement_registers() -> None:
+    """Test create_iterations with custom measurement registers."""
+    sparse_pauli_op = SparsePauliOp.from_list([("XX", 0.5)])
+    hamiltonian = QubitHamiltonian(
+        pauli_strings=sparse_pauli_op.paulis.to_labels(), coefficients=sparse_pauli_op.coeffs
+    )
+    state_prep = QuantumCircuit(2)
+    state_prep.h([0, 1])
+
+    iqpe = IterativePhaseEstimation(hamiltonian, np.pi / 2)
+
+    custom_registers = [ClassicalRegister(1, f"custom_{i}") for i in range(3)]
+    iterations = iqpe.create_iterations(state_prep, num_bits=3, measurement_registers=custom_registers)
+
+    assert len(iterations) == 3
+    for idx, iteration in enumerate(iterations):
+        assert custom_registers[idx] in iteration.circuit.cregs
+
+
+def test_create_iterations_with_iteration_names() -> None:
+    """Test create_iterations with custom iteration names."""
+    sparse_pauli_op = SparsePauliOp.from_list([("ZI", 1.0)])
+    hamiltonian = QubitHamiltonian(
+        pauli_strings=sparse_pauli_op.paulis.to_labels(), coefficients=sparse_pauli_op.coeffs
+    )
+    state_prep = QuantumCircuit(2)
+    state_prep.h(0)
+
+    iqpe = IterativePhaseEstimation(hamiltonian, np.pi / 4)
+
+    names = ["iteration_0", "iteration_1", "iteration_2"]
+    iterations = iqpe.create_iterations(state_prep, num_bits=3, iteration_names=names)
+
+    assert len(iterations) == 3
+    for idx, iteration in enumerate(iterations):
+        assert iteration.circuit.name == names[idx]
+
+
+def test_create_iterations_invalid_num_bits() -> None:
+    """Test that create_iterations raises ValueError for non-positive num_bits."""
+    sparse_pauli_op = SparsePauliOp.from_list([("Z", 1.0)])
+    hamiltonian = QubitHamiltonian(
+        pauli_strings=sparse_pauli_op.paulis.to_labels(), coefficients=sparse_pauli_op.coeffs
+    )
+    state_prep = QuantumCircuit(1)
+
+    iqpe = IterativePhaseEstimation(hamiltonian, np.pi)
+
+    with pytest.raises(ValueError, match="num_bits must be a positive integer"):
+        iqpe.create_iterations(state_prep, num_bits=0)
+
+    with pytest.raises(ValueError, match="num_bits must be a positive integer"):
+        iqpe.create_iterations(state_prep, num_bits=-1)
+
+
+def test_create_iterations_mismatched_phase_corrections_length() -> None:
+    """Test that create_iterations raises ValueError when phase_corrections length doesn't match num_bits."""
+    sparse_pauli_op = SparsePauliOp.from_list([("Z", 1.0)])
+    hamiltonian = QubitHamiltonian(
+        pauli_strings=sparse_pauli_op.paulis.to_labels(), coefficients=sparse_pauli_op.coeffs
+    )
+    state_prep = QuantumCircuit(1)
+
+    iqpe = IterativePhaseEstimation(hamiltonian, np.pi)
+
+    with pytest.raises(ValueError, match="phase_corrections must have length equal to num_bits"):
+        iqpe.create_iterations(state_prep, num_bits=3, phase_corrections=[0.0, 0.0])
+
+
+def test_create_iterations_mismatched_measurement_registers_length() -> None:
+    """Test that create_iterations raises ValueError when measurement_registers length doesn't match num_bits."""
+    sparse_pauli_op = SparsePauliOp.from_list([("Z", 1.0)])
+    hamiltonian = QubitHamiltonian(
+        pauli_strings=sparse_pauli_op.paulis.to_labels(), coefficients=sparse_pauli_op.coeffs
+    )
+    state_prep = QuantumCircuit(1)
+
+    iqpe = IterativePhaseEstimation(hamiltonian, np.pi)
+
+    with pytest.raises(ValueError, match="measurement_registers must have length equal to num_bits"):
+        iqpe.create_iterations(
+            state_prep, num_bits=3, measurement_registers=[ClassicalRegister(1, "c0"), ClassicalRegister(1, "c1")]
+        )
+
+
+def test_create_iterations_mismatched_iteration_names_length() -> None:
+    """Test that create_iterations raises ValueError when iteration_names length doesn't match num_bits."""
+    sparse_pauli_op = SparsePauliOp.from_list([("Z", 1.0)])
+    hamiltonian = QubitHamiltonian(
+        pauli_strings=sparse_pauli_op.paulis.to_labels(), coefficients=sparse_pauli_op.coeffs
+    )
+    state_prep = QuantumCircuit(1)
+
+    iqpe = IterativePhaseEstimation(hamiltonian, np.pi)
+
+    with pytest.raises(ValueError, match="iteration_names must have length equal to num_bits"):
+        iqpe.create_iterations(state_prep, num_bits=3, iteration_names=["name1", "name2"])
+
+
+# Tests for static methods
+def test_update_phase_feedback_with_bit_zero() -> None:
+    """Test phase feedback update when measured bit is 0."""
+    current_phase = np.pi / 4
+    new_phase = IterativePhaseEstimation.update_phase_feedback(current_phase, 0)
+
+    # When bit is 0, phase should be halved
+    assert np.isclose(new_phase, current_phase / 2, rtol=float_comparison_relative_tolerance)
+
+
+def test_phase_fraction_from_feedback_zero() -> None:
+    """Test phase fraction calculation from zero feedback."""
+    phase_fraction = IterativePhaseEstimation.phase_fraction_from_feedback(0.0)
+    assert np.isclose(phase_fraction, 0.0, rtol=float_comparison_relative_tolerance)
+
+
+def test_phase_fraction_from_feedback_negative() -> None:
+    """Test phase fraction calculation from negative feedback."""
+    feedback = np.pi / 2
+    phase_fraction = IterativePhaseEstimation.phase_fraction_from_feedback(feedback)
+
+    # Should be in range [0, 1)
+    assert 0.0 <= phase_fraction < 1.0
+
+
+def test_phase_feedback_from_bits_empty() -> None:
+    """Test phase feedback calculation from empty bit sequence."""
+    phase_feedback = IterativePhaseEstimation.phase_feedback_from_bits([])
+    assert np.isclose(phase_feedback, 0.0, rtol=float_comparison_relative_tolerance)
+
+
+def test_phase_feedback_from_bits_single_zero() -> None:
+    """Test phase feedback calculation from single zero bit."""
+    phase_feedback = IterativePhaseEstimation.phase_feedback_from_bits([0])
+    assert np.isclose(phase_feedback, 0.0, rtol=float_comparison_relative_tolerance)
+
+
+def test_phase_feedback_from_bits_multiple() -> None:
+    """Test phase feedback calculation from multiple bits."""
+    bits = [1, 0, 1, 1]
+    phase_feedback = IterativePhaseEstimation.phase_feedback_from_bits(bits)
+
+    # Verify it's equivalent to accumulated phase
+    expected = accumulated_phase_from_bits(bits)
+    assert np.isclose(phase_feedback, expected, rtol=float_comparison_relative_tolerance)
+
+
+# Tests for IterativePhaseEstimationIteration dataclass
+def test_iteration_dataclass_creation() -> None:
+    """Test creation of IterativePhaseEstimationIteration dataclass."""
+    circuit = QuantumCircuit(3, 1)
+    iteration_obj = IterativePhaseEstimationIteration(
+        circuit=circuit, iteration=0, total_iterations=4, power=8, phase_correction=0.0
+    )
+
+    assert iteration_obj.circuit == circuit
+    assert iteration_obj.iteration == 0
+    assert iteration_obj.total_iterations == 4
+    assert iteration_obj.power == 8
+    assert iteration_obj.phase_correction == 0.0
+
+
+def test_iteration_dataclass_frozen() -> None:
+    """Test that IterativePhaseEstimationIteration is frozen."""
+    circuit = QuantumCircuit(2, 1)
+    iteration_obj = IterativePhaseEstimationIteration(
+        circuit=circuit, iteration=1, total_iterations=5, power=4, phase_correction=np.pi / 4
+    )
+
+    # Should not be able to modify frozen dataclass
+    with pytest.raises(
+        (AttributeError, TypeError)
+    ):  # FrozenInstanceError in Python 3.10+, AttributeError in older versions
+        iteration_obj.iteration = 2
+
+
+def test_create_iteration_returns_correct_metadata() -> None:
+    """Test that create_iteration returns correct metadata."""
+    sparse_pauli_op = SparsePauliOp.from_list([("ZZ", 1.0)])
+    hamiltonian = QubitHamiltonian(
+        pauli_strings=sparse_pauli_op.paulis.to_labels(), coefficients=sparse_pauli_op.coeffs
+    )
+    state_prep = QuantumCircuit(2)
+    state_prep.h([0, 1])
+
+    iqpe = IterativePhaseEstimation(hamiltonian, np.pi / 2)
+
+    iteration_obj = iqpe.create_iteration(state_prep, iteration=2, total_iterations=6, phase_correction=np.pi / 8)
+
+    assert iteration_obj.iteration == 2
+    assert iteration_obj.total_iterations == 6
+    assert iteration_obj.power == 2 ** (6 - 2 - 1)  # 2^3 = 8
+    assert np.isclose(iteration_obj.phase_correction, np.pi / 8)
+    assert iteration_obj.circuit is not None
+
+
+# Tests for validation and error handling
+def test_create_iteration_circuit_invalid_iteration_negative() -> None:
+    """Test that create_iteration_circuit raises ValueError for negative iteration."""
+    sparse_pauli_op = SparsePauliOp.from_list([("Z", 1.0)])
+    hamiltonian = QubitHamiltonian(
+        pauli_strings=sparse_pauli_op.paulis.to_labels(), coefficients=sparse_pauli_op.coeffs
+    )
+    state_prep = QuantumCircuit(1)
+
+    iqpe = IterativePhaseEstimation(hamiltonian, np.pi)
+
+    with pytest.raises(ValueError, match="iteration index -1 is outside the valid range"):
+        iqpe.create_iteration_circuit(state_prep, iteration=-1, total_iterations=4)
+
+
+def test_create_iteration_circuit_invalid_iteration_too_large() -> None:
+    """Test that create_iteration_circuit raises ValueError for iteration >= total_iterations."""
+    sparse_pauli_op = SparsePauliOp.from_list([("Z", 1.0)])
+    hamiltonian = QubitHamiltonian(
+        pauli_strings=sparse_pauli_op.paulis.to_labels(), coefficients=sparse_pauli_op.coeffs
+    )
+    state_prep = QuantumCircuit(1)
+
+    iqpe = IterativePhaseEstimation(hamiltonian, np.pi)
+
+    with pytest.raises(ValueError, match="iteration index 4 is outside the valid range"):
+        iqpe.create_iteration_circuit(state_prep, iteration=4, total_iterations=4)
+
+
+def test_create_iteration_circuit_invalid_total_iterations_zero() -> None:
+    """Test that create_iteration_circuit raises ValueError for total_iterations <= 0."""
+    sparse_pauli_op = SparsePauliOp.from_list([("Z", 1.0)])
+    hamiltonian = QubitHamiltonian(
+        pauli_strings=sparse_pauli_op.paulis.to_labels(), coefficients=sparse_pauli_op.coeffs
+    )
+    state_prep = QuantumCircuit(1)
+
+    iqpe = IterativePhaseEstimation(hamiltonian, np.pi)
+
+    with pytest.raises(ValueError, match="total_iterations must be a positive integer"):
+        iqpe.create_iteration_circuit(state_prep, iteration=0, total_iterations=0)
+
+
+def test_create_iteration_circuit_invalid_total_iterations_negative() -> None:
+    """Test that create_iteration_circuit raises ValueError for negative total_iterations."""
+    sparse_pauli_op = SparsePauliOp.from_list([("Z", 1.0)])
+    hamiltonian = QubitHamiltonian(
+        pauli_strings=sparse_pauli_op.paulis.to_labels(), coefficients=sparse_pauli_op.coeffs
+    )
+    state_prep = QuantumCircuit(1)
+
+    iqpe = IterativePhaseEstimation(hamiltonian, np.pi)
+
+    with pytest.raises(ValueError, match="total_iterations must be a positive integer"):
+        iqpe.create_iteration_circuit(state_prep, iteration=0, total_iterations=-1)
+
+
+def test_create_iteration_circuit_power_calculation() -> None:
+    """Test that the power calculation is correct for different iterations."""
+    sparse_pauli_op = SparsePauliOp.from_list([("Z", 1.0)])
+    hamiltonian = QubitHamiltonian(
+        pauli_strings=sparse_pauli_op.paulis.to_labels(), coefficients=sparse_pauli_op.coeffs
+    )
+    state_prep = QuantumCircuit(1)
+
+    iqpe = IterativePhaseEstimation(hamiltonian, np.pi)
+
+    # For 5 iterations (num_bits=5), powers should be: 16, 8, 4, 2, 1
+    expected_powers = [16, 8, 4, 2, 1]
+    for iteration, expected_power in enumerate(expected_powers):
+        iteration_obj = iqpe.create_iteration(state_prep, iteration=iteration, total_iterations=5)
+        assert iteration_obj.power == expected_power
+
+
+def test_create_iteration_circuit_with_none_measurement_register() -> None:
+    """Test create_iteration_circuit with None measurement register creates default."""
+    sparse_pauli_op = SparsePauliOp.from_list([("Z", 1.0)])
+    hamiltonian = QubitHamiltonian(
+        pauli_strings=sparse_pauli_op.paulis.to_labels(), coefficients=sparse_pauli_op.coeffs
+    )
+    state_prep = QuantumCircuit(1)
+
+    iqpe = IterativePhaseEstimation(hamiltonian, np.pi)
+
+    circuit = iqpe.create_iteration_circuit(state_prep, iteration=2, total_iterations=5, measurement_register=None)
+
+    # Should have created a default classical register named "c2"
+    assert circuit.num_clbits == 1
+    assert any(creg.name == "c2" for creg in circuit.cregs)
+
+
+def test_iterative_qpe_initialization() -> None:
+    """Test IterativePhaseEstimation initialization."""
+    sparse_pauli_op = SparsePauliOp.from_list([("XX", 0.5), ("ZZ", 1.0)])
+    hamiltonian = QubitHamiltonian(
+        pauli_strings=sparse_pauli_op.paulis.to_labels(), coefficients=sparse_pauli_op.coeffs
+    )
+    evolution_time = 2.5
+
+    iqpe = IterativePhaseEstimation(hamiltonian, evolution_time)
+
+    assert iqpe.hamiltonian == hamiltonian
+    assert iqpe.evolution_time == evolution_time
+    assert iqpe.algorithm == PhaseEstimationAlgorithm.ITERATIVE

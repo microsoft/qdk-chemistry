@@ -14,8 +14,14 @@ import numpy as np
 import pytest
 
 from qdk_chemistry.algorithms import create
-from qdk_chemistry.data import CasWavefunctionContainer, Configuration, Hamiltonian, Orbitals, Wavefunction
-from qdk_chemistry.noise_models import QuantumErrorProfile
+from qdk_chemistry.data import (
+    CasWavefunctionContainer,
+    Configuration,
+    Hamiltonian,
+    Orbitals,
+    QuantumErrorProfile,
+    Wavefunction,
+)
 
 from .test_helpers import create_test_orbitals
 
