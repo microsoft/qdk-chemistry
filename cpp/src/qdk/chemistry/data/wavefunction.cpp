@@ -6,6 +6,7 @@
 
 #include <Eigen/Dense>
 #include <fstream>
+#include <map>
 #include <memory>
 #include <qdk/chemistry/data/wavefunction.hpp>
 #include <qdk/chemistry/data/wavefunction_containers/cas.hpp>
@@ -90,6 +91,47 @@ transpose_ijkl_klij_vector_variant(const ContainerTypes::VectorVariant& variant,
       },
       variant);
 }
+
+template <typename T>
+void consolidate_determinants(std::vector<Configuration>& determinants,
+                              std::vector<T>& coefficients) {
+  if (determinants.empty()) {
+    return;
+  }
+
+  // Use a map with string keys to consolidate determinants
+  std::map<std::string, std::pair<Configuration, T>> det_map;
+
+  for (size_t i = 0; i < determinants.size(); ++i) {
+    std::string key = determinants[i].to_string();
+    auto it = det_map.find(key);
+    if (it == det_map.end()) {
+      det_map[key] = std::make_pair(determinants[i], coefficients[i]);
+    } else {
+      it->second.second += coefficients[i];
+    }
+  }
+
+  // Rebuild vectors, filtering out near-zero coefficients
+  determinants.clear();
+  coefficients.clear();
+
+  constexpr double threshold = 1e-14;
+  for (const auto& [key, det_coef] : det_map) {
+    if (std::abs(det_coef.second) > threshold) {
+      determinants.push_back(det_coef.first);
+      coefficients.push_back(det_coef.second);
+    }
+  }
+}
+
+// Explicit template instantiations
+template void consolidate_determinants<double>(
+    std::vector<Configuration>& determinants,
+    std::vector<double>& coefficients);
+template void consolidate_determinants<std::complex<double>>(
+    std::vector<Configuration>& determinants,
+    std::vector<std::complex<double>>& coefficients);
 
 }  // namespace detail
 

@@ -335,8 +335,9 @@ TEST_F(MP2Test, ReferenceInExpansion) {
         auto ref_coeff = mp2_container->get_coefficient(det);
         std::visit(
             [](const auto& coeff) {
-              // The reference coefficient should be dominant in the MP2 expansion.
-              // We check that it is greater than 0.9, rather than matching a hardcoded value.
+              // The reference coefficient should be dominant in the MP2
+              // expansion. We check that it is greater than 0.9, rather than
+              // matching a hardcoded value.
               EXPECT_GT(std::abs(coeff), 0.9);
             },
             ref_coeff);

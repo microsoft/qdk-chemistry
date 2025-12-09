@@ -10,7 +10,6 @@
 #include <macis/hamiltonian_generator/double_loop.hpp>
 #include <macis/sd_operations.hpp>
 #include <macis/util/rdms.hpp>
-#include <map>
 #include <optional>
 #include <qdk/chemistry/data/wavefunction_containers/mp2.hpp>
 #include <stdexcept>
@@ -528,53 +527,6 @@ Configuration MP2Container::_apply_excitations(
   return Configuration(config_str);
 }
 
-template <typename T>
-void MP2Container::_consolidate_determinants(DeterminantVector& determinants,
-                                             std::vector<T>& coefficients) {
-  if (determinants.empty()) {
-    return;
-  }
-
-  // Use a map with string keys to consolidate determinants
-  std::map<std::string, std::pair<Configuration, T>> det_map;
-
-  for (size_t i = 0; i < determinants.size(); ++i) {
-    std::string key = determinants[i].to_string();
-    auto it = det_map.find(key);
-    if (it == det_map.end()) {
-      det_map[key] = std::make_pair(determinants[i], coefficients[i]);
-    } else {
-      it->second.second += coefficients[i];
-    }
-  }
-
-  // Rebuild vectors, filtering out zero coefficients
-  determinants.clear();
-  coefficients.clear();
-
-  constexpr double threshold = 1e-14;
-  for (const auto& [key, det_coef] : det_map) {
-    if constexpr (std::is_same_v<T, std::complex<double>>) {
-      if (std::abs(det_coef.second) > threshold) {
-        determinants.push_back(det_coef.first);
-        coefficients.push_back(det_coef.second);
-      }
-    } else {
-      if (std::abs(det_coef.second) > threshold) {
-        determinants.push_back(det_coef.first);
-        coefficients.push_back(det_coef.second);
-      }
-    }
-  }
-}
-
-// Explicit instantiations
-template void MP2Container::_consolidate_determinants<double>(
-    DeterminantVector& determinants, std::vector<double>& coefficients);
-template void MP2Container::_consolidate_determinants<std::complex<double>>(
-    DeterminantVector& determinants,
-    std::vector<std::complex<double>>& coefficients);
-
 void MP2Container::_generate_ci_expansion() const {
   // MP2 is a perturbation theory method, not an exponential ansatz.
   // The first-order wavefunction correction is:
@@ -632,10 +584,9 @@ void MP2Container::_generate_ci_expansion() const {
     auto get_t2_aaaa_c = [&](size_t i, size_t j, size_t a,
                              size_t b) -> std::complex<double> {
       if (i >= j || a >= b) return std::complex<double>(0.0, 0.0);
-      size_t n_virt_pairs = n_virt_alpha * (n_virt_alpha - 1) / 2;
-      size_t ij_idx = i * n_alpha - i * (i + 1) / 2 + (j - i - 1);
-      size_t ab_idx = a * n_virt_alpha - a * (a + 1) / 2 + (b - a - 1);
-      size_t idx = ij_idx * n_virt_pairs + ab_idx;
+      // Full rectangular storage: nocc * nocc * nvir * nvir
+      size_t idx = i * n_alpha * n_virt_alpha * n_virt_alpha +
+                   j * n_virt_alpha * n_virt_alpha + a * n_virt_alpha + b;
       if (std::holds_alternative<Eigen::VectorXcd>(t2_aaaa)) {
         const auto& vec = std::get<Eigen::VectorXcd>(t2_aaaa);
         return idx < static_cast<size_t>(vec.size())
@@ -652,10 +603,9 @@ void MP2Container::_generate_ci_expansion() const {
     auto get_t2_bbbb_c = [&](size_t i, size_t j, size_t a,
                              size_t b) -> std::complex<double> {
       if (i >= j || a >= b) return std::complex<double>(0.0, 0.0);
-      size_t n_virt_pairs = n_virt_beta * (n_virt_beta - 1) / 2;
-      size_t ij_idx = i * n_beta - i * (i + 1) / 2 + (j - i - 1);
-      size_t ab_idx = a * n_virt_beta - a * (a + 1) / 2 + (b - a - 1);
-      size_t idx = ij_idx * n_virt_pairs + ab_idx;
+      // Full rectangular storage: nocc * nocc * nvir * nvir
+      size_t idx = i * n_beta * n_virt_beta * n_virt_beta +
+                   j * n_virt_beta * n_virt_beta + a * n_virt_beta + b;
       if (std::holds_alternative<Eigen::VectorXcd>(t2_bbbb)) {
         const auto& vec = std::get<Eigen::VectorXcd>(t2_bbbb);
         return idx < static_cast<size_t>(vec.size())
@@ -676,7 +626,7 @@ void MP2Container::_generate_ci_expansion() const {
         for (size_t a = 0; a < n_virt_alpha; ++a) {
           for (size_t b = 0; b < n_virt_beta; ++b) {
             auto t_ijab = get_t2_abab_c(i, j, a, b);
-            if (std::abs(t_ijab) > 1e-14) {
+            if (std::abs(t_ijab) > std::numeric_limits<double>::epsilon()) {
               auto det = _apply_excitations(ref, {{i, n_alpha + a}},
                                             {{j, n_beta + b}});
               determinants.push_back(det);
@@ -693,7 +643,7 @@ void MP2Container::_generate_ci_expansion() const {
         for (size_t a = 0; a < n_virt_alpha; ++a) {
           for (size_t b = a + 1; b < n_virt_alpha; ++b) {
             auto t_ijab = get_t2_aaaa_c(i, j, a, b);
-            if (std::abs(t_ijab) > 1e-14) {
+            if (std::abs(t_ijab) > std::numeric_limits<double>::epsilon()) {
               auto det = _apply_excitations(
                   ref, {{i, n_alpha + a}, {j, n_alpha + b}}, {});
               determinants.push_back(det);
@@ -710,7 +660,7 @@ void MP2Container::_generate_ci_expansion() const {
         for (size_t a = 0; a < n_virt_beta; ++a) {
           for (size_t b = a + 1; b < n_virt_beta; ++b) {
             auto t_ijab = get_t2_bbbb_c(i, j, a, b);
-            if (std::abs(t_ijab) > 1e-14) {
+            if (std::abs(t_ijab) > std::numeric_limits<double>::epsilon()) {
               auto det = _apply_excitations(ref, {},
                                             {{i, n_beta + a}, {j, n_beta + b}});
               determinants.push_back(det);
@@ -722,7 +672,7 @@ void MP2Container::_generate_ci_expansion() const {
     }
 
     // Consolidate duplicates (shouldn't be any, but for safety)
-    _consolidate_determinants(determinants, coefficients);
+    detail::consolidate_determinants(determinants, coefficients);
 
     // Normalize the wavefunction: |Ψ⟩ = |Φ₀⟩ + Σ t_{ijab} |Φ_{ij}^{ab}⟩
     // Norm² = 1 + Σ |t_{ijab}|², so we divide by sqrt(norm²)
@@ -731,10 +681,8 @@ void MP2Container::_generate_ci_expansion() const {
       norm_sq += std::norm(c);  // |c|² for complex
     }
     double norm = std::sqrt(norm_sq);
-    if (norm > 1e-14) {
-      for (auto& c : coefficients) {
-        c /= norm;
-      }
+    for (auto& c : coefficients) {
+      c /= norm;
     }
 
     // Store results
@@ -765,20 +713,18 @@ void MP2Container::_generate_ci_expansion() const {
 
     auto get_t2_aaaa_r = [&](size_t i, size_t j, size_t a, size_t b) -> double {
       if (i >= j || a >= b) return 0.0;
-      size_t n_virt_pairs = n_virt_alpha * (n_virt_alpha - 1) / 2;
-      size_t ij_idx = i * n_alpha - i * (i + 1) / 2 + (j - i - 1);
-      size_t ab_idx = a * n_virt_alpha - a * (a + 1) / 2 + (b - a - 1);
-      size_t idx = ij_idx * n_virt_pairs + ab_idx;
+      // Full rectangular storage: nocc * nocc * nvir * nvir
+      size_t idx = i * n_alpha * n_virt_alpha * n_virt_alpha +
+                   j * n_virt_alpha * n_virt_alpha + a * n_virt_alpha + b;
       const auto& vec = std::get<Eigen::VectorXd>(t2_aaaa);
       return idx < static_cast<size_t>(vec.size()) ? vec[idx] : 0.0;
     };
 
     auto get_t2_bbbb_r = [&](size_t i, size_t j, size_t a, size_t b) -> double {
       if (i >= j || a >= b) return 0.0;
-      size_t n_virt_pairs = n_virt_beta * (n_virt_beta - 1) / 2;
-      size_t ij_idx = i * n_beta - i * (i + 1) / 2 + (j - i - 1);
-      size_t ab_idx = a * n_virt_beta - a * (a + 1) / 2 + (b - a - 1);
-      size_t idx = ij_idx * n_virt_pairs + ab_idx;
+      // Full rectangular storage: nocc * nocc * nvir * nvir
+      size_t idx = i * n_beta * n_virt_beta * n_virt_beta +
+                   j * n_virt_beta * n_virt_beta + a * n_virt_beta + b;
       const auto& vec = std::get<Eigen::VectorXd>(t2_bbbb);
       return idx < static_cast<size_t>(vec.size()) ? vec[idx] : 0.0;
     };
@@ -790,7 +736,7 @@ void MP2Container::_generate_ci_expansion() const {
         for (size_t a = 0; a < n_virt_alpha; ++a) {
           for (size_t b = 0; b < n_virt_beta; ++b) {
             double t_ijab = get_t2_abab_r(i, j, a, b);
-            if (std::abs(t_ijab) > 1e-14) {
+            if (std::abs(t_ijab) > std::numeric_limits<double>::epsilon()) {
               auto det = _apply_excitations(ref, {{i, n_alpha + a}},
                                             {{j, n_beta + b}});
               determinants.push_back(det);
@@ -807,7 +753,7 @@ void MP2Container::_generate_ci_expansion() const {
         for (size_t a = 0; a < n_virt_alpha; ++a) {
           for (size_t b = a + 1; b < n_virt_alpha; ++b) {
             double t_ijab = get_t2_aaaa_r(i, j, a, b);
-            if (std::abs(t_ijab) > 1e-14) {
+            if (std::abs(t_ijab) > std::numeric_limits<double>::epsilon()) {
               auto det = _apply_excitations(
                   ref, {{i, n_alpha + a}, {j, n_alpha + b}}, {});
               determinants.push_back(det);
@@ -824,7 +770,7 @@ void MP2Container::_generate_ci_expansion() const {
         for (size_t a = 0; a < n_virt_beta; ++a) {
           for (size_t b = a + 1; b < n_virt_beta; ++b) {
             double t_ijab = get_t2_bbbb_r(i, j, a, b);
-            if (std::abs(t_ijab) > 1e-14) {
+            if (std::abs(t_ijab) > std::numeric_limits<double>::epsilon()) {
               auto det = _apply_excitations(ref, {},
                                             {{i, n_beta + a}, {j, n_beta + b}});
               determinants.push_back(det);
@@ -836,7 +782,7 @@ void MP2Container::_generate_ci_expansion() const {
     }
 
     // Consolidate duplicates (shouldn't be any, but for safety)
-    _consolidate_determinants(determinants, coefficients);
+    detail::consolidate_determinants(determinants, coefficients);
 
     // Normalize the wavefunction: |Ψ⟩ = |Φ₀⟩ + Σ t_{ijab} |Φ_{ij}^{ab}⟩
     // Norm² = 1 + Σ |t_{ijab}|², so we divide by sqrt(norm²)
@@ -845,10 +791,8 @@ void MP2Container::_generate_ci_expansion() const {
       norm_sq += c * c;
     }
     double norm = std::sqrt(norm_sq);
-    if (norm > 1e-14) {
-      for (auto& c : coefficients) {
-        c /= norm;
-      }
+    for (auto& c : coefficients) {
+      c /= norm;
     }
 
     // Store results

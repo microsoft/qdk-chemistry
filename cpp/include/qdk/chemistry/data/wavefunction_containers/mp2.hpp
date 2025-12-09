@@ -392,14 +392,5 @@ class MP2Container : public WavefunctionContainer {
       const Configuration& ref,
       const std::vector<std::pair<size_t, size_t>>& alpha_excitations,
       const std::vector<std::pair<size_t, size_t>>& beta_excitations);
-
-  /**
-   * @brief Consolidate duplicate determinants by summing their coefficients
-   * @param determinants Vector of determinants (modified in place)
-   * @param coefficients Vector of coefficients (modified in place)
-   */
-  template <typename T>
-  static void _consolidate_determinants(DeterminantVector& determinants,
-                                        std::vector<T>& coefficients);
 };
 }  // namespace qdk::chemistry::data

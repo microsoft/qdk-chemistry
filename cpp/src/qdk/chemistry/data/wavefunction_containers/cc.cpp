@@ -8,7 +8,6 @@
 #include <cmath>
 #include <macis/sd_operations.hpp>
 #include <macis/util/rdms.hpp>
-#include <map>
 #include <optional>
 #include <qdk/chemistry/data/wavefunction_containers/cc.hpp>
 #include <set>
@@ -967,52 +966,6 @@ Configuration CoupledClusterContainer::_apply_excitations(
   return Configuration(config_str);
 }
 
-template <typename T>
-void CoupledClusterContainer::_consolidate_determinants(
-    DeterminantVector& determinants, std::vector<T>& coefficients) {
-  if (determinants.empty()) return;
-
-  // Use a map to consolidate
-  std::map<std::string, std::pair<Configuration, T>> det_map;
-
-  for (size_t i = 0; i < determinants.size(); ++i) {
-    std::string key = determinants[i].to_string();
-    auto it = det_map.find(key);
-    if (it != det_map.end()) {
-      it->second.second += coefficients[i];
-    } else {
-      det_map[key] = {determinants[i], coefficients[i]};
-    }
-  }
-
-  // Rebuild vectors, filtering out near-zero coefficients
-  determinants.clear();
-  coefficients.clear();
-
-  constexpr double tol = 1e-14;
-  for (const auto& [key, value] : det_map) {
-    T coef = value.second;
-    double mag;
-    if constexpr (std::is_same_v<T, std::complex<double>>) {
-      mag = std::abs(coef);
-    } else {
-      mag = std::abs(coef);
-    }
-
-    if (mag > tol) {
-      determinants.push_back(value.first);
-      coefficients.push_back(coef);
-    }
-  }
-}
-
-// Explicit template instantiations
-template void CoupledClusterContainer::_consolidate_determinants<double>(
-    DeterminantVector& determinants, std::vector<double>& coefficients);
-template void CoupledClusterContainer::_consolidate_determinants<
-    std::complex<double>>(DeterminantVector& determinants,
-                          std::vector<std::complex<double>>& coefficients);
-
 void CoupledClusterContainer::_generate_ci_expansion() const {
   if (!has_t1_amplitudes() && !has_t2_amplitudes()) {
     throw std::runtime_error(
@@ -1203,17 +1156,23 @@ void CoupledClusterContainer::_generate_ci_expansion() const {
   // Order 3: Triples (T1·T2 + T1³/6)
   // ==========================================================================
 
-  if (has_t1_amplitudes() && has_t2_amplitudes()) {
-    // T1_α · T2_αα: 3 alpha excitations
+  // 3α + 0β triples
+  if (has_t1_amplitudes()) {
     for (size_t i = 0; i < n_alpha; ++i) {
-      for (size_t a = 0; a < n_vir_alpha; ++a) {
-        for (size_t j = 0; j < n_alpha; ++j) {
-          for (size_t k = j + 1; k < n_alpha; ++k) {
-            if (i == j || i == k) continue;
+      for (size_t j = i + 1; j < n_alpha; ++j) {
+        for (size_t k = j + 1; k < n_alpha; ++k) {
+          for (size_t a = 0; a < n_vir_alpha; ++a) {
             for (size_t b = 0; b < n_vir_alpha; ++b) {
-              for (size_t c = b + 1; c < n_vir_alpha; ++c) {
-                if (a == b || a == c) continue;
-                auto coef = get_t1_aa(i, a) * get_t2_aaaa(j, k, b, c);
+              if (a == b) continue;
+              for (size_t c = 0; c < n_vir_alpha; ++c) {
+                if (a == c || b == c) continue;
+                auto coef =
+                    get_t1_aa(i, a) * get_t1_aa(j, b) * get_t1_aa(k, c) / 6.0;
+                if (has_t2_amplitudes()) {
+                  coef += get_t1_aa(i, a) * get_t2_aaaa(j, k, b, c);
+                  coef += get_t1_aa(j, b) * get_t2_aaaa(i, k, a, c);
+                  coef += get_t1_aa(k, c) * get_t2_aaaa(i, j, a, b);
+                }
                 Configuration det = _apply_excitations(
                     ref, {{i, n_alpha + a}, {j, n_alpha + b}, {k, n_alpha + c}},
                     {});
@@ -1224,17 +1183,25 @@ void CoupledClusterContainer::_generate_ci_expansion() const {
         }
       }
     }
+  }
 
-    // T1_β · T2_ββ: 3 beta excitations
+  // 0α + 3β triples
+  if (has_t1_amplitudes()) {
     for (size_t i = 0; i < n_beta; ++i) {
-      for (size_t a = 0; a < n_vir_beta; ++a) {
-        for (size_t j = 0; j < n_beta; ++j) {
-          for (size_t k = j + 1; k < n_beta; ++k) {
-            if (i == j || i == k) continue;
+      for (size_t j = i + 1; j < n_beta; ++j) {
+        for (size_t k = j + 1; k < n_beta; ++k) {
+          for (size_t a = 0; a < n_vir_beta; ++a) {
             for (size_t b = 0; b < n_vir_beta; ++b) {
-              for (size_t c = b + 1; c < n_vir_beta; ++c) {
-                if (a == b || a == c) continue;
-                auto coef = get_t1_bb(i, a) * get_t2_bbbb(j, k, b, c);
+              if (a == b) continue;
+              for (size_t c = 0; c < n_vir_beta; ++c) {
+                if (a == c || b == c) continue;
+                auto coef =
+                    get_t1_bb(i, a) * get_t1_bb(j, b) * get_t1_bb(k, c) / 6.0;
+                if (has_t2_amplitudes()) {
+                  coef += get_t1_bb(i, a) * get_t2_bbbb(j, k, b, c);
+                  coef += get_t1_bb(j, b) * get_t2_bbbb(i, k, a, c);
+                  coef += get_t1_bb(k, c) * get_t2_bbbb(i, j, a, b);
+                }
                 Configuration det = _apply_excitations(
                     ref, {},
                     {{i, n_beta + a}, {j, n_beta + b}, {k, n_beta + c}});
@@ -1245,17 +1212,24 @@ void CoupledClusterContainer::_generate_ci_expansion() const {
         }
       }
     }
+  }
 
-    // T1_α · T2_αβ: 2 alpha + 1 beta
+  // 2α + 1β triples
+  if (has_t1_amplitudes()) {
     for (size_t i = 0; i < n_alpha; ++i) {
-      for (size_t a = 0; a < n_vir_alpha; ++a) {
-        for (size_t j = 0; j < n_alpha; ++j) {
-          if (i == j) continue;
-          for (size_t k = 0; k < n_beta; ++k) {
+      for (size_t j = i + 1; j < n_alpha; ++j) {
+        for (size_t k = 0; k < n_beta; ++k) {
+          for (size_t a = 0; a < n_vir_alpha; ++a) {
             for (size_t b = 0; b < n_vir_alpha; ++b) {
               if (a == b) continue;
               for (size_t c = 0; c < n_vir_beta; ++c) {
-                auto coef = get_t1_aa(i, a) * get_t2_abab(j, k, b, c);
+                auto coef =
+                    get_t1_aa(i, a) * get_t1_aa(j, b) * get_t1_bb(k, c) / 2.0;
+                if (has_t2_amplitudes()) {
+                  coef += get_t1_aa(i, a) * get_t2_abab(j, k, b, c);
+                  coef += get_t1_aa(j, b) * get_t2_abab(i, k, a, c);
+                  coef += get_t1_bb(k, c) * get_t2_aaaa(i, j, a, b);
+                }
                 Configuration det = _apply_excitations(
                     ref, {{i, n_alpha + a}, {j, n_alpha + b}},
                     {{k, n_beta + c}});
@@ -1266,20 +1240,27 @@ void CoupledClusterContainer::_generate_ci_expansion() const {
         }
       }
     }
+  }
 
-    // T1_β · T2_αβ: 1 alpha + 2 beta
-    for (size_t i = 0; i < n_beta; ++i) {
-      for (size_t a = 0; a < n_vir_beta; ++a) {
-        for (size_t j = 0; j < n_alpha; ++j) {
-          for (size_t k = 0; k < n_beta; ++k) {
-            if (i == k) continue;
-            for (size_t b = 0; b < n_vir_alpha; ++b) {
+  // 1α + 2β triples
+  if (has_t1_amplitudes()) {
+    for (size_t i = 0; i < n_alpha; ++i) {
+      for (size_t j = 0; j < n_beta; ++j) {
+        for (size_t k = j + 1; k < n_beta; ++k) {
+          for (size_t a = 0; a < n_vir_alpha; ++a) {
+            for (size_t b = 0; b < n_vir_beta; ++b) {
               for (size_t c = 0; c < n_vir_beta; ++c) {
-                if (a == c) continue;
-                auto coef = get_t1_bb(i, a) * get_t2_abab(j, k, b, c);
+                if (b == c) continue;
+                auto coef =
+                    get_t1_aa(i, a) * get_t1_bb(j, b) * get_t1_bb(k, c) / 2.0;
+                if (has_t2_amplitudes()) {
+                  coef += get_t1_bb(j, b) * get_t2_abab(i, k, a, c);
+                  coef += get_t1_bb(k, c) * get_t2_abab(i, j, a, b);
+                  coef += get_t1_aa(i, a) * get_t2_bbbb(j, k, b, c);
+                }
                 Configuration det =
-                    _apply_excitations(ref, {{j, n_alpha + b}},
-                                       {{i, n_beta + a}, {k, n_beta + c}});
+                    _apply_excitations(ref, {{i, n_alpha + a}},
+                                       {{j, n_beta + b}, {k, n_beta + c}});
                 add_det(det, coef);
               }
             }
@@ -1289,56 +1270,60 @@ void CoupledClusterContainer::_generate_ci_expansion() const {
     }
   }
 
-  // T1³/6 contributions are typically small; included for completeness
-  // but omitted here for brevity - can be added if needed
-
   // ==========================================================================
   // Order 4: Quadruples (T2²/2 + T1²·T2/2 + T1⁴/24)
   // ==========================================================================
 
-  if (has_t2_amplitudes()) {
-    // T2_αα · T2_ββ: 2 alpha + 2 beta
+  // 4α + 0β quadruples
+  {
     for (size_t i = 0; i < n_alpha; ++i) {
       for (size_t j = i + 1; j < n_alpha; ++j) {
-        for (size_t k = 0; k < n_beta; ++k) {
-          for (size_t l = k + 1; l < n_beta; ++l) {
+        for (size_t k = j + 1; k < n_alpha; ++k) {
+          for (size_t l = k + 1; l < n_alpha; ++l) {
             for (size_t a = 0; a < n_vir_alpha; ++a) {
-              for (size_t b = a + 1; b < n_vir_alpha; ++b) {
-                for (size_t c = 0; c < n_vir_beta; ++c) {
-                  for (size_t d = c + 1; d < n_vir_beta; ++d) {
-                    auto coef =
-                        get_t2_aaaa(i, j, a, b) * get_t2_bbbb(k, l, c, d);
-                    Configuration det = _apply_excitations(
-                        ref, {{i, n_alpha + a}, {j, n_alpha + b}},
-                        {{k, n_beta + c}, {l, n_beta + d}});
-                    add_det(det, coef);
-                  }
-                }
-              }
-            }
-          }
-        }
-      }
-    }
-
-    // T2_αβ · T2_αβ / 2: 2 alpha + 2 beta (different indices)
-    for (size_t i = 0; i < n_alpha; ++i) {
-      for (size_t j = 0; j < n_beta; ++j) {
-        for (size_t k = i + 1; k < n_alpha; ++k) {
-          for (size_t l = 0; l < n_beta; ++l) {
-            if (j == l) continue;
-            for (size_t a = 0; a < n_vir_alpha; ++a) {
-              for (size_t b = 0; b < n_vir_beta; ++b) {
+              for (size_t b = 0; b < n_vir_alpha; ++b) {
+                if (a == b) continue;
                 for (size_t c = 0; c < n_vir_alpha; ++c) {
-                  if (a == c) continue;
-                  for (size_t d = 0; d < n_vir_beta; ++d) {
-                    if (b == d) continue;
-                    auto coef =
-                        get_t2_abab(i, j, a, b) * get_t2_abab(k, l, c, d) / 2.0;
-                    Configuration det = _apply_excitations(
-                        ref, {{i, n_alpha + a}, {k, n_alpha + c}},
-                        {{j, n_beta + b}, {l, n_beta + d}});
-                    add_det(det, coef);
+                  if (a == c || b == c) continue;
+                  for (size_t d = 0; d < n_vir_alpha; ++d) {
+                    if (a == d || b == d || c == d) continue;
+                    std::complex<double> coef = 0.0;
+                    if (has_t1_amplitudes()) {
+                      coef += get_t1_aa(i, a) * get_t1_aa(j, b) *
+                              get_t1_aa(k, c) * get_t1_aa(l, d) / 24.0;
+                    }
+                    if (has_t1_amplitudes() && has_t2_amplitudes()) {
+                      coef += get_t1_aa(i, a) * get_t1_aa(j, b) *
+                              get_t2_aaaa(k, l, c, d) / 2.0;
+                      coef += get_t1_aa(i, a) * get_t1_aa(k, c) *
+                              get_t2_aaaa(j, l, b, d) / 2.0;
+                      coef += get_t1_aa(i, a) * get_t1_aa(l, d) *
+                              get_t2_aaaa(j, k, b, c) / 2.0;
+                      coef += get_t1_aa(j, b) * get_t1_aa(k, c) *
+                              get_t2_aaaa(i, l, a, d) / 2.0;
+                      coef += get_t1_aa(j, b) * get_t1_aa(l, d) *
+                              get_t2_aaaa(i, k, a, c) / 2.0;
+                      coef += get_t1_aa(k, c) * get_t1_aa(l, d) *
+                              get_t2_aaaa(i, j, a, b) / 2.0;
+                    }
+                    if (has_t2_amplitudes()) {
+                      coef += get_t2_aaaa(i, j, a, b) *
+                              get_t2_aaaa(k, l, c, d) / 2.0;
+                      coef += get_t2_aaaa(i, k, a, c) *
+                              get_t2_aaaa(j, l, b, d) / 2.0;
+                      coef += get_t2_aaaa(i, l, a, d) *
+                              get_t2_aaaa(j, k, b, c) / 2.0;
+                    }
+                    if (std::abs(coef) >
+                        std::numeric_limits<double>::epsilon()) {
+                      Configuration det = _apply_excitations(ref,
+                                                             {{i, n_alpha + a},
+                                                              {j, n_alpha + b},
+                                                              {k, n_alpha + c},
+                                                              {l, n_alpha + d}},
+                                                             {});
+                      add_det(det, coef);
+                    }
                   }
                 }
               }
@@ -1349,12 +1334,231 @@ void CoupledClusterContainer::_generate_ci_expansion() const {
     }
   }
 
-  // T1²·T2/2 and T1⁴/24 contributions are typically small;
-  // included for completeness but can be added if needed
+  // 0α + 4β quadruples
+  {
+    for (size_t i = 0; i < n_beta; ++i) {
+      for (size_t j = i + 1; j < n_beta; ++j) {
+        for (size_t k = j + 1; k < n_beta; ++k) {
+          for (size_t l = k + 1; l < n_beta; ++l) {
+            for (size_t a = 0; a < n_vir_beta; ++a) {
+              for (size_t b = 0; b < n_vir_beta; ++b) {
+                if (a == b) continue;
+                for (size_t c = 0; c < n_vir_beta; ++c) {
+                  if (a == c || b == c) continue;
+                  for (size_t d = 0; d < n_vir_beta; ++d) {
+                    if (a == d || b == d || c == d) continue;
+                    std::complex<double> coef = 0.0;
+                    if (has_t1_amplitudes()) {
+                      coef += get_t1_bb(i, a) * get_t1_bb(j, b) *
+                              get_t1_bb(k, c) * get_t1_bb(l, d) / 24.0;
+                    }
+                    if (has_t1_amplitudes() && has_t2_amplitudes()) {
+                      coef += get_t1_bb(i, a) * get_t1_bb(j, b) *
+                              get_t2_bbbb(k, l, c, d) / 2.0;
+                      coef += get_t1_bb(i, a) * get_t1_bb(k, c) *
+                              get_t2_bbbb(j, l, b, d) / 2.0;
+                      coef += get_t1_bb(i, a) * get_t1_bb(l, d) *
+                              get_t2_bbbb(j, k, b, c) / 2.0;
+                      coef += get_t1_bb(j, b) * get_t1_bb(k, c) *
+                              get_t2_bbbb(i, l, a, d) / 2.0;
+                      coef += get_t1_bb(j, b) * get_t1_bb(l, d) *
+                              get_t2_bbbb(i, k, a, c) / 2.0;
+                      coef += get_t1_bb(k, c) * get_t1_bb(l, d) *
+                              get_t2_bbbb(i, j, a, b) / 2.0;
+                    }
+                    if (has_t2_amplitudes()) {
+                      coef += get_t2_bbbb(i, j, a, b) *
+                              get_t2_bbbb(k, l, c, d) / 2.0;
+                      coef += get_t2_bbbb(i, k, a, c) *
+                              get_t2_bbbb(j, l, b, d) / 2.0;
+                      coef += get_t2_bbbb(i, l, a, d) *
+                              get_t2_bbbb(j, k, b, c) / 2.0;
+                    }
+                    if (std::abs(coef) >
+                        std::numeric_limits<double>::epsilon()) {
+                      Configuration det = _apply_excitations(ref, {},
+                                                             {{i, n_beta + a},
+                                                              {j, n_beta + b},
+                                                              {k, n_beta + c},
+                                                              {l, n_beta + d}});
+                      add_det(det, coef);
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+
+  // 3α + 1β quadruples
+  {
+    for (size_t i = 0; i < n_alpha; ++i) {
+      for (size_t j = i + 1; j < n_alpha; ++j) {
+        for (size_t k = j + 1; k < n_alpha; ++k) {
+          for (size_t l = 0; l < n_beta; ++l) {
+            for (size_t a = 0; a < n_vir_alpha; ++a) {
+              for (size_t b = 0; b < n_vir_alpha; ++b) {
+                if (a == b) continue;
+                for (size_t c = 0; c < n_vir_alpha; ++c) {
+                  if (a == c || b == c) continue;
+                  for (size_t d = 0; d < n_vir_beta; ++d) {
+                    std::complex<double> coef = 0.0;
+                    if (has_t1_amplitudes()) {
+                      coef += get_t1_aa(i, a) * get_t1_aa(j, b) *
+                              get_t1_aa(k, c) * get_t1_bb(l, d) / 6.0;
+                    }
+                    if (has_t1_amplitudes() && has_t2_amplitudes()) {
+                      coef += get_t1_aa(i, a) * get_t1_aa(j, b) *
+                              get_t2_abab(k, l, c, d) / 2.0;
+                      coef += get_t1_aa(i, a) * get_t1_aa(k, c) *
+                              get_t2_abab(j, l, b, d) / 2.0;
+                      coef += get_t1_aa(j, b) * get_t1_aa(k, c) *
+                              get_t2_abab(i, l, a, d) / 2.0;
+                      coef += get_t1_aa(i, a) * get_t1_bb(l, d) *
+                              get_t2_aaaa(j, k, b, c);
+                      coef += get_t1_aa(j, b) * get_t1_bb(l, d) *
+                              get_t2_aaaa(i, k, a, c);
+                      coef += get_t1_aa(k, c) * get_t1_bb(l, d) *
+                              get_t2_aaaa(i, j, a, b);
+                    }
+                    if (has_t2_amplitudes()) {
+                      coef += get_t2_aaaa(i, j, a, b) * get_t2_abab(k, l, c, d);
+                      coef += get_t2_aaaa(i, k, a, c) * get_t2_abab(j, l, b, d);
+                      coef += get_t2_aaaa(j, k, b, c) * get_t2_abab(i, l, a, d);
+                    }
+                    if (std::abs(coef) >
+                        std::numeric_limits<double>::epsilon()) {
+                      Configuration det = _apply_excitations(ref,
+                                                             {{i, n_alpha + a},
+                                                              {j, n_alpha + b},
+                                                              {k, n_alpha + c}},
+                                                             {{l, n_beta + d}});
+                      add_det(det, coef);
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+
+  // 1α + 3β quadruples
+  {
+    for (size_t i = 0; i < n_alpha; ++i) {
+      for (size_t j = 0; j < n_beta; ++j) {
+        for (size_t k = j + 1; k < n_beta; ++k) {
+          for (size_t l = k + 1; l < n_beta; ++l) {
+            for (size_t a = 0; a < n_vir_alpha; ++a) {
+              for (size_t b = 0; b < n_vir_beta; ++b) {
+                for (size_t c = 0; c < n_vir_beta; ++c) {
+                  if (b == c) continue;
+                  for (size_t d = 0; d < n_vir_beta; ++d) {
+                    if (b == d || c == d) continue;
+                    std::complex<double> coef = 0.0;
+                    if (has_t1_amplitudes()) {
+                      coef += get_t1_aa(i, a) * get_t1_bb(j, b) *
+                              get_t1_bb(k, c) * get_t1_bb(l, d) / 6.0;
+                    }
+                    if (has_t1_amplitudes() && has_t2_amplitudes()) {
+                      coef += get_t1_bb(j, b) * get_t1_bb(k, c) *
+                              get_t2_abab(i, l, a, d) / 2.0;
+                      coef += get_t1_bb(j, b) * get_t1_bb(l, d) *
+                              get_t2_abab(i, k, a, c) / 2.0;
+                      coef += get_t1_bb(k, c) * get_t1_bb(l, d) *
+                              get_t2_abab(i, j, a, b) / 2.0;
+                      coef += get_t1_aa(i, a) * get_t1_bb(j, b) *
+                              get_t2_bbbb(k, l, c, d);
+                      coef += get_t1_aa(i, a) * get_t1_bb(k, c) *
+                              get_t2_bbbb(j, l, b, d);
+                      coef += get_t1_aa(i, a) * get_t1_bb(l, d) *
+                              get_t2_bbbb(j, k, b, c);
+                    }
+                    if (has_t2_amplitudes()) {
+                      coef += get_t2_bbbb(j, k, b, c) * get_t2_abab(i, l, a, d);
+                      coef += get_t2_bbbb(j, l, b, d) * get_t2_abab(i, k, a, c);
+                      coef += get_t2_bbbb(k, l, c, d) * get_t2_abab(i, j, a, b);
+                    }
+                    if (std::abs(coef) >
+                        std::numeric_limits<double>::epsilon()) {
+                      Configuration det = _apply_excitations(
+                          ref, {{i, n_alpha + a}},
+                          {{j, n_beta + b}, {k, n_beta + c}, {l, n_beta + d}});
+                      add_det(det, coef);
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+
+  // 2α + 2β quadruples
+  {
+    for (size_t i = 0; i < n_alpha; ++i) {
+      for (size_t j = i + 1; j < n_alpha; ++j) {
+        for (size_t k = 0; k < n_beta; ++k) {
+          for (size_t l = k + 1; l < n_beta; ++l) {
+            for (size_t a = 0; a < n_vir_alpha; ++a) {
+              for (size_t b = 0; b < n_vir_alpha; ++b) {
+                if (a == b) continue;
+                for (size_t c = 0; c < n_vir_beta; ++c) {
+                  for (size_t d = 0; d < n_vir_beta; ++d) {
+                    if (c == d) continue;
+                    std::complex<double> coef = 0.0;
+                    if (has_t1_amplitudes()) {
+                      coef += get_t1_aa(i, a) * get_t1_aa(j, b) *
+                              get_t1_bb(k, c) * get_t1_bb(l, d) / 4.0;
+                    }
+                    if (has_t1_amplitudes() && has_t2_amplitudes()) {
+                      coef += get_t1_aa(i, a) * get_t1_aa(j, b) *
+                              get_t2_bbbb(k, l, c, d) / 2.0;
+                      coef += get_t1_bb(k, c) * get_t1_bb(l, d) *
+                              get_t2_aaaa(i, j, a, b) / 2.0;
+                      coef += get_t1_aa(i, a) * get_t1_bb(k, c) *
+                              get_t2_abab(j, l, b, d) / 2.0;
+                      coef += get_t1_aa(i, a) * get_t1_bb(l, d) *
+                              get_t2_abab(j, k, b, c) / 2.0;
+                      coef += get_t1_aa(j, b) * get_t1_bb(k, c) *
+                              get_t2_abab(i, l, a, d) / 2.0;
+                      coef += get_t1_aa(j, b) * get_t1_bb(l, d) *
+                              get_t2_abab(i, k, a, c) / 2.0;
+                    }
+                    if (has_t2_amplitudes()) {
+                      coef += get_t2_aaaa(i, j, a, b) * get_t2_bbbb(k, l, c, d);
+                      coef += get_t2_abab(i, k, a, c) *
+                              get_t2_abab(j, l, b, d) / 2.0;
+                      coef += get_t2_abab(i, l, a, d) *
+                              get_t2_abab(j, k, b, c) / 2.0;
+                    }
+                    if (std::abs(coef) >
+                        std::numeric_limits<double>::epsilon()) {
+                      Configuration det = _apply_excitations(
+                          ref, {{i, n_alpha + a}, {j, n_alpha + b}},
+                          {{k, n_beta + c}, {l, n_beta + d}});
+                      add_det(det, coef);
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
 
   // Consolidate duplicate determinants
   if (use_complex) {
-    _consolidate_determinants(determinants, coefficients_complex);
+    detail::consolidate_determinants(determinants, coefficients_complex);
 
     // Normalize
     double norm_sq = 0.0;
@@ -1362,10 +1566,9 @@ void CoupledClusterContainer::_generate_ci_expansion() const {
       norm_sq += std::norm(c);
     }
     double norm = std::sqrt(norm_sq);
-    if (norm > 1e-14) {
-      for (auto& c : coefficients_complex) {
-        c /= norm;
-      }
+    // Division by 0 should not be possible here since ref coef = 1.0
+    for (auto& c : coefficients_complex) {
+      c /= norm;
     }
 
     // Store in cache
@@ -1375,7 +1578,7 @@ void CoupledClusterContainer::_generate_ci_expansion() const {
     }
     _coefficients_cache = std::make_unique<VectorVariant>(std::move(coef_vec));
   } else {
-    _consolidate_determinants(determinants, coefficients_real);
+    detail::consolidate_determinants(determinants, coefficients_real);
 
     // Normalize
     double norm_sq = 0.0;
@@ -1383,10 +1586,9 @@ void CoupledClusterContainer::_generate_ci_expansion() const {
       norm_sq += c * c;
     }
     double norm = std::sqrt(norm_sq);
-    if (norm > 1e-14) {
-      for (auto& c : coefficients_real) {
-        c /= norm;
-      }
+    // Division by 0 should not be possible here since ref coef = 1.0
+    for (auto& c : coefficients_real) {
+      c /= norm;
     }
 
     // Store in cache
