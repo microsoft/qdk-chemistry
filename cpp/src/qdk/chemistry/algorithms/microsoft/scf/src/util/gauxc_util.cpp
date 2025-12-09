@@ -6,6 +6,7 @@
 
 #include <algorithm>
 #include <cctype>
+#include <qdk/chemistry/utils/logger.hpp>
 #include <stdexcept>
 
 namespace qdk::chemistry::scf::gauxc_util {
@@ -23,6 +24,7 @@ namespace qdk::chemistry::scf::gauxc_util {
  * @note Uses std::tolower which handles ASCII characters properly
  */
 static std::string to_lower(const std::string& s) {
+  QDK_LOG_TRACE_ENTERING();
   std::string out = s;
   std::transform(out.begin(), out.end(), out.begin(),
                  [](unsigned char c) { return std::tolower(c); });
@@ -30,6 +32,7 @@ static std::string to_lower(const std::string& s) {
 }
 
 GauXC::AtomicGridSizeDefault grid_size_from_string(const std::string& str) {
+  QDK_LOG_TRACE_ENTERING();
   std::string s = to_lower(str);
   if (s == "fine") return GauXC::AtomicGridSizeDefault::FineGrid;
   if (s == "ultrafine") return GauXC::AtomicGridSizeDefault::UltraFineGrid;
@@ -38,7 +41,9 @@ GauXC::AtomicGridSizeDefault grid_size_from_string(const std::string& str) {
   if (s == "gm5") return GauXC::AtomicGridSizeDefault::GM5;
   throw std::invalid_argument("Unknown GauXC::AtomicGridSizeDefault: " + str);
 }
+
 std::string to_string(GauXC::AtomicGridSizeDefault type) {
+  QDK_LOG_TRACE_ENTERING();
   switch (type) {
     case GauXC::AtomicGridSizeDefault::FineGrid:
       return "FINE";
@@ -56,6 +61,7 @@ std::string to_string(GauXC::AtomicGridSizeDefault type) {
 }
 
 GauXC::RadialQuad radial_quad_from_string(const std::string& str) {
+  QDK_LOG_TRACE_ENTERING();
   std::string s = to_lower(str);
   if (s == "mura-knowles" || s == "muraknowles")
     return GauXC::RadialQuad::MuraKnowles;
@@ -66,7 +72,9 @@ GauXC::RadialQuad radial_quad_from_string(const std::string& str) {
   if (s == "becke" || s == "becke1988") return GauXC::RadialQuad::Becke;
   throw std::invalid_argument("Unknown GauXC::RadialQuad: " + str);
 }
+
 std::string to_string(GauXC::RadialQuad type) {
+  QDK_LOG_TRACE_ENTERING();
   switch (type) {
     case GauXC::RadialQuad::MuraKnowles:
       return "MURAKNOWLES";
@@ -82,13 +90,16 @@ std::string to_string(GauXC::RadialQuad type) {
 }
 
 GauXC::PruningScheme prune_method_from_string(const std::string& str) {
+  QDK_LOG_TRACE_ENTERING();
   std::string s = to_lower(str);
   if (s == "unpruned") return GauXC::PruningScheme::Unpruned;
   if (s == "robust") return GauXC::PruningScheme::Robust;
   if (s == "treutler") return GauXC::PruningScheme::Treutler;
   throw std::invalid_argument("Unknown GauXC::PruningScheme: " + str);
 }
+
 std::string to_string(GauXC::PruningScheme type) {
+  QDK_LOG_TRACE_ENTERING();
   switch (type) {
     case GauXC::PruningScheme::Unpruned:
       return "UNPRUNED";
@@ -102,6 +113,7 @@ std::string to_string(GauXC::PruningScheme type) {
 }
 
 GauXC::ExecutionSpace execution_space_from_string(const std::string& str) {
+  QDK_LOG_TRACE_ENTERING();
   std::string s = to_lower(str);
   if (s == "host" || s == "cpu") return GauXC::ExecutionSpace::Host;
 #if defined(GAUXC_HAS_DEVICE) && defined(QDK_CHEMISTRY_ENABLE_GPU)
@@ -109,7 +121,9 @@ GauXC::ExecutionSpace execution_space_from_string(const std::string& str) {
 #endif
   throw std::invalid_argument("Unknown GauXC::ExecutionSpace: " + str);
 }
+
 std::string to_string(GauXC::ExecutionSpace type) {
+  QDK_LOG_TRACE_ENTERING();
   switch (type) {
     case GauXC::ExecutionSpace::Host:
       return "HOST";

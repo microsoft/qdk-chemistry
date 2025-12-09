@@ -13,6 +13,7 @@
 #endif
 
 #include <libint2.hpp>
+#include <qdk/chemistry/utils/logger.hpp>
 
 namespace qdk::chemistry::utils::microsoft {
 
@@ -21,6 +22,8 @@ using qdk::chemistry::data::MAX_ORBITAL_ANGULAR_MOMENTUM;
 namespace qcs = qdk::chemistry::scf;
 
 void _norm_psi4_mode(std::vector<qcs::Shell>& shells) {
+  QDK_LOG_TRACE_ENTERING();
+
   // Precompute the double factorial up to n=2*MAX_ORBITAL_ANGULAR_MOMENTUM
   std::vector<double> double_factorial(2 * MAX_ORBITAL_ANGULAR_MOMENTUM + 1, 1);
 
@@ -79,6 +82,8 @@ static int _qdk_initialized_mpi = false;
 static int _qdk_initialized_libint2 = false;
 
 void initialize_backend() {
+  QDK_LOG_TRACE_ENTERING();
+
   if (_backed_initialized) return;
 
 #ifdef QDK_CHEMISTRY_ENABLE_MPI
@@ -114,6 +119,8 @@ void initialize_backend() {
 }
 
 void finalize_backend() {
+  QDK_LOG_TRACE_ENTERING();
+
   if (!_backed_initialized) return;
   if (_qdk_initialized_libint2) libint2::finalize();
 #ifdef QDK_CHEMISTRY_ENABLE_MPI
@@ -123,6 +130,8 @@ void finalize_backend() {
 
 qdk::chemistry::data::Structure convert_to_structure(
     const qcs::Molecule& molecule) {
+  QDK_LOG_TRACE_ENTERING();
+
   // Convert the Molecule to a Structure
   Eigen::MatrixXd coordinates(molecule.n_atoms, 3);
   std::vector<qdk::chemistry::data::Element> elements(molecule.n_atoms);
@@ -142,6 +151,8 @@ qdk::chemistry::data::Structure convert_to_structure(
 std::shared_ptr<qcs::Molecule> convert_to_molecule(
     const qdk::chemistry::data::Structure& structure, int64_t charge,
     int64_t multiplicity) {
+  QDK_LOG_TRACE_ENTERING();
+
   // Convert the Structure to a Molecule
   const auto& coordinates = structure.get_coordinates();
   const auto& nuclear_charges = structure.get_nuclear_charges();
@@ -170,6 +181,8 @@ std::shared_ptr<qcs::Molecule> convert_to_molecule(
 
 qdk::chemistry::data::BasisSet convert_basis_set_to_qdk(
     const qcs::BasisSet& basis_set) {
+  QDK_LOG_TRACE_ENTERING();
+
   // Check if we're encountering edge cases
   if (not basis_set.pure) {
     // TODO (NAB):  is basis_set.pure always false for cartesian basis sets?
@@ -249,6 +262,7 @@ qdk::chemistry::data::BasisSet convert_basis_set_to_qdk(
 
 std::shared_ptr<qcs::BasisSet> convert_basis_set_from_qdk(
     const qdk::chemistry::data::BasisSet& qdk_basis_set, bool keep_raw) {
+  QDK_LOG_TRACE_ENTERING();
   // Create internal Molecule from the structure
   auto structure = qdk_basis_set.get_structure();
   auto mol = convert_to_molecule(*structure, 0,
@@ -275,6 +289,8 @@ std::shared_ptr<qcs::BasisSet> convert_basis_set_from_qdk(
 
 nlohmann::ordered_json convert_to_json(
     const qdk::chemistry::data::Shell& shell) {
+  QDK_LOG_TRACE_ENTERING();
+
   std::vector<double> exponents;
   std::vector<double> coefficients;
   size_t contraction = shell.get_num_primitives();
@@ -304,6 +320,8 @@ nlohmann::ordered_json convert_to_json(
 
 nlohmann::ordered_json convert_to_json(
     const qdk::chemistry::data::BasisSet& basis_set) {
+  QDK_LOG_TRACE_ENTERING();
+
   nlohmann::ordered_json j;
 
   std::vector<nlohmann::ordered_json> json_shells;
@@ -360,6 +378,8 @@ nlohmann::ordered_json convert_to_json(
 std::vector<unsigned> compute_shell_map(
     const qdk::chemistry::data::BasisSet& qdk_basis_set,
     const qcs::BasisSet& itrn_basis_set) {
+  QDK_LOG_TRACE_ENTERING();
+
   const size_t nshells = qdk_basis_set.get_num_shells();
 
   if (nshells != itrn_basis_set.shells.size()) {

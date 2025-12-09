@@ -89,6 +89,7 @@ pybind11_add_module(_core
     src/pybind11/algorithms/scf.cpp
     src/pybind11/algorithms/active_space.cpp
     src/pybind11/algorithms/dynamical_correlation_calculator.cpp
+    src/pybind11/utils/logger.cpp
     src/pybind11/utils/valence_space.cpp
     src/pybind11/utils/orbital_rotation.cpp
     src/pybind11/constants.cpp

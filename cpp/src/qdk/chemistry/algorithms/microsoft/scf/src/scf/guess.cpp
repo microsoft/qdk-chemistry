@@ -5,7 +5,6 @@
 #include "scf/guess.h"
 
 #include <qdk/chemistry/scf/core/types.h>
-#include <spdlog/spdlog.h>
 
 #include <Eigen/Dense>
 #include <algorithm>
@@ -14,6 +13,7 @@
 #include <fstream>
 #include <iostream>
 #include <map>
+#include <qdk/chemistry/utils/logger.hpp>
 #include <vector>
 
 #include "scf_algorithm/asahf.h"
@@ -21,6 +21,7 @@
 
 namespace qdk::chemistry::scf {
 void atom_guess(const BasisSet& obs, const Molecule& mol, double* D) {
+  QDK_LOG_TRACE_ENTERING();
   std::filesystem::path guess_chk(std::filesystem::temp_directory_path() /
                                   "qdk" / "chemistry");
   if (obs.pure) {
@@ -29,11 +30,31 @@ void atom_guess(const BasisSet& obs, const Molecule& mol, double* D) {
     guess_chk = guess_chk / "guess" / (obs.name + "_cart");
   }
 
+  if (!std::filesystem::exists(guess_chk)) {
+    QDK_LOGGER().error(
+        "{} not found, use `scripts/generate_guess.py` to prepare basis",
+        obs.name);
+    exit(EXIT_FAILURE);
+  }
+  std::map<int, RowMajorMatrix> atom_dm;
+  std::ifstream fin(guess_chk);
+  int atomic_number;
+  while (fin >> atomic_number) {
+    int n;
+    fin >> n;
+    RowMajorMatrix d(n, n);
+    for (int i = 0; i < n; i++) {
+      for (int j = 0; j < n; j++) {
+        fin >> d(i, j);
+      }
+    }
+    atom_dm[atomic_number] = d;
+  }
   int N = obs.num_atomic_orbitals;
   RowMajorMatrix tD = RowMajorMatrix::Zero(N, N);
   if (!std::filesystem::exists(guess_chk)) {
-    spdlog::debug("Guess file {} not found, generating atomic guesses",
-                  guess_chk.string());
+    QDK_LOGGER().info("Guess file {} not found, generating atomic guesses",
+                      guess_chk.string());
     get_atom_guess(obs, mol, tD);
   } else {
     std::map<int, RowMajorMatrix> atom_dm;

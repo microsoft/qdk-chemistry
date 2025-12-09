@@ -16,13 +16,12 @@ heuristics without editing the code.
 
 import argparse
 import json
-import logging
 from collections.abc import Sequence
 from pathlib import Path
 
 from qdk_chemistry.algorithms import create
 from qdk_chemistry.data import Structure
-from qdk_chemistry.utils import compute_valence_space_parameters
+from qdk_chemistry.utils import Logger, compute_valence_space_parameters
 from qdk_chemistry.utils.wavefunction import (
     calculate_sparse_wavefunction,
     get_active_determinants_info,
@@ -30,7 +29,6 @@ from qdk_chemistry.utils.wavefunction import (
 
 DEFAULT_ENERGY_TOLERANCE = 1.0e-3  # Hartree
 DEFAULT_MAX_DETERMINANTS = 2000
-LOGGER = logging.getLogger(__file__)
 
 
 def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
@@ -104,7 +102,6 @@ def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
 
 def main(argv: Sequence[str] | None = None) -> None:
     """Drive the simplified SCF → CASCI → sparse-CI workflow."""
-    logging.basicConfig(level=logging.INFO)
     args = parse_args(argv)
 
     ########################################################################################
@@ -116,7 +113,7 @@ def main(argv: Sequence[str] | None = None) -> None:
         raise FileNotFoundError(f"XYZ file {structure_path} not found.")
     structure = Structure.from_xyz_file(structure_path)
     nuclear_repulsion = structure.calculate_nuclear_repulsion_energy()
-    LOGGER.info(structure.get_summary())
+    Logger.info(structure.get_summary())
 
     ########################################################################################
     # 2. Run the SCF stage to obtain the reference wavefunction.
@@ -126,7 +123,7 @@ def main(argv: Sequence[str] | None = None) -> None:
         structure, args.charge, args.spin, args.basis
     )
     total_scf_energy = e_scf + nuclear_repulsion
-    LOGGER.info("SCF Energy: %.8f Hartree", total_scf_energy)
+    Logger.info(f"SCF Energy: {total_scf_energy:.8f} Hartree")
 
     ########################################################################################
     # 3. Select the valence active space (heuristic or user overrides).
@@ -152,7 +149,7 @@ def main(argv: Sequence[str] | None = None) -> None:
 
     active_orbital_wavefunction = selector.run(scf_wavefunction)
     active_orbitals = active_orbital_wavefunction.get_orbitals()
-    LOGGER.info(active_orbitals.get_summary())
+    Logger.info(active_orbitals.get_summary())
 
     ########################################################################################
     # 4. Build the active-space Hamiltonian.
@@ -160,7 +157,7 @@ def main(argv: Sequence[str] | None = None) -> None:
     hamiltonian_constructor = create("hamiltonian_constructor")
     active_hamiltonian = hamiltonian_constructor.run(active_orbitals)
     core_energy = active_hamiltonian.get_core_energy()
-    LOGGER.info(active_hamiltonian.get_summary())
+    Logger.info(active_hamiltonian.get_summary())
 
     ########################################################################################
     # 5. Run the initial CASCI calculation.
@@ -174,7 +171,7 @@ def main(argv: Sequence[str] | None = None) -> None:
         active_hamiltonian, *active_orbital_wavefunction.get_active_num_electrons()
     )
     total_casci_energy = e_cas + core_energy
-    LOGGER.info("CASCI energy = %.8f Hartree", total_casci_energy)
+    Logger.info(f"CASCI energy = {total_casci_energy:.8f} Hartree")
 
     ########################################################################################
     # 6. Optional AutoCAS refinement of active space size.
@@ -187,9 +184,9 @@ def main(argv: Sequence[str] | None = None) -> None:
                 autocas_selector.settings().set(key, value)
         refined_wfn = autocas_selector.run(wfn_cas)
         indices, _ = refined_wfn.get_orbitals().get_active_space_indices()
-        LOGGER.info("AutoCAS selected active space with indices: %s", indices)
+        Logger.info(f"AutoCAS selected active space with indices: {indices}")
         if len(indices) == 0:
-            LOGGER.warning(
+            Logger.warn(
                 "AutoCAS did not identify correlated orbitals; retaining the initial space."
             )
         else:
@@ -200,8 +197,8 @@ def main(argv: Sequence[str] | None = None) -> None:
             )
             core_energy = active_hamiltonian.get_core_energy()
             total_casci_energy = e_cas + core_energy
-            LOGGER.info(active_hamiltonian.get_summary())
-            LOGGER.info("AutoCAS energy = %.8f Hartree", total_casci_energy)
+            Logger.info(active_hamiltonian.get_summary())
+            Logger.info(f"AutoCAS energy = {total_casci_energy:.8f} Hartree")
 
     ########################################################################################
     # 7. Perform sparse-CI screening.
@@ -214,9 +211,10 @@ def main(argv: Sequence[str] | None = None) -> None:
         max_determinants=args.max_determinants,
     )
 
-    LOGGER.info(f"Sparse CI energy values {sparse_ci_energy:.3f} Hartree")
-    LOGGER.info(get_active_determinants_info(sparse_ci_wavefunction))
+    Logger.info(f"Sparse CI energy values {sparse_ci_energy:.3f} Hartree")
+    Logger.info(get_active_determinants_info(sparse_ci_wavefunction))
 
 
 if __name__ == "__main__":
+    Logger.set_global_level("info")
     main()

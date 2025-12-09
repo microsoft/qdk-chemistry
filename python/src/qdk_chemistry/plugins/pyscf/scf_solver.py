@@ -56,6 +56,7 @@ from qdk_chemistry.plugins.pyscf.utils import (
     pyscf_mol_to_qdk_basis,
     structure_to_pyscf_atom_labels,
 )
+from qdk_chemistry.utils import Logger
 
 __all__ = ["PyscfScfSettings", "PyscfScfSolver"]
 
@@ -94,6 +95,7 @@ class PyscfScfSettings(ElectronicStructureSettings):
 
     def __init__(self):
         """Initialize the settings with default values from ElectronicStructureSettings plus PySCF-specific defaults."""
+        Logger.trace_entering()
         super().__init__()  # This sets up all the base class defaults
 
 
@@ -128,6 +130,7 @@ class PyscfScfSolver(ScfSolver):
 
     def __init__(self):
         """Initialize the PySCF SCF solver with default settings."""
+        Logger.trace_entering()
         super().__init__()
         self._settings = PyscfScfSettings()
 
@@ -167,6 +170,7 @@ class PyscfScfSolver(ScfSolver):
             string should be a valid PySCF XC functional name (e.g., "b3lyp", "pbe", "m06", "wb97x-d").
 
         """
+        Logger.trace_entering()
         atoms, _, _ = structure_to_pyscf_atom_labels(structure)
 
         # Determine basis set name and initial guess
@@ -333,4 +337,5 @@ class PyscfScfSolver(ScfSolver):
 
     def name(self) -> str:
         """Return the name of the SCF solver."""
+        Logger.trace_entering()
         return "pyscf"
