@@ -1,6 +1,6 @@
 """QDK/Chemistry Physical Constants Module.
 
-This module provides access to physical constants from CODATA standards :cite:`Tiesinga2021`.
+This module provides access to physical constants from CODATA standards :cite:`Mohr2025`.
 The constants are sourced from the most recent CODATA recommendations
 (currently CODATA 2022), but the underlying C++ implementation supports
 multiple CODATA versions for compatibility and comparison purposes.
