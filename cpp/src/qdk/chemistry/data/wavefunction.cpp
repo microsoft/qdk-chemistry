@@ -419,7 +419,7 @@ Eigen::VectorXd WavefunctionContainer::get_single_orbital_entropies() const {
     return two_rdm_ab(i * norbs * norbs2 + j * norbs2 + k * norbs + l);
   };
 
-  // Source: https://doi.org/10.1002/qua.24832
+  // Source: Boguslawski & Tecmer (2015). doi:10.1002/qua.24832
   // s1_i  = - \sum_alpha \omega_i,alpha * ln(omega_i,alpha)
   Eigen::VectorXd s1_entropies = Eigen::VectorXd::Zero(norbs);
   for (std::size_t i = 0; i < norbs; ++i) {
