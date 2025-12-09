@@ -33,7 +33,7 @@ class MockCoupledClusterCalculator : public DynamicalCorrelationCalculator {
   }
 
  protected:
-  std::pair<double, std::shared_ptr<Wavefunction>> _run_impl(
+  DynamicalCorrelationResult _run_impl(
       std::shared_ptr<Ansatz> ansatz) const override {
     // Create a wavefunction with CC container
     auto original_wfn = ansatz->get_wavefunction();
@@ -56,7 +56,7 @@ class MockCoupledClusterCalculator : public DynamicalCorrelationCalculator {
     auto result_wfn = std::make_shared<Wavefunction>(std::move(cc_container));
 
     double total_energy = -10.0;  // Dummy value
-    return {total_energy, result_wfn};
+    return {total_energy, result_wfn, std::nullopt};
   }
 };
 
@@ -107,11 +107,13 @@ TEST(CoupledClusterCalculatorTest, Calculate) {
       Configuration("20"), dummy_orbitals));
   auto ansatz_ptr =
       std::make_shared<Ansatz>(std::move(hamiltonian), std::move(wfn));
-  auto [energy, result_wavefunction] = calculator.run(ansatz_ptr);
+  auto [energy, result_wavefunction, bra_wavefunction] =
+      calculator.run(ansatz_ptr);
 
   // Verify the results
   EXPECT_DOUBLE_EQ(energy, -10.0);
   EXPECT_NE(result_wavefunction, nullptr);
+  EXPECT_FALSE(bra_wavefunction.has_value());
 
   // Test that we can get the amplitudes from the wavefunction container
   auto& cc_container =

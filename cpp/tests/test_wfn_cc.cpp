@@ -379,9 +379,10 @@ TEST_F(CoupledClusterContainerTest, CIExpansionConsistency) {
   }
 }
 
-// Test lazy RDM computation from CC amplitudes
-// RDMs are now computed lazily from the CI expansion generated from amplitudes
-TEST_F(CoupledClusterContainerTest, LazyRDMComputationFromAmplitudes) {
+// Test that RDMs require the adjoint wavefunction for computation
+// RDMs cannot be computed from ket amplitudes alone - they require lambda
+// amplitudes
+TEST_F(CoupledClusterContainerTest, RDMsRequireAdjointWavefunction) {
   size_t nocc = 2;
   size_t nvirt = 2;
 
@@ -409,94 +410,68 @@ TEST_F(CoupledClusterContainerTest, LazyRDMComputationFromAmplitudes) {
   const auto& determinants = cc.get_active_determinants();
   EXPECT_GT(determinants.size(), 0) << "Determinants should be available";
 
-  // RDMs should now be available via lazy computation from CI expansion
-  EXPECT_TRUE(cc.has_one_rdm_spin_traced())
-      << "Spin-traced 1-RDM should be available via lazy computation";
-  EXPECT_TRUE(cc.has_one_rdm_spin_dependent())
-      << "Spin-dependent 1-RDM should be available via lazy computation";
-  EXPECT_TRUE(cc.has_two_rdm_spin_traced())
-      << "Spin-traced 2-RDM should be available via lazy computation";
-  EXPECT_TRUE(cc.has_two_rdm_spin_dependent())
-      << "Spin-dependent 2-RDM should be available via lazy computation";
+  // RDMs should NOT be available without the adjoint wavefunction
+  EXPECT_FALSE(cc.has_one_rdm_spin_traced())
+      << "Spin-traced 1-RDM requires adjoint wavefunction";
+  EXPECT_FALSE(cc.has_one_rdm_spin_dependent())
+      << "Spin-dependent 1-RDM requires adjoint wavefunction";
+  EXPECT_FALSE(cc.has_two_rdm_spin_traced())
+      << "Spin-traced 2-RDM requires adjoint wavefunction";
+  EXPECT_FALSE(cc.has_two_rdm_spin_dependent())
+      << "Spin-dependent 2-RDM requires adjoint wavefunction";
 
-  // Actually retrieve the RDMs to verify lazy computation works
-  const auto& one_rdm_traced = cc.get_active_one_rdm_spin_traced();
-  std::visit(
-      [&nocc, &nvirt](const auto& mat) {
-        EXPECT_EQ(mat.rows(), nocc + nvirt)
-            << "1-RDM should have correct dimensions";
-        EXPECT_EQ(mat.cols(), nocc + nvirt)
-            << "1-RDM should have correct dimensions";
-        // 1-RDM should not be all zeros (should have some occupation)
-        EXPECT_GT(mat.norm(), 0.0) << "1-RDM should not be zero";
-        // Verify 1-RDM trace equals number of electrons
-        // Reference "2200" has 2 alpha + 2 beta = 4 electrons
-        auto rdm1_trace = mat.trace();
-        size_t n_electrons = 4;  // From reference "2200"
-        EXPECT_NEAR(std::real(rdm1_trace), static_cast<double>(n_electrons),
-                    1e-6)
-            << "1-RDM trace should equal number of electrons. "
-            << "Trace: " << std::real(rdm1_trace)
-            << ", N_electrons: " << n_electrons;
+  // Attempting to get RDMs should throw an error
+  EXPECT_THROW(
+      {
+        try {
+          cc.get_active_one_rdm_spin_traced();
+        } catch (const std::runtime_error& e) {
+          EXPECT_TRUE(std::string(e.what()).find("adjoint") !=
+                      std::string::npos)
+              << "Error message should mention adjoint wavefunction";
+          throw;
+        }
       },
-      one_rdm_traced);
+      std::runtime_error);
 
-  // Get spin-dependent RDMs
-  auto [one_rdm_aa, one_rdm_bb] = cc.get_active_one_rdm_spin_dependent();
-  std::visit(
-      [&nocc, &nvirt](const auto& mat) {
-        EXPECT_EQ(mat.rows(), nocc + nvirt)
-            << "1-RDM aa should have correct dimensions";
+  EXPECT_THROW(
+      {
+        try {
+          cc.get_active_one_rdm_spin_dependent();
+        } catch (const std::runtime_error& e) {
+          EXPECT_TRUE(std::string(e.what()).find("adjoint") !=
+                      std::string::npos)
+              << "Error message should mention adjoint wavefunction";
+          throw;
+        }
       },
-      one_rdm_aa);
+      std::runtime_error);
 
-  // Get 2-RDMs and verify size
-  auto [two_rdm_aabb, two_rdm_aaaa, two_rdm_bbbb] =
-      cc.get_active_two_rdm_spin_dependent();
-  size_t nmo = nocc + nvirt;
-  std::visit(
-      [nmo](const auto& vec) {
-        EXPECT_EQ(vec.size(), nmo * nmo * nmo * nmo)
-            << "2-RDM should have correct size";
+  EXPECT_THROW(
+      {
+        try {
+          cc.get_active_two_rdm_spin_traced();
+        } catch (const std::runtime_error& e) {
+          EXPECT_TRUE(std::string(e.what()).find("adjoint") !=
+                      std::string::npos)
+              << "Error message should mention adjoint wavefunction";
+          throw;
+        }
       },
-      two_rdm_aabb);
-}
+      std::runtime_error);
 
-// Test that RDMs are also available when explicitly provided to CC container
-TEST_F(CoupledClusterContainerTest, RDMsAvailableWhenExplicitlyProvided) {
-  size_t nocc = 2;
-  size_t nvirt = 2;
-  size_t nmo = nocc + nvirt;
-
-  auto orbitals = testing::create_test_orbitals(nocc + nvirt, 4, true);
-  Configuration ref("2200");
-  auto wavefunction = create_test_wavefunction(ref, orbitals);
-
-  Eigen::VectorXd t1_amplitudes = Eigen::VectorXd::Ones(nocc * nvirt) * 0.1;
-  Eigen::VectorXd t2_amplitudes =
-      Eigen::VectorXd::Ones(nocc * nocc * nvirt * nvirt) * 0.05;
-
-  // Create sample RDMs
-  Eigen::MatrixXd one_rdm = Eigen::MatrixXd::Identity(nmo, nmo);
-  Eigen::VectorXd two_rdm = Eigen::VectorXd::Zero(nmo * nmo * nmo * nmo);
-
-  // Create CC container with explicit RDMs
-  CoupledClusterContainer cc_with_rdm(orbitals, wavefunction, t1_amplitudes,
-                                      t2_amplitudes, one_rdm, two_rdm);
-
-  // Now RDMs should be available
-  EXPECT_TRUE(cc_with_rdm.has_one_rdm_spin_traced())
-      << "Spin-traced 1-RDM should be available when explicitly provided";
-  EXPECT_TRUE(cc_with_rdm.has_two_rdm_spin_traced())
-      << "Spin-traced 2-RDM should be available when explicitly provided";
-
-  // CI coefficients should also still be available
-  const auto& coefficients = cc_with_rdm.get_coefficients();
-  std::visit(
-      [](const auto& vec) {
-        EXPECT_GT(vec.size(), 0) << "CI coefficients should be available";
+  EXPECT_THROW(
+      {
+        try {
+          cc.get_active_two_rdm_spin_dependent();
+        } catch (const std::runtime_error& e) {
+          EXPECT_TRUE(std::string(e.what()).find("adjoint") !=
+                      std::string::npos)
+              << "Error message should mention adjoint wavefunction";
+          throw;
+        }
       },
-      coefficients);
+      std::runtime_error);
 }
 
 // Test HDF5 serialization/deserialization

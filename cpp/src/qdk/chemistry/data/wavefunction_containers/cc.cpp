@@ -24,41 +24,9 @@ CoupledClusterContainer::CoupledClusterContainer(
     std::shared_ptr<Wavefunction> wavefunction,
     const std::optional<VectorVariant>& t1_amplitudes,
     const std::optional<VectorVariant>& t2_amplitudes)
-    : CoupledClusterContainer(
-          orbitals, wavefunction, t1_amplitudes, std::nullopt, t2_amplitudes,
-          std::nullopt, std::nullopt, std::nullopt, std::nullopt, std::nullopt,
-          std::nullopt, std::nullopt, std::nullopt, std::nullopt) {}
-
-CoupledClusterContainer::CoupledClusterContainer(
-    std::shared_ptr<Orbitals> orbitals,
-    std::shared_ptr<Wavefunction> wavefunction,
-    const std::optional<VectorVariant>& t1_amplitudes,
-    const std::optional<VectorVariant>& t2_amplitudes,
-    const std::optional<MatrixVariant>& one_rdm_spin_traced,
-    const std::optional<VectorVariant>& two_rdm_spin_traced)
     : CoupledClusterContainer(orbitals, wavefunction, t1_amplitudes,
                               std::nullopt, t2_amplitudes, std::nullopt,
-                              std::nullopt, one_rdm_spin_traced, std::nullopt,
-                              std::nullopt, two_rdm_spin_traced, std::nullopt,
-                              std::nullopt, std::nullopt) {}
-
-CoupledClusterContainer::CoupledClusterContainer(
-    std::shared_ptr<Orbitals> orbitals,
-    std::shared_ptr<Wavefunction> wavefunction,
-    const std::optional<VectorVariant>& t1_amplitudes,
-    const std::optional<VectorVariant>& t2_amplitudes,
-    const std::optional<MatrixVariant>& one_rdm_spin_traced,
-    const std::optional<MatrixVariant>& one_rdm_aa,
-    const std::optional<MatrixVariant>& one_rdm_bb,
-    const std::optional<VectorVariant>& two_rdm_spin_traced,
-    const std::optional<VectorVariant>& two_rdm_aabb,
-    const std::optional<VectorVariant>& two_rdm_aaaa,
-    const std::optional<VectorVariant>& two_rdm_bbbb)
-    : CoupledClusterContainer(orbitals, wavefunction, t1_amplitudes,
-                              std::nullopt, t2_amplitudes, std::nullopt,
-                              std::nullopt, one_rdm_spin_traced, one_rdm_aa,
-                              one_rdm_bb, two_rdm_spin_traced, two_rdm_aabb,
-                              two_rdm_aaaa, two_rdm_bbbb) {}
+                              std::nullopt) {}
 
 CoupledClusterContainer::CoupledClusterContainer(
     std::shared_ptr<Orbitals> orbitals,
@@ -68,43 +36,6 @@ CoupledClusterContainer::CoupledClusterContainer(
     const std::optional<VectorVariant>& t2_amplitudes_abab,
     const std::optional<VectorVariant>& t2_amplitudes_aaaa,
     const std::optional<VectorVariant>& t2_amplitudes_bbbb)
-    : CoupledClusterContainer(
-          orbitals, wavefunction, t1_amplitudes_aa, t1_amplitudes_bb,
-          t2_amplitudes_abab, t2_amplitudes_aaaa, t2_amplitudes_bbbb,
-          std::nullopt, std::nullopt, std::nullopt, std::nullopt, std::nullopt,
-          std::nullopt, std::nullopt) {}
-
-CoupledClusterContainer::CoupledClusterContainer(
-    std::shared_ptr<Orbitals> orbitals,
-    std::shared_ptr<Wavefunction> wavefunction,
-    const std::optional<VectorVariant>& t1_amplitudes_aa,
-    const std::optional<VectorVariant>& t1_amplitudes_bb,
-    const std::optional<VectorVariant>& t2_amplitudes_abab,
-    const std::optional<VectorVariant>& t2_amplitudes_aaaa,
-    const std::optional<VectorVariant>& t2_amplitudes_bbbb,
-    const std::optional<MatrixVariant>& one_rdm_spin_traced,
-    const std::optional<VectorVariant>& two_rdm_spin_traced)
-    : CoupledClusterContainer(
-          orbitals, wavefunction, t1_amplitudes_aa, t1_amplitudes_bb,
-          t2_amplitudes_abab, t2_amplitudes_aaaa, t2_amplitudes_bbbb,
-          one_rdm_spin_traced, std::nullopt, std::nullopt, two_rdm_spin_traced,
-          std::nullopt, std::nullopt, std::nullopt) {}
-
-CoupledClusterContainer::CoupledClusterContainer(
-    std::shared_ptr<Orbitals> orbitals,
-    std::shared_ptr<Wavefunction> wavefunction,
-    const std::optional<VectorVariant>& t1_amplitudes_aa,
-    const std::optional<VectorVariant>& t1_amplitudes_bb,
-    const std::optional<VectorVariant>& t2_amplitudes_abab,
-    const std::optional<VectorVariant>& t2_amplitudes_aaaa,
-    const std::optional<VectorVariant>& t2_amplitudes_bbbb,
-    const std::optional<MatrixVariant>& one_rdm_spin_traced,
-    const std::optional<MatrixVariant>& one_rdm_aa,
-    const std::optional<MatrixVariant>& one_rdm_bb,
-    const std::optional<VectorVariant>& two_rdm_spin_traced,
-    const std::optional<VectorVariant>& two_rdm_aabb,
-    const std::optional<VectorVariant>& two_rdm_aaaa,
-    const std::optional<VectorVariant>& two_rdm_bbbb)
     : WavefunctionContainer(
           WavefunctionType::NotSelfDual),  // Always force NotSelfDual for CC
       _wavefunction(wavefunction),
@@ -263,33 +194,6 @@ CoupledClusterContainer::CoupledClusterContainer(
   } else {
     _t2_amplitudes_bbbb = _t2_amplitudes_abab;
   }
-
-  if (one_rdm_spin_traced) {
-    _one_rdm_spin_traced =
-        std::make_shared<MatrixVariant>(*one_rdm_spin_traced);
-  }
-  if (one_rdm_aa) {
-    _one_rdm_spin_dependent_aa = std::make_shared<MatrixVariant>(*one_rdm_aa);
-  }
-  if (one_rdm_bb) {
-    _one_rdm_spin_dependent_bb = std::make_shared<MatrixVariant>(*one_rdm_bb);
-  }
-  if (two_rdm_spin_traced) {
-    _two_rdm_spin_traced =
-        std::make_shared<VectorVariant>(*two_rdm_spin_traced);
-  }
-  if (two_rdm_aabb) {
-    _two_rdm_spin_dependent_aabb =
-        std::make_shared<VectorVariant>(*two_rdm_aabb);
-  }
-  if (two_rdm_aaaa) {
-    _two_rdm_spin_dependent_aaaa =
-        std::make_shared<VectorVariant>(*two_rdm_aaaa);
-  }
-  if (two_rdm_bbbb) {
-    _two_rdm_spin_dependent_bbbb =
-        std::make_shared<VectorVariant>(*two_rdm_bbbb);
-  }
 }
 
 std::unique_ptr<WavefunctionContainer> CoupledClusterContainer::clone() const {
@@ -310,37 +214,8 @@ std::unique_ptr<WavefunctionContainer> CoupledClusterContainer::clone() const {
       _t2_amplitudes_bbbb ? std::optional<VectorVariant>(*_t2_amplitudes_bbbb)
                           : std::nullopt;
 
-  std::optional<MatrixVariant> one_rdm_spin_traced =
-      _one_rdm_spin_traced ? std::optional<MatrixVariant>(*_one_rdm_spin_traced)
-                           : std::nullopt;
-  std::optional<VectorVariant> two_rdm_spin_traced =
-      _two_rdm_spin_traced ? std::optional<VectorVariant>(*_two_rdm_spin_traced)
-                           : std::nullopt;
-  std::optional<MatrixVariant> one_rdm_aa =
-      _one_rdm_spin_dependent_aa
-          ? std::optional<MatrixVariant>(*_one_rdm_spin_dependent_aa)
-          : std::nullopt;
-  std::optional<MatrixVariant> one_rdm_bb =
-      _one_rdm_spin_dependent_bb
-          ? std::optional<MatrixVariant>(*_one_rdm_spin_dependent_bb)
-          : std::nullopt;
-  std::optional<VectorVariant> two_rdm_aabb =
-      _two_rdm_spin_dependent_aabb
-          ? std::optional<VectorVariant>(*_two_rdm_spin_dependent_aabb)
-          : std::nullopt;
-  std::optional<VectorVariant> two_rdm_aaaa =
-      _two_rdm_spin_dependent_aaaa
-          ? std::optional<VectorVariant>(*_two_rdm_spin_dependent_aaaa)
-          : std::nullopt;
-  std::optional<VectorVariant> two_rdm_bbbb =
-      _two_rdm_spin_dependent_bbbb
-          ? std::optional<VectorVariant>(*_two_rdm_spin_dependent_bbbb)
-          : std::nullopt;
-
   return std::make_unique<CoupledClusterContainer>(
-      _orbitals, _wavefunction, t1_aa, t1_bb, t2_abab, t2_aaaa, t2_bbbb,
-      one_rdm_spin_traced, one_rdm_aa, one_rdm_bb, two_rdm_spin_traced,
-      two_rdm_aabb, two_rdm_aaaa, two_rdm_bbbb);
+      _orbitals, _wavefunction, t1_aa, t1_bb, t2_abab, t2_aaaa, t2_bbbb);
 }
 
 std::shared_ptr<Orbitals> CoupledClusterContainer::get_orbitals() const {
@@ -724,149 +599,20 @@ std::pair<size_t, size_t> CoupledClusterContainer::get_active_num_electrons()
 
 std::pair<Eigen::VectorXd, Eigen::VectorXd>
 CoupledClusterContainer::get_total_orbital_occupations() const {
-  const auto& determinants = _wavefunction->get_total_determinants();
-  if (determinants.empty()) {
-    throw std::runtime_error("No determinants available");
-  }
-
-  // Get the total number of orbitals from the orbital basis set
-  const int num_orbitals =
-      static_cast<int>(get_orbitals()->get_num_molecular_orbitals());
-
-  Eigen::VectorXd alpha_occupations = Eigen::VectorXd::Zero(num_orbitals);
-  Eigen::VectorXd beta_occupations = Eigen::VectorXd::Zero(num_orbitals);
-
-  // Get inactive space indices and mark them as doubly occupied
-  auto [alpha_inactive_indices, beta_inactive_indices] =
-      get_orbitals()->get_inactive_space_indices();
-
-  // Set inactive orbitals as doubly occupied (occupation = 1.0)
-  for (size_t inactive_idx : alpha_inactive_indices) {
-    if (inactive_idx < static_cast<size_t>(num_orbitals)) {
-      alpha_occupations(inactive_idx) = 1.0;
-    }
-  }
-  for (size_t inactive_idx : beta_inactive_indices) {
-    if (inactive_idx < static_cast<size_t>(num_orbitals)) {
-      beta_occupations(inactive_idx) = 1.0;
-    }
-  }
-
-  // For active space orbitals, get occupations from 1RDM eigenvalues
-  if (has_one_rdm_spin_dependent()) {
-    // Get active space occupations using the dedicated method
-    auto [alpha_active_occs, beta_active_occs] =
-        get_active_orbital_occupations();
-
-    // Get active space indices to map back to total orbital indices
-    auto [alpha_active_indices, beta_active_indices] =
-        get_orbitals()->get_active_space_indices();
-
-    // Map active space occupations to total orbital indices
-    for (size_t active_idx = 0; active_idx < alpha_active_indices.size();
-         ++active_idx) {
-      size_t orbital_idx = alpha_active_indices[active_idx];
-      if (orbital_idx < static_cast<size_t>(num_orbitals) &&
-          active_idx < alpha_active_occs.size()) {
-        alpha_occupations(orbital_idx) = alpha_active_occs(active_idx);
-      }
-    }
-
-    for (size_t active_idx = 0; active_idx < beta_active_indices.size();
-         ++active_idx) {
-      size_t orbital_idx = beta_active_indices[active_idx];
-      if (orbital_idx < static_cast<size_t>(num_orbitals) &&
-          active_idx < beta_active_occs.size()) {
-        beta_occupations(orbital_idx) = beta_active_occs(active_idx);
-      }
-    }
-  } else {
-    throw std::runtime_error(
-        "1RDM must be available to compute orbital occupations");
-  }
-
-  return {alpha_occupations, beta_occupations};
+  // Orbital occupations require RDMs which are not available in CC container
+  throw std::runtime_error(
+      "Coupled cluster orbital occupations require the adjoint (bra) "
+      "wavefunction. Use a coupled cluster method that computes lambda "
+      "amplitudes to obtain RDMs and orbital occupations.");
 }
 
 std::pair<Eigen::VectorXd, Eigen::VectorXd>
 CoupledClusterContainer::get_active_orbital_occupations() const {
-  const auto& determinants = get_active_determinants();
-  if (determinants.empty()) {
-    throw std::runtime_error("No determinants available");
-  }
-
-  // Get the active space indices
-  auto [alpha_active_indices, beta_active_indices] =
-      get_orbitals()->get_active_space_indices();
-
-  // If no active space is defined, return empty vectors
-  if (alpha_active_indices.empty()) {
-    return {Eigen::VectorXd::Zero(0), Eigen::VectorXd::Zero(0)};
-  }
-
-  const int num_active_orbitals = static_cast<int>(alpha_active_indices.size());
-
-  Eigen::VectorXd alpha_occupations =
-      Eigen::VectorXd::Zero(num_active_orbitals);
-  Eigen::VectorXd beta_occupations = Eigen::VectorXd::Zero(num_active_orbitals);
-
-  // For active space orbitals, get occupations from 1RDM eigenvalues
-  if (has_one_rdm_spin_dependent()) {
-    const auto& rdm_tuple = get_active_one_rdm_spin_dependent();
-    const auto& alpha_rdm_var = std::get<0>(rdm_tuple);
-    const auto& beta_rdm_var = std::get<1>(rdm_tuple);
-    // Extract real matrices (assuming real for now)
-    if (detail::is_matrix_variant_complex(alpha_rdm_var) ||
-        detail::is_matrix_variant_complex(beta_rdm_var)) {
-      throw std::runtime_error(
-          "Complex 1RDM diagonalization not yet implemented");
-    }
-
-    const Eigen::MatrixXd& alpha_rdm = std::get<Eigen::MatrixXd>(alpha_rdm_var);
-    const Eigen::MatrixXd& beta_rdm = std::get<Eigen::MatrixXd>(beta_rdm_var);
-
-    // Diagonalize alpha 1RDM to get occupations
-    Eigen::SelfAdjointEigenSolver<Eigen::MatrixXd> alpha_solver(alpha_rdm);
-    if (alpha_solver.info() != Eigen::Success) {
-      throw std::runtime_error("Failed to diagonalize alpha 1RDM");
-    }
-    Eigen::VectorXd alpha_eigenvalues = alpha_solver.eigenvalues();
-
-    // reverse to have descending order
-    std::reverse(alpha_eigenvalues.data(),
-                 alpha_eigenvalues.data() + alpha_eigenvalues.size());
-
-    // Diagonalize beta 1RDM to get occupations
-    Eigen::SelfAdjointEigenSolver<Eigen::MatrixXd> beta_solver(beta_rdm);
-    if (beta_solver.info() != Eigen::Success) {
-      throw std::runtime_error("Failed to diagonalize beta 1RDM");
-    }
-    Eigen::VectorXd beta_eigenvalues = beta_solver.eigenvalues();
-
-    // reverse to have descending order
-    std::reverse(beta_eigenvalues.data(),
-                 beta_eigenvalues.data() + beta_eigenvalues.size());
-
-    // Copy eigenvalues directly as active space occupations
-    for (int active_idx = 0;
-         active_idx < std::min(num_active_orbitals,
-                               static_cast<int>(alpha_eigenvalues.size()));
-         ++active_idx) {
-      alpha_occupations(active_idx) = alpha_eigenvalues(active_idx);
-    }
-
-    for (int active_idx = 0;
-         active_idx < std::min(num_active_orbitals,
-                               static_cast<int>(beta_eigenvalues.size()));
-         ++active_idx) {
-      beta_occupations(active_idx) = beta_eigenvalues(active_idx);
-    }
-  } else {
-    throw std::runtime_error(
-        "1RDM must be available to compute orbital occupations");
-  }
-
-  return {alpha_occupations, beta_occupations};
+  // Orbital occupations require RDMs which are not available in CC container
+  throw std::runtime_error(
+      "Coupled cluster orbital occupations require the adjoint (bra) "
+      "wavefunction. Use a coupled cluster method that computes lambda "
+      "amplitudes to obtain RDMs and orbital occupations.");
 }
 
 std::string CoupledClusterContainer::get_container_type() const {
@@ -1681,184 +1427,63 @@ void compute_rdms_impl(const std::vector<Configuration>& determinants,
 }
 }  // namespace
 
-void CoupledClusterContainer::_generate_rdms_from_ci_expansion() const {
-  // Ensure CI expansion is available
-  if (!_determinant_vector_cache || !_coefficients_cache) {
-    _generate_ci_expansion();
-  }
-
-  // Only support real coefficients for now
-  if (is_complex()) {
-    throw std::runtime_error(
-        "Lazy RDM computation from complex CC amplitudes is not yet "
-        "supported. Please provide explicit RDMs at construction time "
-        "for complex-valued coupled cluster wavefunctions.");
-  }
-
-  const auto& determinants = *_determinant_vector_cache;
-  const auto& coeffs_variant = *_coefficients_cache;
-  const auto& coeffs = std::get<Eigen::VectorXd>(coeffs_variant);
-
-  size_t norb = _orbitals->get_num_molecular_orbitals();
-  size_t norb2 = norb * norb;
-  size_t norb4 = norb2 * norb2;
-
-  // Allocate RDM storage
-  std::vector<double> one_rdm_aa(norb2, 0.0);
-  std::vector<double> one_rdm_bb(norb2, 0.0);
-  std::vector<double> two_rdm_aaaa(norb4, 0.0);
-  std::vector<double> two_rdm_bbbb(norb4, 0.0);
-  std::vector<double> two_rdm_aabb(norb4, 0.0);
-
-  // Dispatch based on number of orbitals
-  if (norb <= 32) {
-    compute_rdms_impl<64>(determinants, coeffs.data(), norb, one_rdm_aa,
-                          one_rdm_bb, two_rdm_aaaa, two_rdm_bbbb, two_rdm_aabb);
-  } else if (norb <= 64) {
-    compute_rdms_impl<128>(determinants, coeffs.data(), norb, one_rdm_aa,
-                           one_rdm_bb, two_rdm_aaaa, two_rdm_bbbb,
-                           two_rdm_aabb);
-  } else if (norb <= 128) {
-    compute_rdms_impl<256>(determinants, coeffs.data(), norb, one_rdm_aa,
-                           one_rdm_bb, two_rdm_aaaa, two_rdm_bbbb,
-                           two_rdm_aabb);
-  } else {
-    throw std::runtime_error(
-        "Number of orbitals exceeds maximum supported (128) for RDM "
-        "computation");
-  }
-
-  // Store in base class RDM member variables
-  // Scale 2-RDMs by 2.0 to match convention (MACIS uses 0.5 prefactor)
-  Eigen::MatrixXd one_aa_mat =
-      Eigen::Map<Eigen::MatrixXd>(one_rdm_aa.data(), norb, norb);
-  Eigen::MatrixXd one_bb_mat =
-      Eigen::Map<Eigen::MatrixXd>(one_rdm_bb.data(), norb, norb);
-  Eigen::VectorXd two_aaaa_vec =
-      Eigen::Map<Eigen::VectorXd>(two_rdm_aaaa.data(), norb4) * 2.0;
-  Eigen::VectorXd two_bbbb_vec =
-      Eigen::Map<Eigen::VectorXd>(two_rdm_bbbb.data(), norb4) * 2.0;
-  Eigen::VectorXd two_aabb_vec =
-      Eigen::Map<Eigen::VectorXd>(two_rdm_aabb.data(), norb4) * 2.0;
-
-  _one_rdm_spin_dependent_aa =
-      std::make_shared<MatrixVariant>(std::move(one_aa_mat));
-  _one_rdm_spin_dependent_bb =
-      std::make_shared<MatrixVariant>(std::move(one_bb_mat));
-  _two_rdm_spin_dependent_aaaa =
-      std::make_shared<VectorVariant>(std::move(two_aaaa_vec));
-  _two_rdm_spin_dependent_bbbb =
-      std::make_shared<VectorVariant>(std::move(two_bbbb_vec));
-  _two_rdm_spin_dependent_aabb =
-      std::make_shared<VectorVariant>(std::move(two_aabb_vec));
-}
-
 bool CoupledClusterContainer::has_one_rdm_spin_dependent() const {
-  // RDMs available if explicitly set OR if we have amplitudes to compute them
-  if (_one_rdm_spin_dependent_aa != nullptr &&
-      _one_rdm_spin_dependent_bb != nullptr) {
-    return true;
-  }
-  // Can compute from amplitudes if available
-  return has_t1_amplitudes() || has_t2_amplitudes();
+  // RDMs are not stored in CC container - requires adjoint wavefunction
+  return false;
 }
 
 bool CoupledClusterContainer::has_one_rdm_spin_traced() const {
-  if (_one_rdm_spin_traced != nullptr) {
-    return true;
-  }
-  return has_one_rdm_spin_dependent();
+  // RDMs are not stored in CC container - requires adjoint wavefunction
+  return false;
 }
 
 bool CoupledClusterContainer::has_two_rdm_spin_dependent() const {
-  if (_two_rdm_spin_dependent_aabb != nullptr &&
-      _two_rdm_spin_dependent_aaaa != nullptr &&
-      _two_rdm_spin_dependent_bbbb != nullptr) {
-    return true;
-  }
-  // Can compute from amplitudes if available
-  return has_t1_amplitudes() || has_t2_amplitudes();
+  // RDMs are not stored in CC container - requires adjoint wavefunction
+  return false;
 }
 
 bool CoupledClusterContainer::has_two_rdm_spin_traced() const {
-  if (_two_rdm_spin_traced != nullptr) {
-    return true;
-  }
-  return has_two_rdm_spin_dependent();
+  // RDMs are not stored in CC container - requires adjoint wavefunction
+  return false;
 }
 
 std::tuple<const CoupledClusterContainer::MatrixVariant&,
            const CoupledClusterContainer::MatrixVariant&>
 CoupledClusterContainer::get_active_one_rdm_spin_dependent() const {
-  // If not already computed, generate from CI expansion
-  if (_one_rdm_spin_dependent_aa == nullptr ||
-      _one_rdm_spin_dependent_bb == nullptr) {
-    if (has_t1_amplitudes() || has_t2_amplitudes()) {
-      _generate_rdms_from_ci_expansion();
-    } else {
-      throw std::runtime_error("Spin-dependent one-body RDM not available");
-    }
-  }
-  return std::make_tuple(std::cref(*_one_rdm_spin_dependent_aa),
-                         std::cref(*_one_rdm_spin_dependent_bb));
+  // Cannot compute RDMs from ket amplitudes alone
+  throw std::runtime_error(
+      "Coupled cluster RDM computation requires the adjoint (bra) "
+      "wavefunction. Use a coupled cluster method that computes lambda "
+      "amplitudes.");
 }
 
 std::tuple<const CoupledClusterContainer::VectorVariant&,
            const CoupledClusterContainer::VectorVariant&,
            const CoupledClusterContainer::VectorVariant&>
 CoupledClusterContainer::get_active_two_rdm_spin_dependent() const {
-  // If not already computed, generate from CI expansion
-  if (_two_rdm_spin_dependent_aabb == nullptr ||
-      _two_rdm_spin_dependent_aaaa == nullptr ||
-      _two_rdm_spin_dependent_bbbb == nullptr) {
-    if (has_t1_amplitudes() || has_t2_amplitudes()) {
-      _generate_rdms_from_ci_expansion();
-    } else {
-      throw std::runtime_error("Spin-dependent two-body RDM not available");
-    }
-  }
-  return std::make_tuple(std::cref(*_two_rdm_spin_dependent_aabb),
-                         std::cref(*_two_rdm_spin_dependent_aaaa),
-                         std::cref(*_two_rdm_spin_dependent_bbbb));
+  // Cannot compute RDMs from ket amplitudes alone
+  throw std::runtime_error(
+      "Coupled cluster RDM computation requires the adjoint (bra) "
+      "wavefunction. Use a coupled cluster method that computes lambda "
+      "amplitudes.");
 }
 
 const CoupledClusterContainer::MatrixVariant&
 CoupledClusterContainer::get_active_one_rdm_spin_traced() const {
-  // If spin-traced already available, return it
-  if (_one_rdm_spin_traced != nullptr) {
-    return *_one_rdm_spin_traced;
-  }
-
-  // Ensure spin-dependent RDMs are computed (this triggers lazy eval)
-  get_active_one_rdm_spin_dependent();
-
-  // Now compute spin-traced from spin-dependent
-  _one_rdm_spin_traced = detail::add_matrix_variants(
-      *_one_rdm_spin_dependent_aa, *_one_rdm_spin_dependent_bb);
-  return *_one_rdm_spin_traced;
+  // Cannot compute RDMs from ket amplitudes alone
+  throw std::runtime_error(
+      "Coupled cluster RDM computation requires the adjoint (bra) "
+      "wavefunction. Use a coupled cluster method that computes lambda "
+      "amplitudes.");
 }
 
 const CoupledClusterContainer::VectorVariant&
 CoupledClusterContainer::get_active_two_rdm_spin_traced() const {
-  // If spin-traced already available, return it
-  if (_two_rdm_spin_traced != nullptr) {
-    return *_two_rdm_spin_traced;
-  }
-
-  // Ensure spin-dependent RDMs are computed (this triggers lazy eval)
-  get_active_two_rdm_spin_dependent();
-
-  // Compute spin-traced from spin-dependent components
-  // spin-traced = aaaa + bbbb + aabb + bbaa
-  auto two_rdm_ss_part = detail::add_vector_variants(
-      *_two_rdm_spin_dependent_aaaa, *_two_rdm_spin_dependent_bbbb);
-  auto two_rdm_spin_bbaa = detail::transpose_ijkl_klij_vector_variant(
-      *_two_rdm_spin_dependent_aabb, _orbitals->get_num_molecular_orbitals());
-  auto two_rdm_os_part = detail::add_vector_variants(
-      *_two_rdm_spin_dependent_aabb, *two_rdm_spin_bbaa);
-  _two_rdm_spin_traced =
-      detail::add_vector_variants(*two_rdm_os_part, *two_rdm_ss_part);
-  return *_two_rdm_spin_traced;
+  // Cannot compute RDMs from ket amplitudes alone
+  throw std::runtime_error(
+      "Coupled cluster RDM computation requires the adjoint (bra) "
+      "wavefunction. Use a coupled cluster method that computes lambda "
+      "amplitudes.");
 }
 
 }  // namespace qdk::chemistry::data

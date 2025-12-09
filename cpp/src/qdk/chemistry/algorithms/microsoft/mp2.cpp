@@ -19,7 +19,7 @@ namespace qdk::chemistry::algorithms::microsoft {
 
 MP2Calculator::MP2Calculator() = default;
 
-std::pair<double, std::shared_ptr<data::Wavefunction>> MP2Calculator::_run_impl(
+DynamicalCorrelationResult MP2Calculator::_run_impl(
     std::shared_ptr<data::Ansatz> ansatz) const {
   // Extract Hamiltonian and wavefunction from ansatz
   auto hamiltonian = ansatz->get_hamiltonian();
@@ -63,7 +63,7 @@ std::pair<double, std::shared_ptr<data::Wavefunction>> MP2Calculator::_run_impl(
   // Calculate total energy = reference energy + correlation energy
   double reference_energy_ = ansatz->calculate_energy();
   double total_energy = reference_energy_ + E_corr;
-  return std::make_pair(total_energy, mp2_wavefunction);
+  return {total_energy, mp2_wavefunction, mp2_wavefunction};
 }
 
 double MP2Calculator::calculate_restricted_mp2_energy(

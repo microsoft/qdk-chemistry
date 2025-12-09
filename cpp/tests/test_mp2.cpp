@@ -59,7 +59,7 @@ TEST_F(MP2Test, UMP2Energies_CCPVDZ) {
   auto mp2_calculator =
       DynamicalCorrelationCalculatorFactory::create("qdk_mp2_calculator");
 
-  auto [mp2_total_energy, final_wavefunction] = mp2_calculator->run(ansatz);
+  auto [mp2_total_energy, final_wavefunction, _] = mp2_calculator->run(ansatz);
 
   double reference = ansatz->calculate_energy();
   double mp2_corr_energy = mp2_total_energy - reference;
@@ -109,7 +109,7 @@ TEST_F(MP2Test, RMP2Energies_CCPVDZ) {
       DynamicalCorrelationCalculatorFactory::create("qdk_mp2_calculator");
 
   // MP2 returns total energy, subtract reference to get correlation energy
-  auto [mp2_total_energy, final_wavefunction] = mp2_calculator->run(ansatz);
+  auto [mp2_total_energy, final_wavefunction, _] = mp2_calculator->run(ansatz);
   double hf_reference_energy = ansatz->calculate_energy();
   double mp2_corr_energy = mp2_total_energy - hf_reference_energy;
 

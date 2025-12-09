@@ -6,11 +6,26 @@
 
 #pragma once
 #include <memory>
+#include <optional>
 #include <qdk/chemistry/algorithms/algorithm.hpp>
 #include <qdk/chemistry/data/ansatz.hpp>
 #include <qdk/chemistry/data/wavefunction.hpp>
+#include <tuple>
 
 namespace qdk::chemistry::algorithms {
+
+/**
+ * @brief Return type for dynamical correlation calculations
+ *
+ * A tuple containing:
+ * - double: Total energy (reference + correlation)
+ * - shared_ptr<Wavefunction>: The ket (right) wavefunction
+ * - optional<shared_ptr<Wavefunction>>: Optional bra (left) wavefunction for
+ *   non-Hermitian methods
+ */
+using DynamicalCorrelationResult =
+    std::tuple<double, std::shared_ptr<data::Wavefunction>,
+               std::optional<std::shared_ptr<data::Wavefunction>>>;
 
 /**
  * @class DynamicalCorrelationCalculator
@@ -26,7 +41,7 @@ namespace qdk::chemistry::algorithms {
  */
 class DynamicalCorrelationCalculator
     : public Algorithm<DynamicalCorrelationCalculator,
-                       std::pair<double, std::shared_ptr<data::Wavefunction>>,
+                       DynamicalCorrelationResult,
                        std::shared_ptr<data::Ansatz>> {
  public:
   /**
@@ -43,12 +58,13 @@ class DynamicalCorrelationCalculator
    * @brief Run main calculation
    *
    * This method performs the calculation using the provided ansatz and returns
-   * both the total energy and the resulting wavefunction.
+   * the total energy, the ket wavefunction, and optionally a bra wavefunction
+   * for non-Hermitian methods.
    *
    * @param args Arguments to pass to the underlying algorithm, typically an
    * Ansatz (Wavefunction and Hamiltonian) describing the system of interest
-   * @return A pair containing the total energy (first) and the resulting
-   *         wavefunction (second)
+   * @return A DynamicalCorrelationResult containing the energy, ket
+   * wavefunction, and optionally a bra wavefunction
    *
    * @throw std::runtime_error if the calculation fails
    * @throw std::invalid_argument if the Ansatz is invalid
@@ -79,9 +95,10 @@ class DynamicalCorrelationCalculator
    * by derived classes.
    *
    * @param ansatz The Ansatz describing the quantum system
-   * @return A pair containing the total energy and resulting wavefunction
+   * @return A DynamicalCorrelationResult containing the energy, ket
+   * wavefunction, and optionally a bra wavefunction
    */
-  virtual std::pair<double, std::shared_ptr<data::Wavefunction>> _run_impl(
+  virtual DynamicalCorrelationResult _run_impl(
       std::shared_ptr<data::Ansatz> ansatz) const = 0;
 };
 
