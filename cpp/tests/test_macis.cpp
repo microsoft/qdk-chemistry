@@ -174,7 +174,8 @@ TEST_F(MacisAsciTest, BasicASCICalculation) {
             macis_params::ntdets_max_large);  // Should respect ntdets_max
 
   // Energy should be reasonable (above HF but below exact)
-  EXPECT_LT(energy, 0.0);  // Should be negative for bound system
+  EXPECT_NEAR(energy, -75.945264400409414,
+              macis_params::energy_tol);  // Should be negative for bound system
 }
 
 // Test ASCI settings configuration

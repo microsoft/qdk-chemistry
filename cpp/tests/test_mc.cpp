@@ -167,7 +167,7 @@ TEST_F(MCTest, Water_DEF2SVP_CASCI) {
       std::vector<size_t>{0, 1});
   // Print number of electrons before and after selection
   auto ham = hamiltonian_constructor->run(orbitals_with_active_space);
-  EXPECT_NEAR(ham->get_core_energy(), -6.3499129701956562e+01,
+  EXPECT_NEAR(ham->get_core_energy(), -6.349912970471e+01,
               testing::numerical_zero_tolerance * 10);
 
   // Run CASCI

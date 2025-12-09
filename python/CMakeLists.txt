@@ -70,6 +70,7 @@ find_package(pybind11 REQUIRED)
 # Create the Python extension module
 pybind11_add_module(_core
     src/pybind11/data/data_class.cpp
+    src/pybind11/data/element_data.cpp
     src/pybind11/data/orbitals.cpp
     src/pybind11/data/wavefunction.cpp
     src/pybind11/data/hamiltonian.cpp
