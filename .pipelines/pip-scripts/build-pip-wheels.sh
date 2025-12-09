@@ -68,7 +68,18 @@ export CFLAGS="-fPIC -Os"
 echo "Downloading and installing BLIS..."
 bash .pipelines/install-scripts/install-blis.sh /usr/local ${MARCH} ${BLIS_VERSION} ${CFLAGS}
 
+echo "Checking for symbols in libblis that indicate 64-bit integers..."
 nm -nC /usr/local/lib/libblis.a | grep 64
+
+git clone https://github.com/wavefunction91/linalg-cmake-modules.git
+echo "Checking BLIS integer size..."
+gcc linalg-cmake-modules/util/blis_int_size.c -o blis_int_size /usr/local/lib/libblis.a -lm -pthread -I/usr/local/include
+./blis_int_size
+echo "Checking if BLIS is ILP64..."
+gcc linalg-cmake-modules/util/ilp64_checker.c -o ilp64_checker -DDGEMM_NAME=dgemm_ /usr/local/lib/libblis.a -lm -lpthread
+./ilp64_checker
+rm blis_int_size ilp64_checker
+rm -rf linalg-cmake-modules
 
 echo "Downloading and installing libflame..."
 bash .pipelines/install-scripts/install-libflame.sh /usr/local ${MARCH} ${LIBFLAME_VERSION} ${CFLAGS}
