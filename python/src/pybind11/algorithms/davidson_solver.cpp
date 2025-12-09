@@ -86,7 +86,7 @@ void bind_davidson_solver(py::module& m) {
 
             Parameters
             ----------
-            csr_matrix : scipy.sparse.csr_matrix
+            csr_matrix : ``scipy.sparse.csr_matrix``
                 Sparse matrix representation of the Hamiltonian.
             tol : float, optional
                 Convergence tolerance for the eigenvalue (default: 1e-8).
@@ -95,9 +95,10 @@ void bind_davidson_solver(py::module& m) {
 
             Returns
             -------
-            tuple of (eigenvalue, eigenvector)
-                - eigenvalue: float, the lowest eigenvalue found
-                - eigenvector: numpy.ndarray, corresponding eigenvector
+            tuple of (float, numpy.ndarray)
+                - ``eigenvalue``: float, the lowest eigenvalue found
+                - ``eigenvector``: numpy.ndarray, corresponding eigenvector
+
             Raises
             ------
             RuntimeError

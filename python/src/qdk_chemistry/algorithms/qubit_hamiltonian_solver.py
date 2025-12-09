@@ -1,6 +1,6 @@
 """QDK/Chemistry qubit hamiltonian solver abstractions and utilities.
 
-This module provides the base classes `QubitHamiltonianSolver` and `QubitHamiltonianSolverFactory`
+This module provides the base classes QubitHamiltonianSolver and QubitHamiltonianSolverFactory
 for solving qubit Hamiltonians for ground state energies using various algorithms.
 """
 
@@ -13,12 +13,12 @@ from abc import abstractmethod
 
 import numpy as np
 
+from qdk_chemistry import data
 from qdk_chemistry._core._algorithms import davidson_solver, syev_solver
-from qdk_chemistry.algorithms.base import Algorithm, AlgorithmFactory
-from qdk_chemistry.data import QubitHamiltonian, Settings
+from qdk_chemistry.algorithms import base
 
 
-class QubitHamiltonianSolver(Algorithm):
+class QubitHamiltonianSolver(base.Algorithm):
     """Abstract base class for solving a qubit Hamiltonian."""
 
     def __init__(self):
@@ -26,15 +26,15 @@ class QubitHamiltonianSolver(Algorithm):
         super().__init__()
 
     def type_name(self) -> str:
-        """Return ``qubit_hamiltonian_solver`` as the algorithm type name."""
+        """Return qubit_hamiltonian_solver as the algorithm type name."""
         return "qubit_hamiltonian_solver"
 
     @abstractmethod
-    def _run_impl(self, qubit_hamiltonian: QubitHamiltonian) -> tuple[float, np.ndarray]:
+    def _run_impl(self, qubit_hamiltonian: data.QubitHamiltonian) -> tuple[float, np.ndarray]:
         """Solve a qubit Hamiltonian.
 
         Args:
-            qubit_hamiltonian (QubitHamiltonian): The qubit Hamiltonian.
+            qubit_hamiltonian: The :class:`~qdk_chemistry.data.QubitHamiltonian`.
 
         Returns:
             tuple[float, np.ndarray]: The ground state energy and corresponding eigenstate.
@@ -42,19 +42,19 @@ class QubitHamiltonianSolver(Algorithm):
         """
 
 
-class QubitHamiltonianSolverFactory(AlgorithmFactory):
+class QubitHamiltonianSolverFactory(base.AlgorithmFactory):
     """Factory class for creating QubitHamiltonianSolver instances."""
 
     def algorithm_type_name(self) -> str:
-        """Return ``qubit_hamiltonian_solver`` as the algorithm type name."""
+        """Return qubit_hamiltonian_solver as the algorithm type name."""
         return "qubit_hamiltonian_solver"
 
     def default_algorithm_name(self) -> str:
-        """Return ``qdk_sparse_matrix_solver`` as the default algorithm name."""
+        """Return qdk_sparse_matrix_solver as the default algorithm name."""
         return "qdk_sparse_matrix_solver"
 
 
-class SparseMatrixSolverSettings(Settings):
+class SparseMatrixSolverSettings(data.Settings):
     """Settings configuration for a SparseMatrixSolver.
 
     SparseMatrixSolver-specific settings:
@@ -80,11 +80,11 @@ class SparseMatrixSolver(QubitHamiltonianSolver):
         self._settings.set("tol", tol)
         self._settings.set("max_m", max_m)
 
-    def _run_impl(self, qubit_hamiltonian: QubitHamiltonian) -> tuple[float, np.ndarray]:
+    def _run_impl(self, qubit_hamiltonian: data.QubitHamiltonian) -> tuple[float, np.ndarray]:
         """Solve a qubit Hamiltonian using sparse matrix methods.
 
         Args:
-            qubit_hamiltonian (QubitHamiltonian): The qubit Hamiltonian.
+            qubit_hamiltonian: The :class:`~qdk_chemistry.data.QubitHamiltonian`.
 
         Returns:
             tuple[float, np.ndarray]: The ground state energy and corresponding eigenstate.
@@ -109,11 +109,11 @@ class DenseMatrixSolver(QubitHamiltonianSolver):
         """Initialize the DenseMatrixSolver."""
         super().__init__()
 
-    def _run_impl(self, qubit_hamiltonian: QubitHamiltonian) -> tuple[float, np.ndarray]:
+    def _run_impl(self, qubit_hamiltonian: data.QubitHamiltonian) -> tuple[float, np.ndarray]:
         """Solve a qubit Hamiltonian using dense matrix methods.
 
         Args:
-            qubit_hamiltonian (QubitHamiltonian): The qubit Hamiltonian.
+            qubit_hamiltonian: The :class:`~qdk_chemistry.data.QubitHamiltonian`.
 
         Returns:
             tuple[float, np.ndarray]: The ground state energy and corresponding eigenstate.

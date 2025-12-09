@@ -64,9 +64,9 @@ void bind_syev_solver(py::module& m) {
 
             Returns
             -------
-            tuple of (eigenvalues, eigenvectors)
-                - eigenvalues: numpy.ndarray, the eigenvalues of the matrix in ascending order
-                - eigenvectors: numpy.ndarray, the eigenvectors of the matrix, where each column corresponds to an eigenvector
+            tuple of (numpy.ndarray, numpy.ndarray)
+                - ``eigenvalues``: numpy.ndarray, the eigenvalues of the matrix in ascending order
+                - ``eigenvectors``: numpy.ndarray, the eigenvectors of the matrix, where each column corresponds to an eigenvector
 
             Raises
             ------
