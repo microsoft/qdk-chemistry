@@ -7,6 +7,13 @@
 
 from qdk_chemistry.algorithms import registry
 
+try:
+    import pyscf  # noqa: F401
+
+    PYSCF_AVAILABLE = True
+except ImportError:
+    PYSCF_AVAILABLE = False
+
 
 class TestRegistryShowDefault:
     """Test the show_default function in the registry module."""
@@ -52,9 +59,10 @@ class TestRegistryShowDefault:
         assert default_hamiltonian_constructor == "qdk"
 
         # Test for multi configuration SCF
-        default_mcscf = registry.show_default("multi_configuration_scf")
-        assert isinstance(default_mcscf, str)
-        assert default_mcscf == "pyscf"
+        if PYSCF_AVAILABLE:
+            default_mcscf = registry.show_default("multi_configuration_scf")
+            assert isinstance(default_mcscf, str)
+            assert default_mcscf == "pyscf"
 
         # Test for qubit mapper
         default_qubit_mapper = registry.show_default("qubit_mapper")
@@ -79,6 +87,8 @@ class TestRegistryShowDefault:
         for algorithm_type, default_name in defaults.items():
             # Each default should be in the available list for that type
             assert algorithm_type in available, f"Algorithm type '{algorithm_type}' not in available algorithms"
+            if default_name == "pyscf" and not PYSCF_AVAILABLE:
+                continue  # Skip check if pyscf is not available
             assert default_name in available[algorithm_type], (
                 f"Default algorithm '{default_name}' for type '{algorithm_type}' "
                 f"not found in available algorithms: {available[algorithm_type]}"
@@ -89,6 +99,8 @@ class TestRegistryShowDefault:
         defaults = registry.show_default()
 
         for algorithm_type, default_name in defaults.items():
+            if default_name == "pyscf" and not PYSCF_AVAILABLE:
+                continue  # Skip check if pyscf is not available
             # Should be able to create the default algorithm
             algorithm = registry.create(algorithm_type, default_name)
             assert algorithm is not None

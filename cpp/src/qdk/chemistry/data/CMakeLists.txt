@@ -3,6 +3,7 @@ target_sources(chemistry PRIVATE
     basis_set.cpp
     configuration.cpp
     configuration_set.cpp
+    element_data.cpp
     hdf5_serialization.cpp
     json_serialization.cpp
     hamiltonian.cpp
