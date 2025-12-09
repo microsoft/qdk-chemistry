@@ -75,9 +75,9 @@ class PyscfScfSettings(ElectronicStructureSettings):
     - convergence_threshold (float, default=1e-7): Convergence tolerance for orbital gradient norm.
     - max_iterations (int, default=50): Maximum number of iterations.
     - scf_type (str, default="auto"): Type of SCF calculation. Can be:
-      * "auto": Automatically detect based on spin (RHF for singlet, UHF for open-shell)
-      * "restricted": Force restricted calculation (RHF/ROHF for HF, RKS/ROKS for DFT)
-      * "unrestricted": Force unrestricted calculation (UHF for HF, UKS for DFT)
+    "auto": Automatically detect based on spin (RHF for singlet, UHF for open-shell)
+    "restricted": Force restricted calculation (RHF/ROHF for HF, RKS/ROKS for DFT)
+    "unrestricted": Force unrestricted calculation (UHF for HF, UKS for DFT)
 
     Examples:
         >>> settings = PyscfScfSettings()
