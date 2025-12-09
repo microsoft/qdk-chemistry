@@ -54,7 +54,7 @@ struct ConstantInfo {
  * @brief CODATA 2018 recommended values for fundamental physical constants
  *
  * Constants from the 2018 CODATA recommended values of the fundamental physical
- * constants: https://physics.nist.gov/cuu/Constants/
+ * constants: https://physics.nist.gov/cuu/Constants/ :cite:`Tiesinga2021`.
  */
 namespace codata_2018 {
 
