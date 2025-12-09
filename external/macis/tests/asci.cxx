@@ -714,6 +714,8 @@ TEST_CASE("CoreSelectionStrategy") {
     // First grow a wavefunction to a reasonable size, then test core selection
 
     macis::ASCISettings grow_settings;
+    grow_settings.core_selection_strategy =
+        macis::CoreSelectionStrategy::Fixed;  // Use fixed for initial growth
     grow_settings.ntdets_max = 1000;
     grow_settings.ncdets_max = 100;
     macis::MCSCFSettings mcscf_settings;

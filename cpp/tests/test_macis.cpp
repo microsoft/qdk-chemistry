@@ -193,7 +193,7 @@ TEST_F(MacisAsciTest, PercentageCoreSelectionStrategy) {
   settings.set("max_refine_iter", macis_params::refine_off);
   // Use percentage-based core selection (the default)
   settings.set("core_selection_strategy", "percentage");
-  // Use a low threshold to include all available core determinants
+  // Use a high threshold to include most core determinants
   settings.set("core_selection_threshold", 0.99);
   settings.set("ncdets_max", static_cast<size_t>(200));
 

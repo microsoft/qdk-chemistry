@@ -117,7 +117,9 @@ class MacisAsciSettings : public MultiConfigurationSettings {
     // Core selection strategy parameter
     set_default<std::string>("core_selection_strategy", "percentage");
     set_default<double>("core_selection_threshold",
-                        macis_defaults.core_selection_threshold);
+                        macis_defaults.core_selection_threshold,
+                        "Cumulative weight threshold for core selection",
+                        data::BoundConstraint<double>{0.0, 1.0});
   }
 
   /**
