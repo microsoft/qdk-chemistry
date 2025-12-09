@@ -23,7 +23,7 @@ if [[ ${MARCH} == 'armv8-a' ]]; then
     --disable-shared \
     --enable-static \
     --prefix=${INSTALL_PREFIX} \
-    --blis-int-size=32 \
+    --blas-int-size=32 \
     --int-size=32 \
     $BLIS_ARCH
 elif [[ ${MARCH} == 'x86-64-v3' ]]; then
@@ -37,6 +37,6 @@ elif [[ ${MARCH} == 'x86-64-v3' ]]; then
 fi
 
 make -j$(nproc)
-make install
+# make install
 
 cd ..
