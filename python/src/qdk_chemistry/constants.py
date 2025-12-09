@@ -2,7 +2,7 @@
 
 This module provides access to physical constants from CODATA standards.
 The constants are sourced from the most recent CODATA recommendations
-(currently CODATA 2018), but the underlying C++ implementation supports
+(currently CODATA 2022), but the underlying C++ implementation supports
 multiple CODATA versions for compatibility and comparison purposes.
 
 All constants are provided in their original units as specified by CODATA,
@@ -14,8 +14,8 @@ and quantum mechanics.
 
 Data Source:
     CODATA recommended values of the fundamental physical constants
-    Currently using: CODATA 2018 (default)
-    Also available: CODATA 2014 (via C++ preprocessor directives)
+    Currently using: CODATA 2022 (default)
+    Also available: CODATA 2018, CODATA 2014 (via C++ preprocessor directives)
     https://physics.nist.gov/cuu/Constants/
 
 Constants Documentation:
@@ -76,6 +76,7 @@ from qdk_chemistry._core.constants import (
     ConstantInfo,
     get_constant_info,
     get_constants_info,
+    get_current_codata_version,
 )
 from qdk_chemistry.utils import Logger
 
@@ -93,9 +94,10 @@ def list_constants(show_values: bool = True, show_units: bool = True) -> None:
 
     """
     Logger.trace_entering()
+    codata_version = get_current_codata_version()
     constants_info = get_constants_info()
 
-    constants_info_string = "\nQDK/Chemistry Physical Constants (CODATA 2018)\n"
+    constants_info_string = f"\nQDK/Chemistry Physical Constants ({codata_version})\n"
     constants_info_string += "=" * 50 + "\n"
 
     # Group constants by category
@@ -225,6 +227,7 @@ __all__ = [
     "find_constant",
     "get_constant_info",
     "get_constants_info",
+    "get_current_codata_version",
     "list_constants",
     "show_constant_details",
 ]

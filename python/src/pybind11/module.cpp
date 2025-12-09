@@ -7,6 +7,7 @@
 namespace py = pybind11;
 
 void bind_base_class(py::module& m);
+void bind_element_data(py::module& m);
 void bind_orbitals(py::module& m);
 void bind_hamiltonian(py::module& m);
 void bind_wavefunction(py::module& m);
@@ -47,6 +48,7 @@ PYBIND11_MODULE(_core, m) {
   // Ordering is important!
 
   bind_base_class(data);
+  bind_element_data(data);  // Element enums must be bound before Structure
   bind_structure(data);
   bind_settings(data);
   bind_basis_set(data);
