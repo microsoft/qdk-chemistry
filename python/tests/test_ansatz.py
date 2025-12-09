@@ -304,8 +304,7 @@ class TestAnsatzSerialization:
         mol = Structure([[0.0, 0.0, 0.0], [0.0, 0.0, 4.0]], ["N", "N"])
         # get scf energy and wfn
         scf = algorithms.create("scf_solver")
-        scf.settings().set("basis_set", "cc-pvdz")
-        e_scf, hf_wfn = scf.run(mol, 0, 1)
+        e_scf, hf_wfn = scf.run(mol, 0, 1, "cc-pvdz")
         # get hamiltonian
         h_ctor = algorithms.create("hamiltonian_constructor")
         hamiltonian = h_ctor.run(hf_wfn.get_orbitals())

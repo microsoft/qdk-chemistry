@@ -231,10 +231,9 @@ class TestScfSolver:
         scf_solver = algorithms.create("scf_solver")
 
         scf_solver.settings().set("method", "pbe")
-        scf_solver.settings().set("basis_set", "cc-pvdz")
         scf_solver.settings().set("enable_gdm", True)
 
-        energy, wavefunction = scf_solver.run(oxygen, 0, 1)
+        energy, wavefunction = scf_solver.run(oxygen, 0, 1, "cc-pvdz")
         orbitals = wavefunction.get_orbitals()
 
         # Check that we get reasonable results
@@ -250,11 +249,10 @@ class TestScfSolver:
         scf_solver = algorithms.create("scf_solver")
 
         scf_solver.settings().set("method", "pbe")
-        scf_solver.settings().set("basis_set", "cc-pvdz")
         scf_solver.settings().set("enable_gdm", True)
         scf_solver.settings().set("gdm_bfgs_history_size_limit", 20)
 
-        energy, wavefunction = scf_solver.run(oxygen, 0, 1)
+        energy, wavefunction = scf_solver.run(oxygen, 0, 1, "cc-pvdz")
         orbitals = wavefunction.get_orbitals()
 
         # Check that we get reasonable results
@@ -271,11 +269,10 @@ class TestScfSolver:
 
         # Set method and basis set to match C++ test
         scf_solver.settings().set("method", "pbe")
-        scf_solver.settings().set("basis_set", "cc-pvdz")
         scf_solver.settings().set("enable_gdm", True)
         scf_solver.settings().set("gdm_max_diis_iteration", 1)
 
-        energy, wavefunction = scf_solver.run(oxygen, 0, 1)
+        energy, wavefunction = scf_solver.run(oxygen, 0, 1, "cc-pvdz")
         orbitals = wavefunction.get_orbitals()
 
         # Check that we get reasonable results
@@ -294,7 +291,7 @@ class TestScfSolver:
         scf_solver.settings().set("method", "pbe")
         scf_solver.settings().set("enable_gdm", True)
 
-        energy, wavefunction = scf_solver.run(water, 0, 3)  # triplet state
+        energy, wavefunction = scf_solver.run(water, 0, 3, "def2-svp")  # triplet state
         orbitals = wavefunction.get_orbitals()
 
         # Check that we get reasonable results
@@ -315,11 +312,10 @@ class TestScfSolver:
 
         # Set method and basis set to match C++ test
         scf_solver.settings().set("method", "pbe")
-        scf_solver.settings().set("basis_set", "cc-pvdz")
         scf_solver.settings().set("enable_gdm", True)
         scf_solver.settings().set("max_iterations", 100)
 
-        energy, wavefunction = scf_solver.run(oxygen, 1, 2)  # +1 charge, doublet state
+        energy, wavefunction = scf_solver.run(oxygen, 1, 2, "cc-pvdz")  # +1 charge, doublet state
         orbitals = wavefunction.get_orbitals()
 
         assert isinstance(energy, float)
@@ -338,13 +334,12 @@ class TestScfSolver:
 
         # Set method and basis set to match C++ test
         scf_solver.settings().set("method", "pbe")
-        scf_solver.settings().set("basis_set", "cc-pvdz")
         scf_solver.settings().set("enable_gdm", True)
         scf_solver.settings().set("energy_thresh_diis_switch", -2e-4)
 
         # Test that negative energy_thresh_diis_switch throws a ValueError (std::invalid_argument in C++)
         with pytest.raises(ValueError, match="energy_thresh_diis_switch must be greater than"):
-            scf_solver.run(oxygen, 0, 1)  # singlet state
+            scf_solver.run(oxygen, 0, 1, "cc-pvdz")  # singlet state
 
     def test_scf_solver_oxygen_atom_invalid_bfgs_history_size_limit_gdm(self):
         """Test SCF solver on oxygen atom with GDM - invalid BFGS history size limit."""
@@ -353,10 +348,9 @@ class TestScfSolver:
 
         # Set method and basis set to match C++ test
         scf_solver.settings().set("method", "pbe")
-        scf_solver.settings().set("basis_set", "cc-pvdz")
         scf_solver.settings().set("enable_gdm", True)
         scf_solver.settings().set("gdm_bfgs_history_size_limit", 0)
 
         # Test that invalid history size limit throws a ValueError (std::invalid_argument in C++)
         with pytest.raises(ValueError, match="GDM history size limit must be at least"):
-            scf_solver.run(oxygen, 0, 1)  # singlet state
+            scf_solver.run(oxygen, 0, 1, "cc-pvdz")  # singlet state

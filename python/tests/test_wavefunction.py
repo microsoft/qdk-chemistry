@@ -811,7 +811,7 @@ class TestWavefunctionRdmIntegraion:
 
         mol = Structure(["N", "N"], [[0.0, 0.0, 2.0], [0.0, 0.0, 0.0]])
         scf_solver = algorithms.create("scf_solver")
-        sd_wf = scf_solver.run(mol, 0, np.abs(nelec_alpha - nelec_beta) + 1)[1]
+        sd_wf = scf_solver.run(mol, 0, np.abs(nelec_alpha - nelec_beta) + 1, "def2-svp")[1]
 
         active_space_selector = algorithms.create("active_space_selector", "qdk_valence")
         active_space_selector.settings().set("num_active_electrons", ntot)

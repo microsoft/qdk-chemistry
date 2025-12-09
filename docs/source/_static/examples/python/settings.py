@@ -104,7 +104,7 @@ is_empty = settings.empty()
 settings = scf_solver.settings()  # Re-initialize to clear
 
 # Validate that required settings exist
-settings.validate_required(["basis_set", "convergence_threshold"])
+settings.validate_required(["convergence_threshold"])
 
 # Get a setting as a string representation
 value_str = settings.get_as_string("convergence_threshold")
