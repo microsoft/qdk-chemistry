@@ -497,8 +497,8 @@ def _register_python_factories():
     """Register all built-in Python algorithm factories.
 
     This internal initialization function registers all the Python-implemented
-    algorithm factories. This includes factories for energy estimators, qubit
-    mappers, and state preparation algorithms that are implemented in Python.
+    algorithm factories. This includes factories for energy estimators, qubit Hamiltonian solver,
+    qubit mappers, and state preparation algorithms that are implemented in Python.
 
     This function is automatically called during module import and should not
     be called by users.
@@ -558,7 +558,7 @@ def _register_python_algorithms():
 
     This internal initialization function registers specific Python-implemented
     algorithm instances as built-in algorithms. This includes the default QDK
-    energy estimator and state preparation algorithms.
+    energy estimator, qubit Hamiltonian solvers, and state preparation algorithms.
 
     This function is automatically called during module import and should not
     be called by users.
