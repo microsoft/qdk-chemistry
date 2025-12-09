@@ -3,12 +3,15 @@
 // license information.
 
 #include <qdk/chemistry/scf/eri/eri_multiplexer.h>
-#include <spdlog/spdlog.h>
+
+#include <qdk/chemistry/utils/logger.hpp>
 
 namespace qdk::chemistry::scf {
 ERIMultiplexer::ERIMultiplexer(BasisSet& basis, BasisSet& aux_basis,
                                const SCFConfig& cfg, double omega)
     : ERI(cfg.unrestricted, cfg.eri.eri_threshold, basis, cfg.mpi) {
+  QDK_LOG_TRACE_ENTERING();
+
   if (not cfg.do_dfj) {
     j_impl_ = ERI::create(basis, cfg, omega);
     k_impl_ = j_impl_;
@@ -31,6 +34,8 @@ ERIMultiplexer::ERIMultiplexer(BasisSet& basis, BasisSet& aux_basis,
 ERIMultiplexer::ERIMultiplexer(BasisSet& basis, const SCFConfig& cfg,
                                double omega)
     : ERI(cfg.unrestricted, cfg.eri.eri_threshold, basis, cfg.mpi) {
+  QDK_LOG_TRACE_ENTERING();
+
   if (cfg.do_dfj)
     throw std::runtime_error("An AUX basis must be specified for DFJ");
 
@@ -54,6 +59,8 @@ ERIMultiplexer::ERIMultiplexer(BasisSet& basis, const SCFConfig& cfg,
 
 void ERIMultiplexer::build_JK(const double* P, double* J, double* K,
                               double alpha, double beta, double omega) {
+  QDK_LOG_TRACE_ENTERING();
+
   // jk_impl_->build_JK(P, J, K, alpha, beta, omega);
   if (j_impl_ == k_impl_) {
     j_impl_->build_JK(P, J, K, alpha, beta, omega);
@@ -62,11 +69,17 @@ void ERIMultiplexer::build_JK(const double* P, double* J, double* K,
     k_impl_->build_JK(P, nullptr, K, alpha, beta, omega);
   }
 }
+
 void ERIMultiplexer::quarter_trans(size_t nt, const double* C, double* out) {
+  QDK_LOG_TRACE_ENTERING();
+
   qt_impl_->quarter_trans(nt, C, out);
 }
+
 void ERIMultiplexer::get_gradients(const double* P, double* dJ, double* dK,
                                    double alpha, double beta, double omega) {
+  QDK_LOG_TRACE_ENTERING();
+
   if (grad_impl_ == j_impl_) {
     if (j_impl_ == k_impl_) {
       j_impl_->get_gradients(P, dJ, dK, alpha, beta, omega);

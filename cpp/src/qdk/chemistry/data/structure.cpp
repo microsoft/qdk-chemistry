@@ -10,6 +10,7 @@
 #include <qdk/chemistry/constants.hpp>
 #include <qdk/chemistry/data/element_data.hpp>
 #include <qdk/chemistry/data/structure.hpp>
+#include <qdk/chemistry/utils/logger.hpp>
 #include <sstream>
 #include <stdexcept>
 #include <unordered_map>
@@ -28,6 +29,7 @@ Structure::Structure(const Eigen::MatrixXd& coordinates,
     : _coordinates(coordinates),
       _elements(elements),
       _masses([&]() {
+        QDK_LOG_TRACE_ENTERING();
         if (masses.size() == 0) {
           if (elements.empty()) {
             return Eigen::VectorXd();  // Create completely empty vector
@@ -69,6 +71,7 @@ Structure::Structure(const Eigen::MatrixXd& coordinates,
                      const Eigen::VectorXd& nuclear_charges)
     : _coordinates(coordinates),
       _elements([&]() {
+        QDK_LOG_TRACE_ENTERING();
         std::vector<Element> elements;
         elements.reserve(symbols.size());
         for (const auto& symbol : symbols) {
@@ -118,6 +121,7 @@ Structure::Structure(const std::vector<Eigen::Vector3d>& coordinates,
                      const std::vector<double>& masses,
                      const std::vector<double>& nuclear_charges)
     : _coordinates([&]() {
+        QDK_LOG_TRACE_ENTERING();
         if (coordinates.empty()) {
           return Eigen::MatrixXd();  // Create completely empty matrix (0x0)
         } else {
@@ -178,6 +182,7 @@ Structure::Structure(const std::vector<Eigen::Vector3d>& coordinates,
                      const std::vector<double>& masses,
                      const std::vector<double>& nuclear_charges)
     : _coordinates([&]() {
+        QDK_LOG_TRACE_ENTERING();
         if (coordinates.empty()) {
           return Eigen::MatrixXd();  // Create completely empty matrix (0x0)
         } else {
@@ -242,6 +247,7 @@ Structure::Structure(const std::vector<Eigen::Vector3d>& coordinates,
 }
 
 Eigen::Vector3d Structure::get_atom_coordinates(size_t atom_index) const {
+  QDK_LOG_TRACE_ENTERING();
   if (atom_index >= get_num_atoms()) {
     throw std::out_of_range("Atom index out of range");
   }
@@ -249,6 +255,7 @@ Eigen::Vector3d Structure::get_atom_coordinates(size_t atom_index) const {
 }
 
 Element Structure::get_atom_element(size_t atom_index) const {
+  QDK_LOG_TRACE_ENTERING();
   if (atom_index >= get_num_atoms()) {
     throw std::out_of_range("Atom index out of range");
   }
@@ -256,6 +263,7 @@ Element Structure::get_atom_element(size_t atom_index) const {
 }
 
 double Structure::get_atom_mass(size_t atom_index) const {
+  QDK_LOG_TRACE_ENTERING();
   if (atom_index >= get_num_atoms()) {
     throw std::out_of_range("Atom index out of range");
   }
@@ -263,6 +271,7 @@ double Structure::get_atom_mass(size_t atom_index) const {
 }
 
 double Structure::get_atom_nuclear_charge(size_t atom_index) const {
+  QDK_LOG_TRACE_ENTERING();
   if (atom_index >= get_num_atoms()) {
     throw std::out_of_range("Atom index out of range");
   }
@@ -270,10 +279,12 @@ double Structure::get_atom_nuclear_charge(size_t atom_index) const {
 }
 
 std::string Structure::get_atom_symbol(size_t atom_index) const {
+  QDK_LOG_TRACE_ENTERING();
   return element_to_symbol(get_atom_element(atom_index));
 }
 
 std::vector<std::string> Structure::get_atomic_symbols() const {
+  QDK_LOG_TRACE_ENTERING();
   std::vector<std::string> symbols;
   symbols.reserve(_elements.size());
   for (const auto& element : _elements) {
@@ -283,6 +294,7 @@ std::vector<std::string> Structure::get_atomic_symbols() const {
 }
 
 bool Structure::_is_valid() const {
+  QDK_LOG_TRACE_ENTERING();
   if (_elements.empty()) {
     return _coordinates.rows() == 0 &&
            (_coordinates.cols() == 0 || _coordinates.cols() == 3) &&
@@ -296,9 +308,13 @@ bool Structure::_is_valid() const {
          _nuclear_charges.size() == static_cast<int>(num_atoms);
 }
 
-double Structure::get_total_mass() const { return _masses.sum(); }
+double Structure::get_total_mass() const {
+  QDK_LOG_TRACE_ENTERING();
+  return _masses.sum();
+}
 
 nlohmann::json Structure::to_json() const {
+  QDK_LOG_TRACE_ENTERING();
   nlohmann::json j;
 
   // Store version first
@@ -343,6 +359,7 @@ nlohmann::json Structure::to_json() const {
 }
 
 std::shared_ptr<Structure> Structure::from_json(const nlohmann::json& j) {
+  QDK_LOG_TRACE_ENTERING();
   try {
     // Validate version first (only if version field exists, for backward
     // compatibility)
@@ -456,6 +473,7 @@ std::shared_ptr<Structure> Structure::from_json(const nlohmann::json& j) {
 }
 
 void Structure::to_json_file(const std::string& filename) const {
+  QDK_LOG_TRACE_ENTERING();
   // Validate filename has correct data type suffix
   std::string validated_filename =
       DataTypeFilename::validate_write_suffix(filename, "structure");
@@ -465,6 +483,7 @@ void Structure::to_json_file(const std::string& filename) const {
 
 std::shared_ptr<Structure> Structure::from_json_file(
     const std::string& filename) {
+  QDK_LOG_TRACE_ENTERING();
   // Validate filename has correct data type suffix
   std::string validated_filename =
       DataTypeFilename::validate_read_suffix(filename, "structure");
@@ -473,6 +492,7 @@ std::shared_ptr<Structure> Structure::from_json_file(
 }
 
 void Structure::_to_json_file(const std::string& filename) const {
+  QDK_LOG_TRACE_ENTERING();
   std::ofstream file(filename);
   if (!file.is_open()) {
     throw std::runtime_error("Cannot open file for writing: " + filename);
@@ -488,6 +508,7 @@ void Structure::_to_json_file(const std::string& filename) const {
 
 std::shared_ptr<Structure> Structure::_from_json_file(
     const std::string& filename) {
+  QDK_LOG_TRACE_ENTERING();
   std::ifstream file(filename);
   if (!file.is_open()) {
     throw std::runtime_error(
@@ -506,6 +527,7 @@ std::shared_ptr<Structure> Structure::_from_json_file(
 }
 
 std::string Structure::to_xyz(const std::string& comment) const {
+  QDK_LOG_TRACE_ENTERING();
   std::ostringstream oss;
 
   // First line: number of atoms
@@ -537,6 +559,7 @@ std::string Structure::to_xyz(const std::string& comment) const {
 }
 
 std::shared_ptr<Structure> Structure::from_xyz(const std::string& xyz_string) {
+  QDK_LOG_TRACE_ENTERING();
   std::istringstream iss(xyz_string);
   std::string line;
 
@@ -595,16 +618,19 @@ std::shared_ptr<Structure> Structure::from_xyz(const std::string& xyz_string) {
 
 void Structure::to_xyz_file(const std::string& filename,
                             const std::string& comment) const {
+  QDK_LOG_TRACE_ENTERING();
   _to_xyz_file(filename, comment);
 }
 
 std::shared_ptr<Structure> Structure::from_xyz_file(
     const std::string& filename) {
+  QDK_LOG_TRACE_ENTERING();
   return _from_xyz_file(filename);
 }
 
 void Structure::_to_xyz_file(const std::string& filename,
                              const std::string& comment) const {
+  QDK_LOG_TRACE_ENTERING();
   std::ofstream file(filename);
   if (!file.is_open()) {
     throw std::runtime_error("Cannot open file for writing: " + filename);
@@ -619,6 +645,7 @@ void Structure::_to_xyz_file(const std::string& filename,
 
 std::shared_ptr<Structure> Structure::_from_xyz_file(
     const std::string& filename) {
+  QDK_LOG_TRACE_ENTERING();
   std::ifstream file(filename);
   if (!file.is_open()) {
     throw std::runtime_error("Cannot open file for reading: " + filename);
@@ -636,6 +663,7 @@ std::shared_ptr<Structure> Structure::_from_xyz_file(
 
 void Structure::to_file(const std::string& filename,
                         const std::string& type) const {
+  QDK_LOG_TRACE_ENTERING();
   if (type == "json") {
     _to_json_file(filename);
   } else if (type == "xyz") {
@@ -650,6 +678,7 @@ void Structure::to_file(const std::string& filename,
 
 std::shared_ptr<Structure> Structure::from_file(const std::string& filename,
                                                 const std::string& type) {
+  QDK_LOG_TRACE_ENTERING();
   if (type == "json") {
     return _from_json_file(filename);
   } else if (type == "xyz") {
@@ -663,6 +692,7 @@ std::shared_ptr<Structure> Structure::from_file(const std::string& filename,
 }
 
 std::string Structure::get_summary() const {
+  QDK_LOG_TRACE_ENTERING();
   std::ostringstream oss;
 
   oss << "Structure Summary:\n";
@@ -696,6 +726,7 @@ std::string Structure::get_summary() const {
 }
 
 double Structure::calculate_nuclear_repulsion_energy() const {
+  QDK_LOG_TRACE_ENTERING();
   // Return 0 if there are less than 2 atoms (no repulsion possible)
   if (get_num_atoms() < 2) {
     return 0.0;
@@ -724,6 +755,7 @@ double Structure::calculate_nuclear_repulsion_energy() const {
 }
 
 std::string Structure::_normalize_symbol(const std::string& symbol) {
+  QDK_LOG_TRACE_ENTERING();
   if (symbol.empty()) {
     return symbol;
   }
@@ -749,6 +781,7 @@ std::string Structure::_normalize_symbol(const std::string& symbol) {
 }
 
 std::string Structure::_strip_numbers_from_symbol(const std::string& symbol) {
+  QDK_LOG_TRACE_ENTERING();
   std::string letters_only;
   letters_only.reserve(symbol.size());
 
@@ -762,6 +795,7 @@ std::string Structure::_strip_numbers_from_symbol(const std::string& symbol) {
 }
 
 std::string Structure::_extract_numbers_from_symbol(const std::string& symbol) {
+  QDK_LOG_TRACE_ENTERING();
   std::string numbers_only;
   numbers_only.reserve(symbol.size());
 
@@ -775,6 +809,7 @@ std::string Structure::_extract_numbers_from_symbol(const std::string& symbol) {
 }
 
 Element Structure::symbol_to_element(const std::string& symbol) {
+  QDK_LOG_TRACE_ENTERING();
   std::string normalized_symbol = _normalize_symbol(symbol);
   std::string normalized_element_symbol =
       _strip_numbers_from_symbol(normalized_symbol);
@@ -783,10 +818,12 @@ Element Structure::symbol_to_element(const std::string& symbol) {
 }
 
 std::string Structure::element_to_symbol(Element element) {
+  QDK_LOG_TRACE_ENTERING();
   return nuclear_charge_to_symbol(static_cast<unsigned>(element));
 }
 
 unsigned Structure::symbol_to_nuclear_charge(const std::string& symbol) {
+  QDK_LOG_TRACE_ENTERING();
   std::string normalized_symbol = _normalize_symbol(symbol);
   std::string normalized_element_symbol =
       _strip_numbers_from_symbol(normalized_symbol);
@@ -809,6 +846,7 @@ unsigned Structure::symbol_to_nuclear_charge(const std::string& symbol) {
 }
 
 std::string Structure::nuclear_charge_to_symbol(unsigned nuclear_charge) {
+  QDK_LOG_TRACE_ENTERING();
   auto it = CHARGE_TO_SYMBOL.find(nuclear_charge);
   if (it == CHARGE_TO_SYMBOL.end()) {
     throw std::invalid_argument("Unknown nuclear charge: " +
@@ -818,10 +856,12 @@ std::string Structure::nuclear_charge_to_symbol(unsigned nuclear_charge) {
 }
 
 unsigned Structure::element_to_nuclear_charge(Element element) {
+  QDK_LOG_TRACE_ENTERING();
   return static_cast<unsigned>(element);
 }
 
 Element Structure::nuclear_charge_to_element(unsigned nuclear_charge) {
+  QDK_LOG_TRACE_ENTERING();
   if (nuclear_charge < 1 || nuclear_charge > 118) {
     throw std::invalid_argument("Unknown nuclear charge: " +
                                 std::to_string(nuclear_charge));
@@ -830,10 +870,12 @@ Element Structure::nuclear_charge_to_element(unsigned nuclear_charge) {
 }
 
 double Structure::get_default_atomic_mass(Element element) {
+  QDK_LOG_TRACE_ENTERING();
   return get_atomic_weight(element);
 }
 
 double Structure::get_default_atomic_mass(std::string symbol) {
+  QDK_LOG_TRACE_ENTERING();
   std::string normalized_symbol = _normalize_symbol(symbol);
   std::string normalized_element_symbol =
       _strip_numbers_from_symbol(normalized_symbol);
@@ -848,10 +890,12 @@ double Structure::get_default_atomic_mass(std::string symbol) {
 }
 
 unsigned Structure::get_default_nuclear_charge(Element element) {
+  QDK_LOG_TRACE_ENTERING();
   return static_cast<unsigned>(element);
 }
 
 void Structure::to_hdf5(H5::Group& group) const {
+  QDK_LOG_TRACE_ENTERING();
   try {
     // Add version attribute
     H5::DataSpace scalar_space(H5S_SCALAR);
@@ -916,6 +960,7 @@ void Structure::to_hdf5(H5::Group& group) const {
 }
 
 std::shared_ptr<Structure> Structure::from_hdf5(H5::Group& group) {
+  QDK_LOG_TRACE_ENTERING();
   try {
     // Check version first - it must exist
     if (!group.attrExists("version")) {
@@ -1006,6 +1051,7 @@ std::shared_ptr<Structure> Structure::from_hdf5(H5::Group& group) {
 }
 
 void Structure::to_hdf5_file(const std::string& filename) const {
+  QDK_LOG_TRACE_ENTERING();
   // Validate filename has correct data type suffix
   std::string validated_filename =
       DataTypeFilename::validate_write_suffix(filename, "structure");
@@ -1015,6 +1061,7 @@ void Structure::to_hdf5_file(const std::string& filename) const {
 
 std::shared_ptr<Structure> Structure::from_hdf5_file(
     const std::string& filename) {
+  QDK_LOG_TRACE_ENTERING();
   // Validate filename has correct data type suffix
   std::string validated_filename =
       DataTypeFilename::validate_read_suffix(filename, "structure");
@@ -1023,6 +1070,7 @@ std::shared_ptr<Structure> Structure::from_hdf5_file(
 }
 
 void Structure::_to_hdf5_file(const std::string& filename) const {
+  QDK_LOG_TRACE_ENTERING();
   try {
     H5::H5File file(filename, H5F_ACC_TRUNC);
     H5::Group structure_group = file.createGroup("/structure");
@@ -1035,6 +1083,7 @@ void Structure::_to_hdf5_file(const std::string& filename) const {
 
 std::shared_ptr<Structure> Structure::_from_hdf5_file(
     const std::string& filename) {
+  QDK_LOG_TRACE_ENTERING();
   // Disable HDF5 automatic error printing to stderr unless verbose mode
   if (hdf5_errors_should_be_suppressed()) {
     H5::Exception::dontPrint();
@@ -1074,6 +1123,7 @@ std::shared_ptr<Structure> Structure::_from_hdf5_file(
 }
 
 void Structure::_validate_dimensions() const {
+  QDK_LOG_TRACE_ENTERING();
   if (!_elements.empty()) {
     size_t num_atoms = _elements.size();
     if (_coordinates.rows() != static_cast<int>(num_atoms) ||
