@@ -19,7 +19,6 @@
 
 // QDK/Chemistry data::Hamiltonian headers
 #include <qdk/chemistry/data/hamiltonian_containers/canonical_4_center.hpp>
-
 #include <qdk/chemistry/utils/logger.hpp>
 
 #include "utils.hpp"

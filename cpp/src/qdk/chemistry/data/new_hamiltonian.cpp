@@ -6,29 +6,46 @@
 #include <fstream>
 #include <iostream>
 #include <macis/util/fcidump.hpp>
-#include <qdk/chemistry/data/hamiltonian_containers/canonical_4_center.hpp>
+#include <qdk/chemistry/data/hamiltonian.hpp>
 #include <qdk/chemistry/data/orbitals.hpp>
 #include <qdk/chemistry/data/structure.hpp>
-#include <qdk/chemistry/utils/logger.hpp>
 #include <sstream>
 #include <stdexcept>
 
-#include "../filename_utils.hpp"
-#include "../hdf5_serialization.hpp"
-#include "../json_serialization.hpp"
+#include "filename_utils.hpp"
+#include "hdf5_error_handling.hpp"
+#include "hdf5_serialization.hpp"
+#include "json_serialization.hpp"
 
 namespace qdk::chemistry::data {
 
-Canonical4CenterHamiltonian::Canonical4CenterHamiltonian(
-    const Eigen::MatrixXd& one_body_integrals,
-    const Eigen::VectorXd& two_body_integrals,
-    std::shared_ptr<Orbitals> orbitals, double core_energy,
-    const Eigen::MatrixXd& inactive_fock_matrix, HamiltonianType type)
-    : HamiltonianContainer(one_body_integrals, orbitals, core_energy,
-                           inactive_fock_matrix, type),
+Hamiltonian::Hamiltonian(const Hamiltonian& other)
+    : _one_body_integrals(other._one_body_integrals),
+      _two_body_integrals(other._two_body_integrals),
+      _inactive_fock_matrix(other._inactive_fock_matrix),
+      _orbitals(other._orbitals),
+      _core_energy(other._core_energy),
+      _type(other._type) {
+  if (!_is_valid()) {
+    throw std::invalid_argument(
+        "Tried to generate invalid Hamiltonian object.");
+  }
+}
+
+Hamiltonian::Hamiltonian(const Eigen::MatrixXd& one_body_integrals,
+                         const Eigen::VectorXd& two_body_integrals,
+                         std::shared_ptr<Orbitals> orbitals, double core_energy,
+                         const Eigen::MatrixXd& inactive_fock_matrix,
+                         HamiltonianType type)
+    : _one_body_integrals(
+          make_restricted_one_body_integrals(one_body_integrals)),
       _two_body_integrals(
-          make_restricted_two_body_integrals(two_body_integrals)) {
-  QDK_LOG_TRACE_ENTERING();
+          make_restricted_two_body_integrals(two_body_integrals)),
+      _inactive_fock_matrix(
+          make_restricted_inactive_fock_matrix(inactive_fock_matrix)),
+      _orbitals(orbitals),
+      _core_energy(core_energy),
+      _type(type) {
   if (!orbitals) {
     throw std::invalid_argument("Orbitals pointer cannot be nullptr");
   }
@@ -42,29 +59,34 @@ Canonical4CenterHamiltonian::Canonical4CenterHamiltonian(
     throw std::runtime_error(
         "Orbitals must have an active space set for Hamiltonian");
   }
-  if (!is_valid()) {
+  if (!_is_valid()) {
     throw std::invalid_argument(
         "Tried to generate invalid Hamiltonian object.");
   }
 }
 
-Canonical4CenterHamiltonian::Canonical4CenterHamiltonian(
-    const Eigen::MatrixXd& one_body_integrals_alpha,
-    const Eigen::MatrixXd& one_body_integrals_beta,
-    const Eigen::VectorXd& two_body_integrals_aaaa,
-    const Eigen::VectorXd& two_body_integrals_aabb,
-    const Eigen::VectorXd& two_body_integrals_bbbb,
-    std::shared_ptr<Orbitals> orbitals, double core_energy,
-    const Eigen::MatrixXd& inactive_fock_matrix_alpha,
-    const Eigen::MatrixXd& inactive_fock_matrix_beta, HamiltonianType type)
-    : HamiltonianContainer(one_body_integrals_alpha, one_body_integrals_beta,
-                           orbitals, core_energy, inactive_fock_matrix_alpha,
-                           inactive_fock_matrix_beta, type),
+Hamiltonian::Hamiltonian(const Eigen::MatrixXd& one_body_integrals_alpha,
+                         const Eigen::MatrixXd& one_body_integrals_beta,
+                         const Eigen::VectorXd& two_body_integrals_aaaa,
+                         const Eigen::VectorXd& two_body_integrals_aabb,
+                         const Eigen::VectorXd& two_body_integrals_bbbb,
+                         std::shared_ptr<Orbitals> orbitals, double core_energy,
+                         const Eigen::MatrixXd& inactive_fock_matrix_alpha,
+                         const Eigen::MatrixXd& inactive_fock_matrix_beta,
+                         HamiltonianType type)
+    : _one_body_integrals(
+          std::make_unique<Eigen::MatrixXd>(one_body_integrals_alpha),
+          std::make_unique<Eigen::MatrixXd>(one_body_integrals_beta)),
       _two_body_integrals(
           std::make_unique<Eigen::VectorXd>(two_body_integrals_aaaa),
           std::make_unique<Eigen::VectorXd>(two_body_integrals_aabb),
-          std::make_unique<Eigen::VectorXd>(two_body_integrals_bbbb)) {
-  QDK_LOG_TRACE_ENTERING();
+          std::make_unique<Eigen::VectorXd>(two_body_integrals_bbbb)),
+      _inactive_fock_matrix(
+          std::make_unique<Eigen::MatrixXd>(inactive_fock_matrix_alpha),
+          std::make_unique<Eigen::MatrixXd>(inactive_fock_matrix_beta)),
+      _orbitals(orbitals),
+      _core_energy(core_energy),
+      _type(type) {
   if (!orbitals) {
     throw std::invalid_argument("Orbitals pointer cannot be nullptr");
   }
@@ -78,36 +100,62 @@ Canonical4CenterHamiltonian::Canonical4CenterHamiltonian(
     throw std::runtime_error(
         "Orbitals must have an active space set for Hamiltonian");
   }
-  if (!is_valid()) {
+  if (!_is_valid()) {
     throw std::invalid_argument(
         "Tried to generate invalid Hamiltonian object.");
   }
 }
 
-std::unique_ptr<HamiltonianContainer> Canonical4CenterHamiltonian::clone()
-    const {
-  QDK_LOG_TRACE_ENTERING();
-  if (is_restricted()) {
-    return std::make_unique<Canonical4CenterHamiltonian>(
-        *_one_body_integrals.first, *std::get<0>(_two_body_integrals),
-        _orbitals, _core_energy, *_inactive_fock_matrix.first, _type);
+Hamiltonian& Hamiltonian::operator=(const Hamiltonian& other) {
+  if (this != &other) {
+    // Since all members are const, we need to use placement new
+    this->~Hamiltonian();
+    new (this) Hamiltonian(other);
   }
-  return std::make_unique<Canonical4CenterHamiltonian>(
-      *_one_body_integrals.first, *_one_body_integrals.second,
-      *std::get<0>(_two_body_integrals), *std::get<1>(_two_body_integrals),
-      *std::get<2>(_two_body_integrals), _orbitals, _core_energy,
-      *_inactive_fock_matrix.first, *_inactive_fock_matrix.second, _type);
+  return *this;
 }
 
-std::string Canonical4CenterHamiltonian::get_container_type() const {
-  QDK_LOG_TRACE_ENTERING();
-  return "canonical_4_center";
+std::tuple<const Eigen::MatrixXd&, const Eigen::MatrixXd&>
+Hamiltonian::get_one_body_integrals() const {
+  if (!has_one_body_integrals()) {
+    throw std::runtime_error("One-body integrals are not set");
+  }
+  return std::make_tuple(std::cref(*std::get<0>(_one_body_integrals)),
+                         std::cref(*std::get<1>(_one_body_integrals)));
+}
+
+bool Hamiltonian::has_one_body_integrals() const {
+  return _one_body_integrals.first != nullptr &&
+         _one_body_integrals.first->rows() > 0 &&
+         _one_body_integrals.first->cols() > 0;
+}
+
+double Hamiltonian::get_one_body_element(unsigned i, unsigned j,
+                                         SpinChannel channel) const {
+  if (!has_one_body_integrals()) {
+    throw std::runtime_error("One-body integrals are not set");
+  }
+
+  size_t norb = _orbitals->get_active_space_indices().first.size();
+  if (i >= norb || j >= norb) {
+    throw std::out_of_range("Orbital index out of range");
+  }
+
+  // Select the appropriate integral based on spin channel
+  switch (channel) {
+    case SpinChannel::aa:
+      return (*_one_body_integrals.first)(i, j);
+    case SpinChannel::bb:
+      return (*_one_body_integrals.second)(i, j);
+    default:
+      throw std::invalid_argument(
+          "Invalid spin channel for one-body integrals");
+  }
 }
 
 std::tuple<const Eigen::VectorXd&, const Eigen::VectorXd&,
            const Eigen::VectorXd&>
-Canonical4CenterHamiltonian::get_two_body_integrals() const {
-  QDK_LOG_TRACE_ENTERING();
+Hamiltonian::get_two_body_integrals() const {
   if (!has_two_body_integrals()) {
     throw std::runtime_error("Two-body integrals are not set");
   }
@@ -116,10 +164,17 @@ Canonical4CenterHamiltonian::get_two_body_integrals() const {
                          std::cref(*std::get<2>(_two_body_integrals)));
 }
 
-double Canonical4CenterHamiltonian::get_two_body_element(
-    unsigned i, unsigned j, unsigned k, unsigned l, SpinChannel channel) const {
-  QDK_LOG_TRACE_ENTERING();
+bool Hamiltonian::has_inactive_fock_matrix() const {
+  bool has_alpha = _inactive_fock_matrix.first != nullptr &&
+                   _inactive_fock_matrix.first->size() > 0;
+  bool has_beta = _inactive_fock_matrix.second != nullptr &&
+                  _inactive_fock_matrix.second->size() > 0;
+  return has_alpha && has_beta;
+}
 
+double Hamiltonian::get_two_body_element(unsigned i, unsigned j, unsigned k,
+                                         unsigned l,
+                                         SpinChannel channel) const {
   if (!has_two_body_integrals()) {
     throw std::runtime_error("Two-body integrals are not set");
   }
@@ -144,22 +199,37 @@ double Canonical4CenterHamiltonian::get_two_body_element(
   }
 }
 
-size_t Canonical4CenterHamiltonian::get_two_body_index(size_t i, size_t j,
-                                                       size_t k,
-                                                       size_t l) const {
-  QDK_LOG_TRACE_ENTERING();
-  size_t norb = _orbitals->get_active_space_indices().first.size();
-  return i * norb * norb * norb + j * norb * norb + k * norb + l;
-}
-
-bool Canonical4CenterHamiltonian::has_two_body_integrals() const {
-  QDK_LOG_TRACE_ENTERING();
+bool Hamiltonian::has_two_body_integrals() const {
   return std::get<0>(_two_body_integrals) != nullptr &&
          std::get<0>(_two_body_integrals)->size() > 0;
 }
 
-bool Canonical4CenterHamiltonian::is_restricted() const {
-  QDK_LOG_TRACE_ENTERING();
+std::pair<const Eigen::MatrixXd&, const Eigen::MatrixXd&>
+Hamiltonian::get_inactive_fock_matrix() const {
+  if (!has_inactive_fock_matrix()) {
+    throw std::runtime_error("Inactive Fock matrix is not set");
+  }
+  return {*_inactive_fock_matrix.first, *_inactive_fock_matrix.second};
+}
+
+const std::shared_ptr<Orbitals> Hamiltonian::get_orbitals() const {
+  if (!has_orbitals()) {
+    throw std::runtime_error("Orbitals are not set");
+  }
+  return _orbitals;
+}
+
+bool Hamiltonian::has_orbitals() const { return _orbitals != nullptr; }
+
+double Hamiltonian::get_core_energy() const { return _core_energy; }
+
+HamiltonianType Hamiltonian::get_type() const { return _type; }
+
+bool Hamiltonian::is_hermitian() const {
+  return _type == HamiltonianType::Hermitian;
+}
+
+bool Hamiltonian::is_restricted() const {
   // Hamiltonian is restricted if alpha and beta components point to the same
   // data
   return (_one_body_integrals.first == _one_body_integrals.second) &&
@@ -171,8 +241,9 @@ bool Canonical4CenterHamiltonian::is_restricted() const {
           (!_inactive_fock_matrix.first && !_inactive_fock_matrix.second));
 }
 
-bool Canonical4CenterHamiltonian::is_valid() const {
-  QDK_LOG_TRACE_ENTERING();
+bool Hamiltonian::is_unrestricted() const { return !is_restricted(); }
+
+bool Hamiltonian::_is_valid() const {
   // Check if essential data is present
   if (!has_one_body_integrals() || !has_two_body_integrals()) {
     return false;
@@ -188,18 +259,37 @@ bool Canonical4CenterHamiltonian::is_valid() const {
   return true;
 }
 
-void Canonical4CenterHamiltonian::validate_integral_dimensions() const {
-  QDK_LOG_TRACE_ENTERING();
-  // Check alpha one-body integrals
-  HamiltonianContainer::validate_integral_dimensions();
-
-  if (!has_two_body_integrals()) {
+void Hamiltonian::validate_integral_dimensions() const {
+  if (!has_one_body_integrals() || !has_two_body_integrals()) {
     return;
   }
 
-  // Check two-body integrals dimensions
+  // Check alpha one-body integrals
   size_t norb_alpha = _one_body_integrals.first->rows();
   size_t norb_alpha_cols = _one_body_integrals.first->cols();
+
+  if (norb_alpha != norb_alpha_cols) {
+    throw std::invalid_argument(
+        "Alpha one-body integrals matrix must be square");
+  }
+
+  // Check beta one-body integrals (if different from alpha)
+  if (_one_body_integrals.second != _one_body_integrals.first) {
+    size_t norb_beta = _one_body_integrals.second->rows();
+    size_t norb_beta_cols = _one_body_integrals.second->cols();
+
+    if (norb_beta != norb_beta_cols) {
+      throw std::invalid_argument(
+          "Beta one-body integrals matrix must be square");
+    }
+
+    if (norb_beta != norb_alpha) {
+      throw std::invalid_argument(
+          "Alpha and beta one-body integrals must have same dimensions");
+    }
+  }
+
+  // Check two-body integrals dimensions
   unsigned expected_size = norb_alpha * norb_alpha * norb_alpha * norb_alpha;
 
   // Check alpha-alpha integrals
@@ -230,33 +320,272 @@ void Canonical4CenterHamiltonian::validate_integral_dimensions() const {
   }
 }
 
+void Hamiltonian::validate_restrictedness_consistency() const {
+  if (!_orbitals) return;
+
+  bool orbitals_restricted = _orbitals->is_restricted();
+  bool hamiltonian_restricted = is_restricted();
+
+  if (orbitals_restricted != hamiltonian_restricted) {
+    throw std::invalid_argument(
+        "Hamiltonian restrictedness (" +
+        std::string(hamiltonian_restricted ? "restricted" : "unrestricted") +
+        ") must match orbitals restrictedness (" +
+        std::string(orbitals_restricted ? "restricted" : "unrestricted") + ")");
+  }
+}
+
+void Hamiltonian::validate_active_space_dimensions() const {
+  if (!_orbitals || !_orbitals->has_active_space()) return;
+
+  auto active_indices = _orbitals->get_active_space_indices();
+  size_t n_active_alpha = active_indices.first.size();
+  size_t n_active_beta = active_indices.second.size();
+
+  // Check one-body integrals dimensions match active space
+  if (has_one_body_integrals()) {
+    if (_one_body_integrals.first->rows() != n_active_alpha) {
+      throw std::invalid_argument(
+          "Alpha one-body integrals dimension (" +
+          std::to_string(_one_body_integrals.first->rows()) +
+          ") does not match number of alpha active orbitals (" +
+          std::to_string(n_active_alpha) + ")");
+    }
+
+    if (_one_body_integrals.second != _one_body_integrals.first &&
+        _one_body_integrals.second->rows() != n_active_beta) {
+      throw std::invalid_argument(
+          "Beta one-body integrals dimension does not match number of beta "
+          "active orbitals");
+    }
+  }
+
+  // For restricted case, alpha and beta active spaces should be the same
+  if (is_restricted() && n_active_alpha != n_active_beta) {
+    throw std::invalid_argument(
+        "For restricted Hamiltonian, alpha and beta active spaces must have "
+        "same size");
+  }
+}
+
+size_t Hamiltonian::get_two_body_index(size_t i, size_t j, size_t k,
+                                       size_t l) const {
+  size_t norb = _orbitals->get_active_space_indices().first.size();
+  return i * norb * norb * norb + j * norb * norb + k * norb + l;
+}
+
+std::pair<std::shared_ptr<Eigen::MatrixXd>, std::shared_ptr<Eigen::MatrixXd>>
+Hamiltonian::make_restricted_one_body_integrals(
+    const Eigen::MatrixXd& integrals) {
+  auto shared_integrals = std::make_shared<Eigen::MatrixXd>(integrals);
+  return std::make_pair(
+      shared_integrals,
+      shared_integrals);  // Both alpha and beta point to same data
+}
+
 std::tuple<std::shared_ptr<Eigen::VectorXd>, std::shared_ptr<Eigen::VectorXd>,
            std::shared_ptr<Eigen::VectorXd>>
-Canonical4CenterHamiltonian::make_restricted_two_body_integrals(
+Hamiltonian::make_restricted_two_body_integrals(
     const Eigen::VectorXd& integrals) {
-  QDK_LOG_TRACE_ENTERING();
   auto shared_integrals = std::make_shared<Eigen::VectorXd>(integrals);
   return std::make_tuple(
       shared_integrals, shared_integrals,
       shared_integrals);  // aaaa, aabb, bbbb all point to same data
 }
 
-void Canonical4CenterHamiltonian::to_fcidump_file(const std::string& filename,
-                                                  size_t nalpha,
-                                                  size_t nbeta) const {
-  QDK_LOG_TRACE_ENTERING();
-  _to_fcidump_file(filename, nalpha, nbeta);
+std::pair<std::shared_ptr<Eigen::MatrixXd>, std::shared_ptr<Eigen::MatrixXd>>
+Hamiltonian::make_restricted_inactive_fock_matrix(
+    const Eigen::MatrixXd& matrix) {
+  auto shared_matrix = std::make_shared<Eigen::MatrixXd>(matrix);
+  return std::make_pair(
+      shared_matrix, shared_matrix);  // Both alpha and beta point to same data
 }
 
-nlohmann::json Canonical4CenterHamiltonian::to_json() const {
-  QDK_LOG_TRACE_ENTERING();
+std::string Hamiltonian::get_summary() const {
+  std::string summary = "Hamiltonian Summary:\n";
+  size_t num_molecular_orbitals = _orbitals->get_num_molecular_orbitals();
+  size_t norb = _orbitals->get_active_space_indices().first.size();
+  summary += "  Type: ";
+  summary += (is_hermitian() ? "Hermitian" : "NonHermitian");
+  summary += "\n";
+  summary += "  Restrictedness: ";
+  summary += (is_restricted() ? "Restricted" : "Unrestricted");
+  summary += "\n";
+  summary += "  Active Orbitals: " + std::to_string(norb) + "\n";
+  summary +=
+      "  Total Orbitals: " + std::to_string(num_molecular_orbitals) + "\n";
+
+  const double threshold = 1e-6;  // Threshold for determining negligible
+                                  // integrals in summary statistics
+
+  summary += "  Core Energy: " + std::to_string(get_core_energy()) + "\n";
+  summary += "  Integral Statistics:\n";
+
+  // One-body integrals - alpha
+  auto [one_body_alpha, one_body_beta] = get_one_body_integrals();
+  const size_t non_negligible_one_body_alpha = std::count_if(
+      one_body_alpha.data(), one_body_alpha.data() + one_body_alpha.size(),
+      [threshold](double val) { return std::abs(val) > threshold; });
+
+  summary += "    One-body Integrals (alpha): " +
+             std::to_string(one_body_alpha.size()) + " (larger than " +
+             std::to_string(threshold) + ": " +
+             std::to_string(non_negligible_one_body_alpha) + ")\n";
+
+  // One-body integrals - beta (if unrestricted)
+  if (is_unrestricted()) {
+    const size_t non_negligible_one_body_beta = std::count_if(
+        one_body_beta.data(), one_body_beta.data() + one_body_beta.size(),
+        [threshold](double val) { return std::abs(val) > threshold; });
+
+    summary += "    One-body Integrals (beta): " +
+               std::to_string(one_body_beta.size()) + " (larger than " +
+               std::to_string(threshold) + ": " +
+               std::to_string(non_negligible_one_body_beta) + ")\n";
+  }
+
+  // Two-body integrals - aaaa
+  const auto& two_body_aaaa = std::get<0>(get_two_body_integrals());
+  const size_t non_negligible_two_body_aaaa = std::count_if(
+      two_body_aaaa.data(), two_body_aaaa.data() + two_body_aaaa.size(),
+      [threshold](double val) { return std::abs(val) > threshold; });
+
+  summary +=
+      "    Two-body Integrals (aaaa): " + std::to_string(two_body_aaaa.size()) +
+      " (larger than " + std::to_string(threshold) + ": " +
+      std::to_string(non_negligible_two_body_aaaa) + ")\n";
+
+  // Two-body integrals - aabb and bbbb (if unrestricted)
+  if (is_unrestricted()) {
+    const auto& two_body_aabb = std::get<1>(get_two_body_integrals());
+    const size_t non_negligible_two_body_aabb = std::count_if(
+        two_body_aabb.data(), two_body_aabb.data() + two_body_aabb.size(),
+        [threshold](double val) { return std::abs(val) > threshold; });
+
+    summary += "    Two-body Integrals (aabb): " +
+               std::to_string(two_body_aabb.size()) + " (larger than " +
+               std::to_string(threshold) + ": " +
+               std::to_string(non_negligible_two_body_aabb) + ")\n";
+
+    const auto& two_body_bbbb = std::get<2>(get_two_body_integrals());
+    const size_t non_negligible_two_body_bbbb = std::count_if(
+        two_body_bbbb.data(), two_body_bbbb.data() + two_body_bbbb.size(),
+        [threshold](double val) { return std::abs(val) > threshold; });
+
+    summary += "    Two-body Integrals (bbbb): " +
+               std::to_string(two_body_bbbb.size()) + " (larger than " +
+               std::to_string(threshold) + ": " +
+               std::to_string(non_negligible_two_body_bbbb) + ")\n";
+  }
+
+  return summary;
+}
+
+void Hamiltonian::to_file(const std::string& filename,
+                          const std::string& type) const {
+  if (type == "json") {
+    _to_json_file(filename);
+  } else if (type == "hdf5") {
+    _to_hdf5_file(filename);
+  } else {
+    throw std::runtime_error("Unsupported file type: " + type +
+                             ". Supported types: json, hdf5, fcidump");
+  }
+}
+
+std::shared_ptr<Hamiltonian> Hamiltonian::from_file(const std::string& filename,
+                                                    const std::string& type) {
+  if (type == "json") {
+    return _from_json_file(filename);
+  } else if (type == "hdf5") {
+    return _from_hdf5_file(filename);
+  } else {
+    throw std::runtime_error("Unsupported file type: " + type +
+                             ". Supported types: json, hdf5");
+  }
+}
+
+void Hamiltonian::to_hdf5_file(const std::string& filename) const {
+  // Validate filename has correct data type suffix
+  std::string validated_filename =
+      DataTypeFilename::validate_write_suffix(filename, "hamiltonian");
+
+  _to_hdf5_file(validated_filename);
+}
+
+std::shared_ptr<Hamiltonian> Hamiltonian::from_hdf5_file(
+    const std::string& filename) {
+  // Validate filename has correct data type suffix
+  std::string validated_filename =
+      DataTypeFilename::validate_read_suffix(filename, "hamiltonian");
+
+  return _from_hdf5_file(validated_filename);
+}
+
+void Hamiltonian::to_json_file(const std::string& filename) const {
+  // Validate filename has correct data type suffix
+  std::string validated_filename =
+      DataTypeFilename::validate_write_suffix(filename, "hamiltonian");
+
+  _to_json_file(validated_filename);
+}
+
+std::shared_ptr<Hamiltonian> Hamiltonian::from_json_file(
+    const std::string& filename) {
+  // Validate filename has correct data type suffix
+  std::string validated_filename =
+      DataTypeFilename::validate_read_suffix(filename, "hamiltonian");
+
+  return _from_json_file(validated_filename);
+}
+
+void Hamiltonian::to_fcidump_file(const std::string& filename, size_t nalpha,
+                                  size_t nbeta) const {
+  // Validate filename has correct data type suffix
+  std::string validated_filename =
+      DataTypeFilename::validate_write_suffix(filename, "hamiltonian");
+
+  _to_fcidump_file(validated_filename, nalpha, nbeta);
+}
+
+void Hamiltonian::_to_json_file(const std::string& filename) const {
+  std::ofstream file(filename);
+  if (!file.is_open()) {
+    throw std::runtime_error("Cannot open file for writing: " + filename);
+  }
+
+  nlohmann::json j = to_json();
+  file << j.dump(2);
+
+  if (file.fail()) {
+    throw std::runtime_error("Error writing to file: " + filename);
+  }
+}
+
+std::shared_ptr<Hamiltonian> Hamiltonian::_from_json_file(
+    const std::string& filename) {
+  std::ifstream file(filename);
+  if (!file.is_open()) {
+    throw std::runtime_error(
+        "Unable to open Hamiltonian JSON file '" + filename +
+        "'. Please check that the file exists and you have read permissions.");
+  }
+
+  nlohmann::json j;
+  file >> j;
+
+  if (file.fail()) {
+    throw std::runtime_error("Error reading from file: " + filename);
+  }
+
+  return from_json(j);
+}
+
+nlohmann::json Hamiltonian::to_json() const {
   nlohmann::json j;
 
   // Store version first
   j["version"] = SERIALIZATION_VERSION;
-
-  // Store container type
-  j["container_type"] = get_container_type();
 
   // Store metadata
   j["core_energy"] = _core_energy;
@@ -334,6 +663,7 @@ nlohmann::json Canonical4CenterHamiltonian::to_json() const {
   // Store inactive Fock matrix
   if (has_inactive_fock_matrix()) {
     j["has_inactive_fock_matrix"] = true;
+
     // Store alpha inactive Fock matrix
     std::vector<std::vector<double>> inactive_fock_alpha_vec;
     for (int i = 0; i < _inactive_fock_matrix.first->rows(); ++i) {
@@ -374,9 +704,7 @@ nlohmann::json Canonical4CenterHamiltonian::to_json() const {
   return j;
 }
 
-std::unique_ptr<Canonical4CenterHamiltonian>
-Canonical4CenterHamiltonian::from_json(const nlohmann::json& j) {
-  QDK_LOG_TRACE_ENTERING();
+std::shared_ptr<Hamiltonian> Hamiltonian::from_json(const nlohmann::json& j) {
   try {
     // Validate version first
     if (!j.contains("version")) {
@@ -467,7 +795,6 @@ Canonical4CenterHamiltonian::from_json(const nlohmann::json& j) {
     }
 
     // Load inactive Fock matrix
-
     Eigen::MatrixXd inactive_fock_alpha, inactive_fock_beta;
     bool has_inactive_fock = j.value("has_inactive_fock_matrix", false);
     if (has_inactive_fock) {
@@ -516,12 +843,12 @@ Canonical4CenterHamiltonian::from_json(const nlohmann::json& j) {
     if (is_restricted_data) {
       // Use restricted constructor - it will create shared pointers internally
       // so alpha and beta point to the same data
-      return std::make_unique<Canonical4CenterHamiltonian>(
-          one_body_alpha, two_body_aaaa, orbitals, core_energy,
-          inactive_fock_alpha, type);
+      return std::make_shared<Hamiltonian>(one_body_alpha, two_body_aaaa,
+                                           orbitals, core_energy,
+                                           inactive_fock_alpha, type);
     } else {
       // Use unrestricted constructor with separate alpha and beta data
-      return std::make_unique<Canonical4CenterHamiltonian>(
+      return std::make_shared<Hamiltonian>(
           one_body_alpha, one_body_beta, two_body_aaaa, two_body_aabb,
           two_body_bbbb, orbitals, core_energy, inactive_fock_alpha,
           inactive_fock_beta, type);
@@ -533,8 +860,24 @@ Canonical4CenterHamiltonian::from_json(const nlohmann::json& j) {
   }
 }
 
-void Canonical4CenterHamiltonian::to_hdf5(H5::Group& group) const {
-  QDK_LOG_TRACE_ENTERING();
+void Hamiltonian::_to_hdf5_file(const std::string& filename) const {
+  if (!_is_valid()) {
+    throw std::runtime_error("Cannot save invalid Hamiltonian data to HDF5");
+  }
+
+  try {
+    // Create HDF5 file
+    H5::H5File file(filename, H5F_ACC_TRUNC);
+
+    // Use the group-based serialization method
+    to_hdf5(file);
+
+  } catch (const H5::Exception& e) {
+    throw std::runtime_error("HDF5 error: " + std::string(e.getCDetailMsg()));
+  }
+}
+
+void Hamiltonian::to_hdf5(H5::Group& group) const {
   try {
     // Save version first
     H5::DataSpace scalar_space(H5S_SCALAR);
@@ -544,12 +887,6 @@ void Canonical4CenterHamiltonian::to_hdf5(H5::Group& group) const {
         group.createAttribute("version", string_type, scalar_space);
     std::string version_str = SERIALIZATION_VERSION;
     version_attr.write(string_type, version_str);
-
-    // Add container type attribute
-    H5::Attribute container_type_attr =
-        group.createAttribute("container_type", string_type, scalar_space);
-    std::string container_type_str = get_container_type();
-    container_type_attr.write(string_type, container_type_str);
 
     // Save metadata
     H5::Group metadata_group = group.createGroup("metadata");
@@ -615,9 +952,35 @@ void Canonical4CenterHamiltonian::to_hdf5(H5::Group& group) const {
   }
 }
 
-std::unique_ptr<Canonical4CenterHamiltonian>
-Canonical4CenterHamiltonian::from_hdf5(H5::Group& group) {
-  QDK_LOG_TRACE_ENTERING();
+std::shared_ptr<Hamiltonian> Hamiltonian::_from_hdf5_file(
+    const std::string& filename) {
+  // Disable HDF5 automatic error printing to stderr unless verbose mode
+  if (hdf5_errors_should_be_suppressed()) {
+    H5::Exception::dontPrint();
+  }
+
+  H5::H5File file;
+  try {
+    // Open HDF5 file
+    file.openFile(filename, H5F_ACC_RDONLY);
+  } catch (const H5::Exception& e) {
+    throw std::runtime_error("Unable to open Hamiltonian HDF5 file '" +
+                             filename + "'. " +
+                             "Please check that the file exists, is a valid "
+                             "HDF5 file, and you have read permissions.");
+  }
+
+  try {
+    // Use the group-based deserialization method
+    return from_hdf5(file);
+  } catch (const H5::Exception& e) {
+    throw std::runtime_error(
+        "Unable to read Hamiltonian data from HDF5 file '" + filename + "'. " +
+        "HDF5 error: " + std::string(e.getCDetailMsg()));
+  }
+}
+
+std::shared_ptr<Hamiltonian> Hamiltonian::from_hdf5(H5::Group& group) {
   try {
     // Validate version first
     if (!group.attrExists("version")) {
@@ -723,12 +1086,12 @@ Canonical4CenterHamiltonian::from_hdf5(H5::Group& group) {
     // Create and return appropriate Hamiltonian using the correct constructor
     if (is_restricted_data) {
       // Use restricted constructor - it will create shared pointers internally
-      return std::make_unique<Canonical4CenterHamiltonian>(
-          one_body_alpha, two_body_aaaa, orbitals, core_energy,
-          inactive_fock_alpha, type);
+      return std::make_shared<Hamiltonian>(one_body_alpha, two_body_aaaa,
+                                           orbitals, core_energy,
+                                           inactive_fock_alpha, type);
     } else {
       // Use unrestricted constructor with separate alpha and beta data
-      return std::make_unique<Canonical4CenterHamiltonian>(
+      return std::make_shared<Hamiltonian>(
           one_body_alpha, one_body_beta, two_body_aaaa, two_body_aabb,
           two_body_bbbb, orbitals, core_energy, inactive_fock_alpha,
           inactive_fock_beta, type);
@@ -739,10 +1102,8 @@ Canonical4CenterHamiltonian::from_hdf5(H5::Group& group) {
   }
 }
 
-void Canonical4CenterHamiltonian::_to_fcidump_file(const std::string& filename,
-                                                   size_t nalpha,
-                                                   size_t nbeta) const {
-  QDK_LOG_TRACE_ENTERING();
+void Hamiltonian::_to_fcidump_file(const std::string& filename, size_t nalpha,
+                                   size_t nbeta) const {
   // Check if this is an unrestricted Hamiltonian and throw error
   if (is_unrestricted()) {
     throw std::runtime_error(

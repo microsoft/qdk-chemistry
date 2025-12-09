@@ -93,7 +93,7 @@ bool HamiltonianContainer::has_one_body_integrals() const {
 
 double HamiltonianContainer::get_one_body_element(unsigned i, unsigned j,
                                                   SpinChannel channel) const {
-  QDK_LOG_TRACE_ENTERING();                                                  
+  QDK_LOG_TRACE_ENTERING();
   if (!has_one_body_integrals()) {
     throw std::runtime_error("One-body integrals are not set");
   }
@@ -141,18 +141,30 @@ const std::shared_ptr<Orbitals> HamiltonianContainer::get_orbitals() const {
   return _orbitals;
 }
 
-bool HamiltonianContainer::has_orbitals() const { QDK_LOG_TRACE_ENTERING(); return _orbitals != nullptr; }
+bool HamiltonianContainer::has_orbitals() const {
+  QDK_LOG_TRACE_ENTERING();
+  return _orbitals != nullptr;
+}
 
-double HamiltonianContainer::get_core_energy() const { QDK_LOG_TRACE_ENTERING(); return _core_energy; }
+double HamiltonianContainer::get_core_energy() const {
+  QDK_LOG_TRACE_ENTERING();
+  return _core_energy;
+}
 
-HamiltonianType HamiltonianContainer::get_type() const {QDK_LOG_TRACE_ENTERING(); return _type; }
+HamiltonianType HamiltonianContainer::get_type() const {
+  QDK_LOG_TRACE_ENTERING();
+  return _type;
+}
 
 bool HamiltonianContainer::is_hermitian() const {
   QDK_LOG_TRACE_ENTERING();
   return _type == HamiltonianType::Hermitian;
 }
 
-bool HamiltonianContainer::is_unrestricted() const { QDK_LOG_TRACE_ENTERING(); return !is_restricted(); }
+bool HamiltonianContainer::is_unrestricted() const {
+  QDK_LOG_TRACE_ENTERING();
+  return !is_restricted();
+}
 
 void HamiltonianContainer::validate_integral_dimensions() const {
   // assume the container has one-body integrals only, expect derived classes to
@@ -358,7 +370,7 @@ std::unique_ptr<HamiltonianContainer> HamiltonianContainer::from_json(
 
 std::unique_ptr<HamiltonianContainer> HamiltonianContainer::from_hdf5(
     H5::Group& group) {
-      QDK_LOG_TRACE_ENTERING();
+  QDK_LOG_TRACE_ENTERING();
   try {
     // Read container type identifier
     if (!group.attrExists("container_type")) {
@@ -635,7 +647,9 @@ Hamiltonian::Hamiltonian(std::unique_ptr<HamiltonianContainer> container)
 
 // Copy constructor
 Hamiltonian::Hamiltonian(const Hamiltonian& other)
-    : _container(QDK_LOG_TRACE_ENTERING(); other._container->clone()) {}
+    : _container(other._container->clone()) {
+  QDK_LOG_TRACE_ENTERING();
+}
 
 // Copy assignment operator
 Hamiltonian& Hamiltonian::operator=(const Hamiltonian& other) {

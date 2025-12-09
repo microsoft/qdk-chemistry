@@ -19,7 +19,6 @@
 
 namespace qdk::chemistry::data {
 
-
 class HamiltonianContainer;
 
 // /**
@@ -33,7 +32,6 @@ class HamiltonianContainer;
 //  * @brief Spin channels for one and two-electron integrals
 //  */
 // enum class SpinChannel { aa, bb, aaaa, aabb, bbbb };
-
 
 /**
  * @class Hamiltonian

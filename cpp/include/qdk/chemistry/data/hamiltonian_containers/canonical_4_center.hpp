@@ -117,7 +117,7 @@ class Canonical4CenterHamiltonian : public HamiltonianContainer {
    * @throws std::runtime_error if integrals are not set
    */
   virtual std::tuple<const Eigen::VectorXd&, const Eigen::VectorXd&,
-             const Eigen::VectorXd&>
+                     const Eigen::VectorXd&>
   get_two_body_integrals() const override;
 
   /**

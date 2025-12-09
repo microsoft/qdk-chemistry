@@ -111,7 +111,6 @@ class HamiltonianContainer {
    */
   bool has_one_body_integrals() const;
 
-  
   /**
    * @brief Get specific one-electron integral element
    * @param i First orbital index
@@ -138,7 +137,7 @@ class HamiltonianContainer {
    * @throws std::runtime_error if integrals are not set
    */
   virtual std::tuple<const Eigen::VectorXd&, const Eigen::VectorXd&,
-             const Eigen::VectorXd&>
+                     const Eigen::VectorXd&>
   get_two_body_integrals() const = 0;
 
   /**
