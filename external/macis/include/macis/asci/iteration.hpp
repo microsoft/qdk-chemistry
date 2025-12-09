@@ -67,7 +67,8 @@ auto asci_iter(ASCISettings asci_settings, MCSCFSettings mcscf_settings,
       nkeep = std::min(asci_settings.ncdets_max, wfn.size());
       break;
     case CoreSelectionStrategy::Percentage: {
-      // Use percentage-based selection
+      // Use percentage-based selection - keep determinants until cumulative
+      // weight reaches threshold (not capped by ncdets_max)
       for (size_t i = 0; i < wfn.size(); ++i) {
         core_weight += X[i] * X[i];
         nkeep++;
@@ -75,7 +76,6 @@ auto asci_iter(ASCISettings asci_settings, MCSCFSettings mcscf_settings,
           break;
         }
       }
-      nkeep = std::min(nkeep, asci_settings.ncdets_max);
       break;
     }
     default:
