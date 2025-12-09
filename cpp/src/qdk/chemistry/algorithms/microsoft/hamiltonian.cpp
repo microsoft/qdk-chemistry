@@ -20,6 +20,8 @@
 // QDK/Chemistry data::Hamiltonian headers
 #include <qdk/chemistry/data/hamiltonian_containers/canonical_4_center.hpp>
 
+#include <qdk/chemistry/utils/logger.hpp>
+
 #include "utils.hpp"
 
 namespace qdk::chemistry::algorithms::microsoft {
@@ -37,6 +39,7 @@ namespace detail {
 bool validate_active_contiguous_indices(const std::vector<size_t>& indices,
                                         const std::string& spin_label,
                                         size_t num_molecular_orbitals) {
+  QDK_LOG_TRACE_ENTERING();
   if (indices.empty()) return true;
 
   // Cannot contain more than the total number of MOs
@@ -82,6 +85,7 @@ bool validate_active_contiguous_indices(const std::vector<size_t>& indices,
 
 std::shared_ptr<data::Hamiltonian> HamiltonianConstructor::_run_impl(
     std::shared_ptr<data::Orbitals> orbitals) const {
+  QDK_LOG_TRACE_ENTERING();
   // Initialize the backend if not already done
   utils::microsoft::initialize_backend();
 

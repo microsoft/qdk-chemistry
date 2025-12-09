@@ -212,27 +212,27 @@ class TestDocumentationFunctions:
         all_info = get_constants_info()
         assert len(results) == len(all_info)
 
-    def test_show_constant_details_output(self, capsys: pytest.CaptureFixture[str]):
+    def test_show_constant_details_output(self, capfd: pytest.CaptureFixture[str]):
         """Test that show_constant_details produces output."""
         show_constant_details("bohr_to_angstrom")
 
-        captured = capsys.readouterr()
+        captured = capfd.readouterr()
         assert "bohr_to_angstrom" in captured.out
         assert "Bohr radius" in captured.out
         assert "CODATA" in captured.out
 
-    def test_show_constant_details_unknown(self, capsys: pytest.CaptureFixture[str]):
+    def test_show_constant_details_unknown(self, capfd: pytest.CaptureFixture[str]):
         """Test error handling in show_constant_details."""
         show_constant_details("nonexistent_constant")
 
-        captured = capsys.readouterr()
+        captured = capfd.readouterr()
         assert "Unknown constant" in captured.out
 
-    def test_list_constants_output(self, capsys: pytest.CaptureFixture[str]):
+    def test_list_constants_output(self, capfd: pytest.CaptureFixture[str]):
         """Test that list_constants produces categorized output."""
         list_constants(show_values=False)
 
-        captured = capsys.readouterr()
+        captured = capfd.readouterr()
         output = captured.out
 
         # Check for expected categories
@@ -245,11 +245,11 @@ class TestDocumentationFunctions:
         assert "bohr_to_angstrom" in output
         assert "fine_structure_constant" in output
 
-    def test_list_constants_with_values(self, capsys: pytest.CaptureFixture[str]):
+    def test_list_constants_with_values(self, capfd: pytest.CaptureFixture[str]):
         """Test list_constants with values shown."""
         list_constants(show_values=True, show_units=True)
 
-        captured = capsys.readouterr()
+        captured = capfd.readouterr()
         output = captured.out
 
         # Should contain numerical values

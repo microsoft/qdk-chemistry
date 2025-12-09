@@ -10,7 +10,7 @@ Overview
 --------
 
 The :class:`~qdk_chemistry.algorithms.EnergyEstimator` evaluates the expectation value of a :class:`~qdk_chemistry.data.QubitHamiltonian` with respect to a given quantum circuit.
-It takes a circuit in OpenQASM format with target qubit Hamiltonians, automatically generates the corresponding measurement circuits.
+It takes a Circuit object with target qubit Hamiltonians and automatically generates the corresponding measurement circuits.
 These circuits are executed on a selected backend simulator with the user-specified number of shots, and the resulting bitstring statistics are used to calculate per-term expectation values and the total energy.
 
 

@@ -17,7 +17,6 @@ References:
 
 from __future__ import annotations
 
-import logging
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
@@ -31,6 +30,7 @@ from dataclasses import dataclass
 from qiskit import ClassicalRegister, QuantumCircuit, QuantumRegister
 
 from qdk_chemistry.phase_estimation.base import PhaseEstimation, PhaseEstimationAlgorithm
+from qdk_chemistry.utils import Logger
 from qdk_chemistry.utils.phase import (
     accumulated_phase_from_bits,
     iterative_phase_feedback_update,
@@ -41,8 +41,6 @@ from qdk_chemistry.utils.time_evolution import (
     append_controlled_time_evolution,
     extract_terms_from_hamiltonian,
 )
-
-_LOGGER = logging.getLogger(__name__)
 
 __all__: list[str] = []
 
@@ -71,13 +69,12 @@ class IterativePhaseEstimation(PhaseEstimation):
             evolution_time: Time parameter ``t`` used in the time-evolution unitary ``U = exp(-i H t)``.
 
         """
+        Logger.trace_entering()
         super().__init__(hamiltonian, evolution_time)
         self._terms: list[PauliEvolutionTerm] = extract_terms_from_hamiltonian(hamiltonian)
-        _LOGGER.debug(
-            "Initialized %s with %d evolution terms and evolution time %.6f.",
-            self.__class__.__name__,
-            len(self._terms),
-            evolution_time,
+        Logger.debug(
+            f"Initialized {self.__class__.__name__} with {len(self._terms)} evolution terms and "
+            f"evolution time {evolution_time:.6f}."
         )
 
     def create_iteration_circuit(
@@ -118,6 +115,7 @@ class IterativePhaseEstimation(PhaseEstimation):
             system qubits, and classical measurement register.
 
         """
+        Logger.trace_entering()
         _validate_iteration_inputs(iteration, total_iterations)
         self._validate_state_prep_qubits(state_prep)
 
@@ -132,11 +130,8 @@ class IterativePhaseEstimation(PhaseEstimation):
         control = ancilla[0]
         system_qubits = list(system)
 
-        _LOGGER.debug(
-            "Creating IQPE iteration %d/%d with phase correction %.6f.",
-            iteration + 1,
-            total_iterations,
-            phase_correction,
+        Logger.debug(
+            f"Creating IQPE iteration {iteration + 1}/{total_iterations} with phase correction {phase_correction:.6f}."
         )
 
         circuit.h(control)
@@ -155,13 +150,9 @@ class IterativePhaseEstimation(PhaseEstimation):
 
         circuit.h(control)
         circuit.measure(control, classical[0])
-
-        _LOGGER.debug(
-            "Completed IQPE iteration %d/%d producing circuit with %d qubits and %d classical bits.",
-            iteration + 1,
-            total_iterations,
-            circuit.num_qubits,
-            circuit.num_clbits,
+        Logger.debug(
+            f"Completed IQPE iteration {iteration + 1}/{total_iterations} producing circuit with {circuit.num_qubits} "
+            f"qubits and {circuit.num_clbits} classical bits."
         )
 
         return circuit
@@ -201,6 +192,7 @@ class IterativePhaseEstimation(PhaseEstimation):
             and phase correction.
 
         """
+        Logger.trace_entering()
         circuit = self.create_iteration_circuit(
             state_prep,
             iteration=iteration,
@@ -257,6 +249,7 @@ class IterativePhaseEstimation(PhaseEstimation):
                 does not match ``num_bits``.
 
         """
+        Logger.trace_entering()
         if num_bits <= 0:
             raise ValueError("num_bits must be a positive integer.")
 
@@ -276,7 +269,7 @@ class IterativePhaseEstimation(PhaseEstimation):
             measurement_register = None if measurement_registers is None else measurement_registers[idx]
             iteration_name = None if iteration_names is None else iteration_names[idx]
 
-            _LOGGER.debug("Assembling IQPE iteration object %d/%d.", idx + 1, num_bits)
+            Logger.debug(f"Assembling IQPE iteration object {idx + 1}/{num_bits}.")
 
             iteration_circuit = self.create_iteration(
                 state_prep,

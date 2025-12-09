@@ -92,13 +92,15 @@ Examples:
       },
       "Get documentation information for a specific constant", py::arg("name"));
 
-  // CODATA 2018 constants with detailed documentation
+  // CODATA constants
+  // Length conversion factors
   constants.attr("BOHR_TO_ANGSTROM") =
       py::cast(qdk::chemistry::constants::bohr_to_angstrom);
 
   constants.attr("ANGSTROM_TO_BOHR") =
       py::cast(qdk::chemistry::constants::angstrom_to_bohr);
 
+  // Fundamental constants
   constants.attr("FINE_STRUCTURE_CONSTANT") =
       py::cast(qdk::chemistry::constants::fine_structure_constant);
 
@@ -150,4 +152,28 @@ Examples:
 
   constants.attr("KJ_PER_MOL_TO_HARTREE") =
       py::cast(qdk::chemistry::constants::kj_per_mol_to_hartree);
+
+  // Add type annotations for all constants
+  py::dict annotations;
+  annotations["BOHR_TO_ANGSTROM"] = py::type::of(py::float_(0.0));
+  annotations["ANGSTROM_TO_BOHR"] = py::type::of(py::float_(0.0));
+  annotations["FINE_STRUCTURE_CONSTANT"] = py::type::of(py::float_(0.0));
+  annotations["ELECTRON_MASS"] = py::type::of(py::float_(0.0));
+  annotations["PROTON_MASS"] = py::type::of(py::float_(0.0));
+  annotations["NEUTRON_MASS"] = py::type::of(py::float_(0.0));
+  annotations["ATOMIC_MASS_CONSTANT"] = py::type::of(py::float_(0.0));
+  annotations["AVOGADRO_CONSTANT"] = py::type::of(py::float_(0.0));
+  annotations["BOLTZMANN_CONSTANT"] = py::type::of(py::float_(0.0));
+  annotations["PLANCK_CONSTANT"] = py::type::of(py::float_(0.0));
+  annotations["REDUCED_PLANCK_CONSTANT"] = py::type::of(py::float_(0.0));
+  annotations["SPEED_OF_LIGHT"] = py::type::of(py::float_(0.0));
+  annotations["ELEMENTARY_CHARGE"] = py::type::of(py::float_(0.0));
+  annotations["HARTREE_TO_EV"] = py::type::of(py::float_(0.0));
+  annotations["EV_TO_HARTREE"] = py::type::of(py::float_(0.0));
+  annotations["HARTREE_TO_KCAL_PER_MOL"] = py::type::of(py::float_(0.0));
+  annotations["KCAL_PER_MOL_TO_HARTREE"] = py::type::of(py::float_(0.0));
+  annotations["HARTREE_TO_KJ_PER_MOL"] = py::type::of(py::float_(0.0));
+  annotations["KJ_PER_MOL_TO_HARTREE"] = py::type::of(py::float_(0.0));
+
+  constants.attr("__annotations__") = annotations;
 }

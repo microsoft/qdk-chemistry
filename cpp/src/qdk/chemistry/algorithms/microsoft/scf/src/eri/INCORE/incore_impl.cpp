@@ -6,13 +6,13 @@
 
 #include <qdk/chemistry/scf/config.h>
 
+#include <qdk/chemistry/utils/logger.hpp>
 #include <stdexcept>
 #ifdef QDK_CHEMISTRY_ENABLE_GPU
 #include <cuda_runtime.h>
 #include <qdk/chemistry/scf/util/gpu/cuda_helper.h>
 #endif
 #include <qdk/chemistry/scf/util/libint2_util.h>
-#include <spdlog/spdlog.h>
 
 #include <blas.hh>
 
@@ -27,6 +27,8 @@
 namespace qdk::chemistry::scf::incore {
 
 ERI::ERI(bool unr, const BasisSet& basis, ParallelConfig mpi, double omega) {
+  QDK_LOG_TRACE_ENTERING();
+
   unrestricted_ = unr;
   obs_ = libint2_util::convert_to_libint_basisset(basis);
   omega_ = omega;
@@ -45,6 +47,8 @@ ERI::ERI(bool unr, const BasisSet& basis, ParallelConfig mpi, double omega) {
 }
 
 void ERI::generate_eri_() {
+  QDK_LOG_TRACE_ENTERING();
+
   // Allocate and populate ERIs on host
   const size_t num_atomic_orbitals = obs_.nbf();
   const size_t num_atomic_orbitals2 = num_atomic_orbitals * num_atomic_orbitals;
@@ -55,8 +59,8 @@ void ERI::generate_eri_() {
   const bool is_rsx = std::abs(omega_) > 1e-12;
 
   if (!mpi_.world_rank)
-    spdlog::debug("Generating ERIs via Libint2 {}",
-                  is_rsx ? "omega = " + std::to_string(omega_) : "");
+    QDK_LOGGER().debug("Generating ERIs via Libint2 {}",
+                       is_rsx ? "omega = " + std::to_string(omega_) : "");
 #if (QDK_CHEMISTRY_INCORE_ERI_STRATEGY & INCORE_ERI_GEN_DEBUG) > 0
   h_eri_ =
       libint2_util::debug_eri(basis_mode_, obs_, 0.0, loc_i_st_, loc_i_en_);
@@ -72,12 +76,12 @@ void ERI::generate_eri_() {
 
 #if (QDK_CHEMISTRY_INCORE_ERI_STRATEGY & INCORE_ERI_CON_HOST) > 0 || \
     (QDK_CHEMISTRY_INCORE_ERI_STRATEGY & INCORE_ERI_CON_HOST) > 0
-  if (!mpi_.world_rank) spdlog::debug("Saving ERIs on Host Memory");
+  if (!mpi_.world_rank) QDK_LOGGER().debug("Saving ERIs on Host Memory");
 #else
   // Allocate ERIs on the device and ship data
   if (!mpi_.world_rank) {
-    spdlog::debug("Saving ERIs in Device Memory");
-    spdlog::debug("Using cuTensor for GPU ERI Contraction");
+    QDK_LOGGER().debug("Saving ERIs in Device Memory");
+    QDK_LOGGER().debug("Using cuTensor for GPU ERI Contraction");
   }
   CUDA_CHECK(cudaMallocAsync(&d_eri_, eri_sz * sizeof(double), 0));
   CUDA_CHECK(cudaStreamSynchronize(0));
@@ -124,6 +128,8 @@ void ERI::generate_eri_() {
 
 void ERI::build_JK(const double* P, double* J, double* K, double alpha,
                    double beta, double omega) {
+  QDK_LOG_TRACE_ENTERING();
+
   if (std::abs(omega - omega_) > 1e-12) {
     throw std::runtime_error(fmt::format(
         "Inconsistent OMEGA passed to ERIINCORE (passed {:.2e}, stored {:.2e})",
@@ -229,10 +235,13 @@ void ERI::build_JK(const double* P, double* J, double* K, double alpha,
 
 void ERI::get_gradients(const double* P, double* dJ, double* dK, double alpha,
                         double beta, double omega) {
+  QDK_LOG_TRACE_ENTERING();
+
   throw std::runtime_error("INCORE GRADIENTS NYI");
 }
 
 void ERI::quarter_trans(size_t nt, const double* C, double* out) {
+  QDK_LOG_TRACE_ENTERING();
   const size_t num_atomic_orbitals = obs_.nbf();
   const size_t num_atomic_orbitals2 = num_atomic_orbitals * num_atomic_orbitals;
   const size_t num_atomic_orbitals3 =
@@ -289,6 +298,8 @@ void ERI::quarter_trans(size_t nt, const double* C, double* out) {
 }
 
 ERI::~ERI() noexcept {
+  QDK_LOG_TRACE_ENTERING();
+
 #ifdef QDK_CHEMISTRY_ENABLE_GPU
   if (d_eri_) CUDA_CHECK(cudaFree(d_eri_));
   if (d_eri_erf_) CUDA_CHECK(cudaFree(d_eri_erf_));
@@ -297,6 +308,8 @@ ERI::~ERI() noexcept {
 
 std::unique_ptr<ERI> ERI::make_incore_eri(bool unr, const BasisSet& basis,
                                           ParallelConfig mpi, double omega) {
+  QDK_LOG_TRACE_ENTERING();
+
   return std::make_unique<ERI>(unr, basis, mpi, omega);
 }
 
