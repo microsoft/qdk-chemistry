@@ -91,6 +91,49 @@ VectorVariant load_vector_variant_from_group(H5::Group& grp,
   return vec_var;
 }
 
+MatrixVariant load_matrix_variant_from_group(H5::Group& grp,
+                                             const std::string& name,
+                                             bool is_complex) {
+  MatrixVariant matrix_var;
+  if (grp.nameExists(name)) {
+    if (is_complex) {
+      H5::DataSet dataset = grp.openDataSet(name);
+      H5::DataSpace dataspace = dataset.getSpace();
+      hsize_t dims[2];
+      dataspace.getSimpleExtentDims(dims);
+
+      H5::DataType datatype = dataset.getDataType();
+      if (datatype.getClass() != H5T_COMPOUND) {
+        throw std::runtime_error(
+            "Expected complex compound type in HDF5 coefficients "
+            "dataset. Error reading dataset: " +
+            name);
+      }
+
+      H5::CompType complex_type(sizeof(std::complex<double>));
+      complex_type.insertMember("real", 0, H5::PredType::NATIVE_DOUBLE);
+      complex_type.insertMember("imag", sizeof(double),
+                                H5::PredType::NATIVE_DOUBLE);
+
+      Eigen::MatrixXcd matrix_c(dims[0], dims[1]);
+      dataset.read(matrix_c.data(), complex_type);
+      matrix_var = matrix_c;
+    } else {
+      H5::DataSet dataset = grp.openDataSet(name);
+      H5::DataSpace dataspace = dataset.getSpace();
+      hsize_t dims[2];
+      dataspace.getSimpleExtentDims(dims);
+
+      Eigen::MatrixXd matrix_r(dims[0], dims[1]);
+      dataset.read(matrix_r.data(), H5::PredType::NATIVE_DOUBLE);
+      matrix_var = matrix_r;
+    }
+  } else {
+    throw std::runtime_error("Dataset not found in HDF5 group: " + name);
+  }
+  return matrix_var;
+}
+
 bool dataset_exists(H5::H5File& file, const std::string& dataset_name) {
   try {
     H5::DataSet dataset = file.openDataSet(dataset_name);
@@ -209,67 +252,61 @@ void write_vector_to_hdf5(H5::Group& grp, const std::string& name,
   }
 }
 
-void save_one_rdm_to_hdf5(bool is_one_rdm_complex,
-                          MatrixVariant one_rdm_spin_dependent_chl,
-                          H5::Group rdm_group, std::string storage_name) {
+void save_matrix_variant_to_group(bool is_complex, MatrixVariant matrix_variant,
+                                  H5::Group group, std::string storage_name) {
   // complex
-  if (is_one_rdm_complex) {
-    const auto& rdm_complex =
-        std::get<Eigen::MatrixXcd>(one_rdm_spin_dependent_chl);
-    hsize_t one_rdm_dims[2] = {rdm_complex.rows(), rdm_complex.cols()};
-    H5::DataSpace one_rdm_space(2, one_rdm_dims);
+  if (is_complex) {
+    const auto& matrix_complex = std::get<Eigen::MatrixXcd>(matrix_variant);
+    hsize_t matrix_dims[2] = {matrix_complex.rows(), matrix_complex.cols()};
+    H5::DataSpace matrix_space(2, matrix_dims);
 
     H5::CompType complex_type(sizeof(std::complex<double>));
     complex_type.insertMember("real", 0, H5::PredType::NATIVE_DOUBLE);
     complex_type.insertMember("imag", sizeof(double),
                               H5::PredType::NATIVE_DOUBLE);
-    H5::DataSet complex_dataset_onerdm =
-        rdm_group.createDataSet(storage_name, complex_type, one_rdm_space);
+    H5::DataSet complex_dataset =
+        group.createDataSet(storage_name, complex_type, matrix_space);
     // Write directly from Eigen's memory layout without copying
-    complex_dataset_onerdm.write(rdm_complex.data(), complex_type);
+    complex_dataset.write(matrix_complex.data(), complex_type);
   }
   // real
   else {
-    const auto& rdm_real =
-        std::get<Eigen::MatrixXd>(one_rdm_spin_dependent_chl);
-    hsize_t one_rdm_dims[2] = {rdm_real.rows(), rdm_real.cols()};
-    H5::DataSpace one_rdm_space(2, one_rdm_dims);
-    H5::DataSet dataset_onerdm = rdm_group.createDataSet(
-        storage_name, H5::PredType::NATIVE_DOUBLE, one_rdm_space);
+    const auto& matrix_real = std::get<Eigen::MatrixXd>(matrix_variant);
+    hsize_t matrix_dims[2] = {matrix_real.rows(), matrix_real.cols()};
+    H5::DataSpace matrix_space(2, matrix_dims);
+    H5::DataSet real_dataset = group.createDataSet(
+        storage_name, H5::PredType::NATIVE_DOUBLE, matrix_space);
     // Write directly from Eigen's memory without copying
-    dataset_onerdm.write(rdm_real.data(), H5::PredType::NATIVE_DOUBLE);
+    real_dataset.write(matrix_real.data(), H5::PredType::NATIVE_DOUBLE);
   }
 }
 
-void save_two_rdm_to_hdf5(bool is_two_rdm_complex,
-                          VectorVariant two_rdm_spin_dependent_chl,
-                          H5::Group rdm_group, std::string storage_name) {
+void save_vector_variant_to_group(bool is_complex, VectorVariant vector_variant,
+                                  H5::Group group, std::string storage_name) {
   // complex
-  if (is_two_rdm_complex) {
-    const auto& rdm_complex =
-        std::get<Eigen::VectorXcd>(two_rdm_spin_dependent_chl);
-    hsize_t two_rdm_dims = rdm_complex.size();
-    H5::DataSpace two_rdm_space(1, &two_rdm_dims);
+  if (is_complex) {
+    const auto& vector_complex = std::get<Eigen::VectorXcd>(vector_variant);
+    hsize_t vector_dims = vector_complex.size();
+    H5::DataSpace vector_space(1, &vector_dims);
 
     H5::CompType complex_type(sizeof(std::complex<double>));
     complex_type.insertMember("real", 0, H5::PredType::NATIVE_DOUBLE);
     complex_type.insertMember("imag", sizeof(double),
                               H5::PredType::NATIVE_DOUBLE);
-    H5::DataSet complex_dataset_twordm =
-        rdm_group.createDataSet(storage_name, complex_type, two_rdm_space);
+    H5::DataSet complex_dataset =
+        group.createDataSet(storage_name, complex_type, vector_space);
     // Write directly from Eigen's memory layout without copying
-    complex_dataset_twordm.write(rdm_complex.data(), complex_type);
+    complex_dataset.write(vector_complex.data(), complex_type);
   }
   // real
   else {
-    const auto& rdm_real =
-        std::get<Eigen::VectorXd>(two_rdm_spin_dependent_chl);
-    hsize_t two_rdm_dims = rdm_real.size();
-    H5::DataSpace two_rdm_space(1, &two_rdm_dims);
-    H5::DataSet dataset_twordm = rdm_group.createDataSet(
-        storage_name, H5::PredType::NATIVE_DOUBLE, two_rdm_space);
+    const auto& vector_real = std::get<Eigen::VectorXd>(vector_variant);
+    hsize_t vector_dims = vector_real.size();
+    H5::DataSpace vector_space(1, &vector_dims);
+    H5::DataSet real_dataset = group.createDataSet(
+        storage_name, H5::PredType::NATIVE_DOUBLE, vector_space);
     // Write directly from Eigen's memory without copying
-    dataset_twordm.write(rdm_real.data(), H5::PredType::NATIVE_DOUBLE);
+    real_dataset.write(vector_real.data(), H5::PredType::NATIVE_DOUBLE);
   }
 }
 

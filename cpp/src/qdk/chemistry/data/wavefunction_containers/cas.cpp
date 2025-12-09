@@ -568,63 +568,106 @@ void CasWavefunctionContainer::to_hdf5(H5::Group& group) const {
     H5::Group config_set_group = group.createGroup("configuration_set");
     _configuration_set.to_hdf5(config_set_group);
 
-    H5::Group rdm_group = group.createGroup("rdms");
-
     // If rdms are available, store
-    if (has_one_rdm_spin_dependent()) {
-      // restricted only
-      if (get_orbitals()->is_restricted()) {
-        std::string storage_name = "one_rdm_aa";
+    if (has_one_rdm_spin_dependent || has_two_rdm_spin_dependent) {
+      H5::Group rdm_group = group.createGroup("rdms");
 
-        if (_one_rdm_spin_dependent_aa != nullptr) {
-          // check if real or complex
-          bool is_one_rdm_complex =
+      if (has_one_rdm_spin_dependent()) {
+        // restricted only
+        if (get_orbitals()->is_restricted()) {
+          std::string storage_name = "one_rdm_aa";
+          H5::Attribute one_rdm_aa_complex_attr = group.createAttribute(
+              "is_one_rdm_aa_complex", H5::PredType::NATIVE_HBOOL,
+              H5::DataSpace(H5S_SCALAR));
+
+          if (_one_rdm_spin_dependent_aa != nullptr &&
+              _one_rdm_spin_dependent_bb == nullptr) {
+            // check if real or complex
+            bool is_one_rdm_complex =
+                detail::is_matrix_variant_complex(*_one_rdm_spin_dependent_aa);
+            save_matrix_variant_to_group(is_one_rdm_complex,
+                                         *_one_rdm_spin_dependent_aa, rdm_group,
+                                         storage_name);
+
+            // store complexity flag
+            hbool_t is_one_rdm_aa_complex_flag = is_one_rdm_complex ? 1 : 0;
+            one_rdm_aa_complex_attr.write(H5::PredType::NATIVE_HBOOL,
+                                          &is_one_rdm_aa_complex_flag);
+
+            // if we dont have aa, save bb
+          } else if (_one_rdm_spin_dependent_bb != nullptr &&
+                     _one_rdm_spin_dependent_aa == nullptr) {
+            // check if real or complex
+            bool is_one_rdm_complex =
+                detail::is_matrix_variant_complex(*_one_rdm_spin_dependent_bb);
+            save_matrix_variant_to_group(is_one_rdm_complex,
+                                         *_one_rdm_spin_dependent_bb, rdm_group,
+                                         storage_name);
+
+            // store complexity flag
+            hbool_t is_one_rdm_aa_complex_flag = is_one_rdm_complex ? 1 : 0;
+            one_rdm_aa_complex_attr.write(H5::PredType::NATIVE_HBOOL,
+                                          &is_one_rdm_aa_complex_flag);
+          }
+          // shouldnt get here
+          else {
+            throw std::runtime_error("We should have aa or bb one-rdms.");
+          }
+        } else {
+          // unrestricted - want to store both
+          std::string storage_name_aa = "one_rdm_aa";
+          H5::Attribute one_rdm_aa_complex_attr = group.createAttribute(
+              "is_one_rdm_aa_complex", H5::PredType::NATIVE_HBOOL,
+              H5::DataSpace(H5S_SCALAR));
+          H5::Attribute one_rdm_bb_complex_attr = group.createAttribute(
+              "is_one_rdm_bb_complex", H5::PredType::NATIVE_HBOOL,
+              H5::DataSpace(H5S_SCALAR));
+
+          bool is_aa_rdm_complex =
               detail::is_matrix_variant_complex(*_one_rdm_spin_dependent_aa);
-          save_one_rdm_to_hdf5(is_one_rdm_complex, *_one_rdm_spin_dependent_aa,
-                               rdm_group, storage_name);
-
-          // if we dont have aa, save bb
-        } else if (_one_rdm_spin_dependent_bb != nullptr) {
-          // check if real or complex
-          bool is_one_rdm_complex =
+          save_matrix_variant_to_group(is_aa_rdm_complex,
+                                       *_one_rdm_spin_dependent_aa, rdm_group,
+                                       storage_name_aa);
+          std::string storage_name_bb = "one_rdm_bb";
+          bool is_bb_rdm_complex =
               detail::is_matrix_variant_complex(*_one_rdm_spin_dependent_bb);
-          save_one_rdm_to_hdf5(is_one_rdm_complex, *_one_rdm_spin_dependent_bb,
-                               rdm_group, storage_name);
-        }
-      } else {
-        // unrestricted - want to store both
-        std::string storage_name_aa = "one_rdm_aa";
-        bool is_aa_rdm_complex =
-            detail::is_matrix_variant_complex(*_one_rdm_spin_dependent_aa);
-        save_one_rdm_to_hdf5(is_aa_rdm_complex, *_one_rdm_spin_dependent_aa,
-                             rdm_group, storage_name_aa);
-        std::string storage_name_bb = "one_rdm_bb";
-        bool is_bb_rdm_complex =
-            detail::is_matrix_variant_complex(*_one_rdm_spin_dependent_bb);
-        save_one_rdm_to_hdf5(is_bb_rdm_complex, *_one_rdm_spin_dependent_bb,
-                             rdm_group, storage_name_bb);
-      }
-    }
+          save_matrix_variant_to_group(is_bb_rdm_complex,
+                                       *_one_rdm_spin_dependent_bb, rdm_group,
+                                       storage_name_bb);
 
-    if (has_two_rdm_spin_dependent()) {
-      std::string storage_name_aabb = "two_rdm_aabb";
-      std::string storage_name_aaaa = "two_rdm_aaaa";
-      // we need aabb and aaaa for both restricted and unrestricted
-      bool is_aabb_rdm_complex =
-          detail::is_vector_variant_complex(*_two_rdm_spin_dependent_aabb);
-      save_two_rdm_to_hdf5(is_aabb_rdm_complex, *_two_rdm_spin_dependent_aabb,
-                           rdm_group, storage_name_aabb);
-      bool is_aaaa_rdm_complex =
-          detail::is_vector_variant_complex(*_two_rdm_spin_dependent_aaaa);
-      save_two_rdm_to_hdf5(is_aaaa_rdm_complex, *_two_rdm_spin_dependent_aaaa,
-                           rdm_group, storage_name_aaaa);
-      if (get_orbitals()->is_unrestricted()) {
-        // also save bbbb
-        std::string storage_name_bbbb = "two_rdm_bbbb";
-        bool is_bbbb_rdm_complex =
-            detail::is_vector_variant_complex(*_two_rdm_spin_dependent_bbbb);
-        save_two_rdm_to_hdf5(is_bbbb_rdm_complex, *_two_rdm_spin_dependent_bbbb,
-                             rdm_group, storage_name_bbbb);
+          // store complexity flags
+          hbool_t is_one_rdm_aa_complex_flag = is_aa_rdm_complex ? 1 : 0;
+          one_rdm_aa_complex_attr.write(H5::PredType::NATIVE_HBOOL,
+                                        &is_one_rdm_aa_complex_flag);
+          hbool_t is_one_rdm_bb_complex_flag = is_bb_rdm_complex ? 1 : 0;
+          one_rdm_bb_complex_attr.write(H5::PredType::NATIVE_HBOOL,
+                                        &is_one_rdm_bb_complex_flag);
+        }
+      }
+
+      if (has_two_rdm_spin_dependent()) {
+        std::string storage_name_aabb = "two_rdm_aabb";
+        std::string storage_name_aaaa = "two_rdm_aaaa";
+        // we need aabb and aaaa for both restricted and unrestricted
+        bool is_aabb_rdm_complex =
+            detail::is_vector_variant_complex(*_two_rdm_spin_dependent_aabb);
+        save_vector_variant_to_group(is_aabb_rdm_complex,
+                                     *_two_rdm_spin_dependent_aabb, rdm_group,
+                                     storage_name_aabb);
+        bool is_aaaa_rdm_complex =
+            detail::is_vector_variant_complex(*_two_rdm_spin_dependent_aaaa);
+        save_vector_variant_to_group(is_aaaa_rdm_complex,
+                                     *_two_rdm_spin_dependent_aaaa, rdm_group,
+                                     storage_name_aaaa);
+        if (get_orbitals()->is_unrestricted()) {
+          // also save bbbb
+          std::string storage_name_bbbb = "two_rdm_bbbb";
+          bool is_bbbb_rdm_complex =
+              detail::is_vector_variant_complex(*_two_rdm_spin_dependent_bbbb);
+          save_vector_variant_to_group(is_bbbb_rdm_complex,
+                                       *_two_rdm_spin_dependent_bbbb, rdm_group,
+                                       storage_name_bbbb);
+        }
       }
     }
 
@@ -725,7 +768,38 @@ std::unique_ptr<CasWavefunctionContainer> CasWavefunctionContainer::from_hdf5(
     const auto& determinants = config_set.get_configurations();
     auto orbitals = config_set.get_orbitals();
 
-    // TODO load rdms if they are available, and pass to container
+    // load rdms if they are available
+    if (group.nameExists("rdms")) {
+      H5::Group rdm_group = group.openGroup("rdms");
+      if (is_restricted) {
+        // one rdms aa only
+        // check complexity
+        bool is_one_rdm_aa_complex = false;
+        if (group.attrExists("is_one_rdm_aa_complex")) {
+          H5::Attribute complex_attr =
+              group.openAttribute("is_one_rdm_aa_complex");
+          hbool_t is_complex_flag;
+          complex_attr.read(H5::PredType::NATIVE_HBOOL, &is_complex_flag);
+          is_one_rdm_aa_complex = (is_complex_flag != 0);
+        }
+        auto one_rdm_aa = load_matrix_variant_from_group(
+            rdm_group, "one_rdm_aa", is_one_rdm_aa_complex);
+
+      } else {
+        // also get rdms bb
+        // check complexity
+        bool is_one_rdm_bb_complex = false;
+        if (group.attrExists("is_one_rdm_bb_complex")) {
+          H5::Attribute complex_attr =
+              group.openAttribute("is_one_rdm_bb_complex");
+          hbool_t is_complex_flag;
+          complex_attr.read(H5::PredType::NATIVE_HBOOL, &is_complex_flag);
+          is_one_rdm_bb_complex = (is_complex_flag != 0);
+        }
+        auto one_rdm_bb = load_matrix_variant_from_group(
+            rdm_group, "one_rdm_bb", is_one_rdm_bb_complex);
+      }
+    }
 
     return std::make_unique<CasWavefunctionContainer>(
         coefficients, determinants, orbitals, type);

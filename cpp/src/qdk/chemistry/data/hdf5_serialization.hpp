@@ -119,11 +119,30 @@ VectorVariant load_vector_variant_from_group(H5::Group& grp,
                                              const std::string& name,
                                              bool is_complex = false);
 
+/**
+ * @brief Load a matrix variant (real or complex) from an HDF5 group.
+ *
+ * Loads either a matrix (MatrixXd) or complex (MatrixXcd) Eigen matrix from
+ * an HDF5 group dataset. For complex vectors, expects HDF5 compound type
+ * with "real" and "imag" fields.
+ *
+ * @param grp HDF5 group handle
+ * @param name Name of the dataset in the group
+ * @param is_complex If true, loads as complex matrix; if false, loads as real
+ * matrix
+ * @return MatrixVariant containing either Eigen::MatrixXd or Eigen::MatrixXcd
+ * @throws std::runtime_error if dataset not found or has incorrect format
+ */
+MatrixVariant load_matrix_variant_from_group(H5::Group& grp,
+                                             const std::string& name,
+                                             bool is_complex);
+
 // STL container operations with files
 
 /**
  * @brief Save an STL vector to an HDF5 file as a dataset.
- * @tparam T Element type (must have corresponding h5_pred_type specialization)
+ * @tparam T Element type (must have corresponding h5_pred_type
+ * specialization)
  * @param file HDF5 file handle
  * @param dataset_name Name for the dataset in the HDF5 file
  * @param data STL vector to save
@@ -264,16 +283,15 @@ bool dataset_exists_in_group(H5::Group& group, const std::string& dataset_name);
 bool group_exists_in_group(H5::Group& group, const std::string& group_name);
 
 /**
- * @brief Save one rdm to hdf5
- * @param is_one_rdm_complex Whether or not rdm is complex (affects how it is
+ * @brief Save matrix variant to hdf5
+ * @param is_complex Whether or not matrix variant is complex (affects how
  * stored)
- * @param one_rdm_spin_dependent_chl The one rdm to store
- * @param rdm_group Which rdm group to save to
- * @param storage_name How to save in the dedicated rdm group
+ * @param matrix_variant The matrix variant to store
+ * @param group Which hdf5 group to save to
+ * @param storage_name How to save in the dedicated group
  */
-void save_one_rdm_to_hdf5(bool is_one_rdm_complex,
-                          MatrixVariant one_rdm_spin_dependent_chl,
-                          H5::Group rdm_group, std::string storage_name);
+void save_matrix_variant_to_group(bool is_complex, MatrixVariant matrix_variant,
+                                  H5::Group group, std::string storage_name);
 
 /**
  * @brief Save two rdm to hdf5
@@ -283,9 +301,10 @@ void save_one_rdm_to_hdf5(bool is_one_rdm_complex,
  * @param rdm_group Which rdm group to save to
  * @param storage_name How to save in the dedicated rdm group
  */
-void save_two_rdm_to_hdf5(bool is_two_rdm_complex,
-                          VectorVariant two_rdm_spin_dependent_chl,
-                          H5::Group rdm_group, std::string storage_name);
+void save_vector_variant_to_group(bool is_two_rdm_complex,
+                                  VectorVariant two_rdm_spin_dependent_chl,
+                                  H5::Group rdm_group,
+                                  std::string storage_name);
 // Template implementations
 
 // Save STL vector to HDF5 file
