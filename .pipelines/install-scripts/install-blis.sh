@@ -18,7 +18,7 @@ cd blis
 # Select architectures to build BLIS for
 if [[ ${MARCH} == 'armv8-a' ]]; then
     # Compile for armsve, firestorm, thunderx2, cortexa57, cortexa53, and generic architectures
-    export BLIS_ARCH=arm64
+    export BLIS_ARCH=generic
     CFLAGS=${CFLAGS} ./configure \
     --disable-shared \
     --enable-static \
