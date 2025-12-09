@@ -25,7 +25,6 @@ if [[ ${MARCH} == 'armv8-a' ]]; then
     --prefix=${INSTALL_PREFIX} \
     --enable-cblas \
     --blas-int-size=32 \
-    --int-size=32 \
     $BLIS_ARCH
 elif [[ ${MARCH} == 'x86-64-v3' ]]; then
     # Compile for intel64, amd64, and amd64_legacy architectures
@@ -39,6 +38,7 @@ elif [[ ${MARCH} == 'x86-64-v3' ]]; then
 fi
 
 make -j$(nproc)
+make check
 make install
 
 cd ..
