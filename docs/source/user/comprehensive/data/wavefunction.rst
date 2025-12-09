@@ -117,7 +117,7 @@ Coupled cluster wavefunction container
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 A coupled cluster wavefunction container that stores T1 and T2 cluster amplitudes along with a reference wavefunction.
-Reduced density matrices (RDMs) can be stored if provided.
+The container supports reduced density matrices (RDMs), which are available if they are provided at construction or computed and stored; otherwise, RDM-related operations are not available.
 
 .. tab:: C++ API
 

@@ -55,8 +55,11 @@ std::shared_ptr<Hamiltonian> make_minimal_hamiltonian(
   h_core << -1.5, -0.8, -0.8, 0.5;  // Core Hamiltonian
 
   // Two-electron integrals in MO basis, stored as flattened vector
-  // Indexing: index = i*norb³ + j*norb² + k*norb + l for (ij|kl)
-  // For H2: norb=2, so we need 2⁴=16 elements
+  // These are stored like i*norb*norb*norb + j*norb*norb + k*norb + l
+  // In other words, if we want to access an integral element in the vector,
+  // (ij|kl), we can access using this indexing.
+
+  // For H2: norb=2, so we need 2^4=16 elements
   Eigen::VectorXd eri = Eigen::VectorXd::Zero(16);
 
   // Set some representative values for H2 two-electron integrals
@@ -224,7 +227,7 @@ int main() {
   // start-cell-access-amplitudes
   // Access T1 and T2 amplitudes from MP2 and CC containers
 
-  // Mp2
+  // MP2
   // Get the container back from wfn
   const auto& mp2_container_ref =
       mp2_wavefunction.get_container<MP2Container>();

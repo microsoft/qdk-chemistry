@@ -53,8 +53,11 @@ def make_minimal_hamiltonian(orbitals):
     h_core = np.array([[-1.5, -0.8], [-0.8, 0.5]])  # Core Hamiltonian
 
     # Two-electron integrals in MO basis, stored as flattened vector
-    # Indexing: index = i*norb³ + j*norb² + k*norb + l for (ij|kl)
-    # For H2: norb=2, so we need 2⁴=16 elements
+    # These are stored like i*norb*norb*norb + j*norb*norb + k*norb + l
+    # In other words, if we want to access an integral element in the vector,
+    # (ij|kl), we can access using this indexing.
+
+    # For H2: norb=2, so we need 2^4=16 elements
     eri = np.zeros(16)
 
     # Set some representative values for H2 two-electron integrals
