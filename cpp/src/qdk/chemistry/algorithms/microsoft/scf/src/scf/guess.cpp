@@ -30,26 +30,6 @@ void atom_guess(const BasisSet& obs, const Molecule& mol, double* D) {
     guess_chk = guess_chk / "guess" / (obs.name + "_cart");
   }
 
-  if (!std::filesystem::exists(guess_chk)) {
-    QDK_LOGGER().error(
-        "{} not found, use `scripts/generate_guess.py` to prepare basis",
-        obs.name);
-    exit(EXIT_FAILURE);
-  }
-  std::map<int, RowMajorMatrix> atom_dm;
-  std::ifstream fin(guess_chk);
-  int atomic_number;
-  while (fin >> atomic_number) {
-    int n;
-    fin >> n;
-    RowMajorMatrix d(n, n);
-    for (int i = 0; i < n; i++) {
-      for (int j = 0; j < n; j++) {
-        fin >> d(i, j);
-      }
-    }
-    atom_dm[atomic_number] = d;
-  }
   int N = obs.num_atomic_orbitals;
   RowMajorMatrix tD = RowMajorMatrix::Zero(N, N);
   if (!std::filesystem::exists(guess_chk)) {
