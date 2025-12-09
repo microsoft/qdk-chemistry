@@ -65,8 +65,8 @@ fi
 cmake --version
 
 export CFLAGS="-fPIC -Os"
-echo "Downloading and installing BLIS..."
-bash .pipelines/install-scripts/install-blis.sh /usr/local ${MARCH} ${BLIS_VERSION} ${CFLAGS}
+# echo "Downloading and installing BLIS..."
+# bash .pipelines/install-scripts/install-blis.sh /usr/local ${MARCH} ${BLIS_VERSION} ${CFLAGS}
 
 echo "Downloading and installing libflame..."
 bash .pipelines/install-scripts/install-libflame.sh /usr/local ${MARCH} ${LIBFLAME_VERSION} ${CFLAGS}

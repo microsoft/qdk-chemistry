@@ -36,7 +36,8 @@ CFLAGS=${CFLAGS} ./configure \
     --enable-lapack2flame \
     --enable-legacy-lapack \
     --enable-max-arg-list-hack \
-    --target=$LIBFLAME_ARCH
+    --target=$LIBFLAME_ARCH \
+    --enable-builtin-blas
 
 make -j$(nproc)
 make install
