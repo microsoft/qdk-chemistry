@@ -50,8 +50,7 @@ void compute_trial_fock(const std::shared_ptr<qcs::ERI>& eri,
                         const std::shared_ptr<qcs::EXC>& exc,
                         const RowMajorMatrix& trial_density,
                         const RowMajorMatrix& ground_density,
-                        RowMajorMatrix& trial_fock, RowMajorMatrix& J_scratch,
-                        RowMajorMatrix& K_scratch, bool rhf_external) {
+                        RowMajorMatrix& trial_fock, bool rhf_external) {
   const size_t num_atomic_orbitals = ground_density.cols();
   const bool unrestricted = (ground_density.rows() == 2 * num_atomic_orbitals);
   if (rhf_external and unrestricted)
@@ -65,44 +64,79 @@ void compute_trial_fock(const std::shared_ptr<qcs::ERI>& eri,
     std::tie(alpha, beta, omega) = exc->get_hyb();
   }
 
-  // Build J and K matrices
-  J_scratch.setZero();
-  K_scratch.setZero();
-  eri->build_JK(trial_density.data(), J_scratch.data(), K_scratch.data(), alpha,
-                beta, omega);
+  // JK part
+  {
+    // Build J and K matrices
+    RowMajorMatrix J_scratch =
+        RowMajorMatrix::Zero(ground_density.rows(), num_atomic_orbitals);
+    RowMajorMatrix K_scratch =
+        RowMajorMatrix::Zero(ground_density.rows(), num_atomic_orbitals);
+    eri->build_JK(trial_density.data(), J_scratch.data(), K_scratch.data(),
+                  alpha, beta, omega);
 
-  // Compute Fock matrix: F = J - K for RHF, or appropriate combination for UHF
-  if (unrestricted) {
-    // For UHF: Fa = Ja + Jb - Ka, Fb = Ja + Jb - Kb
-    trial_fock.block(0, 0, num_atomic_orbitals, num_atomic_orbitals) =
-        J_scratch.block(0, 0, num_atomic_orbitals, num_atomic_orbitals) +
-        J_scratch.block(num_atomic_orbitals, 0, num_atomic_orbitals,
-                        num_atomic_orbitals) -
-        K_scratch.block(0, 0, num_atomic_orbitals, num_atomic_orbitals);
-    trial_fock.block(num_atomic_orbitals, 0, num_atomic_orbitals,
-                     num_atomic_orbitals) =
-        J_scratch.block(num_atomic_orbitals, 0, num_atomic_orbitals,
-                        num_atomic_orbitals) +
-        J_scratch.block(0, 0, num_atomic_orbitals, num_atomic_orbitals) -
-        K_scratch.block(num_atomic_orbitals, 0, num_atomic_orbitals,
-                        num_atomic_orbitals);
-  } else {
-    if (rhf_external)
-      // For RHF external: F = - K
-      trial_fock = -K_scratch;
-    else
-      // For RHF internal: F = 2*J - K
-      trial_fock = 2.0 * J_scratch - K_scratch;
+    // Compute Fock matrix: F = J - K for RHF, or appropriate combination for
+    // UHF
+    if (unrestricted) {
+      // For UHF: Fa = Ja + Jb - Ka, Fb = Ja + Jb - Kb
+      trial_fock.block(0, 0, num_atomic_orbitals, num_atomic_orbitals) =
+          J_scratch.block(0, 0, num_atomic_orbitals, num_atomic_orbitals) +
+          J_scratch.block(num_atomic_orbitals, 0, num_atomic_orbitals,
+                          num_atomic_orbitals) -
+          K_scratch.block(0, 0, num_atomic_orbitals, num_atomic_orbitals);
+      trial_fock.block(num_atomic_orbitals, 0, num_atomic_orbitals,
+                       num_atomic_orbitals) =
+          J_scratch.block(num_atomic_orbitals, 0, num_atomic_orbitals,
+                          num_atomic_orbitals) +
+          J_scratch.block(0, 0, num_atomic_orbitals, num_atomic_orbitals) -
+          K_scratch.block(num_atomic_orbitals, 0, num_atomic_orbitals,
+                          num_atomic_orbitals);
+    } else {
+      if (rhf_external)
+        // For RHF external: F = - K
+        trial_fock = -K_scratch;
+      else
+        // For RHF internal: F = 2*J - K
+        trial_fock = 2.0 * J_scratch - K_scratch;
+    }
   }
 
   // Add XC contribution if DFT (similar to KSImpl::update_trial_fock_)
-  // Only call exc->eval_fxc_contraction when exc is not null and not RHF
-  // external
-  if (exc and !rhf_external) {
-    J_scratch.setZero();
-    exc->eval_fxc_contraction(ground_density.data(), trial_density.data(),
-                              J_scratch.data());
-    trial_fock += J_scratch;
+  // Only call exc->eval_fxc_contraction when exc is not null
+  if (exc) {
+    if (!rhf_external) {
+      // Internal
+      RowMajorMatrix FXC =
+          RowMajorMatrix::Zero(ground_density.rows(), num_atomic_orbitals);
+      exc->eval_fxc_contraction(ground_density.data(), trial_density.data(),
+                                FXC.data());
+      trial_fock += FXC;
+    } else {
+      // External
+      RowMajorMatrix ground_density_ext =
+          RowMajorMatrix::Zero(2 * ground_density.rows(), num_atomic_orbitals);
+      RowMajorMatrix trial_density_ext =
+          RowMajorMatrix::Zero(2 * ground_density.rows(), num_atomic_orbitals);
+      RowMajorMatrix FXC =
+          RowMajorMatrix::Zero(2 * ground_density.rows(), num_atomic_orbitals);
+
+      // Use Pb = Pa, tPb = -tPa to calculate triplet fxc
+      ground_density_ext.block(0, 0, num_atomic_orbitals, num_atomic_orbitals) =
+          ground_density * 0.5;
+      ground_density_ext.block(num_atomic_orbitals, 0, num_atomic_orbitals,
+                               num_atomic_orbitals) =
+          ground_density_ext.block(0, 0, num_atomic_orbitals,
+                                   num_atomic_orbitals);
+      trial_density_ext.block(0, 0, num_atomic_orbitals, num_atomic_orbitals) =
+          trial_density;
+      trial_density_ext.block(num_atomic_orbitals, 0, num_atomic_orbitals,
+                              num_atomic_orbitals) =
+          -trial_density_ext.block(0, 0, num_atomic_orbitals,
+                                   num_atomic_orbitals);
+
+      exc->eval_fxc_contraction(ground_density_ext.data(),
+                                trial_density_ext.data(), FXC.data());
+      trial_fock += FXC.block(0, 0, num_atomic_orbitals, num_atomic_orbitals);
+    }
   }
 }
 
@@ -167,22 +201,21 @@ class StabilityOperator {
 
     // Allocate scratch matrices
     const size_t num_density_matrices = unrestricted ? 2 : 1;
-    RowMajorMatrix scratch1 = RowMajorMatrix::Zero(
-        num_atomic_orbitals * num_density_matrices, num_atomic_orbitals);
-    RowMajorMatrix scratch2 = RowMajorMatrix::Zero(
-        num_atomic_orbitals * num_density_matrices, num_atomic_orbitals);
     RowMajorMatrix trial_density = RowMajorMatrix::Zero(
         num_atomic_orbitals * num_density_matrices, num_atomic_orbitals);
     RowMajorMatrix trial_fock = RowMajorMatrix::Zero(
         num_atomic_orbitals * num_density_matrices, num_atomic_orbitals);
-    double* temp = scratch1.data();
+    RowMajorMatrix scratch =
+        RowMajorMatrix::Zero(num_atomic_orbitals, num_atomic_orbitals);
+    double* temp = scratch.data();
 
     // For each right-hand side, apply the operator
     for (size_t vec = 0; vec < num_vectors; ++vec) {
       const double* X_vec = X_ptr + vec * eigensize;
       double* Y_vec = Y_ptr + vec * eigensize;
 
-      // calculate orbital energy difference term using preconditioner diagonal
+      // calculate orbital energy difference term using preconditioner
+      // diagonal
       for (size_t idx = 0; idx < eigensize; ++idx) {
         Y_vec[idx] +=
             alpha * eigen_diff_(idx) * X_vec[idx];  // δij δab δστ (ϵaσ − ϵiτ )
@@ -231,7 +264,7 @@ class StabilityOperator {
 
       // Compute trial Fock matrix
       compute_trial_fock(eri_, exc_, trial_density, ground_density_, trial_fock,
-                         scratch1, scratch2, rhf_external_);
+                         rhf_external_);
 
       // ABX_{ia} = \sum_{uv} C_{ui} F_{uv} C_{av}
       // Step 1: temp = trial_fock^T * Ca_occ, trial_fock is symmetric
@@ -321,7 +354,6 @@ StabilityChecker::_run_impl(
     std::shared_ptr<data::Wavefunction> wavefunction) const {
   // Initialize the backend if not already done
   utils::microsoft::initialize_backend();
-  // spdlog::set_level(spdlog::level::info);
 
   // Extract settings
   const int64_t davidson_max_subspace =
@@ -383,13 +415,6 @@ StabilityChecker::_run_impl(
   scf_config->cartesian = !basis_set_internal->pure;
   scf_config->unrestricted = unrestricted;
   scf_config->eri.method = qcs::ERIMethod::Libint2Direct;
-
-  // Create exchange-correlation instance (only for DFT)
-  std::shared_ptr<qcs::EXC> exc;
-  if (method != "HF") {
-    scf_config->exc.xc_name = method;
-    exc = qcs::EXC::create(basis_set_internal, *scf_config);
-  }
 
   // Create ERI instance
   std::shared_ptr<qcs::ERI> eri;
@@ -470,13 +495,21 @@ StabilityChecker::_run_impl(
   Eigen::MatrixXd external_eigenvectors = Eigen::MatrixXd::Zero(0, 0);
 
   if (check_internal) {
+    // Create exchange-correlation instance
+    std::shared_ptr<qcs::EXC> exc_internal;
+    if (method != "HF") {
+      scf_config->exc.xc_name = method;
+      if (check_internal)
+        exc_internal = qcs::EXC::create(basis_set_internal, *scf_config);
+    }
+
     internal_eigenvectors.resize(eigenvector.size(), 1);
     internal_eigenvectors = eigenvector;
 
     // Create the stability operator wrapper and run Davidson eigensolver
     detail::StabilityOperator stability_op(n_alpha_electrons, n_beta_electrons,
-                                           eigen_diff, Ca, Cb, eri, exc,
-                                           ground_density, false);
+                                           eigen_diff, Ca, Cb, eri,
+                                           exc_internal, ground_density, false);
     auto [num_iterations, lowest_eigenvalue] = macis::davidson(
         eigensize, max_subspace, stability_op, eigen_diff.data(), davidson_tol,
         internal_eigenvectors.data());
@@ -502,16 +535,28 @@ StabilityChecker::_run_impl(
           internal_eigenvectors.data() + nova, num_virtual_beta_orbitals,
           n_beta_electrons);
     }
+
+    if (exc_internal) qcs::util::GAUXCRegistry::clear();  // clear GAUXC cache
   }
 
   if (check_external) {
+    // Create exchange-correlation instance (only for DFT)
+    std::shared_ptr<qcs::EXC> exc_external;
+    if (method != "HF") {
+      // deep copy the scf_config to avoid modifying the original
+      auto scf_config_external = std::make_unique<qcs::SCFConfig>(*scf_config);
+      scf_config_external->unrestricted = true;
+      scf_config_external->exc.xc_name = method;
+      exc_external = qcs::EXC::create(basis_set_internal, *scf_config_external);
+    }
+
     external_eigenvectors.resize(eigenvector.size(), 1);
     external_eigenvectors = eigenvector;
 
     // Create the stability operator wrapper and run Davidson eigensolver
     detail::StabilityOperator stability_op(n_alpha_electrons, n_beta_electrons,
-                                           eigen_diff, Ca, Cb, eri, exc,
-                                           ground_density, true);
+                                           eigen_diff, Ca, Cb, eri,
+                                           exc_external, ground_density, true);
     auto [num_iterations, lowest_eigenvalue] = macis::davidson(
         eigensize, max_subspace, stability_op, eigen_diff.data(), davidson_tol,
         external_eigenvectors.data());
@@ -536,9 +581,8 @@ StabilityChecker::_run_impl(
           external_eigenvectors.data() + nova, num_virtual_beta_orbitals,
           n_beta_electrons);
     }
+    if (exc_external) qcs::util::GAUXCRegistry::clear();  // clear GAUXC cache
   }
-  // Clear the GAUXC cache to make sure next calculation is not affected
-  qcs::util::GAUXCRegistry::clear();
 
   // Create the stability result object
   auto stability_result = std::make_shared<data::StabilityResult>(

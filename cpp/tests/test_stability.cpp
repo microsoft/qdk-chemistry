@@ -500,7 +500,7 @@ TEST_F(StabilityCheckerTest, StabilityResult_Validation) {
 }
 
 // Tests for QDK (first-party) stability checker implementation
-TEST_F(StabilityCheckerTest, QDK_RHF_Water_Stable) {
+TEST_F(StabilityCheckerTest, QDK_RHF_Water_HF_Stable) {
   // Test internal and external stability analysis on stable RHF water molecule
   auto water = testing::create_water_structure();
 
@@ -542,7 +542,7 @@ TEST_F(StabilityCheckerTest, QDK_RHF_Water_Stable) {
   EXPECT_NEAR(smallest_external_eigenvalue, 0.1798655099964312, davidson_tol);
 }
 
-TEST_F(StabilityCheckerTest, QDK_RHF_Water_Stable_M06_2X) {
+TEST_F(StabilityCheckerTest, QDK_RHF_Water_M06_2X_Stable) {
   // Test internal and external stability analysis on stable RHF water molecule
   // using the M06-2X density functional
   auto water = testing::create_water_structure();
@@ -579,14 +579,14 @@ TEST_F(StabilityCheckerTest, QDK_RHF_Water_Stable_M06_2X) {
       result->get_smallest_internal_eigenvalue();
   double davidson_tol =
       stability_checker->settings().get<double>("davidson_tolerance");
-  EXPECT_NEAR(smallest_internal_eigenvalue, 0.262895, davidson_tol);
+  EXPECT_NEAR(smallest_internal_eigenvalue, 0.26289668, davidson_tol);
 
-  // double smallest_external_eigenvalue =
-  //     result->get_smallest_external_eigenvalue();
-  // EXPECT_NEAR(smallest_external_eigenvalue, 0.21016, davidson_tol);
+  double smallest_external_eigenvalue =
+      result->get_smallest_external_eigenvalue();
+  EXPECT_NEAR(smallest_external_eigenvalue, 0.21017080, davidson_tol);
 }
 
-TEST_F(StabilityCheckerTest, QDK_UHF_O2_Stable) {
+TEST_F(StabilityCheckerTest, QDK_UHF_O2_HF_Stable) {
   // Test internal stability analysis on UHF oxygen molecule
   auto o2 = testing::create_o2_structure();
 

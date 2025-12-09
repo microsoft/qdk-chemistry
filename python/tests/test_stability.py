@@ -550,17 +550,21 @@ class TestPyscfStabilityChecker:
 
         # Test internal-only analysis
         stability_checker_internal = self._create_stability_checker(backend=backend, internal=True, external=False)
+        stability_checker_internal.settings().set("method", method)
         is_stable_internal, result_internal = stability_checker_internal.run(wavefunction)
         self._assert_basic_stability_result(result_internal, is_stable_internal, has_internal=True, has_external=False)
         assert result_internal.is_internal_stable() is True
         assert is_stable_internal is True
+        self._check_reference_eigenvalue(result_internal, stability_checker_internal, ref_internal, is_internal=True)
 
         # Test external-only analysis
         stability_checker_external = self._create_stability_checker(backend=backend, internal=False, external=True)
+        stability_checker_external.settings().set("method", method)
         is_stable_external, result_external = stability_checker_external.run(wavefunction)
         self._assert_basic_stability_result(result_external, is_stable_external, has_internal=False, has_external=True)
         assert result_external.is_external_stable() is True
         assert is_stable_external is True
+        self._check_reference_eigenvalue(result_external, stability_checker_external, ref_external, is_internal=False)
 
     @pytest.mark.parametrize("backend", ["pyscf", "qdk"])
     @pytest.mark.parametrize(
