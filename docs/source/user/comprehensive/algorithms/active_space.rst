@@ -45,7 +45,7 @@ The :class:`~qdk_chemistry.algorithms.ActiveSpaceSelector` in QDK/Chemistry prov
 
 - **Entropy-based selection**: Uses orbital entropies to identify strongly correlated orbitals
 
-  - ``qdk_autocas``: Automated selection based on single orbital entropies
+  - ``qdk_autocas``: Automated selection based on single orbital entropies :cite:`Stein2019`
   - ``qdk_autocas_eos``: Enhanced entropy-based selection with plateau detection
 
 - **Orbital type support**:
@@ -183,7 +183,7 @@ QDK/Chemistry implementations
 
 - **qdk_valence**: Manual valence-based selection
 - **qdk_occupation**: Occupation-based automatic selection
-- **qdk_autocas**: Entropy-based automatic selection
+- **qdk_autocas**: Entropy-based automatic selection :cite:`Stein2019`
 - **qdk_autocas_eos**: Enhanced entropy-based selection
 
 The factory pattern allows seamless selection between these implementations based on the system requirements and desired level of automation.

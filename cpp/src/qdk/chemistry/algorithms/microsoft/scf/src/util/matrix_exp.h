@@ -12,10 +12,12 @@ namespace qdk::chemistry::scf {
  *
  * This function computes exp(M) for a square matrix M using the
  * scaling-and-squaring method combined with Padé approximation.
+ *
  * Reference:
- * Higham, Nicholas J. "The scaling and squaring method for the matrix
- * exponential revisited." SIAM Journal on Matrix Analysis and Applications 26,
- * no. 4 (2005): 1179-1193. DOI. 10.1137/04061101X
+ *   Higham, Nicholas J. "The scaling and squaring method for the matrix
+ *   exponential revisited." SIAM Journal on Matrix Analysis and Applications
+ *   26, no. 4 (2005): 1179-1193. DOI. 10.1137/04061101X
+ *   :cite:`Higham2005`
  *
  * @param m Input matrix (row-major storage, size × size)
  * @param exp_m Output matrix exponential (row-major storage, size × size)
