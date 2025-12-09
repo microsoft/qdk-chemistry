@@ -68,6 +68,8 @@ export CFLAGS="-fPIC -Os"
 echo "Downloading and installing BLIS..."
 bash .pipelines/install-scripts/install-blis.sh /usr/local ${MARCH} ${BLIS_VERSION} ${CFLAGS}
 
+nm -nC /usr/local/lib/libblis.a | grep 64
+
 echo "Downloading and installing libflame..."
 bash .pipelines/install-scripts/install-libflame.sh /usr/local ${MARCH} ${LIBFLAME_VERSION} ${CFLAGS}
 
@@ -123,7 +125,9 @@ python3 -m build --wheel \
     -C cmake.define.CMAKE_CXX_FLAGS="${CMAKE_CXX_FLAGS}" \
     -C cmake.define.BLAS_LIBRARIES="/usr/local/lib/libblis.a;m" \
     -C cmake.define.LAPACK_LIBRARIES="/usr/local/lib/libflame.a;/usr/local/lib/libblis.a" \
-    -C cmake.define.BLAS_IS_LP64="TRUE"
+    -C cmake.define.BLAS_IS_LP64="TRUE" \
+    -C cmake.define.BLAS_FOUND="TRUE" \
+    -C cmake.define.GAUXC_BLAS_PREFER_ILP64="OFF"
 
 echo "Checking shared dependencies..."
 ldd build/cp*/_core.*.so
