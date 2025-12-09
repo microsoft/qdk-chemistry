@@ -24,7 +24,6 @@ if [[ ${MARCH} == 'armv8-a' ]]; then
     --enable-static \
     --prefix=${INSTALL_PREFIX} \
     --enable-cblas \
-    --blas-int-size=32 \
     $BLIS_ARCH
 elif [[ ${MARCH} == 'x86-64-v3' ]]; then
     # Compile for intel64, amd64, and amd64_legacy architectures
