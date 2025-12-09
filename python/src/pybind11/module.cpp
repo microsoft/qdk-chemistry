@@ -32,6 +32,8 @@ void bind_valence_space(py::module& m);
 void bind_orbital_rotation(py::module& m);
 void bind_dynamical_correlation_calculator(py::module& m);
 void bind_logger(py::module& m);
+void bind_davidson_solver(py::module& m);
+void bind_syev_solver(py::module& m);
 
 PYBIND11_MODULE(_core, m) {
   m.doc() = "QDK/Chemistry C++ core bindings";
@@ -69,6 +71,8 @@ PYBIND11_MODULE(_core, m) {
   bind_dynamical_correlation_calculator(algorithms);
   bind_pmc(algorithms);
   bind_stability(algorithms);
+  bind_davidson_solver(algorithms);
+  bind_syev_solver(algorithms);
 
   // Bind utilities
   bind_valence_space(utils);

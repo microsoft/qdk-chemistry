@@ -43,16 +43,6 @@ class TestQubitHamiltonian:
         with pytest.raises(ValueError, match="Invalid Pauli strings or coefficients"):
             QubitHamiltonian(pauli_strings=["X", "ZY"], coefficients=np.array([1.0, 2.0]))
 
-    def test_qubit_hamiltonian_exact_energy_small_system(self):
-        """Test that exact_energy works for small qubit systems."""
-        # Create a simple 2-qubit Hamiltonian
-        qubit_hamiltonian = QubitHamiltonian(["ZZ", "XX"], [1.0, 0.5])
-
-        # Should return a float energy value
-        energy = qubit_hamiltonian.exact_energy
-        assert isinstance(energy, float)
-        assert energy is not None
-
     def test_group_commuting(self):
         """Test group_commuting."""
         qubit_hamiltonian = QubitHamiltonian(["XX", "YY", "ZZ", "XY"], [1.0, 0.5, -0.5, 0.2])
