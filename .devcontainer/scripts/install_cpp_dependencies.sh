@@ -1,18 +1,22 @@
 #!/bin/bash
 set -e
 
-echo "Installing C++ dependencies for QDK Chemistry..."
+# Usage: install_cpp_dependencies.sh <cpp_cgmanifest_path> <macis_cgmanifest_path>
+#
+# Arguments:
+#   cpp_cgmanifest_path   - Full path to cpp/manifest/qdk-chemistry/cgmanifest.json
+#   macis_cgmanifest_path - Full path to external/macis/manifest/cgmanifest.json
 
-# Configuration
-BUILD_DIR="/tmp/qdk_deps_build"
-INSTALL_PREFIX="${INSTALL_PREFIX:-/usr/local}"
-BUILD_TYPE="${BUILD_TYPE:-Release}"
-JOBS="${JOBS:-$(nproc)}"
-BUILD_SHARED_LIBS="${BUILD_SHARED_LIBS:-OFF}"  # Default to static libraries
+if [[ $# -ne 2 ]]; then
+    echo "Usage: $0 <cpp_cgmanifest_path> <macis_cgmanifest_path>"
+    echo ""
+    echo "Example:"
+    echo "  $0 /repo/cpp/manifest/qdk-chemistry/cgmanifest.json /repo/external/macis/manifest/cgmanifest.json"
+    exit 1
+fi
 
-# Path to cgmanifest files - these are copied to /tmp by the Dockerfile
-CGMANIFEST="/tmp/cpp_cgmanifest.json"
-MACIS_CGMANIFEST="/tmp/macis_cgmanifest.json"
+CGMANIFEST="$1"
+MACIS_CGMANIFEST="$2"
 
 if [[ ! -f "$CGMANIFEST" ]]; then
     echo "Error: cgmanifest.json not found at $CGMANIFEST"
@@ -23,6 +27,17 @@ if [[ ! -f "$MACIS_CGMANIFEST" ]]; then
     echo "Error: macis cgmanifest.json not found at $MACIS_CGMANIFEST"
     exit 1
 fi
+
+echo "Installing C++ dependencies for QDK Chemistry..."
+echo "Using cgmanifest: $CGMANIFEST"
+echo "Using macis cgmanifest: $MACIS_CGMANIFEST"
+
+# Configuration
+BUILD_DIR="/tmp/qdk_deps_build"
+INSTALL_PREFIX="${INSTALL_PREFIX:-/usr/local}"
+BUILD_TYPE="${BUILD_TYPE:-Release}"
+JOBS="${JOBS:-$(nproc)}"
+BUILD_SHARED_LIBS="${BUILD_SHARED_LIBS:-OFF}"  # Default to static libraries
 
 # Helper function to extract commit hash from cgmanifest by repository URL pattern
 get_commit_hash() {
