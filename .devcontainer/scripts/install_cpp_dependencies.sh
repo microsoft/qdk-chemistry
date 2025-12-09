@@ -89,15 +89,47 @@ for reg in data['registrations']:
 
 # Read versions from cpp cgmanifest
 SPDLOG_COMMIT=$(get_commit_hash "$CGMANIFEST" "gabime/spdlog")
+if [[ -z "$SPDLOG_COMMIT" ]]; then
+    echo "Error: Could not find spdlog commit hash in $CGMANIFEST"
+    exit 1
+fi
 SPDLOG_TAG=$(get_tag "$CGMANIFEST" "gabime/spdlog")
+if [[ -z "$SPDLOG_TAG" ]]; then
+    echo "Error: Could not find spdlog tag in $CGMANIFEST"
+    exit 1
+fi
 LIBECPINT_COMMIT=$(get_commit_hash "$CGMANIFEST" "robashaw/libecpint")
+if [[ -z "$LIBECPINT_COMMIT" ]]; then
+    echo "Error: Could not find libecpint commit hash in $CGMANIFEST"
+    exit 1
+fi
 LIBECPINT_TAG=$(get_tag "$CGMANIFEST" "robashaw/libecpint")
+if [[ -z "$LIBECPINT_TAG" ]]; then
+    echo "Error: Could not find libecpint tag in $CGMANIFEST"
+    exit 1
+fi
 LIBINT_URL=$(get_download_url "$CGMANIFEST" "Libint")
+if [[ -z "$LIBINT_URL" ]]; then
+    echo "Error: Could not find Libint download URL in $CGMANIFEST"
+    exit 1
+fi
 GAUXC_COMMIT=$(get_commit_hash "$CGMANIFEST" "wavefunction91/gauxc")
+if [[ -z "$GAUXC_COMMIT" ]]; then
+    echo "Error: Could not find gauxc commit hash in $CGMANIFEST"
+    exit 1
+fi
 
 # Read versions from macis cgmanifest
 BLASPP_COMMIT=$(get_commit_hash "$MACIS_CGMANIFEST" "icl-utk-edu/blaspp")
+if [[ -z "$BLASPP_COMMIT" ]]; then
+    echo "Error: Could not find blaspp commit hash in $MACIS_CGMANIFEST"
+    exit 1
+fi
 LAPACKPP_COMMIT=$(get_commit_hash "$MACIS_CGMANIFEST" "icl-utk-edu/lapackpp")
+if [[ -z "$LAPACKPP_COMMIT" ]]; then
+    echo "Error: Could not find lapackpp commit hash in $MACIS_CGMANIFEST"
+    exit 1
+fi
 
 echo "Using versions from cgmanifest.json:"
 echo "  spdlog: ${SPDLOG_TAG:-$SPDLOG_COMMIT}"
