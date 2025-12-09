@@ -319,6 +319,7 @@ def filter_and_group_pauli_ops_from_wavefunction(
 
     """
     from qdk_chemistry.plugins.qiskit.conversion import create_statevector_from_wavefunction  # noqa: PLC0415
+
     Logger.trace_entering()
     psi = create_statevector_from_wavefunction(wavefunction, normalize=True)
     return _filter_and_group_pauli_ops_from_statevector(
