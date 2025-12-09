@@ -65,8 +65,8 @@ fi
 cmake --version
 
 export CFLAGS="-fPIC -Os"
-# echo "Downloading and installing BLIS..."
-# bash .pipelines/install-scripts/install-blis.sh /usr/local ${MARCH} ${BLIS_VERSION} ${CFLAGS}
+echo "Downloading and installing BLIS..."
+bash .pipelines/install-scripts/install-blis.sh /usr/local ${MARCH} ${BLIS_VERSION} ${CFLAGS}
 
 echo "Downloading and installing libflame..."
 bash .pipelines/install-scripts/install-libflame.sh /usr/local ${MARCH} ${LIBFLAME_VERSION} ${CFLAGS}
@@ -120,7 +120,9 @@ python3 -m build --wheel \
     -C cmake.define.QDK_CHEMISTRY_ENABLE_COVERAGE=${ENABLE_COVERAGE} \
     -C cmake.define.BUILD_TESTING=${BUILD_TESTING} \
     -C cmake.define.CMAKE_C_FLAGS="${CMAKE_C_FLAGS}" \
-    -C cmake.define.CMAKE_CXX_FLAGS="${CMAKE_CXX_FLAGS}"
+    -C cmake.define.CMAKE_CXX_FLAGS="${CMAKE_CXX_FLAGS}" \
+    -C cmake.define.BLAS_LIBRARIES="/usr/local/lib/libblis.a;m" \
+    -C cmake.define.LAPACK_LIBRARIES="/usr/local/lib/libflame.a;/usr/local/lib/libblis.a"
 
 echo "Checking shared dependencies..."
 ldd build/cp*/_core.*.so
