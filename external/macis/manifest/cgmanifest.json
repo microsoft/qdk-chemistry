@@ -81,7 +81,7 @@
                 "type": "git",
                 "git": {
                     "repositoryUrl": "https://github.com/icl-utk-edu/blaspp.git",
-                    "commitHash": "37b744ed72997d190a9cff651c464a71330aeec0"
+                    "commitHash": "13622021629f5fd27591bb7da60bae5b19561f01"
                 }
             },
             "developmentDependency": false
@@ -91,7 +91,7 @@
                 "type": "git",
                 "git": {
                     "repositoryUrl": "https://github.com/icl-utk-edu/lapackpp.git",
-                    "commitHash": "b7991ec3cf3e404083d9ac09f146a5ac86397cc8"
+                    "commitHash": "5bc9c85201ace48213df5ac7d1ef026c9668dfbd"
                 }
             },
             "developmentDependency": false

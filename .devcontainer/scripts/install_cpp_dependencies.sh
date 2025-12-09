@@ -10,13 +10,96 @@ BUILD_TYPE="${BUILD_TYPE:-Release}"
 JOBS="${JOBS:-$(nproc)}"
 BUILD_SHARED_LIBS="${BUILD_SHARED_LIBS:-OFF}"  # Default to static libraries
 
+# Path to cgmanifest files - these are copied to /tmp by the Dockerfile
+CGMANIFEST="/tmp/cpp_cgmanifest.json"
+MACIS_CGMANIFEST="/tmp/macis_cgmanifest.json"
+
+if [[ ! -f "$CGMANIFEST" ]]; then
+    echo "Error: cgmanifest.json not found at $CGMANIFEST"
+    exit 1
+fi
+
+if [[ ! -f "$MACIS_CGMANIFEST" ]]; then
+    echo "Error: macis cgmanifest.json not found at $MACIS_CGMANIFEST"
+    exit 1
+fi
+
+# Helper function to extract commit hash from cgmanifest by repository URL pattern
+get_commit_hash() {
+    local manifest="$1"
+    local repo_pattern="$2"
+    python3 -c "
+import json
+with open('$manifest') as f:
+    data = json.load(f)
+for reg in data['registrations']:
+    comp = reg['component']
+    if comp['type'] == 'git' and '$repo_pattern' in comp['git'].get('repositoryUrl', ''):
+        print(comp['git']['commitHash'].strip())
+        break
+"
+}
+
+# Helper function to extract tag from cgmanifest by repository URL pattern
+get_tag() {
+    local manifest="$1"
+    local repo_pattern="$2"
+    python3 -c "
+import json
+with open('$manifest') as f:
+    data = json.load(f)
+for reg in data['registrations']:
+    comp = reg['component']
+    if comp['type'] == 'git' and '$repo_pattern' in comp['git'].get('repositoryUrl', ''):
+        print(comp['git'].get('tag', ''))
+        break
+"
+}
+
+# Helper function to get download URL for "other" type components
+get_download_url() {
+    local manifest="$1"
+    local name="$2"
+    python3 -c "
+import json
+with open('$manifest') as f:
+    data = json.load(f)
+for reg in data['registrations']:
+    comp = reg['component']
+    if comp['type'] == 'other' and comp['other'].get('name') == '$name':
+        print(comp['other']['downloadUrl'])
+        break
+"
+}
+
+# Read versions from cpp cgmanifest
+SPDLOG_COMMIT=$(get_commit_hash "$CGMANIFEST" "gabime/spdlog")
+SPDLOG_TAG=$(get_tag "$CGMANIFEST" "gabime/spdlog")
+LIBECPINT_COMMIT=$(get_commit_hash "$CGMANIFEST" "robashaw/libecpint")
+LIBECPINT_TAG=$(get_tag "$CGMANIFEST" "robashaw/libecpint")
+LIBINT_URL=$(get_download_url "$CGMANIFEST" "Libint")
+GAUXC_COMMIT=$(get_commit_hash "$CGMANIFEST" "wavefunction91/gauxc")
+
+# Read versions from macis cgmanifest
+BLASPP_COMMIT=$(get_commit_hash "$MACIS_CGMANIFEST" "icl-utk-edu/blaspp")
+LAPACKPP_COMMIT=$(get_commit_hash "$MACIS_CGMANIFEST" "icl-utk-edu/lapackpp")
+
+echo "Using versions from cgmanifest.json:"
+echo "  spdlog: ${SPDLOG_TAG:-$SPDLOG_COMMIT}"
+echo "  blaspp: $BLASPP_COMMIT"
+echo "  lapackpp: $LAPACKPP_COMMIT"
+echo "  libecpint: ${LIBECPINT_TAG:-$LIBECPINT_COMMIT}"
+echo "  libint: $LIBINT_URL"
+echo "  gauxc: $GAUXC_COMMIT"
+
 mkdir -p "$BUILD_DIR"
 cd "$BUILD_DIR"
 
 # Install spdlog
 echo "=== Installing spdlog ==="
-git clone --depth 1 --branch v1.15.3 https://github.com/gabime/spdlog.git spdlog
+git clone https://github.com/gabime/spdlog.git spdlog
 cd spdlog
+git checkout "$SPDLOG_COMMIT"
 mkdir -p build
 cd build
 cmake .. -DCMAKE_BUILD_TYPE="$BUILD_TYPE" \
@@ -33,7 +116,7 @@ rm -rf spdlog
 echo "=== Installing blaspp ==="
 git clone https://github.com/icl-utk-edu/blaspp.git blaspp
 cd blaspp
-git checkout 13622021629f5fd27591bb7da60bae5b19561f01
+git checkout "$BLASPP_COMMIT"
 mkdir -p build
 cd build
 cmake .. -DCMAKE_BUILD_TYPE="$BUILD_TYPE" \
@@ -50,7 +133,7 @@ rm -rf blaspp
 echo "=== Installing lapackpp ==="
 git clone https://github.com/icl-utk-edu/lapackpp.git lapackpp
 cd lapackpp
-git checkout 5bc9c85201ace48213df5ac7d1ef026c9668dfbd
+git checkout "$LAPACKPP_COMMIT"
 mkdir -p build
 cd build
 cmake .. -DCMAKE_BUILD_TYPE="$BUILD_TYPE" \
@@ -65,9 +148,19 @@ rm -rf lapackpp
 
 # Install libint2
 echo "=== Installing libint2 ==="
-wget -q https://github.com/evaleev/libint/releases/download/v2.9.0/libint-2.9.0-mpqc4.tgz
-tar xzf libint-2.9.0-mpqc4.tgz
-cd libint-2.9.0
+LIBINT_TARBALL=$(basename "$LIBINT_URL")
+wget -q "$LIBINT_URL"
+tar xzf "$LIBINT_TARBALL"
+# The tarball libint-2.9.0-mpqc4.tgz extracts to libint-2.9.0, not libint-2.9.0-mpqc4
+# Find the actual extracted directory (excluding macOS metadata files starting with ._)
+LIBINT_DIR=$(ls -d libint-*/ 2>/dev/null | grep -v '^\._' | head -1 | tr -d '/')
+if [[ -z "$LIBINT_DIR" || ! -d "$LIBINT_DIR" ]]; then
+    echo "Error: Could not find libint directory after extraction"
+    ls -la
+    exit 1
+fi
+echo "Found libint directory: $LIBINT_DIR"
+cd "$LIBINT_DIR"
 mkdir -p build
 cd build
 cmake .. -DCMAKE_BUILD_TYPE="$BUILD_TYPE" \
@@ -77,12 +170,13 @@ cmake .. -DCMAKE_BUILD_TYPE="$BUILD_TYPE" \
 make -j"$JOBS"
 make install
 cd "$BUILD_DIR"
-rm -rf libint-2.9.0 libint-2.9.0-mpqc4.tgz
+rm -rf "$LIBINT_DIR" "$LIBINT_TARBALL"
 
 # Install ecpint
 echo "=== Installing ecpint ==="
-git clone --depth 1 --branch v1.0.7 https://github.com/robashaw/libecpint ecpint
+git clone https://github.com/robashaw/libecpint ecpint
 cd ecpint
+git checkout "$LIBECPINT_COMMIT"
 mkdir -p build
 cd build
 cmake .. -DCMAKE_BUILD_TYPE="$BUILD_TYPE" \
@@ -99,8 +193,9 @@ rm -rf ecpint
 
 # Install gauxc
 echo "=== Installing gauxc ==="
-git clone --depth 1 --branch v1.1 https://github.com/wavefunction91/gauxc.git gauxc
+git clone https://github.com/wavefunction91/gauxc.git gauxc
 cd gauxc
+git checkout "$GAUXC_COMMIT"
 mkdir -p build
 cd build
 cmake .. -DCMAKE_BUILD_TYPE="$BUILD_TYPE" \
