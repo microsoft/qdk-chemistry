@@ -195,6 +195,7 @@ class PyscfStabilitySettings(Settings):
         self._set_default("davidson_tolerance", "double", 1e-4)
         self._set_default("stability_tolerance", "double", -1e-4)
         self._set_default("method", "string", "hf")
+        self._set_default("xc_grid", "int", 3)
 
 
 class PyscfStabilityChecker(StabilityChecker):
@@ -270,6 +271,7 @@ class PyscfStabilityChecker(StabilityChecker):
         alg_tol = self._settings.get("davidson_tolerance")
         stability_tol = self._settings.get("stability_tolerance")
         method = self._settings.get("method")
+        xc_grid = self._settings.get("xc_grid")
 
         # Get orbitals from wavefunction
         orbitals = wavefunction.get_orbitals()
@@ -288,6 +290,8 @@ class PyscfStabilityChecker(StabilityChecker):
 
         # Convert to PySCF SCF object
         mf = orbitals_to_scf(orbitals, occ_alpha, occ_beta, method=method)
+        if method.lower() != "hf":
+            mf.grids.level = xc_grid
 
         # Determine wavefunction type and perform appropriate stability analysis
         internal_eigenvalues_list = []

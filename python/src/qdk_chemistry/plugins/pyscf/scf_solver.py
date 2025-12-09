@@ -96,6 +96,7 @@ class PyscfScfSettings(ElectronicStructureSettings):
         """Initialize the settings with default values from ElectronicStructureSettings plus PySCF-specific defaults."""
         Logger.trace_entering()
         super().__init__()  # This sets up all the base class defaults
+        self._set_default("xc_grid", "int", 3)
 
 
 class PyscfScfSolver(ScfSolver):
@@ -175,6 +176,7 @@ class PyscfScfSolver(ScfSolver):
         method = self._settings["method"].lower()
         convergence_threshold = self._settings["convergence_threshold"]
         max_iterations = self._settings["max_iterations"]
+        grid = self._settings["xc_grid"]
 
         # The PySCF convention is 2S not 2S+1
         multiplicity = spin_multiplicity
@@ -212,15 +214,15 @@ class PyscfScfSolver(ScfSolver):
             else:
                 mf = scf.UHF(mol)
         # DFT methods (Kohn-Sham)
-        elif scf_type == SCFType.RESTRICTED:
-            mf = scf.ROKS(mol) if mol.spin != 0 else scf.RKS(mol)
+        else:
+            if scf_type == SCFType.RESTRICTED:
+                mf = scf.ROKS(mol) if mol.spin != 0 else scf.RKS(mol)
+            elif scf_type == SCFType.UNRESTRICTED:
+                mf = scf.UKS(mol)
+            else:  # SCFType.AUTO
+                mf = scf.RKS(mol) if mol.spin == 0 else scf.UKS(mol)
             mf.xc = method
-        elif scf_type == SCFType.UNRESTRICTED:
-            mf = scf.UKS(mol)
-            mf.xc = method
-        else:  # SCFType.AUTO
-            mf = scf.RKS(mol) if mol.spin == 0 else scf.UKS(mol)
-            mf.xc = method
+            mf.grids.level = grid  # Higher grid level for better accuracy
 
         if scf_type == SCFType.UNRESTRICTED and mol.spin == 0 and initial_guess is None:
             warnings.warn(

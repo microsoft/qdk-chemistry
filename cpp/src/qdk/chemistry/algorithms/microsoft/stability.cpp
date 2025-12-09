@@ -7,6 +7,7 @@
 #include <qdk/chemistry/scf/core/exc.h>
 #include <qdk/chemistry/scf/core/molecule.h>
 #include <qdk/chemistry/scf/eri/eri_multiplexer.h>
+#include <qdk/chemistry/scf/util/gauxc_registry.h>
 #include <spdlog/spdlog.h>
 
 #include <macis/solvers/davidson.hpp>
@@ -95,7 +96,8 @@ void compute_trial_fock(const std::shared_ptr<qcs::ERI>& eri,
   }
 
   // Add XC contribution if DFT (similar to KSImpl::update_trial_fock_)
-  // Only call exc->eval_fxc_contraction when exc is not null
+  // Only call exc->eval_fxc_contraction when exc is not null and not RHF
+  // external
   if (exc and !rhf_external) {
     J_scratch.setZero();
     exc->eval_fxc_contraction(ground_density.data(), trial_density.data(),
@@ -367,7 +369,7 @@ StabilityChecker::_run_impl(
 
   // Get method from wavefunction metadata or settings
   std::string method = _settings->get_or_default<std::string>("method", "hf");
-  std::transform(method.begin(), method.end(), method.begin(), ::tolower);
+  std::transform(method.begin(), method.end(), method.begin(), ::toupper);
 
   // Convert QDK basis set to internal format
   auto basis_set_internal =
@@ -384,7 +386,7 @@ StabilityChecker::_run_impl(
 
   // Create exchange-correlation instance (only for DFT)
   std::shared_ptr<qcs::EXC> exc;
-  if (method != "hf") {
+  if (method != "HF") {
     scf_config->exc.xc_name = method;
     exc = qcs::EXC::create(basis_set_internal, *scf_config);
   }
@@ -535,6 +537,8 @@ StabilityChecker::_run_impl(
           n_beta_electrons);
     }
   }
+  // Clear the GAUXC cache to make sure next calculation is not affected
+  qcs::util::GAUXCRegistry::clear();
 
   // Create the stability result object
   auto stability_result = std::make_shared<data::StabilityResult>(
