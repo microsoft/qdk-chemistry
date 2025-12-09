@@ -653,7 +653,7 @@ TEST_CASE("CoreSelectionStrategy") {
     REQUIRE(dets.size() == 5000);
     REQUIRE(C.size() == 5000);
     REQUIRE_THAT(std::inner_product(C.begin(), C.end(), C.begin(), 0.0),
-                 Catch::Matchers::WithinAbs(1.0, 1e-12));
+                 Catch::Matchers::WithinAbs(1.0, testing::numerical_zero_tolerance));
   }
 
   SECTION("Percentage Strategy") {
@@ -692,7 +692,7 @@ TEST_CASE("CoreSelectionStrategy") {
     REQUIRE(dets.size() > 1);
     REQUIRE(C.size() == dets.size());
     REQUIRE_THAT(std::inner_product(C.begin(), C.end(), C.begin(), 0.0),
-                 Catch::Matchers::WithinAbs(1.0, 1e-12));
+                 Catch::Matchers::WithinAbs(1.0, testing::numerical_zero_tolerance));
   }
 
   SECTION("String Conversion") {
@@ -714,8 +714,6 @@ TEST_CASE("CoreSelectionStrategy") {
     // First grow a wavefunction to a reasonable size, then test core selection
 
     macis::ASCISettings grow_settings;
-    grow_settings.core_selection_strategy =
-        macis::CoreSelectionStrategy::Fixed;  // Use fixed for initial growth
     grow_settings.ntdets_max = 1000;
     grow_settings.ncdets_max = 100;
     macis::MCSCFSettings mcscf_settings;
@@ -777,10 +775,10 @@ TEST_CASE("CoreSelectionStrategy") {
     // Verify normalization
     REQUIRE_THAT(
         std::inner_product(C_low.begin(), C_low.end(), C_low.begin(), 0.0),
-        Catch::Matchers::WithinAbs(1.0, 1e-12));
+        Catch::Matchers::WithinAbs(1.0, testing::numerical_zero_tolerance));
     REQUIRE_THAT(
         std::inner_product(C_high.begin(), C_high.end(), C_high.begin(), 0.0),
-        Catch::Matchers::WithinAbs(1.0, 1e-12));
+        Catch::Matchers::WithinAbs(1.0, testing::numerical_zero_tolerance));
 
     // Additionally verify the core weight captures the expected fraction
     // Sort indices based on C_base coefficients by absolute value (descending)

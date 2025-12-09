@@ -200,9 +200,8 @@ TEST_F(MacisAsciTest, PercentageCoreSelectionStrategy) {
   auto hamiltonian = hamiltonian_constructor_->run(orbitals_);
 
   // Execute ASCI calculation with percentage strategy
-  auto result = calculator->run(hamiltonian, 3, 3);
-  double energy = result.first;
-  const Wavefunction& wavefunction = *result.second;
+  auto [energy, wavefunction_ptr] = calculator->run(hamiltonian, 3, 3);
+  const Wavefunction& wavefunction = *wavefunction_ptr;
 
   // Verify basic properties
   EXPECT_TRUE(std::isfinite(energy));
