@@ -140,7 +140,12 @@ class ScfSolver
    * @param structure The molecular structure
    * @param charge The molecular charge
    * @param spin_multiplicity The spin multiplicity
-   * @param initial_guess Initial orbital guess for the SCF calculation
+   * @param basis_information Basis set information, which can be provided as:
+   *         - A shared pointer to a `data::BasisSet` object
+   *         - A string specifying the name of a standard basis set (e.g.,
+   * "sto-3g")
+   *         - A shared pointer to a `data::Orbitals` object to be used as an
+   * initial guess
    * @return A pair containing the energy and wavefunction
    */
   virtual std::pair<double, std::shared_ptr<data::Wavefunction>> _run_impl(

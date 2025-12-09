@@ -101,11 +101,12 @@ Perform SCF calculation on the given molecular structure.
 This method automatically locks settings before execution.
 
 Args:
-structure (qdk_chemistry.data.Structure): The molecular structure to solve
+    structure (qdk_chemistry.data.Structure): The molecular structure to solve
     charge (int): The molecular charge
     spin_multiplicity (int): The spin multiplicity of the molecular system
-    basis_information (Union[qdk_chemistry.data.Orbitals, qdk_chemistry.data.BasisSet, str])
-    	Basis set information, which can be provided as:
+    basis_information (Union[qdk_chemistry.data.Orbitals, qdk_chemistry.data.BasisSet, str]):
+        Basis set information, which can be provided as:
+        
         - A ``qdk_chemistry.data.BasisSet`` object
         - A string specifying the name of a standard basis set (e.g., "sto-3g")
         - A ``qdk_chemistry.data.Orbitals`` object to be used as an initial guess

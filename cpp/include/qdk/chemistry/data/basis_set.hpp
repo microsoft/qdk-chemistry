@@ -355,6 +355,7 @@ class BasisSet : public DataClass,
    * @brief Constructor with basis set name and structure
    * @param basis_name Name of the basis set (e.g., "6-31G", "cc-pVDZ")
    * @param structure The molecular structure
+   * @param ecp_name Name of the ECP (default: "default_ecp")
    * @param atomic_orbital_type Whether to use spherical or cartesian atomic
    * orbitals
    * @return Shared pointer to the created BasisSet
@@ -368,6 +369,7 @@ class BasisSet : public DataClass,
    * @brief Constructor with basis set name and structure
    * @param basis_name Name of the basis set (e.g., "6-31G", "cc-pVDZ")
    * @param structure Shared pointer to the molecular structure
+   * @param ecp_name Name of the ECP (default: "default_ecp")
    * @param atomic_orbital_type Whether to use spherical or cartesian atomic
    * orbitals
    * @return Shared pointer to the created BasisSet
@@ -381,6 +383,7 @@ class BasisSet : public DataClass,
    * @brief Constructor with basis set name and structure
    * @param element_to_basis_map Mapping from element symbols to basis set names
    * @param structure The molecular structure
+   * @param element_to_ecp_map Mapping from element symbols to ECP names
    * @param atomic_orbital_type Whether to use spherical or cartesian atomic
    * orbitals
    * @return Shared pointer to the created BasisSet
@@ -395,6 +398,7 @@ class BasisSet : public DataClass,
    * @brief Constructor with basis set name and structure
    * @param element_to_basis_map Mapping from element symbols to basis set names
    * @param structure Shared pointer to the molecular structure
+   * @param element_to_ecp_map Mapping from element symbols to ECP names
    * @param atomic_orbital_type Whether to use spherical or cartesian atomic
    * orbitals
    * @return Shared pointer to the created BasisSet
@@ -410,6 +414,7 @@ class BasisSet : public DataClass,
    * @param index_to_basis_map Mapping from atom indices (as strings) to basis
    * set names
    * @param structure The molecular structure
+   * @param index_to_ecp_map Mapping from atom indices to ECP names
    * @param atomic_orbital_type Whether to use spherical or cartesian atomic
    * orbitals
    * @return Shared pointer to the created BasisSet
@@ -425,6 +430,7 @@ class BasisSet : public DataClass,
    * @param index_to_basis_map Mapping from atom indices (as strings) to basis
    * set names
    * @param structure Shared pointer to the molecular structure
+   * @param index_to_ecp_map Mapping from atom indices to ECP names
    * @param atomic_orbital_type Whether to use spherical or cartesian atomic
    * orbitals
    * @return Shared pointer to the created BasisSet
