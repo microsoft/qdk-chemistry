@@ -18,7 +18,7 @@ void bind_constants(py::module& m) {
   constants.doc() = R"(
 Physical constants module.
 
-This module provides access to physical constants from CODATA standards.
+This module provides access to physical constants from CODATA standards :cite:`Tiesinga2021`.
 The constants are sourced from the most recent CODATA recommendations (currently CODATA 2018 by default), but the underlying C++ implementation supports multiple CODATA versions for compatibility and comparison purposes.
 
 All constants are provided in their original units as specified by CODATA, with conversion factors available for different unit systems.
