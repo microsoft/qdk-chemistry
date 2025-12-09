@@ -73,8 +73,8 @@ auto asci_iter(ASCISettings asci_settings, MCSCFSettings mcscf_settings,
     case CoreSelectionStrategy::Percentage: {
       // Use percentage-based selection - keep determinants until cumulative
       // weight reaches threshold (not capped by ncdets_max).
-      // Note: If the threshold is never reached (e.g., very small coefficients),
-      // all determinants will be kept (nkeep == wfn.size()).
+      // Note: If the threshold is never reached (e.g., very small
+      // coefficients), all determinants will be kept (nkeep == wfn.size()).
       double core_weight = 0.0;
       for (size_t i = 0; i < wfn.size(); ++i) {
         core_weight += X[i] * X[i];

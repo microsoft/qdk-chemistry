@@ -652,8 +652,9 @@ TEST_CASE("CoreSelectionStrategy") {
 
     REQUIRE(dets.size() == 5000);
     REQUIRE(C.size() == 5000);
-    REQUIRE_THAT(std::inner_product(C.begin(), C.end(), C.begin(), 0.0),
-                 Catch::Matchers::WithinAbs(1.0, testing::numerical_zero_tolerance));
+    REQUIRE_THAT(
+        std::inner_product(C.begin(), C.end(), C.begin(), 0.0),
+        Catch::Matchers::WithinAbs(1.0, testing::numerical_zero_tolerance));
   }
 
   SECTION("Percentage Strategy") {
@@ -691,8 +692,9 @@ TEST_CASE("CoreSelectionStrategy") {
     // Verify we got some determinants and the wavefunction is normalized
     REQUIRE(dets.size() > 1);
     REQUIRE(C.size() == dets.size());
-    REQUIRE_THAT(std::inner_product(C.begin(), C.end(), C.begin(), 0.0),
-                 Catch::Matchers::WithinAbs(1.0, testing::numerical_zero_tolerance));
+    REQUIRE_THAT(
+        std::inner_product(C.begin(), C.end(), C.begin(), 0.0),
+        Catch::Matchers::WithinAbs(1.0, testing::numerical_zero_tolerance));
   }
 
   SECTION("String Conversion") {
