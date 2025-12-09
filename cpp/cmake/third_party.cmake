@@ -70,6 +70,7 @@ set(GAUXC_ENABLE_CUTLASS ON  CACHE BOOL "Enable gauxc CUTLASS Support" FORCE)
 set(GAUXC_ENABLE_CUDA ${QDK_CHEMISTRY_ENABLE_GPU} CACHE BOOL "Enable gauxc CUDA Support" FORCE)
 set(GAUXC_ENABLE_MPI  ${QDK_CHEMISTRY_ENABLE_MPI} CACHE BOOL "Enable gauxc MPI Support"  FORCE)
 set(GAUXC_ENABLE_OPENMP ${QDK_ENABLE_OPENMP} CACHE BOOL "Enable gauxc OpenMP Support" FORCE)
+set(GAUXC_BLAS_IS_LP64 TRUE CACHE BOOL "Prefer ILP64 BLAS" FORCE)
 
 handle_dependency(gauxc
   GIT_REPOSITORY https://github.com/wavefunction91/gauxc.git
