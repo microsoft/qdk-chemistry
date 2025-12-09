@@ -72,8 +72,8 @@ enum class LogLevel {
  * Output Format
  * -------------
  * ```
-
  * [2025-12-03 10:30:00.123456] [info] [qdk:chemistry:scf:run] Message
+ * ```
  *
  * Thread Safety
  * -------------
@@ -265,9 +265,9 @@ class ContextLogger {
  *
  * Output:
  * ```
-
  * [2025-12-03 10:30:00.123456] [info] [qdk:chemistry:scf:run] Starting
- calculation
+ * calculation
+ * ```
  *
  */
 #define QDK_LOGGER() \

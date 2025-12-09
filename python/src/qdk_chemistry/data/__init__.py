@@ -4,7 +4,7 @@ This module provides access to core quantum chemistry data types including molec
 structures, basis sets, wavefunctions, and computational settings. It serves as the
 primary interface for managing quantum chemical data within the QDK/Chemistry framework.
 
-Exposed classes are:
+Exposed classes:
 
 - :class:`Ansatz`: Quantum chemical ansatz combining a Hamiltonian and wavefunction for energy calculations.
 - :class:`BasisSet`: Gaussian basis set definitions for quantum calculations.
@@ -37,7 +37,7 @@ Exposed classes are:
 - :class:`WavefunctionContainer`: Abstract base class for different wavefunction representations.
 - :class:`WavefunctionType`: Enumeration of wavefunction types (SelfDual, NotSelfDual).
 
-Exposed exceptions are:
+Exposed exceptions:
 
 - :exc:`SettingNotFound` / :exc:`SettingNotFoundError`: Raised when a requested setting is not found.
 - :exc:`SettingTypeMismatch` / :exc:`SettingTypeMismatchError`: Raised when a setting value has an incorrect type.

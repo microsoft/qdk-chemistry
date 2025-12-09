@@ -25,7 +25,7 @@ def _validate_filename_suffix(filename: str | Path, data_type: str, operation: s
     """Validate that filename has the correct data type suffix.
 
     Args:
-        filename (str | Path): Filename to validate (e.g., "example.structure.json")
+        filename (str | pathlib.Path): Filename to validate (e.g., "example.structure.json")
         data_type (str): Expected data structure type (e.g., "structure")
         operation (str): Operation type ("read" or "write") for error messages
 
@@ -302,7 +302,7 @@ class DataClass(_CoreDataClass):
         """Save the object to a JSON file.
 
         Args:
-            filename (str | Path): Path to the output JSON file
+            filename (str | pathlib.Path): Path to the output JSON file
                 Must match pattern: <name>.<data_type>.json
 
         Raises:
@@ -318,7 +318,7 @@ class DataClass(_CoreDataClass):
         """Save the object to an HDF5 file.
 
         Args:
-            filename (str | Path): Path to the output HDF5 file
+            filename (str | pathlib.Path): Path to the output HDF5 file
                 Must match pattern: <name>.<data_type>.h5 or <name>.<data_type>.hdf5
 
         Raises:
@@ -334,7 +334,7 @@ class DataClass(_CoreDataClass):
         """Save the object to a file with the specified format.
 
         Args:
-            filename (str | Path): Path to the output file
+            filename (str | pathlib.Path): Path to the output file
                 Must match pattern: <name>.<data_type>.<extension>
             format_type (str): Format type ("json", "hdf5", or "h5")
 
@@ -386,7 +386,7 @@ class DataClass(_CoreDataClass):
         """Load an instance from a JSON file.
 
         Args:
-            filename (str | Path): Path to the input JSON file
+            filename (str | pathlib.Path): Path to the input JSON file
                 Must match pattern: <name>.<data_type>.json
 
         Returns:
@@ -426,7 +426,7 @@ class DataClass(_CoreDataClass):
         """Load an instance from an HDF5 file.
 
         Args:
-            filename (str | Path): Path to the input HDF5 file
+            filename (str | pathlib.Path): Path to the input HDF5 file
                 Must match pattern: <name>.<data_type>.h5 or <name>.<data_type>.hdf5
 
         Returns:
@@ -446,7 +446,7 @@ class DataClass(_CoreDataClass):
         """Load an instance from a file with the specified format.
 
         Args:
-            filename (str | Path): Path to the input file
+            filename (str | pathlib.Path): Path to the input file
                 Must match pattern: <name>.<data_type>.<extension>
             format_type (str): Format type ("json", "hdf5", or "h5")
 

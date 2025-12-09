@@ -119,18 +119,7 @@ class SupportedGate(CaseInsensitiveStrEnum):
 
 
 class SupportedErrorTypes(CaseInsensitiveStrEnum):
-    """Supported error types for quantum gates with case-insensitive string lookup.
-
-    This enum allows both enum member access and case-insensitive string lookup
-    for error types.
-
-    Example:
-        >>> error1 = SupportedErrorTypes.DEPOLARIZING_ERROR
-        >>> error2 = SupportedErrorTypes("depolarizing_error")
-        >>> error3 = SupportedErrorTypes("DEPOLARIZING_ERROR")
-        >>> assert error1 == error2 == error3
-
-    """
+    """Supported error types for quantum gates with case-insensitive string lookup."""
 
     DEPOLARIZING_ERROR = "depolarizing_error"
 
@@ -272,7 +261,7 @@ class QuantumErrorProfile(DataClass):
         """Save quantum error profile to YAML file.
 
         Args:
-            yaml_file (str | Path): Path to save YAML file.
+            yaml_file (str | pathlib.Path): Path to save YAML file.
 
         """
         yaml = YAML()
@@ -290,7 +279,7 @@ class QuantumErrorProfile(DataClass):
         """Load quantum error profile from YAML file.
 
         Args:
-            yaml_file (str | Path): Path to YAML file.
+            yaml_file (str | pathlib.Path): Path to YAML file.
 
         Returns:
             QuantumErrorProfile: Loaded profile.

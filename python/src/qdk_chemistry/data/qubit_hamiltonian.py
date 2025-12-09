@@ -30,7 +30,7 @@ class QubitHamiltonian(DataClass):
 
     Attributes:
         pauli_strings (list[str]): List of Pauli strings representing the ``QubitHamiltonian``.
-        coefficients (np.ndarray): Array of coefficients corresponding to each Pauli string.
+        coefficients (numpy.ndarray): Array of coefficients corresponding to each Pauli string.
 
     """
 
@@ -45,7 +45,7 @@ class QubitHamiltonian(DataClass):
 
         Args:
             pauli_strings (list[str]): List of Pauli strings representing the ``QubitHamiltonian``.
-            coefficients (np.ndarray): Array of coefficients corresponding to each Pauli string.
+            coefficients (numpy.ndarray): Array of coefficients corresponding to each Pauli string.
 
         Raises:
             ValueError: If the number of Pauli strings and coefficients don't match,
@@ -82,7 +82,7 @@ class QubitHamiltonian(DataClass):
         """Get the qubit Hamiltonian as a ``SparsePauliOp``.
 
         Returns:
-            SparsePauliOp: The qubit Hamiltonian represented as a ``SparsePauliOp``.
+            qiskit.quantum_info.SparsePauliOp: The qubit Hamiltonian represented as a ``SparsePauliOp``.
 
         """
         return SparsePauliOp(self.pauli_strings, self.coefficients)
@@ -215,7 +215,7 @@ def _filter_and_group_pauli_ops_from_statevector(
 
     Args:
         hamiltonian (QubitHamiltonian): QubitHamiltonian to be filtered and grouped.
-        statevector (np.ndarray): Statevector used to compute expectation values.
+        statevector (numpy.ndarray): Statevector used to compute expectation values.
         abelian_grouping (bool): Whether to group into qubit-wise commuting subsets.
         trimming (bool): If True, discard or reduce terms with ±1 or 0 expectation value.
         trimming_tolerance (float): Numerical tolerance for determining zero or ±1 expectation (Default: 1e-8).
