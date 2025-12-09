@@ -23,11 +23,9 @@ if [[ ${MARCH} == 'armv8-a' ]]; then
     --disable-shared \
     --enable-static \
     --prefix=${INSTALL_PREFIX} \
+    --enable-cblas \
     --blas-int-size=32 \
     --int-size=32 \
-    --enable-default-m-blocksize=72 \
-    --enable-default-k-blocksize=256 \
-    --enable-default-n-blocksize=4080 \
     $BLIS_ARCH
 elif [[ ${MARCH} == 'x86-64-v3' ]]; then
     # Compile for intel64, amd64, and amd64_legacy architectures
@@ -35,6 +33,7 @@ elif [[ ${MARCH} == 'x86-64-v3' ]]; then
     CFLAGS=${CFLAGS} ./configure \
     --disable-shared \
     --enable-static \
+    --enable-cblas \
     --prefix=${INSTALL_PREFIX} \
     $BLIS_ARCH
 fi
