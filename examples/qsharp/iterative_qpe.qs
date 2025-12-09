@@ -129,8 +129,8 @@ operation PrepareSparseState(
     }
 }
 
-/// Perform one iteration of MSB-first IQPE with Kitaev's phase accumulation method.
-/// :cite:`Kitaev1995`.
+/// Perform one iteration of MSB-first IQPE with Kitaev's phase accumulation
+/// method. :cite:`Kitaev1995`.
 ///
 /// This implements the phase accumulation approach based on Kitaev's original iterative
 /// QPE formulation (PRA 76, 030306, 2007) :cite:`Dobsicek2007`.
