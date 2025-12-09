@@ -17,6 +17,8 @@ from abc import ABC
 from enum import StrEnum
 from typing import TYPE_CHECKING, TypeVar, cast
 
+from qdk_chemistry.utils import Logger
+
 if TYPE_CHECKING:
     from collections.abc import Iterable
 
@@ -57,6 +59,7 @@ class PhaseEstimation(ABC):  # noqa: B024
             evolution_time: Time parameter ``t`` used in the time-evolution unitary ``U = exp(-i H t)``.
 
         """
+        Logger.trace_entering()
         self._hamiltonian = hamiltonian
         self._evolution_time = evolution_time
 
@@ -94,6 +97,7 @@ class PhaseEstimation(ABC):  # noqa: B024
             ValueError: If the requested algorithm is not registered.
 
         """
+        Logger.trace_entering()
         normalized_algorithm = cls._normalize_algorithm(algorithm)
 
         for subclass in cls._iter_subclasses():

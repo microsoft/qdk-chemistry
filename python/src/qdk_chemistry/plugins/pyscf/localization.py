@@ -32,6 +32,7 @@ from pyscf import lo
 from qdk_chemistry.algorithms import OrbitalLocalizer
 from qdk_chemistry.data import Orbitals, SciWavefunctionContainer, Settings, SlaterDeterminantContainer, Wavefunction
 from qdk_chemistry.plugins.pyscf.utils import basis_to_pyscf_mol
+from qdk_chemistry.utils import Logger
 
 __all__ = ["PyscfLocalizer", "PyscfLocalizerSettings"]
 
@@ -66,6 +67,7 @@ class PyscfLocalizerSettings(Settings):
 
     def __init__(self):
         """Initialize the localization object with default parameters."""
+        Logger.trace_entering()
         super().__init__()
         self._set_default("method", "string", "pipek-mezey")
         self._set_default("occupation_threshold", "double", 1e-10)
@@ -100,6 +102,7 @@ class PyscfLocalizer(OrbitalLocalizer):
 
     def __init__(self):
         """Initialize the PySCF localizer with default settings."""
+        Logger.trace_entering()
         super().__init__()
         self._settings = PyscfLocalizerSettings()
 
@@ -131,6 +134,7 @@ class PyscfLocalizer(OrbitalLocalizer):
                 or if the indices are not sorted.
 
         """
+        Logger.trace_entering()
         # Validate that indices are sorted
         if loc_indices_a != sorted(loc_indices_a):
             raise ValueError("loc_indices_a must be sorted")
@@ -212,4 +216,5 @@ class PyscfLocalizer(OrbitalLocalizer):
 
     def name(self) -> str:
         """Return the settings for the localizer."""
+        Logger.trace_entering()
         return "pyscf_multi"

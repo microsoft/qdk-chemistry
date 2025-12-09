@@ -7,9 +7,13 @@
 #include <qdk/chemistry/scf/exc/gauxc_impl.h>
 #include <qdk/chemistry/scf/util/gauxc_registry.h>
 
+#include <qdk/chemistry/utils/logger.hpp>
+
 namespace qdk::chemistry::scf {
 GAUXC::GAUXC(std::shared_ptr<BasisSet> basis_set, const SCFConfig& cfg)
     : EXC(basis_set, cfg) {
+  QDK_LOG_TRACE_ENTERING();
+
   // Store the GAUXCInput and other parameters needed for registry lookup
   gauxc_input_ = cfg.xc_input;
   unrestricted_ = cfg.unrestricted;
@@ -28,6 +32,8 @@ GAUXC::GAUXC(std::shared_ptr<BasisSet> basis_set, const SCFConfig& cfg)
 GAUXC::~GAUXC() noexcept = default;
 
 void GAUXC::build_XC(const double* D, double* XC, double* xc_energy) {
+  QDK_LOG_TRACE_ENTERING();
+
   // Get the GAUXC implementation from the registry
   impl::GAUXC* gauxc_impl = util::GAUXCRegistry::find(gauxc_input_);
   if (gauxc_impl) {
@@ -38,6 +44,8 @@ void GAUXC::build_XC(const double* D, double* XC, double* xc_energy) {
 }
 
 void GAUXC::get_gradients(const double* D, double* dXC) {
+  QDK_LOG_TRACE_ENTERING();
+
   // Get the GAUXC implementation from the registry
   impl::GAUXC* gauxc_impl = util::GAUXCRegistry::find(gauxc_input_);
   if (gauxc_impl) {
@@ -46,8 +54,11 @@ void GAUXC::get_gradients(const double* D, double* dXC) {
     throw std::runtime_error("GAUXC implementation not found in registry");
   }
 }
+
 void GAUXC::eval_fxc_contraction(const double* D, const double* tD,
                                  double* Fxc) {
+  QDK_LOG_TRACE_ENTERING();
+
   // Get the GAUXC implementation from the registry
   impl::GAUXC* gauxc_impl = util::GAUXCRegistry::find(gauxc_input_);
   if (gauxc_impl) {

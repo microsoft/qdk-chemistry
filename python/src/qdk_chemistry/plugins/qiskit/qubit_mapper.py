@@ -20,6 +20,7 @@ from qiskit_nature.second_q.mappers import (
 
 from qdk_chemistry.algorithms.qubit_mapper import QubitMapper
 from qdk_chemistry.data import Hamiltonian, QubitHamiltonian, Settings
+from qdk_chemistry.utils import Logger
 
 __all__ = ["QiskitQubitMapper", "QiskitQubitMapperSettings"]
 
@@ -36,6 +37,7 @@ class QiskitQubitMapperSettings(Settings):
 
     def __init__(self):
         """Initialize QiskitQubitMapperSettings."""
+        Logger.trace_entering()
         super().__init__()
         self._set_default(
             "encoding",
@@ -63,6 +65,7 @@ class QiskitQubitMapper(QubitMapper):
                 Default: "jordan-wigner".
 
         """
+        Logger.trace_entering()
         super().__init__()
         self._settings = QiskitQubitMapperSettings()
         self._settings.set("encoding", encoding)
@@ -77,6 +80,7 @@ class QiskitQubitMapper(QubitMapper):
             QubitHamiltonian: An instance of the QubitHamiltonian.
 
         """
+        Logger.trace_entering()
         encoding = self._settings.get("encoding")
         if encoding not in self.QubitMappers:
             raise ValueError(
@@ -97,4 +101,5 @@ class QiskitQubitMapper(QubitMapper):
 
     def name(self) -> str:
         """Return the algorithm name ``qiskit``."""
+        Logger.trace_entering()
         return "qiskit"

@@ -30,6 +30,7 @@ from pyscf.soscf import newton_ah
 from qdk_chemistry.algorithms import StabilityChecker
 from qdk_chemistry.data import Settings, StabilityResult, Wavefunction
 from qdk_chemistry.plugins.pyscf.utils import orbitals_to_scf
+from qdk_chemistry.utils import Logger
 
 __all__ = ["PyscfStabilityChecker", "PyscfStabilitySettings"]
 
@@ -65,6 +66,7 @@ def _rhf_internal(
 
     Modified from PySCF implementation.
     """
+    Logger.trace_entering()
     g, hop, hdiag = newton_ah.gen_g_hop_rhf(mf, mf.mo_coeff, mf.mo_occ, with_symmetry=with_symmetry)
     hdiag *= 2
 
@@ -89,6 +91,7 @@ def _rhf_external(
 
     Modified from PySCF implementation.
     """
+    Logger.trace_entering()
     # Do not consider real -> complex instability
     _, _, hop2, hdiag2 = _gen_hop_rhf_external(mf, with_symmetry)
 
@@ -105,6 +108,7 @@ def _rohf_internal(
 
     Modified from PySCF implementation.
     """
+    Logger.trace_entering()
     g, hop, hdiag = newton_ah.gen_g_hop_rohf(mf, mf.mo_coeff, mf.mo_occ, with_symmetry=with_symmetry)
     hdiag *= 2
 
@@ -134,6 +138,7 @@ def _uhf_internal(
 
     Modified from PySCF implementation.
     """
+    Logger.trace_entering()
     g, hop, hdiag = newton_ah.gen_g_hop_uhf(mf, mf.mo_coeff, mf.mo_occ, with_symmetry=with_symmetry)
     hdiag *= 2
 
@@ -181,6 +186,7 @@ class PyscfStabilitySettings(Settings):
 
     def __init__(self):
         """Initialize the stability checker with default parameters."""
+        Logger.trace_entering()
         super().__init__()
         self._set_default("internal", "bool", True)
         self._set_default("external", "bool", True)
@@ -219,6 +225,7 @@ class PyscfStabilityChecker(StabilityChecker):
 
     def __init__(self):
         """Initialize the PySCF stability checker with default settings."""
+        Logger.trace_entering()
         super().__init__()
         self._settings = PyscfStabilitySettings()
 
@@ -242,6 +249,7 @@ class PyscfStabilityChecker(StabilityChecker):
                 stability analysis is requested for ROHF/UHF wavefunctions.
 
         """
+        Logger.trace_entering()
         # Verify wavefunction compatibility: Only SlaterDeterminantContainer currently supported
         if wavefunction.get_container_type() != "sd":
             raise ValueError("Stability analysis currently only supports SlaterDeterminantContainer wavefunctions")
@@ -352,4 +360,5 @@ class PyscfStabilityChecker(StabilityChecker):
 
     def name(self) -> str:
         """Return the name for the stability checker."""
+        Logger.trace_entering()
         return "pyscf"

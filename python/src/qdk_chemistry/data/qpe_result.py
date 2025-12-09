@@ -14,6 +14,7 @@ import numpy as np
 
 from qdk_chemistry.data.base import DataClass
 from qdk_chemistry.phase_estimation.base import PhaseEstimationAlgorithm
+from qdk_chemistry.utils import Logger
 from qdk_chemistry.utils.phase import energy_alias_candidates, energy_from_phase, resolve_energy_aliases
 
 try:
@@ -81,6 +82,7 @@ class QpeResult(DataClass):
             metadata (dict[str, object] | None): Optional metadata dictionary.
 
         """
+        Logger.trace_entering()
         self.method = method
         self.evolution_time = evolution_time
         self.phase_fraction = phase_fraction
@@ -125,6 +127,7 @@ class QpeResult(DataClass):
             QpeResult: Populated :class:`QpeResult` instance reflecting the supplied data.
 
         """
+        Logger.trace_entering()
         method_label = str(method.value) if hasattr(method, "value") else str(method)
 
         normalized_phase = float(phase_fraction % 1.0)

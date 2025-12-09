@@ -12,6 +12,7 @@ import numpy as np
 
 from qdk_chemistry.data.base import DataClass
 from qdk_chemistry.data.qubit_hamiltonian import QubitHamiltonian
+from qdk_chemistry.utils import Logger
 
 __all__: list[str] = []
 
@@ -49,6 +50,7 @@ class EnergyExpectationResult(DataClass):
             variances_each_term (list[np.ndarray]): Variances for each term in the Hamiltonian.
 
         """
+        Logger.trace_entering()
         self.energy_expectation_value = energy_expectation_value
         self.energy_variance = energy_variance
         self.expvals_each_term = expvals_each_term
@@ -198,6 +200,7 @@ class MeasurementData(DataClass):
             shots_list (list[int] | None): List of number of shots used for each measurement.
 
         """
+        Logger.trace_entering()
         self.hamiltonians = hamiltonians
         self.bitstring_counts = bitstring_counts if bitstring_counts is not None else []
         self.shots_list = shots_list if shots_list is not None else []

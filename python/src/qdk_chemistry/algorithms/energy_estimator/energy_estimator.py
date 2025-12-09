@@ -15,6 +15,7 @@ from qiskit.quantum_info import Pauli, PauliList
 
 from qdk_chemistry.algorithms.base import Algorithm, AlgorithmFactory
 from qdk_chemistry.data import Circuit, EnergyExpectationResult, QubitHamiltonian
+from qdk_chemistry.utils import Logger
 
 __all__: list[str] = []
 
@@ -57,6 +58,7 @@ def _compute_expval_and_variance_from_bitstrings(
         A tuple containing expectation values and variances.
 
     """
+    Logger.trace_entering()
     # Determine measurement basis and Pauli contains only measured terms (drop I terms)
     basis = _determine_measurement_basis(paulis)
     measured_indices = np.where(basis.z | basis.x)[0]
@@ -182,6 +184,7 @@ class EnergyEstimator(Algorithm):
             List of Circuits that provide the measurement circuits in OpenQASM3 format.
 
         """
+        Logger.trace_entering()
         meas_circuits = []
         base_circuit = qasm3.loads(circuit.get_qasm())
 
@@ -216,6 +219,7 @@ class EnergyEstimator(Algorithm):
             ``EnergyExpectationResult`` containing the energy expectation value and variance.
 
         """
+        Logger.trace_entering()
         if len(bitstring_counts_list) != len(hamiltonians):
             raise ValueError(f"Expected {len(hamiltonians)} bitstring result sets, got {len(bitstring_counts_list)}.")
 

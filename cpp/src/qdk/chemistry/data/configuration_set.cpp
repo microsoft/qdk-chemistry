@@ -6,6 +6,7 @@
 #include <fstream>
 #include <nlohmann/json.hpp>
 #include <qdk/chemistry/data/configuration_set.hpp>
+#include <qdk/chemistry/utils/logger.hpp>
 #include <stdexcept>
 
 namespace qdk::chemistry::data {
@@ -14,6 +15,8 @@ ConfigurationSet::ConfigurationSet(
     const std::vector<Configuration>& configurations,
     std::shared_ptr<Orbitals> orbitals)
     : _configurations(configurations), _orbitals(orbitals) {
+  QDK_LOG_TRACE_ENTERING();
+
   if (!_orbitals) {
     throw std::invalid_argument(
         "ConfigurationSet: orbitals pointer cannot be null");
@@ -24,6 +27,8 @@ ConfigurationSet::ConfigurationSet(
 ConfigurationSet::ConfigurationSet(std::vector<Configuration>&& configurations,
                                    std::shared_ptr<Orbitals> orbitals)
     : _configurations(std::move(configurations)), _orbitals(orbitals) {
+  QDK_LOG_TRACE_ENTERING();
+
   if (!_orbitals) {
     throw std::invalid_argument(
         "ConfigurationSet: orbitals pointer cannot be null");
@@ -32,42 +37,64 @@ ConfigurationSet::ConfigurationSet(std::vector<Configuration>&& configurations,
 }
 
 const std::vector<Configuration>& ConfigurationSet::get_configurations() const {
+  QDK_LOG_TRACE_ENTERING();
+
   return _configurations;
 }
 
 std::shared_ptr<Orbitals> ConfigurationSet::get_orbitals() const {
+  QDK_LOG_TRACE_ENTERING();
+
   return _orbitals;
 }
 
-size_t ConfigurationSet::size() const { return _configurations.size(); }
+size_t ConfigurationSet::size() const {
+  QDK_LOG_TRACE_ENTERING();
 
-bool ConfigurationSet::empty() const { return _configurations.empty(); }
+  return _configurations.size();
+}
+
+bool ConfigurationSet::empty() const {
+  QDK_LOG_TRACE_ENTERING();
+
+  return _configurations.empty();
+}
 
 const Configuration& ConfigurationSet::operator[](size_t idx) const {
+  QDK_LOG_TRACE_ENTERING();
+
   return _configurations[idx];
 }
 
 const Configuration& ConfigurationSet::at(size_t idx) const {
+  QDK_LOG_TRACE_ENTERING();
+
   return _configurations.at(idx);
 }
 
 std::vector<Configuration>::const_iterator ConfigurationSet::begin() const {
+  QDK_LOG_TRACE_ENTERING();
   return _configurations.begin();
 }
 
 std::vector<Configuration>::const_iterator ConfigurationSet::end() const {
+  QDK_LOG_TRACE_ENTERING();
   return _configurations.end();
 }
 
 std::vector<Configuration>::const_iterator ConfigurationSet::cbegin() const {
+  QDK_LOG_TRACE_ENTERING();
   return _configurations.cbegin();
 }
 
 std::vector<Configuration>::const_iterator ConfigurationSet::cend() const {
+  QDK_LOG_TRACE_ENTERING();
   return _configurations.cend();
 }
 
 bool ConfigurationSet::operator==(const ConfigurationSet& other) const {
+  QDK_LOG_TRACE_ENTERING();
+
   // Check if orbitals point to the same object (not deep equality)
   if (_orbitals != other._orbitals) {
     return false;
@@ -77,10 +104,14 @@ bool ConfigurationSet::operator==(const ConfigurationSet& other) const {
 }
 
 bool ConfigurationSet::operator!=(const ConfigurationSet& other) const {
+  QDK_LOG_TRACE_ENTERING();
+
   return !(*this == other);
 }
 
 void ConfigurationSet::_validate_configurations() const {
+  QDK_LOG_TRACE_ENTERING();
+
   if (_configurations.empty()) {
     // Empty set is valid
     return;
@@ -186,6 +217,8 @@ void ConfigurationSet::_validate_configurations() const {
 }
 
 nlohmann::json ConfigurationSet::to_json() const {
+  QDK_LOG_TRACE_ENTERING();
+
   nlohmann::json j;
 
   // Store orbitals
@@ -201,6 +234,8 @@ nlohmann::json ConfigurationSet::to_json() const {
 }
 
 ConfigurationSet ConfigurationSet::from_json(const nlohmann::json& j) {
+  QDK_LOG_TRACE_ENTERING();
+
   // Deserialize orbitals from JSON
   std::shared_ptr<Orbitals> orbs = nullptr;
   if (j.contains("orbitals")) {
@@ -224,6 +259,8 @@ ConfigurationSet ConfigurationSet::from_json(const nlohmann::json& j) {
 }
 
 void ConfigurationSet::to_hdf5(H5::Group& group) const {
+  QDK_LOG_TRACE_ENTERING();
+
   try {
     // Store orbitals first
     H5::Group orbitals_group = group.createGroup("orbitals");
@@ -297,6 +334,8 @@ void ConfigurationSet::to_hdf5(H5::Group& group) const {
 }
 
 ConfigurationSet ConfigurationSet::from_hdf5(H5::Group& group) {
+  QDK_LOG_TRACE_ENTERING();
+
   try {
     // Deserialize orbitals from HDF5
     std::shared_ptr<Orbitals> orbs = nullptr;
@@ -364,6 +403,8 @@ ConfigurationSet ConfigurationSet::from_hdf5(H5::Group& group) {
 }
 
 std::string ConfigurationSet::get_summary() const {
+  QDK_LOG_TRACE_ENTERING();
+
   std::string summary = "ConfigurationSet:\n";
   summary +=
       "  Number of configurations: " + std::to_string(_configurations.size()) +
@@ -385,6 +426,8 @@ std::string ConfigurationSet::get_summary() const {
 
 void ConfigurationSet::to_file(const std::string& filename,
                                const std::string& type) const {
+  QDK_LOG_TRACE_ENTERING();
+
   if (type == "json") {
     to_json_file(filename);
   } else if (type == "hdf5" || type == "h5") {
@@ -396,6 +439,8 @@ void ConfigurationSet::to_file(const std::string& filename,
 }
 
 void ConfigurationSet::to_json_file(const std::string& filename) const {
+  QDK_LOG_TRACE_ENTERING();
+
   try {
     std::ofstream file(filename);
     if (!file.is_open()) {
@@ -418,6 +463,8 @@ void ConfigurationSet::to_json_file(const std::string& filename) const {
 }
 
 void ConfigurationSet::to_hdf5_file(const std::string& filename) const {
+  QDK_LOG_TRACE_ENTERING();
+
   try {
     H5::H5File file(filename, H5F_ACC_TRUNC);
     H5::Group root_group = file.openGroup("/");
@@ -432,6 +479,8 @@ void ConfigurationSet::to_hdf5_file(const std::string& filename) const {
 
 ConfigurationSet ConfigurationSet::from_file(const std::string& filename,
                                              const std::string& type) {
+  QDK_LOG_TRACE_ENTERING();
+
   if (type == "json") {
     return from_json_file(filename);
   } else if (type == "hdf5" || type == "h5") {
@@ -443,6 +492,8 @@ ConfigurationSet ConfigurationSet::from_file(const std::string& filename,
 }
 
 ConfigurationSet ConfigurationSet::from_json_file(const std::string& filename) {
+  QDK_LOG_TRACE_ENTERING();
+
   try {
     std::ifstream file(filename);
     if (!file.is_open()) {
@@ -464,6 +515,7 @@ ConfigurationSet ConfigurationSet::from_json_file(const std::string& filename) {
 }
 
 ConfigurationSet ConfigurationSet::from_hdf5_file(const std::string& filename) {
+  QDK_LOG_TRACE_ENTERING();
   H5::H5File file;
   try {
     file.openFile(filename, H5F_ACC_RDONLY);

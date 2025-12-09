@@ -5,7 +5,6 @@
 # Licensed under the MIT License. See LICENSE.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
 
-import logging
 from collections import Counter
 
 import qsharp
@@ -13,8 +12,7 @@ from qsharp.openqasm import run
 
 from qdk_chemistry.algorithms.energy_estimator.energy_estimator import EnergyEstimator
 from qdk_chemistry.data import Circuit, EnergyExpectationResult, MeasurementData, QubitHamiltonian, Settings
-
-_LOGGER = logging.getLogger(__name__)
+from qdk_chemistry.utils import Logger
 
 __all__: list[str] = []
 
@@ -30,6 +28,7 @@ class QDKEnergyEstimatorSettings(Settings):
 
     def __init__(self):
         """Initialize QDKEnergyEstimatorSettings."""
+        Logger.trace_entering()
         super().__init__()
         self._set_default("seed", "int", 42)
         self._set_default("qubit_loss", "double", 0.0)
@@ -54,6 +53,7 @@ class QDKEnergyEstimator(EnergyEstimator):
             qubit_loss: Probability of qubit loss in simulation.
 
         """
+        Logger.trace_entering()
         super().__init__()
         self._settings = QDKEnergyEstimatorSettings()
         self._settings.set("seed", seed)
@@ -155,6 +155,7 @@ class QDKEnergyEstimator(EnergyEstimator):
             * Only one circuit is supported per run.
 
         """
+        Logger.trace_entering()
         num_observables = len(qubit_hamiltonians)
         if total_shots < num_observables:
             raise ValueError(
@@ -164,7 +165,7 @@ class QDKEnergyEstimator(EnergyEstimator):
 
         # Evenly distribute shots across all observables
         shots_list = [total_shots // num_observables] * num_observables
-        _LOGGER.debug(f"Shots allocated: {shots_list}")
+        Logger.debug(f"Shots allocated: {shots_list}")
 
         energy_offset = sum(classical_coeffs) if classical_coeffs else 0.0
 

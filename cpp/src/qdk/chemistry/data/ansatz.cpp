@@ -5,6 +5,7 @@
 #include <fstream>
 #include <qdk/chemistry/data/ansatz.hpp>
 #include <qdk/chemistry/data/wavefunction_containers/sd.hpp>
+#include <qdk/chemistry/utils/logger.hpp>
 #include <sstream>
 #include <stdexcept>
 
@@ -17,6 +18,8 @@ namespace qdk::chemistry::data {
 Ansatz::Ansatz(const Hamiltonian& hamiltonian, const Wavefunction& wavefunction)
     : _hamiltonian(std::make_shared<Hamiltonian>(hamiltonian)),
       _wavefunction(std::make_shared<Wavefunction>(wavefunction)) {
+  QDK_LOG_TRACE_ENTERING();
+
   if (!_is_valid()) {
     throw std::invalid_argument("Tried to generate invalid Ansatz object.");
   }
@@ -25,6 +28,8 @@ Ansatz::Ansatz(const Hamiltonian& hamiltonian, const Wavefunction& wavefunction)
 Ansatz::Ansatz(std::shared_ptr<Hamiltonian> hamiltonian,
                std::shared_ptr<Wavefunction> wavefunction)
     : _hamiltonian(hamiltonian), _wavefunction(wavefunction) {
+  QDK_LOG_TRACE_ENTERING();
+
   if (!_hamiltonian) {
     throw std::invalid_argument("Hamiltonian pointer cannot be nullptr");
   }
@@ -38,12 +43,16 @@ Ansatz::Ansatz(std::shared_ptr<Hamiltonian> hamiltonian,
 
 Ansatz::Ansatz(const Ansatz& other)
     : _hamiltonian(other._hamiltonian), _wavefunction(other._wavefunction) {
+  QDK_LOG_TRACE_ENTERING();
+
   if (!_is_valid()) {
     throw std::invalid_argument("Tried to generate invalid Ansatz object.");
   }
 }
 
 Ansatz& Ansatz::operator=(const Ansatz& other) {
+  QDK_LOG_TRACE_ENTERING();
+
   if (this != &other) {
     _hamiltonian = other._hamiltonian;
     _wavefunction = other._wavefunction;
@@ -52,24 +61,38 @@ Ansatz& Ansatz::operator=(const Ansatz& other) {
 }
 
 std::shared_ptr<Hamiltonian> Ansatz::get_hamiltonian() const {
+  QDK_LOG_TRACE_ENTERING();
+
   if (!_hamiltonian) {
     throw std::runtime_error("Hamiltonian is not set");
   }
   return _hamiltonian;
 }
 
-bool Ansatz::has_hamiltonian() const { return _hamiltonian != nullptr; }
+bool Ansatz::has_hamiltonian() const {
+  QDK_LOG_TRACE_ENTERING();
+
+  return _hamiltonian != nullptr;
+}
 
 std::shared_ptr<Wavefunction> Ansatz::get_wavefunction() const {
+  QDK_LOG_TRACE_ENTERING();
+
   if (!_wavefunction) {
     throw std::runtime_error("Wavefunction is not set");
   }
   return _wavefunction;
 }
 
-bool Ansatz::has_wavefunction() const { return _wavefunction != nullptr; }
+bool Ansatz::has_wavefunction() const {
+  QDK_LOG_TRACE_ENTERING();
+
+  return _wavefunction != nullptr;
+}
 
 std::shared_ptr<Orbitals> Ansatz::get_orbitals() const {
+  QDK_LOG_TRACE_ENTERING();
+
   if (!has_hamiltonian()) {
     throw std::runtime_error("Hamiltonian is not available");
   }
@@ -77,11 +100,15 @@ std::shared_ptr<Orbitals> Ansatz::get_orbitals() const {
 }
 
 bool Ansatz::has_orbitals() const {
+  QDK_LOG_TRACE_ENTERING();
+
   return has_hamiltonian() && _hamiltonian->has_orbitals() &&
          has_wavefunction();
 }
 
 double Ansatz::calculate_energy() const {
+  QDK_LOG_TRACE_ENTERING();
+
   if (!_is_valid()) {
     throw std::runtime_error("Cannot calculate energy for invalid Ansatz");
   }
@@ -244,6 +271,8 @@ double Ansatz::calculate_energy() const {
 }
 
 bool Ansatz::_is_valid() const {
+  QDK_LOG_TRACE_ENTERING();
+
   try {
     if (!has_hamiltonian() || !has_wavefunction()) {
       return false;
@@ -258,6 +287,8 @@ bool Ansatz::_is_valid() const {
 }
 
 void Ansatz::validate_orbital_consistency() const {
+  QDK_LOG_TRACE_ENTERING();
+
   if (!has_hamiltonian() || !has_wavefunction()) {
     throw std::runtime_error(
         "Cannot validate orbital consistency: missing Hamiltonian or "
@@ -293,9 +324,15 @@ void Ansatz::validate_orbital_consistency() const {
   }
 }
 
-void Ansatz::_validate_construction() const { validate_orbital_consistency(); }
+void Ansatz::_validate_construction() const {
+  QDK_LOG_TRACE_ENTERING();
+
+  validate_orbital_consistency();
+}
 
 std::string Ansatz::get_summary() const {
+  QDK_LOG_TRACE_ENTERING();
+
   std::ostringstream oss;
   oss << "=== Ansatz Summary ===\n";
 
@@ -339,6 +376,8 @@ std::string Ansatz::get_summary() const {
 
 void Ansatz::to_file(const std::string& filename,
                      const std::string& type) const {
+  QDK_LOG_TRACE_ENTERING();
+
   if (type == "json") {
     to_json_file(filename);
   } else if (type == "hdf5") {
@@ -351,6 +390,8 @@ void Ansatz::to_file(const std::string& filename,
 
 std::shared_ptr<Ansatz> Ansatz::from_file(const std::string& filename,
                                           const std::string& type) {
+  QDK_LOG_TRACE_ENTERING();
+
   if (type == "json") {
     return from_json_file(filename);
   } else if (type == "hdf5") {
@@ -362,6 +403,8 @@ std::shared_ptr<Ansatz> Ansatz::from_file(const std::string& filename,
 }
 
 void Ansatz::to_hdf5_file(const std::string& filename) const {
+  QDK_LOG_TRACE_ENTERING();
+
   // Validate filename
   if (filename.empty()) {
     throw std::runtime_error("Filename cannot be empty");
@@ -370,6 +413,8 @@ void Ansatz::to_hdf5_file(const std::string& filename) const {
 }
 
 std::shared_ptr<Ansatz> Ansatz::from_hdf5_file(const std::string& filename) {
+  QDK_LOG_TRACE_ENTERING();
+
   // Validate filename
   if (filename.empty()) {
     throw std::runtime_error("Filename cannot be empty");
@@ -378,6 +423,8 @@ std::shared_ptr<Ansatz> Ansatz::from_hdf5_file(const std::string& filename) {
 }
 
 void Ansatz::to_json_file(const std::string& filename) const {
+  QDK_LOG_TRACE_ENTERING();
+
   // Validate filename
   if (filename.empty()) {
     throw std::runtime_error("Filename cannot be empty");
@@ -386,6 +433,8 @@ void Ansatz::to_json_file(const std::string& filename) const {
 }
 
 std::shared_ptr<Ansatz> Ansatz::from_json_file(const std::string& filename) {
+  QDK_LOG_TRACE_ENTERING();
+
   // Validate filename
   if (filename.empty()) {
     throw std::runtime_error("Filename cannot be empty");
@@ -394,6 +443,8 @@ std::shared_ptr<Ansatz> Ansatz::from_json_file(const std::string& filename) {
 }
 
 nlohmann::json Ansatz::to_json() const {
+  QDK_LOG_TRACE_ENTERING();
+
   nlohmann::json j;
 
   // Store version first
@@ -420,6 +471,8 @@ nlohmann::json Ansatz::to_json() const {
 }
 
 std::shared_ptr<Ansatz> Ansatz::from_json(const nlohmann::json& j) {
+  QDK_LOG_TRACE_ENTERING();
+
   try {
     // Validate version first
     if (!j.contains("version")) {
@@ -516,6 +569,8 @@ std::shared_ptr<Ansatz> Ansatz::from_json(const nlohmann::json& j) {
 }
 
 void Ansatz::_to_json_file(const std::string& filename) const {
+  QDK_LOG_TRACE_ENTERING();
+
   std::ofstream file(filename);
   if (!file.is_open()) {
     throw std::runtime_error("Failed to open file for writing: " + filename);
@@ -531,6 +586,8 @@ void Ansatz::_to_json_file(const std::string& filename) const {
 }
 
 std::shared_ptr<Ansatz> Ansatz::_from_json_file(const std::string& filename) {
+  QDK_LOG_TRACE_ENTERING();
+
   std::ifstream file(filename);
   if (!file.is_open()) {
     throw std::runtime_error(
@@ -550,6 +607,8 @@ std::shared_ptr<Ansatz> Ansatz::_from_json_file(const std::string& filename) {
 }
 
 void Ansatz::to_hdf5(H5::Group& group) const {
+  QDK_LOG_TRACE_ENTERING();
+
   try {
     // Write metadata
     H5::StrType string_type(H5::PredType::C_S1, H5T_VARIABLE);
@@ -582,6 +641,8 @@ void Ansatz::to_hdf5(H5::Group& group) const {
 }
 
 std::shared_ptr<Ansatz> Ansatz::from_hdf5(H5::Group& group) {
+  QDK_LOG_TRACE_ENTERING();
+
   try {
     // Validate version first
     if (!group.attrExists("version")) {
@@ -689,6 +750,8 @@ std::shared_ptr<Ansatz> Ansatz::from_hdf5(H5::Group& group) {
 }
 
 void Ansatz::_to_hdf5_file(const std::string& filename) const {
+  QDK_LOG_TRACE_ENTERING();
+
   try {
     H5::H5File file(filename, H5F_ACC_TRUNC);
     H5::Group ansatz_group = file.createGroup("/ansatz");
@@ -699,6 +762,7 @@ void Ansatz::_to_hdf5_file(const std::string& filename) const {
 }
 
 std::shared_ptr<Ansatz> Ansatz::_from_hdf5_file(const std::string& filename) {
+  QDK_LOG_TRACE_ENTERING();
   // Disable HDF5 automatic error printing to stderr unless verbose mode
   if (hdf5_errors_should_be_suppressed()) {
     H5::Exception::dontPrint();

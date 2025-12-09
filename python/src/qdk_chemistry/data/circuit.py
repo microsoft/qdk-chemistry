@@ -8,7 +8,6 @@ Includes utilities for visualizing circuits with QDK widgets.
 # Licensed under the MIT License. See LICENSE.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
 
-import logging
 from typing import Any
 
 import h5py
@@ -17,8 +16,7 @@ import qsharp.openqasm
 from qiskit import QuantumCircuit, qasm3
 
 from qdk_chemistry.data.base import DataClass
-
-_LOGGER = logging.getLogger(__name__)
+from qdk_chemistry.utils import Logger
 
 __all__: list[str] = []
 
@@ -48,6 +46,7 @@ class Circuit(DataClass):
             qasm (str | None): The quantum circuit in QASM format. Defaults to None.
 
         """
+        Logger.trace_entering()
         self.qasm = qasm
 
         # Check that a representation of the quantum circuit is given by the keyword arguments
@@ -84,6 +83,7 @@ class Circuit(DataClass):
             qsharp._native.Circuit: A qsharp Circuit object representing the trimmed circuit.
 
         """
+        Logger.trace_entering()
         circuit_to_visualize = self._trim_circuit(remove_idle_qubits, remove_classical_qubits)
 
         return qsharp.openqasm.circuit(circuit_to_visualize)
@@ -100,6 +100,7 @@ class Circuit(DataClass):
             str: A trimmed circuit in QASM format.
 
         """
+        Logger.trace_entering()
         from qdk_chemistry.plugins.qiskit._interop.circuit import analyze_qubit_status  # noqa: PLC0415
 
         if self.qasm is None:
@@ -115,7 +116,7 @@ class Circuit(DataClass):
             remove_status.append("idle")
         if remove_classical_qubits:
             remove_status.append("classical")
-            _LOGGER.info(
+            Logger.info(
                 "Removing classical qubits will also remove any control operations sourced from them "
                 "and measurements involving them."
             )
@@ -139,7 +140,7 @@ class Circuit(DataClass):
             kept_clbit_indices = list(range(len(qc.clbits)))
 
         if not kept_clbit_indices and len(qc.clbits) > 0:
-            _LOGGER.warning("All measurements are dropped, no classical bits remain.")
+            Logger.warn("All measurements are dropped, no classical bits remain.")
 
         new_qc = QuantumCircuit(len(kept_qubit_indices), len(kept_clbit_indices))
         qubit_map = {qc.qubits[i]: new_qc.qubits[new_i] for new_i, i in enumerate(kept_qubit_indices)}

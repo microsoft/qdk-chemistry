@@ -4,6 +4,8 @@
 
 #include "macis_base.hpp"
 
+#include <qdk/chemistry/utils/logger.hpp>
+
 #define SET_MACIS_SETTING(qdk_settings, macis_settings, param_name, type) \
   macis_settings.param_name = qdk_settings.get_or_default<type>(          \
       #param_name, macis_settings.param_name)
@@ -11,6 +13,8 @@
 namespace qdk::chemistry::algorithms::microsoft {
 
 macis::MCSCFSettings get_mcscf_settings_(const data::Settings& settings_) {
+  QDK_LOG_TRACE_ENTERING();
+
   macis::MCSCFSettings mcscf_settings;
   // Respect MACIS native setting names
   if (settings_.has("ci_res_tol")) {
@@ -29,6 +33,8 @@ macis::MCSCFSettings get_mcscf_settings_(const data::Settings& settings_) {
 }
 
 macis::ASCISettings get_asci_settings_(const data::Settings& settings_) {
+  QDK_LOG_TRACE_ENTERING();
+
   macis::ASCISettings asci_settings;
   SET_MACIS_SETTING(settings_, asci_settings, ntdets_max, size_t);
   SET_MACIS_SETTING(settings_, asci_settings, ntdets_min, size_t);

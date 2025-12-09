@@ -25,6 +25,9 @@ set(CMAKE_CXX_FLAGS_RELEASE_INIT "-O3 -DNDEBUG")
 # Options
 option(QDK_CHEMISTRY_ENABLE_COVERAGE    "Enable coverage build" OFF)
 option(QDK_CHEMISTRY_ENABLE_GPU         "Enable GPU acceleration in QDK" OFF)
+option(QDK_CHEMISTRY_DISABLE_TRACE_LOG  "Disable trace logging at compile time" OFF)
+set(QDK_CHEMISTRY_LOG_LEVEL "2" CACHE STRING "Default log level (0=trace, 1=debug, 2=info, 3=warn, 4=error, 5=critical, 6=off)")
+set_property(CACHE QDK_CHEMISTRY_LOG_LEVEL PROPERTY STRINGS "0" "1" "2" "3" "4" "5" "6")
 option(QDK_ALLOW_DEPENDENCY_FETCH "Allow fetching of dependencies"     ON)
 option(QDK_CHEMISTRY_ENABLE_MPI "Enable MPI Bindings for QDK Chemistry"  OFF)
 option(QDK_EMBED_RESOURCE_LOCATION "Point to embedded (permanent) resource location" ON)
@@ -191,7 +194,11 @@ install(TARGETS chemistry ${QDK_DEP_EXPORTS}
     INCLUDES DESTINATION include
 )
 
-# Generate config file
+# Set the config.hpp variable based on the option
+if(QDK_CHEMISTRY_DISABLE_TRACE_LOG)
+  set(QDK_DISABLE_TRACE_LOG 1)
+endif()
+
 configure_file(
   ${PROJECT_SOURCE_DIR}/include/qdk/chemistry/config.hpp.in
   ${PROJECT_BINARY_DIR}/include/qdk/chemistry/config.hpp
