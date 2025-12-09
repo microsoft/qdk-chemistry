@@ -10,6 +10,7 @@
 #include "factory_bindings.hpp"
 #include "qdk/chemistry/algorithms/microsoft/localization/mp2_natural_orbitals.hpp"
 #include "qdk/chemistry/algorithms/microsoft/localization/pipek_mezey.hpp"
+#include "qdk/chemistry/algorithms/microsoft/localization/vvhv.hpp"
 
 namespace py = pybind11;
 using namespace qdk::chemistry::algorithms;
@@ -243,6 +244,58 @@ See Also:
 Default constructor.
 
 Initializes an MP2 natural orbital transformer with default settings.
+
+)");
+
+  // Bind concrete microsoft::VVHVLocalizer implementation
+  py::class_<microsoft::VVHVLocalizer, Localizer, py::smart_holder>(
+      m, "QdkVVHVLocalizer", R"(
+QDK Valence Virtual - Hard Virtual (VV-HV) orbital localizer.
+
+This class provides a concrete implementation of the orbital localizer using
+the VV-HV localization algorithm. The VV-HV algorithm partitions virtual
+orbitals into valence virtuals (VVs) and hard virtuals (HVs) based on
+projection onto a minimal basis, then localizes each space separately.
+
+The algorithm is particularly useful for post-Hartree-Fock methods where
+separate treatment of valence and Rydberg-like virtual orbitals improves
+computational efficiency and accuracy.
+
+Implementation based on:
+  Subotnik et al. JCP 123, 114108 (2005)
+  Wang et al. JCTC 21, 1163 (2025)
+
+.. note::
+    This localizer requires all orbital indices to be covered in the
+    localization call.
+
+Typical usage:
+
+.. code-block:: python
+
+    import qdk_chemistry.algorithms as alg
+
+    # Create a VV-HV localizer
+    localizer = alg.QdkVVHVLocalizer()
+
+    # Configure settings if needed
+    localizer.settings().set("minimal_basis", "sto-3g")
+    localizer.settings().set("weighted_orthogonalization", True)
+    localizer.settings().set("max_iterations", 100)
+    localizer.settings().set("convergence_tolerance", 1e-8)
+
+    # Localize orbitals (must include all orbital indices)
+    localized_wfn = localizer.run(wavefunction, loc_indices_a, loc_indices_b)
+
+See Also:
+    :class:`OrbitalLocalizer`
+    :class:`qdk_chemistry.data.Wavefunction`
+
+)")
+      .def(py::init<>(), R"(
+Default constructor.
+
+Initializes a VV-HV localizer with default settings.
 
 )");
 }

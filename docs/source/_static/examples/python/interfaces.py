@@ -8,7 +8,6 @@
 ################################################################################
 # start-cell-scf
 import numpy as np
-
 from qdk_chemistry.algorithms import available, create
 from qdk_chemistry.data import Structure
 

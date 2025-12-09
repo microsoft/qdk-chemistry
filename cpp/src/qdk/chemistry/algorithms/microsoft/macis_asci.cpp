@@ -12,6 +12,7 @@
 #include <macis/util/mpi.hpp>
 #include <qdk/chemistry/data/structure.hpp>
 #include <qdk/chemistry/data/wavefunction_containers/sci.hpp>
+#include <qdk/chemistry/utils/logger.hpp>
 
 namespace qdk::chemistry::algorithms::microsoft {
 
@@ -34,6 +35,8 @@ struct asci_helper {
   static return_type impl(const data::Hamiltonian& hamiltonian,
                           const data::Settings& settings_, unsigned int nalpha,
                           unsigned int nbeta) {
+    QDK_LOG_TRACE_ENTERING();
+
     using wfn_type = macis::wfn_t<N>;
     using generator_t = macis::SortedDoubleLoopHamiltonianGenerator<wfn_type>;
 
@@ -49,8 +52,8 @@ struct asci_helper {
 
     const size_t num_molecular_orbitals = active_indices.size();
 
-    const auto& T = hamiltonian.get_one_body_integrals();
-    const auto& V = hamiltonian.get_two_body_integrals();
+    const auto& [T_a, T_b] = hamiltonian.get_one_body_integrals();
+    const auto& [V_aaaa, V_aabb, V_bbbb] = hamiltonian.get_two_body_integrals();
 
     // get settings
     macis::MCSCFSettings mcscf_settings = get_mcscf_settings_(settings_);
@@ -61,10 +64,10 @@ struct asci_helper {
     double E_casci = 0.0;
 
     generator_t ham_gen(macis::matrix_span<double>(
-                            const_cast<double*>(T.data()),
+                            const_cast<double*>(T_a.data()),
                             num_molecular_orbitals, num_molecular_orbitals),
                         macis::rank4_span<double>(
-                            const_cast<double*>(V.data()),
+                            const_cast<double*>(V_aaaa.data()),
                             num_molecular_orbitals, num_molecular_orbitals,
                             num_molecular_orbitals, num_molecular_orbitals));
     // HF Guess
@@ -103,6 +106,8 @@ struct asci_helper {
 std::pair<double, std::shared_ptr<data::Wavefunction>> MacisAsci::_run_impl(
     std::shared_ptr<data::Hamiltonian> hamiltonian, unsigned int nalpha,
     unsigned int nbeta) const {
+  QDK_LOG_TRACE_ENTERING();
+
   const auto& orbitals = hamiltonian->get_orbitals();
   const auto& [active_indices, active_indices_beta] =
       orbitals->get_active_space_indices();

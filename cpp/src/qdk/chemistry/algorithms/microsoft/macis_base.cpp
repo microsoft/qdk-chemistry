@@ -4,6 +4,8 @@
 
 #include "macis_base.hpp"
 
+#include <qdk/chemistry/utils/logger.hpp>
+
 #define SET_MACIS_SETTING(qdk_settings, macis_settings, param_name, type) \
   macis_settings.param_name = qdk_settings.get_or_default<type>(          \
       #param_name, macis_settings.param_name)
@@ -11,6 +13,8 @@
 namespace qdk::chemistry::algorithms::microsoft {
 
 macis::MCSCFSettings get_mcscf_settings_(const data::Settings& settings_) {
+  QDK_LOG_TRACE_ENTERING();
+
   macis::MCSCFSettings mcscf_settings;
   // Respect MACIS native setting names
   if (settings_.has("ci_res_tol")) {
@@ -22,13 +26,15 @@ macis::MCSCFSettings get_mcscf_settings_(const data::Settings& settings_) {
     SET_MACIS_SETTING(settings_, mcscf_settings, ci_max_subspace, size_t);
   } else {
     mcscf_settings.ci_max_subspace =
-        settings_.get<size_t>("davidson_iterations");
+        settings_.get<int64_t>("davidson_iterations");
   }
   SET_MACIS_SETTING(settings_, mcscf_settings, ci_matel_tol, double);
   return mcscf_settings;
 }
 
 macis::ASCISettings get_asci_settings_(const data::Settings& settings_) {
+  QDK_LOG_TRACE_ENTERING();
+
   macis::ASCISettings asci_settings;
   SET_MACIS_SETTING(settings_, asci_settings, ntdets_max, size_t);
   SET_MACIS_SETTING(settings_, asci_settings, ntdets_min, size_t);
@@ -46,7 +52,10 @@ macis::ASCISettings get_asci_settings_(const data::Settings& settings_) {
   SET_MACIS_SETTING(settings_, asci_settings, nxtval_bcount_thresh, size_t);
   SET_MACIS_SETTING(settings_, asci_settings, nxtval_bcount_inc, size_t);
   SET_MACIS_SETTING(settings_, asci_settings, just_singles, bool);
-  SET_MACIS_SETTING(settings_, asci_settings, grow_factor, size_t);
+  SET_MACIS_SETTING(settings_, asci_settings, grow_factor, double);
+  SET_MACIS_SETTING(settings_, asci_settings, min_grow_factor, double);
+  SET_MACIS_SETTING(settings_, asci_settings, growth_backoff_rate, double);
+  SET_MACIS_SETTING(settings_, asci_settings, growth_recovery_rate, double);
   SET_MACIS_SETTING(settings_, asci_settings, max_refine_iter, size_t);
   SET_MACIS_SETTING(settings_, asci_settings, refine_energy_tol, double);
   SET_MACIS_SETTING(settings_, asci_settings, grow_with_rot, bool);
@@ -56,6 +65,30 @@ macis::ASCISettings get_asci_settings_(const data::Settings& settings_) {
   SET_MACIS_SETTING(settings_, asci_settings, pt2_min_constraint_level, int);
   SET_MACIS_SETTING(settings_, asci_settings, pt2_constraint_refine_force,
                     int64_t);
+
+  // Validate grow_factor and related parameters
+  if (asci_settings.grow_factor <= 1.0) {
+    throw std::runtime_error("grow_factor must be > 1.0, got " +
+                             std::to_string(asci_settings.grow_factor));
+  }
+  if (asci_settings.min_grow_factor <= 1.0) {
+    throw std::runtime_error("min_grow_factor must be > 1.0, got " +
+                             std::to_string(asci_settings.min_grow_factor));
+  }
+  if (asci_settings.min_grow_factor > asci_settings.grow_factor) {
+    throw std::runtime_error("min_grow_factor must be <= grow_factor");
+  }
+  if (asci_settings.growth_backoff_rate <= 0.0 ||
+      asci_settings.growth_backoff_rate >= 1.0) {
+    throw std::runtime_error("growth_backoff_rate must be in (0, 1), got " +
+                             std::to_string(asci_settings.growth_backoff_rate));
+  }
+  if (asci_settings.growth_recovery_rate <= 1.0) {
+    throw std::runtime_error(
+        "growth_recovery_rate must be > 1.0, got " +
+        std::to_string(asci_settings.growth_recovery_rate));
+  }
+
   return asci_settings;
 }
 

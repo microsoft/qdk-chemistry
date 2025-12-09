@@ -7,16 +7,19 @@
 #include <limits>
 #include <nlohmann/json.hpp>
 #include <qdk/chemistry/data/stability_result.hpp>
+#include <qdk/chemistry/utils/logger.hpp>
 #include <sstream>
 #include <stdexcept>
 
 #include "filename_utils.hpp"
+#include "hdf5_error_handling.hpp"
 #include "hdf5_serialization.hpp"
 #include "json_serialization.hpp"
 
 namespace qdk::chemistry::data {
 
 std::string StabilityResult::get_summary() const {
+  QDK_LOG_TRACE_ENTERING();
   if (internal_eigenvalues_.size() == 0 && external_eigenvalues_.size() == 0) {
     return "StabilityResult(empty)";
   }
@@ -52,18 +55,22 @@ std::string StabilityResult::get_summary() const {
 }
 
 bool StabilityResult::empty() const {
+  QDK_LOG_TRACE_ENTERING();
   return !has_internal_result() && !has_external_result();
 }
 
 bool StabilityResult::has_internal_result() const {
+  QDK_LOG_TRACE_ENTERING();
   return internal_eigenvalues_.size() > 0;
 }
 
 bool StabilityResult::has_external_result() const {
+  QDK_LOG_TRACE_ENTERING();
   return external_eigenvalues_.size() > 0;
 }
 
 double StabilityResult::get_smallest_internal_eigenvalue() const {
+  QDK_LOG_TRACE_ENTERING();
   if (internal_eigenvalues_.size() == 0) {
     throw std::runtime_error("No internal eigenvalues available");
   }
@@ -71,6 +78,7 @@ double StabilityResult::get_smallest_internal_eigenvalue() const {
 }
 
 double StabilityResult::get_smallest_external_eigenvalue() const {
+  QDK_LOG_TRACE_ENTERING();
   if (external_eigenvalues_.size() == 0) {
     throw std::runtime_error("No external eigenvalues available");
   }
@@ -78,6 +86,7 @@ double StabilityResult::get_smallest_external_eigenvalue() const {
 }
 
 double StabilityResult::get_smallest_eigenvalue() const {
+  QDK_LOG_TRACE_ENTERING();
   if (internal_eigenvalues_.size() == 0 && external_eigenvalues_.size() == 0) {
     throw std::runtime_error("No eigenvalues available");
   }
@@ -97,6 +106,7 @@ double StabilityResult::get_smallest_eigenvalue() const {
 
 std::pair<double, Eigen::VectorXd>
 StabilityResult::get_smallest_internal_eigenvalue_and_vector() const {
+  QDK_LOG_TRACE_ENTERING();
   if (internal_eigenvalues_.size() == 0) {
     throw std::runtime_error("No internal eigenvalues available");
   }
@@ -110,6 +120,7 @@ StabilityResult::get_smallest_internal_eigenvalue_and_vector() const {
 
 std::pair<double, Eigen::VectorXd>
 StabilityResult::get_smallest_external_eigenvalue_and_vector() const {
+  QDK_LOG_TRACE_ENTERING();
   if (external_eigenvalues_.size() == 0) {
     throw std::runtime_error("No external eigenvalues available");
   }
@@ -123,6 +134,7 @@ StabilityResult::get_smallest_external_eigenvalue_and_vector() const {
 
 std::pair<double, Eigen::VectorXd>
 StabilityResult::get_smallest_eigenvalue_and_vector() const {
+  QDK_LOG_TRACE_ENTERING();
   if (internal_eigenvalues_.size() == 0 && external_eigenvalues_.size() == 0) {
     throw std::runtime_error("No eigenvalues available");
   }
@@ -158,6 +170,7 @@ StabilityResult::get_smallest_eigenvalue_and_vector() const {
 
 void StabilityResult::to_file(const std::string& filename,
                               const std::string& type) const {
+  QDK_LOG_TRACE_ENTERING();
   DataTypeFilename::validate_write_suffix(filename, "stability_result");
 
   if (type == "json") {
@@ -171,6 +184,7 @@ void StabilityResult::to_file(const std::string& filename,
 }
 
 nlohmann::json StabilityResult::to_json() const {
+  QDK_LOG_TRACE_ENTERING();
   nlohmann::json j;
   j["serialization_version"] = SERIALIZATION_VERSION;
   j["type"] = "StabilityResult";
@@ -194,10 +208,12 @@ nlohmann::json StabilityResult::to_json() const {
 }
 
 void StabilityResult::to_json_file(const std::string& filename) const {
+  QDK_LOG_TRACE_ENTERING();
   DataTypeFilename::validate_write_suffix(filename, "stability_result");
   _to_json_file(filename);
 }
 void StabilityResult::to_hdf5(H5::Group& group) const {
+  QDK_LOG_TRACE_ENTERING();
   // Save metadata
   auto attr_space = H5::DataSpace(H5S_SCALAR);
   auto str_type = H5::StrType(H5::PredType::C_S1, H5T_VARIABLE);
@@ -241,11 +257,13 @@ void StabilityResult::to_hdf5(H5::Group& group) const {
 }
 
 void StabilityResult::to_hdf5_file(const std::string& filename) const {
+  QDK_LOG_TRACE_ENTERING();
   DataTypeFilename::validate_write_suffix(filename, "stability_result");
   _to_hdf5_file(filename);
 }
 std::shared_ptr<StabilityResult> StabilityResult::from_file(
     const std::string& filename, const std::string& type) {
+  QDK_LOG_TRACE_ENTERING();
   DataTypeFilename::validate_read_suffix(filename, "stability_result");
 
   if (type == "json") {
@@ -260,11 +278,13 @@ std::shared_ptr<StabilityResult> StabilityResult::from_file(
 
 std::shared_ptr<StabilityResult> StabilityResult::from_json_file(
     const std::string& filename) {
+  QDK_LOG_TRACE_ENTERING();
   DataTypeFilename::validate_read_suffix(filename, "stability_result");
   return _from_json_file(filename);
 }
 std::shared_ptr<StabilityResult> StabilityResult::from_json(
     const nlohmann::json& j) {
+  QDK_LOG_TRACE_ENTERING();
   // Validate version
   if (j.contains("serialization_version")) {
     validate_serialization_version(
@@ -312,10 +332,12 @@ std::shared_ptr<StabilityResult> StabilityResult::from_json(
 
 std::shared_ptr<StabilityResult> StabilityResult::from_hdf5_file(
     const std::string& filename) {
+  QDK_LOG_TRACE_ENTERING();
   DataTypeFilename::validate_read_suffix(filename, "stability_result");
   return _from_hdf5_file(filename);
 }
 std::shared_ptr<StabilityResult> StabilityResult::from_hdf5(H5::Group& group) {
+  QDK_LOG_TRACE_ENTERING();
   // Validate version if present
   if (group.attrExists("serialization_version")) {
     auto attr = group.openAttribute("serialization_version");
@@ -383,6 +405,7 @@ std::shared_ptr<StabilityResult> StabilityResult::from_hdf5(H5::Group& group) {
 // === Private helper methods ===
 
 bool StabilityResult::_is_valid() const {
+  QDK_LOG_TRACE_ENTERING();
   // Check that eigenvectors dimensions match eigenvalues if both are present
   if (internal_eigenvalues_.size() > 0 && internal_eigenvectors_.size() > 0) {
     if (internal_eigenvectors_.cols() != internal_eigenvalues_.size()) {
@@ -400,6 +423,7 @@ bool StabilityResult::_is_valid() const {
 }
 
 void StabilityResult::_to_json_file(const std::string& filename) const {
+  QDK_LOG_TRACE_ENTERING();
   std::ofstream file(filename);
   if (!file.is_open()) {
     throw std::runtime_error("Failed to open file for writing: " + filename);
@@ -414,12 +438,14 @@ void StabilityResult::_to_json_file(const std::string& filename) const {
 }
 
 void StabilityResult::_to_hdf5_file(const std::string& filename) const {
+  QDK_LOG_TRACE_ENTERING();
   H5::H5File file(filename, H5F_ACC_TRUNC);
   to_hdf5(file);
 }
 
 std::shared_ptr<StabilityResult> StabilityResult::_from_json_file(
     const std::string& filename) {
+  QDK_LOG_TRACE_ENTERING();
   std::ifstream file(filename);
   if (!file.is_open()) {
     throw std::runtime_error(
@@ -434,6 +460,12 @@ std::shared_ptr<StabilityResult> StabilityResult::_from_json_file(
 
 std::shared_ptr<StabilityResult> StabilityResult::_from_hdf5_file(
     const std::string& filename) {
+  QDK_LOG_TRACE_ENTERING();
+  // Disable HDF5 automatic error printing to stderr unless verbose mode
+  if (hdf5_errors_should_be_suppressed()) {
+    H5::Exception::dontPrint();
+  }
+
   H5::H5File file;
   try {
     file.openFile(filename, H5F_ACC_RDONLY);

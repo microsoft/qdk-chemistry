@@ -7,11 +7,14 @@
 #include <algorithm>
 #include <iostream>
 #include <numeric>
+#include <qdk/chemistry/utils/logger.hpp>
 
 namespace qdk::chemistry::algorithms::microsoft {
 
 std::shared_ptr<data::Wavefunction> ValenceActiveSpaceSelector::_run_impl(
     std::shared_ptr<data::Wavefunction> wavefunction) const {
+  QDK_LOG_TRACE_ENTERING();
+
   // If orbitals already have an active space, we'll downselect from it
   // If not, we'll work with all orbitals
 
@@ -31,8 +34,9 @@ std::shared_ptr<data::Wavefunction> ValenceActiveSpaceSelector::_run_impl(
   }
 
   // Get the number of electrons and active orbitals from settings
-  int num_active_electrons = _settings->get<int>("num_active_electrons");
-  int num_active_orbitals = _settings->get<int>("num_active_orbitals");
+  int64_t num_active_electrons =
+      _settings->get<int64_t>("num_active_electrons");
+  int64_t num_active_orbitals = _settings->get<int64_t>("num_active_orbitals");
 
   // Validate settings
   if (num_active_electrons <= 0) {

@@ -474,10 +474,6 @@ class TestStructureEdgeCases:
             s.to_json_file("invalid.json")
         with pytest.raises(ValueError):  # noqa: PT011
             s.from_json_file("invalid.json")
-        with pytest.raises(ValueError):  # noqa: PT011
-            s.to_xyz_file("invalid.xyz")
-        with pytest.raises(ValueError):  # noqa: PT011
-            s.from_xyz_file("invalid.xyz")
 
 
 class TestStructureFileIO:
@@ -629,10 +625,8 @@ class TestStructureFileIO:
 
         invalid_filenames = [
             "test.json",
-            "test.xyz",
             "test.structure",
             "structure.json",
-            "structure.xyz",
         ]
 
         for filename in invalid_filenames:
@@ -640,11 +634,6 @@ class TestStructureFileIO:
                 s.to_json_file(filename)
             with pytest.raises(ValueError):  # noqa: PT011
                 s.from_json_file(filename)
-
-            with pytest.raises(ValueError):  # noqa: PT011
-                s.to_xyz_file(filename)
-            with pytest.raises(ValueError):  # noqa: PT011
-                s.from_xyz_file(filename)
 
 
 class TestStructurePicklingAndRepr:

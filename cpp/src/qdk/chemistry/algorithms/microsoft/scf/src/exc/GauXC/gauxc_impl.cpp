@@ -5,7 +5,6 @@
 #include <qdk/chemistry/scf/config.h>
 #include <qdk/chemistry/scf/exc/gauxc_impl.h>
 #include <qdk/chemistry/scf/util/gauxc_util.h>
-#include <spdlog/spdlog.h>
 
 #include <gauxc/molecular_weights.hpp>
 #include <gauxc/molgrid/defaults.hpp>
@@ -18,6 +17,7 @@
 #ifdef QDK_CHEMISTRY_ENABLE_GPU
 #include <qdk/chemistry/scf/util/gpu/cuda_helper.h>
 #endif
+#include <qdk/chemistry/utils/logger.hpp>
 
 namespace qdk::chemistry::scf::impl {
 
@@ -62,6 +62,8 @@ ExchCXX::BidirectionalMap<std::string, std::string> gauxc_func_alias{
  * @returns GauXC Molecule
  */
 GauXC::Molecule to_gauxc_molecule(const Molecule& mol) {
+  QDK_LOG_TRACE_ENTERING();
+
   GauXC::Molecule gauxc_molecule;
 
   for (size_t iatom = 0; iatom != mol.n_atoms; ++iatom) {
@@ -84,6 +86,8 @@ GauXC::Molecule to_gauxc_molecule(const Molecule& mol) {
  */
 template <typename T>
 GauXC::BasisSet<T> to_gauxc_basisset(const BasisSet& aimd_basisset) {
+  QDK_LOG_TRACE_ENTERING();
+
   using prim_array = typename GauXC::Shell<T>::prim_array;
   using cart_array = typename GauXC::Shell<T>::cart_array;
 
@@ -116,7 +120,7 @@ GauXC::BasisSet<T> to_gauxc_basisset(const BasisSet& aimd_basisset) {
 
 GAUXC::GAUXC(BasisSet& basis_set, const GAUXCInput& gauxc_input,
              bool unrestricted, const std::string& xc_name) {
-  // spdlog::trace("TOP GauXC::GauXC");
+  QDK_LOG_TRACE_ENTERING();
 
   // Unpack the input options directly from GAUXCInput
   const auto& grid_spec = gauxc_input.grid_spec;
@@ -132,15 +136,15 @@ GAUXC::GAUXC(BasisSet& basis_set, const GAUXCInput& gauxc_input,
   const auto& loadbalancer_ex_spec = gauxc_input.loadbalancer_ex;
   const auto& weights_ex_spec = gauxc_input.weights_ex;
 
-  spdlog::trace("GauXC Settings:");
-  spdlog::trace(
+  QDK_LOGGER().trace("GauXC Settings:");
+  QDK_LOGGER().trace(
       "  MolGrid={}, RadQuad={}, PruneSpec={}, BatchSz={}, BasisTol={}",
       gauxc_util::to_string(grid_spec), gauxc_util::to_string(rad_quad_spec),
       gauxc_util::to_string(prune_spec), batch_size, basis_tol);
-  spdlog::trace("  IntExSpace={}, LBExSpace={}, MolWeightsExSpace={}",
-                gauxc_util::to_string(integrator_ex_spec),
-                gauxc_util::to_string(loadbalancer_ex_spec),
-                gauxc_util::to_string(weights_ex_spec));
+  QDK_LOGGER().trace("  IntExSpace={}, LBExSpace={}, MolWeightsExSpace={}",
+                     gauxc_util::to_string(integrator_ex_spec),
+                     gauxc_util::to_string(loadbalancer_ex_spec),
+                     gauxc_util::to_string(weights_ex_spec));
 
   // Create GauXC Runtime instance
 #ifdef QDK_CHEMISTRY_ENABLE_GPU
@@ -208,7 +212,7 @@ GAUXC::GAUXC(BasisSet& basis_set, const GAUXCInput& gauxc_input,
     size_t available_mem, total_mem;
     CUDA_CHECK(cudaMemGetInfo(&available_mem, &total_mem));
     device_buffer_sz_ = 0.5 * available_mem;
-    spdlog::trace("  DeviceBufferSz={}", device_buffer_sz_);
+    QDK_LOGGER().trace("  DeviceBufferSz={}", device_buffer_sz_);
   }
 #endif
 
@@ -243,6 +247,7 @@ GAUXC::GAUXC(BasisSet& basis_set, const GAUXCInput& gauxc_input,
 }
 
 void GAUXC::eval_dd_psi(int lmax, const double* D, double* dd_psi) {
+  QDK_LOG_TRACE_ENTERING();
   auto num_atomic_orbitals = integrator_->load_balancer().basis().nbf();
   auto natom = integrator_->load_balancer().molecule().size();
   auto nharmonics = (lmax + 1) * (lmax + 1);
@@ -254,6 +259,7 @@ void GAUXC::eval_dd_psi(int lmax, const double* D, double* dd_psi) {
 
 void GAUXC::eval_dd_psi_potential(int lmax, const double* x,
                                   double* dd_psi_potential) {
+  QDK_LOG_TRACE_ENTERING();
   auto num_atomic_orbitals = integrator_->load_balancer().basis().nbf();
   auto natom = integrator_->load_balancer().molecule().size();
   auto nharmonics = (lmax + 1) * (lmax + 1);
@@ -267,6 +273,8 @@ GAUXC::~GAUXC() noexcept = default;
 
 #ifdef QDK_CHEMISTRY_ENABLE_GPU
 void GAUXC::allocate_device_buffer_async_(size_t sz, cudaStream_t stream) {
+  QDK_LOG_TRACE_ENTERING();
+
   auto dev_rt_ =
       std::dynamic_pointer_cast<GauXC::DeviceRuntimeEnvironment>(rt_);
   void* p;
@@ -276,6 +284,8 @@ void GAUXC::allocate_device_buffer_async_(size_t sz, cudaStream_t stream) {
 }
 
 void GAUXC::free_device_buffer_async_(cudaStream_t stream) {
+  QDK_LOG_TRACE_ENTERING();
+
   auto dev_rt_ =
       std::dynamic_pointer_cast<GauXC::DeviceRuntimeEnvironment>(rt_);
   CUDA_CHECK(cudaFreeAsync(dev_rt_->device_memory(), stream));
@@ -284,6 +294,8 @@ void GAUXC::free_device_buffer_async_(cudaStream_t stream) {
 #endif
 
 void GAUXC::build_XC(const double* D, double* XC, double* xc_energy) {
+  QDK_LOG_TRACE_ENTERING();
+
   // Allocate a large temporary buffer
 #ifdef QDK_CHEMISTRY_ENABLE_GPU
   allocate_device_buffer_async_(device_buffer_sz_, 0);
@@ -338,6 +350,8 @@ void GAUXC::build_XC(const double* D, double* XC, double* xc_energy) {
 }
 
 void GAUXC::get_gradients(const double* D, double* dXC) {
+  QDK_LOG_TRACE_ENTERING();
+
   // Allocate a large temporary buffer
 #ifdef QDK_CHEMISTRY_ENABLE_GPU
   allocate_device_buffer_async_(device_buffer_sz_, 0);
@@ -382,6 +396,8 @@ void GAUXC::get_gradients(const double* D, double* dXC) {
 }
 
 void GAUXC::build_snK(const double* D, double* K) {
+  QDK_LOG_TRACE_ENTERING();
+
 #ifdef QDK_CHEMISTRY_ENABLE_GPU
   allocate_device_buffer_async_(device_buffer_sz_, 0);
 #endif
@@ -411,6 +427,8 @@ void GAUXC::build_snK(const double* D, double* K) {
 
 void GAUXC::eval_fxc_contraction(const double* D, const double* tD,
                                  double* Fxc) {
+  QDK_LOG_TRACE_ENTERING();
+
   AutoTimer __timer("polarizability::  GAUXC::eval_fxc_contraction");
   // Allocate a large temporary buffer
 #ifdef QDK_CHEMISTRY_ENABLE_GPU

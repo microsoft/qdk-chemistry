@@ -68,3 +68,6 @@ unitarity_error_tolerance = 1e-10
 # This is the tolerance for comparing structures related to xyz file inputs.
 # Consistency of the tested modules can only be expected to agree up to this tolerance.
 xyz_file_structure_tolerance = 1e-6
+
+# This is the tolerance to check the mp2 energies against pyscf
+mp2_energy_tolerance = 1e-8

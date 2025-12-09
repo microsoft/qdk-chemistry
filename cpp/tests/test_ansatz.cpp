@@ -202,44 +202,21 @@ TEST_F(AnsatzEnergyCalculationTest, N2SingletCAS_6e6o) {
   EXPECT_NEAR(energy, E_cas, testing::scf_energy_tolerance);
 }
 
-// TODO(MM): Comment in as soon as the unrestricted Hamiltonian is merged
-// TEST_F(AnsatzEnergyCalculationTest, O2TripletCAS_8e6o) {
-//   // O2 structure
-//   auto structure = testing::create_o2_structure();
+TEST_F(AnsatzEnergyCalculationTest, O2TripletCAS_8e6o) {
+  // O2 structure
+  auto structure = testing::create_o2_structure();
 
-//   // get wavefunction
-//   auto scf = ScfSolverFactory::create();
-//   const auto& [E_scf, wfn_scf] = scf->run(structure, 0, 3);
+  // get wavefunction
+  auto scf = ScfSolverFactory::create();
+  const auto& [E_scf, wfn_scf] = scf->run(structure, 0, 3);
 
-//   // get full hamiltonian
-//   auto hamil_ctor = HamiltonianConstructorFactory::create();
-//   auto hamiltonian_hf = hamil_ctor->run(wfn_scf->get_orbitals());
+  // get full hamiltonian
+  auto hamil_ctor = HamiltonianConstructorFactory::create();
+  auto hamiltonian_hf = hamil_ctor->run(wfn_scf->get_orbitals());
 
-//   // get ansatz and energy
-//   auto ansatz_hf = Ansatz(hamiltonian_hf, wfn_scf);
-//   double energy_hf = ansatz_hf.calculate_energy();
+  // get ansatz and energy
+  auto ansatz_hf = Ansatz(hamiltonian_hf, wfn_scf);
+  double energy_hf = ansatz_hf.calculate_energy();
 
-//   EXPECT_NEAR(energy_hf, E_scf, testing::scf_energy_tolerance);
-
-//   // select active space
-//   auto active_space = ActiveSpaceSelectorFactory::create("valence");
-//   active_space->settings().set("num_active_electrons", 8);
-//   active_space->settings().set("num_active_orbitals", 6);
-//   auto active_space_wfn = active_space->run(wfn_scf);
-
-//   // get hamiltonian
-//   auto hamiltonian_cas = hamil_ctor->run(wfn_scf->get_orbitals());
-
-//   // get cas wavefunction
-//   auto mc_calc = MultiConfigurationCalculatorFactory::create("macis_cas");
-//   auto [E_cas, wfn_cas] = mc_calc->run(
-//       hamiltonian_hf, active_space_wfn->get_active_num_electrons().first,
-//       active_space_wfn->get_active_num_electrons().second);
-
-//   // get ansatz and energy
-//   auto ansatz = Ansatz(hamiltonian_cas, wfn_cas);
-//   double energy = ansatz.calculate_energy();
-
-//   // energy should match SCF energy
-//   EXPECT_NEAR(energy, E_cas, testing::scf_energy_tolerance);
-// }
+  EXPECT_NEAR(energy_hf, E_scf, testing::scf_energy_tolerance);
+}

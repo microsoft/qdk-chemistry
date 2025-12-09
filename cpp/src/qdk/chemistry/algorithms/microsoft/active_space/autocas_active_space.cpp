@@ -6,15 +6,18 @@
 
 #include <algorithm>
 #include <numeric>
+#include <qdk/chemistry/utils/logger.hpp>
 #include <set>
 
 namespace qdk::chemistry::algorithms::microsoft {
 
 std::shared_ptr<data::Wavefunction> AutocasActiveSpaceSelector::_run_impl(
     std::shared_ptr<data::Wavefunction> wavefunction) const {
+  QDK_LOG_TRACE_ENTERING();
+
   // get settings
-  const size_t min_plateau_size = _settings->get<size_t>("min_plateau_size");
-  const size_t num_bins = _settings->get<size_t>("num_bins");
+  const int64_t min_plateau_size = _settings->get<int64_t>("min_plateau_size");
+  const int64_t num_bins = _settings->get<int64_t>("num_bins");
   const double entropy_threshold = _settings->get<double>("entropy_threshold");
   const bool normalize_entropies = _settings->get<bool>("normalize_entropies");
 

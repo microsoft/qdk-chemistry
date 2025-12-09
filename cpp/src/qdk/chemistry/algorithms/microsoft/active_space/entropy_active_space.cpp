@@ -5,12 +5,15 @@
 #include "entropy_active_space.hpp"
 
 #include <algorithm>
+#include <qdk/chemistry/utils/logger.hpp>
 #include <set>
 
 namespace qdk::chemistry::algorithms::microsoft {
 
 std::shared_ptr<data::Wavefunction> AutocasEosActiveSpaceSelector::_run_impl(
     std::shared_ptr<data::Wavefunction> wavefunction) const {
+  QDK_LOG_TRACE_ENTERING();
+
   // get settings
   const double entropy_threshold = _settings->get<double>("entropy_threshold");
   const double plateau_threshold = _settings->get<double>("diff_threshold");

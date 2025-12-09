@@ -6,6 +6,7 @@
 
 #include <qdk/chemistry/scf/util/gauxc_registry.h>
 
+#include <qdk/chemistry/utils/logger.hpp>
 #include <stdexcept>
 
 #include "util/timer.h"
@@ -55,12 +56,14 @@ class ERI {
    */
   ERI(bool unr, const BasisSet& basis_set, GAUXCInput gauxc_input,
       std::string xc_name) {
+    QDK_LOG_TRACE_ENTERING();
+
     unrestricted_ = unr;
     gauxc_input_ = gauxc_input;
     xc_name_ = xc_name == "HF" ? "PBE0" : xc_name;  // does not matter
     num_atomic_orbitals_ = basis_set.num_atomic_orbitals;
 
-    // Get or create the GAUXC implementation from the registry
+    // Get or create the GauXC implementation from the registry
     util::GAUXCRegistry::get_or_create(const_cast<BasisSet&>(basis_set),
                                        gauxc_input_, unrestricted_, xc_name_);
   }
@@ -91,6 +94,8 @@ class ERI {
    */
   void build_JK(const double* P, double* J, double* K, double alpha,
                 double beta, double omega) {
+    QDK_LOG_TRACE_ENTERING();
+
     AutoTimer t("ERI::build_JK");
     const size_t mat_size =
         (unrestricted_ ? 2 : 1) * num_atomic_orbitals_ * num_atomic_orbitals_;
@@ -137,6 +142,8 @@ class ERI {
    */
   void get_gradients(const double* P, double* dJ, double* dK, double alpha,
                      double beta, double omega) {
+    QDK_LOG_TRACE_ENTERING();
+
     throw std::runtime_error("SNK + Gradients Not Yet Implemented");
   }
 
@@ -155,6 +162,8 @@ class ERI {
    * @throws std::runtime_error Always - quarter transformation not supported
    */
   void quarter_trans(size_t nt, const double* C, double* out) {
+    QDK_LOG_TRACE_ENTERING();
+
     throw std::runtime_error("SNK cannot be used for quarter transformation");
   };
 
@@ -175,6 +184,8 @@ class ERI {
                                              const BasisSet& basis_set,
                                              GAUXCInput gauxc_input,
                                              std::string xc_name) {
+    QDK_LOG_TRACE_ENTERING();
+
     return std::make_unique<ERI>(unr, basis_set, gauxc_input, xc_name);
   }
 };
@@ -185,13 +196,17 @@ SNK::SNK(bool unr, BasisSet& basis_set, GAUXCInput gauxc_input,
          std::string xc_name, ParallelConfig _mpi)
     : ERI(unr, 0.0, basis_set, _mpi),
       eri_impl_(
-          snk::ERI::make_gauxc_snk(unr, basis_set, gauxc_input, xc_name)) {}
+          snk::ERI::make_gauxc_snk(unr, basis_set, gauxc_input, xc_name)) {
+  QDK_LOG_TRACE_ENTERING();
+}
 
 SNK::~SNK() noexcept = default;
 
 // Public interface implementation - delegates to internal ERI implementation
 void SNK::build_JK(const double* P, double* J, double* K, double alpha,
                    double beta, double omega) {
+  QDK_LOG_TRACE_ENTERING();
+
   if (!eri_impl_) throw std::runtime_error("SNK NOT INITIALIZED");
   eri_impl_->build_JK(P, J, K, alpha, beta, omega);
 }
@@ -199,6 +214,8 @@ void SNK::build_JK(const double* P, double* J, double* K, double alpha,
 // Override implementation for ERI base class
 void SNK::build_JK_impl_(const double* P, double* J, double* K, double alpha,
                          double beta, double omega) {
+  QDK_LOG_TRACE_ENTERING();
+
   if (!eri_impl_) throw std::runtime_error("SNK NOT INITIALIZED");
   eri_impl_->build_JK(P, J, K, alpha, beta, omega);
 }
@@ -206,12 +223,16 @@ void SNK::build_JK_impl_(const double* P, double* J, double* K, double alpha,
 // Gradient computation interface
 void SNK::get_gradients(const double* P, double* dJ, double* dK, double alpha,
                         double beta, double omega) {
+  QDK_LOG_TRACE_ENTERING();
+
   if (!eri_impl_) throw std::runtime_error("SNK NOT INITIALIZED");
   eri_impl_->get_gradients(P, dJ, dK, alpha, beta, omega);
 }
 
 // Quarter transformation interface
 void SNK::quarter_trans_impl(size_t nt, const double* C, double* out) {
+  QDK_LOG_TRACE_ENTERING();
+
   if (!eri_impl_) throw std::runtime_error("SNK NOT INITIALIZED");
   eri_impl_->quarter_trans(nt, C, out);
 };

@@ -11,6 +11,7 @@
 #include <macis/util/mpi.hpp>
 #include <qdk/chemistry/data/structure.hpp>
 #include <qdk/chemistry/data/wavefunction_containers/cas.hpp>
+#include <qdk/chemistry/utils/logger.hpp>
 
 namespace qdk::chemistry::algorithms::microsoft {
 
@@ -33,6 +34,8 @@ struct cas_helper {
   static return_type impl(const data::Hamiltonian& hamiltonian,
                           const data::Settings& settings_, unsigned int nalpha,
                           unsigned int nbeta) {
+    QDK_LOG_TRACE_ENTERING();
+
     using wfn_type = macis::wfn_t<N>;
     using generator_t = macis::SortedDoubleLoopHamiltonianGenerator<wfn_type>;
 
@@ -47,8 +50,8 @@ struct cas_helper {
     }
     const size_t num_molecular_orbitals = active_indices.size();
 
-    const auto& T = hamiltonian.get_one_body_integrals();
-    const auto& V = hamiltonian.get_two_body_integrals();
+    const auto& [T_a, T_b] = hamiltonian.get_one_body_integrals();
+    const auto& [V_aaaa, V_aabb, V_bbbb] = hamiltonian.get_two_body_integrals();
 
     // get settings
     macis::MCSCFSettings mcscf_settings = get_mcscf_settings_(settings_);
@@ -60,8 +63,8 @@ struct cas_helper {
 
     E_casci = macis::CASRDMFunctor<generator_t>::rdms(
         mcscf_settings, macis::NumOrbital(num_molecular_orbitals), nalpha,
-        nbeta, const_cast<double*>(T.data()), const_cast<double*>(V.data()),
-        nullptr, nullptr, C_casci);
+        nbeta, const_cast<double*>(T_a.data()),
+        const_cast<double*>(V_aaaa.data()), nullptr, nullptr, C_casci);
     // Generate determinant basis for RDM calculation
     dets = macis::generate_hilbert_space<typename generator_t::full_det_t>(
         num_molecular_orbitals, nalpha, nbeta);
@@ -69,10 +72,10 @@ struct cas_helper {
     // Build Hamiltonian generator and delegate wavefunction construction via
     // unified builder
     generator_t ham_gen(macis::matrix_span<double>(
-                            const_cast<double*>(T.data()),
+                            const_cast<double*>(T_a.data()),
                             num_molecular_orbitals, num_molecular_orbitals),
                         macis::rank4_span<double>(
-                            const_cast<double*>(V.data()),
+                            const_cast<double*>(V_aaaa.data()),
                             num_molecular_orbitals, num_molecular_orbitals,
                             num_molecular_orbitals, num_molecular_orbitals));
 
@@ -91,6 +94,8 @@ std::pair<double, std::shared_ptr<data::Wavefunction>> MacisCas::_run_impl(
     std::shared_ptr<data::Hamiltonian> hamiltonian,
     unsigned int n_active_alpha_electrons,
     unsigned int n_active_beta_electrons) const {
+  QDK_LOG_TRACE_ENTERING();
+
   const auto& orbitals = hamiltonian->get_orbitals();
   const auto& [active_indices, active_indices_beta] =
       orbitals->get_active_space_indices();

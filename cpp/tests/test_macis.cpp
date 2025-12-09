@@ -1170,3 +1170,189 @@ TEST_F(MacisPmcTest, InvalidConfigurationHandling) {
   EXPECT_THROW(calculator->run(hamiltonian, wrong_length_configs),
                std::exception);
 }
+
+// Test fixture for ASCI exponential backoff tests
+// Inherits from MacisAsciTest to reuse setup, but uses sto-3g for faster tests
+class MacisAsciBackoffTest : public MacisAsciTest {
+ protected:
+  void SetUp() override {
+    // Use the water molecule for consistent testing
+    structure_ = testing::create_water_structure();
+
+    // Run SCF with smaller basis set for faster backoff tests
+    auto scf_solver = ScfSolverFactory::create();
+    scf_solver->settings().set("basis_set", std::string("sto-3g"));
+
+    auto [scf_energy, wavefunction] = scf_solver->run(structure_, 0, 1);
+    hf_energy_ = scf_energy;
+    water_scf_wavefunction_ = wavefunction;
+    orbitals_ = wavefunction->get_orbitals();
+
+    // Create Hamiltonian constructor for reuse
+    hamiltonian_constructor_ = HamiltonianConstructorFactory::create();
+  }
+
+  double hf_energy_;
+};
+
+// Test that fractional grow_factor values work correctly
+TEST_F(MacisAsciBackoffTest, FractionalGrowFactor) {
+  auto calculator = MultiConfigurationCalculatorFactory::create("macis_asci");
+  ASSERT_NE(calculator, nullptr);
+
+  calculator->settings().set("ntdets_max", static_cast<size_t>(100));
+  calculator->settings().set("ntdets_min", static_cast<size_t>(5));
+  calculator->settings().set("grow_factor", 2.5);  // Fractional value
+  calculator->settings().set("max_refine_iter", static_cast<size_t>(0));
+
+  auto hamiltonian = hamiltonian_constructor_->run(orbitals_);
+  auto [energy, wavefunction] = calculator->run(hamiltonian, 5, 5);
+
+  // Should complete successfully with fractional grow_factor
+  ASSERT_LT(energy, hf_energy_);
+  EXPECT_GT(wavefunction->size(), 1);
+}
+
+// Test that small grow_factor with backoff completes successfully
+TEST_F(MacisAsciBackoffTest, SmallGrowFactorWithBackoff) {
+  auto calculator = MultiConfigurationCalculatorFactory::create("macis_asci");
+  ASSERT_NE(calculator, nullptr);
+
+  calculator->settings().set("ntdets_max", static_cast<size_t>(200));
+  calculator->settings().set("ntdets_min", static_cast<size_t>(5));
+  calculator->settings().set("grow_factor", 1.2);  // Small growth factor
+  calculator->settings().set(
+      "ncdets_max",
+      static_cast<size_t>(20));  // Limited to trigger backoff
+  calculator->settings().set("max_refine_iter", static_cast<size_t>(0));
+
+  auto hamiltonian = hamiltonian_constructor_->run(orbitals_);
+
+  // Should complete without throwing even if growth is constrained
+  auto [energy, wavefunction] = calculator->run(hamiltonian, 5, 5);
+  ASSERT_LT(energy, hf_energy_);
+  EXPECT_GT(wavefunction->size(), 1);
+}
+
+// Test that very aggressive settings trigger backoff mechanism
+TEST_F(MacisAsciBackoffTest, AggressiveSettingsTriggerBackoff) {
+  auto calculator = MultiConfigurationCalculatorFactory::create("macis_asci");
+  ASSERT_NE(calculator, nullptr);
+
+  calculator->settings().set("ntdets_max", static_cast<size_t>(500));
+  calculator->settings().set("ntdets_min", static_cast<size_t>(5));
+  calculator->settings().set("grow_factor", 10.0);  // Very aggressive
+  calculator->settings().set(
+      "ncdets_max",
+      static_cast<size_t>(10));  // Very limited to force backoff
+  calculator->settings().set("max_refine_iter", static_cast<size_t>(0));
+
+  auto hamiltonian = hamiltonian_constructor_->run(orbitals_);
+
+  // Should gracefully handle inability to grow as fast as requested
+  auto [energy, wavefunction] = calculator->run(hamiltonian, 5, 5);
+  ASSERT_LT(energy, hf_energy_);
+  EXPECT_GT(wavefunction->size(), 1);
+}
+
+// Test that normal settings don't trigger unnecessary backoff
+TEST_F(MacisAsciBackoffTest, NormalSettingsNoBackoff) {
+  auto calculator = MultiConfigurationCalculatorFactory::create("macis_asci");
+  ASSERT_NE(calculator, nullptr);
+
+  calculator->settings().set("ntdets_max", static_cast<size_t>(100));
+  calculator->settings().set("ntdets_min", static_cast<size_t>(10));
+  calculator->settings().set("grow_factor", 4.0);  // Reasonable growth
+  calculator->settings().set("ncdets_max",
+                             static_cast<size_t>(100));  // Plenty of room
+  calculator->settings().set("max_refine_iter", static_cast<size_t>(0));
+
+  auto hamiltonian = hamiltonian_constructor_->run(orbitals_);
+  auto [energy, wavefunction] = calculator->run(hamiltonian, 5, 5);
+
+  // Should reach target size
+  EXPECT_EQ(wavefunction->size(), 100);
+  ASSERT_LT(energy, hf_energy_);
+}
+
+// Test that grow_factor <= 1.0 throws an error
+TEST_F(MacisAsciBackoffTest, InvalidGrowFactorThrows) {
+  auto calculator = MultiConfigurationCalculatorFactory::create("macis_asci");
+  ASSERT_NE(calculator, nullptr);
+
+  calculator->settings().set("ntdets_max", static_cast<size_t>(100));
+  calculator->settings().set("ntdets_min", static_cast<size_t>(10));
+  calculator->settings().set("grow_factor", 1.0);  // Invalid: must be > 1.0
+
+  auto hamiltonian = hamiltonian_constructor_->run(orbitals_);
+
+  // Should throw because grow_factor <= 1.0
+  EXPECT_THROW(calculator->run(hamiltonian, 5, 5), std::runtime_error);
+}
+
+// Test that grow_factor slightly above 1.0 works
+TEST_F(MacisAsciBackoffTest, MinimalGrowFactorWorks) {
+  auto calculator = MultiConfigurationCalculatorFactory::create("macis_asci");
+  ASSERT_NE(calculator, nullptr);
+
+  calculator->settings().set("ntdets_max", static_cast<size_t>(50));
+  calculator->settings().set("ntdets_min", static_cast<size_t>(10));
+  calculator->settings().set("grow_factor", 1.01);  // Minimal valid value
+
+  auto hamiltonian = hamiltonian_constructor_->run(orbitals_);
+
+  // Should complete successfully
+  auto [energy, wavefunction] = calculator->run(hamiltonian, 5, 5);
+  ASSERT_LT(energy, hf_energy_);
+  EXPECT_GT(wavefunction->size(), 1);
+}
+
+// Test that growth recovery mechanism works after successful growth
+TEST_F(MacisAsciBackoffTest, GrowthRecoveryMechanism) {
+  auto calculator = MultiConfigurationCalculatorFactory::create("macis_asci");
+  ASSERT_NE(calculator, nullptr);
+
+  // Set up to trigger initial backoff, then allow recovery
+  calculator->settings().set("ntdets_max", static_cast<size_t>(500));
+  calculator->settings().set("ntdets_min", static_cast<size_t>(5));
+  calculator->settings().set("grow_factor", 8.0);  // High initial factor
+  calculator->settings().set("growth_recovery_rate", 1.2);  // Recovery enabled
+  calculator->settings().set(
+      "ncdets_max",
+      static_cast<size_t>(30));  // Moderate limit to trigger some backoff
+  calculator->settings().set("max_refine_iter", static_cast<size_t>(0));
+
+  auto hamiltonian = hamiltonian_constructor_->run(orbitals_);
+
+  // Should complete successfully - the key test is that the algorithm
+  // doesn't stall and produces a valid correlated energy
+  auto [energy, wavefunction] = calculator->run(hamiltonian, 5, 5);
+  ASSERT_LT(energy, hf_energy_);  // Correlation methods must lower energy
+  // Wavefunction should have grown beyond the minimum
+  EXPECT_GT(wavefunction->size(), static_cast<size_t>(5));
+}
+
+// Test that backoff persists when recovery is minimal
+TEST_F(MacisAsciBackoffTest, MinimalRecoveryKeepsBackoff) {
+  auto calculator = MultiConfigurationCalculatorFactory::create("macis_asci");
+  ASSERT_NE(calculator, nullptr);
+
+  // Recovery rate of 1.001 means grow_factor recovers very slowly after backoff
+  calculator->settings().set("ntdets_max", static_cast<size_t>(200));
+  calculator->settings().set("ntdets_min", static_cast<size_t>(5));
+  calculator->settings().set("grow_factor", 4.0);
+  calculator->settings().set("growth_recovery_rate",
+                             1.001);                       // Minimal recovery
+  calculator->settings().set("growth_backoff_rate", 0.5);  // Aggressive backoff
+  calculator->settings().set(
+      "ncdets_max",
+      static_cast<size_t>(10));  // Very restrictive to force backoff
+  calculator->settings().set("max_refine_iter", static_cast<size_t>(0));
+
+  auto hamiltonian = hamiltonian_constructor_->run(orbitals_);
+
+  // Should still complete - backoff allows progress even with minimal recovery
+  auto [energy, wavefunction] = calculator->run(hamiltonian, 5, 5);
+  ASSERT_LT(energy, hf_energy_);
+  EXPECT_GT(wavefunction->size(), static_cast<size_t>(1));
+}

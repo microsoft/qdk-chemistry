@@ -8,75 +8,78 @@
 
 // --------------------------------------------------------------------------------------------
 // start-cell-create
-// Obtain orbitals from an SCF calculation
-auto scf_solver = ScfSolverFactory::create();
-auto [E_scf, orbitals] = scf_solver->solve(structure);
+#include <iostream>
+#include <qdk/chemistry.hpp>
+#include <string>
+using namespace qdk::chemistry::data;
+using namespace qdk::chemistry::algorithms;
 
-// set coefficients manually example (restricted)
-Orbitals orbs_manual;
-Eigen::MatrixXd coeffs = /* coefficient matrix */;
-orbs_manual.set_coefficients(coeffs);  // Same for alpha and beta
+int main() {
+  // Obtain orbitals from an SCF calculation
+  // Create H2 molecule
+  std::vector<Eigen::Vector3d> coords = {{0.0, 0.0, 0.0}, {0.0, 0.0, 1.4}};
+  std::vector<std::string> symbols = {"H", "H"};
+  Structure structure(coords, symbols);
 
-// set coefficients manually example (unrestricted)
-Orbitals orbs_unrestricted;
-Eigen::MatrixXd coeffs_alpha = /* alpha coefficients */;
-Eigen::MatrixXd coeffs_beta = /* beta coefficients */;
-orbs_unrestricted.set_coefficients(coeffs_alpha, coeffs_beta);
-// end-cell-create
-// --------------------------------------------------------------------------------------------
+  // Obtain orbitals from an SCF calculation
+  auto scf_solver = ScfSolverFactory::create();
+  scf_solver->settings().set("basis_set", "sto-3g");
+  auto [E_scf, wfn] = scf_solver->run(structure, 0, 1);
+  std::shared_ptr<Orbitals> orbitals = wfn.get_orbitals();
 
-// --------------------------------------------------------------------------------------------
-// start-cell-access
-// Access orbital coefficients (returns std::pair<const Eigen::MatrixXd&, const
-// Eigen::MatrixXd&>)
-auto [coeffs_alpha, coeffs_beta] = orbitals.get_coefficients();
+  // end-cell-create
+  // --------------------------------------------------------------------------------------------
 
-// Access orbital energies (returns std::pair<const Eigen::VectorXd&, const
-// Eigen::VectorXd&>)
-auto [energies_alpha, energies_beta] = orbitals.get_energies();
+  // --------------------------------------------------------------------------------------------
+  // start-cell-model-orbitals-create
+  // Set basis set size
+  size_t basis_size = 6;
 
-// Access orbital occupations (returns std::pair<const Eigen::VectorXd&, const
-// Eigen::VectorXd&>)
-auto [occs_alpha, occs_beta] = orbitals.get_occupations();
+  // Set active orbitals
+  std::vector<size_t> alpha_active = {1, 2};
+  std::vector<size_t> beta_active = {2, 3, 4};
+  std::vector<size_t> alpha_inactive = {0, 3, 4, 5};
+  std::vector<size_t> beta_inactive = {0, 1, 5};
 
-// Access atomic orbital overlap matrix (returns const Eigen::MatrixXd&)
-const auto& ao_overlap = orbitals.get_overlap_matrix();
+  ModelOrbitals model_orbitals(
+      basis_size, std::make_tuple(alpha_active, beta_active, alpha_inactive,
+                                  beta_inactive));
 
-// Access basis set information (returns const BasisSet&)
-const auto& basis_set = orbitals.get_basis_set();
+  // We can then pass this object to a custom Hamiltonian constructor
+  // end-cell-model-orbitals-create
+  // --------------------------------------------------------------------------------------------
 
-// Check calculation type
-bool is_restricted = orbitals.is_restricted();
-bool is_open_shell = orbitals.is_open_shell();
+  // --------------------------------------------------------------------------------------------
+  // start-cell-access
+  // Access orbital coefficients (returns std::pair<const Eigen::MatrixXd&,
+  // const Eigen::MatrixXd&>)
+  auto [coeffs_alpha, coeffs_beta] = orbitals->get_coefficients();
 
-// Get size information
-size_t num_molecular_orbitals = orbitals.get_num_molecular_orbitals();
-size_t num_atomic_orbitals = orbitals.get_num_atomic_orbitals();
-auto [n_electrons_alpha, n_electrons_beta] =
-    orbitals.get_num_electrons();  // returns std::pair<double, double>
+  // Access orbital energies (returns std::pair<const Eigen::VectorXd&, const
+  // Eigen::VectorXd&>)
+  auto [energies_alpha, energies_beta] = orbitals->get_energies();
 
-std::string summary = orbitals.get_summary();
-std::cout << summary << std::endl;
-// end-cell-access
-// --------------------------------------------------------------------------------------------
+  // Get active space indices
+  auto [active_indices_alpha, active_indices_beta] =
+      orbitals->get_active_space_indices();
 
-// --------------------------------------------------------------------------------------------
-// start-cell-serialization
-// Generic serialization with format specification
-orbitals.to_file("molecule.orbitals.json", "json");
-auto orbitals_from_file = Orbitals::from_file("molecule.orbitals.json", "json");
+  // Access atomic orbital overlap matrix (returns const Eigen::MatrixXd&)
+  const auto& ao_overlap = orbitals->get_overlap_matrix();
 
-// JSON serialization
-orbitals.to_json_file("molecule.orbitals.json");
-auto orbitals_from_json_file =
-    Orbitals::from_json_file("molecule.orbitals.json");
+  // Access basis set information (returns const BasisSet&)
+  const auto& basis_set = orbitals->get_basis_set();
 
-// Direct JSON conversion
-nlohmann::json j = orbitals.to_json();
-auto orbitals_from_json = Orbitals::from_json(j);
+  // Check calculation type
+  bool is_restricted = orbitals->is_restricted();
 
-// HDF5 serialization
-orbitals.to_hdf5_file("molecule.orbitals.h5");
-auto orbitals_from_hdf5_file = Orbitals::from_hdf5_file("molecule.orbitals.h5");
-// end-cell-serialization
-// --------------------------------------------------------------------------------------------
+  // Get size information
+  size_t num_molecular_orbitals = orbitals->get_num_molecular_orbitals();
+  size_t num_atomic_orbitals = orbitals->get_num_atomic_orbitals();
+
+  std::string summary = orbitals->get_summary();
+  std::cout << summary << std::endl;
+
+  // end-cell-access
+  // --------------------------------------------------------------------------------------------
+  return 0;
+}

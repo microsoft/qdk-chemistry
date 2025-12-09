@@ -8,6 +8,7 @@
 #include <qdk/chemistry/data/structure.hpp>
 #include <qdk/chemistry/data/wavefunction_containers/cas.hpp>
 #include <qdk/chemistry/data/wavefunction_containers/sd.hpp>
+#include <qdk/chemistry/utils/logger.hpp>
 #include <variant>
 
 #include "microsoft/active_space/autocas_active_space.hpp"
@@ -22,6 +23,8 @@ namespace detail {
 std::tuple<double, std::vector<size_t>, Eigen::VectorXd>
 _sort_entropies_and_indices(std::shared_ptr<data::Wavefunction> wavefunction,
                             bool normalize_entropies) {
+  QDK_LOG_TRACE_ENTERING();
+
   // get orbitals which have entropies
   auto orbitals = wavefunction->get_orbitals();
   const auto& [active_space_indices, active_space_indices_beta] =
@@ -73,6 +76,7 @@ std::shared_ptr<data::Orbitals> new_orbitals(
     std::shared_ptr<data::Wavefunction> wavefunction,
     const std::vector<size_t>& active_space_indices_a,
     const std::optional<std::vector<size_t>>& active_space_indices_b) {
+  QDK_LOG_TRACE_ENTERING();
   auto orbitals = wavefunction->get_orbitals();
 
   if (orbitals->is_restricted() || !active_space_indices_b.has_value()) {
@@ -175,6 +179,8 @@ std::shared_ptr<data::Orbitals> new_orbitals(
 
 std::vector<size_t> _get_inactive_space_indices(
     size_t nelec, const std::vector<size_t>& active_space_indices) {
+  QDK_LOG_TRACE_ENTERING();
+
   std::vector<size_t> inactive_indices;
   for (size_t i = 0; i < nelec / 2; ++i) {
     inactive_indices.push_back(i);
@@ -196,6 +202,8 @@ std::pair<std::vector<size_t>, std::vector<size_t>> _get_inactive_space_indices(
     size_t nelec_a, size_t nelec_b,
     const std::vector<size_t>& active_space_indices_a,
     const std::vector<size_t>& active_space_indices_b) {
+  QDK_LOG_TRACE_ENTERING();
+
   std::vector<size_t> inactive_indices_a;
   std::vector<size_t> inactive_indices_b;
   for (size_t i = 0; i < nelec_a; ++i) {
@@ -234,6 +242,7 @@ data::Configuration _extract_active_orbitals(
     const data::Configuration& det,
     const std::vector<size_t>& old_active_indices,
     const std::vector<size_t>& new_active_indices) {
+  QDK_LOG_TRACE_ENTERING();
   // Create a string representation with only the new active orbitals
   std::string active_det_string(new_active_indices.size(), '0');
 
@@ -274,6 +283,7 @@ data::Configuration _extract_active_orbitals(
 std::shared_ptr<data::Wavefunction> new_wavefunction(
     std::shared_ptr<data::Wavefunction> wavefunction,
     std::shared_ptr<data::Orbitals> new_orbitals) {
+  QDK_LOG_TRACE_ENTERING();
   if (!wavefunction) {
     throw std::invalid_argument("Wavefunction pointer cannot be nullptr");
   }
@@ -352,26 +362,35 @@ std::shared_ptr<data::Wavefunction> new_wavefunction(
 }  // namespace detail
 
 std::unique_ptr<ActiveSpaceSelector> make_valence_active_space_selector() {
+  QDK_LOG_TRACE_ENTERING();
+
   return std::make_unique<
       qdk::chemistry::algorithms::microsoft::ValenceActiveSpaceSelector>();
 }
 
 std::unique_ptr<ActiveSpaceSelector> make_occupation_active_space_selector() {
+  QDK_LOG_TRACE_ENTERING();
+
   return std::make_unique<
       qdk::chemistry::algorithms::microsoft::OccupationActiveSpaceSelector>();
 }
 
 std::unique_ptr<ActiveSpaceSelector> make_autocas_active_space_selector() {
+  QDK_LOG_TRACE_ENTERING();
+
   return std::make_unique<
       qdk::chemistry::algorithms::microsoft::AutocasActiveSpaceSelector>();
 }
 
 std::unique_ptr<ActiveSpaceSelector> make_autocas_eos_active_space_selector() {
+  QDK_LOG_TRACE_ENTERING();
   return std::make_unique<
       qdk::chemistry::algorithms::microsoft::AutocasEosActiveSpaceSelector>();
 }
 
 void ActiveSpaceSelectorFactory::register_default_instances() {
+  QDK_LOG_TRACE_ENTERING();
+
   ActiveSpaceSelectorFactory::register_instance(
       &make_valence_active_space_selector);
   ActiveSpaceSelectorFactory::register_instance(

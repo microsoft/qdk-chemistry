@@ -5,12 +5,14 @@
 #include <fstream>
 #include <nlohmann/json.hpp>
 #include <qdk/chemistry/data/configuration.hpp>
+#include <qdk/chemistry/utils/logger.hpp>
 #include <sstream>
 
 namespace qdk::chemistry::data {
 
 // Constructor from string representation (e.g., "22uudd000")
 Configuration::Configuration(const std::string& str) {
+  QDK_LOG_TRACE_ENTERING();
   size_t num_orbitals = str.size();
   _packed_orbs.resize((num_orbitals + 3) / 4,
                       0);  // Each byte stores 4 orbitals
@@ -40,6 +42,8 @@ Configuration::Configuration(const std::string& str) {
 
 // Convert back to string representation
 std::string Configuration::to_string() const {
+  QDK_LOG_TRACE_ENTERING();
+
   size_t num_orbitals = get_orbital_capacity();
   std::string result(num_orbitals, '0');
   for (size_t i = 0; i < num_orbitals; ++i) {
@@ -64,6 +68,8 @@ std::string Configuration::to_string() const {
 
 // Get number of electrons
 std::tuple<size_t, size_t> Configuration::get_n_electrons() const {
+  QDK_LOG_TRACE_ENTERING();
+
   size_t num_orbitals = get_orbital_capacity();
   size_t n_alpha = 0, n_beta = 0;
 
@@ -77,6 +83,8 @@ std::tuple<size_t, size_t> Configuration::get_n_electrons() const {
 
 // Check if orbital has alpha electron
 bool Configuration::has_alpha_electron(size_t orbital_idx) const {
+  QDK_LOG_TRACE_ENTERING();
+
   size_t num_orbitals = get_orbital_capacity();
   if (orbital_idx >= num_orbitals) {
     return false;
@@ -87,6 +95,8 @@ bool Configuration::has_alpha_electron(size_t orbital_idx) const {
 
 // Check if orbital has beta electron
 bool Configuration::has_beta_electron(size_t orbital_idx) const {
+  QDK_LOG_TRACE_ENTERING();
+
   size_t num_orbitals = get_orbital_capacity();
   if (orbital_idx >= num_orbitals) {
     return false;
@@ -97,6 +107,8 @@ bool Configuration::has_beta_electron(size_t orbital_idx) const {
 
 // Equality operator for std::find and other algorithms
 bool Configuration::operator==(const Configuration& other) const {
+  QDK_LOG_TRACE_ENTERING();
+
   // Check if they have the same storage size (and thus capacity)
   if (_packed_orbs.size() != other._packed_orbs.size()) {
     return false;
@@ -115,16 +127,22 @@ bool Configuration::operator==(const Configuration& other) const {
 
 // Capacity (number of orbitals)
 size_t Configuration::get_orbital_capacity() const {
+  QDK_LOG_TRACE_ENTERING();
+
   return _packed_orbs.size() * 4;  // Each byte stores 4 orbitals
 }
 
 // Inequality operator (for completeness)
 bool Configuration::operator!=(const Configuration& other) const {
+  QDK_LOG_TRACE_ENTERING();
+
   return !(*this == other);
 }
 
 // Get the occupation state of an orbital
 Configuration::OccupationState Configuration::_get_orbital(size_t pos) const {
+  QDK_LOG_TRACE_ENTERING();
+
   size_t byte_pos = pos / 4;
   size_t bit_offset = (pos % 4) * 2;  // Each orbital uses 2 bits
   return static_cast<OccupationState>((_packed_orbs[byte_pos] >> bit_offset) &
@@ -133,6 +151,8 @@ Configuration::OccupationState Configuration::_get_orbital(size_t pos) const {
 
 // Set the occupation state of an orbital
 void Configuration::_set_orbital(size_t pos, OccupationState value) {
+  QDK_LOG_TRACE_ENTERING();
+
   size_t byte_pos = pos / 4;
   size_t bit_offset = (pos % 4) * 2;
 
@@ -147,6 +167,8 @@ void Configuration::_set_orbital(size_t pos, OccupationState value) {
 Configuration Configuration::canonical_hf_configuration(size_t n_alpha,
                                                         size_t n_beta,
                                                         size_t n_orbitals) {
+  QDK_LOG_TRACE_ENTERING();
+
   std::string config_str;
   config_str.reserve(n_orbitals);
 
@@ -173,6 +195,8 @@ Configuration Configuration::canonical_hf_configuration(size_t n_alpha,
 }
 
 nlohmann::json Configuration::to_json() const {
+  QDK_LOG_TRACE_ENTERING();
+
   nlohmann::json j;
   // Store as string representation for human readability
   j["configuration"] = to_string();
@@ -180,6 +204,8 @@ nlohmann::json Configuration::to_json() const {
 }
 
 Configuration Configuration::from_json(const nlohmann::json& j) {
+  QDK_LOG_TRACE_ENTERING();
+
   if (!j.contains("configuration")) {
     throw std::runtime_error("JSON missing required 'configuration' field");
   }
@@ -188,6 +214,8 @@ Configuration Configuration::from_json(const nlohmann::json& j) {
 }
 
 void Configuration::to_hdf5(H5::Group& group) const {
+  QDK_LOG_TRACE_ENTERING();
+
   try {
     hsize_t packed_size = _packed_orbs.size();
     H5::DataSpace dataspace(1, &packed_size);
@@ -211,6 +239,8 @@ void Configuration::to_hdf5(H5::Group& group) const {
 }
 
 Configuration Configuration::from_hdf5(H5::Group& group) {
+  QDK_LOG_TRACE_ENTERING();
+
   try {
     H5::DataSet dataset = group.openDataSet("configuration");
 
@@ -239,6 +269,8 @@ Configuration Configuration::from_hdf5(H5::Group& group) {
 }
 
 std::string Configuration::get_summary() const {
+  QDK_LOG_TRACE_ENTERING();
+
   auto [n_alpha, n_beta] = get_n_electrons();
   std::ostringstream oss;
   oss << "Configuration Summary:\n";
@@ -252,6 +284,8 @@ std::string Configuration::get_summary() const {
 
 void Configuration::to_file(const std::string& filename,
                             const std::string& type) const {
+  QDK_LOG_TRACE_ENTERING();
+
   if (type == "json") {
     to_json_file(filename);
   } else if (type == "hdf5") {
@@ -263,6 +297,8 @@ void Configuration::to_file(const std::string& filename,
 }
 
 void Configuration::to_json_file(const std::string& filename) const {
+  QDK_LOG_TRACE_ENTERING();
+
   std::ofstream file(filename);
   if (!file.is_open()) {
     throw std::runtime_error("Cannot open file for writing: " + filename);
@@ -277,6 +313,8 @@ void Configuration::to_json_file(const std::string& filename) const {
 }
 
 void Configuration::to_hdf5_file(const std::string& filename) const {
+  QDK_LOG_TRACE_ENTERING();
+
   try {
     H5::H5File file(filename, H5F_ACC_TRUNC);
     H5::Group root_group = file.openGroup("/");
@@ -288,6 +326,8 @@ void Configuration::to_hdf5_file(const std::string& filename) const {
 
 Configuration Configuration::from_file(const std::string& filename,
                                        const std::string& type) {
+  QDK_LOG_TRACE_ENTERING();
+
   if (type == "json") {
     return from_json_file(filename);
   } else if (type == "hdf5") {
@@ -299,6 +339,8 @@ Configuration Configuration::from_file(const std::string& filename,
 }
 
 Configuration Configuration::from_json_file(const std::string& filename) {
+  QDK_LOG_TRACE_ENTERING();
+
   std::ifstream file(filename);
   if (!file.is_open()) {
     throw std::runtime_error(
@@ -317,6 +359,7 @@ Configuration Configuration::from_json_file(const std::string& filename) {
 }
 
 Configuration Configuration::from_hdf5_file(const std::string& filename) {
+  QDK_LOG_TRACE_ENTERING();
   H5::H5File file;
   try {
     file.openFile(filename, H5F_ACC_RDONLY);
