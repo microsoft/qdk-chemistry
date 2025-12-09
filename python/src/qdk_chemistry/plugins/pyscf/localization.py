@@ -10,7 +10,7 @@ orthogonality and physical character.
 
 Supported localization methods (selected via the settings `method`):
 
-* "pipek-mezey" (Pipek-Mezey, supports a configurable population analysis), :cite:`Boughton1993`
+* "pipek-mezey" :cite:`Boughton1993` (Pipek-Mezey, supports a configurable population analysis),
 * "foster-boys" (Foster-Boys),
 * "edmiston-ruedenberg" (Edmiston-Ruedenberg),
 * "cholseky" (Cholesky-based orthogonalization/localization).
