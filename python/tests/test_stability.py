@@ -604,7 +604,7 @@ class TestPyscfStabilityChecker:
         """Test PySCF stability checker on N2 at different distances with RHF."""
         n2 = create_stretched_n2_structure(distance_angstrom=distance)
         scf_solver = self._create_scf_solver(backend=scf_backend)
-        _, wavefunction = scf_solver.run(n2, 0, 1)
+        _, wavefunction = scf_solver.run(n2, 0, 1, "def2-svp")
 
         stability_checker = self._create_stability_checker()
         is_stable, result = stability_checker.run(wavefunction)
@@ -626,7 +626,7 @@ class TestPyscfStabilityChecker:
         expected_negative_count = 2
 
         scf_solver = self._create_scf_solver(backend=scf_backend)
-        _, wavefunction = scf_solver.run(structure, 1, 2)
+        _, wavefunction = scf_solver.run(structure, 1, 2, "def2-svp")
 
         # Test internal-only analysis (external not supported for UHF)
         stability_checker = self._create_stability_checker(internal=True, external=False)
@@ -689,8 +689,12 @@ class TestStabilityWorkflow:
         if max_stability_iterations < 1:
             raise ValueError("max_stability_iterations must be at least 1")
 
-        # Run initial SCF calculation
-        energy, wavefunction = scf_solver.run(structure, charge, spin_multiplicity, initial_guess)
+        if initial_guess is None:
+            # Run initial SCF calculation
+            energy, wavefunction = scf_solver.run(structure, charge, spin_multiplicity, "def2-svp")
+        else:
+            # Run initial SCF calculation
+            energy, wavefunction = scf_solver.run(structure, charge, spin_multiplicity, initial_guess)
 
         # Determine if calculation is restricted from initial wavefunction
         is_restricted_calculation = wavefunction.get_orbitals().is_restricted() and spin_multiplicity == 1

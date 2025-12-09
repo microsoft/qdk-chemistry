@@ -186,13 +186,13 @@ class TestPyscfPlugin:
 
         assert settings.get("max_iterations") == 50
 
-        # Test setting basis set
+        # Test setting max iterations
         settings.set("max_iterations", 100)
         assert settings.get("max_iterations") == 100
 
         # Test setting other parameters
-        settings.set("force_restricted", True)
-        assert settings.get("force_restricted")
+        settings.set("scf_type", "restricted")
+        assert settings.get("scf_type") == "restricted"
 
     def test_pyscf_localizer_settings(self):
         """Test PySCF localizer settings interface."""
@@ -1397,8 +1397,7 @@ class TestPyscfPlugin:
         """Test PySCF UCCSD on O2 triplet with def2-svp basis."""
         o2 = create_o2_structure()
         scf_solver = algorithms.create("scf_solver", "pyscf")
-        scf_solver.settings().set("basis_set", "def2-svp")
-        _, wavefunction = scf_solver.run(o2, 0, 3)
+        _, wavefunction = scf_solver.run(o2, 0, 3, "def2-svp")
 
         # Verify we have unrestricted orbitals
         orbitals = wavefunction.get_orbitals()
@@ -1708,8 +1707,7 @@ class TestPyscfPlugin:
         # 1: Rerouting for non-model Hamiltonian
         water = create_water_structure()
         scf_solver = algorithms.create("scf_solver", "pyscf")
-        scf_solver.settings().set("basis_set", "sto-3g")
-        _, wavefunction = scf_solver.run(water, 0, 1)
+        _, wavefunction = scf_solver.run(water, 0, 1, "sto-3g")
         orbitals = wavefunction.get_orbitals()
 
         # Create a Hamiltonian from these orbitals (non-model)

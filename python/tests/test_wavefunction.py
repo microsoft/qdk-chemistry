@@ -890,7 +890,6 @@ class TestWavefunctionRdmIntegraion:
 
         mol = Structure(["O", "O"], [[0.0, 0.0, 2.0], [0.0, 0.0, 0.0]])
         scf_solver = algorithms.create("scf_solver", "pyscf")
-        scf_solver.settings().set("basis_set", "def2-svp")
         scf_solver.settings().set("scf_type", "restricted")
         sd_wf = scf_solver.run(mol, 0, np.abs(nelec_alpha - nelec_beta) + 1, "def2-svp")[1]
 
