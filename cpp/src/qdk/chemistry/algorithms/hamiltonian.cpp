@@ -7,15 +7,20 @@
 #include <qdk/chemistry/algorithms/hamiltonian.hpp>
 #include <qdk/chemistry/config.hpp>
 #include <qdk/chemistry/data/structure.hpp>
+#include <qdk/chemistry/utils/logger.hpp>
 
 namespace qdk::chemistry::algorithms {
 
 std::unique_ptr<HamiltonianConstructor> make_microsoft_hamiltonian() {
+  QDK_LOG_TRACE_ENTERING();
+
   return std::make_unique<
       qdk::chemistry::algorithms::microsoft::HamiltonianConstructor>();
 }
 
 void HamiltonianConstructorFactory::register_default_instances() {
+  QDK_LOG_TRACE_ENTERING();
+
   HamiltonianConstructorFactory::register_instance(&make_microsoft_hamiltonian);
 }
 

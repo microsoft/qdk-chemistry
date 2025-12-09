@@ -5,13 +5,12 @@
 #include "qdk/chemistry/scf/core/scf_algorithm.h"
 
 #include <qdk/chemistry/scf/config.h>
-#include <spdlog/spdlog.h>
 
 #include <cmath>
 #include <limits>
+#include <qdk/chemistry/utils/logger.hpp>
 
 #include "../scf/scf_impl.h"
-
 #ifdef QDK_CHEMISTRY_ENABLE_GPU
 #include <qdk/chemistry/scf/util/gpu/cuda_helper.h>
 #include <qdk/chemistry/scf/util/gpu/cusolver_utils.h>
@@ -37,6 +36,7 @@ SCFAlgorithm::SCFAlgorithm(const SCFContext& ctx)
       last_energy_(0.0),
       density_rms_(std::numeric_limits<double>::infinity()),
       delta_energy_(std::numeric_limits<double>::infinity()) {
+  QDK_LOG_TRACE_ENTERING();
   auto num_atomic_orbitals = ctx.basis_set->num_atomic_orbitals;
   auto num_density_matrices = ctx.cfg->unrestricted ? 2 : 1;
   P_last_ = RowMajorMatrix::Zero(num_density_matrices * num_atomic_orbitals,
@@ -44,6 +44,7 @@ SCFAlgorithm::SCFAlgorithm(const SCFContext& ctx)
 }
 
 std::shared_ptr<SCFAlgorithm> SCFAlgorithm::create(const SCFContext& ctx) {
+  QDK_LOG_TRACE_ENTERING();
   const auto& cfg = *ctx.cfg;
 
   switch (cfg.scf_algorithm.method) {
@@ -70,6 +71,7 @@ void SCFAlgorithm::solve_fock_eigenproblem(
     RowMajorMatrix& C, RowMajorMatrix& eigenvalues, RowMajorMatrix& P,
     const int num_occupied_orbitals[2], int num_atomic_orbitals,
     int num_molecular_orbitals, int idx_spin, bool unrestricted) {
+  QDK_LOG_TRACE_ENTERING();
 #ifdef ENABLE_NVTX3
   nvtx3::scoped_range r{nvtx3::rgb{0, 0, 255}, "solve_eigen"};
 #endif
@@ -162,6 +164,7 @@ double SCFAlgorithm::calculate_og_error_(const RowMajorMatrix& F,
                                          const RowMajorMatrix& S,
                                          RowMajorMatrix& error_matrix,
                                          bool unrestricted) {
+  QDK_LOG_TRACE_ENTERING();
   int num_atomic_orbitals = static_cast<int>(S.cols());
   int num_density_matrices = unrestricted ? 2 : 1;
 
@@ -194,6 +197,7 @@ double SCFAlgorithm::calculate_og_error_(const RowMajorMatrix& F,
 }
 
 bool SCFAlgorithm::check_convergence(const SCFImpl& scf_impl) {
+  QDK_LOG_TRACE_ENTERING();
   const auto* cfg = ctx_.cfg;
   auto& res = ctx_.result;
 
@@ -216,7 +220,7 @@ bool SCFAlgorithm::check_convergence(const SCFImpl& scf_impl) {
   bool converged = density_rms_ < cfg->scf_algorithm.density_threshold &&
                    og_error < cfg->scf_algorithm.og_threshold;
 
-  spdlog::info(
+  QDK_LOGGER().info(
       "Step {:03}: E={:.15e}, DE={:+.15e}, |DP|={:.15e}, |DG|={:.15e}, ",
       step_count_, energy, delta_energy_, density_rms_, og_error);
 

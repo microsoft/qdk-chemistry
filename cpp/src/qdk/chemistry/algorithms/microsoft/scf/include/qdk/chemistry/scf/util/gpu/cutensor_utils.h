@@ -8,8 +8,8 @@
 #include <cuda_runtime.h>
 #include <cutensor.h>
 #include <qdk/chemistry/scf/util/gpu/cuda_helper.h>
-#include <spdlog/spdlog.h>
 
+#include <qdk/chemistry/utils/logger.hpp>
 #include <vector>
 
 namespace qdk::chemistry::scf::cutensor {
@@ -29,13 +29,14 @@ namespace qdk::chemistry::scf::cutensor {
  *
  * @param x cuTENSOR API function call to check
  */
-#define CUTENSOR_CHECK(x)                                                  \
-  {                                                                        \
-    const auto err = x;                                                    \
-    if (err != CUTENSOR_STATUS_SUCCESS) {                                  \
-      spdlog::critical("cuTENSOR error: {}", cutensorGetErrorString(err)); \
-      throw std::runtime_error("cuTENSOR Exception");                      \
-    }                                                                      \
+#define CUTENSOR_CHECK(x)                                 \
+  {                                                       \
+    const auto err = x;                                   \
+    if (err != CUTENSOR_STATUS_SUCCESS) {                 \
+      QDK_LOGGER().critical("cuTENSOR error: {}",         \
+                            cutensorGetErrorString(err)); \
+      throw std::runtime_error("cuTENSOR Exception");     \
+    }                                                     \
   };
 
 /**
@@ -54,13 +55,14 @@ namespace qdk::chemistry::scf::cutensor {
  *
  * @param x cuTENSOR API function call to check
  */
-#define CUTENSOR_CHECK_ABORT(x)                                            \
-  {                                                                        \
-    const auto err = x;                                                    \
-    if (err != CUTENSOR_STATUS_SUCCESS) {                                  \
-      spdlog::critical("cuTENSOR error: {}", cutensorGetErrorString(err)); \
-      std::abort();                                                        \
-    }                                                                      \
+#define CUTENSOR_CHECK_ABORT(x)                           \
+  {                                                       \
+    const auto err = x;                                   \
+    if (err != CUTENSOR_STATUS_SUCCESS) {                 \
+      QDK_LOGGER().critical("cuTENSOR error: {}",         \
+                            cutensorGetErrorString(err)); \
+      std::abort();                                       \
+    }                                                     \
   };
 
 /**

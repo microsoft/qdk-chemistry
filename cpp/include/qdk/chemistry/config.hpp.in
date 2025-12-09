@@ -1,3 +1,8 @@
 #pragma once
 
 #cmakedefine QDK_ENABLE_OPENMP
+#cmakedefine QDK_DISABLE_TRACE_LOG
+
+// clang-format off
+#define QDK_CHEMISTRY_LOG_LEVEL @QDK_CHEMISTRY_LOG_LEVEL@
+// clang-format on

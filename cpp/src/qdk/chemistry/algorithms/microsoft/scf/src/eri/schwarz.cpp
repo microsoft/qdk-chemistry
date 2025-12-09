@@ -7,10 +7,11 @@
 #include <qdk/chemistry/scf/config.h>
 #include <qdk/chemistry/scf/core/types.h>
 #include <qdk/chemistry/scf/util/libint2_util.h>
+
+#include <qdk/chemistry/utils/logger.hpp>
 #ifdef QDK_CHEMISTRY_ENABLE_MPI
 #include <mpi.h>
 #endif
-#include <spdlog/spdlog.h>
 
 #include <algorithm>
 #include <cassert>
@@ -24,6 +25,8 @@
 namespace qdk::chemistry::scf {
 void schwarz_integral(const BasisSet* iobs, const ParallelConfig& mpi,
                       double* res) {
+  QDK_LOG_TRACE_ENTERING();
+
   AutoTimer timer("schwarz_integral");
   auto obs = libint2_util::convert_to_libint_basisset(*iobs);
 
@@ -73,6 +76,8 @@ void schwarz_integral(const BasisSet* iobs, const ParallelConfig& mpi,
 }
 
 void compute_shell_norm(const BasisSet* obs, const double* D, double* res) {
+  QDK_LOG_TRACE_ENTERING();
+
   auto nsh = obs->shells.size();
   auto num_atomic_orbitals = obs->num_atomic_orbitals;
   for (size_t i = 0, pi = 0; i < nsh; i++) {

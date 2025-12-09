@@ -7,6 +7,7 @@
 #include <iomanip>
 #include <iostream>
 #include <qdk/chemistry/data/settings.hpp>
+#include <qdk/chemistry/utils/logger.hpp>
 #include <sstream>
 
 #include "filename_utils.hpp"
@@ -16,6 +17,7 @@
 namespace qdk::chemistry::data {
 
 void Settings::set(const std::string& key, const SettingValue& value) {
+  QDK_LOG_TRACE_ENTERING();
   if (_locked) {
     throw SettingsAreLocked();
   }
@@ -161,6 +163,7 @@ void Settings::set(const std::string& key, const SettingValue& value) {
 }
 
 void Settings::set(const std::string& key, const char* value) {
+  QDK_LOG_TRACE_ENTERING();
   if (_locked) {
     throw SettingsAreLocked();
   }
@@ -172,6 +175,7 @@ void Settings::set(const std::string& key, const char* value) {
 }
 
 SettingValue Settings::get(const std::string& key) const {
+  QDK_LOG_TRACE_ENTERING();
   auto it = settings_.find(key);
   if (it == settings_.end()) {
     throw SettingNotFound(key);
@@ -181,6 +185,7 @@ SettingValue Settings::get(const std::string& key) const {
 
 SettingValue Settings::get_or_default(const std::string& key,
                                       const SettingValue& default_value) const {
+  QDK_LOG_TRACE_ENTERING();
   auto it = settings_.find(key);
   if (it == settings_.end()) {
     return default_value;
@@ -189,10 +194,12 @@ SettingValue Settings::get_or_default(const std::string& key,
 }
 
 bool Settings::has(const std::string& key) const {
+  QDK_LOG_TRACE_ENTERING();
   return settings_.find(key) != settings_.end();
 }
 
 std::vector<std::string> Settings::keys() const {
+  QDK_LOG_TRACE_ENTERING();
   std::vector<std::string> result;
   result.reserve(settings_.size());
   for (const auto& [key, value] : settings_) {
@@ -201,11 +208,18 @@ std::vector<std::string> Settings::keys() const {
   return result;
 }
 
-size_t Settings::size() const { return settings_.size(); }
+size_t Settings::size() const {
+  QDK_LOG_TRACE_ENTERING();
+  return settings_.size();
+}
 
-bool Settings::empty() const { return settings_.empty(); }
+bool Settings::empty() const {
+  QDK_LOG_TRACE_ENTERING();
+  return settings_.empty();
+}
 
 std::string Settings::get_summary() const {
+  QDK_LOG_TRACE_ENTERING();
   std::ostringstream oss;
   oss << "Settings Summary:\n";
 
@@ -234,6 +248,7 @@ std::string Settings::get_summary() const {
 }
 
 std::string Settings::get_as_string(const std::string& key) const {
+  QDK_LOG_TRACE_ENTERING();
   auto it = settings_.find(key);
   if (it == settings_.end()) {
     throw SettingNotFound(key);
@@ -243,10 +258,12 @@ std::string Settings::get_as_string(const std::string& key) const {
 }
 
 const std::map<std::string, SettingValue>& Settings::get_all_settings() const {
+  QDK_LOG_TRACE_ENTERING();
   return settings_;
 }
 
 nlohmann::json Settings::to_json() const {
+  QDK_LOG_TRACE_ENTERING();
   nlohmann::json json_obj;
 
   // Store version first
@@ -293,6 +310,7 @@ nlohmann::json Settings::to_json() const {
 }
 
 std::shared_ptr<Settings> Settings::from_json(const nlohmann::json& json_obj) {
+  QDK_LOG_TRACE_ENTERING();
   auto settings = std::make_shared<Settings>();
 
   if (!json_obj.is_object()) {
@@ -357,6 +375,7 @@ std::shared_ptr<Settings> Settings::from_json(const nlohmann::json& json_obj) {
 
 void Settings::validate_required(
     const std::vector<std::string>& required_keys) const {
+  QDK_LOG_TRACE_ENTERING();
   for (const auto& key : required_keys) {
     if (!has(key)) {
       throw SettingNotFound(key);
@@ -365,6 +384,7 @@ void Settings::validate_required(
 }
 
 std::string Settings::get_type_name(const std::string& key) const {
+  QDK_LOG_TRACE_ENTERING();
   auto it = settings_.find(key);
   if (it == settings_.end()) {
     return "not_found";
@@ -400,10 +420,12 @@ std::string Settings::get_type_name(const std::string& key) const {
 }
 
 bool Settings::has_description(const std::string& key) const {
+  QDK_LOG_TRACE_ENTERING();
   return descriptions_.find(key) != descriptions_.end();
 }
 
 std::string Settings::get_description(const std::string& key) const {
+  QDK_LOG_TRACE_ENTERING();
   auto it = descriptions_.find(key);
   if (it == descriptions_.end()) {
     throw SettingNotFound("No description found for setting: " + key);
@@ -412,10 +434,12 @@ std::string Settings::get_description(const std::string& key) const {
 }
 
 bool Settings::has_limits(const std::string& key) const {
+  QDK_LOG_TRACE_ENTERING();
   return limits_.find(key) != limits_.end();
 }
 
 Constraint Settings::get_limits(const std::string& key) const {
+  QDK_LOG_TRACE_ENTERING();
   auto it = limits_.find(key);
   if (it == limits_.end()) {
     throw SettingNotFound("No limits found for setting: " + key);
@@ -424,6 +448,7 @@ Constraint Settings::get_limits(const std::string& key) const {
 }
 
 bool Settings::is_documented(const std::string& key) const {
+  QDK_LOG_TRACE_ENTERING();
   if (!has(key)) {
     throw SettingNotFound(key);
   }
@@ -436,6 +461,7 @@ bool Settings::is_documented(const std::string& key) const {
 }
 
 std::string Settings::as_table(size_t max_width, bool show_undocumented) const {
+  QDK_LOG_TRACE_ENTERING();
   // Helper to wrap text to fit within a column width
   auto wrap_text = [](const std::string& text,
                       size_t width) -> std::vector<std::string> {
@@ -714,6 +740,7 @@ std::string Settings::as_table(size_t max_width, bool show_undocumented) const {
 }
 
 void Settings::update(const std::string& key, const SettingValue& value) {
+  QDK_LOG_TRACE_ENTERING();
   if (_locked) {
     throw SettingsAreLocked();
   }
@@ -724,6 +751,7 @@ void Settings::update(const std::string& key, const SettingValue& value) {
 }
 
 void Settings::update(const std::map<std::string, SettingValue>& updates_map) {
+  QDK_LOG_TRACE_ENTERING();
   if (_locked) {
     throw SettingsAreLocked();
   }
@@ -733,6 +761,7 @@ void Settings::update(const std::map<std::string, SettingValue>& updates_map) {
 }
 
 void Settings::update(const std::map<std::string, std::string>& updates_map) {
+  QDK_LOG_TRACE_ENTERING();
   if (_locked) {
     throw SettingsAreLocked();
   }
@@ -761,6 +790,7 @@ void Settings::update(const std::map<std::string, std::string>& updates_map) {
 }
 
 void Settings::update(const Settings& other_settings) {
+  QDK_LOG_TRACE_ENTERING();
   if (_locked) {
     throw SettingsAreLocked();
   }
@@ -775,6 +805,7 @@ void Settings::update(const Settings& other_settings) {
 void Settings::set_default(const std::string& key, const SettingValue& value,
                            std::optional<std::string> description,
                            std::optional<Constraint> limit, bool documented) {
+  QDK_LOG_TRACE_ENTERING();
   if (!has(key)) {
     settings_[key] = value;  // Direct assignment for set_default - this is
                              // allowed to create new keys
@@ -827,6 +858,7 @@ void Settings::set_default(const std::string& key, const char* value,
                            std::optional<const char*> description,
                            std::optional<std::vector<const char*>> limit,
                            bool documented) {
+  QDK_LOG_TRACE_ENTERING();
   std::optional<std::string> desc_str;
   if (description.has_value()) {
     desc_str = std::string(*description);
@@ -840,6 +872,7 @@ void Settings::set_default(const std::string& key, const char* value,
 }
 
 std::string Settings::visit_to_string(const SettingValue& value) const {
+  QDK_LOG_TRACE_ENTERING();
   return std::visit(
       [](const auto& variant_value) -> std::string {
         using ValueType = std::decay_t<decltype(variant_value)>;
@@ -881,6 +914,7 @@ std::string Settings::visit_to_string(const SettingValue& value) const {
 
 nlohmann::json Settings::convert_setting_value_to_json(
     const SettingValue& value) const {
+  QDK_LOG_TRACE_ENTERING();
   return std::visit(
       [](const auto& variant_value) -> nlohmann::json {
         using ValueType = std::decay_t<decltype(variant_value)>;
@@ -916,6 +950,7 @@ nlohmann::json Settings::convert_setting_value_to_json(
 
 SettingValue Settings::convert_json_to_setting_value(
     const nlohmann::json& json_obj) const {
+  QDK_LOG_TRACE_ENTERING();
   if (json_obj.is_boolean()) {
     return json_obj.get<bool>();
   } else if (json_obj.is_number_integer()) {
@@ -959,11 +994,15 @@ SettingValue Settings::convert_json_to_setting_value(
   }
 }
 
-void Settings::lock() const { _locked = true; }
+void Settings::lock() const {
+  QDK_LOG_TRACE_ENTERING();
+  _locked = true;
+}
 
 void Settings::save_setting_value_to_hdf5(H5::Group& group,
                                           const std::string& name,
                                           const SettingValue& value) const {
+  QDK_LOG_TRACE_ENTERING();
   std::visit(
       [&group, &name](const auto& variant_value) {
         using ValueType = std::decay_t<decltype(variant_value)>;
@@ -1096,6 +1135,7 @@ void Settings::save_setting_value_to_hdf5(H5::Group& group,
 
 SettingValue Settings::parse_string_to_setting_value(
     const std::string& key, const std::string& str_value) const {
+  QDK_LOG_TRACE_ENTERING();
   auto it = settings_.find(key);
   if (it == settings_.end()) {
     throw SettingNotFound(key);
@@ -1170,6 +1210,7 @@ SettingValue Settings::parse_string_to_setting_value(
 
 void Settings::to_file(const std::string& filename,
                        const std::string& type) const {
+  QDK_LOG_TRACE_ENTERING();
   if (type == "json") {
     _to_json_file(filename);
   } else if (type == "hdf5") {
@@ -1181,6 +1222,7 @@ void Settings::to_file(const std::string& filename,
 }
 
 void Settings::to_json_file(const std::string& filename) const {
+  QDK_LOG_TRACE_ENTERING();
   // Validate filename has correct data type suffix
   std::string validated_filename =
       DataTypeFilename::validate_write_suffix(filename, "settings");
@@ -1190,6 +1232,7 @@ void Settings::to_json_file(const std::string& filename) const {
 
 std::shared_ptr<Settings> Settings::from_json_file(
     const std::string& filename) {
+  QDK_LOG_TRACE_ENTERING();
   // Validate filename has correct data type suffix
   std::string validated_filename =
       DataTypeFilename::validate_read_suffix(filename, "settings");
@@ -1198,6 +1241,7 @@ std::shared_ptr<Settings> Settings::from_json_file(
 }
 
 void Settings::_to_json_file(const std::string& filename) const {
+  QDK_LOG_TRACE_ENTERING();
   std::ofstream file(filename);
   if (!file.is_open()) {
     throw std::runtime_error("Cannot open file for writing: " + filename);
@@ -1213,6 +1257,7 @@ void Settings::_to_json_file(const std::string& filename) const {
 
 std::shared_ptr<Settings> Settings::_from_json_file(
     const std::string& filename) {
+  QDK_LOG_TRACE_ENTERING();
   std::ifstream file(filename);
   if (!file.is_open()) {
     throw std::runtime_error(
@@ -1231,6 +1276,7 @@ std::shared_ptr<Settings> Settings::_from_json_file(
 }
 
 void Settings::to_hdf5_file(const std::string& filename) const {
+  QDK_LOG_TRACE_ENTERING();
   // Validate filename has correct data type suffix
   std::string validated_filename =
       DataTypeFilename::validate_write_suffix(filename, "settings");
@@ -1240,6 +1286,7 @@ void Settings::to_hdf5_file(const std::string& filename) const {
 
 std::shared_ptr<Settings> Settings::from_hdf5_file(
     const std::string& filename) {
+  QDK_LOG_TRACE_ENTERING();
   // Validate filename has correct data type suffix
   std::string validated_filename =
       DataTypeFilename::validate_read_suffix(filename, "settings");
@@ -1248,6 +1295,7 @@ std::shared_ptr<Settings> Settings::from_hdf5_file(
 }
 
 void Settings::_to_hdf5_file(const std::string& filename) const {
+  QDK_LOG_TRACE_ENTERING();
   try {
     H5::H5File file(filename, H5F_ACC_TRUNC);
 
@@ -1273,6 +1321,7 @@ void Settings::_to_hdf5_file(const std::string& filename) const {
 
 std::shared_ptr<Settings> Settings::_from_hdf5_file(
     const std::string& filename) {
+  QDK_LOG_TRACE_ENTERING();
   // Disable HDF5 automatic error printing to stderr unless verbose mode
   if (hdf5_errors_should_be_suppressed()) {
     H5::Exception::dontPrint();
@@ -1311,6 +1360,7 @@ std::shared_ptr<Settings> Settings::_from_hdf5_file(
 
 std::shared_ptr<Settings> Settings::from_file(const std::string& filename,
                                               const std::string& type) {
+  QDK_LOG_TRACE_ENTERING();
   if (type == "json") {
     return _from_json_file(filename);
   } else if (type == "hdf5") {
@@ -1322,6 +1372,7 @@ std::shared_ptr<Settings> Settings::from_file(const std::string& filename,
 }
 
 bool Settings::group_exists(H5::H5File& file, const std::string& group_name) {
+  QDK_LOG_TRACE_ENTERING();
   try {
     H5::Group group = file.openGroup(group_name);
     return true;
@@ -1332,6 +1383,7 @@ bool Settings::group_exists(H5::H5File& file, const std::string& group_name) {
 
 SettingValue Settings::load_setting_value_from_hdf5(H5::Group& group,
                                                     const std::string& name) {
+  QDK_LOG_TRACE_ENTERING();
   H5::DataSet dataset = group.openDataSet(name);
   H5::DataSpace dataspace = dataset.getSpace();
   H5::DataType datatype = dataset.getDataType();
@@ -1471,6 +1523,7 @@ SettingValue Settings::load_setting_value_from_hdf5(H5::Group& group,
 }
 
 void Settings::to_hdf5(H5::Group& group) const {
+  QDK_LOG_TRACE_ENTERING();
   // Add version attribute to the group
   H5::DataSpace scalar_space(H5S_SCALAR);
   H5::StrType string_type(H5::PredType::C_S1, H5T_VARIABLE);
@@ -1572,6 +1625,7 @@ void Settings::to_hdf5(H5::Group& group) const {
 }
 
 std::shared_ptr<Settings> Settings::from_hdf5(H5::Group& group) {
+  QDK_LOG_TRACE_ENTERING();
   auto settings = std::make_shared<Settings>();
 
   try {

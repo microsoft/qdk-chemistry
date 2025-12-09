@@ -6,10 +6,13 @@
 #ifdef QDK_CHEMISTRY_ENABLE_GPU
 #include <qdk/chemistry/scf/util/gpu/cusolver_utils.h>
 
+#include <qdk/chemistry/utils/logger.hpp>
+
 namespace qdk::chemistry::scf::cusolver {
 
 void potrf(cusolverDnHandle_t handle, cublasFillMode_t uplo, int N, double* A,
            int LDA) {
+  QDK_LOG_TRACE_ENTERING();
   int* d_info;
   int lwork;
   double* work = nullptr;
@@ -41,6 +44,7 @@ void potrf(cusolverDnHandle_t handle, cublasFillMode_t uplo, int N, double* A,
 
 void potrs(cusolverDnHandle_t handle, cublasFillMode_t uplo, int N, int NRHS,
            const double* A, int LDA, double* B, int LDB) {
+  QDK_LOG_TRACE_ENTERING();
   // Allocate space for device-side INFO;
   int* d_info;
   CUDA_CHECK(cudaMallocAsync(&d_info, sizeof(int), 0));
@@ -62,6 +66,7 @@ void potrs(cusolverDnHandle_t handle, cublasFillMode_t uplo, int N, int NRHS,
 
 void syevd(cusolverDnHandle_t handle, cusolverEigMode_t jobz,
            cublasFillMode_t uplo, int N, double* A, int LDA, double* W) {
+  QDK_LOG_TRACE_ENTERING();
   int* d_info;
   int lwork;
   double* work = nullptr;

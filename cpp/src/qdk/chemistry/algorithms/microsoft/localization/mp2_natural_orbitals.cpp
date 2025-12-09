@@ -11,6 +11,7 @@
 #include <qdk/chemistry/algorithms/active_space.hpp>
 #include <qdk/chemistry/algorithms/hamiltonian.hpp>
 #include <qdk/chemistry/data/structure.hpp>
+#include <qdk/chemistry/utils/logger.hpp>
 #include <stdexcept>
 
 namespace qdk::chemistry::algorithms::microsoft {
@@ -19,6 +20,7 @@ std::shared_ptr<data::Wavefunction> MP2NaturalOrbitalLocalizer::_run_impl(
     std::shared_ptr<data::Wavefunction> wavefunction,
     const std::vector<size_t>& loc_indices_a,
     const std::vector<size_t>& loc_indices_b) const {
+  QDK_LOG_TRACE_ENTERING();
   auto orbitals = wavefunction->get_orbitals();
   // Get electron counts from settings
   auto [nalpha, nbeta] = wavefunction->get_total_num_electrons();
