@@ -19,4 +19,7 @@ if( NOT spdlog_FOUND )
   set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fPIC")
   FetchContent_MakeAvailable( spdlog )
   set(MACIS_SPDLOG_EXPORT spdlog CACHE STRING "" FORCE)
+else()
+  # When spdlog is found externally, don't export it
+  set(MACIS_SPDLOG_EXPORT "" CACHE STRING "" FORCE)
 endif()

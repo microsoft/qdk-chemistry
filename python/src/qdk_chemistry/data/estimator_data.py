@@ -1,4 +1,4 @@
-"""QDK/Chemistry data structures for energy estimation results."""
+"""QDK/Chemistry Energy Estimator Results module."""
 
 # --------------------------------------------------------------------------------------------
 # Copyright (c) Microsoft Corporation. All rights reserved.
@@ -12,6 +12,7 @@ import numpy as np
 
 from qdk_chemistry.data.base import DataClass
 from qdk_chemistry.data.qubit_hamiltonian import QubitHamiltonian
+from qdk_chemistry.utils import Logger
 
 __all__: list[str] = []
 
@@ -30,6 +31,9 @@ class EnergyExpectationResult(DataClass):
     # Class attribute for filename validation
     _data_type_name = "energy_expectation_result"
 
+    # Serialization version for this class
+    _serialization_version = "0.1.0"
+
     def __init__(
         self,
         energy_expectation_value: float,
@@ -46,6 +50,7 @@ class EnergyExpectationResult(DataClass):
             variances_each_term: Variances for each term in the Hamiltonian.
 
         """
+        Logger.trace_entering()
         self.energy_expectation_value = energy_expectation_value
         self.energy_variance = energy_variance
         self.expvals_each_term = expvals_each_term
@@ -63,12 +68,13 @@ class EnergyExpectationResult(DataClass):
 
     def to_json(self) -> dict[str, Any]:
         """Convert result to a dictionary for JSON serialization."""
-        return {
+        data = {
             "energy_expectation_value": float(self.energy_expectation_value),
             "energy_variance": float(self.energy_variance),
             "expvals_each_term": [arr.tolist() for arr in self.expvals_each_term],
             "variances_each_term": [arr.tolist() for arr in self.variances_each_term],
         }
+        return self._add_json_version(data)
 
     def to_hdf5(self, group: h5py.Group) -> None:
         """Save the energy expectation result to an HDF5 group.
@@ -78,6 +84,7 @@ class EnergyExpectationResult(DataClass):
             Python users should call to_hdf5_file() directly.
 
         """
+        self._add_hdf5_version(group)
         group.attrs["energy_expectation_value"] = self.energy_expectation_value
         group.attrs["energy_variance"] = self.energy_variance
 
@@ -98,7 +105,12 @@ class EnergyExpectationResult(DataClass):
         Returns:
             EnergyExpectationResult: New instance reconstructed from JSON data
 
+        Raises:
+            RuntimeError: If version field is missing or incompatible
+
         """
+        cls._validate_json_version(cls._serialization_version, json_data)
+
         return cls(
             energy_expectation_value=float(json_data["energy_expectation_value"]),
             energy_variance=float(json_data["energy_variance"]),
@@ -116,7 +128,12 @@ class EnergyExpectationResult(DataClass):
         Returns:
             EnergyExpectationResult: New instance reconstructed from HDF5 data
 
+        Raises:
+            RuntimeError: If version attribute is missing or incompatible
+
         """
+        cls._validate_hdf5_version(cls._serialization_version, group)
+
         energy_expectation_value = group.attrs["energy_expectation_value"]
         energy_variance = group.attrs["energy_variance"]
 
@@ -155,6 +172,9 @@ class MeasurementData(DataClass):
     # Class attribute for filename validation
     _data_type_name = "measurement_data"
 
+    # Serialization version for this class
+    _serialization_version = "0.1.0"
+
     def __init__(
         self,
         hamiltonians: list[QubitHamiltonian],
@@ -169,6 +189,7 @@ class MeasurementData(DataClass):
             shots_list: List of number of shots used for each measurement.
 
         """
+        Logger.trace_entering()
         self.hamiltonians = hamiltonians
         self.bitstring_counts = bitstring_counts if bitstring_counts is not None else []
         self.shots_list = shots_list if shots_list is not None else []
@@ -186,7 +207,7 @@ class MeasurementData(DataClass):
 
     def to_json(self) -> dict[str, Any]:
         """Convert to dictionary for JSON serialization (DataClass interface)."""
-        return {
+        data = {
             str(i): {
                 "hamiltonian": {
                     "paulis": hamiltonian.pauli_strings,
@@ -197,6 +218,7 @@ class MeasurementData(DataClass):
             }
             for i, hamiltonian in enumerate(self.hamiltonians)
         }
+        return self._add_json_version(data)
 
     def to_hdf5(self, group: h5py.Group) -> None:
         """Save the measurement data to an HDF5 group.
@@ -206,6 +228,7 @@ class MeasurementData(DataClass):
             Python users should call to_hdf5_file() directly.
 
         """
+        self._add_hdf5_version(group)
         group.attrs["num_hamiltonians"] = len(self.hamiltonians)
 
         # Store each hamiltonian and its measurements
@@ -239,13 +262,18 @@ class MeasurementData(DataClass):
         Returns:
             MeasurementData: New instance reconstructed from JSON data
 
+        Raises:
+            RuntimeError: If version field is missing or incompatible
+
         """
+        cls._validate_json_version(cls._serialization_version, json_data)
+
         hamiltonians: list[QubitHamiltonian] = []
         bitstring_counts: list[dict[str, int] | None] = []
         shots_list: list[int] = []
 
-        # Iterate through the indexed items
-        for key in sorted(json_data.keys(), key=int):
+        # Iterate through the indexed items (skip 'version' key)
+        for key in sorted((k for k in json_data if k != "version"), key=int):
             item = json_data[key]
 
             # Reconstruct QubitHamiltonian
@@ -278,7 +306,12 @@ class MeasurementData(DataClass):
         Returns:
             MeasurementData: New instance reconstructed from HDF5 data
 
+        Raises:
+            RuntimeError: If version attribute is missing or incompatible
+
         """
+        cls._validate_hdf5_version(cls._serialization_version, group)
+
         num_hamiltonians = group.attrs["num_hamiltonians"]
 
         hamiltonians: list[QubitHamiltonian] = []

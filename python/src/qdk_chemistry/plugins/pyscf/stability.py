@@ -30,6 +30,7 @@ from pyscf.soscf import newton_ah
 from qdk_chemistry.algorithms import StabilityChecker
 from qdk_chemistry.data import Settings, StabilityResult, Wavefunction
 from qdk_chemistry.plugins.pyscf.utils import orbitals_to_scf
+from qdk_chemistry.utils import Logger
 
 __all__ = ["PyscfStabilityChecker", "PyscfStabilitySettings"]
 
@@ -65,6 +66,7 @@ def _rhf_internal(
 
     Modified from PySCF implementation.
     """
+    Logger.trace_entering()
     g, hop, hdiag = newton_ah.gen_g_hop_rhf(mf, mf.mo_coeff, mf.mo_occ, with_symmetry=with_symmetry)
     hdiag *= 2
 
@@ -89,6 +91,7 @@ def _rhf_external(
 
     Modified from PySCF implementation.
     """
+    Logger.trace_entering()
     # Do not consider real -> complex instability
     _, _, hop2, hdiag2 = _gen_hop_rhf_external(mf, with_symmetry)
 
@@ -105,6 +108,7 @@ def _rohf_internal(
 
     Modified from PySCF implementation.
     """
+    Logger.trace_entering()
     g, hop, hdiag = newton_ah.gen_g_hop_rohf(mf, mf.mo_coeff, mf.mo_occ, with_symmetry=with_symmetry)
     hdiag *= 2
 
@@ -134,6 +138,7 @@ def _uhf_internal(
 
     Modified from PySCF implementation.
     """
+    Logger.trace_entering()
     g, hop, hdiag = newton_ah.gen_g_hop_uhf(mf, mf.mo_coeff, mf.mo_occ, with_symmetry=with_symmetry)
     hdiag *= 2
 
@@ -165,7 +170,9 @@ class PyscfStabilitySettings(Settings):
         Only supported for RHF wavefunctions. Will raise an error if enabled for ROHF or UHF.
     - with_symmetry: Whether to respect point group symmetry during stability analysis.
     - nroots: Number of eigenvalue roots to compute in the Davidson solver.
-    - tolerance: Convergence threshold for the Davidson eigenvalue solver.
+    - davidson_tolerance: Convergence threshold for the Davidson eigenvalue solver.
+    - stability_tolerance: Threshold for determining stability from eigenvalues.
+    - method: The electronic structure method ("hf" for Hartree-Fock or a DFT functional name).
 
     Examples:
         >>> settings = PyscfStabilitySettings()
@@ -173,11 +180,13 @@ class PyscfStabilitySettings(Settings):
         3
         >>> settings.set("nroots", 5)
         >>> settings.set("external", False)  # Only internal stability
+        >>> settings.set("method", "b3lyp")  # Use B3LYP DFT
 
     """
 
     def __init__(self):
         """Initialize the stability checker with default parameters."""
+        Logger.trace_entering()
         super().__init__()
         self._set_default("internal", "bool", True)
         self._set_default("external", "bool", True)
@@ -185,6 +194,7 @@ class PyscfStabilitySettings(Settings):
         self._set_default("nroots", "int", 3)
         self._set_default("davidson_tolerance", "double", 1e-4)
         self._set_default("stability_tolerance", "double", -1e-4)
+        self._set_default("method", "string", "hf")
 
 
 class PyscfStabilityChecker(StabilityChecker):
@@ -215,6 +225,7 @@ class PyscfStabilityChecker(StabilityChecker):
 
     def __init__(self):
         """Initialize the PySCF stability checker with default settings."""
+        Logger.trace_entering()
         super().__init__()
         self._settings = PyscfStabilitySettings()
 
@@ -238,6 +249,7 @@ class PyscfStabilityChecker(StabilityChecker):
                 stability analysis is requested for ROHF/UHF wavefunctions.
 
         """
+        Logger.trace_entering()
         # Verify wavefunction compatibility: Only SlaterDeterminantContainer currently supported
         if wavefunction.get_container_type() != "sd":
             raise ValueError("Stability analysis currently only supports SlaterDeterminantContainer wavefunctions")
@@ -249,6 +261,7 @@ class PyscfStabilityChecker(StabilityChecker):
         nroots = self._settings.get("nroots")
         alg_tol = self._settings.get("davidson_tolerance")
         stability_tol = self._settings.get("stability_tolerance")
+        method = self._settings.get("method")
 
         # Get orbitals from wavefunction
         orbitals = wavefunction.get_orbitals()
@@ -266,7 +279,7 @@ class PyscfStabilityChecker(StabilityChecker):
         occ_beta[:nbeta] = 1.0
 
         # Convert to PySCF SCF object
-        mf = orbitals_to_scf(orbitals, occ_alpha, occ_beta)
+        mf = orbitals_to_scf(orbitals, occ_alpha, occ_beta, method=method)
 
         # Determine wavefunction type and perform appropriate stability analysis
         internal_eigenvalues_list = []
@@ -347,4 +360,5 @@ class PyscfStabilityChecker(StabilityChecker):
 
     def name(self) -> str:
         """Return the name for the stability checker."""
+        Logger.trace_entering()
         return "pyscf"
