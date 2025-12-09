@@ -24,7 +24,7 @@ class EnergyExpectationResult(DataClass):
         energy_expectation_value (float): Expectation value of the energy.
         energy_variance (float): Variance of the energy.
         expvals_each_term (list[np.ndarray]): Expectation values for each term in the Hamiltonian.
-        variances_each_term list[np.ndarray]): Variances for each term in the Hamiltonian.
+        variances_each_term (list[np.ndarray]): Variances for each term in the Hamiltonian.
 
     """
 

@@ -15,7 +15,7 @@ from ruamel.yaml import YAML
 
 from qdk_chemistry.data.base import DataClass
 
-__all__: list[str] = ["GateErrorDef", "SupportedErrorTypes", "SupportedGate"]
+__all__: list[str] = ["CaseInsensitiveStrEnum", "GateErrorDef", "SupportedErrorTypes", "SupportedGate"]
 
 
 class CaseInsensitiveStrEnum(StrEnum):
@@ -31,10 +31,12 @@ class CaseInsensitiveStrEnum(StrEnum):
 
 
 class SupportedGate(CaseInsensitiveStrEnum):
-    """An enumeration of quantum gate types.
+    """An enumeration of quantum gate types with case-insensitive string lookup.
 
-    Gathered from qiskit
-    https://github.com/Qiskit/qiskit/blob/a88ed60615eeb988f404f9afaf142775478aceb9/qiskit/circuit/quantumcircuit.py#L673C1-L731C1
+    Note:
+        Gate types gathered from Qiskit:
+        https://github.com/Qiskit/qiskit/blob/a88ed60615eeb988f404f9afaf142775478aceb9/qiskit/circuit/quantumcircuit.py#L673C1-L731C1
+
     """
 
     BARRIER = "barrier"
@@ -117,7 +119,18 @@ class SupportedGate(CaseInsensitiveStrEnum):
 
 
 class SupportedErrorTypes(CaseInsensitiveStrEnum):
-    """Supported error types for quantum gates."""
+    """Supported error types for quantum gates with case-insensitive string lookup.
+
+    This enum allows both enum member access and case-insensitive string lookup
+    for error types.
+
+    Example:
+        >>> error1 = SupportedErrorTypes.DEPOLARIZING_ERROR
+        >>> error2 = SupportedErrorTypes("depolarizing_error")
+        >>> error3 = SupportedErrorTypes("DEPOLARIZING_ERROR")
+        >>> assert error1 == error2 == error3
+
+    """
 
     DEPOLARIZING_ERROR = "depolarizing_error"
 
@@ -144,13 +157,13 @@ class QuantumErrorProfile(DataClass):
         name (str): Name of the quantum error profile.
         description (str): Description of what the error profile represents.
         errors (dict[SupportedGate, GateErrorDef]): Dictionary mapping gate names to their error properties.
-        one_qubit_gates (set): Set of gate names that operate on a single qubit.
-        two_qubit_gates (set): Set of gate names that operate on two qubits.
+        one_qubit_gates (list[str]): List of gate names that operate on a single qubit.
+        two_qubit_gates (list[str]): List of gate names that operate on two qubits.
 
     """
 
     # Class attribute for filename validation
-    _data_type_name = "qpe_result"
+    _data_type_name = "quantum_error_profile"
 
     # Serialization version for this class
     _serialization_version = "0.1.0"
@@ -309,7 +322,7 @@ class QuantumErrorProfile(DataClass):
             str: Summary string describing the quantum error profile.
 
         """
-        data = self.to_dict()
+        data = self.to_json()
         lines = [
             "Quantum Error Profile",
             f"  name: {data['name']}",

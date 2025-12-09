@@ -168,11 +168,15 @@ nitpick_ignore_regex = [
     (r"cpp:identifier", r"Vector<.*>"),
     (r"cpp:identifier", r"SupportedSettingType<.*>"),
     (r"py:class", r"qsharp._qsharp.*"),
+    (r"py:class", r"qsharp._native.*"),
     (r"py:class", r"h5py.*"),
     (r"py:class", r"numpy.*"),
+    (r"py:class", r"np.ndarray"),
     (r"py:class", r"qiskit_aer.*"),
     (r"py:class", r"Circuit"),
     (r"py:class", r"pyscf.*"),
+    (r"py:class", r"Path"),
+    (r"py:class", r"SparsePauliOp"),
     (r"py:class", r"qdk_chemistry._core.data.DataClass"),
 ]
 
