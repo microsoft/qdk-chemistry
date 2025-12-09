@@ -59,8 +59,7 @@ class PipekMezeyLocalizer : public qdk::chemistry::algorithms::Localizer {
  * @brief Pipek-Mezey localization scheme implementation.
  *
  * Implementation according to:
- *   J. W. Boughton, P. Pulay; J. Comp. Chem. 14 (1993), 736 - 740.
- *   https://doi.org/10.1002/jcc.540140615
+ *   Boughton & Pulay (1993), doi:10.1002/jcc.540140615, :cite:`Boughton1993`
  *
  * This class implements the Pipek-Mezey localization algorithm for molecular
  * orbitals. It inherits from the IterativeOrbitalLocalizationScheme base class

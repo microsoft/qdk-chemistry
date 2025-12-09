@@ -253,6 +253,8 @@ QDK entropy-based active space selector.
 This class selects active space orbitals based on orbital entropy measures.
 It identifies orbitals with high entropy, which indicates strong electron
 correlation and multi-reference character.
+This method is a variant of the AutoCAS method that uses entropy as the primary
+criterion for selecting active orbitals :cite:`Stein2019`.
 
 Typical usage:
 
@@ -288,7 +290,7 @@ QDK Automated Complete Active Space (AutoCAS) selector.
 
 This class provides an automated approach to selecting active space orbitals
 based on various criteria including occupation numbers, orbital energies,
-and other chemical information.
+and other chemical information :cite:`Stein2019`.
 
 Typical usage:
 
