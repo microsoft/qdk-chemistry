@@ -23,9 +23,9 @@ if [[ ${MARCH} == 'armv8-a' ]]; then
     --disable-shared \
     --enable-static \
     --prefix=${INSTALL_PREFIX} \
-    $BLIS_ARCH \
     --blis-int-size=32 \
-    --int-size=32
+    --int-size=32 \
+    $BLIS_ARCH
 elif [[ ${MARCH} == 'x86-64-v3' ]]; then
     # Compile for intel64, amd64, and amd64_legacy architectures
     export BLIS_ARCH=x86_64
