@@ -473,33 +473,35 @@ TEST(PauliOperatorExpressionTest, ProductPauliOperatorSimplify) {
             3);
 
   // Product with sum factor
-  // OP = 2 * Y(0) * (X(1) + I(2))
+  // OP = 2 * Y(0) * (X(1) + I(2)) -> 2*Y(0)*X(1) + 2*Y(0)
+  // After simplify: 2*Y(0)*X(1) + 2*Y(0) (I(2) stripped)
   auto prod3 =
       2 * PauliOperator::Y(0) * (PauliOperator::X(1) + PauliOperator::I(2));
   simplified_expr = prod3.simplify();
-  EXPECT_EQ(simplified_expr->to_string(), "2 * Y(0) * (X(1) + I(2))");
+  EXPECT_EQ(simplified_expr->to_string(), "2 * Y(0) * X(1) + 2 * Y(0)");
 
   // Product of multiple products with different coefficients that need to be
   // combined
   // OP = (2 * X(0) * Y(1)) * (3 * Z(2) * (I(3) + Y(5)))
+  // After distribute and simplify: 6*X(0)*Y(1)*Z(2) + 6*X(0)*Y(1)*Z(2)*Y(5)
   auto prod4 =
       (2 * PauliOperator::X(0) * PauliOperator::Y(1)) *
       (3 * PauliOperator::Z(2) * (PauliOperator::I(3) + PauliOperator::Y(5)));
   simplified_expr = prod4.simplify();
   EXPECT_EQ(simplified_expr->to_string(),
-            "6 * X(0) * Y(1) * Z(2) * (I(3) + Y(5))");
+            "6 * X(0) * Y(1) * Z(2) + 6 * X(0) * Y(1) * Z(2) * Y(5)");
 
   // Products with operators on the same qubit that need to be combined
   // P * P = I for any Pauli P
-  // OP = X(0) * X(0) -> I (coefficient only)
+  // OP = X(0) * X(0) -> 1 (pure scalar, identity stripped)
   auto prod5 = PauliOperator::X(0) * PauliOperator::X(0);
   simplified_expr = prod5.simplify();
-  EXPECT_EQ(simplified_expr->to_string(), "I(0)");
+  EXPECT_EQ(simplified_expr->to_string(), "1");
 
-  // OP = 2 * Y(1) * Y(1) -> 2 * I
+  // OP = 2 * Y(1) * Y(1) -> 2 (pure scalar, identity stripped)
   auto prod6 = 2 * PauliOperator::Y(1) * PauliOperator::Y(1);
   simplified_expr = prod6.simplify();
-  EXPECT_EQ(simplified_expr->to_string(), "2 * I(1)");
+  EXPECT_EQ(simplified_expr->to_string(), "2");
 
   // X * Y = iZ
   // OP = X(0) * Y(0) -> i * Z(0)
@@ -532,10 +534,10 @@ TEST(PauliOperatorExpressionTest, ProductPauliOperatorSimplify) {
   EXPECT_EQ(simplified_expr->to_string(), "i * Z(0) * Z(1)");
 
   // Three operators on same qubit: X * Y * Z = iZ * Z = i * I = i
-  // OP = X(0) * Y(0) * Z(0) -> i
+  // OP = X(0) * Y(0) * Z(0) -> i (pure scalar, identity stripped)
   auto prod12 = PauliOperator::X(0) * PauliOperator::Y(0) * PauliOperator::Z(0);
   simplified_expr = prod12.simplify();
-  EXPECT_EQ(simplified_expr->to_string(), "i * I(0)");
+  EXPECT_EQ(simplified_expr->to_string(), "i");
 
   // I * P = P
   // OP = I(0) * X(0) -> X(0)
@@ -552,12 +554,102 @@ TEST(PauliOperatorExpressionTest, SumPauliOperatorSimplify) {
   auto simplified_expr = sum.simplify();
   EXPECT_EQ(simplified_expr->to_string(), "X(0) + Z(1)");
 
-  // Sum with multiple terms
+  // Sum with multiple terms (already distributed)
   // OP = Y(0) + 2 * X(1) * Z(2) + 3 * I(3)
+  // Note: I(3) gets stripped, leaving just the scalar 3
   auto sum2 = PauliOperator::Y(0) +
               (2 * PauliOperator::X(1) * PauliOperator::Z(2)) +
               (3 * PauliOperator::I(3));
 
   simplified_expr = sum2.simplify();
-  EXPECT_EQ(simplified_expr->to_string(), "Y(0) + 2 * X(1) * Z(2) + 3 * I(3)");
+  EXPECT_EQ(simplified_expr->to_string(), "Y(0) + 2 * X(1) * Z(2) + 3");
+}
+
+TEST(PauliOperatorExpressionTest, TermCollection) {
+  // Test that like terms are combined
+  // OP = X(0) + X(0) -> 2 * X(0)
+  auto sum1 = PauliOperator::X(0) + PauliOperator::X(0);
+  auto simplified_expr = sum1.simplify();
+  EXPECT_EQ(simplified_expr->to_string(), "2 * X(0)");
+
+  // OP = X(0) - X(0) -> 0 (cancellation)
+  auto sum2 = PauliOperator::X(0) - PauliOperator::X(0);
+  simplified_expr = sum2.simplify();
+  EXPECT_EQ(simplified_expr->to_string(), "0");
+
+  // OP = 2*X(0)*Y(1) + 3*Y(1)*X(0) -> 5*X(0)*Y(1)
+  auto sum3 = (2 * PauliOperator::X(0) * PauliOperator::Y(1)) +
+              (3 * PauliOperator::Y(1) * PauliOperator::X(0));
+  simplified_expr = sum3.simplify();
+  EXPECT_EQ(simplified_expr->to_string(), "5 * X(0) * Y(1)");
+
+  // OP = X(0) + Y(1) + X(0) -> 2*X(0) + Y(1)
+  auto sum4 = PauliOperator::X(0) + PauliOperator::Y(1) + PauliOperator::X(0);
+  simplified_expr = sum4.simplify();
+  EXPECT_EQ(simplified_expr->to_string(), "2 * X(0) + Y(1)");
+
+  // Test with complex coefficients: X(0) + i*X(0) -> (1+i)*X(0)
+  auto sum5 = PauliOperator::X(0) +
+              (std::complex<double>(0.0, 1.0) * PauliOperator::X(0));
+  simplified_expr = sum5.simplify();
+  EXPECT_EQ(simplified_expr->to_string(), "(1+1i) * X(0)");
+}
+
+TEST(PauliOperatorExpressionTest, SimplifyRequiresDistributed) {
+  // Test that simplify() throws when expression is not distributed
+  auto prod = PauliOperator::X(0) * (PauliOperator::Y(1) + PauliOperator::Z(2));
+  // The product contains a sum, so it's not distributed
+  EXPECT_FALSE(prod.is_distributed());
+
+  // Create a sum containing the undistributed product
+  SumPauliOperatorExpression sum;
+  sum.add_term(prod.clone());
+
+  // simplify() should throw
+  EXPECT_THROW(sum.simplify(), std::logic_error);
+}
+
+TEST(PauliOperatorExpressionTest, PruneThreshold) {
+  // Create a sum with terms of varying coefficient magnitudes
+  // OP = 1e-5 * X(0) + 0.5 * Y(1) + 1e-12 * Z(2) + 2.0 * X(3)
+  auto sum = (1e-5 * PauliOperator::X(0)) + (0.5 * PauliOperator::Y(1)) +
+             (1e-12 * PauliOperator::Z(2)) + (2.0 * PauliOperator::X(3));
+
+  // Threshold at 1e-10: should remove only Z(2)
+  auto thresholded1 = sum.prune_threshold(1e-10);
+  EXPECT_EQ(thresholded1->get_terms().size(), 3);
+
+  // Threshold at 1e-4: should remove X(0) and Z(2)
+  auto thresholded2 = sum.prune_threshold(1e-4);
+  EXPECT_EQ(thresholded2->get_terms().size(), 2);
+
+  // Threshold at 1.0: should remove X(0), Y(1), and Z(2), leaving only X(3)
+  auto thresholded3 = sum.prune_threshold(1.0);
+  EXPECT_EQ(thresholded3->get_terms().size(), 1);
+  EXPECT_EQ(thresholded3->to_string(), "2 * X(3)");
+
+  // Threshold at 0: should keep all terms
+  auto thresholded4 = sum.prune_threshold(0.0);
+  EXPECT_EQ(thresholded4->get_terms().size(), 4);
+
+  // Threshold at very large value: should remove all terms
+  auto thresholded5 = sum.prune_threshold(100.0);
+  EXPECT_EQ(thresholded5->get_terms().size(), 0);
+  EXPECT_EQ(thresholded5->to_string(), "0");
+
+  // Test that prune_threshold is accessible from base class pointer
+  PauliOperator pauli = PauliOperator::X(0);
+  auto pauli_pruned = pauli.prune_threshold(0.5);
+  EXPECT_EQ(pauli_pruned->get_terms().size(), 1);
+
+  auto pauli_pruned2 = pauli.prune_threshold(2.0);
+  EXPECT_EQ(pauli_pruned2->get_terms().size(), 0);
+
+  // Test on ProductPauliOperatorExpression
+  auto prod = 0.1 * PauliOperator::Y(1);
+  auto prod_pruned = prod.prune_threshold(0.05);
+  EXPECT_EQ(prod_pruned->get_terms().size(), 1);
+
+  auto prod_pruned2 = prod.prune_threshold(0.5);
+  EXPECT_EQ(prod_pruned2->get_terms().size(), 0);
 }

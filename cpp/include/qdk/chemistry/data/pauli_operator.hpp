@@ -29,6 +29,15 @@ class PauliOperatorExpression {
   virtual std::unique_ptr<SumPauliOperatorExpression> distribute() const = 0;
   virtual std::unique_ptr<PauliOperatorExpression> simplify() const = 0;
 
+  /**
+   * @brief Returns a new expression with terms having coefficient magnitude
+   *        below the threshold removed.
+   * @param epsilon The threshold below which terms are removed.
+   * @return A new SumPauliOperatorExpression with small terms filtered out.
+   */
+  virtual std::unique_ptr<SumPauliOperatorExpression> prune_threshold(
+      double epsilon) const = 0;
+
   bool is_pauli_operator() const;
 
   bool is_product_expression() const;
@@ -50,6 +59,8 @@ class PauliOperator : public PauliOperatorExpression {
   std::unique_ptr<PauliOperatorExpression> clone() const override;
   std::unique_ptr<SumPauliOperatorExpression> distribute() const override;
   std::unique_ptr<PauliOperatorExpression> simplify() const override;
+  std::unique_ptr<SumPauliOperatorExpression> prune_threshold(
+      double epsilon) const override;
   inline std::uint8_t get_operator_type() const { return operator_type_; }
   inline std::uint64_t get_qubit_index() const { return qubit_index_; }
 
@@ -89,6 +100,8 @@ class ProductPauliOperatorExpression : public PauliOperatorExpression {
   std::unique_ptr<PauliOperatorExpression> clone() const override;
   std::unique_ptr<SumPauliOperatorExpression> distribute() const override;
   std::unique_ptr<PauliOperatorExpression> simplify() const override;
+  std::unique_ptr<SumPauliOperatorExpression> prune_threshold(
+      double epsilon) const override;
 
   void multiply_coefficient(std::complex<double> c);
   void add_factor(std::unique_ptr<PauliOperatorExpression> factor);
@@ -116,6 +129,8 @@ class SumPauliOperatorExpression : public PauliOperatorExpression {
   std::unique_ptr<PauliOperatorExpression> clone() const override;
   std::unique_ptr<SumPauliOperatorExpression> distribute() const override;
   std::unique_ptr<PauliOperatorExpression> simplify() const override;
+  std::unique_ptr<SumPauliOperatorExpression> prune_threshold(
+      double epsilon) const override;
 
   void add_term(std::unique_ptr<PauliOperatorExpression> term);
 

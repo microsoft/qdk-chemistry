@@ -3,8 +3,11 @@
 // license information.
 
 #include <algorithm>
+#include <cmath>
 #include <functional>
 #include <qdk/chemistry/data/pauli_operator.hpp>
+#include <stdexcept>
+#include <tuple>
 
 namespace qdk::chemistry::data {
 
@@ -109,6 +112,18 @@ std::unique_ptr<SumPauliOperatorExpression> PauliOperator::distribute() const {
 
 std::unique_ptr<PauliOperatorExpression> PauliOperator::simplify() const {
   return this->clone();
+}
+
+std::unique_ptr<SumPauliOperatorExpression> PauliOperator::prune_threshold(
+    double epsilon) const {
+  // A bare PauliOperator has implicit coefficient 1.0
+  auto result = std::make_unique<SumPauliOperatorExpression>();
+  if (1.0 >= epsilon) {
+    auto prod = std::make_unique<ProductPauliOperatorExpression>();
+    prod->add_factor(this->clone());
+    result->add_term(std::move(prod));
+  }
+  return result;
 }
 
 // ProductPauliOperatorExpression methods
@@ -258,32 +273,32 @@ ProductPauliOperatorExpression::simplify() const {
     simplified_product->add_factor(std::move(simplified_factor));
   }
 
-  // stable sort factors and perform qubit-wise product simplification
-  if (simplified_product->factors_.size() > 1) {
-    // First unroll the products into a single product with all factors
-    // Since is_distributed() is true, all factors are either PauliOperators
-    // or ProductPauliOperatorExpressions containing only PauliOperators
-    std::vector<std::unique_ptr<PauliOperatorExpression>> unrolled_factors;
-    std::function<void(const std::unique_ptr<PauliOperatorExpression>&)>
-        unroll = [&unrolled_factors, &unroll](
-                     const std::unique_ptr<PauliOperatorExpression>& expr) {
-          if (auto* pauli = dynamic_cast<const PauliOperator*>(expr.get())) {
-            unrolled_factors.push_back(expr->clone());
-          } else if (auto* prod =
-                         dynamic_cast<const ProductPauliOperatorExpression*>(
-                             expr.get())) {
-            for (const auto& factor : prod->get_factors()) {
-              unroll(factor);
-            }
+  // Always unroll nested products into a flat list of PauliOperators
+  // Since is_distributed() is true, all factors are either PauliOperators
+  // or ProductPauliOperatorExpressions containing only PauliOperators
+  std::vector<std::unique_ptr<PauliOperatorExpression>> unrolled_factors;
+  std::function<void(const std::unique_ptr<PauliOperatorExpression>&)> unroll =
+      [&unrolled_factors,
+       &unroll](const std::unique_ptr<PauliOperatorExpression>& expr) {
+        if (auto* pauli = dynamic_cast<const PauliOperator*>(expr.get())) {
+          unrolled_factors.push_back(expr->clone());
+        } else if (auto* prod =
+                       dynamic_cast<const ProductPauliOperatorExpression*>(
+                           expr.get())) {
+          for (const auto& factor : prod->get_factors()) {
+            unroll(factor);
           }
-        };
+        }
+      };
 
-    for (const auto& factor : simplified_product->factors_) {
-      unroll(factor);
-    }
+  for (const auto& factor : simplified_product->factors_) {
+    unroll(factor);
+  }
 
-    simplified_product->factors_ = std::move(unrolled_factors);
+  simplified_product->factors_ = std::move(unrolled_factors);
 
+  // If we have factors, sort and combine them
+  if (!simplified_product->factors_.empty()) {
     auto& factors = simplified_product->factors_;
     std::stable_sort(factors.begin(), factors.end(),
                      [](const auto& a, const auto& b) {
@@ -348,9 +363,10 @@ ProductPauliOperatorExpression::simplify() const {
       }
 
       // Only add non-identity operators to the result
-
-      combined_factors.push_back(
-          std::make_unique<PauliOperator>(result_type, qubit));
+      if (result_type != 0) {
+        combined_factors.push_back(
+            std::make_unique<PauliOperator>(result_type, qubit));
+      }
 
       i = j;
     }
@@ -359,6 +375,15 @@ ProductPauliOperatorExpression::simplify() const {
     simplified_product->coefficient_ *= phase_factor;
   }
   return simplified_product;
+}
+
+std::unique_ptr<SumPauliOperatorExpression>
+ProductPauliOperatorExpression::prune_threshold(double epsilon) const {
+  auto result = std::make_unique<SumPauliOperatorExpression>();
+  if (std::abs(coefficient_) >= epsilon) {
+    result->add_term(this->clone());
+  }
+  return result;
 }
 
 void ProductPauliOperatorExpression::multiply_coefficient(
@@ -434,15 +459,130 @@ SumPauliOperatorExpression::distribute() const {
 
 std::unique_ptr<PauliOperatorExpression> SumPauliOperatorExpression::simplify()
     const {
-  // First distribute to get a sum of products
-  auto distributed = this->distribute();
-
-  auto simplified_sum = std::make_unique<SumPauliOperatorExpression>();
-  for (const auto& term : distributed->get_terms()) {
-    auto simplified_term = term->simplify();
-    simplified_sum->add_term(std::move(simplified_term));
+  // Require the expression to be distributed before simplification
+  if (!this->is_distributed()) {
+    throw std::logic_error(
+        "SumPauliOperatorExpression::simplify() requires a distributed "
+        "expression. Call distribute() first.");
   }
+
+  // Helper function to create a term key from a simplified product
+  // The key is a sorted vector of (qubit_index, operator_type) pairs
+  auto make_term_key = [](const ProductPauliOperatorExpression* prod)
+      -> std::vector<std::pair<std::uint64_t, std::uint8_t>> {
+    std::vector<std::pair<std::uint64_t, std::uint8_t>> key;
+    for (const auto& factor : prod->get_factors()) {
+      if (auto* pauli = dynamic_cast<const PauliOperator*>(factor.get())) {
+        key.emplace_back(pauli->get_qubit_index(), pauli->get_operator_type());
+      }
+    }
+    // Key should already be sorted since simplify() sorts factors by qubit
+    return key;
+  };
+
+  // First simplify all terms individually
+  std::vector<std::unique_ptr<ProductPauliOperatorExpression>> simplified_terms;
+
+  // Helper function to add a simplified expression to simplified_terms
+  std::function<void(std::unique_ptr<PauliOperatorExpression>)>
+      add_simplified_term;
+  add_simplified_term = [&simplified_terms, &add_simplified_term](
+                            std::unique_ptr<PauliOperatorExpression> expr) {
+    if (auto* prod =
+            dynamic_cast<ProductPauliOperatorExpression*>(expr.get())) {
+      simplified_terms.push_back(
+          std::make_unique<ProductPauliOperatorExpression>(*prod));
+    } else if (auto* pauli = dynamic_cast<PauliOperator*>(expr.get())) {
+      // Wrap single PauliOperator in a ProductPauliOperatorExpression
+      auto wrapped = std::make_unique<ProductPauliOperatorExpression>();
+      wrapped->add_factor(std::make_unique<PauliOperator>(*pauli));
+      simplified_terms.push_back(std::move(wrapped));
+    } else if (auto* sum =
+                   dynamic_cast<SumPauliOperatorExpression*>(expr.get())) {
+      // Recursively add terms from the sum
+      for (const auto& term : sum->get_terms()) {
+        add_simplified_term(term->clone());
+      }
+    }
+  };
+
+  for (const auto& term : terms_) {
+    auto simplified_term = term->simplify();
+    add_simplified_term(std::move(simplified_term));
+  }
+
+  // Collect like terms using a vector to preserve insertion order
+  // Each entry: (key, coefficient, term)
+  using TermKey = std::vector<std::pair<std::uint64_t, std::uint8_t>>;
+  std::vector<std::tuple<TermKey, std::complex<double>,
+                         std::unique_ptr<ProductPauliOperatorExpression>>>
+      collected_terms;
+
+  for (auto& term : simplified_terms) {
+    auto key = make_term_key(term.get());
+    // Linear search for existing term with same key
+    auto it = std::find_if(
+        collected_terms.begin(), collected_terms.end(),
+        [&key](const auto& entry) { return std::get<0>(entry) == key; });
+
+    if (it == collected_terms.end()) {
+      // First occurrence of this Pauli string
+      auto coeff = term->get_coefficient();
+      term->set_coefficient(1.0);  // Store with unit coefficient
+      collected_terms.emplace_back(std::move(key), coeff, std::move(term));
+    } else {
+      // Add coefficient to existing term
+      std::get<1>(*it) += term->get_coefficient();
+    }
+  }
+
+  // Build the simplified sum, excluding exactly-zero coefficient terms
+  // Only remove terms where coefficient is exactly zero
+  auto simplified_sum = std::make_unique<SumPauliOperatorExpression>();
+  for (auto& [key, coeff, term] : collected_terms) {
+    // Skip only if coefficient is exactly zero
+    if (coeff == std::complex<double>(0.0, 0.0)) {
+      continue;
+    }
+    term->set_coefficient(coeff);
+    simplified_sum->add_term(std::move(term));
+  }
+
   return simplified_sum;
+}
+
+std::unique_ptr<SumPauliOperatorExpression>
+SumPauliOperatorExpression::prune_threshold(double epsilon) const {
+  auto result = std::make_unique<SumPauliOperatorExpression>();
+
+  // Helper function to recursively process terms
+  std::function<void(const PauliOperatorExpression*)> process_term;
+  process_term = [&result, epsilon,
+                  &process_term](const PauliOperatorExpression* term) {
+    if (auto* sum = dynamic_cast<const SumPauliOperatorExpression*>(term)) {
+      // Recursively process nested sums
+      for (const auto& nested_term : sum->get_terms()) {
+        process_term(nested_term.get());
+      }
+    } else if (auto* prod =
+                   dynamic_cast<const ProductPauliOperatorExpression*>(term)) {
+      // Keep the term only if its coefficient magnitude is >= epsilon
+      if (std::abs(prod->get_coefficient()) >= epsilon) {
+        result->add_term(term->clone());
+      }
+    } else if (auto* pauli = dynamic_cast<const PauliOperator*>(term)) {
+      // Bare PauliOperator has implicit coefficient of 1.0
+      if (1.0 >= epsilon) {
+        result->add_term(term->clone());
+      }
+    }
+  };
+
+  for (const auto& term : terms_) {
+    process_term(term.get());
+  }
+
+  return result;
 }
 
 void SumPauliOperatorExpression::add_term(
