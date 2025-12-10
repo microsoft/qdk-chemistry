@@ -17,8 +17,8 @@ namespace qdk::chemistry::algorithms::microsoft {
  * analysis parameters with sensible default values.
  *
  * Default settings include:
- * - internal: true - Use internal stability solver
- * - external: false - Check external stability (not yet implemented)
+ * - internal: true - Check internal stability
+ * - external: false - Check external stability
  *
  * Users can override these defaults by modifying the settings object
  * obtained from the StabilityChecker instance.

@@ -43,8 +43,7 @@ namespace detail {
  * @param trial_density The trial/perturbed density matrix
  * @param ground_density The ground state density matrix
  * @param trial_fock Output trial Fock matrix
- * @param J_scratch Scratch matrix for J contributions (also used for XC)
- * @param K_scratch Scratch matrix for K contributions
+ * @param rhf_external Flag indicating if RHF external stability is requested
  */
 void compute_trial_fock(const std::shared_ptr<qcs::ERI>& eri,
                         const std::shared_ptr<qcs::EXC>& exc,

@@ -599,7 +599,7 @@ class TestStabilityChecker:
         is_stable, result = stability_checker.run(wavefunction)
 
         self._assert_basic_stability_result(result, is_stable, has_internal=True, has_external=True)
-        assert result.is_stable() is True  # Water RHF should be stable
+        assert result.is_stable() is True
         assert result.is_internal_stable() is True
         assert result.is_external_stable() is True
 
@@ -616,7 +616,7 @@ class TestStabilityChecker:
         ],
     )
     def test_stability_uhf_water_plus(self, backend, method, ref_internal):
-        """Test stability checker on stable UHF water Ion with different backends and methods."""
+        """Test stability checker on stable UHF water cation with different backends and methods."""
         water = create_water_structure()
         scf_solver = self._create_scf_solver()
         scf_solver.settings().set("method", method)
@@ -725,7 +725,7 @@ class TestStabilityChecker:
         """Test stability checker on BN+ cation (UHF) with different backends."""
         structure = create_bn_plus_structure()
         ref_eigenvalue = -0.07936046244954532
-        # QDK finds 1 negative eigenvalue, PySCF finds 2 (different convergence/tolerance)
+        # QDK only checks the lowest eigenvalue now
         expected_negative_count = 1 if backend == "qdk" else 2
 
         scf_solver = self._create_scf_solver()
@@ -794,7 +794,6 @@ class TestStabilityWorkflow:
 
         # Run initial SCF calculation
         energy, wavefunction = scf_solver.run(structure, charge, spin_multiplicity, initial_guess)
-        print(f"iteration: 0, energy:{energy}")
 
         # Determine if calculation is restricted from initial wavefunction
         is_restricted_calculation = wavefunction.get_orbitals().is_restricted() and spin_multiplicity == 1
@@ -868,7 +867,6 @@ class TestStabilityWorkflow:
 
             # Restart SCF with rotated orbitals
             energy, wavefunction = scf_solver.run(structure, charge, spin_multiplicity, rotated_orbitals)
-            print(f"iteration:{iteration}, energy:{energy}")
 
         return energy, wavefunction, is_stable, stability_result
 
@@ -894,7 +892,9 @@ class TestStabilityWorkflow:
 
         # Check energy matches reference value (internal-only stability with pyscf ROHF)
         # ROHF converges to different energy than UHF
-        assert abs(energy - (-149.4705939454018)) < 1e-5, f"Energy {energy} should match reference -149.4705939454018"
+        assert abs(energy - (-149.4705939454018)) < scf_energy_tolerance, (
+            f"Energy {energy} should match reference -149.4705939454018"
+        )
 
     @pytest.mark.parametrize(
         ("backend", "method", "ref_energy"),
@@ -958,6 +958,7 @@ class TestStabilityWorkflow:
         energy, wfn, is_stable, result = self._run_scf_with_stability_workflow(n2, 0, 1, scf_solver, stability_checker)
 
         # Final wavefunction should be unrestricted (switched from RHF to UHF) for HF
+        # DFT may not have RKS external stability here
         if method == "hf":
             assert not wfn.get_orbitals().is_restricted(), (
                 "Final wavefunction should be unrestricted after external instability"

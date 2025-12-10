@@ -71,8 +71,8 @@ namespace qdk::chemistry::data {
  * **Indexing Convention:**
  * The Occupied orbital index varies fastest. For the element corresponding to
  * occupied orbital i and virtual orbital a, the index is computed as:
- * index = i + a * occupied. This tradition is from pyscf row-major eigenvector
- * (num_virtual, num_occupied).
+ * index = i + a * num_occupied. This convention is from pyscf row-major
+ * eigenvector (num_virtual, num_occupied).
  */
 class StabilityResult : public DataClass,
                         public std::enable_shared_from_this<StabilityResult> {
