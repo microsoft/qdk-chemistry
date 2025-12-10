@@ -102,6 +102,10 @@ extends:
               targetPath: $(System.DefaultWorkingDirectory)/artifacts
               artifactName: linux-${{ target.arch }}-wheels-python$(pythonVersion)
           steps:
+          - script: |
+              mkdir -p $(Agent.BuildDirectory)/artifacts
+            displayName: Prepare Artifacts Directory
+
           # Build - x86_64
           - ${{ if eq(target.arch, 'x86_64') }}:
             - template: .pipelines/templates/docker-pip-wheel.yml@self

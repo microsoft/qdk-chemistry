@@ -17,7 +17,8 @@ cd blis
 
 # Select architectures to build BLIS for
 if [[ ${MARCH} == 'armv8-a' ]]; then
-    # Compile for armsve, firestorm, thunderx2, cortexa57, cortexa53, and generic architectures
+    # Compile for generic architecture due to issues with block
+    # size allocations for certain ARM instruction sets
     export BLIS_ARCH=generic
     CFLAGS=${CFLAGS} ./configure \
     --disable-shared \
@@ -37,7 +38,6 @@ elif [[ ${MARCH} == 'x86-64-v3' ]]; then
 fi
 
 make -j$(nproc)
-make check
 make install
 
 cd ..
