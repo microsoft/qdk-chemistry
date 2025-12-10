@@ -206,7 +206,7 @@ class PyscfStabilityChecker(StabilityChecker):
     RHF, ROHF, UHF and external stability analysis (RHF -> UHF instability).
 
     Internal stability eigenvalues are rescaled to follow the convention used in the
-    original stability analysis formulation (J. Chem. Phys. 66, 3045–3050 (1977)) and
+    original stability analysis formulation (J. Chem. Phys. 66, 3045-3050 (1977)) and
     to be consistent with the QDK implementation:
 
     - RHF internal eigenvalues are scaled by 1/4
@@ -300,7 +300,7 @@ class PyscfStabilityChecker(StabilityChecker):
         external_eigenvectors_list = []
 
         # Scale factors for internal eigenvalues so that reported values follow the
-        # convention of J. Chem. Phys. 66, 3045–3050 (1977) and match the QDK backend.
+        # convention of J. Chem. Phys. 66, 3045-3050 (1977) and match the QDK backend.
         internal_scale_factor = 1.0
 
         if isinstance(mf, scf.rohf.ROHF):
@@ -355,7 +355,7 @@ class PyscfStabilityChecker(StabilityChecker):
 
         # Convert to numpy arrays if we have results. Internal eigenvalues are
         # scaled (RHF by 1/4, UHF by 1/2) to follow the convention of
-        # J. Chem. Phys. 66, 3045–3050 (1977) and to match the QDK backend.
+        # J. Chem. Phys. 66, 3045-3050 (1977) and to match the QDK backend.
         # External eigenvalues are left unscaled.
         if len(internal_eigenvalues_list) > 0:
             internal_eigenvalues = np.array(internal_eigenvalues_list) * internal_scale_factor

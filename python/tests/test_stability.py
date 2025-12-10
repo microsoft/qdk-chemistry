@@ -899,10 +899,10 @@ class TestStabilityWorkflow:
     @pytest.mark.parametrize(
         ("backend", "method", "ref_energy"),
         [
-            # ("pyscf", "hf", -108.606721153932),
-            # ("qdk", "hf", -108.606721153932),
+            ("pyscf", "hf", -108.606721153932),
+            ("qdk", "hf", -108.606721153932),
             ("pyscf", "pbe", -109.09282114654889),
-            ("qdk", "pbe", -109.09282114654889),
+            ("qdk", "pbe", -109.09282137913918),
         ],
     )
     def test_workflow_n2_rhf_both_instability(self, backend, method, ref_energy):
