@@ -102,10 +102,6 @@ extends:
               targetPath: $(System.DefaultWorkingDirectory)/artifacts
               artifactName: linux-${{ target.arch }}-wheels-python$(pythonVersion)
           steps:
-          - script: |
-              mkdir -p $(Agent.BuildDirectory)/qdk-chemistry/artifacts
-            displayName: Prepare Artifacts Directory
-
           # Build - x86_64
           - ${{ if eq(target.arch, 'x86_64') }}:
             - template: .pipelines/templates/docker-pip-wheel.yml@self
@@ -220,6 +216,12 @@ extends:
               python3 -m twine upload -r $(DEPENDENCIES_ARTIFACT_FEED) repaired_wheelhouse/linux*/*.whl --config-file $(PYPIRC_PATH)
             displayName: Upload wheel with twine
             condition: and(succeeded(), eq(${{ parameters.forceArtifactUpload }}, true))
+
+          - script: |
+              mkdir -p $(System.DefaultWorkingDirectory)/target/wheels
+              find $(System.DefaultWorkingDirectory)/artifacts -name "*.whl" -exec cp {} $(System.DefaultWorkingDirectory)/target/wheels/ \;
+              ls $(System.DefaultWorkingDirectory)/target/wheels
+            displayName: Collect Python Artifacts for Release
 
               # Uncomment and fill in missing fields after ESRP approval
     #         - task: EsrpRelease@9

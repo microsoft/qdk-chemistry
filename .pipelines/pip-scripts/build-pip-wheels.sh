@@ -44,9 +44,9 @@ apt-get install -y \
     libpugixml-dev
 
 # Upgrade cmake as Ubuntu 22.04 only has up to v3.22 in apt
-export CMAKE_CHECKSUM=cf332727ac863cc0c86ac4f8cd3b711d05a5e417
+export CMAKE_CHECKSUM=72b7570e5c8593de6ac4ab433b73eab18c5fb328880460c86ce32608141ad5c1
 wget -q https://cmake.org/files/v3.28/cmake-3.28.3.tar.gz -O cmake-3.28.3.tar.gz
-echo "${CMAKE_CHECKSUM}  cmake-3.28.3.tar.gz" | shasum -c || exit 1
+echo "${CMAKE_CHECKSUM}  cmake-3.28.3.tar.gz" | shasum -a 256 -c || exit 1
 tar -xzf cmake-3.28.3.tar.gz
 rm cmake-3.28.3.tar.gz
 cd cmake-3.28.3
@@ -65,9 +65,9 @@ echo "Downloading and installing libflame..."
 bash .pipelines/install-scripts/install-libflame.sh /usr/local ${MARCH} ${LIBFLAME_VERSION} ${CFLAGS}
 
 echo "Downloading HDF5 $HDF5_VERSION..."
-export HDF5_CHECKSUM=f47d88abcbdacbc05419be9b69d96da8c585ebe0
+export HDF5_CHECKSUM=1826e198df8dac679f0d3dc703aba02af4c614fd6b7ec936cf4a55e6aa0646ec
 wget -q -nc --no-check-certificate https://support.hdfgroup.org/ftp/HDF5/releases/hdf5-1.13/hdf5-${HDF5_VERSION}/src/hdf5-${HDF5_VERSION}.tar.bz2
-echo "${HDF5_CHECKSUM}  hdf5-${HDF5_VERSION}.tar.bz2" | shasum -c || exit 1
+echo "${HDF5_CHECKSUM}  hdf5-${HDF5_VERSION}.tar.bz2" | shasum -a 256 -c || exit 1
 tar -xjf hdf5-${HDF5_VERSION}.tar.bz2
 rm hdf5-${HDF5_VERSION}.tar.bz2
 mv hdf5-${HDF5_VERSION} hdf5
@@ -79,10 +79,10 @@ bash .pipelines/install-scripts/install-hdf5.sh /usr/local ${BUILD_TYPE} ${PWD} 
 # Install pyenv to use non-system python3 versions
 # pyenv is used in place of a venv to prevent any collisions with the system Python
 # when building with a non-system Python version.
-export PYENV_CHECKSUM=f39d38c42b70f89cec1ea0f1490edfcbf85481c5
+export PYENV_CHECKSUM=95187d6ad9bc8310662b5b805a88506e5cbbe038f88890e5aabe3021711bf3c8
 export PYENV_ROOT="/workspace/.pyenv"
 wget -q https://github.com/pyenv/pyenv/archive/refs/tags/v2.6.15.zip -O pyenv.zip
-echo "${PYENV_CHECKSUM}  pyenv.zip" | shasum -c || exit 1
+echo "${PYENV_CHECKSUM}  pyenv.zip" | shasum -a 256 -c || exit 1
 unzip -q pyenv.zip
 mv pyenv-2.6.15 "$PYENV_ROOT"
 rm pyenv.zip
@@ -140,5 +140,3 @@ done
 rm "$WHEEL_FILE"
 (cd "$TEMP_DIR" && python3 -m zipfile -c "$FULL_WHEEL_PATH" .)
 rm -rf "$TEMP_DIR"
-
-cp repaired_wheelhouse/qdk_chemistry-*.whl /workspace/qdk-chemistry/artifacts/

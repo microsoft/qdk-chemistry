@@ -6,9 +6,9 @@ CFLAGS=${4:-"-fPIC -O3"}
 
 # Download BLIS v2.0
 echo "Downloading BLIS ${BLIS_VERSION}..."
-export BLIS_CHECKSUM=1cccc40e6d4dff71911856e4f5782405fe76fc93
+export BLIS_CHECKSUM=40134f6570d5539609c6328252ad1530c010931bb96f4e249e08279fd978da7a
 wget -q https://github.com/flame/blis/archive/refs/tags/${BLIS_VERSION}.zip -O blis.zip
-echo "${BLIS_CHECKSUM}  blis.zip" | shasum -c || exit 1
+echo "${BLIS_CHECKSUM}  blis.zip" | shasum -a 256 -c || exit 1
 unzip -q blis.zip
 rm blis.zip
 mv blis-${BLIS_VERSION} blis

@@ -50,8 +50,8 @@ python3 -m pip install "fonttools>=4.61.0" "urllib3>=2.6.0"
 
 # Install the wheel in the clean environment
 cd /workspace/qdk-chemistry/python
-pip3 install repaired_wheelhouse/qdk_chemistry*.whl
 python3 -m pip install pytest pyscf
+pip3 install repaired_wheelhouse/qdk_chemistry*.whl
 
 # Run pytest suite
 echo '=== Running pytest suite ==='
