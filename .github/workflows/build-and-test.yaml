@@ -70,7 +70,9 @@ jobs:
         INSTALL_PREFIX: ${{ github.workspace }}/install
         BUILD_DIR: ${{ github.workspace }}/cpp_deps_build
       run: |
-        bash ${{ github.workspace }}/.devcontainer/scripts/install_cpp_dependencies.sh
+        bash ${{ github.workspace }}/.devcontainer/scripts/install_cpp_dependencies.sh \
+          ${{ github.workspace }}/cpp/manifest/qdk-chemistry/cgmanifest.json \
+          ${{ github.workspace }}/external/macis/manifest/cgmanifest.json
 
     - name: Install Python dependencies
       run: |
