@@ -141,4 +141,4 @@ rm "$WHEEL_FILE"
 (cd "$TEMP_DIR" && python3 -m zipfile -c "$FULL_WHEEL_PATH" .)
 rm -rf "$TEMP_DIR"
 
-cp repaired_wheelhouse/qdk_chemistry-*.whl /workspace/artifacts/
+cp repaired_wheelhouse/qdk_chemistry-*.whl /workspace/qdk-chemistry/artifacts/

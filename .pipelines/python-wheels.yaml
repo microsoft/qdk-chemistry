@@ -103,7 +103,7 @@ extends:
               artifactName: linux-${{ target.arch }}-wheels-python$(pythonVersion)
           steps:
           - script: |
-              mkdir -p $(Agent.BuildDirectory)/artifacts
+              mkdir -p $(Agent.BuildDirectory)/qdk-chemistry/artifacts
             displayName: Prepare Artifacts Directory
 
           # Build - x86_64
