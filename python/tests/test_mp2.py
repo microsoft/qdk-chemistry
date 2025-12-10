@@ -53,7 +53,7 @@ class TestMP2Validation:
 
         # QDK MP2 calculation
         mp2_calculator = create("dynamical_correlation_calculator", "qdk_mp2_calculator")
-        qdk_mp2_total_energy, _ = mp2_calculator.run(ansatz)
+        qdk_mp2_total_energy, _, _ = mp2_calculator.run(ansatz)
         reference_energy = ansatz.calculate_energy()
         qdk_mp2_corr_energy = qdk_mp2_total_energy - reference_energy
 
@@ -86,7 +86,7 @@ class TestMP2Validation:
 
         # QDK UMP2 calculation
         mp2_calculator = create("dynamical_correlation_calculator", "qdk_mp2_calculator")
-        qdk_ump2_total_energy, _ = mp2_calculator.run(ansatz)
+        qdk_ump2_total_energy, _, _ = mp2_calculator.run(ansatz)
         reference_energy = ansatz.calculate_energy()
         qdk_ump2_corr_energy = qdk_ump2_total_energy - reference_energy
 

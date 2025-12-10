@@ -33,7 +33,7 @@ ansatz = Ansatz(hamiltonian, wfn_hf)
 mp2_calculator = create("dynamical_correlation_calculator")
 
 # Get energies
-mp2_total_energy, final_wavefunction = mp2_calculator.run(ansatz)
+mp2_total_energy, final_wavefunction, _ = mp2_calculator.run(ansatz)
 
 # If desired we can extract only the correlation energy
 mp2_corr_energy = mp2_total_energy - E_hf

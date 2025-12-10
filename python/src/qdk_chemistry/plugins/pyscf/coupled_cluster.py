@@ -22,7 +22,7 @@ Examples:
 
         >>> from qdk_chemistry.plugins.pyscf.coupled_cluster import PyscfCoupledClusterCalculator
         >>> cc_calculator = PyscfCoupledClusterCalculator()
-        >>> energy, wavefunction = cc_calculator.run(ansatz)
+        >>> energy, wavefunction, _ = cc_calculator.run(ansatz)
 
     Computing the bra wavefunction (lambda/gamma amplitudes)::
 
@@ -317,4 +317,4 @@ class PyscfCoupledClusterCalculator(DynamicalCorrelationCalculator):
             bra_wavefunction = Wavefunction(bra_container)
             return total_energy, updated_wavefunction, bra_wavefunction
 
-        return total_energy, updated_wavefunction
+        return total_energy, updated_wavefunction, None
