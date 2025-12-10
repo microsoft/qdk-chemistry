@@ -620,7 +620,8 @@ class TestStabilityChecker:
         water = create_water_structure()
         scf_solver = self._create_scf_solver(backend=backend)
         scf_solver.settings().set("method", method)
-        scf_solver.settings().set("xc_grid", 5)
+        if backend == "pyscf":
+            scf_solver.settings().set("xc_grid", 5)
         _, wavefunction = scf_solver.run(water, 1, 2)
 
         stability_checker_internal = self._create_stability_checker(backend=backend, internal=True, external=False)
