@@ -569,7 +569,7 @@ void CasWavefunctionContainer::to_hdf5(H5::Group& group) const {
     _configuration_set.to_hdf5(config_set_group);
 
     // If rdms are available, store
-    if (has_one_rdm_spin_dependent || has_two_rdm_spin_dependent) {
+    if (has_one_rdm_spin_dependent() || has_two_rdm_spin_dependent()) {
       H5::Group rdm_group = group.createGroup("rdms");
 
       if (has_one_rdm_spin_dependent()) {
@@ -843,10 +843,10 @@ std::unique_ptr<CasWavefunctionContainer> CasWavefunctionContainer::from_hdf5(
             detail::add_vector_variants(*two_rdm_ss_part, *two_rdm_os_part);
 
         return std::make_unique<CasWavefunctionContainer>(
-            coefficients, determinants, orbitals, one_rdm_spin_traced,
+            coefficients, determinants, orbitals, *one_rdm_spin_traced,
             one_rdm_aa,
             one_rdm_aa,  // bb is aa
-            two_rdm_spin_traced, two_rdm_aabb, two_rdm_aaaa,
+            *two_rdm_spin_traced, two_rdm_aabb, two_rdm_aaaa,
             two_rdm_aaaa,  // two_rdm_bbbb is two-rdm_aaaa
             type);
       } else {
@@ -891,8 +891,8 @@ std::unique_ptr<CasWavefunctionContainer> CasWavefunctionContainer::from_hdf5(
 
         // return unrestricted object with rdms
         return std::make_unique<CasWavefunctionContainer>(
-            coefficients, determinants, orbitals, one_rdm_spin_traced,
-            one_rdm_aa, one_rdm_bb, two_rdm_spin_traced, two_rdm_aabb,
+            coefficients, determinants, orbitals, *one_rdm_spin_traced,
+            one_rdm_aa, one_rdm_bb, *two_rdm_spin_traced, two_rdm_aabb,
             two_rdm_aaaa, two_rdm_bbbb, type);
       }
     }

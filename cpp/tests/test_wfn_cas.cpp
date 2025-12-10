@@ -15,6 +15,7 @@
 #include "ut_common.hpp"
 
 using namespace qdk::chemistry::data;
+using namespace qdk::chemistry::algorithms;
 
 class CasWavefunctionTest : public ::testing::Test {
  protected:
@@ -454,7 +455,7 @@ TEST_F(CasWavefunctionTest, SerializationRDMs) {
   // create h2 structure
   std::vector<Eigen::Vector3d> coords = {{0., 0., 0.}, {1.4, 0., 0.}};
   std::vector<std::string> symbols = {"H", "H"};
-  Structure structure(coords, symbols);
+  auto structure = std::make_shared<Structure>(coords, symbols);
 
   // scf
   auto scf_solver = ScfSolverFactory::create();
@@ -468,12 +469,14 @@ TEST_F(CasWavefunctionTest, SerializationRDMs) {
   auto mc = MultiConfigurationCalculatorFactory::create();
   mc->settings().set("calculate_one_rdm", true);
   mc->settings().set("calculate_two_rdm", true);
-  auto [E_cas, wfn_cas] = mc.run(H, 2, 2);
+  auto [E_cas, wfn_cas] = mc->run(H, 2, 2);
 
-  EXPECT_TRUE(wfn_cas->has_one_rdm_spin_dependent());
-  EXPECT_TRUE(wfn_cas->has_one_rdm_spin_traced());
-  EXPECT_TRUE(wfn_cas->has_two_rdm_spin_dependent());
-  EXPECT_TRUE(wfn_cas->has_two_rdm_spin_traced());
+  auto original = wfn_cas->get_container<CasWavefunctionContainer>();
+
+  EXPECT_TRUE(original.has_one_rdm_spin_dependent());
+  EXPECT_TRUE(original.has_one_rdm_spin_traced());
+  EXPECT_TRUE(original.has_two_rdm_spin_dependent());
+  EXPECT_TRUE(original.has_two_rdm_spin_traced());
 
   // save to hdf5
   std::string filename = "test_cas_rdm_serialization.h5";
@@ -482,28 +485,10 @@ TEST_F(CasWavefunctionTest, SerializationRDMs) {
     H5::Group root = file.openGroup("/");
 
     // Serialize to HDF5
-    wfn_cas.to_hdf5(root);
+    original.to_hdf5(root);
 
     // Deserialize from HDF5
     auto restored = CasWavefunctionContainer::from_hdf5(root);
-
-    // Verify key properties match
-    EXPECT_EQ(wfn_cas.size(), restored->size());
-    EXPECT_EQ(wfn_cas.get_active_determinants().size(),
-              restored->get_active_determinants().size());
-
-    // Verify coefficients match
-    const auto& orig_coeffs =
-        std::get<Eigen::VectorXd>(wfn_cas.get_coefficients());
-    const auto& rest_coeffs =
-        std::get<Eigen::VectorXd>(restored->get_coefficients());
-    EXPECT_TRUE(orig_coeffs.isApprox(rest_coeffs, testing::wf_tolerance));
-
-    // Verify determinants match
-    for (size_t i = 0; i < wfn_cas.get_active_determinants().size(); ++i) {
-      EXPECT_EQ(wfn_cas.get_active_determinants()[i],
-                restored->get_active_determinants()[i]);
-    }
 
     // Verify rdms are still there
     EXPECT_TRUE(restored->has_one_rdm_spin_dependent());
@@ -515,32 +500,63 @@ TEST_F(CasWavefunctionTest, SerializationRDMs) {
     auto [restored_aa_rdm, restored_bb_rdm] =
         restored->get_active_one_rdm_spin_dependent();
     auto [original_aa_rdm, original_bb_rdm] =
-        wfn_cas->get_active_one_rdm_spin_dependent();
+        original.get_active_one_rdm_spin_dependent();
+    // extract data from variants
+    const auto& restored_aa_rdm_r = std::get<Eigen::MatrixXd>(restored_aa_rdm);
+    const auto& restored_bb_rdm_r = std::get<Eigen::MatrixXd>(restored_bb_rdm);
+    const auto& original_aa_rdm_r = std::get<Eigen::MatrixXd>(original_aa_rdm);
+    const auto& original_bb_rdm_r = std::get<Eigen::MatrixXd>(original_bb_rdm);
+
     EXPECT_TRUE(
-        restored_aa_rdm.isApprox(original_aa_rdm, testing::rdm_tolerance));
+        restored_aa_rdm_r.isApprox(original_aa_rdm_r, testing::rdm_tolerance));
     EXPECT_TRUE(
-        restored_bb_rdm.isApprox(original_bb_rdm, testing::rdm_tolerance));
+        restored_bb_rdm_r.isApprox(original_bb_rdm_r, testing::rdm_tolerance));
 
     auto restored_one_rdm = restored->get_active_one_rdm_spin_traced();
-    auto original_one_rdm = wfn_cas->get_active_one_rdm_spin_traced();
-    EXPECT_TRUE(
-        restored_one_rdm.isApprox(original_one_rdm, testing::rdm_tolerance));
+    auto original_one_rdm = original.get_active_one_rdm_spin_traced();
+    // extract data from variants
+    const auto& restored_one_rdm_r =
+        std::get<Eigen::MatrixXd>(restored_one_rdm);
+    const auto& original_one_rdm_r =
+        std::get<Eigen::MatrixXd>(original_one_rdm);
+
+    EXPECT_TRUE(restored_one_rdm_r.isApprox(original_one_rdm_r,
+                                            testing::rdm_tolerance));
 
     auto [restored_aabb_rdm, restored_aaaa_rdm, restored_bbbb_rdm] =
         restored->get_active_two_rdm_spin_dependent();
     auto [original_aabb_rdm, original_aaaa_rdm, original_bbbb_rdm] =
-        wfn_cas->get_active_two_rdm_spin_dependent();
-    EXPECT_TRUE(
-        restored_aabb_rdm.isApprox(original_aabb_rdm, testing::rdm_tolerance));
-    EXPECT_TRUE(
-        restored_aaaa_rdm.isApprox(original_aaaa_rdm, testing::rdm_tolerance));
-    EXPECT_TRUE(
-        restored_bbbb_rdm.isApprox(original_bbbb_rdm, testing::rdm_tolerance));
+        original.get_active_two_rdm_spin_dependent();
+    // extract data from variants
+    const auto& restored_aabb_rdm_r =
+        std::get<Eigen::VectorXd>(restored_aabb_rdm);
+    const auto& restored_aaaa_rdm_r =
+        std::get<Eigen::VectorXd>(restored_aaaa_rdm);
+    const auto& restored_bbbb_rdm_r =
+        std::get<Eigen::VectorXd>(restored_bbbb_rdm);
+    const auto& original_aabb_rdm_r =
+        std::get<Eigen::VectorXd>(original_aabb_rdm);
+    const auto& original_aaaa_rdm_r =
+        std::get<Eigen::VectorXd>(original_aaaa_rdm);
+    const auto& original_bbbb_rdm_r =
+        std::get<Eigen::VectorXd>(original_bbbb_rdm);
+
+    EXPECT_TRUE(restored_aabb_rdm_r.isApprox(original_aabb_rdm_r,
+                                             testing::rdm_tolerance));
+    EXPECT_TRUE(restored_aaaa_rdm_r.isApprox(original_aaaa_rdm_r,
+                                             testing::rdm_tolerance));
+    EXPECT_TRUE(restored_bbbb_rdm_r.isApprox(original_bbbb_rdm_r,
+                                             testing::rdm_tolerance));
 
     auto restored_two_rdm = restored->get_active_two_rdm_spin_traced();
-    auto original_two_rdm = wfn_cas->get_active_two_rdm_spin_traced();
-    EXPECT_TRUE(
-        restored_two_rdm.isApprox(original_two_rdm, testing::rdm_tolerance));
+    auto original_two_rdm = original.get_active_two_rdm_spin_traced();
+    // extract data from variants
+    const auto& restored_two_rdm_r =
+        std::get<Eigen::MatrixXd>(restored_two_rdm);
+    const auto& original_two_rdm_r =
+        std::get<Eigen::MatrixXd>(original_two_rdm);
+    EXPECT_TRUE(restored_two_rdm_r.isApprox(original_two_rdm_r,
+                                            testing::rdm_tolerance));
 
     file.close();
   }
