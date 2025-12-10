@@ -25,6 +25,7 @@ from qdk_chemistry.data import (
     WavefunctionType,
 )
 
+
 from .reference_tolerances import (
     float_comparison_absolute_tolerance,
     float_comparison_relative_tolerance,
@@ -954,6 +955,59 @@ class TestWavefunctionRdmIntegraion:
             rtol=float_comparison_relative_tolerance,
             atol=scf_orbital_tolerance,
         )
+    
+    def test_sci_hdf5_roundtrip(self, tmp_path):
+        symbols = ["C", "C", "H", "H", "H", "H"]
+        coords = np.array([
+            [0.0,   0.0,   0.6695],
+            [0.0,   0.0,  -0.6695],
+            [0.0,   0.9289,   1.2321],
+            [0.0,  -0.9289,   1.2321],
+            [0.0,   0.9289,  -1.2321],
+            [0.0,  -0.9289,  -1.2321],
+        ])
+
+        structure = Structure(coords, symbols)
+
+        # Run SCF
+        scf = algorithms.create("scf_solver")
+        scf.settings().set("basis_set", "sto-3g") # minimal basis
+        _, wfn_scf = scf.run(structure, charge=0, spin_multiplicity=1)
+
+        # Build Hamiltonian (12e/12o active space)
+        as_selector = algorithms.create("active_space_selector", "qdk_valence")
+        as_selector.settings().set("num_active_electrons", 12)
+        as_selector.settings().set("num_active_orbitals", 12)
+        orbitals = as_selector.run(wfn_scf).get_orbitals()
+
+        ham_constructor = algorithms.create("hamiltonian_constructor")
+        hamiltonian = ham_constructor.run(orbitals)
+
+        # Run ASCI with RDM calculation (minimal settings)
+        mc = algorithms.create("multi_configuration_calculator", "macis_asci")
+        mc.settings().set("calculate_one_rdm", True)
+        mc.settings().set("calculate_two_rdm", True)
+        mc.settings().set("ntdets_max", 10)
+        mc.settings().set("ntdets_min", 1)
+        mc.settings().set("grow_factor", 2)
+        mc.settings().set("max_refine_iter", 0)
+        _, wfn_cas = mc.run(hamiltonian, 6, 6)
+
+        assert wfn_cas.has_one_rdm_spin_dependent(), "one rdm is not available"
+
+        # Verify RDMs exist before save
+        original_1rdm_aa, _ = wfn_cas.get_active_one_rdm_spin_dependent()
+
+        # Save and reload using tmp_path
+        h5_file = tmp_path / "test_wavefunction.h5"
+        wfn_cas.to_hdf5_file(str(h5_file))
+        wfn_loaded = Wavefunction.from_hdf5_file(str(h5_file))
+
+        # Check RDMs after load
+        assert wfn_loaded.has_one_rdm_spin_dependent(), "one rdm is not avaialble"
+        after_1rdm_aa, _ = wfn_loaded.get_active_one_rdm_spin_dependent()
+
+        assert np.allclose(original_1rdm_aa, after_1rdm_aa, atol=rdm_tolerance)
 
     @pytest.fixture
     def basic_orbitals(self):
@@ -978,7 +1032,6 @@ class TestWavefunctionRdmIntegraion:
         core_energy = 0.0
         inactive_fock = np.eye(0)  # Empty inactive Fock matrix
         return Hamiltonian(h1e, h2e.flatten(), basic_orbitals, core_energy, inactive_fock)
-
 
 class TestMP2Container:
     @pytest.fixture
