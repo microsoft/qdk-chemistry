@@ -44,8 +44,9 @@ python3 --version
 python3 -m venv /workspace/test_wheel_env
 . /workspace/test_wheel_env/bin/activate
 
-# Upgrade pip and install pytest
+# Upgrade pip packages
 python3 -m pip install --upgrade pip
+python3 -m pip install "fonttools>=4.61.0" "urllib3>=2.6.0"
 
 # Install the wheel in the clean environment
 cd /workspace/qdk-chemistry/python

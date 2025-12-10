@@ -99,7 +99,7 @@ extends:
             outputs:
             - output: pipelineArtifact
               displayName: Upload Linux Python $(pythonVersion) Wheels for ${{ target.march }}
-              targetPath: $(System.DefaultWorkingDirectory)/python/repaired_wheelhouse
+              targetPath: $(System.DefaultWorkingDirectory)/artifacts
               artifactName: linux-${{ target.arch }}-wheels-python$(pythonVersion)
           steps:
           # Build - x86_64
