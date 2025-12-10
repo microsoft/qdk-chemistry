@@ -77,8 +77,10 @@ class TestCoreBinding:
         """Test that documentation functions are bound."""
         assert hasattr(core_constants, "get_constants_info")
         assert hasattr(core_constants, "get_constant_info")
+        assert hasattr(core_constants, "get_current_codata_version")
         assert callable(core_constants.get_constants_info)
         assert callable(core_constants.get_constant_info)
+        assert callable(core_constants.get_current_codata_version)
 
     def test_constant_info_class_exists(self):
         """Test that ConstantInfo class is bound."""
@@ -134,6 +136,14 @@ class TestCoreBinding:
         """Test error handling for unknown constants."""
         with pytest.raises(KeyError):
             core_constants.get_constant_info("nonexistent_constant")
+
+    def test_get_current_codata_version(self):
+        """Test that get_current_codata_version returns a valid version string."""
+        version = core_constants.get_current_codata_version()
+
+        assert isinstance(version, str)
+        assert "CODATA" in version
+        assert any(year in version for year in ["2022", "2018", "2014"])
 
 
 class TestValueConsistency:
@@ -211,4 +221,4 @@ class TestValueConsistency:
 
         source = next(iter(sources))
         assert "CODATA" in source
-        assert any(year in source for year in ["2014", "2018"])
+        assert any(year in source for year in ["2022", "2018", "2014"])

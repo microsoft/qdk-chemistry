@@ -423,9 +423,10 @@ TEST_F(StructureTest, EigenVectorComprehensive) {
   // Test masses are Eigen::VectorXd
   const Eigen::VectorXd& masses = s.get_masses();
   EXPECT_EQ(masses.size(), 3);
-  EXPECT_GT(masses(0), 0.0);  // Should have positive mass
-  EXPECT_GT(masses(1), 0.0);
-  EXPECT_GT(masses(2), 0.0);
+  EXPECT_NEAR(masses(0), 1.0080,
+              testing::numerical_zero_tolerance);  // Should have positive mass
+  EXPECT_NEAR(masses(1), 12.011, testing::numerical_zero_tolerance);
+  EXPECT_NEAR(masses(2), 15.999, testing::numerical_zero_tolerance);
 
   // Test constructor with custom vectors
   std::vector<double> custom_charges = {1.1, 6.6, 8.8};

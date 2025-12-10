@@ -76,7 +76,7 @@ class SparseIsometryGF2XStatePreparation(StatePreparation):
 
     Key References:
 
-        * Sparse isometry: Malvetti, Iten and Colbeck, `arXiv:2006.00016 <https://arxiv.org/abs/2006.00016>`_
+        * Sparse isometry: Malvetti, Iten, and Colbeck (arXiv:2006.00016) :cite:`Malvetti2021`
     """
 
     def __init__(self):
