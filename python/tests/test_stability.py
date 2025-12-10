@@ -731,11 +731,9 @@ class TestStabilityChecker:
         # QDK finds 1 negative eigenvalue, PySCF finds 2. This discrepancy is due to differences in the
         # numerical convergence criteria and stability tolerance settings between the two implementations.
         # PySCF's stability analysis is known to be sensitive to the SCF convergence threshold and the
-        # stability tolerance (see PySCF documentation: https://pyscf.org/user/stability.html).
-        # QDK uses a slightly different algorithm and default tolerance, which can result in a different
-        # count of negative eigenvalues for borderline cases. For more details, see:
-        # - PySCF stability documentation: https://pyscf.org/user/stability.html
-        # - QDK Chemistry stability documentation: [add link if available]
+        # stability tolerance. QDK uses a slightly different algorithm and default tolerance, which can
+        # result in a different count of negative eigenvalues for borderline cases. For more details, see
+        # the PySCF stability documentation: https://pyscf.org/user/stability.html
         # This test expects the difference and will fail if the implementations are harmonized or updated.
         expected_negative_count = 1 if backend == "qdk" else 2
 
