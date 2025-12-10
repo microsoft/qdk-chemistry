@@ -1,129 +1,129 @@
 {
-    "$schema": "https://json.schemastore.org/component-detection-manifest.json",
-    "version": 1,
-    "registrations": [
-        {
-            "component": {
-                "type": "other",
-                "other": {
-                    "name": "Boost",
-                    "version": "1.86.0",
-                    "downloadUrl": "https://archives.boost.io/release/1.86.0/source/boost_1_86_0.tar.bz2"
-                }
-            },
-            "developmentDependency": false
-        },
-        {
-            "component": {
-                "type": "git",
-                "git": {
-                    "repositoryUrl": "https://gitlab.com/libeigen/eigen",
-                    "commitHash": "3147391d946bb4b6c68edd901f2add6ac1f31f8c",
-                    "tag": "3.4.0"
-                }
-            },
-            "developmentDependency": false
-        },
-        {
-            "component": {
-                "type": "git",
-                "git": {
-                    "repositoryUrl": "https://github.com/xianyi/OpenBLAS",
-                    "commitHash": "95c8c63e96b0771854caffa2ae3712bf71b56c53",
-                    "tag": "v0.3.28"
-                }
-            },
-            "developmentDependency": false
-        },
-        {
-            "component": {
-                "type": "other",
-                "other": {
-                    "name": "Libint",
-                    "version": "2.9.0",
-                    "downloadUrl": "https://github.com/evaleev/libint/releases/download/v2.9.0/libint-2.9.0-mpqc4.tgz",
-                    "hash": "cb63f296d4b05d0542ff0307b29302f9d2a591a3"
-                }
-            },
-            "developmentDependency": false
-        },
-        {
-            "component": {
-                "type": "git",
-                "git": {
-                    "repositoryUrl": "https://github.com/robashaw/libecpint",
-                    "commitHash": "5d669d65127ae9b4b2977d37e27be57b5fe5ad4b",
-                    "tag": "v1.0.7"
-                }
-            },
-            "developmentDependency": false
-        },
-        {
-            "component": {
-                "type": "git",
-                "git": {
-                    "repositoryUrl": "https://github.com/gabime/spdlog",
-                    "commitHash": "7e635fca68d014934b4af8a1cf874f63989352b7",
-                    "tag": "v1.10.0"
-                }
-            },
-            "developmentDependency": false
-        },
-        {
-            "component": {
-                "type": "git",
-                "git": {
-                    "repositoryUrl": "https://github.com/nlohmann/json",
-                    "commitHash": "bc889afb4c5bf1c0d8ee29ef35eaaf4c8bef8a5d",
-                    "tag": "v3.11.2"
-                }
-            },
-            "developmentDependency": false
-        },
-        {
-            "component": {
-                "type": "git",
-                "git": {
-                    "repositoryUrl": "https://github.com/catchorg/Catch2",
-                    "commitHash": "7f18282fa02e8317ac9f10bf6fd545883a170561",
-                    "tag": "v2.13.10"
-                }
-            },
-            "developmentDependency": true
-        },
-        {
-            "component": {
-                "type": "git",
-                "git": {
-                    "repositoryUrl": "https://github.com/google/googletest",
-                    "commitHash": "f8d7d77c06936315286eb55f8de22cd23c188571",
-                    "tag": "v1.14.0"
-                }
-            },
-            "developmentDependency": true
-        },
-        {
-            "component": {
-                "type": "git",
-                "git": {
-                    "repositoryUrl": "https://github.com/dftd3/simple-dftd3",
-                    "commitHash": "8c3219d0b4f8c0e9fb9e8b56ef3bb63897fe3bb6",
-                    "tag": "v1.0.0"
-                }
-            },
-            "developmentDependency": false
-        },
-        {
-            "component": {
-                "type": "git",
-                "git": {
-                    "repositoryUrl": "https://github.com/NVIDIA/NVTX",
-                    "commitHash": "c4dcd75c589917324a261c295055ef3aad243b67",
-                    "tag": "release-v3"
-                }
-            },
-            "developmentDependency": false
-        },
+  "$schema": "https://json.schemastore.org/component-detection-manifest.json",
+  "version": 1,
+  "registrations": [
+    {
+      "component": {
+        "type": "other",
+        "other": {
+          "name": "Boost",
+          "version": "1.86.0",
+          "downloadUrl": "https://archives.boost.io/release/1.86.0/source/boost_1_86_0.tar.bz2"
+        }
+      },
+      "developmentDependency": false
+    },
+    {
+      "component": {
+        "type": "git",
+        "git": {
+          "repositoryUrl": "https://gitlab.com/libeigen/eigen",
+          "commitHash": "3147391d946bb4b6c68edd901f2add6ac1f31f8c",
+          "tag": "3.4.0"
+        }
+      },
+      "developmentDependency": false
+    },
+    {
+      "component": {
+        "type": "git",
+        "git": {
+          "repositoryUrl": "https://github.com/xianyi/OpenBLAS",
+          "commitHash": "95c8c63e96b0771854caffa2ae3712bf71b56c53",
+          "tag": "v0.3.28"
+        }
+      },
+      "developmentDependency": false
+    },
+    {
+      "component": {
+        "type": "other",
+        "other": {
+          "name": "Libint",
+          "version": "2.9.0",
+          "downloadUrl": "https://github.com/evaleev/libint/releases/download/v2.9.0/libint-2.9.0-mpqc4.tgz",
+          "hash": "cb63f296d4b05d0542ff0307b29302f9d2a591a3"
+        }
+      },
+      "developmentDependency": false
+    },
+    {
+      "component": {
+        "type": "git",
+        "git": {
+          "repositoryUrl": "https://github.com/robashaw/libecpint",
+          "commitHash": "f07f8b963d3719ec2667879fceb49deb4e2c6826",
+          "tag": "v1.0.7"
+        }
+      },
+      "developmentDependency": false
+    },
+    {
+      "component": {
+        "type": "git",
+        "git": {
+          "repositoryUrl": "https://github.com/gabime/spdlog",
+          "commitHash": "7e635fca68d014934b4af8a1cf874f63989352b7",
+          "tag": "v1.10.0"
+        }
+      },
+      "developmentDependency": false
+    },
+    {
+      "component": {
+        "type": "git",
+        "git": {
+          "repositoryUrl": "https://github.com/nlohmann/json",
+          "commitHash": "bc889afb4c5bf1c0d8ee29ef35eaaf4c8bef8a5d",
+          "tag": "v3.11.2"
+        }
+      },
+      "developmentDependency": false
+    },
+    {
+      "component": {
+        "type": "git",
+        "git": {
+          "repositoryUrl": "https://github.com/catchorg/Catch2",
+          "commitHash": "7f18282fa02e8317ac9f10bf6fd545883a170561",
+          "tag": "v2.13.10"
+        }
+      },
+      "developmentDependency": true
+    },
+    {
+      "component": {
+        "type": "git",
+        "git": {
+          "repositoryUrl": "https://github.com/google/googletest",
+          "commitHash": "f8d7d77c06936315286eb55f8de22cd23c188571",
+          "tag": "v1.14.0"
+        }
+      },
+      "developmentDependency": true
+    },
+    {
+      "component": {
+        "type": "git",
+        "git": {
+          "repositoryUrl": "https://github.com/dftd3/simple-dftd3",
+          "commitHash": "8c3219d0b4f8c0e9fb9e8b56ef3bb63897fe3bb6",
+          "tag": "v1.0.0"
+        }
+      },
+      "developmentDependency": false
+    },
+    {
+      "component": {
+        "type": "git",
+        "git": {
+          "repositoryUrl": "https://github.com/NVIDIA/NVTX",
+          "commitHash": "c4dcd75c589917324a261c295055ef3aad243b67",
+          "tag": "release-v3"
+        }
+      },
+      "developmentDependency": false
+    },
     {
       "component": {
         "type": "git",
@@ -150,19 +150,9 @@
       "component": {
         "type": "git",
         "git": {
-          "repositoryUrl": "https://github.com/USCiLab/cereal.git",
-          "commitHash": "02eace19a99ce3cd564ca4e379753d69af08c2c8",
-          "tag": "v1.3.0"
-        }
-      },
-      "developmentDependency": false
-    },
-    {
-      "component": {
-        "type": "git",
-        "git": {
           "repositoryUrl": "https://github.com/wavefunction91/ExchCXX.git",
-          "commitHash": "f932a1bd3a0ff9d5b1de4cfe7fe86bfb1f20cb74 "
+          "commitHash": "bd50b73e4b7a798ff8cec6f386e633637f4c6d3f",
+          "tag": "v1.0.0"
         }
       },
       "developmentDependency": false
@@ -183,7 +173,7 @@
         "type": "git",
         "git": {
           "repositoryUrl": "https://github.com/wavefunction91/IntegratorXX.git",
-          "commitHash": "cf2917c64916583cef1081011beab3085b66e352"
+          "commitHash": "1369be58d7a3235dac36d75dd964fef058830622"
         }
       },
       "developmentDependency": false
@@ -193,7 +183,7 @@
         "type": "git",
         "git": {
           "repositoryUrl": "https://github.com/wavefunction91/linalg-cmake-modules.git",
-          "commitHash": "28ceaa9738f14935aa544289fa2fe4c4cc955d0e"
+          "commitHash": "9d2c273a671d6811e9fd432f6a4fa3d915b144b8"
         }
       },
       "developmentDependency": true
@@ -205,6 +195,16 @@
           "repositoryUrl": "https://github.com/HDFGroup/hdf5.git",
           "commitHash": "34ae2775ac67f03f352a340352043e499e90141c",
           "tag": "hdf5-1_13_0"
+        }
+      },
+      "developmentDependency": false
+    },
+    {
+      "component": {
+        "type": "git",
+        "git": {
+          "repositoryUrl": "https://github.com/wavefunction91/gauxc.git",
+          "commitHash": "62fea07c9306dbd83dd18b6957358827ac9b3da0"
         }
       },
       "developmentDependency": false

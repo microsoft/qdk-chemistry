@@ -35,11 +35,11 @@ parameters:
   type: string
 - name: exchCXXRef
   displayName: ExchCXX Reference
-  default: master
+  default: refs/tags/v1.0.0
   type: string
 - name: gauXCRef
   displayName: GauXC Reference
-  default: refs/tags/v1.0
+  default: 62fea07c9306dbd83dd18b6957358827ac9b3da0
   type: string
 - name: hgpRef
   displayName: HGP Reference

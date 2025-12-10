@@ -56,7 +56,9 @@ RUN apt-get update && \
 
 # Install C++ dependencies
 COPY .devcontainer/scripts/install_cpp_dependencies.sh /tmp/install_cpp_dependencies.sh
-RUN bash /tmp/install_cpp_dependencies.sh && rm /tmp/install_cpp_dependencies.sh
+COPY cpp/manifest/qdk-chemistry/cgmanifest.json /tmp/cpp_cgmanifest.json
+COPY external/macis/manifest/cgmanifest.json /tmp/macis_cgmanifest.json
+RUN bash /tmp/install_cpp_dependencies.sh /tmp/cpp_cgmanifest.json /tmp/macis_cgmanifest.json && rm /tmp/install_cpp_dependencies.sh /tmp/cpp_cgmanifest.json /tmp/macis_cgmanifest.json
 
 # Create/align the non-root user and group (safe for repeated builds)
 RUN if getent group "$USER_GID" >/dev/null; then \
