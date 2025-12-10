@@ -5,8 +5,7 @@ Quantum Fourier Transform (QFT), which measures all phase bits in parallel using
 multiple ancilla qubits.
 
 References:
-    Nielsen, M. A., & Chuang, I. L. (2010). "Quantum Computation and Quantum
-    Information" (10th Anniversary Edition), Ch. 5.2.
+    Nielsen, M. A., & Chuang, I. L. (2010). :cite:`Nielsen-Chuang2010-QPE`
 
 """
 
