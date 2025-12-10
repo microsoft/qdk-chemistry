@@ -665,6 +665,11 @@ Hamiltonian::get_one_body_integrals() const {
   return _container->get_one_body_integrals();
 }
 
+double Hamiltonian::get_one_body_element(unsigned i, unsigned j,
+                                         SpinChannel channel) const {
+  return _container->get_one_body_element(i, j, channel);
+}
+
 bool Hamiltonian::has_one_body_integrals() const {
   return _container->has_one_body_integrals();
 }

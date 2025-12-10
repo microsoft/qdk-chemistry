@@ -1,4 +1,8 @@
 {
+  "container" : {
+  "container_type": "canonical_4_center",
+  "type": "Hermitian",
+  "version": "0.1.0",
   "core_energy": -165.21558176572384,
   "has_inactive_fock_matrix": true,
   "has_one_body_integrals": true,
@@ -7612,7 +7616,9 @@
       4.121588317257565e-17,
       0.6859646396472756
     ]
-  },
+  }
+},
+  "container_type": "canonical_4_center",
   "type": "Hermitian",
   "version": "0.1.0"
 }
