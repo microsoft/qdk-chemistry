@@ -971,6 +971,35 @@ Examples:
 )",
                   py::arg("filename"))
 
+      .def_static("get_supported_basis_set_names",
+                  &BasisSet::get_supported_basis_set_names,
+                  R"(
+Get list of supported basis set names.
+
+Returns:
+    list[str]: Vector of supported basis set names
+
+Examples:
+    >>> supported = BasisSet.get_supported_basis_set_names()
+)")
+      .def_static("get_supported_elements_for_basis_set",
+                  &BasisSet::get_supported_elements_for_basis_set,
+                  R"(
+Get list of supported elements for a given basis set.
+
+Returns all elements that are defined for the specified basis set.
+
+Args:
+    basis_name (str): Name of the basis set (e.g., "sto-3g", "cc-pvdz")
+
+Returns:
+    list[Element]: Vector of supported elements as Element enum values
+
+Examples:
+    >>> elements = BasisSet.get_supported_elements_for_basis_set("sto-3g")
+    >>> print(f"STO-3G supports: {[elem.name for elem in elements]}")
+)",
+                  py::arg("basis_name"))
       .def_static("from_basis_name",
                   py::overload_cast<const std::string&, const Structure&,
                                     const std::string&, AOType>(
@@ -1229,5 +1258,28 @@ Examples:
           [](const std::string& json_str) -> BasisSet {
             // Reconstruct from JSON string
             return *BasisSet::from_json(nlohmann::json::parse(json_str));
-          }));
+          }))
+
+      // Static constant variables
+      .def_readonly_static("custom_name", &BasisSet::custom_name,
+                           R"(
+Name used for custom basis sets.
+
+Type:
+    str
+)")
+      .def_readonly_static("custom_ecp_name", &BasisSet::custom_ecp_name,
+                           R"(
+Name used for custom ECP basis sets.
+
+Type:
+    str
+)")
+      .def_readonly_static("default_ecp_name", &BasisSet::default_ecp_name,
+                           R"(
+Default name for ECP basis sets.
+
+Type:
+    str
+)");
 }
