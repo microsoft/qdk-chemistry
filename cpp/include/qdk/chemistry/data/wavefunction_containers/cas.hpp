@@ -29,7 +29,7 @@ class CasWavefunctionContainer : public WavefunctionContainer {
   using CoeffContainer = ContainerTypes::VectorVariant;
 
   /**
-   * @brief Constructs a wavefunction with full reduced density matrix data
+   * @brief Constructs a wavefunction without reduced density matrices (RDMs)
    *
    * @param coeffs The vector of CI coefficients (can be real or complex)
    * @param dets The vector of determinants
