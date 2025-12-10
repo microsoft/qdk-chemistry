@@ -25,7 +25,6 @@ from qdk_chemistry.data import (
     WavefunctionType,
 )
 
-
 from .reference_tolerances import (
     float_comparison_absolute_tolerance,
     float_comparison_relative_tolerance,
@@ -955,23 +954,25 @@ class TestWavefunctionRdmIntegraion:
             rtol=float_comparison_relative_tolerance,
             atol=scf_orbital_tolerance,
         )
-    
+
     def test_sci_hdf5_roundtrip(self, tmp_path):
         symbols = ["C", "C", "H", "H", "H", "H"]
-        coords = np.array([
-            [0.0,   0.0,   0.6695],
-            [0.0,   0.0,  -0.6695],
-            [0.0,   0.9289,   1.2321],
-            [0.0,  -0.9289,   1.2321],
-            [0.0,   0.9289,  -1.2321],
-            [0.0,  -0.9289,  -1.2321],
-        ])
+        coords = np.array(
+            [
+                [0.0, 0.0, 0.6695],
+                [0.0, 0.0, -0.6695],
+                [0.0, 0.9289, 1.2321],
+                [0.0, -0.9289, 1.2321],
+                [0.0, 0.9289, -1.2321],
+                [0.0, -0.9289, -1.2321],
+            ]
+        )
 
         structure = Structure(coords, symbols)
 
         # Run SCF
         scf = algorithms.create("scf_solver")
-        scf.settings().set("basis_set", "sto-3g") # minimal basis
+        scf.settings().set("basis_set", "sto-3g")  # minimal basis
         _, wfn_scf = scf.run(structure, charge=0, spin_multiplicity=1)
 
         # Build Hamiltonian (12e/12o active space)
@@ -1032,6 +1033,7 @@ class TestWavefunctionRdmIntegraion:
         core_energy = 0.0
         inactive_fock = np.eye(0)  # Empty inactive Fock matrix
         return Hamiltonian(h1e, h2e.flatten(), basic_orbitals, core_energy, inactive_fock)
+
 
 class TestMP2Container:
     @pytest.fixture
