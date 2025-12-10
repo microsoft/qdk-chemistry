@@ -552,9 +552,9 @@ TEST_F(CasWavefunctionTest, SerializationRDMs) {
     auto original_two_rdm = original.get_active_two_rdm_spin_traced();
     // extract data from variants
     const auto& restored_two_rdm_r =
-        std::get<Eigen::MatrixXd>(restored_two_rdm);
+        std::get<Eigen::VectorXd>(restored_two_rdm);
     const auto& original_two_rdm_r =
-        std::get<Eigen::MatrixXd>(original_two_rdm);
+        std::get<Eigen::VectorXd>(original_two_rdm);
     EXPECT_TRUE(restored_two_rdm_r.isApprox(original_two_rdm_r,
                                             testing::rdm_tolerance));
 
