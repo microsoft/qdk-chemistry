@@ -148,6 +148,15 @@ ProductPauliOperatorExpression operator*(std::complex<double> s, const Ex& op) {
   return ProductPauliOperatorExpression(s, op);
 }
 
+// Specialization for ProductPauliOperatorExpression: multiply coefficient
+// directly
+inline ProductPauliOperatorExpression operator*(
+    std::complex<double> s, const ProductPauliOperatorExpression& op) {
+  ProductPauliOperatorExpression result(op);
+  result.set_coefficient(s * op.get_coefficient());
+  return result;
+}
+
 template <IsPauliOperatorExpression Ex>
 ProductPauliOperatorExpression operator*(const Ex& op, std::complex<double> s) {
   return s * op;
@@ -166,6 +175,15 @@ SumPauliOperatorExpression operator+(const Lhs& left, const Rhs& right) {
 template <IsPauliOperatorExpression Lhs, IsPauliOperatorExpression Rhs>
 SumPauliOperatorExpression operator-(const Lhs& left, const Rhs& right) {
   return left + (-1 * right);
+}
+
+/**
+ * @brief Unary negation operator for Pauli operator expressions.
+ * @return A ProductPauliOperatorExpression representing -1 * expr.
+ */
+template <IsPauliOperatorExpression Ex>
+ProductPauliOperatorExpression operator-(const Ex& expr) {
+  return -1 * expr;
 }
 
 }  // namespace qdk::chemistry::data

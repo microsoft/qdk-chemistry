@@ -438,8 +438,10 @@ TEST(PauliOperatorExpressionTest, MultiplyProductPauliOperatorExpressions) {
   ProductPauliOperatorExpression prod2(std::complex<double>(-1.0, 0.0), opY);
   prod2.add_factor(std::make_unique<PauliOperator>(PauliOperator::I(3)));
 
+  // 0.5 * prod1 multiplies the coefficient directly: 0.5 * 2.0 = 1.0
+  // Then multiplying by prod2 nests it as a factor
   auto prod_result = 0.5 * prod1 * prod2;
-  EXPECT_EQ(prod_result.to_string(), "0.5 * 2 * X(0) * Z(2) * -Y(1) * I(3)");
+  EXPECT_EQ(prod_result.to_string(), "X(0) * Z(2) * -Y(1) * I(3)");
 }
 
 // Simplify Tests
@@ -652,4 +654,38 @@ TEST(PauliOperatorExpressionTest, PruneThreshold) {
 
   auto prod_pruned2 = prod.prune_threshold(0.5);
   EXPECT_EQ(prod_pruned2->get_terms().size(), 0);
+}
+
+TEST(PauliOperatorExpressionTest, UnaryNegation) {
+  // Test unary negation of PauliOperator
+  auto opX = PauliOperator::X(0);
+  auto neg_opX = -opX;
+  EXPECT_EQ(neg_opX.to_string(), "-X(0)");
+  EXPECT_EQ(neg_opX.get_coefficient(), std::complex<double>(-1.0, 0.0));
+  EXPECT_EQ(neg_opX.get_factors().size(), 1);
+
+  // Test unary negation of ProductPauliOperatorExpression
+  // Scaling a product should multiply its coefficient directly
+  auto prod = std::complex<double>(2.0, 1.0) * PauliOperator::Y(1);
+  auto neg_prod = -prod;
+  // The coefficient should be negated directly: -(2+i) = (-2-i)
+  EXPECT_EQ(neg_prod.get_coefficient(), std::complex<double>(-2.0, -1.0));
+  EXPECT_EQ(neg_prod.get_factors().size(), 1);
+
+  // Test unary negation of SumPauliOperatorExpression
+  auto sum = PauliOperator::X(0) + PauliOperator::Y(1);
+  auto neg_sum = -sum;
+  // The negated sum wraps the original sum with coefficient -1
+  EXPECT_EQ(neg_sum.get_factors().size(), 1);
+  EXPECT_EQ(neg_sum.get_coefficient(), std::complex<double>(-1.0, 0.0));
+
+  // Test double negation should give coefficient 1
+  auto double_neg = -(-opX);
+  EXPECT_EQ(double_neg.get_coefficient(), std::complex<double>(1.0, 0.0));
+
+  // Test scaling a product by a scalar
+  auto scaled = std::complex<double>(3.0, 0.0) * prod;
+  // 3 * (2+i)*Y(1) = (6+3i)*Y(1)
+  EXPECT_EQ(scaled.get_coefficient(), std::complex<double>(6.0, 3.0));
+  EXPECT_EQ(scaled.get_factors().size(), 1);
 }
