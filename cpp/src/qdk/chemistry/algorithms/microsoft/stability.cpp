@@ -8,11 +8,11 @@
 #include <qdk/chemistry/scf/core/molecule.h>
 #include <qdk/chemistry/scf/eri/eri_multiplexer.h>
 #include <qdk/chemistry/scf/util/gauxc_registry.h>
-#include <spdlog/spdlog.h>
 
 #include <macis/solvers/davidson.hpp>
 #include <qdk/chemistry/data/stability_result.hpp>
 #include <qdk/chemistry/data/wavefunction.hpp>
+#include <qdk/chemistry/utils/logger.hpp>
 
 #ifdef _OPENMP
 #include <omp.h>
@@ -24,6 +24,9 @@
 namespace qdk::chemistry::algorithms::microsoft {
 
 namespace qcs = qdk::chemistry::scf;
+// Bring logger types into scope
+using qdk::chemistry::utils::Logger;
+using qdk::chemistry::utils::LogLevel;
 
 // Type aliases
 using RowMajorMatrix =
@@ -50,6 +53,7 @@ void compute_trial_fock(const std::shared_ptr<qcs::ERI>& eri,
                         const RowMajorMatrix& trial_density,
                         const RowMajorMatrix& ground_density,
                         RowMajorMatrix& trial_fock, bool rhf_external) {
+  QDK_LOG_TRACE_ENTERING();
   const size_t num_atomic_orbitals = ground_density.cols();
   const bool unrestricted = (ground_density.rows() == 2 * num_atomic_orbitals);
   if (rhf_external and unrestricted)
@@ -173,6 +177,7 @@ class StabilityOperator {
    */
   void apply_stability_operator(const double* X_ptr, double* Y_ptr,
                                 size_t num_vectors, double alpha) const {
+    QDK_LOG_TRACE_ENTERING();
     // Calculate sizes
     const size_t num_atomic_orbitals = Ca_.rows();
     const size_t num_molecular_orbitals = Ca_.cols();
@@ -311,6 +316,7 @@ class StabilityOperator {
 
   void operator_action(size_t m, double alpha, const double* V, size_t LDV,
                        double beta, double* AV, size_t LDAV) const {
+    QDK_LOG_TRACE_ENTERING();
     const size_t N = eigen_diff_.size();
 
     // Scale Y by beta (Y = beta * Y)
@@ -351,6 +357,7 @@ void transpose_eigenvector_to_rowmajor(double* eigenvector_ptr,
 std::pair<bool, std::shared_ptr<data::StabilityResult>>
 StabilityChecker::_run_impl(
     std::shared_ptr<data::Wavefunction> wavefunction) const {
+  QDK_LOG_TRACE_ENTERING();
   // Initialize the backend if not already done
   utils::microsoft::initialize_backend();
 
@@ -487,7 +494,7 @@ StabilityChecker::_run_impl(
   const int64_t max_subspace =
       std::min(davidson_max_subspace, static_cast<int64_t>(eigensize));
 
-  spdlog::info(
+  QDK_LOGGER().info(
       "Starting Davidson eigensolver (size: {}, subspace: {}, tol: {:.2e})",
       eigensize, max_subspace, davidson_tol);
 
@@ -503,8 +510,7 @@ StabilityChecker::_run_impl(
     std::shared_ptr<qcs::EXC> exc_internal;
     if (method != "HF") {
       scf_config->exc.xc_name = method;
-      if (check_internal)
-        exc_internal = qcs::EXC::create(basis_set_internal, *scf_config);
+      exc_internal = qcs::EXC::create(basis_set_internal, *scf_config);
     }
 
     internal_eigenvectors.resize(eigenvector.size(), 1);
@@ -522,14 +528,14 @@ StabilityChecker::_run_impl(
     // stability tolerance
     internal_stable = (lowest_eigenvalue > stability_tol);
 
-    spdlog::info(
+    QDK_LOGGER().info(
         "Davidson converged in {} iterations for internal stability, lowest "
         "eigenvalue: {:.8f}",
         num_iterations, lowest_eigenvalue);
     internal_eigenvalues.resize(1);
     internal_eigenvalues(0) = lowest_eigenvalue;
 
-    // Transpose eigenvectors from column-major (nvir x nocc) to row-major
+    // Transpose eigenvectors from column-major to row-major
     // to be compatible with the PySCF format
     detail::transpose_eigenvector_to_rowmajor(internal_eigenvectors.data(),
                                               num_virtual_alpha_orbitals,
@@ -568,14 +574,14 @@ StabilityChecker::_run_impl(
     // Determine stability: stable if the lowest eigenvalue is greater than the
     // stability tolerance
     external_stable = (lowest_eigenvalue > stability_tol);
-    spdlog::info(
+    QDK_LOGGER().info(
         "Davidson converged in {} iterations for external stability, lowest "
         "eigenvalue: {:.8f}",
         num_iterations, lowest_eigenvalue);
     external_eigenvalues.resize(1);
     external_eigenvalues(0) = lowest_eigenvalue;
 
-    // Transpose eigenvectors from column-major (nvir x nocc)
+    // Transpose eigenvectors from column-major to row-major
     // to be compatible with the PySCF format
     detail::transpose_eigenvector_to_rowmajor(external_eigenvectors.data(),
                                               num_virtual_alpha_orbitals,

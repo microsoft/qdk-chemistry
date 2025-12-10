@@ -511,10 +511,8 @@ class TestStabilityChecker:
         smallest = (
             result.get_smallest_internal_eigenvalue() if is_internal else result.get_smallest_external_eigenvalue()
         )
-        expected_value = ref_value
-
         alg_tol = stability_checker.settings().get("davidson_tolerance")
-        assert abs(smallest - expected_value) < alg_tol, f"Eigenvalue mismatch: {smallest} vs {expected_value}"
+        assert abs(smallest - ref_value) < alg_tol, f"Eigenvalue mismatch: {smallest} vs {ref_value}"
 
     def test_stability_no_analysis_requested(self):
         """Test stability checker when no analysis is requested."""
