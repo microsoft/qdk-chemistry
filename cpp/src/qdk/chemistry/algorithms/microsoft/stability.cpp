@@ -163,7 +163,7 @@ class StabilityOperator {
    * @brief Apply the stability analysis matrix-vector operation
    *
    * This function computes Y += alpha * (A+B)*X,
-   * See J. Chem. Phys. 66, 3045 (1977) for the definition of A and B.
+   * See J. Chem. Phys. 66, 3045-3050 (1977) for the definition of A and B.
    *
    * @param X_ptr Pointer to input vectors (eigensize x num_vectors in
    * column-major)

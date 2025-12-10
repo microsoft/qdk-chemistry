@@ -615,8 +615,8 @@ class TestStabilityChecker:
             ("pbe", 0.0788062),
         ],
     )
-    def test_stability_uhf_water_plus(self, backend, method, ref_internal):
-        """Test stability checker on stable UHF water Ion with different backends and methods."""
+    def test_stability_uhf_water_cation(self, backend, method, ref_internal):
+        """Test stability checker on stable UHF water cation (H2O+) with different backends and methods."""
         water = create_water_structure()
         scf_solver = self._create_scf_solver()
         scf_solver.settings().set("method", method)
@@ -690,6 +690,9 @@ class TestStabilityChecker:
     @pytest.mark.parametrize(
         ("distance", "expected_internal_stable", "expected_external_stable", "ref_internal", "ref_external"),
         [
+            # Reference eigenvalues are scaled to match QDK convention and the original stability analysis
+            # formulation from J. Chem. Phys. 66, 3045-3050 (1977). PySCF internal eigenvalues for RHF
+            # are scaled by 1/4 to match this convention. The values below reflect this scaling.
             (1.2, True, False, 0.16709956461035308, -0.04997491473779583),  # External instability
             (1.6, False, False, -0.06540845676884896, -0.28245222121208535),  # Internal instability
         ],
@@ -725,7 +728,15 @@ class TestStabilityChecker:
         """Test stability checker on BN+ cation (UHF) with different backends."""
         structure = create_bn_plus_structure()
         ref_eigenvalue = -0.07936046244954532
-        # QDK finds 1 negative eigenvalue, PySCF finds 2 (different convergence/tolerance)
+        # QDK finds 1 negative eigenvalue, PySCF finds 2. This discrepancy is due to differences in the
+        # numerical convergence criteria and stability tolerance settings between the two implementations.
+        # PySCF's stability analysis is known to be sensitive to the SCF convergence threshold and the
+        # stability tolerance (see PySCF documentation: https://pyscf.org/user/stability.html).
+        # QDK uses a slightly different algorithm and default tolerance, which can result in a different
+        # count of negative eigenvalues for borderline cases. For more details, see:
+        # - PySCF stability documentation: https://pyscf.org/user/stability.html
+        # - QDK Chemistry stability documentation: [add link if available]
+        # This test expects the difference and will fail if the implementations are harmonized or updated.
         expected_negative_count = 1 if backend == "qdk" else 2
 
         scf_solver = self._create_scf_solver()
@@ -957,11 +968,11 @@ class TestStabilityWorkflow:
         # Run workflow - should detect external instability and switch to UHF
         energy, wfn, is_stable, result = self._run_scf_with_stability_workflow(n2, 0, 1, scf_solver, stability_checker)
 
-        # Final wavefunction should be unrestricted (switched from RHF to UHF) for HF
-        if method == "hf":
-            assert not wfn.get_orbitals().is_restricted(), (
-                "Final wavefunction should be unrestricted after external instability"
-            )
+        # Final wavefunction should be unrestricted (switched from RHF to UHF) after external instability
+        # This check applies to all methods that support switching to unrestricted (e.g., HF and DFT).
+        assert not wfn.get_orbitals().is_restricted(), (
+            "Final wavefunction should be unrestricted after external instability"
+        )
 
         # Should be stable after resolving external instability
         assert is_stable is True, "Wavefunction should be stable after switching to UHF"
@@ -986,7 +997,7 @@ class TestStabilityWorkflow:
         # Create and configure solvers
         scf_solver = algorithms.create("scf_solver", backend)
         scf_solver.settings().set("basis_set", "def2-svp")
-        scf_solver.settings().set("scf_type", "auto")
+        scf_solver.settings().set("scf_type", "unrestricted")
         scf_solver.settings().set("method", method)
 
         stability_checker = algorithms.create("stability_checker", backend)
