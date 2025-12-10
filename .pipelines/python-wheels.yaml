@@ -99,7 +99,7 @@ extends:
             outputs:
             - output: pipelineArtifact
               displayName: Upload Linux Python $(pythonVersion) Wheels for ${{ target.march }}
-              targetPath: $(System.DefaultWorkingDirectory)/artifacts
+              targetPath: $(System.DefaultWorkingDirectory)/target/wheels
               artifactName: linux-${{ target.arch }}-wheels-python$(pythonVersion)
           steps:
           # Build - x86_64
@@ -144,21 +144,21 @@ extends:
                 imageTag: linux/arm64/v8
                 pythonVersion: $(pythonVersion)
 
-    # - stage: Approval
-    #   displayName: Approval
-    #   dependsOn: Build
-    #   condition: and(succeeded(), eq(variables['Build.Reason'], 'Manual'))
-    #   jobs:
-    #       - job: "Approval"
-    #         pool: server
-    #         timeoutInMinutes: 1440 # job times out in 1 day
-    #         steps:
-    #           - task: ManualValidation@0
-    #             timeoutInMinutes: 1440 # task times out in 1 day
-    #             inputs:
-    #               notifyUsers: ""
-    #               instructions: "Please verify artifacts and approve the release"
-    #               onTimeout: "reject"
+    - stage: Approval
+      displayName: Approval
+      dependsOn: Build
+      condition: and(succeeded(), eq(variables['Build.Reason'], 'Manual'))
+      jobs:
+      - job: Approval
+        pool: server
+        timeoutInMinutes: 1440     # job times out in 1 day
+        steps:
+        - task: ManualValidation@0
+          timeoutInMinutes: 1440       # task times out in 1 day
+          inputs:
+            notifyUsers: ''
+            instructions: Please verify artifacts and approve the release
+            onTimeout: reject
 
     - stage: Release
       displayName: Release
@@ -235,7 +235,7 @@ extends:
     #             clientid:
     #             contenttype: PyPi
     #             domaintenantid:
-    #             folderlocation: "$(System.DefaultWorkingDirectory)/artifacts"
+    #             folderlocation: "$(System.DefaultWorkingDirectory)/artifacts/"
     #             waitforreleasecompletion: true
     #             owners: "nathanbaker@microsoft.com"
     #             approvers: "nathanbaker@microsoft.com"
