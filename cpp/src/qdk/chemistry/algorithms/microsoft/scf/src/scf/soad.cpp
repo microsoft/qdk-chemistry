@@ -3,6 +3,7 @@
 // license information.
 
 #include <cstdint>
+#include <qdk/chemistry/utils/logger.hpp>
 
 namespace qdk::chemistry::scf {
 uint64_t element_shell_count[] = {
@@ -188,6 +189,7 @@ uint64_t element_electron_distribution[][11] = {
 void soad_initialize_density_matrix(double *density_matrix, uint64_t N,
                                     const uint64_t *atomic_nums,
                                     uint64_t n_atoms) {
+  QDK_LOG_TRACE_ENTERING();
   uint64_t index = 0;
   for (uint64_t i = 0; i < n_atoms; ++i) {
     uint64_t Z = atomic_nums[i];

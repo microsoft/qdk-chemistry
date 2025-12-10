@@ -3,6 +3,7 @@
 // license information.
 
 #include <qdk/chemistry/data/wavefunction_containers/sd.hpp>
+#include <qdk/chemistry/utils/logger.hpp>
 #include <stdexcept>
 
 #include "../json_serialization.hpp"
@@ -20,6 +21,7 @@ SlaterDeterminantContainer::SlaterDeterminantContainer(
   // Note: Configurations only represent the active space, not the full orbital
   // space (inactive and virtual orbitals are not included in the configuration
   // representation)
+  QDK_LOG_TRACE_ENTERING();
 
   const std::string config_str = det.to_string();
 
@@ -63,26 +65,36 @@ SlaterDeterminantContainer::SlaterDeterminantContainer(
 
 std::unique_ptr<WavefunctionContainer> SlaterDeterminantContainer::clone()
     const {
+  QDK_LOG_TRACE_ENTERING();
+
   return std::make_unique<SlaterDeterminantContainer>(_determinant, _orbitals,
                                                       _type);
 }
 
 std::shared_ptr<Orbitals> SlaterDeterminantContainer::get_orbitals() const {
+  QDK_LOG_TRACE_ENTERING();
+
   return _orbitals;
 }
 
 const ContainerTypes::VectorVariant&
 SlaterDeterminantContainer::get_coefficients() const {
+  QDK_LOG_TRACE_ENTERING();
+
   return _coefficient_vector;
 }
 
 ContainerTypes::ScalarVariant SlaterDeterminantContainer::get_coefficient(
     const Configuration& det) const {
+  QDK_LOG_TRACE_ENTERING();
+
   return (_determinant == det) ? 1.0 : 0.0;
 }
 
 const ContainerTypes::DeterminantVector&
 SlaterDeterminantContainer::get_active_determinants() const {
+  QDK_LOG_TRACE_ENTERING();
+
   if (!_determinant_vector_cache) {
     _determinant_vector_cache = std::make_unique<DeterminantVector>();
     _determinant_vector_cache->push_back(_determinant);
@@ -90,10 +102,16 @@ SlaterDeterminantContainer::get_active_determinants() const {
   return *_determinant_vector_cache;
 }
 
-size_t SlaterDeterminantContainer::size() const { return 1; }
+size_t SlaterDeterminantContainer::size() const {
+  QDK_LOG_TRACE_ENTERING();
+
+  return 1;
+}
 
 ContainerTypes::ScalarVariant SlaterDeterminantContainer::overlap(
     const WavefunctionContainer& other) const {
+  QDK_LOG_TRACE_ENTERING();
+
   // For single determinant, overlap is coefficient of this determinant in other
   // wavefunction if the bases are identical
   // return other.get_coefficient(_determinant);
@@ -103,15 +121,21 @@ ContainerTypes::ScalarVariant SlaterDeterminantContainer::overlap(
 }
 
 double SlaterDeterminantContainer::norm() const {
+  QDK_LOG_TRACE_ENTERING();
+
   return 1.0;  // Single normalized determinant always has norm 1
 }
 
 bool SlaterDeterminantContainer::contains_determinant(
     const Configuration& det) const {
+  QDK_LOG_TRACE_ENTERING();
+
   return _determinant == det;
 }
 
 void SlaterDeterminantContainer::clear_caches() const {
+  QDK_LOG_TRACE_ENTERING();
+
   // Clear the cached determinant vector
   _determinant_vector_cache.reset();
 
@@ -122,6 +146,7 @@ void SlaterDeterminantContainer::clear_caches() const {
 std::tuple<const ContainerTypes::MatrixVariant&,
            const ContainerTypes::MatrixVariant&>
 SlaterDeterminantContainer::get_active_one_rdm_spin_dependent() const {
+  QDK_LOG_TRACE_ENTERING();
   if (_one_rdm_spin_dependent_aa == nullptr ||
       _one_rdm_spin_dependent_bb == nullptr) {
     auto [alpha_occupations, beta_occupations] =
@@ -165,6 +190,7 @@ std::tuple<const ContainerTypes::VectorVariant&,
            const ContainerTypes::VectorVariant&,
            const ContainerTypes::VectorVariant&>
 SlaterDeterminantContainer::get_active_two_rdm_spin_dependent() const {
+  QDK_LOG_TRACE_ENTERING();
   if (!_two_rdm_spin_dependent_aaaa || !_two_rdm_spin_dependent_bbbb ||
       !_two_rdm_spin_dependent_aabb) {
     auto [alpha_occupations, beta_occupations] =
@@ -242,6 +268,7 @@ SlaterDeterminantContainer::get_active_two_rdm_spin_dependent() const {
 
 const ContainerTypes::MatrixVariant&
 SlaterDeterminantContainer::get_active_one_rdm_spin_traced() const {
+  QDK_LOG_TRACE_ENTERING();
   if (!_one_rdm_spin_traced) {
     if (_orbitals->get_active_space_indices().first.size() !=
         _orbitals->get_active_space_indices().second.size()) {
@@ -273,6 +300,7 @@ SlaterDeterminantContainer::get_active_one_rdm_spin_traced() const {
 
 const ContainerTypes::VectorVariant&
 SlaterDeterminantContainer::get_active_two_rdm_spin_traced() const {
+  QDK_LOG_TRACE_ENTERING();
   if (!_two_rdm_spin_traced) {
     auto [alpha_occupations, beta_occupations] =
         get_active_orbital_occupations();
@@ -333,6 +361,7 @@ SlaterDeterminantContainer::get_active_two_rdm_spin_traced() const {
 
 Eigen::VectorXd SlaterDeterminantContainer::get_single_orbital_entropies()
     const {
+  QDK_LOG_TRACE_ENTERING();
   // For a single Slater determinant, all orbitals are either fully occupied
   // or unoccupied, leading to zero entropy for each orbital.
   if (_orbitals->get_active_space_indices().first.size() !=
@@ -348,6 +377,8 @@ Eigen::VectorXd SlaterDeterminantContainer::get_single_orbital_entropies()
 
 std::pair<size_t, size_t> SlaterDeterminantContainer::get_total_num_electrons()
     const {
+  QDK_LOG_TRACE_ENTERING();
+
   // Get active space electrons from the determinant
   auto [n_alpha_active, n_beta_active] = get_active_num_electrons();
 
@@ -363,12 +394,16 @@ std::pair<size_t, size_t> SlaterDeterminantContainer::get_total_num_electrons()
 
 std::pair<size_t, size_t> SlaterDeterminantContainer::get_active_num_electrons()
     const {
+  QDK_LOG_TRACE_ENTERING();
+
   auto [n_alpha, n_beta] = _determinant.get_n_electrons();
   return {n_alpha, n_beta};
 }
 
 std::pair<Eigen::VectorXd, Eigen::VectorXd>
 SlaterDeterminantContainer::get_total_orbital_occupations() const {
+  QDK_LOG_TRACE_ENTERING();
+
   // Get the total number of orbitals from the orbital basis set
   const int num_orbitals =
       static_cast<int>(_orbitals->get_num_molecular_orbitals());
@@ -421,6 +456,8 @@ SlaterDeterminantContainer::get_total_orbital_occupations() const {
 
 std::pair<Eigen::VectorXd, Eigen::VectorXd>
 SlaterDeterminantContainer::get_active_orbital_occupations() const {
+  QDK_LOG_TRACE_ENTERING();
+
   // Get the active space indices and size
   auto [alpha_active_indices, beta_active_indices] =
       _orbitals->get_active_space_indices();
@@ -458,34 +495,48 @@ SlaterDeterminantContainer::get_active_orbital_occupations() const {
 }
 
 bool SlaterDeterminantContainer::has_one_rdm_spin_dependent() const {
+  QDK_LOG_TRACE_ENTERING();
+
   // Always available for Slater determinants (can be computed on-the-fly)
   return true;
 }
 
 bool SlaterDeterminantContainer::has_one_rdm_spin_traced() const {
+  QDK_LOG_TRACE_ENTERING();
+
   // Always available for Slater determinants (can be computed on-the-fly)
   return true;
 }
 
 bool SlaterDeterminantContainer::has_two_rdm_spin_dependent() const {
+  QDK_LOG_TRACE_ENTERING();
+
   // Always available for Slater determinants (can be computed on-the-fly)
   return true;
 }
 
 bool SlaterDeterminantContainer::has_two_rdm_spin_traced() const {
+  QDK_LOG_TRACE_ENTERING();
+
   // Always available for Slater determinants (can be computed on-the-fly)
   return true;
 }
 
 std::string SlaterDeterminantContainer::get_container_type() const {
+  QDK_LOG_TRACE_ENTERING();
+
   return "sd";
 }
 
 bool SlaterDeterminantContainer::is_complex() const {
+  QDK_LOG_TRACE_ENTERING();
+
   return false;  // Slater determinants always use real coefficients (unity)
 }
 
 nlohmann::json SlaterDeterminantContainer::to_json() const {
+  QDK_LOG_TRACE_ENTERING();
+
   nlohmann::json j;
 
   // Store version first
@@ -512,6 +563,8 @@ nlohmann::json SlaterDeterminantContainer::to_json() const {
 
 std::unique_ptr<SlaterDeterminantContainer>
 SlaterDeterminantContainer::from_json(const nlohmann::json& j) {
+  QDK_LOG_TRACE_ENTERING();
+
   try {
     // Validate version first
     if (!j.contains("version")) {
@@ -550,6 +603,8 @@ SlaterDeterminantContainer::from_json(const nlohmann::json& j) {
 }
 
 void SlaterDeterminantContainer::to_hdf5(H5::Group& group) const {
+  QDK_LOG_TRACE_ENTERING();
+
   try {
     H5::StrType string_type(H5::PredType::C_S1, H5T_VARIABLE);
 
@@ -594,6 +649,8 @@ void SlaterDeterminantContainer::to_hdf5(H5::Group& group) const {
 
 std::unique_ptr<SlaterDeterminantContainer>
 SlaterDeterminantContainer::from_hdf5(H5::Group& group) {
+  QDK_LOG_TRACE_ENTERING();
+
   try {
     // Check version first
     H5::StrType string_type(H5::PredType::C_S1, H5T_VARIABLE);

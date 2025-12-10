@@ -9,10 +9,12 @@
 #include <qdk/chemistry/data/hamiltonian.hpp>
 #include <qdk/chemistry/data/orbitals.hpp>
 #include <qdk/chemistry/data/structure.hpp>
+#include <qdk/chemistry/utils/logger.hpp>
 #include <sstream>
 #include <stdexcept>
 
 #include "filename_utils.hpp"
+#include "hdf5_error_handling.hpp"
 #include "hdf5_serialization.hpp"
 #include "json_serialization.hpp"
 
@@ -25,6 +27,7 @@ Hamiltonian::Hamiltonian(const Hamiltonian& other)
       _orbitals(other._orbitals),
       _core_energy(other._core_energy),
       _type(other._type) {
+  QDK_LOG_TRACE_ENTERING();
   if (!_is_valid()) {
     throw std::invalid_argument(
         "Tried to generate invalid Hamiltonian object.");
@@ -45,6 +48,7 @@ Hamiltonian::Hamiltonian(const Eigen::MatrixXd& one_body_integrals,
       _orbitals(orbitals),
       _core_energy(core_energy),
       _type(type) {
+  QDK_LOG_TRACE_ENTERING();
   if (!orbitals) {
     throw std::invalid_argument("Orbitals pointer cannot be nullptr");
   }
@@ -86,6 +90,7 @@ Hamiltonian::Hamiltonian(const Eigen::MatrixXd& one_body_integrals_alpha,
       _orbitals(orbitals),
       _core_energy(core_energy),
       _type(type) {
+  QDK_LOG_TRACE_ENTERING();
   if (!orbitals) {
     throw std::invalid_argument("Orbitals pointer cannot be nullptr");
   }
@@ -106,6 +111,7 @@ Hamiltonian::Hamiltonian(const Eigen::MatrixXd& one_body_integrals_alpha,
 }
 
 Hamiltonian& Hamiltonian::operator=(const Hamiltonian& other) {
+  QDK_LOG_TRACE_ENTERING();
   if (this != &other) {
     // Since all members are const, we need to use placement new
     this->~Hamiltonian();
@@ -116,6 +122,7 @@ Hamiltonian& Hamiltonian::operator=(const Hamiltonian& other) {
 
 std::tuple<const Eigen::MatrixXd&, const Eigen::MatrixXd&>
 Hamiltonian::get_one_body_integrals() const {
+  QDK_LOG_TRACE_ENTERING();
   if (!has_one_body_integrals()) {
     throw std::runtime_error("One-body integrals are not set");
   }
@@ -124,6 +131,7 @@ Hamiltonian::get_one_body_integrals() const {
 }
 
 bool Hamiltonian::has_one_body_integrals() const {
+  QDK_LOG_TRACE_ENTERING();
   return _one_body_integrals.first != nullptr &&
          _one_body_integrals.first->rows() > 0 &&
          _one_body_integrals.first->cols() > 0;
@@ -131,6 +139,7 @@ bool Hamiltonian::has_one_body_integrals() const {
 
 double Hamiltonian::get_one_body_element(unsigned i, unsigned j,
                                          SpinChannel channel) const {
+  QDK_LOG_TRACE_ENTERING();
   if (!has_one_body_integrals()) {
     throw std::runtime_error("One-body integrals are not set");
   }
@@ -155,6 +164,7 @@ double Hamiltonian::get_one_body_element(unsigned i, unsigned j,
 std::tuple<const Eigen::VectorXd&, const Eigen::VectorXd&,
            const Eigen::VectorXd&>
 Hamiltonian::get_two_body_integrals() const {
+  QDK_LOG_TRACE_ENTERING();
   if (!has_two_body_integrals()) {
     throw std::runtime_error("Two-body integrals are not set");
   }
@@ -164,6 +174,7 @@ Hamiltonian::get_two_body_integrals() const {
 }
 
 bool Hamiltonian::has_inactive_fock_matrix() const {
+  QDK_LOG_TRACE_ENTERING();
   bool has_alpha = _inactive_fock_matrix.first != nullptr &&
                    _inactive_fock_matrix.first->size() > 0;
   bool has_beta = _inactive_fock_matrix.second != nullptr &&
@@ -174,6 +185,7 @@ bool Hamiltonian::has_inactive_fock_matrix() const {
 double Hamiltonian::get_two_body_element(unsigned i, unsigned j, unsigned k,
                                          unsigned l,
                                          SpinChannel channel) const {
+  QDK_LOG_TRACE_ENTERING();
   if (!has_two_body_integrals()) {
     throw std::runtime_error("Two-body integrals are not set");
   }
@@ -199,12 +211,14 @@ double Hamiltonian::get_two_body_element(unsigned i, unsigned j, unsigned k,
 }
 
 bool Hamiltonian::has_two_body_integrals() const {
+  QDK_LOG_TRACE_ENTERING();
   return std::get<0>(_two_body_integrals) != nullptr &&
          std::get<0>(_two_body_integrals)->size() > 0;
 }
 
 std::pair<const Eigen::MatrixXd&, const Eigen::MatrixXd&>
 Hamiltonian::get_inactive_fock_matrix() const {
+  QDK_LOG_TRACE_ENTERING();
   if (!has_inactive_fock_matrix()) {
     throw std::runtime_error("Inactive Fock matrix is not set");
   }
@@ -212,23 +226,35 @@ Hamiltonian::get_inactive_fock_matrix() const {
 }
 
 const std::shared_ptr<Orbitals> Hamiltonian::get_orbitals() const {
+  QDK_LOG_TRACE_ENTERING();
   if (!has_orbitals()) {
     throw std::runtime_error("Orbitals are not set");
   }
   return _orbitals;
 }
 
-bool Hamiltonian::has_orbitals() const { return _orbitals != nullptr; }
+bool Hamiltonian::has_orbitals() const {
+  QDK_LOG_TRACE_ENTERING();
+  return _orbitals != nullptr;
+}
 
-double Hamiltonian::get_core_energy() const { return _core_energy; }
+double Hamiltonian::get_core_energy() const {
+  QDK_LOG_TRACE_ENTERING();
+  return _core_energy;
+}
 
-HamiltonianType Hamiltonian::get_type() const { return _type; }
+HamiltonianType Hamiltonian::get_type() const {
+  QDK_LOG_TRACE_ENTERING();
+  return _type;
+}
 
 bool Hamiltonian::is_hermitian() const {
+  QDK_LOG_TRACE_ENTERING();
   return _type == HamiltonianType::Hermitian;
 }
 
 bool Hamiltonian::is_restricted() const {
+  QDK_LOG_TRACE_ENTERING();
   // Hamiltonian is restricted if alpha and beta components point to the same
   // data
   return (_one_body_integrals.first == _one_body_integrals.second) &&
@@ -240,9 +266,13 @@ bool Hamiltonian::is_restricted() const {
           (!_inactive_fock_matrix.first && !_inactive_fock_matrix.second));
 }
 
-bool Hamiltonian::is_unrestricted() const { return !is_restricted(); }
+bool Hamiltonian::is_unrestricted() const {
+  QDK_LOG_TRACE_ENTERING();
+  return !is_restricted();
+}
 
 bool Hamiltonian::_is_valid() const {
+  QDK_LOG_TRACE_ENTERING();
   // Check if essential data is present
   if (!has_one_body_integrals() || !has_two_body_integrals()) {
     return false;
@@ -259,6 +289,7 @@ bool Hamiltonian::_is_valid() const {
 }
 
 void Hamiltonian::validate_integral_dimensions() const {
+  QDK_LOG_TRACE_ENTERING();
   if (!has_one_body_integrals() || !has_two_body_integrals()) {
     return;
   }
@@ -320,6 +351,7 @@ void Hamiltonian::validate_integral_dimensions() const {
 }
 
 void Hamiltonian::validate_restrictedness_consistency() const {
+  QDK_LOG_TRACE_ENTERING();
   if (!_orbitals) return;
 
   bool orbitals_restricted = _orbitals->is_restricted();
@@ -335,6 +367,7 @@ void Hamiltonian::validate_restrictedness_consistency() const {
 }
 
 void Hamiltonian::validate_active_space_dimensions() const {
+  QDK_LOG_TRACE_ENTERING();
   if (!_orbitals || !_orbitals->has_active_space()) return;
 
   auto active_indices = _orbitals->get_active_space_indices();
@@ -369,6 +402,7 @@ void Hamiltonian::validate_active_space_dimensions() const {
 
 size_t Hamiltonian::get_two_body_index(size_t i, size_t j, size_t k,
                                        size_t l) const {
+  QDK_LOG_TRACE_ENTERING();
   size_t norb = _orbitals->get_active_space_indices().first.size();
   return i * norb * norb * norb + j * norb * norb + k * norb + l;
 }
@@ -376,6 +410,7 @@ size_t Hamiltonian::get_two_body_index(size_t i, size_t j, size_t k,
 std::pair<std::shared_ptr<Eigen::MatrixXd>, std::shared_ptr<Eigen::MatrixXd>>
 Hamiltonian::make_restricted_one_body_integrals(
     const Eigen::MatrixXd& integrals) {
+  QDK_LOG_TRACE_ENTERING();
   auto shared_integrals = std::make_shared<Eigen::MatrixXd>(integrals);
   return std::make_pair(
       shared_integrals,
@@ -386,6 +421,7 @@ std::tuple<std::shared_ptr<Eigen::VectorXd>, std::shared_ptr<Eigen::VectorXd>,
            std::shared_ptr<Eigen::VectorXd>>
 Hamiltonian::make_restricted_two_body_integrals(
     const Eigen::VectorXd& integrals) {
+  QDK_LOG_TRACE_ENTERING();
   auto shared_integrals = std::make_shared<Eigen::VectorXd>(integrals);
   return std::make_tuple(
       shared_integrals, shared_integrals,
@@ -395,12 +431,14 @@ Hamiltonian::make_restricted_two_body_integrals(
 std::pair<std::shared_ptr<Eigen::MatrixXd>, std::shared_ptr<Eigen::MatrixXd>>
 Hamiltonian::make_restricted_inactive_fock_matrix(
     const Eigen::MatrixXd& matrix) {
+  QDK_LOG_TRACE_ENTERING();
   auto shared_matrix = std::make_shared<Eigen::MatrixXd>(matrix);
   return std::make_pair(
       shared_matrix, shared_matrix);  // Both alpha and beta point to same data
 }
 
 std::string Hamiltonian::get_summary() const {
+  QDK_LOG_TRACE_ENTERING();
   std::string summary = "Hamiltonian Summary:\n";
   size_t num_molecular_orbitals = _orbitals->get_num_molecular_orbitals();
   size_t norb = _orbitals->get_active_space_indices().first.size();
@@ -482,6 +520,7 @@ std::string Hamiltonian::get_summary() const {
 
 void Hamiltonian::to_file(const std::string& filename,
                           const std::string& type) const {
+  QDK_LOG_TRACE_ENTERING();
   if (type == "json") {
     _to_json_file(filename);
   } else if (type == "hdf5") {
@@ -494,6 +533,7 @@ void Hamiltonian::to_file(const std::string& filename,
 
 std::shared_ptr<Hamiltonian> Hamiltonian::from_file(const std::string& filename,
                                                     const std::string& type) {
+  QDK_LOG_TRACE_ENTERING();
   if (type == "json") {
     return _from_json_file(filename);
   } else if (type == "hdf5") {
@@ -505,6 +545,7 @@ std::shared_ptr<Hamiltonian> Hamiltonian::from_file(const std::string& filename,
 }
 
 void Hamiltonian::to_hdf5_file(const std::string& filename) const {
+  QDK_LOG_TRACE_ENTERING();
   // Validate filename has correct data type suffix
   std::string validated_filename =
       DataTypeFilename::validate_write_suffix(filename, "hamiltonian");
@@ -514,6 +555,7 @@ void Hamiltonian::to_hdf5_file(const std::string& filename) const {
 
 std::shared_ptr<Hamiltonian> Hamiltonian::from_hdf5_file(
     const std::string& filename) {
+  QDK_LOG_TRACE_ENTERING();
   // Validate filename has correct data type suffix
   std::string validated_filename =
       DataTypeFilename::validate_read_suffix(filename, "hamiltonian");
@@ -522,6 +564,7 @@ std::shared_ptr<Hamiltonian> Hamiltonian::from_hdf5_file(
 }
 
 void Hamiltonian::to_json_file(const std::string& filename) const {
+  QDK_LOG_TRACE_ENTERING();
   // Validate filename has correct data type suffix
   std::string validated_filename =
       DataTypeFilename::validate_write_suffix(filename, "hamiltonian");
@@ -531,6 +574,7 @@ void Hamiltonian::to_json_file(const std::string& filename) const {
 
 std::shared_ptr<Hamiltonian> Hamiltonian::from_json_file(
     const std::string& filename) {
+  QDK_LOG_TRACE_ENTERING();
   // Validate filename has correct data type suffix
   std::string validated_filename =
       DataTypeFilename::validate_read_suffix(filename, "hamiltonian");
@@ -540,6 +584,7 @@ std::shared_ptr<Hamiltonian> Hamiltonian::from_json_file(
 
 void Hamiltonian::to_fcidump_file(const std::string& filename, size_t nalpha,
                                   size_t nbeta) const {
+  QDK_LOG_TRACE_ENTERING();
   // Validate filename has correct data type suffix
   std::string validated_filename =
       DataTypeFilename::validate_write_suffix(filename, "hamiltonian");
@@ -548,6 +593,7 @@ void Hamiltonian::to_fcidump_file(const std::string& filename, size_t nalpha,
 }
 
 void Hamiltonian::_to_json_file(const std::string& filename) const {
+  QDK_LOG_TRACE_ENTERING();
   std::ofstream file(filename);
   if (!file.is_open()) {
     throw std::runtime_error("Cannot open file for writing: " + filename);
@@ -563,6 +609,7 @@ void Hamiltonian::_to_json_file(const std::string& filename) const {
 
 std::shared_ptr<Hamiltonian> Hamiltonian::_from_json_file(
     const std::string& filename) {
+  QDK_LOG_TRACE_ENTERING();
   std::ifstream file(filename);
   if (!file.is_open()) {
     throw std::runtime_error(
@@ -581,6 +628,7 @@ std::shared_ptr<Hamiltonian> Hamiltonian::_from_json_file(
 }
 
 nlohmann::json Hamiltonian::to_json() const {
+  QDK_LOG_TRACE_ENTERING();
   nlohmann::json j;
 
   // Store version first
@@ -704,6 +752,7 @@ nlohmann::json Hamiltonian::to_json() const {
 }
 
 std::shared_ptr<Hamiltonian> Hamiltonian::from_json(const nlohmann::json& j) {
+  QDK_LOG_TRACE_ENTERING();
   try {
     // Validate version first
     if (!j.contains("version")) {
@@ -860,6 +909,7 @@ std::shared_ptr<Hamiltonian> Hamiltonian::from_json(const nlohmann::json& j) {
 }
 
 void Hamiltonian::_to_hdf5_file(const std::string& filename) const {
+  QDK_LOG_TRACE_ENTERING();
   if (!_is_valid()) {
     throw std::runtime_error("Cannot save invalid Hamiltonian data to HDF5");
   }
@@ -877,6 +927,7 @@ void Hamiltonian::_to_hdf5_file(const std::string& filename) const {
 }
 
 void Hamiltonian::to_hdf5(H5::Group& group) const {
+  QDK_LOG_TRACE_ENTERING();
   try {
     // Save version first
     H5::DataSpace scalar_space(H5S_SCALAR);
@@ -953,6 +1004,12 @@ void Hamiltonian::to_hdf5(H5::Group& group) const {
 
 std::shared_ptr<Hamiltonian> Hamiltonian::_from_hdf5_file(
     const std::string& filename) {
+  QDK_LOG_TRACE_ENTERING();
+  // Disable HDF5 automatic error printing to stderr unless verbose mode
+  if (hdf5_errors_should_be_suppressed()) {
+    H5::Exception::dontPrint();
+  }
+
   H5::H5File file;
   try {
     // Open HDF5 file
@@ -975,6 +1032,7 @@ std::shared_ptr<Hamiltonian> Hamiltonian::_from_hdf5_file(
 }
 
 std::shared_ptr<Hamiltonian> Hamiltonian::from_hdf5(H5::Group& group) {
+  QDK_LOG_TRACE_ENTERING();
   try {
     // Validate version first
     if (!group.attrExists("version")) {
@@ -1098,6 +1156,7 @@ std::shared_ptr<Hamiltonian> Hamiltonian::from_hdf5(H5::Group& group) {
 
 void Hamiltonian::_to_fcidump_file(const std::string& filename, size_t nalpha,
                                    size_t nbeta) const {
+  QDK_LOG_TRACE_ENTERING();
   // Check if this is an unrestricted Hamiltonian and throw error
   if (is_unrestricted()) {
     throw std::runtime_error(

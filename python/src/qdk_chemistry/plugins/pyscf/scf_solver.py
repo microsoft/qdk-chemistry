@@ -33,11 +33,13 @@ restricted and unrestricted variants for both HF and DFT calculations.
 # Licensed under the MIT License. See LICENSE.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
 
+import warnings
+
 import numpy as np
 from pyscf import gto, scf
 from pyscf.gto.mole import bse_predefined_ecp
 
-from qdk_chemistry.algorithms import ScfSolver, register
+from qdk_chemistry.algorithms import ScfSolver
 from qdk_chemistry.data import (
     Configuration,
     ElectronicStructureSettings,
@@ -52,6 +54,7 @@ from qdk_chemistry.plugins.pyscf.utils import (
     pyscf_mol_to_qdk_basis,
     structure_to_pyscf_atom_labels,
 )
+from qdk_chemistry.utils import Logger
 
 __all__ = ["PyscfScfSettings", "PyscfScfSolver"]
 
@@ -70,12 +73,10 @@ class PyscfScfSettings(ElectronicStructureSettings):
       Common options include "def2-svp", "def2-tzvp", "cc-pvdz", etc.
     - convergence_threshold (float, default=1e-7): Convergence tolerance for orbital gradient norm.
     - max_iterations (int, default=50): Maximum number of iterations.
-
-    PySCF-specific settings:
-        scf_type (str, default="auto"): Type of SCF calculation. Can be:
-            * "auto": Automatically detect based on spin (RHF for singlet, UHF for open-shell)
-            * "restricted": Force restricted calculation (RHF/ROHF for HF, RKS/ROKS for DFT)
-            * "unrestricted": Force unrestricted calculation (UHF for HF, UKS for DFT)
+    - scf_type (str, default="auto"): Type of SCF calculation. Can be:
+        * "auto": Automatically detect based on spin (RHF for singlet, UHF for open-shell)
+        * "restricted": Force restricted calculation (RHF/ROHF for HF, RKS/ROKS for DFT)
+        * "unrestricted": Force unrestricted calculation (UHF for HF, UKS for DFT)
 
     Examples:
         >>> settings = PyscfScfSettings()
@@ -92,10 +93,9 @@ class PyscfScfSettings(ElectronicStructureSettings):
     """
 
     def __init__(self):
-        """Initialize the settings with default values from ElectronicStructureSettingsplus PySCF-specific defaults."""
+        """Initialize the settings with default values from ElectronicStructureSettings plus PySCF-specific defaults."""
+        Logger.trace_entering()
         super().__init__()  # This sets up all the base class defaults
-        # Add PySCF-specific settings
-        self._set_default("scf_type", "string", "auto")
 
 
 class PyscfScfSolver(ScfSolver):
@@ -130,6 +130,7 @@ class PyscfScfSolver(ScfSolver):
 
     def __init__(self):
         """Initialize the PySCF SCF solver with default settings."""
+        Logger.trace_entering()
         super().__init__()
         self._settings = PyscfScfSettings()
 
@@ -168,6 +169,7 @@ class PyscfScfSolver(ScfSolver):
             string should be a valid PySCF XC functional name (e.g., "b3lyp", "pbe", "m06", "wb97x-d").
 
         """
+        Logger.trace_entering()
         atoms, _, _ = structure_to_pyscf_atom_labels(structure)
         basis_name = self._settings["basis_set"]
         method = self._settings["method"].lower()
@@ -220,6 +222,14 @@ class PyscfScfSolver(ScfSolver):
             mf = scf.RKS(mol) if mol.spin == 0 else scf.UKS(mol)
             mf.xc = method
 
+        if scf_type == SCFType.UNRESTRICTED and mol.spin == 0 and initial_guess is None:
+            warnings.warn(
+                "Unrestricted reference requested for closed-shell system. "
+                "Automatic spin symmetry breaking is not supported. "
+                "Consider providing a spin-broken initial guess if desired.",
+                stacklevel=2,
+            )
+
         # Configure convergence settings
 
         # conv_tol in PySCF is tolerance for dE, convergence_threshold is for
@@ -229,6 +239,17 @@ class PyscfScfSolver(ScfSolver):
 
         # Set initial guess if provided
         if initial_guess is not None and hasattr(initial_guess, "get_coefficients"):
+            # Validate initial guess compatibility with reference type
+            initial_guess_is_unrestricted = initial_guess.is_unrestricted()
+            unrestricted = scf_type == SCFType.UNRESTRICTED or (scf_type == SCFType.AUTO and mol.spin != 0)
+            if unrestricted and not initial_guess_is_unrestricted:
+                warnings.warn(
+                    "Unrestricted calculation requested but restricted initial guess provided.",
+                    stacklevel=2,
+                )
+            if not unrestricted and initial_guess_is_unrestricted:
+                raise ValueError("Restricted calculation requested but unrestricted initial guess provided.")
+
             # Create occupation arrays based on electron configuration
             norb = initial_guess.get_num_molecular_orbitals()
             num_alpha = mol.nelec[0]  # Number of alpha electrons
@@ -298,7 +319,5 @@ class PyscfScfSolver(ScfSolver):
 
     def name(self) -> str:
         """Return the name of the SCF solver."""
+        Logger.trace_entering()
         return "pyscf"
-
-
-register(lambda: PyscfScfSolver())

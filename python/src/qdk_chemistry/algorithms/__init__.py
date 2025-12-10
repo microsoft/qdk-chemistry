@@ -9,6 +9,7 @@ custom algorithms that can be registered and used within the QDK/Chemistry frame
 # Licensed under the MIT License. See LICENSE.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
 
+import contextlib
 import importlib
 from types import ModuleType
 from typing import TYPE_CHECKING, Any
@@ -36,6 +37,7 @@ from qdk_chemistry.algorithms.orbital_localizer import (
     OrbitalLocalizer,
     QdkMP2NaturalOrbitalLocalizer,
     QdkPipekMezeyLocalizer,
+    QdkVVHVLocalizer,
 )
 from qdk_chemistry.algorithms.projected_multi_configuration_calculator import (
     ProjectedMultiConfigurationCalculator,
@@ -78,6 +80,7 @@ __all__ = [
     "QdkOccupationActiveSpaceSelector",
     "QdkPipekMezeyLocalizer",
     "QdkScfSolver",
+    "QdkVVHVLocalizer",
     "QdkValenceActiveSpaceSelector",
     "QubitMapper",
     "ScfSolver",
@@ -88,9 +91,10 @@ __all__ = [
     "available",
     "create",
     "energy_from_phase",
+    "inspect_settings",
+    "print_settings",
     "register",
     "show_default",
-    "show_settings",
     "unregister",
 ]
 
@@ -98,9 +102,10 @@ _REGISTRY_EXPORTS = frozenset(
     {
         "available",
         "create",
+        "inspect_settings",
+        "print_settings",
         "register",
         "show_default",
-        "show_settings",
         "unregister",
     }
 )
@@ -112,9 +117,10 @@ if TYPE_CHECKING:  # pragma: no cover - typing-only imports
 
     available = _registry_type.available
     create = _registry_type.create
+    inspect_settings = _registry_type.inspect_settings
+    print_settings = _registry_type.print_settings
     register = _registry_type.register
     show_default = _registry_type.show_default
-    show_settings = _registry_type.show_settings
     unregister = _registry_type.unregister
 
 

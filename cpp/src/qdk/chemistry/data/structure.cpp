@@ -8,177 +8,19 @@
 #include <fstream>
 #include <iomanip>
 #include <qdk/chemistry/constants.hpp>
+#include <qdk/chemistry/data/element_data.hpp>
 #include <qdk/chemistry/data/structure.hpp>
+#include <qdk/chemistry/utils/logger.hpp>
 #include <sstream>
 #include <stdexcept>
 #include <unordered_map>
 
 #include "filename_utils.hpp"
+#include "hdf5_error_handling.hpp"
 #include "hdf5_serialization.hpp"
 #include "json_serialization.hpp"
 
-// TODO (NAB):  This file is also very long.  Should we break it up? workitem:
-// 41353
-
 namespace qdk::chemistry::data {
-
-// Static data for element lookup
-static const std::unordered_map<unsigned, std::string> CHARGE_TO_SYMBOL = {
-    {1, "H"},    {2, "He"},   {3, "Li"},   {4, "Be"},   {5, "B"},
-    {6, "C"},    {7, "N"},    {8, "O"},    {9, "F"},    {10, "Ne"},
-    {11, "Na"},  {12, "Mg"},  {13, "Al"},  {14, "Si"},  {15, "P"},
-    {16, "S"},   {17, "Cl"},  {18, "Ar"},  {19, "K"},   {20, "Ca"},
-    {21, "Sc"},  {22, "Ti"},  {23, "V"},   {24, "Cr"},  {25, "Mn"},
-    {26, "Fe"},  {27, "Co"},  {28, "Ni"},  {29, "Cu"},  {30, "Zn"},
-    {31, "Ga"},  {32, "Ge"},  {33, "As"},  {34, "Se"},  {35, "Br"},
-    {36, "Kr"},  {37, "Rb"},  {38, "Sr"},  {39, "Y"},   {40, "Zr"},
-    {41, "Nb"},  {42, "Mo"},  {43, "Tc"},  {44, "Ru"},  {45, "Rh"},
-    {46, "Pd"},  {47, "Ag"},  {48, "Cd"},  {49, "In"},  {50, "Sn"},
-    {51, "Sb"},  {52, "Te"},  {53, "I"},   {54, "Xe"},  {55, "Cs"},
-    {56, "Ba"},  {57, "La"},  {58, "Ce"},  {59, "Pr"},  {60, "Nd"},
-    {61, "Pm"},  {62, "Sm"},  {63, "Eu"},  {64, "Gd"},  {65, "Tb"},
-    {66, "Dy"},  {67, "Ho"},  {68, "Er"},  {69, "Tm"},  {70, "Yb"},
-    {71, "Lu"},  {72, "Hf"},  {73, "Ta"},  {74, "W"},   {75, "Re"},
-    {76, "Os"},  {77, "Ir"},  {78, "Pt"},  {79, "Au"},  {80, "Hg"},
-    {81, "Tl"},  {82, "Pb"},  {83, "Bi"},  {84, "Po"},  {85, "At"},
-    {86, "Rn"},  {87, "Fr"},  {88, "Ra"},  {89, "Ac"},  {90, "Th"},
-    {91, "Pa"},  {92, "U"},   {93, "Np"},  {94, "Pu"},  {95, "Am"},
-    {96, "Cm"},  {97, "Bk"},  {98, "Cf"},  {99, "Es"},  {100, "Fm"},
-    {101, "Md"}, {102, "No"}, {103, "Lr"}, {104, "Rf"}, {105, "Db"},
-    {106, "Sg"}, {107, "Bh"}, {108, "Hs"}, {109, "Mt"}, {110, "Ds"},
-    {111, "Rg"}, {112, "Cn"}, {113, "Nh"}, {114, "Fl"}, {115, "Mc"},
-    {116, "Lv"}, {117, "Ts"}, {118, "Og"}};
-
-// Reverse lookup map for symbol to nuclear charge (lazy initialization)
-static std::unordered_map<std::string, unsigned> SYMBOL_TO_CHARGE;
-
-// Standard atomic masses in AMU (atomic mass units) for all elements 1-118
-static const std::unordered_map<Element, double> STANDARD_ATOMIC_MASSES = {
-    // Period 1
-    {Element::H, 1.008},
-    {Element::He, 4.0026},
-    // Period 2
-    {Element::Li, 6.94},
-    {Element::Be, 9.0122},
-    {Element::B, 10.81},
-    {Element::C, 12.011},
-    {Element::N, 14.007},
-    {Element::O, 15.999},
-    {Element::F, 18.998},
-    {Element::Ne, 20.180},
-    // Period 3
-    {Element::Na, 22.990},
-    {Element::Mg, 24.305},
-    {Element::Al, 26.982},
-    {Element::Si, 28.085},
-    {Element::P, 30.974},
-    {Element::S, 32.06},
-    {Element::Cl, 35.45},
-    {Element::Ar, 39.948},
-    // Period 4
-    {Element::K, 39.098},
-    {Element::Ca, 40.078},
-    {Element::Sc, 44.956},
-    {Element::Ti, 47.867},
-    {Element::V, 50.942},
-    {Element::Cr, 51.996},
-    {Element::Mn, 54.938},
-    {Element::Fe, 55.845},
-    {Element::Co, 58.933},
-    {Element::Ni, 58.693},
-    {Element::Cu, 63.546},
-    {Element::Zn, 65.38},
-    {Element::Ga, 69.723},
-    {Element::Ge, 72.630},
-    {Element::As, 74.922},
-    {Element::Se, 78.971},
-    {Element::Br, 79.904},
-    {Element::Kr, 83.798},
-    // Period 5
-    {Element::Rb, 85.468},
-    {Element::Sr, 87.62},
-    {Element::Y, 88.906},
-    {Element::Zr, 91.224},
-    {Element::Nb, 92.906},
-    {Element::Mo, 95.95},
-    {Element::Tc, 98.0},
-    {Element::Ru, 101.07},
-    {Element::Rh, 102.91},
-    {Element::Pd, 106.42},
-    {Element::Ag, 107.87},
-    {Element::Cd, 112.41},
-    {Element::In, 114.82},
-    {Element::Sn, 118.71},
-    {Element::Sb, 121.76},
-    {Element::Te, 127.60},
-    {Element::I, 126.90},
-    {Element::Xe, 131.29},
-    // Period 6
-    {Element::Cs, 132.91},
-    {Element::Ba, 137.33},
-    {Element::La, 138.91},
-    {Element::Ce, 140.12},
-    {Element::Pr, 140.91},
-    {Element::Nd, 144.24},
-    {Element::Pm, 145.0},
-    {Element::Sm, 150.36},
-    {Element::Eu, 151.96},
-    {Element::Gd, 157.25},
-    {Element::Tb, 158.93},
-    {Element::Dy, 162.50},
-    {Element::Ho, 164.93},
-    {Element::Er, 167.26},
-    {Element::Tm, 168.93},
-    {Element::Yb, 173.05},
-    {Element::Lu, 174.97},
-    {Element::Hf, 178.49},
-    {Element::Ta, 180.95},
-    {Element::W, 183.84},
-    {Element::Re, 186.21},
-    {Element::Os, 190.23},
-    {Element::Ir, 192.22},
-    {Element::Pt, 195.08},
-    {Element::Au, 196.97},
-    {Element::Hg, 200.59},
-    {Element::Tl, 204.38},
-    {Element::Pb, 207.2},
-    {Element::Bi, 208.98},
-    {Element::Po, 209.0},
-    {Element::At, 210.0},
-    {Element::Rn, 222.0},
-    // Period 7
-    {Element::Fr, 223.0},
-    {Element::Ra, 226.0},
-    {Element::Ac, 227.0},
-    {Element::Th, 232.04},
-    {Element::Pa, 231.04},
-    {Element::U, 238.03},
-    {Element::Np, 237.0},
-    {Element::Pu, 244.0},
-    {Element::Am, 243.0},
-    {Element::Cm, 247.0},
-    {Element::Bk, 247.0},
-    {Element::Cf, 251.0},
-    {Element::Es, 252.0},
-    {Element::Fm, 257.0},
-    {Element::Md, 258.0},
-    {Element::No, 259.0},
-    {Element::Lr, 262.0},
-    {Element::Rf, 267.0},
-    {Element::Db, 270.0},
-    {Element::Sg, 271.0},
-    {Element::Bh, 270.0},
-    {Element::Hs, 277.0},
-    {Element::Mt, 276.0},
-    {Element::Ds, 281.0},
-    {Element::Rg, 280.0},
-    {Element::Cn, 285.0},
-    {Element::Nh, 284.0},
-    {Element::Fl, 289.0},
-    {Element::Mc, 288.0},
-    {Element::Lv, 293.0},
-    {Element::Ts, 294.0},
-    {Element::Og, 294.0}};
 
 Structure::Structure(const Eigen::MatrixXd& coordinates,
                      const std::vector<Element>& elements,
@@ -187,13 +29,14 @@ Structure::Structure(const Eigen::MatrixXd& coordinates,
     : _coordinates(coordinates),
       _elements(elements),
       _masses([&]() {
+        QDK_LOG_TRACE_ENTERING();
         if (masses.size() == 0) {
           if (elements.empty()) {
             return Eigen::VectorXd();  // Create completely empty vector
           } else {
             Eigen::VectorXd default_masses(elements.size());
             for (size_t i = 0; i < elements.size(); ++i) {
-              default_masses[i] = get_standard_atomic_mass(elements[i]);
+              default_masses[i] = get_default_atomic_mass(elements[i]);
             }
             return default_masses;
           }
@@ -228,11 +71,11 @@ Structure::Structure(const Eigen::MatrixXd& coordinates,
                      const Eigen::VectorXd& nuclear_charges)
     : _coordinates(coordinates),
       _elements([&]() {
+        QDK_LOG_TRACE_ENTERING();
         std::vector<Element> elements;
         elements.reserve(symbols.size());
         for (const auto& symbol : symbols) {
-          std::string fixed_symbol = _fix_symbol_capitalization(symbol);
-          elements.push_back(symbol_to_element(fixed_symbol));
+          elements.push_back(symbol_to_element(symbol));
         }
         return elements;
       }()),
@@ -243,9 +86,7 @@ Structure::Structure(const Eigen::MatrixXd& coordinates,
           } else {
             Eigen::VectorXd default_masses(symbols.size());
             for (size_t i = 0; i < symbols.size(); ++i) {
-              std::string fixed_symbol = _fix_symbol_capitalization(symbols[i]);
-              Element element = symbol_to_element(fixed_symbol);
-              default_masses[i] = get_standard_atomic_mass(element);
+              default_masses[i] = get_default_atomic_mass(symbols[i]);
             }
             return default_masses;
           }
@@ -260,8 +101,7 @@ Structure::Structure(const Eigen::MatrixXd& coordinates,
           } else {
             Eigen::VectorXd default_charges(symbols.size());
             for (size_t i = 0; i < symbols.size(); ++i) {
-              std::string fixed_symbol = _fix_symbol_capitalization(symbols[i]);
-              Element element = symbol_to_element(fixed_symbol);
+              Element element = symbol_to_element(symbols[i]);
               default_charges[i] = element_to_nuclear_charge(element);
             }
             return default_charges;
@@ -277,10 +117,11 @@ Structure::Structure(const Eigen::MatrixXd& coordinates,
 }
 
 Structure::Structure(const std::vector<Eigen::Vector3d>& coordinates,
-                     const std::vector<std::string>& symbols,
+                     const std::vector<Element>& elements,
                      const std::vector<double>& masses,
                      const std::vector<double>& nuclear_charges)
     : _coordinates([&]() {
+        QDK_LOG_TRACE_ENTERING();
         if (coordinates.empty()) {
           return Eigen::MatrixXd();  // Create completely empty matrix (0x0)
         } else {
@@ -291,25 +132,15 @@ Structure::Structure(const std::vector<Eigen::Vector3d>& coordinates,
           return coords;
         }
       }()),
-      _elements([&]() {
-        std::vector<Element> elements;
-        elements.reserve(symbols.size());
-        for (const auto& symbol : symbols) {
-          std::string fixed_symbol = _fix_symbol_capitalization(symbol);
-          elements.push_back(symbol_to_element(fixed_symbol));
-        }
-        return elements;
-      }()),
+      _elements(elements),
       _masses([&]() {
         if (masses.empty()) {
-          if (symbols.empty()) {
+          if (elements.empty()) {
             return Eigen::VectorXd();  // Create completely empty vector
           } else {
-            Eigen::VectorXd default_masses(symbols.size());
-            for (size_t i = 0; i < symbols.size(); ++i) {
-              std::string fixed_symbol = _fix_symbol_capitalization(symbols[i]);
-              Element element = symbol_to_element(fixed_symbol);
-              default_masses[i] = get_standard_atomic_mass(element);
+            Eigen::VectorXd default_masses(elements.size());
+            for (size_t i = 0; i < elements.size(); ++i) {
+              default_masses[i] = get_default_atomic_mass(elements[i]);
             }
             return default_masses;
           }
@@ -323,14 +154,12 @@ Structure::Structure(const std::vector<Eigen::Vector3d>& coordinates,
       }()),
       _nuclear_charges([&]() {
         if (nuclear_charges.empty()) {
-          if (symbols.empty()) {
+          if (elements.empty()) {
             return Eigen::VectorXd();  // Create completely empty vector
           } else {
-            Eigen::VectorXd default_charges(symbols.size());
-            for (size_t i = 0; i < symbols.size(); ++i) {
-              std::string fixed_symbol = _fix_symbol_capitalization(symbols[i]);
-              Element element = symbol_to_element(fixed_symbol);
-              default_charges[i] = element_to_nuclear_charge(element);
+            Eigen::VectorXd default_charges(elements.size());
+            for (size_t i = 0; i < elements.size(); ++i) {
+              default_charges[i] = element_to_nuclear_charge(elements[i]);
             }
             return default_charges;
           }
@@ -349,10 +178,11 @@ Structure::Structure(const std::vector<Eigen::Vector3d>& coordinates,
 }
 
 Structure::Structure(const std::vector<Eigen::Vector3d>& coordinates,
-                     const std::vector<Element>& elements,
+                     const std::vector<std::string>& symbols,
                      const std::vector<double>& masses,
                      const std::vector<double>& nuclear_charges)
     : _coordinates([&]() {
+        QDK_LOG_TRACE_ENTERING();
         if (coordinates.empty()) {
           return Eigen::MatrixXd();  // Create completely empty matrix (0x0)
         } else {
@@ -363,15 +193,22 @@ Structure::Structure(const std::vector<Eigen::Vector3d>& coordinates,
           return coords;
         }
       }()),
-      _elements(elements),
+      _elements([&]() {
+        std::vector<Element> elements;
+        elements.reserve(symbols.size());
+        for (const auto& symbol : symbols) {
+          elements.push_back(symbol_to_element(symbol));
+        }
+        return elements;
+      }()),
       _masses([&]() {
         if (masses.empty()) {
-          if (elements.empty()) {
+          if (symbols.empty()) {
             return Eigen::VectorXd();  // Create completely empty vector
           } else {
-            Eigen::VectorXd default_masses(elements.size());
-            for (size_t i = 0; i < elements.size(); ++i) {
-              default_masses[i] = get_standard_atomic_mass(elements[i]);
+            Eigen::VectorXd default_masses(symbols.size());
+            for (size_t i = 0; i < symbols.size(); ++i) {
+              default_masses[i] = get_default_atomic_mass(symbols[i]);
             }
             return default_masses;
           }
@@ -385,12 +222,13 @@ Structure::Structure(const std::vector<Eigen::Vector3d>& coordinates,
       }()),
       _nuclear_charges([&]() {
         if (nuclear_charges.empty()) {
-          if (elements.empty()) {
+          if (symbols.empty()) {
             return Eigen::VectorXd();  // Create completely empty vector
           } else {
-            Eigen::VectorXd default_charges(elements.size());
-            for (size_t i = 0; i < elements.size(); ++i) {
-              default_charges[i] = element_to_nuclear_charge(elements[i]);
+            Eigen::VectorXd default_charges(symbols.size());
+            for (size_t i = 0; i < symbols.size(); ++i) {
+              Element element = symbol_to_element(symbols[i]);
+              default_charges[i] = element_to_nuclear_charge(element);
             }
             return default_charges;
           }
@@ -409,6 +247,7 @@ Structure::Structure(const std::vector<Eigen::Vector3d>& coordinates,
 }
 
 Eigen::Vector3d Structure::get_atom_coordinates(size_t atom_index) const {
+  QDK_LOG_TRACE_ENTERING();
   if (atom_index >= get_num_atoms()) {
     throw std::out_of_range("Atom index out of range");
   }
@@ -416,6 +255,7 @@ Eigen::Vector3d Structure::get_atom_coordinates(size_t atom_index) const {
 }
 
 Element Structure::get_atom_element(size_t atom_index) const {
+  QDK_LOG_TRACE_ENTERING();
   if (atom_index >= get_num_atoms()) {
     throw std::out_of_range("Atom index out of range");
   }
@@ -423,6 +263,7 @@ Element Structure::get_atom_element(size_t atom_index) const {
 }
 
 double Structure::get_atom_mass(size_t atom_index) const {
+  QDK_LOG_TRACE_ENTERING();
   if (atom_index >= get_num_atoms()) {
     throw std::out_of_range("Atom index out of range");
   }
@@ -430,6 +271,7 @@ double Structure::get_atom_mass(size_t atom_index) const {
 }
 
 double Structure::get_atom_nuclear_charge(size_t atom_index) const {
+  QDK_LOG_TRACE_ENTERING();
   if (atom_index >= get_num_atoms()) {
     throw std::out_of_range("Atom index out of range");
   }
@@ -437,10 +279,12 @@ double Structure::get_atom_nuclear_charge(size_t atom_index) const {
 }
 
 std::string Structure::get_atom_symbol(size_t atom_index) const {
+  QDK_LOG_TRACE_ENTERING();
   return element_to_symbol(get_atom_element(atom_index));
 }
 
 std::vector<std::string> Structure::get_atomic_symbols() const {
+  QDK_LOG_TRACE_ENTERING();
   std::vector<std::string> symbols;
   symbols.reserve(_elements.size());
   for (const auto& element : _elements) {
@@ -450,8 +294,10 @@ std::vector<std::string> Structure::get_atomic_symbols() const {
 }
 
 bool Structure::_is_valid() const {
+  QDK_LOG_TRACE_ENTERING();
   if (_elements.empty()) {
-    return _coordinates.rows() == 0 && _coordinates.cols() == 0 &&
+    return _coordinates.rows() == 0 &&
+           (_coordinates.cols() == 0 || _coordinates.cols() == 3) &&
            _masses.size() == 0 && _nuclear_charges.size() == 0;
   }
 
@@ -462,9 +308,13 @@ bool Structure::_is_valid() const {
          _nuclear_charges.size() == static_cast<int>(num_atoms);
 }
 
-double Structure::get_total_mass() const { return _masses.sum(); }
+double Structure::get_total_mass() const {
+  QDK_LOG_TRACE_ENTERING();
+  return _masses.sum();
+}
 
 nlohmann::json Structure::to_json() const {
+  QDK_LOG_TRACE_ENTERING();
   nlohmann::json j;
 
   // Store version first
@@ -509,6 +359,7 @@ nlohmann::json Structure::to_json() const {
 }
 
 std::shared_ptr<Structure> Structure::from_json(const nlohmann::json& j) {
+  QDK_LOG_TRACE_ENTERING();
   try {
     // Validate version first (only if version field exists, for backward
     // compatibility)
@@ -579,15 +430,14 @@ std::shared_ptr<Structure> Structure::from_json(const nlohmann::json& j) {
       auto symbols = j["symbols"].get<std::vector<std::string>>();
       elements.reserve(symbols.size());
       for (const auto& symbol : symbols) {
-        std::string fixed_symbol = _fix_symbol_capitalization(symbol);
-        elements.push_back(symbol_to_element(fixed_symbol));
+        elements.push_back(symbol_to_element(symbol));
       }
     } else {
       throw std::runtime_error(
           "JSON missing element/nuclear_charges/symbols data");
     }
 
-    // Load masses (use standard if not provided)
+    // Load masses (use default if not provided)
     Eigen::VectorXd masses;
     if (j.contains("masses")) {
       std::vector<double> masses_vec = j["masses"].get<std::vector<double>>();
@@ -596,11 +446,11 @@ std::shared_ptr<Structure> Structure::from_json(const nlohmann::json& j) {
     } else {
       masses = Eigen::VectorXd(elements.size());
       for (size_t i = 0; i < elements.size(); ++i) {
-        masses[i] = get_standard_atomic_mass(elements[i]);
+        masses[i] = get_default_atomic_mass(elements[i]);
       }
     }
 
-    // Load nuclear charges (use standard if not provided)
+    // Load nuclear charges (use default if not provided)
     Eigen::VectorXd nuclear_charges;
     if (j.contains("nuclear_charges")) {
       std::vector<double> nuclear_charges_vec =
@@ -623,6 +473,7 @@ std::shared_ptr<Structure> Structure::from_json(const nlohmann::json& j) {
 }
 
 void Structure::to_json_file(const std::string& filename) const {
+  QDK_LOG_TRACE_ENTERING();
   // Validate filename has correct data type suffix
   std::string validated_filename =
       DataTypeFilename::validate_write_suffix(filename, "structure");
@@ -632,6 +483,7 @@ void Structure::to_json_file(const std::string& filename) const {
 
 std::shared_ptr<Structure> Structure::from_json_file(
     const std::string& filename) {
+  QDK_LOG_TRACE_ENTERING();
   // Validate filename has correct data type suffix
   std::string validated_filename =
       DataTypeFilename::validate_read_suffix(filename, "structure");
@@ -640,6 +492,7 @@ std::shared_ptr<Structure> Structure::from_json_file(
 }
 
 void Structure::_to_json_file(const std::string& filename) const {
+  QDK_LOG_TRACE_ENTERING();
   std::ofstream file(filename);
   if (!file.is_open()) {
     throw std::runtime_error("Cannot open file for writing: " + filename);
@@ -655,6 +508,7 @@ void Structure::_to_json_file(const std::string& filename) const {
 
 std::shared_ptr<Structure> Structure::_from_json_file(
     const std::string& filename) {
+  QDK_LOG_TRACE_ENTERING();
   std::ifstream file(filename);
   if (!file.is_open()) {
     throw std::runtime_error(
@@ -673,6 +527,7 @@ std::shared_ptr<Structure> Structure::_from_json_file(
 }
 
 std::string Structure::to_xyz(const std::string& comment) const {
+  QDK_LOG_TRACE_ENTERING();
   std::ostringstream oss;
 
   // First line: number of atoms
@@ -704,6 +559,7 @@ std::string Structure::to_xyz(const std::string& comment) const {
 }
 
 std::shared_ptr<Structure> Structure::from_xyz(const std::string& xyz_string) {
+  QDK_LOG_TRACE_ENTERING();
   std::istringstream iss(xyz_string);
   std::string line;
 
@@ -762,16 +618,19 @@ std::shared_ptr<Structure> Structure::from_xyz(const std::string& xyz_string) {
 
 void Structure::to_xyz_file(const std::string& filename,
                             const std::string& comment) const {
+  QDK_LOG_TRACE_ENTERING();
   _to_xyz_file(filename, comment);
 }
 
 std::shared_ptr<Structure> Structure::from_xyz_file(
     const std::string& filename) {
+  QDK_LOG_TRACE_ENTERING();
   return _from_xyz_file(filename);
 }
 
 void Structure::_to_xyz_file(const std::string& filename,
                              const std::string& comment) const {
+  QDK_LOG_TRACE_ENTERING();
   std::ofstream file(filename);
   if (!file.is_open()) {
     throw std::runtime_error("Cannot open file for writing: " + filename);
@@ -786,6 +645,7 @@ void Structure::_to_xyz_file(const std::string& filename,
 
 std::shared_ptr<Structure> Structure::_from_xyz_file(
     const std::string& filename) {
+  QDK_LOG_TRACE_ENTERING();
   std::ifstream file(filename);
   if (!file.is_open()) {
     throw std::runtime_error("Cannot open file for reading: " + filename);
@@ -803,6 +663,7 @@ std::shared_ptr<Structure> Structure::_from_xyz_file(
 
 void Structure::to_file(const std::string& filename,
                         const std::string& type) const {
+  QDK_LOG_TRACE_ENTERING();
   if (type == "json") {
     _to_json_file(filename);
   } else if (type == "xyz") {
@@ -817,6 +678,7 @@ void Structure::to_file(const std::string& filename,
 
 std::shared_ptr<Structure> Structure::from_file(const std::string& filename,
                                                 const std::string& type) {
+  QDK_LOG_TRACE_ENTERING();
   if (type == "json") {
     return _from_json_file(filename);
   } else if (type == "xyz") {
@@ -830,6 +692,7 @@ std::shared_ptr<Structure> Structure::from_file(const std::string& filename,
 }
 
 std::string Structure::get_summary() const {
+  QDK_LOG_TRACE_ENTERING();
   std::ostringstream oss;
 
   oss << "Structure Summary:\n";
@@ -863,6 +726,7 @@ std::string Structure::get_summary() const {
 }
 
 double Structure::calculate_nuclear_repulsion_energy() const {
+  QDK_LOG_TRACE_ENTERING();
   // Return 0 if there are less than 2 atoms (no repulsion possible)
   if (get_num_atoms() < 2) {
     return 0.0;
@@ -890,34 +754,79 @@ double Structure::calculate_nuclear_repulsion_energy() const {
   return repulsion_energy;
 }
 
-std::string Structure::_fix_symbol_capitalization(const std::string& symbol) {
+std::string Structure::_normalize_symbol(const std::string& symbol) {
+  QDK_LOG_TRACE_ENTERING();
   if (symbol.empty()) {
     return symbol;
   }
 
-  std::string fixed = symbol;
+  std::string normalized_symbol = symbol;
 
   // Convert to lowercase first
-  std::transform(fixed.begin(), fixed.end(), fixed.begin(), ::tolower);
+  std::transform(normalized_symbol.begin(), normalized_symbol.end(),
+                 normalized_symbol.begin(), ::tolower);
 
   // Capitalize the first letter
-  fixed[0] = std::toupper(fixed[0]);
+  normalized_symbol[0] = std::toupper(normalized_symbol[0]);
 
-  return fixed;
+  // Handle special cases for deuterium (D) and tritium (T)
+  if (normalized_symbol == "D") {
+    return "H2";
+  }
+  if (normalized_symbol == "T") {
+    return "H3";
+  }
+
+  return normalized_symbol;
+}
+
+std::string Structure::_strip_numbers_from_symbol(const std::string& symbol) {
+  QDK_LOG_TRACE_ENTERING();
+  std::string letters_only;
+  letters_only.reserve(symbol.size());
+
+  for (char c : symbol) {
+    if (std::isalpha(static_cast<unsigned char>(c))) {
+      letters_only += c;
+    }
+  }
+
+  return letters_only;
+}
+
+std::string Structure::_extract_numbers_from_symbol(const std::string& symbol) {
+  QDK_LOG_TRACE_ENTERING();
+  std::string numbers_only;
+  numbers_only.reserve(symbol.size());
+
+  for (char c : symbol) {
+    if (std::isdigit(static_cast<unsigned char>(c))) {
+      numbers_only += c;
+    }
+  }
+
+  return numbers_only;
 }
 
 Element Structure::symbol_to_element(const std::string& symbol) {
-  std::string fixed_symbol = _fix_symbol_capitalization(symbol);
-  unsigned charge = symbol_to_nuclear_charge(fixed_symbol);
+  QDK_LOG_TRACE_ENTERING();
+  std::string normalized_symbol = _normalize_symbol(symbol);
+  std::string normalized_element_symbol =
+      _strip_numbers_from_symbol(normalized_symbol);
+  unsigned charge = symbol_to_nuclear_charge(normalized_element_symbol);
   return static_cast<Element>(charge);
 }
 
 std::string Structure::element_to_symbol(Element element) {
+  QDK_LOG_TRACE_ENTERING();
   return nuclear_charge_to_symbol(static_cast<unsigned>(element));
 }
 
 unsigned Structure::symbol_to_nuclear_charge(const std::string& symbol) {
-  std::string fixed_symbol = _fix_symbol_capitalization(symbol);
+  QDK_LOG_TRACE_ENTERING();
+  std::string normalized_symbol = _normalize_symbol(symbol);
+  std::string normalized_element_symbol =
+      _strip_numbers_from_symbol(normalized_symbol);
 
   // Lazy initialization: build the reverse map only once when first needed
   if (SYMBOL_TO_CHARGE.empty()) {
@@ -926,16 +835,18 @@ unsigned Structure::symbol_to_nuclear_charge(const std::string& symbol) {
     }
   }
 
-  auto it = SYMBOL_TO_CHARGE.find(fixed_symbol);
+  auto it = SYMBOL_TO_CHARGE.find(normalized_element_symbol);
   if (it != SYMBOL_TO_CHARGE.end()) {
     return it->second;
   }
 
   throw std::invalid_argument("Unknown atomic symbol: " + symbol +
-                              " (normalized to: " + fixed_symbol + ")");
+                              " (normalized to: " + normalized_element_symbol +
+                              ")");
 }
 
 std::string Structure::nuclear_charge_to_symbol(unsigned nuclear_charge) {
+  QDK_LOG_TRACE_ENTERING();
   auto it = CHARGE_TO_SYMBOL.find(nuclear_charge);
   if (it == CHARGE_TO_SYMBOL.end()) {
     throw std::invalid_argument("Unknown nuclear charge: " +
@@ -945,10 +856,12 @@ std::string Structure::nuclear_charge_to_symbol(unsigned nuclear_charge) {
 }
 
 unsigned Structure::element_to_nuclear_charge(Element element) {
+  QDK_LOG_TRACE_ENTERING();
   return static_cast<unsigned>(element);
 }
 
 Element Structure::nuclear_charge_to_element(unsigned nuclear_charge) {
+  QDK_LOG_TRACE_ENTERING();
   if (nuclear_charge < 1 || nuclear_charge > 118) {
     throw std::invalid_argument("Unknown nuclear charge: " +
                                 std::to_string(nuclear_charge));
@@ -956,19 +869,33 @@ Element Structure::nuclear_charge_to_element(unsigned nuclear_charge) {
   return static_cast<Element>(nuclear_charge);
 }
 
-double Structure::get_standard_atomic_mass(Element element) {
-  auto it = STANDARD_ATOMIC_MASSES.find(element);
-  if (it == STANDARD_ATOMIC_MASSES.end()) {
-    throw std::invalid_argument("Unknown element for mass lookup");
-  }
-  return it->second;
+double Structure::get_default_atomic_mass(Element element) {
+  QDK_LOG_TRACE_ENTERING();
+  return get_atomic_weight(element);
 }
 
-unsigned Structure::get_standard_nuclear_charge(Element element) {
+double Structure::get_default_atomic_mass(std::string symbol) {
+  QDK_LOG_TRACE_ENTERING();
+  std::string normalized_symbol = _normalize_symbol(symbol);
+  std::string normalized_element_symbol =
+      _strip_numbers_from_symbol(normalized_symbol);
+  unsigned atomic_number = symbol_to_nuclear_charge(normalized_element_symbol);
+  std::string mass_number_string =
+      _extract_numbers_from_symbol(normalized_symbol);
+  if (mass_number_string.empty()) {
+    return get_atomic_weight(atomic_number, 0);
+  }
+  unsigned mass_number = std::stoul(mass_number_string);
+  return get_atomic_weight(atomic_number, mass_number);
+}
+
+unsigned Structure::get_default_nuclear_charge(Element element) {
+  QDK_LOG_TRACE_ENTERING();
   return static_cast<unsigned>(element);
 }
 
 void Structure::to_hdf5(H5::Group& group) const {
+  QDK_LOG_TRACE_ENTERING();
   try {
     // Add version attribute
     H5::DataSpace scalar_space(H5S_SCALAR);
@@ -1033,6 +960,7 @@ void Structure::to_hdf5(H5::Group& group) const {
 }
 
 std::shared_ptr<Structure> Structure::from_hdf5(H5::Group& group) {
+  QDK_LOG_TRACE_ENTERING();
   try {
     // Check version first - it must exist
     if (!group.attrExists("version")) {
@@ -1123,6 +1051,7 @@ std::shared_ptr<Structure> Structure::from_hdf5(H5::Group& group) {
 }
 
 void Structure::to_hdf5_file(const std::string& filename) const {
+  QDK_LOG_TRACE_ENTERING();
   // Validate filename has correct data type suffix
   std::string validated_filename =
       DataTypeFilename::validate_write_suffix(filename, "structure");
@@ -1132,6 +1061,7 @@ void Structure::to_hdf5_file(const std::string& filename) const {
 
 std::shared_ptr<Structure> Structure::from_hdf5_file(
     const std::string& filename) {
+  QDK_LOG_TRACE_ENTERING();
   // Validate filename has correct data type suffix
   std::string validated_filename =
       DataTypeFilename::validate_read_suffix(filename, "structure");
@@ -1140,6 +1070,7 @@ std::shared_ptr<Structure> Structure::from_hdf5_file(
 }
 
 void Structure::_to_hdf5_file(const std::string& filename) const {
+  QDK_LOG_TRACE_ENTERING();
   try {
     H5::H5File file(filename, H5F_ACC_TRUNC);
     H5::Group structure_group = file.createGroup("/structure");
@@ -1152,6 +1083,12 @@ void Structure::_to_hdf5_file(const std::string& filename) const {
 
 std::shared_ptr<Structure> Structure::_from_hdf5_file(
     const std::string& filename) {
+  QDK_LOG_TRACE_ENTERING();
+  // Disable HDF5 automatic error printing to stderr unless verbose mode
+  if (hdf5_errors_should_be_suppressed()) {
+    H5::Exception::dontPrint();
+  }
+
   H5::H5File file;
   try {
     file.openFile(filename, H5F_ACC_RDONLY);
@@ -1186,6 +1123,7 @@ std::shared_ptr<Structure> Structure::_from_hdf5_file(
 }
 
 void Structure::_validate_dimensions() const {
+  QDK_LOG_TRACE_ENTERING();
   if (!_elements.empty()) {
     size_t num_atoms = _elements.size();
     if (_coordinates.rows() != static_cast<int>(num_atoms) ||

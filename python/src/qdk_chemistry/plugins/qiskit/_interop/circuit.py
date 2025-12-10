@@ -5,7 +5,6 @@
 # Licensed under the MIT License. See LICENSE.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
 
-import logging
 from collections import Counter
 from dataclasses import dataclass, field
 from math import inf
@@ -22,8 +21,7 @@ from qdk_chemistry.definitions import (
     TWO_QUBIT_CLIFFORD_GATES,
     UNI_DIRECTIONAL_2Q_CLIFFORD_GATES,
 )
-
-_LOGGER = logging.getLogger(__name__)
+from qdk_chemistry.utils import Logger
 
 __all__ = ["CircuitInfo", "analyze_qubit_status", "plot_circuit_diagram"]
 
@@ -47,6 +45,7 @@ def analyze_qubit_status(circuit: QuantumCircuit) -> dict[int, str]:
         A summary of qubit roles indexed by qubit index.
 
     """
+    Logger.trace_entering()
     dag = circuit_to_dag(circuit)
 
     # Setup data structures to track qubit status and two-qubit gates for propagation.
@@ -134,6 +133,7 @@ class CircuitInfo:
 
     def __post_init__(self):
         """Post-initialization to compute circuit properties."""
+        Logger.trace_entering()
         self.num_qubits = self.circuit.num_qubits
         self.depth = self.circuit.depth()
         self.gate_counts = Counter(self.circuit.count_ops())
@@ -141,10 +141,12 @@ class CircuitInfo:
 
     def count_gate_category(self, gate_list: frozenset[str]) -> int:
         """Return the number of gates in the circuit that belong to a list."""
+        Logger.trace_entering()
         return sum(self.gate_counts.get(g, 0) for g in gate_list)
 
     def count_gate(self, gate_name: str) -> int:
         """Return the number of times a specific gate appears."""
+        Logger.trace_entering()
         return self.gate_counts.get(gate_name.lower(), 0)
 
     @property
@@ -163,6 +165,7 @@ class CircuitInfo:
         return self.count_gate_category(NON_CLIFFORD_GATES)
 
     def summary(self) -> dict:
+        Logger.trace_entering()
         """Return a summary of the circuit information."""
         return {
             "num_qubits": self.num_qubits,
@@ -175,6 +178,7 @@ class CircuitInfo:
 
     def __str__(self) -> str:
         """Nicely formatted summary for printing."""
+        Logger.trace_entering()
         s = self.summary()
         return (
             f"Circuit info summary:\n"
@@ -198,13 +202,14 @@ def plot_circuit_diagram(
 
     Ensures measurement targets and classical registers remain consistent.
     """
+    Logger.trace_entering()
     status = analyze_qubit_status(circuit)
     remove_status = []
     if remove_idle_qubits:
         remove_status.append("idle")
     if remove_classical_qubits:
         remove_status.append("classical")
-        _LOGGER.info(
+        Logger.info(
             "Removing classical qubits will also remove any control operations sourced from them "
             "and measurements involving them."
         )
@@ -228,7 +233,7 @@ def plot_circuit_diagram(
         kept_clbit_indices = list(range(len(circuit.clbits)))
 
     if not kept_clbit_indices and len(circuit.clbits) > 0:
-        _LOGGER.warning("All measurements are dropped, no classical bits remain.")
+        Logger.warn("All measurements are dropped, no classical bits remain.")
 
     new_qc = QuantumCircuit(len(kept_qubit_indices), len(kept_clbit_indices))
     qubit_map = {circuit.qubits[i]: new_qc.qubits[new_i] for new_i, i in enumerate(kept_qubit_indices)}
@@ -246,7 +251,7 @@ def plot_circuit_diagram(
             circuit_drawer(new_qc, output="mpl", filename=output_file, **draw_kwargs)
             return None
         except MemoryError:
-            _LOGGER.warning("MemoryError: Failed to save circuit diagram.")
+            Logger.warn("MemoryError: Failed to save circuit diagram.")
             return None
     else:
         return new_qc.draw("mpl", **draw_kwargs)

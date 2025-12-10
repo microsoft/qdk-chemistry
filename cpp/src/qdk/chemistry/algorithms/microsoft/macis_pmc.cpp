@@ -12,6 +12,7 @@
 #include <macis/util/mpi.hpp>
 #include <qdk/chemistry/data/structure.hpp>
 #include <qdk/chemistry/data/wavefunction_containers/sci.hpp>
+#include <qdk/chemistry/utils/logger.hpp>
 
 namespace qdk::chemistry::algorithms::microsoft {
 
@@ -35,15 +36,16 @@ struct pmc_helper {
       const data::Hamiltonian& hamiltonian,
       const std::vector<data::Configuration>& configurations,
       const data::Settings& settings_) {
+    QDK_LOG_TRACE_ENTERING();
     // Create MacisPmcSettings instance for accessing PMC-specific settings
     MacisPmcSettings macis_pmc_settings;
     double h_el_tol = macis_pmc_settings.get<double>("h_el_tol");
     double H_thresh = macis_pmc_settings.get<double>("H_thresh");
     double davidson_res_tol =
         macis_pmc_settings.get<double>("davidson_res_tol");
-    size_t iterative_solver_dimension_cutoff =
-        macis_pmc_settings.get<size_t>("iterative_solver_dimension_cutoff");
-    size_t davidson_max_m = macis_pmc_settings.get<size_t>("davidson_max_m");
+    int64_t iterative_solver_dimension_cutoff =
+        macis_pmc_settings.get<int64_t>("iterative_solver_dimension_cutoff");
+    int64_t davidson_max_m = macis_pmc_settings.get<int64_t>("davidson_max_m");
 
     using wfn_type = macis::wfn_t<N>;
     using wfn_traits = macis::wavefunction_traits<wfn_type>;
@@ -179,6 +181,8 @@ struct pmc_helper {
 std::pair<double, std::shared_ptr<data::Wavefunction>> MacisPmc::_run_impl(
     std::shared_ptr<data::Hamiltonian> hamiltonian,
     const std::vector<data::Configuration>& configurations) const {
+  QDK_LOG_TRACE_ENTERING();
+
   const auto& orbitals = hamiltonian->get_orbitals();
   std::vector<size_t> active_indices =
       orbitals->get_active_space_indices().first;

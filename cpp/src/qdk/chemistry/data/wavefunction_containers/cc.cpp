@@ -10,6 +10,7 @@
 #include <macis/util/rdms.hpp>
 #include <optional>
 #include <qdk/chemistry/data/wavefunction_containers/cc.hpp>
+#include <qdk/chemistry/utils/logger.hpp>
 #include <set>
 #include <stdexcept>
 #include <variant>
@@ -26,7 +27,9 @@ CoupledClusterContainer::CoupledClusterContainer(
     const std::optional<VectorVariant>& t2_amplitudes)
     : CoupledClusterContainer(orbitals, wavefunction, t1_amplitudes,
                               std::nullopt, t2_amplitudes, std::nullopt,
-                              std::nullopt) {}
+                              std::nullopt) {
+  QDK_LOG_TRACE_ENTERING();
+}
 
 CoupledClusterContainer::CoupledClusterContainer(
     std::shared_ptr<Orbitals> orbitals,
@@ -40,6 +43,7 @@ CoupledClusterContainer::CoupledClusterContainer(
           WavefunctionType::NotSelfDual),  // Always force NotSelfDual for CC
       _wavefunction(wavefunction),
       _orbitals(orbitals) {
+  QDK_LOG_TRACE_ENTERING();
   if (!orbitals) {
     throw std::invalid_argument("Orbitals cannot be null");
   }
@@ -197,6 +201,7 @@ CoupledClusterContainer::CoupledClusterContainer(
 }
 
 std::unique_ptr<WavefunctionContainer> CoupledClusterContainer::clone() const {
+  QDK_LOG_TRACE_ENTERING();
   // Create optional variants for the amplitudes
   std::optional<VectorVariant> t1_aa =
       _t1_amplitudes_aa ? std::optional<VectorVariant>(*_t1_amplitudes_aa)
@@ -219,16 +224,19 @@ std::unique_ptr<WavefunctionContainer> CoupledClusterContainer::clone() const {
 }
 
 std::shared_ptr<Orbitals> CoupledClusterContainer::get_orbitals() const {
+  QDK_LOG_TRACE_ENTERING();
   return _orbitals;
 }
 
 std::shared_ptr<Wavefunction> CoupledClusterContainer::get_wavefunction()
     const {
+  QDK_LOG_TRACE_ENTERING();
   return _wavefunction;
 }
 
 const CoupledClusterContainer::VectorVariant&
 CoupledClusterContainer::get_coefficients() const {
+  QDK_LOG_TRACE_ENTERING();
   if (!_coefficients_cache) {
     _generate_ci_expansion();
   }
@@ -237,6 +245,7 @@ CoupledClusterContainer::get_coefficients() const {
 
 CoupledClusterContainer::ScalarVariant CoupledClusterContainer::get_coefficient(
     const Configuration& det) const {
+  QDK_LOG_TRACE_ENTERING();
   if (!_coefficients_cache || !_determinant_vector_cache) {
     _generate_ci_expansion();
   }
@@ -263,6 +272,7 @@ CoupledClusterContainer::ScalarVariant CoupledClusterContainer::get_coefficient(
 
 const CoupledClusterContainer::DeterminantVector&
 CoupledClusterContainer::get_active_determinants() const {
+  QDK_LOG_TRACE_ENTERING();
   if (!_determinant_vector_cache) {
     _generate_ci_expansion();
   }
@@ -272,6 +282,7 @@ CoupledClusterContainer::get_active_determinants() const {
 std::pair<const CoupledClusterContainer::VectorVariant&,
           const CoupledClusterContainer::VectorVariant&>
 CoupledClusterContainer::get_t1_amplitudes() const {
+  QDK_LOG_TRACE_ENTERING();
   if (!has_t1_amplitudes()) {
     throw std::runtime_error("T1 amplitudes not available");
   }
@@ -283,6 +294,7 @@ std::tuple<const CoupledClusterContainer::VectorVariant&,
            const CoupledClusterContainer::VectorVariant&,
            const CoupledClusterContainer::VectorVariant&>
 CoupledClusterContainer::get_t2_amplitudes() const {
+  QDK_LOG_TRACE_ENTERING();
   if (!has_t2_amplitudes()) {
     throw std::runtime_error("T2 amplitudes not available");
   }
@@ -292,14 +304,17 @@ CoupledClusterContainer::get_t2_amplitudes() const {
 }
 
 bool CoupledClusterContainer::has_t1_amplitudes() const {
+  QDK_LOG_TRACE_ENTERING();
   return _t1_amplitudes_aa != nullptr;
 }
 
 bool CoupledClusterContainer::has_t2_amplitudes() const {
+  QDK_LOG_TRACE_ENTERING();
   return _t2_amplitudes_abab != nullptr;
 }
 
 size_t CoupledClusterContainer::size() const {
+  QDK_LOG_TRACE_ENTERING();
   if (!_determinant_vector_cache) {
     _generate_ci_expansion();
   }
@@ -308,28 +323,33 @@ size_t CoupledClusterContainer::size() const {
 
 CoupledClusterContainer::ScalarVariant CoupledClusterContainer::overlap(
     const WavefunctionContainer& other) const {
+  QDK_LOG_TRACE_ENTERING();
   throw std::runtime_error(
       "overlap() is not implemented for coupled cluster wavefunctions. ");
 }
 
 double CoupledClusterContainer::norm() const {
+  QDK_LOG_TRACE_ENTERING();
   throw std::runtime_error(
       "norm() is not implemented for coupled cluster wavefunctions. ");
 }
 
 bool CoupledClusterContainer::contains_determinant(
     const Configuration& det) const {
+  QDK_LOG_TRACE_ENTERING();
   return contains_reference(det);
 }
 
 bool CoupledClusterContainer::contains_reference(
     const Configuration& det) const {
+  QDK_LOG_TRACE_ENTERING();
   const auto& references = _wavefunction->get_total_determinants();
   return std::find(references.begin(), references.end(), det) !=
          references.end();
 }
 
 void CoupledClusterContainer::clear_caches() const {
+  QDK_LOG_TRACE_ENTERING();
   // Clear the cached determinant vector and coefficients
   _determinant_vector_cache.reset();
   _coefficients_cache.reset();
@@ -339,6 +359,7 @@ void CoupledClusterContainer::clear_caches() const {
 }
 
 nlohmann::json CoupledClusterContainer::to_json() const {
+  QDK_LOG_TRACE_ENTERING();
   nlohmann::json j;
 
   j["version"] = SERIALIZATION_VERSION;
@@ -405,6 +426,7 @@ nlohmann::json CoupledClusterContainer::to_json() const {
 
 std::unique_ptr<CoupledClusterContainer> CoupledClusterContainer::from_json(
     const nlohmann::json& j) {
+  QDK_LOG_TRACE_ENTERING();
   try {
     if (!j.contains("version")) {
       throw std::runtime_error("JSON does not contain version information");
@@ -445,6 +467,7 @@ std::unique_ptr<CoupledClusterContainer> CoupledClusterContainer::from_json(
 }
 
 void CoupledClusterContainer::to_hdf5(H5::Group& group) const {
+  QDK_LOG_TRACE_ENTERING();
   try {
     H5::StrType string_type(H5::PredType::C_S1, H5T_VARIABLE);
 
@@ -508,6 +531,7 @@ void CoupledClusterContainer::to_hdf5(H5::Group& group) const {
 
 std::unique_ptr<CoupledClusterContainer> CoupledClusterContainer::from_hdf5(
     H5::Group& group) {
+  QDK_LOG_TRACE_ENTERING();
   try {
     // version
     H5::StrType string_type(H5::PredType::C_S1, H5T_VARIABLE);
@@ -574,6 +598,7 @@ std::unique_ptr<CoupledClusterContainer> CoupledClusterContainer::from_hdf5(
 
 std::pair<size_t, size_t> CoupledClusterContainer::get_total_num_electrons()
     const {
+  QDK_LOG_TRACE_ENTERING();
   // Get active space electrons using the dedicated method
   auto [n_alpha_active, n_beta_active] = get_active_num_electrons();
 
@@ -589,6 +614,7 @@ std::pair<size_t, size_t> CoupledClusterContainer::get_total_num_electrons()
 
 std::pair<size_t, size_t> CoupledClusterContainer::get_active_num_electrons()
     const {
+  QDK_LOG_TRACE_ENTERING();
   const auto& determinants = _wavefunction->get_total_determinants();
   if (determinants.empty()) {
     throw std::runtime_error("No determinants available");
@@ -599,6 +625,7 @@ std::pair<size_t, size_t> CoupledClusterContainer::get_active_num_electrons()
 
 std::pair<Eigen::VectorXd, Eigen::VectorXd>
 CoupledClusterContainer::get_total_orbital_occupations() const {
+  QDK_LOG_TRACE_ENTERING();
   // Orbital occupations require RDMs which are not available in CC container
   throw std::runtime_error(
       "Coupled cluster orbital occupations require the adjoint (bra) "
@@ -609,6 +636,7 @@ CoupledClusterContainer::get_total_orbital_occupations() const {
 std::pair<Eigen::VectorXd, Eigen::VectorXd>
 CoupledClusterContainer::get_active_orbital_occupations() const {
   // Orbital occupations require RDMs which are not available in CC container
+  QDK_LOG_TRACE_ENTERING();
   throw std::runtime_error(
       "Coupled cluster orbital occupations require the adjoint (bra) "
       "wavefunction. Use a coupled cluster method that computes lambda "
@@ -616,10 +644,12 @@ CoupledClusterContainer::get_active_orbital_occupations() const {
 }
 
 std::string CoupledClusterContainer::get_container_type() const {
+  QDK_LOG_TRACE_ENTERING();
   return "coupled_cluster";
 }
 
 bool CoupledClusterContainer::is_complex() const {
+  QDK_LOG_TRACE_ENTERING();
   // Check if any amplitude is complex
   if (_t1_amplitudes_aa &&
       std::holds_alternative<Eigen::VectorXcd>(*_t1_amplitudes_aa)) {

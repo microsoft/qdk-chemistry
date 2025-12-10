@@ -12,6 +12,7 @@
 #include <macis/util/rdms.hpp>
 #include <optional>
 #include <qdk/chemistry/data/wavefunction_containers/mp2.hpp>
+#include <qdk/chemistry/utils/logger.hpp>
 #include <stdexcept>
 #include <variant>
 
@@ -26,6 +27,7 @@ MP2Container::MP2Container(std::shared_ptr<Hamiltonian> hamiltonian,
     : WavefunctionContainer(WavefunctionType::NotSelfDual),
       _wavefunction(wavefunction),
       _hamiltonian(hamiltonian) {
+  QDK_LOG_TRACE_ENTERING();
   if (!hamiltonian) {
     throw std::invalid_argument("Hamiltonian cannot be null");
   }
@@ -41,22 +43,27 @@ MP2Container::MP2Container(std::shared_ptr<Hamiltonian> hamiltonian,
 }
 
 std::unique_ptr<WavefunctionContainer> MP2Container::clone() const {
+  QDK_LOG_TRACE_ENTERING();
   return std::make_unique<MP2Container>(_hamiltonian, _wavefunction);
 }
 
 std::shared_ptr<Orbitals> MP2Container::get_orbitals() const {
+  QDK_LOG_TRACE_ENTERING();
   return _hamiltonian->get_orbitals();
 }
 
 std::shared_ptr<Hamiltonian> MP2Container::get_hamiltonian() const {
+  QDK_LOG_TRACE_ENTERING();
   return _hamiltonian;
 }
 
 std::shared_ptr<Wavefunction> MP2Container::get_wavefunction() const {
+  QDK_LOG_TRACE_ENTERING();
   return _wavefunction;
 }
 
 const MP2Container::VectorVariant& MP2Container::get_coefficients() const {
+  QDK_LOG_TRACE_ENTERING();
   if (!_coefficients_cache) {
     _generate_ci_expansion();
   }
@@ -65,6 +72,7 @@ const MP2Container::VectorVariant& MP2Container::get_coefficients() const {
 
 MP2Container::ScalarVariant MP2Container::get_coefficient(
     const Configuration& det) const {
+  QDK_LOG_TRACE_ENTERING();
   // Ensure expansion is generated
   if (!_coefficients_cache) {
     _generate_ci_expansion();
@@ -88,6 +96,7 @@ MP2Container::ScalarVariant MP2Container::get_coefficient(
 
 const MP2Container::DeterminantVector& MP2Container::get_active_determinants()
     const {
+  QDK_LOG_TRACE_ENTERING();
   if (!_determinant_vector_cache) {
     _generate_ci_expansion();
   }
@@ -95,6 +104,7 @@ const MP2Container::DeterminantVector& MP2Container::get_active_determinants()
 }
 
 void MP2Container::_compute_t1_amplitudes() const {
+  QDK_LOG_TRACE_ENTERING();
   // Check if T1 amplitudes are already computed
   if (_t1_amplitudes_aa && _t1_amplitudes_bb) {
     return;
@@ -123,6 +133,7 @@ void MP2Container::_compute_t1_amplitudes() const {
 }
 
 void MP2Container::_compute_t2_amplitudes() const {
+  QDK_LOG_TRACE_ENTERING();
   // Check if amplitudes are already computed
   if (_t2_amplitudes_abab && _t2_amplitudes_aaaa && _t2_amplitudes_bbbb) {
     return;
@@ -233,6 +244,7 @@ void MP2Container::_compute_t2_amplitudes() const {
 std::pair<const MP2Container::VectorVariant&,
           const MP2Container::VectorVariant&>
 MP2Container::get_t1_amplitudes() const {
+  QDK_LOG_TRACE_ENTERING();
   if (!_t1_amplitudes_aa) {
     _compute_t1_amplitudes();
   }
@@ -245,6 +257,7 @@ std::tuple<const MP2Container::VectorVariant&,
            const MP2Container::VectorVariant&,
            const MP2Container::VectorVariant&>
 MP2Container::get_t2_amplitudes() const {
+  QDK_LOG_TRACE_ENTERING();
   if (!_t2_amplitudes_abab) {
     _compute_t2_amplitudes();
   }
@@ -255,14 +268,17 @@ MP2Container::get_t2_amplitudes() const {
 }
 
 bool MP2Container::has_t1_amplitudes() const {
+  QDK_LOG_TRACE_ENTERING();
   return _t1_amplitudes_aa != nullptr;
 }
 
 bool MP2Container::has_t2_amplitudes() const {
+  QDK_LOG_TRACE_ENTERING();
   return _t2_amplitudes_abab != nullptr;
 }
 
 size_t MP2Container::size() const {
+  QDK_LOG_TRACE_ENTERING();
   if (!_determinant_vector_cache) {
     _generate_ci_expansion();
   }
@@ -271,26 +287,31 @@ size_t MP2Container::size() const {
 
 MP2Container::ScalarVariant MP2Container::overlap(
     const WavefunctionContainer& other) const {
+  QDK_LOG_TRACE_ENTERING();
   throw std::runtime_error(
       "overlap() is not implemented for MP2 wavefunctions.");
 }
 
 double MP2Container::norm() const {
+  QDK_LOG_TRACE_ENTERING();
   throw std::runtime_error("norm() is not implemented for MP2 wavefunctions.");
 }
 
 bool MP2Container::contains_determinant(const Configuration& det) const {
+  QDK_LOG_TRACE_ENTERING();
   throw std::runtime_error(
       "contains_determinant() is not implemented for MP2 wavefunctions.");
 }
 
 bool MP2Container::contains_reference(const Configuration& det) const {
+  QDK_LOG_TRACE_ENTERING();
   const auto& references = _wavefunction->get_total_determinants();
   return std::find(references.begin(), references.end(), det) !=
          references.end();
 }
 
 void MP2Container::clear_caches() const {
+  QDK_LOG_TRACE_ENTERING();
   _t1_amplitudes_aa = nullptr;
   _t1_amplitudes_bb = nullptr;
   _t2_amplitudes_abab = nullptr;
@@ -302,6 +323,7 @@ void MP2Container::clear_caches() const {
 }
 
 nlohmann::json MP2Container::to_json() const {
+  QDK_LOG_TRACE_ENTERING();
   nlohmann::json j;
   j["type"] = "mp2";
   j["version"] = SERIALIZATION_VERSION;
@@ -322,6 +344,7 @@ nlohmann::json MP2Container::to_json() const {
 }
 
 std::unique_ptr<MP2Container> MP2Container::from_json(const nlohmann::json& j) {
+  QDK_LOG_TRACE_ENTERING();
   // Deserialize orbitals
   auto orbitals = Orbitals::from_json(j.at("orbitals"));
 
@@ -341,6 +364,7 @@ std::unique_ptr<MP2Container> MP2Container::from_json(const nlohmann::json& j) {
 }
 
 void MP2Container::to_hdf5(H5::Group& group) const {
+  QDK_LOG_TRACE_ENTERING();
   try {
     H5::StrType string_type(H5::PredType::C_S1, H5T_VARIABLE);
 
@@ -385,6 +409,7 @@ void MP2Container::to_hdf5(H5::Group& group) const {
 }
 
 std::unique_ptr<MP2Container> MP2Container::from_hdf5(H5::Group& group) {
+  QDK_LOG_TRACE_ENTERING();
   try {
     H5::StrType string_type(H5::PredType::C_S1, H5T_VARIABLE);
 
@@ -415,6 +440,7 @@ std::unique_ptr<MP2Container> MP2Container::from_hdf5(H5::Group& group) {
 }
 
 std::pair<size_t, size_t> MP2Container::get_total_num_electrons() const {
+  QDK_LOG_TRACE_ENTERING();
   // Get from first reference determinant
   const auto& references = _wavefunction->get_total_determinants();
   if (references.size() == 0) {
@@ -426,11 +452,13 @@ std::pair<size_t, size_t> MP2Container::get_total_num_electrons() const {
 }
 
 std::pair<size_t, size_t> MP2Container::get_active_num_electrons() const {
+  QDK_LOG_TRACE_ENTERING();
   return get_total_num_electrons();
 }
 
 std::pair<Eigen::VectorXd, Eigen::VectorXd>
 MP2Container::get_total_orbital_occupations() const {
+  QDK_LOG_TRACE_ENTERING();
   throw std::runtime_error(
       "get_total_orbital_occupations() is not implemented for MP2 "
       "wavefunctions.");
@@ -438,14 +466,19 @@ MP2Container::get_total_orbital_occupations() const {
 
 std::pair<Eigen::VectorXd, Eigen::VectorXd>
 MP2Container::get_active_orbital_occupations() const {
+  QDK_LOG_TRACE_ENTERING();
   throw std::runtime_error(
       "get_active_orbital_occupations() is not implemented for MP2 "
       "wavefunctions.");
 }
 
-std::string MP2Container::get_container_type() const { return "mp2"; }
+std::string MP2Container::get_container_type() const {
+  QDK_LOG_TRACE_ENTERING();
+  return "mp2";
+}
 
 bool MP2Container::is_complex() const {
+  QDK_LOG_TRACE_ENTERING();
   if (_t1_amplitudes_aa) {
     if (std::holds_alternative<Eigen::VectorXcd>(*_t1_amplitudes_aa)) {
       return true;

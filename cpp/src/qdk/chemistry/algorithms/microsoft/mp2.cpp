@@ -12,6 +12,7 @@
 #include <qdk/chemistry/data/hamiltonian.hpp>
 #include <qdk/chemistry/data/orbitals.hpp>
 #include <qdk/chemistry/data/wavefunction_containers/mp2.hpp>
+#include <qdk/chemistry/utils/logger.hpp>
 #include <stdexcept>
 #include <tuple>
 
@@ -21,6 +22,7 @@ MP2Calculator::MP2Calculator() = default;
 
 DynamicalCorrelationResult MP2Calculator::_run_impl(
     std::shared_ptr<data::Ansatz> ansatz) const {
+  QDK_LOG_TRACE_ENTERING();
   // Extract Hamiltonian and wavefunction from ansatz
   auto hamiltonian = ansatz->get_hamiltonian();
   auto wavefunction = ansatz->get_wavefunction();
@@ -70,6 +72,7 @@ double MP2Calculator::calculate_restricted_mp2_energy(
     std::shared_ptr<qdk::chemistry::data::Hamiltonian> ham,
     std::shared_ptr<qdk::chemistry::data::Orbitals> orbitals,
     size_t n_occ) const {
+  QDK_LOG_TRACE_ENTERING();
   // Validate input parameters
   if (!ham->is_restricted()) {
     throw std::runtime_error("This function requires a restricted Hamiltonian");
@@ -133,6 +136,7 @@ double MP2Calculator::calculate_unrestricted_mp2_energy(
     std::shared_ptr<qdk::chemistry::data::Hamiltonian> ham,
     std::shared_ptr<qdk::chemistry::data::Orbitals> orbitals, size_t n_alpha,
     size_t n_beta) const {
+  QDK_LOG_TRACE_ENTERING();
   // Validation
   if (!ham->is_unrestricted()) {
     throw std::runtime_error(
@@ -213,6 +217,7 @@ void MP2Calculator::compute_opposite_spin_t2(
     const Eigen::VectorXd& moeri, size_t n_occ_i, size_t n_occ_j,
     size_t n_vir_i, size_t n_vir_j, size_t stride_i, size_t stride_j,
     size_t stride_k, Eigen::VectorXd& t2, double* energy) {
+  QDK_LOG_TRACE_ENTERING();
   // Precompute T2 tensor strides for flattened indexing
   const size_t t2_stride_i = n_occ_j * n_vir_i * n_vir_j;
   const size_t t2_stride_j = n_vir_i * n_vir_j;
@@ -263,6 +268,7 @@ void MP2Calculator::compute_restricted_t2(const Eigen::VectorXd& eps,
                                           size_t stride_i, size_t stride_j,
                                           size_t stride_k, Eigen::VectorXd& t2,
                                           double* energy) {
+  QDK_LOG_TRACE_ENTERING();
   // Precompute T2 tensor strides for flattened indexing
   const size_t t2_stride_i = n_occ * n_vir * n_vir;
   const size_t t2_stride_j = n_vir * n_vir;
@@ -318,6 +324,7 @@ void MP2Calculator::compute_same_spin_t2(const Eigen::VectorXd& eps,
                                          size_t stride_i, size_t stride_j,
                                          size_t stride_k, Eigen::VectorXd& t2,
                                          double* energy) {
+  QDK_LOG_TRACE_ENTERING();
   // Precompute T2 tensor strides for flattened indexing
   const size_t t2_stride_i = n_occ * n_vir * n_vir;
   const size_t t2_stride_j = n_vir * n_vir;
