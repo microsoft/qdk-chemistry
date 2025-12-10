@@ -795,3 +795,53 @@ TEST_F(StabilityCheckerTest, QDK_UHF_BN_Plus_Internal_Instability) {
       stability_checker->settings().get<double>("davidson_tolerance");
   EXPECT_NEAR(smallest_eigenvalue, -0.07936046244954532, davidson_tol);
 }
+
+TEST_F(StabilityCheckerTest, QDK_RHF_N2_Stretched_PBE_Instability) {
+  // Test stability analysis on stretched N2 molecule with PBE
+  // At 1.6 Angstrom, N2 RHF/PBE is internally stable but externally unstable
+  auto n2 = testing::create_stretched_n2_structure(1.6);
+
+  // Run RHF SCF calculation with PBE
+  auto scf_solver = ScfSolverFactory::create();
+  scf_solver->settings().set("basis_set", "def2-svp");
+  scf_solver->settings().set("method", "pbe");
+  auto [energy, wavefunction] = scf_solver->run(n2, 0, 1);
+
+  EXPECT_NEAR(energy, -109.09003668989645, testing::scf_energy_tolerance);
+
+  // Create stability checker for full analysis (internal + external)
+  auto stability_checker = StabilityCheckerFactory::create("qdk");
+  stability_checker->settings().set("internal", true);
+  stability_checker->settings().set("external", true);
+  stability_checker->settings().set("method", "pbe");
+  stability_checker->settings().set("davidson_tolerance", 1e-4);
+  stability_checker->settings().set("stability_tolerance", -1e-4);
+  stability_checker->settings().set("max_subspace", 30);
+
+  // Run stability analysis
+  auto [is_stable, result] = stability_checker->run(wavefunction);
+
+  // Verify result properties
+  EXPECT_TRUE(result != nullptr);
+  EXPECT_TRUE(result->has_internal_result());
+  EXPECT_TRUE(result->has_external_result());
+  EXPECT_GT(result->internal_size(), 0);
+  EXPECT_GT(result->external_size(), 0);
+
+  // N2 RHF/PBE at 1.6 Angstrom is internally stable but externally unstable
+  EXPECT_TRUE(result->is_internal_stable());   // Internal eigenvalue ~0.0
+  EXPECT_FALSE(result->is_external_stable());  // External eigenvalue ~-0.02
+  EXPECT_FALSE(is_stable);  // Overall unstable due to external instability
+
+  // Check eigenvalues
+  double smallest_internal_eigenvalue =
+      result->get_smallest_internal_eigenvalue();
+  double smallest_external_eigenvalue =
+      result->get_smallest_external_eigenvalue();
+
+  double davidson_tol =
+      stability_checker->settings().get<double>("davidson_tolerance");
+  // Internal eigenvalue should be very small but positive (stable)
+  EXPECT_NEAR(smallest_internal_eigenvalue, 0.165945565, davidson_tol);
+  EXPECT_NEAR(smallest_external_eigenvalue, -0.01967330, davidson_tol);
+}

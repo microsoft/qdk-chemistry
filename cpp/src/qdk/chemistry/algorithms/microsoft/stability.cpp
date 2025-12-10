@@ -470,14 +470,18 @@ StabilityChecker::_run_impl(
     }
   }
 
-  // Construct Initial Eigenvector, the nonzero elements is intended to avoid
-  // division by zero in Gram-Schmidt of Davidson's algorithm
+  // Construct Initial Eigenvector by using the inverse of energy differences
+  // Note Davidson algorithm is highly sensitive to the choice of initial
+  // vector. Note we need to avoid zero entries, uniform vector and respect the
+  // symmetry.
   Eigen::VectorXd eigenvector = Eigen::VectorXd::Constant(eigensize, 1e-2);
-  // Set the element corresponding to the minimum energy difference to 1
-  eigenvector((n_alpha_electrons - 1) * num_virtual_alpha_orbitals) = 1.0;
-  if (unrestricted)
-    eigenvector((n_beta_electrons - 1) * num_virtual_beta_orbitals + nova) =
-        1.0;
+  for (int i = 0; i < eigen_diff.size(); ++i) {
+    if (eigen_diff(i) != 0) {
+      eigenvector(i) = std::min(1.0 / std::abs(eigen_diff(i)), 1e3);
+    } else {
+      eigenvector(i) = 1e3;
+    }
+  }
   eigenvector.normalize();
 
   const int64_t max_subspace =
