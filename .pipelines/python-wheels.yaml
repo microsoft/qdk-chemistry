@@ -177,22 +177,22 @@ extends:
           inputs:     # Declare all build artifacts to be consumed in the release job
           - input: pipelineArtifact
             artifactName: linux-x86_64-wheels-python3.11
-            targetPath: $(System.DefaultWorkingDirectory)/python/repaired_wheelhouse/linux-x86_64-wheels-python3.11
+            targetPath: $(System.DefaultWorkingDirectory)/artifacts/linux-x86_64-wheels-python3.11
           - input: pipelineArtifact
             artifactName: linux-x86_64-wheels-python3.12
-            targetPath: $(System.DefaultWorkingDirectory)/python/repaired_wheelhouse/linux-x86_64-wheels-python3.12
+            targetPath: $(System.DefaultWorkingDirectory)/artifacts/linux-x86_64-wheels-python3.12
           - input: pipelineArtifact
             artifactName: linux-x86_64-wheels-python3.13
-            targetPath: $(System.DefaultWorkingDirectory)/python/repaired_wheelhouse/linux-x86_64-wheels-python3.13
+            targetPath: $(System.DefaultWorkingDirectory)/artifacts/linux-x86_64-wheels-python3.13
           - input: pipelineArtifact
             artifactName: linux-aarch64-wheels-python3.11
-            targetPath: $(System.DefaultWorkingDirectory)/python/repaired_wheelhouse/linux-aarch64-wheels-python3.11
+            targetPath: $(System.DefaultWorkingDirectory)/artifacts/linux-aarch64-wheels-python3.11
           - input: pipelineArtifact
             artifactName: linux-aarch64-wheels-python3.12
-            targetPath: $(System.DefaultWorkingDirectory)/python/repaired_wheelhouse/linux-aarch64-wheels-python3.12
+            targetPath: $(System.DefaultWorkingDirectory)/artifacts/linux-aarch64-wheels-python3.12
           - input: pipelineArtifact
             artifactName: linux-aarch64-wheels-python3.13
-            targetPath: $(System.DefaultWorkingDirectory)/python/repaired_wheelhouse/linux-aarch64-wheels-python3.13
+            targetPath: $(System.DefaultWorkingDirectory)/artifacts/linux-aarch64-wheels-python3.13
           steps:
             # Deploy: only from main branch and not for PRs
             # Delete after ESRP approval
@@ -203,7 +203,7 @@ extends:
             condition: and(succeeded(), eq(variables['Build.SourceBranch'], 'refs/heads/main'), ne(variables['Build.Reason'], 'PullRequest'))
 
           - script: |
-              cd $(Agent.BuildDirectory)python
+              cd $(Agent.BuildDirectory)/python
               pip install --user twine
               python3 -m twine upload -r $(DEPENDENCIES_ARTIFACT_FEED) repaired_wheelhouse/*.whl --config-file $(PYPIRC_PATH)
             displayName: Upload wheel with twine
@@ -229,7 +229,7 @@ extends:
     #             clientid:
     #             contenttype: PyPi
     #             domaintenantid:
-    #             folderlocation: "$(System.DefaultWorkingDirectory)/python/repaired_wheelhouse"
+    #             folderlocation: "$(System.DefaultWorkingDirectory)/artifacts"
     #             waitforreleasecompletion: true
     #             owners: "nathanbaker@microsoft.com"
     #             approvers: "nathanbaker@microsoft.com"

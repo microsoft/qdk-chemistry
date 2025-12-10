@@ -13,6 +13,12 @@ LIBFLAME_VERSION=${9:-5.2.0}
 
 export DEBIAN_FRONTEND=noninteractive
 
+# Try to prevent stochastic segfault from libc-bin
+rm /var/lib/dpkg/info/libc-bin.*
+apt-get clean
+apt-get update
+apt install libc-bin
+
 # Update and install dependencies
 apt-get update
 apt-get install -y \
@@ -38,48 +44,22 @@ apt-get install -y \
     libpugixml-dev
 
 # Upgrade cmake as Ubuntu 22.04 only has up to v3.22 in apt
-# export CMAKE_CHECKSUM=cf332727ac863cc0c86ac4f8cd3b711d05a5e417
-# wget -q https://cmake.org/files/v3.28/cmake-3.28.3.tar.gz -O cmake-3.28.3.tar.gz
-# echo "${CMAKE_CHECKSUM}  cmake-3.28.3.tar.gz" | shasum -c || exit 1
-# tar -xzf cmake-3.28.3.tar.gz
-# rm cmake-3.28.3.tar.gz
-# cd cmake-3.28.3
-# ./bootstrap --parallel=$(nproc) --prefix=/usr/local
-# make -j$(nproc)
-# make install
-# cd ..
-# rm -r cmake-3.28.3
-# cmake --version
-
-if [[ ${MARCH} == 'armv8-a' ]]; then
-    wget -q https://github.com/Kitware/CMake/releases/download/v${CMAKE_VERSION}/cmake-${CMAKE_VERSION}-linux-aarch64.sh
-    chmod +x cmake-${CMAKE_VERSION}-linux-aarch64.sh
-    /bin/sh cmake-${CMAKE_VERSION}-linux-aarch64.sh --skip-license --prefix=/usr/local
-    rm cmake-${CMAKE_VERSION}-linux-aarch64.sh
-elif [[ ${MARCH} == 'x86-64-v3' ]]; then
-    wget -q https://github.com/Kitware/CMake/releases/download/v${CMAKE_VERSION}/cmake-${CMAKE_VERSION}-linux-x86_64.sh
-    chmod +x cmake-${CMAKE_VERSION}-linux-x86_64.sh
-    /bin/sh cmake-${CMAKE_VERSION}-linux-x86_64.sh --skip-license --prefix=/usr/local
-    rm cmake-${CMAKE_VERSION}-linux-x86_64.sh
-fi
+export CMAKE_CHECKSUM=cf332727ac863cc0c86ac4f8cd3b711d05a5e417
+wget -q https://cmake.org/files/v3.28/cmake-3.28.3.tar.gz -O cmake-3.28.3.tar.gz
+echo "${CMAKE_CHECKSUM}  cmake-3.28.3.tar.gz" | shasum -c || exit 1
+tar -xzf cmake-3.28.3.tar.gz
+rm cmake-3.28.3.tar.gz
+cd cmake-3.28.3
+./bootstrap --parallel=$(nproc) --prefix=/usr/local
+make -j$(nproc)
+make install
+cd ..
+rm -r cmake-3.28.3
 cmake --version
 
 export CFLAGS="-fPIC -Os"
 echo "Downloading and installing BLIS..."
 bash .pipelines/install-scripts/install-blis.sh /usr/local ${MARCH} ${BLIS_VERSION} ${CFLAGS}
-
-echo "Checking for symbols in libblis that indicate 64-bit integers..."
-nm -nC /usr/local/lib/libblis.a | grep 64
-
-git clone https://github.com/wavefunction91/linalg-cmake-modules.git
-echo "Checking BLIS integer size..."
-gcc linalg-cmake-modules/util/blis_int_size.c -o blis_int_size /usr/local/lib/libblis.a -lm -pthread -I/usr/local/include
-./blis_int_size
-echo "Checking if BLIS is ILP64..."
-gcc linalg-cmake-modules/util/ilp64_checker.c -o ilp64_checker -DDGEMM_NAME=dgemm_ /usr/local/lib/libblis.a -lm -lpthread
-./ilp64_checker
-rm blis_int_size ilp64_checker
-rm -rf linalg-cmake-modules
 
 echo "Downloading and installing libflame..."
 bash .pipelines/install-scripts/install-libflame.sh /usr/local ${MARCH} ${LIBFLAME_VERSION} ${CFLAGS}
@@ -133,12 +113,7 @@ python3 -m build --wheel \
     -C cmake.define.QDK_CHEMISTRY_ENABLE_COVERAGE=${ENABLE_COVERAGE} \
     -C cmake.define.BUILD_TESTING=${BUILD_TESTING} \
     -C cmake.define.CMAKE_C_FLAGS="${CMAKE_C_FLAGS}" \
-    -C cmake.define.CMAKE_CXX_FLAGS="${CMAKE_CXX_FLAGS}" \
-    -C cmake.define.BLAS_LIBRARIES="/usr/local/lib/libblis.a;m;pthread" \
-    -C cmake.define.LAPACK_LIBRARIES="/usr/local/lib/libflame.a;/usr/local/lib/libblis.a" \
-    -C cmake.define.GAUXC_BLAS_IS_LP64="TRUE" \
-    -C cmake.define.BLAS_FOUND="TRUE" \
-    -C cmake.define.GAUXC_BLAS_PREFER_ILP64="OFF"
+    -C cmake.define.CMAKE_CXX_FLAGS="${CMAKE_CXX_FLAGS}"
 
 echo "Checking shared dependencies..."
 ldd build/cp*/_core.*.so
@@ -166,8 +141,5 @@ rm "$WHEEL_FILE"
 (cd "$TEMP_DIR" && python3 -m zipfile -c "$FULL_WHEEL_PATH" .)
 rm -rf "$TEMP_DIR"
 
-# [GMN:TODO] Make sure that the artifacts end up in a separate directory
-# so that the ESRP upload will work correctly. The ESRP upload will not do
-# a recursive search for wheels like twine has done in the past.
-# mkdir /workspace/artifacts
-# cp repaired_wheelhouse/qdk_chemistry-*.whl /workspace/artifacts/
+mkdir ../artifacts
+cp repaired_wheelhouse/qdk_chemistry-*.whl ../artifacts/
