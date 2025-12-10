@@ -618,7 +618,7 @@ class TestStabilityChecker:
     def test_stability_uhf_water_plus(self, backend, method, ref_internal):
         """Test stability checker on stable UHF water cation with different backends and methods."""
         water = create_water_structure()
-        scf_solver = self._create_scf_solver()
+        scf_solver = self._create_scf_solver(backend=backend)
         scf_solver.settings().set("method", method)
         scf_solver.settings().set("xc_grid", 5)
         _, wavefunction = scf_solver.run(water, 1, 2)

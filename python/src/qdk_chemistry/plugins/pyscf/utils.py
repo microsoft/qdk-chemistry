@@ -453,7 +453,6 @@ def orbitals_to_scf(
     if basis_set.has_ecp_shells() and basis_set.has_ecp_electrons():
         ecp_electrons = basis_set.get_ecp_electrons()
         charge -= sum(ecp_electrons)
-    print(charge, multiplicity)
 
     mol = basis_to_pyscf_mol(basis_set, charge=int(charge), multiplicity=multiplicity)
 

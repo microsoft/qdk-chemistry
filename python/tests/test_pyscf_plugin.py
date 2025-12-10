@@ -260,7 +260,7 @@ class TestPyscfPlugin:
         # Test default settings
         assert settings.get("internal") is True
         assert settings.get("external") is True
-        assert settings.get("with_symmetry") is True
+        assert settings.get("with_symmetry") is False
         assert settings.get("nroots") == 3
         assert settings.get("davidson_tolerance") == 1e-4
         assert settings.get("stability_tolerance") == -1e-4

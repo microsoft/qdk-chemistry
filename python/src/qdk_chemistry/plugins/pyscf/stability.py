@@ -24,6 +24,7 @@ and `pyscf.scf.stability` routines).
 
 import numpy as np
 from pyscf import lib, scf
+from pyscf.lib import logger as pyscf_logger
 from pyscf.scf.stability import _gen_hop_rhf_external
 from pyscf.soscf import newton_ah
 
@@ -60,13 +61,14 @@ def _stability_hessian(hop, x: np.ndarray) -> np.ndarray:
 
 
 def _rhf_internal(
-    mf: scf.hf.SCF, with_symmetry: bool = True, nroots: int = 3, tol: float = 1e-4
+    mf: scf.hf.SCF, with_symmetry: bool = True, nroots: int = 3, tol: float = 1e-4, verbose: int | None = None
 ) -> tuple[np.ndarray, np.ndarray]:
     """RHF internal stability analysis.
 
     Modified from PySCF implementation.
     """
     Logger.trace_entering()
+    log = pyscf_logger.new_logger(mf, verbose)
     g, hop, hdiag = newton_ah.gen_g_hop_rhf(mf, mf.mo_coeff, mf.mo_occ, with_symmetry=with_symmetry)
     hdiag *= 2
 
@@ -80,35 +82,42 @@ def _rhf_internal(
         lambda dx, e, _x0: _stability_preconditioner(dx, e, hdiag),
         tol=tol,
         nroots=nroots,
+        verbose=log,
     )
+    log.info("rhf_internal: lowest eigs of H = %s", e)
     return e, v
 
 
 def _rhf_external(
-    mf: scf.hf.SCF, with_symmetry: bool = True, nroots: int = 3, tol: float = 1e-4
+    mf: scf.hf.SCF, with_symmetry: bool = True, nroots: int = 3, tol: float = 1e-4, verbose: int | None = None
 ) -> tuple[np.ndarray, np.ndarray]:
     """RHF external stability analysis (RHF -> UHF).
 
     Modified from PySCF implementation.
     """
     Logger.trace_entering()
+    log = pyscf_logger.new_logger(mf, verbose)
     # Do not consider real -> complex instability
     _, _, hop2, hdiag2 = _gen_hop_rhf_external(mf, with_symmetry)
 
     x0 = np.zeros_like(hdiag2)
     x0[hdiag2 > 1e-5] = 1.0 / hdiag2[hdiag2 > 1e-5]
-    e, v = lib.davidson(hop2, x0, lambda dx, e, _x0: _stability_preconditioner(dx, e, hdiag2), tol=tol, nroots=nroots)
+    e, v = lib.davidson(
+        hop2, x0, lambda dx, e, _x0: _stability_preconditioner(dx, e, hdiag2), tol=tol, nroots=nroots, verbose=log
+    )
+    log.info("rhf_external: lowest eigs of H = %s", e)
     return e, v
 
 
 def _rohf_internal(
-    mf: scf.rohf.ROHF, with_symmetry: bool = True, nroots: int = 3, tol: float = 1e-4
+    mf: scf.rohf.ROHF, with_symmetry: bool = True, nroots: int = 3, tol: float = 1e-4, verbose: int | None = None
 ) -> tuple[np.ndarray, np.ndarray]:
     """ROHF internal stability analysis.
 
     Modified from PySCF implementation.
     """
     Logger.trace_entering()
+    log = pyscf_logger.new_logger(mf, verbose)
     g, hop, hdiag = newton_ah.gen_g_hop_rohf(mf, mf.mo_coeff, mf.mo_occ, with_symmetry=with_symmetry)
     hdiag *= 2
 
@@ -122,7 +131,9 @@ def _rohf_internal(
         lambda dx, e, _x0: _stability_preconditioner(dx, e, hdiag),
         tol=tol,
         nroots=nroots,
+        verbose=log,
     )
+    log.info("rohf_internal: lowest eigs of H = %s", e)
     return e, v
 
 
@@ -132,13 +143,14 @@ def _rohf_external(mf: scf.rohf.ROHF, with_symmetry: bool = True, nroots: int = 
 
 
 def _uhf_internal(
-    mf: scf.uhf.UHF, with_symmetry: bool = True, nroots: int = 3, tol: float = 1e-4
+    mf: scf.uhf.UHF, with_symmetry: bool = True, nroots: int = 3, tol: float = 1e-4, verbose: int | None = None
 ) -> tuple[np.ndarray, np.ndarray]:
     """UHF internal stability analysis.
 
     Modified from PySCF implementation.
     """
     Logger.trace_entering()
+    log = pyscf_logger.new_logger(mf, verbose)
     g, hop, hdiag = newton_ah.gen_g_hop_uhf(mf, mf.mo_coeff, mf.mo_occ, with_symmetry=with_symmetry)
     hdiag *= 2
 
@@ -152,7 +164,9 @@ def _uhf_internal(
         lambda dx, e, _x0: _stability_preconditioner(dx, e, hdiag),
         tol=tol,
         nroots=nroots,
+        verbose=log,
     )
+    log.info("uhf_internal: lowest eigs of H = %s", e)
     return e, v
 
 
@@ -173,6 +187,7 @@ class PyscfStabilitySettings(Settings):
     - davidson_tolerance: Convergence threshold for the Davidson eigenvalue solver.
     - stability_tolerance: Threshold for determining stability from eigenvalues.
     - method: The electronic structure method ("hf" for Hartree-Fock or a DFT functional name).
+    - pyscf_verbose: PySCF verbosity level for lib.davidson logging (0=silent, 4=info, 5=debug).
 
     Examples:
         >>> settings = PyscfStabilitySettings()
@@ -190,12 +205,13 @@ class PyscfStabilitySettings(Settings):
         super().__init__()
         self._set_default("internal", "bool", True)
         self._set_default("external", "bool", True)
-        self._set_default("with_symmetry", "bool", True)
+        self._set_default("with_symmetry", "bool", False)
         self._set_default("nroots", "int", 3)
         self._set_default("davidson_tolerance", "double", 1e-4)
         self._set_default("stability_tolerance", "double", -1e-4)
         self._set_default("method", "string", "hf")
         self._set_default("xc_grid", "int", 3)
+        self._set_default("pyscf_verbose", "int", 4)
 
 
 class PyscfStabilityChecker(StabilityChecker):
@@ -272,6 +288,7 @@ class PyscfStabilityChecker(StabilityChecker):
         stability_tol = self._settings.get("stability_tolerance")
         method = self._settings.get("method")
         xc_grid = self._settings.get("xc_grid")
+        pyscf_verbose = self._settings.get("pyscf_verbose")
 
         # Get orbitals from wavefunction
         orbitals = wavefunction.get_orbitals()
@@ -306,7 +323,9 @@ class PyscfStabilityChecker(StabilityChecker):
         if isinstance(mf, scf.rohf.ROHF):
             # ROHF stability analysis
             if do_internal:
-                e, v = _rohf_internal(mf, with_symmetry=with_symmetry, nroots=nroots, tol=alg_tol)
+                e, v = _rohf_internal(
+                    mf, with_symmetry=with_symmetry, nroots=nroots, tol=alg_tol, verbose=pyscf_verbose
+                )
                 internal_eigenvalues_list.extend(e if isinstance(e, list | tuple | np.ndarray) else [e])
                 internal_eigenvectors_list.extend(v if isinstance(v, list | tuple | np.ndarray) else [v])
                 # TODO: Update internal_scale_factor if needed for future implementation.
@@ -322,7 +341,7 @@ class PyscfStabilityChecker(StabilityChecker):
         elif isinstance(mf, scf.uhf.UHF):
             # UHF stability analysis
             if do_internal:
-                e, v = _uhf_internal(mf, with_symmetry=with_symmetry, nroots=nroots, tol=alg_tol)
+                e, v = _uhf_internal(mf, with_symmetry=with_symmetry, nroots=nroots, tol=alg_tol, verbose=pyscf_verbose)
                 # Scale UHF internal eigenvalues by 1/2 to match the convention
                 # used in the original stability analysis paper and the QDK backend.
                 internal_scale_factor = 0.5
@@ -338,14 +357,14 @@ class PyscfStabilityChecker(StabilityChecker):
         else:
             # RHF stability analysis (default)
             if do_internal:
-                e, v = _rhf_internal(mf, with_symmetry=with_symmetry, nroots=nroots, tol=alg_tol)
+                e, v = _rhf_internal(mf, with_symmetry=with_symmetry, nroots=nroots, tol=alg_tol, verbose=pyscf_verbose)
                 # Scale RHF internal eigenvalues by 1/4 to match the convention
                 # used in the original stability analysis paper and the QDK backend.
                 internal_scale_factor = 0.25
                 internal_eigenvalues_list.extend(e if isinstance(e, list | tuple | np.ndarray) else [e])
                 internal_eigenvectors_list.extend(v if isinstance(v, list | tuple | np.ndarray) else [v])
             if do_external:
-                e, v = _rhf_external(mf, with_symmetry=with_symmetry, nroots=nroots, tol=alg_tol)
+                e, v = _rhf_external(mf, with_symmetry=with_symmetry, nroots=nroots, tol=alg_tol, verbose=pyscf_verbose)
                 external_eigenvalues_list.extend(e if isinstance(e, list | tuple | np.ndarray) else [e])
                 external_eigenvectors_list.extend(v if isinstance(v, list | tuple | np.ndarray) else [v])
 
