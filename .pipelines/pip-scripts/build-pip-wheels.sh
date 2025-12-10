@@ -14,14 +14,16 @@ LIBFLAME_VERSION=${9:-5.2.0}
 export DEBIAN_FRONTEND=noninteractive
 
 # Try to prevent stochastic segfault from libc-bin
+echo "Reinstalling libc-bin..."
 rm /var/lib/dpkg/info/libc-bin.*
 apt-get clean
-apt-get update
-apt install libc-bin
+apt-get update -q
+apt install -q libc-bin
 
 # Update and install dependencies
-apt-get update
-apt-get install -y \
+echo "Installing apt dependencies..."
+apt-get update -q
+apt-get install -y -q \
     python3 python3-pip python3-dev \
     libssl-dev zlib1g-dev libbz2-dev libreadline-dev libsqlite3-dev \
     libncurses5-dev xz-utils tk-dev libxml2-dev libxmlsec1-dev \
@@ -44,6 +46,7 @@ apt-get install -y \
     libpugixml-dev
 
 # Upgrade cmake as Ubuntu 22.04 only has up to v3.22 in apt
+echo "Downloading and installing CMake ${CMAKE_VERSION}..."
 export CMAKE_CHECKSUM=72b7570e5c8593de6ac4ab433b73eab18c5fb328880460c86ce32608141ad5c1
 wget -q https://cmake.org/files/v3.28/cmake-3.28.3.tar.gz -O cmake-3.28.3.tar.gz
 echo "${CMAKE_CHECKSUM}  cmake-3.28.3.tar.gz" | shasum -a 256 -c || exit 1
@@ -51,7 +54,7 @@ tar -xzf cmake-3.28.3.tar.gz
 rm cmake-3.28.3.tar.gz
 cd cmake-3.28.3
 ./bootstrap --parallel=$(nproc) --prefix=/usr/local
-make -j$(nproc)
+make --silent -j$(nproc)
 make install
 cd ..
 rm -r cmake-3.28.3

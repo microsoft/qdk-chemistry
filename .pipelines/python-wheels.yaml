@@ -99,7 +99,7 @@ extends:
             outputs:
             - output: pipelineArtifact
               displayName: Upload Linux Python $(pythonVersion) Wheels for ${{ target.march }}
-              targetPath: $(System.DefaultWorkingDirectory)/target/wheels
+              targetPath: $(System.DefaultWorkingDirectory)/qdk-chemistry/python/repaired_wheelhouse
               artifactName: linux-${{ target.arch }}-wheels-python$(pythonVersion)
           steps:
           # Build - x86_64
@@ -162,8 +162,7 @@ extends:
 
     - stage: Release
       displayName: Release
-      # dependsOn: Approval # Uncomment when ready to switch to manual approval
-      dependsOn: Build
+      dependsOn: Approval
       condition: and(succeeded(), eq(variables['Build.Reason'], 'Manual'))
       jobs:
       - job: Publish_Python_Packages
@@ -196,26 +195,26 @@ extends:
           steps:
             # Deploy: only from main branch and not for PRs
             # Delete after ESRP approval
-          - task: TwineAuthenticate@1
-            displayName: Twine Authenticate for wheel upload
-            inputs:
-              $(DEPENDENCIES_ARTIFACT_FEED): $(DEPENDENCIES_ARTIFACT_PROJECT)/$(DEPENDENCIES_ARTIFACT_FEED)
-            condition: and(succeeded(), eq(variables['Build.SourceBranch'], 'refs/heads/main'), ne(variables['Build.Reason'], 'PullRequest'))
+          # - task: TwineAuthenticate@1
+          #   displayName: Twine Authenticate for wheel upload
+          #   inputs:
+          #     $(DEPENDENCIES_ARTIFACT_FEED): $(DEPENDENCIES_ARTIFACT_PROJECT)/$(DEPENDENCIES_ARTIFACT_FEED)
+          #   condition: and(succeeded(), eq(variables['Build.SourceBranch'], 'refs/heads/main'), ne(variables['Build.Reason'], 'PullRequest'))
 
-          - script: |
-              cd $(Agent.BuildDirectory)/python
-              pip install --user twine
-              python3 -m twine upload -r $(DEPENDENCIES_ARTIFACT_FEED) repaired_wheelhouse/*.whl --config-file $(PYPIRC_PATH)
-            displayName: Upload wheel with twine
-            condition: and(succeeded(), eq(variables['Build.SourceBranch'], 'refs/heads/main'), ne(variables['Build.Reason'], 'PullRequest'))
+          # - script: |
+          #     cd $(Agent.BuildDirectory)/python
+          #     pip install --user twine
+          #     python3 -m twine upload -r $(DEPENDENCIES_ARTIFACT_FEED) repaired_wheelhouse/*.whl --config-file $(PYPIRC_PATH)
+          #   displayName: Upload wheel with twine
+          #   condition: and(succeeded(), eq(variables['Build.SourceBranch'], 'refs/heads/main'), ne(variables['Build.Reason'], 'PullRequest'))
 
-          - script: |
-              echo "WARNING: Forcing artifact upload. This is intended for debugging purposes only."
-              cd $(Agent.BuildDirectory)/python
-              pip install --user twine
-              python3 -m twine upload -r $(DEPENDENCIES_ARTIFACT_FEED) repaired_wheelhouse/linux*/*.whl --config-file $(PYPIRC_PATH)
-            displayName: Upload wheel with twine
-            condition: and(succeeded(), eq(${{ parameters.forceArtifactUpload }}, true))
+          # - script: |
+          #     echo "WARNING: Forcing artifact upload. This is intended for debugging purposes only."
+          #     cd $(Agent.BuildDirectory)/python
+          #     pip install --user twine
+          #     python3 -m twine upload -r $(DEPENDENCIES_ARTIFACT_FEED) repaired_wheelhouse/linux*/*.whl --config-file $(PYPIRC_PATH)
+          #   displayName: Upload wheel with twine
+          #   condition: and(succeeded(), eq(${{ parameters.forceArtifactUpload }}, true))
 
           - script: |
               mkdir -p $(System.DefaultWorkingDirectory)/target/wheels
@@ -224,6 +223,8 @@ extends:
             displayName: Collect Python Artifacts for Release
 
               # Uncomment and fill in missing fields after ESRP approval
+              # Setting the contenttype to the wrong value will allow us to do a dry run of this task without
+              # publishing anything, according to the ESRP docs
     #         - task: EsrpRelease@9
     #           condition: succeeded()
     #           displayName: Publish Python Packages
@@ -233,7 +234,7 @@ extends:
     #             keyvaultname:
     #             signcertname: ESRPCert
     #             clientid:
-    #             contenttype: PyPi
+    #             contenttype: 'NPM'
     #             domaintenantid:
     #             folderlocation: "$(System.DefaultWorkingDirectory)/artifacts/"
     #             waitforreleasecompletion: true
