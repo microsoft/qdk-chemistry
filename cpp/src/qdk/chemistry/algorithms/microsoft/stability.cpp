@@ -472,16 +472,17 @@ StabilityChecker::_run_impl(
 
   // Construct Initial Eigenvector by using the inverse of energy differences
   // Note Davidson algorithm is highly sensitive to the choice of initial
-  // vector. Note we need to avoid zero entries, uniform vector and respect the
-  // symmetry.
-  Eigen::VectorXd eigenvector = Eigen::VectorXd::Constant(eigensize, 1e-2);
+  // vector. The mix of two initialization here is to avoid Davidson unconverged
+  // Note 1e4 and 1e-4 here is just to avoid division by zero.
+  Eigen::VectorXd eigenvector = Eigen::VectorXd::Constant(eigensize, 1e4);
   for (int i = 0; i < eigen_diff.size(); ++i) {
-    if (eigen_diff(i) != 0) {
-      eigenvector(i) = std::min(1.0 / std::abs(eigen_diff(i)), 1e3);
-    } else {
-      eigenvector(i) = 1e3;
-    }
+    if (std::abs(eigen_diff(i)) > 1e-4) eigenvector(i) = 1.0 / eigen_diff(i);
   }
+  eigenvector.normalize();
+  eigenvector((n_alpha_electrons - 1) * num_virtual_alpha_orbitals) = 1.0;
+  if (unrestricted)
+    eigenvector((n_beta_electrons - 1) * num_virtual_beta_orbitals + nova) =
+        1.0;
   eigenvector.normalize();
 
   const int64_t max_subspace =

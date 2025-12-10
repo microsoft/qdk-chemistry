@@ -669,6 +669,50 @@ TEST_F(StabilityCheckerTest, QDK_UHF_O2_M06_2X_Stable) {
   EXPECT_NEAR(smallest_eigenvalue, 0.197267, davidson_tol);
 }
 
+TEST_F(StabilityCheckerTest, QDK_UHF_O2_PBE_Stable) {
+  // Test internal stability analysis on UHF oxygen molecule using PBE
+  auto o2 = testing::create_o2_structure();
+
+  // Run UHF SCF calculation (triplet state) with PBE
+  auto scf_solver = ScfSolverFactory::create();
+  scf_solver->settings().set("basis_set", "def2-svp");
+  scf_solver->settings().set("method", "pbe");
+  auto [energy, wavefunction] = scf_solver->run(o2, 0, 3);
+
+  // Check SCF energy
+  EXPECT_NEAR(energy, -150.06573508243756, testing::scf_energy_tolerance);
+
+  // Verify we have UHF orbitals
+  auto orbitals = wavefunction->get_orbitals();
+  EXPECT_FALSE(orbitals->is_restricted());
+
+  // Create stability checker for internal-only analysis
+  auto stability_checker = StabilityCheckerFactory::create("qdk");
+  stability_checker->settings().set("internal", true);
+  stability_checker->settings().set("external", false);
+  stability_checker->settings().set("method", "pbe");
+
+  // Run stability analysis
+  auto [is_stable, result] = stability_checker->run(wavefunction);
+
+  // Verify result properties
+  EXPECT_TRUE(result != nullptr);
+  EXPECT_TRUE(result->has_internal_result());
+  EXPECT_FALSE(result->has_external_result());
+  EXPECT_GT(result->internal_size(), 0);
+  EXPECT_EQ(result->external_size(), 0);
+
+  // UHF O2 triplet should be internally stable
+  EXPECT_TRUE(result->is_internal_stable());
+  EXPECT_TRUE(is_stable);
+
+  // Check the smallest internal eigenvalue against Python reference
+  double smallest_eigenvalue = result->get_smallest_internal_eigenvalue();
+  double davidson_tol =
+      stability_checker->settings().get<double>("davidson_tolerance");
+  EXPECT_NEAR(smallest_eigenvalue, 0.22847945, davidson_tol);
+}
+
 TEST_F(StabilityCheckerTest, QDK_RHF_N2_Stretched_External_Instability) {
   // Test external stability analysis on stretched N2 molecule (RHF)
   // At 1.2 Angstrom, N2 RHF should be internally stable but externally unstable
