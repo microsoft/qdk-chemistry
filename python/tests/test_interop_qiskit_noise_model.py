@@ -5,14 +5,10 @@
 # Licensed under the MIT License. See LICENSE.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
 
-import warnings
-
 from qiskit_aer.noise import NoiseModel
 
 from qdk_chemistry.data.noise_models import (
-    GateErrorDef,
     QuantumErrorProfile,
-    SupportedGate,
 )
 from qdk_chemistry.plugins.qiskit._interop.noise_model import get_noise_model_from_profile
 
