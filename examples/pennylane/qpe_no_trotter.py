@@ -3,7 +3,11 @@
 # Licensed under the MIT License. See LICENSE.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
 
-"""qdk-chemistry + PennyLane quantum phase estimation example."""
+"""qdk-chemistry + PennyLane quantum phase estimation example.
+
+This example demonstrates the use of PennyLane to implement traditional QFT-based Quantum Phase Estimation (QPE)
+using QDK/Chemistry tools for preparing the electronic structure problem.
+"""
 
 import numpy as np
 from qdk_chemistry.algorithms import create
