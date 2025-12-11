@@ -146,7 +146,7 @@ void jacobi_rotation(VectorType&& v1, VectorType&& v2, long double angle) {
 }
 
 // Compute the Jacobi rotation parameters according to
-// https://doi.org/10.1103/RevModPhys.35.457
+// Edmiston & Ruedenberg (1963), doi:10.1103/RevModPhys.35.457
 // INC Eq(23)
 // ROT Eq(19)
 auto compute_jacobi_AB(long double A, long double B) {

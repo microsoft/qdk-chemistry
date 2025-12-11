@@ -27,7 +27,7 @@ class RegularIsometryStatePreparation(StatePreparation):
     """State preparation using a regular isometry approach.
 
     This class implements the isometry-based state preparation proposed by
-    Matthias Christandl in `arXiv:1501.06911 <https://arxiv.org/abs/1501.06911>`_.
+    Matthias Christandl in arXiv:1501.06911 :cite:`Christandl2016`.
     """
 
     def __init__(self):
