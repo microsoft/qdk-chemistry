@@ -187,8 +187,7 @@ class QpeResult(DataClass):
         """Return the phase estimation algorithm that produced the result if available.
 
         Returns:
-            PhaseEstimationAlgorithm | None: Phase estimation algorithm that produced the result or None if the phase
-                estimation algorithm is not available.
+            PhaseEstimationAlgorithm | None: Phase estimation algorithm that produced the result or None.
 
         """
         if _PhaseEstimationAlgorithm is None:

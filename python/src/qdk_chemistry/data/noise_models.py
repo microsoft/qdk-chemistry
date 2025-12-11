@@ -169,8 +169,8 @@ class QuantumErrorProfile(DataClass):
         Args:
             name (str | None): Name of the quantum error profile.
             description (str | None): Description of what the error profile represents.
-            errors (dict[SupportedGate | str, GateErrorDef | dict[str, Any]] | None): Dictionary mapping supported gate
-                names (as SupportedGate or string) to their error definitions (as GateErrorDef or dict).
+            errors (dict[SupportedGate | str, GateErrorDef | dict[str, Any]] | None):
+                Dictionary mapping supported gate names to their error definitions.
 
         """
         self.name: str = "default"

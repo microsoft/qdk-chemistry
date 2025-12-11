@@ -76,8 +76,8 @@ class Circuit(DataClass):
 
         Args:
             remove_idle_qubits (bool): If True, remove qubits that are idle (no gates applied). Default is True.
-            remove_classical_qubits (bool): If True, remove qubits with gates but bitstring outputs are deterministic
-                (0 or 1). Default is True.
+            remove_classical_qubits (bool):
+                If True, remove qubits with gates but bitstring outputs are deterministic (0 or 1). Default is True.
 
         Returns:
             qsharp._native.Circuit: A qsharp Circuit object representing the trimmed circuit.
@@ -93,8 +93,8 @@ class Circuit(DataClass):
 
         Args:
             remove_idle_qubits (bool): If True, remove qubits that are idle (no gates applied). Default is True.
-            remove_classical_qubits (bool): If True, remove qubits with gates but bitstring outputs are deterministic
-                (0 or 1). Default is True.
+            remove_classical_qubits (bool):
+                If True, remove qubits with gates but bitstring outputs are deterministic (0 or 1). Default is True.
 
         Returns:
             str: A trimmed circuit in QASM format.
