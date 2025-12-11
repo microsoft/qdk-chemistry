@@ -55,7 +55,7 @@ steps:
     echo "Running pip wheel build..."
     docker run --rm \
       --platform ${{ parameters.imageTag }} \
-      -v ${{ parameters.agentBuildDirectory }}:/workspace \
+      -v ${{ parameters.agentBuildDirectory }}:/workspace:rshared \
       -e QDK_UARCH=${{ parameters.march }} \
       -w /workspace/qdk-chemistry \
       ${{ parameters.dockerImage }} \
