@@ -7,9 +7,9 @@
 
 ################################################################################
 # start-cell-mp2-example
-from qdk_chemistry.data import Structure, Ansatz
-from qdk_chemistry.algorithms import create
 import numpy as np
+from qdk_chemistry.algorithms import create
+from qdk_chemistry.data import Ansatz, Structure
 
 # Create a simple structure
 coords = np.array([[0.0, 0.0, 0.0], [1.4, 0.0, 0.0]])

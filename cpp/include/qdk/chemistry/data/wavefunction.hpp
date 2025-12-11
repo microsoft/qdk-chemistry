@@ -156,13 +156,16 @@ template <typename T>
 void consolidate_determinants(std::vector<Configuration>& determinants,
                               std::vector<T>& coefficients);
 
-// Explicit template declarations
+/// @cond DOXYGEN_SKIP
+// Explicit template declarations (hidden from Doxygen to avoid Sphinx parsing
+// issues)
 extern template void consolidate_determinants<double>(
     std::vector<Configuration>& determinants,
     std::vector<double>& coefficients);
 extern template void consolidate_determinants<std::complex<double>>(
     std::vector<Configuration>& determinants,
     std::vector<std::complex<double>>& coefficients);
+/// @endcond
 
 }  // namespace detail
 
