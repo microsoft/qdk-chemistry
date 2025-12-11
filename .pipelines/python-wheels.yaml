@@ -144,6 +144,11 @@ extends:
           #       imageTag: linux/arm64/v8
           #       pythonVersion: $(pythonVersion)
 
+          - ${{ if eq(target.arch, 'aarch64') }}:
+            - script: |
+                # On ARM nodes we need to adjust the permissions for this folder for SBoM generation
+                chmod -R u+w $(System.DefaultWorkingDirectory)/python/repaired_wheelhouse/
+
     - stage: Approval
       displayName: Approval
       dependsOn: Build
