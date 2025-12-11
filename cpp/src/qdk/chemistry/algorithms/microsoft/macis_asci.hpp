@@ -119,7 +119,8 @@ class MacisAsciSettings : public MultiConfigurationSettings {
     set_default<double>("core_selection_threshold",
                         macis_defaults.core_selection_threshold,
                         "Cumulative weight threshold for core selection",
-                        data::BoundConstraint<double>{0.0, 1.0});
+                        data::BoundConstraint<double>{
+                            std::numeric_limits<double>::epsilon(), 1.0});
   }
 
   /**
