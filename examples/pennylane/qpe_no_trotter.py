@@ -7,6 +7,7 @@
 
 This example demonstrates the use of PennyLane to implement traditional QFT-based Quantum Phase Estimation (QPE)
 using QDK/Chemistry tools for preparing the electronic structure problem.
+This example does not use Trotterization; instead, it leverages PennyLane's ability to implement the time-evolution operator `exp(−i*coeff*H)` exactly for a given qubit Hamiltonian.
 """
 
 import numpy as np
