@@ -46,6 +46,42 @@ std::shared_ptr<Orbitals> make_minimal_orbitals() {
   return orbitals;
 }
 
+// Helper function to create a minimal Hamiltonian for H2
+// This is needed for MP2 container examples
+std::shared_ptr<Hamiltonian> make_minimal_hamiltonian(
+    std::shared_ptr<Orbitals> orbitals) {
+  // Create minimal one- and two-electron integrals for H2
+  Eigen::MatrixXd h_core(2, 2);
+  h_core << -1.5, -0.8, -0.8, 0.5;  // Core Hamiltonian
+
+  // Two-electron integrals in MO basis, stored as flattened vector
+  // These are stored like i*norb*norb*norb + j*norb*norb + k*norb + l
+  // In other words, if we want to access an integral element in the vector,
+  // (ij|kl), we can access using this indexing.
+
+  // For H2: norb=2, so we need 2^4=16 elements
+  Eigen::VectorXd eri = Eigen::VectorXd::Zero(16);
+
+  // Set some representative values for H2 two-electron integrals
+  // Format: (ij|kl) in physicist notation
+  eri[0] = 1.0;   // (00|00) - index 0*8 + 0*4 + 0*2 + 0 = 0
+  eri[5] = 0.6;   // (01|01) - index 0*8 + 1*4 + 0*2 + 1 = 5
+  eri[10] = 0.6;  // (10|10) - index 1*8 + 0*4 + 1*2 + 0 = 10
+  eri[15] = 0.8;  // (11|11) - index 1*8 + 1*4 + 1*2 + 1 = 15
+  eri[3] = 0.4;   // (00|11) - index 0*8 + 0*4 + 1*2 + 1 = 3
+  eri[12] = 0.4;  // (11|00) - index 1*8 + 1*4 + 0*2 + 0 = 12
+
+  // Core energy (nuclear repulsion + core electron contributions)
+  double core_energy = 0.0;
+
+  // Inactive Fock matrix (empty for minimal example)
+  Eigen::MatrixXd inactive_fock = Eigen::MatrixXd::Zero(2, 2);
+
+  // Create Hamiltonian
+  return std::make_shared<Hamiltonian>(h_core, eri, orbitals, core_energy,
+                                       inactive_fock);
+}
+
 int main() {
   // --------------------------------------------------------------------------------------------
   // start-cell-create-slater
@@ -110,6 +146,60 @@ int main() {
   // --------------------------------------------------------------------------------------------
 
   // --------------------------------------------------------------------------------------------
+  // start-cell-create-mp2
+  // Create an MP2 wavefunction for H2
+  // MP2 uses a reference wavefunction and Hamiltonian to compute amplitudes on
+  // demand
+
+  // Use the Slater determinant as reference
+  auto orbitals_mp2 = make_minimal_orbitals();
+  auto hamiltonian = make_minimal_hamiltonian(orbitals_mp2);
+  Configuration ref_det("20");
+  auto sd_container_mp2 =
+      std::make_unique<SlaterDeterminantContainer>(ref_det, orbitals_mp2);
+  auto ref_wavefunction =
+      std::make_shared<Wavefunction>(std::move(sd_container_mp2));
+
+  // Create MP2 container: requires Hamiltonian and reference wavefunction
+  // Amplitudes are computed lazily when first requested
+  auto mp2_container =
+      std::make_unique<MP2Container>(hamiltonian, ref_wavefunction, "mp");
+  Wavefunction mp2_wavefunction(std::move(mp2_container));
+  // end-cell-create-mp2
+  // --------------------------------------------------------------------------------------------
+
+  // --------------------------------------------------------------------------------------------
+  // start-cell-create-cc
+  // Create a coupled cluster wavefunction for H2
+  // CC uses a reference wavefunction and pre-computed amplitudes
+
+  // Use the Slater determinant as reference
+  auto orbitals_cc = make_minimal_orbitals();
+  Configuration ref_det_cc("20");
+  auto sd_container_cc =
+      std::make_unique<SlaterDeterminantContainer>(ref_det_cc, orbitals_cc);
+  auto ref_wavefunction_cc =
+      std::make_shared<Wavefunction>(std::move(sd_container_cc));
+
+  // Create example T1 and T2 amplitudes
+  // T1: occupied-virtual excitations (1 occ × 1 virt = 1 element for H2)
+  Eigen::VectorXd t1_amplitudes(1);
+  t1_amplitudes << 0.05;
+
+  // T2: occupied-occupied to virtual-virtual excitations
+  // (1 occ pair × 1 virt pair = 1 element for H2)
+  Eigen::VectorXd t2_amplitudes(1);
+  t2_amplitudes << 0.15;
+
+  // Create CC container: requires reference wavefunction, orbitals, and
+  // amplitudes
+  auto cc_container = std::make_unique<CoupledClusterContainer>(
+      orbitals_cc, ref_wavefunction_cc, t1_amplitudes, t2_amplitudes);
+  Wavefunction cc_wavefunction(std::move(cc_container));
+  // end-cell-create-cc
+  // --------------------------------------------------------------------------------------------
+
+  // --------------------------------------------------------------------------------------------
   // start-cell-access-data
   // Access coefficient(s) and determinant(s) - SD has only one
   auto coeffs = sd_wavefunction.get_coefficients();
@@ -132,5 +222,28 @@ int main() {
   auto entropies = sd_wavefunction.get_single_orbital_entropies();
   // end-cell-access-data
   // --------------------------------------------------------------------------------------------
+
+  // --------------------------------------------------------------------------------------------
+  // start-cell-access-amplitudes
+  // Access T1 and T2 amplitudes from MP2 and CC containers
+
+  // MP2
+  // Get the container back from wfn
+  const auto& mp2_container_ref =
+      mp2_wavefunction.get_container<MP2Container>();
+  // Amplitudes are lazily evaluated on first call then cached
+  auto [t2_abab_mp2, t2_aaaa_mp2, t2_bbbb_mp2] =
+      mp2_container_ref->get_t2_amplitudes();
+
+  // CC
+  const auto& cc_container_ref =
+      cc_wavefunction.get_container<CoupledClusterContainer>();
+  // Amplitudes are stored already from construction
+  auto [t1_aa, t1_bb] = cc_container_ref->get_t1_amplitudes();
+  auto [t2_abab_cc, t2_aaaa_cc, t2_bbbb_cc] =
+      cc_container_ref->get_t2_amplitudes();
+  // end-cell-access-amplitudes
+  // --------------------------------------------------------------------------------------------
+
   return 0;
 }
