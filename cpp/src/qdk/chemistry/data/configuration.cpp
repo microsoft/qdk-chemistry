@@ -400,10 +400,8 @@ std::pair<std::string, std::string> Configuration::to_binary_strings(
         break;
       case ALPHA:
         result_alpha[i] = '1';
-        result_beta[i] = '0';
         break;
       case BETA:
-        result_alpha[i] = '0';
         result_beta[i] = '1';
         break;
       case DOUBLY:
@@ -429,7 +427,12 @@ Configuration Configuration::from_binary_strings(std::string alpha_string,
   for (size_t i = 0; i < n_orbitals; ++i) {
     char alpha_contents = alpha_string[i];
     char beta_contents = beta_string[i];
-    if (alpha_contents == '1' && beta_contents == '1') {
+
+    if (alpha_contents != '0' && alpha_contents != '1') {
+      throw std::runtime_error("alpha string should contain only 0/1");
+    } else if (beta_contents != '0' && beta_contents != '1') {
+      throw std::runtime_error("beta string should contain only 0/1");
+    } else if (alpha_contents == '1' && beta_contents == '1') {
       orbital_rep[i] = '2';
     } else if (alpha_contents == '1' && beta_contents == '0') {
       orbital_rep[i] = 'u';

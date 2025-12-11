@@ -13,6 +13,7 @@ import numpy as np
 
 from qdk_chemistry import data
 
+__all__ = ["create_statevector_from_wavefunction"]
 
 def create_statevector_from_wavefunction(wavefunction: data.Wavefunction, normalize: bool = True) -> np.ndarray:
     """Create a Qiskit-compatible statevector from a QDK Chemistry wavefunction.
