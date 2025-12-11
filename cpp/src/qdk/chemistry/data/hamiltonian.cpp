@@ -643,7 +643,9 @@ std::shared_ptr<Hamiltonian> Hamiltonian::_from_hdf5_file(
 }
 
 Hamiltonian::Hamiltonian(std::unique_ptr<HamiltonianContainer> container)
-    : _container(std::move(container)) {};
+    : _container(std::move(container)) {
+  QDK_LOG_TRACE_ENTERING();
+};
 
 // Copy constructor
 Hamiltonian::Hamiltonian(const Hamiltonian& other)
@@ -662,64 +664,89 @@ Hamiltonian& Hamiltonian::operator=(const Hamiltonian& other) {
 
 std::tuple<const Eigen::MatrixXd&, const Eigen::MatrixXd&>
 Hamiltonian::get_one_body_integrals() const {
+  QDK_LOG_TRACE_ENTERING();
   return _container->get_one_body_integrals();
 }
 
 double Hamiltonian::get_one_body_element(unsigned i, unsigned j,
                                          SpinChannel channel) const {
+  QDK_LOG_TRACE_ENTERING();
   return _container->get_one_body_element(i, j, channel);
 }
 
 bool Hamiltonian::has_one_body_integrals() const {
+  QDK_LOG_TRACE_ENTERING();
   return _container->has_one_body_integrals();
 }
 
 std::tuple<const Eigen::VectorXd&, const Eigen::VectorXd&,
            const Eigen::VectorXd&>
 Hamiltonian::get_two_body_integrals() const {
+  QDK_LOG_TRACE_ENTERING();
   return _container->get_two_body_integrals();
 }
 
 double Hamiltonian::get_two_body_element(unsigned i, unsigned j, unsigned k,
                                          unsigned l,
                                          SpinChannel channel) const {
+  QDK_LOG_TRACE_ENTERING();
   return _container->get_two_body_element(i, j, k, l, channel);
 }
 
 bool Hamiltonian::has_two_body_integrals() const {
+  QDK_LOG_TRACE_ENTERING();
   return _container->has_two_body_integrals();
 }
 
 std::pair<const Eigen::MatrixXd&, const Eigen::MatrixXd&>
 Hamiltonian::get_inactive_fock_matrix() const {
+  QDK_LOG_TRACE_ENTERING();
   return _container->get_inactive_fock_matrix();
 }
 
 bool Hamiltonian::has_inactive_fock_matrix() const {
+  QDK_LOG_TRACE_ENTERING();
   return _container->has_inactive_fock_matrix();
 }
 
 const std::shared_ptr<Orbitals> Hamiltonian::get_orbitals() const {
+  QDK_LOG_TRACE_ENTERING();
   return _container->get_orbitals();
 }
 
-bool Hamiltonian::has_orbitals() const { return _container->has_orbitals(); }
+bool Hamiltonian::has_orbitals() const {
+  QDK_LOG_TRACE_ENTERING();
+  return _container->has_orbitals();
+}
 
 double Hamiltonian::get_core_energy() const {
+  QDK_LOG_TRACE_ENTERING();
   return _container->get_core_energy();
 }
 
-HamiltonianType Hamiltonian::get_type() const { return _container->get_type(); }
+HamiltonianType Hamiltonian::get_type() const {
+  QDK_LOG_TRACE_ENTERING();
+  return _container->get_type();
+}
 
 std::string Hamiltonian::get_container_type() const {
+  QDK_LOG_TRACE_ENTERING();
   return _container->get_container_type();
 }
 
-bool Hamiltonian::is_hermitian() const { return _container->is_hermitian(); };
+bool Hamiltonian::is_hermitian() const {
+  QDK_LOG_TRACE_ENTERING();
+  return _container->is_hermitian();
+};
 
-bool Hamiltonian::is_restricted() const { return _container->is_restricted(); }
+bool Hamiltonian::is_restricted() const {
+  QDK_LOG_TRACE_ENTERING();
+  return _container->is_restricted();
+}
 
 bool Hamiltonian::is_unrestricted() const {
+  QDK_LOG_TRACE_ENTERING();
+
   return !_container->is_restricted();
 };
 
