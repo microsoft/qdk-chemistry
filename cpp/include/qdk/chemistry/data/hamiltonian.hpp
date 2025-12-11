@@ -453,7 +453,7 @@ class Hamiltonian : public DataClass,
   /**
    * @brief Get the type of the underlying container
    * @return String identifying the container type (e.g., "canonical_4_center",
-   * "desnity_fitted", "DoubleFactorizedTHC")
+   * "density_fitted", "DoubleFactorizedTHC")
    */
   virtual std::string get_container_type() const;
 
