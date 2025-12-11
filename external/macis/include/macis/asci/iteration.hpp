@@ -48,14 +48,6 @@ auto asci_iter(ASCISettings asci_settings, MCSCFSettings mcscf_settings,
                size_t ndets_max, double E0, std::vector<wfn_t<N>> wfn,
                std::vector<double> X, HamiltonianGenerator<wfn_t<N>>& ham_gen,
                size_t norb MACIS_MPI_CODE(, MPI_Comm comm)) {
-  // Validate core_selection_threshold
-  if (asci_settings.core_selection_threshold <= 0.0 ||
-      asci_settings.core_selection_threshold > 1.0) {
-    throw std::invalid_argument(
-        "core_selection_threshold must be in (0.0, 1.0], got " +
-        std::to_string(asci_settings.core_selection_threshold));
-  }
-
   // Sort wfn on coefficient weights
   if (wfn.size() > 1) reorder_ci_on_coeff(wfn, X);
 
@@ -71,6 +63,14 @@ auto asci_iter(ASCISettings asci_settings, MCSCFSettings mcscf_settings,
       }
       break;
     case CoreSelectionStrategy::Percentage: {
+      // Validate core_selection_threshold only when using Percentage strategy
+      if (asci_settings.core_selection_threshold <
+              std::numeric_limits<double>::epsilon() ||
+          asci_settings.core_selection_threshold > 1.0) {
+        throw std::invalid_argument(
+            "core_selection_threshold must be in [epsilon, 1.0], got " +
+            std::to_string(asci_settings.core_selection_threshold));
+      }
       // Use percentage-based selection - keep determinants until cumulative
       // weight reaches threshold (not capped by ncdets_max).
       // Note: If the threshold is never reached (e.g., very small

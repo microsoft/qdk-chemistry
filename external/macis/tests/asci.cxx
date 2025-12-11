@@ -496,6 +496,8 @@ TEST_CASE("ASCI Exponential Backoff", "[asci][backoff]") {
     asci_settings.grow_factor = 2.5;
     asci_settings.ntdets_max = 100;
     asci_settings.ntdets_min = 10;
+    // Use Fixed strategy to ensure deterministic behavior for this backoff test
+    asci_settings.core_selection_strategy = macis::CoreSelectionStrategy::Fixed;
 
     std::tie(E0, dets, C) = macis::asci_grow(
         asci_settings, mcscf_settings, E0, std::move(dets), std::move(C),
@@ -504,8 +506,9 @@ TEST_CASE("ASCI Exponential Backoff", "[asci][backoff]") {
     // Should reach target size or close to it
     // Note: The algorithm may return slightly more than ntdets_max when
     // multiple determinants have the same predicted weight at the cutoff.
-    REQUIRE(dets.size() >= 50);   // Should grow with factor 2.5
-    REQUIRE(dets.size() <= 101);  // Allow small overage for equivalent dets
+    REQUIRE(dets.size() >= 50);  // Should grow with factor 2.5
+    REQUIRE(dets.size() <=
+            100);  // Should not exceed ntdets_max with Fixed strategy
     REQUIRE(C.size() == dets.size());
     REQUIRE_THAT(
         std::inner_product(C.begin(), C.end(), C.begin(), 0.0),
@@ -590,6 +593,8 @@ TEST_CASE("ASCI Exponential Backoff", "[asci][backoff]") {
     asci_settings.ntdets_max = 1000;
     asci_settings.ntdets_min = 100;
     asci_settings.ncdets_max = 1000;  // Plenty of room
+    // Use Fixed strategy to ensure deterministic behavior for this backoff test
+    asci_settings.core_selection_strategy = macis::CoreSelectionStrategy::Fixed;
 
     // Reset to HF
     dets = {wfn_traits::canonical_hf_determinant(nalpha, nbeta)};

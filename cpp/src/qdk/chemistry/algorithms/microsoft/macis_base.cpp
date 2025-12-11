@@ -111,10 +111,13 @@ macis::ASCISettings get_asci_settings_(const data::Settings& settings_) {
         "growth_recovery_rate must be > 1.0, got " +
         std::to_string(asci_settings.growth_recovery_rate));
   }
-  if (asci_settings.core_selection_threshold <= 0.0 ||
-      asci_settings.core_selection_threshold > 1.0) {
-    throw std::runtime_error(
-        "core_selection_threshold must be in (0.0, 1.0], got " +
+  if (asci_settings.core_selection_strategy ==
+          macis::CoreSelectionStrategy::Percentage &&
+      (asci_settings.core_selection_threshold <
+           std::numeric_limits<double>::epsilon() ||
+       asci_settings.core_selection_threshold > 1.0)) {
+    throw std::invalid_argument(
+        "core_selection_threshold must be in [epsilon, 1.0], got " +
         std::to_string(asci_settings.core_selection_threshold));
   }
 
