@@ -592,8 +592,8 @@ def test_phase_fraction_from_feedback_zero() -> None:
     assert np.isclose(phase_fraction, 0.0, rtol=float_comparison_relative_tolerance)
 
 
-def test_phase_fraction_from_feedback_negative() -> None:
-    """Test phase fraction calculation from negative feedback."""
+def test_phase_fraction_from_feedback_in_valid_range() -> None:
+    """Test phase fraction calculation from feedback in valid range."""
     feedback = np.pi / 2
     phase_fraction = IterativePhaseEstimation.phase_fraction_from_feedback(feedback)
 
