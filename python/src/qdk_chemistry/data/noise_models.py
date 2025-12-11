@@ -33,10 +33,8 @@ class CaseInsensitiveStrEnum(StrEnum):
 class SupportedGate(CaseInsensitiveStrEnum):
     """An enumeration of quantum gate types with case-insensitive string lookup.
 
-    Note:
-        Gate types gathered from Qiskit:
-        https://github.com/Qiskit/qiskit/blob/a88ed60615eeb988f404f9afaf142775478aceb9/qiskit/circuit/quantumcircuit.py#L673C1-L731C1
-
+    Gate types gathered from Qiskit
+    https://github.com/Qiskit/qiskit/blob/a88ed60615eeb988f404f9afaf142775478aceb9/qiskit/circuit/quantumcircuit.py#L673C1-L731C1
     """
 
     BARRIER = "barrier"
@@ -298,7 +296,8 @@ class QuantumErrorProfile(DataClass):
         invalid_keys = set(data.keys()) - {"version", "name", "description", "errors"}
         if invalid_keys:
             raise ValueError(
-                f"Invalid keys in YAML file: {invalid_keys}.\nOnly 'name', 'description', and 'errors' are allowed."
+                f"Invalid keys in YAML file: {invalid_keys}.\n"
+                "Only 'version', 'name', 'description', and 'errors' are allowed."
             )
 
         return cls.from_json(data)

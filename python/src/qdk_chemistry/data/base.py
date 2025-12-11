@@ -303,6 +303,7 @@ class DataClass(_CoreDataClass):
 
         Args:
             filename (str | pathlib.Path): Path to the output JSON file
+
                 Must match pattern: <name>.<data_type>.json
 
         Raises:
@@ -319,6 +320,7 @@ class DataClass(_CoreDataClass):
 
         Args:
             filename (str | pathlib.Path): Path to the output HDF5 file
+
                 Must match pattern: <name>.<data_type>.h5 or <name>.<data_type>.hdf5
 
         Raises:
@@ -335,7 +337,9 @@ class DataClass(_CoreDataClass):
 
         Args:
             filename (str | pathlib.Path): Path to the output file
+
                 Must match pattern: <name>.<data_type>.<extension>
+
             format_type (str): Format type ("json", "hdf5", or "h5")
 
         Raises:
@@ -387,6 +391,7 @@ class DataClass(_CoreDataClass):
 
         Args:
             filename (str | pathlib.Path): Path to the input JSON file
+
                 Must match pattern: <name>.<data_type>.json
 
         Returns:
@@ -427,6 +432,7 @@ class DataClass(_CoreDataClass):
 
         Args:
             filename (str | pathlib.Path): Path to the input HDF5 file
+
                 Must match pattern: <name>.<data_type>.h5 or <name>.<data_type>.hdf5
 
         Returns:
@@ -447,7 +453,9 @@ class DataClass(_CoreDataClass):
 
         Args:
             filename (str | pathlib.Path): Path to the input file
+
                 Must match pattern: <name>.<data_type>.<extension>
+
             format_type (str): Format type ("json", "hdf5", or "h5")
 
         Returns:

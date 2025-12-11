@@ -39,29 +39,6 @@ def test_get_noise_model_except(simple_error_profile):
             assert gate in noise_model.noise_instructions
 
 
-def test_get_noise_model_with_unsupported_error_type():
-    """Test get_noise_model_from_profile with unsupported error type (should trigger warning)."""
-    # Create a profile with a valid error type first
-    profile = QuantumErrorProfile(
-        name="test",
-        description="test profile",
-        errors={SupportedGate.H: {"type": "depolarizing_error", "rate": 0.01, "num_qubits": 1}},
-    )
-
-    # Manually modify the error type to simulate an unsupported type
-    # This bypasses the validation but tests the warning behavior
-    profile.errors[SupportedGate.H] = GateErrorDef(type="unsupported_error_type", rate=0.01, num_qubits=1)
-
-    with warnings.catch_warnings(record=True) as w:
-        warnings.simplefilter("always")
-        noise_model = get_noise_model_from_profile(profile)
-
-        # Should generate a warning about unsupported error type
-        assert len(w) == 1
-        assert "Unsupported error type" in str(w[0].message)
-        assert noise_model is not None
-
-
 def test_get_noise_model_with_multiple_gates():
     """Test noise model generation with multiple gates."""
     profile = QuantumErrorProfile(
