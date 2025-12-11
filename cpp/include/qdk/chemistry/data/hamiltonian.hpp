@@ -32,7 +32,7 @@ enum class SpinChannel { aa, bb, aaaa, aabb, bbbb };
 
 /**
  * @class HamiltonianContainer
- * @brief Represents a molecular Hamiltonian implemetnation in the molecular
+ * @brief Represents a molecular Hamiltonian implementation in the molecular
  * orbital basis
  *
  * This class stores molecular Hamiltonian data for quantum chemistry
