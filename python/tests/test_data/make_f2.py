@@ -9,14 +9,17 @@ from pathlib import Path
 
 from qdk_chemistry.algorithms import create
 from qdk_chemistry.data import Configuration, Orbitals, Structure
+from qdk_chemistry.utils import Logger
 
 if __name__ == "__main__":
+    Logger.set_global_level("info")
     f2 = Structure.from_xyz_file(Path("f2.structure.xyz"))
     hf = create("scf_solver", "qdk", method="hf", basis_set="def2-svp")
     hf_energy, hf_wfn = hf.run(f2, 0, 1)
 
-    print(
-        "HF energy and determinant:", hf_energy, hf_wfn.get_active_num_electrons(), hf_wfn.get_active_determinants()[0]
+    Logger.info(
+        f"HF energy and determinant: {hf_energy}, {hf_wfn.get_active_num_electrons()}, "
+        f"{hf_wfn.get_active_determinants()[0]}"
     )
 
     active_space_orbitals = Orbitals(
@@ -44,9 +47,11 @@ if __name__ == "__main__":
     pmc_energy, pmc_wfn = pmc.run(
         active_space_h, [Configuration("222220"), Configuration("220222"), Configuration("222202")]
     )
-    print("PMC energy:", pmc_energy)
-    print("PMC correction:", pmc_energy - active_space_h.get_core_energy())
-    print("Leading configurations and coefficients:")
+    Logger.info(f"SCI energy: {sci_energy}")
+    Logger.info(f"SCI correction: {sci_energy - active_space_h.get_core_energy()}")
+    Logger.info(f"PMC energy: {pmc_energy}")
+    Logger.info(f"PMC correction: {pmc_energy - active_space_h.get_core_energy()}")
+    Logger.info("Leading configurations and coefficients:")
     for det, coeff in zip(pmc_wfn.get_active_determinants(), pmc_wfn.get_coefficients(), strict=True):
         if abs(coeff) > 0.001:
-            print(det, coeff)
+            Logger.info(f"{det} {coeff}")

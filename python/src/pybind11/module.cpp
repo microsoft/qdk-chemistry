@@ -7,6 +7,7 @@
 namespace py = pybind11;
 
 void bind_base_class(py::module& m);
+void bind_element_data(py::module& m);
 void bind_orbitals(py::module& m);
 void bind_hamiltonian(py::module& m);
 void bind_wavefunction(py::module& m);
@@ -30,6 +31,9 @@ void bind_qdk_chemistry_config(py::module& m);
 void bind_valence_space(py::module& m);
 void bind_orbital_rotation(py::module& m);
 void bind_dynamical_correlation_calculator(py::module& m);
+void bind_logger(py::module& m);
+void bind_davidson_solver(py::module& m);
+void bind_syev_solver(py::module& m);
 
 PYBIND11_MODULE(_core, m) {
   m.doc() = "QDK/Chemistry C++ core bindings";
@@ -44,7 +48,9 @@ PYBIND11_MODULE(_core, m) {
   utils.doc() = R"(Utilities submodule)";
 
   // Ordering is important!
+
   bind_base_class(data);
+  bind_element_data(data);  // Element enums must be bound before Structure
   bind_structure(data);
   bind_settings(data);
   bind_basis_set(data);
@@ -65,10 +71,13 @@ PYBIND11_MODULE(_core, m) {
   bind_dynamical_correlation_calculator(algorithms);
   bind_pmc(algorithms);
   bind_stability(algorithms);
+  bind_davidson_solver(algorithms);
+  bind_syev_solver(algorithms);
 
   // Bind utilities
   bind_valence_space(utils);
   bind_orbital_rotation(utils);
+  bind_logger(utils);
 
   // Bind constants and config at the top level
   bind_constants(m);

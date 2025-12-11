@@ -7,6 +7,7 @@
 #include <iostream>
 #include <qdk/chemistry/data/basis_set.hpp>
 #include <qdk/chemistry/data/structure.hpp>
+#include <qdk/chemistry/utils/logger.hpp>
 #include <sstream>
 #include <stdexcept>
 
@@ -20,6 +21,8 @@ Shell::Shell(size_t atom_idx, OrbitalType orb_type,
              const std::vector<double>& exp_list,
              const std::vector<double>& coeff_list)
     : atom_index(atom_idx), orbital_type(orb_type) {
+  QDK_LOG_TRACE_ENTERING();
+
   if (exp_list.size() != coeff_list.size()) {
     throw std::invalid_argument(
         "Exponents and coefficients must have the same size");
@@ -36,6 +39,7 @@ Shell::Shell(size_t atom_idx, OrbitalType orb_type,
              const std::vector<double>& coeff_list,
              const std::vector<int>& rpow_list)
     : atom_index(atom_idx), orbital_type(orb_type) {
+  QDK_LOG_TRACE_ENTERING();
   if (exp_list.size() != coeff_list.size()) {
     throw std::invalid_argument(
         "Exponents and coefficients must have the same size");
@@ -55,13 +59,16 @@ Shell::Shell(size_t atom_idx, OrbitalType orb_type,
 BasisSet::BasisSet(const std::string& name, const Structure& structure,
                    AOType atomic_orbital_type)
     : BasisSet(name, std::make_shared<Structure>(structure),
-               atomic_orbital_type) {}
+               atomic_orbital_type) {
+  QDK_LOG_TRACE_ENTERING();
+}
 
 BasisSet::BasisSet(const std::string& name, const std::vector<Shell>& shells,
                    AOType atomic_orbital_type)
     : _name(name),
       _atomic_orbital_type(atomic_orbital_type),
       _ecp_name("none") {
+  QDK_LOG_TRACE_ENTERING();
   // Organize shells by atom index
   for (const auto& shell : shells) {
     size_t atom_index = shell.atom_index;
@@ -85,7 +92,9 @@ BasisSet::BasisSet(const std::string& name, const std::vector<Shell>& shells,
 BasisSet::BasisSet(const std::string& name, const std::vector<Shell>& shells,
                    const Structure& structure, AOType atomic_orbital_type)
     : BasisSet(name, shells, std::make_shared<Structure>(structure),
-               atomic_orbital_type) {}
+               atomic_orbital_type) {
+  QDK_LOG_TRACE_ENTERING();
+}
 
 BasisSet::BasisSet(const std::string& name,
                    std::shared_ptr<Structure> structure,
@@ -94,6 +103,7 @@ BasisSet::BasisSet(const std::string& name,
       _atomic_orbital_type(atomic_orbital_type),
       _structure(structure),
       _ecp_name("none") {
+  QDK_LOG_TRACE_ENTERING();
   if (_name.empty()) {
     throw std::invalid_argument("BasisSet name cannot be empty");
   }
@@ -116,6 +126,7 @@ BasisSet::BasisSet(const std::string& name, const std::vector<Shell>& shells,
       _atomic_orbital_type(atomic_orbital_type),
       _structure(structure),
       _ecp_name("none") {
+  QDK_LOG_TRACE_ENTERING();
   if (!structure) {
     throw std::invalid_argument("Structure shared_ptr cannot be nullptr");
   }
@@ -144,7 +155,9 @@ BasisSet::BasisSet(const std::string& name, const std::vector<Shell>& shells,
                    const std::vector<Shell>& ecp_shells,
                    const Structure& structure, AOType atomic_orbital_type)
     : BasisSet(name, shells, ecp_shells, std::make_shared<Structure>(structure),
-               atomic_orbital_type) {}
+               atomic_orbital_type) {
+  QDK_LOG_TRACE_ENTERING();
+}
 
 BasisSet::BasisSet(const std::string& name, const std::vector<Shell>& shells,
                    const std::vector<Shell>& ecp_shells,
@@ -154,6 +167,7 @@ BasisSet::BasisSet(const std::string& name, const std::vector<Shell>& shells,
       _atomic_orbital_type(atomic_orbital_type),
       _structure(structure),
       _ecp_name("none") {
+  QDK_LOG_TRACE_ENTERING();
   if (!structure) {
     throw std::invalid_argument("Structure shared_ptr cannot be nullptr");
   }
@@ -196,7 +210,9 @@ BasisSet::BasisSet(const std::string& name, const std::vector<Shell>& shells,
                    const std::vector<size_t>& ecp_electrons,
                    const Structure& structure, AOType atomic_orbital_type)
     : BasisSet(name, shells, ecp_name, ecp_shells, ecp_electrons,
-               std::make_shared<Structure>(structure), atomic_orbital_type) {}
+               std::make_shared<Structure>(structure), atomic_orbital_type) {
+  QDK_LOG_TRACE_ENTERING();
+}
 
 BasisSet::BasisSet(const std::string& name, const std::vector<Shell>& shells,
                    const std::string& ecp_name,
@@ -209,6 +225,7 @@ BasisSet::BasisSet(const std::string& name, const std::vector<Shell>& shells,
       _structure(structure),
       _ecp_name(ecp_name),
       _ecp_electrons(ecp_electrons) {
+  QDK_LOG_TRACE_ENTERING();
   if (!structure) {
     throw std::invalid_argument("Structure shared_ptr cannot be nullptr");
   }
@@ -254,6 +271,7 @@ BasisSet::BasisSet(const BasisSet& other)
       _ecp_name(other._ecp_name),
       _ecp_shells_per_atom(other._ecp_shells_per_atom),
       _ecp_electrons(other._ecp_electrons) {
+  QDK_LOG_TRACE_ENTERING();
   if (other._structure) {
     _structure = std::make_shared<Structure>(*other._structure);
   }
@@ -264,6 +282,8 @@ BasisSet::BasisSet(const BasisSet& other)
 }
 
 BasisSet& BasisSet::operator=(const BasisSet& other) {
+  QDK_LOG_TRACE_ENTERING();
+
   if (this != &other) {
     _name = other._name;
     _atomic_orbital_type = other._atomic_orbital_type;
@@ -283,10 +303,13 @@ BasisSet& BasisSet::operator=(const BasisSet& other) {
 }
 
 AOType BasisSet::get_atomic_orbital_type() const {
+  QDK_LOG_TRACE_ENTERING();
   return _atomic_orbital_type;
 }
 
 std::vector<Shell> BasisSet::get_shells() const {
+  QDK_LOG_TRACE_ENTERING();
+
   std::vector<Shell> all_shells;
 
   for (const auto& atom_shells : _shells_per_atom) {
@@ -300,11 +323,15 @@ std::vector<Shell> BasisSet::get_shells() const {
 
 const std::vector<Shell>& BasisSet::get_shells_for_atom(
     size_t atom_index) const {
+  QDK_LOG_TRACE_ENTERING();
+
   _validate_atom_index(atom_index);
   return _shells_per_atom[atom_index];
 }
 
 const Shell& BasisSet::get_shell(size_t shell_index) const {
+  QDK_LOG_TRACE_ENTERING();
+
   _validate_shell_index(shell_index);
 
   size_t current_index = 0;
@@ -320,15 +347,22 @@ const Shell& BasisSet::get_shell(size_t shell_index) const {
 }
 
 size_t BasisSet::get_num_shells() const {
+  QDK_LOG_TRACE_ENTERING();
+
   if (!_cache_valid) {
     _compute_mappings();
   }
   return _cached_num_shells;
 }
 
-size_t BasisSet::get_num_atoms() const { return _shells_per_atom.size(); }
+size_t BasisSet::get_num_atoms() const {
+  QDK_LOG_TRACE_ENTERING();
+
+  return _shells_per_atom.size();
+}
 
 std::vector<Shell> BasisSet::get_ecp_shells() const {
+  QDK_LOG_TRACE_ENTERING();
   std::vector<Shell> all_ecp_shells;
 
   for (const auto& atom_ecp_shells : _ecp_shells_per_atom) {
@@ -342,6 +376,7 @@ std::vector<Shell> BasisSet::get_ecp_shells() const {
 
 const std::vector<Shell>& BasisSet::get_ecp_shells_for_atom(
     size_t atom_index) const {
+  QDK_LOG_TRACE_ENTERING();
   _validate_atom_index(atom_index);
   if (atom_index >= _ecp_shells_per_atom.size()) {
     static const std::vector<Shell> empty_vector;
@@ -351,6 +386,7 @@ const std::vector<Shell>& BasisSet::get_ecp_shells_for_atom(
 }
 
 const Shell& BasisSet::get_ecp_shell(size_t shell_index) const {
+  QDK_LOG_TRACE_ENTERING();
   size_t total_ecp_shells = get_num_ecp_shells();
   if (shell_index >= total_ecp_shells) {
     throw std::out_of_range("ECP shell index " + std::to_string(shell_index) +
@@ -371,6 +407,7 @@ const Shell& BasisSet::get_ecp_shell(size_t shell_index) const {
 }
 
 size_t BasisSet::get_num_ecp_shells() const {
+  QDK_LOG_TRACE_ENTERING();
   size_t total = 0;
   for (const auto& atom_ecp_shells : _ecp_shells_per_atom) {
     total += atom_ecp_shells.size();
@@ -378,15 +415,20 @@ size_t BasisSet::get_num_ecp_shells() const {
   return total;
 }
 
-bool BasisSet::has_ecp_shells() const { return get_num_ecp_shells() > 0; }
+bool BasisSet::has_ecp_shells() const {
+  QDK_LOG_TRACE_ENTERING();
+  return get_num_ecp_shells() > 0;
+}
 
 std::pair<size_t, int> BasisSet::get_atomic_orbital_info(
     size_t atomic_orbital_index) const {
+  QDK_LOG_TRACE_ENTERING();
   _validate_atomic_orbital_index(atomic_orbital_index);
   return basis_to_shell_index(atomic_orbital_index);
 }
 
 size_t BasisSet::get_num_atomic_orbitals() const {
+  QDK_LOG_TRACE_ENTERING();
   if (!_cache_valid) {
     _compute_mappings();
   }
@@ -395,6 +437,7 @@ size_t BasisSet::get_num_atomic_orbitals() const {
 
 size_t BasisSet::get_atom_index_for_atomic_orbital(
     size_t atomic_orbital_index) const {
+  QDK_LOG_TRACE_ENTERING();
   if (!_cache_valid) {
     _compute_mappings();
   }
@@ -405,6 +448,8 @@ size_t BasisSet::get_atom_index_for_atomic_orbital(
 
 std::vector<size_t> BasisSet::get_atomic_orbital_indices_for_atom(
     size_t atom_index) const {
+  QDK_LOG_TRACE_ENTERING();
+
   _validate_atom_index(atom_index);
 
   std::vector<size_t> result;
@@ -431,6 +476,8 @@ std::vector<size_t> BasisSet::get_atomic_orbital_indices_for_atom(
 
 std::vector<size_t> BasisSet::get_shell_indices_for_atom(
     size_t atom_index) const {
+  QDK_LOG_TRACE_ENTERING();
+
   _validate_atom_index(atom_index);
 
   std::vector<size_t> result;
@@ -450,6 +497,7 @@ std::vector<size_t> BasisSet::get_shell_indices_for_atom(
 }
 
 size_t BasisSet::get_num_atomic_orbitals_for_atom(size_t atom_index) const {
+  QDK_LOG_TRACE_ENTERING();
   _validate_atom_index(atom_index);
 
   size_t total = 0;
@@ -461,6 +509,8 @@ size_t BasisSet::get_num_atomic_orbitals_for_atom(size_t atom_index) const {
 
 std::vector<size_t> BasisSet::get_shell_indices_for_orbital_type(
     OrbitalType orbital_type) const {
+  QDK_LOG_TRACE_ENTERING();
+
   std::vector<size_t> result;
   size_t shell_idx = 0;
 
@@ -478,6 +528,8 @@ std::vector<size_t> BasisSet::get_shell_indices_for_orbital_type(
 
 size_t BasisSet::get_num_atomic_orbitals_for_orbital_type(
     OrbitalType orbital_type) const {
+  QDK_LOG_TRACE_ENTERING();
+
   size_t total = 0;
   for (const auto& atom_shells : _shells_per_atom) {
     for (const auto& shell : atom_shells) {
@@ -491,6 +543,8 @@ size_t BasisSet::get_num_atomic_orbitals_for_orbital_type(
 
 std::vector<size_t> BasisSet::get_shell_indices_for_atom_and_orbital_type(
     size_t atom_index, OrbitalType orbital_type) const {
+  QDK_LOG_TRACE_ENTERING();
+
   _validate_atom_index(atom_index);
 
   std::vector<size_t> result;
@@ -514,6 +568,7 @@ std::vector<size_t> BasisSet::get_shell_indices_for_atom_and_orbital_type(
 
 std::vector<size_t> BasisSet::get_ecp_shell_indices_for_atom(
     size_t atom_index) const {
+  QDK_LOG_TRACE_ENTERING();
   _validate_atom_index(atom_index);
 
   std::vector<size_t> result;
@@ -539,6 +594,7 @@ std::vector<size_t> BasisSet::get_ecp_shell_indices_for_atom(
 
 std::vector<size_t> BasisSet::get_ecp_shell_indices_for_orbital_type(
     OrbitalType orbital_type) const {
+  QDK_LOG_TRACE_ENTERING();
   std::vector<size_t> result;
   size_t ecp_shell_idx = 0;
 
@@ -556,6 +612,7 @@ std::vector<size_t> BasisSet::get_ecp_shell_indices_for_orbital_type(
 
 std::vector<size_t> BasisSet::get_ecp_shell_indices_for_atom_and_orbital_type(
     size_t atom_index, OrbitalType orbital_type) const {
+  QDK_LOG_TRACE_ENTERING();
   _validate_atom_index(atom_index);
 
   std::vector<size_t> result;
@@ -582,24 +639,38 @@ std::vector<size_t> BasisSet::get_ecp_shell_indices_for_atom_and_orbital_type(
   return result;
 }
 
-const std::string& BasisSet::get_name() const { return _name; }
+const std::string& BasisSet::get_name() const {
+  QDK_LOG_TRACE_ENTERING();
+  return _name;
+}
 
 const std::shared_ptr<Structure> BasisSet::get_structure() const {
+  QDK_LOG_TRACE_ENTERING();
+
   if (!_structure) {
     throw std::runtime_error("No structure is associated with this basis set");
   }
   return _structure;
 }
 
-bool BasisSet::has_structure() const { return _structure != nullptr; }
+bool BasisSet::has_structure() const {
+  QDK_LOG_TRACE_ENTERING();
 
-const std::string& BasisSet::get_ecp_name() const { return _ecp_name; }
+  return _structure != nullptr;
+}
+
+const std::string& BasisSet::get_ecp_name() const {
+  QDK_LOG_TRACE_ENTERING();
+  return _ecp_name;
+}
 
 const std::vector<size_t>& BasisSet::get_ecp_electrons() const {
+  QDK_LOG_TRACE_ENTERING();
   return _ecp_electrons;
 }
 
 bool BasisSet::has_ecp_electrons() const {
+  QDK_LOG_TRACE_ENTERING();
   // Check if any atom has a finite number of ECP electrons
   for (size_t ecp_electrons : _ecp_electrons) {
     if (ecp_electrons > 0) {
@@ -610,6 +681,8 @@ bool BasisSet::has_ecp_electrons() const {
 }
 
 bool BasisSet::_is_consistent_with_structure() const {
+  QDK_LOG_TRACE_ENTERING();
+
   if (!has_structure()) {
     return true;  // No structure to validate against
   }
@@ -633,6 +706,8 @@ bool BasisSet::_is_consistent_with_structure() const {
 }
 
 bool BasisSet::_is_valid() const {
+  QDK_LOG_TRACE_ENTERING();
+
   // Check if we have any shells
   bool has_shells = false;
   for (const auto& atom_shells : _shells_per_atom) {
@@ -655,6 +730,8 @@ bool BasisSet::_is_valid() const {
 }
 
 std::string BasisSet::get_summary() const {
+  QDK_LOG_TRACE_ENTERING();
+
   std::ostringstream oss;
   oss << "BasisSet: " << _name << "\n";
   oss << "Basis type: " << atomic_orbital_type_to_string(_atomic_orbital_type)
@@ -690,6 +767,8 @@ std::string BasisSet::get_summary() const {
 
 void BasisSet::to_file(const std::string& filename,
                        const std::string& type) const {
+  QDK_LOG_TRACE_ENTERING();
+
   if (type == "json") {
     to_json_file(filename);
   } else if (type == "hdf5") {
@@ -702,6 +781,8 @@ void BasisSet::to_file(const std::string& filename,
 
 std::shared_ptr<BasisSet> BasisSet::from_file(const std::string& filename,
                                               const std::string& type) {
+  QDK_LOG_TRACE_ENTERING();
+
   if (type == "json") {
     return from_json_file(filename);
   } else if (type == "hdf5") {
@@ -713,6 +794,8 @@ std::shared_ptr<BasisSet> BasisSet::from_file(const std::string& filename,
 }
 
 void BasisSet::to_hdf5_file(const std::string& filename) const {
+  QDK_LOG_TRACE_ENTERING();
+
   // Validate filename has correct data type suffix
   std::string validated_filename =
       DataTypeFilename::validate_write_suffix(filename, "basis_set");
@@ -722,6 +805,8 @@ void BasisSet::to_hdf5_file(const std::string& filename) const {
 
 std::shared_ptr<BasisSet> BasisSet::from_hdf5_file(
     const std::string& filename) {
+  QDK_LOG_TRACE_ENTERING();
+
   // Validate filename has correct data type suffix
   std::string validated_filename =
       DataTypeFilename::validate_read_suffix(filename, "basis_set");
@@ -730,6 +815,8 @@ std::shared_ptr<BasisSet> BasisSet::from_hdf5_file(
 }
 
 void BasisSet::to_json_file(const std::string& filename) const {
+  QDK_LOG_TRACE_ENTERING();
+
   // Validate filename has correct data type suffix
   std::string validated_filename =
       DataTypeFilename::validate_write_suffix(filename, "basis_set");
@@ -739,6 +826,8 @@ void BasisSet::to_json_file(const std::string& filename) const {
 
 std::shared_ptr<BasisSet> BasisSet::from_json_file(
     const std::string& filename) {
+  QDK_LOG_TRACE_ENTERING();
+
   // Validate filename has correct data type suffix
   std::string validated_filename =
       DataTypeFilename::validate_read_suffix(filename, "basis_set");
@@ -747,6 +836,8 @@ std::shared_ptr<BasisSet> BasisSet::from_json_file(
 }
 
 void BasisSet::_to_json_file(const std::string& filename) const {
+  QDK_LOG_TRACE_ENTERING();
+
   std::ofstream file(filename);
   if (!file.is_open()) {
     throw std::runtime_error("Cannot open file for writing: " + filename);
@@ -762,6 +853,8 @@ void BasisSet::_to_json_file(const std::string& filename) const {
 
 std::shared_ptr<BasisSet> BasisSet::_from_json_file(
     const std::string& filename) {
+  QDK_LOG_TRACE_ENTERING();
+
   std::ifstream file(filename);
   if (!file.is_open()) {
     throw std::runtime_error(
@@ -780,6 +873,8 @@ std::shared_ptr<BasisSet> BasisSet::_from_json_file(
 }
 
 void BasisSet::_to_hdf5_file(const std::string& filename) const {
+  QDK_LOG_TRACE_ENTERING();
+
   try {
     H5::H5File file(filename, H5F_ACC_TRUNC);
     H5::Group basis_set_group = file.createGroup("/basis_set");
@@ -790,6 +885,8 @@ void BasisSet::_to_hdf5_file(const std::string& filename) const {
 }
 
 void BasisSet::to_hdf5(H5::Group& group) const {
+  QDK_LOG_TRACE_ENTERING();
+
   try {
     // Save version first
     H5::DataSpace scalar_space(H5S_SCALAR);
@@ -980,6 +1077,7 @@ void BasisSet::to_hdf5(H5::Group& group) const {
 
 std::shared_ptr<BasisSet> BasisSet::_from_hdf5_file(
     const std::string& filename) {
+  QDK_LOG_TRACE_ENTERING();
   // Disable HDF5 automatic error printing to stderr unless verbose mode
   if (hdf5_errors_should_be_suppressed()) {
     H5::Exception::dontPrint();
@@ -1006,6 +1104,8 @@ std::shared_ptr<BasisSet> BasisSet::_from_hdf5_file(
 }
 
 std::shared_ptr<BasisSet> BasisSet::from_hdf5(H5::Group& group) {
+  QDK_LOG_TRACE_ENTERING();
+
   try {
     // Validate version first
     if (!group.attrExists("version")) {
@@ -1259,6 +1359,8 @@ std::shared_ptr<BasisSet> BasisSet::from_hdf5(H5::Group& group) {
 }
 
 nlohmann::json BasisSet::to_json() const {
+  QDK_LOG_TRACE_ENTERING();
+
   nlohmann::json j;
 
   // Store version first
@@ -1356,6 +1458,8 @@ nlohmann::json BasisSet::to_json() const {
 }
 
 std::shared_ptr<BasisSet> BasisSet::from_json(const nlohmann::json& j) {
+  QDK_LOG_TRACE_ENTERING();
+
   try {
     // Validate version first
     if (!j.contains("version")) {
@@ -1602,6 +1706,8 @@ std::shared_ptr<BasisSet> BasisSet::from_json(const nlohmann::json& j) {
 }
 
 std::string BasisSet::orbital_type_to_string(OrbitalType orbital_type) {
+  QDK_LOG_TRACE_ENTERING();
+
   switch (orbital_type) {
     case OrbitalType::UL:
       return "ul";
@@ -1625,6 +1731,8 @@ std::string BasisSet::orbital_type_to_string(OrbitalType orbital_type) {
 }
 
 OrbitalType BasisSet::l_to_orbital_type(int l) {
+  QDK_LOG_TRACE_ENTERING();
+
   switch (l) {
     case -1:
       return OrbitalType::UL;
@@ -1650,6 +1758,8 @@ OrbitalType BasisSet::l_to_orbital_type(int l) {
 
 OrbitalType BasisSet::string_to_orbital_type(
     const std::string& orbital_string) {
+  QDK_LOG_TRACE_ENTERING();
+
   std::string lower_str = orbital_string;
   std::transform(lower_str.begin(), lower_str.end(), lower_str.begin(),
                  ::tolower);
@@ -1667,10 +1777,13 @@ OrbitalType BasisSet::string_to_orbital_type(
 }
 
 int BasisSet::get_angular_momentum(OrbitalType orbital_type) {
+  QDK_LOG_TRACE_ENTERING();
+
   return static_cast<int>(orbital_type);
 }
 
 int BasisSet::get_num_orbitals_for_l(int l, AOType atomic_orbital_type) {
+  QDK_LOG_TRACE_ENTERING();
   if (atomic_orbital_type == AOType::Spherical) {
     return 2 * l + 1;  // Spherical harmonics
   } else {
@@ -1680,6 +1793,7 @@ int BasisSet::get_num_orbitals_for_l(int l, AOType atomic_orbital_type) {
 
 std::string BasisSet::atomic_orbital_type_to_string(
     AOType atomic_orbital_type) {
+  QDK_LOG_TRACE_ENTERING();
   switch (atomic_orbital_type) {
     case AOType::Spherical:
       return "spherical";
@@ -1692,6 +1806,7 @@ std::string BasisSet::atomic_orbital_type_to_string(
 
 AOType BasisSet::string_to_atomic_orbital_type(
     const std::string& basis_string) {
+  QDK_LOG_TRACE_ENTERING();
   std::string lower_str = basis_string;
   std::transform(lower_str.begin(), lower_str.end(), lower_str.begin(),
                  ::tolower);
@@ -1703,6 +1818,8 @@ AOType BasisSet::string_to_atomic_orbital_type(
 }
 
 void BasisSet::_clear_maps() {
+  QDK_LOG_TRACE_ENTERING();
+
   _cache_valid = false;
   _basis_to_atom_map.clear();
   _basis_to_shell_map.clear();
@@ -1711,6 +1828,8 @@ void BasisSet::_clear_maps() {
 }
 
 void BasisSet::_compute_mappings() const {
+  QDK_LOG_TRACE_ENTERING();
+
   if (_cache_valid) {
     return;  // Already computed
   }
@@ -1757,6 +1876,7 @@ void BasisSet::_compute_mappings() const {
 
 void BasisSet::_validate_atomic_orbital_index(
     size_t atomic_orbital_index) const {
+  QDK_LOG_TRACE_ENTERING();
   if (atomic_orbital_index >= get_num_atomic_orbitals()) {
     throw std::out_of_range("atomic orbital index " +
                             std::to_string(atomic_orbital_index) +
@@ -1766,6 +1886,8 @@ void BasisSet::_validate_atomic_orbital_index(
 }
 
 void BasisSet::_validate_shell_index(size_t shell_index) const {
+  QDK_LOG_TRACE_ENTERING();
+
   if (shell_index >= get_num_shells()) {
     throw std::out_of_range("Shell index " + std::to_string(shell_index) +
                             " is out of range. Maximum index: " +
@@ -1774,6 +1896,8 @@ void BasisSet::_validate_shell_index(size_t shell_index) const {
 }
 
 void BasisSet::_validate_atom_index(size_t atom_index) const {
+  QDK_LOG_TRACE_ENTERING();
+
   if (atom_index >= _shells_per_atom.size()) {
     throw std::out_of_range("Atom index " + std::to_string(atom_index) +
                             " is out of range. Maximum index: " +
@@ -1783,6 +1907,7 @@ void BasisSet::_validate_atom_index(size_t atom_index) const {
 
 std::pair<size_t, int> BasisSet::basis_to_shell_index(
     size_t atomic_orbital_index) const {
+  QDK_LOG_TRACE_ENTERING();
   if (!_cache_valid) {
     _compute_mappings();
   }

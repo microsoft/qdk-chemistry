@@ -4,8 +4,6 @@
 # Licensed under the MIT License. See LICENSE.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
 
-import logging
-
 from qiskit import QuantumCircuit, qasm3
 from qiskit.circuit.library import StatePreparation as QiskitStatePreparation
 from qiskit.compiler import transpile
@@ -19,10 +17,9 @@ from qdk_chemistry.plugins.qiskit._interop.transpiler import (
     RemoveZBasisOnZeroState,
     SubstituteCliffordRz,
 )
+from qdk_chemistry.utils import Logger
 from qdk_chemistry.utils.bitstring import separate_alpha_beta_to_binary_string
 from qdk_chemistry.utils.statevector import _create_statevector_from_coeffs_and_dets_string
-
-_LOGGER = logging.getLogger(__name__)
 
 __all__ = ["RegularIsometryStatePreparation"]
 
@@ -31,11 +28,12 @@ class RegularIsometryStatePreparation(StatePreparation):
     """State preparation using a regular isometry approach.
 
     This class implements the isometry-based state preparation proposed by
-    Matthias Christandl in `arXiv:1501.06911 <https://arxiv.org/abs/1501.06911>`_.
+    Matthias Christandl in arXiv:1501.06911 :cite:`Christandl2016`.
     """
 
     def __init__(self):
         """Initialize the RegularIsometryStatePreparation."""
+        Logger.trace_entering()
         super().__init__()
         self._settings = StatePreparationSettings()
 
@@ -49,6 +47,7 @@ class RegularIsometryStatePreparation(StatePreparation):
             A Circuit object containing a QASM string representation of the quantum circuit.
 
         """
+        Logger.trace_entering()
         # Active Space Consistency Check
         alpha_indices, beta_indices = wavefunction.get_orbitals().get_active_space_indices()
         if alpha_indices != beta_indices:
@@ -70,7 +69,7 @@ class RegularIsometryStatePreparation(StatePreparation):
         if not bitstrings:
             raise ValueError("No valid bitstrings found. The determinants list might be empty.")
         n_qubits = len(bitstrings[0])
-        _LOGGER.debug(f"Using {len(bitstrings)} determinants for state preparation")
+        Logger.debug(f"Using {len(bitstrings)} determinants for state preparation")
 
         # Create a statevector from the filtered terms
         statevector_data = _create_statevector_from_coeffs_and_dets_string(coeffs, bitstrings, n_qubits)
@@ -101,4 +100,5 @@ class RegularIsometryStatePreparation(StatePreparation):
 
     def name(self) -> str:
         """Return the name of the state preparation method."""
+        Logger.trace_entering()
         return "regular_isometry"

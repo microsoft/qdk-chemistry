@@ -4,12 +4,11 @@
 
 #include "pipek_mezey.hpp"
 
-#include <spdlog/spdlog.h>
-
 #include <algorithm>
 #include <blas.hh>
 #include <iostream>
 #include <qdk/chemistry/algorithms/active_space.hpp>
+#include <qdk/chemistry/utils/logger.hpp>
 
 #include "../utils.hpp"
 
@@ -19,6 +18,7 @@ std::shared_ptr<data::Wavefunction> PipekMezeyLocalizer::_run_impl(
     std::shared_ptr<data::Wavefunction> wavefunction,
     const std::vector<size_t>& loc_indices_a,
     const std::vector<size_t>& loc_indices_b) const {
+  QDK_LOG_TRACE_ENTERING();
   auto orbitals = wavefunction->get_orbitals();
 
   // If both index vectors are empty, return original orbitals unchanged
@@ -131,6 +131,8 @@ std::shared_ptr<data::Wavefunction> PipekMezeyLocalizer::_run_impl(
 // where c = cos(a) s = sin(a)
 template <typename VectorType>
 void jacobi_rotation(VectorType&& v1, VectorType&& v2, long double angle) {
+  QDK_LOG_TRACE_ENTERING();
+
   const double c = std::cos(angle);
   const double s = std::sin(angle);
   const size_t n = v1.size();
@@ -144,10 +146,12 @@ void jacobi_rotation(VectorType&& v1, VectorType&& v2, long double angle) {
 }
 
 // Compute the Jacobi rotation parameters according to
-// https://doi.org/10.1103/RevModPhys.35.457
+// Edmiston & Ruedenberg (1963), doi:10.1103/RevModPhys.35.457
 // INC Eq(23)
 // ROT Eq(19)
 auto compute_jacobi_AB(long double A, long double B) {
+  QDK_LOG_TRACE_ENTERING();
+
   double inc = A + std::hypot(A, B);
   double rot = 0.25 * std::atan2(B, -A);
   return std::make_pair(inc, rot);
@@ -160,10 +164,14 @@ PipekMezeyLocalization::PipekMezeyLocalization(
     : IterativeOrbitalLocalizationScheme(settings),
       overlap_matrix_(overlap_matrix),
       ao_to_atom_map_(std::move(ao_to_atom_map)),
-      num_atoms_(num_atoms) {}
+      num_atoms_(num_atoms) {
+  QDK_LOG_TRACE_ENTERING();
+}
 
 Eigen::MatrixXd PipekMezeyLocalization::localize(
     const Eigen::MatrixXd& initial_orbitals) {
+  QDK_LOG_TRACE_ENTERING();
+
   using MatrixType = Eigen::MatrixXd;
 
   // Work with local copy of orbitals
@@ -290,12 +298,12 @@ Eigen::MatrixXd PipekMezeyLocalization::localize(
     }
   this->obj_fun_ = Xi.cwiseProduct(Xi).sum();
   if (this->converged_)
-    spdlog::info(
+    QDK_LOGGER().info(
         "Pipek-Mezey Converged in {:6} sweeps with ObjectiveFunction = "
         "{:.6e}",
         i_sweep, this->obj_fun_);
   else
-    spdlog::info(
+    QDK_LOGGER().info(
         "Pipek-Mezey Failed to Converge in {:6} sweeps - Last "
         "ObjectiveFunction = {:.6e}",
         i_sweep, this->obj_fun_);

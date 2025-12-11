@@ -5,14 +5,11 @@
 # Licensed under the MIT License. See LICENSE.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
 
-from logging import getLogger
-
 import numpy as np
 
 from qdk_chemistry.algorithms import create
 from qdk_chemistry.data import Configuration, Hamiltonian, SciWavefunctionContainer, Wavefunction
-
-LOGGER = getLogger(__name__)
+from qdk_chemistry.utils import Logger
 
 __all__ = [
     "calculate_sparse_wavefunction",
@@ -34,6 +31,7 @@ def get_top_determinants(
         A dictionary containing (Configuration, CI coefficient) pairs consisting of the top determinants.
 
     """
+    Logger.trace_entering()
     coefficients = list(wavefunction.get_coefficients())
     determinants = wavefunction.get_active_determinants()
     pairs = sorted(zip(coefficients, determinants, strict=True), key=lambda pair: -abs(pair[0]))
@@ -53,6 +51,7 @@ def get_active_determinants_info(wavefunction: Wavefunction, max_determinants: i
         A formatted string listing CI coefficients and their corresponding configurations.
 
     """
+    Logger.trace_entering()
     info_str = ""
     info_str += f"Stored wavefunction with {wavefunction.size()} determinants\n"
     info_str += "Determinants:\n"
@@ -96,9 +95,10 @@ def calculate_sparse_wavefunction(
         Energy value and a Wavefunction object representing the sparse-CI wavefunction.
 
     """
+    Logger.trace_entering()
     ranked = get_top_determinants(reference_wavefunction, max_determinants)
     if not ranked:
-        LOGGER.warning("No determinants found; returning an empty wavefunction.")
+        Logger.warn("No determinants found; returning an empty wavefunction.")
         return Wavefunction(SciWavefunctionContainer(np.array([]), [], reference_wavefunction.get_orbitals()))
 
     projector = create("projected_multi_configuration_calculator", pmc_calculator)
@@ -126,17 +126,11 @@ def calculate_sparse_wavefunction(
     best_count = count
 
     if count == len(ranked_items) and not found:
-        LOGGER.warning(
-            "Sparse CI tolerance not reached with %s determinants; returning the full truncated set.",
-            best_count,
+        Logger.warn(
+            f"Sparse CI tolerance not reached with {best_count} determinants; returning the full truncated set."
         )
 
-    LOGGER.info(
-        "Sparse CI finder (%s dets) = %.8f Hartree (ΔE = %.4f mHartree)",
-        best_count,
-        best_energy,
-        diff * 1000.0,
-    )
+    Logger.info(f"Sparse CI finder ({best_count} dets) = {best_energy:.8f} Hartree (ΔE = {diff * 1000.0:.4f} mHartree)")
     determinants = list(best_wavefunction.get_active_determinants())
     coeffs = [best_wavefunction.get_coefficient(det) for det in determinants]
     sci_container = SciWavefunctionContainer(

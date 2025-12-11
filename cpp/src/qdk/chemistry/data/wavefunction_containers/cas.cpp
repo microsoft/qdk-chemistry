@@ -8,6 +8,7 @@
 #include <cmath>
 #include <memory>
 #include <qdk/chemistry/data/wavefunction_containers/cas.hpp>
+#include <qdk/chemistry/utils/logger.hpp>
 #include <stdexcept>
 #include <tuple>
 #include <variant>
@@ -31,7 +32,9 @@ CasWavefunctionContainer::CasWavefunctionContainer(
                                std::nullopt,  // two_rdm_aabb
                                std::nullopt,  // two_rdm_aaaa
                                std::nullopt,  // two_rdm_bbbb
-                               type) {}
+                               type) {
+  QDK_LOG_TRACE_ENTERING();
+}
 
 CasWavefunctionContainer::CasWavefunctionContainer(
     const VectorVariant& coeffs, const DeterminantVector& dets,
@@ -46,7 +49,9 @@ CasWavefunctionContainer::CasWavefunctionContainer(
                                std::nullopt,  // two_rdm_aabb
                                std::nullopt,  // two_rdm_aaaa
                                std::nullopt,  // two_rdm_bbbb
-                               type) {}
+                               type) {
+  QDK_LOG_TRACE_ENTERING();
+}
 
 CasWavefunctionContainer::CasWavefunctionContainer(
     const VectorVariant& coeffs, const DeterminantVector& dets,
@@ -62,9 +67,13 @@ CasWavefunctionContainer::CasWavefunctionContainer(
                             two_rdm_spin_traced, two_rdm_aabb, two_rdm_aaaa,
                             two_rdm_bbbb, type),
       _coefficients(coeffs),
-      _configuration_set(dets, orbitals) {}
+      _configuration_set(dets, orbitals) {
+  QDK_LOG_TRACE_ENTERING();
+}
 
 std::unique_ptr<WavefunctionContainer> CasWavefunctionContainer::clone() const {
+  QDK_LOG_TRACE_ENTERING();
+
   return std::make_unique<CasWavefunctionContainer>(
       _coefficients, _configuration_set.get_configurations(),
       this->get_orbitals(),
@@ -92,6 +101,7 @@ std::unique_ptr<WavefunctionContainer> CasWavefunctionContainer::clone() const {
 
 ScalarVariant CasWavefunctionContainer::get_coefficient(
     const Configuration& det) const {
+  QDK_LOG_TRACE_ENTERING();
   const auto& determinants = get_active_determinants();
   if (determinants.empty()) {
     throw std::runtime_error("No determinants available");
@@ -110,19 +120,25 @@ ScalarVariant CasWavefunctionContainer::get_coefficient(
 
 const CasWavefunctionContainer::VectorVariant&
 CasWavefunctionContainer::get_coefficients() const {
+  QDK_LOG_TRACE_ENTERING();
+
   return _coefficients;
 }
 
 std::shared_ptr<Orbitals> CasWavefunctionContainer::get_orbitals() const {
+  QDK_LOG_TRACE_ENTERING();
+
   return _configuration_set.get_orbitals();
 }
 
 const CasWavefunctionContainer::DeterminantVector&
 CasWavefunctionContainer::get_active_determinants() const {
+  QDK_LOG_TRACE_ENTERING();
   return _configuration_set.get_configurations();
 }
 
 size_t CasWavefunctionContainer::size() const {
+  QDK_LOG_TRACE_ENTERING();
   const auto& determinants = get_active_determinants();
   if (determinants.empty()) {
     return 0;  // Empty wavefunction has size 0
@@ -135,6 +151,8 @@ size_t CasWavefunctionContainer::size() const {
 
 CasWavefunctionContainer::ScalarVariant CasWavefunctionContainer::overlap(
     const WavefunctionContainer& other) const {
+  QDK_LOG_TRACE_ENTERING();
+
   // Check type of other.  If not CasWavefunctionContainer, throw error.
   const auto* other_cas = dynamic_cast<const CasWavefunctionContainer*>(&other);
   if (!other_cas) {
@@ -192,6 +210,8 @@ CasWavefunctionContainer::ScalarVariant CasWavefunctionContainer::overlap(
 }
 
 double CasWavefunctionContainer::norm() const {
+  QDK_LOG_TRACE_ENTERING();
+
   const auto& coeffs = this->get_coefficients();
   if (detail::is_vector_variant_complex(coeffs)) {
     const auto& complex_coeffs = std::get<Eigen::VectorXcd>(coeffs);
@@ -203,12 +223,16 @@ double CasWavefunctionContainer::norm() const {
 }
 
 void CasWavefunctionContainer::clear_caches() const {
+  QDK_LOG_TRACE_ENTERING();
+
   // Clear all cached RDMs
   _clear_rdms();
 }
 
 std::pair<size_t, size_t> CasWavefunctionContainer::get_total_num_electrons()
     const {
+  QDK_LOG_TRACE_ENTERING();
+
   // Get active space electrons using the dedicated method
   auto [n_alpha_active, n_beta_active] = get_active_num_electrons();
 
@@ -224,6 +248,7 @@ std::pair<size_t, size_t> CasWavefunctionContainer::get_total_num_electrons()
 
 std::pair<size_t, size_t> CasWavefunctionContainer::get_active_num_electrons()
     const {
+  QDK_LOG_TRACE_ENTERING();
   const auto& determinants = get_active_determinants();
   if (determinants.empty()) {
     throw std::runtime_error("No determinants available");
@@ -234,6 +259,7 @@ std::pair<size_t, size_t> CasWavefunctionContainer::get_active_num_electrons()
 
 std::pair<Eigen::VectorXd, Eigen::VectorXd>
 CasWavefunctionContainer::get_total_orbital_occupations() const {
+  QDK_LOG_TRACE_ENTERING();
   const auto& determinants = get_active_determinants();
   if (determinants.empty()) {
     throw std::runtime_error("No determinants available");
@@ -300,6 +326,7 @@ CasWavefunctionContainer::get_total_orbital_occupations() const {
 
 std::pair<Eigen::VectorXd, Eigen::VectorXd>
 CasWavefunctionContainer::get_active_orbital_occupations() const {
+  QDK_LOG_TRACE_ENTERING();
   const auto& determinants = get_active_determinants();
   if (determinants.empty()) {
     throw std::runtime_error("No determinants available");
@@ -381,14 +408,19 @@ CasWavefunctionContainer::get_active_orbital_occupations() const {
 }
 
 std::string CasWavefunctionContainer::get_container_type() const {
+  QDK_LOG_TRACE_ENTERING();
+
   return "cas";
 }
 
 bool CasWavefunctionContainer::is_complex() const {
+  QDK_LOG_TRACE_ENTERING();
   return detail::is_vector_variant_complex(_coefficients);
 }
 
 nlohmann::json CasWavefunctionContainer::to_json() const {
+  QDK_LOG_TRACE_ENTERING();
+
   nlohmann::json j;
 
   // Store version first
@@ -428,6 +460,8 @@ nlohmann::json CasWavefunctionContainer::to_json() const {
 
 std::unique_ptr<CasWavefunctionContainer> CasWavefunctionContainer::from_json(
     const nlohmann::json& j) {
+  QDK_LOG_TRACE_ENTERING();
+
   try {
     // Validate version first
     if (!j.contains("version")) {
@@ -502,6 +536,8 @@ std::unique_ptr<CasWavefunctionContainer> CasWavefunctionContainer::from_json(
 }
 
 void CasWavefunctionContainer::to_hdf5(H5::Group& group) const {
+  QDK_LOG_TRACE_ENTERING();
+
   try {
     H5::StrType string_type(H5::PredType::C_S1, H5T_VARIABLE);
 
@@ -715,6 +751,8 @@ void CasWavefunctionContainer::to_hdf5(H5::Group& group) const {
 
 std::unique_ptr<CasWavefunctionContainer> CasWavefunctionContainer::from_hdf5(
     H5::Group& group) {
+  QDK_LOG_TRACE_ENTERING();
+
   try {
     // Check version first
     H5::StrType string_type(H5::PredType::C_S1, H5T_VARIABLE);

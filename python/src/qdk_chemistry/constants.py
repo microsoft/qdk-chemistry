@@ -1,8 +1,8 @@
 """QDK/Chemistry Physical Constants Module.
 
-This module provides access to physical constants from CODATA standards.
+This module provides access to physical constants from CODATA standards :cite:`Mohr2025`.
 The constants are sourced from the most recent CODATA recommendations
-(currently CODATA 2018), but the underlying C++ implementation supports
+(currently CODATA 2022), but the underlying C++ implementation supports
 multiple CODATA versions for compatibility and comparison purposes.
 
 All constants are provided in their original units as specified by CODATA,
@@ -14,8 +14,8 @@ and quantum mechanics.
 
 Data Source:
     CODATA recommended values of the fundamental physical constants
-    Currently using: CODATA 2018 (default)
-    Also available: CODATA 2014 (via C++ preprocessor directives)
+    Currently using: CODATA 2022 (default)
+    Also available: CODATA 2018, CODATA 2014 (via C++ preprocessor directives)
     https://physics.nist.gov/cuu/Constants/
 
 Constants Documentation:
@@ -76,7 +76,9 @@ from qdk_chemistry._core.constants import (
     ConstantInfo,
     get_constant_info,
     get_constants_info,
+    get_current_codata_version,
 )
+from qdk_chemistry.utils import Logger
 
 
 def list_constants(show_values: bool = True, show_units: bool = True) -> None:
@@ -91,12 +93,12 @@ def list_constants(show_values: bool = True, show_units: bool = True) -> None:
         >>> list_constants(show_values=False)  # Just names and descriptions
 
     """
+    Logger.trace_entering()
+    codata_version = get_current_codata_version()
     constants_info = get_constants_info()
 
-    # TODO (NAB):  change output to logger rather than print() here and elsewhere
-    # or just return strings workitem 41417
-    print("QDK/Chemistry Physical Constants (CODATA 2018)")
-    print("=" * 50)
+    constants_info_string = f"\nQDK/Chemistry Physical Constants ({codata_version})\n"
+    constants_info_string += "=" * 50 + "\n"
 
     # Group constants by category
     categories = {
@@ -121,8 +123,8 @@ def list_constants(show_values: bool = True, show_units: bool = True) -> None:
     }
 
     for category, constant_names in categories.items():
-        print(f"\n{category}:")
-        print("-" * len(category))
+        constants_info_string += f"\n{category}:\n"
+        constants_info_string += "-" * len(category) + "\n"
 
         for name in constant_names:
             if name in constants_info:
@@ -137,7 +139,8 @@ def list_constants(show_values: bool = True, show_units: bool = True) -> None:
                 if show_units and info.units:
                     line += f" {info.units}"
 
-                print(line)
+                constants_info_string += line + "\n"
+    Logger.info(constants_info_string)
 
 
 def find_constant(search_term: str) -> dict:
@@ -155,6 +158,7 @@ def find_constant(search_term: str) -> dict:
         >>> find_constant("energy")
 
     """
+    Logger.trace_entering()
     constants_info = get_constants_info()
     matches = {}
 
@@ -182,17 +186,20 @@ def show_constant_details(name: str) -> None:
         >>> show_constant_details('fine_structure_constant')
 
     """
+    Logger.trace_entering()
     try:
         info = get_constant_info(name)
-        print(f"Constant: {info.name}")
+        constant_details_string = f"\nConstant: {info.name}\n"
         if info.symbol:
-            print(f"Symbol: {info.symbol}")
-        print(f"Value: {info.value} {info.units}")
-        print(f"Description: {info.description}")
-        print(f"Source: {info.source}")
+            constant_details_string += f"Symbol: {info.symbol}\n"
+        constant_details_string += f"Value: {info.value} {info.units}\n"
+        constant_details_string += f"Description: {info.description}\n"
+        constant_details_string += f"Source: {info.source}\n"
+        Logger.info(constant_details_string)
     except KeyError:
-        print(f"Unknown constant: {name}")
-        print("Use list_constants() to see all available constants.")
+        error_msg = f"Unknown constant: {name}\n"
+        error_msg += "Use list_constants() to see all available constants.\n"
+        Logger.error(error_msg)
 
 
 # Make the new functions available
@@ -220,6 +227,7 @@ __all__ = [
     "find_constant",
     "get_constant_info",
     "get_constants_info",
+    "get_current_codata_version",
     "list_constants",
     "show_constant_details",
 ]

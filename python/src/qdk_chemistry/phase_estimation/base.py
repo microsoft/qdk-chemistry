@@ -17,6 +17,8 @@ from abc import ABC
 from enum import StrEnum
 from typing import TYPE_CHECKING, TypeVar, cast
 
+from qdk_chemistry.utils import Logger
+
 if TYPE_CHECKING:
     from collections.abc import Iterable
 
@@ -33,10 +35,8 @@ class PhaseEstimationAlgorithm(StrEnum):
     """Enumeration of supported phase estimation routines.
 
     References:
-        * Iterative QPE: Kitaev, A. (1995). "Quantum measurements and the Abelian
-            Stabilizer Problem." arXiv:quant-ph/9511026. https://arxiv.org/abs/quant-ph/9511026
-        * Traditional QPE: Nielsen, M. A., & Chuang, I. L. (2010). "Quantum Computation
-            and Quantum Information" (10th Anniversary Edition), Ch. 5.2.
+        * Iterative QPE: Kitaev, A. (1995). arXiv:quant-ph/9511026. :cite:`Kitaev1995`
+        * Traditional QPE: Nielsen, M. A., & Chuang, I. L. (2010). :cite:`Nielsen-Chuang2010-QPE`
 
     """
 
@@ -57,6 +57,7 @@ class PhaseEstimation(ABC):  # noqa: B024
             evolution_time: Time parameter ``t`` used in the time-evolution unitary ``U = exp(-i H t)``.
 
         """
+        Logger.trace_entering()
         self._hamiltonian = hamiltonian
         self._evolution_time = evolution_time
 
@@ -94,6 +95,7 @@ class PhaseEstimation(ABC):  # noqa: B024
             ValueError: If the requested algorithm is not registered.
 
         """
+        Logger.trace_entering()
         normalized_algorithm = cls._normalize_algorithm(algorithm)
 
         for subclass in cls._iter_subclasses():
