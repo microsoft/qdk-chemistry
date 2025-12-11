@@ -146,8 +146,14 @@ extends:
 
           - ${{ if eq(target.arch, 'aarch64') }}:
             - script: |
-                # On ARM nodes we need to adjust the permissions for this folder for SBoM generation
-                chmod -R u+w $(System.DefaultWorkingDirectory)/python/repaired_wheelhouse/
+                echo $PWD
+                echo "Contents of Agent.BuildDirectory:"
+                ls $(Agent.BuildDirectory)
+                echo "Contents of repaired_wheelhouse:"
+                ls -ld /mnt/vss/_work/1/qdk-chemistry/python/repaired_wheelhouse/
+                whoami
+                id
+              displayName: List built wheels
 
     - stage: Approval
       displayName: Approval
